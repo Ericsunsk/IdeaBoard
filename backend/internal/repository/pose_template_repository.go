@@ -20,7 +20,7 @@ func (r *PoseTemplateRepository) Create(tpl *model.PoseTemplate) error {
 
 func (r *PoseTemplateRepository) GetByID(id uint64) (*model.PoseTemplate, error) {
 	var tpl model.PoseTemplate
-	if err := r.db.Where("id = ?", id).First(&tpl).Error; err != nil {
+	if err := findByID(r.db, id, &tpl); err != nil {
 		return nil, err
 	}
 	return &tpl, nil
@@ -28,12 +28,8 @@ func (r *PoseTemplateRepository) GetByID(id uint64) (*model.PoseTemplate, error)
 
 func (r *PoseTemplateRepository) List(page, pageSize int) ([]*model.PoseTemplate, int64, error) {
 	var list []*model.PoseTemplate
-	var total int64
-	if err := r.db.Model(&model.PoseTemplate{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-	offset := (page - 1) * pageSize
-	if err := r.db.Offset(offset).Limit(pageSize).Order("sort_order ASC, id ASC").Find(&list).Error; err != nil {
+	total, err := listWithPagination(r.db, page, pageSize, &list)
+	if err != nil {
 		return nil, 0, err
 	}
 	return list, total, nil
@@ -41,7 +37,7 @@ func (r *PoseTemplateRepository) List(page, pageSize int) ([]*model.PoseTemplate
 
 func (r *PoseTemplateRepository) ListEnabled() ([]*model.PoseTemplate, error) {
 	var list []*model.PoseTemplate
-	err := r.db.Where("is_enabled = ?", true).Order("category ASC, sort_order ASC, id ASC").Find(&list).Error
+	err := listEnabledByCategory(r.db, &list)
 	return list, err
 }
 
@@ -50,5 +46,5 @@ func (r *PoseTemplateRepository) Update(tpl *model.PoseTemplate) error {
 }
 
 func (r *PoseTemplateRepository) Delete(id uint64) error {
-	return r.db.Delete(&model.PoseTemplate{}, id).Error
+	return deleteByID[model.PoseTemplate](r.db, id)
 }

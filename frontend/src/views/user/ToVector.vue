@@ -233,6 +233,7 @@ import { useUserStore } from '../../stores/user'
 import { vectorizeApi, taskApi } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 import { buildGalleryGroups } from '../../utils/galleryGroups'
+import { getTaskImageUrl as extractTaskImageUrl, stripFeaturePrefix } from '../../utils/task-history'
 import type { Task } from '../../api'
 
 const FEATURE_SLUG = 'to-vector'
@@ -243,12 +244,7 @@ const message = useMessage()
 const userStore = useUserStore()
 
 function stripPrefix(str?: string) {
-  if (!str) return ''
-  if (str.startsWith('[')) {
-    const idx = str.indexOf('] ')
-    if (idx > 0) return str.slice(idx + 2)
-  }
-  return str
+  return stripFeaturePrefix(str)
 }
 
 // ============ 参数 ============
@@ -304,7 +300,7 @@ const galleryTasks = computed(() => {
 })
 
 function getTaskImageUrl(task: Task): string {
-  try { return JSON.parse(task.result || '{}').image_url || '' } catch { return '' }
+  return extractTaskImageUrl(task)
 }
 
 async function loadHistory() {

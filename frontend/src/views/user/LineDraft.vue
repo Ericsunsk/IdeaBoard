@@ -251,6 +251,7 @@ import { buildGalleryGroups } from '../../utils/galleryGroups'
 import { taskApi, lineDraftApi } from '../../api/index'
 import type { Task } from '../../api/index'
 import { useUserStore } from '../../stores/user'
+import { getTaskImageUrl as extractTaskImageUrl } from '../../utils/task-history'
 
 const router = useRouter()
 const message = useMessage()
@@ -275,10 +276,7 @@ const galleryTasks = computed(() => {
 })
 
 function getTaskImageUrl(task: Task): string {
-  try {
-    const r = JSON.parse(task.result || '{}')
-    return r.image_url || ''
-  } catch { return '' }
+  return extractTaskImageUrl(task)
 }
 
 async function loadHistory() {

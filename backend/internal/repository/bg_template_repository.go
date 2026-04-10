@@ -20,7 +20,7 @@ func (r *BgTemplateRepository) Create(tpl *model.BgTemplate) error {
 
 func (r *BgTemplateRepository) GetByID(id uint64) (*model.BgTemplate, error) {
 	var tpl model.BgTemplate
-	err := r.db.Where("id = ?", id).First(&tpl).Error
+	err := findByID(r.db, id, &tpl)
 	if err != nil {
 		return nil, err
 	}
@@ -29,14 +29,8 @@ func (r *BgTemplateRepository) GetByID(id uint64) (*model.BgTemplate, error) {
 
 func (r *BgTemplateRepository) List(page, pageSize int) ([]*model.BgTemplate, int64, error) {
 	var list []*model.BgTemplate
-	var total int64
-
-	if err := r.db.Model(&model.BgTemplate{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	offset := (page - 1) * pageSize
-	if err := r.db.Offset(offset).Limit(pageSize).Order("sort_order ASC, id ASC").Find(&list).Error; err != nil {
+	total, err := listWithPagination(r.db, page, pageSize, &list)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -46,7 +40,7 @@ func (r *BgTemplateRepository) List(page, pageSize int) ([]*model.BgTemplate, in
 // ListEnabled 获取已上架的背景模板（用户端）
 func (r *BgTemplateRepository) ListEnabled() ([]*model.BgTemplate, error) {
 	var list []*model.BgTemplate
-	err := r.db.Where("is_enabled = ?", true).Order("category ASC, sort_order ASC, id ASC").Find(&list).Error
+	err := listEnabledByCategory(r.db, &list)
 	return list, err
 }
 
@@ -55,5 +49,5 @@ func (r *BgTemplateRepository) Update(tpl *model.BgTemplate) error {
 }
 
 func (r *BgTemplateRepository) Delete(id uint64) error {
-	return r.db.Delete(&model.BgTemplate{}, id).Error
+	return deleteByID[model.BgTemplate](r.db, id)
 }

@@ -517,6 +517,7 @@ import type { StyleCard, Task } from '../../api/index'
 import { useUserStore } from '../../stores/user'
 import ImageUploader from '../../components/ImageUploader.vue'
 import { buildGalleryGroups } from '../../utils/galleryGroups'
+import { downloadImageByProxy, getTaskImageUrl as extractTaskImageUrl } from '../../utils/task-history'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -544,7 +545,7 @@ const galleryTasks = computed(() =>
 )
 
 function getTaskImageUrl(task: Task): string {
-  try { return JSON.parse(task.result || '{}').image_url || '' } catch { return '' }
+  return extractTaskImageUrl(task)
 }
 
 // ============ 图片尺寸 ============
@@ -736,14 +737,7 @@ function openLightbox(url?: string) {
 }
 
 function downloadImage(url?: string, _name?: string) {
-  if (!url) return
-  const proxyUrl = '/api/user/download?url=' + encodeURIComponent(url)
-  const a = document.createElement('a')
-  a.href = proxyUrl
-  a.download = 'image.png'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  downloadImageByProxy(url)
   message.success('下载已开始')
 }
 

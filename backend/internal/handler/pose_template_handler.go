@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"backend/internal/model"
 	"backend/internal/repository"
 	"backend/pkg/response"
@@ -30,16 +28,7 @@ func (h *PoseTemplateHandler) ListEnabled(c *gin.Context) {
 
 // List 管理端列表
 func (h *PoseTemplateHandler) List(c *gin.Context) {
-	pageStr := c.DefaultQuery("page", "1")
-	pageSizeStr := c.DefaultQuery("page_size", "50")
-	page, _ := strconv.Atoi(pageStr)
-	pageSize, _ := strconv.Atoi(pageSizeStr)
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 50
-	}
+	page, pageSize := parsePageQuery(c, 100)
 	list, total, err := h.repo.List(page, pageSize)
 	if err != nil {
 		response.Error(c, 500, "获取列表失败")
@@ -51,8 +40,7 @@ func (h *PoseTemplateHandler) List(c *gin.Context) {
 // Create 创建
 func (h *PoseTemplateHandler) Create(c *gin.Context) {
 	var req model.CreatePoseTemplateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+	if !bindJSON(c, &req) {
 		return
 	}
 	tpl := &model.PoseTemplate{
@@ -68,14 +56,12 @@ func (h *PoseTemplateHandler) Create(c *gin.Context) {
 
 // Update 更新
 func (h *PoseTemplateHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		response.Error(c, 400, "无效的ID")
+	id, ok := parseIDParam(c)
+	if !ok {
 		return
 	}
 	var req model.UpdatePoseTemplateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+	if !bindJSON(c, &req) {
 		return
 	}
 	tpl, err := h.repo.GetByID(id)
@@ -97,9 +83,8 @@ func (h *PoseTemplateHandler) Update(c *gin.Context) {
 
 // Delete 删除
 func (h *PoseTemplateHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		response.Error(c, 400, "无效的ID")
+	id, ok := parseIDParam(c)
+	if !ok {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {

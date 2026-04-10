@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"backend/internal/model"
 	"backend/internal/repository"
 	"backend/pkg/response"
@@ -34,16 +32,7 @@ func (h *FaceTemplateHandler) ListEnabled(c *gin.Context) {
 
 // List 获取人脸模板列表
 func (h *FaceTemplateHandler) List(c *gin.Context) {
-	pageStr := c.DefaultQuery("page", "1")
-	pageSizeStr := c.DefaultQuery("page_size", "50")
-	page, _ := strconv.Atoi(pageStr)
-	pageSize, _ := strconv.Atoi(pageSizeStr)
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 50
-	}
+	page, pageSize := parsePageQuery(c, 100)
 	list, total, err := h.repo.List(page, pageSize)
 	if err != nil {
 		response.Error(c, 500, "获取列表失败")
@@ -55,8 +44,7 @@ func (h *FaceTemplateHandler) List(c *gin.Context) {
 // Create 创建人脸模板
 func (h *FaceTemplateHandler) Create(c *gin.Context) {
 	var req model.CreateFaceTemplateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+	if !bindJSON(c, &req) {
 		return
 	}
 	tpl := &model.FaceTemplate{
@@ -75,15 +63,12 @@ func (h *FaceTemplateHandler) Create(c *gin.Context) {
 
 // Update 更新人脸模板
 func (h *FaceTemplateHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil || id == 0 {
-		response.Error(c, 400, "无效的ID")
+	id, ok := parseIDParam(c)
+	if !ok {
 		return
 	}
 	var req model.UpdateFaceTemplateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+	if !bindJSON(c, &req) {
 		return
 	}
 	tpl, err := h.repo.GetByID(id)
@@ -105,10 +90,8 @@ func (h *FaceTemplateHandler) Update(c *gin.Context) {
 
 // Delete 删除人脸模板
 func (h *FaceTemplateHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil || id == 0 {
-		response.Error(c, 400, "无效的ID")
+	id, ok := parseIDParam(c)
+	if !ok {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {

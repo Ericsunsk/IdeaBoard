@@ -357,6 +357,12 @@ import { useUserStore } from '../../stores/user'
 import { taskApi, uploadApi } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 import { buildGalleryGroups } from '../../utils/galleryGroups'
+import {
+  downloadImageByProxy,
+  getTaskImageUrl,
+  isCompletedFeatureTaskWithImage,
+  stripFeaturePrefix,
+} from '../../utils/task-history'
 import type { Task } from '../../api'
 
 const FEATURE_SLUG = 'pattern-inpaint'
@@ -367,30 +373,13 @@ const router = useRouter()
 const message = useMessage()
 const userStore = useUserStore()
 
-function stripPrefix(str?: string) {
-  if (!str) return ''
-  if (str.startsWith('[')) {
-    const idx = str.indexOf('] ')
-    if (idx > 0) return str.slice(idx + 2)
-  }
-  return str
-}
+const stripPrefix = stripFeaturePrefix
 
 // ============ 画廊 ============
 const historyTasks = ref<Task[]>([])
 const activeTaskId = ref<string | null>(null)
 
-const galleryTasks = computed(() =>
-  historyTasks.value.filter(t => {
-    if (t.status !== 'completed') return false
-    if (!t.prompt || !t.prompt.startsWith(FEATURE_PREFIX)) return false
-    try { return !!JSON.parse(t.result || '{}').image_url } catch { return false }
-  })
-)
-
-function getTaskImageUrl(task: Task): string {
-  try { return JSON.parse(task.result || '{}').image_url || '' } catch { return '' }
-}
+const galleryTasks = computed(() => historyTasks.value.filter(t => isCompletedFeatureTaskWithImage(t, FEATURE_PREFIX)))
 
 async function loadHistory() {
   try {
@@ -1120,12 +1109,7 @@ function handleImgError(e: Event) {
 }
 
 function downloadImage(url?: string) {
-  if (!url) return
-  const proxyUrl = '/api/user/download?url=' + encodeURIComponent(url)
-  const a = document.createElement('a')
-  a.href = proxyUrl
-  a.download = 'image.png'
-  a.click()
+  downloadImageByProxy(url)
 }
 
 // ============ 生命周期 ============

@@ -35,11 +35,11 @@
               <div v-else class="cover-placeholder">暂无封面</div>
             </div>
             <n-upload
-              :action="'/api/admin/upload'"
+              :action="adminUploadAction"
               :headers="uploadHeaders"
               :max="1"
               :show-file-list="false"
-              accept="image/jpeg,image/png,image/gif,image/webp"
+              :accept="IMAGE_UPLOAD_ACCEPT_EXTENDED"
               @finish="handleUploadFinish"
               @before-upload="() => { uploading = true; return true }"
             >
@@ -108,6 +108,8 @@ import {
 } from 'naive-ui'
 import type { UploadFileInfo } from 'naive-ui'
 import { lineDraftApi } from '../../api/index'
+import { IMAGE_UPLOAD_ACCEPT_EXTENDED, UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../constants/media'
+import { adminUploadAction, parseAdminUploadResponse, useAdminUploadHeaders } from '../../utils/admin-upload'
 
 const message = useMessage()
 
@@ -177,10 +179,7 @@ const formData = ref({ name: '', cover_image: '', prompt: '', sort_order: 0, is_
 const editingId = ref<number | null>(null)
 const uploading = ref(false)
 
-const uploadHeaders = computed(() => {
-  const token = localStorage.getItem('token') || ''
-  return { Authorization: 'Bearer ' + token }
-})
+const uploadHeaders = useAdminUploadHeaders()
 
 function openAddModal() {
   isEditing.value = false
@@ -204,16 +203,12 @@ function openEditModal(row: any) {
 
 function handleUploadFinish({ file, event }: { file: UploadFileInfo; event?: ProgressEvent }) {
   uploading.value = false
-  try {
-    const res = JSON.parse((event?.target as XMLHttpRequest).response)
-    if (res.code === 0) {
-      formData.value.cover_image = res.data.url
-      message.success('上传成功')
-    } else {
-      message.error(res.msg || '上传失败')
-    }
-  } catch {
-    message.error('上传失败')
+  const res = parseAdminUploadResponse(event)
+  if (res.code === 0 && res.data?.url) {
+    formData.value.cover_image = res.data.url
+    message.success(UPLOAD_SUCCESS_MESSAGE)
+  } else {
+    message.error(res.msg || UPLOAD_FAILED_MESSAGE)
   }
   return file
 }

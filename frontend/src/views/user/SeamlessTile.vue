@@ -157,6 +157,7 @@ import { useUserStore } from '../../stores/user'
 import { taskApi } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 import { buildGalleryGroups } from '../../utils/galleryGroups'
+import { downloadImageByProxy, getTaskImageUrl as extractTaskImageUrl, stripFeaturePrefix } from '../../utils/task-history'
 import type { Task } from '../../api'
 
 const message = useMessage()
@@ -170,7 +171,9 @@ const STYLE_SLUG_MAP: Record<string, string> = {
 // 用于画廊匹配：同时匹配两种风格的任务
 const FEATURE_PREFIXES = ['[seamless-tile-classic] ', '[seamless-tile-cartoon] ']
 function isMyTask(prompt?: string) { if (!prompt) return false; return FEATURE_PREFIXES.some(p => prompt.startsWith(p)) }
-function stripPrefix(s?: string) { if (!s) return ''; const i = s.indexOf('] '); return s.startsWith('[') && i > 0 ? s.slice(i + 2) : s }
+function stripPrefix(str?: string) {
+  return stripFeaturePrefix(str)
+}
 
 // ============ ① 上传原图 ============
 const sourceImages = ref<string[]>([])
@@ -201,7 +204,9 @@ const selectedQuality = ref('1k')
 const historyTasks = ref<Task[]>([])
 const activeTaskId = ref<string | null>(null)
 const galleryTasks = computed(() => historyTasks.value.filter(t => { if (t.status !== 'completed') return false; if (!isMyTask(t.prompt)) return false; try { return !!JSON.parse(t.result || '{}').image_url } catch { return false } }))
-function getTaskImageUrl(t: Task): string { try { return JSON.parse(t.result || '{}').image_url || '' } catch { return '' } }
+function getTaskImageUrl(task: Task): string {
+  return extractTaskImageUrl(task)
+}
 async function loadHistory() { if (!userStore.isLoggedIn) return; try { const r: any = await taskApi.list({ page: 1, page_size: 200 }); if (r.code === 0) { historyTasks.value = r.data.list || []; if (messages.value.length === 0) rebuildMessages() } } catch {} }
 function rebuildMessages() {
   const tasks = historyTasks.value.filter(t => isMyTask(t.prompt)).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).slice(-20)
@@ -267,7 +272,9 @@ async function pollTask(taskId: string, aMsg: ChatMessage) {
 
 function resetAll() { sourceImages.value = []; selectedStyle.value = ''; userPrompt.value = ''; selectedRatio.value = '1:1'; imageCount.value = 1; selectedQuality.value = '1k' }
 function handleImgError(e: Event) { (e.target as HTMLImageElement).style.background = '#27272a' }
-function downloadImage(url?: string) { if (!url) return; const a = document.createElement('a'); a.href = '/api/user/download?url=' + encodeURIComponent(url); a.download = 'image.png'; a.click() }
+function downloadImage(url?: string) {
+  downloadImageByProxy(url)
+}
 
 onMounted(() => { if (userStore.isLoggedIn) loadHistory() })
 onUnmounted(() => { if (pollTimer) clearTimeout(pollTimer) })

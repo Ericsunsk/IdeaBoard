@@ -380,6 +380,7 @@ import { useUserStore } from '../../stores/user'
 import { taskApi, uploadApi } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 import { buildGalleryGroups } from '../../utils/galleryGroups'
+import { downloadImageByProxy, getTaskImageUrl as extractTaskImageUrl, stripFeaturePrefix } from '../../utils/task-history'
 import type { Task } from '../../api'
 
 const FEATURE_SLUG = 'directed-recolor'
@@ -391,12 +392,7 @@ const message = useMessage()
 const userStore = useUserStore()
 
 function stripPrefix(str?: string) {
-  if (!str) return ''
-  if (str.startsWith('[')) {
-    const idx = str.indexOf('] ')
-    if (idx > 0) return str.slice(idx + 2)
-  }
-  return str
+  return stripFeaturePrefix(str)
 }
 
 // ============ 画廊 ============
@@ -412,7 +408,7 @@ const galleryTasks = computed(() =>
 )
 
 function getTaskImageUrl(task: Task): string {
-  try { return JSON.parse(task.result || '{}').image_url || '' } catch { return '' }
+  return extractTaskImageUrl(task)
 }
 
 async function loadHistory() {
@@ -913,8 +909,7 @@ function handleClear() {
 
 function handleImgError(e: Event) { const img = e.target as HTMLImageElement; img.style.background = '#27272a' }
 function downloadImage(url?: string) {
-  if (!url) return; const proxyUrl = '/api/user/download?url=' + encodeURIComponent(url)
-  const a = document.createElement('a'); a.href = proxyUrl; a.download = 'image.png'; a.click()
+  downloadImageByProxy(url)
 }
 
 // ============ 生命周期 ============

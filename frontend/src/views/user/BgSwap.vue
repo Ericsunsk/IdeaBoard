@@ -242,6 +242,7 @@ import { useUserStore } from '../../stores/user'
 import { taskApi, segApi, uploadApi, bgTemplateApi } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 import { buildGalleryGroups } from '../../utils/galleryGroups'
+import { downloadImageByProxy, getTaskImageUrl as extractTaskImageUrl, stripFeaturePrefix } from '../../utils/task-history'
 import type { Task } from '../../api'
 
 const FEATURE_SLUG = 'bg-swap'
@@ -252,13 +253,17 @@ const router = useRouter()
 const message = useMessage()
 const userStore = useUserStore()
 
-function stripPrefix(str?: string) { if (!str) return ''; if (str.startsWith('[')) { const idx = str.indexOf('] '); if (idx > 0) return str.slice(idx + 2) }; return str }
+function stripPrefix(str?: string) {
+  return stripFeaturePrefix(str)
+}
 
 // ============ 画廊 ============
 const historyTasks = ref<Task[]>([])
 const activeTaskId = ref<string | null>(null)
 const galleryTasks = computed(() => historyTasks.value.filter(t => { if (t.status !== 'completed') return false; if (!t.prompt || !t.prompt.startsWith(FEATURE_PREFIX)) return false; try { return !!JSON.parse(t.result || '{}').image_url } catch { return false } }))
-function getTaskImageUrl(task: Task): string { try { return JSON.parse(task.result || '{}').image_url || '' } catch { return '' } }
+function getTaskImageUrl(task: Task): string {
+  return extractTaskImageUrl(task)
+}
 
 async function loadHistory() { try { const res: any = await taskApi.list({ page: 1, page_size: 200 }); if (res.code === 0) { historyTasks.value = res.data.list || []; if (messages.value.length === 0) rebuildMessagesFromHistory() } } catch {} }
 
@@ -645,7 +650,9 @@ function handleClear() {
 }
 
 function handleImgError(e: Event) { (e.target as HTMLImageElement).style.background = '#27272a' }
-function downloadImage(url?: string) { if (!url) return; const a = document.createElement('a'); a.href = '/api/user/download?url=' + encodeURIComponent(url); a.download = 'image.png'; a.click() }
+function downloadImage(url?: string) {
+  downloadImageByProxy(url)
+}
 
 onMounted(() => {
   if (userStore.isLoggedIn) {

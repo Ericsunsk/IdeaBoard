@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"backend/internal/model"
 	"backend/internal/repository"
 	"backend/pkg/response"
@@ -55,8 +53,7 @@ func (h *LineDraftHandler) List(c *gin.Context) {
 // Create 创建线稿模式
 func (h *LineDraftHandler) Create(c *gin.Context) {
 	var req model.CreateLineDraftModeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+	if !bindJSON(c, &req) {
 		return
 	}
 	mode := &model.LineDraftMode{
@@ -75,14 +72,12 @@ func (h *LineDraftHandler) Create(c *gin.Context) {
 
 // Update 更新线稿模式
 func (h *LineDraftHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		response.Error(c, 400, "无效的ID")
+	id, ok := parseIDParam(c)
+	if !ok {
 		return
 	}
 	var req model.UpdateLineDraftModeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+	if !bindJSON(c, &req) {
 		return
 	}
 	mode, err := h.repo.GetByID(id)
@@ -104,9 +99,8 @@ func (h *LineDraftHandler) Update(c *gin.Context) {
 
 // Delete 删除线稿模式
 func (h *LineDraftHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		response.Error(c, 400, "无效的ID")
+	id, ok := parseIDParam(c)
+	if !ok {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {

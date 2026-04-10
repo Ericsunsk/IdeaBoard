@@ -20,7 +20,7 @@ func (r *LineDraftModeRepository) Create(mode *model.LineDraftMode) error {
 
 func (r *LineDraftModeRepository) GetByID(id uint64) (*model.LineDraftMode, error) {
 	var mode model.LineDraftMode
-	err := r.db.Where("id = ?", id).First(&mode).Error
+	err := findByID(r.db, id, &mode)
 	if err != nil {
 		return nil, err
 	}
@@ -29,13 +29,13 @@ func (r *LineDraftModeRepository) GetByID(id uint64) (*model.LineDraftMode, erro
 
 func (r *LineDraftModeRepository) List() ([]*model.LineDraftMode, error) {
 	var modes []*model.LineDraftMode
-	err := r.db.Order("sort_order ASC, id ASC").Find(&modes).Error
+	err := listAllOrdered(r.db, &modes)
 	return modes, err
 }
 
 func (r *LineDraftModeRepository) ListEnabled() ([]*model.LineDraftMode, error) {
 	var modes []*model.LineDraftMode
-	err := r.db.Where("is_enabled = ?", true).Order("sort_order ASC, id ASC").Find(&modes).Error
+	err := listEnabledOrdered(r.db, &modes)
 	return modes, err
 }
 
@@ -44,5 +44,5 @@ func (r *LineDraftModeRepository) Update(mode *model.LineDraftMode) error {
 }
 
 func (r *LineDraftModeRepository) Delete(id uint64) error {
-	return r.db.Delete(&model.LineDraftMode{}, id).Error
+	return deleteByID[model.LineDraftMode](r.db, id)
 }

@@ -34,7 +34,7 @@
               <img v-if="formData.image_url" :src="formData.image_url" alt="模特预览" @error="e => (e.target as HTMLImageElement).style.display='none'" />
               <div v-else class="cover-placeholder">暂无图片</div>
             </div>
-            <n-upload :action="'/api/admin/upload'" :headers="uploadHeaders" :max="1" :show-file-list="false" accept="image/jpeg,image/png" @finish="handleUploadFinish" @before-upload="() => { uploading = true; return true }">
+            <n-upload :action="adminUploadAction" :headers="uploadHeaders" :max="1" :show-file-list="false" :accept="IMAGE_UPLOAD_ACCEPT" @finish="handleUploadFinish" @before-upload="() => { uploading = true; return true }">
               <n-button :loading="uploading" secondary>
                 <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></template>
                 {{ formData.image_url ? '重新上传' : '上传图片' }}
@@ -62,6 +62,8 @@ import { ref, computed, onMounted, h } from 'vue'
 import { NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem, NInput, NSwitch, NGrid, NGi, NInputNumber, NUpload, useMessage } from 'naive-ui'
 import type { UploadFileInfo } from 'naive-ui'
 import { modelTemplateApi } from '../../api/index'
+import { IMAGE_UPLOAD_ACCEPT, UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../constants/media'
+import { adminUploadAction, parseAdminUploadResponse, useAdminUploadHeaders } from '../../utils/admin-upload'
 
 const message = useMessage()
 
@@ -119,15 +121,17 @@ const formData = ref({ name: '', image_url: '', category: 'female', sort_order: 
 const editingId = ref<number | null>(null)
 const uploading = ref(false)
 
-const uploadHeaders = computed(() => ({ Authorization: 'Bearer ' + (localStorage.getItem('token') || '') }))
+const uploadHeaders = useAdminUploadHeaders()
 
 function handleUploadFinish({ file, event }: { file: UploadFileInfo; event?: ProgressEvent }) {
   uploading.value = false
-  try {
-    const res = JSON.parse((event?.target as XMLHttpRequest)?.response || '{}')
-    if (res.code === 0 && res.data?.url) { formData.value.image_url = res.data.url; message.success('上传成功') }
-    else { message.error(res.msg || '上传失败') }
-  } catch { message.error('上传失败') }
+  const res = parseAdminUploadResponse(event)
+  if (res.code === 0 && res.data?.url) {
+    formData.value.image_url = res.data.url
+    message.success(UPLOAD_SUCCESS_MESSAGE)
+  } else {
+    message.error(res.msg || UPLOAD_FAILED_MESSAGE)
+  }
   return file
 }
 

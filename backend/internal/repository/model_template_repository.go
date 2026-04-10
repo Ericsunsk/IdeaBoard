@@ -20,7 +20,7 @@ func (r *ModelTemplateRepository) Create(tpl *model.ModelTemplate) error {
 
 func (r *ModelTemplateRepository) GetByID(id uint64) (*model.ModelTemplate, error) {
 	var tpl model.ModelTemplate
-	if err := r.db.Where("id = ?", id).First(&tpl).Error; err != nil {
+	if err := findByID(r.db, id, &tpl); err != nil {
 		return nil, err
 	}
 	return &tpl, nil
@@ -28,12 +28,8 @@ func (r *ModelTemplateRepository) GetByID(id uint64) (*model.ModelTemplate, erro
 
 func (r *ModelTemplateRepository) List(page, pageSize int) ([]*model.ModelTemplate, int64, error) {
 	var list []*model.ModelTemplate
-	var total int64
-	if err := r.db.Model(&model.ModelTemplate{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-	offset := (page - 1) * pageSize
-	if err := r.db.Offset(offset).Limit(pageSize).Order("sort_order ASC, id ASC").Find(&list).Error; err != nil {
+	total, err := listWithPagination(r.db, page, pageSize, &list)
+	if err != nil {
 		return nil, 0, err
 	}
 	return list, total, nil
@@ -41,7 +37,7 @@ func (r *ModelTemplateRepository) List(page, pageSize int) ([]*model.ModelTempla
 
 func (r *ModelTemplateRepository) ListEnabled() ([]*model.ModelTemplate, error) {
 	var list []*model.ModelTemplate
-	err := r.db.Where("is_enabled = ?", true).Order("category ASC, sort_order ASC, id ASC").Find(&list).Error
+	err := listEnabledByCategory(r.db, &list)
 	return list, err
 }
 
@@ -50,5 +46,5 @@ func (r *ModelTemplateRepository) Update(tpl *model.ModelTemplate) error {
 }
 
 func (r *ModelTemplateRepository) Delete(id uint64) error {
-	return r.db.Delete(&model.ModelTemplate{}, id).Error
+	return deleteByID[model.ModelTemplate](r.db, id)
 }

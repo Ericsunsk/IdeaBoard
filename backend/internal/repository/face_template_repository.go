@@ -20,7 +20,7 @@ func (r *FaceTemplateRepository) Create(tpl *model.FaceTemplate) error {
 
 func (r *FaceTemplateRepository) GetByID(id uint64) (*model.FaceTemplate, error) {
 	var tpl model.FaceTemplate
-	err := r.db.Where("id = ?", id).First(&tpl).Error
+	err := findByID(r.db, id, &tpl)
 	if err != nil {
 		return nil, err
 	}
@@ -29,14 +29,8 @@ func (r *FaceTemplateRepository) GetByID(id uint64) (*model.FaceTemplate, error)
 
 func (r *FaceTemplateRepository) List(page, pageSize int) ([]*model.FaceTemplate, int64, error) {
 	var list []*model.FaceTemplate
-	var total int64
-
-	if err := r.db.Model(&model.FaceTemplate{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	offset := (page - 1) * pageSize
-	if err := r.db.Offset(offset).Limit(pageSize).Order("sort_order ASC, id ASC").Find(&list).Error; err != nil {
+	total, err := listWithPagination(r.db, page, pageSize, &list)
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -46,7 +40,7 @@ func (r *FaceTemplateRepository) List(page, pageSize int) ([]*model.FaceTemplate
 // ListEnabled 获取已上架的人脸模板（用户端）
 func (r *FaceTemplateRepository) ListEnabled() ([]*model.FaceTemplate, error) {
 	var list []*model.FaceTemplate
-	err := r.db.Where("is_enabled = ?", true).Order("category ASC, sort_order ASC, id ASC").Find(&list).Error
+	err := listEnabledByCategory(r.db, &list)
 	return list, err
 }
 
@@ -55,5 +49,5 @@ func (r *FaceTemplateRepository) Update(tpl *model.FaceTemplate) error {
 }
 
 func (r *FaceTemplateRepository) Delete(id uint64) error {
-	return r.db.Delete(&model.FaceTemplate{}, id).Error
+	return deleteByID[model.FaceTemplate](r.db, id)
 }
