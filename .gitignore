@@ -1,0 +1,27 @@
+# ===== Frontend =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vscode/
+
+# ===== Backend =====
+backend/*.exe
+backend/*.exe~
+backend/feng-server
+backend/feng-server~
+backend/feng-server-linux
+backend/uploads/
+backend/*.log
+backend/test_upload.png
+backend/bin/
+
+# ===== OS / IDE =====
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== Env / Secrets =====
+.env
+.env.*
