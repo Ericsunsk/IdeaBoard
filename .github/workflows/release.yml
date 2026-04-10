@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要发布的 tag，例如 v0.01"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          if [ -z "$TAG" ]; then
+            echo "Release tag is empty"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.meta.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.4"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        shell: bash
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p "release/$TAG"
+          cd frontend
+          npm run build
+          tar -czf "../release/$TAG/frontend-dist-$TAG.tar.gz" dist
+
+      - name: Build backend binaries
+        shell: bash
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p "release/$TAG"
+          cd backend
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "../release/$TAG/feng-server-linux-amd64-$TAG" ./cmd/main.go
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o "../release/$TAG/feng-server-darwin-arm64-$TAG" ./cmd/main.go
+
+      - name: Generate release metadata
+        shell: bash
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          RELEASE_DIR="release/$TAG"
+          FRONTEND_VERSION="$(node -p "require('./frontend/package.json').version")"
+
+          {
+            echo "release=$TAG"
+            echo "commit=${GITHUB_SHA}"
+            echo "built_at=$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "frontend_package_version=${FRONTEND_VERSION}"
+          } > "$RELEASE_DIR/RELEASE_INFO.txt"
+
+          (
+            cd "$RELEASE_DIR"
+            sha256sum \
+              "feng-server-darwin-arm64-$TAG" \
+              "feng-server-linux-amd64-$TAG" \
+              "frontend-dist-$TAG.tar.gz" \
+              > SHA256SUMS.txt
+          )
+
+      - name: Generate release notes from changelog
+        shell: bash
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          RELEASE_DIR="release/$TAG"
+          NOTES_FILE="$RELEASE_DIR/RELEASE_NOTES.md"
+
+          {
+            echo "# FENG $TAG"
+            echo
+
+            awk -v tag="$TAG" '
+              $0 ~ "^## " tag "([[:space:]]|$)" { found=1; print; next }
+              /^## / && found { exit }
+              found { print }
+            ' CHANGELOG.md
+          } > "$NOTES_FILE"
+
+          if [ ! -s "$NOTES_FILE" ] || [ "$(wc -l < "$NOTES_FILE")" -le 2 ]; then
+            printf '# FENG %s\n\n自动发布版本 %s。\n' "$TAG" "$TAG" > "$NOTES_FILE"
+          fi
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          body_path: release/${{ steps.meta.outputs.tag }}/RELEASE_NOTES.md
+          files: |
+            release/${{ steps.meta.outputs.tag }}/feng-server-darwin-arm64-${{ steps.meta.outputs.tag }}
+            release/${{ steps.meta.outputs.tag }}/feng-server-linux-amd64-${{ steps.meta.outputs.tag }}
+            release/${{ steps.meta.outputs.tag }}/frontend-dist-${{ steps.meta.outputs.tag }}.tar.gz
+            release/${{ steps.meta.outputs.tag }}/RELEASE_INFO.txt
+            release/${{ steps.meta.outputs.tag }}/SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          make_latest: true

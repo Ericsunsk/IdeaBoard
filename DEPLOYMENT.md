@@ -198,7 +198,30 @@ WantedBy=multi-user.target
 5. `/uploads/*` 可访问
 6. 提交任务后状态可轮询
 
-## 10. 回滚建议
+## 10. GitHub Actions 自动发布
+
+仓库已支持自动发布 Workflow：
+
+1. 本地完成版本变更后，提交到 `main`
+2. 推送一个符合 `v*` 规则的 tag，例如：
+
+```bash
+git tag -a v0.02 -m "发布 v0.02"
+git push origin main
+git push origin v0.02
+```
+
+3. GitHub Actions 会自动执行：
+
+- 前端 `npm ci && npm run build`
+- 后端构建 `linux/amd64` 和 `darwin/arm64` 二进制
+- 生成 `RELEASE_INFO.txt`
+- 生成 `SHA256SUMS.txt`
+- 自动创建或更新对应 GitHub Release
+
+也支持在 GitHub Actions 页面通过 `workflow_dispatch` 手动输入 tag 重新发布。
+
+## 11. 回滚建议
 
 如果 `v0.01` 发布后要快速回滚：
 
@@ -207,7 +230,7 @@ WantedBy=multi-user.target
 3. 回滚时优先替换前后端文件，再重启后端进程
 4. 避免在回滚时做额外 schema 变更
 
-## 11. 当前版本说明
+## 12. 当前版本说明
 
 - Git Tag：`v0.01`
 - 前端包版本：`0.0.1`
