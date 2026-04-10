@@ -4,9 +4,23 @@ import type { User } from '../types'
 import { userApi, authApi } from '../api'
 import router from '../router'
 
+function readStoredUser(): User | null {
+  const raw = localStorage.getItem('user')
+  if (!raw) {
+    return null
+  }
+
+  try {
+    return JSON.parse(raw) as User
+  } catch {
+    localStorage.removeItem('user')
+    return null
+  }
+}
+
 export const useUserStore = defineStore('user', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
-  const user = ref<User | null>(JSON.parse(localStorage.getItem('user') || 'null'))
+  const user = ref<User | null>(readStoredUser())
 
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.role === 'admin')

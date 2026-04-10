@@ -141,9 +141,33 @@ func (r *RedisManager) PushGlobalQueue(ctx context.Context, task *GlobalQueueTas
 	return r.rdb.RPush(ctx, KeyGlobalQueue, string(data)).Err()
 }
 
+func (r *RedisManager) PushGlobalQueueFront(ctx context.Context, task *GlobalQueueTask) error {
+	data, err := json.Marshal(task)
+	if err != nil {
+		return err
+	}
+	return r.rdb.LPush(ctx, KeyGlobalQueue, string(data)).Err()
+}
+
 // PopGlobalQueue 弹出全局队列任务
 func (r *RedisManager) PopGlobalQueue(ctx context.Context) (*GlobalQueueTask, error) {
 	data, err := r.rdb.LPop(ctx, KeyGlobalQueue).Result()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var task GlobalQueueTask
+	if err := json.Unmarshal([]byte(data), &task); err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
+func (r *RedisManager) PopWaitQueue(ctx context.Context) (*GlobalQueueTask, error) {
+	data, err := r.rdb.LPop(ctx, KeyWaitQueue).Result()
 	if err == redis.Nil {
 		return nil, nil
 	}

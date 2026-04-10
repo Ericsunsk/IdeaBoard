@@ -107,9 +107,11 @@ type UpdateAccountRequest struct {
 }
 
 type SubmitTaskRequest struct {
-	Prompt  string                 `json:"prompt" binding:"required"`
-	CardIDs []uint64               `json:"card_ids"` // 用户选中的风格卡片 ID
-	Params  map[string]interface{} `json:"params"`
+	Prompt    string                 `json:"prompt" binding:"required"`
+	CardIDs   []uint64               `json:"card_ids"` // 用户选中的风格卡片 ID
+	Feature   string                 `json:"feature"`
+	ImageURLs []string               `json:"image_urls"`
+	Params    map[string]interface{} `json:"params"`
 }
 
 // 列表响应

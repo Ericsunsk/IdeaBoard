@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import type { User } from '../types'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -184,10 +185,23 @@ const router = createRouter({
   routes
 })
 
+function readStoredUser(): User | null {
+  const userStr = localStorage.getItem('user')
+  if (!userStr) {
+    return null
+  }
+
+  try {
+    return JSON.parse(userStr) as User
+  } catch {
+    localStorage.removeItem('user')
+    return null
+  }
+}
+
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  const userStr = localStorage.getItem('user')
-  const user = userStr ? JSON.parse(userStr) : null
+  const user = readStoredUser()
 
   const isAdminRoute = to.path.startsWith('/admin')
 

@@ -1,10 +1,11 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
+	"time"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	imageenhan "github.com/alibabacloud-go/imageenhan-20190930/v3/client"
@@ -15,6 +16,7 @@ import (
 
 	"backend/internal/model"
 	"backend/internal/repository"
+	"backend/pkg/safehttp"
 )
 
 const aliyunSegConfigKey = "aliyun_seg_config"
@@ -63,7 +65,7 @@ func (s *SegService) createClient(cfg *model.AliyunSegConfig) (*imageseg.Client,
 
 // fetchImageStream 从 URL 获取图片流
 func fetchImageStream(imageURL string) (io.ReadCloser, error) {
-	resp, err := http.Get(imageURL)
+	resp, err := safehttp.Get(context.Background(), imageURL, 20*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("获取图片失败: %v", err)
 	}

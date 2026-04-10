@@ -200,8 +200,9 @@ func (h *AccountHandler) GetUserTasks(c *gin.Context) {
 
 // GetUserTask 用户端获取单个任务详情（隐藏内部关键词）
 func (h *AccountHandler) GetUserTask(c *gin.Context) {
+	userID := c.GetUint64("user_id")
 	taskID := c.Param("task_id")
-	task, err := h.accountService.GetTask(taskID)
+	task, err := h.accountService.GetUserTask(taskID, userID)
 	if err != nil {
 		response.Error(c, 404, "任务不存在")
 		return

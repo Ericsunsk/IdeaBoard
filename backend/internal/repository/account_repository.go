@@ -102,6 +102,14 @@ func (r *TaskRepository) GetByTaskID(taskID string) (*model.Task, error) {
 	return &task, nil
 }
 
+func (r *TaskRepository) GetByTaskIDAndUserID(taskID string, userID uint64) (*model.Task, error) {
+	var task model.Task
+	if err := r.db.Where("task_id = ? AND user_id = ?", taskID, userID).First(&task).Error; err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
 func (r *TaskRepository) GetByID(id uint64) (*model.Task, error) {
 	var task model.Task
 	if err := r.db.First(&task, id).Error; err != nil {
@@ -159,6 +167,17 @@ func (r *TaskRepository) GetByUserID(userID uint64, page, pageSize int) ([]*mode
 
 func (r *TaskRepository) DeleteByTaskIDAndUserID(taskID string, userID uint64) error {
 	return r.db.Where("task_id = ? AND user_id = ?", taskID, userID).Delete(&model.Task{}).Error
+}
+
+func (r *TaskRepository) MarkQueueFailed(taskID string, errMsg string) error {
+	now := time.Now()
+	return r.db.Model(&model.Task{}).
+		Where("task_id = ?", taskID).
+		Updates(map[string]interface{}{
+			"status":       "failed",
+			"error_msg":    errMsg,
+			"completed_at": now,
+		}).Error
 }
 
 // FailRunningByAccountID 将指定账号下所有 running/pending 状态的任务标记为 failed

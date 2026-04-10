@@ -125,10 +125,10 @@ interface TaskItem {
   task_id: string
   status: string
   prompt: string
-  retry_count: number
-  error_msg: string
+  retry_count?: number
+  error_msg?: string
   created_at: string
-  completed_at?: string
+  completed_at?: string | null
 }
 
 const userStore = useUserStore()

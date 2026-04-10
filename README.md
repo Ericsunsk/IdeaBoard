@@ -1,212 +1,138 @@
 # FENG — AI 服装设计平台
 
-一个面向服装行业的 AI 辅助设计平台，提供从线稿到成品的全链路 AI 设计工具。采用 **Vue 3 + Golang** 全栈技术架构。
-
----
+FENG 是一个面向服装行业的 Web 应用，提供从线稿、款式创新到图案处理的 AI 辅助设计能力。当前仓库采用 `Vue 3 + Vite + TypeScript` 前端，以及 `Golang + Gin + GORM + Redis` 后端。
 
 ## 技术栈
 
 ### 前端
 
-- **Vue 3** — Composition API + `<script setup>`
-- **Vite** — 构建与开发服务器
-- **Naive UI** — 组件库
-- **TypeScript** — 类型安全
-- **Vue Router** — 路由管理
-- **Pinia** — 状态管理
+- `Vue 3`
+- `Vite`
+- `TypeScript`
+- `Naive UI`
+- `Vue Router`
+- `Pinia`
 
 ### 后端
 
-- **Golang** — 高性能后端
-- **Gin** — HTTP 框架
-- **GORM** — ORM
-- **MySQL 5.7** — 关系型数据库
-- **Redis 7** — 缓存 & 任务队列
+- `Golang`
+- `Gin`
+- `GORM`
+- `MySQL 5.7`
+- `Redis 7`
 
----
+## 功能与路由
 
-## 功能模块
+用户端页面统一挂载在 `/user/*`，管理后台挂载在 `/admin/*`。
 
-### 图・文生图
+### 用户端
 
-基础的文本/图片生成功能，支持自由创作。
-
-### 服装实验室
-
-| 功能 | 路由 | 说明 |
+| 模块 | 路由 | 说明 |
 |------|------|------|
-| 线稿生成 | `/sketch-gen` | 从服装图片生成线稿 |
-| 线稿成款 | `/sketch-to-design` | 从线稿生成服装效果图 |
-| 局部改款 | `/partial-edit` | 涂抹选区 + 文字描述局部修改 |
-| 款式创新 | `/style-innovate` | 基于原图进行款式变化 |
-| 风格融合 | `/style-fusion` | 将参考图风格融合到原图 |
-| 系列配色 | `/series-color` | 为服装生成系列配色方案 |
-| 定向换色 | `/directed-recolor` | 涂抹选区 + 选择目标颜色精准换色 |
-| 面料上身 | `/fabric-on-body` | 将面料贴合到服装上 |
-| 图案上身 | `/pattern-on-body` | 将图案贴合到服装上 |
-
-### 摄影商拍
-
-| 功能 | 路由 | 说明 |
-|------|------|------|
-| 模特多角度 | `/multi-angle` | 生成模特多角度展示图 |
-| 虚拟 3D | `/virtual-3d` | 服装 3D 虚拟展示 |
-| 人台变模特 | `/mannequin-to-model` | 人台展示图转为模特上身图 |
-| 定向换脸 | `/face-swap` | 模特换脸 |
-| 换背景 | `/bg-swap` | 更换拍摄背景 |
-| 款式上身 | `/garment-on-model` | 服装虚拟试穿 |
-| 款式上身 Pro | `/garment-on-model-pro` | 高精度服装虚拟试穿 |
-
-### 图案工作室
-
-| 功能 | 路由 | 说明 |
-|------|------|------|
-| 图案生成 | `/pattern-gen` | AI 生成原创图案 |
-| 画风复刻 | `/style-clone` | 复刻参考图画风 |
-| 四方连续 | `/seamless-tile` | 生成无缝拼接图案 |
-| 图案融合 | `/pattern-fusion` | 多图案融合 |
-| 工艺融合 | `/craft-fusion` | 将工艺效果融入图案 |
-| 图案涂改 | `/pattern-inpaint` | 局部修改图案 |
-| 图案变清晰 | `/pattern-upscale` | 图案超分辨率（阿里云 ImageEnhance 超分 API，后端已接入） |
-
-### AI 工具箱
-
-| 功能 | 路由 | 说明 |
-|------|------|------|
-| 转矢量图 | `/to-vector` | 位图转矢量（后端调用 potrace 输出 SVG，支持参数调节） |
-| 抠图褪底 | `/remove-bg` | 智能抠图去背景 |
-| 高清放大 | `/hd-upscale` | 图片超分辨率放大 |
-| 模糊变清晰 | `/deblur` | 图片去模糊 |
-| 画布延伸 | `/canvas-extend` | AI 扩展画布 |
+| 首页 | `/user/home` | 图文生图入口 |
+| 用户中心 | `/user/center` | 账号信息、密码修改、任务查看 |
+| 线稿生成 | `/user/line-draft` | 从服装图生成线稿 |
+| 线稿成款 | `/user/sketch-to-design` | 从线稿生成效果图 |
+| 局部改款 | `/user/partial-edit` | 局部编辑款式 |
+| 款式创新 | `/user/style-innovate` | 基于原图做款式变化 |
+| 风格融合 | `/user/style-fusion` | 融合参考风格 |
+| 系列配色 | `/user/series-color` | 批量生成配色方案 |
+| 定向换色 | `/user/directed-recolor` | 精准换色 |
+| 面料上身 | `/user/fabric-on-body` | 面料贴合展示 |
+| 图案上身 | `/user/pattern-on-body` | 图案贴合展示 |
+| 模特多角度 | `/user/multi-angle` | 生成模特多角度图 |
+| 虚拟 3D | `/user/virtual-3d` | 虚拟展示 |
+| 人台变模特 | `/user/mannequin-to-model` | 人台图转模特图 |
+| 定向换脸 | `/user/face-swap` | 模特换脸 |
+| 换背景 | `/user/bg-swap` | 更换背景 |
+| 款式上身 | `/user/garment-on-model` | 虚拟试穿 |
+| 图案生成 | `/user/pattern-gen` | 生成原创图案 |
+| 画风复刻 | `/user/style-clone` | 复刻参考画风 |
+| 四方连续 | `/user/seamless-tile` | 无缝拼接图案 |
+| 图案融合 | `/user/pattern-fusion` | 多图案融合 |
+| 工艺融合 | `/user/craft-fusion` | 工艺效果融合 |
+| 图案涂改 | `/user/pattern-inpaint` | 局部修改图案 |
+| 图案变清晰 | `/user/pattern-upscale` | 图案超分 |
+| 转矢量图 | `/user/to-vector` | 位图转 SVG |
+| 抠图褪底 | `/user/remove-bg` | 抠图去背景 |
+| 高清放大 | `/user/hd-upscale` | 图片超分辨率 |
+| 模糊变清晰 | `/user/deblur` | 去模糊 |
+| 画布延伸 | `/user/canvas-extend` | 扩展画布 |
 
 ### 管理后台
 
-| 模块 | 说明 |
+| 模块 | 路由 |
 |------|------|
-| 用户管理 | 用户列表、权限管理 |
-| 账户管理 | 充值、消费记录 |
-| 渠道管理 | AI 渠道配置 |
-| 绘图记录 | 全平台任务记录查看 |
-| 风格卡管理 | 预设风格卡的增删改查 |
-| 线稿配置 | 线稿生成相关参数 |
-| 功能提示词配置 | 各功能的系统提示词模板（支持 `{{变量}}` 模板语法） |
-| OSS 配置 | 对象存储配置 |
-| 分割配置 | 图像分割服务配置 |
-| 监控 | 系统运行状态 |
-
----
-
-## 提示词模板系统
-
-管理后台支持为每个功能配置系统提示词，使用 `{{变量}}` 语法实现动态替换。
-
-| 变量 | 适用功能 | 说明 |
-|------|----------|------|
-| `{{user_prompt}}` | 通用 | 用户输入的描述文本 |
-| `{{strength}}` | 款式创新 | 改变幅度（1-10） |
-| `{{category}}` | 风格融合、系列配色 | 用户选择的品类 |
-| `{{color_type}}` | 系列配色 | 配色类型（women/men/kids/reference） |
-| `{{colors}}` | 系列配色 | 颜色列表（如 `#8b3a3a, #6b2d3e`） |
-| `{{target_color}}` | 定向换色 | 目标颜色（如 `#ff5500`） |
-
----
+| 登录 | `/admin/login` |
+| 用户管理 | `/admin/users` |
+| 账号管理 | `/admin/accounts` |
+| 监控 | `/admin/monitor` |
+| 风格卡管理 | `/admin/style-cards` |
+| 绘图记录 | `/admin/drawing-records` |
+| 渠道管理 | `/admin/channels` |
+| OSS 配置 | `/admin/oss-config` |
+| 分割配置 | `/admin/seg-config` |
+| 线稿配置 | `/admin/line-draft-config` |
+| 人脸库 | `/admin/face-library` |
+| 背景库 | `/admin/bg-library` |
+| 模特库 | `/admin/model-library` |
+| 姿势库 | `/admin/pose-library` |
+| 图案风格库 | `/admin/pattern-style-library` |
+| 功能提示词配置 | `/admin/feature-prompts` |
 
 ## 项目结构
 
-```
-FENG/
-├── frontend/                    # 前端项目
-│   ├── src/
-│   │   ├── api/                 # API 封装
-│   │   ├── assets/              # 静态资源
-│   │   ├── components/          # 公共组件（ImageUploader 等）
-│   │   ├── router/              # 路由配置
-│   │   ├── stores/              # Pinia 状态管理
-│   │   ├── types/               # TypeScript 类型定义
-│   │   ├── utils/               # 工具函数
-│   │   └── views/
-│   │       ├── user/            # 用户端页面
-│   │       │   ├── Home.vue              # 图・文生图
-│   │       │   ├── LineDraft.vue          # 线稿生成
-│   │       │   ├── SketchToDesign.vue     # 线稿成款
-│   │       │   ├── PartialEdit.vue        # 局部改款
-│   │       │   ├── StyleInnovate.vue      # 款式创新
-│   │       │   ├── StyleFusion.vue        # 风格融合
-│   │       │   ├── SeriesColor.vue        # 系列配色
-│   │       │   ├── DirectedRecolor.vue    # 定向换色
-│   │       │   ├── FeaturePage.vue        # 通用功能页
-│   │       │   └── Layout.vue             # 用户端布局
-│   │       └── admin/           # 管理后台页面
-│   │           ├── Users.vue              # 用户管理
-│   │           ├── Accounts.vue           # 账户管理
-│   │           ├── Channels.vue           # 渠道管理
-│   │           ├── DrawingRecords.vue     # 绘图记录
-│   │           ├── StyleCards.vue         # 风格卡管理
-│   │           ├── FeaturePromptConfig.vue # 功能提示词配置
-│   │           ├── OSSConfig.vue          # OSS 配置
-│   │           ├── SegConfig.vue          # 分割配置
-│   │           ├── Monitor.vue            # 监控
-│   │           └── Layout.vue             # 后台布局
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/                     # 后端项目
-│   ├── cmd/                     # 入口文件
-│   │   └── main.go
-│   ├── internal/
-│   │   ├── config/              # 配置加载
-│   │   ├── handler/             # HTTP 处理器
-│   │   │   ├── account_handler.go
-│   │   │   ├── admin_handler.go
-│   │   │   ├── auth_handler.go
-│   │   │   ├── channel_handler.go
-│   │   │   ├── feature_prompt_handler.go
-│   │   │   ├── line_draft_handler.go
-│   │   │   ├── oss_handler.go
-│   │   │   ├── seg_handler.go
-│   │   │   ├── vectorize_handler.go     # 转矢量图（potrace）
-│   │   │   └── style_card_handler.go
-│   │   ├── middleware/          # 中间件（鉴权等）
-│   │   ├── model/               # 数据模型
-│   │   ├── repository/          # 数据仓库层
-│   │   ├── service/             # 业务逻辑层
-│   │   └── worker/              # 异步任务消费者
-│   │       └── consumer.go
-│   └── pkg/                     # 公共包
-│       ├── database/
-│       ├── redis/
-│       └── response/
-├── docker/                      # Docker 配置
-│   ├── docker-compose.yml
-│   └── mysql/
+```text
+Feng-AI-main/
+├── frontend/           # Vue 3 前端
+│   ├── src/api/        # API 封装
+│   ├── src/router/     # 路由配置
+│   ├── src/stores/     # Pinia store
+│   ├── src/views/      # 用户端与管理后台页面
+│   └── vite.config.ts  # Dev proxy 配置
+├── backend/            # Gin 后端
+│   ├── cmd/main.go     # 入口与初始化命令
+│   ├── internal/       # handler / service / repository / middleware
+│   └── pkg/            # response / redis / safehttp 等公共包
+├── docker/             # MySQL / Redis 本地开发环境
 └── README.md
 ```
 
----
-
 ## 快速开始
 
-### 1. 启动数据库服务
+### 1. 启动 MySQL 和 Redis
 
 ```bash
 cd docker
-docker-compose up -d
+docker compose up -d
 ```
 
 默认会启动：
 
-- **MySQL 5.7**（root/root123，初始化库 `feng`）
-- **Redis 7**
+- `MySQL 5.7`，端口 `3306`
+- `Redis 7`，端口 `6379`
 
-### 2. 启动后端服务
+说明：
+
+- `docker/docker-compose.yml` 已为 Apple Silicon 的 `mysql:5.7` 增加 `platform: linux/amd64`
+- 当前默认账号与密码仅适合本地开发或内部调试
+
+### 2. 启动后端
 
 ```bash
 cd backend
 go run cmd/main.go
 ```
 
-后端服务：http://localhost:8080
+默认地址：`http://localhost:8080`
 
-### 3. 启动前端服务
+健康检查：
+
+```bash
+curl http://localhost:8080/api/health
+```
+
+### 3. 启动前端
 
 ```bash
 cd frontend
@@ -214,146 +140,109 @@ npm install
 npm run dev
 ```
 
-前端服务：http://localhost:5173
+默认地址：`http://localhost:5173`
 
----
+### 4. 初始化管理员账号
+
+```bash
+cd backend
+go run cmd/main.go init-admin
+```
+
+默认管理员账号：
+
+- 用户名：`admin`
+- 密码：`admin123`
 
 ## 环境变量
 
 ### 后端
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| DB_HOST | localhost | MySQL 主机 |
-| DB_PORT | 3306 | MySQL 端口 |
-| DB_USER | root | MySQL 用户名 |
-| DB_PASSWORD | root123 | MySQL 密码 |
-| DB_NAME | feng | 数据库名 |
-| REDIS_HOST | localhost | Redis 主机 |
-| REDIS_PORT | 6379 | Redis 端口 |
-| REDIS_AUTH | | Redis 密码 |
-| APP_PORT | 8080 | 服务端口 |
-
-说明：后端使用环境变量加载配置（`backend/internal/config/config.go`），未设置时会使用上述默认值。
-
-### 前端
+后端从 `backend/internal/config/config.go` 和鉴权中间件读取配置。
 
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
-| VITE_API_BASE_URL | /api | API 基础路径 |
-
----
-
-## 开发指南
+| `DB_HOST` | `localhost` | MySQL Host |
+| `DB_PORT` | `3306` | MySQL Port |
+| `DB_USER` | `root` | MySQL User |
+| `DB_PASSWORD` | `root123` | MySQL Password |
+| `DB_NAME` | `feng` | Database Name |
+| `REDIS_HOST` | `localhost` | Redis Host |
+| `REDIS_PORT` | `6379` | Redis Port |
+| `REDIS_AUTH` | 空 | Redis Password |
+| `APP_PORT` | `8080` | Backend Port |
+| `JWT_SECRET` | 无默认固定值 | JWT 签名密钥；未设置时后端会生成一次性开发密钥，服务重启后旧 token 会失效 |
 
 ### 前端
 
-```bash
-npm install          # 安装依赖
-npm run dev          # 启动开发服务器
-npm run build        # 构建生产版本
-npm run preview      # 本地预览生产构建
-```
+当前前端没有启用 `VITE_API_BASE_URL` 这类运行时环境变量。
 
-### 后端
+- Dev 环境通过 `frontend/vite.config.ts` 代理 `/api` 和 `/uploads` 到 `http://localhost:8080`
+- 如果需要切换本地后端地址，请直接修改 `vite.config.ts` 中的 `server.proxy`
 
-```bash
-go mod tidy                      # 下载依赖
-go run cmd/main.go               # 启动服务
-go build -o server cmd/main.go   # 构建
-```
-
-初始化管理员账号（默认用户名 `admin`，密码 `admin123`）：
-
-```bash
-go run cmd/main.go init-admin
-```
-
----
-
-## 核心交互流程
-
-```
-用户上传图片 → 前端组件处理（涂抹/选色/描述）→ 提交任务（taskApi.submit）
-    → 后端 SubmitTask（模板变量替换 + 任务入队）→ Worker 消费（调用 AI API）
-    → 前端轮询任务状态 → 展示生成结果
-```
-
-补充：
-
-- **转矢量图**：前端调用 `POST /api/user/vectorize`，后端直接同步返回 `svg_url`（不走异步队列）。
-- **图案变清晰**：前端调用 `POST /api/user/upscale`，后端调用阿里云超分后将结果持久化并返回。
-
----
-
-## 关键 API（节选）
-
-- `POST /api/user/upload` 上传参考图（返回 `url`）
-- `POST /api/user/vectorize` 转矢量图（返回 `svg_url`、`task_id`）
-- `GET  /api/user/vectorize/check` 检测 potrace 是否可用
-- `POST /api/user/upscale` 图案超分（返回 `image_url`、`task_id`）
-
----
-
-## 依赖与运行要求
-
-### 1) MySQL + Redis
-
-- 开发环境推荐用 `docker/docker-compose.yml` 启动
-- 生产环境（宝塔）可以用宝塔的 MySQL/Redis 服务（注意与环境变量一致）
-
-### 2) potrace（转矢量图）
-
-`/to-vector` 功能依赖 **potrace**。
-
-- Linux 常用安装：`apt install potrace` 或 `yum install potrace`
-- Windows 本地开发：下载 potrace 并加入 PATH
-
-后端会优先尝试这些路径：
-
-- `C:\Users\qingf\Desktop\下载\potrace-1.16.win64\potrace-1.16.win64\potrace.exe`
-- `/usr/bin/potrace`
-- `/usr/local/bin/potrace`
-
-找不到则回退到 `PATH` 中的 `potrace`。
-
----
-
-## 生产构建（简版）
-
-### 后端（Linux 可执行文件）
-
-在本机交叉编译（示例：linux/amd64，静态编译）：
-
-```bash
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o feng-server ./cmd
-```
+## 开发命令
 
 ### 前端
 
 ```bash
 cd frontend
+npm install
+npm run dev
 npm run build
 ```
 
-构建产物在 `frontend/dist/`。
+### 后端
 
----
+```bash
+cd backend
+go mod tidy
+go run cmd/main.go
+go build ./...
+```
 
-## 常见问题
+## 核心交互流程
 
-### 1) `potrace: command not found`
+```text
+用户上传图片
+  -> 前端提交任务参数
+  -> 后端创建任务并写入 Redis 队列
+  -> Worker 消费任务并调用外部 AI 渠道
+  -> 前端轮询任务状态
+  -> 展示结果或失败信息
+```
 
-- 确认已安装 potrace
-- 如果刚修改 PATH，需要重启终端/服务
-- 可访问 `GET /api/user/vectorize/check` 验证
+补充：
 
-### 2) 上传图片后无法访问 `/uploads/...`
+- `POST /api/user/vectorize` 为同步接口，直接返回 `svg_url`
+- `POST /api/user/upscale` 为同步增强接口，处理完成后直接返回结果地址
 
-- 后端会将 `uploads/` 作为静态目录：`/uploads` → `./uploads`
-- 生产部署时注意进程工作目录（确保 `uploads/` 在同级目录）
+## 关键 API
 
----
+- `GET /api/health`：服务健康检查
+- `POST /api/auth/login`：用户登录
+- `POST /api/auth/register`：用户注册
+- `POST /api/user/upload`：上传参考图
+- `GET /api/user/info`：获取当前用户信息
+- `POST /api/user/vectorize`：转矢量图
+- `GET /api/user/vectorize/check`：检查 `potrace` 是否可用
+- `POST /api/user/upscale`：图案超分
+
+## 外部依赖
+
+### potrace
+
+`/user/to-vector` 依赖 `potrace`。
+
+- macOS：`brew install potrace`
+- Ubuntu / Debian：`apt install potrace`
+- CentOS：`yum install potrace`
+
+后端会优先尝试常见系统路径，找不到时回退到 `PATH` 中的 `potrace`。
+
+## 相关文档
+
+- `docker/README.md`：本地 Docker 环境说明
+- `frontend/README.md`：前端开发说明
 
 ## 许可证
 

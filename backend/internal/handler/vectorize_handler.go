@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -8,7 +9,6 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"math/rand"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +19,7 @@ import (
 	"backend/internal/repository"
 	"backend/internal/service"
 	"backend/pkg/response"
+	"backend/pkg/safehttp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -99,9 +100,9 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 	}
 
 	// 下载图片
-	imgResp, err := http.Get(req.ImageURL)
+	imgResp, err := safehttp.Get(context.Background(), req.ImageURL, 20*time.Second)
 	if err != nil {
-		response.Error(c, 500, "下载图片失败: "+err.Error())
+		response.Error(c, 400, "下载图片失败: "+err.Error())
 		return
 	}
 	defer imgResp.Body.Close()

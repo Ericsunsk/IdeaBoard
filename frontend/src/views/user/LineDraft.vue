@@ -630,7 +630,8 @@ function handleImgError(e: Event) {
   img.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHJ4PSIyIiBmaWxsPSIjMzM2NjZmMSIgZmlsbC1vcGFjaXR5PSIwLjEiLz48cGF0aCBkPSJNMyA5aDE4bC0xOCA4eiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNTU1NTY2IiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4='
 }
 
-function downloadImage(url: string, prefix: string) {
+function downloadImage(url: string | undefined, prefix: string) {
+  if (!url) return
   const proxyUrl = `/api/user/download?url=${encodeURIComponent(url)}`
   const a = document.createElement('a')
   a.href = proxyUrl

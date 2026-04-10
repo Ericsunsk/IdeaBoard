@@ -215,6 +215,18 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 	// 生成任务ID
 	taskID := fmt.Sprintf("task_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
 
+	params := req.Params
+	if params == nil {
+		params = map[string]interface{}{}
+	}
+	if req.Feature != "" {
+		params["feature"] = req.Feature
+	}
+	if len(req.ImageURLs) > 0 {
+		params["image_urls"] = req.ImageURLs
+	}
+	req.Params = params
+
 	// 使用风格卡片拼接完整提示词
 	fullPrompt := req.Prompt
 	if req.CardIDs != nil && len(req.CardIDs) > 0 {
@@ -379,6 +391,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 	}
 
 	if err := s.redisMgr.PushGlobalQueue(context.Background(), queueTask); err != nil {
+		_ = s.taskRepo.MarkQueueFailed(taskID, "任务入队失败: "+err.Error())
 		return "", err
 	}
 
@@ -387,6 +400,10 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 
 func (s *AccountService) GetTask(taskID string) (*model.Task, error) {
 	return s.taskRepo.GetByTaskID(taskID)
+}
+
+func (s *AccountService) GetUserTask(taskID string, userID uint64) (*model.Task, error) {
+	return s.taskRepo.GetByTaskIDAndUserID(taskID, userID)
 }
 
 func (s *AccountService) ListTasks(req *model.TaskListRequest) ([]*model.Task, int64, error) {

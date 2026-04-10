@@ -104,6 +104,7 @@ func (c *Consumer) worker(id int) {
 
 func (c *Consumer) processQueue() {
 	ctx := context.Background()
+	c.promoteWaitQueue(ctx)
 
 	task, err := c.redisMgr.PopGlobalQueue(ctx)
 	if err != nil {
@@ -115,6 +116,12 @@ func (c *Consumer) processQueue() {
 	}
 
 	log.Printf("[Consumer] 拉到任务: %s", task.TaskID)
+
+	if err := c.refreshTaskAccounts(task); err != nil {
+		log.Printf("[Consumer] 刷新任务账号失败: %v", err)
+		c.failTask(task, 0, "刷新可用账号失败: "+err.Error())
+		return
+	}
 
 	if len(task.AccountIDs) == 0 {
 		log.Printf("[Consumer] 没有可用账号: %s", task.TaskID)
@@ -131,7 +138,7 @@ func (c *Consumer) processQueue() {
 
 	if status == "queue_full" {
 		log.Printf("[Consumer] 等待队列满，将任务放回: %s", task.TaskID)
-		c.redisMgr.PushGlobalQueue(ctx, task)
+		c.redisMgr.PushGlobalQueueFront(ctx, task)
 		return
 	}
 
@@ -143,13 +150,45 @@ func (c *Consumer) processQueue() {
 	go c.executeTask(task, accountID)
 }
 
+func (c *Consumer) promoteWaitQueue(ctx context.Context) {
+	task, err := c.redisMgr.PopWaitQueue(ctx)
+	if err != nil {
+		log.Printf("[Consumer] 拉取等待队列失败: %v", err)
+		return
+	}
+	if task == nil {
+		return
+	}
+	if err := c.redisMgr.PushGlobalQueueFront(ctx, task); err != nil {
+		log.Printf("[Consumer] 回流等待队列失败: %v", err)
+	}
+}
+
+func (c *Consumer) refreshTaskAccounts(task *redis.GlobalQueueTask) error {
+	accounts, err := c.accountRepo.GetAllEnabled()
+	if err != nil {
+		return err
+	}
+
+	task.AccountIDs = task.AccountIDs[:0]
+	for _, account := range accounts {
+		task.AccountIDs = append(task.AccountIDs, account.ID)
+	}
+
+	return nil
+}
+
 func (c *Consumer) executeTask(task *redis.GlobalQueueTask, accountID uint64) {
 	log.Printf("[Consumer] 执行任务: %s, 账号: %d", task.TaskID, accountID)
 	startTime := time.Now()
 
 	account, err := c.accountRepo.GetByID(accountID)
 	if err != nil {
-		c.completeTask(task, accountID, "failed", "账号不存在", 0)
+		c.requeueTask(task, accountID, "账号不存在，重新调度")
+		return
+	}
+	if account.Status != 1 {
+		c.requeueTask(task, accountID, "账号已停用，重新调度")
 		return
 	}
 
@@ -177,6 +216,24 @@ func (c *Consumer) executeTask(task *redis.GlobalQueueTask, accountID uint64) {
 	elapsed := time.Since(startTime).Seconds()
 	c.completeTask(task, accountID, "completed", result, elapsed)
 	c.accountRepo.ResetFailCount(accountID)
+}
+
+func (c *Consumer) requeueTask(task *redis.GlobalQueueTask, accountID uint64, reason string) {
+	ctx := context.Background()
+	if accountID > 0 {
+		_ = c.redisMgr.ReleaseTask(ctx, accountID, task.TaskID)
+	}
+	if err := c.refreshTaskAccounts(task); err != nil {
+		c.failTask(task, 0, reason)
+		return
+	}
+	if len(task.AccountIDs) == 0 {
+		c.failTask(task, 0, reason)
+		return
+	}
+	if err := c.redisMgr.PushGlobalQueueFront(ctx, task); err != nil {
+		c.failTask(task, 0, reason)
+	}
 }
 
 func (c *Consumer) completeTask(task *redis.GlobalQueueTask, accountID uint64, status, result string, elapsedSec float64) {

@@ -1,11 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +15,7 @@ import (
 	"backend/internal/repository"
 	"backend/internal/service"
 	"backend/pkg/response"
+	"backend/pkg/safehttp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -220,13 +221,17 @@ func (h *SegHandler) SaveSegResult(c *gin.Context) {
 
 // persistImage 将远程图片 URL 持久化到对象存储或本地
 func (h *SegHandler) persistImage(imageURL string) (string, error) {
+	if _, err := safehttp.ValidateURL(imageURL); err != nil {
+		return "", err
+	}
+
 	// 优先使用对象存储
 	if h.kodoService != nil && h.kodoService.IsEnabled() {
 		return h.kodoService.FetchURL(imageURL)
 	}
 
 	// 回退：下载到本地
-	resp, err := http.Get(imageURL)
+	resp, err := safehttp.Get(context.Background(), imageURL, 20*time.Second)
 	if err != nil {
 		return "", fmt.Errorf("下载图片失败: %v", err)
 	}

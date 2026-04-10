@@ -157,7 +157,7 @@ const menuOptions = [
 ] as any
 
 const currentMenuLabel = computed(() => {
-  const item = menuOptions.find(m => m.key === activeKey.value)
+  const item = menuOptions.find((m: any) => m.key === activeKey.value)
   return item?.label || ''
 })
 

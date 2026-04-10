@@ -18,10 +18,15 @@ backend/bin/
 .DS_Store
 Thumbs.db
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
+.playwright-cli/
 
 # ===== Env / Secrets =====
 .env
 .env.*
+
+# ===== Release Artifacts =====
+release/

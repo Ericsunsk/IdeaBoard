@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"backend/pkg/database"
 	"backend/pkg/redis"
 	"backend/pkg/response"
+	"backend/pkg/safehttp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -117,7 +117,7 @@ func main() {
 	vectorizeHandler := handler.NewVectorizeHandler(taskRepo, kodoService)
 
 	r := gin.Default()
-	registerRoutes(r, authHandler, adminHandler, accountHandler, cardHandler, channelHandler, kodoHandler, segHandler, lineDraftHandler, featurePromptHandler, faceTemplateHandler, bgTemplateHandler, modelTemplateHandler, poseTemplateHandler, patternStyleHandler, vectorizeHandler, kodoService, rdb)
+	registerRoutes(r, authHandler, adminHandler, accountHandler, cardHandler, channelHandler, kodoHandler, segHandler, lineDraftHandler, featurePromptHandler, faceTemplateHandler, bgTemplateHandler, modelTemplateHandler, poseTemplateHandler, patternStyleHandler, vectorizeHandler, kodoService, rdb, userRepo)
 
 	consumer := worker.NewConsumer(accountRepo, channelRepo, taskRepo, redisMgr, kodoService)
 	go consumer.Start(5)
@@ -133,7 +133,7 @@ func main() {
 	}
 }
 
-func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandler *handler.AdminHandler, accountHandler *handler.AccountHandler, cardHandler *handler.StyleCardHandler, channelHandler *handler.ChannelHandler, kodoHandler *handler.KodoHandler, segHandler *handler.SegHandler, lineDraftHandler *handler.LineDraftHandler, featurePromptHandler *handler.FeaturePromptHandler, faceTemplateHandler *handler.FaceTemplateHandler, bgTemplateHandler *handler.BgTemplateHandler, modelTemplateHandler *handler.ModelTemplateHandler, poseTemplateHandler *handler.PoseTemplateHandler, patternStyleHandler *handler.PatternStyleHandler, vectorizeHandler *handler.VectorizeHandler, kodoService *service.KodoService, rdb *redis.Client) {
+func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandler *handler.AdminHandler, accountHandler *handler.AccountHandler, cardHandler *handler.StyleCardHandler, channelHandler *handler.ChannelHandler, kodoHandler *handler.KodoHandler, segHandler *handler.SegHandler, lineDraftHandler *handler.LineDraftHandler, featurePromptHandler *handler.FeaturePromptHandler, faceTemplateHandler *handler.FaceTemplateHandler, bgTemplateHandler *handler.BgTemplateHandler, modelTemplateHandler *handler.ModelTemplateHandler, poseTemplateHandler *handler.PoseTemplateHandler, patternStyleHandler *handler.PatternStyleHandler, vectorizeHandler *handler.VectorizeHandler, kodoService *service.KodoService, rdb *redis.Client, userRepo *repository.UserRepository) {
 	r.GET("/api/health", func(c *gin.Context) {
 		response.Success(c, gin.H{"status": "ok"})
 	})
@@ -143,7 +143,7 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 	r.Static("/uploads", "./uploads")
 
 	userApi := r.Group("/api/user")
-	userApi.Use(middleware.AuthMiddleware(rdb))
+	userApi.Use(middleware.AuthMiddleware(rdb, userRepo))
 	{
 		userApi.GET("/info", authHandler.GetCurrentUser)
 		userApi.POST("/password", authHandler.UpdatePassword)
@@ -219,9 +219,9 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 				response.Error(c, 400, "缺少 url 参数")
 				return
 			}
-			resp, err := http.Get(imgURL)
+			resp, err := safehttp.Get(c.Request.Context(), imgURL, 20*time.Second)
 			if err != nil {
-				response.Error(c, 500, "下载失败")
+				response.Error(c, 400, "下载失败: "+err.Error())
 				return
 			}
 			defer resp.Body.Close()
@@ -256,7 +256,7 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 	}
 
 	adminApi := r.Group("/api/admin")
-	adminApi.Use(middleware.AuthMiddleware(rdb), middleware.AdminMiddleware())
+	adminApi.Use(middleware.AuthMiddleware(rdb, userRepo), middleware.AdminMiddleware())
 	{
 		adminApi.GET("/users", adminHandler.ListUsers)
 		adminApi.POST("/users", adminHandler.CreateUser)

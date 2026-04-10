@@ -1,23 +1,9 @@
 import api from './index'
+import type { Task as BaseTask, SubmitTaskData } from './index'
 import type { ApiResponse } from '../types'
 
-export interface Task {
-  id: number
-  task_id: string
-  user_id: number
-  account_id: number
-  prompt: string
-  image_url: string
-  status: string
-  retry_count: number
-  error_msg: string
-  created_at: string
-  updated_at: string
-}
-
-export interface SubmitTaskRequest {
-  prompt: string
-}
+export type Task = BaseTask
+export type SubmitTaskRequest = SubmitTaskData
 
 export interface TaskListResponse {
   list: Task[]
@@ -95,7 +81,7 @@ export interface MonitorResponse {
 export const submitTask = (data: SubmitTaskRequest): Promise<ApiResponse<{ task_id: string }>> =>
   api.post('/user/drawing/submit', data) as any
 
-export const getTask = (task_id: string): Promise<ApiResponse<Task>> =>
+export const getTask = (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
   api.get('/user/drawing/' + task_id) as any
 
 export const listTasks = (params?: { page?: number; page_size?: number }): Promise<ApiResponse<TaskListResponse>> =>
@@ -105,7 +91,7 @@ export const listTasks = (params?: { page?: number; page_size?: number }): Promi
 export const submitAdminTask = (data: SubmitTaskRequest): Promise<ApiResponse<{ task_id: string }>> =>
   api.post('/admin/tasks/submit', data) as any
 
-export const getAdminTask = (task_id: string): Promise<ApiResponse<Task>> =>
+export const getAdminTask = (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
   api.get('/admin/tasks/' + task_id) as any
 
 export const listAdminTasks = (params?: { page?: number; page_size?: number; status?: string }): Promise<ApiResponse<TaskListResponse>> =>

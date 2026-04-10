@@ -1,10 +1,16 @@
-﻿package middleware
+package middleware
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
 
+	"backend/internal/repository"
 	"backend/pkg/redis"
 	"backend/pkg/response"
 
@@ -12,7 +18,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var JWTSecret = []byte("feng-secret-key-2024")
+var (
+	jwtSecret     []byte
+	jwtSecretOnce sync.Once
+)
 
 type Claims struct {
 	UserID   uint64 `json:"user_id"`
@@ -21,8 +30,27 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+func JWTSigningSecret() []byte {
+	jwtSecretOnce.Do(func() {
+		if secret := strings.TrimSpace(os.Getenv("JWT_SECRET")); secret != "" {
+			jwtSecret = []byte(secret)
+			return
+		}
+
+		buf := make([]byte, 32)
+		if _, err := rand.Read(buf); err != nil {
+			log.Fatalf("failed to initialize JWT secret: %v", err)
+		}
+
+		jwtSecret = []byte(base64.StdEncoding.EncodeToString(buf))
+		log.Printf("[Auth] JWT_SECRET 未配置，已生成一次性开发密钥；服务重启后旧 token 会失效")
+	})
+
+	return jwtSecret
+}
+
 // AuthMiddleware 认证中间件
-func AuthMiddleware(rdb *redis.Client) gin.HandlerFunc {
+func AuthMiddleware(rdb *redis.Client, userRepo *repository.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -43,7 +71,7 @@ func AuthMiddleware(rdb *redis.Client) gin.HandlerFunc {
 
 		// 解析token
 		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-			return JWTSecret, nil
+			return JWTSigningSecret(), nil
 		})
 
 		if err != nil || !token.Valid {
@@ -65,6 +93,21 @@ func AuthMiddleware(rdb *redis.Client) gin.HandlerFunc {
 		if err != nil || storedToken != tokenString {
 			response.Error(c, http.StatusUnauthorized, "令牌已失效")
 			c.Abort()
+			return
+		}
+
+		if userRepo != nil {
+			user, err := userRepo.GetByID(claims.UserID)
+			if err != nil || user.Status != 1 {
+				response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
+				c.Abort()
+				return
+			}
+
+			c.Set("user_id", user.ID)
+			c.Set("username", user.Username)
+			c.Set("role", user.Role)
+			c.Next()
 			return
 		}
 

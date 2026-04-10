@@ -9,7 +9,13 @@ import type {
   User,
   ApiResponse,
 } from '../types'
-import type { AxiosResponse } from 'axios'
+
+type ApiClientError = Error & {
+  code?: number
+  msg?: string
+  status?: number
+  data?: unknown
+}
 
 const api = axios.create({
   baseURL: '/api',
@@ -18,6 +24,28 @@ const api = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+function createApiError(payload?: any, status?: number): ApiClientError {
+  const message = payload?.msg || payload?.message || '请求失败'
+  const error = new Error(message) as ApiClientError
+  error.code = payload?.code ?? status
+  error.msg = payload?.msg || message
+  error.status = status
+  error.data = payload?.data
+  return error
+}
+
+function handleAuthExpired(status: number | undefined, payload: any, requestUrl: string) {
+  const code = payload?.code ?? status
+  if (code !== 401 || requestUrl.includes('/auth/')) {
+    return
+  }
+
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  const isAdmin = window.location.pathname.startsWith('/admin')
+  window.location.href = isAdmin ? '/admin/login' : '/user/login'
+}
 
 api.interceptors.request.use(
   (config) => {
@@ -35,26 +63,20 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     const data = response.data
-    // 后端 response.Error() 返回 HTTP 200 但 code 非 0，需要当作错误处理
     if (data && typeof data.code === 'number' && data.code !== 0) {
-      // 令牌失效：清除本地存储，跳转登录页（排除登录/注册接口本身）
       const requestUrl = response.config?.url || ''
-      if (data.code === 401 && !requestUrl.includes('/auth/')) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        const isAdmin = window.location.pathname.startsWith('/admin')
-        window.location.href = isAdmin ? '/admin/login' : '/user/login'
-        return new Promise(() => {}) // 阻止后续逻辑执行
-      }
-      return Promise.reject(data)
+      handleAuthExpired(response.status, data, requestUrl)
+      return Promise.reject(createApiError(data, response.status))
     }
     return data
   },
   (error) => {
-    if (error.response && error.response.data) {
-      return Promise.reject(error.response.data)
+    if (error.response) {
+      const requestUrl = error.config?.url || ''
+      handleAuthExpired(error.response.status, error.response.data, requestUrl)
+      return Promise.reject(createApiError(error.response.data, error.response.status))
     }
-    return Promise.reject(error)
+    return Promise.reject(createApiError(error))
   }
 )
 
@@ -142,22 +164,24 @@ export interface Task {
   id: number
   task_id: string
   user_id: number
-  channel_id: number
-  account_id: number
+  channel_id?: number
+  account_id?: number
   prompt: string
-  params: string
+  params?: string
   status: string
-  retry_count: number
-  error_msg: string
-  result: string
+  retry_count?: number
+  error_msg?: string
+  result?: string
   created_at: string
   updated_at: string
-  completed_at: string
+  completed_at?: string | null
 }
 
 export interface SubmitTaskData {
   prompt: string
   card_ids?: number[]
+  feature?: string
+  image_urls?: string[]
   params?: Record<string, any>
 }
 
