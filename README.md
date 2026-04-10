@@ -357,4 +357,4 @@ npm run build
 
 ## 许可证
 
-MIT License
+本项目为闭源私有项目，未经授权不得复制、分发或使用。All Rights Reserved.
