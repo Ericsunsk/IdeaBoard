@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
+	iofs "io/fs"
 	"log"
+	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,6 +23,7 @@ import (
 	"backend/pkg/redis"
 	"backend/pkg/response"
 	"backend/pkg/safehttp"
+	"backend/web"
 
 	"github.com/gin-gonic/gin"
 )
@@ -117,7 +121,13 @@ func main() {
 	vectorizeHandler := handler.NewVectorizeHandler(taskRepo, kodoService)
 
 	r := gin.Default()
-	registerRoutes(r, authHandler, adminHandler, accountHandler, cardHandler, channelHandler, kodoHandler, segHandler, lineDraftHandler, featurePromptHandler, faceTemplateHandler, bgTemplateHandler, modelTemplateHandler, poseTemplateHandler, patternStyleHandler, vectorizeHandler, kodoService, rdb, userRepo)
+
+	frontendFS, err := web.DistFS()
+	if err != nil {
+		log.Printf("[Main] Failed to load embedded frontend dist: %v", err)
+	}
+
+	registerRoutes(r, authHandler, adminHandler, accountHandler, cardHandler, channelHandler, kodoHandler, segHandler, lineDraftHandler, featurePromptHandler, faceTemplateHandler, bgTemplateHandler, modelTemplateHandler, poseTemplateHandler, patternStyleHandler, vectorizeHandler, kodoService, rdb, userRepo, frontendFS)
 
 	consumer := worker.NewConsumer(accountRepo, channelRepo, taskRepo, redisMgr, kodoService)
 	go consumer.Start(5)
@@ -133,7 +143,7 @@ func main() {
 	}
 }
 
-func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandler *handler.AdminHandler, accountHandler *handler.AccountHandler, cardHandler *handler.StyleCardHandler, channelHandler *handler.ChannelHandler, kodoHandler *handler.KodoHandler, segHandler *handler.SegHandler, lineDraftHandler *handler.LineDraftHandler, featurePromptHandler *handler.FeaturePromptHandler, faceTemplateHandler *handler.FaceTemplateHandler, bgTemplateHandler *handler.BgTemplateHandler, modelTemplateHandler *handler.ModelTemplateHandler, poseTemplateHandler *handler.PoseTemplateHandler, patternStyleHandler *handler.PatternStyleHandler, vectorizeHandler *handler.VectorizeHandler, kodoService *service.KodoService, rdb *redis.Client, userRepo *repository.UserRepository) {
+func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandler *handler.AdminHandler, accountHandler *handler.AccountHandler, cardHandler *handler.StyleCardHandler, channelHandler *handler.ChannelHandler, kodoHandler *handler.KodoHandler, segHandler *handler.SegHandler, lineDraftHandler *handler.LineDraftHandler, featurePromptHandler *handler.FeaturePromptHandler, faceTemplateHandler *handler.FaceTemplateHandler, bgTemplateHandler *handler.BgTemplateHandler, modelTemplateHandler *handler.ModelTemplateHandler, poseTemplateHandler *handler.PoseTemplateHandler, patternStyleHandler *handler.PatternStyleHandler, vectorizeHandler *handler.VectorizeHandler, kodoService *service.KodoService, rdb *redis.Client, userRepo *repository.UserRepository, frontendFS iofs.FS) {
 	r.GET("/api/health", func(c *gin.Context) {
 		response.Success(c, gin.H{"status": "ok"})
 	})
@@ -383,4 +393,49 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 		adminApi.GET("/feature-prompts/:slug", featurePromptHandler.GetPrompt)
 		adminApi.PUT("/feature-prompts/:slug", featurePromptHandler.SetPrompt)
 	}
+
+	registerFrontendRoutes(r, frontendFS)
+}
+
+func registerFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
+	if frontendFS == nil {
+		return
+	}
+
+	if _, err := iofs.Stat(frontendFS, "index.html"); err != nil {
+		log.Printf("[Main] Embedded frontend index.html not found, skip SPA routes: %v", err)
+		return
+	}
+
+	serveIndex := func(c *gin.Context) {
+		c.FileFromFS("index.html", http.FS(frontendFS))
+	}
+
+	r.GET("/", serveIndex)
+
+	r.NoRoute(func(c *gin.Context) {
+		requestPath := strings.TrimPrefix(path.Clean(c.Request.URL.Path), "/")
+		if requestPath == "." {
+			requestPath = ""
+		}
+
+		if requestPath == "api" || strings.HasPrefix(requestPath, "api/") || requestPath == "uploads" || strings.HasPrefix(requestPath, "uploads/") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		if requestPath != "" {
+			if _, err := iofs.Stat(frontendFS, requestPath); err == nil {
+				c.FileFromFS(requestPath, http.FS(frontendFS))
+				return
+			}
+		}
+
+		serveIndex(c)
+	})
 }

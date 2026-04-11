@@ -6,6 +6,7 @@
 
 - 开发文档（功能模块、提示词模板系统、项目结构）：`DEVELOPMENT.md`
 - 服务器部署全量步骤（生产详细版）：`DEPLOYMENT.md`
+- 宝塔 Go 直接部署（单可执行文件）：`DEPLOY_BAOTA_GO.md`
 
 ## 技术栈
 
@@ -83,7 +84,7 @@ cp /opt/feng/backend/.env.example /opt/feng/backend/.env
 6. 验证上线：
 
 ```bash
-curl http://127.0.0.1:8080/api/health
+curl http://127.0.0.1:6000/api/health
 curl -I http://127.0.0.1/
 ```
 

@@ -21,7 +21,7 @@
 确认服务器满足以下条件：
 
 - 系统：`Linux amd64`
-- 已开放端口：`80`（Nginx），`8080`（后端仅本机回环即可）
+- 已开放端口：`80`（Nginx），`6000`（后端仅本机回环即可）
 - 已安装：`tar`、`nginx`、`mysql`、`redis`
 
 如果是 Ubuntu / Debian，可以执行：
@@ -140,7 +140,7 @@ nano /opt/feng/backend/.env
 
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`：必须与线上 MySQL 实际账号一致
 - `REDIS_HOST/REDIS_PORT/REDIS_AUTH`：必须与线上 Redis 配置一致
-- `APP_PORT`：与 systemd/Nginx 反向代理端口一致（默认 `8080`）
+- `APP_PORT`：与 systemd/Nginx 反向代理端口一致（默认 `6000`）
 - `JWT_SECRET`：必须替换为足够长的随机字符串
 
 额外建议：
@@ -231,7 +231,7 @@ server_name ai.example.com;
 先检查后端健康接口：
 
 ```bash
-curl http://127.0.0.1:8080/api/health
+curl http://127.0.0.1:6000/api/health
 ```
 
 预期返回包含：
@@ -295,7 +295,7 @@ nginx -t && systemctl reload nginx
 3. 用新版本覆盖 `/opt/feng/backend`、`/opt/feng/frontend`、`/opt/feng/deploy`
 4. 保留原有 `/opt/feng/backend/.env`
 5. 执行 `systemctl restart feng`
-6. 检查 `curl http://127.0.0.1:8080/api/health`
+6. 检查 `curl http://127.0.0.1:6000/api/health`
 
 建议不要在升级时删除：
 
@@ -339,5 +339,5 @@ cp /opt/feng/deploy/nginx/feng.conf /etc/nginx/sites-available/feng.conf
 ln -sf /etc/nginx/sites-available/feng.conf /etc/nginx/sites-enabled/feng.conf
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
-curl http://127.0.0.1:8080/api/health
+curl http://127.0.0.1:6000/api/health
 ```

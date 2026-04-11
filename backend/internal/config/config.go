@@ -52,7 +52,7 @@ func Load() *Config {
 			Auth: getEnv("REDIS_AUTH", ""),
 		},
 		App: AppConfig{
-			Port: getEnv("APP_PORT", "8080"),
+			Port: getEnv("APP_PORT", "6000"),
 		},
 	}
 }

@@ -134,7 +134,7 @@ FENG/
 | `REDIS_HOST` | `localhost` | Redis 主机 |
 | `REDIS_PORT` | `6379` | Redis 端口 |
 | `REDIS_AUTH` | 空 | Redis 密码 |
-| `APP_PORT` | `8080` | 后端端口 |
+| `APP_PORT` | `6000` | 后端端口 |
 | `JWT_SECRET` | 空 | JWT 密钥（生产环境必须设置） |
 
 说明：后端会在启动时自动加载 `.env`（也支持通过 `ENV_FILE=/path/to/.env` 指定配置文件）。

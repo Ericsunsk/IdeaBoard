@@ -27,6 +27,7 @@ ARCHIVE_PATH="$RELEASE_ROOT/${BUNDLE_NAME}.tar.gz"
 
 NPM_CACHE_DIR="$ROOT_DIR/.cache/npm"
 GO_CACHE_DIR="$ROOT_DIR/.cache/go-build"
+GO_MOD_CACHE_DIR="$ROOT_DIR/.cache/go-mod"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIST_DIR="$FRONTEND_DIR/dist"
@@ -35,7 +36,7 @@ BACKEND_BINARY_DST="$BUNDLE_DIR/backend/feng-server"
 BUILD_TIME_UTC="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 COMMIT_SHA="$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
 
-mkdir -p "$NPM_CACHE_DIR" "$GO_CACHE_DIR" "$RELEASE_ROOT" "$ROOT_DIR/release-temp"
+mkdir -p "$NPM_CACHE_DIR" "$GO_CACHE_DIR" "$GO_MOD_CACHE_DIR" "$RELEASE_ROOT" "$ROOT_DIR/release-temp"
 
 echo "[1/5] Installing frontend dependencies"
 npm --prefix "$FRONTEND_DIR" ci --cache "$NPM_CACHE_DIR"
@@ -46,7 +47,7 @@ npm --prefix "$FRONTEND_DIR" run build
 echo "[3/5] Building backend binary (linux/amd64)"
 (
   cd "$BACKEND_DIR"
-  env GOCACHE="$GO_CACHE_DIR" CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+  env GOCACHE="$GO_CACHE_DIR" GOMODCACHE="$GO_MOD_CACHE_DIR" CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -o "$BACKEND_BINARY_TMP" ./cmd/main.go
 )
 
@@ -94,7 +95,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:6000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -102,7 +103,7 @@ server {
     }
 
     location /uploads/ {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:6000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
