@@ -1,10 +1,10 @@
 # FENG 部署说明
 
-本文档用于 `FENG` 项目的部署、发布和回滚，当前对外发布号为 `v0.01`。
+本文档用于 `FENG` 项目的部署、发布和回滚。
 
 说明：
 
-- 仓库发布号使用 `v0.01`
+- 仓库发布号建议使用 `SemVer`：`vMAJOR.MINOR.PATCH`（例如 `v0.1.0`）
 - 前端 `package.json` 使用兼容 `npm` 的 `SemVer`：`0.0.1`
 
 ## 1. 部署目标
@@ -77,7 +77,8 @@ Linux 发布二进制：
 
 ```bash
 cd backend
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o feng-server-linux-amd64 ./cmd/main.go
+TAG=v0.1.0
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o feng-backend-${TAG}-linux-amd64 ./cmd/main.go
 ```
 
 ## 5. 推荐部署目录
@@ -206,15 +207,17 @@ WantedBy=multi-user.target
 2. 推送一个符合 `v*` 规则的 tag，例如：
 
 ```bash
-git tag -a v0.02 -m "发布 v0.02"
+git tag -a v0.1.0 -m "发布 v0.1.0"
 git push origin main
-git push origin v0.02
+git push origin v0.1.0
 ```
 
 3. GitHub Actions 会自动执行：
 
 - 前端 `npm ci && npm run build`
-- 后端构建 `linux/amd64` 和 `darwin/arm64` 二进制
+- 后端构建 `linux/amd64` 和 `darwin/arm64` 二进制（命名：`feng-backend-<tag>-<os>-<arch>`）
+- 打包前端产物（命名：`feng-frontend-<tag>.tar.gz`）
+- 组装一体化部署包（命名：`feng-bundle-<tag>-linux-amd64.tar.gz`）
 - 生成 `RELEASE_INFO.txt`
 - 生成 `SHA256SUMS.txt`
 - 自动创建或更新对应 GitHub Release
@@ -223,15 +226,16 @@ git push origin v0.02
 
 ## 11. 回滚建议
 
-如果 `v0.01` 发布后要快速回滚：
+如果某个版本发布后要快速回滚：
 
 1. 保留上一个可用版本的前端 `dist/`
 2. 保留上一个可用版本的后端二进制
 3. 回滚时优先替换前后端文件，再重启后端进程
 4. 避免在回滚时做额外 schema 变更
 
-## 12. 当前版本说明
+## 12. 产物命名规范
 
-- Git Tag：`v0.01`
-- 前端包版本：`0.0.1`
-- 发布产物目录建议：`release/v0.01/`
+- 后端：`feng-backend-<tag>-<os>-<arch>`
+- 前端：`feng-frontend-<tag>.tar.gz`
+- 部署包：`feng-bundle-<tag>-linux-amd64.tar.gz`
+- 发布目录：`release/<tag>/`

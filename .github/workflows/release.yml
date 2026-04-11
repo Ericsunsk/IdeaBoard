@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "要发布的 tag，例如 v0.01"
+        description: "要发布的 tag，例如 v0.1.0"
         required: true
         type: string
 
@@ -66,25 +66,105 @@ jobs:
         shell: bash
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
+          FRONTEND_ARCHIVE="feng-frontend-${TAG}.tar.gz"
           mkdir -p "release/$TAG"
           cd frontend
           npm run build
-          tar -czf "../release/$TAG/frontend-dist-$TAG.tar.gz" dist
+          tar -czf "../release/$TAG/${FRONTEND_ARCHIVE}" dist
 
       - name: Build backend binaries
         shell: bash
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
+          BACKEND_LINUX="feng-backend-${TAG}-linux-amd64"
+          BACKEND_DARWIN="feng-backend-${TAG}-darwin-arm64"
           mkdir -p "release/$TAG"
           cd backend
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "../release/$TAG/feng-server-linux-amd64-$TAG" ./cmd/main.go
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o "../release/$TAG/feng-server-darwin-arm64-$TAG" ./cmd/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "../release/$TAG/${BACKEND_LINUX}" ./cmd/main.go
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o "../release/$TAG/${BACKEND_DARWIN}" ./cmd/main.go
+
+      - name: Assemble deployment bundle
+        shell: bash
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          RELEASE_DIR="release/$TAG"
+          BUNDLE_NAME="feng-bundle-${TAG}-linux-amd64"
+          BUNDLE_DIR="$RELEASE_DIR/$BUNDLE_NAME"
+          BUNDLE_ARCHIVE="${BUNDLE_NAME}.tar.gz"
+
+          rm -rf "$BUNDLE_DIR"
+          mkdir -p \
+            "$BUNDLE_DIR/backend/uploads" \
+            "$BUNDLE_DIR/frontend" \
+            "$BUNDLE_DIR/deploy/nginx" \
+            "$BUNDLE_DIR/deploy/systemd"
+
+          cp "$RELEASE_DIR/feng-backend-${TAG}-linux-amd64" "$BUNDLE_DIR/backend/feng-server"
+          cp -R frontend/dist "$BUNDLE_DIR/frontend/dist"
+          cp backend/.env.example "$BUNDLE_DIR/backend/.env.example"
+          cp README.md "$BUNDLE_DIR/README.md"
+          cp DEPLOYMENT.md "$BUNDLE_DIR/DEPLOYMENT.md"
+          cp development.md "$BUNDLE_DIR/development.md"
+
+          cat > "$BUNDLE_DIR/deploy/systemd/feng.service" <<'EOF'
+          [Unit]
+          Description=FENG Backend
+          After=network.target
+
+          [Service]
+          WorkingDirectory=/opt/feng/backend
+          ExecStart=/opt/feng/backend/feng-server
+          Restart=always
+          RestartSec=3
+          EnvironmentFile=/opt/feng/backend/.env
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          sed -i 's/^          //' "$BUNDLE_DIR/deploy/systemd/feng.service"
+
+          cat > "$BUNDLE_DIR/deploy/nginx/feng.conf" <<'EOF'
+          server {
+              listen 80;
+              server_name _;
+
+              root /opt/feng/frontend/dist;
+              index index.html;
+
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+
+              location /api/ {
+                  proxy_pass http://127.0.0.1:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+
+              location /uploads/ {
+                  proxy_pass http://127.0.0.1:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+          EOF
+          sed -i 's/^          //' "$BUNDLE_DIR/deploy/nginx/feng.conf"
+
+          tar -czf "$RELEASE_DIR/$BUNDLE_ARCHIVE" -C "$RELEASE_DIR" "$BUNDLE_NAME"
 
       - name: Generate release metadata
         shell: bash
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
           RELEASE_DIR="release/$TAG"
+          FRONTEND_ARCHIVE="feng-frontend-${TAG}.tar.gz"
+          BACKEND_DARWIN="feng-backend-${TAG}-darwin-arm64"
+          BACKEND_LINUX="feng-backend-${TAG}-linux-amd64"
+          BUNDLE_ARCHIVE="feng-bundle-${TAG}-linux-amd64.tar.gz"
           FRONTEND_VERSION="$(node -p "require('./frontend/package.json').version")"
 
           {
@@ -97,9 +177,10 @@ jobs:
           (
             cd "$RELEASE_DIR"
             sha256sum \
-              "feng-server-darwin-arm64-$TAG" \
-              "feng-server-linux-amd64-$TAG" \
-              "frontend-dist-$TAG.tar.gz" \
+              "$BACKEND_DARWIN" \
+              "$BACKEND_LINUX" \
+              "$FRONTEND_ARCHIVE" \
+              "$BUNDLE_ARCHIVE" \
               > SHA256SUMS.txt
           )
 
@@ -132,9 +213,10 @@ jobs:
           name: ${{ steps.meta.outputs.tag }}
           body_path: release/${{ steps.meta.outputs.tag }}/RELEASE_NOTES.md
           files: |
-            release/${{ steps.meta.outputs.tag }}/feng-server-darwin-arm64-${{ steps.meta.outputs.tag }}
-            release/${{ steps.meta.outputs.tag }}/feng-server-linux-amd64-${{ steps.meta.outputs.tag }}
-            release/${{ steps.meta.outputs.tag }}/frontend-dist-${{ steps.meta.outputs.tag }}.tar.gz
+            release/${{ steps.meta.outputs.tag }}/feng-backend-${{ steps.meta.outputs.tag }}-darwin-arm64
+            release/${{ steps.meta.outputs.tag }}/feng-backend-${{ steps.meta.outputs.tag }}-linux-amd64
+            release/${{ steps.meta.outputs.tag }}/feng-frontend-${{ steps.meta.outputs.tag }}.tar.gz
+            release/${{ steps.meta.outputs.tag }}/feng-bundle-${{ steps.meta.outputs.tag }}-linux-amd64.tar.gz
             release/${{ steps.meta.outputs.tag }}/RELEASE_INFO.txt
             release/${{ steps.meta.outputs.tag }}/SHA256SUMS.txt
           fail_on_unmatched_files: true

@@ -2,6 +2,11 @@ package config
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -28,7 +33,11 @@ type AppConfig struct {
 	Port string
 }
 
+var loadEnvOnce sync.Once
+
 func Load() *Config {
+	loadEnvFile()
+
 	return &Config{
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -46,6 +55,32 @@ func Load() *Config {
 			Port: getEnv("APP_PORT", "8080"),
 		},
 	}
+}
+
+func loadEnvFile() {
+	loadEnvOnce.Do(func() {
+		candidates := make([]string, 0, 3)
+
+		if envFile := strings.TrimSpace(os.Getenv("ENV_FILE")); envFile != "" {
+			candidates = append(candidates, envFile)
+		}
+
+		candidates = append(candidates, ".env")
+
+		if exePath, err := os.Executable(); err == nil {
+			candidates = append(candidates, filepath.Join(filepath.Dir(exePath), ".env"))
+		}
+
+		for _, path := range candidates {
+			if path == "" {
+				continue
+			}
+			if _, err := os.Stat(path); err == nil {
+				_ = godotenv.Load(path)
+				return
+			}
+		}
+	})
 }
 
 func getEnv(key, defaultValue string) string {

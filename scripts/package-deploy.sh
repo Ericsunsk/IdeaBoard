@@ -12,12 +12,16 @@ if [[ -n "${1:-}" ]]; then
 elif [[ -f "$VERSION_FILE" ]]; then
   TAG="v$(tr -d '[:space:]' < "$VERSION_FILE")"
 else
-  echo "Missing version. Pass a tag like v0.01 or create VERSION." >&2
+  echo "Missing version. Pass a tag like v0.1.0 or create VERSION." >&2
   exit 1
 fi
 
+if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Warning: non-SemVer tag '$TAG' (recommended: vMAJOR.MINOR.PATCH)." >&2
+fi
+
 RELEASE_ROOT="$ROOT_DIR/release/$TAG"
-BUNDLE_NAME="feng-deploy-${TAG}-linux-amd64"
+BUNDLE_NAME="feng-bundle-${TAG}-linux-amd64"
 BUNDLE_DIR="$RELEASE_ROOT/$BUNDLE_NAME"
 ARCHIVE_PATH="$RELEASE_ROOT/${BUNDLE_NAME}.tar.gz"
 
@@ -58,19 +62,8 @@ cp "$BACKEND_BINARY_TMP" "$BACKEND_BINARY_DST"
 cp -R "$FRONTEND_DIST_DIR" "$BUNDLE_DIR/frontend/dist"
 cp "$ROOT_DIR/DEPLOYMENT.md" "$BUNDLE_DIR/DEPLOYMENT.md"
 cp "$ROOT_DIR/README.md" "$BUNDLE_DIR/README.md"
-
-cat > "$BUNDLE_DIR/backend/.env.example" <<'EOF'
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=replace-me
-DB_NAME=feng
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-REDIS_AUTH=
-APP_PORT=8080
-JWT_SECRET=replace-with-a-long-random-secret
-EOF
+cp "$ROOT_DIR/development.md" "$BUNDLE_DIR/development.md"
+cp "$BACKEND_DIR/.env.example" "$BUNDLE_DIR/backend/.env.example"
 
 cat > "$BUNDLE_DIR/deploy/systemd/feng.service" <<'EOF'
 [Unit]

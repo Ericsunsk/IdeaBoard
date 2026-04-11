@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,6 +21,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var featureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+
 type SegHandler struct {
 	segService  *service.SegService
 	taskRepo    *repository.TaskRepository
@@ -28,6 +31,17 @@ type SegHandler struct {
 
 func NewSegHandler(segService *service.SegService, taskRepo *repository.TaskRepository, kodoService *service.KodoService) *SegHandler {
 	return &SegHandler{segService: segService, taskRepo: taskRepo, kodoService: kodoService}
+}
+
+func normalizeFeatureSlug(raw string, fallback string) string {
+	slug := strings.ToLower(strings.TrimSpace(raw))
+	if slug == "" {
+		return fallback
+	}
+	if !featureSlugRe.MatchString(slug) {
+		return fallback
+	}
+	return slug
 }
 
 // GetConfig 获取分割抠图配置
@@ -94,6 +108,7 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 		UpscaleFactor int64  `json:"upscale_factor"`
 		OutputFormat  string `json:"output_format"`
 		OutputQuality int64  `json:"output_quality"`
+		Feature       string `json:"feature"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误: "+err.Error())
@@ -136,7 +151,8 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 	if modeName == "" {
 		modeName = req.Mode
 	}
-	prompt := fmt.Sprintf("[pattern-upscale] %s %dx", modeName, req.UpscaleFactor)
+	featureSlug := normalizeFeatureSlug(req.Feature, "pattern-upscale")
+	prompt := fmt.Sprintf("[%s] %s %dx", featureSlug, modeName, req.UpscaleFactor)
 
 	taskID := fmt.Sprintf("upscale_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
 	now := time.Now()
@@ -144,6 +160,7 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 		"image_url":      persistedURL,
 		"mode":           req.Mode,
 		"upscale_factor": req.UpscaleFactor,
+		"feature":        featureSlug,
 		"status":         "success",
 	})
 	task := &model.Task{
@@ -159,7 +176,7 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 		// 不影响返回结果
 	}
 
-	response.Success(c, gin.H{"image_url": persistedURL, "task_id": taskID})
+	response.Success(c, gin.H{"image_url": persistedURL, "task_id": taskID, "feature": featureSlug})
 }
 
 // SaveSegResult 保存分割结果到画廊（先持久化图片到对象存储或本地）
@@ -173,6 +190,7 @@ func (h *SegHandler) SaveSegResult(c *gin.Context) {
 	var req struct {
 		ResultURL string `json:"result_url" binding:"required"`
 		SegType   string `json:"seg_type" binding:"required"`
+		Feature   string `json:"feature"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
@@ -194,19 +212,25 @@ func (h *SegHandler) SaveSegResult(c *gin.Context) {
 	if typeName == "" {
 		typeName = "智能分割"
 	}
+	featureSlug := normalizeFeatureSlug(req.Feature, "")
+	prompt := typeName
+	if featureSlug != "" {
+		prompt = fmt.Sprintf("[%s] %s", featureSlug, typeName)
+	}
 
 	taskID := fmt.Sprintf("seg_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
 	now := time.Now()
 	resultJSON, _ := json.Marshal(map[string]interface{}{
 		"image_url": persistedURL,
 		"seg_type":  req.SegType,
+		"feature":   featureSlug,
 		"status":    "success",
 	})
 	task := &model.Task{
 		TaskID:      taskID,
 		UserID:      userID,
-		Prompt:      typeName,
-		UserPrompt:  typeName,
+		Prompt:      prompt,
+		UserPrompt:  prompt,
 		Status:      "completed",
 		Result:      string(resultJSON),
 		CompletedAt: &now,
@@ -216,7 +240,7 @@ func (h *SegHandler) SaveSegResult(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"image_url": persistedURL})
+	response.Success(c, gin.H{"image_url": persistedURL, "task_id": taskID, "feature": featureSlug})
 }
 
 // persistImage 将远程图片 URL 持久化到对象存储或本地

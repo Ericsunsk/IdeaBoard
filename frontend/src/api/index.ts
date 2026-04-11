@@ -188,7 +188,7 @@ export interface SubmitTaskData {
 export const segApi = {
   segment: (data: { image_url: string; seg_type: string; return_form?: string }): Promise<ApiResponse<{ result_url: string }>> =>
     api.post('/user/segment', data) as any,
-  save: (data: { result_url: string; seg_type: string }): Promise<ApiResponse<{ image_url: string }>> =>
+  save: (data: { result_url: string; seg_type: string; feature?: string }): Promise<ApiResponse<{ image_url: string; task_id: string }>> =>
     api.post('/user/segment/save', data) as any,
 }
 
@@ -280,7 +280,7 @@ export const patternStyleApi = {
 }
 
 export const upscaleApi = {
-  upscale: (data: { image_url: string; mode: string; upscale_factor: number; output_format: string; output_quality: number }): Promise<ApiResponse<{ image_url: string; task_id: string }>> =>
+  upscale: (data: { image_url: string; mode: string; upscale_factor: number; output_format: string; output_quality: number; feature?: string }): Promise<ApiResponse<{ image_url: string; task_id: string }>> =>
     api.post('/user/upscale', data, { timeout: 120000 }) as any,
 }
 

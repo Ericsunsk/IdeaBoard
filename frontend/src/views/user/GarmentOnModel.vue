@@ -39,7 +39,7 @@
             <div class="empty-icon-wrap">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#a3e635" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             </div>
-            <p class="chat-empty-text">款式上身</p>
+            <p class="chat-empty-text">{{ featureTitle }}</p>
             <p class="chat-empty-sub">上传款式图片，选择模特和姿势，一键生成上身效果</p>
           </div>
           <div v-for="msg in messages" :key="msg.id" :id="msg.taskId ? 'task-' + msg.taskId : undefined" class="chat-bubble" :class="msg.role">
@@ -79,7 +79,7 @@
       <!-- ====== 右侧：创作面板 ====== -->
       <aside class="control-panel">
         <div class="panel-top">
-          <div class="panel-tabs"><button class="panel-tab active">款式上身</button></div>
+          <div class="panel-tabs"><button class="panel-tab active">{{ featureTitle }}</button></div>
         </div>
         <div class="panel-scroll">
 
@@ -206,7 +206,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../stores/user'
 import { taskApi, modelTemplateApi, poseTemplateApi, uploadApi } from '../../api'
@@ -215,13 +215,20 @@ import { buildGalleryGroups } from '../../utils/galleryGroups'
 import { downloadImageByProxy, getTaskImageUrl as extractTaskImageUrl, stripFeaturePrefix } from '../../utils/task-history'
 import type { Task } from '../../api'
 
-const FEATURE_SLUG = 'garment-on-model'
-const FEATURE_TITLE = '款式上身'
-const FEATURE_PREFIX = `[${FEATURE_SLUG}] `
-
+const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const userStore = useUserStore()
+
+const featureSlug = computed(() => {
+  const raw = route.meta.slug
+  return typeof raw === 'string' && raw ? raw : 'garment-on-model'
+})
+const featureTitle = computed(() => {
+  const raw = route.meta.title
+  return typeof raw === 'string' && raw ? raw : '款式上身'
+})
+const featurePrefix = computed(() => `[${featureSlug.value}] `)
 
 function stripPrefix(str?: string) {
   return stripFeaturePrefix(str)
@@ -230,7 +237,7 @@ function stripPrefix(str?: string) {
 // ============ 画廊 ============
 const historyTasks = ref<Task[]>([])
 const activeTaskId = ref<string | null>(null)
-const galleryTasks = computed(() => historyTasks.value.filter(t => { if (t.status !== 'completed') return false; if (!t.prompt || !t.prompt.startsWith(FEATURE_PREFIX)) return false; try { return !!JSON.parse(t.result || '{}').image_url } catch { return false } }))
+const galleryTasks = computed(() => historyTasks.value.filter(t => { if (t.status !== 'completed') return false; if (!t.prompt || !t.prompt.startsWith(featurePrefix.value)) return false; try { return !!JSON.parse(t.result || '{}').image_url } catch { return false } }))
 function getTaskImageUrl(task: Task): string {
   return extractTaskImageUrl(task)
 }
@@ -238,10 +245,10 @@ function getTaskImageUrl(task: Task): string {
 async function loadHistory() { try { const res: any = await taskApi.list({ page: 1, page_size: 200 }); if (res.code === 0) { historyTasks.value = res.data.list || []; if (messages.value.length === 0) rebuildMessagesFromHistory() } } catch {} }
 
 function rebuildMessagesFromHistory() {
-  const tasks = historyTasks.value.filter(t => t.prompt && t.prompt.startsWith(FEATURE_PREFIX)).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).slice(-20)
+  const tasks = historyTasks.value.filter(t => t.prompt && t.prompt.startsWith(featurePrefix.value)).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).slice(-20)
   for (const task of tasks) {
     const imgUrl = getTaskImageUrl(task); const timeStr = task.created_at ? new Date(task.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : ''
-    messages.value.push({ id: 'hist_user_' + task.task_id, role: 'user', prompt: stripPrefix(task.prompt) || FEATURE_TITLE, time: timeStr })
+    messages.value.push({ id: 'hist_user_' + task.task_id, role: 'user', prompt: stripPrefix(task.prompt) || featureTitle.value, time: timeStr })
     if (task.status === 'completed' && imgUrl) { let elapsed: string | undefined; if (task.completed_at && task.created_at) { const t = new Date(task.updated_at).getTime() - new Date(task.created_at).getTime(); if (t > 0) elapsed = (t / 1000).toFixed(1) }; messages.value.push({ id: 'hist_ai_' + task.task_id, role: 'assistant', prompt: task.prompt || '', status: 'completed', imageUrl: imgUrl, taskId: task.task_id, elapsed }) }
     else if (task.status === 'failed') { messages.value.push({ id: 'hist_ai_' + task.task_id, role: 'assistant', prompt: task.prompt || '', status: 'failed', errorMsg: task.error_msg || '生成失败', taskId: task.task_id }) }
   }
@@ -250,7 +257,7 @@ function rebuildMessagesFromHistory() {
 
 function viewHistoryTask(task: Task) {
   activeTaskId.value = task.task_id; const imgUrl = getTaskImageUrl(task)
-  if (imgUrl) { const existing = messages.value.find(m => m.taskId === task.task_id); if (!existing) { messages.value.push({ id: 'hist_user_' + task.task_id, role: 'user', prompt: stripPrefix(task.prompt) || FEATURE_TITLE }); messages.value.push({ id: 'hist_ai_' + task.task_id, role: 'assistant', prompt: task.prompt || '', status: 'completed', imageUrl: imgUrl, taskId: task.task_id }); scrollToBottom() } else { const el = document.getElementById('task-' + task.task_id); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('highlight'); setTimeout(() => el.classList.remove('highlight'), 2000) } } }
+  if (imgUrl) { const existing = messages.value.find(m => m.taskId === task.task_id); if (!existing) { messages.value.push({ id: 'hist_user_' + task.task_id, role: 'user', prompt: stripPrefix(task.prompt) || featureTitle.value }); messages.value.push({ id: 'hist_ai_' + task.task_id, role: 'assistant', prompt: task.prompt || '', status: 'completed', imageUrl: imgUrl, taskId: task.task_id }); scrollToBottom() } else { const el = document.getElementById('task-' + task.task_id); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('highlight'); setTimeout(() => el.classList.remove('highlight'), 2000) } } }
 }
 
 // ============ 删除 ============
@@ -362,7 +369,7 @@ async function handleGenerate() {
   if (!canGenerate.value) return
   generating.value = true
 
-  const promptText = userPrompt.value.trim() || FEATURE_TITLE
+  const promptText = userPrompt.value.trim() || featureTitle.value
   const timeStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   const userMsgId = 'user_' + Date.now()
   messages.value.push({ id: userMsgId, role: 'user', prompt: promptText, time: timeStr, refImageUrls: [...garmentImages.value] })
@@ -373,12 +380,12 @@ async function handleGenerate() {
       image_urls: garmentImages.value,
       model_url: finalModelUrl.value,
       pose_url: selectedPoseUrl.value,
-      feature: FEATURE_SLUG,
+      feature: featureSlug.value,
     }
 
     const res: any = await taskApi.submit({
       prompt: promptText,
-      feature: FEATURE_SLUG,
+      feature: featureSlug.value,
       params,
     })
 
