@@ -27,6 +27,7 @@ Thumbs.db
 # ===== Env / Secrets =====
 .env
 .env.*
+!backend/.env.example
 
 # ===== Release Artifacts =====
 release/
