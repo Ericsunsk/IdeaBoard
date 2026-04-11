@@ -62,7 +62,7 @@ cp "$BACKEND_BINARY_TMP" "$BACKEND_BINARY_DST"
 cp -R "$FRONTEND_DIST_DIR" "$BUNDLE_DIR/frontend/dist"
 cp "$ROOT_DIR/DEPLOYMENT.md" "$BUNDLE_DIR/DEPLOYMENT.md"
 cp "$ROOT_DIR/README.md" "$BUNDLE_DIR/README.md"
-cp "$ROOT_DIR/development.md" "$BUNDLE_DIR/development.md"
+cp "$ROOT_DIR/DEVELOPMENT.md" "$BUNDLE_DIR/DEVELOPMENT.md"
 cp "$BACKEND_DIR/.env.example" "$BUNDLE_DIR/backend/.env.example"
 
 cat > "$BUNDLE_DIR/deploy/systemd/feng.service" <<'EOF'

@@ -1,241 +1,343 @@
-# FENG 部署说明
+# FENG 服务器部署步骤
 
-本文档用于 `FENG` 项目的部署、发布和回滚。
+本文档基于已经生成好的发布包进行部署，适用于 `Linux amd64` 服务器。  
+发布包命名规则：
 
-说明：
+- 部署包：`feng-bundle-${TAG}-linux-amd64.tar.gz`
+- 示例下载：`https://github.com/2837123/Feng-AI/releases/download/v0.1.0/feng-bundle-v0.1.0-linux-amd64.tar.gz`
+- SHA256：以 Release 页面（`SHA256SUMS.txt`）为准
 
-- 仓库发布号建议使用 `SemVer`：`vMAJOR.MINOR.PATCH`（例如 `v0.1.0`）
-- 前端 `package.json` 使用兼容 `npm` 的 `SemVer`：`0.0.1`
+以下步骤默认使用：
 
-## 1. 部署目标
+- 前端：`Nginx` 托管静态文件
+- 后端：`systemd` 守护 `feng-server`
+- 数据库：`MySQL 5.7+`
+- 缓存：`Redis 7+`
 
-当前项目形态：
+如果你的服务器已经有 `MySQL`、`Redis`、`Nginx`，可以跳过对应安装步骤。
 
-- 前端：`Vue 3 + Vite`，构建后产物位于 `frontend/dist/`
-- 后端：`Gin` HTTP 服务
-- 基础设施：`MySQL 5.7 + Redis 7`
+## 1. 服务器准备
 
-推荐部署方式：
+确认服务器满足以下条件：
 
-1. `MySQL / Redis` 继续用 Docker 或宿主机现成服务
-2. 前端用 `Nginx` 托管静态文件
-3. 后端用 `systemd` 或进程守护方式运行
+- 系统：`Linux amd64`
+- 已开放端口：`80`（Nginx），`8080`（后端仅本机回环即可）
+- 已安装：`tar`、`nginx`、`mysql`、`redis`
 
-## 2. 服务器要求
-
-- Linux `amd64`
-- `Go 1.22+`
-- `Node.js 20+`
-- `Nginx`
-- `MySQL 5.7+`
-- `Redis 7+`
-- 如果启用转矢量功能，还需要 `potrace`
-
-## 3. 关键环境变量
-
-后端支持以下环境变量：
-
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `DB_HOST` | `localhost` | MySQL Host |
-| `DB_PORT` | `3306` | MySQL Port |
-| `DB_USER` | `root` | MySQL User |
-| `DB_PASSWORD` | `root123` | MySQL Password |
-| `DB_NAME` | `feng` | Database Name |
-| `REDIS_HOST` | `localhost` | Redis Host |
-| `REDIS_PORT` | `6379` | Redis Port |
-| `REDIS_AUTH` | 空 | Redis Password |
-| `APP_PORT` | `8080` | Backend Port |
-| `JWT_SECRET` | 无固定默认值 | 生产环境必须显式设置 |
-
-生产建议：
-
-- 不要依赖默认数据库密码
-- `JWT_SECRET` 必须设置为高强度随机值
-- 生产环境建议关闭调试日志落盘，或单独接日志系统
-
-## 4. 本地打包
-
-### 前端
+如果是 Ubuntu / Debian，可以执行：
 
 ```bash
-cd frontend
-npm install
-npm run build
+sudo apt update
+sudo apt install -y nginx redis-server mysql-server
 ```
 
-### 后端
-
-当前机器本地构建：
+如果需要转矢量功能，还要安装：
 
 ```bash
-cd backend
-go build ./...
+sudo apt install -y potrace
 ```
 
-Linux 发布二进制：
+## 2. 获取发布包到服务器
+
+从 GitHub Release 拉取：
 
 ```bash
-cd backend
+ssh root@你的服务器IP
+cd /root
 TAG=v0.1.0
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o feng-backend-${TAG}-linux-amd64 ./cmd/main.go
+BUNDLE="feng-bundle-${TAG}-linux-amd64.tar.gz"
+curl -L -o "$BUNDLE" \
+  "https://github.com/2837123/Feng-AI/releases/download/${TAG}/${BUNDLE}"
 ```
 
-## 5. 推荐部署目录
+校验文件完整性：
+
+```bash
+cd /root
+sha256sum "$BUNDLE"
+```
+
+输出中应包含文件名：
+
+```text
+<sha256>  $BUNDLE
+```
+
+## 3. 解压到部署目录
+
+建议部署目录：
 
 ```text
 /opt/feng/
 ├── backend/
-│   ├── feng-server
-│   ├── .env
-│   └── uploads/
 ├── frontend/
-│   └── dist/
+├── deploy/
 └── logs/
 ```
 
-## 6. 首次部署步骤
-
-### 6.1 启动数据库
-
-如果沿用仓库内 Docker 配置：
+执行：
 
 ```bash
-cd docker
-docker compose up -d
+mkdir -p /opt/feng/releases
+mkdir -p /opt/feng/logs
+cd /opt/feng/releases
+tar -xzf "/root/${BUNDLE}"
+RELEASE_DIR="/opt/feng/releases/feng-bundle-${TAG}-linux-amd64"
+rm -rf /opt/feng/backend /opt/feng/frontend /opt/feng/deploy
+cp -R "${RELEASE_DIR}/backend" /opt/feng/backend
+cp -R "${RELEASE_DIR}/frontend" /opt/feng/frontend
+cp -R "${RELEASE_DIR}/deploy" /opt/feng/deploy
 ```
 
-### 6.2 初始化管理员账号
+## 4. 准备 MySQL 和 Redis
+
+### 4.1 创建数据库
+
+进入 MySQL：
 
 ```bash
-cd backend
-go run cmd/main.go init-admin
+mysql -uroot -p
 ```
 
-默认账号：
+执行：
+
+```sql
+CREATE DATABASE feng DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'feng'@'127.0.0.1' IDENTIFIED BY '请替换为强密码';
+GRANT ALL PRIVILEGES ON feng.* TO 'feng'@'127.0.0.1';
+FLUSH PRIVILEGES;
+```
+
+### 4.2 启动 Redis
+
+确认 Redis 已运行：
+
+```bash
+sudo systemctl enable redis-server
+sudo systemctl restart redis-server
+sudo systemctl status redis-server --no-pager
+```
+
+如果你的系统服务名是 `redis`，把上面的 `redis-server` 替换成 `redis`。
+
+## 5. 配置后端环境变量
+
+复制环境变量模板：
+
+```bash
+cp /opt/feng/backend/.env.example /opt/feng/backend/.env
+```
+
+编辑：
+
+```bash
+nano /opt/feng/backend/.env
+```
+
+环境变量字段的完整说明统一维护在 `DEVELOPMENT.md` 的“环境变量（后端）”章节。
+
+这里仅列生产部署必须确认项：
+
+- `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`：必须与线上 MySQL 实际账号一致
+- `REDIS_HOST/REDIS_PORT/REDIS_AUTH`：必须与线上 Redis 配置一致
+- `APP_PORT`：与 systemd/Nginx 反向代理端口一致（默认 `8080`）
+- `JWT_SECRET`：必须替换为足够长的随机字符串
+
+额外建议：
+
+- 生产环境不要继续使用默认数据库账号 `root/root123`
+- 如果 Redis 开启了密码，必须配置 `REDIS_AUTH`
+
+## 6. 初始化管理员账号
+
+进入后端目录并加载环境变量：
+
+```bash
+cd /opt/feng/backend
+set -a
+source /opt/feng/backend/.env
+set +a
+./feng-server init-admin
+```
+
+默认管理员账号：
 
 - 用户名：`admin`
 - 密码：`admin123`
 
-首次登录后建议立刻修改。
+首次登录后请立即修改密码。
 
-### 6.3 启动后端
+## 7. 配置 systemd 启动后端
+
+把打包产物里的 service 文件复制到系统目录：
 
 ```bash
-cd backend
-JWT_SECRET='replace-with-a-long-random-secret' APP_PORT=8080 ./feng-server
+cp /opt/feng/deploy/systemd/feng.service /etc/systemd/system/feng.service
 ```
 
-### 6.4 部署前端
+重新加载并启动：
 
-将 `frontend/dist/` 发布到 `Nginx` 静态目录。
+```bash
+systemctl daemon-reload
+systemctl enable feng
+systemctl restart feng
+systemctl status feng --no-pager
+```
 
-## 7. Nginx 示例
+查看日志：
+
+```bash
+journalctl -u feng -n 100 --no-pager
+```
+
+如果启动失败，先检查：
+
+- `/opt/feng/backend/.env` 是否存在
+- MySQL 和 Redis 是否可连接
+- `JWT_SECRET` 是否已配置
+
+## 8. 配置 Nginx
+
+复制站点配置：
+
+```bash
+cp /opt/feng/deploy/nginx/feng.conf /etc/nginx/sites-available/feng.conf
+ln -sf /etc/nginx/sites-available/feng.conf /etc/nginx/sites-enabled/feng.conf
+rm -f /etc/nginx/sites-enabled/default
+```
+
+测试配置并重载：
+
+```bash
+nginx -t
+systemctl reload nginx
+systemctl enable nginx
+```
+
+如果你有正式域名，把配置里的：
 
 ```nginx
-server {
-    listen 80;
-    server_name _;
-
-    root /opt/feng/frontend/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /uploads/ {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+server_name _;
 ```
 
-## 8. systemd 示例
+改成你的域名，例如：
 
-```ini
-[Unit]
-Description=FENG Backend
-After=network.target
-
-[Service]
-WorkingDirectory=/opt/feng/backend
-ExecStart=/opt/feng/backend/feng-server
-Restart=always
-RestartSec=3
-Environment=APP_PORT=8080
-Environment=DB_HOST=127.0.0.1
-Environment=DB_PORT=3306
-Environment=DB_USER=root
-Environment=DB_PASSWORD=replace-me
-Environment=DB_NAME=feng
-Environment=REDIS_HOST=127.0.0.1
-Environment=REDIS_PORT=6379
-Environment=JWT_SECRET=replace-with-a-long-random-secret
-
-[Install]
-WantedBy=multi-user.target
+```nginx
+server_name ai.example.com;
 ```
 
-## 9. 发布检查
+## 9. 验证部署
 
-发布后至少检查以下内容：
-
-1. `GET /api/health` 返回成功
-2. 用户登录正常
-3. 管理员登录正常
-4. 上传图片正常
-5. `/uploads/*` 可访问
-6. 提交任务后状态可轮询
-
-## 10. GitHub Actions 自动发布
-
-仓库已支持自动发布 Workflow：
-
-1. 本地完成版本变更后，提交到 `main`
-2. 推送一个符合 `v*` 规则的 tag，例如：
+先检查后端健康接口：
 
 ```bash
-git tag -a v0.1.0 -m "发布 v0.1.0"
-git push origin main
-git push origin v0.1.0
+curl http://127.0.0.1:8080/api/health
 ```
 
-3. GitHub Actions 会自动执行：
+预期返回包含：
 
-- 前端 `npm ci && npm run build`
-- 后端构建 `linux/amd64` 和 `darwin/arm64` 二进制（命名：`feng-backend-<tag>-<os>-<arch>`）
-- 打包前端产物（命名：`feng-frontend-<tag>.tar.gz`）
-- 组装一体化部署包（命名：`feng-bundle-<tag>-linux-amd64.tar.gz`）
-- 生成 `RELEASE_INFO.txt`
-- 生成 `SHA256SUMS.txt`
-- 自动创建或更新对应 GitHub Release
+```json
+{"code":0,"data":{"status":"ok"},"message":"success"}
+```
 
-也支持在 GitHub Actions 页面通过 `workflow_dispatch` 手动输入 tag 重新发布。
+再检查 Nginx：
 
-## 11. 回滚建议
+```bash
+curl -I http://127.0.0.1/
+curl http://127.0.0.1/api/health
+```
 
-如果某个版本发布后要快速回滚：
+浏览器访问：
 
-1. 保留上一个可用版本的前端 `dist/`
-2. 保留上一个可用版本的后端二进制
-3. 回滚时优先替换前后端文件，再重启后端进程
-4. 避免在回滚时做额外 schema 变更
+- `http://你的服务器IP/`
 
-## 12. 产物命名规范
+上线前至少确认：
 
-- 后端：`feng-backend-<tag>-<os>-<arch>`
-- 前端：`feng-frontend-<tag>.tar.gz`
-- 部署包：`feng-bundle-<tag>-linux-amd64.tar.gz`
-- 发布目录：`release/<tag>/`
+1. 首页能正常打开
+2. `/api/health` 返回成功
+3. 管理员可以登录
+4. 图片上传正常
+5. `/uploads/*` 可以访问
+6. 提交任务后可以轮询到状态
+
+## 10. 常用运维命令
+
+重启后端：
+
+```bash
+systemctl restart feng
+```
+
+查看后端状态：
+
+```bash
+systemctl status feng --no-pager
+```
+
+查看后端日志：
+
+```bash
+journalctl -u feng -f
+```
+
+重载 Nginx：
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+## 11. 更新版本
+
+以后升级新版本时，重复以下流程：
+
+1. 从 GitHub Release 下载新的 `tar.gz` 包到服务器
+2. 解压到 `/opt/feng/releases/`
+3. 用新版本覆盖 `/opt/feng/backend`、`/opt/feng/frontend`、`/opt/feng/deploy`
+4. 保留原有 `/opt/feng/backend/.env`
+5. 执行 `systemctl restart feng`
+6. 检查 `curl http://127.0.0.1:8080/api/health`
+
+建议不要在升级时删除：
+
+- `/opt/feng/backend/.env`
+- `/opt/feng/backend/uploads/`
+
+## 12. 回滚方法
+
+如果新版本有问题：
+
+1. 回到 `/opt/feng/releases/` 中上一个版本目录
+2. 重新复制旧版 `backend`、`frontend`、`deploy`
+3. 执行 `systemctl restart feng`
+4. 再次检查健康接口
+
+## 13. 当前这次部署最短执行路径
+
+如果你已经有一台装好 `Nginx + MySQL + Redis` 的服务器，最短流程就是：
+
+```bash
+ssh root@你的服务器IP
+cd /root
+TAG=v0.1.0
+BUNDLE="feng-bundle-${TAG}-linux-amd64.tar.gz"
+curl -L -o "$BUNDLE" \
+  "https://github.com/2837123/Feng-AI/releases/download/${TAG}/${BUNDLE}"
+sha256sum "$BUNDLE"
+mkdir -p /opt/feng/releases /opt/feng/logs
+cd /opt/feng/releases
+tar -xzf "/root/${BUNDLE}"
+RELEASE_DIR="/opt/feng/releases/feng-bundle-${TAG}-linux-amd64"
+cp -R "${RELEASE_DIR}/backend" /opt/feng/backend
+cp -R "${RELEASE_DIR}/frontend" /opt/feng/frontend
+cp -R "${RELEASE_DIR}/deploy" /opt/feng/deploy
+cp /opt/feng/backend/.env.example /opt/feng/backend/.env
+nano /opt/feng/backend/.env
+cd /opt/feng/backend && set -a && source .env && set +a && ./feng-server init-admin
+cp /opt/feng/deploy/systemd/feng.service /etc/systemd/system/feng.service
+systemctl daemon-reload && systemctl enable feng && systemctl restart feng
+cp /opt/feng/deploy/nginx/feng.conf /etc/nginx/sites-available/feng.conf
+ln -sf /etc/nginx/sites-available/feng.conf /etc/nginx/sites-enabled/feng.conf
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
+curl http://127.0.0.1:8080/api/health
+```

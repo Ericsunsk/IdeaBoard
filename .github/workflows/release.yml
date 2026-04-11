@@ -104,7 +104,7 @@ jobs:
           cp backend/.env.example "$BUNDLE_DIR/backend/.env.example"
           cp README.md "$BUNDLE_DIR/README.md"
           cp DEPLOYMENT.md "$BUNDLE_DIR/DEPLOYMENT.md"
-          cp development.md "$BUNDLE_DIR/development.md"
+          cp DEVELOPMENT.md "$BUNDLE_DIR/DEVELOPMENT.md"
 
           cat > "$BUNDLE_DIR/deploy/systemd/feng.service" <<'EOF'
           [Unit]

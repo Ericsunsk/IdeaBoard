@@ -117,9 +117,8 @@ FENG/
 │       ├── redis/
 │       └── response/
 ├── docker/                      # Docker 配置
-├── DEPLOYMENT.md                # 部署/发布说明
-├── 部署步骤.md                   # 服务器部署详细步骤
-├── development.md               # 开发文档（本文件）
+├── DEPLOYMENT.md                # 服务器部署详细步骤
+├── DEVELOPMENT.md               # 开发文档（本文件）
 └── README.md                    # 项目总览与快速部署
 ```
 
