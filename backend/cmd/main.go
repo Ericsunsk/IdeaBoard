@@ -408,7 +408,7 @@ func registerFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 	}
 
 	serveIndex := func(c *gin.Context) {
-		c.FileFromFS("index.html", http.FS(frontendFS))
+		c.FileFromFS("/index.html", http.FS(frontendFS))
 	}
 
 	r.GET("/", serveIndex)
@@ -431,7 +431,7 @@ func registerFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 
 		if requestPath != "" {
 			if _, err := iofs.Stat(frontendFS, requestPath); err == nil {
-				c.FileFromFS(requestPath, http.FS(frontendFS))
+				c.FileFromFS("/"+requestPath, http.FS(frontendFS))
 				return
 			}
 		}
