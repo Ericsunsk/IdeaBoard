@@ -55,7 +55,7 @@ const desc = computed(() => {
 })
 
 function goHome() {
-  router.push('/user/home')
+  router.push('/user/picture')
 }
 </script>
 

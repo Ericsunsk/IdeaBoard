@@ -2,6 +2,7 @@
 export interface User {
   id: number
   username: string
+  avatar?: string
   role: string
   status: number
   created_at: string

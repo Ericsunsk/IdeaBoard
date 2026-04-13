@@ -10,13 +10,13 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/user/login',
     name: 'UserLogin',
-    component: () => import('../views/user/Login.vue'),
+    redirect: { path: '/user/home', query: { auth: 'login' } },
     meta: { guest: true }
   },
   {
     path: '/user/register',
     name: 'UserRegister',
-    component: () => import('../views/user/Register.vue'),
+    redirect: { path: '/user/home', query: { auth: 'register' } },
     meta: { guest: true }
   },
   {
@@ -26,6 +26,11 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'home',
         name: 'UserHome',
+        component: () => import('../views/user/HomeBlank.vue'),
+      },
+      {
+        path: 'picture',
+        name: 'UserPicture',
         component: () => import('../views/user/Home.vue'),
       },
       {
