@@ -163,7 +163,7 @@
     </div>
 
     <!-- ⑥ 内容展示区 -->
-    <div class="canvas-content" ref="chatMessagesRef">
+    <div class="canvas-content">
        <div 
           v-for="msg in messages" 
           :key="msg.id" 

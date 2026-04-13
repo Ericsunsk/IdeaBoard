@@ -88,59 +88,12 @@ import RegisterModal from "../../components/RegisterModal.vue";
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
-const featuresRef = ref<HTMLElement | null>(null);
 const showLoginModal = ref(false);
 const showRegisterModal = ref(false);
-
-// 动态主题系统
-const themes = [
-    {
-        name: "Siri Glow",
-        primary: "#3b82f6",
-        secondary: "#a855f7",
-        tertiary: "#ec4899",
-    },
-    {
-        name: "Aurora",
-        primary: "#10b981",
-        secondary: "#3b82f6",
-        tertiary: "#a3e635",
-    },
-    {
-        name: "Sunset",
-        primary: "#f97316",
-        secondary: "#eab308",
-        tertiary: "#ef4444",
-    },
-    {
-        name: "Cosmic",
-        primary: "#8b5cf6",
-        secondary: "#6366f1",
-        tertiary: "#d946ef",
-    },
-    {
-        name: "Original",
-        primary: "#a3e635",
-        secondary: "#34d399",
-        tertiary: "#10b981",
-    },
-];
-
-const currentTheme = ref(themes[0]);
-
-const themeStyles = computed(() => ({
-    "--theme-primary": currentTheme.value.primary,
-    "--theme-secondary": currentTheme.value.secondary,
-    "--theme-tertiary": currentTheme.value.tertiary,
-}));
 
 const primaryActionText = computed(() =>
     userStore.isLoggedIn ? "Get started" : "Sign in"
 );
-
-function navigateTo(path: string) {
-    router.push(path);
-}
 
 function startJourney() {
     if (userStore.isLoggedIn) {
@@ -244,10 +197,6 @@ onMounted(() => {
 });
 
 function scrollToFeatures() {
-    if (featuresRef.value) {
-        featuresRef.value.scrollIntoView({ behavior: "smooth" });
-        return;
-    }
     const container = document.querySelector(".home-blank") as HTMLElement | null;
     if (container) {
         container.scrollTo({ top: container.clientHeight, behavior: "smooth" });

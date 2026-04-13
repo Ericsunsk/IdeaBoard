@@ -1,7 +1,7 @@
 <template>
   <div class="user-layout">
     <!-- ========== 顶部导航 ========== -->
-    <header v-if="!['/user/home', '/user/picture', '/user', '/user/center'].includes(route.path)" class="top-header" :class="{ 'transparent-header': isHome, 'header-hidden': !showHeader }">
+    <header v-if="!['/user/home', '/user/picture', '/user', '/user/center'].includes(route.path)" class="top-header">
       <n-menu
         v-model:value="activeKey"
         mode="horizontal"
@@ -19,49 +19,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NMenu } from 'naive-ui'
 import type { MenuOption } from 'naive-ui'
 
 const router = useRouter()
 const route = useRoute()
-
-const isHome = computed(() => 
-  route.path === '/user/home' || 
-  route.path === '/user' || 
-  route.path === '/user/picture'
-)
-const showHeader = ref(true)
-let lastScrollTop = 0
-
-function handleScroll(e: Event) {
-  if (!isHome.value) {
-    showHeader.value = true
-    return
-  }
-  
-  const target = e.target as HTMLElement
-  if (target && target.classList && target.classList.contains('home-blank')) {
-    const st = target.scrollTop
-    if (st > lastScrollTop && st > 50) {
-      // scroll down
-      showHeader.value = false
-    } else if (st < lastScrollTop) {
-      // scroll up
-      showHeader.value = true
-    }
-    lastScrollTop = st
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll, true)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('scroll', handleScroll, true)
-})
 
 const activeKey = ref<string>('free')
 
@@ -191,19 +155,6 @@ watch(
   transition: background-color 0.3s, border-color 0.3s, transform 0.3s ease;
 }
 
-.top-header.header-hidden {
-  transform: translateY(-100%);
-}
-
-.top-header.transparent-header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: transparent;
-  border-bottom: 1px solid transparent;
-}
-
 .layout-content {
   flex: 1;
   min-height: 0;
@@ -233,27 +184,6 @@ watch(
   --n-item-height: 46px;
   --n-font-size: 14px;
   --n-border-radius: 6px;
-}
-
-/* 仅在首页透明背景时强制文字为黑色 */
-.transparent-header :deep(.n-menu.n-menu--horizontal) {
-  --n-item-text-color: #1d1d1f !important;
-  --n-item-text-color-hover: #000000 !important;
-  --n-item-text-color-active: #000000 !important;
-  --n-item-text-color-active-hover: #000000 !important;
-  --n-item-text-color-child-active: #000000 !important;
-  --n-item-text-color-child-active-hover: #000000 !important;
-  --n-arrow-color: #1d1d1f !important;
-  --n-arrow-color-hover: #000000 !important;
-  --n-arrow-color-active: #000000 !important;
-}
-
-.transparent-header :deep(.n-menu-item-content-header),
-.transparent-header :deep(.n-menu-item-content-header a),
-.transparent-header :deep(.n-submenu-children),
-.transparent-header :deep(.n-menu-item-content) {
-  color: #1d1d1f !important;
-  font-weight: 600 !important;
 }
 
 :deep(.n-menu.n-menu--horizontal .n-menu-item-content) {
