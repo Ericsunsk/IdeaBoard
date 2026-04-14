@@ -135,7 +135,27 @@
         </div>
       </transition>
 
-      <div class="prompt-container">
+      <div v-if="selectedPreviewItems.length > 0" class="selected-preview-bar" @mousedown.stop>
+        <div class="selected-preview-header">
+          <span class="selected-preview-count">{{ selectedPreviewItems.length }} selected</span>
+          <button class="clear-selected-btn" type="button" @click="clearSelectedIds">Clear</button>
+        </div>
+        <div class="selected-preview-list">
+          <button
+            v-for="item in visiblePreviewItems"
+            :key="item.id"
+            type="button"
+            class="selected-preview-item"
+            @click="focusSelectedItem(item.id)"
+          >
+            <img :src="item.url" class="selected-preview-image" />
+            <span class="selected-preview-remove" @click.stop="removeSelectedId(item.id)">×</span>
+          </button>
+          <div v-if="previewOverflowCount > 0" class="selected-preview-overflow">+{{ previewOverflowCount }}</div>
+        </div>
+      </div>
+
+      <div class="prompt-container" @mousedown.stop>
         <button class="add-btn" :class="{ active: showSettings }" @click="showSettings = !showSettings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -388,7 +408,31 @@ function handleKey(e: KeyboardEvent) {
 }
 
 function handleWheel(e: WheelEvent) {
-  if (e.ctrlKey || e.metaKey) { e.preventDefault(); updateZoom(e.deltaY > 0 ? -5 : 5) }
+  const target = e.target as HTMLElement | null
+  if (!target || !target.closest('.canvas-layout')) return
+  const wheelPanSpeed = 1.5
+
+  // 保留设置面板和缩略图条自己的滚动行为
+  if (target.closest('.settings-panel') || target.closest('.selected-preview-list')) return
+
+  // Option(Mac)/Alt(Win) + 滚轮：缩放
+  if (e.altKey) {
+    e.preventDefault()
+    updateZoom(e.deltaY > 0 ? -5 : 5)
+    return
+  }
+
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault()
+    // Ctrl/Cmd + 滚轮：强制横向平移
+    const horizontalDelta = (Math.abs(e.deltaX) > 0 ? e.deltaX : e.deltaY) * wheelPanSpeed
+    canvasX.value -= horizontalDelta
+    return
+  }
+
+  e.preventDefault()
+  canvasX.value -= e.deltaX * wheelPanSpeed
+  canvasY.value -= e.deltaY * wheelPanSpeed
 }
 
 async function handleDrop(e: DragEvent) {
@@ -416,12 +460,37 @@ const canvasStyle = computed(() => ({
   '--grid-opacity': zoomLevel.value > 80 ? 1 : 0,
 }))
 
+const selectedPreviewItems = computed(() => {
+  const messageMap = new Map(messages.value.map(item => [item.id, item]))
+  return selectedIds.value
+    .map(id => messageMap.get(id))
+    .filter((item): item is any => !!item && item.type === 'image' && !!item.url)
+})
+const visiblePreviewItems = computed(() => selectedPreviewItems.value.slice(0, 6))
+const previewOverflowCount = computed(() => Math.max(0, selectedPreviewItems.value.length - visiblePreviewItems.value.length))
+
 const styleCards = ref<StyleCard[]>([])
 const selectedCardIds = ref<number[]>([])
 const selectedRatio = ref('3:4')
 const selectedResolution = ref('1K')
 const currentTaskId = ref<string | null>(null)
 let pollTimer: number | null = null
+
+function clearSelectedIds() {
+  selectedIds.value = []
+}
+
+function removeSelectedId(id: number) {
+  selectedIds.value = selectedIds.value.filter(selectedId => selectedId !== id)
+}
+
+function focusSelectedItem(id: number) {
+  const target = messages.value.find(item => item.id === id)
+  if (!target) return
+  const zoom = zoomLevel.value / 100
+  canvasX.value = -(target.x * zoom)
+  canvasY.value = -(target.y * zoom)
+}
 
 function toggleCard(id: number) {
   const idx = selectedCardIds.value.indexOf(id)
@@ -783,7 +852,105 @@ onUnmounted(() => {
 .slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .slide-up-enter-from, .slide-up-leave-to { opacity: 0; transform: translateY(20px); }
 
-.prompt-container { background: #fff; height: 56px; border-radius: 28px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 12px; border: 1px solid #e2e4e8; }
+.selected-preview-bar {
+  margin-bottom: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 228, 232, 0.95);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  padding: 10px 12px;
+}
+
+.selected-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.selected-preview-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+}
+
+.clear-selected-btn {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9278e6;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.selected-preview-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.selected-preview-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.selected-preview-list::-webkit-scrollbar-thumb {
+  background: #d7dbe3;
+  border-radius: 999px;
+}
+
+.selected-preview-item {
+  position: relative;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 2px solid #9278e6;
+  padding: 0;
+  background: #fff;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.selected-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.selected-preview-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.68);
+  color: #fff;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.selected-preview-overflow {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px dashed #cfd5e3;
+  color: #6f7787;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f7f8fb;
+}
+
+.prompt-container { background: #fff; height: 56px; border-radius: 28px; padding: 0 8px; display: flex; align-items: center; gap: 12px; border: 1px solid #e2e4e8; }
 .prompt-container input { flex: 1; border: none; outline: none; font-size: 16px; }
 .add-btn, .send-btn { width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .send-btn { background: #f1f3f9; color: #9278e6; }
