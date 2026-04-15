@@ -34,34 +34,34 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/user/Home.vue'),
       },
       {
+        path: 'boards',
+        name: 'UserBoards',
+        component: () => import('../views/user/CanvasBoards.vue'),
+      },
+      {
         path: 'center',
         name: 'UserCenter',
         component: () => import('../views/user/Center.vue'),
         meta: { requiresAuth: true }
       },
-      {
-        path: 'line-draft',
-        name: 'LineDraft',
-        component: () => import('../views/user/LineDraft.vue'),
-        meta: { requiresAuth: true }
-      },
       // 服装实验室
-      { path: 'sketch-to-design', name: 'SketchToDesign', component: () => import('../views/user/SketchToDesign.vue'), meta: { requiresAuth: true, title: '线稿成款', slug: 'sketch-to-design' } },
+      { path: 'line-draft', redirect: '/user/picture' },
+      { path: 'sketch-to-design', redirect: '/user/picture' },
       { path: 'partial-edit', name: 'PartialEdit', component: () => import('../views/user/PartialEdit.vue'), meta: { requiresAuth: true, title: '局部改款', slug: 'partial-edit' } },
-      { path: 'style-innovate', name: 'StyleInnovate', component: () => import('../views/user/StyleInnovate.vue'), meta: { requiresAuth: true, title: '款式创新', slug: 'style-innovate' } },
+      { path: 'style-innovate', redirect: '/user/picture' },
       { path: 'style-fusion', name: 'StyleFusion', component: () => import('../views/user/StyleFusion.vue'), meta: { requiresAuth: true, title: '风格融合', slug: 'style-fusion' } },
       { path: 'series-color', name: 'SeriesColor', component: () => import('../views/user/SeriesColor.vue'), meta: { requiresAuth: true, title: '系列配色', slug: 'series-color' } },
       { path: 'directed-recolor', name: 'DirectedRecolor', component: () => import('../views/user/DirectedRecolor.vue'), meta: { requiresAuth: true, title: '定向换色', slug: 'directed-recolor' } },
       { path: 'fabric-on-body', name: 'FabricOnBody', component: () => import('../views/user/FabricOnBody.vue'), meta: { requiresAuth: true, title: '面料上身', slug: 'fabric-on-body' } },
       { path: 'pattern-on-body', name: 'PatternOnBody', component: () => import('../views/user/PatternOnBody.vue'), meta: { requiresAuth: true, title: '图案上身', slug: 'pattern-on-body' } },
       // 摄影商拍
-      { path: 'multi-angle', name: 'MultiAngle', component: () => import('../views/user/MultiAngle.vue'), meta: { requiresAuth: true, title: '模特多角度', slug: 'multi-angle' } },
+      { path: 'multi-angle', redirect: '/user/picture' },
       { path: 'virtual-3d', name: 'Virtual3D', component: () => import('../views/user/Virtual3D.vue'), meta: { requiresAuth: true, title: '虚拟 3D', slug: 'virtual-3d' } },
       { path: 'mannequin-to-model', name: 'MannequinToModel', component: () => import('../views/user/MannequinToModel.vue'), meta: { requiresAuth: true, title: '人台变模特', slug: 'mannequin-to-model' } },
       { path: 'face-swap', name: 'FaceSwap', component: () => import('../views/user/FaceSwap.vue'), meta: { requiresAuth: true, title: '定向换脸', slug: 'face-swap' } },
-      { path: 'bg-swap', name: 'BgSwap', component: () => import('../views/user/BgSwap.vue'), meta: { requiresAuth: true, title: '换背景', slug: 'bg-swap' } },
-      { path: 'garment-on-model', name: 'GarmentOnModel', component: () => import('../views/user/GarmentOnModel.vue'), meta: { requiresAuth: true, title: '款式上身', slug: 'garment-on-model' } },
-      { path: 'garment-on-model-pro', redirect: '/user/garment-on-model' },
+      { path: 'bg-swap', redirect: '/user/picture' },
+      { path: 'garment-on-model', redirect: '/user/picture' },
+      { path: 'garment-on-model-pro', redirect: '/user/picture' },
       // 图案工作室
       { path: 'pattern-gen', name: 'PatternGen', component: () => import('../views/user/PatternStudio.vue'), meta: { requiresAuth: true, title: '图案生成', slug: 'pattern-gen' } },
       { path: 'style-clone', name: 'StyleClone', component: () => import('../views/user/StyleClone.vue'), meta: { requiresAuth: true, title: '画风复刻', slug: 'style-clone' } },
@@ -71,8 +71,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'pattern-inpaint', name: 'PatternInpaint', component: () => import('../views/user/PatternInpaint.vue'), meta: { requiresAuth: true, title: '图案涂改', slug: 'pattern-inpaint' } },
       { path: 'pattern-upscale', name: 'PatternUpscale', component: () => import('../views/user/PatternUpscale.vue'), meta: { requiresAuth: true, title: '图案变清晰', slug: 'pattern-upscale' } },
       // AI 工具箱
-      { path: 'to-vector', name: 'ToVector', component: () => import('../views/user/ToVector.vue'), meta: { requiresAuth: true, title: '转矢量图', slug: 'to-vector' } },
-      { path: 'remove-bg', name: 'RemoveBg', component: () => import('../views/user/RemoveBg.vue'), meta: { requiresAuth: true, title: '抠图褪底', slug: 'remove-bg' } },
+      { path: 'to-vector', redirect: '/user/picture' },
+      { path: 'remove-bg', redirect: '/user/picture' },
       { path: 'hd-upscale', name: 'HdUpscale', component: () => import('../views/user/PatternUpscale.vue'), meta: { requiresAuth: true, title: '高清放大', slug: 'hd-upscale' } },
       { path: 'deblur', name: 'Deblur', component: () => import('../views/user/FeaturePage.vue'), meta: { requiresAuth: true, title: '模糊变清晰', slug: 'deblur' } },
       { path: 'canvas-extend', name: 'CanvasExtend', component: () => import('../views/user/FeaturePage.vue'), meta: { requiresAuth: true, title: '画布延伸', slug: 'canvas-extend' } },

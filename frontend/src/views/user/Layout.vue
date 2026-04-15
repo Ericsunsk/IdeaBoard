@@ -1,7 +1,7 @@
 <template>
   <div class="user-layout">
     <!-- ========== 顶部导航 ========== -->
-    <header v-if="!['/user/home', '/user/picture', '/user', '/user/center'].includes(route.path)" class="top-header">
+    <header v-if="!['/user/home', '/user/boards', '/user/picture', '/user', '/user/center'].includes(route.path)" class="top-header">
       <n-menu
         v-model:value="activeKey"
         mode="horizontal"
@@ -13,7 +13,7 @@
 
     <!-- ========== 页面内容 ========== -->
     <div class="layout-content">
-      <router-view :key="route.fullPath" />
+      <router-view :key="route.path === '/user/picture' ? route.path : route.fullPath" />
     </div>
   </div>
 </template>
@@ -42,10 +42,7 @@ const menuOptions: MenuOption[] = [
     label: '服装实验室',
     key: 'fashion-lab',
     children: [
-      { label: '线稿生成', key: 'sketch-gen' },
-      { label: '线稿成款', key: 'sketch-to-design' },
       { label: '局部改款', key: 'partial-edit' },
-      { label: '款式创新', key: 'style-innovate' },
       { label: '风格融合', key: 'style-fusion' },
       { label: '系列配色', key: 'series-color' },
       { label: '定向换色', key: 'directed-recolor' },
@@ -57,12 +54,9 @@ const menuOptions: MenuOption[] = [
     label: '摄影商拍',
     key: 'photo-shoot',
     children: [
-      { label: '模特多角度', key: 'multi-angle' },
       { label: '虚拟 3D', key: 'virtual-3d' },
       { label: '人台变模特', key: 'mannequin-to-model' },
       { label: '定向换脸', key: 'face-swap' },
-      { label: '换背景', key: 'bg-swap' },
-      { label: '款式上身', key: 'garment-on-model' },
     ]
   },
   {
@@ -82,8 +76,6 @@ const menuOptions: MenuOption[] = [
     label: 'AI 工具箱',
     key: 'ai-toolbox',
     children: [
-      { label: '转矢量图', key: 'to-vector' },
-      { label: '抠图褪底', key: 'remove-bg' },
       { label: '高清放大', key: 'hd-upscale' },
       { label: '模糊变清晰', key: 'deblur' },
       { label: '画布延伸', key: 'canvas-extend' },
@@ -101,9 +93,8 @@ const menuOptions: MenuOption[] = [
 // 菜单 key → 路由路径的映射
 const keyToPath: Record<string, string> = {
   home: '/user/home',
-  free: '/user/picture',
+  free: '/user/boards',
   'my-works': '/user/center',
-  'sketch-gen': '/user/line-draft',
 }
 
 function handleMenuSelect(key: string) {
@@ -113,10 +104,10 @@ function handleMenuSelect(key: string) {
 
 // 路由路径 → 菜单 key 的映射
 const pathToKey: Record<string, string> = {
+  '/user/boards': 'free',
   '/user/picture': 'free',
   '/user/home': 'home',
   '/user/center': 'my-works',
-  '/user/line-draft': 'sketch-gen',
 }
 
 watch(
@@ -125,7 +116,7 @@ watch(
     if (pathToKey[path]) {
       activeKey.value = pathToKey[path]
     } else {
-      // /user/sketch-to-design → sketch-to-design
+      // /user/xxx -> xxx
       const match = path.match(/^\/user\/([\w-]+)/)
       if (match) activeKey.value = match[1]
     }

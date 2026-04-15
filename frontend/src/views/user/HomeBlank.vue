@@ -16,12 +16,12 @@
                 <!-- 核心文字内容 -->
                 <div class="hero-content">
                     <h1 class="hero-title">IdeaBoard</h1>
-                    <p class="mixboard-subtitle">
+                    <p class="ideaboard-subtitle">
                         EXPLORE, EXPAND, AND REFINE YOUR IDEAS
                     </p>
                     <div class="hero-actions">
                         <button
-                            class="btn-primary mixboard-btn"
+                            class="btn-primary ideaboard-btn"
                             @click="startJourney"
                         >
                             {{ primaryActionText }}
@@ -97,7 +97,7 @@ const primaryActionText = computed(() =>
 
 function startJourney() {
     if (userStore.isLoggedIn) {
-        router.push("/user/picture");
+        router.push("/user/boards");
         return;
     }
     openLoginModal();
@@ -215,7 +215,7 @@ function scrollToFeatures() {
     overflow-x: hidden;
     position: relative;
     background-color: #ffffff;
-    /* Google Mixboard style dotted background */
+    /* Google IdeaBoard style dotted background */
     background-image: radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
     background-size: 24px 24px;
     background-position: center center;
@@ -359,7 +359,7 @@ function scrollToFeatures() {
     color: #202124;
 }
 
-.mixboard-subtitle {
+.ideaboard-subtitle {
     font-family:
         "Comic Sans MS", "Chalkboard SE", "Bradley Hand", "Caveat", cursive,
         sans-serif;
@@ -377,7 +377,7 @@ function scrollToFeatures() {
     margin-top: 16px; /* 单独给按钮区域加间距 */
 }
 
-.mixboard-btn {
+.ideaboard-btn {
     background: #9278e6 !important;
     color: #ffffff !important;
     border-radius: 999px;
@@ -393,12 +393,12 @@ function scrollToFeatures() {
         background 0.2s !important;
 }
 
-.mixboard-btn:hover {
+.ideaboard-btn:hover {
     background: #8065d6 !important;
     transform: scale(1.04) !important;
 }
 
-/* Mixboard Floating Gallery */
+/* IdeaBoard Floating Gallery */
 .floating-gallery {
     position: absolute;
     inset: 0;

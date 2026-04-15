@@ -135,8 +135,8 @@ import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../stores/user'
 import { taskApi } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
-import { buildGalleryGroups } from '../../utils/galleryGroups'
-import { downloadImageByProxy, getTaskImageUrl as extractTaskImageUrl, stripFeaturePrefix } from '../../utils/task-history'
+import { downloadImageByProxy } from '../../utils/task-history'
+import { useFeatureHistory } from '../../composables/useFeatureHistory'
 import type { Task } from '../../api'
 
 const message = useMessage()
@@ -145,9 +145,18 @@ const userStore = useUserStore()
 const SLUG_MAP: Record<string, string> = { creative: 'pattern-fusion-creative', style: 'pattern-fusion-style' }
 const PREFIXES = ['[pattern-fusion-creative] ', '[pattern-fusion-style] ']
 function isMyTask(p?: string) { return !!p && PREFIXES.some(x => p.startsWith(x)) }
-function stripPrefix(str?: string) {
-  return stripFeaturePrefix(str)
-}
+const {
+  historyTasks,
+  activeTaskId,
+  galleryTasks,
+  allGalleryGroups,
+  stripPrefix,
+  getTaskImageUrl,
+  loadHistory,
+} = useFeatureHistory({
+  canLoad: () => userStore.isLoggedIn,
+  matchPrompt: (prompt) => isMyTask(prompt),
+})
 
 // ============ 模式 Tab ============
 const modeTab = ref<'creative' | 'style'>('creative')
@@ -156,7 +165,6 @@ const currentSlug = computed(() => SLUG_MAP[modeTab.value])
 // ============ ① 主图案 ============
 const primaryImages = ref<string[]>([])
 const primaryImageUrl = computed(() => primaryImages.value[0] || '')
-const allGalleryGroups = computed(() => buildGalleryGroups(historyTasks.value))
 
 // ============ ② 副图案 ============
 const secondaryImages = ref<string[]>([])
@@ -179,13 +187,6 @@ const qualityOptions = [{ label: '1K', value: '1k', desc: '1024px' }, { label: '
 const selectedQuality = ref('1k')
 
 // ============ 画廊 ============
-const historyTasks = ref<Task[]>([])
-const activeTaskId = ref<string | null>(null)
-const galleryTasks = computed(() => historyTasks.value.filter(t => { if (t.status !== 'completed') return false; if (!isMyTask(t.prompt)) return false; try { return !!JSON.parse(t.result || '{}').image_url } catch { return false } }))
-function getTaskImageUrl(task: Task): string {
-  return extractTaskImageUrl(task)
-}
-async function loadHistory() { if (!userStore.isLoggedIn) return; try { const r: any = await taskApi.list({ page: 1, page_size: 200 }); if (r.code === 0) { historyTasks.value = r.data.list || []; if (messages.value.length === 0) rebuildMessages() } } catch {} }
 function rebuildMessages() {
   const tasks = historyTasks.value.filter(t => isMyTask(t.prompt)).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).slice(-20)
   for (const t of tasks) {

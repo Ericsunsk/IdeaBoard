@@ -108,8 +108,8 @@ import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../stores/user'
 import { taskApi, patternStyleApi } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
-import { buildGalleryGroups } from '../../utils/galleryGroups'
-import { downloadImageByProxy, getTaskImageUrl as extractTaskImageUrl, stripFeaturePrefix } from '../../utils/task-history'
+import { downloadImageByProxy } from '../../utils/task-history'
+import { useFeatureHistory } from '../../composables/useFeatureHistory'
 import type { Task } from '../../api'
 
 const route = useRoute()
@@ -119,9 +119,18 @@ const userStore = useUserStore()
 const featureSlug = computed(() => (route.meta.slug as string) || 'pattern-gen')
 const featureTitle = computed(() => (route.meta.title as string) || '图案生成')
 const FEATURE_PREFIX = computed(() => `[${featureSlug.value}] `)
-function stripPrefix(str?: string) {
-  return stripFeaturePrefix(str)
-}
+const {
+  historyTasks,
+  activeTaskId,
+  galleryTasks,
+  allGalleryGroups,
+  stripPrefix,
+  getTaskImageUrl,
+  loadHistory,
+} = useFeatureHistory({
+  canLoad: () => userStore.isLoggedIn,
+  matchPrompt: (prompt) => !!prompt && prompt.startsWith(FEATURE_PREFIX.value),
+})
 
 interface StyleItem { id: number; name: string; image_url: string; category: string }
 const patternStyles = ref<StyleItem[]>([])
@@ -132,7 +141,6 @@ async function loadStyles() { stylesLoading.value = true; try { const r: any = a
 function selectStyle(s: StyleItem) { selectedStyleId.value = s.id; selectedStyleName.value = s.name }
 
 const refImages = ref<string[]>([])
-const allGalleryGroups = computed(() => buildGalleryGroups(historyTasks.value))
 const userPrompt = ref('')
 const ratios = [
   { label: '1:1', value: '1:1', iconStyle: { width: '18px', height: '18px' } },
@@ -145,14 +153,6 @@ const selectedRatio = ref('1:1')
 const imageCount = ref(1)
 const qualityOptions = [{ label: '1K', value: '1k', desc: '1024px' }, { label: '2K', value: '2k', desc: '2048px' }, { label: '4K', value: '4k', desc: '4096px' }]
 const selectedQuality = ref('1k')
-
-const historyTasks = ref<Task[]>([])
-const activeTaskId = ref<string | null>(null)
-const galleryTasks = computed(() => historyTasks.value.filter(t => { if (t.status !== 'completed') return false; if (!t.prompt || !t.prompt.startsWith(FEATURE_PREFIX.value)) return false; try { return !!JSON.parse(t.result || '{}').image_url } catch { return false } }))
-function getTaskImageUrl(task: Task): string {
-  return extractTaskImageUrl(task)
-}
-async function loadHistory() { if (!userStore.isLoggedIn) return; try { const r: any = await taskApi.list({ page: 1, page_size: 200 }); if (r.code === 0) { historyTasks.value = r.data.list || []; if (messages.value.length === 0) rebuildMessages() } } catch {} }
 function rebuildMessages() {
   const tasks = historyTasks.value.filter(t => t.prompt && t.prompt.startsWith(FEATURE_PREFIX.value)).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).slice(-20)
   for (const t of tasks) {
