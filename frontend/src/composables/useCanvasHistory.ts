@@ -22,6 +22,16 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
     })),
     maskNodes: snapshot.maskNodes.map(node => ({ ...node })),
     colorNodes: snapshot.colorNodes.map(node => ({ ...node })),
+    editNodes: snapshot.editNodes.map(node => ({ ...node })),
+    fusionNodes: snapshot.fusionNodes.map(node => ({ ...node })),
+    enhanceNodes: snapshot.enhanceNodes.map(node => ({ ...node })),
+    tryOnNodes: snapshot.tryOnNodes.map(node => ({ ...node })),
+    paletteNodes: snapshot.paletteNodes.map(node => ({
+      ...node,
+      colors: [...node.colors],
+    })),
+    generateNodes: snapshot.generateNodes.map(node => ({ ...node })),
+    connections: snapshot.connections.map(connection => ({ ...connection })),
     viewport: { ...snapshot.viewport },
   }
 }

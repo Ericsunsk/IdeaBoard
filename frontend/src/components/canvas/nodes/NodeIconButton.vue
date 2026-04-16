@@ -2,7 +2,7 @@
   <button
     type="button"
     class="node-icon-btn"
-    :class="[{ active, 'is-round': round }, `tone-${tone}`]"
+    :class="[{ active }, `tone-${tone}`]"
     :style="{ width: `${size}px`, height: `${size}px` }"
     :disabled="disabled"
     :title="title"
@@ -18,14 +18,12 @@ withDefaults(defineProps<{
   active?: boolean
   disabled?: boolean
   size?: number
-  round?: boolean
   title?: string
 }>(), {
   tone: 'tool',
   active: false,
   disabled: false,
   size: 28,
-  round: false,
   title: '',
 })
 
@@ -46,10 +44,6 @@ const emit = defineEmits<{
   padding: 0;
   cursor: pointer;
   transition: all 0.2s ease;
-}
-
-.node-icon-btn.is-round {
-  border-radius: 999px;
 }
 
 .node-icon-btn.tone-tool:hover:not(:disabled) {

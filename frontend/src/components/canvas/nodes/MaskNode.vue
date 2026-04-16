@@ -7,21 +7,19 @@
     :style="nodeStyle"
     @mousedown.stop
   >
-    <div class="workflow-node-header" @mousedown.stop="emit('node-mousedown', $event)">
-      <div class="node-header-title">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 6px; opacity: 0.8">
+    <NodeHeader
+      title="Mask"
+      rounded
+      @node-mousedown="emit('node-mousedown', $event)"
+      @delete="emit('delete')"
+    >
+      <template #icon>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <path d="M4 7a3 3 0 0 1 3-3h6l7 7v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" />
           <path d="M13 4v6h6" />
         </svg>
-        Mask
-      </div>
-      <button class="node-delete-btn" title="删除" @mousedown.stop @click.stop="emit('delete')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
+      </template>
+    </NodeHeader>
 
     <div class="mask-node-body" @mousedown.stop @contextmenu.stop>
       <div
@@ -32,8 +30,8 @@
         @drop.prevent.stop="emit('stage-drop', $event)"
         @contextmenu.prevent.stop="togglePaintPopup"
       >
-        <template v-if="node.sourceImageUrl">
-          <img :src="node.sourceImageUrl" class="mask-stage-image" />
+        <template v-if="effectiveSourceImageUrl">
+          <img :src="effectiveSourceImageUrl" class="mask-stage-image" />
           <canvas
             v-if="!paintPopupOpen"
             :ref="onCanvasRef"
@@ -46,7 +44,7 @@
             @mousemove="onCanvasMouseMove"
             @mouseleave="hideMaskCursor"
           />
-          <div class="mask-stage-actions">
+          <div v-if="node.sourceImageUrl && !hasConnectedImageInput" class="mask-stage-actions">
             <NodeActionButton variant="stage-ghost" @click="emit('clear-image')">清空</NodeActionButton>
           </div>
         </template>
@@ -83,7 +81,7 @@
         </NodeIconButton>
         <input
           :value="node.brushSize"
-          class="mask-brush-range"
+          class="mask-brush-range node-inline-range"
           :style="{ '--slider-pct': `${((node.brushSize - 4) / 44) * 100}%` }"
           type="range"
           min="4"
@@ -96,7 +94,7 @@
         <span class="mask-refine-label">Refine</span>
         <input
           :value="node.refineAmount"
-          class="mask-refine-range"
+          class="mask-refine-range node-inline-range"
           :style="{ '--slider-pct': `${((node.refineAmount + 100) / 200) * 100}%` }"
           type="range"
           min="-100"
@@ -125,7 +123,7 @@
           class="mask-paint-popup-stage"
           :style="{ width: `${popupStageWidth}px`, height: `${popupStageHeight}px` }"
         >
-          <img :src="node.sourceImageUrl" class="mask-stage-image" />
+          <img :src="effectiveSourceImageUrl" class="mask-stage-image" />
           <canvas
             :ref="onCanvasRef"
             class="mask-paint-popup-canvas"
@@ -138,39 +136,14 @@
             @mouseleave="hideMaskCursor"
           />
         </div>
-        <div class="mask-paint-popup-toolbar">
-          <NodeIconButton
-            :active="node.drawMode === 'paint'"
-            title="Brush"
-            @click="emit('set-draw-mode', 'paint')"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-              <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
-            </svg>
-          </NodeIconButton>
-          <NodeIconButton
-            :active="node.drawMode === 'erase'"
-            title="Eraser"
-            @click="emit('set-draw-mode', 'erase')"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/>
-              <path d="M22 21H7"/>
-            </svg>
-          </NodeIconButton>
-          <input
-            :value="node.brushSize"
-            class="mask-brush-range popup"
-            :style="{ '--slider-pct': `${((node.brushSize - 4) / 44) * 100}%` }"
-            type="range"
-            min="4"
-            max="48"
-            @input="emit('update:brush-size', toNumber(($event.target as HTMLInputElement).value, node.brushSize))"
-          />
-        </div>
       </div>
     </div>
+    <NodePorts
+      node-kind="mask"
+      :node-id="node.id"
+      :ports="ports"
+      @port-mousedown="onPortMouseDown"
+    />
   </div>
 </template>
 
@@ -179,7 +152,11 @@ import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import type { MaskNodeItem } from '../../../types/canvasNodes'
 import NodeActionButton from './NodeActionButton.vue'
+import NodeHeader from './NodeHeader.vue'
 import NodeIconButton from './NodeIconButton.vue'
+import NodePorts from './NodePorts.vue'
+import { buildNodeIoFromSlots, MASK_NODE_IO_SLOTS } from './nodeIoConfig'
+import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
   node: MaskNodeItem
@@ -188,6 +165,10 @@ const props = defineProps<{
   copyMode: boolean
   stageHeight: number
   canvasWidth: number
+  sourceImageUrl?: string
+  hasConnectedImageInput?: boolean
+  imageInputConnected?: boolean
+  outputConnected?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -203,14 +184,20 @@ const emit = defineEmits<{
   (e: 'toggle-invert'): void
   (e: 'clear-mask'): void
   (e: 'set-canvas-ref', value: Element | null): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'mask'): void
 }>()
 
-const nodeStyle = computed(() => ({
-  left: '50%',
-  top: '50%',
-  transform: `translate(${props.node.x}px, ${props.node.y}px)`,
-  width: `${props.node.width}px`,
-}))
+const nodeStyle = useCanvasNodeStyle(() => props.node)
+
+const effectiveSourceImageUrl = computed(() => props.sourceImageUrl ?? props.node.sourceImageUrl)
+const ports = computed(() =>
+  buildNodeIoFromSlots(MASK_NODE_IO_SLOTS, null, {
+    connected: {
+      image: props.imageInputConnected,
+      output: props.outputConnected,
+    },
+  }).ports,
+)
 
 const popupRef = ref<HTMLElement | null>(null)
 const paintPopupOpen = ref(false)
@@ -264,12 +251,16 @@ function clampBrushSize(value: number): number {
   return Math.max(BRUSH_SIZE_MIN, Math.min(BRUSH_SIZE_MAX, Math.round(value)))
 }
 
+function onPortMouseDown(event: MouseEvent, port: string) {
+  emit('port-mousedown', event, port as 'mask')
+}
+
 function updateBrushSize(value: number) {
   emit('update:brush-size', clampBrushSize(value))
 }
 
 function togglePaintPopup() {
-  if (!props.node.sourceImageUrl) return
+  if (!effectiveSourceImageUrl.value) return
   hideMaskCursor()
   paintPopupOpen.value = !paintPopupOpen.value
 }
@@ -370,29 +361,12 @@ onBeforeUnmount(() => {
   overflow: visible;
 }
 
-.workflow-node.mask-node .workflow-node-header {
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-}
-
 .mask-node-body {
   position: relative;
   padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.mask-stage {
-  position: relative;
-  min-height: 120px;
-  border-radius: 12px;
-  border: 1px solid #e4e7ec;
-  background: linear-gradient(160deg, #fafbfd 0%, #f1f4f8 100%);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .mask-stage-image {
@@ -410,53 +384,14 @@ onBeforeUnmount(() => {
   opacity: 0.5;
 }
 
-.mask-stage-empty {
-  width: calc(100% - 20px);
-  height: calc(100% - 20px);
-  border: 1px dashed #c7cfdd;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #6d7685;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.mask-stage-empty:hover {
-  border-color: #9278e6;
-  color: #6757c8;
-  background: rgba(146, 120, 230, 0.05);
-}
-
 .mask-paint-popup {
-  position: absolute;
-  left: 50%;
-  top: 12px;
-  transform: translateX(-50%);
   z-index: 30;
   width: max-content;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 12px;
-  border: 1px solid #d8ddea;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 30px rgba(25, 30, 45, 0.12);
 }
 
 .mask-paint-popup-stage {
   position: relative;
-  overflow: hidden;
-  border-radius: 12px;
   border: 1px solid #d8ddea;
-  background: linear-gradient(160deg, #fafbfd 0%, #f1f4f8 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
@@ -466,21 +401,6 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   opacity: 0.5;
-}
-
-.mask-paint-popup-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 2px 2px;
-}
-
-.mask-stage-actions {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  display: flex;
-  gap: 6px;
 }
 
 .mask-toolbar {
@@ -506,83 +426,6 @@ onBeforeUnmount(() => {
 .mask-refine-range {
   flex: 1;
   min-width: 80px;
-  margin: 0;
-  height: 14px;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-.mask-brush-range::-webkit-slider-runnable-track,
-.mask-refine-range::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    #9278e6 0%,
-    #9278e6 var(--slider-pct),
-    #EEF2F5 var(--slider-pct),
-    #EEF2F5 100%
-  );
-}
-
-.mask-brush-range::-webkit-slider-thumb,
-.mask-refine-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -4px;
-  border: none;
-  border-radius: 999px;
-  background: #9278e6;
-  box-shadow: none;
-}
-
-.mask-brush-range::-moz-range-track,
-.mask-refine-range::-moz-range-track {
-  height: 6px;
-  border: none;
-  border-radius: 999px;
-  background: #EEF2F5;
-}
-
-.mask-brush-range::-moz-range-progress,
-.mask-refine-range::-moz-range-progress {
-  height: 6px;
-  border: none;
-  border-radius: 999px;
-  background: #9278e6;
-}
-
-.mask-brush-range::-moz-range-thumb,
-.mask-refine-range::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 999px;
-  background: #9278e6;
-  box-shadow: none;
-}
-
-.mask-brush-range:focus,
-.mask-refine-range:focus {
-  outline: none;
-}
-
-.mask-brush-range:active,
-.mask-refine-range:active,
-.mask-brush-range:focus,
-.mask-refine-range:focus,
-.mask-brush-range::-webkit-slider-runnable-track:active,
-.mask-refine-range::-webkit-slider-runnable-track:active,
-.mask-brush-range::-moz-range-track:active,
-.mask-refine-range::-moz-range-track:active,
-.mask-brush-range::-moz-range-thumb:active,
-.mask-refine-range::-moz-range-thumb:active {
-  opacity: 1;
-  filter: none;
 }
 
 </style>

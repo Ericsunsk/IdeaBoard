@@ -4,7 +4,6 @@
     class="node-action-btn"
     :class="[`variant-${variant}`, { active, full, 'push-right': pushRight }]"
     :disabled="disabled"
-    :title="title"
     @click="emit('click', $event)"
   >
     <slot />
@@ -18,14 +17,12 @@ withDefaults(defineProps<{
   disabled?: boolean
   full?: boolean
   pushRight?: boolean
-  title?: string
 }>(), {
   variant: 'tool',
   active: false,
   disabled: false,
   full: false,
   pushRight: false,
-  title: '',
 })
 
 const emit = defineEmits<{
@@ -41,8 +38,13 @@ const emit = defineEmits<{
   border-radius: 8px;
   min-height: 28px;
   padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
+  line-height: 1;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -95,8 +97,12 @@ const emit = defineEmits<{
 }
 
 .node-action-btn.variant-chip {
+  height: 24px;
   min-height: 24px;
   padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .node-action-btn.variant-chip:hover:not(:disabled) {

@@ -1,0 +1,65 @@
+.node-port {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid #fff;
+  border-radius: 999px;
+  background: var(--port-color, #9278e6);
+  transform: translateY(-50%);
+  cursor: crosshair;
+  z-index: 4;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.16);
+  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.node-port[data-port-kind='image'] {
+  --port-color: #5b8def;
+  --port-glow: rgba(91, 141, 239, 0.24);
+}
+
+.node-port[data-port-kind='mask'] {
+  --port-color: #34c38f;
+  --port-glow: rgba(52, 195, 143, 0.24);
+}
+
+.node-port[data-port-kind='prompt'] {
+  --port-color: #f59e0b;
+  --port-glow: rgba(245, 158, 11, 0.24);
+}
+
+.node-port:hover {
+  transform: translateY(-50%) scale(1.08);
+  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.18));
+}
+
+.node-port.is-connected {
+  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.2));
+}
+
+.node-port.is-connection-source {
+  box-shadow: 0 0 0 4px var(--port-glow, rgba(146, 120, 230, 0.26));
+}
+
+.node-port.is-connection-target {
+  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.2));
+}
+
+.node-port.is-connection-hover-target {
+  transform: translateY(-50%) scale(1.12);
+  box-shadow: 0 0 0 4px var(--port-glow, rgba(146, 120, 230, 0.26));
+}
+
+.node-port.is-connection-invalid-target {
+  background: #fff;
+  border-color: #e06a82;
+  box-shadow: 0 0 0 3px rgba(224, 106, 130, 0.14);
+}
+
+.node-port.is-input {
+  left: -5.5px;
+}
+
+.node-port.is-output {
+  right: -5.5px;
+}

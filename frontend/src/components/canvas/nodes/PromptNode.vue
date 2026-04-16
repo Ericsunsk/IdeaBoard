@@ -7,20 +7,17 @@
     :style="nodeStyle"
     @mousedown.stop
   >
-    <div class="workflow-node-header" @mousedown.stop="emit('node-mousedown', $event)">
-      <div class="node-header-title">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px; opacity: 0.8">
+    <NodeHeader
+      title="Prompt"
+      @node-mousedown="emit('node-mousedown', $event)"
+      @delete="emit('delete')"
+    >
+      <template #icon>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        Prompt
-      </div>
-      <button class="node-delete-btn" title="删除" @mousedown.stop @click.stop="emit('delete')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
+      </template>
+    </NodeHeader>
     <textarea
       :value="node.text"
       class="workflow-node-input"
@@ -30,18 +27,29 @@
       @mousedown.stop
       @contextmenu.stop
     />
+    <NodePorts
+      node-kind="prompt"
+      :node-id="node.id"
+      :ports="ports"
+      @port-mousedown="onPortMouseDown"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { PromptNodeItem } from '../../../types/canvasNodes'
+import NodeHeader from './NodeHeader.vue'
+import NodePorts from './NodePorts.vue'
+import { buildNodeIoFromSlots, PROMPT_NODE_IO_SLOTS } from './nodeIoConfig'
+import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
   node: PromptNodeItem
   active: boolean
   dragging: boolean
   copyMode: boolean
+  outputConnected?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -49,17 +57,24 @@ const emit = defineEmits<{
   (e: 'delete'): void
   (e: 'focus'): void
   (e: 'update:text', value: string): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'prompt'): void
 }>()
 
-const nodeStyle = computed(() => ({
-  left: '50%',
-  top: '50%',
-  transform: `translate(${props.node.x}px, ${props.node.y}px)`,
-  width: `${props.node.width}px`,
-}))
+const nodeStyle = useCanvasNodeStyle(() => props.node)
+const ports = computed(() =>
+  buildNodeIoFromSlots(PROMPT_NODE_IO_SLOTS, null, {
+    connected: {
+      output: props.outputConnected,
+    },
+  }).ports,
+)
 
 function onInput(event: Event) {
   emit('update:text', (event.target as HTMLTextAreaElement).value)
+}
+
+function onPortMouseDown(event: MouseEvent, port: string) {
+  emit('port-mousedown', event, port as 'prompt')
 }
 </script>
 

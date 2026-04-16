@@ -7,23 +7,20 @@
     :style="nodeStyle"
     @mousedown.stop
   >
-    <div class="workflow-node-header" @mousedown.stop="emit('node-mousedown', $event)">
-      <div class="node-header-title">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 6px; opacity: 0.8">
+    <NodeHeader
+      title="Model"
+      @node-mousedown="emit('node-mousedown', $event)"
+      @delete="emit('delete')"
+    >
+      <template #icon>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <circle cx="12" cy="6" r="2.5" />
           <path d="M12 9.5v5M8.5 13.5h7M10 20l2-5 2 5" />
         </svg>
-        Model
-      </div>
-      <button class="node-delete-btn" title="删除" @mousedown.stop @click.stop="emit('delete')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
+      </template>
+    </NodeHeader>
 
-    <div class="model-node-body" @mousedown.stop @contextmenu.stop>
+    <div class="model-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
       <div
         class="model-stage"
         :data-model-id="node.id"
@@ -31,9 +28,9 @@
         @dragover.prevent
         @drop.prevent.stop="emit('stage-drop', $event)"
       >
-        <template v-if="node.sourceImageUrl">
-          <img :src="node.sourceImageUrl" class="model-stage-image" />
-          <div class="model-stage-actions">
+        <template v-if="effectiveSourceImageUrl">
+          <img :src="effectiveSourceImageUrl" class="model-stage-image" />
+          <div v-if="node.sourceImageUrl && !hasConnectedImageInput" class="model-stage-actions">
             <NodeActionButton variant="stage" @click="emit('open-file-picker')">更换图片</NodeActionButton>
             <NodeActionButton variant="stage-ghost" @click="emit('clear-image')">清空</NodeActionButton>
           </div>
@@ -48,9 +45,9 @@
         </div>
       </div>
 
-      <div class="model-control-group">
-        <div class="model-angle-head">
-          <span class="model-control-label">角度（最多 4 个）</span>
+      <div class="model-control-group node-control-group">
+        <div class="model-angle-head node-control-head">
+          <span class="model-control-label node-control-label">角度（最多 4 个）</span>
           <button
             v-if="node.selectedAngles.length > 0"
             type="button"
@@ -60,7 +57,7 @@
             清空
           </button>
         </div>
-        <div class="model-control-options">
+        <div class="model-control-options node-option-row">
           <NodeActionButton
             v-for="opt in angleOptions"
             :key="`${node.id}-angle-${opt.key}`"
@@ -74,9 +71,9 @@
         <span v-if="node.selectedAngles.length === 0" class="model-angle-empty">请至少选择一个角度</span>
       </div>
 
-      <div class="model-control-group">
-        <span class="model-control-label">背景</span>
-        <div class="model-control-options">
+      <div class="model-control-group node-control-group">
+        <span class="model-control-label node-control-label">背景</span>
+        <div class="model-control-options node-option-row">
           <NodeActionButton
             v-for="opt in backgroundOptions"
             :key="`${node.id}-bg-${opt.key}`"
@@ -89,10 +86,20 @@
         </div>
       </div>
 
-      <NodeActionButton variant="primary" :disabled="generating" full @click="emit('generate')">
-        生成多角度
-      </NodeActionButton>
+      <NodeConnectionChips :items="connectionChips" />
+
+      <div class="node-primary-action-slot">
+        <NodeActionButton variant="primary" :disabled="generating" full @click="emit('generate')">
+          生成多角度
+        </NodeActionButton>
+      </div>
     </div>
+    <NodePorts
+      node-kind="model"
+      :node-id="node.id"
+      :ports="ports"
+      @port-mousedown="onPortMouseDown"
+    />
   </div>
 </template>
 
@@ -100,6 +107,11 @@
 import { computed } from 'vue'
 import type { ModelNodeItem } from '../../../types/canvasNodes'
 import NodeActionButton from './NodeActionButton.vue'
+import NodeConnectionChips from './NodeConnectionChips.vue'
+import NodeHeader from './NodeHeader.vue'
+import NodePorts from './NodePorts.vue'
+import { buildNodeIoFromSlots, MODEL_NODE_IO_SLOTS } from './nodeIoConfig'
+import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
   node: ModelNodeItem
@@ -108,6 +120,12 @@ const props = defineProps<{
   copyMode: boolean
   generating: boolean
   stageHeight: number
+  sourceImageUrl?: string
+  hasConnectedImageInput?: boolean
+  imageInputConnected?: boolean
+  promptInputConnected?: boolean
+  outputConnected?: boolean
+  errorPortKeys: string[]
   angleOptions: Array<{ key: string; label: string }>
   backgroundOptions: Array<{ key: string; label: string }>
 }>()
@@ -122,80 +140,41 @@ const emit = defineEmits<{
   (e: 'clear-angles'): void
   (e: 'select-background', key: string): void
   (e: 'generate'): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'image'): void
 }>()
 
-const nodeStyle = computed(() => ({
-  left: '50%',
-  top: '50%',
-  transform: `translate(${props.node.x}px, ${props.node.y}px)`,
-  width: `${props.node.width}px`,
-}))
+const nodeStyle = useCanvasNodeStyle(() => props.node)
+const io = computed(() =>
+  buildNodeIoFromSlots(MODEL_NODE_IO_SLOTS, null, {
+    connected: {
+      image: props.imageInputConnected,
+      prompt: props.promptInputConnected,
+      output: props.outputConnected,
+    },
+    errorPortKeys: props.errorPortKeys,
+  }),
+)
+const connectionChips = computed(() => io.value.connectionChips)
+const ports = computed(() => io.value.ports)
+
+const effectiveSourceImageUrl = computed(() => props.sourceImageUrl ?? props.node.sourceImageUrl)
+
+function onPortMouseDown(event: MouseEvent, port: string) {
+  emit('port-mousedown', event, port as 'image')
+}
 </script>
 
 <style scoped src="./node-shared.css"></style>
 <style scoped>
 
 .model-node-body {
-  padding: 10px 12px 12px;
-  display: flex;
-  flex-direction: column;
   gap: 8px;
-}
-
-.model-stage {
-  position: relative;
-  min-height: 120px;
-  border-radius: 12px;
-  border: 1px solid #e4e7ec;
-  background: linear-gradient(160deg, #fafbfd 0%, #f1f4f8 100%);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.model-stage-empty {
-  width: calc(100% - 20px);
-  height: calc(100% - 20px);
-  border: 1px dashed #c7cfdd;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #6d7685;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.model-stage-empty:hover {
-  border-color: #9278e6;
-  color: #6757c8;
-  background: rgba(146, 120, 230, 0.05);
 }
 
 .model-stage-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.model-stage-actions {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  display: flex;
-  gap: 6px;
-}
-
-.model-angle-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
 }
 
 .model-angle-empty {
@@ -216,22 +195,4 @@ const nodeStyle = computed(() => ({
   color: #9278e6;
 }
 
-.model-control-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.model-control-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #7b8798;
-  letter-spacing: 0.03em;
-}
-
-.model-control-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
 </style>

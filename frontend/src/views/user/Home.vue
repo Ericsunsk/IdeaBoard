@@ -202,7 +202,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
         <input v-model="userPrompt" type="text" :placeholder="promptPlaceholder" @keyup.enter="handleGenerate" />
-        <button class="send-btn" :disabled="!userPrompt.trim() || generating" @click="handleGenerate">
+        <button class="send-btn" :disabled="!hasDirectPrompt || generating" @click="handleGenerate">
           <svg v-if="!generating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           <n-spin v-else size="small" />
         </button>
@@ -248,22 +248,57 @@
       @mousedown.stop
       @click.stop
     >
-      <button type="button" class="node-context-item" @click="createImageNode">
-        + Image 节点
-      </button>
-      <button type="button" class="node-context-item" @click="createPromptNode">
-        + Prompt 节点
-      </button>
-      <button type="button" class="node-context-item" @click="createModelNode">
-        + 模特节点
-      </button>
-      <button type="button" class="node-context-item" @click="createMaskNode">
-        + Mask 节点
-      </button>
-      <button type="button" class="node-context-item" @click="createColorNode">
-        + Color 节点
+      <button
+        v-for="item in canvasNodeMenuItems"
+        :key="item.key"
+        type="button"
+        class="node-context-item"
+        @click="handleNodeMenuAction(item.actionKey)"
+      >
+        {{ item.label }}
       </button>
     </div>
+
+    <svg class="canvas-connections-layer">
+      <path
+        v-for="connection in renderedConnections"
+        :key="connection.id"
+        class="canvas-connection-hit"
+        :d="connection.path"
+        @mousedown.stop="onConnectionPathMouseDown($event, connection.id)"
+      />
+      <path
+        v-for="connection in renderedConnections"
+        :key="`visible-${connection.id}`"
+        class="canvas-connection-path"
+        :class="[selectedConnectionId === connection.id ? 'selected' : '', `tone-${connection.tone}`]"
+        :d="connection.path"
+      />
+      <path
+        v-if="draftConnectionPath"
+        class="canvas-connection-path draft"
+        :class="[ `tone-${draftConnectionKind}`, `is-${draftConnectionTone}` ]"
+        :d="draftConnectionPath"
+      />
+      <template v-for="connection in renderedConnections" :key="`endpoints-${connection.id}`">
+        <circle
+          v-if="selectedConnectionId === connection.id"
+          class="canvas-connection-endpoint"
+          :class="`tone-${connection.tone}`"
+          :cx="connection.startX"
+          :cy="connection.startY"
+          r="4"
+        />
+        <circle
+          v-if="selectedConnectionId === connection.id"
+          class="canvas-connection-endpoint"
+          :class="`tone-${connection.tone}`"
+          :cx="connection.endX"
+          :cy="connection.endY"
+          r="4"
+        />
+      </template>
+    </svg>
 
     <!-- ⑥ 内容展示区 -->
     <div class="canvas-content">
@@ -275,8 +310,12 @@
         :dragging="isNodeDragging('image', node.id)"
         :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
         :stage-height="getImageNodeStageHeight(node)"
-        :display-image="getImageNodeDisplayImage(node)"
+        :display-image="getResolvedImageNodeDisplay(node).image"
+        :display-mode="getResolvedImageNodeDisplay(node).mode"
+        :input-connected="hasIncomingPortConnection('image', node.id, 'image')"
+        :output-connected="hasOutgoingPortConnection('image', node.id, 'image')"
         @node-mousedown="onImageNodeMouseDown($event, node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'image', node.id, port)"
         @delete="deleteImageNode(node.id)"
         @stage-drop="onImageNodeStageDrop($event, node)"
         @open-file="openImageNodeFilePicker(node)"
@@ -292,7 +331,9 @@
         :active="isNodeSelected('prompt', node.id)"
         :dragging="isNodeDragging('prompt', node.id)"
         :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+        :output-connected="hasOutgoingPortConnection('prompt', node.id, 'prompt')"
         @node-mousedown="onPromptNodeMouseDown($event, node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'prompt', node.id, port)"
         @delete="deletePromptNode(node.id)"
         @focus="activatePromptNode(node.id)"
         @update:text="node.text = $event"
@@ -306,10 +347,17 @@
         :dragging="isNodeDragging('model', node.id)"
         :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
         :generating="generating"
-        :stage-height="getModelStageHeight(node)"
+        :stage-height="getModelNodeStageHeight(node)"
+        :source-image-url="getModelNodeEffectiveSource(node).url"
+        :has-connected-image-input="getModelNodeEffectiveSource(node).connected"
+        :image-input-connected="getModelNodeConnectionStatus(node).imageConnected"
+        :prompt-input-connected="getModelNodeConnectionStatus(node).promptConnected"
+        :output-connected="getModelNodeConnectionStatus(node).outputConnected"
+        :error-port-keys="getNodeConnectionErrorPorts('model', node.id)"
         :angle-options="modelAngleOptions"
         :background-options="modelBackgroundOptions"
         @node-mousedown="onModelNodeMouseDown($event, node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'model', node.id, port)"
         @delete="deleteModelNode(node.id)"
         @open-file-picker="openModelNodeFilePicker(node)"
         @clear-image="clearModelNodeImage(node)"
@@ -327,14 +375,19 @@
         :active="isNodeSelected('mask', node.id)"
         :dragging="isNodeDragging('mask', node.id)"
         :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :stage-height="getMaskStageHeight(node)"
+        :stage-height="getMaskNodeStageHeight(node)"
         :canvas-width="getMaskCanvasWidth(node)"
+        :source-image-url="getMaskNodeEffectiveSource(node).url"
+        :has-connected-image-input="getMaskNodeEffectiveSource(node).connected"
+        :image-input-connected="hasIncomingPortConnection('mask', node.id, 'image')"
+        :output-connected="hasOutgoingPortConnection('mask', node.id, 'mask')"
         @node-mousedown="onMaskNodeMouseDown($event, node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'mask', node.id, port)"
         @delete="deleteMaskNode(node.id)"
         @open-file-picker="openMaskNodeFilePicker(node)"
         @clear-image="clearMaskNodeImage(node)"
         @stage-drop="onMaskStageDrop($event, node)"
-        @canvas-mousedown="onMaskCanvasMouseDown($event, node)"
+        @canvas-mousedown="onMaskCanvasMouseDown($event, getMaskNodeRuntimeNode(node))"
         @set-draw-mode="node.drawMode = $event"
         @update:brush-size="node.brushSize = $event"
         @update:refine-amount="node.refineAmount = clampMaskRefineAmount($event)"
@@ -359,6 +412,11 @@
         :spectrum-style="colorSpectrumStyle"
         :cursor-style="colorSpectrumCursorStyle"
         :quick-swatches="colorQuickSwatches"
+        :image-input-connected="getColorNodeConnectionStatus(node).imageConnected"
+        :mask-input-connected="getColorNodeConnectionStatus(node).maskConnected"
+        :prompt-input-connected="getColorNodeConnectionStatus(node).promptConnected"
+        :output-connected="getColorNodeConnectionStatus(node).outputConnected"
+        :error-port-keys="getNodeConnectionErrorPorts('color', node.id)"
         @node-mousedown="onColorNodeMouseDown($event, node)"
         @delete="deleteColorNode(node.id)"
         @toggle-popover="toggleColorPopover(node)"
@@ -373,7 +431,141 @@
         @select-swatch="setColorPopoverHex($event)"
         @eyedropper="onColorNodeEyedropperClick(node)"
         @generate="handleColorNodeGenerate(node)"
-        @set-spectrum-ref="setColorSpectrumElement($event)"
+        @set-spectrum-ref="setColorSpectrumRef($event)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'color', node.id, port)"
+      />
+
+      <EditNode
+        v-for="node in editNodes"
+        :key="node.id"
+        :node="node"
+        :active="isNodeSelected('edit', node.id)"
+        :dragging="isNodeDragging('edit', node.id)"
+        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+        :generating="generating"
+        :image-input-connected="getEditNodeConnectionStatus(node).imageConnected"
+        :mask-input-connected="getEditNodeConnectionStatus(node).maskConnected"
+        :prompt-input-connected="getEditNodeConnectionStatus(node).promptConnected"
+        :output-connected="getEditNodeConnectionStatus(node).outputConnected"
+        :error-port-keys="getNodeConnectionErrorPorts('edit', node.id)"
+        @node-mousedown="onEditNodeMouseDown($event, node)"
+        @delete="deleteEditNode(node.id)"
+        @update:mode="node.mode = $event"
+        @generate="handleEditNodeGenerate(node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'edit', node.id, port)"
+      />
+
+      <FusionNode
+        v-for="node in fusionNodes"
+        :key="node.id"
+        :node="node"
+        :active="isNodeSelected('fusion', node.id)"
+        :dragging="isNodeDragging('fusion', node.id)"
+        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+        :generating="generating"
+        :image-a-input-connected="getFusionNodeConnectionStatus(node).imageAConnected"
+        :image-b-input-connected="getFusionNodeConnectionStatus(node).imageBConnected"
+        :prompt-input-connected="getFusionNodeConnectionStatus(node).promptConnected"
+        :output-connected="getFusionNodeConnectionStatus(node).outputConnected"
+        :error-port-keys="getNodeConnectionErrorPorts('fusion', node.id)"
+        @node-mousedown="onFusionNodeMouseDown($event, node)"
+        @delete="deleteFusionNode(node.id)"
+        @update:mode="node.mode = $event"
+        @generate="handleFusionNodeGenerate(node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'fusion', node.id, port)"
+      />
+
+      <EnhanceNode
+        v-for="node in enhanceNodes"
+        :key="node.id"
+        :node="node"
+        :active="isNodeSelected('enhance', node.id)"
+        :dragging="isNodeDragging('enhance', node.id)"
+        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+        :generating="generating"
+        :image-input-connected="getEnhanceNodeConnectionStatus(node).imageConnected"
+        :prompt-input-connected="getEnhanceNodeConnectionStatus(node).promptConnected"
+        :output-connected="getEnhanceNodeConnectionStatus(node).outputConnected"
+        :error-port-keys="getNodeConnectionErrorPorts('enhance', node.id)"
+        @node-mousedown="onEnhanceNodeMouseDown($event, node)"
+        @delete="deleteEnhanceNode(node.id)"
+        @update:mode="setEnhanceNodeMode(node, $event)"
+        @update:upscale-mode="node.upscaleMode = $event"
+        @update:upscale-factor="node.upscaleFactor = $event"
+        @update:output-format="node.outputFormat = $event"
+        @update:output-quality="node.outputQuality = Math.max(30, Math.min(100, Math.round($event)))"
+        @generate="handleEnhanceNodeGenerate(node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'enhance', node.id, port)"
+      />
+
+      <TryOnNode
+        v-for="node in tryOnNodes"
+        :key="node.id"
+        :node="node"
+        :active="isNodeSelected('tryon', node.id)"
+        :dragging="isNodeDragging('tryon', node.id)"
+        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+        :generating="generating"
+        :image-a-input-connected="getTryOnNodeConnectionStatus(node).imageAConnected"
+        :image-b-input-connected="getTryOnNodeConnectionStatus(node).imageBConnected"
+        :output-connected="getTryOnNodeConnectionStatus(node).outputConnected"
+        :error-port-keys="getNodeConnectionErrorPorts('tryon', node.id)"
+        @node-mousedown="onTryOnNodeMouseDown($event, node)"
+        @delete="deleteTryOnNode(node.id)"
+        @update:mode="node.mode = $event"
+        @update:tile-mode="node.tileMode = $event"
+        @update:rotation="node.rotation = Math.max(0, Math.min(360, Math.round($event)))"
+        @update:scale="node.scale = Math.max(10, Math.min(300, Math.round($event)))"
+        @update:opacity="node.opacity = Math.max(0, Math.min(100, Math.round($event)))"
+        @generate="handleTryOnNodeGenerate(node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'tryon', node.id, port)"
+      />
+
+      <PaletteNode
+        v-for="node in paletteNodes"
+        :key="node.id"
+        :node="node"
+        :active="isNodeSelected('palette', node.id)"
+        :dragging="isNodeDragging('palette', node.id)"
+        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+        :generating="generating"
+        :image-input-connected="getPaletteNodeConnectionStatus(node).imageConnected"
+        :reference-input-connected="getPaletteNodeConnectionStatus(node).referenceConnected"
+        :output-connected="getPaletteNodeConnectionStatus(node).outputConnected"
+        :error-port-keys="getNodeConnectionErrorPorts('palette', node.id)"
+        @node-mousedown="onPaletteNodeMouseDown($event, node)"
+        @delete="deletePaletteNode(node.id)"
+        @update:mode="setPaletteNodeMode(node, $event)"
+        @apply-preset="node.colors = [...$event]"
+        @remove-color="removePaletteColor(node, $event)"
+        @add-color="addPaletteColor(node, $event)"
+        @generate="handlePaletteNodeGenerate(node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'palette', node.id, port)"
+      />
+
+      <GenerateNode
+        v-for="node in generateNodes"
+        :key="node.id"
+        :node="node"
+        :active="isNodeSelected('generate', node.id)"
+        :dragging="isNodeDragging('generate', node.id)"
+        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+        :generating="generating"
+        :image-input-connected="getGenerateNodeConnectionStatus(node).imageConnected"
+        :prompt-input-connected="getGenerateNodeConnectionStatus(node).promptConnected"
+        :output-connected="getGenerateNodeConnectionStatus(node).outputConnected"
+        :error-port-keys="getNodeConnectionErrorPorts('generate', node.id)"
+        :style-options="getGenerateStyleOptions(node.mode)"
+        :styles-loading="isGenerateStyleLoading(node.mode)"
+        @node-mousedown="onGenerateNodeMouseDown($event, node)"
+        @delete="deleteGenerateNode(node.id)"
+        @update:mode="setGenerateNodeMode(node, $event)"
+        @update:style-model="node.styleModel = $event"
+        @update:ratio="node.ratio = $event"
+        @update:count="node.count = $event"
+        @update:quality="node.quality = $event"
+        @generate="handleGenerateNodeGenerate(node)"
+        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'generate', node.id, port)"
       />
 
        <div 
@@ -505,42 +697,68 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import type { ComponentPublicInstance } from 'vue'
+import type { ComponentPublicInstance, Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMessage, NSpin } from 'naive-ui'
-import { segApi, taskApi, styleCardApi, uploadApi, vectorizeApi } from '../../api/index'
+import { patternStyleApi, segApi, taskApi, styleCardApi, uploadApi, upscaleApi, vectorizeApi } from '../../api/index'
 import type { StyleCard } from '../../api/index'
 import { useUserStore } from '../../stores/user'
+import { CANVAS_NODE_MENU_ITEMS, type CanvasNodeCreateActionKey } from '../../config/canvasNodeMenu'
+import { useCanvasConnections } from '../../composables/useCanvasConnections'
 import { useCanvasViewport } from '../../composables/useCanvasViewport'
 import { useCanvasBoard } from '../../composables/useCanvasBoard'
 import { useCanvasEditor } from '../../composables/useCanvasEditor'
 import { useCanvasHistory } from '../../composables/useCanvasHistory'
 import { useColorNode } from '../../composables/useColorNode'
+import { useCanvasDirectActions, type SegType } from '../../composables/useCanvasDirectActions'
 import { useGenerationPipeline } from '../../composables/useGenerationPipeline'
 import { useImageNode } from '../../composables/useImageNode'
 import { clampMaskRefineAmount, useMaskNode } from '../../composables/useMaskNode'
 import { useModelNode } from '../../composables/useModelNode'
+import { useNodeExecutors } from '../../composables/useNodeExecutors'
 import ColorNode from '../../components/canvas/nodes/ColorNode.vue'
+import EditNode from '../../components/canvas/nodes/EditNode.vue'
+import EnhanceNode from '../../components/canvas/nodes/EnhanceNode.vue'
+import FusionNode from '../../components/canvas/nodes/FusionNode.vue'
+import GenerateNode from '../../components/canvas/nodes/GenerateNode.vue'
 import ImageNode from '../../components/canvas/nodes/ImageNode.vue'
 import MaskNode from '../../components/canvas/nodes/MaskNode.vue'
 import ModelNode from '../../components/canvas/nodes/ModelNode.vue'
+import PaletteNode from '../../components/canvas/nodes/PaletteNode.vue'
 import PromptNode from '../../components/canvas/nodes/PromptNode.vue'
+import TryOnNode from '../../components/canvas/nodes/TryOnNode.vue'
+import { MODEL_ANGLE_OPTIONS, MODEL_BACKGROUND_OPTIONS } from '../../components/canvas/nodes/nodeOptionConfig'
 import {
   createCanvasImageItemAt,
   createColorNodeAt,
+  createEnhanceNodeAt,
+  createEditNodeAt,
+  createFusionNodeAt,
+  createGenerateNodeAt,
   createImageNodeAt,
   createMaskNodeAt,
   createModelNodeAt,
+  createPaletteNodeAt,
   createPromptNodeAt,
+  createTryOnNodeAt,
 } from '../../utils/canvasNodeFactory'
 import type {
   CanvasBoardSnapshot,
+  CanvasConnection,
+  CanvasConnectionNodeType,
+  CanvasConnectionPort,
   CanvasImageItem,
   ColorNodeItem,
+  EnhanceNodeItem,
+  EditNodeItem,
+  FusionNodeItem,
+  GenerateNodeItem,
   ImageNodeItem,
   MaskNodeItem,
   ModelNodeItem,
+  PaletteNodeItem,
   PromptNodeItem,
+  TryOnNodeItem,
 } from '../../types/canvasNodes'
 
 const router = useRouter()
@@ -548,9 +766,6 @@ const route = useRoute()
 const message = useMessage()
 const userStore = useUserStore()
 const defaultCanvasName = 'Untitled'
-
-type SegType = 'common' | 'commodity' | 'body'
-type CanvasActionKey = 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'to-vector'
 
 const multiAngleLabelMap: Record<string, string> = {
   front_full: '正面全身',
@@ -567,25 +782,8 @@ const multiAngleLabelMap: Record<string, string> = {
   side_portrait: '侧颜特写',
 }
 
-const modelBackgroundOptions = [
-  { key: 'original', label: '原图背景' },
-  { key: 'studio', label: '影棚白底' },
-]
-
-const modelAngleOptions = [
-  { key: 'front_full', label: '正面全身' },
-  { key: 'front_left_45', label: '前左 45°' },
-  { key: 'front_right_45', label: '前右 45°' },
-  { key: 'left_90', label: '左侧 90°' },
-  { key: 'right_90', label: '右侧 90°' },
-  { key: 'back_left_45', label: '后左 45°' },
-  { key: 'back_right_45', label: '后右 45°' },
-  { key: 'back_full', label: '背面全身' },
-  { key: 'front_half', label: '正面半身' },
-  { key: 'side_half', label: '侧面半身' },
-  { key: 'portrait', label: '肖像特写' },
-  { key: 'side_portrait', label: '侧颜特写' },
-]
+const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
+const modelAngleOptions = MODEL_ANGLE_OPTIONS
 
 const modelDefaultPose = 'runway_stand'
 const modelDefaultExpression = 'cool'
@@ -615,6 +813,14 @@ const promptNodes = ref<PromptNodeItem[]>([])
 const modelNodes = ref<ModelNodeItem[]>([])
 const maskNodes = ref<MaskNodeItem[]>([])
 const colorNodes = ref<ColorNodeItem[]>([])
+const enhanceNodes = ref<EnhanceNodeItem[]>([])
+const editNodes = ref<EditNodeItem[]>([])
+const fusionNodes = ref<FusionNodeItem[]>([])
+const tryOnNodes = ref<TryOnNodeItem[]>([])
+const paletteNodes = ref<PaletteNodeItem[]>([])
+const generateNodes = ref<GenerateNodeItem[]>([])
+const connections = ref<CanvasConnection[]>([])
+const processedMaskPreviewUrls = ref<Record<number, string>>({})
 const defaultSegType: SegType = 'common'
 const styleInnovateDefaultStrength = 5
 const styleInnovateStrength = ref(styleInnovateDefaultStrength)
@@ -625,17 +831,167 @@ const suppressStyleInnovateClick = ref(false)
 const canvasImageRefs = new Map<number, HTMLImageElement>()
 const styleStrengthMenuGap = 16
 const colorQuickSwatches = ['#A3E635', '#7A6BD5', '#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#111827', '#F3F4F6']
+const paletteReferenceExtractingIds = ref<number[]>([])
+const generateStyleOptions = ref<Record<string, string[]>>({})
+const generateStyleLoading = ref<Record<string, boolean>>({})
 
-let exportLoading: { destroy: () => void } | null = null
 let styleStrengthLongPressTimer: number | null = null
 let styleStrengthHideTimer: number | null = null
 let styleStrengthDragging = false
 let styleStrengthPointerY = 0
 
 const tools = [
-  { title: '图・文生图', path: '/user/picture', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14l4-4 5 5 5-5 4 4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M19 3l-1 2-2 1 2 1 1 2 1-2 2-1-2-1-1-2z" fill="currentColor" stroke="none"/>' },
-  { title: '图案工作室', path: '/user/pattern-gen', icon: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>' }
+  { title: '图・文生图', path: '/user/picture', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14l4-4 5 5 5-5 4 4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M19 3l-1 2-2 1 2 1 1 2 1-2 2-1-2-1-1-2z" fill="currentColor" stroke="none"/>' }
 ]
+
+const canvasNodeMenuItems = CANVAS_NODE_MENU_ITEMS
+
+const editModeMeta = {
+  'partial-edit': {
+    feature: 'partial-edit',
+    promptPrefix: '[partial-edit]',
+    fallbackPrompt: '局部改款',
+  },
+  'pattern-inpaint': {
+    feature: 'pattern-inpaint',
+    promptPrefix: '[pattern-inpaint]',
+    fallbackPrompt: '图案涂改',
+  },
+} as const
+
+const fusionModeMeta = {
+  'style-fusion': {
+    feature: 'style-fusion',
+    promptPrefix: '[style-fusion]',
+    fallbackPrompt: '风格融合',
+    successLabel: 'Style fusion',
+  },
+  'pattern-fusion-creative': {
+    feature: 'pattern-fusion-creative',
+    promptPrefix: '[pattern-fusion-creative]',
+    fallbackPrompt: '图案创意融合',
+    successLabel: 'Pattern fusion',
+  },
+  'pattern-fusion-style': {
+    feature: 'pattern-fusion-style',
+    promptPrefix: '[pattern-fusion-style]',
+    fallbackPrompt: '图案画风融合',
+    successLabel: 'Pattern fusion',
+  },
+  'craft-fusion-creative': {
+    feature: 'craft-fusion-creative',
+    promptPrefix: '[craft-fusion-creative]',
+    fallbackPrompt: '工艺创意融合',
+    successLabel: 'Craft fusion',
+  },
+  'craft-fusion-style': {
+    feature: 'craft-fusion-style',
+    promptPrefix: '[craft-fusion-style]',
+    fallbackPrompt: '工艺画风融合',
+    successLabel: 'Craft fusion',
+  },
+} as const
+
+const tryOnModeMeta = {
+  'fabric-on-body': {
+    feature: 'fabric-on-body',
+    promptPrefix: '[fabric-on-body]',
+    successLabel: 'Fabric try-on',
+  },
+  'pattern-on-body': {
+    feature: 'pattern-on-body',
+    promptPrefix: '[pattern-on-body]',
+    successLabel: 'Pattern try-on',
+  },
+} as const
+
+const paletteModeMeta = {
+  women: {
+    colorType: 'women',
+    label: '女装',
+  },
+  men: {
+    colorType: 'men',
+    label: '男装',
+  },
+  kids: {
+    colorType: 'kids',
+    label: '童装',
+  },
+  reference: {
+    colorType: 'reference',
+    label: '参考图',
+  },
+} as const
+
+const generateModeMeta = {
+  'pattern-gen': {
+    feature: 'pattern-gen',
+    promptPrefix: '',
+    successLabel: 'Pattern generate',
+    requiresImage: false,
+    supportsStyleModel: true,
+  },
+  'style-clone': {
+    feature: 'style-clone',
+    promptPrefix: '',
+    successLabel: 'Style clone',
+    requiresImage: true,
+    supportsStyleModel: true,
+  },
+  'seamless-tile-classic': {
+    feature: 'seamless-tile-classic',
+    promptPrefix: '[seamless-tile-classic]',
+    successLabel: 'Tile classic',
+    requiresImage: true,
+    supportsStyleModel: false,
+  },
+  'seamless-tile-cartoon': {
+    feature: 'seamless-tile-cartoon',
+    promptPrefix: '[seamless-tile-cartoon]',
+    successLabel: 'Tile cartoon',
+    requiresImage: true,
+    supportsStyleModel: false,
+  },
+} as const
+
+const processedMaskPreviewSignatures = new Map<number, string>()
+const {
+  selectedConnectionId,
+  renderedConnections,
+  draftConnectionPath,
+  draftConnectionTone,
+  draftConnectionKind,
+  hasSelectedConnection,
+  clearSelectedConnection,
+  selectConnection,
+  deleteSelectedConnection,
+  findIncomingConnection,
+  getIncomingConnections,
+  hasIncomingPortConnection,
+  findOutgoingConnection,
+  hasOutgoingPortConnection,
+  removeConnectionsForNode,
+  clearNodeConnectionError,
+  clearAllNodeConnectionErrors,
+  getNodeConnectionErrorPorts,
+  triggerNodeConnectionError,
+  clearConnectionDraft,
+  scheduleRenderedConnectionsRefresh,
+  startConnectionDrag,
+  addGlobalConnectionListeners,
+  removeGlobalConnectionListeners,
+  disposeConnectionRuntime,
+} = useCanvasConnections({
+  connections,
+  canvasLayoutRef,
+  onConnectionNotAllowed: () => {
+    message.warning('当前这两个端口不能连接')
+  },
+  onInvalidDirection: () => {
+    message.warning('连线只能从输出口接到输入口')
+  },
+})
 
 const {
   selectedIds,
@@ -646,6 +1002,12 @@ const {
   activeModelNodeId,
   activeMaskNodeId,
   activeColorNodeId,
+  activeEditNodeId,
+  activeFusionNodeId,
+  activeEnhanceNodeId,
+  activeTryOnNodeId,
+  activePaletteNodeId,
+  activeGenerateNodeId,
   nodeContextMenu,
   isSelecting,
   selectionRect,
@@ -654,6 +1016,12 @@ const {
   activateModelNode,
   activateMaskNode,
   activateColorNode,
+  activateEditNode,
+  activateFusionNode,
+  activateEnhanceNode,
+  activateTryOnNode,
+  activatePaletteNode,
+  activateGenerateNode,
   isNodeSelected,
   isNodeDragging,
   closeNodeContextMenu,
@@ -667,6 +1035,12 @@ const {
   onModelNodeMouseDown,
   onMaskNodeMouseDown,
   onColorNodeMouseDown,
+  onEditNodeMouseDown,
+  onFusionNodeMouseDown,
+  onEnhanceNodeMouseDown,
+  onTryOnNodeMouseDown,
+  onPaletteNodeMouseDown,
+  onGenerateNodeMouseDown,
   onResizeMouseDown,
   readNodeImageDropPayload,
   handleDrop: handleCanvasDropCore,
@@ -681,6 +1055,12 @@ const {
   modelNodes,
   maskNodes,
   colorNodes,
+  enhanceNodes,
+  editNodes,
+  fusionNodes,
+  tryOnNodes,
+  paletteNodes,
+  generateNodes,
   activeTool,
   showStyleStrengthControl,
   canvasX,
@@ -709,6 +1089,15 @@ const {
   deleteModelNode,
   deleteMaskNode,
   deleteColorNode,
+  deleteEnhanceNode,
+  deleteEditNode,
+  deleteFusionNode,
+  deleteTryOnNode,
+  deletePaletteNode,
+  deleteGenerateNode,
+  hasSelectedConnection,
+  clearSelectedConnection,
+  deleteSelectedConnection,
   beginHistoryBatch: () => beginCanvasHistoryBatch(),
   endHistoryBatch: (commit) => endCanvasHistoryBatch(commit),
   undo: () => undoCanvasSnapshot(),
@@ -723,7 +1112,7 @@ const {
   colorPopoverHue,
   colorPopoverSaturation,
   colorPopoverLightness,
-  colorSpectrumRef,
+  setColorSpectrumRef,
   colorSpectrumStyle,
   colorSpectrumCursorStyle,
   normalizeHexColor,
@@ -885,12 +1274,23 @@ function loadImageRatioFromFile(file: File): Promise<number | null> {
 function resetEditorState() {
   messages.value = []
   resetEditorUiState()
+  clearAllNodeConnectionErrors()
   resetMaskRuntime()
   imageNodes.value = []
   promptNodes.value = []
   modelNodes.value = []
   maskNodes.value = []
   colorNodes.value = []
+  enhanceNodes.value = []
+  editNodes.value = []
+  fusionNodes.value = []
+  tryOnNodes.value = []
+  paletteNodes.value = []
+  generateNodes.value = []
+  connections.value = []
+  processedMaskPreviewUrls.value = {}
+  processedMaskPreviewSignatures.clear()
+  clearConnectionDraft()
   userPrompt.value = ''
   resetViewport()
 }
@@ -907,6 +1307,7 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
 
   messages.value = state.messages.map(item => ({ ...item }))
   resetEditorUiState()
+  clearAllNodeConnectionErrors()
 
   imageNodes.value = state.imageNodes.map(node => ({
     ...node,
@@ -928,11 +1329,37 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
     ...node,
     strength: Math.max(0, Math.min(100, Math.round(node.strength ?? 70))),
   }))
+  enhanceNodes.value = state.enhanceNodes.map(node => ({
+    ...node,
+    outputQuality: Math.max(30, Math.min(100, Math.round(node.outputQuality ?? 95))),
+  }))
+  editNodes.value = state.editNodes.map(node => ({ ...node }))
+  fusionNodes.value = state.fusionNodes.map(node => ({ ...node }))
+  tryOnNodes.value = state.tryOnNodes.map(node => ({
+    ...node,
+    rotation: Math.max(0, Math.min(360, Math.round(node.rotation ?? 0))),
+    scale: Math.max(10, Math.min(300, Math.round(node.scale ?? 100))),
+    opacity: Math.max(0, Math.min(100, Math.round(node.opacity ?? 100))),
+  }))
+  paletteNodes.value = state.paletteNodes.map(node => ({
+    ...node,
+    colors: [...node.colors],
+  }))
+  generateNodes.value = state.generateNodes.map(node => ({ ...node }))
+  generateNodes.value.forEach((node) => {
+    if (generateModeSupportsStyleModel(node.mode)) {
+      void ensureGenerateStyleOptions(node.mode)
+    }
+  })
+  connections.value = state.connections.map(connection => ({ ...connection }))
+  clearSelectedConnection()
+  clearConnectionDraft()
   activeColorPopoverNodeId.value = null
   setViewport(state.viewport)
 
   await nextTick()
   maskNodes.value.forEach(node => renderMaskNodeMask(node))
+  scheduleRenderedConnectionsRefresh()
   resetHistoryBaseline?.(state)
 }
 
@@ -950,6 +1377,16 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
     })),
     maskNodes: maskNodes.value.map(node => ({ ...node })),
     colorNodes: colorNodes.value.map(node => ({ ...node })),
+    enhanceNodes: enhanceNodes.value.map(node => ({ ...node })),
+    editNodes: editNodes.value.map(node => ({ ...node })),
+    fusionNodes: fusionNodes.value.map(node => ({ ...node })),
+    tryOnNodes: tryOnNodes.value.map(node => ({ ...node })),
+    paletteNodes: paletteNodes.value.map(node => ({
+      ...node,
+      colors: [...node.colors],
+    })),
+    generateNodes: generateNodes.value.map(node => ({ ...node })),
+    connections: connections.value.map(connection => ({ ...connection })),
     viewport: createViewportSnapshot(),
   }
 }
@@ -994,7 +1431,7 @@ const {
 })
 
 watch(
-  [messages, imageNodes, promptNodes, modelNodes, maskNodes, colorNodes, canvasX, canvasY, zoomLevel],
+  [messages, imageNodes, promptNodes, modelNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, paletteNodes, generateNodes, connections, canvasX, canvasY, zoomLevel],
   () => {
     markBoardDirty()
     notifySnapshotChanged()
@@ -1002,97 +1439,208 @@ watch(
   { deep: true }
 )
 
+watch(
+  [connections, imageNodes, promptNodes, modelNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, paletteNodes, generateNodes, canvasX, canvasY, zoomLevel],
+  () => {
+    scheduleRenderedConnectionsRefresh()
+  },
+  { deep: true, flush: 'post' }
+)
+
+watch(
+  maskNodes,
+  (nodes) => {
+    const nextIds = new Set(nodes.map(node => node.id))
+    Object.keys(processedMaskPreviewUrls.value).forEach((rawId) => {
+      const id = Number(rawId)
+      if (!nextIds.has(id)) {
+        clearProcessedMaskPreview(id)
+      }
+    })
+    nodes.forEach((node) => {
+      void refreshProcessedMaskPreview(node)
+    })
+  },
+  { deep: true, immediate: true }
+)
+
 function deletePromptNode(id: number) {
-  promptNodes.value = promptNodes.value.filter(n => n.id !== id)
-  removeSelectedNodeKey('prompt', id)
-  if (activePromptNodeId.value === id) {
-    activePromptNodeId.value = null
-  }
+  deleteNodeFromCollection(promptNodes, 'prompt', id, () => {
+    if (activePromptNodeId.value === id) {
+      activePromptNodeId.value = null
+    }
+  })
 }
 
 function deleteModelNode(id: number) {
-  modelNodes.value = modelNodes.value.filter(n => n.id !== id)
-  removeSelectedNodeKey('model', id)
-  if (activeModelNodeId.value === id) {
-    activeModelNodeId.value = null
-  }
+  deleteNodeFromCollection(modelNodes, 'model', id, () => {
+    if (activeModelNodeId.value === id) {
+      activeModelNodeId.value = null
+    }
+  })
 }
 
 function deleteMaskNode(id: number) {
-  maskNodes.value = maskNodes.value.filter(n => n.id !== id)
-  removeMaskRuntimeFor(id)
-  removeSelectedNodeKey('mask', id)
-  if (activeMaskNodeId.value === id) {
-    activeMaskNodeId.value = null
-  }
+  deleteNodeFromCollection(maskNodes, 'mask', id, () => {
+    removeMaskRuntimeFor(id)
+    clearProcessedMaskPreview(id)
+    if (activeMaskNodeId.value === id) {
+      activeMaskNodeId.value = null
+    }
+  })
 }
 
 function deleteImageNode(id: number) {
-  imageNodes.value = imageNodes.value.filter(n => n.id !== id)
-  removeSelectedNodeKey('image', id)
-  if (activeImageNodeId.value === id) {
-    activeImageNodeId.value = null
-  }
+  deleteNodeFromCollection(imageNodes, 'image', id, () => {
+    if (activeImageNodeId.value === id) {
+      activeImageNodeId.value = null
+    }
+  })
 }
 
 function deleteColorNode(id: number) {
-  colorNodes.value = colorNodes.value.filter(n => n.id !== id)
-  removeSelectedNodeKey('color', id)
-  if (activeColorPopoverNodeId.value === id) {
-    activeColorPopoverNodeId.value = null
-  }
-  if (activeColorNodeId.value === id) {
-    activeColorNodeId.value = null
-  }
+  deleteNodeFromCollection(colorNodes, 'color', id, () => {
+    if (activeColorPopoverNodeId.value === id) {
+      activeColorPopoverNodeId.value = null
+    }
+    if (activeColorNodeId.value === id) {
+      activeColorNodeId.value = null
+    }
+  })
 }
 
-function createImageNode() {
+function deleteEnhanceNode(id: number) {
+  deleteNodeFromCollection(enhanceNodes, 'enhance', id, () => {
+    if (activeEnhanceNodeId.value === id) {
+      activeEnhanceNodeId.value = null
+    }
+  })
+}
+
+function deleteEditNode(id: number) {
+  deleteNodeFromCollection(editNodes, 'edit', id, () => {
+    if (activeEditNodeId.value === id) {
+      activeEditNodeId.value = null
+    }
+  })
+}
+
+function deleteFusionNode(id: number) {
+  deleteNodeFromCollection(fusionNodes, 'fusion', id, () => {
+    if (activeFusionNodeId.value === id) {
+      activeFusionNodeId.value = null
+    }
+  })
+}
+
+function deleteTryOnNode(id: number) {
+  deleteNodeFromCollection(tryOnNodes, 'tryon', id, () => {
+    if (activeTryOnNodeId.value === id) {
+      activeTryOnNodeId.value = null
+    }
+  })
+}
+
+function deletePaletteNode(id: number) {
+  deleteNodeFromCollection(paletteNodes, 'palette', id, () => {
+    if (activePaletteNodeId.value === id) {
+      activePaletteNodeId.value = null
+    }
+    paletteReferenceExtractingIds.value = paletteReferenceExtractingIds.value.filter(nodeId => nodeId !== id)
+  })
+}
+
+function deleteGenerateNode(id: number) {
+  deleteNodeFromCollection(generateNodes, 'generate', id, () => {
+    if (activeGenerateNodeId.value === id) {
+      activeGenerateNodeId.value = null
+    }
+  })
+}
+
+function createNodeFromContextMenu<T extends { id: number }>(
+  createAt: (point: { x: number; y: number }) => T,
+  append: (node: T) => void,
+  activate: (id: number) => void,
+  afterCreate?: (node: T) => void,
+) {
   const { clientX, clientY } = nodeContextMenu.value
   const point = getCanvasPointFromClient(clientX, clientY)
-  const newNode = createImageNodeAt(point)
-  imageNodes.value.push(newNode)
-  activateImageNode(newNode.id)
+  const newNode = createAt(point)
+  append(newNode)
+  activate(newNode.id)
+  afterCreate?.(newNode)
   closeNodeContextMenu()
 }
 
-function createPromptNode() {
-  const { clientX, clientY } = nodeContextMenu.value
-  const point = getCanvasPointFromClient(clientX, clientY)
-  const newNode = createPromptNodeAt(point)
-  promptNodes.value.push(newNode)
-  activatePromptNode(newNode.id)
-  closeNodeContextMenu()
+function deleteNodeFromCollection<T extends { id: number }>(
+  collection: Ref<T[]>,
+  nodeType: CanvasConnectionNodeType,
+  id: number,
+  afterDelete?: () => void,
+) {
+  collection.value = collection.value.filter(node => node.id !== id)
+  clearNodeConnectionError(nodeType, id)
+  removeConnectionsForNode(nodeType, id)
+  removeSelectedNodeKey(nodeType, id)
+  afterDelete?.()
 }
 
-function createModelNode() {
-  const { clientX, clientY } = nodeContextMenu.value
-  const point = getCanvasPointFromClient(clientX, clientY)
-  const newNode = createModelNodeAt(point)
-  modelNodes.value.push(newNode)
-  activateModelNode(newNode.id)
-  closeNodeContextMenu()
+function buildNodeCreateHandler<T extends { id: number }>(
+  createAt: (point: { x: number; y: number }) => T,
+  collection: Ref<T[]>,
+  activate: (id: number) => void,
+  afterCreate?: (node: T) => void,
+) {
+  return () => createNodeFromContextMenu(
+    createAt,
+    (newNode) => collection.value.push(newNode),
+    activate,
+    afterCreate,
+  )
 }
 
-function createMaskNode() {
-  const { clientX, clientY } = nodeContextMenu.value
-  const point = getCanvasPointFromClient(clientX, clientY)
-  const newNode = createMaskNodeAt(point)
-  maskNodes.value.push(newNode)
-  activateMaskNode(newNode.id)
-  closeNodeContextMenu()
+const nodeContextMenuHandlers: Record<CanvasNodeCreateActionKey, () => void> = {
+  createImageNode: buildNodeCreateHandler(createImageNodeAt, imageNodes, activateImageNode),
+  createPromptNode: buildNodeCreateHandler(createPromptNodeAt, promptNodes, activatePromptNode),
+  createModelNode: buildNodeCreateHandler(createModelNodeAt, modelNodes, activateModelNode),
+  createMaskNode: buildNodeCreateHandler(createMaskNodeAt, maskNodes, activateMaskNode),
+  createColorNode: buildNodeCreateHandler(createColorNodeAt, colorNodes, activateColorNode),
+  createEditNode: buildNodeCreateHandler(createEditNodeAt, editNodes, activateEditNode),
+  createFusionNode: buildNodeCreateHandler(createFusionNodeAt, fusionNodes, activateFusionNode),
+  createEnhanceNode: buildNodeCreateHandler(createEnhanceNodeAt, enhanceNodes, activateEnhanceNode),
+  createTryOnNode: buildNodeCreateHandler(createTryOnNodeAt, tryOnNodes, activateTryOnNode),
+  createPaletteNode: buildNodeCreateHandler(createPaletteNodeAt, paletteNodes, activatePaletteNode),
+  createGenerateNode: buildNodeCreateHandler(createGenerateNodeAt, generateNodes, activateGenerateNode, (newNode) => {
+    void ensureGenerateStyleOptions(newNode.mode)
+  }),
 }
 
-function createColorNode() {
-  const { clientX, clientY } = nodeContextMenu.value
-  const point = getCanvasPointFromClient(clientX, clientY)
-  const newNode = createColorNodeAt(point)
-  colorNodes.value.push(newNode)
-  activateColorNode(newNode.id)
-  closeNodeContextMenu()
+function handleNodeMenuAction(actionKey: CanvasNodeCreateActionKey) {
+  nodeContextMenuHandlers[actionKey]?.()
 }
 
-function setColorSpectrumElement(el: HTMLElement | null) {
-  colorSpectrumRef.value = el
+function handleConnectionPortMouseDown(
+  event: MouseEvent,
+  nodeType: CanvasConnectionNodeType,
+  nodeId: number,
+  port: CanvasConnectionPort,
+) {
+  clearSelectedIds()
+  clearSelectedConnection()
+  closeNodeContextMenu()
+  closeColorPopover()
+  startConnectionDrag(event, nodeType, nodeId, port)
+}
+
+function onConnectionPathMouseDown(event: MouseEvent, connectionId: number) {
+  event.preventDefault()
+  event.stopPropagation()
+  clearSelectedIds()
+  closeNodeContextMenu()
+  closeColorPopover()
+  clearSelectedConnection()
+  selectConnection(connectionId)
 }
 
 function onModelStageDrop(e: DragEvent, node: ModelNodeItem) {
@@ -1253,14 +1801,594 @@ const selectedPreviewItems = computed(() => {
 const visiblePreviewItems = computed(() => selectedPreviewItems.value.slice(0, 6))
 const previewOverflowCount = computed(() => Math.max(0, selectedPreviewItems.value.length - visiblePreviewItems.value.length))
 const promptPlaceholder = computed(() =>
-  selectedIds.value.length === 1
-    ? 'Type an idea for the selected image, or right-click image for quick tools'
-    : 'What do you want to create?'
+  selectedIds.value.length > 0
+    ? 'Direct prompt for the selected image'
+    : 'Direct text-to-image prompt'
 )
+const preferredWorkflowPromptNode = computed(() => {
+  const activePromptNode =
+    activePromptNodeId.value !== null
+      ? promptNodes.value.find(item => item.id === activePromptNodeId.value) ?? null
+      : null
+  if (activePromptNode?.text.trim()) return activePromptNode
+  return [...promptNodes.value].reverse().find(item => item.text.trim()) ?? null
+})
+const hasDirectPrompt = computed(() => !!userPrompt.value.trim())
 const styleCards = ref<StyleCard[]>([])
 const selectedCardIds = ref<number[]>([])
 const selectedRatio = ref('3:4')
 const selectedResolution = ref('1K')
+
+function resolveWorkflowPromptText(fallback = ''): string {
+  return preferredWorkflowPromptNode.value?.text.trim() || fallback
+}
+
+function extractDominantColors(imageUrl: string, maxColors: number): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const size = 150
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Canvas not available'))
+        return
+      }
+      ctx.drawImage(img, 0, 0, size, size)
+      const data = ctx.getImageData(0, 0, size, size).data
+      const buckets = new Map<string, number>()
+      for (let index = 0; index < data.length; index += 4) {
+        const r = data[index]
+        const g = data[index + 1]
+        const b = data[index + 2]
+        const alpha = data[index + 3]
+        if (alpha < 128) continue
+        if (r > 240 && g > 240 && b > 240) continue
+        if (r < 15 && g < 15 && b < 15) continue
+        const qr = Math.round(r / 32) * 32
+        const qg = Math.round(g / 32) * 32
+        const qb = Math.round(b / 32) * 32
+        const key = `${qr},${qg},${qb}`
+        buckets.set(key, (buckets.get(key) || 0) + 1)
+      }
+      const result: string[] = []
+      const sorted = [...buckets.entries()].sort((left, right) => right[1] - left[1])
+      for (const [key] of sorted) {
+        if (result.length >= maxColors) break
+        const [r, g, b] = key.split(',').map(Number)
+        const hex = `#${[r, g, b].map(value => value.toString(16).padStart(2, '0')).join('')}`.toUpperCase()
+        const tooClose = result.some((existing) => {
+          const er = parseInt(existing.slice(1, 3), 16)
+          const eg = parseInt(existing.slice(3, 5), 16)
+          const eb = parseInt(existing.slice(5, 7), 16)
+          return Math.abs(r - er) + Math.abs(g - eg) + Math.abs(b - eb) < 80
+        })
+        if (!tooClose) {
+          result.push(hex)
+        }
+      }
+      resolve(result)
+    }
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = imageUrl
+  })
+}
+
+function getImageNodeConnectionOutput(node: ImageNodeItem | null): { url: string; ratio: number } | null {
+  if (!node) return null
+  return getImageNodePreferredImage(node)
+}
+
+function clearProcessedMaskPreview(id: number) {
+  if (!(id in processedMaskPreviewUrls.value)) {
+    processedMaskPreviewSignatures.delete(id)
+    return
+  }
+  const next = { ...processedMaskPreviewUrls.value }
+  delete next[id]
+  processedMaskPreviewUrls.value = next
+  processedMaskPreviewSignatures.delete(id)
+}
+
+function getMaskPreviewSignature(node: MaskNodeItem): string {
+  return `${node.maskDataUrl}|${clampMaskRefineAmount(node.refineAmount ?? 0)}|${node.invertMask ? 1 : 0}`
+}
+
+async function refreshProcessedMaskPreview(node: MaskNodeItem) {
+  if (!node.maskDataUrl) {
+    clearProcessedMaskPreview(node.id)
+    return
+  }
+
+  const refineAmount = clampMaskRefineAmount(node.refineAmount ?? 0)
+  const signature = getMaskPreviewSignature(node)
+  processedMaskPreviewSignatures.set(node.id, signature)
+
+  if (refineAmount === 0 && !node.invertMask) {
+    processedMaskPreviewUrls.value = {
+      ...processedMaskPreviewUrls.value,
+      [node.id]: node.maskDataUrl,
+    }
+    return
+  }
+
+  const refinedUrl = await refineMaskDataUrl(node.maskDataUrl, refineAmount, !!node.invertMask)
+  if (processedMaskPreviewSignatures.get(node.id) !== signature) return
+  processedMaskPreviewUrls.value = {
+    ...processedMaskPreviewUrls.value,
+    [node.id]: refinedUrl || node.maskDataUrl,
+  }
+}
+
+function getMaskNodeProcessedOutputUrl(node: MaskNodeItem): string {
+  if (!node.maskDataUrl) return ''
+  return processedMaskPreviewUrls.value[node.id] || node.maskDataUrl
+}
+
+function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: number; mode: 'mask' } | null {
+  const connection = findIncomingConnection('image', node.id, 'image')
+  if (!connection || connection.fromNodeType !== 'mask') return null
+  const sourceNode = maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
+  if (!sourceNode?.maskDataUrl) return null
+  const source = getMaskNodeEffectiveSource(sourceNode)
+  return {
+    url: getMaskNodeProcessedOutputUrl(sourceNode),
+    ratio: source.ratio,
+    mode: 'mask',
+  }
+}
+
+function getResolvedImageNodeDisplay(node: ImageNodeItem): { image: { url: string; ratio: number } | null; mode: 'source' | 'output' | 'mask' } {
+  const connectedInput = getImageNodeConnectedInput(node)
+  if (connectedInput) {
+    return {
+      image: {
+        url: connectedInput.url,
+        ratio: connectedInput.ratio,
+      },
+      mode: connectedInput.mode,
+    }
+  }
+  return {
+    image: getImageNodeDisplayImage(node),
+    mode: node.outputImages.length > 0 ? 'output' : 'source',
+  }
+}
+
+function getMaskNodeConnectedImageInput(node: MaskNodeItem): { url: string; ratio: number } | null {
+  return getConnectedImageNodeOutput('mask', node.id, 'image')
+}
+
+function getMaskNodeEffectiveSource(node: MaskNodeItem): { url: string; ratio: number; connected: boolean } {
+  const connectedImage = getMaskNodeConnectedImageInput(node)
+  if (connectedImage) {
+    return {
+      url: connectedImage.url,
+      ratio: connectedImage.ratio,
+      connected: true,
+    }
+  }
+  return {
+    url: node.sourceImageUrl,
+    ratio: node.sourceImageRatio,
+    connected: false,
+  }
+}
+
+function getModelNodeConnectedImageInput(node: ModelNodeItem): { url: string; ratio: number } | null {
+  return getConnectedImageNodeOutput('model', node.id, 'image')
+}
+
+function getModelNodeConnectedPromptInput(node: ModelNodeItem): string {
+  return getConnectedPromptText('model', node.id, 'prompt')
+}
+
+function getModelNodeEffectiveSource(node: ModelNodeItem): { url: string; ratio: number; connected: boolean } {
+  const connectedImage = getModelNodeConnectedImageInput(node)
+  if (connectedImage) {
+    return {
+      url: connectedImage.url,
+      ratio: connectedImage.ratio,
+      connected: true,
+    }
+  }
+  return {
+    url: node.sourceImageUrl,
+    ratio: node.sourceImageRatio,
+    connected: false,
+  }
+}
+
+function getModelNodeConnectedOutputTarget(node: ModelNodeItem): ImageNodeItem | null {
+  return getConnectedOutputImageTarget('model', node.id, 'image')
+}
+
+function getColorNodeConnectedOutputTarget(node: ColorNodeItem): ImageNodeItem | null {
+  return getConnectedOutputImageTarget('color', node.id, 'image')
+}
+
+function getEditNodeConnectedOutputTarget(node: EditNodeItem): ImageNodeItem | null {
+  return getConnectedOutputImageTarget('edit', node.id, 'image')
+}
+
+function getFusionNodeConnectedOutputTarget(node: FusionNodeItem): ImageNodeItem | null {
+  return getConnectedOutputImageTarget('fusion', node.id, 'image')
+}
+
+function getEnhanceNodeConnectedOutputTarget(node: EnhanceNodeItem): ImageNodeItem | null {
+  return getConnectedOutputImageTarget('enhance', node.id, 'image')
+}
+
+function getTryOnNodeConnectedOutputTarget(node: TryOnNodeItem): ImageNodeItem | null {
+  return getConnectedOutputImageTarget('tryon', node.id, 'image')
+}
+
+function getPaletteNodeConnectedOutputTarget(node: PaletteNodeItem): ImageNodeItem | null {
+  return getConnectedOutputImageTarget('palette', node.id, 'image')
+}
+
+function getGenerateNodeConnectedOutputTarget(node: GenerateNodeItem): ImageNodeItem | null {
+  return getConnectedOutputImageTarget('generate', node.id, 'image')
+}
+
+function getColorNodeConnectionStatus(node: ColorNodeItem) {
+  const status = createNodeConnectionStatusBuilder('color', node.id)
+  const hasAnyConnection = status.hasAnyConnection('image')
+  const imageConnected = status.incoming('image')
+  const maskConnected = status.incoming('mask')
+  const promptConnected = status.incoming('prompt')
+  const outputConnected = status.outgoing('image')
+  return {
+    hasAnyConnection,
+    imageConnected,
+    maskConnected,
+    promptConnected,
+    outputConnected,
+  }
+}
+
+function getConnectedImageNodeOutput(
+  toNodeType: CanvasConnectionNodeType,
+  toNodeId: number,
+  toPort: CanvasConnectionPort,
+): { url: string; ratio: number } | null {
+  const connection = findIncomingConnection(toNodeType, toNodeId, toPort)
+  if (!connection || connection.fromNodeType !== 'image') return null
+  const sourceNode = imageNodes.value.find(item => item.id === connection.fromNodeId) ?? null
+  const preferredImage = getImageNodeConnectionOutput(sourceNode)
+  if (!preferredImage?.url) return null
+  return preferredImage
+}
+
+function getConnectedPromptText(
+  toNodeType: CanvasConnectionNodeType,
+  toNodeId: number,
+  toPort: CanvasConnectionPort,
+): string {
+  const connection = findIncomingConnection(toNodeType, toNodeId, toPort)
+  if (!connection || connection.fromNodeType !== 'prompt') return ''
+  const sourceNode = promptNodes.value.find(item => item.id === connection.fromNodeId) ?? null
+  return sourceNode?.text.trim() || ''
+}
+
+function getConnectedOutputImageTarget(
+  fromNodeType: CanvasConnectionNodeType,
+  fromNodeId: number,
+  fromPort: CanvasConnectionPort,
+): ImageNodeItem | null {
+  const connection = findOutgoingConnection(fromNodeType, fromNodeId, fromPort)
+  if (!connection || connection.toNodeType !== 'image') return null
+  return imageNodes.value.find(item => item.id === connection.toNodeId) ?? null
+}
+
+function resolveConnectedPlacedImageInput(
+  toNodeType: CanvasConnectionNodeType,
+  toNodeId: number,
+  toPort: CanvasConnectionPort,
+): { url: string; placementX: number; placementY: number } | null {
+  const connection = findIncomingConnection(toNodeType, toNodeId, toPort)
+  if (!connection || connection.fromNodeType !== 'image') return null
+  const sourceNode = imageNodes.value.find(item => item.id === connection.fromNodeId) ?? null
+  const preferredImage = getImageNodeConnectionOutput(sourceNode)
+  if (!preferredImage?.url || !sourceNode) return null
+  return {
+    url: preferredImage.url,
+    placementX: sourceNode.x - 340,
+    placementY: sourceNode.y + 18,
+  }
+}
+
+async function resolveConnectedPlacedMaskInput(
+  toNodeType: CanvasConnectionNodeType,
+  toNodeId: number,
+  toPort: CanvasConnectionPort,
+): Promise<{ dataUrl: string; placementX: number; placementY: number } | null> {
+  const connection = findIncomingConnection(toNodeType, toNodeId, toPort)
+  if (!connection || connection.fromNodeType !== 'mask') return null
+  const sourceNode = maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
+  if (!sourceNode?.maskDataUrl) return null
+  const dataUrl = await refineMaskDataUrl(
+    sourceNode.maskDataUrl,
+    sourceNode.refineAmount ?? 0,
+    !!sourceNode.invertMask,
+  )
+  if (!dataUrl) return null
+  return {
+    dataUrl,
+    placementX: sourceNode.x + 340,
+    placementY: sourceNode.y + 18,
+  }
+}
+
+function resolvePreferredOutputNodeId(connectedOutputNodeId: number | null): number | null {
+  return connectedOutputNodeId ?? resolvePreferredImageOutputNode()?.id ?? null
+}
+
+function buildPlacementSource(url: string, x: number, y: number): CanvasImageItem {
+  return {
+    id: -Date.now(),
+    type: 'image',
+    url,
+    x,
+    y,
+    width: 300,
+  }
+}
+
+function warnMissingNodeInputs(
+  nodeType: CanvasConnectionNodeType,
+  nodeId: number,
+  missingPorts: string[],
+  formatMessage: (ports: string[]) => string,
+): boolean {
+  if (missingPorts.length === 0) return false
+  triggerNodeConnectionError(nodeType, nodeId, missingPorts)
+  message.warning(formatMessage(missingPorts))
+  return true
+}
+
+function createNodeConnectionStatusBuilder(nodeType: CanvasConnectionNodeType, nodeId: number) {
+  return {
+    incoming: (port: CanvasConnectionPort) => hasIncomingPortConnection(nodeType, nodeId, port),
+    outgoing: (port: CanvasConnectionPort) => hasOutgoingPortConnection(nodeType, nodeId, port),
+    hasAnyConnection: (outputPort: CanvasConnectionPort) =>
+      getIncomingConnections(nodeType, nodeId).length > 0 || hasOutgoingPortConnection(nodeType, nodeId, outputPort),
+  }
+}
+
+function getModelNodeConnectionStatus(node: ModelNodeItem) {
+  const status = createNodeConnectionStatusBuilder('model', node.id)
+  const hasAnyConnection = status.hasAnyConnection('image')
+  const imageConnected = status.incoming('image')
+  const promptConnected = status.incoming('prompt')
+  const outputConnected = status.outgoing('image')
+  return {
+    hasAnyConnection,
+    imageConnected,
+    promptConnected,
+    outputConnected,
+  }
+}
+
+function getEditNodeConnectionStatus(node: EditNodeItem) {
+  const status = createNodeConnectionStatusBuilder('edit', node.id)
+  const hasAnyConnection = status.hasAnyConnection('image')
+  const imageConnected = status.incoming('image')
+  const maskConnected = status.incoming('mask')
+  const promptConnected = status.incoming('prompt')
+  const outputConnected = status.outgoing('image')
+  return {
+    hasAnyConnection,
+    imageConnected,
+    maskConnected,
+    promptConnected,
+    outputConnected,
+  }
+}
+
+function getFusionNodeConnectionStatus(node: FusionNodeItem) {
+  const status = createNodeConnectionStatusBuilder('fusion', node.id)
+  const hasAnyConnection = status.hasAnyConnection('image')
+  const imageAConnected = status.incoming('imageA')
+  const imageBConnected = status.incoming('imageB')
+  const promptConnected = status.incoming('prompt')
+  const outputConnected = status.outgoing('image')
+  return {
+    hasAnyConnection,
+    imageAConnected,
+    imageBConnected,
+    promptConnected,
+    outputConnected,
+  }
+}
+
+function enhanceModeSupportsPrompt(mode: EnhanceNodeItem['mode']) {
+  return mode === 'deblur' || mode === 'canvas-extend'
+}
+
+function getEnhanceNodeConnectionStatus(node: EnhanceNodeItem) {
+  const status = createNodeConnectionStatusBuilder('enhance', node.id)
+  const hasAnyConnection = status.hasAnyConnection('image')
+  const imageConnected = status.incoming('image')
+  const promptConnected = enhanceModeSupportsPrompt(node.mode)
+    ? status.incoming('prompt')
+    : false
+  const outputConnected = status.outgoing('image')
+  return {
+    hasAnyConnection,
+    imageConnected,
+    promptConnected,
+    outputConnected,
+  }
+}
+
+function getTryOnNodeConnectionStatus(node: TryOnNodeItem) {
+  const status = createNodeConnectionStatusBuilder('tryon', node.id)
+  const imageAConnected = status.incoming('imageA')
+  const imageBConnected = status.incoming('imageB')
+  const outputConnected = status.outgoing('image')
+  return {
+    imageAConnected,
+    imageBConnected,
+    outputConnected,
+  }
+}
+
+function paletteModeUsesReference(mode: PaletteNodeItem['mode']) {
+  return mode === 'reference'
+}
+
+function generateModeRequiresImage(mode: GenerateNodeItem['mode']) {
+  return generateModeMeta[mode].requiresImage
+}
+
+function generateModeSupportsStyleModel(mode: GenerateNodeItem['mode']) {
+  return generateModeMeta[mode].supportsStyleModel
+}
+
+function getPaletteNodeConnectionStatus(node: PaletteNodeItem) {
+  const status = createNodeConnectionStatusBuilder('palette', node.id)
+  const imageConnected = status.incoming('image')
+  const referenceConnected = paletteModeUsesReference(node.mode)
+    ? status.incoming('reference')
+    : false
+  const outputConnected = status.outgoing('image')
+  return {
+    imageConnected,
+    referenceConnected,
+    outputConnected,
+  }
+}
+
+function getGenerateNodeConnectionStatus(node: GenerateNodeItem) {
+  const status = createNodeConnectionStatusBuilder('generate', node.id)
+  const imageConnected = status.incoming('image')
+  const promptConnected = status.incoming('prompt')
+  const outputConnected = status.outgoing('image')
+  return {
+    imageConnected,
+    promptConnected,
+    outputConnected,
+  }
+}
+
+function setEnhanceNodeMode(node: EnhanceNodeItem, mode: EnhanceNodeItem['mode']) {
+  node.mode = mode
+  if (enhanceModeSupportsPrompt(mode)) return
+  const removedSelected = connections.value.some(connection =>
+    connection.id === selectedConnectionId.value &&
+    connection.toNodeType === 'enhance' &&
+    connection.toNodeId === node.id &&
+    connection.toPort === 'prompt',
+  )
+  connections.value = connections.value.filter(connection =>
+    !(
+      connection.toNodeType === 'enhance' &&
+      connection.toNodeId === node.id &&
+      connection.toPort === 'prompt'
+    ),
+  )
+  if (removedSelected) {
+    clearSelectedConnection()
+  }
+}
+
+function setPaletteNodeMode(node: PaletteNodeItem, mode: PaletteNodeItem['mode']) {
+  const usingReferenceBefore = paletteModeUsesReference(node.mode)
+  node.mode = mode
+  if (paletteModeUsesReference(mode)) return
+
+  const removedSelected = connections.value.some(connection =>
+    connection.id === selectedConnectionId.value &&
+    connection.toNodeType === 'palette' &&
+    connection.toNodeId === node.id &&
+    connection.toPort === 'reference',
+  )
+  connections.value = connections.value.filter(connection =>
+    !(
+      connection.toNodeType === 'palette' &&
+      connection.toNodeId === node.id &&
+      connection.toPort === 'reference'
+    ),
+  )
+  if (removedSelected) {
+    clearSelectedConnection()
+  }
+  if (usingReferenceBefore) {
+    paletteReferenceExtractingIds.value = paletteReferenceExtractingIds.value.filter(item => item !== node.id)
+  }
+}
+
+function getGenerateStyleOptions(mode: GenerateNodeItem['mode']): string[] {
+  return generateStyleOptions.value[mode] ?? []
+}
+
+function isGenerateStyleLoading(mode: GenerateNodeItem['mode']): boolean {
+  return !!generateStyleLoading.value[mode]
+}
+
+async function ensureGenerateStyleOptions(mode: GenerateNodeItem['mode']) {
+  if (!generateModeSupportsStyleModel(mode)) return
+  if (generateStyleLoading.value[mode]) return
+  if ((generateStyleOptions.value[mode] ?? []).length > 0) return
+  generateStyleLoading.value = { ...generateStyleLoading.value, [mode]: true }
+  try {
+    const res: any = await patternStyleApi.listEnabled(mode)
+    if (res.code === 0) {
+      const names = (res.data?.list || [])
+        .map((item: any) => item?.name)
+        .filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
+      const uniqueNames = Array.from(new Set<string>(names))
+      generateStyleOptions.value = {
+        ...generateStyleOptions.value,
+        [mode]: uniqueNames,
+      }
+    }
+  } catch {
+    // ignore and keep current options empty
+  } finally {
+    generateStyleLoading.value = { ...generateStyleLoading.value, [mode]: false }
+  }
+}
+
+function setGenerateNodeMode(node: GenerateNodeItem, mode: GenerateNodeItem['mode']) {
+  node.mode = mode
+  if (!generateModeSupportsStyleModel(mode)) {
+    node.styleModel = ''
+  } else {
+    void ensureGenerateStyleOptions(mode)
+  }
+}
+
+function getMaskNodeStageHeight(node: MaskNodeItem): number {
+  const source = getMaskNodeEffectiveSource(node)
+  return getMaskStageHeight({
+    ...node,
+    sourceImageUrl: source.url,
+    sourceImageRatio: source.ratio,
+  })
+}
+
+function getMaskNodeRuntimeNode(node: MaskNodeItem): MaskNodeItem {
+  const source = getMaskNodeEffectiveSource(node)
+  return {
+    ...node,
+    sourceImageUrl: source.url,
+    sourceImageRatio: source.ratio,
+  }
+}
+
+function getModelNodeStageHeight(node: ModelNodeItem): number {
+  const source = getModelNodeEffectiveSource(node)
+  return getModelStageHeight({
+    ...node,
+    sourceImageUrl: source.url,
+    sourceImageRatio: source.ratio,
+  })
+}
 
 function toggleCard(id: number) {
   const idx = selectedCardIds.value.indexOf(id)
@@ -1268,421 +2396,110 @@ function toggleCard(id: number) {
   else selectedCardIds.value.push(id)
 }
 
-async function runCanvasAction(action: CanvasActionKey, item: CanvasImageItem) {
-  if (generating.value) return
-  selectedIds.value = [item.id]
-  activeImageActionId.value = null
-  showStyleStrengthControl.value = false
-  if (action === 'remove-bg') {
-    await handleRemoveBgGenerate(item)
+function removePaletteColor(node: PaletteNodeItem, index: number) {
+  if (index < 0 || index >= node.colors.length) return
+  node.colors.splice(index, 1)
+}
+
+function addPaletteColor(node: PaletteNodeItem, rawColor: string) {
+  if (node.colors.length >= 8) {
+    message.warning('最多保留 8 种颜色')
     return
   }
-  if (action === 'style-innovate') {
-    await handleStyleInnovateGenerate(item)
-    return
-  }
-  if (action === 'to-vector') {
-    await handleToVectorGenerate(item)
-    return
-  }
-  await handleSketchToDesignGenerate(item)
+  const nextColor = normalizeHexColor(rawColor)
+  if (node.colors.includes(nextColor)) return
+  node.colors.push(nextColor)
 }
 
-async function handleGenerate() {
-  if (generating.value) return
-  if (!userPrompt.value.trim()) return
-  await handlePictureGenerate()
-}
+const {
+  handleModelNodeGenerate,
+  handleColorNodeGenerate,
+  handleEditNodeGenerate,
+  handleFusionNodeGenerate,
+  handleEnhanceNodeGenerate,
+  handleTryOnNodeGenerate,
+  handlePaletteNodeGenerate,
+  handleGenerateNodeGenerate,
+} = useNodeExecutors({
+  generating,
+  message,
+  messages,
+  selectedIds,
+  imageNodes,
+  modelNodes,
+  maskNodes,
+  activeImageNodeId,
+  activeModelNodeId,
+  activeMaskNodeId,
+  paletteReferenceExtractingIds,
+  modelDefaultPose,
+  modelDefaultExpression,
+  editModeMeta,
+  fusionModeMeta,
+  tryOnModeMeta,
+  paletteModeMeta,
+  generateModeMeta,
+  getModelAngleLabel,
+  getIncomingConnections,
+  triggerNodeConnectionError,
+  getModelNodeEffectiveSource,
+  getModelNodeConnectedPromptInput,
+  resolveWorkflowPromptText,
+  getModelNodeConnectedOutputTarget,
+  getColorNodeConnectedOutputTarget,
+  getEditNodeConnectedOutputTarget,
+  getFusionNodeConnectedOutputTarget,
+  getEnhanceNodeConnectedOutputTarget,
+  getTryOnNodeConnectedOutputTarget,
+  getPaletteNodeConnectedOutputTarget,
+  getGenerateNodeConnectedOutputTarget,
+  resolvePreferredOutputNodeId,
+  buildPlacementSource,
+  warnMissingNodeInputs,
+  submitTaskAndPoll,
+  appendGeneratedImages,
+  normalizeHexColor,
+  getImageNodePreferredImage,
+  resolveConnectedPlacedImageInput,
+  resolveConnectedPlacedMaskInput,
+  getConnectedPromptText,
+  buildFullMaskDataUrl,
+  refineMaskDataUrl,
+  dataUrlToFile,
+  uploadImage: uploadApi.upload,
+  upscaleImage: upscaleApi.upscale,
+  segmentImage: segApi.segment,
+  extractDominantColors,
+  paletteModeUsesReference,
+  generateModeRequiresImage,
+  generateModeSupportsStyleModel,
+})
 
-async function handlePictureGenerate() {
-  generating.value = true
-  await submitTaskAndPoll({
-    request: { 
-      prompt: userPrompt.value.trim(), 
-      card_ids: selectedCardIds.value, 
-      params: { 
-        ratio: selectedRatio.value,
-        resolution: selectedResolution.value
-      } 
-    },
-    successMessage: '任务已提交',
-    failureMessage: '提交失败',
-    onSubmitted: () => {
-      userPrompt.value = ''
-      showSettings.value = false
-    },
-  })
-}
-
-async function handleRemoveBgGenerate(source: CanvasImageItem) {
-  generating.value = true
-  const startTime = Date.now()
-  try {
-    const segmentRes: any = await segApi.segment({
-      image_url: source.url,
-      seg_type: defaultSegType,
-    })
-    if (segmentRes.code !== 0 || !segmentRes.data?.result_url) {
-      message.error(segmentRes.msg || 'Segmentation failed')
-      return
-    }
-
-    const saveRes: any = await segApi.save({
-      result_url: segmentRes.data.result_url,
-      seg_type: defaultSegType,
-      feature: 'remove-bg',
-    })
-    if (saveRes.code !== 0 || !saveRes.data?.image_url) {
-      message.error(saveRes.msg || 'Save result failed')
-      return
-    }
-
-    appendGeneratedImages([saveRes.data.image_url], source)
-    message.success(`Background removed in ${((Date.now() - startTime) / 1000).toFixed(1)}s`)
-  } catch (error: any) {
-    message.error(error?.msg || error?.message || 'Failed to remove background')
-  } finally {
-    generating.value = false
-  }
-}
-
-async function handleSketchToDesignGenerate(source: CanvasImageItem) {
-  generating.value = true
-  const desc = userPrompt.value.trim() || 'Sketch to design'
-  await submitTaskAndPoll({
-    request: {
-      prompt: `[sketch-to-design] ${desc}`,
-      params: {
-        image_urls: [source.url],
-        feature: 'sketch-to-design',
-      },
-    },
-    source,
-    successMessage: 'Task submitted',
-    failureMessage: 'Failed to submit task',
-    onSubmitted: () => {
-      userPrompt.value = ''
-    },
-  })
-}
-
-async function handleStyleInnovateGenerate(source: CanvasImageItem) {
-  generating.value = true
-  const desc = userPrompt.value.trim() || 'Style innovate'
-  const strength = styleInnovateStrength.value
-  await submitTaskAndPoll({
-    request: {
-      prompt: `[style-innovate] 改变幅度：${strength}/10，${desc}`,
-      params: {
-        image_urls: [source.url],
-        feature: 'style-innovate',
-        variation_strength: strength,
-      },
-    },
-    source,
-    successMessage: 'Task submitted',
-    failureMessage: 'Failed to submit task',
-    onSubmitted: () => {
-      userPrompt.value = ''
-    },
-  })
-}
-
-async function handleToVectorGenerate(source: CanvasImageItem) {
-  generating.value = true
-  const startTime = Date.now()
-  try {
-    const res: any = await vectorizeApi.vectorize({
-      image_url: source.url,
-      threshold: 0.45,
-      turd_size: 2,
-      alpha_max: 1.0,
-      opt_tolerance: 0.2,
-      turn_policy: 'minority',
-      invert: false,
-      color_count: 0,
-    })
-
-    if (res.code !== 0 || !res.data?.svg_url) {
-      message.error(res.msg || 'Vectorize failed')
-      return
-    }
-
-    appendGeneratedImages([res.data.svg_url], source)
-    message.success(`Vectorized in ${((Date.now() - startTime) / 1000).toFixed(1)}s`)
-  } catch (error: any) {
-    message.error(error?.msg || error?.message || 'Failed to vectorize image')
-  } finally {
-    generating.value = false
-  }
-}
-
-async function handleModelNodeGenerate(node: ModelNodeItem) {
-  if (generating.value) return
-  const sourceUrl = node.sourceImageUrl
-  if (!sourceUrl) {
-    message.warning('请先上传模特图')
-    return
-  }
-
-  const angles = [...node.selectedAngles]
-  if (angles.length === 0) {
-    message.warning('请至少选择一个角度')
-    return
-  }
-
-  generating.value = true
-  const angleLabel = angles.map(getModelAngleLabel).join('、')
-  const promptText = userPrompt.value.trim() || `多角度：${angleLabel}`
-  const outputNodeId = resolvePreferredImageOutputNode()?.id ?? null
-  const placementSource: CanvasImageItem = {
-    id: -Date.now(),
-    type: 'image',
-    url: sourceUrl,
-    x: node.x + 340,
-    y: node.y + 18,
-    width: 300,
-  }
-
-  await submitTaskAndPoll({
-    request: {
-      prompt: `[multi-angle] ${promptText}`,
-      params: {
-        image_urls: [sourceUrl],
-        feature: 'multi-angle',
-        angles: angles.join(','),
-        pose: modelDefaultPose,
-        expression: modelDefaultExpression,
-        background: node.background,
-      },
-    },
-    source: placementSource,
-    outputNodeId,
-    successMessage: `Task submitted · ${angleLabel}`,
-    failureMessage: 'Failed to submit task',
-  })
-}
-
-async function handleColorNodeGenerate(node: ColorNodeItem) {
-  if (generating.value) return
-
-  const targetColor = normalizeHexColor(node.targetColor)
-  const strength = Math.max(0, Math.min(100, Math.round(node.strength ?? 70)))
-  node.targetColor = targetColor
-  node.strength = strength
-  let originalImageUrl = ''
-  let maskDataUrl = ''
-  let placementX = node.x + 340
-  let placementY = node.y + 18
-  const selectedCanvasImage =
-    selectedIds.value.length === 1
-      ? messages.value.find(item => item.id === selectedIds.value[0])
-      : null
-  const activeMaskNode =
-    activeMaskNodeId.value !== null
-      ? maskNodes.value.find(item => item.id === activeMaskNodeId.value)
-      : null
-  const latestMaskNode = [...maskNodes.value]
-    .reverse()
-    .find(item => !!item.sourceImageUrl && !!item.maskDataUrl)
-  const activeModelNode =
-    activeModelNodeId.value !== null
-      ? modelNodes.value.find(item => item.id === activeModelNodeId.value)
-      : null
-  const latestModelNode = [...modelNodes.value]
-    .reverse()
-    .find(item => !!item.sourceImageUrl)
-  const activeImageNode =
-    activeImageNodeId.value !== null
-      ? imageNodes.value.find(item => item.id === activeImageNodeId.value)
-      : null
-  const latestImageNode = [...imageNodes.value]
-    .reverse()
-    .find(item => !!item.sourceImageUrl || item.outputImages.length > 0)
-  const latestCanvasImage = [...messages.value].reverse()[0] ?? null
-
-  if (selectedCanvasImage) {
-    originalImageUrl = selectedCanvasImage.url
-    placementX = selectedCanvasImage.x - 340
-    placementY = selectedCanvasImage.y + 18
-    const autoMask = await buildFullMaskDataUrl(originalImageUrl)
-    if (!autoMask) {
-      message.error('无法生成全图蒙版，请重试')
-      return
-    }
-    maskDataUrl = autoMask
-  } else {
-    const pickedMaskNode =
-      activeMaskNode && activeMaskNode.sourceImageUrl && activeMaskNode.maskDataUrl
-        ? activeMaskNode
-        : latestMaskNode
-    if (pickedMaskNode) {
-      originalImageUrl = pickedMaskNode.sourceImageUrl
-      maskDataUrl = await refineMaskDataUrl(
-        pickedMaskNode.maskDataUrl,
-        pickedMaskNode.refineAmount ?? 0,
-        !!pickedMaskNode.invertMask,
-      )
-      placementX = pickedMaskNode.x + 340
-      placementY = pickedMaskNode.y + 18
-    } else {
-      const pickedImageNode = getImageNodePreferredImage(activeImageNode ?? latestImageNode ?? null)
-      const pickedModelNode =
-        activeModelNode && activeModelNode.sourceImageUrl
-          ? activeModelNode
-          : latestModelNode
-      const pickedCanvasImage = latestCanvasImage
-
-      if (pickedImageNode) {
-        originalImageUrl = pickedImageNode.url
-        placementX = (activeImageNode ?? latestImageNode)?.x ?? node.x
-        placementY = ((activeImageNode ?? latestImageNode)?.y ?? node.y) + 18
-      } else if (pickedModelNode) {
-        originalImageUrl = pickedModelNode.sourceImageUrl
-        placementX = pickedModelNode.x - 340
-        placementY = pickedModelNode.y + 18
-      } else if (pickedCanvasImage) {
-        originalImageUrl = pickedCanvasImage.url
-        placementX = pickedCanvasImage.x - 340
-        placementY = pickedCanvasImage.y + 18
-      } else {
-        message.warning('暂无可用输入，请先准备图片或 Mask 节点')
-        return
-      }
-
-      const autoMask = await buildFullMaskDataUrl(originalImageUrl)
-      if (!autoMask) {
-        message.error('无法生成全图蒙版，请重试')
-        return
-      }
-      maskDataUrl = autoMask
-    }
-  }
-
-  if (!maskDataUrl) {
-    message.warning('请先准备可用蒙版')
-    return
-  }
-
-  generating.value = true
-  const outputNodeId = resolvePreferredImageOutputNode()?.id ?? null
-  try {
-    const maskFile = await dataUrlToFile(maskDataUrl, `mask-${Date.now()}.png`)
-    const uploadRes: any = await uploadApi.upload(maskFile)
-    if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-      message.error(uploadRes.msg || '蒙版上传失败')
-      generating.value = false
-      return
-    }
-
-    const placementSource: CanvasImageItem = {
-      id: -Date.now(),
-      type: 'image',
-      url: originalImageUrl,
-      x: placementX,
-      y: placementY,
-      width: 300,
-    }
-
-    await submitTaskAndPoll({
-      request: {
-      prompt: `[directed-recolor] 目标颜色：${targetColor}，强度：${strength}`,
-      params: {
-        image_urls: [uploadRes.data.url],
-        original_image_url: originalImageUrl,
-        feature: 'directed-recolor',
-        target_color: targetColor,
-        strength,
-      },
-      },
-      source: placementSource,
-      outputNodeId,
-      successMessage: `Task submitted · ${targetColor} · ${strength}%`,
-      failureMessage: 'Failed to submit task',
-    })
-  } catch (error: any) {
-    message.error(error?.msg || error?.message || 'Failed to submit task')
-    generating.value = false
-  }
-}
-
-function toSafeFileName(rawName: string): string {
-  const decoded = rawName ? decodeURIComponent(rawName) : ''
-  const cleaned = decoded.replace(/[\\/:*?"<>|]+/g, '_').trim()
-  if (!cleaned) return `export-${Date.now()}.png`
-  if (/\.[a-z0-9]+$/i.test(cleaned)) return cleaned
-  return `${cleaned}.png`
-}
-
-function buildExportFileName(url: string, index: number, total: number, timestamp: number): string {
-  const fromUrl = String(url).split('/').pop()?.split('?')[0] || ''
-  const safeName = toSafeFileName(fromUrl)
-  if (total > 1) {
-    return `${String(index + 1).padStart(2, '0')}-${timestamp}-${safeName}`
-  }
-  return safeName
-}
-
-async function handleExport() {
-  if (selectedIds.value.length === 0) return
-
-  const exportableItems = messages.value.filter(
-    m => selectedIds.value.includes(m.id) && m.type === 'image' && !!m.url
-  )
-
-  if (exportableItems.length === 0) {
-    message.warning('No exportable images selected')
-    return
-  }
-
-  const timestamp = Date.now()
-  let failed = 0
-
-  if (exportLoading) {
-    exportLoading.destroy()
-    exportLoading = null
-  }
-
-  const loading = message.loading(`Exporting ${exportableItems.length} images...`, {
-    duration: 1500,
-    keepAliveOnHover: false
-  })
-  exportLoading = loading
-
-  try {
-    for (let i = 0; i < exportableItems.length; i++) {
-      const item = exportableItems[i]
-      const fileName = buildExportFileName(item.url, i, exportableItems.length, timestamp)
-
-      try {
-        const link = document.createElement('a')
-        link.href = item.url
-        link.download = fileName
-        link.rel = 'noopener'
-        link.style.display = 'none'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } catch (error) {
-        failed += 1
-        console.error('Export failed:', error)
-      }
-    }
-  } catch (err) {
-    failed += 1
-    console.error('Export failed:', err)
-  } finally {
-    loading.destroy()
-    if (exportLoading === loading) exportLoading = null
-  }
-
-  if (failed === 0) {
-    message.success(`Export queued: ${exportableItems.length} image${exportableItems.length > 1 ? 's' : ''}`)
-  } else {
-    const success = exportableItems.length - failed
-    message.warning(`Export queued ${success}/${exportableItems.length}, failed ${failed}`)
-  }
-}
+const {
+  runCanvasAction,
+  handleGenerate,
+  handleExport,
+} = useCanvasDirectActions({
+  generating,
+  selectedIds,
+  activeImageActionId,
+  showStyleStrengthControl,
+  hasDirectPrompt,
+  showSettings,
+  selectedCardIds,
+  selectedRatio,
+  selectedResolution,
+  userPrompt,
+  messages,
+  styleInnovateStrength,
+  defaultSegType,
+  message,
+  submitTaskAndPoll,
+  appendGeneratedImages,
+  segmentImage: segApi.segment,
+  saveSegmentResult: segApi.save,
+  vectorizeImage: vectorizeApi.vectorize,
+})
 
 function onImageLoad(msg: any, event: Event) {
   const target = event.target as HTMLImageElement | null
@@ -1705,6 +2522,10 @@ onMounted(async () => {
     const res: any = await styleCardApi.getEnabled()
     if (res.code === 0) styleCards.value = res.data.list
   } catch (e) {}
+  addGlobalConnectionListeners()
+  nextTick(() => {
+    scheduleRenderedConnectionsRefresh()
+  })
 })
 
 onUnmounted(() => {
@@ -1712,6 +2533,8 @@ onUnmounted(() => {
   clearStyleStrengthLongPressTimer()
   clearStyleStrengthHideTimer()
   removeStyleStrengthGlobalListeners()
+  removeGlobalConnectionListeners()
+  disposeConnectionRuntime()
 })
 </script>
 
@@ -1862,6 +2685,88 @@ onUnmounted(() => {
   border-radius: 4px;
   z-index: 1000;
   pointer-events: none;
+}
+
+.canvas-connections-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: visible;
+}
+
+.canvas-connection-path,
+.canvas-connection-hit {
+  fill: none;
+}
+
+.canvas-connection-path {
+  stroke: var(--connection-color, #5b8def);
+  stroke-width: 1.8;
+  opacity: 0.78;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition:
+    stroke-width 0.16s ease,
+    opacity 0.16s ease,
+    filter 0.16s ease;
+}
+
+.canvas-connection-path.tone-image,
+.canvas-connection-endpoint.tone-image {
+  --connection-color: #5b8def;
+  --connection-selected: #3f79e6;
+  --connection-glow: rgba(91, 141, 239, 0.18);
+}
+
+.canvas-connection-path.tone-mask,
+.canvas-connection-endpoint.tone-mask {
+  --connection-color: #34c38f;
+  --connection-selected: #22a876;
+  --connection-glow: rgba(52, 195, 143, 0.18);
+}
+
+.canvas-connection-path.tone-prompt,
+.canvas-connection-endpoint.tone-prompt {
+  --connection-color: #f59e0b;
+  --connection-selected: #d68608;
+  --connection-glow: rgba(245, 158, 11, 0.18);
+}
+
+.canvas-connection-path.selected {
+  stroke: var(--connection-selected, var(--connection-color, #3f79e6));
+  stroke-width: 2.8;
+  opacity: 1;
+  filter: drop-shadow(0 0 10px var(--connection-glow, rgba(91, 141, 239, 0.18)));
+}
+
+.canvas-connection-path.draft {
+  stroke: var(--connection-color, #5b8def);
+  opacity: 0.92;
+  stroke-dasharray: 6 6;
+}
+
+.canvas-connection-path.draft.is-valid {
+  stroke: var(--connection-selected, var(--connection-color, #3f79e6));
+}
+
+.canvas-connection-path.draft.is-invalid {
+  stroke: #e06a82;
+}
+
+.canvas-connection-hit {
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.canvas-connection-endpoint {
+  fill: var(--connection-color, #5b8def);
+  stroke: #fff;
+  stroke-width: 2;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px var(--connection-glow, rgba(91, 141, 239, 0.18)));
 }
 
 .leave-confirm-mask {
@@ -2253,16 +3158,22 @@ onUnmounted(() => {
   transform: rotate(360deg);
 }
 
-.canvas-content { position: absolute; inset: 0; z-index: 1; transform: translate(var(--offset-x, 0px), var(--offset-y, 0px)) scale(var(--zoom, 1)); transform-origin: center center; }
+.canvas-content { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform: translate(var(--offset-x, 0px), var(--offset-y, 0px)) scale(var(--zoom, 1)); transform-origin: center center; }
 .workflow-node {
   position: absolute;
   z-index: 12;
   border: 1.5px solid #e2e8f0;
   border-radius: 14px;
   background: #ffffff;
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 0.2s ease;
   will-change: transform;
+  pointer-events: auto;
+}
+
+.workflow-node :deep(.workflow-node-header) {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
 }
 
 .workflow-node.active {
@@ -2281,6 +3192,7 @@ onUnmounted(() => {
   border: 1.5px solid #e2e4e8;
   user-select: none;
   -webkit-user-select: none;
+  pointer-events: auto;
 }
 .canvas-item.active { border-color: #9278e6; z-index: 10; }
 .canvas-img {

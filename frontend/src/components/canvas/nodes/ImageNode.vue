@@ -7,22 +7,26 @@
     :style="nodeStyle"
     @mousedown.stop
   >
-    <div class="workflow-node-header" @mousedown.stop="emit('node-mousedown', $event)">
-      <div class="node-header-title">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right: 6px; opacity: 0.8">
+    <NodePorts
+      node-kind="image"
+      :node-id="node.id"
+      :ports="ports"
+      @port-mousedown="onPortMouseDown"
+    />
+    <NodeHeader
+      title="Image"
+      rounded
+      @node-mousedown="emit('node-mousedown', $event)"
+      @delete="emit('delete')"
+    >
+      <template #icon>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <circle cx="8.5" cy="8.5" r="1.5" />
           <path d="M3 14l4-4 5 5 5-5 4 4" />
         </svg>
-        Image
-      </div>
-      <button class="node-delete-btn" title="删除" @mousedown.stop @click.stop="emit('delete')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
+      </template>
+    </NodeHeader>
     <div class="image-node-body" @mousedown.stop @contextmenu.stop>
       <div
         class="image-node-stage"
@@ -34,6 +38,12 @@
         @contextmenu.prevent.stop
       >
         <template v-if="displayImage">
+          <div
+            class="image-node-stage-badge"
+            :class="displayModeClass"
+          >
+            {{ displayModeLabel }}
+          </div>
           <img
             :src="displayImage.url"
             class="image-node-stage-image"
@@ -81,6 +91,10 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { ImageNodeItem } from '../../../types/canvasNodes'
 import NodeActionButton from './NodeActionButton.vue'
+import NodeHeader from './NodeHeader.vue'
+import NodePorts from './NodePorts.vue'
+import { buildNodeIoFromSlots, IMAGE_NODE_IO_SLOTS } from './nodeIoConfig'
+import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
   node: ImageNodeItem
@@ -89,6 +103,9 @@ const props = defineProps<{
   copyMode: boolean
   stageHeight: number
   displayImage: { url: string } | null
+  displayMode?: 'source' | 'output' | 'mask'
+  inputConnected?: boolean
+  outputConnected?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -99,16 +116,30 @@ const emit = defineEmits<{
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'display-dragstart', event: DragEvent): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'image'): void
 }>()
 
-const nodeStyle = computed(() => ({
-  left: '50%',
-  top: '50%',
-  transform: `translate(${props.node.x}px, ${props.node.y}px)`,
-  width: `${props.node.width}px`,
-}))
+const nodeStyle = useCanvasNodeStyle(() => props.node)
 
 const previewPopupOpen = ref(false)
+const displayModeLabel = computed(() => {
+  if (props.displayMode === 'mask') return 'Mask'
+  if (props.displayMode === 'output') return 'Output'
+  return 'Source'
+})
+const displayModeClass = computed(() => {
+  if (props.displayMode === 'mask') return 'is-mask'
+  if (props.displayMode === 'output') return 'is-output'
+  return 'is-source'
+})
+const ports = computed(() =>
+  buildNodeIoFromSlots(IMAGE_NODE_IO_SLOTS, null, {
+    connected: {
+      input: props.inputConnected,
+      output: props.outputConnected,
+    },
+  }).ports,
+)
 
 const popupStageHeight = computed(() =>
   Math.max(280, Math.min(560, Math.round(props.stageHeight * 2))),
@@ -139,6 +170,10 @@ function onWindowBlur() {
   closePreviewPopup()
 }
 
+function onPortMouseDown(event: MouseEvent, port: string) {
+  emit('port-mousedown', event, port as 'image')
+}
+
 window.addEventListener('mouseup', onGlobalMouseUp, true)
 window.addEventListener('blur', onWindowBlur, true)
 
@@ -154,52 +189,12 @@ onBeforeUnmount(() => {
   overflow: visible;
 }
 
-.workflow-node.image-node .workflow-node-header {
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-}
-
 .image-node-body {
   position: relative;
   padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.image-node-stage {
-  position: relative;
-  min-height: 120px;
-  border-radius: 12px;
-  border: 1px solid #e4e7ec;
-  background: linear-gradient(160deg, #fafbfd 0%, #f1f4f8 100%);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.image-node-stage-empty {
-  width: calc(100% - 20px);
-  height: calc(100% - 20px);
-  border: 1px dashed #c7cfdd;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #6d7685;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.image-node-stage-empty:hover {
-  border-color: #9278e6;
-  color: #6757c8;
-  background: rgba(146, 120, 230, 0.05);
 }
 
 .image-node-stage-image {
@@ -213,32 +208,40 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.image-node-stage-actions {
+.image-node-stage-badge {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  display: flex;
-  gap: 6px;
+  left: 8px;
+  top: 8px;
+  z-index: 2;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+}
+
+.image-node-stage-badge.is-source {
+  border: 1px solid rgba(146, 120, 230, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  color: #7b67d1;
+}
+
+.image-node-stage-badge.is-output {
+  border: 1px solid rgba(53, 171, 123, 0.18);
+  background: rgba(240, 255, 248, 0.92);
+  color: #1d8b61;
+}
+
+.image-node-stage-badge.is-mask {
+  border: 1px solid rgba(146, 120, 230, 0.2);
+  background: rgba(247, 243, 255, 0.94);
+  color: #7b67d1;
 }
 
 .image-preview-popup {
-  position: absolute;
-  left: 50%;
-  top: 12px;
-  transform: translateX(-50%);
   z-index: 28;
-  padding: 8px;
-  border-radius: 12px;
-  border: 1px solid #d8ddea;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 30px rgba(25, 30, 45, 0.12);
-}
-
-.image-preview-popup-stage {
-  overflow: hidden;
-  border-radius: 12px;
-  background: linear-gradient(160deg, #fafbfd 0%, #f1f4f8 100%);
 }
 
 </style>

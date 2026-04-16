@@ -1,13 +1,20 @@
 import type {
   CanvasBoardSnapshot,
   CanvasImageItem,
+  CanvasConnection,
   CanvasViewportState,
   ColorNodeItem,
+  EnhanceNodeItem,
+  EditNodeItem,
+  FusionNodeItem,
   ImageNodeItem,
   ImageNodeOutputItem,
   MaskNodeItem,
   ModelNodeItem,
+  PaletteNodeItem,
   PromptNodeItem,
+  GenerateNodeItem,
+  TryOnNodeItem,
 } from '../types/canvasNodes'
 
 export type CanvasBoardStateMessage = CanvasImageItem
@@ -17,6 +24,13 @@ export type CanvasBoardStateMaskNode = MaskNodeItem
 export type CanvasBoardStateImageNodeOutput = ImageNodeOutputItem
 export type CanvasBoardStateImageNode = ImageNodeItem
 export type CanvasBoardStateColorNode = ColorNodeItem
+export type CanvasBoardStateEditNode = EditNodeItem
+export type CanvasBoardStateFusionNode = FusionNodeItem
+export type CanvasBoardStateEnhanceNode = EnhanceNodeItem
+export type CanvasBoardStateTryOnNode = TryOnNodeItem
+export type CanvasBoardStatePaletteNode = PaletteNodeItem
+export type CanvasBoardStateGenerateNode = GenerateNodeItem
+export type CanvasBoardStateConnection = CanvasConnection
 export type CanvasBoardStateViewport = CanvasViewportState
 
 export interface CanvasBoardState extends CanvasBoardSnapshot {
@@ -184,6 +198,215 @@ function toValidColorNode(item: unknown): CanvasBoardStateColorNode | null {
   }
 }
 
+function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
+  if (!isObject(item)) return null
+  if (!isFiniteNumber(item.id)) return null
+  const fromNodeType =
+    item.fromNodeType === 'image' ||
+    item.fromNodeType === 'prompt' ||
+    item.fromNodeType === 'mask' ||
+    item.fromNodeType === 'color' ||
+    item.fromNodeType === 'model' ||
+    item.fromNodeType === 'edit' ||
+    item.fromNodeType === 'fusion' ||
+    item.fromNodeType === 'enhance' ||
+    item.fromNodeType === 'tryon' ||
+    item.fromNodeType === 'palette' ||
+    item.fromNodeType === 'generate'
+      ? item.fromNodeType
+      : null
+  const toNodeType =
+    item.toNodeType === 'image' ||
+    item.toNodeType === 'prompt' ||
+    item.toNodeType === 'mask' ||
+    item.toNodeType === 'color' ||
+    item.toNodeType === 'model' ||
+    item.toNodeType === 'edit' ||
+    item.toNodeType === 'fusion' ||
+    item.toNodeType === 'enhance' ||
+    item.toNodeType === 'tryon' ||
+    item.toNodeType === 'palette' ||
+    item.toNodeType === 'generate'
+      ? item.toNodeType
+      : null
+  const fromPort =
+    item.fromPort === 'image' || item.fromPort === 'mask' || item.fromPort === 'prompt' || item.fromPort === 'imageA' || item.fromPort === 'imageB' || item.fromPort === 'reference'
+      ? item.fromPort
+      : null
+  const toPort =
+    item.toPort === 'image' || item.toPort === 'mask' || item.toPort === 'prompt' || item.toPort === 'imageA' || item.toPort === 'imageB' || item.toPort === 'reference'
+      ? item.toPort
+      : null
+  if (!fromNodeType || !toNodeType || !fromPort || !toPort) return null
+  if (!isFiniteNumber(item.fromNodeId) || !isFiniteNumber(item.toNodeId)) return null
+  return {
+    id: item.id,
+    fromNodeType,
+    fromNodeId: item.fromNodeId,
+    fromPort,
+    toNodeType,
+    toNodeId: item.toNodeId,
+    toPort,
+  }
+}
+
+function toValidEditNode(item: unknown): CanvasBoardStateEditNode | null {
+  if (!isObject(item)) return null
+  if (item.type !== 'edit') return null
+  if (!isFiniteNumber(item.id)) return null
+  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
+  const mode = item.mode === 'pattern-inpaint' ? 'pattern-inpaint' : 'partial-edit'
+  return {
+    id: item.id,
+    type: 'edit',
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    mode,
+  }
+}
+
+function toValidFusionNode(item: unknown): CanvasBoardStateFusionNode | null {
+  if (!isObject(item)) return null
+  if (item.type !== 'fusion') return null
+  if (!isFiniteNumber(item.id)) return null
+  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
+  const mode =
+    item.mode === 'style-fusion' ||
+    item.mode === 'pattern-fusion-creative' ||
+    item.mode === 'pattern-fusion-style' ||
+    item.mode === 'craft-fusion-creative' ||
+    item.mode === 'craft-fusion-style'
+      ? item.mode
+      : 'style-fusion'
+  return {
+    id: item.id,
+    type: 'fusion',
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    mode,
+  }
+}
+
+function toValidEnhanceNode(item: unknown): CanvasBoardStateEnhanceNode | null {
+  if (!isObject(item)) return null
+  if (item.type !== 'enhance') return null
+  if (!isFiniteNumber(item.id)) return null
+  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
+  const mode =
+    item.mode === 'pattern-upscale' ||
+    item.mode === 'hd-upscale' ||
+    item.mode === 'deblur' ||
+    item.mode === 'canvas-extend'
+      ? item.mode
+      : 'pattern-upscale'
+  const upscaleMode = item.upscaleMode === 'enhancement' ? 'enhancement' : 'base'
+  const upscaleFactor = item.upscaleFactor === 3 || item.upscaleFactor === 4 ? item.upscaleFactor : 2
+  const outputFormat = item.outputFormat === 'png' ? 'png' : 'jpg'
+  const outputQuality = isFiniteNumber(item.outputQuality)
+    ? Math.max(30, Math.min(100, Math.round(item.outputQuality)))
+    : 95
+  return {
+    id: item.id,
+    type: 'enhance',
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    mode,
+    upscaleMode,
+    upscaleFactor,
+    outputFormat,
+    outputQuality,
+  }
+}
+
+function toValidTryOnNode(item: unknown): CanvasBoardStateTryOnNode | null {
+  if (!isObject(item)) return null
+  if (item.type !== 'tryon') return null
+  if (!isFiniteNumber(item.id)) return null
+  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
+  const mode = item.mode === 'pattern-on-body' ? 'pattern-on-body' : 'fabric-on-body'
+  const tileMode = item.tileMode === 'single' ? 'single' : 'seamless'
+  const rotation = isFiniteNumber(item.rotation) ? Math.max(0, Math.min(360, Math.round(item.rotation))) : 0
+  const scale = isFiniteNumber(item.scale) ? Math.max(10, Math.min(300, Math.round(item.scale))) : 100
+  const opacity = isFiniteNumber(item.opacity) ? Math.max(0, Math.min(100, Math.round(item.opacity))) : 100
+  return {
+    id: item.id,
+    type: 'tryon',
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    mode,
+    tileMode,
+    rotation,
+    scale,
+    opacity,
+  }
+}
+
+function toValidPaletteNode(item: unknown): CanvasBoardStatePaletteNode | null {
+  if (!isObject(item)) return null
+  if (item.type !== 'palette') return null
+  if (!isFiniteNumber(item.id)) return null
+  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
+  const mode =
+    item.mode === 'men' ||
+    item.mode === 'kids' ||
+    item.mode === 'reference'
+      ? item.mode
+      : 'women'
+  const rawColors = Array.isArray(item.colors) ? item.colors : []
+  const colors = rawColors
+    .filter((color): color is string => typeof color === 'string')
+    .map(color => color.trim().toUpperCase())
+    .filter(color => /^#[0-9A-F]{6}$/.test(color))
+    .slice(0, 8)
+  return {
+    id: item.id,
+    type: 'palette',
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    mode,
+    colors,
+  }
+}
+
+function toValidGenerateNode(item: unknown): CanvasBoardStateGenerateNode | null {
+  if (!isObject(item)) return null
+  if (item.type !== 'generate') return null
+  if (!isFiniteNumber(item.id)) return null
+  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
+  const mode =
+    item.mode === 'style-clone' ||
+    item.mode === 'seamless-tile-classic' ||
+    item.mode === 'seamless-tile-cartoon'
+      ? item.mode
+      : 'pattern-gen'
+  const ratio =
+    item.ratio === '3:4' ||
+    item.ratio === '4:3' ||
+    item.ratio === '2:3' ||
+    item.ratio === '3:2'
+      ? item.ratio
+      : '1:1'
+  const count = item.count === 2 || item.count === 4 ? item.count : 1
+  const quality = item.quality === '2k' || item.quality === '4k' ? item.quality : '1k'
+  return {
+    id: item.id,
+    type: 'generate',
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    mode,
+    styleModel: typeof item.styleModel === 'string' ? item.styleModel : '',
+    ratio,
+    count,
+    quality,
+  }
+}
+
 function toValidViewport(item: unknown): CanvasBoardStateViewport {
   if (!isObject(item)) {
     return { canvasX: 0, canvasY: 0, zoomLevel: 100 }
@@ -203,6 +426,13 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
   const rawModelNodes = Array.isArray(item.modelNodes) ? item.modelNodes : []
   const rawMaskNodes = Array.isArray(item.maskNodes) ? item.maskNodes : []
   const rawColorNodes = Array.isArray(item.colorNodes) ? item.colorNodes : []
+  const rawEditNodes = Array.isArray(item.editNodes) ? item.editNodes : []
+  const rawFusionNodes = Array.isArray(item.fusionNodes) ? item.fusionNodes : []
+  const rawEnhanceNodes = Array.isArray(item.enhanceNodes) ? item.enhanceNodes : []
+  const rawTryOnNodes = Array.isArray(item.tryOnNodes) ? item.tryOnNodes : []
+  const rawPaletteNodes = Array.isArray(item.paletteNodes) ? item.paletteNodes : []
+  const rawGenerateNodes = Array.isArray(item.generateNodes) ? item.generateNodes : []
+  const rawConnections = Array.isArray(item.connections) ? item.connections : []
   return {
     messages: rawMessages.map(toValidMessage).filter((m): m is CanvasBoardStateMessage => !!m),
     imageNodes: rawImageNodes.map(toValidImageNode).filter((n): n is CanvasBoardStateImageNode => !!n),
@@ -210,6 +440,13 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
     modelNodes: rawModelNodes.map(toValidModelNode).filter((n): n is CanvasBoardStateModelNode => !!n),
     maskNodes: rawMaskNodes.map(toValidMaskNode).filter((n): n is CanvasBoardStateMaskNode => !!n),
     colorNodes: rawColorNodes.map(toValidColorNode).filter((n): n is CanvasBoardStateColorNode => !!n),
+    editNodes: rawEditNodes.map(toValidEditNode).filter((n): n is CanvasBoardStateEditNode => !!n),
+    fusionNodes: rawFusionNodes.map(toValidFusionNode).filter((n): n is CanvasBoardStateFusionNode => !!n),
+    enhanceNodes: rawEnhanceNodes.map(toValidEnhanceNode).filter((n): n is CanvasBoardStateEnhanceNode => !!n),
+    tryOnNodes: rawTryOnNodes.map(toValidTryOnNode).filter((n): n is CanvasBoardStateTryOnNode => !!n),
+    paletteNodes: rawPaletteNodes.map(toValidPaletteNode).filter((n): n is CanvasBoardStatePaletteNode => !!n),
+    generateNodes: rawGenerateNodes.map(toValidGenerateNode).filter((n): n is CanvasBoardStateGenerateNode => !!n),
+    connections: rawConnections.map(toValidConnection).filter((n): n is CanvasBoardStateConnection => !!n),
     viewport: toValidViewport(item.viewport),
     updatedAt: isFiniteNumber(item.updatedAt) ? item.updatedAt : Date.now(),
   }
