@@ -35,16 +35,42 @@ function createApiError(payload?: any, status?: number): ApiClientError {
   return error
 }
 
+function clearStoredAuth() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+}
+
+function isAuthRequest(requestUrl: string) {
+  return requestUrl.includes('/auth/')
+}
+
+function isAdminApiRequest(requestUrl: string) {
+  return requestUrl.includes('/admin/')
+}
+
+function isAdminPage() {
+  return window.location.pathname.startsWith('/admin')
+}
+
+function buildLoginRedirectPath() {
+  const currentPath = window.location.pathname + window.location.search
+  return '/user/login?redirect=' + encodeURIComponent(currentPath)
+}
+
 function handleAuthExpired(status: number | undefined, payload: any, requestUrl: string) {
   const code = payload?.code ?? status
-  if (code !== 401 || requestUrl.includes('/auth/')) {
+
+  if (code === 403 && isAdminApiRequest(requestUrl) && isAdminPage()) {
+    window.location.href = '/user/home'
     return
   }
 
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-  const isAdmin = window.location.pathname.startsWith('/admin')
-  window.location.href = isAdmin ? '/admin/login' : '/user/login'
+  if (code !== 401 || isAuthRequest(requestUrl)) {
+    return
+  }
+
+  clearStoredAuth()
+  window.location.href = buildLoginRedirectPath()
 }
 
 api.interceptors.request.use(

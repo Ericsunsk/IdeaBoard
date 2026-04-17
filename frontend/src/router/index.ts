@@ -10,13 +10,15 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/user/login',
     name: 'UserLogin',
-    redirect: { path: '/user/home', query: { auth: 'login' } },
+    component: () => import('../views/user/Auth.vue'),
+    props: { mode: 'login' },
     meta: { guest: true }
   },
   {
     path: '/user/register',
     name: 'UserRegister',
-    redirect: { path: '/user/home', query: { auth: 'register' } },
+    component: () => import('../views/user/Auth.vue'),
+    props: { mode: 'register' },
     meta: { guest: true }
   },
   {
@@ -32,11 +34,13 @@ const routes: RouteRecordRaw[] = [
         path: 'picture',
         name: 'UserPicture',
         component: () => import('../views/user/Home.vue'),
+        meta: { requiresAuth: true },
       },
       {
         path: 'boards',
         name: 'UserBoards',
         component: () => import('../views/user/CanvasBoards.vue'),
+        meta: { requiresAuth: true },
       },
       {
         path: 'center',
@@ -191,6 +195,11 @@ const router = createRouter({
   routes
 })
 
+function clearStoredAuth() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+}
+
 function readStoredUser(): User | null {
   const userStr = localStorage.getItem('user')
   if (!userStr) {
@@ -200,7 +209,7 @@ function readStoredUser(): User | null {
   try {
     return JSON.parse(userStr) as User
   } catch {
-    localStorage.removeItem('user')
+    clearStoredAuth()
     return null
   }
 }
@@ -208,16 +217,17 @@ function readStoredUser(): User | null {
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
   const user = readStoredUser()
+  const isLoggedIn = !!(token && user)
 
   const isAdminRoute = to.path.startsWith('/admin')
 
-  if (to.meta.requiresAuth && !token) {
-    if (isAdminRoute) {
-      next('/admin/login')
-    } else {
-      next('/user/login')
-    }
-  } else if (to.meta.guest && token) {
+  if (token && !user) {
+    clearStoredAuth()
+  }
+
+  if (to.meta.requiresAuth && !isLoggedIn) {
+    next({ path: '/user/login', query: { redirect: to.fullPath } })
+  } else if (to.meta.guest && isLoggedIn) {
     if (isAdminRoute) {
       next('/admin/users')
     } else {

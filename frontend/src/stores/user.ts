@@ -4,6 +4,11 @@ import type { User } from '../types'
 import { userApi, authApi } from '../api'
 import router from '../router'
 
+function clearStoredAuth() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+}
+
 function readStoredUser(): User | null {
   const raw = localStorage.getItem('user')
   if (!raw) {
@@ -13,16 +18,24 @@ function readStoredUser(): User | null {
   try {
     return JSON.parse(raw) as User
   } catch {
-    localStorage.removeItem('user')
+    clearStoredAuth()
     return null
   }
 }
 
 export const useUserStore = defineStore('user', () => {
-  const token = ref<string | null>(localStorage.getItem('token'))
-  const user = ref<User | null>(readStoredUser())
+  const storedToken = localStorage.getItem('token')
+  const storedUser = readStoredUser()
+  const hasValidAuth = !!(storedToken && storedUser)
 
-  const isLoggedIn = computed(() => !!token.value)
+  if (!hasValidAuth && (storedToken || storedUser)) {
+    clearStoredAuth()
+  }
+
+  const token = ref<string | null>(hasValidAuth ? storedToken : null)
+  const user = ref<User | null>(hasValidAuth ? storedUser : null)
+
+  const isLoggedIn = computed(() => !!(token.value && user.value))
   const isAdmin = computed(() => user.value?.role === 'admin')
 
   function setAuth(newToken: string, newUser: User) {
@@ -35,8 +48,7 @@ export const useUserStore = defineStore('user', () => {
   function clearAuth() {
     token.value = null
     user.value = null
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    clearStoredAuth()
   }
 
   async function login(username: string, password: string) {

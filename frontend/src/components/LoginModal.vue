@@ -46,7 +46,6 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { NForm, NFormItem, NInput, NButton, useMessage } from 'naive-ui'
 import type { FormInst } from 'naive-ui'
@@ -58,9 +57,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:show', value: boolean): void
   (e: 'to-register'): void
+  (e: 'login-success'): void
 }>()
 
-const router = useRouter()
 const userStore = useUserStore()
 const message = useMessage()
 
@@ -147,8 +146,8 @@ async function handleLogin() {
     await userStore.login(formValue.value.username, formValue.value.password)
     message.success('Sign in successful')
     resetForm()
+    emit('login-success')
     emit('update:show', false)
-    router.push('/user/home')
   } catch (error: any) {
     if (Array.isArray(error)) return
     message.error(error?.message || 'Sign in failed, please try again.')
