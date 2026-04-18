@@ -19,6 +19,9 @@ export type WorkflowNodeOutputStatus = 'idle' | 'ready' | 'stale'
 export const DEFAULT_COLOR_STRENGTH = 70
 export const MAX_COLOR_NODE_SWATCHES = 8
 export const DEFAULT_COLOR_NODE_COLOR = DEFAULT_COLOR_HEX
+export const ENHANCE_EXTEND_PERCENT_MIN = 0
+export const ENHANCE_EXTEND_PERCENT_MAX = 50
+export const ENHANCE_EXTEND_PERCENT_DEFAULT = 15
 
 export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = ['idle', 'ready', 'stale']
 
@@ -134,7 +137,7 @@ export interface EditNodeItem {
   x: number
   y: number
   width: number
-  mode: 'partial-edit' | 'pattern-inpaint' | 'bg-swap'
+  mode: 'partial-edit' | 'bg-swap'
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }
@@ -156,11 +159,15 @@ export interface EnhanceNodeItem {
   x: number
   y: number
   width: number
-  mode: 'pattern-upscale' | 'hd-upscale' | 'deblur' | 'canvas-extend'
+  mode: 'hd-upscale' | 'canvas-extend'
   upscaleMode: 'base' | 'enhancement'
   upscaleFactor: 2 | 3 | 4
   outputFormat: 'jpg' | 'png'
   outputQuality: number
+  extendTop: number
+  extendRight: number
+  extendBottom: number
+  extendLeft: number
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }

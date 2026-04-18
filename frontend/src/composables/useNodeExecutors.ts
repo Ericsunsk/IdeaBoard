@@ -211,6 +211,10 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     return options.resolveConnectedPlacedImageInput('enhance', node.id, 'image')
   }
 
+  async function resolveConnectedEnhanceMaskInput(node: EnhanceNodeItem): Promise<PlacedMaskInput | null> {
+    return options.resolveConnectedPlacedMaskInput('enhance', node.id, 'mask')
+  }
+
   function resolveConnectedEnhancePromptInput(node: EnhanceNodeItem, fallback = ''): string {
     return options.resolveNodePromptText('enhance', node.id, fallback)
   }
@@ -715,12 +719,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         },
         source: placementSource,
         outputNodeId,
-        successMessage:
-          node.mode === 'pattern-inpaint'
-            ? 'Pattern edit submitted'
-            : node.mode === 'bg-swap'
-              ? 'Background swap submitted'
-              : 'Partial edit submitted',
+        successMessage: node.mode === 'bg-swap' ? 'Background swap submitted' : 'Partial edit submitted',
         failureMessage: 'Failed to submit edit task',
         onCompleted: urls => cacheNodeOutputs('edit', node.id, urls),
       })
@@ -781,9 +780,12 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   async function handleEnhanceNodeGenerate(node: EnhanceNodeItem) {
     if (options.generating.value) return
 
+    const connectionStatus = options.getNodeConnectionStatus('enhance', node)
     const connectedImage = resolveConnectedEnhanceImageInput(node)
+    const connectedMask = node.mode === 'hd-upscale' ? await resolveConnectedEnhanceMaskInput(node) : null
+    const hasMaskConnection = node.mode === 'hd-upscale' && !!connectionStatus.incoming.mask
     const promptText = enhanceModeSupportsPrompt(node.mode)
-      ? resolveConnectedEnhancePromptInput(node, node.mode === 'deblur' ? '模糊变清晰' : '画布延伸')
+      ? resolveConnectedEnhancePromptInput(node, '画布延伸')
       : ''
     const missingPorts = options.getMissingRequiredNodeInputs('enhance', node, {
       image: connectedImage,
@@ -798,17 +800,68 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     options.generating.value = true
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('enhance', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const placementSource = options.buildPlacementSource(connectedImage!.url, node.x + 340, node.y + 18)
+    const placementSource = options.buildPlacementSource(
+      connectedImage!.url,
+      node.x + 340,
+      node.y + 18,
+    )
 
     try {
-      if (node.mode === 'pattern-upscale' || node.mode === 'hd-upscale') {
+      if (node.mode === 'hd-upscale') {
+        if (hasMaskConnection) {
+          if (!connectedMask?.dataUrl) {
+            options.triggerNodeConnectionError('enhance', node.id, ['mask'])
+            options.message.warning(
+              connectionStatus.pendingIncoming.mask
+                ? 'Enhance 节点等待上游 Mask 输出'
+                : 'Enhance 节点蒙版不可用，请检查 Mask 节点',
+            )
+            options.generating.value = false
+            return
+          }
+
+          const maskFile = await options.dataUrlToFile(connectedMask.dataUrl, `enhance-mask-${Date.now()}.png`)
+          const uploadRes = await options.uploadImage(maskFile)
+          if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+            options.message.error(uploadRes.msg || '蒙版上传失败')
+            options.generating.value = false
+            return
+          }
+
+          await options.submitTaskAndPoll({
+            request: {
+              prompt: '[hd-upscale] 局部高清放大，仅增强蒙版区域',
+              params: {
+                image_urls: [connectedImage!.url],
+                original_image_url: connectedImage!.url,
+                mask_image_url: uploadRes.data.url,
+                feature: 'hd-upscale',
+                use_mask: true,
+                mask_enabled: true,
+                is_masked: true,
+                local_enhance: true,
+                upscale_mode: node.upscaleMode,
+                upscale_factor: node.upscaleFactor,
+                output_format: node.outputFormat,
+                output_quality: node.outputQuality,
+              },
+            },
+            source: placementSource,
+            outputNodeId,
+            successMessage: 'HD upscale submitted · masked area',
+            failureMessage: 'Failed to submit enhance task',
+            onCompleted: urls => cacheNodeOutputs('enhance', node.id, urls),
+          })
+          return
+        }
+
         const res = await options.upscaleImage({
           image_url: connectedImage!.url,
           mode: node.upscaleMode,
           upscale_factor: node.upscaleFactor,
           output_format: node.outputFormat,
           output_quality: node.outputQuality,
-          feature: node.mode,
+          feature: 'hd-upscale',
         })
 
         if (res.code !== 0 || !res.data?.image_url) {
@@ -819,22 +872,26 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
         options.appendGeneratedImages([res.data.image_url], placementSource, outputNodeId)
         cacheNodeOutputs('enhance', node.id, [res.data.image_url])
-        options.message.success(node.mode === 'hd-upscale' ? 'HD upscale completed' : 'Pattern upscale completed')
+        options.message.success('HD upscale completed')
         options.generating.value = false
         return
       }
 
       await options.submitTaskAndPoll({
         request: {
-          prompt: `[${node.mode}] ${promptText || (node.mode === 'deblur' ? '模糊变清晰' : '画布延伸')}`,
+          prompt: `[canvas-extend] ${promptText || '画布延伸'}`,
           params: {
             image_urls: [connectedImage!.url],
-            feature: node.mode,
+            feature: 'canvas-extend',
+            extend_top: node.extendTop,
+            extend_right: node.extendRight,
+            extend_bottom: node.extendBottom,
+            extend_left: node.extendLeft,
           },
         },
         source: placementSource,
         outputNodeId,
-        successMessage: node.mode === 'deblur' ? 'Deblur submitted' : 'Canvas extend submitted',
+        successMessage: 'Canvas extend submitted',
         failureMessage: 'Failed to submit enhance task',
         onCompleted: urls => cacheNodeOutputs('enhance', node.id, urls),
       })

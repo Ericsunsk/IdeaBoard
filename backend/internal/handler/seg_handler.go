@@ -151,7 +151,7 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 	if modeName == "" {
 		modeName = req.Mode
 	}
-	featureSlug := normalizeFeatureSlug(req.Feature, "pattern-upscale")
+	featureSlug := normalizeFeatureSlug(req.Feature, "hd-upscale")
 	prompt := fmt.Sprintf("[%s] %s %dx", featureSlug, modeName, req.UpscaleFactor)
 
 	taskID := fmt.Sprintf("upscale_%d_%d", time.Now().UnixNano(), rand.Intn(10000))

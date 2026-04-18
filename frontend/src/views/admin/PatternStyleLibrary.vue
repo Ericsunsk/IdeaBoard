@@ -86,7 +86,6 @@ const archivedCategoryLabelMap: Record<string, string> = {
   'seamless-tile': 'Archived · 四方连续',
   'pattern-fusion': 'Archived · 双图融合',
   'craft-fusion': 'Archived · 双图融合',
-  'pattern-inpaint': 'Archived · 图案涂改',
   'pattern-upscale': 'Archived · 图案变清晰',
 }
 const categoryLabelMap: Record<string, string> = {

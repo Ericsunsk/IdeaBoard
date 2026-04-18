@@ -43,7 +43,11 @@ export interface CanvasNodePortContract {
 }
 
 export function enhanceModeSupportsPrompt(mode: EnhanceNodeItem['mode']) {
-  return mode === 'deblur' || mode === 'canvas-extend'
+  return mode === 'canvas-extend'
+}
+
+export function enhanceModeSupportsMask(mode: EnhanceNodeItem['mode']) {
+  return mode === 'hd-upscale'
 }
 
 export function generateModeRequiresImage(mode: GenerateNodeItem['mode']) {
@@ -99,8 +103,10 @@ export function getCanvasNodePortContracts(
     case 'enhance': {
       const enhanceNode = node as EnhanceNodeItem
       const promptVisible = enhanceModeSupportsPrompt(enhanceNode.mode)
+      const maskVisible = enhanceModeSupportsMask(enhanceNode.mode)
       return [
         input('image', 'image', true),
+        input('mask', 'mask', false, maskVisible),
         input('prompt', 'prompt', false, promptVisible),
         output('image', 'image'),
       ]

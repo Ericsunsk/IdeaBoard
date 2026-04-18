@@ -25,7 +25,6 @@ const CURRENT_PREFIX_LABELS: Record<string, string> = {
   'style-clone': '画风复刻',
   'seamless-tile-classic': '四方连续',
   'seamless-tile-cartoon': '四方连续',
-  'pattern-inpaint': '图案涂改',
   'pattern-upscale': '图案变清晰',
   'to-vector': '转矢量图',
   'remove-bg': '抠图褪底',

@@ -49,6 +49,10 @@
       @update:upscale-factor="emit('enhance-update-upscale-factor', node, $event)"
       @update:output-format="emit('enhance-update-output-format', node, $event)"
       @update:output-quality="emit('enhance-update-output-quality', node, $event)"
+      @update:extend-top="emit('enhance-update-extend-top', node, $event)"
+      @update:extend-right="emit('enhance-update-extend-right', node, $event)"
+      @update:extend-bottom="emit('enhance-update-extend-bottom', node, $event)"
+      @update:extend-left="emit('enhance-update-extend-left', node, $event)"
       @generate="emit('enhance-generate', node)"
       @port-mousedown="(event, port) => emit('enhance-port-mousedown', event, node.id, port)"
     />
@@ -207,6 +211,10 @@ const emit = defineEmits<{
   (e: 'enhance-update-upscale-factor', node: EnhanceNodeItem, value: EnhanceNodeItem['upscaleFactor']): void
   (e: 'enhance-update-output-format', node: EnhanceNodeItem, value: EnhanceNodeItem['outputFormat']): void
   (e: 'enhance-update-output-quality', node: EnhanceNodeItem, value: number): void
+  (e: 'enhance-update-extend-top', node: EnhanceNodeItem, value: number): void
+  (e: 'enhance-update-extend-right', node: EnhanceNodeItem, value: number): void
+  (e: 'enhance-update-extend-bottom', node: EnhanceNodeItem, value: number): void
+  (e: 'enhance-update-extend-left', node: EnhanceNodeItem, value: number): void
   (e: 'enhance-generate', node: EnhanceNodeItem): void
   (e: 'enhance-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
 

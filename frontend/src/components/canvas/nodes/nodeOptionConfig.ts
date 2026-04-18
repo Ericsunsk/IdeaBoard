@@ -22,9 +22,7 @@ export const GENERATE_COUNT_OPTIONS: GenerateNodeItem['count'][] = [1, 2, 4]
 export const GENERATE_QUALITY_OPTIONS: GenerateNodeItem['quality'][] = ['1k', '2k', '4k']
 
 export const ENHANCE_MODE_OPTIONS: OptionItem<EnhanceNodeItem['mode']>[] = [
-  { label: 'Pattern', value: 'pattern-upscale' },
   { label: 'HD', value: 'hd-upscale' },
-  { label: 'Deblur', value: 'deblur' },
   { label: 'Extend', value: 'canvas-extend' },
 ]
 

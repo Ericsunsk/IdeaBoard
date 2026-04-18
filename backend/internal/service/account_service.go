@@ -16,13 +16,18 @@ import (
 )
 
 const (
-	MaxFailCount           = 5
-	styleFusionFeatureSlug = "style-fusion"
+	MaxFailCount            = 5
+	styleFusionFeatureSlug  = "style-fusion"
+	canvasExtendFeatureSlug = "canvas-extend"
+	hdUpscaleFeatureSlug    = "hd-upscale"
 )
 
 const (
-	styleFusionHiddenConstraintGeneric = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
-	styleFusionHiddenConstraintWithNum = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息（Image A: %s，Image B: %s）。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
+	styleFusionHiddenConstraintGeneric  = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
+	styleFusionHiddenConstraintWithNum  = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息（Image A: %s，Image B: %s）。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
+	canvasExtendHiddenConstraintGeneric = "【执行语义】画布延伸以扩边参数为主导，决定上、右、下、左四个方向的延伸幅度。用户 prompt 只用于描述新扩展区域的内容、纹理、背景和补全方式；若与扩边方向冲突，以扩边参数为准。"
+	canvasExtendHiddenConstraintWithNum = "【执行语义】画布延伸以扩边参数为主导（上 %s，右 %s，下 %s，左 %s），决定四个方向的延伸幅度。用户 prompt 只用于描述新扩展区域的内容、纹理、背景和补全方式；若与扩边方向冲突，以扩边参数为准。"
+	hdUpscaleMaskedConstraint            = "【执行语义】当前请求为局部/遮罩高清增强（非整图放大）。请以原图（original_image_url）作为全局上下文，仅对蒙版（mask_image_url / mask_image_urls / mask_url）限定区域进行高清增强，未遮罩区域保持原图主体、结构与语义一致。"
 )
 
 func buildStyleFusionHiddenConstraint(params map[string]interface{}) string {
@@ -39,6 +44,28 @@ func buildStyleFusionHiddenConstraint(params map[string]interface{}) string {
 	}
 
 	return styleFusionHiddenConstraintGeneric
+}
+
+func buildCanvasExtendHiddenConstraint(params map[string]interface{}) string {
+	if params == nil {
+		return canvasExtendHiddenConstraintGeneric
+	}
+
+	top, hasTop := readCanvasExtendPercent(params["extend_top"])
+	right, hasRight := readCanvasExtendPercent(params["extend_right"])
+	bottom, hasBottom := readCanvasExtendPercent(params["extend_bottom"])
+	left, hasLeft := readCanvasExtendPercent(params["extend_left"])
+	if hasTop || hasRight || hasBottom || hasLeft {
+		return fmt.Sprintf(
+			canvasExtendHiddenConstraintWithNum,
+			formatWeightPercent(top),
+			formatWeightPercent(right),
+			formatWeightPercent(bottom),
+			formatWeightPercent(left),
+		)
+	}
+
+	return canvasExtendHiddenConstraintGeneric
 }
 
 func readStyleFusionWeights(params map[string]interface{}) (float64, float64, bool) {
@@ -105,6 +132,20 @@ func parseWeight(v interface{}) (float64, bool) {
 	}
 }
 
+func readCanvasExtendPercent(v interface{}) (float64, bool) {
+	value, ok := parseWeight(v)
+	if !ok {
+		return 0, false
+	}
+	if value < 0 {
+		value = 0
+	}
+	if value > 100 {
+		value = 100
+	}
+	return value, true
+}
+
 func normalizeWeights(a, b float64) (float64, float64, bool) {
 	if a < 0 || b < 0 {
 		return 0, 0, false
@@ -130,6 +171,110 @@ func appendHiddenConstraint(fullPrompt, constraint string) string {
 		return constraint
 	}
 	return fullPrompt + "\n\n" + constraint
+}
+
+func parseBoolLike(v interface{}) (bool, bool) {
+	switch b := v.(type) {
+	case bool:
+		return b, true
+	case float64:
+		return b != 0, true
+	case float32:
+		return b != 0, true
+	case int:
+		return b != 0, true
+	case int8:
+		return b != 0, true
+	case int16:
+		return b != 0, true
+	case int32:
+		return b != 0, true
+	case int64:
+		return b != 0, true
+	case uint:
+		return b != 0, true
+	case uint8:
+		return b != 0, true
+	case uint16:
+		return b != 0, true
+	case uint32:
+		return b != 0, true
+	case uint64:
+		return b != 0, true
+	case string:
+		s := strings.TrimSpace(strings.ToLower(b))
+		if s == "" {
+			return false, false
+		}
+		switch s {
+		case "1", "true", "yes", "y", "on", "enabled", "masked", "local", "partial":
+			return true, true
+		case "0", "false", "no", "n", "off", "disabled":
+			return false, true
+		}
+		return false, false
+	default:
+		return false, false
+	}
+}
+
+func hasNonEmptyString(v interface{}) bool {
+	s, ok := v.(string)
+	return ok && strings.TrimSpace(s) != ""
+}
+
+func hasNonEmptyStringList(v interface{}) bool {
+	switch arr := v.(type) {
+	case []string:
+		for _, item := range arr {
+			if strings.TrimSpace(item) != "" {
+				return true
+			}
+		}
+	case []interface{}:
+		for _, item := range arr {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isMaskedHDUpscaleRequest(params map[string]interface{}) bool {
+	if params == nil {
+		return false
+	}
+
+	flagKeys := []string{
+		"is_masked", "masked",
+		"use_mask", "mask_enabled",
+		"local_enhance", "is_local_enhance",
+		"partial_enhance", "is_partial_enhance",
+	}
+	for _, key := range flagKeys {
+		if raw, ok := params[key]; ok {
+			if enabled, parsed := parseBoolLike(raw); parsed && enabled {
+				return true
+			}
+		}
+	}
+
+	maskURLKeys := []string{"mask_image_url", "mask_url", "mask_image"}
+	for _, key := range maskURLKeys {
+		if hasNonEmptyString(params[key]) {
+			return true
+		}
+	}
+
+	maskListKeys := []string{"mask_image_urls", "mask_urls"}
+	for _, key := range maskListKeys {
+		if hasNonEmptyStringList(params[key]) {
+			return true
+		}
+	}
+
+	return hasNonEmptyString(params["original_image_url"]) && hasNonEmptyStringList(params["image_urls"])
 }
 
 type AccountService struct {
@@ -393,6 +538,18 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 					if v, ok := req.Params["blend_ratio"]; ok {
 						varMap["{{blend_ratio}}"] = fmt.Sprintf("%v", v)
 					}
+					if v, ok := req.Params["extend_top"]; ok {
+						varMap["{{extend_top}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["extend_right"]; ok {
+						varMap["{{extend_right}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["extend_bottom"]; ok {
+						varMap["{{extend_bottom}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["extend_left"]; ok {
+						varMap["{{extend_left}}"] = fmt.Sprintf("%v", v)
+					}
 					if v, ok := req.Params["image_a_weight"]; ok {
 						varMap["{{image_a_weight}}"] = fmt.Sprintf("%v", v)
 					}
@@ -483,6 +640,12 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 
 	if featureSlug == styleFusionFeatureSlug {
 		fullPrompt = appendHiddenConstraint(fullPrompt, buildStyleFusionHiddenConstraint(req.Params))
+	}
+	if featureSlug == canvasExtendFeatureSlug {
+		fullPrompt = appendHiddenConstraint(fullPrompt, buildCanvasExtendHiddenConstraint(req.Params))
+	}
+	if featureSlug == hdUpscaleFeatureSlug && isMaskedHDUpscaleRequest(req.Params) {
+		fullPrompt = appendHiddenConstraint(fullPrompt, hdUpscaleMaskedConstraint)
 	}
 
 	// 序列化参数

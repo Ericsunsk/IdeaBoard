@@ -42,7 +42,6 @@
 | 四方连续 | `/seamless-tile` | 生成无缝拼接图案 |
 | 图案融合 | `/pattern-fusion` | 多图案融合 |
 | 工艺融合 | `/craft-fusion` | 将工艺效果融入图案 |
-| 图案涂改 | `/pattern-inpaint` | 局部修改图案 |
 | 图案变清晰 | `/pattern-upscale` | 图案超分辨率（阿里云 ImageEnhance 超分 API，后端已接入） |
 
 ### AI 工具箱

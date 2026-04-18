@@ -1,22 +1,23 @@
 <template>
-  <template v-for="node in imageNodes" :key="node.id">
+  <template v-for="entry in imageNodeEntries" :key="entry.node.id">
     <ImageNode
-      :node="node"
-      :active="isNodeSelected('image', node.id)"
-      :dragging="isNodeDragging('image', node.id)"
+      :node="entry.node"
+      :active="isNodeSelected('image', entry.node.id)"
+      :dragging="isNodeDragging('image', entry.node.id)"
       :copy-mode="copyMode"
-      :stage-height="getImageNodeStageHeight(node)"
-      :display-image="getResolvedImageNodeDisplay(node).image"
-      :display-mode="getResolvedImageNodeDisplay(node).mode"
-      :ui-state="getImageNodeUiState(node)"
-      @node-mousedown="emit('image-node-mousedown', $event, node)"
-      @port-mousedown="(event, port) => emit('image-port-mousedown', event, node.id, port)"
-      @delete="emit('image-delete', node.id)"
-      @stage-drop="emit('image-stage-drop', $event, node)"
-      @open-file="emit('image-open-file', node)"
-      @append-to-canvas="emit('image-append-to-canvas', node)"
-      @reset="emit('image-reset', node)"
-      @display-dragstart="emit('image-display-dragstart', $event, node)"
+      :stage-height="getImageNodeStageHeight(entry.node)"
+      :display-image="entry.displayImage"
+      :display-mode="entry.displayMode"
+      :input-locked="entry.inputLocked"
+      :ui-state="entry.uiState"
+      @node-mousedown="emit('image-node-mousedown', $event, entry.node)"
+      @port-mousedown="(event, port) => emit('image-port-mousedown', event, entry.node.id, port)"
+      @delete="emit('image-delete', entry.node.id)"
+      @stage-drop="emit('image-stage-drop', $event, entry.node)"
+      @open-file="emit('image-open-file', entry.node)"
+      @append-to-canvas="emit('image-append-to-canvas', entry.node)"
+      @reset="emit('image-reset', entry.node)"
+      @display-dragstart="emit('image-display-dragstart', $event, entry.node)"
     />
   </template>
 
@@ -37,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import ImageNode from '../../../components/canvas/nodes/ImageNode.vue'
 import PromptNode from '../../../components/canvas/nodes/PromptNode.vue'
 import type { ImageNodeItem, PromptNodeItem } from '../../../types/canvasNodes'
@@ -44,7 +46,7 @@ import type { NodeUiState, PromptNodeUiState } from '../../../types/canvasNodeUi
 
 type ImageNodeDisplay = {
   image: { url: string; ratio: number } | null
-  mode: 'source' | 'output' | 'mask'
+  mode: 'source' | 'node-output' | 'linked-output' | 'mask' | 'pending'
 }
 
 const props = defineProps<{
@@ -74,4 +76,21 @@ const emit = defineEmits<{
   (e: 'prompt-focus', nodeId: number): void
   (e: 'prompt-update-text', node: PromptNodeItem, value: string): void
 }>()
+
+const imageNodeEntries = computed(() =>
+  props.imageNodes.map(node => {
+    const uiState = props.getImageNodeUiState(node)
+    const resolvedDisplay = props.getResolvedImageNodeDisplay(node)
+    const hasConnectedInput = Boolean(uiState?.connection?.connected?.image)
+    const hasPendingInput = Boolean(uiState?.connection?.pending?.image)
+
+    return {
+      node,
+      uiState,
+      displayImage: resolvedDisplay.image,
+      displayMode: resolvedDisplay.mode,
+      inputLocked: hasConnectedInput || hasPendingInput,
+    }
+  }),
+)
 </script>

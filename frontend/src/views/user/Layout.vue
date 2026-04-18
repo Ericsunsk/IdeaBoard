@@ -52,8 +52,6 @@ const menuOptions: MenuOption[] = [
     children: [
       { label: '图案生成', key: 'pattern-gen' },
       { label: '四方连续', key: 'seamless-tile' },
-      { label: '图案涂改', key: 'pattern-inpaint' },
-      { label: '图案变清晰', key: 'pattern-upscale' },
     ]
   },
   {
@@ -61,7 +59,6 @@ const menuOptions: MenuOption[] = [
     key: 'ai-toolbox',
     children: [
       { label: '高清放大', key: 'hd-upscale' },
-      { label: '模糊变清晰', key: 'deblur' },
       { label: '画布延伸', key: 'canvas-extend' },
     ]
   },
@@ -83,10 +80,7 @@ const keyToPath: Record<string, string> = {
   'directed-recolor': '/user/picture',
   'pattern-gen': '/user/picture',
   'seamless-tile': '/user/picture',
-  'pattern-inpaint': '/user/picture',
-  'pattern-upscale': '/user/picture',
   'hd-upscale': '/user/picture',
-  'deblur': '/user/picture',
   'canvas-extend': '/user/picture',
 }
 

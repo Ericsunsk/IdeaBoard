@@ -39,6 +39,7 @@ const maskPaintAlpha = 0.5
 const maskColorR = 122
 const maskColorG = 107
 const maskColorB = 213
+const MASK_NODE_LOG_PREFIX = '[MaskNode]'
 
 export function clampMaskRefineAmount(value: number): number {
   if (!Number.isFinite(value)) return 0
@@ -72,6 +73,13 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     const ratio = await options.loadImageRatioFromUrl(url)
     if (!ratio || node.sourceImageUrl !== url) return
     node.sourceImageRatio = ratio
+  }
+
+  function logMaskNodeError(context: string, error: unknown, detail?: Record<string, unknown>) {
+    console.error(`${MASK_NODE_LOG_PREFIX} ${context}`, {
+      ...detail,
+      error,
+    })
   }
 
   function setMaskCanvasRef(id: number, el: Element | ComponentPublicInstance | null) {
@@ -234,8 +242,12 @@ export function useMaskNode(options: UseMaskNodeOptions) {
       const raster = new Image()
       raster.src = node.maskDataUrl
       maskRasterCache.set(node.id, raster)
-    } catch {
-      // Keep current mask when export fails.
+    } catch (error: unknown) {
+      logMaskNodeError('Failed to commit mask canvas to data URL.', error, {
+        nodeId: node.id,
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+      })
     }
   }
 
@@ -280,19 +292,21 @@ export function useMaskNode(options: UseMaskNodeOptions) {
 
   function onMaskCanvasMouseDown(event: MouseEvent, node: MaskNodeItem) {
     if (event.button !== 0) return
-    if (!node.sourceImageUrl) {
-      openMaskNodeFilePicker(node)
+    const liveNode = options.maskNodes.value.find(item => item.id === node.id) ?? node
+    const canvas = maskCanvasRefs.get(liveNode.id)
+    if (!canvas) {
+      if (!liveNode.sourceImageUrl) {
+        openMaskNodeFilePicker(liveNode)
+      }
       return
     }
-    const canvas = maskCanvasRefs.get(node.id)
-    if (!canvas) return
-    options.activateMaskNode(node.id)
+    options.activateMaskNode(liveNode.id)
     options.closeNodeContextMenu()
     options.activeImageActionId.value = null
     options.showStyleStrengthControl.value = false
     stopMaskPainting(false)
     const point = getMaskCanvasPoint(event.clientX, event.clientY, canvas)
-    drawingInitMaskPoint(node, canvas, point.x, point.y)
+    drawingInitMaskPoint(liveNode, canvas, point.x, point.y)
   }
 
   async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
@@ -460,7 +474,11 @@ export function useMaskNode(options: UseMaskNodeOptions) {
       }
       outputCtx.putImageData(output, 0, 0)
       return outputCanvas.toDataURL('image/png')
-    } catch {
+    } catch (error: unknown) {
+      logMaskNodeError('Failed to refine mask data URL.', error, {
+        refineAmount,
+        invertMask,
+      })
       return maskDataUrl
     }
   }

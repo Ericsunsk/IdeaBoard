@@ -28,27 +28,15 @@
             :active="node.mode === 'partial-edit'"
             @click="emit('update:mode', 'partial-edit')"
           >
-            Partial
-          </NodeActionButton>
-          <NodeActionButton
-            variant="chip"
-            :active="node.mode === 'pattern-inpaint'"
-            @click="emit('update:mode', 'pattern-inpaint')"
-          >
-            Pattern
+            Detail
           </NodeActionButton>
           <NodeActionButton
             variant="chip"
             :active="node.mode === 'bg-swap'"
             @click="emit('update:mode', 'bg-swap')"
           >
-            BG
+            Background
           </NodeActionButton>
-        </div>
-        <div class="edit-mode-meta">
-          <span class="edit-mode-pill">{{ modeLabel }}</span>
-          <span class="edit-mode-dot"></span>
-          <span class="edit-mode-meta-text">Mask-guided edit</span>
         </div>
       </div>
 
@@ -94,9 +82,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'delete'): void
-  (e: 'update:mode', value: 'partial-edit' | 'pattern-inpaint' | 'bg-swap'): void
+  (e: 'update:mode', value: 'partial-edit' | 'bg-swap'): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image'): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'mask' | 'prompt'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -118,14 +106,8 @@ const io = computed(() =>
 const connectionChips = computed(() => io.value.connectionChips)
 const ports = computed(() => io.value.ports)
 
-const modeLabel = computed(() => {
-  if (props.node.mode === 'pattern-inpaint') return 'Pattern'
-  if (props.node.mode === 'bg-swap') return 'Background'
-  return 'Partial'
-})
-
 function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image')
+  emit('port-mousedown', event, port as 'image' | 'mask' | 'prompt')
 }
 </script>
 
@@ -134,39 +116,4 @@ function onPortMouseDown(event: MouseEvent, port: string) {
 .edit-node-body {
   gap: 8px;
 }
-
-.edit-mode-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 18px;
-}
-
-.edit-mode-pill {
-  height: 18px;
-  padding: 0 7px;
-  border-radius: 999px;
-  border: 1px solid rgba(146, 120, 230, 0.2);
-  background: rgba(247, 243, 255, 0.9);
-  display: inline-flex;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #7b67d1;
-}
-
-.edit-mode-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: #c5cedb;
-}
-
-.edit-mode-meta-text {
-  font-size: 11px;
-  font-weight: 600;
-  color: #7d8899;
-}
-
 </style>

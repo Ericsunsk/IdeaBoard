@@ -363,6 +363,10 @@
         @enhance-update-upscale-factor="onEnhanceNodeUpdateUpscaleFactor"
         @enhance-update-output-format="onEnhanceNodeUpdateOutputFormat"
         @enhance-update-output-quality="onEnhanceNodeUpdateOutputQuality"
+        @enhance-update-extend-top="onEnhanceNodeUpdateExtendTop"
+        @enhance-update-extend-right="onEnhanceNodeUpdateExtendRight"
+        @enhance-update-extend-bottom="onEnhanceNodeUpdateExtendBottom"
+        @enhance-update-extend-left="onEnhanceNodeUpdateExtendLeft"
         @enhance-generate="handleEnhanceNodeGenerate"
         @enhance-port-mousedown="onEnhanceNodePortMouseDown"
         @tryon-node-mousedown="(event, node) => onTryOnNodeMouseDown(event, node)"
@@ -563,6 +567,7 @@ import {
 import { normalizeHexColor } from '../../components/canvas/nodes/colorPopoverUtils'
 import {
   enhanceModeSupportsPrompt,
+  enhanceModeSupportsMask,
 } from '../../config/canvasNodeConnectionContract'
 import { isCanvasConnectionAllowed } from '../../config/canvasConnections'
 import {
@@ -583,6 +588,9 @@ import {
 } from '../../utils/canvasNodeFactory'
 import {
   DEFAULT_COLOR_STRENGTH,
+  ENHANCE_EXTEND_PERCENT_DEFAULT,
+  ENHANCE_EXTEND_PERCENT_MAX,
+  ENHANCE_EXTEND_PERCENT_MIN,
   isCanvasExecutionOutputNodeType,
   isColorNodePlaceholderState,
   MAX_COLOR_NODE_SWATCHES,
@@ -723,11 +731,6 @@ const editModeMeta = {
     feature: 'partial-edit',
     promptPrefix: '[partial-edit]',
     fallbackPrompt: '局部改款',
-  },
-  'pattern-inpaint': {
-    feature: 'pattern-inpaint',
-    promptPrefix: '[pattern-inpaint]',
-    fallbackPrompt: '图案涂改',
   },
   'bg-swap': {
     feature: 'bg-swap',
@@ -981,26 +984,19 @@ const {
 })
 
 const {
-  getImageNodeStageHeight,
   getImageNodePreferredImage,
-  getImageNodeDisplayImage,
   openImageNodeFilePicker,
   resetImageNode,
   onImageNodeStageDrop: handleImageNodeStageDrop,
-  appendImageNodeDisplayToCanvas,
-  onImageNodeDisplayDragStart,
   importCanvasImageToImageNodeAtPoint,
 } = useImageNode({
   imageNodes,
-  messages,
-  selectedIds,
   message,
   uploadImage: uploadApi.upload,
   loadImageRatioFromFile,
   loadImageRatioFromUrl,
   readNodeImageDropPayload,
-  createCanvasImageAt: createCanvasImageItemAt,
-  nodeImageDragMime,
+  hasIncomingImageConnection: (nodeId) => hasIncomingPortConnection('image', nodeId, 'image'),
 })
 
 const {
@@ -1348,6 +1344,10 @@ function buildExecutionInputSignatureMap(): Record<string, string> {
       String(node.upscaleFactor),
       node.outputFormat,
       String(node.outputQuality),
+      String(node.extendTop),
+      String(node.extendRight),
+      String(node.extendBottom),
+      String(node.extendLeft),
     ].join('|')
   })
 
@@ -1493,6 +1493,10 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
       ...node,
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
       outputQuality: Math.max(30, Math.min(100, Math.round(node.outputQuality ?? 95))),
+      extendTop: clampEnhanceExtendPercent(node.extendTop ?? ENHANCE_EXTEND_PERCENT_DEFAULT),
+      extendRight: clampEnhanceExtendPercent(node.extendRight ?? ENHANCE_EXTEND_PERCENT_DEFAULT),
+      extendBottom: clampEnhanceExtendPercent(node.extendBottom ?? ENHANCE_EXTEND_PERCENT_DEFAULT),
+      extendLeft: clampEnhanceExtendPercent(node.extendLeft ?? ENHANCE_EXTEND_PERCENT_DEFAULT),
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
     editNodes.value = state.editNodes.map(node => ({
@@ -2241,21 +2245,67 @@ function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: 
   }
 }
 
-function getResolvedImageNodeDisplay(node: ImageNodeItem): { image: { url: string; ratio: number } | null; mode: 'source' | 'output' | 'mask' } {
-  const connectedInput = getImageNodeConnectedInput(node)
-  if (connectedInput) {
+function getResolvedImageNodeDisplay(node: ImageNodeItem): { image: { url: string; ratio: number } | null; mode: 'source' | 'node-output' | 'linked-output' | 'mask' | 'pending' } {
+  if (hasIncomingPortConnection('image', node.id, 'image')) {
+    const connectedInput = getImageNodeConnectedInput(node)
+    if (!connectedInput) {
+      return {
+        image: null,
+        mode: 'pending',
+      }
+    }
     return {
       image: {
         url: connectedInput.url,
         ratio: connectedInput.ratio,
       },
-      mode: connectedInput.mode,
+      mode: connectedInput.mode === 'mask' ? 'mask' : 'linked-output',
     }
   }
-  return {
-    image: getImageNodeDisplayImage(node),
-    mode: node.outputImages.length > 0 ? 'output' : 'source',
+
+  const preferredImage = getImageNodePreferredImage(node)
+  if (node.outputImages.length > 0 && preferredImage) {
+    return {
+      image: preferredImage,
+      mode: 'node-output',
+    }
   }
+
+  return {
+    image: preferredImage,
+    mode: 'source',
+  }
+}
+
+function getImageNodeStageHeight(node: ImageNodeItem): number {
+  const displayImage = getResolvedImageNodeDisplay(node).image
+  if (!displayImage) return 160
+  const stageWidth = Math.max(120, node.width - 24)
+  const ratio = Number.isFinite(displayImage.ratio) && displayImage.ratio > 0
+    ? displayImage.ratio
+    : 1
+  const dynamicHeight = Math.round(stageWidth * ratio)
+  return Math.max(110, dynamicHeight)
+}
+
+function appendImageNodeDisplayToCanvas(node: ImageNodeItem) {
+  const display = getResolvedImageNodeDisplay(node).image
+  if (!display) return
+  const item = createCanvasImageItemAt(
+    { x: node.x - 360, y: node.y + 18 },
+    display.url,
+    display.ratio,
+  )
+  messages.value.push(item)
+  selectedIds.value = [item.id]
+}
+
+function onImageNodeDisplayDragStart(event: DragEvent, node: ImageNodeItem) {
+  const display = getResolvedImageNodeDisplay(node).image
+  if (!display || !event.dataTransfer) return
+  event.dataTransfer.effectAllowed = 'copy'
+  event.dataTransfer.setData(nodeImageDragMime, display.url)
+  event.dataTransfer.setData(`${nodeImageDragMime}-ratio`, String(display.ratio || 1))
 }
 
 function getMaskNodeConnectedImageInput(node: MaskNodeItem): { url: string; ratio: number } | null {
@@ -2429,8 +2479,16 @@ function warnMissingNodeInputs(
 
 function setEnhanceNodeMode(node: EnhanceNodeItem, mode: EnhanceNodeItem['mode']) {
   node.mode = mode
-  if (enhanceModeSupportsPrompt(mode)) return
-  removeIncomingConnectionsForPort('enhance', node.id, 'prompt')
+  if (!enhanceModeSupportsPrompt(mode)) {
+    removeIncomingConnectionsForPort('enhance', node.id, 'prompt')
+  }
+  if (!enhanceModeSupportsMask(mode)) {
+    removeIncomingConnectionsForPort('enhance', node.id, 'mask')
+  }
+}
+
+function clampEnhanceExtendPercent(value: number): number {
+  return Math.max(ENHANCE_EXTEND_PERCENT_MIN, Math.min(ENHANCE_EXTEND_PERCENT_MAX, Math.round(value)))
 }
 
 function getGenerateStyleOptions(mode: GenerateNodeItem['mode']): string[] {
@@ -2482,15 +2540,6 @@ function getMaskNodeStageHeight(node: MaskNodeItem): number {
     sourceImageUrl: source.url,
     sourceImageRatio: source.ratio,
   })
-}
-
-function getMaskNodeRuntimeNode(node: MaskNodeItem): MaskNodeItem {
-  const source = getMaskNodeEffectiveSource(node)
-  return {
-    ...node,
-    sourceImageUrl: source.url,
-    sourceImageRatio: source.ratio,
-  }
 }
 
 function getModelNodeStageHeight(node: ModelNodeItem): number {
@@ -2618,7 +2667,7 @@ function onViewpointNodeUpdateLighting(node: ViewpointNodeItem, value: Viewpoint
 }
 
 function onMaskNodeCanvasMouseDownBridge(event: MouseEvent, node: MaskNodeItem) {
-  onMaskCanvasMouseDown(event, getMaskNodeRuntimeNode(node))
+  onMaskCanvasMouseDown(event, node)
 }
 
 function onMaskNodeSetDrawMode(node: MaskNodeItem, value: 'paint' | 'erase') {
@@ -2663,6 +2712,22 @@ function onEnhanceNodeUpdateOutputFormat(node: EnhanceNodeItem, value: EnhanceNo
 
 function onEnhanceNodeUpdateOutputQuality(node: EnhanceNodeItem, value: number) {
   node.outputQuality = Math.max(30, Math.min(100, Math.round(value)))
+}
+
+function onEnhanceNodeUpdateExtendTop(node: EnhanceNodeItem, value: number) {
+  node.extendTop = clampEnhanceExtendPercent(value)
+}
+
+function onEnhanceNodeUpdateExtendRight(node: EnhanceNodeItem, value: number) {
+  node.extendRight = clampEnhanceExtendPercent(value)
+}
+
+function onEnhanceNodeUpdateExtendBottom(node: EnhanceNodeItem, value: number) {
+  node.extendBottom = clampEnhanceExtendPercent(value)
+}
+
+function onEnhanceNodeUpdateExtendLeft(node: EnhanceNodeItem, value: number) {
+  node.extendLeft = clampEnhanceExtendPercent(value)
 }
 
 function onTryOnNodeUpdateMode(node: TryOnNodeItem, value: TryOnNodeItem['mode']) {

@@ -1,4 +1,8 @@
-import { DEFAULT_COLOR_NODE_COLOR, DEFAULT_COLOR_STRENGTH } from '../types/canvasNodes'
+import {
+  DEFAULT_COLOR_NODE_COLOR,
+  DEFAULT_COLOR_STRENGTH,
+  ENHANCE_EXTEND_PERCENT_DEFAULT,
+} from '../types/canvasNodes'
 import type {
   CanvasImageItem,
   CanvasPoint,
@@ -157,11 +161,15 @@ export function createEnhanceNodeAt(point: CanvasPoint): EnhanceNodeItem {
     x: point.x,
     y: point.y,
     width: 286,
-    mode: 'pattern-upscale',
+    mode: 'hd-upscale',
     upscaleMode: 'base',
     upscaleFactor: 2,
     outputFormat: 'jpg',
     outputQuality: 95,
+    extendTop: ENHANCE_EXTEND_PERCENT_DEFAULT,
+    extendRight: ENHANCE_EXTEND_PERCENT_DEFAULT,
+    extendBottom: ENHANCE_EXTEND_PERCENT_DEFAULT,
+    extendLeft: ENHANCE_EXTEND_PERCENT_DEFAULT,
     outputStatus: 'idle',
     outputImages: [],
   }

@@ -79,6 +79,64 @@
             />
           </div>
         </template>
+        <div v-else class="enhance-extend-group node-control-group">
+          <div class="enhance-extend-row">
+            <span class="node-control-label">Top</span>
+            <input
+              class="enhance-extend-slider node-inline-range"
+              :style="{ '--slider-pct': `${toExtendSliderPct(node.extendTop)}%` }"
+              type="range"
+              :min="extendMin"
+              :max="extendMax"
+              step="1"
+              :value="node.extendTop"
+              @input="emit('update:extend-top', Number(($event.target as HTMLInputElement).value))"
+            />
+            <span class="enhance-extend-value">{{ node.extendTop }}%</span>
+          </div>
+          <div class="enhance-extend-row">
+            <span class="node-control-label">Right</span>
+            <input
+              class="enhance-extend-slider node-inline-range"
+              :style="{ '--slider-pct': `${toExtendSliderPct(node.extendRight)}%` }"
+              type="range"
+              :min="extendMin"
+              :max="extendMax"
+              step="1"
+              :value="node.extendRight"
+              @input="emit('update:extend-right', Number(($event.target as HTMLInputElement).value))"
+            />
+            <span class="enhance-extend-value">{{ node.extendRight }}%</span>
+          </div>
+          <div class="enhance-extend-row">
+            <span class="node-control-label">Bottom</span>
+            <input
+              class="enhance-extend-slider node-inline-range"
+              :style="{ '--slider-pct': `${toExtendSliderPct(node.extendBottom)}%` }"
+              type="range"
+              :min="extendMin"
+              :max="extendMax"
+              step="1"
+              :value="node.extendBottom"
+              @input="emit('update:extend-bottom', Number(($event.target as HTMLInputElement).value))"
+            />
+            <span class="enhance-extend-value">{{ node.extendBottom }}%</span>
+          </div>
+          <div class="enhance-extend-row">
+            <span class="node-control-label">Left</span>
+            <input
+              class="enhance-extend-slider node-inline-range"
+              :style="{ '--slider-pct': `${toExtendSliderPct(node.extendLeft)}%` }"
+              type="range"
+              :min="extendMin"
+              :max="extendMax"
+              step="1"
+              :value="node.extendLeft"
+              @input="emit('update:extend-left', Number(($event.target as HTMLInputElement).value))"
+            />
+            <span class="enhance-extend-value">{{ node.extendLeft }}%</span>
+          </div>
+        </div>
       </div>
 
       <NodeConnectionChips :items="connectionChips" />
@@ -101,7 +159,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { EnhanceNodeItem } from '../../../types/canvasNodes'
+import {
+  ENHANCE_EXTEND_PERCENT_MAX,
+  ENHANCE_EXTEND_PERCENT_MIN,
+  type EnhanceNodeItem,
+} from '../../../types/canvasNodes'
 import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
@@ -134,8 +196,12 @@ const emit = defineEmits<{
   (e: 'update:upscale-factor', value: EnhanceNodeItem['upscaleFactor']): void
   (e: 'update:output-format', value: EnhanceNodeItem['outputFormat']): void
   (e: 'update:output-quality', value: number): void
+  (e: 'update:extend-top', value: number): void
+  (e: 'update:extend-right', value: number): void
+  (e: 'update:extend-bottom', value: number): void
+  (e: 'update:extend-left', value: number): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image'): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'mask' | 'prompt'): void
 }>()
 
 const enhanceModeOptions = ENHANCE_MODE_OPTIONS
@@ -145,17 +211,22 @@ const enhanceOutputFormatOptions = ENHANCE_OUTPUT_FORMAT_OPTIONS
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 
-const isUpscaleMode = computed(() => props.node.mode === 'pattern-upscale' || props.node.mode === 'hd-upscale')
-const supportsPrompt = computed(() => props.node.mode === 'deblur' || props.node.mode === 'canvas-extend')
+const extendMin = ENHANCE_EXTEND_PERCENT_MIN
+const extendMax = ENHANCE_EXTEND_PERCENT_MAX
+const isUpscaleMode = computed(() => props.node.mode === 'hd-upscale')
+const supportsPrompt = computed(() => props.node.mode === 'canvas-extend')
+const supportsMask = computed(() => props.node.mode === 'hd-upscale')
 const io = computed(() =>
-  buildNodeIoFromSlots(ENHANCE_NODE_IO_SLOTS, { supportsPrompt: supportsPrompt.value }, {
+  buildNodeIoFromSlots(ENHANCE_NODE_IO_SLOTS, { supportsPrompt: supportsPrompt.value, supportsMask: supportsMask.value }, {
     connected: {
       image: props.uiState?.connection?.connected?.image,
+      mask: props.uiState?.connection?.connected?.mask,
       prompt: props.uiState?.connection?.connected?.prompt,
       output: props.uiState?.connection?.connected?.output,
     },
     pending: {
       image: props.uiState?.connection?.pending?.image,
+      mask: props.uiState?.connection?.pending?.mask,
     },
     errorPortKeys: props.errorPortKeys,
   }),
@@ -163,8 +234,12 @@ const io = computed(() =>
 const connectionChips = computed(() => io.value.connectionChips)
 const ports = computed(() => io.value.ports)
 
+function toExtendSliderPct(value: number): number {
+  return ((value - extendMin) / (extendMax - extendMin)) * 100
+}
+
 function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image')
+  emit('port-mousedown', event, port as 'image' | 'mask' | 'prompt')
 }
 </script>
 
@@ -184,6 +259,34 @@ function onPortMouseDown(event: MouseEvent, port: string) {
   flex: 1;
   margin: 0;
   min-width: 0;
+}
+
+.enhance-extend-group {
+  gap: 6px;
+}
+
+.enhance-extend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.enhance-extend-row .node-control-label {
+  min-width: 36px;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+
+.enhance-extend-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.enhance-extend-value {
+  min-width: 32px;
+  font-size: 10px;
+  color: #a1a1aa;
+  text-align: right;
 }
 
 </style>

@@ -384,24 +384,7 @@ func (c *Consumer) callOpenAI(account *model.ApiAccount, prompt string, width, h
 		"size":   size,
 	}
 
-	// 透传参考图片 URL（用于图生图 / 变体生成）
-	if params != nil {
-		if imgURLs, ok := params["image_urls"]; ok {
-			reqBody["image"] = imgURLs
-		}
-		if strength, ok := params["variation_strength"]; ok {
-			reqBody["variation_strength"] = strength
-		}
-		if blendRatio, ok := params["blend_ratio"]; ok {
-			reqBody["blend_ratio"] = blendRatio
-		}
-		if imageAWeight, ok := params["image_a_weight"]; ok {
-			reqBody["image_a_weight"] = imageAWeight
-		}
-		if imageBWeight, ok := params["image_b_weight"]; ok {
-			reqBody["image_b_weight"] = imageBWeight
-		}
-	}
+	appendOpenAIAllowedParams(reqBody, params)
 
 	bodyJSON, _ := json.Marshal(reqBody)
 
@@ -446,6 +429,51 @@ func (c *Consumer) callOpenAI(account *model.ApiAccount, prompt string, width, h
 	}
 
 	return respData.Data[0].URL, nil
+}
+
+func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string]interface{}) {
+	if params == nil {
+		return
+	}
+
+	// OpenAI 兼容图像接口通常接收 image 字段；前端沿用 image_urls，这里做受控映射。
+	if imgURLs, ok := params["image_urls"]; ok {
+		reqBody["image"] = imgURLs
+	}
+
+	allowedKeys := []string{
+		"variation_strength",
+		"blend_ratio",
+		"extend_top",
+		"extend_right",
+		"extend_bottom",
+		"extend_left",
+		"image_a_weight",
+		"image_b_weight",
+		"original_image_url",
+		"mask_image_url",
+		"mask_image_urls",
+		"mask_url",
+		"mask_urls",
+		"use_mask",
+		"mask_enabled",
+		"is_masked",
+		"masked",
+		"local_enhance",
+		"is_local_enhance",
+		"partial_enhance",
+		"is_partial_enhance",
+		"mode",
+		"upscale_mode",
+		"upscale_factor",
+		"output_format",
+		"output_quality",
+	}
+	for _, key := range allowedKeys {
+		if v, ok := params[key]; ok {
+			reqBody[key] = v
+		}
+	}
 }
 
 // callStabilityAI 调用 Stability AI 接口

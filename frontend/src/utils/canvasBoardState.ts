@@ -20,6 +20,9 @@ import type {
 } from '../types/canvasNodes'
 import {
   DEFAULT_COLOR_STRENGTH,
+  ENHANCE_EXTEND_PERCENT_DEFAULT,
+  ENHANCE_EXTEND_PERCENT_MAX,
+  ENHANCE_EXTEND_PERCENT_MIN,
   normalizeColorNodeColors,
   resolveWorkflowNodeOutputStatus,
 } from '../types/canvasNodes'
@@ -54,6 +57,12 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object'
+}
+
+function clampEnhanceExtendPercent(value: unknown): number {
+  return isFiniteNumber(value)
+    ? Math.max(ENHANCE_EXTEND_PERCENT_MIN, Math.min(ENHANCE_EXTEND_PERCENT_MAX, Math.round(value)))
+    : ENHANCE_EXTEND_PERCENT_DEFAULT
 }
 
 function readRawStateMap(): Record<string, CanvasBoardState> {
@@ -341,11 +350,7 @@ function toValidEditNode(item: unknown): CanvasBoardStateEditNode | null {
   if (!isFiniteNumber(item.id)) return null
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
-  const mode =
-    item.mode === 'pattern-inpaint' ||
-    item.mode === 'bg-swap'
-      ? item.mode
-      : 'partial-edit'
+  const mode = item.mode === 'bg-swap' ? item.mode : 'partial-edit'
   return {
     id: item.id,
     type: 'edit',
@@ -386,18 +391,20 @@ function toValidEnhanceNode(item: unknown): CanvasBoardStateEnhanceNode | null {
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
   const mode =
-    item.mode === 'pattern-upscale' ||
     item.mode === 'hd-upscale' ||
-    item.mode === 'deblur' ||
     item.mode === 'canvas-extend'
       ? item.mode
-      : 'pattern-upscale'
+      : 'hd-upscale'
   const upscaleMode = item.upscaleMode === 'enhancement' ? 'enhancement' : 'base'
   const upscaleFactor = item.upscaleFactor === 3 || item.upscaleFactor === 4 ? item.upscaleFactor : 2
   const outputFormat = item.outputFormat === 'png' ? 'png' : 'jpg'
   const outputQuality = isFiniteNumber(item.outputQuality)
     ? Math.max(30, Math.min(100, Math.round(item.outputQuality)))
     : 95
+  const extendTop = clampEnhanceExtendPercent(item.extendTop)
+  const extendRight = clampEnhanceExtendPercent(item.extendRight)
+  const extendBottom = clampEnhanceExtendPercent(item.extendBottom)
+  const extendLeft = clampEnhanceExtendPercent(item.extendLeft)
   return {
     id: item.id,
     type: 'enhance',
@@ -409,6 +416,10 @@ function toValidEnhanceNode(item: unknown): CanvasBoardStateEnhanceNode | null {
     upscaleFactor,
     outputFormat,
     outputQuality,
+    extendTop,
+    extendRight,
+    extendBottom,
+    extendLeft,
     outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
     outputImages,
   }

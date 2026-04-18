@@ -102,10 +102,12 @@ export const FUSION_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
 
 export type EnhanceNodeIoContext = {
   supportsPrompt: boolean
+  supportsMask: boolean
 }
 
 export const ENHANCE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EnhanceNodeIoContext>[] = [
   { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'enhance-image-input', top: 92 },
+  { key: 'mask', label: 'Mask', kind: 'mask', direction: 'input', portName: 'mask', portKey: 'enhance-mask-input', top: 136, visible: (ctx) => ctx.supportsMask },
   { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'enhance-prompt-input', top: 136, visible: (ctx) => ctx.supportsPrompt },
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'enhance-output', top: 92 },
 ]

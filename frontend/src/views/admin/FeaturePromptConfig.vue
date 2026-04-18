@@ -83,12 +83,9 @@ const featureList = [
   { slug: 'style-clone', title: 'Generate · 画风复刻' },
   { slug: 'seamless-tile-classic', title: 'Generate · 四方连续 Classic' },
   { slug: 'seamless-tile-cartoon', title: 'Generate · 四方连续 Cartoon' },
-  { slug: 'pattern-inpaint', title: 'Edit · 图案涂改' },
-  { slug: 'pattern-upscale', title: 'Enhance · 图案变清晰' },
   { slug: 'to-vector', title: 'Quick · 转矢量图' },
   { slug: 'remove-bg', title: 'Quick · 抠图褪底' },
   { slug: 'hd-upscale', title: 'Enhance · 高清放大' },
-  { slug: 'deblur', title: 'Enhance · 模糊变清晰' },
   { slug: 'canvas-extend', title: 'Enhance · 画布延伸' },
 ] as const
 
@@ -163,14 +160,9 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{image_a_weight}}', desc: 'Image A 实际融合百分比' },
     { key: '{{image_b_weight}}', desc: 'Image B 实际融合百分比' },
   ],
-  'pattern-inpaint': [
-    { key: '{{user_prompt}}', desc: '用户提示词' },
-  ],
-  'pattern-upscale': noVars,
   'to-vector': noVars,
   'remove-bg': noVars,
   'hd-upscale': noVars,
-  'deblur': promptVars,
   'canvas-extend': promptVars,
 }
 
@@ -178,7 +170,7 @@ function getVarsForSlug(slug: FeatureSlug): VarDef[] {
   return featureVarMap[slug] || noVars
 }
 
-const directApiFeatureSlugs = new Set<FeatureSlug>(['remove-bg', 'to-vector', 'pattern-upscale', 'hd-upscale'])
+const directApiFeatureSlugs = new Set<FeatureSlug>(['remove-bg', 'to-vector', 'hd-upscale'])
 
 function isDirectApiFeature(slug: FeatureSlug) {
   return directApiFeatureSlugs.has(slug)

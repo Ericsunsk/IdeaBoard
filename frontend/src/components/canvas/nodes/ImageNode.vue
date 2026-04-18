@@ -32,8 +32,8 @@
         class="image-node-stage"
         :data-image-node-id="node.id"
         :style="{ height: `${stageHeight}px` }"
-        @dragover.prevent
-        @drop.prevent.stop="emit('stage-drop', $event)"
+        @dragover.stop="onStageDragOver"
+        @drop.stop="onStageDrop"
         @mousedown.stop="onStageMouseDown"
         @contextmenu.prevent.stop
       >
@@ -51,17 +51,37 @@
             @dragstart="emit('display-dragstart', $event)"
             @dblclick="emit('append-to-canvas')"
           />
-          <div class="image-node-stage-actions">
+          <div v-if="!props.inputLocked" class="image-node-stage-actions">
             <NodeActionButton variant="stage-ghost" @click="emit('reset')">清空</NodeActionButton>
           </div>
         </template>
-        <div v-else class="image-node-stage-empty" @click="emit('open-file')">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <div
+          v-else
+          class="image-node-stage-empty"
+          :class="{
+            'is-pending': isPendingDisplayMode,
+            'is-readonly': props.inputLocked,
+          }"
+          @click="onEmptyStateClick"
+        >
+          <svg
+            v-if="isPendingDisplayMode"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <circle cx="12" cy="12" r="8" />
+            <path d="M12 8v4l2.5 2.5" />
+          </svg>
+          <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
-          <span>上传或拖拽图片作为输入</span>
+          <span>{{ emptyStateLabel }}</span>
         </div>
       </div>
 
@@ -104,7 +124,8 @@ const props = defineProps<{
   copyMode: boolean
   stageHeight: number
   displayImage: { url: string } | null
-  displayMode?: 'source' | 'output' | 'mask'
+  displayMode?: 'source' | 'node-output' | 'linked-output' | 'mask' | 'pending'
+  inputLocked?: boolean
   uiState?: NodeUiState
 }>()
 
@@ -122,14 +143,23 @@ const emit = defineEmits<{
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 const previewPopupOpen = ref(false)
 const displayModeLabel = computed(() => {
+  if (props.displayMode === 'pending') return 'Pending'
+  if (props.displayMode === 'linked-output') return 'Linked'
+  if (props.displayMode === 'node-output') return 'Output'
   if (props.displayMode === 'mask') return 'Mask'
-  if (props.displayMode === 'output') return 'Output'
   return 'Source'
 })
 const displayModeClass = computed(() => {
+  if (props.displayMode === 'pending') return 'is-pending'
+  if (props.displayMode === 'linked-output') return 'is-linked-output'
+  if (props.displayMode === 'node-output') return 'is-output'
   if (props.displayMode === 'mask') return 'is-mask'
-  if (props.displayMode === 'output') return 'is-output'
   return 'is-source'
+})
+const isPendingDisplayMode = computed(() => props.displayMode === 'pending')
+const emptyStateLabel = computed(() => {
+  if (props.displayMode === 'pending' || props.inputLocked) return 'Waiting...'
+  return '上传或拖拽图片作为输入'
 })
 const ports = computed(() =>
   buildNodeIoFromSlots(IMAGE_NODE_IO_SLOTS, null, {
@@ -161,6 +191,21 @@ function onStageMouseDown(event: MouseEvent) {
   if (event.button !== 2 || !props.displayImage) return
   event.preventDefault()
   previewPopupOpen.value = true
+}
+
+function onStageDragOver(event: DragEvent) {
+  event.preventDefault()
+}
+
+function onStageDrop(event: DragEvent) {
+  event.preventDefault()
+  if (props.inputLocked) return
+  emit('stage-drop', event)
+}
+
+function onEmptyStateClick() {
+  if (props.inputLocked) return
+  emit('open-file')
 }
 
 function onGlobalMouseUp(event: MouseEvent) {
@@ -236,10 +281,30 @@ onBeforeUnmount(() => {
   color: #1d8b61;
 }
 
+.image-node-stage-badge.is-linked-output {
+  border: 1px solid rgba(76, 118, 229, 0.18);
+  background: rgba(244, 247, 255, 0.92);
+  color: #496ad5;
+}
+
 .image-node-stage-badge.is-mask {
   border: 1px solid rgba(146, 120, 230, 0.2);
   background: rgba(247, 243, 255, 0.94);
   color: #7b67d1;
+}
+
+.image-node-stage-badge.is-pending {
+  border: 1px solid rgba(243, 187, 64, 0.18);
+  background: rgba(255, 250, 239, 0.94);
+  color: #bb7b00;
+}
+
+.image-node-stage-empty.is-readonly {
+  cursor: default;
+}
+
+.image-node-stage-empty.is-pending {
+  color: #8f789b;
 }
 
 .image-preview-popup {

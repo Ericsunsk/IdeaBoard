@@ -332,6 +332,22 @@ function onGlobalKeyDown(event: KeyboardEvent) {
   if (!paintPopupOpen.value && !maskCursor.visible) return
   if (isTextEditableTarget(event.target)) return
 
+  const isBrushShortcut =
+    event.key === 'b' ||
+    event.key === 'B' ||
+    event.code === 'KeyB'
+
+  const isEraserShortcut =
+    event.key === 'e' ||
+    event.key === 'E' ||
+    event.code === 'KeyE'
+
+  if (isBrushShortcut || isEraserShortcut) {
+    event.preventDefault()
+    emit('set-draw-mode', isEraserShortcut ? 'erase' : 'paint')
+    return
+  }
+
   const isDecrease =
     event.key === '[' ||
     event.key === '【' ||

@@ -1,7 +1,6 @@
 import type { Ref } from 'vue'
 import type {
   CanvasImageItem,
-  CanvasPoint,
   ImageNodeItem,
   ImageNodeOutputItem,
 } from '../types/canvasNodes'
@@ -27,18 +26,23 @@ interface DragPayload {
 
 interface UseImageNodeOptions {
   imageNodes: Ref<ImageNodeItem[]>
-  messages: Ref<CanvasImageItem[]>
-  selectedIds: Ref<number[]>
   message: ImageNodeMessageApi
   uploadImage: (file: File) => Promise<UploadResponse>
   loadImageRatioFromFile: (file: File) => Promise<number | null>
   loadImageRatioFromUrl: (url: string) => Promise<number | null>
   readNodeImageDropPayload: (event: DragEvent) => DragPayload | null
-  createCanvasImageAt: (point: CanvasPoint, url: string, ratio?: number) => CanvasImageItem
-  nodeImageDragMime: string
+  hasIncomingImageConnection?: (nodeId: number) => boolean
 }
 
 export function useImageNode(options: UseImageNodeOptions) {
+  function hasLockedIncomingImage(node: ImageNodeItem) {
+    return options.hasIncomingImageConnection?.(node.id) ?? false
+  }
+
+  function warnLockedIncomingImage() {
+    options.message.warning('已连接上游 Image 输入，请先断开后再替换本地图')
+  }
+
   async function syncImageNodeImageRatioByUrl(node: ImageNodeItem, url: string) {
     const ratio = await options.loadImageRatioFromUrl(url)
     if (!ratio || node.sourceImageUrl !== url) return
@@ -63,21 +67,6 @@ export function useImageNode(options: UseImageNodeOptions) {
     return null
   }
 
-  function getImageNodeDisplayImage(node: ImageNodeItem): ImageNodeOutputItem | null {
-    return getImageNodePreferredImage(node)
-  }
-
-  function getImageNodeStageHeight(node: ImageNodeItem): number {
-    const displayImage = getImageNodePreferredImage(node)
-    if (!displayImage) return 160
-    const stageWidth = Math.max(120, node.width - 24)
-    const ratio = Number.isFinite(displayImage.ratio) && displayImage.ratio > 0
-      ? displayImage.ratio
-      : 1
-    const dynamicHeight = Math.round(stageWidth * ratio)
-    return Math.max(110, dynamicHeight)
-  }
-
   function setImageNodeInput(node: ImageNodeItem, url: string, ratio?: number | null, clearOutputs = true) {
     node.sourceImageUrl = url
     if (ratio && ratio > 0) {
@@ -91,6 +80,10 @@ export function useImageNode(options: UseImageNodeOptions) {
   }
 
   async function uploadImageNodeFile(node: ImageNodeItem, file: File) {
+    if (hasLockedIncomingImage(node)) {
+      warnLockedIncomingImage()
+      return
+    }
     if (!file.type.startsWith('image/')) {
       options.message.warning('请上传图片文件')
       return
@@ -111,6 +104,10 @@ export function useImageNode(options: UseImageNodeOptions) {
   }
 
   function openImageNodeFilePicker(node: ImageNodeItem) {
+    if (hasLockedIncomingImage(node)) {
+      warnLockedIncomingImage()
+      return
+    }
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/*'
@@ -128,11 +125,19 @@ export function useImageNode(options: UseImageNodeOptions) {
   }
 
   function resetImageNode(node: ImageNodeItem) {
+    if (hasLockedIncomingImage(node)) {
+      warnLockedIncomingImage()
+      return
+    }
     clearImageNodeSource(node)
     node.outputImages = []
   }
 
   function onImageNodeStageDrop(event: DragEvent, node: ImageNodeItem) {
+    if (hasLockedIncomingImage(node)) {
+      warnLockedIncomingImage()
+      return
+    }
     const payload = options.readNodeImageDropPayload(event)
     if (payload) {
       setImageNodeInput(node, payload.url, payload.ratio, true)
@@ -143,26 +148,6 @@ export function useImageNode(options: UseImageNodeOptions) {
     void uploadImageNodeFile(node, file)
   }
 
-  function appendImageNodeDisplayToCanvas(node: ImageNodeItem) {
-    const display = getImageNodeDisplayImage(node)
-    if (!display) return
-    const item = options.createCanvasImageAt(
-      { x: node.x - 360, y: node.y + 18 },
-      display.url,
-      display.ratio,
-    )
-    options.messages.value.push(item)
-    options.selectedIds.value = [item.id]
-  }
-
-  function onImageNodeDisplayDragStart(event: DragEvent, node: ImageNodeItem) {
-    const display = getImageNodeDisplayImage(node)
-    if (!display || !event.dataTransfer) return
-    event.dataTransfer.effectAllowed = 'copy'
-    event.dataTransfer.setData(options.nodeImageDragMime, display.url)
-    event.dataTransfer.setData(`${options.nodeImageDragMime}-ratio`, String(display.ratio || 1))
-  }
-
   function importCanvasImageToImageNodeAtPoint(clientX: number, clientY: number, item: CanvasImageItem): boolean {
     const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null
     const stageEl = target?.closest('.image-node-stage[data-image-node-id]') as HTMLElement | null
@@ -171,20 +156,20 @@ export function useImageNode(options: UseImageNodeOptions) {
     if (!Number.isFinite(imageNodeId)) return false
     const node = options.imageNodes.value.find(n => n.id === imageNodeId)
     if (!node) return false
+    if (hasLockedIncomingImage(node)) {
+      warnLockedIncomingImage()
+      return false
+    }
     setImageNodeInput(node, item.url, item.height_ratio, true)
     return true
   }
 
   return {
-    getImageNodeStageHeight,
     getImageNodePreferredImage,
-    getImageNodeDisplayImage,
     setImageNodeInput,
     openImageNodeFilePicker,
     resetImageNode,
     onImageNodeStageDrop,
-    appendImageNodeDisplayToCanvas,
-    onImageNodeDisplayDragStart,
     importCanvasImageToImageNodeAtPoint,
   }
 }
