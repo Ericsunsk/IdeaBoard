@@ -13,13 +13,16 @@ import type {
   MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
-  PaletteNodeItem,
   PromptNodeItem,
   GenerateNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
-import { resolveWorkflowNodeOutputStatus } from '../types/canvasNodes'
+import {
+  DEFAULT_COLOR_STRENGTH,
+  normalizeColorNodeColors,
+  resolveWorkflowNodeOutputStatus,
+} from '../types/canvasNodes'
 
 export type CanvasBoardStateMessage = CanvasImageItem
 export type CanvasBoardStatePromptNode = PromptNodeItem
@@ -35,7 +38,6 @@ export type CanvasBoardStateFusionNode = FusionNodeItem
 export type CanvasBoardStateEnhanceNode = EnhanceNodeItem
 export type CanvasBoardStateTryOnNode = TryOnNodeItem
 export type CanvasBoardStateFaceSwapNode = FaceSwapNodeItem
-export type CanvasBoardStatePaletteNode = PaletteNodeItem
 export type CanvasBoardStateGenerateNode = GenerateNodeItem
 export type CanvasBoardStateConnection = CanvasConnection
 export type CanvasBoardStateViewport = CanvasViewportState
@@ -259,16 +261,18 @@ function toValidColorNode(item: unknown): CanvasBoardStateColorNode | null {
   if (!isFiniteNumber(item.id)) return null
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
-  const rawColor = typeof item.targetColor === 'string' ? item.targetColor.trim() : ''
-  const targetColor = /^#[0-9a-fA-F]{6}$/.test(rawColor) ? rawColor.toUpperCase() : '#A3E635'
-  const strength = isFiniteNumber(item.strength) ? Math.max(0, Math.min(100, Math.round(item.strength))) : 70
+  const rawColors = Array.isArray(item.colors) ? item.colors : []
+  const colors = normalizeColorNodeColors(rawColors.filter((color): color is string => typeof color === 'string'))
+  const strength = isFiniteNumber(item.strength)
+    ? Math.max(0, Math.min(100, Math.round(item.strength)))
+    : DEFAULT_COLOR_STRENGTH
   return {
     id: item.id,
     type: 'color',
     x: item.x,
     y: item.y,
     width: item.width,
-    targetColor,
+    colors,
     strength,
     outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
     outputImages,
@@ -278,7 +282,7 @@ function toValidColorNode(item: unknown): CanvasBoardStateColorNode | null {
 function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
   if (!isObject(item)) return null
   if (!isFiniteNumber(item.id)) return null
-  const fromNodeType =
+  const rawFromNodeType =
     item.fromNodeType === 'image' ||
     item.fromNodeType === 'prompt' ||
     item.fromNodeType === 'mask' ||
@@ -291,11 +295,10 @@ function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
     item.fromNodeType === 'enhance' ||
     item.fromNodeType === 'tryon' ||
     item.fromNodeType === 'faceswap' ||
-    item.fromNodeType === 'palette' ||
     item.fromNodeType === 'generate'
       ? item.fromNodeType
       : null
-  const toNodeType =
+  const rawToNodeType =
     item.toNodeType === 'image' ||
     item.toNodeType === 'prompt' ||
     item.toNodeType === 'mask' ||
@@ -308,26 +311,25 @@ function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
     item.toNodeType === 'enhance' ||
     item.toNodeType === 'tryon' ||
     item.toNodeType === 'faceswap' ||
-    item.toNodeType === 'palette' ||
     item.toNodeType === 'generate'
       ? item.toNodeType
       : null
   const fromPort =
-    item.fromPort === 'image' || item.fromPort === 'mask' || item.fromPort === 'prompt' || item.fromPort === 'imageA' || item.fromPort === 'imageB' || item.fromPort === 'reference'
+    item.fromPort === 'image' || item.fromPort === 'mask' || item.fromPort === 'prompt' || item.fromPort === 'imageA' || item.fromPort === 'imageB'
       ? item.fromPort
       : null
   const toPort =
-    item.toPort === 'image' || item.toPort === 'mask' || item.toPort === 'prompt' || item.toPort === 'imageA' || item.toPort === 'imageB' || item.toPort === 'reference'
+    item.toPort === 'image' || item.toPort === 'mask' || item.toPort === 'prompt' || item.toPort === 'imageA' || item.toPort === 'imageB'
       ? item.toPort
       : null
-  if (!fromNodeType || !toNodeType || !fromPort || !toPort) return null
+  if (!rawFromNodeType || !rawToNodeType || !fromPort || !toPort) return null
   if (!isFiniteNumber(item.fromNodeId) || !isFiniteNumber(item.toNodeId)) return null
   return {
     id: item.id,
-    fromNodeType,
+    fromNodeType: rawFromNodeType,
     fromNodeId: item.fromNodeId,
     fromPort,
-    toNodeType,
+    toNodeType: rawToNodeType,
     toNodeId: item.toNodeId,
     toPort,
   }
@@ -362,21 +364,16 @@ function toValidFusionNode(item: unknown): CanvasBoardStateFusionNode | null {
   if (!isFiniteNumber(item.id)) return null
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
-  const mode =
-    item.mode === 'style-fusion' ||
-    item.mode === 'pattern-fusion-creative' ||
-    item.mode === 'pattern-fusion-style' ||
-    item.mode === 'craft-fusion-creative' ||
-    item.mode === 'craft-fusion-style'
-      ? item.mode
-      : 'style-fusion'
+  const blendRatio = isFiniteNumber(item.blendRatio)
+    ? Math.max(0, Math.min(100, Math.round(item.blendRatio)))
+    : 50
   return {
     id: item.id,
     type: 'fusion',
     x: item.x,
     y: item.y,
     width: item.width,
-    mode,
+    blendRatio,
     outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
     outputImages,
   }
@@ -461,37 +458,6 @@ function toValidFaceSwapNode(item: unknown): CanvasBoardStateFaceSwapNode | null
   }
 }
 
-function toValidPaletteNode(item: unknown): CanvasBoardStatePaletteNode | null {
-  if (!isObject(item)) return null
-  if (item.type !== 'palette') return null
-  if (!isFiniteNumber(item.id)) return null
-  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
-  const outputImages = readOutputImages(item)
-  const mode =
-    item.mode === 'men' ||
-    item.mode === 'kids' ||
-    item.mode === 'reference'
-      ? item.mode
-      : 'women'
-  const rawColors = Array.isArray(item.colors) ? item.colors : []
-  const colors = rawColors
-    .filter((color): color is string => typeof color === 'string')
-    .map(color => color.trim().toUpperCase())
-    .filter(color => /^#[0-9A-F]{6}$/.test(color))
-    .slice(0, 8)
-  return {
-    id: item.id,
-    type: 'palette',
-    x: item.x,
-    y: item.y,
-    width: item.width,
-    mode,
-    colors,
-    outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
-    outputImages,
-  }
-}
-
 function toValidGenerateNode(item: unknown): CanvasBoardStateGenerateNode | null {
   if (!isObject(item)) return null
   if (item.type !== 'generate') return null
@@ -555,7 +521,6 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
   const rawEnhanceNodes = Array.isArray(item.enhanceNodes) ? item.enhanceNodes : []
   const rawTryOnNodes = Array.isArray(item.tryOnNodes) ? item.tryOnNodes : []
   const rawFaceSwapNodes = Array.isArray(item.faceSwapNodes) ? item.faceSwapNodes : []
-  const rawPaletteNodes = Array.isArray(item.paletteNodes) ? item.paletteNodes : []
   const rawGenerateNodes = Array.isArray(item.generateNodes) ? item.generateNodes : []
   const rawConnections = Array.isArray(item.connections) ? item.connections : []
   return {
@@ -572,7 +537,6 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
     enhanceNodes: rawEnhanceNodes.map(toValidEnhanceNode).filter((n): n is CanvasBoardStateEnhanceNode => !!n),
     tryOnNodes: rawTryOnNodes.map(toValidTryOnNode).filter((n): n is CanvasBoardStateTryOnNode => !!n),
     faceSwapNodes: rawFaceSwapNodes.map(toValidFaceSwapNode).filter((n): n is CanvasBoardStateFaceSwapNode => !!n),
-    paletteNodes: rawPaletteNodes.map(toValidPaletteNode).filter((n): n is CanvasBoardStatePaletteNode => !!n),
     generateNodes: rawGenerateNodes.map(toValidGenerateNode).filter((n): n is CanvasBoardStateGenerateNode => !!n),
     connections: rawConnections.map(toValidConnection).filter((n): n is CanvasBoardStateConnection => !!n),
     viewport: toValidViewport(item.viewport),

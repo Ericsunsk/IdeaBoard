@@ -11,7 +11,6 @@ import type {
   MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
-  PaletteNodeItem,
   PromptNodeItem,
   GenerateNodeItem,
   TryOnNodeItem,
@@ -36,7 +35,6 @@ export interface UseCanvasEditorOptions {
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
   faceSwapNodes: Ref<FaceSwapNodeItem[]>
-  paletteNodes: Ref<PaletteNodeItem[]>
   generateNodes: Ref<GenerateNodeItem[]>
   activeTool: Ref<string>
   showStyleStrengthControl: Ref<boolean>
@@ -48,10 +46,8 @@ export interface UseCanvasEditorOptions {
   setBoardMenuOpen: (visible: boolean) => void
   isBoardRenaming: () => boolean
   isLeaveConfirmVisible: () => boolean
-  activeColorPopoverNodeId: () => number | null
   confirmBoardRename: () => void
   resolveLeaveConfirm: (decision: 'save' | 'discard' | 'cancel') => void
-  closeColorPopover: () => void
   updateZoom: (delta: number, anchor?: { clientX: number; clientY: number }) => void
   getCanvasPointFromClient: (clientX: number, clientY: number) => CanvasPoint
   createCanvasImageAt: (point: CanvasPoint, url: string, ratio?: number) => CanvasImageItem
@@ -73,7 +69,6 @@ export interface UseCanvasEditorOptions {
   deleteEnhanceNode: (id: number) => void
   deleteTryOnNode: (id: number) => void
   deleteFaceSwapNode: (id: number) => void
-  deletePaletteNode: (id: number) => void
   deleteGenerateNode: (id: number) => void
   hasSelectedConnection?: () => boolean
   clearSelectedConnection?: () => void

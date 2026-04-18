@@ -35,14 +35,14 @@
       />
     </label>
     <label class="node-color-popover-control">
-      <span>Lightness</span>
+      <span>Brightness</span>
       <input
-        :value="lightness"
+        :value="brightness"
         class="node-color-popover-range"
         type="range"
         min="0"
         max="100"
-        @input="emit('lightness-input', toNumber(($event.target as HTMLInputElement).value, lightness))"
+        @input="emit('brightness-input', toNumber(($event.target as HTMLInputElement).value, brightness))"
       />
     </label>
     <div
@@ -73,7 +73,7 @@ defineProps<{
   hex: string
   hue: number
   saturation: number
-  lightness: number
+  brightness: number
   spectrumStyle: Record<string, string>
   cursorStyle: Record<string, string>
   quickSwatches: string[]
@@ -84,7 +84,7 @@ const emit = defineEmits<{
   (e: 'hex-commit'): void
   (e: 'hue-input', value: number): void
   (e: 'saturation-input', value: number): void
-  (e: 'lightness-input', value: number): void
+  (e: 'brightness-input', value: number): void
   (e: 'spectrum-pointerdown', event: PointerEvent): void
   (e: 'select-swatch', value: string): void
   (e: 'set-spectrum-ref', value: HTMLElement | null): void

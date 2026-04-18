@@ -1,28 +1,29 @@
 import { computed, onUnmounted, ref } from 'vue'
 import {
   clampColorValue,
+  DEFAULT_COLOR_HEX,
   DEFAULT_COLOR_SWATCHES,
   hexToRgb,
-  hslToRgb,
+  hsvToRgb,
   normalizeHexColor,
   rgbToHex,
-  rgbToHsl,
+  rgbToHsv,
 } from '../components/canvas/nodes/colorPopoverUtils'
 import { pickHexColor } from '../utils/eyedropper'
 
 interface UseColorPickerStateOptions {
   initialHex?: string
-  syncHslOnHexInput?: boolean
+  syncHsvOnHexInput?: boolean
   onColorChange?: (hex: string) => void
 }
 
 export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
   const quickSwatches = DEFAULT_COLOR_SWATCHES
   const spectrumRef = ref<HTMLElement | HTMLElement[] | null>(null)
-  const hex = ref('#A3E635')
+  const hex = ref(DEFAULT_COLOR_HEX)
   const hue = ref(84)
   const saturation = ref(78)
-  const lightness = ref(56)
+  const brightness = ref(89)
   let activePointerId: number | null = null
 
   function notifyColorChange(value: string) {
@@ -32,20 +33,20 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
   function syncFromHex(value: string, notifyChange = false) {
     const normalized = normalizeHexColor(value)
     const { r, g, b } = hexToRgb(normalized)
-    const hsl = rgbToHsl(r, g, b)
+    const hsv = rgbToHsv(r, g, b)
     hex.value = normalized
-    hue.value = hsl.h
-    saturation.value = hsl.s
-    lightness.value = hsl.l
+    hue.value = hsv.h
+    saturation.value = hsv.s
+    brightness.value = hsv.v
     if (notifyChange) notifyColorChange(normalized)
     return normalized
   }
 
-  function applyCurrentHsl(notifyChange = true) {
+  function applyCurrentHsv(notifyChange = true) {
     hue.value = clampColorValue(hue.value, 0, 360)
     saturation.value = clampColorValue(saturation.value, 0, 100)
-    lightness.value = clampColorValue(lightness.value, 0, 100)
-    const rgb = hslToRgb(hue.value, saturation.value, lightness.value)
+    brightness.value = clampColorValue(brightness.value, 0, 100)
+    const rgb = hsvToRgb(hue.value, saturation.value, brightness.value)
     const normalized = rgbToHex(rgb.r, rgb.g, rgb.b)
     hex.value = normalized
     if (notifyChange) notifyColorChange(normalized)
@@ -58,7 +59,7 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
     hex.value = display.slice(0, 7)
     if (!/^#?[0-9A-F]{6}$/.test(raw)) return null
     const normalized = normalizeHexColor(raw)
-    if (options.syncHslOnHexInput) {
+    if (options.syncHsvOnHexInput) {
       return syncFromHex(normalized, true)
     }
     hex.value = normalized
@@ -66,7 +67,7 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
     return normalized
   }
 
-  function commitHex(fallbackHex = '#A3E635') {
+  function commitHex(fallbackHex = DEFAULT_COLOR_HEX) {
     const raw = hex.value.trim().toUpperCase()
     if (/^#?[0-9A-F]{6}$/.test(raw)) {
       return syncFromHex(raw, true)
@@ -88,8 +89,8 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
     const xRatio = clampColorValue((clientX - rect.left) / rect.width, 0, 1)
     const yRatio = clampColorValue((clientY - rect.top) / rect.height, 0, 1)
     saturation.value = Math.round(xRatio * 100)
-    lightness.value = Math.round((1 - yRatio) * 100)
-    return applyCurrentHsl(true)
+    brightness.value = Math.round((1 - yRatio) * 100)
+    return applyCurrentHsv(true)
   }
 
   function onSpectrumPointerMove(event: PointerEvent) {
@@ -126,17 +127,17 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
 
   function setHue(value: number) {
     hue.value = value
-    return applyCurrentHsl(true)
+    return applyCurrentHsv(true)
   }
 
   function setSaturation(value: number) {
     saturation.value = value
-    return applyCurrentHsl(true)
+    return applyCurrentHsv(true)
   }
 
-  function setLightness(value: number) {
-    lightness.value = value
-    return applyCurrentHsl(true)
+  function setBrightness(value: number) {
+    brightness.value = value
+    return applyCurrentHsv(true)
   }
 
   async function pickEyeDropperColor(fallbackHex: string) {
@@ -150,10 +151,10 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
 
   const cursorStyle = computed(() => ({
     left: `${saturation.value}%`,
-    top: `${100 - lightness.value}%`,
+    top: `${100 - brightness.value}%`,
   }))
 
-  syncFromHex(options.initialHex ?? '#A3E635', false)
+  syncFromHex(options.initialHex ?? DEFAULT_COLOR_HEX, false)
 
   onUnmounted(() => {
     stopSpectrumDragging()
@@ -163,7 +164,7 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
     hex,
     hue,
     saturation,
-    lightness,
+    brightness,
     quickSwatches,
     spectrumStyle,
     cursorStyle,
@@ -172,7 +173,7 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
     commitHex,
     setHue,
     setSaturation,
-    setLightness,
+    setBrightness,
     setSpectrumRef,
     onSpectrumPointerDown,
     pickEyeDropperColor,

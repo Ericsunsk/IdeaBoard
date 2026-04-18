@@ -1,3 +1,5 @@
+import { DEFAULT_COLOR_HEX } from '../components/canvas/nodes/colorPopoverUtils'
+
 export interface CanvasPoint {
   x: number
   y: number
@@ -14,6 +16,9 @@ export interface CanvasImageItem {
 }
 
 export type WorkflowNodeOutputStatus = 'idle' | 'ready' | 'stale'
+export const DEFAULT_COLOR_STRENGTH = 70
+export const MAX_COLOR_NODE_SWATCHES = 8
+export const DEFAULT_COLOR_NODE_COLOR = DEFAULT_COLOR_HEX
 
 export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = ['idle', 'ready', 'stale']
 
@@ -117,7 +122,7 @@ export interface ColorNodeItem {
   x: number
   y: number
   width: number
-  targetColor: string
+  colors: string[]
   strength: number
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
@@ -140,12 +145,7 @@ export interface FusionNodeItem {
   x: number
   y: number
   width: number
-  mode:
-    | 'style-fusion'
-    | 'pattern-fusion-creative'
-    | 'pattern-fusion-style'
-    | 'craft-fusion-creative'
-    | 'craft-fusion-style'
+  blendRatio: number
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }
@@ -190,16 +190,25 @@ export interface FaceSwapNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export interface PaletteNodeItem {
-  id: number
-  type: 'palette'
-  x: number
-  y: number
-  width: number
-  mode: 'women' | 'men' | 'kids' | 'reference'
-  colors: string[]
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
+export function normalizeColorNodeColors(colors: readonly string[] | null | undefined): string[] {
+  return Array.from(new Set(
+    (colors ?? [])
+      .map(color => color.trim().toUpperCase())
+      .filter(color => /^#?[0-9A-F]{6}$/.test(color))
+      .map(color => (color.startsWith('#') ? color : `#${color}`)),
+  )).slice(0, MAX_COLOR_NODE_SWATCHES)
+}
+
+export function hasColorNodeColors(node: { colors?: readonly string[] | null }) {
+  return (node.colors?.length ?? 0) > 0
+}
+
+export function isColorNodePlaceholderState(node: { colors?: readonly string[] | null }) {
+  return (node.colors?.length ?? 0) === 1 && normalizeColorNodeColors(node.colors)[0] === DEFAULT_COLOR_NODE_COLOR
+}
+
+export function isColorSingleColorMode(node: { colors?: readonly string[] | null }) {
+  return (node.colors?.length ?? 0) === 1
 }
 
 export interface GenerateNodeItem {
@@ -227,7 +236,6 @@ export type CanvasExecutionOutputNodeType =
   | 'enhance'
   | 'tryon'
   | 'faceswap'
-  | 'palette'
   | 'generate'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
@@ -240,7 +248,6 @@ export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType
   'enhance',
   'tryon',
   'faceswap',
-  'palette',
   'generate',
 ]
 
@@ -258,7 +265,6 @@ export type CanvasExecutionOutputNodeItem =
   | EnhanceNodeItem
   | TryOnNodeItem
   | FaceSwapNodeItem
-  | PaletteNodeItem
   | GenerateNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
@@ -278,9 +284,8 @@ export type CanvasConnectionNodeType =
   | 'enhance'
   | 'tryon'
   | 'faceswap'
-  | 'palette'
   | 'generate'
-export type CanvasConnectionPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB' | 'reference'
+export type CanvasConnectionPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
 
 export interface CanvasConnection {
   id: number
@@ -305,7 +310,6 @@ export type CanvasNodeItem =
   | EnhanceNodeItem
   | TryOnNodeItem
   | FaceSwapNodeItem
-  | PaletteNodeItem
   | GenerateNodeItem
 
 export interface CanvasViewportState {
@@ -328,7 +332,6 @@ export interface CanvasBoardSnapshot {
   enhanceNodes: EnhanceNodeItem[]
   tryOnNodes: TryOnNodeItem[]
   faceSwapNodes: FaceSwapNodeItem[]
-  paletteNodes: PaletteNodeItem[]
   generateNodes: GenerateNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState

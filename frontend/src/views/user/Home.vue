@@ -325,53 +325,27 @@
       />
 
       <HomeCanvasNodesExecution
-        :color-nodes="colorNodes"
         :edit-nodes="editNodes"
         :fusion-nodes="fusionNodes"
         :enhance-nodes="enhanceNodes"
         :try-on-nodes="tryOnNodes"
         :face-swap-nodes="faceSwapNodes"
-        :palette-nodes="paletteNodes"
+        :color-nodes="colorNodes"
         :generate-nodes="generateNodes"
         :generating="generating"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
-        :get-color-node-ui-state="getColorNodeUiState"
         :get-edit-node-ui-state="getEditNodeUiState"
         :get-fusion-node-ui-state="getFusionNodeUiState"
         :get-enhance-node-ui-state="getEnhanceNodeUiState"
         :get-try-on-node-ui-state="getTryOnNodeUiState"
         :get-face-swap-node-ui-state="getFaceSwapNodeUiState"
-        :get-palette-node-ui-state="getPaletteNodeUiState"
+        :get-color-node-ui-state="getColorNodeUiState"
         :get-generate-node-ui-state="getGenerateNodeUiState"
         :get-node-connection-error-ports="getNodeConnectionErrorPorts"
-        :active-color-popover-node-id="activeColorPopoverNodeId"
-        :color-popover-hex="colorPopoverHex"
-        :color-popover-hue="colorPopoverHue"
-        :color-popover-saturation="colorPopoverSaturation"
-        :color-popover-lightness="colorPopoverLightness"
-        :color-spectrum-style="colorSpectrumStyle"
-        :color-spectrum-cursor-style="colorSpectrumCursorStyle"
-        :color-quick-swatches="colorQuickSwatches"
         :get-generate-style-options="getGenerateStyleOptions"
         :is-generate-style-loading="isGenerateStyleLoading"
-        @color-node-mousedown="(event, node) => onColorNodeMouseDown(event, node)"
-        @color-delete="deleteColorNode"
-        @color-toggle-popover="toggleColorPopover"
-        @color-target-color-change="(node, value) => onColorNodeTargetColorChange(node, value)"
-        @color-strength-input="onColorNodeStrengthInput"
-        @color-popover-hex-input="onColorPopoverHexInput"
-        @color-popover-hex-commit="commitColorPopoverHex"
-        @color-popover-hue-input="onColorPopoverHueChange"
-        @color-popover-saturation-input="onColorPopoverSaturationChange"
-        @color-popover-lightness-input="onColorPopoverLightnessChange"
-        @color-spectrum-pointerdown="onColorSpectrumPointerDown"
-        @color-select-swatch="setColorPopoverHex"
-        @color-eyedropper="onColorNodeEyedropperClick"
-        @color-generate="handleColorNodeGenerate"
-        @color-set-spectrum-ref="setColorSpectrumRef"
-        @color-port-mousedown="onColorNodePortMouseDown"
         @edit-node-mousedown="(event, node) => onEditNodeMouseDown(event, node)"
         @edit-delete="deleteEditNode"
         @edit-update-mode="onEditNodeUpdateMode"
@@ -379,7 +353,7 @@
         @edit-port-mousedown="onEditNodePortMouseDown"
         @fusion-node-mousedown="(event, node) => onFusionNodeMouseDown(event, node)"
         @fusion-delete="deleteFusionNode"
-        @fusion-update-mode="onFusionNodeUpdateMode"
+        @fusion-update-blend-ratio="onFusionNodeUpdateBlendRatio"
         @fusion-generate="handleFusionNodeGenerate"
         @fusion-port-mousedown="onFusionNodePortMouseDown"
         @enhance-node-mousedown="(event, node) => onEnhanceNodeMouseDown(event, node)"
@@ -404,14 +378,14 @@
         @faceswap-delete="deleteFaceSwapNode"
         @faceswap-generate="handleFaceSwapNodeGenerate"
         @faceswap-port-mousedown="onFaceSwapNodePortMouseDown"
-        @palette-node-mousedown="(event, node) => onPaletteNodeMouseDown(event, node)"
-        @palette-delete="deletePaletteNode"
-        @palette-update-mode="onPaletteNodeUpdateMode"
-        @palette-apply-preset="onPaletteNodeApplyPreset"
-        @palette-remove-color="(node, index) => removePaletteColor(node, index)"
-        @palette-add-color="(node, value) => addPaletteColor(node, value)"
-        @palette-generate="handlePaletteNodeGenerate"
-        @palette-port-mousedown="onPaletteNodePortMouseDown"
+        @color-node-mousedown="(event, node) => onColorNodeMouseDown(event, node)"
+        @color-delete="deleteColorNode"
+        @color-apply-preset="onColorNodeApplyPreset"
+        @color-remove-color="(node, index) => removeColorNodeColor(node, index)"
+        @color-add-color="(node, value) => addColorNodeColor(node, value)"
+        @color-strength-input="onColorNodeStrengthInput"
+        @color-generate="handleColorNodeGenerate"
+        @color-port-mousedown="onColorNodePortMouseDown"
         @generate-node-mousedown="(event, node) => onGenerateNodeMouseDown(event, node)"
         @generate-delete="deleteGenerateNode"
         @generate-update-mode="onGenerateNodeUpdateMode"
@@ -567,7 +541,6 @@ import { useCanvasEditor } from '../../composables/useCanvasEditor'
 import { useCanvasHistory } from '../../composables/useCanvasHistory'
 import { useCanvasNodeConnections } from '../../composables/useCanvasNodeConnections'
 import { useCanvasNodeUiState } from '../../composables/useCanvasNodeUiState'
-import { useColorNode } from '../../composables/useColorNode'
 import { useCanvasDirectActions, type SegType } from '../../composables/useCanvasDirectActions'
 import { useGenerationPipeline } from '../../composables/useGenerationPipeline'
 import { useImageNode } from '../../composables/useImageNode'
@@ -587,14 +560,13 @@ import {
   VIEWPOINT_LIGHTING_LABELS,
   VIEWPOINT_OPTIONS_BY_CATEGORY,
 } from '../../components/canvas/nodes/nodeOptionConfig'
+import { normalizeHexColor } from '../../components/canvas/nodes/colorPopoverUtils'
 import {
   enhanceModeSupportsPrompt,
-  paletteModeUsesReference,
 } from '../../config/canvasNodeConnectionContract'
 import { isCanvasConnectionAllowed } from '../../config/canvasConnections'
 import {
   createCanvasImageItemAt,
-  createColorNodeAt,
   createEnhanceNodeAt,
   createEditNodeAt,
   createFusionNodeAt,
@@ -604,13 +576,17 @@ import {
   createMannequinNodeAt,
   createMaskNodeAt,
   createModelNodeAt,
-  createPaletteNodeAt,
+  createColorNodeAt,
   createPromptNodeAt,
   createTryOnNodeAt,
   createViewpointNodeAt,
 } from '../../utils/canvasNodeFactory'
 import {
+  DEFAULT_COLOR_STRENGTH,
   isCanvasExecutionOutputNodeType,
+  isColorNodePlaceholderState,
+  MAX_COLOR_NODE_SWATCHES,
+  normalizeColorNodeColors,
   resolveWorkflowNodeOutputStatus,
 } from '../../types/canvasNodes'
 import type {
@@ -632,7 +608,6 @@ import type {
   MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
-  PaletteNodeItem,
   PromptNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
@@ -705,7 +680,6 @@ const editNodes = ref<EditNodeItem[]>([])
 const fusionNodes = ref<FusionNodeItem[]>([])
 const tryOnNodes = ref<TryOnNodeItem[]>([])
 const faceSwapNodes = ref<FaceSwapNodeItem[]>([])
-const paletteNodes = ref<PaletteNodeItem[]>([])
 const generateNodes = ref<GenerateNodeItem[]>([])
 const executionNodeWatchSources = [
   modelNodes,
@@ -717,7 +691,6 @@ const executionNodeWatchSources = [
   fusionNodes,
   tryOnNodes,
   faceSwapNodes,
-  paletteNodes,
   generateNodes,
 ] as const
 const connections = ref<CanvasConnection[]>([])
@@ -731,8 +704,6 @@ const styleInnovateStrengthPct = computed(() => (styleInnovateStrength.value / 1
 const suppressStyleInnovateClick = ref(false)
 const canvasImageRefs = new Map<number, HTMLImageElement>()
 const styleStrengthMenuGap = 16
-const colorQuickSwatches = ['#A3E635', '#7A6BD5', '#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#111827', '#F3F4F6']
-const paletteReferenceExtractingIds = ref<number[]>([])
 const generateStyleOptions = ref<Record<string, string[]>>({})
 const generateStyleLoading = ref<Record<string, boolean>>({})
 
@@ -765,39 +736,6 @@ const editModeMeta = {
   },
 } as const
 
-const fusionModeMeta = {
-  'style-fusion': {
-    feature: 'style-fusion',
-    promptPrefix: '[style-fusion]',
-    fallbackPrompt: '风格融合',
-    successLabel: 'Style fusion',
-  },
-  'pattern-fusion-creative': {
-    feature: 'pattern-fusion-creative',
-    promptPrefix: '[pattern-fusion-creative]',
-    fallbackPrompt: '图案创意融合',
-    successLabel: 'Pattern fusion',
-  },
-  'pattern-fusion-style': {
-    feature: 'pattern-fusion-style',
-    promptPrefix: '[pattern-fusion-style]',
-    fallbackPrompt: '图案画风融合',
-    successLabel: 'Pattern fusion',
-  },
-  'craft-fusion-creative': {
-    feature: 'craft-fusion-creative',
-    promptPrefix: '[craft-fusion-creative]',
-    fallbackPrompt: '工艺创意融合',
-    successLabel: 'Craft fusion',
-  },
-  'craft-fusion-style': {
-    feature: 'craft-fusion-style',
-    promptPrefix: '[craft-fusion-style]',
-    fallbackPrompt: '工艺画风融合',
-    successLabel: 'Craft fusion',
-  },
-} as const
-
 const tryOnModeMeta = {
   'fabric-on-body': {
     feature: 'fabric-on-body',
@@ -808,25 +746,6 @@ const tryOnModeMeta = {
     feature: 'pattern-on-body',
     promptPrefix: '[pattern-on-body]',
     successLabel: 'Pattern try-on',
-  },
-} as const
-
-const paletteModeMeta = {
-  women: {
-    colorType: 'women',
-    label: '女装',
-  },
-  men: {
-    colorType: 'men',
-    label: '男装',
-  },
-  kids: {
-    colorType: 'kids',
-    label: '童装',
-  },
-  reference: {
-    colorType: 'reference',
-    label: '参考图',
   },
 } as const
 
@@ -924,7 +843,6 @@ const {
   activeEnhanceNodeId,
   activeTryOnNodeId,
   activeFaceSwapNodeId,
-  activePaletteNodeId,
   activeGenerateNodeId,
   nodeContextMenu,
   isSelecting,
@@ -941,7 +859,6 @@ const {
   activateEnhanceNode,
   activateTryOnNode,
   activateFaceSwapNode,
-  activatePaletteNode,
   activateGenerateNode,
   isNodeSelected,
   isNodeDragging,
@@ -957,13 +874,12 @@ const {
   onMannequinNodeMouseDown,
   onViewpointNodeMouseDown,
   onMaskNodeMouseDown,
-  onColorNodeMouseDown,
   onEditNodeMouseDown,
   onFusionNodeMouseDown,
   onEnhanceNodeMouseDown,
   onTryOnNodeMouseDown,
   onFaceSwapNodeMouseDown,
-  onPaletteNodeMouseDown,
+  onColorNodeMouseDown,
   onGenerateNodeMouseDown,
   onResizeMouseDown,
   readNodeImageDropPayload,
@@ -986,7 +902,6 @@ const {
   fusionNodes,
   tryOnNodes,
   faceSwapNodes,
-  paletteNodes,
   generateNodes,
   activeTool,
   showStyleStrengthControl,
@@ -1000,10 +915,8 @@ const {
   },
   isBoardRenaming: () => isRenamingBoard.value,
   isLeaveConfirmVisible: () => leaveConfirmVisible.value,
-  activeColorPopoverNodeId: () => activeColorPopoverNodeId.value,
   confirmBoardRename: () => confirmBoardRename(),
   resolveLeaveConfirm: (decision) => resolveLeaveConfirm(decision),
-  closeColorPopover: () => closeColorPopover(),
   updateZoom,
   getCanvasPointFromClient,
   createCanvasImageAt: createCanvasImageItemAt,
@@ -1025,7 +938,6 @@ const {
   deleteFusionNode,
   deleteTryOnNode,
   deleteFaceSwapNode,
-  deletePaletteNode,
   deleteGenerateNode,
   hasSelectedConnection,
   clearSelectedConnection,
@@ -1037,42 +949,6 @@ const {
   message,
   nodeImageDragMime,
 })
-
-const {
-  activeColorPopoverNodeId,
-  colorPopoverHex,
-  colorPopoverHue,
-  colorPopoverSaturation,
-  colorPopoverLightness,
-  setColorSpectrumRef,
-  colorSpectrumStyle,
-  colorSpectrumCursorStyle,
-  normalizeHexColor,
-  setColorPopoverHex,
-  applyColorPopoverToNode,
-  closeColorPopover,
-  toggleColorPopover,
-  onColorSpectrumPointerDown,
-  onColorPopoverHexInput,
-  commitColorPopoverHex,
-  onColorNodeTargetColorChange,
-  onColorNodeEyedropperClick,
-} = useColorNode({
-  colorNodes,
-  message,
-})
-
-function setColorPopoverHueValue(value: number) {
-  colorPopoverHue.value = value
-}
-
-function setColorPopoverSaturationValue(value: number) {
-  colorPopoverSaturation.value = value
-}
-
-function setColorPopoverLightnessValue(value: number) {
-  colorPopoverLightness.value = value
-}
 
 const {
   getMaskCanvasWidth,
@@ -1212,6 +1088,17 @@ function setWorkflowNodeOutputStatus(
 
 function cloneNodeOutputImages(outputs: { url: string; ratio: number }[]) {
   return outputs.map(output => ({ ...output }))
+}
+
+function toNormalizedColorNode(node: ColorNodeItem): ColorNodeItem {
+  const colors = normalizeColorNodeColors(node.colors.map(color => normalizeHexColor(color)))
+  return {
+    ...node,
+    outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+    colors,
+    strength: Math.max(0, Math.min(100, Math.round(node.strength ?? DEFAULT_COLOR_STRENGTH))),
+    outputImages: cloneNodeOutputImages(node.outputImages),
+  }
 }
 
 function markExecutionNodeDirty(
@@ -1364,7 +1251,6 @@ function resetEditorState() {
   fusionNodes.value = []
   tryOnNodes.value = []
   faceSwapNodes.value = []
-  paletteNodes.value = []
   generateNodes.value = []
   connections.value = []
   processedMaskPreviewUrls.value = {}
@@ -1441,7 +1327,10 @@ function buildExecutionInputSignatureMap(): Record<string, string> {
   })
 
   colorNodes.value.forEach((node) => {
-    result[`color:${node.id}`] = [node.targetColor, String(node.strength)].join('|')
+    result[`color:${node.id}`] = [
+      node.colors.join(','),
+      String(node.strength),
+    ].join('|')
   })
 
   editNodes.value.forEach((node) => {
@@ -1449,7 +1338,7 @@ function buildExecutionInputSignatureMap(): Record<string, string> {
   })
 
   fusionNodes.value.forEach((node) => {
-    result[`fusion:${node.id}`] = node.mode
+    result[`fusion:${node.id}`] = String(node.blendRatio)
   })
 
   enhanceNodes.value.forEach((node) => {
@@ -1474,10 +1363,6 @@ function buildExecutionInputSignatureMap(): Record<string, string> {
 
   faceSwapNodes.value.forEach((node) => {
     result[`faceswap:${node.id}`] = String(node.id)
-  })
-
-  paletteNodes.value.forEach((node) => {
-    result[`palette:${node.id}`] = [node.mode, node.colors.join(',')].join('|')
   })
 
   generateNodes.value.forEach((node) => {
@@ -1515,7 +1400,6 @@ function buildExecutionOutputSignatureMap(): Record<string, string> {
   assign('enhance', enhanceNodes.value)
   assign('tryon', tryOnNodes.value)
   assign('faceswap', faceSwapNodes.value)
-  assign('palette', paletteNodes.value)
   assign('generate', generateNodes.value)
 
   return result
@@ -1605,12 +1489,6 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
       refineAmount: clampMaskRefineAmount(node.refineAmount ?? 0),
       invertMask: !!node.invertMask,
     }))
-    colorNodes.value = state.colorNodes.map(node => ({
-      ...node,
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      strength: Math.max(0, Math.min(100, Math.round(node.strength ?? 70))),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
     enhanceNodes.value = state.enhanceNodes.map(node => ({
       ...node,
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
@@ -1624,6 +1502,7 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
     }))
     fusionNodes.value = state.fusionNodes.map(node => ({
       ...node,
+      blendRatio: Math.max(0, Math.min(100, Math.round(node.blendRatio ?? 50))),
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
@@ -1640,12 +1519,7 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
-    paletteNodes.value = state.paletteNodes.map(node => ({
-      ...node,
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      colors: [...node.colors],
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
+    colorNodes.value = state.colorNodes.map(toNormalizedColorNode)
     generateNodes.value = state.generateNodes.map(node => ({
       ...node,
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
@@ -1659,14 +1533,13 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
     connections.value = state.connections.map(connection => ({ ...connection }))
     clearSelectedConnection()
     clearConnectionDraft()
-    activeColorPopoverNodeId.value = null
     setViewport(state.viewport)
 
     await nextTick()
     maskNodes.value.forEach(node => renderMaskNodeMask(node))
     scheduleRenderedConnectionsRefresh()
     primeWorkflowCacheSignatureMaps()
-    resetHistoryBaseline?.(state)
+    resetHistoryBaseline?.(createBoardSnapshot())
   } finally {
     suspendWorkflowCacheReactions = false
   }
@@ -1696,10 +1569,7 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
     maskNodes: maskNodes.value.map(node => ({ ...node })),
-    colorNodes: colorNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
+    colorNodes: colorNodes.value.map(toNormalizedColorNode),
     enhanceNodes: enhanceNodes.value.map(node => ({
       ...node,
       outputImages: cloneNodeOutputImages(node.outputImages),
@@ -1718,11 +1588,6 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
     })),
     faceSwapNodes: faceSwapNodes.value.map(node => ({
       ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    paletteNodes: paletteNodes.value.map(node => ({
-      ...node,
-      colors: [...node.colors],
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
     generateNodes: generateNodes.value.map(node => ({
@@ -1904,7 +1769,7 @@ watch(
 )
 
 watch(
-  [messages, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, faceSwapNodes, paletteNodes, generateNodes, connections, canvasX, canvasY, zoomLevel],
+  [messages, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, faceSwapNodes, generateNodes, connections, canvasX, canvasY, zoomLevel],
   () => {
     markBoardDirty()
     notifySnapshotChanged()
@@ -1913,7 +1778,7 @@ watch(
 )
 
 watch(
-  [connections, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, faceSwapNodes, paletteNodes, generateNodes, canvasX, canvasY, zoomLevel],
+  [connections, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, faceSwapNodes, generateNodes, canvasX, canvasY, zoomLevel],
   () => {
     refreshRenderedConnections()
   },
@@ -1989,9 +1854,6 @@ function deleteImageNode(id: number) {
 
 function deleteColorNode(id: number) {
   deleteNodeFromCollection(colorNodes, 'color', id, () => {
-    if (activeColorPopoverNodeId.value === id) {
-      activeColorPopoverNodeId.value = null
-    }
     if (activeColorNodeId.value === id) {
       activeColorNodeId.value = null
     }
@@ -2035,15 +1897,6 @@ function deleteFaceSwapNode(id: number) {
     if (activeFaceSwapNodeId.value === id) {
       activeFaceSwapNodeId.value = null
     }
-  })
-}
-
-function deletePaletteNode(id: number) {
-  deleteNodeFromCollection(paletteNodes, 'palette', id, () => {
-    if (activePaletteNodeId.value === id) {
-      activePaletteNodeId.value = null
-    }
-    paletteReferenceExtractingIds.value = paletteReferenceExtractingIds.value.filter(nodeId => nodeId !== id)
   })
 }
 
@@ -2104,13 +1957,12 @@ const nodeContextMenuHandlers: Record<CanvasNodeCreateActionKey, () => void> = {
   createMannequinNode: buildNodeCreateHandler(createMannequinNodeAt, mannequinNodes, activateMannequinNode),
   createViewpointNode: buildNodeCreateHandler(createViewpointNodeAt, viewpointNodes, activateViewpointNode),
   createMaskNode: buildNodeCreateHandler(createMaskNodeAt, maskNodes, activateMaskNode),
-  createColorNode: buildNodeCreateHandler(createColorNodeAt, colorNodes, activateColorNode),
   createEditNode: buildNodeCreateHandler(createEditNodeAt, editNodes, activateEditNode),
   createFusionNode: buildNodeCreateHandler(createFusionNodeAt, fusionNodes, activateFusionNode),
   createEnhanceNode: buildNodeCreateHandler(createEnhanceNodeAt, enhanceNodes, activateEnhanceNode),
   createTryOnNode: buildNodeCreateHandler(createTryOnNodeAt, tryOnNodes, activateTryOnNode),
   createFaceSwapNode: buildNodeCreateHandler(createFaceSwapNodeAt, faceSwapNodes, activateFaceSwapNode),
-  createPaletteNode: buildNodeCreateHandler(createPaletteNodeAt, paletteNodes, activatePaletteNode),
+  createColorNode: buildNodeCreateHandler(createColorNodeAt, colorNodes, activateColorNode),
   createGenerateNode: buildNodeCreateHandler(createGenerateNodeAt, generateNodes, activateGenerateNode, (newNode) => {
     void ensureGenerateStyleOptions(newNode.mode)
   }),
@@ -2129,7 +1981,6 @@ function handleConnectionPortMouseDown(
   clearSelectedIds()
   clearSelectedConnection()
   closeNodeContextMenu()
-  closeColorPopover()
   const target = event.currentTarget as HTMLElement | null
   const direction = target?.dataset.portDirection
   if (direction === 'input') {
@@ -2146,7 +1997,6 @@ function onConnectionPathMouseDown(event: MouseEvent, connectionId: number) {
   event.stopPropagation()
   clearSelectedIds()
   closeNodeContextMenu()
-  closeColorPopover()
   clearSelectedConnection()
   selectConnection(connectionId)
 }
@@ -2318,60 +2168,6 @@ const styleCards = ref<StyleCard[]>([])
 const selectedCardIds = ref<number[]>([])
 const selectedRatio = ref('3:4')
 const selectedResolution = ref('1K')
-
-function extractDominantColors(imageUrl: string, maxColors: number): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const size = 150
-      canvas.width = size
-      canvas.height = size
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        reject(new Error('Canvas not available'))
-        return
-      }
-      ctx.drawImage(img, 0, 0, size, size)
-      const data = ctx.getImageData(0, 0, size, size).data
-      const buckets = new Map<string, number>()
-      for (let index = 0; index < data.length; index += 4) {
-        const r = data[index]
-        const g = data[index + 1]
-        const b = data[index + 2]
-        const alpha = data[index + 3]
-        if (alpha < 128) continue
-        if (r > 240 && g > 240 && b > 240) continue
-        if (r < 15 && g < 15 && b < 15) continue
-        const qr = Math.round(r / 32) * 32
-        const qg = Math.round(g / 32) * 32
-        const qb = Math.round(b / 32) * 32
-        const key = `${qr},${qg},${qb}`
-        buckets.set(key, (buckets.get(key) || 0) + 1)
-      }
-      const result: string[] = []
-      const sorted = [...buckets.entries()].sort((left, right) => right[1] - left[1])
-      for (const [key] of sorted) {
-        if (result.length >= maxColors) break
-        const [r, g, b] = key.split(',').map(Number)
-        const hex = `#${[r, g, b].map(value => value.toString(16).padStart(2, '0')).join('')}`.toUpperCase()
-        const tooClose = result.some((existing) => {
-          const er = parseInt(existing.slice(1, 3), 16)
-          const eg = parseInt(existing.slice(3, 5), 16)
-          const eb = parseInt(existing.slice(5, 7), 16)
-          return Math.abs(r - er) + Math.abs(g - eg) + Math.abs(b - eb) < 80
-        })
-        if (!tooClose) {
-          result.push(hex)
-        }
-      }
-      resolve(result)
-    }
-    img.onerror = () => reject(new Error('Failed to load image'))
-    img.src = imageUrl
-  })
-}
 
 function getImageNodeConnectionOutput(node: ImageNodeItem | null): { url: string; ratio: number } | null {
   if (!node) return null
@@ -2592,8 +2388,6 @@ function getCanvasConnectionNodeByType(
       return tryOnNodes.value.find(item => item.id === nodeId) ?? null
     case 'faceswap':
       return faceSwapNodes.value.find(item => item.id === nodeId) ?? null
-    case 'palette':
-      return paletteNodes.value.find(item => item.id === nodeId) ?? null
     case 'generate':
       return generateNodes.value.find(item => item.id === nodeId) ?? null
     default:
@@ -2637,17 +2431,6 @@ function setEnhanceNodeMode(node: EnhanceNodeItem, mode: EnhanceNodeItem['mode']
   node.mode = mode
   if (enhanceModeSupportsPrompt(mode)) return
   removeIncomingConnectionsForPort('enhance', node.id, 'prompt')
-}
-
-function setPaletteNodeMode(node: PaletteNodeItem, mode: PaletteNodeItem['mode']) {
-  const usingReferenceBefore = paletteModeUsesReference(node.mode)
-  node.mode = mode
-  if (paletteModeUsesReference(mode)) return
-
-  removeIncomingConnectionsForPort('palette', node.id, 'reference')
-  if (usingReferenceBefore) {
-    paletteReferenceExtractingIds.value = paletteReferenceExtractingIds.value.filter(item => item !== node.id)
-  }
 }
 
 function getGenerateStyleOptions(mode: GenerateNodeItem['mode']): string[] {
@@ -2725,13 +2508,13 @@ function toggleCard(id: number) {
   else selectedCardIds.value.push(id)
 }
 
-function removePaletteColor(node: PaletteNodeItem, index: number) {
+function removeColorNodeColor(node: ColorNodeItem, index: number) {
   if (index < 0 || index >= node.colors.length) return
   node.colors.splice(index, 1)
 }
 
-function addPaletteColor(node: PaletteNodeItem, rawColor: string) {
-  if (node.colors.length >= 8) {
+function addColorNodeColor(node: ColorNodeItem, rawColor: string) {
+  if (node.colors.length >= MAX_COLOR_NODE_SWATCHES) {
     message.warning('最多保留 8 种颜色')
     return
   }
@@ -2787,13 +2570,12 @@ const getModelNodeUiState = (node: ModelNodeItem) => getNodeUiState('model', nod
 const getMannequinNodeUiState = (node: MannequinNodeItem) => getNodeUiState('mannequin', node)
 const getViewpointNodeUiState = (node: ViewpointNodeItem) => getNodeUiState('viewpoint', node)
 const getMaskNodeUiState = (node: MaskNodeItem) => getNodeUiState('mask', node)
-const getColorNodeUiState = (node: ColorNodeItem) => getNodeUiState('color', node)
 const getEditNodeUiState = (node: EditNodeItem) => getNodeUiState('edit', node)
 const getFusionNodeUiState = (node: FusionNodeItem) => getNodeUiState('fusion', node)
 const getEnhanceNodeUiState = (node: EnhanceNodeItem) => getNodeUiState('enhance', node)
 const getTryOnNodeUiState = (node: TryOnNodeItem) => getNodeUiState('tryon', node)
 const getFaceSwapNodeUiState = (node: FaceSwapNodeItem) => getNodeUiState('faceswap', node)
-const getPaletteNodeUiState = (node: PaletteNodeItem) => getNodeUiState('palette', node)
+const getColorNodeUiState = (node: ColorNodeItem) => getNodeUiState('color', node)
 const getGenerateNodeUiState = (node: GenerateNodeItem) => getNodeUiState('generate', node)
 
 const onImageNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
@@ -2808,8 +2590,6 @@ const onViewpointNodePortMouseDown = (event: MouseEvent, nodeId: number, port: C
   handleConnectionPortMouseDown(event, 'viewpoint', nodeId, port)
 const onMaskNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'mask', nodeId, port)
-const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'color', nodeId, port)
 const onEditNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'edit', nodeId, port)
 const onFusionNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
@@ -2820,8 +2600,8 @@ const onTryOnNodePortMouseDown = (event: MouseEvent, nodeId: number, port: Canva
   handleConnectionPortMouseDown(event, 'tryon', nodeId, port)
 const onFaceSwapNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'faceswap', nodeId, port)
-const onPaletteNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'palette', nodeId, port)
+const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'color', nodeId, port)
 const onGenerateNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'generate', nodeId, port)
 
@@ -2857,31 +2637,12 @@ function onMaskNodeToggleInvert(node: MaskNodeItem) {
   node.invertMask = !node.invertMask
 }
 
-function onColorNodeStrengthInput(node: ColorNodeItem, value: number) {
-  node.strength = Math.max(0, Math.min(100, Math.round(value)))
-}
-
-function onColorPopoverHueChange(value: number) {
-  setColorPopoverHueValue(value)
-  applyColorPopoverToNode()
-}
-
-function onColorPopoverSaturationChange(value: number) {
-  setColorPopoverSaturationValue(value)
-  applyColorPopoverToNode()
-}
-
-function onColorPopoverLightnessChange(value: number) {
-  setColorPopoverLightnessValue(value)
-  applyColorPopoverToNode()
-}
-
 function onEditNodeUpdateMode(node: EditNodeItem, value: EditNodeItem['mode']) {
   node.mode = value
 }
 
-function onFusionNodeUpdateMode(node: FusionNodeItem, value: FusionNodeItem['mode']) {
-  node.mode = value
+function onFusionNodeUpdateBlendRatio(node: FusionNodeItem, value: number) {
+  node.blendRatio = Math.max(0, Math.min(100, Math.round(value)))
 }
 
 function onEnhanceNodeUpdateMode(node: EnhanceNodeItem, value: EnhanceNodeItem['mode']) {
@@ -2924,12 +2685,13 @@ function onTryOnNodeUpdateOpacity(node: TryOnNodeItem, value: number) {
   node.opacity = Math.max(0, Math.min(100, Math.round(value)))
 }
 
-function onPaletteNodeUpdateMode(node: PaletteNodeItem, value: PaletteNodeItem['mode']) {
-  setPaletteNodeMode(node, value)
+function onColorNodeApplyPreset(node: ColorNodeItem, value: string[]) {
+  const baseColors = isColorNodePlaceholderState(node) ? [] : node.colors
+  node.colors = normalizeColorNodeColors([...baseColors, ...value])
 }
 
-function onPaletteNodeApplyPreset(node: PaletteNodeItem, value: string[]) {
-  node.colors = [...value]
+function onColorNodeStrengthInput(node: ColorNodeItem, value: number) {
+  node.strength = Math.max(0, Math.min(100, Math.round(value)))
 }
 
 function onGenerateNodeUpdateMode(node: GenerateNodeItem, value: GenerateNodeItem['mode']) {
@@ -2956,13 +2718,12 @@ const {
   handleModelNodeGenerate,
   handleMannequinNodeGenerate,
   handleViewpointNodeGenerate,
-  handleColorNodeGenerate,
   handleEditNodeGenerate,
   handleFusionNodeGenerate,
   handleEnhanceNodeGenerate,
   handleTryOnNodeGenerate,
   handleFaceSwapNodeGenerate,
-  handlePaletteNodeGenerate,
+  handleColorNodeGenerate,
   handleGenerateNodeGenerate,
 } = useNodeExecutors({
   generating,
@@ -2975,13 +2736,10 @@ const {
   activeImageNodeId,
   activeModelNodeId,
   activeMaskNodeId,
-  paletteReferenceExtractingIds,
   modelDefaultPose,
   modelDefaultExpression,
   editModeMeta,
-  fusionModeMeta,
   tryOnModeMeta,
-  paletteModeMeta,
   generateModeMeta,
   getModelAngleLabel,
   getViewpointLabel,
@@ -3009,7 +2767,6 @@ const {
   upscaleImage: upscaleApi.upscale,
   segmentImage: segApi.segment,
   saveSegmentResult: segApi.save,
-  extractDominantColors,
   generateModeSupportsStyleModel,
 })
 

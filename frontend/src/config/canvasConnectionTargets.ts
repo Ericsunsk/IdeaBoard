@@ -16,7 +16,6 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
   'enhance',
   'tryon',
   'faceswap',
-  'palette',
   'generate',
 ] as const
 
@@ -26,7 +25,6 @@ export const CANVAS_CONNECTION_PORT_WHITELIST: readonly CanvasConnectionPort[] =
   'prompt',
   'imageA',
   'imageB',
-  'reference',
 ] as const
 
 export const CANVAS_CONNECTION_PORT_DIRECTIONS = ['input', 'output'] as const

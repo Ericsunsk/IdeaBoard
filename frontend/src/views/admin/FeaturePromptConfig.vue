@@ -69,9 +69,9 @@ const featureList = [
   { slug: 'sketch-to-design', title: 'Quick · 线稿成款' },
   { slug: 'partial-edit', title: 'Edit · 局部改款' },
   { slug: 'style-innovate', title: 'Quick · 款式创新' },
-  { slug: 'style-fusion', title: 'Fusion · 风格融合' },
-  { slug: 'series-color', title: 'Palette · 系列配色' },
-  { slug: 'directed-recolor', title: 'Color · 定向换色' },
+  { slug: 'style-fusion', title: 'Fusion · 双图融合' },
+  { slug: 'series-color', title: 'Color · 多色配色' },
+  { slug: 'directed-recolor', title: 'Color · 单色换色' },
   { slug: 'fabric-on-body', title: 'TryOn · 面料上身' },
   { slug: 'pattern-on-body', title: 'TryOn · 图案上身' },
   { slug: 'multi-angle', title: 'Model · 多角度' },
@@ -83,10 +83,6 @@ const featureList = [
   { slug: 'style-clone', title: 'Generate · 画风复刻' },
   { slug: 'seamless-tile-classic', title: 'Generate · 四方连续 Classic' },
   { slug: 'seamless-tile-cartoon', title: 'Generate · 四方连续 Cartoon' },
-  { slug: 'pattern-fusion-creative', title: 'Fusion · 图案融合 Creative' },
-  { slug: 'pattern-fusion-style', title: 'Fusion · 图案融合 Style' },
-  { slug: 'craft-fusion-creative', title: 'Fusion · 工艺融合 Creative' },
-  { slug: 'craft-fusion-style', title: 'Fusion · 工艺融合 Style' },
   { slug: 'pattern-inpaint', title: 'Edit · 图案涂改' },
   { slug: 'pattern-upscale', title: 'Enhance · 图案变清晰' },
   { slug: 'to-vector', title: 'Quick · 转矢量图' },
@@ -105,15 +101,16 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{strength}}', desc: '改变幅度分数（1-10）' },
     { key: '{{user_prompt}}', desc: '当前提交的描述文本' },
   ],
-  'style-fusion': promptVars,
   'series-color': [
-    { key: '{{color_type}}', desc: '配色类型（women/men/kids/reference）' },
-    { key: '{{colors}}', desc: '用户选择的配色列表（如 #8b3a3a, #6b2d3e）' },
+    { key: '{{color_type}}', desc: '配色类型，当前 Color 节点多色模式固定为 reference（自定义多色配色）' },
+    { key: '{{colors}}', desc: 'Color 节点多色模式下的配色列表（如 #8b3a3a, #6b2d3e）' },
+    { key: '{{strength}}', desc: 'Color 节点多色模式的配色强度百分比（0-100）' },
+    { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词，可用来描述颜色主次、比例倾向和整体换色方向' },
   ],
   'directed-recolor': [
-    { key: '{{target_color}}', desc: '用户选择的目标颜色（如 #ff5500）' },
-    { key: '{{strength}}', desc: '换色强度百分比（0-100）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词（可选）' },
+    { key: '{{target_color}}', desc: 'Color 节点单色模式下的目标颜色（如 #ff5500）' },
+    { key: '{{strength}}', desc: 'Color 节点单色模式的换色强度百分比（0-100）' },
+    { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词（单色模式可选）' },
   ],
   'fabric-on-body': [
     { key: '{{tile_mode}}', desc: '替换方式（seamless=四方连续 / single=非四方连续）' },
@@ -160,17 +157,11 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   'seamless-tile-cartoon': [
     { key: '{{user_prompt}}', desc: '用户提示词' },
   ],
-  'pattern-fusion-creative': [
-    { key: '{{user_prompt}}', desc: '用户提示词' },
-  ],
-  'pattern-fusion-style': [
-    { key: '{{user_prompt}}', desc: '用户提示词' },
-  ],
-  'craft-fusion-creative': [
-    { key: '{{user_prompt}}', desc: '用户提示词' },
-  ],
-  'craft-fusion-style': [
-    { key: '{{user_prompt}}', desc: '用户提示词' },
+  'style-fusion': [
+    { key: '{{user_prompt}}', desc: '用于弱修饰/辅助修饰融合方式、质感、细节、氛围；Image A / Image B 主次建议通过滑块控制' },
+    { key: '{{blend_ratio}}', desc: 'Image A 占比（0-100）' },
+    { key: '{{image_a_weight}}', desc: 'Image A 实际融合百分比' },
+    { key: '{{image_b_weight}}', desc: 'Image B 实际融合百分比' },
   ],
   'pattern-inpaint': [
     { key: '{{user_prompt}}', desc: '用户提示词' },

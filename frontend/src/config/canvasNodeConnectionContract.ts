@@ -11,7 +11,6 @@ import type {
   MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
-  PaletteNodeItem,
   PromptNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
@@ -33,7 +32,6 @@ export type CanvasConnectionContractNode =
   | EnhanceNodeItem
   | TryOnNodeItem
   | FaceSwapNodeItem
-  | PaletteNodeItem
   | GenerateNodeItem
 
 export interface CanvasNodePortContract {
@@ -46,10 +44,6 @@ export interface CanvasNodePortContract {
 
 export function enhanceModeSupportsPrompt(mode: EnhanceNodeItem['mode']) {
   return mode === 'deblur' || mode === 'canvas-extend'
-}
-
-export function paletteModeUsesReference(mode: PaletteNodeItem['mode']) {
-  return mode === 'reference'
 }
 
 export function generateModeRequiresImage(mode: GenerateNodeItem['mode']) {
@@ -84,13 +78,6 @@ export function getCanvasNodePortContracts(
       return [input('image', 'image'), output('image', 'image')]
     case 'mask':
       return [input('image', 'image', true), output('mask', 'mask')]
-    case 'color':
-      return [
-        input('image', 'image', true),
-        input('mask', 'mask', true),
-        input('prompt', 'prompt'),
-        output('image', 'image'),
-      ]
     case 'model':
     case 'mannequin':
     case 'viewpoint':
@@ -127,15 +114,13 @@ export function getCanvasNodePortContracts(
         input('mask', 'mask'),
         output('image', 'image'),
       ]
-    case 'palette': {
-      const paletteNode = node as PaletteNodeItem
-      const referenceVisible = paletteModeUsesReference(paletteNode.mode)
+    case 'color':
       return [
         input('image', 'image', true),
-        input('reference', 'image', referenceVisible, referenceVisible),
+        input('mask', 'mask', true),
+        input('prompt', 'prompt'),
         output('image', 'image'),
       ]
-    }
     case 'generate': {
       const generateNode = node as GenerateNodeItem
       return [

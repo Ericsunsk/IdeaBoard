@@ -10,14 +10,13 @@ import type {
   MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
-  PaletteNodeItem,
   PromptNodeItem,
   GenerateNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
-export type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'palette' | 'generate'
+export type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'generate'
 
 export type DraggableNode =
   | ImageNodeItem
@@ -32,7 +31,6 @@ export type DraggableNode =
   | EnhanceNodeItem
   | TryOnNodeItem
   | FaceSwapNodeItem
-  | PaletteNodeItem
   | GenerateNodeItem
 
 interface UseCanvasSelectionStateOptions {
@@ -49,7 +47,6 @@ interface UseCanvasSelectionStateOptions {
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
   faceSwapNodes: Ref<FaceSwapNodeItem[]>
-  paletteNodes: Ref<PaletteNodeItem[]>
   generateNodes: Ref<GenerateNodeItem[]>
   showStyleStrengthControl: Ref<boolean>
   canvasX: Ref<number>
@@ -67,7 +64,6 @@ interface UseCanvasSelectionStateOptions {
   deleteEnhanceNode: (id: number) => void
   deleteTryOnNode: (id: number) => void
   deleteFaceSwapNode: (id: number) => void
-  deletePaletteNode: (id: number) => void
   deleteGenerateNode: (id: number) => void
 }
 
@@ -88,7 +84,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   const activeEnhanceNodeId = ref<number | null>(null)
   const activeTryOnNodeId = ref<number | null>(null)
   const activeFaceSwapNodeId = ref<number | null>(null)
-  const activePaletteNodeId = ref<number | null>(null)
   const activeGenerateNodeId = ref<number | null>(null)
 
   function clearActiveNodes() {
@@ -104,7 +99,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeEnhanceNodeId.value = null
     activeTryOnNodeId.value = null
     activeFaceSwapNodeId.value = null
-    activePaletteNodeId.value = null
     activeGenerateNodeId.value = null
   }
 
@@ -127,7 +121,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
       kind !== 'enhance' &&
       kind !== 'tryon' &&
       kind !== 'faceswap' &&
-      kind !== 'palette' &&
       kind !== 'generate'
     ) {
       return null
@@ -153,7 +146,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'enhance') return options.enhanceNodes.value.find(node => node.id === id) ?? null
     if (kind === 'tryon') return options.tryOnNodes.value.find(node => node.id === id) ?? null
     if (kind === 'faceswap') return options.faceSwapNodes.value.find(node => node.id === id) ?? null
-    if (kind === 'palette') return options.paletteNodes.value.find(node => node.id === id) ?? null
     return options.generateNodes.value.find(node => node.id === id) ?? null
   }
 
@@ -172,7 +164,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'enhance') return activeEnhanceNodeId.value === id
     if (kind === 'tryon') return activeTryOnNodeId.value === id
     if (kind === 'faceswap') return activeFaceSwapNodeId.value === id
-    if (kind === 'palette') return activePaletteNodeId.value === id
     return activeGenerateNodeId.value === id
   }
 
@@ -189,7 +180,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'enhance') return activeEnhanceNodeId.value === id
     if (kind === 'tryon') return activeTryOnNodeId.value === id
     if (kind === 'faceswap') return activeFaceSwapNodeId.value === id
-    if (kind === 'palette') return activePaletteNodeId.value === id
     return activeGenerateNodeId.value === id
   }
 
@@ -262,11 +252,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeFaceSwapNodeId.value = id
   }
 
-  function activatePaletteNode(id: number) {
-    clearActiveNodes()
-    activePaletteNodeId.value = id
-  }
-
   function activateGenerateNode(id: number) {
     clearActiveNodes()
     activeGenerateNodeId.value = id
@@ -285,7 +270,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     else if (kind === 'enhance') activateEnhanceNode(id)
     else if (kind === 'tryon') activateTryOnNode(id)
     else if (kind === 'faceswap') activateFaceSwapNode(id)
-    else if (kind === 'palette') activatePaletteNode(id)
     else activateGenerateNode(id)
   }
 
@@ -314,7 +298,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     else if (kind === 'enhance') options.deleteEnhanceNode(id)
     else if (kind === 'tryon') options.deleteTryOnNode(id)
     else if (kind === 'faceswap') options.deleteFaceSwapNode(id)
-    else if (kind === 'palette') options.deletePaletteNode(id)
     else options.deleteGenerateNode(id)
   }
 
@@ -380,10 +363,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
       options.deleteFaceSwapNode(activeFaceSwapNodeId.value)
       return true
     }
-    if (activePaletteNodeId.value !== null) {
-      options.deletePaletteNode(activePaletteNodeId.value)
-      return true
-    }
     if (activeGenerateNodeId.value !== null) {
       options.deleteGenerateNode(activeGenerateNodeId.value)
       return true
@@ -427,7 +406,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeEnhanceNodeId.value !== null ||
     activeTryOnNodeId.value !== null ||
     activeFaceSwapNodeId.value !== null ||
-    activePaletteNodeId.value !== null ||
     activeGenerateNodeId.value !== null ||
     selectedNodeKeys.value.length > 0,
   )
@@ -453,7 +431,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeEnhanceNodeId,
     activeTryOnNodeId,
     activeFaceSwapNodeId,
-    activePaletteNodeId,
     activeGenerateNodeId,
     clearActiveNodes,
     getNodeSelectionKey,
@@ -475,7 +452,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activateEnhanceNode,
     activateTryOnNode,
     activateFaceSwapNode,
-    activatePaletteNode,
     activateGenerateNode,
     activateNodeByKind,
     clearCanvasQuickActionState,

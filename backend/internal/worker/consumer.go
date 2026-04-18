@@ -392,6 +392,15 @@ func (c *Consumer) callOpenAI(account *model.ApiAccount, prompt string, width, h
 		if strength, ok := params["variation_strength"]; ok {
 			reqBody["variation_strength"] = strength
 		}
+		if blendRatio, ok := params["blend_ratio"]; ok {
+			reqBody["blend_ratio"] = blendRatio
+		}
+		if imageAWeight, ok := params["image_a_weight"]; ok {
+			reqBody["image_a_weight"] = imageAWeight
+		}
+		if imageBWeight, ok := params["image_b_weight"]; ok {
+			reqBody["image_b_weight"] = imageBWeight
+		}
 	}
 
 	bodyJSON, _ := json.Marshal(reqBody)

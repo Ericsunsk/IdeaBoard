@@ -1,3 +1,4 @@
+import { DEFAULT_COLOR_NODE_COLOR, DEFAULT_COLOR_STRENGTH } from '../types/canvasNodes'
 import type {
   CanvasImageItem,
   CanvasPoint,
@@ -10,7 +11,6 @@ import type {
   MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
-  PaletteNodeItem,
   PromptNodeItem,
   GenerateNodeItem,
   TryOnNodeItem,
@@ -124,20 +124,6 @@ export function createImageNodeAt(point: CanvasPoint): ImageNodeItem {
   }
 }
 
-export function createColorNodeAt(point: CanvasPoint): ColorNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'color',
-    x: point.x,
-    y: point.y,
-    width: 276,
-    targetColor: '#A3E635',
-    strength: 70,
-    outputStatus: 'idle',
-    outputImages: [],
-  }
-}
-
 export function createEditNodeAt(point: CanvasPoint): EditNodeItem {
   return {
     id: createCanvasEntityId(),
@@ -158,7 +144,7 @@ export function createFusionNodeAt(point: CanvasPoint): FusionNodeItem {
     x: point.x,
     y: point.y,
     width: 286,
-    mode: 'style-fusion',
+    blendRatio: 50,
     outputStatus: 'idle',
     outputImages: [],
   }
@@ -210,15 +196,15 @@ export function createFaceSwapNodeAt(point: CanvasPoint): FaceSwapNodeItem {
   }
 }
 
-export function createPaletteNodeAt(point: CanvasPoint): PaletteNodeItem {
+export function createColorNodeAt(point: CanvasPoint): ColorNodeItem {
   return {
     id: createCanvasEntityId(),
-    type: 'palette',
+    type: 'color',
     x: point.x,
     y: point.y,
     width: 286,
-    mode: 'women',
-    colors: ['#8B3A3A', '#6B2D3E'],
+    colors: [DEFAULT_COLOR_NODE_COLOR],
+    strength: DEFAULT_COLOR_STRENGTH,
     outputStatus: 'idle',
     outputImages: [],
   }

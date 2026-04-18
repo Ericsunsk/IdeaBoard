@@ -1,40 +1,4 @@
 <template>
-  <template v-for="node in colorNodes" :key="node.id">
-    <ColorNode
-      :node="node"
-      :active="isNodeSelected('color', node.id)"
-      :dragging="isNodeDragging('color', node.id)"
-      :copy-mode="copyMode"
-      :generating="generating"
-      :is-popover-open="activeColorPopoverNodeId === node.id"
-      :popover-hex="colorPopoverHex"
-      :popover-hue="colorPopoverHue"
-      :popover-saturation="colorPopoverSaturation"
-      :popover-lightness="colorPopoverLightness"
-      :spectrum-style="colorSpectrumStyle"
-      :cursor-style="colorSpectrumCursorStyle"
-      :quick-swatches="colorQuickSwatches"
-      :ui-state="getColorNodeUiState(node)"
-      :error-port-keys="getNodeConnectionErrorPorts('color', node.id)"
-      @node-mousedown="emit('color-node-mousedown', $event, node)"
-      @delete="emit('color-delete', node.id)"
-      @toggle-popover="emit('color-toggle-popover', node)"
-      @target-color-change="emit('color-target-color-change', node, $event)"
-      @strength-input="emit('color-strength-input', node, $event)"
-      @popover-hex-input="emit('color-popover-hex-input', $event)"
-      @popover-hex-commit="emit('color-popover-hex-commit')"
-      @popover-hue-input="emit('color-popover-hue-input', $event)"
-      @popover-saturation-input="emit('color-popover-saturation-input', $event)"
-      @popover-lightness-input="emit('color-popover-lightness-input', $event)"
-      @spectrum-pointerdown="emit('color-spectrum-pointerdown', $event)"
-      @select-swatch="emit('color-select-swatch', $event)"
-      @eyedropper="emit('color-eyedropper', node)"
-      @generate="emit('color-generate', node)"
-      @set-spectrum-ref="emit('color-set-spectrum-ref', $event)"
-      @port-mousedown="(event, port) => emit('color-port-mousedown', event, node.id, port)"
-    />
-  </template>
-
   <template v-for="node in editNodes" :key="node.id">
     <EditNode
       :node="node"
@@ -63,7 +27,7 @@
       :error-port-keys="getNodeConnectionErrorPorts('fusion', node.id)"
       @node-mousedown="emit('fusion-node-mousedown', $event, node)"
       @delete="emit('fusion-delete', node.id)"
-      @update:mode="emit('fusion-update-mode', node, $event)"
+      @update:blend-ratio="emit('fusion-update-blend-ratio', node, $event)"
       @generate="emit('fusion-generate', node)"
       @port-mousedown="(event, port) => emit('fusion-port-mousedown', event, node.id, port)"
     />
@@ -127,23 +91,23 @@
     />
   </template>
 
-  <template v-for="node in paletteNodes" :key="node.id">
-    <PaletteNode
+  <template v-for="node in colorNodes" :key="node.id">
+    <ColorNode
       :node="node"
-      :active="isNodeSelected('palette', node.id)"
-      :dragging="isNodeDragging('palette', node.id)"
+      :active="isNodeSelected('color', node.id)"
+      :dragging="isNodeDragging('color', node.id)"
       :copy-mode="copyMode"
       :generating="generating"
-      :ui-state="getPaletteNodeUiState(node)"
-      :error-port-keys="getNodeConnectionErrorPorts('palette', node.id)"
-      @node-mousedown="emit('palette-node-mousedown', $event, node)"
-      @delete="emit('palette-delete', node.id)"
-      @update:mode="emit('palette-update-mode', node, $event)"
-      @apply-preset="emit('palette-apply-preset', node, $event)"
-      @remove-color="emit('palette-remove-color', node, $event)"
-      @add-color="emit('palette-add-color', node, $event)"
-      @generate="emit('palette-generate', node)"
-      @port-mousedown="(event, port) => emit('palette-port-mousedown', event, node.id, port)"
+      :ui-state="getColorNodeUiState(node)"
+      :error-port-keys="getNodeConnectionErrorPorts('color', node.id)"
+      @node-mousedown="emit('color-node-mousedown', $event, node)"
+      @delete="emit('color-delete', node.id)"
+      @apply-preset="emit('color-apply-preset', node, $event)"
+      @remove-color="emit('color-remove-color', node, $event)"
+      @add-color="emit('color-add-color', node, $event)"
+      @strength-input="emit('color-strength-input', node, $event)"
+      @generate="emit('color-generate', node)"
+      @port-mousedown="(event, port) => emit('color-port-mousedown', event, node.id, port)"
     />
   </template>
 
@@ -172,87 +136,58 @@
 </template>
 
 <script setup lang="ts">
-import ColorNode from '../../../components/canvas/nodes/ColorNode.vue'
 import EditNode from '../../../components/canvas/nodes/EditNode.vue'
 import EnhanceNode from '../../../components/canvas/nodes/EnhanceNode.vue'
 import FaceSwapNode from '../../../components/canvas/nodes/FaceSwapNode.vue'
 import FusionNode from '../../../components/canvas/nodes/FusionNode.vue'
 import GenerateNode from '../../../components/canvas/nodes/GenerateNode.vue'
-import PaletteNode from '../../../components/canvas/nodes/PaletteNode.vue'
+import ColorNode from '../../../components/canvas/nodes/ColorNode.vue'
 import TryOnNode from '../../../components/canvas/nodes/TryOnNode.vue'
 import type {
-  ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
   FaceSwapNodeItem,
   FusionNodeItem,
   GenerateNodeItem,
-  PaletteNodeItem,
+  ColorNodeItem,
   TryOnNodeItem,
 } from '../../../types/canvasNodes'
 import type { NodeUiState } from '../../../types/canvasNodeUi'
 
 const props = defineProps<{
-  colorNodes: ColorNodeItem[]
   editNodes: EditNodeItem[]
   fusionNodes: FusionNodeItem[]
   enhanceNodes: EnhanceNodeItem[]
   tryOnNodes: TryOnNodeItem[]
   faceSwapNodes: FaceSwapNodeItem[]
-  paletteNodes: PaletteNodeItem[]
+  colorNodes: ColorNodeItem[]
   generateNodes: GenerateNodeItem[]
   generating: boolean
   copyMode: boolean
   isNodeSelected: (
-    kind: 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'palette' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'color' | 'generate',
     id: number,
   ) => boolean
   isNodeDragging: (
-    kind: 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'palette' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'color' | 'generate',
     id: number,
   ) => boolean
-  getColorNodeUiState: (node: ColorNodeItem) => NodeUiState | undefined
   getEditNodeUiState: (node: EditNodeItem) => NodeUiState | undefined
   getFusionNodeUiState: (node: FusionNodeItem) => NodeUiState | undefined
   getEnhanceNodeUiState: (node: EnhanceNodeItem) => NodeUiState | undefined
   getTryOnNodeUiState: (node: TryOnNodeItem) => NodeUiState | undefined
   getFaceSwapNodeUiState: (node: FaceSwapNodeItem) => NodeUiState | undefined
-  getPaletteNodeUiState: (node: PaletteNodeItem) => NodeUiState | undefined
+  getColorNodeUiState: (node: ColorNodeItem) => NodeUiState | undefined
   getGenerateNodeUiState: (node: GenerateNodeItem) => NodeUiState | undefined
   getNodeConnectionErrorPorts: (
-    kind: 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'palette' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'color' | 'generate',
     id: number,
   ) => string[]
-  activeColorPopoverNodeId: number | null
-  colorPopoverHex: string
-  colorPopoverHue: number
-  colorPopoverSaturation: number
-  colorPopoverLightness: number
-  colorSpectrumStyle: Record<string, string>
-  colorSpectrumCursorStyle: Record<string, string>
-  colorQuickSwatches: string[]
   getGenerateStyleOptions: (mode: GenerateNodeItem['mode']) => string[]
   isGenerateStyleLoading: (mode: GenerateNodeItem['mode']) => boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'color-node-mousedown', event: MouseEvent, node: ColorNodeItem): void
-  (e: 'color-delete', nodeId: number): void
-  (e: 'color-toggle-popover', node: ColorNodeItem): void
-  (e: 'color-target-color-change', node: ColorNodeItem, value: string): void
-  (e: 'color-strength-input', node: ColorNodeItem, value: number): void
-  (e: 'color-popover-hex-input', event: Event): void
-  (e: 'color-popover-hex-commit'): void
-  (e: 'color-popover-hue-input', value: number): void
-  (e: 'color-popover-saturation-input', value: number): void
-  (e: 'color-popover-lightness-input', value: number): void
-  (e: 'color-spectrum-pointerdown', event: PointerEvent): void
-  (e: 'color-select-swatch', value: string): void
-  (e: 'color-eyedropper', node: ColorNodeItem): void
-  (e: 'color-generate', node: ColorNodeItem): void
-  (e: 'color-set-spectrum-ref', element: Element | null): void
-  (e: 'color-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
-
   (e: 'edit-node-mousedown', event: MouseEvent, node: EditNodeItem): void
   (e: 'edit-delete', nodeId: number): void
   (e: 'edit-update-mode', node: EditNodeItem, value: EditNodeItem['mode']): void
@@ -261,7 +196,7 @@ const emit = defineEmits<{
 
   (e: 'fusion-node-mousedown', event: MouseEvent, node: FusionNodeItem): void
   (e: 'fusion-delete', nodeId: number): void
-  (e: 'fusion-update-mode', node: FusionNodeItem, value: FusionNodeItem['mode']): void
+  (e: 'fusion-update-blend-ratio', node: FusionNodeItem, value: number): void
   (e: 'fusion-generate', node: FusionNodeItem): void
   (e: 'fusion-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
 
@@ -290,14 +225,14 @@ const emit = defineEmits<{
   (e: 'faceswap-generate', node: FaceSwapNodeItem): void
   (e: 'faceswap-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
 
-  (e: 'palette-node-mousedown', event: MouseEvent, node: PaletteNodeItem): void
-  (e: 'palette-delete', nodeId: number): void
-  (e: 'palette-update-mode', node: PaletteNodeItem, value: PaletteNodeItem['mode']): void
-  (e: 'palette-apply-preset', node: PaletteNodeItem, value: string[]): void
-  (e: 'palette-remove-color', node: PaletteNodeItem, index: number): void
-  (e: 'palette-add-color', node: PaletteNodeItem, value: string): void
-  (e: 'palette-generate', node: PaletteNodeItem): void
-  (e: 'palette-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
+  (e: 'color-node-mousedown', event: MouseEvent, node: ColorNodeItem): void
+  (e: 'color-delete', nodeId: number): void
+  (e: 'color-apply-preset', node: ColorNodeItem, value: string[]): void
+  (e: 'color-remove-color', node: ColorNodeItem, index: number): void
+  (e: 'color-add-color', node: ColorNodeItem, value: string): void
+  (e: 'color-strength-input', node: ColorNodeItem, value: number): void
+  (e: 'color-generate', node: ColorNodeItem): void
+  (e: 'color-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
 
   (e: 'generate-node-mousedown', event: MouseEvent, node: GenerateNodeItem): void
   (e: 'generate-delete', nodeId: number): void

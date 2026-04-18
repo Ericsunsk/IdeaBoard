@@ -1,8 +1,5 @@
-import {
-  getCanvasNodeRequiredInputPorts,
-  paletteModeUsesReference,
-} from '../config/canvasNodeConnectionContract'
-import { resolveWorkflowNodeOutputStatus } from '../types/canvasNodes'
+import { getCanvasNodeRequiredInputPorts } from '../config/canvasNodeConnectionContract'
+import { hasColorNodeColors, isColorSingleColorMode, resolveWorkflowNodeOutputStatus } from '../types/canvasNodes'
 import type { NodeConnectionStatus } from './useCanvasNodeConnections'
 import type {
   CanvasConnectionNodeType,
@@ -18,7 +15,6 @@ import type {
   GenerateNodeItem,
   MannequinNodeItem,
   ModelNodeItem,
-  PaletteNodeItem,
   PromptNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
@@ -52,7 +48,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     if (port === 'image') return 'Image'
     if (port === 'mask') return 'Mask'
     if (port === 'prompt') return 'Prompt'
-    if (port === 'reference') return 'Ref'
     if (port === 'imageA') {
       if (nodeType === 'tryon') return 'Base'
       if (nodeType === 'faceswap') return 'Target'
@@ -180,7 +175,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
   function getNodePrimaryActionState(nodeType: 'enhance', node: EnhanceNodeItem): NodePrimaryActionState
   function getNodePrimaryActionState(nodeType: 'tryon', node: TryOnNodeItem): NodePrimaryActionState
   function getNodePrimaryActionState(nodeType: 'faceswap', node: FaceSwapNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'palette', node: PaletteNodeItem): NodePrimaryActionState
   function getNodePrimaryActionState(nodeType: 'generate', node: GenerateNodeItem): NodePrimaryActionState
   function getNodePrimaryActionState(
     nodeType: CanvasExecutionOutputNodeType,
@@ -207,23 +201,21 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
           viewpointNode.selectedViewpoints.length === 0 ? '选择视角' : null,
         )
       }
-      case 'color':
-        return buildExecutionPrimaryActionState(nodeType, node, '应用换色')
+      case 'color': {
+        const colorNode = node as ColorNodeItem
+        return buildExecutionPrimaryActionState(
+          nodeType,
+          colorNode,
+          isColorSingleColorMode(colorNode) ? '应用换色' : '生成',
+          !hasColorNodeColors(colorNode) ? '添加颜色' : null,
+        )
+      }
       case 'edit':
       case 'fusion':
       case 'enhance':
       case 'tryon':
       case 'faceswap':
         return buildExecutionPrimaryActionState(nodeType, node, '生成')
-      case 'palette': {
-        const paletteNode = node as PaletteNodeItem
-        return buildExecutionPrimaryActionState(
-          nodeType,
-          paletteNode,
-          '生成',
-          !paletteModeUsesReference(paletteNode.mode) && paletteNode.colors.length === 0 ? '添加颜色' : null,
-        )
-      }
       case 'generate': {
         const generateNode = node as GenerateNodeItem
         return buildExecutionPrimaryActionState(
@@ -245,7 +237,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
   function getNodeUiState(nodeType: 'enhance', node: EnhanceNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'tryon', node: TryOnNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'faceswap', node: FaceSwapNodeItem): NodeUiState
-  function getNodeUiState(nodeType: 'palette', node: PaletteNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'generate', node: GenerateNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'image', node: CanvasNodeItem & { id: number }): NodeUiState
   function getNodeUiState(nodeType: 'mask', node: CanvasNodeItem & { id: number }): NodeUiState
@@ -287,9 +278,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
         break
       case 'faceswap':
         primaryAction = getNodePrimaryActionState(nodeType, node as FaceSwapNodeItem)
-        break
-      case 'palette':
-        primaryAction = getNodePrimaryActionState(nodeType, node as PaletteNodeItem)
         break
       case 'generate':
         primaryAction = getNodePrimaryActionState(nodeType, node as GenerateNodeItem)

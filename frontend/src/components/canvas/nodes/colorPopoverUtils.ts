@@ -2,8 +2,10 @@ export function clampColorValue(value: number, min: number, max: number): number
   return Math.min(max, Math.max(min, value))
 }
 
+export const DEFAULT_COLOR_HEX = '#A3E635'
+
 export const DEFAULT_COLOR_SWATCHES = [
-  '#A3E635',
+  DEFAULT_COLOR_HEX,
   '#7A6BD5',
   '#22C55E',
   '#3B82F6',
@@ -27,7 +29,7 @@ export function rgbToHex(r: number, g: number, b: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase()
 }
 
-export function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+export function rgbToHsv(r: number, g: number, b: number): { h: number; s: number; v: number } {
   const rn = r / 255
   const gn = g / 255
   const bn = b / 255
@@ -35,11 +37,9 @@ export function rgbToHsl(r: number, g: number, b: number): { h: number; s: numbe
   const min = Math.min(rn, gn, bn)
   const delta = max - min
   let h = 0
-  const l = (max + min) / 2
   let s = 0
 
   if (delta !== 0) {
-    s = delta / (1 - Math.abs(2 * l - 1))
     switch (max) {
       case rn:
         h = ((gn - bn) / delta + (gn < bn ? 6 : 0)) * 60
@@ -52,40 +52,53 @@ export function rgbToHsl(r: number, g: number, b: number): { h: number; s: numbe
         break
     }
   }
+  if (max !== 0) {
+    s = delta / max
+  }
 
   return {
     h: Math.round(h),
     s: Math.round(s * 100),
-    l: Math.round(l * 100),
+    v: Math.round(max * 100),
   }
 }
 
-export function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+export function hsvToRgb(h: number, s: number, v: number): { r: number; g: number; b: number } {
   const hn = ((h % 360) + 360) % 360 / 360
   const sn = clampColorValue(s, 0, 100) / 100
-  const ln = clampColorValue(l, 0, 100) / 100
+  const vn = clampColorValue(v, 0, 100) / 100
+  const scaledHue = hn * 6
+  const chroma = vn * sn
+  const x = chroma * (1 - Math.abs((scaledHue % 2) - 1))
+  const m = vn - chroma
+  let rPrime = 0
+  let gPrime = 0
+  let bPrime = 0
 
-  if (sn === 0) {
-    const gray = Math.round(ln * 255)
-    return { r: gray, g: gray, b: gray }
-  }
-
-  const q = ln < 0.5 ? ln * (1 + sn) : ln + sn - ln * sn
-  const p = 2 * ln - q
-  const hueToRgb = (t: number) => {
-    let tt = t
-    if (tt < 0) tt += 1
-    if (tt > 1) tt -= 1
-    if (tt < 1 / 6) return p + (q - p) * 6 * tt
-    if (tt < 1 / 2) return q
-    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6
-    return p
+  if (scaledHue >= 0 && scaledHue < 1) {
+    rPrime = chroma
+    gPrime = x
+  } else if (scaledHue < 2) {
+    rPrime = x
+    gPrime = chroma
+  } else if (scaledHue < 3) {
+    gPrime = chroma
+    bPrime = x
+  } else if (scaledHue < 4) {
+    gPrime = x
+    bPrime = chroma
+  } else if (scaledHue < 5) {
+    rPrime = x
+    bPrime = chroma
+  } else {
+    rPrime = chroma
+    bPrime = x
   }
 
   return {
-    r: Math.round(hueToRgb(hn + 1 / 3) * 255),
-    g: Math.round(hueToRgb(hn) * 255),
-    b: Math.round(hueToRgb(hn - 1 / 3) * 255),
+    r: Math.round((rPrime + m) * 255),
+    g: Math.round((gPrime + m) * 255),
+    b: Math.round((bPrime + m) * 255),
   }
 }
 
@@ -93,5 +106,5 @@ export function normalizeHexColor(input: string): string {
   const raw = input.trim().toUpperCase()
   if (/^#[0-9A-F]{6}$/.test(raw)) return raw
   if (/^[0-9A-F]{6}$/.test(raw)) return `#${raw}`
-  return '#A3E635'
+  return DEFAULT_COLOR_HEX
 }

@@ -84,8 +84,8 @@ const categoryOptions = [
 const statusOptions = [{ label: '已上架', value: 1 }, { label: '已下架', value: 0 }]
 const archivedCategoryLabelMap: Record<string, string> = {
   'seamless-tile': 'Archived · 四方连续',
-  'pattern-fusion': 'Archived · 图案融合',
-  'craft-fusion': 'Archived · 工艺融合',
+  'pattern-fusion': 'Archived · 双图融合',
+  'craft-fusion': 'Archived · 双图融合',
   'pattern-inpaint': 'Archived · 图案涂改',
   'pattern-upscale': 'Archived · 图案变清晰',
 }

@@ -128,16 +128,6 @@ export const FACESWAP_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'faceswap-output', top: 92 },
 ]
 
-export type PaletteNodeIoContext = {
-  usesReference: boolean
-}
-
-export const PALETTE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<PaletteNodeIoContext>[] = [
-  { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'palette-image-input', top: 92 },
-  { key: 'reference', label: 'Ref', kind: 'image', required: true, direction: 'input', portName: 'reference', portKey: 'palette-reference-input', top: 136, visible: (ctx) => ctx.usesReference },
-  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'palette-output', top: 92 },
-]
-
 export const GENERATE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   { key: 'image', label: 'Image', kind: 'image', direction: 'input', portName: 'image', portKey: 'generate-image-input', top: 92 },
   { key: 'prompt', label: 'Prompt', kind: 'prompt', required: true, direction: 'input', portName: 'prompt', portKey: 'generate-prompt-input', top: 136 },

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,8 +16,121 @@ import (
 )
 
 const (
-	MaxFailCount = 5
+	MaxFailCount           = 5
+	styleFusionFeatureSlug = "style-fusion"
 )
+
+const (
+	styleFusionHiddenConstraintGeneric = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
+	styleFusionHiddenConstraintWithNum = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息（Image A: %s，Image B: %s）。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
+)
+
+func buildStyleFusionHiddenConstraint(params map[string]interface{}) string {
+	if params == nil {
+		return styleFusionHiddenConstraintGeneric
+	}
+
+	if imageAWeight, imageBWeight, ok := readStyleFusionWeights(params); ok {
+		return fmt.Sprintf(
+			styleFusionHiddenConstraintWithNum,
+			formatWeightPercent(imageAWeight),
+			formatWeightPercent(imageBWeight),
+		)
+	}
+
+	return styleFusionHiddenConstraintGeneric
+}
+
+func readStyleFusionWeights(params map[string]interface{}) (float64, float64, bool) {
+	if params == nil {
+		return 0, 0, false
+	}
+
+	if rawA, okA := params["image_a_weight"]; okA {
+		if rawB, okB := params["image_b_weight"]; okB {
+			if imageAWeight, ok := parseWeight(rawA); ok {
+				if imageBWeight, ok := parseWeight(rawB); ok {
+					return normalizeWeights(imageAWeight, imageBWeight)
+				}
+			}
+		}
+	}
+
+	if blendRatio, ok := params["blend_ratio"]; ok {
+		if imageAWeight, ok := parseWeight(blendRatio); ok {
+			if imageAWeight >= 0 && imageAWeight <= 1 {
+				return normalizeWeights(imageAWeight, 1-imageAWeight)
+			}
+			return normalizeWeights(imageAWeight, 100-imageAWeight)
+		}
+	}
+
+	return 0, 0, false
+}
+
+func parseWeight(v interface{}) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int8:
+		return float64(n), true
+	case int16:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case uint:
+		return float64(n), true
+	case uint8:
+		return float64(n), true
+	case uint16:
+		return float64(n), true
+	case uint32:
+		return float64(n), true
+	case uint64:
+		return float64(n), true
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	default:
+		return 0, false
+	}
+}
+
+func normalizeWeights(a, b float64) (float64, float64, bool) {
+	if a < 0 || b < 0 {
+		return 0, 0, false
+	}
+	total := a + b
+	if total <= 0 {
+		return 0, 0, false
+	}
+	return a / total * 100, b / total * 100, true
+}
+
+func formatWeightPercent(weight float64) string {
+	value := strconv.FormatFloat(weight, 'f', 1, 64)
+	value = strings.TrimSuffix(value, ".0")
+	return value + "%"
+}
+
+func appendHiddenConstraint(fullPrompt, constraint string) string {
+	if strings.TrimSpace(constraint) == "" {
+		return fullPrompt
+	}
+	if strings.TrimSpace(fullPrompt) == "" {
+		return constraint
+	}
+	return fullPrompt + "\n\n" + constraint
+}
 
 type AccountService struct {
 	accountRepo      *repository.AccountRepository
@@ -236,97 +350,113 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 		}
 	}
 
+	featureSlug := ""
+	if req.Params != nil {
+		if featureRaw, ok := req.Params["feature"]; ok {
+			if feature, ok := featureRaw.(string); ok {
+				featureSlug = feature
+			}
+		}
+	}
+
 	// 功能页系统提示词：根据 feature slug 查找系统预设 prompt，支持模板变量替换
 	if req.Params != nil {
-		if featureRaw, ok := req.Params["feature"]; ok && s.systemConfigRepo != nil {
-			if featureSlug, ok := featureRaw.(string); ok && featureSlug != "" {
-				sysPrompt, err := s.systemConfigRepo.Get("feature_prompt:" + featureSlug)
-				if err == nil && sysPrompt != "" {
-					// 构建模板变量映射
-					varMap := map[string]string{
-						"{{user_prompt}}": req.Prompt,
+		if featureSlug != "" && s.systemConfigRepo != nil {
+			sysPrompt, err := s.systemConfigRepo.Get("feature_prompt:" + featureSlug)
+			if err == nil && sysPrompt != "" {
+				// 构建模板变量映射
+				varMap := map[string]string{
+					"{{user_prompt}}": req.Prompt,
+				}
+				if req.Params != nil {
+					if v, ok := req.Params["color_type"]; ok {
+						varMap["{{color_type}}"] = fmt.Sprintf("%v", v)
 					}
-					if req.Params != nil {
-						if v, ok := req.Params["color_type"]; ok {
-							varMap["{{color_type}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["colors"]; ok {
-							switch arr := v.(type) {
-							case []interface{}:
-								strs := make([]string, 0, len(arr))
-								for _, item := range arr {
-									strs = append(strs, fmt.Sprintf("%v", item))
-								}
-								varMap["{{colors}}"] = strings.Join(strs, ", ")
-							default:
-								varMap["{{colors}}"] = fmt.Sprintf("%v", v)
+					if v, ok := req.Params["colors"]; ok {
+						switch arr := v.(type) {
+						case []interface{}:
+							strs := make([]string, 0, len(arr))
+							for _, item := range arr {
+								strs = append(strs, fmt.Sprintf("%v", item))
 							}
-						}
-						if v, ok := req.Params["category"]; ok {
-							varMap["{{category}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["variation_strength"]; ok {
-							varMap["{{strength}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["target_color"]; ok {
-							varMap["{{target_color}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["fabric_rotation"]; ok {
-							varMap["{{fabric_rotation}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["fabric_opacity"]; ok {
-							varMap["{{fabric_opacity}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["fabric_scale"]; ok {
-							varMap["{{fabric_scale}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["tile_mode"]; ok {
-							varMap["{{tile_mode}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["pattern_mode"]; ok {
-							varMap["{{pattern_mode}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["angles"]; ok {
-							varMap["{{angles}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["pose"]; ok {
-							varMap["{{pose}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["expression"]; ok {
-							varMap["{{expression}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["background"]; ok {
-							varMap["{{background}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["viewpoints"]; ok {
-							varMap["{{viewpoints}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["lighting"]; ok {
-							varMap["{{lighting}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["model_url"]; ok {
-							varMap["{{model_url}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["pose_url"]; ok {
-							varMap["{{pose_url}}"] = fmt.Sprintf("%v", v)
-						}
-						if v, ok := req.Params["style_model"]; ok {
-							varMap["{{style_model}}"] = fmt.Sprintf("%v", v)
+							varMap["{{colors}}"] = strings.Join(strs, ", ")
+						default:
+							varMap["{{colors}}"] = fmt.Sprintf("%v", v)
 						}
 					}
+					if v, ok := req.Params["category"]; ok {
+						varMap["{{category}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["variation_strength"]; ok {
+						varMap["{{strength}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["blend_ratio"]; ok {
+						varMap["{{blend_ratio}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["image_a_weight"]; ok {
+						varMap["{{image_a_weight}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["image_b_weight"]; ok {
+						varMap["{{image_b_weight}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["target_color"]; ok {
+						varMap["{{target_color}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["fabric_rotation"]; ok {
+						varMap["{{fabric_rotation}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["fabric_opacity"]; ok {
+						varMap["{{fabric_opacity}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["fabric_scale"]; ok {
+						varMap["{{fabric_scale}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["tile_mode"]; ok {
+						varMap["{{tile_mode}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["pattern_mode"]; ok {
+						varMap["{{pattern_mode}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["angles"]; ok {
+						varMap["{{angles}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["pose"]; ok {
+						varMap["{{pose}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["expression"]; ok {
+						varMap["{{expression}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["background"]; ok {
+						varMap["{{background}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["viewpoints"]; ok {
+						varMap["{{viewpoints}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["lighting"]; ok {
+						varMap["{{lighting}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["model_url"]; ok {
+						varMap["{{model_url}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["pose_url"]; ok {
+						varMap["{{pose_url}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["style_model"]; ok {
+						varMap["{{style_model}}"] = fmt.Sprintf("%v", v)
+					}
+				}
 
-					// 检查是否包含模板变量
-					if strings.Contains(sysPrompt, "{{") {
-						// 模板模式：替换所有 {{var}}
-						result := sysPrompt
-						for k, v := range varMap {
-							result = strings.ReplaceAll(result, k, v)
-						}
-						fullPrompt = result
-					} else {
-						// 兼容模式：系统提示词 + 用户提示词
-						fullPrompt = sysPrompt + " " + fullPrompt
+				// 检查是否包含模板变量
+				if strings.Contains(sysPrompt, "{{") {
+					// 模板模式：替换所有 {{var}}
+					result := sysPrompt
+					for k, v := range varMap {
+						result = strings.ReplaceAll(result, k, v)
 					}
+					fullPrompt = result
+				} else {
+					// 兼容模式：系统提示词 + 用户提示词
+					fullPrompt = sysPrompt + " " + fullPrompt
 				}
 			}
 		}
@@ -349,6 +479,10 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 				}
 			}
 		}
+	}
+
+	if featureSlug == styleFusionFeatureSlug {
+		fullPrompt = appendHiddenConstraint(fullPrompt, buildStyleFusionHiddenConstraint(req.Params))
 	}
 
 	// 序列化参数

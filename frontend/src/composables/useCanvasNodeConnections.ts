@@ -98,7 +98,7 @@ export function useCanvasNodeConnections(options: UseCanvasNodeConnectionsOption
   function getConnectedImageInput(
     toNodeType: CanvasConnectionNodeType,
     toNodeId: number,
-    toPort: 'image' | 'imageA' | 'imageB' | 'reference',
+    toPort: 'image' | 'imageA' | 'imageB',
   ): ConnectedImageInput | null {
     const connection = options.findIncomingConnection(toNodeType, toNodeId, toPort)
     if (!connection) return null
@@ -130,7 +130,7 @@ export function useCanvasNodeConnections(options: UseCanvasNodeConnectionsOption
   function resolveConnectedPlacedImageInput(
     toNodeType: CanvasConnectionNodeType,
     toNodeId: number,
-    toPort: 'image' | 'imageA' | 'imageB' | 'reference',
+    toPort: 'image' | 'imageA' | 'imageB',
   ): PlacedImageInput | null {
     const connection = options.findIncomingConnection(toNodeType, toNodeId, toPort)
     if (!connection) return null
@@ -200,7 +200,7 @@ export function useCanvasNodeConnections(options: UseCanvasNodeConnectionsOption
     const connection = options.findIncomingConnection(toNodeType, toNodeId, toPort)
     if (!connection) return false
 
-    if (toPort === 'image' || toPort === 'imageA' || toPort === 'imageB' || toPort === 'reference') {
+    if (toPort === 'image' || toPort === 'imageA' || toPort === 'imageB') {
       return !resolveConnectedImageSource(connection.fromNodeType, connection.fromNodeId)
     }
 

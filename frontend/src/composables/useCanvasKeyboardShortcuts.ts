@@ -7,8 +7,6 @@ interface UseCanvasKeyboardShortcutsOptions {
   closeNodeContextMenu: () => void
   hasSelectedConnection: () => boolean
   clearSelectedConnection: () => void
-  activeColorPopoverNodeId: () => number | null
-  closeColorPopover: () => void
   activeImageActionId: Ref<number | null>
   showStyleStrengthControl: Ref<boolean>
   clearCanvasQuickActionState: () => void
@@ -54,10 +52,6 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
       }
       if (options.hasSelectedConnection()) {
         options.clearSelectedConnection()
-        return
-      }
-      if (options.activeColorPopoverNodeId() !== null) {
-        options.closeColorPopover()
         return
       }
       if (options.activeImageActionId.value !== null || options.showStyleStrengthControl.value) {

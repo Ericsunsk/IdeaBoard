@@ -11,7 +11,7 @@ const CURRENT_PREFIX_LABELS: Record<string, string> = {
   'sketch-to-design': '线稿成款',
   'partial-edit': '局部改款',
   'style-innovate': '款式创新',
-  'style-fusion': '风格融合',
+  'style-fusion': '双图融合',
   'series-color': '系列配色',
   'directed-recolor': '定向换色',
   'fabric-on-body': '面料上身',
@@ -25,10 +25,6 @@ const CURRENT_PREFIX_LABELS: Record<string, string> = {
   'style-clone': '画风复刻',
   'seamless-tile-classic': '四方连续',
   'seamless-tile-cartoon': '四方连续',
-  'pattern-fusion-creative': '图案融合',
-  'pattern-fusion-style': '图案融合',
-  'craft-fusion-creative': '工艺融合',
-  'craft-fusion-style': '工艺融合',
   'pattern-inpaint': '图案涂改',
   'pattern-upscale': '图案变清晰',
   'to-vector': '转矢量图',
@@ -36,6 +32,18 @@ const CURRENT_PREFIX_LABELS: Record<string, string> = {
   'hd-upscale': '高清放大',
   'deblur': '模糊变清晰',
   'canvas-extend': '画布延伸',
+}
+
+function normalizeGroupKey(prefix: string | null): string {
+  if (
+    prefix === 'pattern-fusion-creative' ||
+    prefix === 'pattern-fusion-style' ||
+    prefix === 'craft-fusion-creative' ||
+    prefix === 'craft-fusion-style'
+  ) {
+    return 'style-fusion'
+  }
+  return prefix || '__text2img__'
 }
 
 /**
@@ -71,7 +79,7 @@ export function buildGalleryGroups(tasks: Task[]): GalleryGroup[] {
     if (!url) continue
 
     const prefix = t.prompt ? extractPrefix(t.prompt) : null
-    const key = prefix || '__text2img__'
+    const key = normalizeGroupKey(prefix)
 
     if (!map.has(key)) map.set(key, [])
     map.get(key)!.push(url)

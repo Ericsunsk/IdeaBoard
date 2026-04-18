@@ -38,7 +38,6 @@ interface CanvasSelectionBindings {
   activeEnhanceNodeId: Ref<number | null>
   activeTryOnNodeId: Ref<number | null>
   activeFaceSwapNodeId: Ref<number | null>
-  activePaletteNodeId: Ref<number | null>
   activeGenerateNodeId: Ref<number | null>
   clearActiveNodes: () => void
   clearSelectedNodeKeys: () => void
@@ -74,7 +73,6 @@ export function createCanvasPointerBindings(
     enhanceNodes: options.enhanceNodes,
     tryOnNodes: options.tryOnNodes,
     faceSwapNodes: options.faceSwapNodes,
-    paletteNodes: options.paletteNodes,
     generateNodes: options.generateNodes,
     activeTool: options.activeTool,
     showStyleStrengthControl: options.showStyleStrengthControl,
@@ -97,7 +95,6 @@ export function createCanvasPointerBindings(
     activeEnhanceNodeId: selection.activeEnhanceNodeId,
     activeTryOnNodeId: selection.activeTryOnNodeId,
     activeFaceSwapNodeId: selection.activeFaceSwapNodeId,
-    activePaletteNodeId: selection.activePaletteNodeId,
     activeGenerateNodeId: selection.activeGenerateNodeId,
     isPanning: uiState.isPanning,
     isSelecting: uiState.isSelecting,
@@ -111,8 +108,6 @@ export function createCanvasPointerBindings(
     setBoardMenuOpen: options.setBoardMenuOpen,
     isBoardRenaming: options.isBoardRenaming,
     confirmBoardRename: options.confirmBoardRename,
-    activeColorPopoverNodeId: options.activeColorPopoverNodeId,
-    closeColorPopover: options.closeColorPopover,
     clearSelectedConnection: () => options.clearSelectedConnection?.(),
     clearSelectedNodeKeys: selection.clearSelectedNodeKeys,
     removeSelectedNodeKey: selection.removeSelectedNodeKey,
@@ -175,8 +170,6 @@ export function createCanvasKeyboardBindings(
     closeNodeContextMenu,
     hasSelectedConnection: () => options.hasSelectedConnection?.() ?? false,
     clearSelectedConnection: () => options.clearSelectedConnection?.(),
-    activeColorPopoverNodeId: options.activeColorPopoverNodeId,
-    closeColorPopover: options.closeColorPopover,
     activeImageActionId: selection.activeImageActionId,
     showStyleStrengthControl: options.showStyleStrengthControl,
     clearCanvasQuickActionState: selection.clearCanvasQuickActionState,

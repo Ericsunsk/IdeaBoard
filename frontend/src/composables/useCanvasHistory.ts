@@ -34,6 +34,7 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
     maskNodes: snapshot.maskNodes.map(node => ({ ...node })),
     colorNodes: snapshot.colorNodes.map(node => ({
       ...node,
+      colors: [...node.colors],
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),
     editNodes: snapshot.editNodes.map(node => ({
@@ -54,11 +55,6 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
     })),
     faceSwapNodes: snapshot.faceSwapNodes.map(node => ({
       ...node,
-      outputImages: node.outputImages.map(output => ({ ...output })),
-    })),
-    paletteNodes: snapshot.paletteNodes.map(node => ({
-      ...node,
-      colors: [...node.colors],
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),
     generateNodes: snapshot.generateNodes.map(node => ({

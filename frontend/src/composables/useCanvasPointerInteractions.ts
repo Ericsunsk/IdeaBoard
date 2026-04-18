@@ -12,13 +12,12 @@ import type {
   MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
-  PaletteNodeItem,
   PromptNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
-type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'palette' | 'generate'
+type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'generate'
 type DraggableNode =
   | ImageNodeItem
   | PromptNodeItem
@@ -32,7 +31,6 @@ type DraggableNode =
   | EnhanceNodeItem
   | TryOnNodeItem
   | FaceSwapNodeItem
-  | PaletteNodeItem
   | GenerateNodeItem
 type PendingInteraction = 'pan' | 'select' | 'item-drag' | 'node-drag' | 'resize'
 
@@ -56,7 +54,6 @@ interface UseCanvasPointerInteractionsOptions {
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
   faceSwapNodes: Ref<FaceSwapNodeItem[]>
-  paletteNodes: Ref<PaletteNodeItem[]>
   generateNodes: Ref<GenerateNodeItem[]>
   activeTool: Ref<string>
   showStyleStrengthControl: Ref<boolean>
@@ -79,7 +76,6 @@ interface UseCanvasPointerInteractionsOptions {
   activeEnhanceNodeId: Ref<number | null>
   activeTryOnNodeId: Ref<number | null>
   activeFaceSwapNodeId: Ref<number | null>
-  activePaletteNodeId: Ref<number | null>
   activeGenerateNodeId: Ref<number | null>
   isPanning: Ref<boolean>
   isSelecting: Ref<boolean>
@@ -93,8 +89,6 @@ interface UseCanvasPointerInteractionsOptions {
   setBoardMenuOpen: (visible: boolean) => void
   isBoardRenaming: () => boolean
   confirmBoardRename: () => void
-  activeColorPopoverNodeId: () => number | null
-  closeColorPopover: () => void
   clearSelectedConnection: () => void
   clearSelectedNodeKeys: () => void
   removeSelectedNodeKey: (kind: NodeDragKind, id: number) => void
@@ -219,8 +213,14 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
         outputImages: node.outputImages.map(output => ({ ...output })),
       }
     }
+    if (node.type === 'color') {
+      return {
+        ...node,
+        id: createCanvasEntityId(),
+        outputImages: node.outputImages.map(output => ({ ...output })),
+      }
+    }
     if (
-      node.type === 'color' ||
       node.type === 'edit' ||
       node.type === 'fusion' ||
       node.type === 'enhance' ||
@@ -231,14 +231,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       return {
         ...node,
         id: createCanvasEntityId(),
-        outputImages: node.outputImages.map(output => ({ ...output })),
-      }
-    }
-    if (node.type === 'palette') {
-      return {
-        ...node,
-        id: createCanvasEntityId(),
-        colors: [...node.colors],
         outputImages: node.outputImages.map(output => ({ ...output })),
       }
     }
@@ -292,7 +284,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       else if (kind === 'enhance') options.enhanceNodes.value.push(duplicate as EnhanceNodeItem)
       else if (kind === 'tryon') options.tryOnNodes.value.push(duplicate as TryOnNodeItem)
       else if (kind === 'faceswap') options.faceSwapNodes.value.push(duplicate as FaceSwapNodeItem)
-      else if (kind === 'palette') options.paletteNodes.value.push(duplicate as PaletteNodeItem)
       else options.generateNodes.value.push(duplicate as GenerateNodeItem)
 
       const duplicateKey = options.getNodeSelectionKey(kind as NodeDragKind, duplicate.id)
@@ -339,7 +330,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     clearCanvasQuickActionState()
     options.clearActiveNodes()
     closeNodeContextMenu()
-    options.closeColorPopover()
     options.isPanning.value = false
     options.isSelecting.value = false
     options.isDraggingItem.value = false
@@ -356,7 +346,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
   }
 
   function onCanvasContextMenu(e: MouseEvent) {
-    options.closeColorPopover()
     const target = e.target as HTMLElement | null
     if (
       target?.closest('.floating-header') ||
@@ -389,9 +378,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     if (options.isBoardRenaming() && !target?.closest('.file-name-chip')) {
       options.confirmBoardRename()
     }
-    if (options.activeColorPopoverNodeId() !== null && !target?.closest('.color-node-color-wrap')) {
-      options.closeColorPopover()
-    }
     if (!options.nodeContextMenu.value.visible) return
     if (target?.closest('.node-context-menu')) return
     closeNodeContextMenu()
@@ -400,7 +386,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
   function onCanvasMouseDown(e: MouseEvent) {
     options.setBoardMenuOpen(false)
     if (options.isBoardRenaming()) options.confirmBoardRename()
-    options.closeColorPopover()
     closeNodeContextMenu()
     options.clearSelectedConnection()
     options.clearActiveNodes()
@@ -435,7 +420,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
 
   function onItemMouseDown(e: MouseEvent, msg: CanvasImageItem) {
     if (options.activeTool.value !== 'select' || e.button !== 0) return
-    options.closeColorPopover()
     closeNodeContextMenu()
     options.clearSelectedConnection()
     options.clearActiveNodes()
@@ -474,7 +458,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
 
   function onItemContextMenu(_e: MouseEvent, msg: CanvasImageItem) {
     if (options.activeTool.value !== 'select' || msg.type !== 'image') return
-    options.closeColorPopover()
     closeNodeContextMenu()
     options.clearSelectedConnection()
     options.clearSelectedNodeKeys()
@@ -489,7 +472,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
   function beginNodeDrag(kind: NodeDragKind, node: DraggableNode, e: MouseEvent) {
     if (options.activeTool.value !== 'select') return
     if (e.button !== 0) return
-    options.closeColorPopover()
     closeNodeContextMenu()
     options.clearSelectedConnection()
     clearCanvasQuickActionState()
@@ -584,10 +566,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
 
   function onFaceSwapNodeMouseDown(e: MouseEvent, node: FaceSwapNodeItem) {
     beginNodeDrag('faceswap', node, e)
-  }
-
-  function onPaletteNodeMouseDown(e: MouseEvent, node: PaletteNodeItem) {
-    beginNodeDrag('palette', node, e)
   }
 
   function onGenerateNodeMouseDown(e: MouseEvent, node: GenerateNodeItem) {
@@ -873,7 +851,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     onEnhanceNodeMouseDown,
     onTryOnNodeMouseDown,
     onFaceSwapNodeMouseDown,
-    onPaletteNodeMouseDown,
     onGenerateNodeMouseDown,
     onResizeMouseDown,
   }
