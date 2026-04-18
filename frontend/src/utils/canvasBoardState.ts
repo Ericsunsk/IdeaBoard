@@ -6,7 +6,6 @@ import type {
   ColorNodeItem,
   EnhanceNodeItem,
   EditNodeItem,
-  FaceSwapNodeItem,
   FusionNodeItem,
   ImageNodeItem,
   ImageNodeOutputItem,
@@ -40,7 +39,6 @@ export type CanvasBoardStateEditNode = EditNodeItem
 export type CanvasBoardStateFusionNode = FusionNodeItem
 export type CanvasBoardStateEnhanceNode = EnhanceNodeItem
 export type CanvasBoardStateTryOnNode = TryOnNodeItem
-export type CanvasBoardStateFaceSwapNode = FaceSwapNodeItem
 export type CanvasBoardStateGenerateNode = GenerateNodeItem
 export type CanvasBoardStateConnection = CanvasConnection
 export type CanvasBoardStateViewport = CanvasViewportState
@@ -303,7 +301,6 @@ function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
     item.fromNodeType === 'fusion' ||
     item.fromNodeType === 'enhance' ||
     item.fromNodeType === 'tryon' ||
-    item.fromNodeType === 'faceswap' ||
     item.fromNodeType === 'generate'
       ? item.fromNodeType
       : null
@@ -319,7 +316,6 @@ function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
     item.toNodeType === 'fusion' ||
     item.toNodeType === 'enhance' ||
     item.toNodeType === 'tryon' ||
-    item.toNodeType === 'faceswap' ||
     item.toNodeType === 'generate'
       ? item.toNodeType
       : null
@@ -350,7 +346,10 @@ function toValidEditNode(item: unknown): CanvasBoardStateEditNode | null {
   if (!isFiniteNumber(item.id)) return null
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
-  const mode = item.mode === 'bg-swap' ? item.mode : 'partial-edit'
+  const mode =
+    item.mode === 'bg-swap' || item.mode === 'face-swap'
+      ? item.mode
+      : 'partial-edit'
   return {
     id: item.id,
     type: 'edit',
@@ -452,23 +451,6 @@ function toValidTryOnNode(item: unknown): CanvasBoardStateTryOnNode | null {
   }
 }
 
-function toValidFaceSwapNode(item: unknown): CanvasBoardStateFaceSwapNode | null {
-  if (!isObject(item)) return null
-  if (item.type !== 'faceswap') return null
-  if (!isFiniteNumber(item.id)) return null
-  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
-  const outputImages = readOutputImages(item)
-  return {
-    id: item.id,
-    type: 'faceswap',
-    x: item.x,
-    y: item.y,
-    width: item.width,
-    outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
-    outputImages,
-  }
-}
-
 function toValidGenerateNode(item: unknown): CanvasBoardStateGenerateNode | null {
   if (!isObject(item)) return null
   if (item.type !== 'generate') return null
@@ -531,7 +513,6 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
   const rawFusionNodes = Array.isArray(item.fusionNodes) ? item.fusionNodes : []
   const rawEnhanceNodes = Array.isArray(item.enhanceNodes) ? item.enhanceNodes : []
   const rawTryOnNodes = Array.isArray(item.tryOnNodes) ? item.tryOnNodes : []
-  const rawFaceSwapNodes = Array.isArray(item.faceSwapNodes) ? item.faceSwapNodes : []
   const rawGenerateNodes = Array.isArray(item.generateNodes) ? item.generateNodes : []
   const rawConnections = Array.isArray(item.connections) ? item.connections : []
   return {
@@ -547,7 +528,6 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
     fusionNodes: rawFusionNodes.map(toValidFusionNode).filter((n): n is CanvasBoardStateFusionNode => !!n),
     enhanceNodes: rawEnhanceNodes.map(toValidEnhanceNode).filter((n): n is CanvasBoardStateEnhanceNode => !!n),
     tryOnNodes: rawTryOnNodes.map(toValidTryOnNode).filter((n): n is CanvasBoardStateTryOnNode => !!n),
-    faceSwapNodes: rawFaceSwapNodes.map(toValidFaceSwapNode).filter((n): n is CanvasBoardStateFaceSwapNode => !!n),
     generateNodes: rawGenerateNodes.map(toValidGenerateNode).filter((n): n is CanvasBoardStateGenerateNode => !!n),
     connections: rawConnections.map(toValidConnection).filter((n): n is CanvasBoardStateConnection => !!n),
     viewport: toValidViewport(item.viewport),

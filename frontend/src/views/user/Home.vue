@@ -329,7 +329,6 @@
         :fusion-nodes="fusionNodes"
         :enhance-nodes="enhanceNodes"
         :try-on-nodes="tryOnNodes"
-        :face-swap-nodes="faceSwapNodes"
         :color-nodes="colorNodes"
         :generate-nodes="generateNodes"
         :generating="generating"
@@ -340,7 +339,6 @@
         :get-fusion-node-ui-state="getFusionNodeUiState"
         :get-enhance-node-ui-state="getEnhanceNodeUiState"
         :get-try-on-node-ui-state="getTryOnNodeUiState"
-        :get-face-swap-node-ui-state="getFaceSwapNodeUiState"
         :get-color-node-ui-state="getColorNodeUiState"
         :get-generate-node-ui-state="getGenerateNodeUiState"
         :get-node-connection-error-ports="getNodeConnectionErrorPorts"
@@ -378,10 +376,6 @@
         @tryon-update-opacity="onTryOnNodeUpdateOpacity"
         @tryon-generate="handleTryOnNodeGenerate"
         @tryon-port-mousedown="onTryOnNodePortMouseDown"
-        @faceswap-node-mousedown="(event, node) => onFaceSwapNodeMouseDown(event, node)"
-        @faceswap-delete="deleteFaceSwapNode"
-        @faceswap-generate="handleFaceSwapNodeGenerate"
-        @faceswap-port-mousedown="onFaceSwapNodePortMouseDown"
         @color-node-mousedown="(event, node) => onColorNodeMouseDown(event, node)"
         @color-delete="deleteColorNode"
         @color-apply-preset="onColorNodeApplyPreset"
@@ -568,6 +562,8 @@ import { normalizeHexColor } from '../../components/canvas/nodes/colorPopoverUti
 import {
   enhanceModeSupportsPrompt,
   enhanceModeSupportsMask,
+  editModeSupportsPrompt,
+  editModeSupportsSourceImage,
 } from '../../config/canvasNodeConnectionContract'
 import { isCanvasConnectionAllowed } from '../../config/canvasConnections'
 import {
@@ -575,7 +571,6 @@ import {
   createEnhanceNodeAt,
   createEditNodeAt,
   createFusionNodeAt,
-  createFaceSwapNodeAt,
   createGenerateNodeAt,
   createImageNodeAt,
   createMannequinNodeAt,
@@ -610,7 +605,6 @@ import type {
   EnhanceNodeItem,
   EditNodeItem,
   FusionNodeItem,
-  FaceSwapNodeItem,
   GenerateNodeItem,
   ImageNodeItem,
   MannequinNodeItem,
@@ -687,7 +681,6 @@ const enhanceNodes = ref<EnhanceNodeItem[]>([])
 const editNodes = ref<EditNodeItem[]>([])
 const fusionNodes = ref<FusionNodeItem[]>([])
 const tryOnNodes = ref<TryOnNodeItem[]>([])
-const faceSwapNodes = ref<FaceSwapNodeItem[]>([])
 const generateNodes = ref<GenerateNodeItem[]>([])
 const executionNodeWatchSources = [
   modelNodes,
@@ -698,7 +691,6 @@ const executionNodeWatchSources = [
   editNodes,
   fusionNodes,
   tryOnNodes,
-  faceSwapNodes,
   generateNodes,
 ] as const
 const connections = ref<CanvasConnection[]>([])
@@ -845,7 +837,6 @@ const {
   activeFusionNodeId,
   activeEnhanceNodeId,
   activeTryOnNodeId,
-  activeFaceSwapNodeId,
   activeGenerateNodeId,
   nodeContextMenu,
   isSelecting,
@@ -861,7 +852,6 @@ const {
   activateFusionNode,
   activateEnhanceNode,
   activateTryOnNode,
-  activateFaceSwapNode,
   activateGenerateNode,
   isNodeSelected,
   isNodeDragging,
@@ -881,7 +871,6 @@ const {
   onFusionNodeMouseDown,
   onEnhanceNodeMouseDown,
   onTryOnNodeMouseDown,
-  onFaceSwapNodeMouseDown,
   onColorNodeMouseDown,
   onGenerateNodeMouseDown,
   onResizeMouseDown,
@@ -904,7 +893,6 @@ const {
   editNodes,
   fusionNodes,
   tryOnNodes,
-  faceSwapNodes,
   generateNodes,
   activeTool,
   showStyleStrengthControl,
@@ -940,7 +928,6 @@ const {
   deleteEditNode,
   deleteFusionNode,
   deleteTryOnNode,
-  deleteFaceSwapNode,
   deleteGenerateNode,
   hasSelectedConnection,
   clearSelectedConnection,
@@ -1246,7 +1233,6 @@ function resetEditorState() {
   editNodes.value = []
   fusionNodes.value = []
   tryOnNodes.value = []
-  faceSwapNodes.value = []
   generateNodes.value = []
   connections.value = []
   processedMaskPreviewUrls.value = {}
@@ -1361,10 +1347,6 @@ function buildExecutionInputSignatureMap(): Record<string, string> {
     ].join('|')
   })
 
-  faceSwapNodes.value.forEach((node) => {
-    result[`faceswap:${node.id}`] = String(node.id)
-  })
-
   generateNodes.value.forEach((node) => {
     result[`generate:${node.id}`] = [
       node.mode,
@@ -1399,7 +1381,6 @@ function buildExecutionOutputSignatureMap(): Record<string, string> {
   assign('fusion', fusionNodes.value)
   assign('enhance', enhanceNodes.value)
   assign('tryon', tryOnNodes.value)
-  assign('faceswap', faceSwapNodes.value)
   assign('generate', generateNodes.value)
 
   return result
@@ -1518,11 +1499,6 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
       opacity: Math.max(0, Math.min(100, Math.round(node.opacity ?? 100))),
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
-    faceSwapNodes.value = state.faceSwapNodes.map(node => ({
-      ...node,
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
     colorNodes.value = state.colorNodes.map(toNormalizedColorNode)
     generateNodes.value = state.generateNodes.map(node => ({
       ...node,
@@ -1587,10 +1563,6 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
     tryOnNodes: tryOnNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    faceSwapNodes: faceSwapNodes.value.map(node => ({
       ...node,
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
@@ -1773,7 +1745,7 @@ watch(
 )
 
 watch(
-  [messages, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, faceSwapNodes, generateNodes, connections, canvasX, canvasY, zoomLevel],
+  [messages, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, generateNodes, connections, canvasX, canvasY, zoomLevel],
   () => {
     markBoardDirty()
     notifySnapshotChanged()
@@ -1782,7 +1754,7 @@ watch(
 )
 
 watch(
-  [connections, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, faceSwapNodes, generateNodes, canvasX, canvasY, zoomLevel],
+  [connections, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, generateNodes, canvasX, canvasY, zoomLevel],
   () => {
     refreshRenderedConnections()
   },
@@ -1896,14 +1868,6 @@ function deleteTryOnNode(id: number) {
   })
 }
 
-function deleteFaceSwapNode(id: number) {
-  deleteNodeFromCollection(faceSwapNodes, 'faceswap', id, () => {
-    if (activeFaceSwapNodeId.value === id) {
-      activeFaceSwapNodeId.value = null
-    }
-  })
-}
-
 function deleteGenerateNode(id: number) {
   deleteNodeFromCollection(generateNodes, 'generate', id, () => {
     if (activeGenerateNodeId.value === id) {
@@ -1965,7 +1929,6 @@ const nodeContextMenuHandlers: Record<CanvasNodeCreateActionKey, () => void> = {
   createFusionNode: buildNodeCreateHandler(createFusionNodeAt, fusionNodes, activateFusionNode),
   createEnhanceNode: buildNodeCreateHandler(createEnhanceNodeAt, enhanceNodes, activateEnhanceNode),
   createTryOnNode: buildNodeCreateHandler(createTryOnNodeAt, tryOnNodes, activateTryOnNode),
-  createFaceSwapNode: buildNodeCreateHandler(createFaceSwapNodeAt, faceSwapNodes, activateFaceSwapNode),
   createColorNode: buildNodeCreateHandler(createColorNodeAt, colorNodes, activateColorNode),
   createGenerateNode: buildNodeCreateHandler(createGenerateNodeAt, generateNodes, activateGenerateNode, (newNode) => {
     void ensureGenerateStyleOptions(newNode.mode)
@@ -2436,8 +2399,6 @@ function getCanvasConnectionNodeByType(
       return enhanceNodes.value.find(item => item.id === nodeId) ?? null
     case 'tryon':
       return tryOnNodes.value.find(item => item.id === nodeId) ?? null
-    case 'faceswap':
-      return faceSwapNodes.value.find(item => item.id === nodeId) ?? null
     case 'generate':
       return generateNodes.value.find(item => item.id === nodeId) ?? null
     default:
@@ -2484,6 +2445,16 @@ function setEnhanceNodeMode(node: EnhanceNodeItem, mode: EnhanceNodeItem['mode']
   }
   if (!enhanceModeSupportsMask(mode)) {
     removeIncomingConnectionsForPort('enhance', node.id, 'mask')
+  }
+}
+
+function setEditNodeMode(node: EditNodeItem, mode: EditNodeItem['mode']) {
+  node.mode = mode
+  if (!editModeSupportsPrompt(mode)) {
+    removeIncomingConnectionsForPort('edit', node.id, 'prompt')
+  }
+  if (!editModeSupportsSourceImage(mode)) {
+    removeIncomingConnectionsForPort('edit', node.id, 'imageB')
   }
 }
 
@@ -2623,7 +2594,6 @@ const getEditNodeUiState = (node: EditNodeItem) => getNodeUiState('edit', node)
 const getFusionNodeUiState = (node: FusionNodeItem) => getNodeUiState('fusion', node)
 const getEnhanceNodeUiState = (node: EnhanceNodeItem) => getNodeUiState('enhance', node)
 const getTryOnNodeUiState = (node: TryOnNodeItem) => getNodeUiState('tryon', node)
-const getFaceSwapNodeUiState = (node: FaceSwapNodeItem) => getNodeUiState('faceswap', node)
 const getColorNodeUiState = (node: ColorNodeItem) => getNodeUiState('color', node)
 const getGenerateNodeUiState = (node: GenerateNodeItem) => getNodeUiState('generate', node)
 
@@ -2647,8 +2617,6 @@ const onEnhanceNodePortMouseDown = (event: MouseEvent, nodeId: number, port: Can
   handleConnectionPortMouseDown(event, 'enhance', nodeId, port)
 const onTryOnNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'tryon', nodeId, port)
-const onFaceSwapNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'faceswap', nodeId, port)
 const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'color', nodeId, port)
 const onGenerateNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
@@ -2687,7 +2655,7 @@ function onMaskNodeToggleInvert(node: MaskNodeItem) {
 }
 
 function onEditNodeUpdateMode(node: EditNodeItem, value: EditNodeItem['mode']) {
-  node.mode = value
+  setEditNodeMode(node, value)
 }
 
 function onFusionNodeUpdateBlendRatio(node: FusionNodeItem, value: number) {
@@ -2787,7 +2755,6 @@ const {
   handleFusionNodeGenerate,
   handleEnhanceNodeGenerate,
   handleTryOnNodeGenerate,
-  handleFaceSwapNodeGenerate,
   handleColorNodeGenerate,
   handleGenerateNodeGenerate,
 } = useNodeExecutors({

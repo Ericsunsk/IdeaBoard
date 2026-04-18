@@ -1,3 +1,11 @@
+import type { EditNodeItem } from '../../../types/canvasNodes'
+import {
+  editModeRequiresMask,
+  editModeSupportsPrompt,
+  editModeSupportsSourceImage,
+  getEditNodePortLabel,
+} from '../../../config/canvasNodeConnectionContract'
+
 export type NodeIoKind = 'image' | 'mask' | 'prompt'
 export type NodeIoDirection = 'input' | 'output'
 
@@ -10,8 +18,8 @@ type NodeIoSlotTemplate<T> = {
   direction?: NodeIoDirection
   portName?: string
   portKey?: string
-  top?: number
-  required?: boolean
+  top?: Resolvable<T, number>
+  required?: Resolvable<T, boolean>
   visible?: Resolvable<T, boolean>
 }
 
@@ -86,10 +94,31 @@ export const VIEWPOINT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'viewpoint-output', top: 92 },
 ]
 
-export const EDIT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'edit-image-input', top: 92 },
-  { key: 'mask', label: 'Mask', kind: 'mask', required: true, direction: 'input', portName: 'mask', portKey: 'edit-mask-input', top: 136 },
-  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'edit-prompt-input', top: 180 },
+export type EditNodeIoContext = {
+  imageLabel: string
+  sourceLabel: string
+  maskLabel: string
+  supportsPrompt: boolean
+  supportsSourceImage: boolean
+  requiresMask: boolean
+}
+
+export function buildEditNodeIoContext(node: Pick<EditNodeItem, 'mode'>): EditNodeIoContext {
+  return {
+    imageLabel: getEditNodePortLabel(node.mode, 'image'),
+    sourceLabel: getEditNodePortLabel(node.mode, 'imageB'),
+    maskLabel: getEditNodePortLabel(node.mode, 'mask'),
+    supportsPrompt: editModeSupportsPrompt(node.mode),
+    supportsSourceImage: editModeSupportsSourceImage(node.mode),
+    requiresMask: editModeRequiresMask(node.mode),
+  }
+}
+
+export const EDIT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EditNodeIoContext>[] = [
+  { key: 'image', label: (ctx) => ctx.imageLabel, kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'edit-image-input', top: 92 },
+  { key: 'imageB', label: (ctx) => ctx.sourceLabel, kind: 'image', required: (ctx) => ctx.supportsSourceImage, direction: 'input', portName: 'imageB', portKey: 'edit-image-b-input', top: 136, visible: (ctx) => ctx.supportsSourceImage },
+  { key: 'mask', label: (ctx) => ctx.maskLabel, kind: 'mask', required: (ctx) => ctx.requiresMask, direction: 'input', portName: 'mask', portKey: 'edit-mask-input', top: (ctx) => ctx.supportsSourceImage ? 180 : 136 },
+  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'edit-prompt-input', top: (ctx) => ctx.supportsSourceImage ? 224 : 180, visible: (ctx) => ctx.supportsPrompt },
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'edit-output', top: 92 },
 ]
 
@@ -123,13 +152,6 @@ export const TRYON_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<TryOnNodeIoContext
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'tryon-output', top: 92 },
 ]
 
-export const FACESWAP_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'imageA', label: 'Target', kind: 'image', required: true, direction: 'input', portName: 'imageA', portKey: 'faceswap-image-a', top: 92 },
-  { key: 'imageB', label: 'Face', kind: 'image', required: true, direction: 'input', portName: 'imageB', portKey: 'faceswap-image-b', top: 136 },
-  { key: 'mask', label: 'Mask', kind: 'mask', direction: 'input', portName: 'mask', portKey: 'faceswap-mask-input', top: 180 },
-  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'faceswap-output', top: 92 },
-]
-
 export const GENERATE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   { key: 'image', label: 'Image', kind: 'image', direction: 'input', portName: 'image', portKey: 'generate-image-input', top: 92 },
   { key: 'prompt', label: 'Prompt', kind: 'prompt', required: true, direction: 'input', portName: 'prompt', portKey: 'generate-prompt-input', top: 136 },
@@ -152,6 +174,7 @@ export function buildNodeIoFromSlots<T>(
     const connected = Boolean(connectedMap[slot.key])
     const pending = Boolean(pendingMap[slot.key])
     const error = errorSet.has(slot.key)
+    const required = slot.required == null ? undefined : resolveValue(slot.required, context)
     const visible = slot.visible == null ? undefined : resolveValue(slot.visible, context)
 
     if (slot.label != null) {
@@ -159,7 +182,7 @@ export function buildNodeIoFromSlots<T>(
         key: slot.key,
         label: resolveValue(slot.label, context),
         kind: slot.kind,
-        required: slot.required,
+        required,
         connected,
         pending,
         error,
@@ -173,7 +196,7 @@ export function buildNodeIoFromSlots<T>(
         direction: slot.direction,
         kind: slot.kind,
         name: slot.portName,
-        top: slot.top,
+        top: slot.top == null ? undefined : resolveValue(slot.top, context),
         connected,
         pending,
         visible,

@@ -37,6 +37,13 @@
           >
             Background
           </NodeActionButton>
+          <NodeActionButton
+            variant="chip"
+            :active="node.mode === 'face-swap'"
+            @click="emit('update:mode', 'face-swap')"
+          >
+            Face
+          </NodeActionButton>
         </div>
       </div>
 
@@ -66,7 +73,7 @@ import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodePorts from './NodePorts.vue'
-import { buildNodeIoFromSlots, EDIT_NODE_IO_SLOTS } from './nodeIoConfig'
+import { buildEditNodeIoContext, buildNodeIoFromSlots, EDIT_NODE_IO_SLOTS } from './nodeIoConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -82,22 +89,24 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'delete'): void
-  (e: 'update:mode', value: 'partial-edit' | 'bg-swap'): void
+  (e: 'update:mode', value: 'partial-edit' | 'bg-swap' | 'face-swap'): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'mask' | 'prompt'): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'imageB' | 'mask' | 'prompt'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 const io = computed(() =>
-  buildNodeIoFromSlots(EDIT_NODE_IO_SLOTS, null, {
+  buildNodeIoFromSlots(EDIT_NODE_IO_SLOTS, buildEditNodeIoContext(props.node), {
     connected: {
       image: props.uiState?.connection?.connected?.image,
+      imageB: props.uiState?.connection?.connected?.imageB,
       mask: props.uiState?.connection?.connected?.mask,
       prompt: props.uiState?.connection?.connected?.prompt,
       output: props.uiState?.connection?.connected?.output,
     },
     pending: {
       image: props.uiState?.connection?.pending?.image,
+      imageB: props.uiState?.connection?.pending?.imageB,
       mask: props.uiState?.connection?.pending?.mask,
     },
     errorPortKeys: props.errorPortKeys,
@@ -107,7 +116,7 @@ const connectionChips = computed(() => io.value.connectionChips)
 const ports = computed(() => io.value.ports)
 
 function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image' | 'mask' | 'prompt')
+  emit('port-mousedown', event, port as 'image' | 'imageB' | 'mask' | 'prompt')
 }
 </script>
 

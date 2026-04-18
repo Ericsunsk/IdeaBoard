@@ -10,7 +10,6 @@ import type {
   EnhanceNodeItem,
   EditNodeItem,
   FusionNodeItem,
-  FaceSwapNodeItem,
   ImageNodeItem,
   MannequinNodeItem,
   MaskNodeItem,
@@ -187,18 +186,6 @@ export function createTryOnNodeAt(point: CanvasPoint): TryOnNodeItem {
     rotation: 0,
     scale: 100,
     opacity: 100,
-    outputStatus: 'idle',
-    outputImages: [],
-  }
-}
-
-export function createFaceSwapNodeAt(point: CanvasPoint): FaceSwapNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'faceswap',
-    x: point.x,
-    y: point.y,
-    width: 286,
     outputStatus: 'idle',
     outputImages: [],
   }

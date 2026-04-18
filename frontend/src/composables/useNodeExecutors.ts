@@ -2,6 +2,7 @@ import type { Ref } from 'vue'
 import type { SubmitTaskData } from '../api/index'
 import {
   enhanceModeSupportsPrompt,
+  getEditNodePortLabel,
 } from '../config/canvasNodeConnectionContract'
 import {
   DEFAULT_COLOR_STRENGTH,
@@ -17,7 +18,6 @@ import type {
   ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
-  FaceSwapNodeItem,
   FusionNodeItem,
   GenerateNodeItem,
   ImageNodeItem,
@@ -66,7 +66,8 @@ type SegmentPayload = {
   return_form?: string
 }
 
-type EditModeMeta = Record<EditNodeItem['mode'], { feature: string; promptPrefix: string; fallbackPrompt: string }>
+type StandardEditMode = Exclude<EditNodeItem['mode'], 'face-swap'>
+type EditModeMeta = Record<StandardEditMode, { feature: string; promptPrefix: string; fallbackPrompt: string }>
 type TryOnModeMeta = Record<TryOnNodeItem['mode'], { feature: string; promptPrefix: string; successLabel: string }>
 type GenerateModeMeta = Record<GenerateNodeItem['mode'], { feature: string; promptPrefix: string; successLabel: string }>
 
@@ -163,6 +164,10 @@ interface UseNodeExecutorsOptions {
 }
 
 export function useNodeExecutors(options: UseNodeExecutorsOptions) {
+  function getEditModeMeta(mode: StandardEditMode) {
+    return options.editModeMeta[mode]
+  }
+
   function cacheNodeOutputs(
     nodeType: CanvasExecutionOutputNodeType,
     nodeId: number,
@@ -189,6 +194,10 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
   function resolveConnectedEditImageInput(node: EditNodeItem): PlacedImageInput | null {
     return options.resolveConnectedPlacedImageInput('edit', node.id, 'image')
+  }
+
+  function resolveConnectedEditSourceImageInput(node: EditNodeItem): PlacedImageInput | null {
+    return options.resolveConnectedPlacedImageInput('edit', node.id, 'imageB')
   }
 
   async function resolveConnectedEditMaskInput(node: EditNodeItem): Promise<PlacedMaskInput | null> {
@@ -221,14 +230,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
   function resolveConnectedTryOnImageInput(node: TryOnNodeItem, port: 'imageA' | 'imageB'): PlacedImageInput | null {
     return options.resolveConnectedPlacedImageInput('tryon', node.id, port)
-  }
-
-  function resolveConnectedFaceSwapImageInput(node: FaceSwapNodeItem, port: 'imageA' | 'imageB'): PlacedImageInput | null {
-    return options.resolveConnectedPlacedImageInput('faceswap', node.id, port)
-  }
-
-  async function resolveConnectedFaceSwapMaskInput(node: FaceSwapNodeItem): Promise<PlacedMaskInput | null> {
-    return options.resolveConnectedPlacedMaskInput('faceswap', node.id, 'mask')
   }
 
   async function resolveColorGenerationContext(
@@ -675,29 +676,79 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     if (options.generating.value) return
 
     const connectedImage = resolveConnectedEditImageInput(node)
+    const connectedSourceImage = node.mode === 'face-swap'
+      ? resolveConnectedEditSourceImageInput(node)
+      : null
     const connectedMask = await resolveConnectedEditMaskInput(node)
-    const promptText = resolveConnectedEditPromptInput(node, options.editModeMeta[node.mode].fallbackPrompt)
+    const editModeMeta = node.mode === 'face-swap' ? null : getEditModeMeta(node.mode)
+    const promptText = editModeMeta
+      ? resolveConnectedEditPromptInput(node, editModeMeta.fallbackPrompt)
+      : ''
     const missingPorts = options.getMissingRequiredNodeInputs('edit', node, {
       image: connectedImage,
-      mask: connectedMask,
+      ...(node.mode === 'face-swap'
+        ? { imageB: connectedSourceImage }
+        : { mask: connectedMask }),
     })
     if (options.warnMissingNodeInputs('edit', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
+      const formatLabel = (port: string) =>
+        port === 'image' || port === 'imageB' || port === 'mask' || port === 'prompt'
+          ? getEditNodePortLabel(node.mode, port)
+          : port
       if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
-        return `Edit 节点等待上游 ${pendingPorts.join(' / ')} 输出`
+        return `Edit 节点等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
       }
       if (pendingPorts.length > 0) {
-        return `Edit 节点缺少 ${disconnectedPorts.join(' / ')} 连线，且等待上游 ${pendingPorts.join(' / ')} 输出`
+        return `Edit 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线，且等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
       }
-      return `Edit 节点缺少 ${disconnectedPorts.join(' / ')} 连线`
+      return `Edit 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线`
     })) return
     const resolvedImage = connectedImage!
-    const resolvedMask = connectedMask!
 
     options.generating.value = true
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('edit', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
 
     try {
+      if (node.mode === 'face-swap') {
+        let faceSourceUrl = connectedSourceImage!.url
+        if (connectedMask?.dataUrl) {
+          const maskedFaceDataUrl = await buildMaskedImageDataUrl(connectedSourceImage!.url, connectedMask.dataUrl)
+          if (!maskedFaceDataUrl) {
+            options.message.error('无法生成分割人脸，请重试')
+            options.generating.value = false
+            return
+          }
+          const faceFile = await options.dataUrlToFile(maskedFaceDataUrl, `face-swap-face-${Date.now()}.png`)
+          const uploadRes = await options.uploadImage(faceFile)
+          if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+            options.message.error(uploadRes.msg || '分割人脸上传失败')
+            options.generating.value = false
+            return
+          }
+          faceSourceUrl = uploadRes.data.url
+        }
+
+        const placementSource = options.buildPlacementSource(resolvedImage.url, node.x + 340, node.y + 18)
+
+        await options.submitTaskAndPoll({
+          request: {
+            prompt: '[face-swap] 换脸',
+            params: {
+              image_urls: [resolvedImage.url, faceSourceUrl],
+              feature: 'face-swap',
+            },
+          },
+          source: placementSource,
+          outputNodeId,
+          successMessage: connectedMask ? 'Face swap submitted · masked face' : 'Face swap submitted',
+          failureMessage: 'Failed to submit edit task',
+          onCompleted: urls => cacheNodeOutputs('edit', node.id, urls),
+        })
+        return
+      }
+
+      const resolvedMask = connectedMask!
       const maskFile = await options.dataUrlToFile(resolvedMask.dataUrl, `edit-mask-${Date.now()}.png`)
       const uploadRes = await options.uploadImage(maskFile)
       if (uploadRes.code !== 0 || !uploadRes.data?.url) {
@@ -710,11 +761,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
       await options.submitTaskAndPoll({
         request: {
-          prompt: `${options.editModeMeta[node.mode].promptPrefix} ${promptText}`,
+          prompt: `${editModeMeta!.promptPrefix} ${promptText}`,
           params: {
             image_urls: [uploadRes.data.url],
             original_image_url: resolvedImage.url,
-            feature: options.editModeMeta[node.mode].feature,
+            feature: editModeMeta!.feature,
           },
         },
         source: placementSource,
@@ -949,74 +1000,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     })
   }
 
-  async function handleFaceSwapNodeGenerate(node: FaceSwapNodeItem) {
-    if (options.generating.value) return
-
-    const connectedImageA = resolveConnectedFaceSwapImageInput(node, 'imageA')
-    const connectedImageB = resolveConnectedFaceSwapImageInput(node, 'imageB')
-    const connectedMask = await resolveConnectedFaceSwapMaskInput(node)
-    const missingPorts = options.getMissingRequiredNodeInputs('faceswap', node, {
-      imageA: connectedImageA,
-      imageB: connectedImageB,
-      mask: connectedMask,
-    })
-
-    if (options.warnMissingNodeInputs('faceswap', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
-      const formatLabel = (port: string) => port === 'imageA' ? 'Target' : 'Face'
-      if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
-        return `FaceSwap 节点等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
-      }
-      if (pendingPorts.length > 0) {
-        return `FaceSwap 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线，且等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
-      }
-      return `FaceSwap 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线`
-    })) return
-
-    options.generating.value = true
-    const connectedOutputNodeId = options.getConnectedOutputImageTarget('faceswap', node.id)?.id ?? null
-    const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const placementSource = options.buildPlacementSource(connectedImageA!.url, node.x + 340, node.y + 18)
-
-    try {
-      let faceSourceUrl = connectedImageB!.url
-      if (connectedMask?.dataUrl) {
-        const maskedFaceDataUrl = await buildMaskedImageDataUrl(connectedImageB!.url, connectedMask.dataUrl)
-        if (!maskedFaceDataUrl) {
-          options.message.error('无法生成分割人脸，请重试')
-          options.generating.value = false
-          return
-        }
-        const faceFile = await options.dataUrlToFile(maskedFaceDataUrl, `face-swap-face-${Date.now()}.png`)
-        const uploadRes = await options.uploadImage(faceFile)
-        if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-          options.message.error(uploadRes.msg || '分割人脸上传失败')
-          options.generating.value = false
-          return
-        }
-        faceSourceUrl = uploadRes.data.url
-      }
-
-      await options.submitTaskAndPoll({
-        request: {
-          prompt: '[face-swap] 换脸',
-          params: {
-            image_urls: [connectedImageA!.url, faceSourceUrl],
-            feature: 'face-swap',
-          },
-        },
-        source: placementSource,
-        outputNodeId,
-        successMessage: connectedMask ? 'Face swap submitted · masked face' : 'Face swap submitted',
-        failureMessage: 'Failed to submit face swap task',
-        onCompleted: urls => cacheNodeOutputs('faceswap', node.id, urls),
-      })
-    } catch (error: unknown) {
-      const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || 'Failed to submit face swap task')
-      options.generating.value = false
-    }
-  }
-
   async function handleColorNodeGenerate(node: ColorNodeItem) {
     if (options.generating.value) return
 
@@ -1154,7 +1137,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     handleFusionNodeGenerate,
     handleEnhanceNodeGenerate,
     handleTryOnNodeGenerate,
-    handleFaceSwapNodeGenerate,
     handleGenerateNodeGenerate,
   }
 }

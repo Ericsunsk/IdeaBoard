@@ -5,7 +5,6 @@ import type {
   ColorNodeItem,
   EnhanceNodeItem,
   EditNodeItem,
-  FaceSwapNodeItem,
   FusionNodeItem,
   ImageNodeItem,
   MannequinNodeItem,
@@ -34,7 +33,6 @@ export interface UseCanvasEditorOptions {
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
-  faceSwapNodes: Ref<FaceSwapNodeItem[]>
   generateNodes: Ref<GenerateNodeItem[]>
   activeTool: Ref<string>
   showStyleStrengthControl: Ref<boolean>
@@ -68,7 +66,6 @@ export interface UseCanvasEditorOptions {
   deleteFusionNode: (id: number) => void
   deleteEnhanceNode: (id: number) => void
   deleteTryOnNode: (id: number) => void
-  deleteFaceSwapNode: (id: number) => void
   deleteGenerateNode: (id: number) => void
   hasSelectedConnection?: () => boolean
   clearSelectedConnection?: () => void

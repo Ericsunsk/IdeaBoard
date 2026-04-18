@@ -4,7 +4,6 @@ import type {
   ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
-  FaceSwapNodeItem,
   FusionNodeItem,
   GenerateNodeItem,
   ImageNodeItem,
@@ -31,7 +30,6 @@ export type CanvasConnectionContractNode =
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | FaceSwapNodeItem
   | GenerateNodeItem
 
 export interface CanvasNodePortContract {
@@ -48,6 +46,34 @@ export function enhanceModeSupportsPrompt(mode: EnhanceNodeItem['mode']) {
 
 export function enhanceModeSupportsMask(mode: EnhanceNodeItem['mode']) {
   return mode === 'hd-upscale'
+}
+
+export function editModeSupportsPrompt(mode: EditNodeItem['mode']) {
+  return mode !== 'face-swap'
+}
+
+export function editModeSupportsSourceImage(mode: EditNodeItem['mode']) {
+  return mode === 'face-swap'
+}
+
+export function editModeRequiresMask(mode: EditNodeItem['mode']) {
+  return mode !== 'face-swap'
+}
+
+export function getEditNodePortLabel(
+  mode: EditNodeItem['mode'],
+  port: Extract<CanvasConnectionPort, 'image' | 'imageB' | 'mask' | 'prompt'>,
+) {
+  switch (port) {
+    case 'image':
+      return mode === 'face-swap' ? 'Target' : 'Image'
+    case 'imageB':
+      return 'Face'
+    case 'mask':
+      return mode === 'face-swap' ? 'Face Mask' : 'Mask'
+    case 'prompt':
+      return 'Prompt'
+  }
 }
 
 export function generateModeRequiresImage(mode: GenerateNodeItem['mode']) {
@@ -86,13 +112,16 @@ export function getCanvasNodePortContracts(
     case 'mannequin':
     case 'viewpoint':
       return [input('image', 'image', true), input('prompt', 'prompt'), output('image', 'image')]
-    case 'edit':
+    case 'edit': {
+      const editNode = node as EditNodeItem
       return [
         input('image', 'image', true),
-        input('mask', 'mask', true),
-        input('prompt', 'prompt'),
+        input('imageB', 'image', editModeSupportsSourceImage(editNode.mode), editModeSupportsSourceImage(editNode.mode)),
+        input('mask', 'mask', editModeRequiresMask(editNode.mode), true),
+        input('prompt', 'prompt', false, editModeSupportsPrompt(editNode.mode)),
         output('image', 'image'),
       ]
+    }
     case 'fusion':
       return [
         input('imageA', 'image', true),
@@ -113,13 +142,6 @@ export function getCanvasNodePortContracts(
     }
     case 'tryon':
       return [input('imageA', 'image', true), input('imageB', 'image', true), output('image', 'image')]
-    case 'faceswap':
-      return [
-        input('imageA', 'image', true),
-        input('imageB', 'image', true),
-        input('mask', 'mask'),
-        output('image', 'image'),
-      ]
     case 'color':
       return [
         input('image', 'image', true),

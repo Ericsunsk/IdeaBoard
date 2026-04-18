@@ -12,10 +12,10 @@ import type {
   CanvasNodeItem,
 } from '../types/canvasNodes'
 import {
+  buildEditNodeIoContext,
   COLOR_NODE_IO_SLOTS,
   EDIT_NODE_IO_SLOTS,
   ENHANCE_NODE_IO_SLOTS,
-  FACESWAP_NODE_IO_SLOTS,
   FUSION_NODE_IO_SLOTS,
   GENERATE_NODE_IO_SLOTS,
   IMAGE_NODE_IO_SLOTS,
@@ -85,7 +85,6 @@ const NODE_IO_SLOTS_BY_TYPE: Record<CanvasConnectionNodeType, readonly NodeIoSlo
   fusion: FUSION_NODE_IO_SLOTS,
   enhance: ENHANCE_NODE_IO_SLOTS,
   tryon: TRYON_NODE_IO_SLOTS,
-  faceswap: FACESWAP_NODE_IO_SLOTS,
   generate: GENERATE_NODE_IO_SLOTS,
 }
 
@@ -327,6 +326,7 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
 
   function resolvePortTop(
     nodeType: CanvasConnectionNodeType,
+    nodeId: number,
     direction: 'input' | 'output',
     portName: CanvasConnectionPort,
     nodeHeight: number,
@@ -334,7 +334,16 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     const slot = NODE_IO_SLOTS_BY_TYPE[nodeType].find(item =>
       item.direction === direction && item.portName === portName,
     )
-    return slot?.top ?? nodeHeight / 2
+    if (!slot || slot.top == null) return nodeHeight / 2
+    if (typeof slot.top === 'function') {
+      const node = options.lookupNodeByType(nodeType, nodeId)
+      if (!node) return nodeHeight / 2
+      if (nodeType === 'edit' && node.type === 'edit') {
+        return slot.top(buildEditNodeIoContext(node) as never)
+      }
+      return slot.top(node as never)
+    }
+    return slot.top
   }
 
   function getNodePortCenter(
@@ -355,7 +364,7 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
       center.y +
       node.y +
       WORKFLOW_NODE_BORDER_WIDTH +
-      resolvePortTop(endpoint.nodeType, direction, endpoint.port, nodeHeight)
+      resolvePortTop(endpoint.nodeType, endpoint.nodeId, direction, endpoint.port, nodeHeight)
     return { x, y }
   }
 

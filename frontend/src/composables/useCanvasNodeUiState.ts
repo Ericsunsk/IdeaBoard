@@ -1,4 +1,4 @@
-import { getCanvasNodeRequiredInputPorts } from '../config/canvasNodeConnectionContract'
+import { getCanvasNodeRequiredInputPorts, getEditNodePortLabel } from '../config/canvasNodeConnectionContract'
 import { hasColorNodeColors, isColorSingleColorMode, resolveWorkflowNodeOutputStatus } from '../types/canvasNodes'
 import type { NodeConnectionStatus } from './useCanvasNodeConnections'
 import type {
@@ -10,7 +10,6 @@ import type {
   ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
-  FaceSwapNodeItem,
   FusionNodeItem,
   GenerateNodeItem,
   MannequinNodeItem,
@@ -45,19 +44,25 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     port: CanvasConnectionPort,
     node?: CanvasNodeItem | null,
   ): string {
+    if (
+      nodeType === 'edit' &&
+      node &&
+      node.type === 'edit' &&
+      (port === 'image' || port === 'imageB' || port === 'mask' || port === 'prompt')
+    ) {
+      return getEditNodePortLabel(node.mode, port)
+    }
     if (port === 'image') return 'Image'
     if (port === 'mask') return 'Mask'
     if (port === 'prompt') return 'Prompt'
     if (port === 'imageA') {
       if (nodeType === 'tryon') return 'Base'
-      if (nodeType === 'faceswap') return 'Target'
       return 'Image A'
     }
     if (port === 'imageB') {
       if (nodeType === 'tryon') {
         return node && node.type === 'tryon' && node.mode === 'pattern-on-body' ? 'Pattern' : 'Fabric'
       }
-      if (nodeType === 'faceswap') return 'Face'
       return 'Image B'
     }
     return port
@@ -174,7 +179,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
   function getNodePrimaryActionState(nodeType: 'fusion', node: FusionNodeItem): NodePrimaryActionState
   function getNodePrimaryActionState(nodeType: 'enhance', node: EnhanceNodeItem): NodePrimaryActionState
   function getNodePrimaryActionState(nodeType: 'tryon', node: TryOnNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'faceswap', node: FaceSwapNodeItem): NodePrimaryActionState
   function getNodePrimaryActionState(nodeType: 'generate', node: GenerateNodeItem): NodePrimaryActionState
   function getNodePrimaryActionState(
     nodeType: CanvasExecutionOutputNodeType,
@@ -211,10 +215,10 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
         )
       }
       case 'edit':
+        return buildExecutionPrimaryActionState(nodeType, node as EditNodeItem, '生成')
       case 'fusion':
       case 'enhance':
       case 'tryon':
-      case 'faceswap':
         return buildExecutionPrimaryActionState(nodeType, node, '生成')
       case 'generate': {
         const generateNode = node as GenerateNodeItem
@@ -236,7 +240,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
   function getNodeUiState(nodeType: 'fusion', node: FusionNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'enhance', node: EnhanceNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'tryon', node: TryOnNodeItem): NodeUiState
-  function getNodeUiState(nodeType: 'faceswap', node: FaceSwapNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'generate', node: GenerateNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'image', node: CanvasNodeItem & { id: number }): NodeUiState
   function getNodeUiState(nodeType: 'mask', node: CanvasNodeItem & { id: number }): NodeUiState
@@ -275,9 +278,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
         break
       case 'tryon':
         primaryAction = getNodePrimaryActionState(nodeType, node as TryOnNodeItem)
-        break
-      case 'faceswap':
-        primaryAction = getNodePrimaryActionState(nodeType, node as FaceSwapNodeItem)
         break
       case 'generate':
         primaryAction = getNodePrimaryActionState(nodeType, node as GenerateNodeItem)

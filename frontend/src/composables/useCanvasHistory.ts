@@ -53,10 +53,6 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
       ...node,
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),
-    faceSwapNodes: snapshot.faceSwapNodes.map(node => ({
-      ...node,
-      outputImages: node.outputImages.map(output => ({ ...output })),
-    })),
     generateNodes: snapshot.generateNodes.map(node => ({
       ...node,
       outputImages: node.outputImages.map(output => ({ ...output })),

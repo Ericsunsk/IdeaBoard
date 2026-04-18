@@ -37,7 +37,6 @@ interface CanvasSelectionBindings {
   activeFusionNodeId: Ref<number | null>
   activeEnhanceNodeId: Ref<number | null>
   activeTryOnNodeId: Ref<number | null>
-  activeFaceSwapNodeId: Ref<number | null>
   activeGenerateNodeId: Ref<number | null>
   clearActiveNodes: () => void
   clearSelectedNodeKeys: () => void
@@ -72,7 +71,6 @@ export function createCanvasPointerBindings(
     fusionNodes: options.fusionNodes,
     enhanceNodes: options.enhanceNodes,
     tryOnNodes: options.tryOnNodes,
-    faceSwapNodes: options.faceSwapNodes,
     generateNodes: options.generateNodes,
     activeTool: options.activeTool,
     showStyleStrengthControl: options.showStyleStrengthControl,
@@ -94,7 +92,6 @@ export function createCanvasPointerBindings(
     activeFusionNodeId: selection.activeFusionNodeId,
     activeEnhanceNodeId: selection.activeEnhanceNodeId,
     activeTryOnNodeId: selection.activeTryOnNodeId,
-    activeFaceSwapNodeId: selection.activeFaceSwapNodeId,
     activeGenerateNodeId: selection.activeGenerateNodeId,
     isPanning: uiState.isPanning,
     isSelecting: uiState.isSelecting,

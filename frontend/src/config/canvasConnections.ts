@@ -27,7 +27,6 @@ const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>([
   'fusion',
   'enhance',
   'tryon',
-  'faceswap',
   'generate',
 ])
 

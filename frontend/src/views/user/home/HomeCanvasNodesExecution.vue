@@ -79,22 +79,6 @@
     />
   </template>
 
-  <template v-for="node in faceSwapNodes" :key="node.id">
-    <FaceSwapNode
-      :node="node"
-      :active="isNodeSelected('faceswap', node.id)"
-      :dragging="isNodeDragging('faceswap', node.id)"
-      :copy-mode="copyMode"
-      :generating="generating"
-      :ui-state="getFaceSwapNodeUiState(node)"
-      :error-port-keys="getNodeConnectionErrorPorts('faceswap', node.id)"
-      @node-mousedown="emit('faceswap-node-mousedown', $event, node)"
-      @delete="emit('faceswap-delete', node.id)"
-      @generate="emit('faceswap-generate', node)"
-      @port-mousedown="(event, port) => emit('faceswap-port-mousedown', event, node.id, port)"
-    />
-  </template>
-
   <template v-for="node in colorNodes" :key="node.id">
     <ColorNode
       :node="node"
@@ -142,7 +126,6 @@
 <script setup lang="ts">
 import EditNode from '../../../components/canvas/nodes/EditNode.vue'
 import EnhanceNode from '../../../components/canvas/nodes/EnhanceNode.vue'
-import FaceSwapNode from '../../../components/canvas/nodes/FaceSwapNode.vue'
 import FusionNode from '../../../components/canvas/nodes/FusionNode.vue'
 import GenerateNode from '../../../components/canvas/nodes/GenerateNode.vue'
 import ColorNode from '../../../components/canvas/nodes/ColorNode.vue'
@@ -150,7 +133,6 @@ import TryOnNode from '../../../components/canvas/nodes/TryOnNode.vue'
 import type {
   EditNodeItem,
   EnhanceNodeItem,
-  FaceSwapNodeItem,
   FusionNodeItem,
   GenerateNodeItem,
   ColorNodeItem,
@@ -163,28 +145,26 @@ const props = defineProps<{
   fusionNodes: FusionNodeItem[]
   enhanceNodes: EnhanceNodeItem[]
   tryOnNodes: TryOnNodeItem[]
-  faceSwapNodes: FaceSwapNodeItem[]
   colorNodes: ColorNodeItem[]
   generateNodes: GenerateNodeItem[]
   generating: boolean
   copyMode: boolean
   isNodeSelected: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'color' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color' | 'generate',
     id: number,
   ) => boolean
   isNodeDragging: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'color' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color' | 'generate',
     id: number,
   ) => boolean
   getEditNodeUiState: (node: EditNodeItem) => NodeUiState | undefined
   getFusionNodeUiState: (node: FusionNodeItem) => NodeUiState | undefined
   getEnhanceNodeUiState: (node: EnhanceNodeItem) => NodeUiState | undefined
   getTryOnNodeUiState: (node: TryOnNodeItem) => NodeUiState | undefined
-  getFaceSwapNodeUiState: (node: FaceSwapNodeItem) => NodeUiState | undefined
   getColorNodeUiState: (node: ColorNodeItem) => NodeUiState | undefined
   getGenerateNodeUiState: (node: GenerateNodeItem) => NodeUiState | undefined
   getNodeConnectionErrorPorts: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'color' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color' | 'generate',
     id: number,
   ) => string[]
   getGenerateStyleOptions: (mode: GenerateNodeItem['mode']) => string[]
@@ -227,11 +207,6 @@ const emit = defineEmits<{
   (e: 'tryon-update-opacity', node: TryOnNodeItem, value: number): void
   (e: 'tryon-generate', node: TryOnNodeItem): void
   (e: 'tryon-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
-
-  (e: 'faceswap-node-mousedown', event: MouseEvent, node: FaceSwapNodeItem): void
-  (e: 'faceswap-delete', nodeId: number): void
-  (e: 'faceswap-generate', node: FaceSwapNodeItem): void
-  (e: 'faceswap-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
 
   (e: 'color-node-mousedown', event: MouseEvent, node: ColorNodeItem): void
   (e: 'color-delete', nodeId: number): void

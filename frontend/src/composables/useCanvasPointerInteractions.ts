@@ -5,7 +5,6 @@ import type {
   ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
-  FaceSwapNodeItem,
   FusionNodeItem,
   GenerateNodeItem,
   ImageNodeItem,
@@ -17,7 +16,7 @@ import type {
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
-type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'generate'
+type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'generate'
 type DraggableNode =
   | ImageNodeItem
   | PromptNodeItem
@@ -30,7 +29,6 @@ type DraggableNode =
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | FaceSwapNodeItem
   | GenerateNodeItem
 type PendingInteraction = 'pan' | 'select' | 'item-drag' | 'node-drag' | 'resize'
 
@@ -53,7 +51,6 @@ interface UseCanvasPointerInteractionsOptions {
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
-  faceSwapNodes: Ref<FaceSwapNodeItem[]>
   generateNodes: Ref<GenerateNodeItem[]>
   activeTool: Ref<string>
   showStyleStrengthControl: Ref<boolean>
@@ -75,7 +72,6 @@ interface UseCanvasPointerInteractionsOptions {
   activeFusionNodeId: Ref<number | null>
   activeEnhanceNodeId: Ref<number | null>
   activeTryOnNodeId: Ref<number | null>
-  activeFaceSwapNodeId: Ref<number | null>
   activeGenerateNodeId: Ref<number | null>
   isPanning: Ref<boolean>
   isSelecting: Ref<boolean>
@@ -225,7 +221,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       node.type === 'fusion' ||
       node.type === 'enhance' ||
       node.type === 'tryon' ||
-      node.type === 'faceswap' ||
       node.type === 'generate'
     ) {
       return {
@@ -283,7 +278,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       else if (kind === 'fusion') options.fusionNodes.value.push(duplicate as FusionNodeItem)
       else if (kind === 'enhance') options.enhanceNodes.value.push(duplicate as EnhanceNodeItem)
       else if (kind === 'tryon') options.tryOnNodes.value.push(duplicate as TryOnNodeItem)
-      else if (kind === 'faceswap') options.faceSwapNodes.value.push(duplicate as FaceSwapNodeItem)
       else options.generateNodes.value.push(duplicate as GenerateNodeItem)
 
       const duplicateKey = options.getNodeSelectionKey(kind as NodeDragKind, duplicate.id)
@@ -562,10 +556,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
 
   function onTryOnNodeMouseDown(e: MouseEvent, node: TryOnNodeItem) {
     beginNodeDrag('tryon', node, e)
-  }
-
-  function onFaceSwapNodeMouseDown(e: MouseEvent, node: FaceSwapNodeItem) {
-    beginNodeDrag('faceswap', node, e)
   }
 
   function onGenerateNodeMouseDown(e: MouseEvent, node: GenerateNodeItem) {
@@ -850,7 +840,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     onFusionNodeMouseDown,
     onEnhanceNodeMouseDown,
     onTryOnNodeMouseDown,
-    onFaceSwapNodeMouseDown,
     onGenerateNodeMouseDown,
     onResizeMouseDown,
   }

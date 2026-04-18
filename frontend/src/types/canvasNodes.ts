@@ -137,7 +137,7 @@ export interface EditNodeItem {
   x: number
   y: number
   width: number
-  mode: 'partial-edit' | 'bg-swap'
+  mode: 'partial-edit' | 'bg-swap' | 'face-swap'
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }
@@ -187,16 +187,6 @@ export interface TryOnNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export interface FaceSwapNodeItem {
-  id: number
-  type: 'faceswap'
-  x: number
-  y: number
-  width: number
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
 export function normalizeColorNodeColors(colors: readonly string[] | null | undefined): string[] {
   return Array.from(new Set(
     (colors ?? [])
@@ -242,7 +232,6 @@ export type CanvasExecutionOutputNodeType =
   | 'fusion'
   | 'enhance'
   | 'tryon'
-  | 'faceswap'
   | 'generate'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
@@ -254,7 +243,6 @@ export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType
   'fusion',
   'enhance',
   'tryon',
-  'faceswap',
   'generate',
 ]
 
@@ -271,7 +259,6 @@ export type CanvasExecutionOutputNodeItem =
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | FaceSwapNodeItem
   | GenerateNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
@@ -290,7 +277,6 @@ export type CanvasConnectionNodeType =
   | 'fusion'
   | 'enhance'
   | 'tryon'
-  | 'faceswap'
   | 'generate'
 export type CanvasConnectionPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
 
@@ -316,7 +302,6 @@ export type CanvasNodeItem =
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | FaceSwapNodeItem
   | GenerateNodeItem
 
 export interface CanvasViewportState {
@@ -338,7 +323,6 @@ export interface CanvasBoardSnapshot {
   fusionNodes: FusionNodeItem[]
   enhanceNodes: EnhanceNodeItem[]
   tryOnNodes: TryOnNodeItem[]
-  faceSwapNodes: FaceSwapNodeItem[]
   generateNodes: GenerateNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState

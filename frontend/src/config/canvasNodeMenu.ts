@@ -9,7 +9,6 @@ export type CanvasNodeCreateActionKey =
   | 'createFusionNode'
   | 'createEnhanceNode'
   | 'createTryOnNode'
-  | 'createFaceSwapNode'
   | 'createColorNode'
   | 'createGenerateNode'
 
@@ -32,9 +31,8 @@ export const CANVAS_NODE_MENU_ITEMS: readonly CanvasNodeMenuItem[] = [
   { key: 'enhance', label: '+ Enhance 节点', actionKey: 'createEnhanceNode', group: 'process', order: 80 },
   { key: 'tryon', label: '+ TryOn 节点', actionKey: 'createTryOnNode', group: 'process', order: 90 },
   { key: 'viewpoint', label: '+ Viewpoint 节点', actionKey: 'createViewpointNode', group: 'process', order: 100 },
-  { key: 'faceswap', label: '+ FaceSwap 节点', actionKey: 'createFaceSwapNode', group: 'process', order: 110 },
-  { key: 'color', label: '+ Color 节点', actionKey: 'createColorNode', group: 'process', order: 120 },
-  { key: 'generate', label: '+ Generate 节点', actionKey: 'createGenerateNode', group: 'process', order: 130 },
+  { key: 'color', label: '+ Color 节点', actionKey: 'createColorNode', group: 'process', order: 110 },
+  { key: 'generate', label: '+ Generate 节点', actionKey: 'createGenerateNode', group: 'process', order: 120 },
 ] as const
 
 export const CANVAS_NODE_MENU_BY_ACTION = Object.freeze(

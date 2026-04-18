@@ -15,7 +15,6 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
   'fusion',
   'enhance',
   'tryon',
-  'faceswap',
   'generate',
 ] as const
 

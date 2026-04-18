@@ -77,7 +77,7 @@ const featureList = [
   { slug: 'multi-angle', title: 'Model · 多角度' },
   { slug: 'virtual-3d', title: 'Viewpoint · 虚拟 3D' },
   { slug: 'mannequin-to-model', title: 'Mannequin · 人台变模特' },
-  { slug: 'face-swap', title: 'FaceSwap · 定向换脸' },
+  { slug: 'face-swap', title: 'Edit · 定向换脸' },
   { slug: 'bg-swap', title: 'Edit · 换背景' },
   { slug: 'pattern-gen', title: 'Generate · 图案生成' },
   { slug: 'style-clone', title: 'Generate · 画风复刻' },
