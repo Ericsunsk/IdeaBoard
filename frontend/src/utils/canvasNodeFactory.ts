@@ -5,13 +5,16 @@ import type {
   EnhanceNodeItem,
   EditNodeItem,
   FusionNodeItem,
+  FaceSwapNodeItem,
   ImageNodeItem,
+  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   PaletteNodeItem,
   PromptNodeItem,
   GenerateNodeItem,
   TryOnNodeItem,
+  ViewpointNodeItem,
 } from '../types/canvasNodes'
 
 function createCanvasEntityId(): number {
@@ -56,6 +59,38 @@ export function createModelNodeAt(point: CanvasPoint): ModelNodeItem {
     sourceImageRatio: 1,
     selectedAngles: ['front_full'],
     background: 'original',
+    outputStatus: 'idle',
+    outputImages: [],
+  }
+}
+
+export function createMannequinNodeAt(point: CanvasPoint): MannequinNodeItem {
+  return {
+    id: createCanvasEntityId(),
+    type: 'mannequin',
+    x: point.x,
+    y: point.y,
+    width: 280,
+    sourceImageUrl: '',
+    sourceImageRatio: 1,
+    outputStatus: 'idle',
+    outputImages: [],
+  }
+}
+
+export function createViewpointNodeAt(point: CanvasPoint): ViewpointNodeItem {
+  return {
+    id: createCanvasEntityId(),
+    type: 'viewpoint',
+    x: point.x,
+    y: point.y,
+    width: 320,
+    sourceImages: [],
+    activeCategory: 'top',
+    selectedViewpoints: [],
+    lighting: 'warm_white',
+    outputStatus: 'idle',
+    outputImages: [],
   }
 }
 
@@ -98,6 +133,8 @@ export function createColorNodeAt(point: CanvasPoint): ColorNodeItem {
     width: 276,
     targetColor: '#A3E635',
     strength: 70,
+    outputStatus: 'idle',
+    outputImages: [],
   }
 }
 
@@ -109,6 +146,8 @@ export function createEditNodeAt(point: CanvasPoint): EditNodeItem {
     y: point.y,
     width: 280,
     mode: 'partial-edit',
+    outputStatus: 'idle',
+    outputImages: [],
   }
 }
 
@@ -120,6 +159,8 @@ export function createFusionNodeAt(point: CanvasPoint): FusionNodeItem {
     y: point.y,
     width: 286,
     mode: 'style-fusion',
+    outputStatus: 'idle',
+    outputImages: [],
   }
 }
 
@@ -135,6 +176,8 @@ export function createEnhanceNodeAt(point: CanvasPoint): EnhanceNodeItem {
     upscaleFactor: 2,
     outputFormat: 'jpg',
     outputQuality: 95,
+    outputStatus: 'idle',
+    outputImages: [],
   }
 }
 
@@ -150,6 +193,20 @@ export function createTryOnNodeAt(point: CanvasPoint): TryOnNodeItem {
     rotation: 0,
     scale: 100,
     opacity: 100,
+    outputStatus: 'idle',
+    outputImages: [],
+  }
+}
+
+export function createFaceSwapNodeAt(point: CanvasPoint): FaceSwapNodeItem {
+  return {
+    id: createCanvasEntityId(),
+    type: 'faceswap',
+    x: point.x,
+    y: point.y,
+    width: 286,
+    outputStatus: 'idle',
+    outputImages: [],
   }
 }
 
@@ -162,6 +219,8 @@ export function createPaletteNodeAt(point: CanvasPoint): PaletteNodeItem {
     width: 286,
     mode: 'women',
     colors: ['#8B3A3A', '#6B2D3E'],
+    outputStatus: 'idle',
+    outputImages: [],
   }
 }
 
@@ -177,5 +236,7 @@ export function createGenerateNodeAt(point: CanvasPoint): GenerateNodeItem {
     ratio: '1:1',
     count: 1,
     quality: '1k',
+    outputStatus: 'idle',
+    outputImages: [],
   }
 }

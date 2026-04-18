@@ -54,7 +54,8 @@ function isAdminPage() {
 
 function buildLoginRedirectPath() {
   const currentPath = window.location.pathname + window.location.search
-  return '/user/login?redirect=' + encodeURIComponent(currentPath)
+  const loginPath = isAdminPage() ? '/admin/login' : '/user/login'
+  return loginPath + '?redirect=' + encodeURIComponent(currentPath)
 }
 
 function handleAuthExpired(status: number | undefined, payload: any, requestUrl: string) {

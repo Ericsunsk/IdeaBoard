@@ -1,7 +1,7 @@
 <template>
   <div class="face-library-page">
     <div class="toolbar">
-      <n-select v-model:value="filterCategory" :options="categoryOptions" placeholder="功能分类" clearable style="width: 160px" />
+      <n-select v-model:value="filterCategory" :options="categoryOptions" placeholder="工作流分类" clearable style="width: 180px" />
       <n-select v-model:value="filterEnabled" :options="statusOptions" placeholder="上下架状态" clearable style="width: 140px" />
       <n-button @click="loadList">
         <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></template>
@@ -25,8 +25,8 @@
         <n-form-item label="名称" path="name">
           <n-input v-model:value="formData.name" placeholder="如：水墨国画、波普艺术" />
         </n-form-item>
-        <n-form-item label="功能分类" path="category">
-          <n-select v-model:value="formData.category" :options="categoryFormOptions" placeholder="选择所属功能" />
+        <n-form-item label="工作流分类" path="category">
+          <n-select v-model:value="formData.category" :options="categoryFormOptions" placeholder="选择所属工作流" />
         </n-form-item>
         <n-form-item label="风格预览图" path="image_url">
           <div class="cover-upload-area">
@@ -78,17 +78,31 @@ const filterCategory = ref<string | null>(null)
 const filterEnabled = ref<number | null>(null)
 
 const categoryOptions = [
-  { label: '图案生成', value: 'pattern-gen' },
-  { label: '画风复刻', value: 'style-clone' },
-  { label: '四方连续', value: 'seamless-tile' },
-  { label: '图案融合', value: 'pattern-fusion' },
-  { label: '工艺融合', value: 'craft-fusion' },
-  { label: '图案涂改', value: 'pattern-inpaint' },
-  { label: '图案变清晰', value: 'pattern-upscale' },
+  { label: 'Generate · 图案生成', value: 'pattern-gen' },
+  { label: 'Generate · 画风复刻', value: 'style-clone' },
 ]
-const categoryFormOptions = [...categoryOptions]
 const statusOptions = [{ label: '已上架', value: 1 }, { label: '已下架', value: 0 }]
-const categoryLabelMap: Record<string, string> = Object.fromEntries(categoryOptions.map(o => [o.value, o.label]))
+const archivedCategoryLabelMap: Record<string, string> = {
+  'seamless-tile': 'Archived · 四方连续',
+  'pattern-fusion': 'Archived · 图案融合',
+  'craft-fusion': 'Archived · 工艺融合',
+  'pattern-inpaint': 'Archived · 图案涂改',
+  'pattern-upscale': 'Archived · 图案变清晰',
+}
+const categoryLabelMap: Record<string, string> = {
+  ...Object.fromEntries(categoryOptions.map(o => [o.value, o.label])),
+  ...archivedCategoryLabelMap,
+}
+const categoryFormOptions = computed(() => {
+  const currentValue = formData.value.category
+  if (!currentValue || categoryOptions.some(option => option.value === currentValue)) {
+    return categoryOptions
+  }
+  return [
+    { label: archivedCategoryLabelMap[currentValue] || `Archived · ${currentValue}`, value: currentValue, disabled: true },
+    ...categoryOptions,
+  ]
+})
 
 const filteredList = computed(() => {
   let result = list.value
@@ -107,7 +121,7 @@ const columns = [
     }
   },
   { title: '名称', key: 'name', ellipsis: { tooltip: true } },
-  { title: '功能分类', key: 'category', width: 110, render(row: Item) { return h('span', { style: 'color: #a1a1aa; font-size: 12px;' }, categoryLabelMap[row.category] || row.category) } },
+  { title: '工作流分类', key: 'category', width: 160, render(row: Item) { return h('span', { style: 'color: #a1a1aa; font-size: 12px;' }, categoryLabelMap[row.category] || row.category) } },
   { title: '排序', key: 'sort_order', width: 70, render(row: Item) { return h('span', { style: 'color: #71717a;' }, row.sort_order) } },
   { title: '状态', key: 'is_enabled', width: 80, render(row: Item) { return h('span', { style: row.is_enabled ? 'color: #22c55e;' : 'color: #ef4444;' }, row.is_enabled ? '已上架' : '已下架') } },
   {

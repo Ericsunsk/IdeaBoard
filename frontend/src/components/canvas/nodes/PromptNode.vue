@@ -39,6 +39,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { PromptNodeItem } from '../../../types/canvasNodes'
+import type { PromptNodeUiState } from '../../../types/canvasNodeUi'
 import NodeHeader from './NodeHeader.vue'
 import NodePorts from './NodePorts.vue'
 import { buildNodeIoFromSlots, PROMPT_NODE_IO_SLOTS } from './nodeIoConfig'
@@ -49,7 +50,7 @@ const props = defineProps<{
   active: boolean
   dragging: boolean
   copyMode: boolean
-  outputConnected?: boolean
+  uiState?: PromptNodeUiState
 }>()
 
 const emit = defineEmits<{
@@ -61,11 +62,21 @@ const emit = defineEmits<{
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
+const resolvedUiState = computed<PromptNodeUiState>(() => ({
+  connection: {
+    hasAnyConnection: props.uiState?.connection?.hasAnyConnection ?? false,
+    connected: {
+      output: props.uiState?.connection?.connected?.output ?? false,
+    },
+    pending: props.uiState?.connection?.pending,
+  },
+  primaryAction: props.uiState?.primaryAction,
+}))
+
 const ports = computed(() =>
   buildNodeIoFromSlots(PROMPT_NODE_IO_SLOTS, null, {
-    connected: {
-      output: props.outputConnected,
-    },
+    connected: resolvedUiState.value.connection.connected,
+    pending: resolvedUiState.value.connection.pending,
   }).ports,
 )
 

@@ -29,12 +29,15 @@ interface CanvasSelectionBindings {
   activeImageNodeId: Ref<number | null>
   activePromptNodeId: Ref<number | null>
   activeModelNodeId: Ref<number | null>
+  activeMannequinNodeId: Ref<number | null>
+  activeViewpointNodeId: Ref<number | null>
   activeMaskNodeId: Ref<number | null>
   activeColorNodeId: Ref<number | null>
   activeEditNodeId: Ref<number | null>
   activeFusionNodeId: Ref<number | null>
   activeEnhanceNodeId: Ref<number | null>
   activeTryOnNodeId: Ref<number | null>
+  activeFaceSwapNodeId: Ref<number | null>
   activePaletteNodeId: Ref<number | null>
   activeGenerateNodeId: Ref<number | null>
   clearActiveNodes: () => void
@@ -62,12 +65,15 @@ export function createCanvasPointerBindings(
     imageNodes: options.imageNodes,
     promptNodes: options.promptNodes,
     modelNodes: options.modelNodes,
+    mannequinNodes: options.mannequinNodes,
+    viewpointNodes: options.viewpointNodes,
     maskNodes: options.maskNodes,
     colorNodes: options.colorNodes,
     editNodes: options.editNodes,
     fusionNodes: options.fusionNodes,
     enhanceNodes: options.enhanceNodes,
     tryOnNodes: options.tryOnNodes,
+    faceSwapNodes: options.faceSwapNodes,
     paletteNodes: options.paletteNodes,
     generateNodes: options.generateNodes,
     activeTool: options.activeTool,
@@ -82,12 +88,15 @@ export function createCanvasPointerBindings(
     activeImageNodeId: selection.activeImageNodeId,
     activePromptNodeId: selection.activePromptNodeId,
     activeModelNodeId: selection.activeModelNodeId,
+    activeMannequinNodeId: selection.activeMannequinNodeId,
+    activeViewpointNodeId: selection.activeViewpointNodeId,
     activeMaskNodeId: selection.activeMaskNodeId,
     activeColorNodeId: selection.activeColorNodeId,
     activeEditNodeId: selection.activeEditNodeId,
     activeFusionNodeId: selection.activeFusionNodeId,
     activeEnhanceNodeId: selection.activeEnhanceNodeId,
     activeTryOnNodeId: selection.activeTryOnNodeId,
+    activeFaceSwapNodeId: selection.activeFaceSwapNodeId,
     activePaletteNodeId: selection.activePaletteNodeId,
     activeGenerateNodeId: selection.activeGenerateNodeId,
     isPanning: uiState.isPanning,
@@ -117,6 +126,8 @@ export function createCanvasPointerBindings(
     importCanvasImageToImageNodeAtPoint: options.importCanvasImageToImageNodeAtPoint,
     importCanvasImageToMaskNodeAtPoint: options.importCanvasImageToMaskNodeAtPoint,
     importCanvasImageToModelNodeAtPoint: options.importCanvasImageToModelNodeAtPoint,
+    importCanvasImageToMannequinNodeAtPoint: options.importCanvasImageToMannequinNodeAtPoint,
+    importCanvasImageToViewpointNodeAtPoint: options.importCanvasImageToViewpointNodeAtPoint,
     message: options.message,
   }
 }

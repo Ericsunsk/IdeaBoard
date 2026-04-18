@@ -43,20 +43,7 @@ const menuOptions: MenuOption[] = [
     key: 'fashion-lab',
     children: [
       { label: '局部改款', key: 'partial-edit' },
-      { label: '风格融合', key: 'style-fusion' },
-      { label: '系列配色', key: 'series-color' },
       { label: '定向换色', key: 'directed-recolor' },
-      { label: '面料上身', key: 'fabric-on-body' },
-      { label: '图案上身', key: 'pattern-on-body' },
-    ]
-  },
-  {
-    label: '摄影商拍',
-    key: 'photo-shoot',
-    children: [
-      { label: '虚拟 3D', key: 'virtual-3d' },
-      { label: '人台变模特', key: 'mannequin-to-model' },
-      { label: '定向换脸', key: 'face-swap' },
     ]
   },
   {
@@ -64,10 +51,7 @@ const menuOptions: MenuOption[] = [
     key: 'pattern-studio',
     children: [
       { label: '图案生成', key: 'pattern-gen' },
-      { label: '画风复刻', key: 'style-clone' },
       { label: '四方连续', key: 'seamless-tile' },
-      { label: '图案融合', key: 'pattern-fusion' },
-      { label: '工艺融合', key: 'craft-fusion' },
       { label: '图案涂改', key: 'pattern-inpaint' },
       { label: '图案变清晰', key: 'pattern-upscale' },
     ]
@@ -95,6 +79,15 @@ const keyToPath: Record<string, string> = {
   home: '/user/home',
   free: '/user/boards',
   'my-works': '/user/center',
+  'partial-edit': '/user/picture',
+  'directed-recolor': '/user/picture',
+  'pattern-gen': '/user/picture',
+  'seamless-tile': '/user/picture',
+  'pattern-inpaint': '/user/picture',
+  'pattern-upscale': '/user/picture',
+  'hd-upscale': '/user/picture',
+  'deblur': '/user/picture',
+  'canvas-extend': '/user/picture',
 }
 
 function handleMenuSelect(key: string) {

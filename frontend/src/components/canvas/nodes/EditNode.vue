@@ -37,6 +37,13 @@
           >
             Pattern
           </NodeActionButton>
+          <NodeActionButton
+            variant="chip"
+            :active="node.mode === 'bg-swap'"
+            @click="emit('update:mode', 'bg-swap')"
+          >
+            BG
+          </NodeActionButton>
         </div>
         <div class="edit-mode-meta">
           <span class="edit-mode-pill">{{ modeLabel }}</span>
@@ -48,8 +55,8 @@
       <NodeConnectionChips :items="connectionChips" />
 
       <div class="node-primary-action-slot">
-        <NodeActionButton variant="primary" :disabled="generating" full @click="emit('generate')">
-          生成
+        <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
+          {{ uiState?.primaryAction?.label || '生成' }}
         </NodeActionButton>
       </div>
     </div>
@@ -66,6 +73,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { EditNodeItem } from '../../../types/canvasNodes'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeHeader from './NodeHeader.vue'
@@ -79,17 +87,14 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   generating: boolean
-  imageInputConnected?: boolean
-  maskInputConnected?: boolean
-  promptInputConnected?: boolean
-  outputConnected?: boolean
+  uiState?: NodeUiState
   errorPortKeys: string[]
 }>()
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'delete'): void
-  (e: 'update:mode', value: 'partial-edit' | 'pattern-inpaint'): void
+  (e: 'update:mode', value: 'partial-edit' | 'pattern-inpaint' | 'bg-swap'): void
   (e: 'generate'): void
   (e: 'port-mousedown', event: MouseEvent, port: 'image'): void
 }>()
@@ -98,10 +103,14 @@ const nodeStyle = useCanvasNodeStyle(() => props.node)
 const io = computed(() =>
   buildNodeIoFromSlots(EDIT_NODE_IO_SLOTS, null, {
     connected: {
-      image: props.imageInputConnected,
-      mask: props.maskInputConnected,
-      prompt: props.promptInputConnected,
-      output: props.outputConnected,
+      image: props.uiState?.connection?.connected?.image,
+      mask: props.uiState?.connection?.connected?.mask,
+      prompt: props.uiState?.connection?.connected?.prompt,
+      output: props.uiState?.connection?.connected?.output,
+    },
+    pending: {
+      image: props.uiState?.connection?.pending?.image,
+      mask: props.uiState?.connection?.pending?.mask,
     },
     errorPortKeys: props.errorPortKeys,
   }),
@@ -109,7 +118,11 @@ const io = computed(() =>
 const connectionChips = computed(() => io.value.connectionChips)
 const ports = computed(() => io.value.ports)
 
-const modeLabel = computed(() => (props.node.mode === 'pattern-inpaint' ? 'Pattern' : 'Partial'))
+const modeLabel = computed(() => {
+  if (props.node.mode === 'pattern-inpaint') return 'Pattern'
+  if (props.node.mode === 'bg-swap') return 'Background'
+  return 'Partial'
+})
 
 function onPortMouseDown(event: MouseEvent, port: string) {
   emit('port-mousedown', event, port as 'image')

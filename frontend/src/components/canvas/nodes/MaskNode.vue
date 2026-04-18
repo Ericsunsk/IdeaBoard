@@ -151,6 +151,7 @@
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import type { MaskNodeItem } from '../../../types/canvasNodes'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodeIconButton from './NodeIconButton.vue'
@@ -167,8 +168,7 @@ const props = defineProps<{
   canvasWidth: number
   sourceImageUrl?: string
   hasConnectedImageInput?: boolean
-  imageInputConnected?: boolean
-  outputConnected?: boolean
+  uiState?: NodeUiState
 }>()
 
 const emit = defineEmits<{
@@ -188,13 +188,15 @@ const emit = defineEmits<{
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-
 const effectiveSourceImageUrl = computed(() => props.sourceImageUrl ?? props.node.sourceImageUrl)
 const ports = computed(() =>
   buildNodeIoFromSlots(MASK_NODE_IO_SLOTS, null, {
     connected: {
-      image: props.imageInputConnected,
-      output: props.outputConnected,
+      image: props.uiState?.connection?.connected?.image,
+      output: props.uiState?.connection?.connected?.output,
+    },
+    pending: {
+      image: props.uiState?.connection?.pending?.image,
     },
   }).ports,
 )

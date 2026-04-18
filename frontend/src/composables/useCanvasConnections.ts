@@ -1,5 +1,5 @@
-import { onUnmounted, ref, type Ref } from 'vue'
-import { isCanvasConnectionAllowed, resolveCanvasConnectionTone, type CanvasConnectionTone } from '../config/canvasConnections'
+import { computed, onUnmounted, ref, type Ref } from 'vue'
+import { resolveCanvasConnectionTone, type CanvasConnectionTone } from '../config/canvasConnections'
 import {
   isCanvasConnectionNodeType,
   isCanvasConnectionPort,
@@ -9,7 +9,25 @@ import type {
   CanvasConnection,
   CanvasConnectionNodeType,
   CanvasConnectionPort,
+  CanvasNodeItem,
 } from '../types/canvasNodes'
+import {
+  COLOR_NODE_IO_SLOTS,
+  EDIT_NODE_IO_SLOTS,
+  ENHANCE_NODE_IO_SLOTS,
+  FACESWAP_NODE_IO_SLOTS,
+  FUSION_NODE_IO_SLOTS,
+  GENERATE_NODE_IO_SLOTS,
+  IMAGE_NODE_IO_SLOTS,
+  MANNEQUIN_NODE_IO_SLOTS,
+  MASK_NODE_IO_SLOTS,
+  MODEL_NODE_IO_SLOTS,
+  PALETTE_NODE_IO_SLOTS,
+  PROMPT_NODE_IO_SLOTS,
+  TRYON_NODE_IO_SLOTS,
+  VIEWPOINT_NODE_IO_SLOTS,
+  type NodeIoSlotTemplate,
+} from '../components/canvas/nodes/nodeIoConfig'
 
 export interface ConnectionEndpoint {
   nodeType: CanvasConnectionNodeType
@@ -36,8 +54,41 @@ export interface RenderedConnection {
 export interface UseCanvasConnectionsOptions {
   connections: Ref<CanvasConnection[]>
   canvasLayoutRef: Ref<HTMLElement | null>
+  canvasX: Ref<number>
+  canvasY: Ref<number>
+  zoomLevel: Ref<number>
+  isConnectionAllowed: (from: ConnectionEndpoint, to: ConnectionEndpoint) => boolean
+  lookupNodeByType: (nodeType: CanvasConnectionNodeType, nodeId: number) => CanvasNodeItem | null
   onConnectionNotAllowed?: () => void
   onInvalidDirection?: () => void
+}
+
+type ConnectionRenderableNode = Pick<CanvasNodeItem, 'x' | 'y' | 'width'>
+
+const WORKFLOW_NODE_BORDER_WIDTH = 1.5
+// Match the actual visual center of NodePorts relative to the node border box:
+// - Port width: 9px, border: 1.5px => port border-box width = 12px
+// - Input left: -5.5px, output right: -5.5px
+// - Node absolute x/y uses the workflow-node border-box origin, while absolute child positioning
+//   is resolved from the padding box. We therefore need to add the node border width back in.
+const INPUT_PORT_CENTER_OFFSET_X = WORKFLOW_NODE_BORDER_WIDTH + 0.5
+const OUTPUT_PORT_CENTER_OFFSET_X = -(WORKFLOW_NODE_BORDER_WIDTH + 0.5)
+
+const NODE_IO_SLOTS_BY_TYPE: Record<CanvasConnectionNodeType, readonly NodeIoSlotTemplate<any>[]> = {
+  image: IMAGE_NODE_IO_SLOTS,
+  prompt: PROMPT_NODE_IO_SLOTS,
+  mask: MASK_NODE_IO_SLOTS,
+  color: COLOR_NODE_IO_SLOTS,
+  model: MODEL_NODE_IO_SLOTS,
+  mannequin: MANNEQUIN_NODE_IO_SLOTS,
+  viewpoint: VIEWPOINT_NODE_IO_SLOTS,
+  edit: EDIT_NODE_IO_SLOTS,
+  fusion: FUSION_NODE_IO_SLOTS,
+  enhance: ENHANCE_NODE_IO_SLOTS,
+  tryon: TRYON_NODE_IO_SLOTS,
+  faceswap: FACESWAP_NODE_IO_SLOTS,
+  palette: PALETTE_NODE_IO_SLOTS,
+  generate: GENERATE_NODE_IO_SLOTS,
 }
 
 function createConnectionId(): number {
@@ -55,6 +106,7 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
   const draftConnectionTone = ref<'default' | 'valid' | 'invalid'>('default')
   const draftConnectionKind = ref<CanvasConnectionTone>('image')
   const nodeConnectionErrorPorts = ref<Record<string, string[]>>({})
+  const reconnectingConnectionId = computed(() => connectionDragState.value?.reconnectConnectionId ?? null)
 
   const connectionDragState = ref<{
     from: ConnectionEndpoint
@@ -62,6 +114,8 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     startY: number
     currentX: number
     currentY: number
+    reconnectConnectionId?: number
+    reconnectConnectionSnapshot?: CanvasConnection
   } | null>(null)
 
   let connectionRenderRaf: number | null = null
@@ -177,6 +231,18 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     )
   }
 
+  function getOutgoingConnections(
+    fromNodeType: CanvasConnectionNodeType,
+    fromNodeId: number,
+    fromPort: CanvasConnectionPort,
+  ): CanvasConnection[] {
+    return options.connections.value.filter(connection =>
+      connection.fromNodeType === fromNodeType &&
+      connection.fromNodeId === fromNodeId &&
+      connection.fromPort === fromPort,
+    )
+  }
+
   function hasOutgoingPortConnection(
     fromNodeType: CanvasConnectionNodeType,
     fromNodeId: number,
@@ -224,6 +290,75 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
       `[data-node-id="${endpoint.nodeId}"]`,
       `[data-port-name="${endpoint.port}"]`,
     ].join('')
+  }
+
+  function getNodeSelector(nodeType: CanvasConnectionNodeType, nodeId: number): string {
+    return [
+      '.workflow-node',
+      `[data-node-kind="${nodeType}"]`,
+      `[data-node-id="${nodeId}"]`,
+    ].join('')
+  }
+
+  function getCanvasCenter(layout: HTMLElement) {
+    return {
+      x: layout.clientWidth / 2,
+      y: layout.clientHeight / 2,
+    }
+  }
+
+  function getCanvasLayerPointFromClient(clientX: number, clientY: number): { x: number; y: number } | null {
+    const layout = options.canvasLayoutRef.value
+    if (!layout) return null
+    const layoutRect = layout.getBoundingClientRect()
+    const center = getCanvasCenter(layout)
+    const zoom = options.zoomLevel.value / 100
+    return {
+      x: center.x + (clientX - layoutRect.left - options.canvasX.value - center.x) / zoom,
+      y: center.y + (clientY - layoutRect.top - options.canvasY.value - center.y) / zoom,
+    }
+  }
+
+  function getNodeRenderHeight(nodeType: CanvasConnectionNodeType, nodeId: number): number | null {
+    const layout = options.canvasLayoutRef.value
+    if (!layout) return null
+    const nodeEl = layout.querySelector<HTMLElement>(getNodeSelector(nodeType, nodeId))
+    if (!nodeEl) return null
+    return nodeEl.offsetHeight || null
+  }
+
+  function resolvePortTop(
+    nodeType: CanvasConnectionNodeType,
+    direction: 'input' | 'output',
+    portName: CanvasConnectionPort,
+    nodeHeight: number,
+  ): number {
+    const slot = NODE_IO_SLOTS_BY_TYPE[nodeType].find(item =>
+      item.direction === direction && item.portName === portName,
+    )
+    return slot?.top ?? nodeHeight / 2
+  }
+
+  function getNodePortCenter(
+    direction: 'input' | 'output',
+    node: ConnectionRenderableNode,
+    endpoint: ConnectionEndpoint,
+  ): { x: number; y: number } | null {
+    const layout = options.canvasLayoutRef.value
+    if (!layout) return null
+    const nodeHeight = getNodeRenderHeight(endpoint.nodeType, endpoint.nodeId)
+    if (!nodeHeight) return null
+    const center = getCanvasCenter(layout)
+    const x =
+      center.x +
+      node.x +
+      (direction === 'input' ? INPUT_PORT_CENTER_OFFSET_X : node.width + OUTPUT_PORT_CENTER_OFFSET_X)
+    const y =
+      center.y +
+      node.y +
+      WORKFLOW_NODE_BORDER_WIDTH +
+      resolvePortTop(endpoint.nodeType, direction, endpoint.port, nodeHeight)
+    return { x, y }
   }
 
   function parsePortTarget(target: HTMLElement | null, direction?: 'input' | 'output'): ParsedPortTarget | null {
@@ -283,7 +418,7 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     layout.querySelectorAll<HTMLElement>('.node-port[data-port-direction="input"]').forEach((portEl) => {
       const parsed = parsePortTarget(portEl, 'input')
       if (!parsed) return
-      if (isCanvasConnectionAllowed(connectionDragState.value!.from, parsed.endpoint)) {
+      if (options.isConnectionAllowed(connectionDragState.value!.from, parsed.endpoint)) {
         portEl.classList.add('is-connection-target')
       }
     })
@@ -292,7 +427,7 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
 
     const isValidHover =
       hoveredPort.direction === 'input' &&
-      isCanvasConnectionAllowed(connectionDragState.value.from, hoveredPort.endpoint)
+      options.isConnectionAllowed(connectionDragState.value.from, hoveredPort.endpoint)
 
     hoveredPort.element.classList.add(
       isValidHover ? 'is-connection-hover-target' : 'is-connection-invalid-target',
@@ -303,27 +438,9 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     direction: 'input' | 'output',
     endpoint: ConnectionEndpoint,
   ): { x: number; y: number } | null {
-    const layout = options.canvasLayoutRef.value
-    if (!layout) return null
-    const port = layout.querySelector<HTMLElement>(getPortSelector(direction, endpoint))
-    if (!port) return null
-    const layoutRect = layout.getBoundingClientRect()
-    const portRect = port.getBoundingClientRect()
-    return {
-      x: portRect.left - layoutRect.left + portRect.width / 2,
-      y: portRect.top - layoutRect.top + portRect.height / 2,
-    }
-  }
-
-  function getPortCenterFromElement(
-    portEl: HTMLElement,
-    layoutRect: DOMRect,
-  ): { x: number; y: number } {
-    const portRect = portEl.getBoundingClientRect()
-    return {
-      x: portRect.left - layoutRect.left + portRect.width / 2,
-      y: portRect.top - layoutRect.top + portRect.height / 2,
-    }
+    const node = options.lookupNodeByType(endpoint.nodeType, endpoint.nodeId)
+    if (!node) return null
+    return getNodePortCenter(direction, node, endpoint)
   }
 
   function buildConnectionPath(start: { x: number; y: number }, end: { x: number; y: number }): string {
@@ -383,15 +500,8 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
   }
 
   function upsertConnection(from: ConnectionEndpoint, to: ConnectionEndpoint) {
-    if (!isCanvasConnectionAllowed(from, to)) return false
-    const filtered = options.connections.value.filter(connection =>
-      !(
-        connection.toNodeType === to.nodeType &&
-        connection.toNodeId === to.nodeId &&
-        connection.toPort === to.port
-      ),
-    )
-    const existingExact = filtered.find(connection =>
+    if (!options.isConnectionAllowed(from, to)) return false
+    const existingExact = options.connections.value.find(connection =>
       connection.fromNodeType === from.nodeType &&
       connection.fromNodeId === from.nodeId &&
       connection.fromPort === from.port &&
@@ -399,62 +509,124 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
       connection.toNodeId === to.nodeId &&
       connection.toPort === to.port,
     )
-    options.connections.value = existingExact
-      ? filtered
-      : [
-          ...filtered,
-          {
-            id: createConnectionId(),
-            fromNodeType: from.nodeType,
-            fromNodeId: from.nodeId,
-            fromPort: from.port,
-            toNodeType: to.nodeType,
-            toNodeId: to.nodeId,
-            toPort: to.port,
-          },
-        ]
+    if (existingExact) {
+      options.connections.value = options.connections.value.filter(connection => connection.id !== existingExact.id)
+      if (selectedConnectionId.value === existingExact.id) {
+        clearSelectedConnection()
+      }
+      return true
+    }
+
+    const filtered = options.connections.value.filter(connection =>
+      !(
+        connection.toNodeType === to.nodeType &&
+        connection.toNodeId === to.nodeId &&
+        connection.toPort === to.port
+      ),
+    )
+    options.connections.value = [
+      ...filtered,
+      {
+        id: createConnectionId(),
+        fromNodeType: from.nodeType,
+        fromNodeId: from.nodeId,
+        fromPort: from.port,
+        toNodeType: to.nodeType,
+        toNodeId: to.nodeId,
+        toPort: to.port,
+      },
+    ]
     clearSelectedConnection()
     return true
   }
 
-  function beginConnectionDrag(from: ConnectionEndpoint, target: HTMLElement) {
-    const layout = options.canvasLayoutRef.value
-    if (!layout) return
-    const layoutRect = layout.getBoundingClientRect()
-    const targetRect = target.getBoundingClientRect()
-    const startX = targetRect.left - layoutRect.left + targetRect.width / 2
-    const startY = targetRect.top - layoutRect.top + targetRect.height / 2
+  function removeIncomingConnectionsForPort(
+    toNodeType: CanvasConnectionNodeType,
+    toNodeId: number,
+    toPort: CanvasConnectionPort,
+  ) {
+    const removedSelected = options.connections.value.some(connection =>
+      connection.id === selectedConnectionId.value &&
+      connection.toNodeType === toNodeType &&
+      connection.toNodeId === toNodeId &&
+      connection.toPort === toPort,
+    )
+    options.connections.value = options.connections.value.filter(connection =>
+      !(
+        connection.toNodeType === toNodeType &&
+        connection.toNodeId === toNodeId &&
+        connection.toPort === toPort
+      ),
+    )
+    if (removedSelected) {
+      clearSelectedConnection()
+    }
+  }
+
+  function beginConnectionDrag(from: ConnectionEndpoint) {
+    const startPoint = getPortCenter('output', from)
+    if (!startPoint) return
     connectionDragState.value = {
       from,
-      startX,
-      startY,
-      currentX: startX,
-      currentY: startY,
+      startX: startPoint.x,
+      startY: startPoint.y,
+      currentX: startPoint.x,
+      currentY: startPoint.y,
     }
     draftConnectionPath.value = buildConnectionPath(
-      { x: startX, y: startY },
-      { x: startX, y: startY },
+      { x: startPoint.x, y: startPoint.y },
+      { x: startPoint.x, y: startPoint.y },
     )
     draftConnectionKind.value = resolveCanvasConnectionTone(from.port)
     draftConnectionTone.value = 'default'
     refreshConnectionPortHighlights()
   }
 
+  function beginConnectionReconnect(connectionId: number) {
+    const connection = options.connections.value.find(item => item.id === connectionId)
+    if (!connection) return
+    const startPoint = getPortCenter('output', {
+      nodeType: connection.fromNodeType,
+      nodeId: connection.fromNodeId,
+      port: connection.fromPort,
+    })
+    const endPoint = getPortCenter('input', {
+      nodeType: connection.toNodeType,
+      nodeId: connection.toNodeId,
+      port: connection.toPort,
+    })
+    if (!startPoint || !endPoint) return
+    connectionDragState.value = {
+      from: {
+        nodeType: connection.fromNodeType,
+        nodeId: connection.fromNodeId,
+        port: connection.fromPort,
+      },
+      startX: startPoint.x,
+      startY: startPoint.y,
+      currentX: endPoint.x,
+      currentY: endPoint.y,
+      reconnectConnectionId: connectionId,
+      reconnectConnectionSnapshot: { ...connection },
+    }
+    draftConnectionPath.value = buildConnectionPath(startPoint, endPoint)
+    draftConnectionKind.value = resolveCanvasConnectionTone(connection.fromPort)
+    draftConnectionTone.value = 'default'
+    refreshConnectionPortHighlights()
+  }
+
   function updateConnectionDrag(clientX: number, clientY: number) {
-    if (!connectionDragState.value || !options.canvasLayoutRef.value) return
-    const layoutRect = options.canvasLayoutRef.value.getBoundingClientRect()
+    if (!connectionDragState.value) return
     const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null
     const hoveredPort = parsePortTarget(target)
     const isValidHover =
       !!hoveredPort &&
       hoveredPort.direction === 'input' &&
-      isCanvasConnectionAllowed(connectionDragState.value.from, hoveredPort.endpoint)
+      options.isConnectionAllowed(connectionDragState.value.from, hoveredPort.endpoint)
     const previewPoint = isValidHover && hoveredPort
-      ? getPortCenterFromElement(hoveredPort.element, layoutRect)
-      : {
-          x: clientX - layoutRect.left,
-          y: clientY - layoutRect.top,
-        }
+      ? getPortCenter('input', hoveredPort.endpoint)
+      : getCanvasLayerPointFromClient(clientX, clientY)
+    if (!previewPoint) return
     connectionDragState.value = {
       ...connectionDragState.value,
       currentX: previewPoint.x,
@@ -477,12 +649,23 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     if (!connectionDragState.value) return 'noop'
     const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null
     const parsedPort = parsePortTarget(target)
+    const reconnectConnectionId = connectionDragState.value.reconnectConnectionId ?? null
+    const reconnectConnectionSnapshot = connectionDragState.value.reconnectConnectionSnapshot
     let result: 'linked' | 'invalid-pair' | 'invalid-direction' | 'noop' = 'noop'
     if (parsedPort?.direction === 'input') {
+      if (reconnectConnectionId !== null) {
+        options.connections.value = options.connections.value.filter(connection => connection.id !== reconnectConnectionId)
+      }
       const linked = upsertConnection(connectionDragState.value.from, parsedPort.endpoint)
       result = linked ? 'linked' : 'invalid-pair'
     } else if (parsedPort) {
       result = 'invalid-direction'
+    }
+    if (result !== 'linked' && reconnectConnectionSnapshot) {
+      options.connections.value = [
+        ...options.connections.value.filter(connection => connection.id !== reconnectConnectionSnapshot.id),
+        reconnectConnectionSnapshot,
+      ]
     }
     clearConnectionDraft()
     return result
@@ -519,9 +702,7 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     nodeId: number,
     port: CanvasConnectionPort,
   ) {
-    const target = event.currentTarget
-    if (!(target instanceof HTMLElement)) return
-    beginConnectionDrag({ nodeType, nodeId, port }, target)
+    beginConnectionDrag({ nodeType, nodeId, port })
   }
 
   function selectConnection(connectionId: number) {
@@ -549,22 +730,27 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     draftConnectionPath,
     draftConnectionTone,
     draftConnectionKind,
+    reconnectingConnectionId,
     clearSelectedConnection,
     hasSelectedConnection,
     findIncomingConnection,
     getIncomingConnections,
     hasIncomingPortConnection,
     findOutgoingConnection,
+    getOutgoingConnections,
     hasOutgoingPortConnection,
     removeConnectionsForNode,
+    removeIncomingConnectionsForPort,
     deleteSelectedConnection,
     clearNodeConnectionError,
     clearAllNodeConnectionErrors,
     getNodeConnectionErrorPorts,
     triggerNodeConnectionError,
+    refreshRenderedConnections,
     scheduleRenderedConnectionsRefresh,
     clearConnectionDraft,
     startConnectionDrag,
+    beginConnectionReconnect,
     beginConnectionDrag,
     updateConnectionDrag,
     finishConnectionDrag,

@@ -17,6 +17,7 @@ type NodeIoSlotTemplate<T> = {
 
 type NodeIoBuildState = {
   connected?: Partial<Record<string, boolean | undefined>>
+  pending?: Partial<Record<string, boolean | undefined>>
   errorPortKeys?: readonly string[]
 }
 
@@ -25,6 +26,7 @@ type NodeConnectionChipItem = {
   label: string
   kind: NodeIoKind
   connected?: boolean
+  pending?: boolean
   error?: boolean
   required?: boolean
   visible?: boolean
@@ -37,6 +39,7 @@ type NodePortItem = {
   name: string
   top?: number
   connected?: boolean
+  pending?: boolean
   visible?: boolean
 }
 
@@ -49,7 +52,7 @@ export const PROMPT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
 ]
 
 export const IMAGE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'input', kind: 'image', direction: 'input', portName: 'image', portKey: 'image-input' },
+  { key: 'image', kind: 'image', direction: 'input', portName: 'image', portKey: 'image-input' },
   { key: 'output', kind: 'image', direction: 'output', portName: 'image', portKey: 'image-output' },
 ]
 
@@ -69,6 +72,18 @@ export const MODEL_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'model-image-input', top: 92 },
   { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'model-prompt-input', top: 148 },
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'model-output', top: 92 },
+]
+
+export const MANNEQUIN_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
+  { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'mannequin-image-input', top: 92 },
+  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'mannequin-prompt-input', top: 148 },
+  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'mannequin-output', top: 92 },
+]
+
+export const VIEWPOINT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
+  { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'viewpoint-image-input', top: 92 },
+  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'viewpoint-prompt-input', top: 148 },
+  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'viewpoint-output', top: 92 },
 ]
 
 export const EDIT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
@@ -106,6 +121,13 @@ export const TRYON_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<TryOnNodeIoContext
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'tryon-output', top: 92 },
 ]
 
+export const FACESWAP_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
+  { key: 'imageA', label: 'Target', kind: 'image', required: true, direction: 'input', portName: 'imageA', portKey: 'faceswap-image-a', top: 92 },
+  { key: 'imageB', label: 'Face', kind: 'image', required: true, direction: 'input', portName: 'imageB', portKey: 'faceswap-image-b', top: 136 },
+  { key: 'mask', label: 'Mask', kind: 'mask', direction: 'input', portName: 'mask', portKey: 'faceswap-mask-input', top: 180 },
+  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'faceswap-output', top: 92 },
+]
+
 export type PaletteNodeIoContext = {
   usesReference: boolean
 }
@@ -129,12 +151,14 @@ export function buildNodeIoFromSlots<T>(
 ): { connectionChips: NodeConnectionChipItem[]; ports: NodePortItem[] } {
   const errorSet = new Set(state.errorPortKeys ?? [])
   const connectedMap = state.connected ?? {}
+  const pendingMap = state.pending ?? {}
 
   const connectionChips: NodeConnectionChipItem[] = []
   const ports: NodePortItem[] = []
 
   for (const slot of slots) {
     const connected = Boolean(connectedMap[slot.key])
+    const pending = Boolean(pendingMap[slot.key])
     const error = errorSet.has(slot.key)
     const visible = slot.visible == null ? undefined : resolveValue(slot.visible, context)
 
@@ -145,6 +169,7 @@ export function buildNodeIoFromSlots<T>(
         kind: slot.kind,
         required: slot.required,
         connected,
+        pending,
         error,
         visible,
       })
@@ -158,6 +183,7 @@ export function buildNodeIoFromSlots<T>(
         name: slot.portName,
         top: slot.top,
         connected,
+        pending,
         visible,
       })
     }

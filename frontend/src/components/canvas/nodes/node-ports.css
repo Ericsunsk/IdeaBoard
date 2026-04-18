@@ -37,6 +37,12 @@
   box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.2));
 }
 
+.node-port.is-pending {
+  background: #fff;
+  border-color: var(--port-color, #9278e6);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--port-color, #9278e6) 18%, transparent);
+}
+
 .node-port.is-connection-source {
   box-shadow: 0 0 0 4px var(--port-glow, rgba(146, 120, 230, 0.26));
 }

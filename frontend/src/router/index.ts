@@ -47,39 +47,7 @@ const routes: RouteRecordRaw[] = [
         name: 'UserCenter',
         component: () => import('../views/user/Center.vue'),
         meta: { requiresAuth: true }
-      },
-      // 服装实验室
-      { path: 'line-draft', redirect: '/user/picture' },
-      { path: 'sketch-to-design', redirect: '/user/picture' },
-      { path: 'partial-edit', redirect: '/user/picture' },
-      { path: 'style-innovate', redirect: '/user/picture' },
-      { path: 'style-fusion', name: 'StyleFusion', component: () => import('../views/user/StyleFusion.vue'), meta: { requiresAuth: true, title: '风格融合', slug: 'style-fusion' } },
-      { path: 'series-color', name: 'SeriesColor', component: () => import('../views/user/SeriesColor.vue'), meta: { requiresAuth: true, title: '系列配色', slug: 'series-color' } },
-      { path: 'directed-recolor', redirect: '/user/picture' },
-      { path: 'fabric-on-body', name: 'FabricOnBody', component: () => import('../views/user/FabricOnBody.vue'), meta: { requiresAuth: true, title: '面料上身', slug: 'fabric-on-body' } },
-      { path: 'pattern-on-body', name: 'PatternOnBody', component: () => import('../views/user/PatternOnBody.vue'), meta: { requiresAuth: true, title: '图案上身', slug: 'pattern-on-body' } },
-      // 摄影商拍
-      { path: 'multi-angle', redirect: '/user/picture' },
-      { path: 'virtual-3d', name: 'Virtual3D', component: () => import('../views/user/Virtual3D.vue'), meta: { requiresAuth: true, title: '虚拟 3D', slug: 'virtual-3d' } },
-      { path: 'mannequin-to-model', name: 'MannequinToModel', component: () => import('../views/user/MannequinToModel.vue'), meta: { requiresAuth: true, title: '人台变模特', slug: 'mannequin-to-model' } },
-      { path: 'face-swap', name: 'FaceSwap', component: () => import('../views/user/FaceSwap.vue'), meta: { requiresAuth: true, title: '定向换脸', slug: 'face-swap' } },
-      { path: 'bg-swap', redirect: '/user/picture' },
-      { path: 'garment-on-model', redirect: '/user/picture' },
-      { path: 'garment-on-model-pro', redirect: '/user/picture' },
-      // 图案工作室
-      { path: 'pattern-gen', redirect: '/user/picture' },
-      { path: 'style-clone', name: 'StyleClone', component: () => import('../views/user/StyleClone.vue'), meta: { requiresAuth: true, title: '画风复刻', slug: 'style-clone' } },
-      { path: 'seamless-tile', redirect: '/user/picture' },
-      { path: 'pattern-fusion', name: 'PatternFusion', component: () => import('../views/user/PatternFusion.vue'), meta: { requiresAuth: true, title: '图案融合', slug: 'pattern-fusion' } },
-      { path: 'craft-fusion', name: 'CraftFusion', component: () => import('../views/user/CraftFusion.vue'), meta: { requiresAuth: true, title: '工艺融合', slug: 'craft-fusion' } },
-      { path: 'pattern-inpaint', redirect: '/user/picture' },
-      { path: 'pattern-upscale', redirect: '/user/picture' },
-      // AI 工具箱
-      { path: 'to-vector', redirect: '/user/picture' },
-      { path: 'remove-bg', redirect: '/user/picture' },
-      { path: 'hd-upscale', redirect: '/user/picture' },
-      { path: 'deblur', redirect: '/user/picture' },
-      { path: 'canvas-extend', redirect: '/user/picture' },
+      }
     ]
   },
   {
@@ -226,10 +194,14 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.meta.requiresAuth && !isLoggedIn) {
-    next({ path: '/user/login', query: { redirect: to.fullPath } })
+    if (isAdminRoute) {
+      next({ path: '/admin/login', query: { redirect: to.fullPath } })
+    } else {
+      next({ path: '/user/login', query: { redirect: to.fullPath } })
+    }
   } else if (to.meta.guest && isLoggedIn) {
     if (isAdminRoute) {
-      next('/admin/users')
+      next(user?.role === 'admin' ? '/admin/users' : '/user/home')
     } else {
       next('/user/home')
     }

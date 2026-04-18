@@ -4,28 +4,34 @@ import type {
   ColorNodeItem,
   EnhanceNodeItem,
   EditNodeItem,
+  FaceSwapNodeItem,
   FusionNodeItem,
   ImageNodeItem,
+  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   PaletteNodeItem,
   PromptNodeItem,
   GenerateNodeItem,
   TryOnNodeItem,
+  ViewpointNodeItem,
 } from '../types/canvasNodes'
 
-export type NodeDragKind = 'image' | 'prompt' | 'model' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'palette' | 'generate'
+export type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'faceswap' | 'palette' | 'generate'
 
 export type DraggableNode =
   | ImageNodeItem
   | PromptNodeItem
   | ModelNodeItem
+  | MannequinNodeItem
+  | ViewpointNodeItem
   | MaskNodeItem
   | ColorNodeItem
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
+  | FaceSwapNodeItem
   | PaletteNodeItem
   | GenerateNodeItem
 
@@ -34,12 +40,15 @@ interface UseCanvasSelectionStateOptions {
   imageNodes: Ref<ImageNodeItem[]>
   promptNodes: Ref<PromptNodeItem[]>
   modelNodes: Ref<ModelNodeItem[]>
+  mannequinNodes: Ref<MannequinNodeItem[]>
+  viewpointNodes: Ref<ViewpointNodeItem[]>
   maskNodes: Ref<MaskNodeItem[]>
   colorNodes: Ref<ColorNodeItem[]>
   editNodes: Ref<EditNodeItem[]>
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
+  faceSwapNodes: Ref<FaceSwapNodeItem[]>
   paletteNodes: Ref<PaletteNodeItem[]>
   generateNodes: Ref<GenerateNodeItem[]>
   showStyleStrengthControl: Ref<boolean>
@@ -49,12 +58,15 @@ interface UseCanvasSelectionStateOptions {
   deleteImageNode: (id: number) => void
   deletePromptNode: (id: number) => void
   deleteModelNode: (id: number) => void
+  deleteMannequinNode: (id: number) => void
+  deleteViewpointNode: (id: number) => void
   deleteMaskNode: (id: number) => void
   deleteColorNode: (id: number) => void
   deleteEditNode: (id: number) => void
   deleteFusionNode: (id: number) => void
   deleteEnhanceNode: (id: number) => void
   deleteTryOnNode: (id: number) => void
+  deleteFaceSwapNode: (id: number) => void
   deletePaletteNode: (id: number) => void
   deleteGenerateNode: (id: number) => void
 }
@@ -67,12 +79,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   const activeImageNodeId = ref<number | null>(null)
   const activePromptNodeId = ref<number | null>(null)
   const activeModelNodeId = ref<number | null>(null)
+  const activeMannequinNodeId = ref<number | null>(null)
+  const activeViewpointNodeId = ref<number | null>(null)
   const activeMaskNodeId = ref<number | null>(null)
   const activeColorNodeId = ref<number | null>(null)
   const activeEditNodeId = ref<number | null>(null)
   const activeFusionNodeId = ref<number | null>(null)
   const activeEnhanceNodeId = ref<number | null>(null)
   const activeTryOnNodeId = ref<number | null>(null)
+  const activeFaceSwapNodeId = ref<number | null>(null)
   const activePaletteNodeId = ref<number | null>(null)
   const activeGenerateNodeId = ref<number | null>(null)
 
@@ -80,12 +95,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeImageNodeId.value = null
     activePromptNodeId.value = null
     activeModelNodeId.value = null
+    activeMannequinNodeId.value = null
+    activeViewpointNodeId.value = null
     activeMaskNodeId.value = null
     activeColorNodeId.value = null
     activeEditNodeId.value = null
     activeFusionNodeId.value = null
     activeEnhanceNodeId.value = null
     activeTryOnNodeId.value = null
+    activeFaceSwapNodeId.value = null
     activePaletteNodeId.value = null
     activeGenerateNodeId.value = null
   }
@@ -100,12 +118,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
       kind !== 'image' &&
       kind !== 'prompt' &&
       kind !== 'model' &&
+      kind !== 'mannequin' &&
+      kind !== 'viewpoint' &&
       kind !== 'mask' &&
       kind !== 'color' &&
       kind !== 'edit' &&
       kind !== 'fusion' &&
       kind !== 'enhance' &&
       kind !== 'tryon' &&
+      kind !== 'faceswap' &&
       kind !== 'palette' &&
       kind !== 'generate'
     ) {
@@ -123,12 +144,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'image') return options.imageNodes.value.find(node => node.id === id) ?? null
     if (kind === 'prompt') return options.promptNodes.value.find(node => node.id === id) ?? null
     if (kind === 'model') return options.modelNodes.value.find(node => node.id === id) ?? null
+    if (kind === 'mannequin') return options.mannequinNodes.value.find(node => node.id === id) ?? null
+    if (kind === 'viewpoint') return options.viewpointNodes.value.find(node => node.id === id) ?? null
     if (kind === 'mask') return options.maskNodes.value.find(node => node.id === id) ?? null
     if (kind === 'color') return options.colorNodes.value.find(node => node.id === id) ?? null
     if (kind === 'edit') return options.editNodes.value.find(node => node.id === id) ?? null
     if (kind === 'fusion') return options.fusionNodes.value.find(node => node.id === id) ?? null
     if (kind === 'enhance') return options.enhanceNodes.value.find(node => node.id === id) ?? null
     if (kind === 'tryon') return options.tryOnNodes.value.find(node => node.id === id) ?? null
+    if (kind === 'faceswap') return options.faceSwapNodes.value.find(node => node.id === id) ?? null
     if (kind === 'palette') return options.paletteNodes.value.find(node => node.id === id) ?? null
     return options.generateNodes.value.find(node => node.id === id) ?? null
   }
@@ -139,12 +163,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'image') return activeImageNodeId.value === id
     if (kind === 'prompt') return activePromptNodeId.value === id
     if (kind === 'model') return activeModelNodeId.value === id
+    if (kind === 'mannequin') return activeMannequinNodeId.value === id
+    if (kind === 'viewpoint') return activeViewpointNodeId.value === id
     if (kind === 'mask') return activeMaskNodeId.value === id
     if (kind === 'color') return activeColorNodeId.value === id
     if (kind === 'edit') return activeEditNodeId.value === id
     if (kind === 'fusion') return activeFusionNodeId.value === id
     if (kind === 'enhance') return activeEnhanceNodeId.value === id
     if (kind === 'tryon') return activeTryOnNodeId.value === id
+    if (kind === 'faceswap') return activeFaceSwapNodeId.value === id
     if (kind === 'palette') return activePaletteNodeId.value === id
     return activeGenerateNodeId.value === id
   }
@@ -153,12 +180,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'image') return activeImageNodeId.value === id
     if (kind === 'prompt') return activePromptNodeId.value === id
     if (kind === 'model') return activeModelNodeId.value === id
+    if (kind === 'mannequin') return activeMannequinNodeId.value === id
+    if (kind === 'viewpoint') return activeViewpointNodeId.value === id
     if (kind === 'mask') return activeMaskNodeId.value === id
     if (kind === 'color') return activeColorNodeId.value === id
     if (kind === 'edit') return activeEditNodeId.value === id
     if (kind === 'fusion') return activeFusionNodeId.value === id
     if (kind === 'enhance') return activeEnhanceNodeId.value === id
     if (kind === 'tryon') return activeTryOnNodeId.value === id
+    if (kind === 'faceswap') return activeFaceSwapNodeId.value === id
     if (kind === 'palette') return activePaletteNodeId.value === id
     return activeGenerateNodeId.value === id
   }
@@ -185,6 +215,16 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   function activateModelNode(id: number) {
     clearActiveNodes()
     activeModelNodeId.value = id
+  }
+
+  function activateMannequinNode(id: number) {
+    clearActiveNodes()
+    activeMannequinNodeId.value = id
+  }
+
+  function activateViewpointNode(id: number) {
+    clearActiveNodes()
+    activeViewpointNodeId.value = id
   }
 
   function activateMaskNode(id: number) {
@@ -217,6 +257,11 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeTryOnNodeId.value = id
   }
 
+  function activateFaceSwapNode(id: number) {
+    clearActiveNodes()
+    activeFaceSwapNodeId.value = id
+  }
+
   function activatePaletteNode(id: number) {
     clearActiveNodes()
     activePaletteNodeId.value = id
@@ -231,12 +276,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'image') activateImageNode(id)
     else if (kind === 'prompt') activatePromptNode(id)
     else if (kind === 'model') activateModelNode(id)
+    else if (kind === 'mannequin') activateMannequinNode(id)
+    else if (kind === 'viewpoint') activateViewpointNode(id)
     else if (kind === 'mask') activateMaskNode(id)
     else if (kind === 'color') activateColorNode(id)
     else if (kind === 'edit') activateEditNode(id)
     else if (kind === 'fusion') activateFusionNode(id)
     else if (kind === 'enhance') activateEnhanceNode(id)
     else if (kind === 'tryon') activateTryOnNode(id)
+    else if (kind === 'faceswap') activateFaceSwapNode(id)
     else if (kind === 'palette') activatePaletteNode(id)
     else activateGenerateNode(id)
   }
@@ -257,12 +305,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'image') options.deleteImageNode(id)
     else if (kind === 'prompt') options.deletePromptNode(id)
     else if (kind === 'model') options.deleteModelNode(id)
+    else if (kind === 'mannequin') options.deleteMannequinNode(id)
+    else if (kind === 'viewpoint') options.deleteViewpointNode(id)
     else if (kind === 'mask') options.deleteMaskNode(id)
     else if (kind === 'color') options.deleteColorNode(id)
     else if (kind === 'edit') options.deleteEditNode(id)
     else if (kind === 'fusion') options.deleteFusionNode(id)
     else if (kind === 'enhance') options.deleteEnhanceNode(id)
     else if (kind === 'tryon') options.deleteTryOnNode(id)
+    else if (kind === 'faceswap') options.deleteFaceSwapNode(id)
     else if (kind === 'palette') options.deletePaletteNode(id)
     else options.deleteGenerateNode(id)
   }
@@ -293,6 +344,14 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
       options.deleteModelNode(activeModelNodeId.value)
       return true
     }
+    if (activeMannequinNodeId.value !== null) {
+      options.deleteMannequinNode(activeMannequinNodeId.value)
+      return true
+    }
+    if (activeViewpointNodeId.value !== null) {
+      options.deleteViewpointNode(activeViewpointNodeId.value)
+      return true
+    }
     if (activeMaskNodeId.value !== null) {
       options.deleteMaskNode(activeMaskNodeId.value)
       return true
@@ -315,6 +374,10 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     }
     if (activeTryOnNodeId.value !== null) {
       options.deleteTryOnNode(activeTryOnNodeId.value)
+      return true
+    }
+    if (activeFaceSwapNodeId.value !== null) {
+      options.deleteFaceSwapNode(activeFaceSwapNodeId.value)
       return true
     }
     if (activePaletteNodeId.value !== null) {
@@ -355,12 +418,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeImageNodeId.value !== null ||
     activePromptNodeId.value !== null ||
     activeModelNodeId.value !== null ||
+    activeMannequinNodeId.value !== null ||
+    activeViewpointNodeId.value !== null ||
     activeMaskNodeId.value !== null ||
     activeColorNodeId.value !== null ||
     activeEditNodeId.value !== null ||
     activeFusionNodeId.value !== null ||
     activeEnhanceNodeId.value !== null ||
     activeTryOnNodeId.value !== null ||
+    activeFaceSwapNodeId.value !== null ||
     activePaletteNodeId.value !== null ||
     activeGenerateNodeId.value !== null ||
     selectedNodeKeys.value.length > 0,
@@ -378,12 +444,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeImageNodeId,
     activePromptNodeId,
     activeModelNodeId,
+    activeMannequinNodeId,
+    activeViewpointNodeId,
     activeMaskNodeId,
     activeColorNodeId,
     activeEditNodeId,
     activeFusionNodeId,
     activeEnhanceNodeId,
     activeTryOnNodeId,
+    activeFaceSwapNodeId,
     activePaletteNodeId,
     activeGenerateNodeId,
     clearActiveNodes,
@@ -397,12 +466,15 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activateImageNode,
     activatePromptNode,
     activateModelNode,
+    activateMannequinNode,
+    activateViewpointNode,
     activateMaskNode,
     activateColorNode,
     activateEditNode,
     activateFusionNode,
     activateEnhanceNode,
     activateTryOnNode,
+    activateFaceSwapNode,
     activatePaletteNode,
     activateGenerateNode,
     activateNodeByKind,

@@ -1,7 +1,9 @@
-import type {
-  CanvasConnectionNodeType,
-  CanvasConnectionPort,
-} from '../types/canvasNodes'
+import {
+  getCanvasNodeVisibleInputPorts,
+  getCanvasNodeVisibleOutputPorts,
+  type CanvasConnectionContractNode,
+} from './canvasNodeConnectionContract'
+import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 
 export type CanvasConnectionTone = 'image' | 'mask' | 'prompt'
 
@@ -11,52 +13,24 @@ export interface CanvasConnectionEndpointLike {
   port: CanvasConnectionPort
 }
 
-export interface CanvasConnectionRule {
-  fromNodeType: CanvasConnectionNodeType
-  fromPort: CanvasConnectionPort
-  toNodeType: CanvasConnectionNodeType
-  toPort: CanvasConnectionPort
-}
+export type CanvasConnectionNodeLookup = (
+  nodeType: CanvasConnectionNodeType,
+  nodeId: number,
+) => CanvasConnectionContractNode | null
 
-export const CANVAS_CONNECTION_RULES: readonly CanvasConnectionRule[] = [
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'mask', toPort: 'image' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'color', toPort: 'image' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'model', toPort: 'image' },
-  { fromNodeType: 'model', fromPort: 'image', toNodeType: 'image', toPort: 'image' },
-  { fromNodeType: 'color', fromPort: 'image', toNodeType: 'image', toPort: 'image' },
-  { fromNodeType: 'mask', fromPort: 'mask', toNodeType: 'image', toPort: 'image' },
-  { fromNodeType: 'mask', fromPort: 'mask', toNodeType: 'color', toPort: 'mask' },
-  { fromNodeType: 'mask', fromPort: 'mask', toNodeType: 'edit', toPort: 'mask' },
-  { fromNodeType: 'prompt', fromPort: 'prompt', toNodeType: 'color', toPort: 'prompt' },
-  { fromNodeType: 'prompt', fromPort: 'prompt', toNodeType: 'model', toPort: 'prompt' },
-  { fromNodeType: 'prompt', fromPort: 'prompt', toNodeType: 'edit', toPort: 'prompt' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'edit', toPort: 'image' },
-  { fromNodeType: 'edit', fromPort: 'image', toNodeType: 'image', toPort: 'image' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'fusion', toPort: 'imageA' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'fusion', toPort: 'imageB' },
-  { fromNodeType: 'prompt', fromPort: 'prompt', toNodeType: 'fusion', toPort: 'prompt' },
-  { fromNodeType: 'fusion', fromPort: 'image', toNodeType: 'image', toPort: 'image' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'enhance', toPort: 'image' },
-  { fromNodeType: 'prompt', fromPort: 'prompt', toNodeType: 'enhance', toPort: 'prompt' },
-  { fromNodeType: 'enhance', fromPort: 'image', toNodeType: 'image', toPort: 'image' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'tryon', toPort: 'imageA' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'tryon', toPort: 'imageB' },
-  { fromNodeType: 'tryon', fromPort: 'image', toNodeType: 'image', toPort: 'image' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'palette', toPort: 'image' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'palette', toPort: 'reference' },
-  { fromNodeType: 'palette', fromPort: 'image', toNodeType: 'image', toPort: 'image' },
-  { fromNodeType: 'image', fromPort: 'image', toNodeType: 'generate', toPort: 'image' },
-  { fromNodeType: 'prompt', fromPort: 'prompt', toNodeType: 'generate', toPort: 'prompt' },
-  { fromNodeType: 'generate', fromPort: 'image', toNodeType: 'image', toPort: 'image' },
-] as const
-
-function buildConnectionRuleKey(rule: CanvasConnectionRule): string {
-  return `${rule.fromNodeType}:${rule.fromPort}->${rule.toNodeType}:${rule.toPort}`
-}
-
-const CANVAS_CONNECTION_RULE_KEY_SET = new Set<string>(
-  CANVAS_CONNECTION_RULES.map(buildConnectionRuleKey),
-)
+const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>([
+  'model',
+  'mannequin',
+  'viewpoint',
+  'color',
+  'edit',
+  'fusion',
+  'enhance',
+  'tryon',
+  'faceswap',
+  'palette',
+  'generate',
+])
 
 export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasConnectionTone {
   if (port === 'mask') return 'mask'
@@ -67,14 +41,37 @@ export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasC
 export function isCanvasConnectionAllowed(
   from: CanvasConnectionEndpointLike,
   to: CanvasConnectionEndpointLike,
+  lookupNode: CanvasConnectionNodeLookup,
 ): boolean {
   if (from.nodeType === to.nodeType && from.nodeId === to.nodeId) return false
-  return CANVAS_CONNECTION_RULE_KEY_SET.has(
-    buildConnectionRuleKey({
-      fromNodeType: from.nodeType,
-      fromPort: from.port,
-      toNodeType: to.nodeType,
-      toPort: to.port,
-    }),
-  )
+
+  const fromNode = lookupNode(from.nodeType, from.nodeId)
+  const toNode = lookupNode(to.nodeType, to.nodeId)
+  if (!fromNode || !toNode) return false
+
+  const fromPort = getCanvasNodeVisibleOutputPorts(from.nodeType, fromNode).find(port => port.port === from.port)
+  const toPort = getCanvasNodeVisibleInputPorts(to.nodeType, toNode).find(port => port.port === to.port)
+  if (!fromPort || !toPort) return false
+
+  if (from.nodeType === 'prompt') {
+    return fromPort.kind === 'prompt' && toPort.kind === 'prompt'
+  }
+
+  if (from.nodeType === 'mask') {
+    if (fromPort.kind !== 'mask') return false
+    return (
+      toPort.kind === 'mask' ||
+      (to.nodeType === 'image' && to.port === 'image')
+    )
+  }
+
+  if (from.nodeType === 'image') {
+    return fromPort.kind === 'image' && toPort.kind === 'image' && to.nodeType !== 'image'
+  }
+
+  if (RELAY_IMAGE_OUTPUT_NODE_TYPES.has(from.nodeType)) {
+    return fromPort.kind === 'image' && toPort.kind === 'image'
+  }
+
+  return false
 }

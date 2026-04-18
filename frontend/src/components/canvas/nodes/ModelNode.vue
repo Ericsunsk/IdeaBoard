@@ -89,8 +89,8 @@
       <NodeConnectionChips :items="connectionChips" />
 
       <div class="node-primary-action-slot">
-        <NodeActionButton variant="primary" :disabled="generating" full @click="emit('generate')">
-          生成多角度
+        <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
+          {{ uiState?.primaryAction?.label || '生成多角度' }}
         </NodeActionButton>
       </div>
     </div>
@@ -106,6 +106,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ModelNodeItem } from '../../../types/canvasNodes'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeHeader from './NodeHeader.vue'
@@ -122,9 +123,7 @@ const props = defineProps<{
   stageHeight: number
   sourceImageUrl?: string
   hasConnectedImageInput?: boolean
-  imageInputConnected?: boolean
-  promptInputConnected?: boolean
-  outputConnected?: boolean
+  uiState?: NodeUiState
   errorPortKeys: string[]
   angleOptions: Array<{ key: string; label: string }>
   backgroundOptions: Array<{ key: string; label: string }>
@@ -147,9 +146,12 @@ const nodeStyle = useCanvasNodeStyle(() => props.node)
 const io = computed(() =>
   buildNodeIoFromSlots(MODEL_NODE_IO_SLOTS, null, {
     connected: {
-      image: props.imageInputConnected,
-      prompt: props.promptInputConnected,
-      output: props.outputConnected,
+      image: props.uiState?.connection?.connected?.image,
+      prompt: props.uiState?.connection?.connected?.prompt,
+      output: props.uiState?.connection?.connected?.output,
+    },
+    pending: {
+      image: props.uiState?.connection?.pending?.image,
     },
     errorPortKeys: props.errorPortKeys,
   }),

@@ -2,12 +2,15 @@ export type CanvasNodeCreateActionKey =
   | 'createImageNode'
   | 'createPromptNode'
   | 'createModelNode'
+  | 'createMannequinNode'
+  | 'createViewpointNode'
   | 'createMaskNode'
   | 'createColorNode'
   | 'createEditNode'
   | 'createFusionNode'
   | 'createEnhanceNode'
   | 'createTryOnNode'
+  | 'createFaceSwapNode'
   | 'createPaletteNode'
   | 'createGenerateNode'
 
@@ -23,14 +26,17 @@ export const CANVAS_NODE_MENU_ITEMS: readonly CanvasNodeMenuItem[] = [
   { key: 'image', label: '+ Image 节点', actionKey: 'createImageNode', group: 'source', order: 10 },
   { key: 'prompt', label: '+ Prompt 节点', actionKey: 'createPromptNode', group: 'source', order: 20 },
   { key: 'model', label: '+ 模特节点', actionKey: 'createModelNode', group: 'source', order: 30 },
-  { key: 'mask', label: '+ Mask 节点', actionKey: 'createMaskNode', group: 'source', order: 40 },
-  { key: 'color', label: '+ Color 节点', actionKey: 'createColorNode', group: 'process', order: 50 },
-  { key: 'edit', label: '+ Edit 节点', actionKey: 'createEditNode', group: 'process', order: 60 },
-  { key: 'fusion', label: '+ Fusion 节点', actionKey: 'createFusionNode', group: 'process', order: 70 },
-  { key: 'enhance', label: '+ Enhance 节点', actionKey: 'createEnhanceNode', group: 'process', order: 80 },
-  { key: 'tryon', label: '+ TryOn 节点', actionKey: 'createTryOnNode', group: 'process', order: 90 },
-  { key: 'palette', label: '+ Palette 节点', actionKey: 'createPaletteNode', group: 'process', order: 100 },
-  { key: 'generate', label: '+ Generate 节点', actionKey: 'createGenerateNode', group: 'process', order: 110 },
+  { key: 'mannequin', label: '+ Mannequin 节点', actionKey: 'createMannequinNode', group: 'source', order: 40 },
+  { key: 'mask', label: '+ Mask 节点', actionKey: 'createMaskNode', group: 'source', order: 50 },
+  { key: 'color', label: '+ Color 节点', actionKey: 'createColorNode', group: 'process', order: 60 },
+  { key: 'edit', label: '+ Edit 节点', actionKey: 'createEditNode', group: 'process', order: 70 },
+  { key: 'fusion', label: '+ Fusion 节点', actionKey: 'createFusionNode', group: 'process', order: 80 },
+  { key: 'enhance', label: '+ Enhance 节点', actionKey: 'createEnhanceNode', group: 'process', order: 90 },
+  { key: 'tryon', label: '+ TryOn 节点', actionKey: 'createTryOnNode', group: 'process', order: 100 },
+  { key: 'viewpoint', label: '+ Viewpoint 节点', actionKey: 'createViewpointNode', group: 'process', order: 110 },
+  { key: 'faceswap', label: '+ FaceSwap 节点', actionKey: 'createFaceSwapNode', group: 'process', order: 120 },
+  { key: 'palette', label: '+ Palette 节点', actionKey: 'createPaletteNode', group: 'process', order: 130 },
+  { key: 'generate', label: '+ Generate 节点', actionKey: 'createGenerateNode', group: 'process', order: 140 },
 ] as const
 
 export const CANVAS_NODE_MENU_BY_ACTION = Object.freeze(

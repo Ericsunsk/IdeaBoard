@@ -34,11 +34,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { NForm, NFormItem, NInput, NButton, useMessage } from 'naive-ui'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const message = useMessage()
 
@@ -54,6 +55,17 @@ const rules = {
   password: { required: true, message: '请输入密码', trigger: 'blur' }
 }
 
+function resolveAdminRedirectPath() {
+  const redirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
+  if (!redirect || typeof redirect !== 'string') {
+    return '/admin/users'
+  }
+  if (!redirect.startsWith('/admin/') || redirect.startsWith('/admin/login')) {
+    return '/admin/users'
+  }
+  return redirect
+}
+
 async function handleLogin() {
   try {
     await formRef.value?.validate()
@@ -61,9 +73,9 @@ async function handleLogin() {
     await userStore.login(formValue.value.username, formValue.value.password)
     if (userStore.isAdmin) {
       message.success('管理员登录成功')
-      router.push('/admin/users')
+      await router.replace(resolveAdminRedirectPath())
     } else {
-      await userStore.logout()
+      userStore.clearAuth()
       message.error('该账号不是管理员')
     }
   } catch (error: any) {

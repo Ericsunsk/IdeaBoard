@@ -44,170 +44,18 @@
                     <div class="float-item pos-4 purple-sq"></div>
                 </div>
 
-                <!-- 手写箭头引导 -->
-                <div class="hand-drawn-hint" @click="scrollToFeatures">
-                    <span class="hint-text">WATCH THIS FEATURES</span>
-                    <svg
-                        class="hint-arrow"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <path d="M12 5v14M19 12l-7 7-7-7" />
-                    </svg>
-                </div>
             </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-const featuresRef = ref<HTMLElement | null>(null);
-
-// 动态主题系统
-const themes = [
-    {
-        name: "Siri Glow",
-        primary: "#3b82f6",
-        secondary: "#a855f7",
-        tertiary: "#ec4899",
-    }, // Apple Siri 风格蓝紫粉
-    {
-        name: "Aurora",
-        primary: "#10b981",
-        secondary: "#3b82f6",
-        tertiary: "#a3e635",
-    }, // 极光绿蓝
-    {
-        name: "Sunset",
-        primary: "#f97316",
-        secondary: "#eab308",
-        tertiary: "#ef4444",
-    }, // 日落橘黄红
-    {
-        name: "Cosmic",
-        primary: "#8b5cf6",
-        secondary: "#6366f1",
-        tertiary: "#d946ef",
-    }, // 宇宙深紫
-    {
-        name: "Original",
-        primary: "#a3e635",
-        secondary: "#34d399",
-        tertiary: "#10b981",
-    }, // 原始亮绿
-];
-
-const currentTheme = ref(themes[0]);
-
-const themeStyles = computed(() => ({
-    "--theme-primary": currentTheme.value.primary,
-    "--theme-secondary": currentTheme.value.secondary,
-    "--theme-tertiary": currentTheme.value.tertiary,
-}));
-
-const featureGroups = [
-    {
-        title: "服装实验室",
-        items: [
-            {
-                label: "线稿成款",
-                desc: "将手绘线稿转化为真实服装，细节尽显",
-                path: "/user/sketch-to-design",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
-            },
-            {
-                label: "线稿生成",
-                desc: "根据提示词快速生成多种风格的服装线稿",
-                path: "/user/line-draft",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
-            },
-            {
-                label: "面料上身",
-                desc: "将指定面料材质无缝应用到模特图片上",
-                path: "/user/fabric-on-body",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
-            },
-        ],
-    },
-    {
-        title: "摄影商拍",
-        items: [
-            {
-                label: "人台变模特",
-                desc: "将人台图无缝转化为高度逼真的真人模特展示",
-                path: "/user/mannequin-to-model",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-            },
-            {
-                label: "换背景",
-                desc: "一键替换商品图背景，自然融合光影",
-                path: "/user/bg-swap",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
-            },
-            {
-                label: "款式上身",
-                desc: "虚拟试衣，在不同体型上展现真实的穿搭效果",
-                path: "/user/garment-on-model",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
-            },
-            {
-                label: "模特多角度",
-                desc: "由单图生成模特不同角度的高清展示图",
-                path: "/user/multi-angle",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>',
-            },
-        ],
-    },
-    {
-        title: "图案工作室",
-        items: [
-            {
-                label: "画风复刻",
-                desc: "提取参考图的独特画风，完美应用到新作品中",
-                path: "/user/style-clone",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
-            },
-        ],
-    },
-    {
-        title: "AI 工具箱",
-        items: [
-            {
-                label: "抠图褪底",
-                desc: "发丝级精准抠图，一键提取画面主体",
-                path: "/user/remove-bg",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>',
-            },
-            {
-                label: "转矢量图",
-                desc: "将位图转换为可无限缩放的高质量矢量图形",
-                path: "/user/to-vector",
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 2 22 12 17 22 22 12 2"/></svg>',
-            },
-        ],
-    },
-];
-
-function navigateTo(path: string) {
-    router.push(path);
-}
 
 function startJourney() {
-    router.push("/user/picture");
-}
-
-function scrollToFeatures() {
-    if (featuresRef.value) {
-        featuresRef.value.scrollIntoView({ behavior: "smooth" });
-    }
+    router.push("/user/boards");
 }
 </script>
 
@@ -541,36 +389,6 @@ function scrollToFeatures() {
     background: conic-gradient(from 135deg, #d946ef, #3b82f6, #ec4899);
     border: 4px solid #ffffff;
     transform: rotate(8deg);
-}
-
-/* Hand drawn hint */
-.hand-drawn-hint {
-    position: absolute;
-    left: 1007px;
-    top: 432px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    z-index: 20;
-    transform: rotate(-10.6deg);
-}
-
-.hint-text {
-    font-family: "Comic Sans MS", "Chalkboard SE", "Bradley Hand", sans-serif;
-    text-transform: uppercase;
-    font-size: 14px;
-    letter-spacing: 1px;
-    color: #1a1a1a;
-    transform: rotate(0deg);
-}
-
-.hint-arrow {
-    width: 24px;
-    height: 24px;
-    color: #1a1a1a;
-    transform: rotate(0deg);
 }
 
 /* 响应式设计 */

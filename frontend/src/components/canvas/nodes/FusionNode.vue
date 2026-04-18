@@ -50,8 +50,8 @@
       <NodeConnectionChips :items="connectionChips" />
 
       <div class="node-primary-action-slot">
-        <NodeActionButton variant="primary" :disabled="generating" full @click="emit('generate')">
-          生成
+        <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
+          {{ uiState?.primaryAction?.label || '生成' }}
         </NodeActionButton>
       </div>
     </div>
@@ -68,6 +68,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { FusionNodeItem } from '../../../types/canvasNodes'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeHeader from './NodeHeader.vue'
@@ -86,10 +87,7 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   generating: boolean
-  imageAInputConnected?: boolean
-  imageBInputConnected?: boolean
-  promptInputConnected?: boolean
-  outputConnected?: boolean
+  uiState?: NodeUiState
   errorPortKeys: string[]
 }>()
 
@@ -108,10 +106,14 @@ const nodeStyle = useCanvasNodeStyle(() => props.node)
 const io = computed(() =>
   buildNodeIoFromSlots(FUSION_NODE_IO_SLOTS, null, {
     connected: {
-      imageA: props.imageAInputConnected,
-      imageB: props.imageBInputConnected,
-      prompt: props.promptInputConnected,
-      output: props.outputConnected,
+      imageA: props.uiState?.connection?.connected?.imageA,
+      imageB: props.uiState?.connection?.connected?.imageB,
+      prompt: props.uiState?.connection?.connected?.prompt,
+      output: props.uiState?.connection?.connected?.output,
+    },
+    pending: {
+      imageA: props.uiState?.connection?.pending?.imageA,
+      imageB: props.uiState?.connection?.pending?.imageB,
     },
     errorPortKeys: props.errorPortKeys,
   }),

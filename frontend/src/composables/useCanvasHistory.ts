@@ -19,18 +19,52 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
     modelNodes: snapshot.modelNodes.map(node => ({
       ...node,
       selectedAngles: [...node.selectedAngles],
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
+    mannequinNodes: snapshot.mannequinNodes.map(node => ({
+      ...node,
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
+    viewpointNodes: snapshot.viewpointNodes.map(node => ({
+      ...node,
+      sourceImages: node.sourceImages.map(image => ({ ...image })),
+      selectedViewpoints: [...node.selectedViewpoints],
+      outputImages: node.outputImages.map(output => ({ ...output })),
     })),
     maskNodes: snapshot.maskNodes.map(node => ({ ...node })),
-    colorNodes: snapshot.colorNodes.map(node => ({ ...node })),
-    editNodes: snapshot.editNodes.map(node => ({ ...node })),
-    fusionNodes: snapshot.fusionNodes.map(node => ({ ...node })),
-    enhanceNodes: snapshot.enhanceNodes.map(node => ({ ...node })),
-    tryOnNodes: snapshot.tryOnNodes.map(node => ({ ...node })),
+    colorNodes: snapshot.colorNodes.map(node => ({
+      ...node,
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
+    editNodes: snapshot.editNodes.map(node => ({
+      ...node,
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
+    fusionNodes: snapshot.fusionNodes.map(node => ({
+      ...node,
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
+    enhanceNodes: snapshot.enhanceNodes.map(node => ({
+      ...node,
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
+    tryOnNodes: snapshot.tryOnNodes.map(node => ({
+      ...node,
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
+    faceSwapNodes: snapshot.faceSwapNodes.map(node => ({
+      ...node,
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
     paletteNodes: snapshot.paletteNodes.map(node => ({
       ...node,
       colors: [...node.colors],
+      outputImages: node.outputImages.map(output => ({ ...output })),
     })),
-    generateNodes: snapshot.generateNodes.map(node => ({ ...node })),
+    generateNodes: snapshot.generateNodes.map(node => ({
+      ...node,
+      outputImages: node.outputImages.map(output => ({ ...output })),
+    })),
     connections: snapshot.connections.map(connection => ({ ...connection })),
     viewport: { ...snapshot.viewport },
   }

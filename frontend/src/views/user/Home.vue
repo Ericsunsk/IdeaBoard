@@ -14,66 +14,25 @@
     <div class="canvas-grid" :class="{ 'grid-dragging': isDraggingFile }"></div>
 
     <!-- ② 顶部悬浮栏 -->
-    <header class="floating-header">
-      <div class="header-left">
-        <div class="file-name-chip" @mousedown.stop>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          <input
-            v-if="isRenamingBoard"
-            ref="boardNameInputRef"
-            v-model="boardNameDraft"
-            class="board-name-input"
-            type="text"
-            maxlength="60"
-            @keydown.enter.prevent="confirmBoardRename"
-            @keydown.esc.prevent="cancelBoardRename"
-            @blur="confirmBoardRename"
-          />
-          <button
-            v-else
-            type="button"
-            class="file-name-btn"
-            title="点击重命名画布"
-            @click.stop="startBoardRename"
-          >
-            {{ currentBoardName }}
-          </button>
-          <button
-            type="button"
-            class="board-switch-btn"
-            title="选择画布"
-            @click.stop="toggleBoardMenu"
-          >
-            <svg class="chevron-down" :class="{ open: isBoardMenuOpen }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div v-if="isBoardMenuOpen" class="board-switch-menu" @mousedown.stop @click.stop>
-            <button
-              v-for="board in boardOptions"
-              :key="board.id"
-              type="button"
-              class="board-switch-item"
-              :class="{ active: board.id === currentBoardId }"
-              @click="handleBoardSelect(board.id)"
-            >
-              {{ board.name }}
-            </button>
-            <div v-if="boardOptions.length === 0" class="board-switch-empty">No canvas</div>
-          </div>
-        </div>
-      </div>
-      <div class="header-right">
-        <button class="btn-ghost share-btn" @mousedown.stop>Share</button>
-        <button class="btn-primary export-btn" :disabled="selectedIds.length === 0" @mousedown.stop @click="handleExport">Export</button>
-        <div class="user-avatar-wrap" @click="router.push('/user/center')" title="个人中心">
-          <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="user-avatar" />
-          <div v-else class="user-avatar-placeholder">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-    </header>
+    <HomeCanvasHeader
+      :current-board-name="currentBoardName"
+      :board-options="boardOptions"
+      :current-board-id="currentBoardId"
+      :is-board-menu-open="isBoardMenuOpen"
+      :is-renaming-board="isRenamingBoard"
+      :board-name-draft="boardNameDraft"
+      :set-board-name-input-ref="setBoardNameInputRef"
+      :export-disabled="selectedIds.length === 0"
+      :avatar-url="userStore.user?.avatar"
+      @update:board-name-draft="boardNameDraft = $event"
+      @toggle-board-menu="toggleBoardMenu"
+      @start-board-rename="startBoardRename"
+      @cancel-board-rename="cancelBoardRename"
+      @confirm-board-rename="confirmBoardRename"
+      @select-board="handleBoardSelect"
+      @export="handleExport"
+      @open-center="router.push('/user/center')"
+    />
 
     <!-- 框选视觉矩形 -->
     <div 
@@ -259,313 +218,209 @@
       </button>
     </div>
 
-    <svg class="canvas-connections-layer">
-      <path
-        v-for="connection in renderedConnections"
-        :key="connection.id"
-        class="canvas-connection-hit"
-        :d="connection.path"
-        @mousedown.stop="onConnectionPathMouseDown($event, connection.id)"
-      />
-      <path
-        v-for="connection in renderedConnections"
-        :key="`visible-${connection.id}`"
-        class="canvas-connection-path"
-        :class="[selectedConnectionId === connection.id ? 'selected' : '', `tone-${connection.tone}`]"
-        :d="connection.path"
-      />
-      <path
-        v-if="draftConnectionPath"
-        class="canvas-connection-path draft"
-        :class="[ `tone-${draftConnectionKind}`, `is-${draftConnectionTone}` ]"
-        :d="draftConnectionPath"
-      />
-      <template v-for="connection in renderedConnections" :key="`endpoints-${connection.id}`">
-        <circle
-          v-if="selectedConnectionId === connection.id"
-          class="canvas-connection-endpoint"
-          :class="`tone-${connection.tone}`"
-          :cx="connection.startX"
-          :cy="connection.startY"
-          r="4"
-        />
-        <circle
-          v-if="selectedConnectionId === connection.id"
-          class="canvas-connection-endpoint"
-          :class="`tone-${connection.tone}`"
-          :cx="connection.endX"
-          :cy="connection.endY"
-          r="4"
-        />
-      </template>
-    </svg>
+    <HomeCanvasConnectionLayer
+      :rendered-connections="renderedConnections"
+      :selected-connection-id="selectedConnectionId"
+      :hidden-connection-id="reconnectingConnectionId"
+      :draft-connection-path="draftConnectionPath"
+      :draft-connection-kind="draftConnectionKind"
+      :draft-connection-tone="draftConnectionTone"
+      @path-mousedown="onConnectionPathMouseDown"
+    />
 
     <!-- ⑥ 内容展示区 -->
     <div class="canvas-content">
-      <ImageNode
-        v-for="node in imageNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('image', node.id)"
-        :dragging="isNodeDragging('image', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :stage-height="getImageNodeStageHeight(node)"
-        :display-image="getResolvedImageNodeDisplay(node).image"
-        :display-mode="getResolvedImageNodeDisplay(node).mode"
-        :input-connected="hasIncomingPortConnection('image', node.id, 'image')"
-        :output-connected="hasOutgoingPortConnection('image', node.id, 'image')"
-        @node-mousedown="onImageNodeMouseDown($event, node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'image', node.id, port)"
-        @delete="deleteImageNode(node.id)"
-        @stage-drop="onImageNodeStageDrop($event, node)"
-        @open-file="openImageNodeFilePicker(node)"
-        @append-to-canvas="appendImageNodeDisplayToCanvas(node)"
-        @reset="resetImageNode(node)"
-        @display-dragstart="onImageNodeDisplayDragStart($event, node)"
+      <HomeCanvasNodesBasic
+        :image-nodes="imageNodes"
+        :prompt-nodes="promptNodes"
+        :copy-mode="nodeCopyMode"
+        :is-node-selected="isNodeSelected"
+        :is-node-dragging="isNodeDragging"
+        :get-image-node-ui-state="getImageNodeUiState"
+        :get-prompt-node-ui-state="getPromptNodeUiState"
+        :get-image-node-stage-height="getImageNodeStageHeight"
+        :get-resolved-image-node-display="getResolvedImageNodeDisplay"
+        @image-node-mousedown="(event, node) => onImageNodeMouseDown(event, node)"
+        @image-port-mousedown="onImageNodePortMouseDown"
+        @image-delete="deleteImageNode"
+        @image-stage-drop="(event, node) => onImageNodeStageDrop(event, node)"
+        @image-open-file="openImageNodeFilePicker"
+        @image-append-to-canvas="appendImageNodeDisplayToCanvas"
+        @image-reset="resetImageNode"
+        @image-display-dragstart="(event, node) => onImageNodeDisplayDragStart(event, node)"
+        @prompt-node-mousedown="(event, node) => onPromptNodeMouseDown(event, node)"
+        @prompt-port-mousedown="onPromptNodePortMouseDown"
+        @prompt-delete="deletePromptNode"
+        @prompt-focus="activatePromptNode"
+        @prompt-update-text="onPromptNodeTextUpdate"
       />
 
-      <PromptNode
-        v-for="node in promptNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('prompt', node.id)"
-        :dragging="isNodeDragging('prompt', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :output-connected="hasOutgoingPortConnection('prompt', node.id, 'prompt')"
-        @node-mousedown="onPromptNodeMouseDown($event, node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'prompt', node.id, port)"
-        @delete="deletePromptNode(node.id)"
-        @focus="activatePromptNode(node.id)"
-        @update:text="node.text = $event"
-      />
-
-      <ModelNode
-        v-for="node in modelNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('model', node.id)"
-        :dragging="isNodeDragging('model', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+      <HomeCanvasNodesStructured
+        :model-nodes="modelNodes"
+        :mannequin-nodes="mannequinNodes"
+        :viewpoint-nodes="viewpointNodes"
+        :mask-nodes="maskNodes"
         :generating="generating"
-        :stage-height="getModelNodeStageHeight(node)"
-        :source-image-url="getModelNodeEffectiveSource(node).url"
-        :has-connected-image-input="getModelNodeEffectiveSource(node).connected"
-        :image-input-connected="getModelNodeConnectionStatus(node).imageConnected"
-        :prompt-input-connected="getModelNodeConnectionStatus(node).promptConnected"
-        :output-connected="getModelNodeConnectionStatus(node).outputConnected"
-        :error-port-keys="getNodeConnectionErrorPorts('model', node.id)"
-        :angle-options="modelAngleOptions"
-        :background-options="modelBackgroundOptions"
-        @node-mousedown="onModelNodeMouseDown($event, node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'model', node.id, port)"
-        @delete="deleteModelNode(node.id)"
-        @open-file-picker="openModelNodeFilePicker(node)"
-        @clear-image="clearModelNodeImage(node)"
-        @stage-drop="onModelStageDrop($event, node)"
-        @toggle-angle="toggleModelAngle(node, $event)"
-        @clear-angles="clearModelAngles(node)"
-        @select-background="node.background = $event"
-        @generate="handleModelNodeGenerate(node)"
+        :copy-mode="nodeCopyMode"
+        :is-node-selected="isNodeSelected"
+        :is-node-dragging="isNodeDragging"
+        :get-model-node-ui-state="getModelNodeUiState"
+        :get-mannequin-node-ui-state="getMannequinNodeUiState"
+        :get-viewpoint-node-ui-state="getViewpointNodeUiState"
+        :get-mask-node-ui-state="getMaskNodeUiState"
+        :get-node-connection-error-ports="getNodeConnectionErrorPorts"
+        :get-model-node-stage-height="getModelNodeStageHeight"
+        :get-model-node-effective-source="getModelNodeEffectiveSource"
+        :get-mannequin-node-stage-height="getMannequinNodeStageHeight"
+        :get-mannequin-node-effective-source="getMannequinNodeEffectiveSource"
+        :get-viewpoint-node-stage-height="getViewpointNodeStageHeight"
+        :get-viewpoint-node-effective-source="getViewpointNodeEffectiveSource"
+        :get-viewpoint-node-effective-source-images="getViewpointNodeEffectiveSourceImages"
+        :get-mask-node-stage-height="getMaskNodeStageHeight"
+        :get-mask-canvas-width="getMaskCanvasWidth"
+        :get-mask-node-effective-source="getMaskNodeEffectiveSource"
+        :model-angle-options="modelAngleOptions"
+        :model-background-options="modelBackgroundOptions"
+        @model-node-mousedown="(event, node) => onModelNodeMouseDown(event, node)"
+        @model-port-mousedown="onModelNodePortMouseDown"
+        @model-delete="deleteModelNode"
+        @model-open-file-picker="openModelNodeFilePicker"
+        @model-clear-image="clearModelNodeImage"
+        @model-stage-drop="(event, node) => onModelStageDrop(event, node)"
+        @model-toggle-angle="(node, key) => toggleModelAngle(node, key)"
+        @model-clear-angles="clearModelAngles"
+        @model-select-background="onModelNodeSelectBackground"
+        @model-generate="handleModelNodeGenerate"
+        @mannequin-node-mousedown="(event, node) => onMannequinNodeMouseDown(event, node)"
+        @mannequin-port-mousedown="onMannequinNodePortMouseDown"
+        @mannequin-delete="deleteMannequinNode"
+        @mannequin-open-file-picker="openMannequinNodeFilePicker"
+        @mannequin-clear-image="clearMannequinNodeImage"
+        @mannequin-stage-drop="(event, node) => handleMannequinStageDrop(event, node)"
+        @mannequin-generate="handleMannequinNodeGenerate"
+        @viewpoint-node-mousedown="(event, node) => onViewpointNodeMouseDown(event, node)"
+        @viewpoint-port-mousedown="onViewpointNodePortMouseDown"
+        @viewpoint-delete="deleteViewpointNode"
+        @viewpoint-open-file-picker="openViewpointNodeFilePicker"
+        @viewpoint-clear-images="clearViewpointNodeImages"
+        @viewpoint-remove-image="(node, index) => removeViewpointNodeImage(node, index)"
+        @viewpoint-stage-drop="(event, node) => handleViewpointStageDrop(event, node)"
+        @viewpoint-update-category="(node, category) => setViewpointNodeCategory(node, category)"
+        @viewpoint-toggle-selection="(node, key) => toggleViewpointSelection(node, key)"
+        @viewpoint-update-lighting="onViewpointNodeUpdateLighting"
+        @viewpoint-generate="handleViewpointNodeGenerate"
+        @mask-node-mousedown="(event, node) => onMaskNodeMouseDown(event, node)"
+        @mask-port-mousedown="onMaskNodePortMouseDown"
+        @mask-delete="deleteMaskNode"
+        @mask-open-file-picker="openMaskNodeFilePicker"
+        @mask-clear-image="clearMaskNodeImage"
+        @mask-stage-drop="(event, node) => onMaskStageDrop(event, node)"
+        @mask-canvas-mousedown="onMaskNodeCanvasMouseDownBridge"
+        @mask-set-draw-mode="onMaskNodeSetDrawMode"
+        @mask-update-brush-size="onMaskNodeUpdateBrushSize"
+        @mask-update-refine-amount="onMaskNodeUpdateRefineAmount"
+        @mask-toggle-invert="onMaskNodeToggleInvert"
+        @mask-clear-mask="clearMaskNodeMask"
+        @mask-set-canvas-ref="setMaskCanvasRef"
       />
 
-      <MaskNode
-        v-for="node in maskNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('mask', node.id)"
-        :dragging="isNodeDragging('mask', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :stage-height="getMaskNodeStageHeight(node)"
-        :canvas-width="getMaskCanvasWidth(node)"
-        :source-image-url="getMaskNodeEffectiveSource(node).url"
-        :has-connected-image-input="getMaskNodeEffectiveSource(node).connected"
-        :image-input-connected="hasIncomingPortConnection('mask', node.id, 'image')"
-        :output-connected="hasOutgoingPortConnection('mask', node.id, 'mask')"
-        @node-mousedown="onMaskNodeMouseDown($event, node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'mask', node.id, port)"
-        @delete="deleteMaskNode(node.id)"
-        @open-file-picker="openMaskNodeFilePicker(node)"
-        @clear-image="clearMaskNodeImage(node)"
-        @stage-drop="onMaskStageDrop($event, node)"
-        @canvas-mousedown="onMaskCanvasMouseDown($event, getMaskNodeRuntimeNode(node))"
-        @set-draw-mode="node.drawMode = $event"
-        @update:brush-size="node.brushSize = $event"
-        @update:refine-amount="node.refineAmount = clampMaskRefineAmount($event)"
-        @toggle-invert="node.invertMask = !node.invertMask"
-        @clear-mask="clearMaskNodeMask(node)"
-        @set-canvas-ref="setMaskCanvasRef(node.id, $event)"
-      />
-
-      <ColorNode
-        v-for="node in colorNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('color', node.id)"
-        :dragging="isNodeDragging('color', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
+      <HomeCanvasNodesExecution
+        :color-nodes="colorNodes"
+        :edit-nodes="editNodes"
+        :fusion-nodes="fusionNodes"
+        :enhance-nodes="enhanceNodes"
+        :try-on-nodes="tryOnNodes"
+        :face-swap-nodes="faceSwapNodes"
+        :palette-nodes="paletteNodes"
+        :generate-nodes="generateNodes"
         :generating="generating"
-        :is-popover-open="activeColorPopoverNodeId === node.id"
-        :popover-hex="colorPopoverHex"
-        :popover-hue="colorPopoverHue"
-        :popover-saturation="colorPopoverSaturation"
-        :popover-lightness="colorPopoverLightness"
-        :spectrum-style="colorSpectrumStyle"
-        :cursor-style="colorSpectrumCursorStyle"
-        :quick-swatches="colorQuickSwatches"
-        :image-input-connected="getColorNodeConnectionStatus(node).imageConnected"
-        :mask-input-connected="getColorNodeConnectionStatus(node).maskConnected"
-        :prompt-input-connected="getColorNodeConnectionStatus(node).promptConnected"
-        :output-connected="getColorNodeConnectionStatus(node).outputConnected"
-        :error-port-keys="getNodeConnectionErrorPorts('color', node.id)"
-        @node-mousedown="onColorNodeMouseDown($event, node)"
-        @delete="deleteColorNode(node.id)"
-        @toggle-popover="toggleColorPopover(node)"
-        @target-color-change="onColorNodeTargetColorChange(node, $event)"
-        @strength-input="node.strength = Math.max(0, Math.min(100, Math.round($event)))"
-        @popover-hex-input="onColorPopoverHexInput($event)"
-        @popover-hex-commit="commitColorPopoverHex"
-        @popover-hue-input="colorPopoverHue = $event; applyColorPopoverToNode()"
-        @popover-saturation-input="colorPopoverSaturation = $event; applyColorPopoverToNode()"
-        @popover-lightness-input="colorPopoverLightness = $event; applyColorPopoverToNode()"
-        @spectrum-pointerdown="onColorSpectrumPointerDown($event)"
-        @select-swatch="setColorPopoverHex($event)"
-        @eyedropper="onColorNodeEyedropperClick(node)"
-        @generate="handleColorNodeGenerate(node)"
-        @set-spectrum-ref="setColorSpectrumRef($event)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'color', node.id, port)"
-      />
-
-      <EditNode
-        v-for="node in editNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('edit', node.id)"
-        :dragging="isNodeDragging('edit', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :generating="generating"
-        :image-input-connected="getEditNodeConnectionStatus(node).imageConnected"
-        :mask-input-connected="getEditNodeConnectionStatus(node).maskConnected"
-        :prompt-input-connected="getEditNodeConnectionStatus(node).promptConnected"
-        :output-connected="getEditNodeConnectionStatus(node).outputConnected"
-        :error-port-keys="getNodeConnectionErrorPorts('edit', node.id)"
-        @node-mousedown="onEditNodeMouseDown($event, node)"
-        @delete="deleteEditNode(node.id)"
-        @update:mode="node.mode = $event"
-        @generate="handleEditNodeGenerate(node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'edit', node.id, port)"
-      />
-
-      <FusionNode
-        v-for="node in fusionNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('fusion', node.id)"
-        :dragging="isNodeDragging('fusion', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :generating="generating"
-        :image-a-input-connected="getFusionNodeConnectionStatus(node).imageAConnected"
-        :image-b-input-connected="getFusionNodeConnectionStatus(node).imageBConnected"
-        :prompt-input-connected="getFusionNodeConnectionStatus(node).promptConnected"
-        :output-connected="getFusionNodeConnectionStatus(node).outputConnected"
-        :error-port-keys="getNodeConnectionErrorPorts('fusion', node.id)"
-        @node-mousedown="onFusionNodeMouseDown($event, node)"
-        @delete="deleteFusionNode(node.id)"
-        @update:mode="node.mode = $event"
-        @generate="handleFusionNodeGenerate(node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'fusion', node.id, port)"
-      />
-
-      <EnhanceNode
-        v-for="node in enhanceNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('enhance', node.id)"
-        :dragging="isNodeDragging('enhance', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :generating="generating"
-        :image-input-connected="getEnhanceNodeConnectionStatus(node).imageConnected"
-        :prompt-input-connected="getEnhanceNodeConnectionStatus(node).promptConnected"
-        :output-connected="getEnhanceNodeConnectionStatus(node).outputConnected"
-        :error-port-keys="getNodeConnectionErrorPorts('enhance', node.id)"
-        @node-mousedown="onEnhanceNodeMouseDown($event, node)"
-        @delete="deleteEnhanceNode(node.id)"
-        @update:mode="setEnhanceNodeMode(node, $event)"
-        @update:upscale-mode="node.upscaleMode = $event"
-        @update:upscale-factor="node.upscaleFactor = $event"
-        @update:output-format="node.outputFormat = $event"
-        @update:output-quality="node.outputQuality = Math.max(30, Math.min(100, Math.round($event)))"
-        @generate="handleEnhanceNodeGenerate(node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'enhance', node.id, port)"
-      />
-
-      <TryOnNode
-        v-for="node in tryOnNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('tryon', node.id)"
-        :dragging="isNodeDragging('tryon', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :generating="generating"
-        :image-a-input-connected="getTryOnNodeConnectionStatus(node).imageAConnected"
-        :image-b-input-connected="getTryOnNodeConnectionStatus(node).imageBConnected"
-        :output-connected="getTryOnNodeConnectionStatus(node).outputConnected"
-        :error-port-keys="getNodeConnectionErrorPorts('tryon', node.id)"
-        @node-mousedown="onTryOnNodeMouseDown($event, node)"
-        @delete="deleteTryOnNode(node.id)"
-        @update:mode="node.mode = $event"
-        @update:tile-mode="node.tileMode = $event"
-        @update:rotation="node.rotation = Math.max(0, Math.min(360, Math.round($event)))"
-        @update:scale="node.scale = Math.max(10, Math.min(300, Math.round($event)))"
-        @update:opacity="node.opacity = Math.max(0, Math.min(100, Math.round($event)))"
-        @generate="handleTryOnNodeGenerate(node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'tryon', node.id, port)"
-      />
-
-      <PaletteNode
-        v-for="node in paletteNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('palette', node.id)"
-        :dragging="isNodeDragging('palette', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :generating="generating"
-        :image-input-connected="getPaletteNodeConnectionStatus(node).imageConnected"
-        :reference-input-connected="getPaletteNodeConnectionStatus(node).referenceConnected"
-        :output-connected="getPaletteNodeConnectionStatus(node).outputConnected"
-        :error-port-keys="getNodeConnectionErrorPorts('palette', node.id)"
-        @node-mousedown="onPaletteNodeMouseDown($event, node)"
-        @delete="deletePaletteNode(node.id)"
-        @update:mode="setPaletteNodeMode(node, $event)"
-        @apply-preset="node.colors = [...$event]"
-        @remove-color="removePaletteColor(node, $event)"
-        @add-color="addPaletteColor(node, $event)"
-        @generate="handlePaletteNodeGenerate(node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'palette', node.id, port)"
-      />
-
-      <GenerateNode
-        v-for="node in generateNodes"
-        :key="node.id"
-        :node="node"
-        :active="isNodeSelected('generate', node.id)"
-        :dragging="isNodeDragging('generate', node.id)"
-        :copy-mode="isDuplicateModifierPressed && activeTool === 'select'"
-        :generating="generating"
-        :image-input-connected="getGenerateNodeConnectionStatus(node).imageConnected"
-        :prompt-input-connected="getGenerateNodeConnectionStatus(node).promptConnected"
-        :output-connected="getGenerateNodeConnectionStatus(node).outputConnected"
-        :error-port-keys="getNodeConnectionErrorPorts('generate', node.id)"
-        :style-options="getGenerateStyleOptions(node.mode)"
-        :styles-loading="isGenerateStyleLoading(node.mode)"
-        @node-mousedown="onGenerateNodeMouseDown($event, node)"
-        @delete="deleteGenerateNode(node.id)"
-        @update:mode="setGenerateNodeMode(node, $event)"
-        @update:style-model="node.styleModel = $event"
-        @update:ratio="node.ratio = $event"
-        @update:count="node.count = $event"
-        @update:quality="node.quality = $event"
-        @generate="handleGenerateNodeGenerate(node)"
-        @port-mousedown="(event, port) => handleConnectionPortMouseDown(event, 'generate', node.id, port)"
+        :copy-mode="nodeCopyMode"
+        :is-node-selected="isNodeSelected"
+        :is-node-dragging="isNodeDragging"
+        :get-color-node-ui-state="getColorNodeUiState"
+        :get-edit-node-ui-state="getEditNodeUiState"
+        :get-fusion-node-ui-state="getFusionNodeUiState"
+        :get-enhance-node-ui-state="getEnhanceNodeUiState"
+        :get-try-on-node-ui-state="getTryOnNodeUiState"
+        :get-face-swap-node-ui-state="getFaceSwapNodeUiState"
+        :get-palette-node-ui-state="getPaletteNodeUiState"
+        :get-generate-node-ui-state="getGenerateNodeUiState"
+        :get-node-connection-error-ports="getNodeConnectionErrorPorts"
+        :active-color-popover-node-id="activeColorPopoverNodeId"
+        :color-popover-hex="colorPopoverHex"
+        :color-popover-hue="colorPopoverHue"
+        :color-popover-saturation="colorPopoverSaturation"
+        :color-popover-lightness="colorPopoverLightness"
+        :color-spectrum-style="colorSpectrumStyle"
+        :color-spectrum-cursor-style="colorSpectrumCursorStyle"
+        :color-quick-swatches="colorQuickSwatches"
+        :get-generate-style-options="getGenerateStyleOptions"
+        :is-generate-style-loading="isGenerateStyleLoading"
+        @color-node-mousedown="(event, node) => onColorNodeMouseDown(event, node)"
+        @color-delete="deleteColorNode"
+        @color-toggle-popover="toggleColorPopover"
+        @color-target-color-change="(node, value) => onColorNodeTargetColorChange(node, value)"
+        @color-strength-input="onColorNodeStrengthInput"
+        @color-popover-hex-input="onColorPopoverHexInput"
+        @color-popover-hex-commit="commitColorPopoverHex"
+        @color-popover-hue-input="onColorPopoverHueChange"
+        @color-popover-saturation-input="onColorPopoverSaturationChange"
+        @color-popover-lightness-input="onColorPopoverLightnessChange"
+        @color-spectrum-pointerdown="onColorSpectrumPointerDown"
+        @color-select-swatch="setColorPopoverHex"
+        @color-eyedropper="onColorNodeEyedropperClick"
+        @color-generate="handleColorNodeGenerate"
+        @color-set-spectrum-ref="setColorSpectrumRef"
+        @color-port-mousedown="onColorNodePortMouseDown"
+        @edit-node-mousedown="(event, node) => onEditNodeMouseDown(event, node)"
+        @edit-delete="deleteEditNode"
+        @edit-update-mode="onEditNodeUpdateMode"
+        @edit-generate="handleEditNodeGenerate"
+        @edit-port-mousedown="onEditNodePortMouseDown"
+        @fusion-node-mousedown="(event, node) => onFusionNodeMouseDown(event, node)"
+        @fusion-delete="deleteFusionNode"
+        @fusion-update-mode="onFusionNodeUpdateMode"
+        @fusion-generate="handleFusionNodeGenerate"
+        @fusion-port-mousedown="onFusionNodePortMouseDown"
+        @enhance-node-mousedown="(event, node) => onEnhanceNodeMouseDown(event, node)"
+        @enhance-delete="deleteEnhanceNode"
+        @enhance-update-mode="onEnhanceNodeUpdateMode"
+        @enhance-update-upscale-mode="onEnhanceNodeUpdateUpscaleMode"
+        @enhance-update-upscale-factor="onEnhanceNodeUpdateUpscaleFactor"
+        @enhance-update-output-format="onEnhanceNodeUpdateOutputFormat"
+        @enhance-update-output-quality="onEnhanceNodeUpdateOutputQuality"
+        @enhance-generate="handleEnhanceNodeGenerate"
+        @enhance-port-mousedown="onEnhanceNodePortMouseDown"
+        @tryon-node-mousedown="(event, node) => onTryOnNodeMouseDown(event, node)"
+        @tryon-delete="deleteTryOnNode"
+        @tryon-update-mode="onTryOnNodeUpdateMode"
+        @tryon-update-tile-mode="onTryOnNodeUpdateTileMode"
+        @tryon-update-rotation="onTryOnNodeUpdateRotation"
+        @tryon-update-scale="onTryOnNodeUpdateScale"
+        @tryon-update-opacity="onTryOnNodeUpdateOpacity"
+        @tryon-generate="handleTryOnNodeGenerate"
+        @tryon-port-mousedown="onTryOnNodePortMouseDown"
+        @faceswap-node-mousedown="(event, node) => onFaceSwapNodeMouseDown(event, node)"
+        @faceswap-delete="deleteFaceSwapNode"
+        @faceswap-generate="handleFaceSwapNodeGenerate"
+        @faceswap-port-mousedown="onFaceSwapNodePortMouseDown"
+        @palette-node-mousedown="(event, node) => onPaletteNodeMouseDown(event, node)"
+        @palette-delete="deletePaletteNode"
+        @palette-update-mode="onPaletteNodeUpdateMode"
+        @palette-apply-preset="onPaletteNodeApplyPreset"
+        @palette-remove-color="(node, index) => removePaletteColor(node, index)"
+        @palette-add-color="(node, value) => addPaletteColor(node, value)"
+        @palette-generate="handlePaletteNodeGenerate"
+        @palette-port-mousedown="onPaletteNodePortMouseDown"
+        @generate-node-mousedown="(event, node) => onGenerateNodeMouseDown(event, node)"
+        @generate-delete="deleteGenerateNode"
+        @generate-update-mode="onGenerateNodeUpdateMode"
+        @generate-update-style-model="onGenerateNodeUpdateStyleModel"
+        @generate-update-ratio="onGenerateNodeUpdateRatio"
+        @generate-update-count="onGenerateNodeUpdateCount"
+        @generate-update-quality="onGenerateNodeUpdateQuality"
+        @generate-generate="handleGenerateNodeGenerate"
+        @generate-port-mousedown="onGenerateNodePortMouseDown"
       />
 
        <div 
@@ -692,6 +547,7 @@
           </template>
        </div>
     </div>
+
   </div>
 </template>
 
@@ -709,56 +565,78 @@ import { useCanvasViewport } from '../../composables/useCanvasViewport'
 import { useCanvasBoard } from '../../composables/useCanvasBoard'
 import { useCanvasEditor } from '../../composables/useCanvasEditor'
 import { useCanvasHistory } from '../../composables/useCanvasHistory'
+import { useCanvasNodeConnections } from '../../composables/useCanvasNodeConnections'
+import { useCanvasNodeUiState } from '../../composables/useCanvasNodeUiState'
 import { useColorNode } from '../../composables/useColorNode'
 import { useCanvasDirectActions, type SegType } from '../../composables/useCanvasDirectActions'
 import { useGenerationPipeline } from '../../composables/useGenerationPipeline'
 import { useImageNode } from '../../composables/useImageNode'
+import { useMannequinNode } from '../../composables/useMannequinNode'
 import { clampMaskRefineAmount, useMaskNode } from '../../composables/useMaskNode'
 import { useModelNode } from '../../composables/useModelNode'
 import { useNodeExecutors } from '../../composables/useNodeExecutors'
-import ColorNode from '../../components/canvas/nodes/ColorNode.vue'
-import EditNode from '../../components/canvas/nodes/EditNode.vue'
-import EnhanceNode from '../../components/canvas/nodes/EnhanceNode.vue'
-import FusionNode from '../../components/canvas/nodes/FusionNode.vue'
-import GenerateNode from '../../components/canvas/nodes/GenerateNode.vue'
-import ImageNode from '../../components/canvas/nodes/ImageNode.vue'
-import MaskNode from '../../components/canvas/nodes/MaskNode.vue'
-import ModelNode from '../../components/canvas/nodes/ModelNode.vue'
-import PaletteNode from '../../components/canvas/nodes/PaletteNode.vue'
-import PromptNode from '../../components/canvas/nodes/PromptNode.vue'
-import TryOnNode from '../../components/canvas/nodes/TryOnNode.vue'
-import { MODEL_ANGLE_OPTIONS, MODEL_BACKGROUND_OPTIONS } from '../../components/canvas/nodes/nodeOptionConfig'
+import { useViewpointNode } from '../../composables/useViewpointNode'
+import HomeCanvasConnectionLayer from './home/HomeCanvasConnectionLayer.vue'
+import HomeCanvasHeader from './home/HomeCanvasHeader.vue'
+import HomeCanvasNodesBasic from './home/HomeCanvasNodesBasic.vue'
+import HomeCanvasNodesExecution from './home/HomeCanvasNodesExecution.vue'
+import HomeCanvasNodesStructured from './home/HomeCanvasNodesStructured.vue'
+import {
+  MODEL_ANGLE_OPTIONS,
+  MODEL_BACKGROUND_OPTIONS,
+  VIEWPOINT_LIGHTING_LABELS,
+  VIEWPOINT_OPTIONS_BY_CATEGORY,
+} from '../../components/canvas/nodes/nodeOptionConfig'
+import {
+  enhanceModeSupportsPrompt,
+  paletteModeUsesReference,
+} from '../../config/canvasNodeConnectionContract'
+import { isCanvasConnectionAllowed } from '../../config/canvasConnections'
 import {
   createCanvasImageItemAt,
   createColorNodeAt,
   createEnhanceNodeAt,
   createEditNodeAt,
   createFusionNodeAt,
+  createFaceSwapNodeAt,
   createGenerateNodeAt,
   createImageNodeAt,
+  createMannequinNodeAt,
   createMaskNodeAt,
   createModelNodeAt,
   createPaletteNodeAt,
   createPromptNodeAt,
   createTryOnNodeAt,
+  createViewpointNodeAt,
 } from '../../utils/canvasNodeFactory'
+import {
+  isCanvasExecutionOutputNodeType,
+  resolveWorkflowNodeOutputStatus,
+} from '../../types/canvasNodes'
 import type {
   CanvasBoardSnapshot,
   CanvasConnection,
+  CanvasExecutionOutputNodeType,
+  CanvasExecutionOutputNodeItem,
   CanvasConnectionNodeType,
   CanvasConnectionPort,
   CanvasImageItem,
+  CanvasNodeItem,
   ColorNodeItem,
   EnhanceNodeItem,
   EditNodeItem,
   FusionNodeItem,
+  FaceSwapNodeItem,
   GenerateNodeItem,
   ImageNodeItem,
+  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   PaletteNodeItem,
   PromptNodeItem,
   TryOnNodeItem,
+  ViewpointNodeItem,
+  WorkflowNodeOutputStatus,
 } from '../../types/canvasNodes'
 
 const router = useRouter()
@@ -784,6 +662,13 @@ const multiAngleLabelMap: Record<string, string> = {
 
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const modelAngleOptions = MODEL_ANGLE_OPTIONS
+const viewpointLightingLabels = VIEWPOINT_LIGHTING_LABELS
+const viewpointLabelMap = Object.values(VIEWPOINT_OPTIONS_BY_CATEGORY).reduce<Record<string, string>>((acc, options) => {
+  options.forEach((option) => {
+    acc[option.key] = option.label
+  })
+  return acc
+}, {})
 
 const modelDefaultPose = 'runway_stand'
 const modelDefaultExpression = 'cool'
@@ -811,14 +696,30 @@ const showSettings = ref(false)
 const imageNodes = ref<ImageNodeItem[]>([])
 const promptNodes = ref<PromptNodeItem[]>([])
 const modelNodes = ref<ModelNodeItem[]>([])
+const mannequinNodes = ref<MannequinNodeItem[]>([])
+const viewpointNodes = ref<ViewpointNodeItem[]>([])
 const maskNodes = ref<MaskNodeItem[]>([])
 const colorNodes = ref<ColorNodeItem[]>([])
 const enhanceNodes = ref<EnhanceNodeItem[]>([])
 const editNodes = ref<EditNodeItem[]>([])
 const fusionNodes = ref<FusionNodeItem[]>([])
 const tryOnNodes = ref<TryOnNodeItem[]>([])
+const faceSwapNodes = ref<FaceSwapNodeItem[]>([])
 const paletteNodes = ref<PaletteNodeItem[]>([])
 const generateNodes = ref<GenerateNodeItem[]>([])
+const executionNodeWatchSources = [
+  modelNodes,
+  mannequinNodes,
+  viewpointNodes,
+  colorNodes,
+  enhanceNodes,
+  editNodes,
+  fusionNodes,
+  tryOnNodes,
+  faceSwapNodes,
+  paletteNodes,
+  generateNodes,
+] as const
 const connections = ref<CanvasConnection[]>([])
 const processedMaskPreviewUrls = ref<Record<number, string>>({})
 const defaultSegType: SegType = 'common'
@@ -856,6 +757,11 @@ const editModeMeta = {
     feature: 'pattern-inpaint',
     promptPrefix: '[pattern-inpaint]',
     fallbackPrompt: '图案涂改',
+  },
+  'bg-swap': {
+    feature: 'bg-swap',
+    promptPrefix: '[bg-swap]',
+    fallbackPrompt: '换背景',
   },
 } as const
 
@@ -962,6 +868,7 @@ const {
   draftConnectionPath,
   draftConnectionTone,
   draftConnectionKind,
+  reconnectingConnectionId,
   hasSelectedConnection,
   clearSelectedConnection,
   selectConnection,
@@ -969,14 +876,17 @@ const {
   findIncomingConnection,
   getIncomingConnections,
   hasIncomingPortConnection,
-  findOutgoingConnection,
+  getOutgoingConnections,
   hasOutgoingPortConnection,
   removeConnectionsForNode,
+  removeIncomingConnectionsForPort,
   clearNodeConnectionError,
   clearAllNodeConnectionErrors,
   getNodeConnectionErrorPorts,
   triggerNodeConnectionError,
   clearConnectionDraft,
+  beginConnectionReconnect,
+  refreshRenderedConnections,
   scheduleRenderedConnectionsRefresh,
   startConnectionDrag,
   addGlobalConnectionListeners,
@@ -985,6 +895,11 @@ const {
 } = useCanvasConnections({
   connections,
   canvasLayoutRef,
+  canvasX,
+  canvasY,
+  zoomLevel,
+  lookupNodeByType: getCanvasConnectionNodeByType,
+  isConnectionAllowed: (from, to) => isCanvasConnectionAllowed(from, to, getCanvasConnectionNodeByType),
   onConnectionNotAllowed: () => {
     message.warning('当前这两个端口不能连接')
   },
@@ -1000,12 +915,15 @@ const {
   activeImageNodeId,
   activePromptNodeId,
   activeModelNodeId,
+  activeMannequinNodeId,
+  activeViewpointNodeId,
   activeMaskNodeId,
   activeColorNodeId,
   activeEditNodeId,
   activeFusionNodeId,
   activeEnhanceNodeId,
   activeTryOnNodeId,
+  activeFaceSwapNodeId,
   activePaletteNodeId,
   activeGenerateNodeId,
   nodeContextMenu,
@@ -1014,12 +932,15 @@ const {
   activateImageNode,
   activatePromptNode,
   activateModelNode,
+  activateMannequinNode,
+  activateViewpointNode,
   activateMaskNode,
   activateColorNode,
   activateEditNode,
   activateFusionNode,
   activateEnhanceNode,
   activateTryOnNode,
+  activateFaceSwapNode,
   activatePaletteNode,
   activateGenerateNode,
   isNodeSelected,
@@ -1033,12 +954,15 @@ const {
   onImageNodeMouseDown,
   onPromptNodeMouseDown,
   onModelNodeMouseDown,
+  onMannequinNodeMouseDown,
+  onViewpointNodeMouseDown,
   onMaskNodeMouseDown,
   onColorNodeMouseDown,
   onEditNodeMouseDown,
   onFusionNodeMouseDown,
   onEnhanceNodeMouseDown,
   onTryOnNodeMouseDown,
+  onFaceSwapNodeMouseDown,
   onPaletteNodeMouseDown,
   onGenerateNodeMouseDown,
   onResizeMouseDown,
@@ -1053,12 +977,15 @@ const {
   imageNodes,
   promptNodes,
   modelNodes,
+  mannequinNodes,
+  viewpointNodes,
   maskNodes,
   colorNodes,
   enhanceNodes,
   editNodes,
   fusionNodes,
   tryOnNodes,
+  faceSwapNodes,
   paletteNodes,
   generateNodes,
   activeTool,
@@ -1084,15 +1011,20 @@ const {
   importCanvasImageToImageNodeAtPoint: (clientX, clientY, item) => importCanvasImageToImageNodeAtPoint(clientX, clientY, item),
   importCanvasImageToMaskNodeAtPoint: (clientX, clientY, item) => importCanvasImageToMaskNodeAtPoint(clientX, clientY, item),
   importCanvasImageToModelNodeAtPoint: (clientX, clientY, item) => importCanvasImageToModelNodeAtPoint(clientX, clientY, item),
+  importCanvasImageToMannequinNodeAtPoint: (clientX, clientY, item) => importCanvasImageToMannequinNodeAtPoint(clientX, clientY, item),
+  importCanvasImageToViewpointNodeAtPoint: (clientX, clientY, item) => importCanvasImageToViewpointNodeAtPoint(clientX, clientY, item),
   deleteImageNode,
   deletePromptNode,
   deleteModelNode,
+  deleteMannequinNode,
+  deleteViewpointNode,
   deleteMaskNode,
   deleteColorNode,
   deleteEnhanceNode,
   deleteEditNode,
   deleteFusionNode,
   deleteTryOnNode,
+  deleteFaceSwapNode,
   deletePaletteNode,
   deleteGenerateNode,
   hasSelectedConnection,
@@ -1129,6 +1061,18 @@ const {
   colorNodes,
   message,
 })
+
+function setColorPopoverHueValue(value: number) {
+  colorPopoverHue.value = value
+}
+
+function setColorPopoverSaturationValue(value: number) {
+  colorPopoverSaturation.value = value
+}
+
+function setColorPopoverLightnessValue(value: number) {
+  colorPopoverLightness.value = value
+}
 
 const {
   getMaskCanvasWidth,
@@ -1201,6 +1145,38 @@ const {
 })
 
 const {
+  getMannequinStageHeight,
+  openMannequinNodeFilePicker,
+  clearMannequinNodeImage,
+  onMannequinStageDrop: handleMannequinStageDrop,
+  importCanvasImageToMannequinNodeAtPoint,
+} = useMannequinNode({
+  mannequinNodes,
+  message,
+  uploadImage: uploadApi.upload,
+  loadImageRatioFromFile,
+  loadImageRatioFromUrl,
+  readNodeImageDropPayload,
+})
+
+const {
+  getViewpointStageHeight,
+  openViewpointNodeFilePicker,
+  clearViewpointNodeImages,
+  removeViewpointNodeImage,
+  onViewpointStageDrop: handleViewpointStageDrop,
+  importCanvasImageToViewpointNodeAtPoint,
+  toggleViewpointSelection,
+} = useViewpointNode({
+  viewpointNodes,
+  message,
+  uploadImage: uploadApi.upload,
+  loadImageRatioFromFile,
+  loadImageRatioFromUrl,
+  readNodeImageDropPayload,
+})
+
+const {
   stopTaskPolling,
   resolvePreferredImageOutputNode,
   appendGeneratedImages,
@@ -1218,8 +1194,108 @@ const {
   getTask: taskApi.get,
 })
 
+function getExecutionOutputNodeByType(
+  nodeType: CanvasExecutionOutputNodeType,
+  nodeId: number,
+) {
+  const node = getCanvasConnectionNodeByType(nodeType, nodeId)
+  if (!node || !('outputStatus' in node)) return null
+  return node as CanvasExecutionOutputNodeItem
+}
+
+function setWorkflowNodeOutputStatus(
+  node: { outputImages: { url: string }[]; outputStatus?: WorkflowNodeOutputStatus },
+  status?: WorkflowNodeOutputStatus,
+) {
+  node.outputStatus = status ?? (node.outputImages.length > 0 ? 'ready' : 'idle')
+}
+
+function cloneNodeOutputImages(outputs: { url: string; ratio: number }[]) {
+  return outputs.map(output => ({ ...output }))
+}
+
+function markExecutionNodeDirty(
+  nodeType: CanvasExecutionOutputNodeType,
+  nodeId: number,
+  visited = new Set<string>(),
+) {
+  const visitKey = `${nodeType}:${nodeId}`
+  if (visited.has(visitKey)) return
+  visited.add(visitKey)
+
+  const node = getExecutionOutputNodeByType(nodeType, nodeId)
+  if (!node) return
+  setWorkflowNodeOutputStatus(node, node.outputImages.length > 0 ? 'stale' : 'idle')
+
+  getOutgoingConnections(nodeType, nodeId, 'image').forEach((connection) => {
+    if (isCanvasExecutionOutputNodeType(connection.toNodeType)) {
+      markExecutionNodeDirty(connection.toNodeType, connection.toNodeId, visited)
+      return
+    }
+    if (connection.toNodeType === 'mask') {
+      markConnectedExecutionTargetsDirty('mask', connection.toNodeId, visited)
+    }
+  })
+}
+
+function markConnectedExecutionTargetsDirty(
+  fromNodeType: CanvasConnectionNodeType,
+  fromNodeId: number,
+  visited = new Set<string>(),
+) {
+  const outgoingPort =
+    fromNodeType === 'prompt'
+      ? 'prompt'
+      : fromNodeType === 'mask'
+        ? 'mask'
+        : 'image'
+  getOutgoingConnections(fromNodeType, fromNodeId, outgoingPort).forEach((connection) => {
+    if (isCanvasExecutionOutputNodeType(connection.toNodeType)) {
+      markExecutionNodeDirty(connection.toNodeType, connection.toNodeId, visited)
+      return
+    }
+    if (connection.toNodeType === 'mask') {
+      markConnectedExecutionTargetsDirty('mask', connection.toNodeId, visited)
+    }
+  })
+}
+
+function appendWorkflowNodeOutputs(
+  nodeType: CanvasExecutionOutputNodeType,
+  nodeId: number,
+  urls: string[],
+) {
+  if (urls.length === 0) return
+  const node = getExecutionOutputNodeByType(nodeType, nodeId)
+  if (!node) return
+  setWorkflowNodeOutputStatus(node, 'ready')
+  const startIndex = node.outputImages.length
+  urls.forEach((url) => {
+    node.outputImages.push({ url, ratio: 1 })
+  })
+  urls.forEach((url, offset) => {
+    const outputIndex = startIndex + offset
+    void loadImageRatioFromUrl(url).then((ratio) => {
+      if (!ratio) return
+      const targetNode = getExecutionOutputNodeByType(nodeType, nodeId)
+      if (!targetNode) return
+      const output = targetNode.outputImages[outputIndex]
+      if (!output || output.url !== url) return
+      output.ratio = ratio
+    })
+  })
+}
+
 function getModelAngleLabel(key: string): string {
   return multiAngleLabelMap[key] || key
+}
+
+function getViewpointLabel(key: string): string {
+  return viewpointLabelMap[key] || key
+}
+
+function getViewpointLightingLabel(key: ViewpointNodeItem['lighting']): string {
+  return viewpointLightingLabels[key] || key
 }
 
 function loadImageRatioFromUrl(url: string): Promise<number | null> {
@@ -1279,12 +1355,15 @@ function resetEditorState() {
   imageNodes.value = []
   promptNodes.value = []
   modelNodes.value = []
+  mannequinNodes.value = []
+  viewpointNodes.value = []
   maskNodes.value = []
   colorNodes.value = []
   enhanceNodes.value = []
   editNodes.value = []
   fusionNodes.value = []
   tryOnNodes.value = []
+  faceSwapNodes.value = []
   paletteNodes.value = []
   generateNodes.value = []
   connections.value = []
@@ -1295,72 +1374,302 @@ function resetEditorState() {
   resetViewport()
 }
 
+let suspendWorkflowCacheReactions = false
+let previousPromptSignatureMap: Record<string, string> = {}
+let previousImageSourceSignatureMap: Record<string, string> = {}
+let previousMaskSignatureMap: Record<string, string> = {}
+let previousExecutionInputSignatureMap: Record<string, string> = {}
+let previousExecutionOutputSignatureMap: Record<string, string> = {}
+let previousConnectionTargetSignatureMap: Record<string, string> = {}
+
+function buildPromptSignatureMap(): Record<string, string> {
+  return promptNodes.value.reduce<Record<string, string>>((acc, node) => {
+    acc[String(node.id)] = node.text
+    return acc
+  }, {})
+}
+
+function buildImageSourceSignatureMap(): Record<string, string> {
+  return imageNodes.value.reduce<Record<string, string>>((acc, node) => {
+    const latestOutput = node.outputImages[node.outputImages.length - 1]
+    acc[String(node.id)] = [
+      node.sourceImageUrl,
+      String(node.sourceImageRatio || 1),
+      latestOutput?.url || '',
+      String(latestOutput?.ratio || 1),
+      String(node.outputImages.length),
+    ].join('|')
+    return acc
+  }, {})
+}
+
+function buildMaskSignatureMap(): Record<string, string> {
+  return maskNodes.value.reduce<Record<string, string>>((acc, node) => {
+    acc[String(node.id)] = [
+      node.sourceImageUrl,
+      String(node.sourceImageRatio || 1),
+      node.maskDataUrl,
+      String(clampMaskRefineAmount(node.refineAmount ?? 0)),
+      node.invertMask ? '1' : '0',
+    ].join('|')
+    return acc
+  }, {})
+}
+
+function buildExecutionInputSignatureMap(): Record<string, string> {
+  const result: Record<string, string> = {}
+
+  modelNodes.value.forEach((node) => {
+    result[`model:${node.id}`] = [
+      node.sourceImageUrl,
+      String(node.sourceImageRatio || 1),
+      node.selectedAngles.join(','),
+      node.background,
+    ].join('|')
+  })
+
+  mannequinNodes.value.forEach((node) => {
+    result[`mannequin:${node.id}`] = [node.sourceImageUrl, String(node.sourceImageRatio || 1)].join('|')
+  })
+
+  viewpointNodes.value.forEach((node) => {
+    result[`viewpoint:${node.id}`] = [
+      node.sourceImages.map(image => `${image.url}@${image.ratio}`).join(','),
+      node.selectedViewpoints.join(','),
+      node.lighting,
+    ].join('|')
+  })
+
+  colorNodes.value.forEach((node) => {
+    result[`color:${node.id}`] = [node.targetColor, String(node.strength)].join('|')
+  })
+
+  editNodes.value.forEach((node) => {
+    result[`edit:${node.id}`] = node.mode
+  })
+
+  fusionNodes.value.forEach((node) => {
+    result[`fusion:${node.id}`] = node.mode
+  })
+
+  enhanceNodes.value.forEach((node) => {
+    result[`enhance:${node.id}`] = [
+      node.mode,
+      node.upscaleMode,
+      String(node.upscaleFactor),
+      node.outputFormat,
+      String(node.outputQuality),
+    ].join('|')
+  })
+
+  tryOnNodes.value.forEach((node) => {
+    result[`tryon:${node.id}`] = [
+      node.mode,
+      node.tileMode,
+      String(node.rotation),
+      String(node.scale),
+      String(node.opacity),
+    ].join('|')
+  })
+
+  faceSwapNodes.value.forEach((node) => {
+    result[`faceswap:${node.id}`] = String(node.id)
+  })
+
+  paletteNodes.value.forEach((node) => {
+    result[`palette:${node.id}`] = [node.mode, node.colors.join(',')].join('|')
+  })
+
+  generateNodes.value.forEach((node) => {
+    result[`generate:${node.id}`] = [
+      node.mode,
+      node.styleModel,
+      node.ratio,
+      String(node.count),
+      node.quality,
+    ].join('|')
+  })
+
+  return result
+}
+
+function buildExecutionOutputSignatureMap(): Record<string, string> {
+  const result: Record<string, string> = {}
+  const assign = (nodeType: CanvasExecutionOutputNodeType, nodes: { id: number; outputImages: { url: string; ratio: number }[] }[]) => {
+    nodes.forEach((node) => {
+      const latestOutput = node.outputImages[node.outputImages.length - 1]
+      result[`${nodeType}:${node.id}`] = [
+        latestOutput?.url || '',
+        String(latestOutput?.ratio || 1),
+        String(node.outputImages.length),
+      ].join('|')
+    })
+  }
+
+  assign('model', modelNodes.value)
+  assign('mannequin', mannequinNodes.value)
+  assign('viewpoint', viewpointNodes.value)
+  assign('color', colorNodes.value)
+  assign('edit', editNodes.value)
+  assign('fusion', fusionNodes.value)
+  assign('enhance', enhanceNodes.value)
+  assign('tryon', tryOnNodes.value)
+  assign('faceswap', faceSwapNodes.value)
+  assign('palette', paletteNodes.value)
+  assign('generate', generateNodes.value)
+
+  return result
+}
+
+function buildConnectionTargetSignatureMap(): Record<string, string> {
+  const grouped: Record<string, string[]> = {}
+  connections.value.forEach((connection) => {
+    const targetKey = `${connection.toNodeType}:${connection.toNodeId}`
+    if (!grouped[targetKey]) {
+      grouped[targetKey] = []
+    }
+    grouped[targetKey].push(`${connection.fromNodeType}:${connection.fromNodeId}:${connection.fromPort}->${connection.toPort}`)
+  })
+  return Object.entries(grouped).reduce<Record<string, string>>((acc, [key, values]) => {
+    acc[key] = values.sort().join('|')
+    return acc
+  }, {})
+}
+
+function primeWorkflowCacheSignatureMaps() {
+  previousPromptSignatureMap = buildPromptSignatureMap()
+  previousImageSourceSignatureMap = buildImageSourceSignatureMap()
+  previousMaskSignatureMap = buildMaskSignatureMap()
+  previousExecutionInputSignatureMap = buildExecutionInputSignatureMap()
+  previousExecutionOutputSignatureMap = buildExecutionOutputSignatureMap()
+  previousConnectionTargetSignatureMap = buildConnectionTargetSignatureMap()
+}
+
+function forEachChangedSignature(
+  previousMap: Record<string, string>,
+  nextMap: Record<string, string>,
+  onChanged: (key: string) => void,
+) {
+  const keys = new Set([...Object.keys(previousMap), ...Object.keys(nextMap)])
+  keys.forEach((key) => {
+    if (previousMap[key] !== nextMap[key]) {
+      onChanged(key)
+    }
+  })
+}
+
 let resetHistoryBaseline: ((snapshot?: CanvasBoardSnapshot | null) => void) | null = null
 
 async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
-  if (!state) {
-    resetEditorState()
-    await nextTick()
-    resetHistoryBaseline?.(createBoardSnapshot())
-    return
-  }
-
-  messages.value = state.messages.map(item => ({ ...item }))
-  resetEditorUiState()
-  clearAllNodeConnectionErrors()
-
-  imageNodes.value = state.imageNodes.map(node => ({
-    ...node,
-    outputImages: node.outputImages.map(output => ({ ...output })),
-  }))
-
-  promptNodes.value = state.promptNodes.map(node => ({ ...node }))
-
-  modelNodes.value = state.modelNodes.map(node => ({
-    ...node,
-    selectedAngles: [...node.selectedAngles],
-  }))
-  maskNodes.value = state.maskNodes.map(node => ({
-    ...node,
-    refineAmount: clampMaskRefineAmount(node.refineAmount ?? 0),
-    invertMask: !!node.invertMask,
-  }))
-  colorNodes.value = state.colorNodes.map(node => ({
-    ...node,
-    strength: Math.max(0, Math.min(100, Math.round(node.strength ?? 70))),
-  }))
-  enhanceNodes.value = state.enhanceNodes.map(node => ({
-    ...node,
-    outputQuality: Math.max(30, Math.min(100, Math.round(node.outputQuality ?? 95))),
-  }))
-  editNodes.value = state.editNodes.map(node => ({ ...node }))
-  fusionNodes.value = state.fusionNodes.map(node => ({ ...node }))
-  tryOnNodes.value = state.tryOnNodes.map(node => ({
-    ...node,
-    rotation: Math.max(0, Math.min(360, Math.round(node.rotation ?? 0))),
-    scale: Math.max(10, Math.min(300, Math.round(node.scale ?? 100))),
-    opacity: Math.max(0, Math.min(100, Math.round(node.opacity ?? 100))),
-  }))
-  paletteNodes.value = state.paletteNodes.map(node => ({
-    ...node,
-    colors: [...node.colors],
-  }))
-  generateNodes.value = state.generateNodes.map(node => ({ ...node }))
-  generateNodes.value.forEach((node) => {
-    if (generateModeSupportsStyleModel(node.mode)) {
-      void ensureGenerateStyleOptions(node.mode)
+  suspendWorkflowCacheReactions = true
+  try {
+    if (!state) {
+      resetEditorState()
+      await nextTick()
+      primeWorkflowCacheSignatureMaps()
+      resetHistoryBaseline?.(createBoardSnapshot())
+      return
     }
-  })
-  connections.value = state.connections.map(connection => ({ ...connection }))
-  clearSelectedConnection()
-  clearConnectionDraft()
-  activeColorPopoverNodeId.value = null
-  setViewport(state.viewport)
 
-  await nextTick()
-  maskNodes.value.forEach(node => renderMaskNodeMask(node))
-  scheduleRenderedConnectionsRefresh()
-  resetHistoryBaseline?.(state)
+    messages.value = state.messages.map(item => ({ ...item }))
+    resetEditorUiState()
+    clearAllNodeConnectionErrors()
+
+    imageNodes.value = state.imageNodes.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+
+    promptNodes.value = state.promptNodes.map(node => ({ ...node }))
+
+    modelNodes.value = state.modelNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      selectedAngles: [...node.selectedAngles],
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    mannequinNodes.value = state.mannequinNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    viewpointNodes.value = state.viewpointNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      sourceImages: cloneNodeOutputImages(node.sourceImages),
+      selectedViewpoints: [...node.selectedViewpoints],
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    maskNodes.value = state.maskNodes.map(node => ({
+      ...node,
+      refineAmount: clampMaskRefineAmount(node.refineAmount ?? 0),
+      invertMask: !!node.invertMask,
+    }))
+    colorNodes.value = state.colorNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      strength: Math.max(0, Math.min(100, Math.round(node.strength ?? 70))),
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    enhanceNodes.value = state.enhanceNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      outputQuality: Math.max(30, Math.min(100, Math.round(node.outputQuality ?? 95))),
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    editNodes.value = state.editNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    fusionNodes.value = state.fusionNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    tryOnNodes.value = state.tryOnNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      rotation: Math.max(0, Math.min(360, Math.round(node.rotation ?? 0))),
+      scale: Math.max(10, Math.min(300, Math.round(node.scale ?? 100))),
+      opacity: Math.max(0, Math.min(100, Math.round(node.opacity ?? 100))),
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    faceSwapNodes.value = state.faceSwapNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    paletteNodes.value = state.paletteNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      colors: [...node.colors],
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    generateNodes.value = state.generateNodes.map(node => ({
+      ...node,
+      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    }))
+    generateNodes.value.forEach((node) => {
+      if (generateModeSupportsStyleModel(node.mode)) {
+        void ensureGenerateStyleOptions(node.mode)
+      }
+    })
+    connections.value = state.connections.map(connection => ({ ...connection }))
+    clearSelectedConnection()
+    clearConnectionDraft()
+    activeColorPopoverNodeId.value = null
+    setViewport(state.viewport)
+
+    await nextTick()
+    maskNodes.value.forEach(node => renderMaskNodeMask(node))
+    scheduleRenderedConnectionsRefresh()
+    primeWorkflowCacheSignatureMaps()
+    resetHistoryBaseline?.(state)
+  } finally {
+    suspendWorkflowCacheReactions = false
+  }
 }
 
 function createBoardSnapshot(): CanvasBoardSnapshot {
@@ -1368,24 +1677,58 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
     messages: messages.value.map(item => ({ ...item })),
     imageNodes: imageNodes.value.map(node => ({
       ...node,
-      outputImages: node.outputImages.map(output => ({ ...output })),
+      outputImages: cloneNodeOutputImages(node.outputImages),
     })),
     promptNodes: promptNodes.value.map(node => ({ ...node })),
     modelNodes: modelNodes.value.map(node => ({
       ...node,
       selectedAngles: [...node.selectedAngles],
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
+    mannequinNodes: mannequinNodes.value.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
+    viewpointNodes: viewpointNodes.value.map(node => ({
+      ...node,
+      sourceImages: cloneNodeOutputImages(node.sourceImages),
+      selectedViewpoints: [...node.selectedViewpoints],
+      outputImages: cloneNodeOutputImages(node.outputImages),
     })),
     maskNodes: maskNodes.value.map(node => ({ ...node })),
-    colorNodes: colorNodes.value.map(node => ({ ...node })),
-    enhanceNodes: enhanceNodes.value.map(node => ({ ...node })),
-    editNodes: editNodes.value.map(node => ({ ...node })),
-    fusionNodes: fusionNodes.value.map(node => ({ ...node })),
-    tryOnNodes: tryOnNodes.value.map(node => ({ ...node })),
+    colorNodes: colorNodes.value.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
+    enhanceNodes: enhanceNodes.value.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
+    editNodes: editNodes.value.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
+    fusionNodes: fusionNodes.value.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
+    tryOnNodes: tryOnNodes.value.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
+    faceSwapNodes: faceSwapNodes.value.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
     paletteNodes: paletteNodes.value.map(node => ({
       ...node,
       colors: [...node.colors],
+      outputImages: cloneNodeOutputImages(node.outputImages),
     })),
-    generateNodes: generateNodes.value.map(node => ({ ...node })),
+    generateNodes: generateNodes.value.map(node => ({
+      ...node,
+      outputImages: cloneNodeOutputImages(node.outputImages),
+    })),
     connections: connections.value.map(connection => ({ ...connection })),
     viewport: createViewportSnapshot(),
   }
@@ -1430,8 +1773,138 @@ const {
   applySnapshot: applyBoardSnapshot,
 })
 
+primeWorkflowCacheSignatureMaps()
+
+function setBoardNameInputRef(element: HTMLInputElement | null) {
+  boardNameInputRef.value = element
+}
+
 watch(
-  [messages, imageNodes, promptNodes, modelNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, paletteNodes, generateNodes, connections, canvasX, canvasY, zoomLevel],
+  promptNodes,
+  () => {
+    const nextMap = buildPromptSignatureMap()
+    if (suspendWorkflowCacheReactions) {
+      previousPromptSignatureMap = nextMap
+      return
+    }
+    forEachChangedSignature(previousPromptSignatureMap, nextMap, (key) => {
+      const nodeId = Number(key)
+      if (Number.isFinite(nodeId)) {
+        markConnectedExecutionTargetsDirty('prompt', nodeId)
+      }
+    })
+    previousPromptSignatureMap = nextMap
+  },
+  { deep: true },
+)
+
+watch(
+  imageNodes,
+  () => {
+    const nextMap = buildImageSourceSignatureMap()
+    if (suspendWorkflowCacheReactions) {
+      previousImageSourceSignatureMap = nextMap
+      return
+    }
+    forEachChangedSignature(previousImageSourceSignatureMap, nextMap, (key) => {
+      const nodeId = Number(key)
+      if (Number.isFinite(nodeId)) {
+        markConnectedExecutionTargetsDirty('image', nodeId)
+      }
+    })
+    previousImageSourceSignatureMap = nextMap
+  },
+  { deep: true },
+)
+
+watch(
+  maskNodes,
+  () => {
+    const nextMap = buildMaskSignatureMap()
+    if (suspendWorkflowCacheReactions) {
+      previousMaskSignatureMap = nextMap
+      return
+    }
+    forEachChangedSignature(previousMaskSignatureMap, nextMap, (key) => {
+      const nodeId = Number(key)
+      if (Number.isFinite(nodeId)) {
+        markConnectedExecutionTargetsDirty('mask', nodeId)
+      }
+    })
+    previousMaskSignatureMap = nextMap
+  },
+  { deep: true },
+)
+
+watch(
+  executionNodeWatchSources,
+  () => {
+    const nextMap = buildExecutionInputSignatureMap()
+    if (suspendWorkflowCacheReactions) {
+      previousExecutionInputSignatureMap = nextMap
+      return
+    }
+    forEachChangedSignature(previousExecutionInputSignatureMap, nextMap, (key) => {
+      const [nodeType, rawNodeId] = key.split(':')
+      const nodeId = Number(rawNodeId)
+      if (isCanvasExecutionOutputNodeType(nodeType) && Number.isFinite(nodeId)) {
+        markExecutionNodeDirty(nodeType, nodeId)
+      }
+    })
+    previousExecutionInputSignatureMap = nextMap
+  },
+  { deep: true },
+)
+
+watch(
+  executionNodeWatchSources,
+  () => {
+    const nextMap = buildExecutionOutputSignatureMap()
+    if (suspendWorkflowCacheReactions) {
+      previousExecutionOutputSignatureMap = nextMap
+      return
+    }
+    forEachChangedSignature(previousExecutionOutputSignatureMap, nextMap, (key) => {
+      const [nodeType, rawNodeId] = key.split(':')
+      const nodeId = Number(rawNodeId)
+      if (!isCanvasExecutionOutputNodeType(nodeType) || !Number.isFinite(nodeId)) return
+      const node = getExecutionOutputNodeByType(nodeType, nodeId)
+      if (!node) return
+      setWorkflowNodeOutputStatus(node)
+      markConnectedExecutionTargetsDirty(nodeType, nodeId)
+    })
+    previousExecutionOutputSignatureMap = nextMap
+  },
+  { deep: true },
+)
+
+watch(
+  connections,
+  () => {
+    const nextMap = buildConnectionTargetSignatureMap()
+    if (suspendWorkflowCacheReactions) {
+      previousConnectionTargetSignatureMap = nextMap
+      return
+    }
+    forEachChangedSignature(previousConnectionTargetSignatureMap, nextMap, (key) => {
+      const [nodeType, rawNodeId] = key.split(':')
+      const nodeId = Number(rawNodeId)
+      if (!Number.isFinite(nodeId)) return
+      if (isCanvasExecutionOutputNodeType(nodeType)) {
+        markExecutionNodeDirty(nodeType, nodeId)
+        return
+      }
+      if (nodeType === 'mask') {
+        markConnectedExecutionTargetsDirty('mask', nodeId)
+      }
+    })
+    previousConnectionTargetSignatureMap = nextMap
+  },
+  { deep: true },
+)
+
+watch(
+  [messages, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, faceSwapNodes, paletteNodes, generateNodes, connections, canvasX, canvasY, zoomLevel],
   () => {
     markBoardDirty()
     notifySnapshotChanged()
@@ -1440,9 +1913,9 @@ watch(
 )
 
 watch(
-  [connections, imageNodes, promptNodes, modelNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, paletteNodes, generateNodes, canvasX, canvasY, zoomLevel],
+  [connections, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, faceSwapNodes, paletteNodes, generateNodes, canvasX, canvasY, zoomLevel],
   () => {
-    scheduleRenderedConnectionsRefresh()
+    refreshRenderedConnections()
   },
   { deep: true, flush: 'post' }
 )
@@ -1476,6 +1949,22 @@ function deleteModelNode(id: number) {
   deleteNodeFromCollection(modelNodes, 'model', id, () => {
     if (activeModelNodeId.value === id) {
       activeModelNodeId.value = null
+    }
+  })
+}
+
+function deleteMannequinNode(id: number) {
+  deleteNodeFromCollection(mannequinNodes, 'mannequin', id, () => {
+    if (activeMannequinNodeId.value === id) {
+      activeMannequinNodeId.value = null
+    }
+  })
+}
+
+function deleteViewpointNode(id: number) {
+  deleteNodeFromCollection(viewpointNodes, 'viewpoint', id, () => {
+    if (activeViewpointNodeId.value === id) {
+      activeViewpointNodeId.value = null
     }
   })
 }
@@ -1537,6 +2026,14 @@ function deleteTryOnNode(id: number) {
   deleteNodeFromCollection(tryOnNodes, 'tryon', id, () => {
     if (activeTryOnNodeId.value === id) {
       activeTryOnNodeId.value = null
+    }
+  })
+}
+
+function deleteFaceSwapNode(id: number) {
+  deleteNodeFromCollection(faceSwapNodes, 'faceswap', id, () => {
+    if (activeFaceSwapNodeId.value === id) {
+      activeFaceSwapNodeId.value = null
     }
   })
 }
@@ -1604,12 +2101,15 @@ const nodeContextMenuHandlers: Record<CanvasNodeCreateActionKey, () => void> = {
   createImageNode: buildNodeCreateHandler(createImageNodeAt, imageNodes, activateImageNode),
   createPromptNode: buildNodeCreateHandler(createPromptNodeAt, promptNodes, activatePromptNode),
   createModelNode: buildNodeCreateHandler(createModelNodeAt, modelNodes, activateModelNode),
+  createMannequinNode: buildNodeCreateHandler(createMannequinNodeAt, mannequinNodes, activateMannequinNode),
+  createViewpointNode: buildNodeCreateHandler(createViewpointNodeAt, viewpointNodes, activateViewpointNode),
   createMaskNode: buildNodeCreateHandler(createMaskNodeAt, maskNodes, activateMaskNode),
   createColorNode: buildNodeCreateHandler(createColorNodeAt, colorNodes, activateColorNode),
   createEditNode: buildNodeCreateHandler(createEditNodeAt, editNodes, activateEditNode),
   createFusionNode: buildNodeCreateHandler(createFusionNodeAt, fusionNodes, activateFusionNode),
   createEnhanceNode: buildNodeCreateHandler(createEnhanceNodeAt, enhanceNodes, activateEnhanceNode),
   createTryOnNode: buildNodeCreateHandler(createTryOnNodeAt, tryOnNodes, activateTryOnNode),
+  createFaceSwapNode: buildNodeCreateHandler(createFaceSwapNodeAt, faceSwapNodes, activateFaceSwapNode),
   createPaletteNode: buildNodeCreateHandler(createPaletteNodeAt, paletteNodes, activatePaletteNode),
   createGenerateNode: buildNodeCreateHandler(createGenerateNodeAt, generateNodes, activateGenerateNode, (newNode) => {
     void ensureGenerateStyleOptions(newNode.mode)
@@ -1630,6 +2130,14 @@ function handleConnectionPortMouseDown(
   clearSelectedConnection()
   closeNodeContextMenu()
   closeColorPopover()
+  const target = event.currentTarget as HTMLElement | null
+  const direction = target?.dataset.portDirection
+  if (direction === 'input') {
+    const existingConnection = findIncomingConnection(nodeType, nodeId, port)
+    if (!existingConnection) return
+    beginConnectionReconnect(existingConnection.id)
+    return
+  }
   startConnectionDrag(event, nodeType, nodeId, port)
 }
 
@@ -1805,23 +2313,11 @@ const promptPlaceholder = computed(() =>
     ? 'Direct prompt for the selected image'
     : 'Direct text-to-image prompt'
 )
-const preferredWorkflowPromptNode = computed(() => {
-  const activePromptNode =
-    activePromptNodeId.value !== null
-      ? promptNodes.value.find(item => item.id === activePromptNodeId.value) ?? null
-      : null
-  if (activePromptNode?.text.trim()) return activePromptNode
-  return [...promptNodes.value].reverse().find(item => item.text.trim()) ?? null
-})
 const hasDirectPrompt = computed(() => !!userPrompt.value.trim())
 const styleCards = ref<StyleCard[]>([])
 const selectedCardIds = ref<number[]>([])
 const selectedRatio = ref('3:4')
 const selectedResolution = ref('1K')
-
-function resolveWorkflowPromptText(fallback = ''): string {
-  return preferredWorkflowPromptNode.value?.text.trim() || fallback
-}
 
 function extractDominantColors(imageUrl: string, maxColors: number): Promise<string[]> {
   return new Promise((resolve, reject) => {
@@ -1928,16 +2424,24 @@ function getMaskNodeProcessedOutputUrl(node: MaskNodeItem): string {
   return processedMaskPreviewUrls.value[node.id] || node.maskDataUrl
 }
 
-function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: number; mode: 'mask' } | null {
+function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: number; mode: 'mask' | 'output' } | null {
   const connection = findIncomingConnection('image', node.id, 'image')
-  if (!connection || connection.fromNodeType !== 'mask') return null
-  const sourceNode = maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
-  if (!sourceNode?.maskDataUrl) return null
-  const source = getMaskNodeEffectiveSource(sourceNode)
+  if (!connection) return null
+  if (connection.fromNodeType === 'mask') {
+    const sourceNode = maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
+    if (!sourceNode?.maskDataUrl) return null
+    const source = getMaskNodeEffectiveSource(sourceNode)
+    return {
+      url: getMaskNodeProcessedOutputUrl(sourceNode),
+      ratio: source.ratio,
+      mode: 'mask',
+    }
+  }
+  const resolvedImage = getConnectedImageInput('image', node.id, 'image')
+  if (!resolvedImage) return null
   return {
-    url: getMaskNodeProcessedOutputUrl(sourceNode),
-    ratio: source.ratio,
-    mode: 'mask',
+    ...resolvedImage,
+    mode: 'output',
   }
 }
 
@@ -1959,7 +2463,7 @@ function getResolvedImageNodeDisplay(node: ImageNodeItem): { image: { url: strin
 }
 
 function getMaskNodeConnectedImageInput(node: MaskNodeItem): { url: string; ratio: number } | null {
-  return getConnectedImageNodeOutput('mask', node.id, 'image')
+  return getConnectedImageInput('mask', node.id, 'image')
 }
 
 function getMaskNodeEffectiveSource(node: MaskNodeItem): { url: string; ratio: number; connected: boolean } {
@@ -1979,11 +2483,7 @@ function getMaskNodeEffectiveSource(node: MaskNodeItem): { url: string; ratio: n
 }
 
 function getModelNodeConnectedImageInput(node: ModelNodeItem): { url: string; ratio: number } | null {
-  return getConnectedImageNodeOutput('model', node.id, 'image')
-}
-
-function getModelNodeConnectedPromptInput(node: ModelNodeItem): string {
-  return getConnectedPromptText('model', node.id, 'prompt')
+  return getConnectedImageInput('model', node.id, 'image')
 }
 
 function getModelNodeEffectiveSource(node: ModelNodeItem): { url: string; ratio: number; connected: boolean } {
@@ -2002,124 +2502,102 @@ function getModelNodeEffectiveSource(node: ModelNodeItem): { url: string; ratio:
   }
 }
 
-function getModelNodeConnectedOutputTarget(node: ModelNodeItem): ImageNodeItem | null {
-  return getConnectedOutputImageTarget('model', node.id, 'image')
+function getMannequinNodeConnectedImageInput(node: MannequinNodeItem): { url: string; ratio: number } | null {
+  return getConnectedImageInput('mannequin', node.id, 'image')
 }
 
-function getColorNodeConnectedOutputTarget(node: ColorNodeItem): ImageNodeItem | null {
-  return getConnectedOutputImageTarget('color', node.id, 'image')
-}
-
-function getEditNodeConnectedOutputTarget(node: EditNodeItem): ImageNodeItem | null {
-  return getConnectedOutputImageTarget('edit', node.id, 'image')
-}
-
-function getFusionNodeConnectedOutputTarget(node: FusionNodeItem): ImageNodeItem | null {
-  return getConnectedOutputImageTarget('fusion', node.id, 'image')
-}
-
-function getEnhanceNodeConnectedOutputTarget(node: EnhanceNodeItem): ImageNodeItem | null {
-  return getConnectedOutputImageTarget('enhance', node.id, 'image')
-}
-
-function getTryOnNodeConnectedOutputTarget(node: TryOnNodeItem): ImageNodeItem | null {
-  return getConnectedOutputImageTarget('tryon', node.id, 'image')
-}
-
-function getPaletteNodeConnectedOutputTarget(node: PaletteNodeItem): ImageNodeItem | null {
-  return getConnectedOutputImageTarget('palette', node.id, 'image')
-}
-
-function getGenerateNodeConnectedOutputTarget(node: GenerateNodeItem): ImageNodeItem | null {
-  return getConnectedOutputImageTarget('generate', node.id, 'image')
-}
-
-function getColorNodeConnectionStatus(node: ColorNodeItem) {
-  const status = createNodeConnectionStatusBuilder('color', node.id)
-  const hasAnyConnection = status.hasAnyConnection('image')
-  const imageConnected = status.incoming('image')
-  const maskConnected = status.incoming('mask')
-  const promptConnected = status.incoming('prompt')
-  const outputConnected = status.outgoing('image')
+function getMannequinNodeEffectiveSource(node: MannequinNodeItem): { url: string; ratio: number; connected: boolean } {
+  const connectedImage = getMannequinNodeConnectedImageInput(node)
+  if (connectedImage) {
+    return {
+      url: connectedImage.url,
+      ratio: connectedImage.ratio,
+      connected: true,
+    }
+  }
   return {
-    hasAnyConnection,
-    imageConnected,
-    maskConnected,
-    promptConnected,
-    outputConnected,
+    url: node.sourceImageUrl,
+    ratio: node.sourceImageRatio,
+    connected: false,
   }
 }
 
-function getConnectedImageNodeOutput(
-  toNodeType: CanvasConnectionNodeType,
-  toNodeId: number,
-  toPort: CanvasConnectionPort,
-): { url: string; ratio: number } | null {
-  const connection = findIncomingConnection(toNodeType, toNodeId, toPort)
-  if (!connection || connection.fromNodeType !== 'image') return null
-  const sourceNode = imageNodes.value.find(item => item.id === connection.fromNodeId) ?? null
-  const preferredImage = getImageNodeConnectionOutput(sourceNode)
-  if (!preferredImage?.url) return null
-  return preferredImage
+function getMannequinNodeStageHeight(node: MannequinNodeItem): number {
+  const source = getMannequinNodeEffectiveSource(node)
+  return getMannequinStageHeight(node, source.url, source.ratio)
 }
 
-function getConnectedPromptText(
-  toNodeType: CanvasConnectionNodeType,
-  toNodeId: number,
-  toPort: CanvasConnectionPort,
-): string {
-  const connection = findIncomingConnection(toNodeType, toNodeId, toPort)
-  if (!connection || connection.fromNodeType !== 'prompt') return ''
-  const sourceNode = promptNodes.value.find(item => item.id === connection.fromNodeId) ?? null
-  return sourceNode?.text.trim() || ''
+function getViewpointNodeConnectedImageInput(node: ViewpointNodeItem): { url: string; ratio: number } | null {
+  return getConnectedImageInput('viewpoint', node.id, 'image')
 }
 
-function getConnectedOutputImageTarget(
-  fromNodeType: CanvasConnectionNodeType,
-  fromNodeId: number,
-  fromPort: CanvasConnectionPort,
-): ImageNodeItem | null {
-  const connection = findOutgoingConnection(fromNodeType, fromNodeId, fromPort)
-  if (!connection || connection.toNodeType !== 'image') return null
-  return imageNodes.value.find(item => item.id === connection.toNodeId) ?? null
-}
-
-function resolveConnectedPlacedImageInput(
-  toNodeType: CanvasConnectionNodeType,
-  toNodeId: number,
-  toPort: CanvasConnectionPort,
-): { url: string; placementX: number; placementY: number } | null {
-  const connection = findIncomingConnection(toNodeType, toNodeId, toPort)
-  if (!connection || connection.fromNodeType !== 'image') return null
-  const sourceNode = imageNodes.value.find(item => item.id === connection.fromNodeId) ?? null
-  const preferredImage = getImageNodeConnectionOutput(sourceNode)
-  if (!preferredImage?.url || !sourceNode) return null
+function getViewpointNodeEffectiveSource(node: ViewpointNodeItem): { images: { url: string; ratio: number }[]; connected: boolean } {
+  const connectedImage = getViewpointNodeConnectedImageInput(node)
+  if (connectedImage) {
+    return {
+      images: [connectedImage],
+      connected: true,
+    }
+  }
   return {
-    url: preferredImage.url,
-    placementX: sourceNode.x - 340,
-    placementY: sourceNode.y + 18,
+    images: node.sourceImages.map(image => ({
+      url: image.url,
+      ratio: image.ratio,
+    })),
+    connected: false,
   }
 }
 
-async function resolveConnectedPlacedMaskInput(
-  toNodeType: CanvasConnectionNodeType,
-  toNodeId: number,
-  toPort: CanvasConnectionPort,
-): Promise<{ dataUrl: string; placementX: number; placementY: number } | null> {
-  const connection = findIncomingConnection(toNodeType, toNodeId, toPort)
-  if (!connection || connection.fromNodeType !== 'mask') return null
-  const sourceNode = maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
-  if (!sourceNode?.maskDataUrl) return null
-  const dataUrl = await refineMaskDataUrl(
-    sourceNode.maskDataUrl,
-    sourceNode.refineAmount ?? 0,
-    !!sourceNode.invertMask,
-  )
-  if (!dataUrl) return null
-  return {
-    dataUrl,
-    placementX: sourceNode.x + 340,
-    placementY: sourceNode.y + 18,
+function getViewpointNodeEffectiveSourceImages(node: ViewpointNodeItem) {
+  return getViewpointNodeEffectiveSource(node).images
+}
+
+function getViewpointNodeStageHeight(node: ViewpointNodeItem): number {
+  const source = getViewpointNodeEffectiveSource(node).images[0]
+  return getViewpointStageHeight(node, source?.url ?? '', source?.ratio ?? 1)
+}
+
+function setViewpointNodeCategory(node: ViewpointNodeItem, category: ViewpointNodeItem['activeCategory']) {
+  node.activeCategory = category
+  const allowedKeys = new Set((VIEWPOINT_OPTIONS_BY_CATEGORY[category] ?? []).map(option => option.key))
+  node.selectedViewpoints = node.selectedViewpoints.filter(key => allowedKeys.has(key))
+}
+
+function getCanvasConnectionNodeByType(
+  nodeType: CanvasConnectionNodeType,
+  nodeId: number,
+): CanvasNodeItem | null {
+  switch (nodeType) {
+    case 'prompt':
+      return promptNodes.value.find(item => item.id === nodeId) ?? null
+    case 'image':
+      return imageNodes.value.find(item => item.id === nodeId) ?? null
+    case 'mask':
+      return maskNodes.value.find(item => item.id === nodeId) ?? null
+    case 'color':
+      return colorNodes.value.find(item => item.id === nodeId) ?? null
+    case 'model':
+      return modelNodes.value.find(item => item.id === nodeId) ?? null
+    case 'mannequin':
+      return mannequinNodes.value.find(item => item.id === nodeId) ?? null
+    case 'viewpoint':
+      return viewpointNodes.value.find(item => item.id === nodeId) ?? null
+    case 'edit':
+      return editNodes.value.find(item => item.id === nodeId) ?? null
+    case 'fusion':
+      return fusionNodes.value.find(item => item.id === nodeId) ?? null
+    case 'enhance':
+      return enhanceNodes.value.find(item => item.id === nodeId) ?? null
+    case 'tryon':
+      return tryOnNodes.value.find(item => item.id === nodeId) ?? null
+    case 'faceswap':
+      return faceSwapNodes.value.find(item => item.id === nodeId) ?? null
+    case 'palette':
+      return paletteNodes.value.find(item => item.id === nodeId) ?? null
+    case 'generate':
+      return generateNodes.value.find(item => item.id === nodeId) ?? null
+    default:
+      return null
   }
 }
 
@@ -2138,162 +2616,27 @@ function buildPlacementSource(url: string, x: number, y: number): CanvasImageIte
   }
 }
 
-function warnMissingNodeInputs(
-  nodeType: CanvasConnectionNodeType,
-  nodeId: number,
-  missingPorts: string[],
-  formatMessage: (ports: string[]) => string,
-): boolean {
-  if (missingPorts.length === 0) return false
-  triggerNodeConnectionError(nodeType, nodeId, missingPorts)
-  message.warning(formatMessage(missingPorts))
-  return true
-}
-
-function createNodeConnectionStatusBuilder(nodeType: CanvasConnectionNodeType, nodeId: number) {
-  return {
-    incoming: (port: CanvasConnectionPort) => hasIncomingPortConnection(nodeType, nodeId, port),
-    outgoing: (port: CanvasConnectionPort) => hasOutgoingPortConnection(nodeType, nodeId, port),
-    hasAnyConnection: (outputPort: CanvasConnectionPort) =>
-      getIncomingConnections(nodeType, nodeId).length > 0 || hasOutgoingPortConnection(nodeType, nodeId, outputPort),
-  }
-}
-
-function getModelNodeConnectionStatus(node: ModelNodeItem) {
-  const status = createNodeConnectionStatusBuilder('model', node.id)
-  const hasAnyConnection = status.hasAnyConnection('image')
-  const imageConnected = status.incoming('image')
-  const promptConnected = status.incoming('prompt')
-  const outputConnected = status.outgoing('image')
-  return {
-    hasAnyConnection,
-    imageConnected,
-    promptConnected,
-    outputConnected,
-  }
-}
-
-function getEditNodeConnectionStatus(node: EditNodeItem) {
-  const status = createNodeConnectionStatusBuilder('edit', node.id)
-  const hasAnyConnection = status.hasAnyConnection('image')
-  const imageConnected = status.incoming('image')
-  const maskConnected = status.incoming('mask')
-  const promptConnected = status.incoming('prompt')
-  const outputConnected = status.outgoing('image')
-  return {
-    hasAnyConnection,
-    imageConnected,
-    maskConnected,
-    promptConnected,
-    outputConnected,
-  }
-}
-
-function getFusionNodeConnectionStatus(node: FusionNodeItem) {
-  const status = createNodeConnectionStatusBuilder('fusion', node.id)
-  const hasAnyConnection = status.hasAnyConnection('image')
-  const imageAConnected = status.incoming('imageA')
-  const imageBConnected = status.incoming('imageB')
-  const promptConnected = status.incoming('prompt')
-  const outputConnected = status.outgoing('image')
-  return {
-    hasAnyConnection,
-    imageAConnected,
-    imageBConnected,
-    promptConnected,
-    outputConnected,
-  }
-}
-
-function enhanceModeSupportsPrompt(mode: EnhanceNodeItem['mode']) {
-  return mode === 'deblur' || mode === 'canvas-extend'
-}
-
-function getEnhanceNodeConnectionStatus(node: EnhanceNodeItem) {
-  const status = createNodeConnectionStatusBuilder('enhance', node.id)
-  const hasAnyConnection = status.hasAnyConnection('image')
-  const imageConnected = status.incoming('image')
-  const promptConnected = enhanceModeSupportsPrompt(node.mode)
-    ? status.incoming('prompt')
-    : false
-  const outputConnected = status.outgoing('image')
-  return {
-    hasAnyConnection,
-    imageConnected,
-    promptConnected,
-    outputConnected,
-  }
-}
-
-function getTryOnNodeConnectionStatus(node: TryOnNodeItem) {
-  const status = createNodeConnectionStatusBuilder('tryon', node.id)
-  const imageAConnected = status.incoming('imageA')
-  const imageBConnected = status.incoming('imageB')
-  const outputConnected = status.outgoing('image')
-  return {
-    imageAConnected,
-    imageBConnected,
-    outputConnected,
-  }
-}
-
-function paletteModeUsesReference(mode: PaletteNodeItem['mode']) {
-  return mode === 'reference'
-}
-
-function generateModeRequiresImage(mode: GenerateNodeItem['mode']) {
-  return generateModeMeta[mode].requiresImage
-}
-
 function generateModeSupportsStyleModel(mode: GenerateNodeItem['mode']) {
   return generateModeMeta[mode].supportsStyleModel
 }
 
-function getPaletteNodeConnectionStatus(node: PaletteNodeItem) {
-  const status = createNodeConnectionStatusBuilder('palette', node.id)
-  const imageConnected = status.incoming('image')
-  const referenceConnected = paletteModeUsesReference(node.mode)
-    ? status.incoming('reference')
-    : false
-  const outputConnected = status.outgoing('image')
-  return {
-    imageConnected,
-    referenceConnected,
-    outputConnected,
-  }
-}
-
-function getGenerateNodeConnectionStatus(node: GenerateNodeItem) {
-  const status = createNodeConnectionStatusBuilder('generate', node.id)
-  const imageConnected = status.incoming('image')
-  const promptConnected = status.incoming('prompt')
-  const outputConnected = status.outgoing('image')
-  return {
-    imageConnected,
-    promptConnected,
-    outputConnected,
-  }
+function warnMissingNodeInputs(
+  nodeType: CanvasConnectionNodeType,
+  nodeId: number,
+  missingPorts: string[],
+  formatMessage: (state: { disconnectedPorts: string[]; pendingPorts: string[] }) => string,
+): boolean {
+  if (missingPorts.length === 0) return false
+  const { disconnectedPorts, pendingPorts } = getNodeRequiredPortIssues(nodeType, nodeId, missingPorts)
+  triggerNodeConnectionError(nodeType, nodeId, missingPorts)
+  message.warning(formatMessage({ disconnectedPorts, pendingPorts }))
+  return true
 }
 
 function setEnhanceNodeMode(node: EnhanceNodeItem, mode: EnhanceNodeItem['mode']) {
   node.mode = mode
   if (enhanceModeSupportsPrompt(mode)) return
-  const removedSelected = connections.value.some(connection =>
-    connection.id === selectedConnectionId.value &&
-    connection.toNodeType === 'enhance' &&
-    connection.toNodeId === node.id &&
-    connection.toPort === 'prompt',
-  )
-  connections.value = connections.value.filter(connection =>
-    !(
-      connection.toNodeType === 'enhance' &&
-      connection.toNodeId === node.id &&
-      connection.toPort === 'prompt'
-    ),
-  )
-  if (removedSelected) {
-    clearSelectedConnection()
-  }
+  removeIncomingConnectionsForPort('enhance', node.id, 'prompt')
 }
 
 function setPaletteNodeMode(node: PaletteNodeItem, mode: PaletteNodeItem['mode']) {
@@ -2301,22 +2644,7 @@ function setPaletteNodeMode(node: PaletteNodeItem, mode: PaletteNodeItem['mode']
   node.mode = mode
   if (paletteModeUsesReference(mode)) return
 
-  const removedSelected = connections.value.some(connection =>
-    connection.id === selectedConnectionId.value &&
-    connection.toNodeType === 'palette' &&
-    connection.toNodeId === node.id &&
-    connection.toPort === 'reference',
-  )
-  connections.value = connections.value.filter(connection =>
-    !(
-      connection.toNodeType === 'palette' &&
-      connection.toNodeId === node.id &&
-      connection.toPort === 'reference'
-    ),
-  )
-  if (removedSelected) {
-    clearSelectedConnection()
-  }
+  removeIncomingConnectionsForPort('palette', node.id, 'reference')
   if (usingReferenceBefore) {
     paletteReferenceExtractingIds.value = paletteReferenceExtractingIds.value.filter(item => item !== node.id)
   }
@@ -2332,6 +2660,7 @@ function isGenerateStyleLoading(mode: GenerateNodeItem['mode']): boolean {
 
 async function ensureGenerateStyleOptions(mode: GenerateNodeItem['mode']) {
   if (!generateModeSupportsStyleModel(mode)) return
+  if (!userStore.isLoggedIn) return
   if (generateStyleLoading.value[mode]) return
   if ((generateStyleOptions.value[mode] ?? []).length > 0) return
   generateStyleLoading.value = { ...generateStyleLoading.value, [mode]: true }
@@ -2412,12 +2741,227 @@ function addPaletteColor(node: PaletteNodeItem, rawColor: string) {
 }
 
 const {
+  getNodeConnectionStatus,
+  getConnectedImageInput,
+  getConnectedPromptInput,
+  getConnectedOutputImageTarget,
+  resolveConnectedPlacedImageInput,
+  resolveConnectedPlacedMaskInput,
+  getMissingRequiredNodeInputs,
+} = useCanvasNodeConnections({
+  imageNodes,
+  promptNodes,
+  maskNodes,
+  getIncomingConnections,
+  hasIncomingPortConnection,
+  hasOutgoingPortConnection,
+  findIncomingConnection,
+  getOutgoingConnections,
+  getImageNodePreferredImage,
+  lookupNodeByType: getCanvasConnectionNodeByType,
+  refineMaskDataUrl,
+})
+
+const {
+  getNodeRequiredPortIssues,
+  getNodeUiState,
+} = useCanvasNodeUiState({
+  getNodeConnectionStatus,
+  lookupNodeByType: getCanvasConnectionNodeByType,
+  generateModeSupportsStyleModel,
+})
+
+function resolveWorkflowPromptText(
+  nodeType: CanvasConnectionNodeType,
+  nodeId: number,
+  fallback = '',
+): string {
+  return getConnectedPromptInput(nodeType, nodeId, 'prompt') || fallback
+}
+
+const nodeCopyMode = computed(() => isDuplicateModifierPressed.value && activeTool.value === 'select')
+
+const getImageNodeUiState = (node: ImageNodeItem) => getNodeUiState('image', node)
+const getPromptNodeUiState = (node: PromptNodeItem) => getNodeUiState('prompt', node)
+const getModelNodeUiState = (node: ModelNodeItem) => getNodeUiState('model', node)
+const getMannequinNodeUiState = (node: MannequinNodeItem) => getNodeUiState('mannequin', node)
+const getViewpointNodeUiState = (node: ViewpointNodeItem) => getNodeUiState('viewpoint', node)
+const getMaskNodeUiState = (node: MaskNodeItem) => getNodeUiState('mask', node)
+const getColorNodeUiState = (node: ColorNodeItem) => getNodeUiState('color', node)
+const getEditNodeUiState = (node: EditNodeItem) => getNodeUiState('edit', node)
+const getFusionNodeUiState = (node: FusionNodeItem) => getNodeUiState('fusion', node)
+const getEnhanceNodeUiState = (node: EnhanceNodeItem) => getNodeUiState('enhance', node)
+const getTryOnNodeUiState = (node: TryOnNodeItem) => getNodeUiState('tryon', node)
+const getFaceSwapNodeUiState = (node: FaceSwapNodeItem) => getNodeUiState('faceswap', node)
+const getPaletteNodeUiState = (node: PaletteNodeItem) => getNodeUiState('palette', node)
+const getGenerateNodeUiState = (node: GenerateNodeItem) => getNodeUiState('generate', node)
+
+const onImageNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'image', nodeId, port)
+const onPromptNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'prompt', nodeId, port)
+const onModelNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'model', nodeId, port)
+const onMannequinNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'mannequin', nodeId, port)
+const onViewpointNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'viewpoint', nodeId, port)
+const onMaskNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'mask', nodeId, port)
+const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'color', nodeId, port)
+const onEditNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'edit', nodeId, port)
+const onFusionNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'fusion', nodeId, port)
+const onEnhanceNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'enhance', nodeId, port)
+const onTryOnNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'tryon', nodeId, port)
+const onFaceSwapNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'faceswap', nodeId, port)
+const onPaletteNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'palette', nodeId, port)
+const onGenerateNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'generate', nodeId, port)
+
+function onPromptNodeTextUpdate(node: PromptNodeItem, value: string) {
+  node.text = value
+}
+
+function onModelNodeSelectBackground(node: ModelNodeItem, key: string) {
+  node.background = key
+}
+
+function onViewpointNodeUpdateLighting(node: ViewpointNodeItem, value: ViewpointNodeItem['lighting']) {
+  node.lighting = value
+}
+
+function onMaskNodeCanvasMouseDownBridge(event: MouseEvent, node: MaskNodeItem) {
+  onMaskCanvasMouseDown(event, getMaskNodeRuntimeNode(node))
+}
+
+function onMaskNodeSetDrawMode(node: MaskNodeItem, value: 'paint' | 'erase') {
+  node.drawMode = value
+}
+
+function onMaskNodeUpdateBrushSize(node: MaskNodeItem, value: number) {
+  node.brushSize = value
+}
+
+function onMaskNodeUpdateRefineAmount(node: MaskNodeItem, value: number) {
+  node.refineAmount = clampMaskRefineAmount(value)
+}
+
+function onMaskNodeToggleInvert(node: MaskNodeItem) {
+  node.invertMask = !node.invertMask
+}
+
+function onColorNodeStrengthInput(node: ColorNodeItem, value: number) {
+  node.strength = Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function onColorPopoverHueChange(value: number) {
+  setColorPopoverHueValue(value)
+  applyColorPopoverToNode()
+}
+
+function onColorPopoverSaturationChange(value: number) {
+  setColorPopoverSaturationValue(value)
+  applyColorPopoverToNode()
+}
+
+function onColorPopoverLightnessChange(value: number) {
+  setColorPopoverLightnessValue(value)
+  applyColorPopoverToNode()
+}
+
+function onEditNodeUpdateMode(node: EditNodeItem, value: EditNodeItem['mode']) {
+  node.mode = value
+}
+
+function onFusionNodeUpdateMode(node: FusionNodeItem, value: FusionNodeItem['mode']) {
+  node.mode = value
+}
+
+function onEnhanceNodeUpdateMode(node: EnhanceNodeItem, value: EnhanceNodeItem['mode']) {
+  setEnhanceNodeMode(node, value)
+}
+
+function onEnhanceNodeUpdateUpscaleMode(node: EnhanceNodeItem, value: EnhanceNodeItem['upscaleMode']) {
+  node.upscaleMode = value
+}
+
+function onEnhanceNodeUpdateUpscaleFactor(node: EnhanceNodeItem, value: EnhanceNodeItem['upscaleFactor']) {
+  node.upscaleFactor = value
+}
+
+function onEnhanceNodeUpdateOutputFormat(node: EnhanceNodeItem, value: EnhanceNodeItem['outputFormat']) {
+  node.outputFormat = value
+}
+
+function onEnhanceNodeUpdateOutputQuality(node: EnhanceNodeItem, value: number) {
+  node.outputQuality = Math.max(30, Math.min(100, Math.round(value)))
+}
+
+function onTryOnNodeUpdateMode(node: TryOnNodeItem, value: TryOnNodeItem['mode']) {
+  node.mode = value
+}
+
+function onTryOnNodeUpdateTileMode(node: TryOnNodeItem, value: TryOnNodeItem['tileMode']) {
+  node.tileMode = value
+}
+
+function onTryOnNodeUpdateRotation(node: TryOnNodeItem, value: number) {
+  node.rotation = Math.max(0, Math.min(360, Math.round(value)))
+}
+
+function onTryOnNodeUpdateScale(node: TryOnNodeItem, value: number) {
+  node.scale = Math.max(10, Math.min(300, Math.round(value)))
+}
+
+function onTryOnNodeUpdateOpacity(node: TryOnNodeItem, value: number) {
+  node.opacity = Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function onPaletteNodeUpdateMode(node: PaletteNodeItem, value: PaletteNodeItem['mode']) {
+  setPaletteNodeMode(node, value)
+}
+
+function onPaletteNodeApplyPreset(node: PaletteNodeItem, value: string[]) {
+  node.colors = [...value]
+}
+
+function onGenerateNodeUpdateMode(node: GenerateNodeItem, value: GenerateNodeItem['mode']) {
+  setGenerateNodeMode(node, value)
+}
+
+function onGenerateNodeUpdateStyleModel(node: GenerateNodeItem, value: string) {
+  node.styleModel = value
+}
+
+function onGenerateNodeUpdateRatio(node: GenerateNodeItem, value: GenerateNodeItem['ratio']) {
+  node.ratio = value
+}
+
+function onGenerateNodeUpdateCount(node: GenerateNodeItem, value: GenerateNodeItem['count']) {
+  node.count = value
+}
+
+function onGenerateNodeUpdateQuality(node: GenerateNodeItem, value: GenerateNodeItem['quality']) {
+  node.quality = value
+}
+
+const {
   handleModelNodeGenerate,
+  handleMannequinNodeGenerate,
+  handleViewpointNodeGenerate,
   handleColorNodeGenerate,
   handleEditNodeGenerate,
   handleFusionNodeGenerate,
   handleEnhanceNodeGenerate,
   handleTryOnNodeGenerate,
+  handleFaceSwapNodeGenerate,
   handlePaletteNodeGenerate,
   handleGenerateNodeGenerate,
 } = useNodeExecutors({
@@ -2440,38 +2984,32 @@ const {
   paletteModeMeta,
   generateModeMeta,
   getModelAngleLabel,
-  getIncomingConnections,
+  getViewpointLabel,
+  getViewpointLightingLabel,
+  getNodeConnectionStatus,
   triggerNodeConnectionError,
   getModelNodeEffectiveSource,
-  getModelNodeConnectedPromptInput,
-  resolveWorkflowPromptText,
-  getModelNodeConnectedOutputTarget,
-  getColorNodeConnectedOutputTarget,
-  getEditNodeConnectedOutputTarget,
-  getFusionNodeConnectedOutputTarget,
-  getEnhanceNodeConnectedOutputTarget,
-  getTryOnNodeConnectedOutputTarget,
-  getPaletteNodeConnectedOutputTarget,
-  getGenerateNodeConnectedOutputTarget,
+  resolveNodePromptText: resolveWorkflowPromptText,
+  getConnectedOutputImageTarget,
   resolvePreferredOutputNodeId,
   buildPlacementSource,
+  getMissingRequiredNodeInputs,
   warnMissingNodeInputs,
   submitTaskAndPoll,
   appendGeneratedImages,
+  appendWorkflowNodeOutputs,
   normalizeHexColor,
   getImageNodePreferredImage,
   resolveConnectedPlacedImageInput,
   resolveConnectedPlacedMaskInput,
-  getConnectedPromptText,
   buildFullMaskDataUrl,
   refineMaskDataUrl,
   dataUrlToFile,
   uploadImage: uploadApi.upload,
   upscaleImage: upscaleApi.upscale,
   segmentImage: segApi.segment,
+  saveSegmentResult: segApi.save,
   extractDominantColors,
-  paletteModeUsesReference,
-  generateModeRequiresImage,
   generateModeSupportsStyleModel,
 })
 
@@ -2518,10 +3056,19 @@ function getImageDisplayHeight(item: CanvasImageItem): number {
 }
 
 onMounted(async () => {
+  if (!userStore.isLoggedIn) {
+    addGlobalConnectionListeners()
+    nextTick(() => {
+      scheduleRenderedConnectionsRefresh()
+    })
+    return
+  }
   try {
     const res: any = await styleCardApi.getEnabled()
     if (res.code === 0) styleCards.value = res.data.list
-  } catch (e) {}
+  } catch (error) {
+    console.error('[Home] Failed to load enabled style cards', error)
+  }
   addGlobalConnectionListeners()
   nextTick(() => {
     scheduleRenderedConnectionsRefresh()
@@ -2549,135 +3096,6 @@ onUnmounted(() => {
 .canvas-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, #e2e4e8 calc(1.5px * var(--zoom, 1)), transparent calc(1.5px * var(--zoom, 1))); background-size: calc(24px * var(--zoom, 1)) calc(24px * var(--zoom, 1)); background-position: calc(50% + var(--offset-x, 0px)) calc(50% + var(--offset-y, 0px)); z-index: 0; opacity: var(--grid-opacity, 1); }
 .canvas-grid.grid-dragging { background: rgba(146, 120, 230, 0.05); }
 
-.floating-header { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; z-index: 100; pointer-events: none; }
-.header-left, .header-right { display: flex; gap: 12px; pointer-events: auto; }
-.file-name-chip { 
-  background: #f1f3f9; 
-  padding: 8px 16px; 
-  border-radius: 12px; 
-  font-size: 14px; 
-  font-weight: 500; 
-  color: #202124;
-  cursor: pointer; 
-  display: flex; 
-  gap: 8px; 
-  align-items: center; 
-  transition: background 0.2s;
-  position: relative;
-}
-.file-name-chip:hover { background: #e8eaed; }
-.file-name-btn {
-  border: none;
-  background: transparent;
-  padding: 0;
-  margin: 0;
-  color: #202124;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  line-height: 1.2;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.file-name-btn:hover {
-  color: #6757c8;
-}
-.board-name-input {
-  height: 24px;
-  min-width: 140px;
-  max-width: 220px;
-  border-radius: 6px;
-  border: 1px solid #cfd5e3;
-  padding: 0 8px;
-  font-size: 14px;
-  outline: none;
-  color: #202124;
-  background: #fff;
-}
-.board-name-input:focus {
-  border-color: #9278e6;
-}
-.board-switch-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #5f6368;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-.board-switch-btn:hover {
-  background: #fff;
-  color: #6757c8;
-}
-.chevron-down {
-  transition: transform 0.2s ease;
-}
-.chevron-down.open {
-  transform: rotate(180deg);
-}
-.board-switch-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  min-width: 220px;
-  max-width: 280px;
-  max-height: 280px;
-  overflow-y: auto;
-  padding: 6px;
-  border-radius: 10px;
-  border: 1px solid #d8ddea;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 30px rgba(25, 30, 45, 0.12);
-  z-index: 140;
-}
-.board-switch-item {
-  width: 100%;
-  height: 34px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  text-align: left;
-  padding: 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #4b5565;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.board-switch-item:hover {
-  background: rgba(146, 120, 230, 0.12);
-  color: #6757c8;
-}
-.board-switch-item.active {
-  background: rgba(146, 120, 230, 0.16);
-  color: #6757c8;
-}
-.board-switch-empty {
-  height: 34px;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  font-size: 12px;
-  color: #8a91a3;
-}
-.btn-ghost, .btn-primary { height: 40px; padding: 0 16px; border-radius: 10px; font-size: 14px; border: none; cursor: pointer; }
-.btn-ghost { background: #f1f3f9; }
-.btn-ghost:hover { background: #f1f3f9; }
-.share-btn { background: #f1f3f9 !important; }
-.share-btn:hover { background: #f1f3f9 !important; transform: none; }
-.btn-primary { background: #9278e6; color: white; }
-.btn-primary:disabled { background: #e2e4e8; color: #a8adb7; cursor: not-allowed; }
-
 .selection-marquee {
   position: absolute;
   background: rgba(146, 120, 230, 0.1);
@@ -2685,88 +3103,6 @@ onUnmounted(() => {
   border-radius: 4px;
   z-index: 1000;
   pointer-events: none;
-}
-
-.canvas-connections-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: visible;
-}
-
-.canvas-connection-path,
-.canvas-connection-hit {
-  fill: none;
-}
-
-.canvas-connection-path {
-  stroke: var(--connection-color, #5b8def);
-  stroke-width: 1.8;
-  opacity: 0.78;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  pointer-events: none;
-  transition:
-    stroke-width 0.16s ease,
-    opacity 0.16s ease,
-    filter 0.16s ease;
-}
-
-.canvas-connection-path.tone-image,
-.canvas-connection-endpoint.tone-image {
-  --connection-color: #5b8def;
-  --connection-selected: #3f79e6;
-  --connection-glow: rgba(91, 141, 239, 0.18);
-}
-
-.canvas-connection-path.tone-mask,
-.canvas-connection-endpoint.tone-mask {
-  --connection-color: #34c38f;
-  --connection-selected: #22a876;
-  --connection-glow: rgba(52, 195, 143, 0.18);
-}
-
-.canvas-connection-path.tone-prompt,
-.canvas-connection-endpoint.tone-prompt {
-  --connection-color: #f59e0b;
-  --connection-selected: #d68608;
-  --connection-glow: rgba(245, 158, 11, 0.18);
-}
-
-.canvas-connection-path.selected {
-  stroke: var(--connection-selected, var(--connection-color, #3f79e6));
-  stroke-width: 2.8;
-  opacity: 1;
-  filter: drop-shadow(0 0 10px var(--connection-glow, rgba(91, 141, 239, 0.18)));
-}
-
-.canvas-connection-path.draft {
-  stroke: var(--connection-color, #5b8def);
-  opacity: 0.92;
-  stroke-dasharray: 6 6;
-}
-
-.canvas-connection-path.draft.is-valid {
-  stroke: var(--connection-selected, var(--connection-color, #3f79e6));
-}
-
-.canvas-connection-path.draft.is-invalid {
-  stroke: #e06a82;
-}
-
-.canvas-connection-hit {
-  stroke: transparent;
-  stroke-width: 14;
-  pointer-events: stroke;
-  cursor: pointer;
-}
-
-.canvas-connection-endpoint {
-  fill: var(--connection-color, #5b8def);
-  stroke: #fff;
-  stroke-width: 2;
-  pointer-events: none;
-  filter: drop-shadow(0 0 6px var(--connection-glow, rgba(91, 141, 239, 0.18)));
 }
 
 .leave-confirm-mask {
@@ -3159,7 +3495,7 @@ onUnmounted(() => {
 }
 
 .canvas-content { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform: translate(var(--offset-x, 0px), var(--offset-y, 0px)) scale(var(--zoom, 1)); transform-origin: center center; }
-.workflow-node {
+:deep(.workflow-node) {
   position: absolute;
   z-index: 12;
   border: 1.5px solid #e2e8f0;
@@ -3171,16 +3507,16 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-.workflow-node :deep(.workflow-node-header) {
+:deep(.workflow-node .workflow-node-header) {
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
 }
 
-.workflow-node.active {
+:deep(.workflow-node.active) {
   border-color: #9278e6;
 }
 
-.workflow-node.dragging {
+:deep(.workflow-node.dragging) {
   transition: none;
 }
 

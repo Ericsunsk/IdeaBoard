@@ -5,9 +5,9 @@ export interface GalleryGroup {
   images: string[]
 }
 
-// prompt 前缀 → 中文标签
-const PREFIX_LABELS: Record<string, string> = {
-  '线稿': '线稿生成',
+// 当前前端仍会产出的 prompt 前缀 → 中文标签
+const CURRENT_PREFIX_LABELS: Record<string, string> = {
+  'line-draft': '线稿生成',
   'sketch-to-design': '线稿成款',
   'partial-edit': '局部改款',
   'style-innovate': '款式创新',
@@ -21,12 +21,14 @@ const PREFIX_LABELS: Record<string, string> = {
   'mannequin-to-model': '人台变模特',
   'face-swap': '定向换脸',
   'bg-swap': '换背景',
-  'garment-on-model': '款式上身',
   'pattern-gen': '图案生成',
   'style-clone': '画风复刻',
-  'seamless-tile': '四方连续',
-  'pattern-fusion': '图案融合',
-  'craft-fusion': '工艺融合',
+  'seamless-tile-classic': '四方连续',
+  'seamless-tile-cartoon': '四方连续',
+  'pattern-fusion-creative': '图案融合',
+  'pattern-fusion-style': '图案融合',
+  'craft-fusion-creative': '工艺融合',
+  'craft-fusion-style': '工艺融合',
   'pattern-inpaint': '图案涂改',
   'pattern-upscale': '图案变清晰',
   'to-vector': '转矢量图',
@@ -85,7 +87,7 @@ export function buildGalleryGroups(tasks: Task[]): GalleryGroup[] {
 
   // 其余按已有顺序
   for (const [key, images] of map) {
-    const label = PREFIX_LABELS[key] || key
+    const label = CURRENT_PREFIX_LABELS[key] || key
     groups.push({ label, images })
   }
 

@@ -6,7 +6,10 @@
     class="node-port"
     :class="[
       port.direction === 'input' ? 'is-input' : 'is-output',
-      { 'is-connected': !!port.connected },
+      {
+        'is-connected': !!port.connected,
+        'is-pending': !!port.pending,
+      },
     ]"
     :style="port.top != null ? { top: `${port.top}px` } : undefined"
     :data-port-kind="port.kind"
@@ -31,6 +34,7 @@ type NodePortItem = {
   name: string
   top?: number
   connected?: boolean
+  pending?: boolean
   visible?: boolean
 }
 
@@ -47,7 +51,6 @@ const emit = defineEmits<{
 const visiblePorts = computed(() => props.ports.filter((port) => port.visible !== false))
 
 function onMouseDown(event: MouseEvent, port: NodePortItem) {
-  if (port.direction !== 'output') return
   event.preventDefault()
   emit('port-mousedown', event, port.name)
 }

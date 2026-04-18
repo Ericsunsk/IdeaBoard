@@ -9,10 +9,13 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
   'mask',
   'color',
   'model',
+  'mannequin',
+  'viewpoint',
   'edit',
   'fusion',
   'enhance',
   'tryon',
+  'faceswap',
   'palette',
   'generate',
 ] as const

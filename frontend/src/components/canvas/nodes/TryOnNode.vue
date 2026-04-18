@@ -90,8 +90,8 @@
       <NodeConnectionChips :items="connectionChips" />
 
       <div class="node-primary-action-slot">
-        <NodeActionButton variant="primary" :disabled="generating" full @click="emit('generate')">
-          生成
+        <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
+          {{ uiState?.primaryAction?.label || '生成' }}
         </NodeActionButton>
       </div>
     </div>
@@ -108,6 +108,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TryOnNodeItem } from '../../../types/canvasNodes'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeHeader from './NodeHeader.vue'
@@ -122,9 +123,7 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   generating: boolean
-  imageAInputConnected?: boolean
-  imageBInputConnected?: boolean
-  outputConnected?: boolean
+  uiState?: NodeUiState
   errorPortKeys: string[]
 }>()
 
@@ -153,9 +152,13 @@ const io = computed(() =>
     layerLabel: layerLabel.value,
   }, {
     connected: {
-      imageA: props.imageAInputConnected,
-      imageB: props.imageBInputConnected,
-      output: props.outputConnected,
+      imageA: props.uiState?.connection?.connected?.imageA,
+      imageB: props.uiState?.connection?.connected?.imageB,
+      output: props.uiState?.connection?.connected?.output,
+    },
+    pending: {
+      imageA: props.uiState?.connection?.pending?.imageA,
+      imageB: props.uiState?.connection?.pending?.imageB,
     },
     errorPortKeys: props.errorPortKeys,
   }),

@@ -126,8 +126,8 @@
       <NodeConnectionChips :items="connectionChips" />
 
       <div class="node-primary-action-slot">
-        <NodeActionButton variant="primary" :disabled="generating" full @click="emit('generate')">
-          生成
+        <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
+          {{ uiState?.primaryAction?.label || '生成' }}
         </NodeActionButton>
       </div>
     </div>
@@ -144,6 +144,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { PaletteNodeItem } from '../../../types/canvasNodes'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
 import { useColorPickerState } from '../../../composables/useColorPickerState'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
@@ -167,9 +168,7 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   generating: boolean
-  imageInputConnected?: boolean
-  referenceInputConnected?: boolean
-  outputConnected?: boolean
+  uiState?: NodeUiState
   errorPortKeys: string[]
 }>()
 
@@ -199,9 +198,13 @@ const presetPalettes = computed(() => {
 const io = computed(() =>
   buildNodeIoFromSlots(PALETTE_NODE_IO_SLOTS, { usesReference: usesReference.value }, {
     connected: {
-      image: props.imageInputConnected,
-      reference: props.referenceInputConnected,
-      output: props.outputConnected,
+      image: props.uiState?.connection?.connected?.image,
+      reference: props.uiState?.connection?.connected?.reference,
+      output: props.uiState?.connection?.connected?.output,
+    },
+    pending: {
+      image: props.uiState?.connection?.pending?.image,
+      reference: props.uiState?.connection?.pending?.reference,
     },
     errorPortKeys: props.errorPortKeys,
   }),

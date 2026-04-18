@@ -90,6 +90,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { ImageNodeItem } from '../../../types/canvasNodes'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodePorts from './NodePorts.vue'
@@ -104,8 +105,7 @@ const props = defineProps<{
   stageHeight: number
   displayImage: { url: string } | null
   displayMode?: 'source' | 'output' | 'mask'
-  inputConnected?: boolean
-  outputConnected?: boolean
+  uiState?: NodeUiState
 }>()
 
 const emit = defineEmits<{
@@ -120,7 +120,6 @@ const emit = defineEmits<{
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-
 const previewPopupOpen = ref(false)
 const displayModeLabel = computed(() => {
   if (props.displayMode === 'mask') return 'Mask'
@@ -135,8 +134,11 @@ const displayModeClass = computed(() => {
 const ports = computed(() =>
   buildNodeIoFromSlots(IMAGE_NODE_IO_SLOTS, null, {
     connected: {
-      input: props.inputConnected,
-      output: props.outputConnected,
+      image: props.uiState?.connection?.connected?.image,
+      output: props.uiState?.connection?.connected?.output,
+    },
+    pending: {
+      image: props.uiState?.connection?.pending?.image,
     },
   }).ports,
 )

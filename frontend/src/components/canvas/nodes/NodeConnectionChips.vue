@@ -9,6 +9,7 @@
           `is-${item.kind}`,
           {
             'is-connected': !!item.connected,
+            'is-pending': !!item.pending,
             'is-error': !!item.error,
             'is-required': !!item.required,
           },
@@ -30,6 +31,7 @@ type ConnectionChipItem = {
   label: string
   kind: ChipKind
   connected?: boolean
+  pending?: boolean
   error?: boolean
   required?: boolean
   visible?: boolean

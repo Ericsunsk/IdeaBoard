@@ -35,6 +35,7 @@ interface SubmitAndPollOptions<TSubmitPayload extends object> {
   source?: CanvasImageItem
   outputNodeId?: number | null
   onSubmitted?: (taskId: string) => void
+  onCompleted?: (urls: string[]) => void
 }
 
 interface UseGenerationPipelineOptions<TSubmitPayload extends object> {
@@ -140,7 +141,12 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     }
   }
 
-  function startTaskPolling(taskId: string, source?: CanvasImageItem, outputNodeId?: number | null) {
+  function startTaskPolling(
+    taskId: string,
+    source?: CanvasImageItem,
+    outputNodeId?: number | null,
+    onCompleted?: (urls: string[]) => void,
+  ) {
     stopTaskPolling()
 
     const check = async () => {
@@ -151,6 +157,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
           if (task.status === 'completed') {
             const urls = extractImageUrlsFromTask(task)
             if (urls.length > 0) {
+              onCompleted?.(urls)
               appendGeneratedImages(urls, source, outputNodeId)
               options.message.success('生成完成')
             } else {
@@ -189,7 +196,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
       currentTaskId.value = taskId
       options.message.success(submitOptions.successMessage)
       submitOptions.onSubmitted?.(taskId)
-      startTaskPolling(taskId, submitOptions.source, submitOptions.outputNodeId)
+      startTaskPolling(taskId, submitOptions.source, submitOptions.outputNodeId, submitOptions.onCompleted)
       return taskId
     } catch (error: unknown) {
       const maybeError = error as { msg?: string; message?: string } | null

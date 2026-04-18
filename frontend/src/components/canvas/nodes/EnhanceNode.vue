@@ -84,8 +84,8 @@
       <NodeConnectionChips :items="connectionChips" />
 
       <div class="node-primary-action-slot">
-        <NodeActionButton variant="primary" :disabled="generating" full @click="emit('generate')">
-          生成
+        <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
+          {{ uiState?.primaryAction?.label || '生成' }}
         </NodeActionButton>
       </div>
     </div>
@@ -102,6 +102,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { EnhanceNodeItem } from '../../../types/canvasNodes'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeHeader from './NodeHeader.vue'
@@ -121,9 +122,7 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   generating: boolean
-  imageInputConnected?: boolean
-  promptInputConnected?: boolean
-  outputConnected?: boolean
+  uiState?: NodeUiState
   errorPortKeys: string[]
 }>()
 
@@ -151,9 +150,12 @@ const supportsPrompt = computed(() => props.node.mode === 'deblur' || props.node
 const io = computed(() =>
   buildNodeIoFromSlots(ENHANCE_NODE_IO_SLOTS, { supportsPrompt: supportsPrompt.value }, {
     connected: {
-      image: props.imageInputConnected,
-      prompt: props.promptInputConnected,
-      output: props.outputConnected,
+      image: props.uiState?.connection?.connected?.image,
+      prompt: props.uiState?.connection?.connected?.prompt,
+      output: props.uiState?.connection?.connected?.output,
+    },
+    pending: {
+      image: props.uiState?.connection?.pending?.image,
     },
     errorPortKeys: props.errorPortKeys,
   }),
