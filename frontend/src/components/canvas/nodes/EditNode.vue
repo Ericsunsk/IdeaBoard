@@ -3,7 +3,7 @@
     class="workflow-node edit-node"
     data-node-kind="edit"
     :data-node-id="node.id"
-    :class="{ active, dragging, 'copy-mode': copyMode }"
+    :class="{ active, dragging, 'copy-mode': copyMode, running: uiState?.isRunning }"
     :style="nodeStyle"
     @mousedown.stop
   >
@@ -48,10 +48,6 @@
       </div>
 
       <NodeConnectionChips :items="connectionChips" />
-      <div v-if="uiState?.secondaryStatus" class="node-secondary-status">
-        {{ uiState.secondaryStatus }}
-      </div>
-
       <div class="node-primary-action-slot">
         <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
           {{ uiState?.primaryAction?.label || '编辑' }}

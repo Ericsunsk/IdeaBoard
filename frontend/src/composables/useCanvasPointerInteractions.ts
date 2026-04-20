@@ -10,11 +10,11 @@ import type {
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
-type NodeDragKind = 'image' | 'prompt' | 'model' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon'
+type NodeDragKind = 'image' | 'prompt' | 'model' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'wear'
 type DraggableNode =
   | ImageNodeItem
   | PromptNodeItem
@@ -25,7 +25,7 @@ type DraggableNode =
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
-  | TryOnNodeItem
+  | WearNodeItem
 type PendingInteraction = 'pan' | 'select' | 'item-drag' | 'node-drag' | 'resize'
 
 const POINTER_INTERACTION_THRESHOLD = 4
@@ -45,7 +45,7 @@ interface UseCanvasPointerInteractionsOptions {
   editNodes: Ref<EditNodeItem[]>
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
-  tryOnNodes: Ref<TryOnNodeItem[]>
+  wearNodes: Ref<WearNodeItem[]>
   activeTool: Ref<string>
   showStyleStrengthControl: Ref<boolean>
   canvasX: Ref<number>
@@ -64,7 +64,7 @@ interface UseCanvasPointerInteractionsOptions {
   activeEditNodeId: Ref<number | null>
   activeFusionNodeId: Ref<number | null>
   activeEnhanceNodeId: Ref<number | null>
-  activeTryOnNodeId: Ref<number | null>
+  activeWearNodeId: Ref<number | null>
   isPanning: Ref<boolean>
   isSelecting: Ref<boolean>
   isDraggingItem: Ref<boolean>
@@ -200,7 +200,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       node.type === 'edit' ||
       node.type === 'fusion' ||
       node.type === 'enhance' ||
-      node.type === 'tryon'
+      node.type === 'wear'
     ) {
       return {
         ...node,
@@ -255,7 +255,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       else if (kind === 'edit') options.editNodes.value.push(duplicate as EditNodeItem)
       else if (kind === 'fusion') options.fusionNodes.value.push(duplicate as FusionNodeItem)
       else if (kind === 'enhance') options.enhanceNodes.value.push(duplicate as EnhanceNodeItem)
-      else options.tryOnNodes.value.push(duplicate as TryOnNodeItem)
+      else options.wearNodes.value.push(duplicate as WearNodeItem)
 
       const duplicateKey = options.getNodeSelectionKey(kind as NodeDragKind, duplicate.id)
       nextSelectionKeys.push(duplicateKey)
@@ -527,8 +527,8 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     beginNodeDrag('enhance', node, e)
   }
 
-  function onTryOnNodeMouseDown(e: MouseEvent, node: TryOnNodeItem) {
-    beginNodeDrag('tryon', node, e)
+  function onWearNodeMouseDown(e: MouseEvent, node: WearNodeItem) {
+    beginNodeDrag('wear', node, e)
   }
 
   function applyNodeDragFrame() {
@@ -794,7 +794,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     onEditNodeMouseDown,
     onFusionNodeMouseDown,
     onEnhanceNodeMouseDown,
-    onTryOnNodeMouseDown,
+    onWearNodeMouseDown,
     onResizeMouseDown,
   }
 }

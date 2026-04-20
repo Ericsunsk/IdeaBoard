@@ -10,7 +10,7 @@ import type {
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
@@ -29,7 +29,7 @@ export interface UseCanvasEditorOptions {
   editNodes: Ref<EditNodeItem[]>
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
-  tryOnNodes: Ref<TryOnNodeItem[]>
+  wearNodes: Ref<WearNodeItem[]>
   activeTool: Ref<string>
   showStyleStrengthControl: Ref<boolean>
   canvasX: Ref<number>
@@ -57,7 +57,7 @@ export interface UseCanvasEditorOptions {
   deleteEditNode: (id: number) => void
   deleteFusionNode: (id: number) => void
   deleteEnhanceNode: (id: number) => void
-  deleteTryOnNode: (id: number) => void
+  deleteWearNode: (id: number) => void
   hasSelectedConnection?: () => boolean
   clearSelectedConnection?: () => void
   deleteSelectedConnection?: () => boolean

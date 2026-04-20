@@ -137,8 +137,8 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
         <input v-model="userPrompt" type="text" :placeholder="promptPlaceholder" @keyup.enter="handleGenerate" />
-        <button class="send-btn" :disabled="!hasDirectPrompt || generating" @click="handleGenerate">
-          <svg v-if="!generating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        <button class="send-btn" :disabled="!hasDirectPrompt || directGenerating" @click="handleGenerate">
+          <svg v-if="!directGenerating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           <n-spin v-else size="small" />
         </button>
       </div>
@@ -235,7 +235,7 @@
         :model-nodes="modelNodes"
         :viewpoint-nodes="viewpointNodes"
         :mask-nodes="maskNodes"
-        :generating="generating"
+        :generating="nodeGenerating"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
@@ -282,16 +282,16 @@
         :edit-nodes="editNodes"
         :fusion-nodes="fusionNodes"
         :enhance-nodes="enhanceNodes"
-        :try-on-nodes="tryOnNodes"
+        :wear-nodes="wearNodes"
         :color-nodes="colorNodes"
-        :generating="generating"
+        :generating="nodeGenerating"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
         :get-edit-node-ui-state="getEditNodeUiState"
         :get-fusion-node-ui-state="getFusionNodeUiState"
         :get-enhance-node-ui-state="getEnhanceNodeUiState"
-        :get-try-on-node-ui-state="getTryOnNodeUiState"
+        :get-wear-node-ui-state="getWearNodeUiState"
         :get-color-node-ui-state="getColorNodeUiState"
         :get-node-connection-error-ports="getNodeConnectionErrorPorts"
         @edit-node-mousedown="(event, node) => onEditNodeMouseDown(event, node)"
@@ -317,14 +317,14 @@
         @enhance-update-extend-left="onEnhanceNodeUpdateExtendLeft"
         @enhance-generate="handleEnhanceNodeGenerate"
         @enhance-port-mousedown="onEnhanceNodePortMouseDown"
-        @tryon-node-mousedown="(event, node) => onTryOnNodeMouseDown(event, node)"
-        @tryon-delete="deleteTryOnNode"
-        @tryon-update-tile-mode="onTryOnNodeUpdateTileMode"
-        @tryon-update-rotation="onTryOnNodeUpdateRotation"
-        @tryon-update-scale="onTryOnNodeUpdateScale"
-        @tryon-update-opacity="onTryOnNodeUpdateOpacity"
-        @tryon-generate="handleTryOnNodeGenerate"
-        @tryon-port-mousedown="onTryOnNodePortMouseDown"
+        @wear-node-mousedown="(event, node) => onWearNodeMouseDown(event, node)"
+        @wear-delete="deleteWearNode"
+        @wear-update-tile-mode="onWearNodeUpdateTileMode"
+        @wear-update-rotation="onWearNodeUpdateRotation"
+        @wear-update-scale="onWearNodeUpdateScale"
+        @wear-update-opacity="onWearNodeUpdateOpacity"
+        @wear-generate="handleWearNodeGenerate"
+        @wear-port-mousedown="onWearNodePortMouseDown"
         @color-node-mousedown="(event, node) => onColorNodeMouseDown(event, node)"
         @color-delete="deleteColorNode"
         @color-apply-preset="onColorNodeApplyPreset"
@@ -369,7 +369,7 @@
               <button
                 type="button"
                 class="image-action-icon-btn"
-                :disabled="generating"
+                :disabled="directGenerating"
                 title="抠图退底"
                 @click="runCanvasAction('remove-bg', msg)"
               >
@@ -384,7 +384,7 @@
               <button
                 type="button"
                 class="image-action-icon-btn"
-                :disabled="generating"
+                :disabled="directGenerating"
                 title="款式创新"
                 @mousedown.stop="onStyleInnovateMouseDown($event)"
                 @click="onStyleInnovateClick(msg)"
@@ -399,7 +399,7 @@
               <button
                 type="button"
                 class="image-action-icon-btn"
-                :disabled="generating"
+                :disabled="directGenerating"
                 title="转矢量图"
                 @click="runCanvasAction('to-vector', msg)"
               >
@@ -415,7 +415,7 @@
               <button
                 type="button"
                 class="image-action-icon-btn"
-                :disabled="generating"
+                :disabled="directGenerating"
                 title="线稿成款"
                 @click="runCanvasAction('sketch-to-design', msg)"
               >
@@ -516,7 +516,7 @@ import {
   createModelNodeAt,
   createColorNodeAt,
   createPromptNodeAt,
-  createTryOnNodeAt,
+  createWearNodeAt,
   createViewpointNodeAt,
 } from '../../utils/canvasNodeFactory'
 import {
@@ -524,15 +524,15 @@ import {
   ENHANCE_EXTEND_PERCENT_DEFAULT,
   ENHANCE_EXTEND_PERCENT_MAX,
   ENHANCE_EXTEND_PERCENT_MIN,
-  clampTryOnOpacity,
-  clampTryOnRotation,
-  clampTryOnScale,
+  clampWearOpacity,
+  clampWearRotation,
+  clampWearScale,
   clampModelPoseStrength,
   clampModelReferenceStrength,
   isCanvasExecutionOutputNodeType,
   isColorNodePlaceholderState,
   MAX_COLOR_NODE_SWATCHES,
-  normalizeTryOnTileMode,
+  normalizeWearTileMode,
   normalizeColorNodeColors,
   resolveWorkflowNodeOutputStatus,
 } from '../../types/canvasNodes'
@@ -555,7 +555,7 @@ import type {
   ModelAngleSpec,
   ModelNodeItem,
   PromptNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
   WorkflowNodeOutputStatus,
 } from '../../types/canvasNodes'
@@ -574,7 +574,8 @@ const nodeImageDragMime = 'application/x-feng-image-url'
 
 // 状态
 const userPrompt = ref('')
-const generating = ref(false)
+const nodeGenerating = ref(false)
+const directGenerating = ref(false)
 const messages = ref<CanvasImageItem[]>([])
 const {
   zoomLevel,
@@ -600,7 +601,7 @@ const colorNodes = ref<ColorNodeItem[]>([])
 const enhanceNodes = ref<EnhanceNodeItem[]>([])
 const editNodes = ref<EditNodeItem[]>([])
 const fusionNodes = ref<FusionNodeItem[]>([])
-const tryOnNodes = ref<TryOnNodeItem[]>([])
+const wearNodes = ref<WearNodeItem[]>([])
 const runningExecutionNodeKey = ref<string | null>(null)
 const executionNodeLastRunFailedMap = ref<Record<string, boolean>>({})
 const executionNodeWatchSources = [
@@ -610,7 +611,7 @@ const executionNodeWatchSources = [
   enhanceNodes,
   editNodes,
   fusionNodes,
-  tryOnNodes,
+  wearNodes,
 ] as const
 const connections = ref<CanvasConnection[]>([])
 const processedMaskPreviewUrls = ref<Record<number, string>>({})
@@ -647,7 +648,7 @@ const editModeMeta = {
   },
 } as const
 
-const tryOnFeatureMeta = {
+const wearFeatureMeta = {
   feature: 'fabric-on-body',
   promptPrefix: '[fabric-on-body]',
   successLabel: 'Wear',
@@ -713,7 +714,7 @@ const {
   activeEditNodeId,
   activeFusionNodeId,
   activeEnhanceNodeId,
-  activeTryOnNodeId,
+  activeWearNodeId,
   nodeContextMenu,
   isSelecting,
   selectionRect,
@@ -726,7 +727,7 @@ const {
   activateEditNode,
   activateFusionNode,
   activateEnhanceNode,
-  activateTryOnNode,
+  activateWearNode,
   isNodeSelected,
   isNodeDragging,
   closeNodeContextMenu,
@@ -743,7 +744,7 @@ const {
   onEditNodeMouseDown,
   onFusionNodeMouseDown,
   onEnhanceNodeMouseDown,
-  onTryOnNodeMouseDown,
+  onWearNodeMouseDown,
   onColorNodeMouseDown,
   onResizeMouseDown,
   readNodeImageDropPayload,
@@ -763,7 +764,7 @@ const {
   enhanceNodes,
   editNodes,
   fusionNodes,
-  tryOnNodes,
+  wearNodes,
   activeTool,
   showStyleStrengthControl,
   canvasX,
@@ -793,7 +794,7 @@ const {
   deleteEnhanceNode,
   deleteEditNode,
   deleteFusionNode,
-  deleteTryOnNode,
+  deleteWearNode,
   hasSelectedConnection,
   clearSelectedConnection,
   deleteSelectedConnection,
@@ -862,12 +863,28 @@ const {
 } = useViewpointNode()
 
 const {
-  stopTaskPolling,
+  stopTaskPolling: stopNodeTaskPolling,
   resolvePreferredImageOutputNode,
   appendGeneratedImages,
   submitTaskAndPoll,
 } = useGenerationPipeline({
-  generating,
+  generating: nodeGenerating,
+  messages,
+  selectedIds,
+  imageNodes,
+  activeImageNodeId,
+  message,
+  loadImageRatioFromUrl,
+  createCanvasImageAt: createCanvasImageItemAt,
+  submitTask: taskApi.submit,
+  getTask: taskApi.get,
+})
+
+const {
+  stopTaskPolling: stopDirectTaskPolling,
+  submitTaskAndPoll: submitDirectTaskAndPoll,
+} = useGenerationPipeline({
+  generating: directGenerating,
   messages,
   selectedIds,
   imageNodes,
@@ -1111,7 +1128,7 @@ function resetEditorState() {
   enhanceNodes.value = []
   editNodes.value = []
   fusionNodes.value = []
-  tryOnNodes.value = []
+  wearNodes.value = []
   runningExecutionNodeKey.value = null
   executionNodeLastRunFailedMap.value = {}
   connections.value = []
@@ -1212,8 +1229,8 @@ function buildExecutionInputSignatureMap(): Record<string, string> {
     ].join('|')
   })
 
-  tryOnNodes.value.forEach((node) => {
-    result[`tryon:${node.id}`] = [
+  wearNodes.value.forEach((node) => {
+    result[`wear:${node.id}`] = [
       node.tileMode,
       String(node.rotation),
       String(node.scale),
@@ -1243,7 +1260,7 @@ function buildExecutionOutputSignatureMap(): Record<string, string> {
   assign('edit', editNodes.value)
   assign('fusion', fusionNodes.value)
   assign('enhance', enhanceNodes.value)
-  assign('tryon', tryOnNodes.value)
+  assign('wear', wearNodes.value)
   return result
 }
 
@@ -1350,13 +1367,13 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
-    tryOnNodes.value = state.tryOnNodes.map(node => ({
+    wearNodes.value = state.wearNodes.map(node => ({
       ...node,
-      tileMode: normalizeTryOnTileMode(node.tileMode),
+      tileMode: normalizeWearTileMode(node.tileMode),
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      rotation: clampTryOnRotation(node.rotation),
-      scale: clampTryOnScale(node.scale),
-      opacity: clampTryOnOpacity(node.opacity),
+      rotation: clampWearRotation(node.rotation),
+      scale: clampWearScale(node.scale),
+      opacity: clampWearOpacity(node.opacity),
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
     colorNodes.value = state.colorNodes.map(toNormalizedColorNode)
@@ -1406,7 +1423,7 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
       ...node,
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
-    tryOnNodes: tryOnNodes.value.map(node => ({
+    wearNodes: wearNodes.value.map(node => ({
       ...node,
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
@@ -1585,7 +1602,7 @@ watch(
 )
 
 watch(
-  [messages, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, connections, canvasX, canvasY, zoomLevel],
+  [messages, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, wearNodes, connections, canvasX, canvasY, zoomLevel],
   () => {
     markBoardDirty()
     notifySnapshotChanged()
@@ -1594,7 +1611,7 @@ watch(
 )
 
 watch(
-  [connections, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, canvasX, canvasY, zoomLevel],
+  [connections, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, wearNodes, canvasX, canvasY, zoomLevel],
   () => {
     refreshRenderedConnections()
   },
@@ -1692,10 +1709,10 @@ function deleteFusionNode(id: number) {
   })
 }
 
-function deleteTryOnNode(id: number) {
-  deleteNodeFromCollection(tryOnNodes, 'tryon', id, () => {
-    if (activeTryOnNodeId.value === id) {
-      activeTryOnNodeId.value = null
+function deleteWearNode(id: number) {
+  deleteNodeFromCollection(wearNodes, 'wear', id, () => {
+    if (activeWearNodeId.value === id) {
+      activeWearNodeId.value = null
     }
   })
 }
@@ -1754,7 +1771,7 @@ const nodeContextMenuHandlers: Record<CanvasNodeCreateActionKey, () => void> = {
   createEditNode: buildNodeCreateHandler(createEditNodeAt, editNodes, activateEditNode),
   createFusionNode: buildNodeCreateHandler(createFusionNodeAt, fusionNodes, activateFusionNode),
   createEnhanceNode: buildNodeCreateHandler(createEnhanceNodeAt, enhanceNodes, activateEnhanceNode),
-  createTryOnNode: buildNodeCreateHandler(createTryOnNodeAt, tryOnNodes, activateTryOnNode),
+  createWearNode: buildNodeCreateHandler(createWearNodeAt, wearNodes, activateWearNode),
   createColorNode: buildNodeCreateHandler(createColorNodeAt, colorNodes, activateColorNode),
 }
 
@@ -1888,7 +1905,7 @@ function beginStyleStrengthDragging(clientY: number) {
 }
 
 function onStyleInnovateMouseDown(e: MouseEvent) {
-  if (generating.value) return
+  if (directGenerating.value) return
   clearStyleStrengthHideTimer()
   clearStyleStrengthLongPressTimer()
   suppressStyleInnovateClick.value = false
@@ -1999,7 +2016,7 @@ function getMaskNodeProcessedOutputUrl(node: MaskNodeItem): string {
   return processedMaskPreviewUrls.value[node.id] || node.maskDataUrl
 }
 
-function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: number; mode: 'mask' | 'output' } | null {
+function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: number; mode: 'mask' | 'linked-output' | 'node-output' } | null {
   const connection = findIncomingConnection('image', node.id, 'image')
   if (!connection) return null
   if (connection.fromNodeType === 'mask') {
@@ -2016,7 +2033,7 @@ function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: 
   if (!resolvedImage) return null
   return {
     ...resolvedImage,
-    mode: 'output',
+    mode: connection.fromNodeType === 'image' ? 'linked-output' : 'node-output',
   }
 }
 
@@ -2034,7 +2051,7 @@ function getResolvedImageNodeDisplay(node: ImageNodeItem): { image: { url: strin
         url: connectedInput.url,
         ratio: connectedInput.ratio,
       },
-      mode: connectedInput.mode === 'mask' ? 'mask' : 'linked-output',
+      mode: connectedInput.mode,
     }
   }
 
@@ -2131,8 +2148,8 @@ function getCanvasConnectionNodeByType(
       return fusionNodes.value.find(item => item.id === nodeId) ?? null
     case 'enhance':
       return enhanceNodes.value.find(item => item.id === nodeId) ?? null
-    case 'tryon':
-      return tryOnNodes.value.find(item => item.id === nodeId) ?? null
+    case 'wear':
+      return wearNodes.value.find(item => item.id === nodeId) ?? null
     default:
       return null
   }
@@ -2264,7 +2281,7 @@ const getMaskNodeUiState = (node: MaskNodeItem) => getNodeUiState('mask', node)
 const getEditNodeUiState = (node: EditNodeItem) => getNodeUiState('edit', node)
 const getFusionNodeUiState = (node: FusionNodeItem) => getNodeUiState('fusion', node)
 const getEnhanceNodeUiState = (node: EnhanceNodeItem) => getNodeUiState('enhance', node)
-const getTryOnNodeUiState = (node: TryOnNodeItem) => getNodeUiState('tryon', node)
+const getWearNodeUiState = (node: WearNodeItem) => getNodeUiState('wear', node)
 const getColorNodeUiState = (node: ColorNodeItem) => getNodeUiState('color', node)
 
 const onImageNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
@@ -2283,8 +2300,8 @@ const onFusionNodePortMouseDown = (event: MouseEvent, nodeId: number, port: Canv
   handleConnectionPortMouseDown(event, 'fusion', nodeId, port)
 const onEnhanceNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'enhance', nodeId, port)
-const onTryOnNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'tryon', nodeId, port)
+const onWearNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
+  handleConnectionPortMouseDown(event, 'wear', nodeId, port)
 const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'color', nodeId, port)
 
@@ -2380,20 +2397,20 @@ function onEnhanceNodeUpdateExtendLeft(node: EnhanceNodeItem, value: number) {
   node.extendLeft = clampEnhanceExtendPercent(value)
 }
 
-function onTryOnNodeUpdateTileMode(node: TryOnNodeItem, value: TryOnNodeItem['tileMode']) {
-  node.tileMode = normalizeTryOnTileMode(value)
+function onWearNodeUpdateTileMode(node: WearNodeItem, value: WearNodeItem['tileMode']) {
+  node.tileMode = normalizeWearTileMode(value)
 }
 
-function onTryOnNodeUpdateRotation(node: TryOnNodeItem, value: number) {
-  node.rotation = clampTryOnRotation(value)
+function onWearNodeUpdateRotation(node: WearNodeItem, value: number) {
+  node.rotation = clampWearRotation(value)
 }
 
-function onTryOnNodeUpdateScale(node: TryOnNodeItem, value: number) {
-  node.scale = clampTryOnScale(value)
+function onWearNodeUpdateScale(node: WearNodeItem, value: number) {
+  node.scale = clampWearScale(value)
 }
 
-function onTryOnNodeUpdateOpacity(node: TryOnNodeItem, value: number) {
-  node.opacity = clampTryOnOpacity(value)
+function onWearNodeUpdateOpacity(node: WearNodeItem, value: number) {
+  node.opacity = clampWearOpacity(value)
 }
 
 function onColorNodeApplyPreset(node: ColorNodeItem, value: string[]) {
@@ -2411,10 +2428,10 @@ const {
   handleEditNodeGenerate,
   handleFusionNodeGenerate,
   handleEnhanceNodeGenerate,
-  handleTryOnNodeGenerate,
+  handleWearNodeGenerate,
   handleColorNodeGenerate,
 } = useNodeExecutors({
-  generating,
+  generating: nodeGenerating,
   message,
   messages,
   selectedIds,
@@ -2423,7 +2440,7 @@ const {
   activeImageNodeId,
   activeMaskNodeId,
   editModeMeta,
-  tryOnFeatureMeta,
+  wearFeatureMeta,
   getViewpointLabel,
   getViewpointLightingLabel,
   getNodeConnectionStatus,
@@ -2457,7 +2474,7 @@ const {
   handleGenerate,
   handleExport,
 } = useCanvasDirectActions({
-  generating,
+  generating: directGenerating,
   selectedIds,
   activeImageActionId,
   showStyleStrengthControl,
@@ -2470,7 +2487,7 @@ const {
   styleInnovateStrength,
   defaultSegType,
   message,
-  submitTaskAndPoll,
+  submitTaskAndPoll: submitDirectTaskAndPoll,
   appendGeneratedImages,
   segmentImage: segApi.segment,
   saveSegmentResult: segApi.save,
@@ -2508,7 +2525,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  stopTaskPolling()
+  stopNodeTaskPolling()
+  stopDirectTaskPolling()
   clearStyleStrengthLongPressTimer()
   clearStyleStrengthHideTimer()
   removeStyleStrengthGlobalListeners()

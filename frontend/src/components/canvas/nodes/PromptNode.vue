@@ -70,7 +70,6 @@ const resolvedUiState = computed<PromptNodeUiState>(() => ({
     },
     pending: props.uiState?.connection?.pending,
   },
-  primaryAction: props.uiState?.primaryAction,
 }))
 
 const ports = computed(() =>

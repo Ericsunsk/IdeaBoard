@@ -9,11 +9,11 @@ import type {
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
-export type NodeDragKind = 'image' | 'prompt' | 'model' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon'
+export type NodeDragKind = 'image' | 'prompt' | 'model' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'wear'
 
 export type DraggableNode =
   | ImageNodeItem
@@ -25,7 +25,7 @@ export type DraggableNode =
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
-  | TryOnNodeItem
+  | WearNodeItem
 
 interface UseCanvasSelectionStateOptions {
   messages: Ref<CanvasImageItem[]>
@@ -38,7 +38,7 @@ interface UseCanvasSelectionStateOptions {
   editNodes: Ref<EditNodeItem[]>
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
-  tryOnNodes: Ref<TryOnNodeItem[]>
+  wearNodes: Ref<WearNodeItem[]>
   showStyleStrengthControl: Ref<boolean>
   canvasX: Ref<number>
   canvasY: Ref<number>
@@ -52,7 +52,7 @@ interface UseCanvasSelectionStateOptions {
   deleteEditNode: (id: number) => void
   deleteFusionNode: (id: number) => void
   deleteEnhanceNode: (id: number) => void
-  deleteTryOnNode: (id: number) => void
+  deleteWearNode: (id: number) => void
 }
 
 export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions) {
@@ -69,7 +69,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   const activeEditNodeId = ref<number | null>(null)
   const activeFusionNodeId = ref<number | null>(null)
   const activeEnhanceNodeId = ref<number | null>(null)
-  const activeTryOnNodeId = ref<number | null>(null)
+  const activeWearNodeId = ref<number | null>(null)
 
   function clearActiveNodes() {
     activeImageNodeId.value = null
@@ -81,7 +81,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeEditNodeId.value = null
     activeFusionNodeId.value = null
     activeEnhanceNodeId.value = null
-    activeTryOnNodeId.value = null
+    activeWearNodeId.value = null
   }
 
   function getNodeSelectionKey(kind: NodeDragKind, id: number): string {
@@ -100,7 +100,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
       kind !== 'edit' &&
       kind !== 'fusion' &&
       kind !== 'enhance' &&
-      kind !== 'tryon'
+      kind !== 'wear'
     ) {
       return null
     }
@@ -122,7 +122,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'edit') return options.editNodes.value.find(node => node.id === id) ?? null
     if (kind === 'fusion') return options.fusionNodes.value.find(node => node.id === id) ?? null
     if (kind === 'enhance') return options.enhanceNodes.value.find(node => node.id === id) ?? null
-    return options.tryOnNodes.value.find(node => node.id === id) ?? null
+    return options.wearNodes.value.find(node => node.id === id) ?? null
   }
 
   function isNodeSelected(kind: NodeDragKind, id: number): boolean {
@@ -137,7 +137,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'edit') return activeEditNodeId.value === id
     if (kind === 'fusion') return activeFusionNodeId.value === id
     if (kind === 'enhance') return activeEnhanceNodeId.value === id
-    return activeTryOnNodeId.value === id
+    return activeWearNodeId.value === id
   }
 
   function isNodeActive(kind: NodeDragKind, id: number): boolean {
@@ -150,7 +150,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'edit') return activeEditNodeId.value === id
     if (kind === 'fusion') return activeFusionNodeId.value === id
     if (kind === 'enhance') return activeEnhanceNodeId.value === id
-    return activeTryOnNodeId.value === id
+    return activeWearNodeId.value === id
   }
 
   function clearSelectedNodeKeys() {
@@ -207,9 +207,9 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeEnhanceNodeId.value = id
   }
 
-  function activateTryOnNode(id: number) {
+  function activateWearNode(id: number) {
     clearActiveNodes()
-    activeTryOnNodeId.value = id
+    activeWearNodeId.value = id
   }
 
   function activateNodeByKind(kind: NodeDragKind, id: number) {
@@ -222,7 +222,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     else if (kind === 'edit') activateEditNode(id)
     else if (kind === 'fusion') activateFusionNode(id)
     else if (kind === 'enhance') activateEnhanceNode(id)
-    else if (kind === 'tryon') activateTryOnNode(id)
+    else if (kind === 'wear') activateWearNode(id)
   }
 
   function clearCanvasQuickActionState() {
@@ -247,7 +247,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     else if (kind === 'edit') options.deleteEditNode(id)
     else if (kind === 'fusion') options.deleteFusionNode(id)
     else if (kind === 'enhance') options.deleteEnhanceNode(id)
-    else if (kind === 'tryon') options.deleteTryOnNode(id)
+    else if (kind === 'wear') options.deleteWearNode(id)
   }
 
   function deleteSelectedNodes(): boolean {
@@ -300,8 +300,8 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
       options.deleteEnhanceNode(activeEnhanceNodeId.value)
       return true
     }
-    if (activeTryOnNodeId.value !== null) {
-      options.deleteTryOnNode(activeTryOnNodeId.value)
+    if (activeWearNodeId.value !== null) {
+      options.deleteWearNode(activeWearNodeId.value)
       return true
     }
     return false
@@ -340,7 +340,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeEditNodeId.value !== null ||
     activeFusionNodeId.value !== null ||
     activeEnhanceNodeId.value !== null ||
-    activeTryOnNodeId.value !== null ||
+    activeWearNodeId.value !== null ||
     selectedNodeKeys.value.length > 0,
   )
 
@@ -362,7 +362,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeEditNodeId,
     activeFusionNodeId,
     activeEnhanceNodeId,
-    activeTryOnNodeId,
+    activeWearNodeId,
     clearActiveNodes,
     getNodeSelectionKey,
     parseNodeSelectionKey,
@@ -380,7 +380,7 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activateEditNode,
     activateFusionNode,
     activateEnhanceNode,
-    activateTryOnNode,
+    activateWearNode,
     activateNodeByKind,
     clearCanvasQuickActionState,
     clearSelectedIds,

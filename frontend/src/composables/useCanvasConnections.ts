@@ -21,7 +21,7 @@ import {
   MASK_NODE_IO_SLOTS,
   MODEL_NODE_IO_SLOTS,
   PROMPT_NODE_IO_SLOTS,
-  TRYON_NODE_IO_SLOTS,
+  WEAR_NODE_IO_SLOTS,
   VIEWPOINT_NODE_IO_SLOTS,
   type NodeIoSlotTemplate,
 } from '../components/canvas/nodes/nodeIoConfig'
@@ -81,7 +81,7 @@ const NODE_IO_SLOTS_BY_TYPE: Record<CanvasConnectionNodeType, readonly NodeIoSlo
   edit: EDIT_NODE_IO_SLOTS,
   fusion: FUSION_NODE_IO_SLOTS,
   enhance: ENHANCE_NODE_IO_SLOTS,
-  tryon: TRYON_NODE_IO_SLOTS,
+  wear: WEAR_NODE_IO_SLOTS,
 }
 
 function createConnectionId(): number {

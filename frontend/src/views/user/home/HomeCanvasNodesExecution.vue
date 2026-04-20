@@ -58,23 +58,23 @@
     />
   </template>
 
-  <template v-for="node in tryOnNodes" :key="node.id">
-    <TryOnNode
+  <template v-for="node in wearNodes" :key="node.id">
+    <WearNode
       :node="node"
-      :active="isNodeSelected('tryon', node.id)"
-      :dragging="isNodeDragging('tryon', node.id)"
+      :active="isNodeSelected('wear', node.id)"
+      :dragging="isNodeDragging('wear', node.id)"
       :copy-mode="copyMode"
       :generating="generating"
-      :ui-state="getTryOnNodeUiState(node)"
-      :error-port-keys="getNodeConnectionErrorPorts('tryon', node.id)"
-      @node-mousedown="emit('tryon-node-mousedown', $event, node)"
-      @delete="emit('tryon-delete', node.id)"
-      @update:tile-mode="emit('tryon-update-tile-mode', node, $event)"
-      @update:rotation="emit('tryon-update-rotation', node, $event)"
-      @update:scale="emit('tryon-update-scale', node, $event)"
-      @update:opacity="emit('tryon-update-opacity', node, $event)"
-      @generate="emit('tryon-generate', node)"
-      @port-mousedown="(event, port) => emit('tryon-port-mousedown', event, node.id, port)"
+      :ui-state="getWearNodeUiState(node)"
+      :error-port-keys="getNodeConnectionErrorPorts('wear', node.id)"
+      @node-mousedown="emit('wear-node-mousedown', $event, node)"
+      @delete="emit('wear-delete', node.id)"
+      @update:tile-mode="emit('wear-update-tile-mode', node, $event)"
+      @update:rotation="emit('wear-update-rotation', node, $event)"
+      @update:scale="emit('wear-update-scale', node, $event)"
+      @update:opacity="emit('wear-update-opacity', node, $event)"
+      @generate="emit('wear-generate', node)"
+      @port-mousedown="(event, port) => emit('wear-port-mousedown', event, node.id, port)"
     />
   </template>
 
@@ -105,13 +105,13 @@ import EditNode from '../../../components/canvas/nodes/EditNode.vue'
 import EnhanceNode from '../../../components/canvas/nodes/EnhanceNode.vue'
 import FusionNode from '../../../components/canvas/nodes/FusionNode.vue'
 import ColorNode from '../../../components/canvas/nodes/ColorNode.vue'
-import TryOnNode from '../../../components/canvas/nodes/TryOnNode.vue'
+import WearNode from '../../../components/canvas/nodes/WearNode.vue'
 import type {
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
   ColorNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
 } from '../../../types/canvasNodes'
 import type { NodeUiState } from '../../../types/canvasNodeUi'
 
@@ -119,25 +119,25 @@ const props = defineProps<{
   editNodes: EditNodeItem[]
   fusionNodes: FusionNodeItem[]
   enhanceNodes: EnhanceNodeItem[]
-  tryOnNodes: TryOnNodeItem[]
+  wearNodes: WearNodeItem[]
   colorNodes: ColorNodeItem[]
   generating: boolean
   copyMode: boolean
   isNodeSelected: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color',
+    kind: 'edit' | 'fusion' | 'enhance' | 'wear' | 'color',
     id: number,
   ) => boolean
   isNodeDragging: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color',
+    kind: 'edit' | 'fusion' | 'enhance' | 'wear' | 'color',
     id: number,
   ) => boolean
   getEditNodeUiState: (node: EditNodeItem) => NodeUiState | undefined
   getFusionNodeUiState: (node: FusionNodeItem) => NodeUiState | undefined
   getEnhanceNodeUiState: (node: EnhanceNodeItem) => NodeUiState | undefined
-  getTryOnNodeUiState: (node: TryOnNodeItem) => NodeUiState | undefined
+  getWearNodeUiState: (node: WearNodeItem) => NodeUiState | undefined
   getColorNodeUiState: (node: ColorNodeItem) => NodeUiState | undefined
   getNodeConnectionErrorPorts: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color',
+    kind: 'edit' | 'fusion' | 'enhance' | 'wear' | 'color',
     id: number,
   ) => string[]
 }>()
@@ -169,14 +169,14 @@ const emit = defineEmits<{
   (e: 'enhance-generate', node: EnhanceNodeItem): void
   (e: 'enhance-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
 
-  (e: 'tryon-node-mousedown', event: MouseEvent, node: TryOnNodeItem): void
-  (e: 'tryon-delete', nodeId: number): void
-  (e: 'tryon-update-tile-mode', node: TryOnNodeItem, value: TryOnNodeItem['tileMode']): void
-  (e: 'tryon-update-rotation', node: TryOnNodeItem, value: number): void
-  (e: 'tryon-update-scale', node: TryOnNodeItem, value: number): void
-  (e: 'tryon-update-opacity', node: TryOnNodeItem, value: number): void
-  (e: 'tryon-generate', node: TryOnNodeItem): void
-  (e: 'tryon-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
+  (e: 'wear-node-mousedown', event: MouseEvent, node: WearNodeItem): void
+  (e: 'wear-delete', nodeId: number): void
+  (e: 'wear-update-tile-mode', node: WearNodeItem, value: WearNodeItem['tileMode']): void
+  (e: 'wear-update-rotation', node: WearNodeItem, value: number): void
+  (e: 'wear-update-scale', node: WearNodeItem, value: number): void
+  (e: 'wear-update-opacity', node: WearNodeItem, value: number): void
+  (e: 'wear-generate', node: WearNodeItem): void
+  (e: 'wear-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
 
   (e: 'color-node-mousedown', event: MouseEvent, node: ColorNodeItem): void
   (e: 'color-delete', nodeId: number): void

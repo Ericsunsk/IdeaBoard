@@ -38,6 +38,17 @@ var viewpointTemplateLabels = map[string]string{
 	"set_back":       "背面展示",
 }
 
+var viewpointLightingTemplateLabels = map[string]string{
+	"warm_white": "高级暖白",
+	"afternoon":  "午后暖阳",
+	"hard_light": "质感硬光",
+}
+
+var wearTileModeTemplateLabels = map[string]string{
+	"seamless": "平铺重复",
+	"single":   "单张贴合",
+}
+
 var supportedTaskFeatureSlugs = map[string]struct{}{
 	"sketch-to-design": {},
 	"style-innovate":   {},
@@ -138,11 +149,23 @@ func buildMultiAngleHiddenConstraint(params map[string]interface{}) string {
 }
 
 func describeViewpointTemplateValue(value string) string {
+	return describeTemplateLabel(value, viewpointTemplateLabels)
+}
+
+func describeViewpointLightingTemplateValue(value string) string {
+	return describeTemplateLabel(value, viewpointLightingTemplateLabels)
+}
+
+func describeWearTileModeTemplateValue(value string) string {
+	return describeTemplateLabel(value, wearTileModeTemplateLabels)
+}
+
+func describeTemplateLabel(value string, labels map[string]string) string {
 	normalized := strings.TrimSpace(value)
 	if normalized == "" {
 		return ""
 	}
-	if label, ok := viewpointTemplateLabels[normalized]; ok {
+	if label, ok := labels[normalized]; ok {
 		return label
 	}
 	return normalized
@@ -691,7 +714,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 						varMap["{{fabric_scale}}"] = fmt.Sprintf("%v", v)
 					}
 					if v, ok := req.Params["tile_mode"]; ok {
-						varMap["{{tile_mode}}"] = fmt.Sprintf("%v", v)
+						varMap["{{tile_mode}}"] = describeWearTileModeTemplateValue(fmt.Sprintf("%v", v))
 					}
 					if v, ok := req.Params["original_image_url"]; ok {
 						varMap["{{original_image_url}}"] = fmt.Sprintf("%v", v)
@@ -701,6 +724,18 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 					}
 					if enabled, parsed := readMaskEnabledFlag(req.Params); parsed {
 						varMap["{{use_mask}}"] = fmt.Sprintf("%t", enabled)
+					}
+					if v, ok := req.Params["upscale_mode"]; ok {
+						varMap["{{upscale_mode}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["upscale_factor"]; ok {
+						varMap["{{upscale_factor}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["output_format"]; ok {
+						varMap["{{output_format}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["output_quality"]; ok {
+						varMap["{{output_quality}}"] = fmt.Sprintf("%v", v)
 					}
 					if v, ok := req.Params["pattern_mode"]; ok {
 						varMap["{{pattern_mode}}"] = fmt.Sprintf("%v", v)
@@ -717,7 +752,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 						varMap["{{viewpoint}}"] = describeViewpointTemplateValue(fmt.Sprintf("%v", v))
 					}
 					if v, ok := req.Params["lighting"]; ok {
-						varMap["{{lighting}}"] = fmt.Sprintf("%v", v)
+						varMap["{{lighting}}"] = describeViewpointLightingTemplateValue(fmt.Sprintf("%v", v))
 					}
 					if v, ok := req.Params["model_url"]; ok {
 						varMap["{{model_url}}"] = fmt.Sprintf("%v", v)

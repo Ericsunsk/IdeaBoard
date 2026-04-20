@@ -31,16 +31,16 @@ export const MODEL_ANGLE_YAW_DEFAULT = 0
 export const ENHANCE_EXTEND_PERCENT_MIN = 0
 export const ENHANCE_EXTEND_PERCENT_MAX = 50
 export const ENHANCE_EXTEND_PERCENT_DEFAULT = 15
-export const TRYON_ROTATION_MIN = 0
-export const TRYON_ROTATION_MAX = 360
-export const TRYON_ROTATION_DEFAULT = 0
-export const TRYON_SCALE_MIN = 10
-export const TRYON_SCALE_MAX = 300
-export const TRYON_SCALE_DEFAULT = 88
-export const TRYON_OPACITY_MIN = 0
-export const TRYON_OPACITY_MAX = 100
-export const TRYON_OPACITY_DEFAULT = 82
-export const TRYON_TILE_MODE_DEFAULT = 'single'
+export const WEAR_ROTATION_MIN = 0
+export const WEAR_ROTATION_MAX = 360
+export const WEAR_ROTATION_DEFAULT = 0
+export const WEAR_SCALE_MIN = 10
+export const WEAR_SCALE_MAX = 300
+export const WEAR_SCALE_DEFAULT = 88
+export const WEAR_OPACITY_MIN = 0
+export const WEAR_OPACITY_MAX = 100
+export const WEAR_OPACITY_DEFAULT = 82
+export const WEAR_TILE_MODE_DEFAULT = 'single'
 
 export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = ['idle', 'ready', 'stale']
 
@@ -99,26 +99,26 @@ export function createDefaultModelAngleSpec(): ModelAngleSpec {
   }
 }
 
-export function normalizeTryOnTileMode(value: unknown): TryOnNodeItem['tileMode'] {
-  return value === 'seamless' ? 'seamless' : TRYON_TILE_MODE_DEFAULT
+export function normalizeWearTileMode(value: unknown): WearNodeItem['tileMode'] {
+  return value === 'seamless' ? 'seamless' : WEAR_TILE_MODE_DEFAULT
 }
 
-export function clampTryOnRotation(value: unknown): number {
+export function clampWearRotation(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(TRYON_ROTATION_MIN, Math.min(TRYON_ROTATION_MAX, Math.round(value)))
-    : TRYON_ROTATION_DEFAULT
+    ? Math.max(WEAR_ROTATION_MIN, Math.min(WEAR_ROTATION_MAX, Math.round(value)))
+    : WEAR_ROTATION_DEFAULT
 }
 
-export function clampTryOnScale(value: unknown): number {
+export function clampWearScale(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(TRYON_SCALE_MIN, Math.min(TRYON_SCALE_MAX, Math.round(value)))
-    : TRYON_SCALE_DEFAULT
+    ? Math.max(WEAR_SCALE_MIN, Math.min(WEAR_SCALE_MAX, Math.round(value)))
+    : WEAR_SCALE_DEFAULT
 }
 
-export function clampTryOnOpacity(value: unknown): number {
+export function clampWearOpacity(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(TRYON_OPACITY_MIN, Math.min(TRYON_OPACITY_MAX, Math.round(value)))
-    : TRYON_OPACITY_DEFAULT
+    ? Math.max(WEAR_OPACITY_MIN, Math.min(WEAR_OPACITY_MAX, Math.round(value)))
+    : WEAR_OPACITY_DEFAULT
 }
 
 export interface ModelNodeItem {
@@ -232,9 +232,9 @@ export interface EnhanceNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export interface TryOnNodeItem {
+export interface WearNodeItem {
   id: number
-  type: 'tryon'
+  type: 'wear'
   x: number
   y: number
   width: number
@@ -274,7 +274,7 @@ export type CanvasExecutionOutputNodeType =
   | 'edit'
   | 'fusion'
   | 'enhance'
-  | 'tryon'
+  | 'wear'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
   'model',
@@ -283,7 +283,7 @@ export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType
   'edit',
   'fusion',
   'enhance',
-  'tryon',
+  'wear',
 ]
 
 export function isCanvasExecutionOutputNodeType(value: unknown): value is CanvasExecutionOutputNodeType {
@@ -297,7 +297,7 @@ export type CanvasExecutionOutputNodeItem =
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
-  | TryOnNodeItem
+  | WearNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
 
@@ -313,7 +313,7 @@ export type CanvasConnectionNodeType =
   | 'edit'
   | 'fusion'
   | 'enhance'
-  | 'tryon'
+  | 'wear'
 export type CanvasConnectionPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
 
 export interface CanvasConnection {
@@ -336,7 +336,7 @@ export type CanvasNodeItem =
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
-  | TryOnNodeItem
+  | WearNodeItem
 
 export interface CanvasViewportState {
   canvasX: number
@@ -355,7 +355,7 @@ export interface CanvasBoardSnapshot {
   editNodes: EditNodeItem[]
   fusionNodes: FusionNodeItem[]
   enhanceNodes: EnhanceNodeItem[]
-  tryOnNodes: TryOnNodeItem[]
+  wearNodes: WearNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState
 }

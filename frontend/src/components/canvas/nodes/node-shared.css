@@ -29,6 +29,37 @@
   cursor: grabbing;
 }
 
+.workflow-node.running {
+  isolation: isolate;
+}
+
+.workflow-node.running::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(120deg, #9278e6 0%, #6dbef7 50%, #9278e6 100%);
+  background-size: 220% 100%;
+  animation: node-running-border-flow 2.4s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+@keyframes node-running-border-flow {
+  0% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 .node-header-title {
   display: flex;
   align-items: center;
@@ -62,13 +93,6 @@
 
 .node-primary-action-slot {
   padding-top: 2px;
-}
-
-.node-secondary-status {
-  margin-top: -2px;
-  font-size: 10.5px;
-  line-height: 1.35;
-  color: #8a94a6;
 }
 
 .node-mode-card {

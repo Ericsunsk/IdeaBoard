@@ -43,7 +43,7 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
       ...node,
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),
-    tryOnNodes: snapshot.tryOnNodes.map(node => ({
+    wearNodes: snapshot.wearNodes.map(node => ({
       ...node,
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),

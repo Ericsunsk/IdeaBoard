@@ -13,7 +13,7 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
   'edit',
   'fusion',
   'enhance',
-  'tryon',
+  'wear',
 ] as const
 
 export const CANVAS_CONNECTION_PORT_WHITELIST: readonly CanvasConnectionPort[] = [

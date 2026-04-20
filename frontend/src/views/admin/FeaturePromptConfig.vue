@@ -27,8 +27,8 @@
             @click="insertVar(item.slug, v.key)"
           ><span class="var-btn-key">{{ v.key }}</span><span class="var-btn-desc">{{ v.desc }}</span></button>
         </div>
-        <div v-else-if="isDirectApiFeature(item.slug)" class="var-note">
-          当前功能走直连接口，不经过任务模板变量替换。
+        <div v-if="getFeatureNote(item.slug)" class="var-note">
+          {{ getFeatureNote(item.slug) }}
         </div>
         <n-input
           :ref="(el: any) => { if (el) textareaRefs[item.slug] = el }"
@@ -53,7 +53,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { NInput, NButton, useMessage } from 'naive-ui'
 import { featurePromptApi } from '../../api'
-import { TRYON_TILE_MODE_TEMPLATE_DESC } from '../../components/canvas/nodes/nodeOptionConfig'
+import { WEAR_TILE_MODE_TEMPLATE_DESC } from '../../components/canvas/nodes/nodeOptionConfig'
 
 const message = useMessage()
 
@@ -74,7 +74,7 @@ const featureList = [
   { slug: 'series-color', title: 'Color · 多色配色' },
   { slug: 'directed-recolor', title: 'Color · 单色换色' },
   { slug: 'fabric-on-body', title: 'Wear · 上身贴合' },
-  { slug: 'multi-angle', title: 'Model · 视角控制（看画布输入口）' },
+  { slug: 'multi-angle', title: 'Model · 单视角控制' },
   { slug: 'virtual-3d', title: 'Display · 商品展示' },
   { slug: 'face-swap', title: 'Edit · 定向换脸' },
   { slug: 'bg-swap', title: 'Edit · 换背景' },
@@ -106,13 +106,13 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词（单色模式可选）' },
   ],
   'fabric-on-body': [
-    { key: '{{tile_mode}}', desc: TRYON_TILE_MODE_TEMPLATE_DESC },
+    { key: '{{tile_mode}}', desc: WEAR_TILE_MODE_TEMPLATE_DESC },
     { key: '{{fabric_rotation}}', desc: 'Texture 方向角度（0-360）' },
     { key: '{{fabric_scale}}', desc: 'Texture 大小百分比（10-300）' },
     { key: '{{fabric_opacity}}', desc: 'Texture 融合强度百分比（0-100）' },
     { key: '{{original_image_url}}', desc: 'Body 原图 URL（由 Wear 节点 Image 输入自动传入，无需手填）' },
-    { key: '{{mask_image_url}}', desc: 'Mask 节点输出上传后的 URL（连接 Mask 时自动传入，无需手填）' },
-    { key: '{{use_mask}}', desc: '是否启用蒙版（canonical，连接 Mask 时自动为 true，无需手填）' },
+    { key: '{{mask_image_url}}', desc: 'Mask 节点输出上传后的 URL（连接 Mask 时自动传入；未连接时为空）' },
+    { key: '{{use_mask}}', desc: '是否启用蒙版（连接 Mask 时自动为 true，未连接时自动为 false）' },
   ],
   'multi-angle': [
     { key: '{{angle_spec}}', desc: '视角控制参数（JSON，系统按它决定 yaw 与景别）' },
@@ -121,16 +121,16 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{pose_url}}', desc: '画布里接到 Pose 输入口的姿态参考图（系统自动传值）' },
     { key: '{{pose_strength}}', desc: 'Pose 输入口权重（0-100，越高越跟随姿态）' },
     { key: '{{background}}', desc: 'Model 节点背景参数（original / studio）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 输入口文本（弱修饰，用于氛围和细节）' },
+    { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本（弱修饰，用于氛围和细节）' },
   ],
   'virtual-3d': [
     { key: '{{viewpoint}}', desc: 'Display 节点所选展示视角，系统会自动转换成中文描述（如：45° 侧视）' },
-    { key: '{{lighting}}', desc: 'Display 节点光影（暖白 / 午后 / 硬光）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点或底部兜底提示词' },
+    { key: '{{lighting}}', desc: 'Display 节点光影，系统会自动转换成中文描述（如：高级暖白）' },
+    { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本；未连接时系统会用当前视角/光影摘要兜底' },
   ],
   'face-swap': noVars,
   'bg-swap': [
-    { key: '{{user_prompt}}', desc: 'Prompt 节点或底部兜底提示词（可选）' },
+    { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本（可选，未连接时系统会用默认背景切换描述）' },
   ],
   'pattern-gen': [
     { key: '{{user_prompt}}', desc: '底部输入栏提交的图案生成提示词' },
@@ -143,7 +143,15 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   ],
   'to-vector': noVars,
   'remove-bg': noVars,
-  'hd-upscale': noVars,
+  'hd-upscale': [
+    { key: '{{use_mask}}', desc: '是否启用局部增强（连接 Mask 时自动为 true，否则为 false）' },
+    { key: '{{original_image_url}}', desc: 'Enhance 节点输入的原图 URL（自动传入）' },
+    { key: '{{mask_image_url}}', desc: 'Mask 节点输出上传后的 URL（仅连接 Mask 时自动传入）' },
+    { key: '{{upscale_mode}}', desc: 'HD 模式（base / enhancement）' },
+    { key: '{{upscale_factor}}', desc: '放大倍数（2 / 3 / 4）' },
+    { key: '{{output_format}}', desc: '输出格式（jpg / png）' },
+    { key: '{{output_quality}}', desc: '输出质量（30-100）' },
+  ],
   'canvas-extend': promptVars,
 }
 
@@ -151,10 +159,14 @@ function getVarsForSlug(slug: FeatureSlug): VarDef[] {
   return featureVarMap[slug] || noVars
 }
 
-const directApiFeatureSlugs = new Set<FeatureSlug>(['remove-bg', 'to-vector', 'hd-upscale'])
+const featureNotes: Partial<Record<FeatureSlug, string>> = {
+  'remove-bg': '当前功能走直连接口，不经过任务模板变量替换。',
+  'to-vector': '当前功能走直连接口，不经过任务模板变量替换。',
+  'hd-upscale': 'Enhance · HD 在未连接 Mask 时走直连超分，不使用这里的系统提示词；连接 Mask 进入局部增强任务链后，才会使用下方模板变量与系统提示词。',
+}
 
-function isDirectApiFeature(slug: FeatureSlug) {
-  return directApiFeatureSlugs.has(slug)
+function getFeatureNote(slug: FeatureSlug) {
+  return featureNotes[slug] || ''
 }
 
 // textarea 引用 + 插入逻辑

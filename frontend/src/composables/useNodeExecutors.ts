@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { SubmitTaskData } from '../api/index'
-import { describeModelAngleSpec, describeTryOnTileMode } from '../components/canvas/nodes/nodeOptionConfig'
+import { describeModelAngleSpec, describeWearTileMode } from '../components/canvas/nodes/nodeOptionConfig'
 import {
   enhanceModeSupportsPrompt,
   getEditNodePortLabel,
@@ -25,7 +25,7 @@ import type {
   ImageNodeItem,
   MaskNodeItem,
   ModelNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
@@ -70,7 +70,7 @@ type SegmentPayload = {
 
 type StandardEditMode = Exclude<EditNodeItem['mode'], 'face-swap'>
 type EditModeMeta = Record<StandardEditMode, { feature: string; promptPrefix: string; fallbackPrompt: string }>
-type TryOnFeatureMeta = { feature: string; promptPrefix: string; successLabel: string }
+type WearFeatureMeta = { feature: string; promptPrefix: string; successLabel: string }
 
 const FUSION_META = {
   feature: 'style-fusion',
@@ -101,7 +101,7 @@ interface UseNodeExecutorsOptions {
   activeImageNodeId: Ref<number | null>
   activeMaskNodeId: Ref<number | null>
   editModeMeta: EditModeMeta
-  tryOnFeatureMeta: TryOnFeatureMeta
+  wearFeatureMeta: WearFeatureMeta
   getViewpointLabel: (key: string) => string
   getViewpointLightingLabel: (key: ViewpointNodeItem['lighting']) => string
   getNodeConnectionStatus: (
@@ -293,12 +293,12 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     return options.resolveNodePromptText('enhance', node.id, fallback)
   }
 
-  function resolveConnectedTryOnImageInput(node: TryOnNodeItem, port: 'imageA' | 'imageB'): PlacedImageInput | null {
-    return options.resolveConnectedPlacedImageInput('tryon', node.id, port)
+  function resolveConnectedWearImageInput(node: WearNodeItem, port: 'imageA' | 'imageB'): PlacedImageInput | null {
+    return options.resolveConnectedPlacedImageInput('wear', node.id, port)
   }
 
-  async function resolveConnectedTryOnMaskInput(node: TryOnNodeItem): Promise<PlacedMaskInput | null> {
-    return options.resolveConnectedPlacedMaskInput('tryon', node.id, 'mask')
+  async function resolveConnectedWearMaskInput(node: WearNodeItem): Promise<PlacedMaskInput | null> {
+    return options.resolveConnectedPlacedMaskInput('wear', node.id, 'mask')
   }
 
   async function resolveColorGenerationContext(
@@ -917,20 +917,20 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     }
   }
 
-  async function handleTryOnNodeGenerate(node: TryOnNodeItem) {
+  async function handleWearNodeGenerate(node: WearNodeItem) {
     if (options.generating.value) return
 
-    const connectionStatus = options.getNodeConnectionStatus('tryon', node)
-    const connectedImageA = resolveConnectedTryOnImageInput(node, 'imageA')
-    const connectedImageB = resolveConnectedTryOnImageInput(node, 'imageB')
-    const connectedMask = await resolveConnectedTryOnMaskInput(node)
+    const connectionStatus = options.getNodeConnectionStatus('wear', node)
+    const connectedImageA = resolveConnectedWearImageInput(node, 'imageA')
+    const connectedImageB = resolveConnectedWearImageInput(node, 'imageB')
+    const connectedMask = await resolveConnectedWearMaskInput(node)
     const hasMaskConnection = !!connectionStatus.incoming.mask
-    const missingPorts = options.getMissingRequiredNodeInputs('tryon', node, {
+    const missingPorts = options.getMissingRequiredNodeInputs('wear', node, {
       imageA: connectedImageA,
       imageB: connectedImageB,
     })
 
-    if (options.warnMissingNodeInputs('tryon', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
+    if (options.warnMissingNodeInputs('wear', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
       const formatLabel = (port: string) => port === 'imageA' ? 'Body' : 'Texture'
       if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
         return `Wear 节点等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
@@ -942,7 +942,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     })) return
 
     if (hasMaskConnection && !connectedMask?.dataUrl) {
-      options.triggerNodeConnectionError('tryon', node.id, ['mask'])
+      options.triggerNodeConnectionError('wear', node.id, ['mask'])
       options.message.warning(
         connectionStatus.pendingIncoming.mask
           ? 'Wear 节点等待上游 Mask 输出'
@@ -952,25 +952,25 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     }
 
     options.generating.value = true
-    const connectedOutputNodeId = options.getConnectedOutputImageTarget('tryon', node.id)?.id ?? null
+    const connectedOutputNodeId = options.getConnectedOutputImageTarget('wear', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const tileModeLabel = describeTryOnTileMode(node.tileMode)
+    const tileModeLabel = describeWearTileMode(node.tileMode)
     const placementSource = options.buildPlacementSource(connectedImageA!.url, node.x + 340, node.y + 18)
     try {
       let maskImageUrl = ''
       if (connectedMask?.dataUrl) {
-        const maskFile = await options.dataUrlToFile(connectedMask.dataUrl, `tryon-mask-${Date.now()}.png`)
+        const maskFile = await options.dataUrlToFile(connectedMask.dataUrl, `wear-mask-${Date.now()}.png`)
         const uploadRes = await options.uploadImage(maskFile)
         if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-          failExecution('tryon', node.id, uploadRes.msg || '蒙版上传失败')
+          failExecution('wear', node.id, uploadRes.msg || '蒙版上传失败')
           return
         }
         maskImageUrl = uploadRes.data.url
       }
 
-      await submitExecutionTask('tryon', node.id, {
+      await submitExecutionTask('wear', node.id, {
         request: {
-          prompt: `${options.tryOnFeatureMeta.promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，融合强度${node.opacity}%`,
+          prompt: `${options.wearFeatureMeta.promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，融合强度${node.opacity}%`,
           params: {
             image_urls: [connectedImageA!.url, connectedImageB!.url],
             original_image_url: connectedImageA!.url,
@@ -980,7 +980,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
                   use_mask: true,
                 }
               : {}),
-            feature: options.tryOnFeatureMeta.feature,
+            feature: options.wearFeatureMeta.feature,
             fabric_rotation: node.rotation,
             fabric_opacity: node.opacity,
             fabric_scale: node.scale,
@@ -989,12 +989,12 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         },
         source: placementSource,
         outputNodeId,
-        successMessage: `${options.tryOnFeatureMeta.successLabel} submitted`,
-        failureMessage: 'Failed to submit try-on task',
-        onCompleted: urls => cacheNodeOutputs('tryon', node.id, urls),
+        successMessage: `${options.wearFeatureMeta.successLabel} submitted`,
+        failureMessage: 'Failed to submit wear task',
+        onCompleted: urls => cacheNodeOutputs('wear', node.id, urls),
       })
     } catch (error: unknown) {
-      failExecutionFromError('tryon', node.id, error, 'Failed to submit try-on task')
+      failExecutionFromError('wear', node.id, error, 'Failed to submit wear task')
     }
   }
 
@@ -1078,6 +1078,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     handleEditNodeGenerate,
     handleFusionNodeGenerate,
     handleEnhanceNodeGenerate,
-    handleTryOnNodeGenerate,
+    handleWearNodeGenerate,
   }
 }

@@ -2,7 +2,7 @@ import type {
   EnhanceNodeItem,
   ModelAngleFraming,
   ModelAngleSpec,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../../../types/canvasNodes'
 
@@ -32,20 +32,20 @@ export const ENHANCE_OUTPUT_FORMAT_OPTIONS: OptionItem<EnhanceNodeItem['outputFo
   { label: 'PNG', value: 'png' },
 ]
 
-export const TRYON_TILE_MODE_OPTIONS: OptionItem<TryOnNodeItem['tileMode']>[] = [
+export const WEAR_TILE_MODE_OPTIONS: OptionItem<WearNodeItem['tileMode']>[] = [
   { label: 'Repeat', value: 'seamless' },
   { label: 'Placement', value: 'single' },
 ]
 
-export const TRYON_TILE_MODE_DESCRIPTIONS: Record<TryOnNodeItem['tileMode'], string> = {
+export const WEAR_TILE_MODE_DESCRIPTIONS: Record<WearNodeItem['tileMode'], string> = {
   seamless: '平铺重复',
   single: '单张贴合',
 }
 
-export const TRYON_TILE_MODE_TEMPLATE_DESC = '贴合法（平铺重复 / 单张贴合）'
+export const WEAR_TILE_MODE_TEMPLATE_DESC = '贴合法（平铺重复 / 单张贴合）'
 
-export function describeTryOnTileMode(mode: TryOnNodeItem['tileMode']): string {
-  return TRYON_TILE_MODE_DESCRIPTIONS[mode]
+export function describeWearTileMode(mode: WearNodeItem['tileMode']): string {
+  return WEAR_TILE_MODE_DESCRIPTIONS[mode]
 }
 
 export const MODEL_BACKGROUND_OPTIONS: ModelOptionItem[] = [

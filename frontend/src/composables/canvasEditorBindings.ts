@@ -35,7 +35,7 @@ interface CanvasSelectionBindings {
   activeEditNodeId: Ref<number | null>
   activeFusionNodeId: Ref<number | null>
   activeEnhanceNodeId: Ref<number | null>
-  activeTryOnNodeId: Ref<number | null>
+  activeWearNodeId: Ref<number | null>
   clearActiveNodes: () => void
   clearSelectedNodeKeys: () => void
   removeSelectedNodeKey: (kind: NodeDragKind, id: number) => void
@@ -67,7 +67,7 @@ export function createCanvasPointerBindings(
     editNodes: options.editNodes,
     fusionNodes: options.fusionNodes,
     enhanceNodes: options.enhanceNodes,
-    tryOnNodes: options.tryOnNodes,
+    wearNodes: options.wearNodes,
     activeTool: options.activeTool,
     showStyleStrengthControl: options.showStyleStrengthControl,
     canvasX: options.canvasX,
@@ -86,7 +86,7 @@ export function createCanvasPointerBindings(
     activeEditNodeId: selection.activeEditNodeId,
     activeFusionNodeId: selection.activeFusionNodeId,
     activeEnhanceNodeId: selection.activeEnhanceNodeId,
-    activeTryOnNodeId: selection.activeTryOnNodeId,
+    activeWearNodeId: selection.activeWearNodeId,
     isPanning: uiState.isPanning,
     isSelecting: uiState.isSelecting,
     isDraggingItem: uiState.isDraggingItem,

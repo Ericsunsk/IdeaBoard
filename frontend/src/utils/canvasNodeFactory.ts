@@ -5,10 +5,10 @@ import {
   ENHANCE_EXTEND_PERCENT_DEFAULT,
   MODEL_REFERENCE_STRENGTH_DEFAULT,
   MODEL_POSE_STRENGTH_DEFAULT,
-  TRYON_OPACITY_DEFAULT,
-  TRYON_ROTATION_DEFAULT,
-  TRYON_SCALE_DEFAULT,
-  TRYON_TILE_MODE_DEFAULT,
+  WEAR_OPACITY_DEFAULT,
+  WEAR_ROTATION_DEFAULT,
+  WEAR_SCALE_DEFAULT,
+  WEAR_TILE_MODE_DEFAULT,
 } from '../types/canvasNodes'
 import type {
   CanvasImageItem,
@@ -21,7 +21,7 @@ import type {
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
@@ -164,17 +164,17 @@ export function createEnhanceNodeAt(point: CanvasPoint): EnhanceNodeItem {
   }
 }
 
-export function createTryOnNodeAt(point: CanvasPoint): TryOnNodeItem {
+export function createWearNodeAt(point: CanvasPoint): WearNodeItem {
   return {
     id: createCanvasEntityId(),
-    type: 'tryon',
+    type: 'wear',
     x: point.x,
     y: point.y,
     width: 286,
-    tileMode: TRYON_TILE_MODE_DEFAULT,
-    rotation: TRYON_ROTATION_DEFAULT,
-    scale: TRYON_SCALE_DEFAULT,
-    opacity: TRYON_OPACITY_DEFAULT,
+    tileMode: WEAR_TILE_MODE_DEFAULT,
+    rotation: WEAR_ROTATION_DEFAULT,
+    scale: WEAR_SCALE_DEFAULT,
+    opacity: WEAR_OPACITY_DEFAULT,
     outputStatus: 'idle',
     outputImages: [],
   }

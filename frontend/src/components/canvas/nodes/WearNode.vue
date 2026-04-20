@@ -1,9 +1,9 @@
 <template>
   <div
-    class="workflow-node tryon-node"
-    data-node-kind="tryon"
+    class="workflow-node wear-node"
+    data-node-kind="wear"
     :data-node-id="node.id"
-    :class="{ active, dragging, 'copy-mode': copyMode }"
+    :class="{ active, dragging, 'copy-mode': copyMode, running: uiState?.isRunning }"
     :style="nodeStyle"
     @mousedown.stop
   >
@@ -19,11 +19,11 @@
       </template>
     </NodeHeader>
 
-    <div class="tryon-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
-      <div class="tryon-tile-card node-mode-card">
-        <div class="tryon-tile-row node-option-row">
+    <div class="wear-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
+      <div class="wear-tile-card node-mode-card">
+        <div class="wear-tile-row node-option-row">
           <NodeActionButton
-            v-for="option in tryOnTileModeOptions"
+            v-for="option in wearTileModeOptions"
             :key="option.value"
             variant="chip"
             :active="node.tileMode === option.value"
@@ -34,11 +34,11 @@
         </div>
       </div>
 
-      <div class="tryon-control-group node-control-group">
-        <div class="tryon-control-row">
+      <div class="wear-control-group node-control-group">
+        <div class="wear-control-row">
           <span class="node-control-label">Direction</span>
           <input
-            class="tryon-slider node-inline-range"
+            class="wear-slider node-inline-range"
             :style="{ '--slider-pct': `${(node.rotation / 360) * 100}%` }"
             type="range"
             min="0"
@@ -48,10 +48,10 @@
             @input="emit('update:rotation', Number(($event.target as HTMLInputElement).value))"
           />
         </div>
-        <div class="tryon-control-row">
+        <div class="wear-control-row">
           <span class="node-control-label">Size</span>
           <input
-            class="tryon-slider node-inline-range"
+            class="wear-slider node-inline-range"
             :style="{ '--slider-pct': `${((node.scale - 10) / 290) * 100}%` }"
             type="range"
             min="10"
@@ -61,10 +61,10 @@
             @input="emit('update:scale', Number(($event.target as HTMLInputElement).value))"
           />
         </div>
-        <div class="tryon-control-row">
+        <div class="wear-control-row">
           <span class="node-control-label">Blend</span>
           <input
-            class="tryon-slider node-inline-range"
+            class="wear-slider node-inline-range"
             :style="{ '--slider-pct': `${node.opacity}%` }"
             type="range"
             min="0"
@@ -77,10 +77,6 @@
       </div>
 
       <NodeConnectionChips :items="connectionChips" />
-      <div v-if="uiState?.secondaryStatus" class="node-secondary-status">
-        {{ uiState.secondaryStatus }}
-      </div>
-
       <div class="node-primary-action-slot">
         <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
           {{ uiState?.primaryAction?.label || '上身' }}
@@ -89,7 +85,7 @@
     </div>
 
     <NodePorts
-      node-kind="tryon"
+      node-kind="wear"
       :node-id="node.id"
       :ports="ports"
       @port-mousedown="onPortMouseDown"
@@ -99,18 +95,18 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { TryOnNodeItem } from '../../../types/canvasNodes'
+import type { WearNodeItem } from '../../../types/canvasNodes'
 import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodePorts from './NodePorts.vue'
-import { buildNodeIoFromSlots, TRYON_NODE_IO_SLOTS } from './nodeIoConfig'
-import { TRYON_TILE_MODE_OPTIONS } from './nodeOptionConfig'
+import { buildNodeIoFromSlots, WEAR_NODE_IO_SLOTS } from './nodeIoConfig'
+import { WEAR_TILE_MODE_OPTIONS } from './nodeOptionConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
-  node: TryOnNodeItem
+  node: WearNodeItem
   active: boolean
   dragging: boolean
   copyMode: boolean
@@ -122,7 +118,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'delete'): void
-  (e: 'update:tile-mode', value: TryOnNodeItem['tileMode']): void
+  (e: 'update:tile-mode', value: WearNodeItem['tileMode']): void
   (e: 'update:rotation', value: number): void
   (e: 'update:scale', value: number): void
   (e: 'update:opacity', value: number): void
@@ -130,12 +126,12 @@ const emit = defineEmits<{
   (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'imageA' | 'imageB' | 'mask'): void
 }>()
 
-const tryOnTileModeOptions = TRYON_TILE_MODE_OPTIONS
+const wearTileModeOptions = WEAR_TILE_MODE_OPTIONS
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 
 const io = computed(() =>
-  buildNodeIoFromSlots(TRYON_NODE_IO_SLOTS, null, {
+  buildNodeIoFromSlots(WEAR_NODE_IO_SLOTS, null, {
     connected: {
       imageA: props.uiState?.connection?.connected?.imageA,
       imageB: props.uiState?.connection?.connected?.imageB,
@@ -162,32 +158,32 @@ function onPortMouseDown(event: MouseEvent, port: string) {
 
 <style scoped src="./node-shared.css"></style>
 <style scoped>
-.tryon-node-body {
+.wear-node-body {
   gap: 7px;
 }
 
-.tryon-tile-card {
+.wear-tile-card {
   gap: 6px;
 }
 
-.tryon-control-group {
+.wear-control-group {
   gap: 6px;
 }
 
-.tryon-control-row {
+.wear-control-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.tryon-control-row .node-control-label {
+.wear-control-row .node-control-label {
   width: 56px;
   flex: 0 0 56px;
   font-size: 10.5px;
   letter-spacing: 0.02em;
 }
 
-.tryon-slider {
+.wear-slider {
   flex: 1;
   min-width: 0;
 }

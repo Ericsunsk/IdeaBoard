@@ -7,7 +7,7 @@ export type CanvasNodeCreateActionKey =
   | 'createEditNode'
   | 'createFusionNode'
   | 'createEnhanceNode'
-  | 'createTryOnNode'
+  | 'createWearNode'
   | 'createColorNode'
 
 export interface CanvasNodeMenuItem {
@@ -26,7 +26,7 @@ export const CANVAS_NODE_MENU_ITEMS: readonly CanvasNodeMenuItem[] = [
   { key: 'edit', label: '+ Edit 节点', actionKey: 'createEditNode', group: 'process', order: 50 },
   { key: 'fusion', label: '+ Fusion 节点', actionKey: 'createFusionNode', group: 'process', order: 60 },
   { key: 'enhance', label: '+ Enhance 节点', actionKey: 'createEnhanceNode', group: 'process', order: 70 },
-  { key: 'tryon', label: '+ Wear 节点', actionKey: 'createTryOnNode', group: 'process', order: 80 },
+  { key: 'wear', label: '+ Wear 节点', actionKey: 'createWearNode', group: 'process', order: 80 },
   { key: 'viewpoint', label: '+ Display 节点', actionKey: 'createViewpointNode', group: 'process', order: 90 },
   { key: 'color', label: '+ Color 节点', actionKey: 'createColorNode', group: 'process', order: 100 },
 ] as const

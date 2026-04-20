@@ -25,7 +25,7 @@ const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>([
   'edit',
   'fusion',
   'enhance',
-  'tryon',
+  'wear',
 ])
 
 export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasConnectionTone {

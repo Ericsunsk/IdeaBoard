@@ -115,6 +115,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     if (!urls.length) return
     const outputNode = resolvePreferredImageOutputNode(outputNodeId)
     appendUrlsToImageNodeOutputs(urls, outputNode)
+    if (outputNode) return
 
     const generatedWidth = 300
     const stepX = 170
@@ -211,7 +212,8 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
       return taskId
     } catch (error: unknown) {
       const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || submitOptions.failureMessage || 'Failed to submit task')
+      const errorMessage = maybeError?.msg || maybeError?.message
+      options.message.error(errorMessage || submitOptions.failureMessage || 'Failed to submit task')
       submitOptions.onFailed?.()
       options.generating.value = false
       return null

@@ -14,7 +14,7 @@ import type {
   ModelAngleSpec,
   ModelNodeItem,
   PromptNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 import {
@@ -22,14 +22,14 @@ import {
   ENHANCE_EXTEND_PERCENT_DEFAULT,
   ENHANCE_EXTEND_PERCENT_MAX,
   ENHANCE_EXTEND_PERCENT_MIN,
-  clampTryOnOpacity,
-  clampTryOnRotation,
-  clampTryOnScale,
+  clampWearOpacity,
+  clampWearRotation,
+  clampWearScale,
   clampModelAngleYaw,
   clampModelReferenceStrength,
   clampModelPoseStrength,
   createDefaultModelAngleSpec,
-  normalizeTryOnTileMode,
+  normalizeWearTileMode,
   normalizeColorNodeColors,
   resolveWorkflowNodeOutputStatus,
 } from '../types/canvasNodes'
@@ -46,7 +46,7 @@ export type CanvasBoardStateColorNode = ColorNodeItem
 export type CanvasBoardStateEditNode = EditNodeItem
 export type CanvasBoardStateFusionNode = FusionNodeItem
 export type CanvasBoardStateEnhanceNode = EnhanceNodeItem
-export type CanvasBoardStateTryOnNode = TryOnNodeItem
+export type CanvasBoardStateWearNode = WearNodeItem
 export type CanvasBoardStateConnection = CanvasConnection
 export type CanvasBoardStateViewport = CanvasViewportState
 
@@ -295,7 +295,7 @@ function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
     item.fromNodeType === 'edit' ||
     item.fromNodeType === 'fusion' ||
     item.fromNodeType === 'enhance' ||
-    item.fromNodeType === 'tryon'
+    item.fromNodeType === 'wear'
       ? item.fromNodeType
       : null
   const rawToNodeType =
@@ -308,7 +308,7 @@ function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
     item.toNodeType === 'edit' ||
     item.toNodeType === 'fusion' ||
     item.toNodeType === 'enhance' ||
-    item.toNodeType === 'tryon'
+    item.toNodeType === 'wear'
       ? item.toNodeType
       : null
   const fromPort =
@@ -416,22 +416,22 @@ function toValidEnhanceNode(item: unknown): CanvasBoardStateEnhanceNode | null {
   }
 }
 
-function toValidTryOnNode(item: unknown): CanvasBoardStateTryOnNode | null {
+function toValidWearNode(item: unknown): CanvasBoardStateWearNode | null {
   if (!isObject(item)) return null
-  if (item.type !== 'tryon') return null
+  if (item.type !== 'wear') return null
   if (!isFiniteNumber(item.id)) return null
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
   return {
     id: item.id,
-    type: 'tryon',
+    type: 'wear',
     x: item.x,
     y: item.y,
     width: item.width,
-    tileMode: normalizeTryOnTileMode(item.tileMode),
-    rotation: clampTryOnRotation(item.rotation),
-    scale: clampTryOnScale(item.scale),
-    opacity: clampTryOnOpacity(item.opacity),
+    tileMode: normalizeWearTileMode(item.tileMode),
+    rotation: clampWearRotation(item.rotation),
+    scale: clampWearScale(item.scale),
+    opacity: clampWearOpacity(item.opacity),
     outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
     outputImages,
   }
@@ -460,7 +460,7 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
   const rawEditNodes = Array.isArray(item.editNodes) ? item.editNodes : []
   const rawFusionNodes = Array.isArray(item.fusionNodes) ? item.fusionNodes : []
   const rawEnhanceNodes = Array.isArray(item.enhanceNodes) ? item.enhanceNodes : []
-  const rawTryOnNodes = Array.isArray(item.tryOnNodes) ? item.tryOnNodes : []
+  const rawWearNodes = Array.isArray(item.wearNodes) ? item.wearNodes : []
   const rawConnections = Array.isArray(item.connections) ? item.connections : []
   return {
     messages: rawMessages.map(toValidMessage).filter((m): m is CanvasBoardStateMessage => !!m),
@@ -473,7 +473,7 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
     editNodes: rawEditNodes.map(toValidEditNode).filter((n): n is CanvasBoardStateEditNode => !!n),
     fusionNodes: rawFusionNodes.map(toValidFusionNode).filter((n): n is CanvasBoardStateFusionNode => !!n),
     enhanceNodes: rawEnhanceNodes.map(toValidEnhanceNode).filter((n): n is CanvasBoardStateEnhanceNode => !!n),
-    tryOnNodes: rawTryOnNodes.map(toValidTryOnNode).filter((n): n is CanvasBoardStateTryOnNode => !!n),
+    wearNodes: rawWearNodes.map(toValidWearNode).filter((n): n is CanvasBoardStateWearNode => !!n),
     connections: rawConnections.map(toValidConnection).filter((n): n is CanvasBoardStateConnection => !!n),
     viewport: toValidViewport(item.viewport),
     updatedAt: isFiniteNumber(item.updatedAt) ? item.updatedAt : Date.now(),

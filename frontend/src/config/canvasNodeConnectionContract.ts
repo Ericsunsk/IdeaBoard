@@ -9,7 +9,7 @@ import type {
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
@@ -26,7 +26,7 @@ export type CanvasConnectionContractNode =
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
-  | TryOnNodeItem
+  | WearNodeItem
 
 export interface CanvasNodePortContract {
   port: CanvasConnectionPort
@@ -132,7 +132,7 @@ export function getCanvasNodePortContracts(
         output('image', 'image'),
       ]
     }
-    case 'tryon':
+    case 'wear':
       return [
         input('imageA', 'image', true),
         input('imageB', 'image', true),

@@ -137,11 +137,11 @@ export const ENHANCE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EnhanceNodeIoCon
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'enhance-output', top: 92 },
 ]
 
-export const TRYON_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'imageA', label: 'Body', kind: 'image', required: true, direction: 'input', portName: 'imageA', portKey: 'tryon-image-a', top: 92 },
-  { key: 'imageB', label: 'Texture', kind: 'image', required: true, direction: 'input', portName: 'imageB', portKey: 'tryon-image-b', top: 136 },
-  { key: 'mask', label: 'Mask', kind: 'mask', direction: 'input', portName: 'mask', portKey: 'tryon-mask-input', top: 180 },
-  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'tryon-output', top: 92 },
+export const WEAR_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
+  { key: 'imageA', label: 'Body', kind: 'image', required: true, direction: 'input', portName: 'imageA', portKey: 'wear-image-a', top: 92 },
+  { key: 'imageB', label: 'Texture', kind: 'image', required: true, direction: 'input', portName: 'imageB', portKey: 'wear-image-b', top: 136 },
+  { key: 'mask', label: 'Mask', kind: 'mask', direction: 'input', portName: 'mask', portKey: 'wear-mask-input', top: 180 },
+  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'wear-output', top: 92 },
 ]
 
 export function buildNodeIoFromSlots<T>(

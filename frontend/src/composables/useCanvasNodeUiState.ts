@@ -17,7 +17,7 @@ import type {
   FusionNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  TryOnNodeItem,
+  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 import type {
@@ -45,7 +45,6 @@ type ExecutionActionLabels = { ready: string; running: string }
 
 type ExecutionActionState = {
   primaryAction: NodePrimaryActionState
-  secondaryStatus?: string
 }
 
 export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
@@ -62,7 +61,7 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
         return { ready: '融合', running: '融合中...' }
       case 'enhance':
         return { ready: '增强', running: '增强中...' }
-      case 'tryon':
+      case 'wear':
         return { ready: '上身', running: '上身中...' }
     }
   }
@@ -89,11 +88,11 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     if (port === 'mask') return 'Mask'
     if (port === 'prompt') return 'Prompt'
     if (port === 'imageA') {
-      if (nodeType === 'tryon') return 'Body'
+      if (nodeType === 'wear') return 'Body'
       return 'Image A'
     }
     if (port === 'imageB') {
-      if (nodeType === 'tryon') {
+      if (nodeType === 'wear') {
         return 'Texture'
       }
       return 'Image B'
@@ -217,7 +216,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
             : `连接 ${disconnectedPorts.length} 个输入`,
           disabled: true,
         },
-        secondaryStatus: `缺少：${missingLabels.join(' / ')}`,
       }
     }
 
@@ -233,7 +231,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
             : `等待 ${pendingPorts.length} 个输入`,
           disabled: true,
         },
-        secondaryStatus: `等待上游：${pendingLabels.join(' / ')}`,
       }
     }
 
@@ -251,10 +248,9 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     if (cacheStatus === 'stale') {
       return {
         primaryAction: {
-          label: '刷新缓存',
+          label: node.outputImages.length > 0 ? '重新生成' : actionLabels.ready,
           disabled: false,
         },
-        secondaryStatus: '当前结果已过期，需刷新',
       }
     }
 
@@ -264,7 +260,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
           label: '重试',
           disabled: false,
         },
-        secondaryStatus: '上次执行失败，可重试',
       }
     }
 
@@ -274,7 +269,6 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
           label: '重新生成',
           disabled: false,
         },
-        secondaryStatus: '当前缓存可用',
       }
     }
 
@@ -303,7 +297,7 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
   function getNodeUiState(nodeType: 'edit', node: EditNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'fusion', node: FusionNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'enhance', node: EnhanceNodeItem): NodeUiState
-  function getNodeUiState(nodeType: 'tryon', node: TryOnNodeItem): NodeUiState
+  function getNodeUiState(nodeType: 'wear', node: WearNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'image', node: CanvasNodeItem & { id: number }): NodeUiState
   function getNodeUiState(nodeType: 'mask', node: CanvasNodeItem & { id: number }): NodeUiState
   function getNodeUiState(nodeType: 'prompt', node: PromptNodeItem): PromptNodeUiState
@@ -318,12 +312,13 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
 
     const executionNode = node as CanvasExecutionOutputNodeItem
     const executionState = buildExecutionActionState(nodeType, executionNode)
+    const isRunning = options.isExecutionNodeRunning?.(nodeType, executionNode.id) ?? false
 
     return {
       connection,
       primaryAction: executionState.primaryAction,
-      secondaryStatus: executionState.secondaryStatus,
       cacheStatus: resolveExecutionNodeCacheStatus(executionNode),
+      isRunning,
     }
   }
 
