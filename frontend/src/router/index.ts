@@ -131,18 +131,6 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'model-library',
-        name: 'AdminModelLibrary',
-        component: () => import('../views/admin/ModelLibrary.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: 'pose-library',
-        name: 'AdminPoseLibrary',
-        component: () => import('../views/admin/PoseLibrary.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
         path: 'pattern-style-library',
         name: 'AdminPatternStyleLibrary',
         component: () => import('../views/admin/PatternStyleLibrary.vue'),

@@ -20,14 +20,12 @@ export type CanvasConnectionNodeLookup = (
 
 const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>([
   'model',
-  'mannequin',
   'viewpoint',
   'color',
   'edit',
   'fusion',
   'enhance',
   'tryon',
-  'generate',
 ])
 
 export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasConnectionTone {

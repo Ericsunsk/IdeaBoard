@@ -36,6 +36,7 @@ interface SubmitAndPollOptions<TSubmitPayload extends object> {
   outputNodeId?: number | null
   onSubmitted?: (taskId: string) => void
   onCompleted?: (urls: string[]) => void
+  onFailed?: () => void
 }
 
 interface UseGenerationPipelineOptions<TSubmitPayload extends object> {
@@ -146,6 +147,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     source?: CanvasImageItem,
     outputNodeId?: number | null,
     onCompleted?: (urls: string[]) => void,
+    onFailed?: () => void,
   ) {
     stopTaskPolling()
 
@@ -161,6 +163,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
               appendGeneratedImages(urls, source, outputNodeId)
               options.message.success('生成完成')
             } else {
+              onFailed?.()
               options.message.warning('任务完成，但未返回图片')
             }
             currentTaskId.value = null
@@ -169,6 +172,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
           }
           if (task.status === 'failed') {
             options.message.error(task.error_msg || '生成失败')
+            onFailed?.()
             currentTaskId.value = null
             options.generating.value = false
             return
@@ -188,6 +192,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
       const submitRes = await options.submitTask(submitOptions.request)
       if (submitRes.code !== 0 || !submitRes.data?.task_id) {
         options.message.error(submitRes.msg || submitOptions.failureMessage || 'Submit failed')
+        submitOptions.onFailed?.()
         options.generating.value = false
         return null
       }
@@ -196,11 +201,18 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
       currentTaskId.value = taskId
       options.message.success(submitOptions.successMessage)
       submitOptions.onSubmitted?.(taskId)
-      startTaskPolling(taskId, submitOptions.source, submitOptions.outputNodeId, submitOptions.onCompleted)
+      startTaskPolling(
+        taskId,
+        submitOptions.source,
+        submitOptions.outputNodeId,
+        submitOptions.onCompleted,
+        submitOptions.onFailed,
+      )
       return taskId
     } catch (error: unknown) {
       const maybeError = error as { msg?: string; message?: string } | null
       options.message.error(maybeError?.msg || maybeError?.message || submitOptions.failureMessage || 'Failed to submit task')
+      submitOptions.onFailed?.()
       options.generating.value = false
       return null
     }

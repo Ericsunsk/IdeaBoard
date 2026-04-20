@@ -95,41 +95,17 @@
 
           <div class="settings-section">
             <div class="section-header">
-              <span class="section-title">Resolution</span>
+              <span class="section-title">Quality</span>
               <div class="ratio-group">
                 <button 
-                  v-for="res in ['1K', '2K', '4K']" 
-                  :key="res"
+                  v-for="quality in patternGenerateQualityOptions" 
+                  :key="quality"
                   class="ratio-btn"
-                  :class="{ active: selectedResolution === res }"
-                  @click="selectedResolution = res"
+                  :class="{ active: selectedQuality === quality }"
+                  @click="selectedQuality = quality"
                 >
-                  {{ res }}
+                  {{ quality.toUpperCase() }}
                 </button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="settings-section">
-            <div class="section-header">
-              <span class="section-title">Style Model</span>
-              <span class="section-subtitle">{{ selectedCardIds.length }} selected</span>
-            </div>
-            <div class="style-cards-grid">
-              <div 
-                v-for="card in styleCards" 
-                :key="card.id"
-                class="style-card-item"
-                :class="{ active: selectedCardIds.includes(card.id) }"
-                @click="toggleCard(card.id)"
-              >
-                <img :src="card.cover_image" class="card-preview" />
-                <div class="card-info">
-                  <span class="card-name">{{ card.name }}</span>
-                </div>
-                <div class="card-check">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
               </div>
             </div>
           </div>
@@ -257,7 +233,6 @@
 
       <HomeCanvasNodesStructured
         :model-nodes="modelNodes"
-        :mannequin-nodes="mannequinNodes"
         :viewpoint-nodes="viewpointNodes"
         :mask-nodes="maskNodes"
         :generating="generating"
@@ -265,48 +240,27 @@
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
         :get-model-node-ui-state="getModelNodeUiState"
-        :get-mannequin-node-ui-state="getMannequinNodeUiState"
         :get-viewpoint-node-ui-state="getViewpointNodeUiState"
         :get-mask-node-ui-state="getMaskNodeUiState"
         :get-node-connection-error-ports="getNodeConnectionErrorPorts"
-        :get-model-node-stage-height="getModelNodeStageHeight"
-        :get-model-node-effective-source="getModelNodeEffectiveSource"
-        :get-mannequin-node-stage-height="getMannequinNodeStageHeight"
-        :get-mannequin-node-effective-source="getMannequinNodeEffectiveSource"
-        :get-viewpoint-node-stage-height="getViewpointNodeStageHeight"
-        :get-viewpoint-node-effective-source="getViewpointNodeEffectiveSource"
-        :get-viewpoint-node-effective-source-images="getViewpointNodeEffectiveSourceImages"
         :get-mask-node-stage-height="getMaskNodeStageHeight"
         :get-mask-canvas-width="getMaskCanvasWidth"
         :get-mask-node-effective-source="getMaskNodeEffectiveSource"
-        :model-angle-options="modelAngleOptions"
         :model-background-options="modelBackgroundOptions"
         @model-node-mousedown="(event, node) => onModelNodeMouseDown(event, node)"
         @model-port-mousedown="onModelNodePortMouseDown"
         @model-delete="deleteModelNode"
-        @model-open-file-picker="openModelNodeFilePicker"
-        @model-clear-image="clearModelNodeImage"
-        @model-stage-drop="(event, node) => onModelStageDrop(event, node)"
-        @model-toggle-angle="(node, key) => toggleModelAngle(node, key)"
-        @model-clear-angles="clearModelAngles"
+        @model-update-angle-yaw="onModelNodeUpdateAngleYaw"
+        @model-update-angle-framing="onModelNodeUpdateAngleFraming"
+        @model-update-model-strength="onModelNodeUpdateModelStrength"
+        @model-update-pose-strength="onModelNodeUpdatePoseStrength"
         @model-select-background="onModelNodeSelectBackground"
         @model-generate="handleModelNodeGenerate"
-        @mannequin-node-mousedown="(event, node) => onMannequinNodeMouseDown(event, node)"
-        @mannequin-port-mousedown="onMannequinNodePortMouseDown"
-        @mannequin-delete="deleteMannequinNode"
-        @mannequin-open-file-picker="openMannequinNodeFilePicker"
-        @mannequin-clear-image="clearMannequinNodeImage"
-        @mannequin-stage-drop="(event, node) => handleMannequinStageDrop(event, node)"
-        @mannequin-generate="handleMannequinNodeGenerate"
         @viewpoint-node-mousedown="(event, node) => onViewpointNodeMouseDown(event, node)"
         @viewpoint-port-mousedown="onViewpointNodePortMouseDown"
         @viewpoint-delete="deleteViewpointNode"
-        @viewpoint-open-file-picker="openViewpointNodeFilePicker"
-        @viewpoint-clear-images="clearViewpointNodeImages"
-        @viewpoint-remove-image="(node, index) => removeViewpointNodeImage(node, index)"
-        @viewpoint-stage-drop="(event, node) => handleViewpointStageDrop(event, node)"
         @viewpoint-update-category="(node, category) => setViewpointNodeCategory(node, category)"
-        @viewpoint-toggle-selection="(node, key) => toggleViewpointSelection(node, key)"
+        @viewpoint-select="(node, key) => setViewpointSelection(node, key)"
         @viewpoint-update-lighting="onViewpointNodeUpdateLighting"
         @viewpoint-generate="handleViewpointNodeGenerate"
         @mask-node-mousedown="(event, node) => onMaskNodeMouseDown(event, node)"
@@ -330,7 +284,6 @@
         :enhance-nodes="enhanceNodes"
         :try-on-nodes="tryOnNodes"
         :color-nodes="colorNodes"
-        :generate-nodes="generateNodes"
         :generating="generating"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
@@ -340,10 +293,7 @@
         :get-enhance-node-ui-state="getEnhanceNodeUiState"
         :get-try-on-node-ui-state="getTryOnNodeUiState"
         :get-color-node-ui-state="getColorNodeUiState"
-        :get-generate-node-ui-state="getGenerateNodeUiState"
         :get-node-connection-error-ports="getNodeConnectionErrorPorts"
-        :get-generate-style-options="getGenerateStyleOptions"
-        :is-generate-style-loading="isGenerateStyleLoading"
         @edit-node-mousedown="(event, node) => onEditNodeMouseDown(event, node)"
         @edit-delete="deleteEditNode"
         @edit-update-mode="onEditNodeUpdateMode"
@@ -369,7 +319,6 @@
         @enhance-port-mousedown="onEnhanceNodePortMouseDown"
         @tryon-node-mousedown="(event, node) => onTryOnNodeMouseDown(event, node)"
         @tryon-delete="deleteTryOnNode"
-        @tryon-update-mode="onTryOnNodeUpdateMode"
         @tryon-update-tile-mode="onTryOnNodeUpdateTileMode"
         @tryon-update-rotation="onTryOnNodeUpdateRotation"
         @tryon-update-scale="onTryOnNodeUpdateScale"
@@ -384,15 +333,6 @@
         @color-strength-input="onColorNodeStrengthInput"
         @color-generate="handleColorNodeGenerate"
         @color-port-mousedown="onColorNodePortMouseDown"
-        @generate-node-mousedown="(event, node) => onGenerateNodeMouseDown(event, node)"
-        @generate-delete="deleteGenerateNode"
-        @generate-update-mode="onGenerateNodeUpdateMode"
-        @generate-update-style-model="onGenerateNodeUpdateStyleModel"
-        @generate-update-ratio="onGenerateNodeUpdateRatio"
-        @generate-update-count="onGenerateNodeUpdateCount"
-        @generate-update-quality="onGenerateNodeUpdateQuality"
-        @generate-generate="handleGenerateNodeGenerate"
-        @generate-port-mousedown="onGenerateNodePortMouseDown"
       />
 
        <div 
@@ -528,8 +468,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import type { ComponentPublicInstance, Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMessage, NSpin } from 'naive-ui'
-import { patternStyleApi, segApi, taskApi, styleCardApi, uploadApi, upscaleApi, vectorizeApi } from '../../api/index'
-import type { StyleCard } from '../../api/index'
+import { segApi, taskApi, uploadApi, upscaleApi, vectorizeApi } from '../../api/index'
 import { useUserStore } from '../../stores/user'
 import { CANVAS_NODE_MENU_ITEMS, type CanvasNodeCreateActionKey } from '../../config/canvasNodeMenu'
 import { useCanvasConnections } from '../../composables/useCanvasConnections'
@@ -542,7 +481,6 @@ import { useCanvasNodeUiState } from '../../composables/useCanvasNodeUiState'
 import { useCanvasDirectActions, type SegType } from '../../composables/useCanvasDirectActions'
 import { useGenerationPipeline } from '../../composables/useGenerationPipeline'
 import { useImageNode } from '../../composables/useImageNode'
-import { useMannequinNode } from '../../composables/useMannequinNode'
 import { clampMaskRefineAmount, useMaskNode } from '../../composables/useMaskNode'
 import { useModelNode } from '../../composables/useModelNode'
 import { useNodeExecutors } from '../../composables/useNodeExecutors'
@@ -553,9 +491,11 @@ import HomeCanvasNodesBasic from './home/HomeCanvasNodesBasic.vue'
 import HomeCanvasNodesExecution from './home/HomeCanvasNodesExecution.vue'
 import HomeCanvasNodesStructured from './home/HomeCanvasNodesStructured.vue'
 import {
-  MODEL_ANGLE_OPTIONS,
+  describeViewpointOption,
+  GENERATE_QUALITY_OPTIONS,
   MODEL_BACKGROUND_OPTIONS,
   VIEWPOINT_LIGHTING_LABELS,
+  normalizeViewpointSelectionByCategory,
   VIEWPOINT_OPTIONS_BY_CATEGORY,
 } from '../../components/canvas/nodes/nodeOptionConfig'
 import { normalizeHexColor } from '../../components/canvas/nodes/colorPopoverUtils'
@@ -571,9 +511,7 @@ import {
   createEnhanceNodeAt,
   createEditNodeAt,
   createFusionNodeAt,
-  createGenerateNodeAt,
   createImageNodeAt,
-  createMannequinNodeAt,
   createMaskNodeAt,
   createModelNodeAt,
   createColorNodeAt,
@@ -586,9 +524,15 @@ import {
   ENHANCE_EXTEND_PERCENT_DEFAULT,
   ENHANCE_EXTEND_PERCENT_MAX,
   ENHANCE_EXTEND_PERCENT_MIN,
+  clampTryOnOpacity,
+  clampTryOnRotation,
+  clampTryOnScale,
+  clampModelPoseStrength,
+  clampModelReferenceStrength,
   isCanvasExecutionOutputNodeType,
   isColorNodePlaceholderState,
   MAX_COLOR_NODE_SWATCHES,
+  normalizeTryOnTileMode,
   normalizeColorNodeColors,
   resolveWorkflowNodeOutputStatus,
 } from '../../types/canvasNodes'
@@ -605,10 +549,10 @@ import type {
   EnhanceNodeItem,
   EditNodeItem,
   FusionNodeItem,
-  GenerateNodeItem,
   ImageNodeItem,
-  MannequinNodeItem,
   MaskNodeItem,
+  ModelAngleFraming,
+  ModelAngleSpec,
   ModelNodeItem,
   PromptNodeItem,
   TryOnNodeItem,
@@ -622,33 +566,10 @@ const message = useMessage()
 const userStore = useUserStore()
 const defaultCanvasName = 'Untitled'
 
-const multiAngleLabelMap: Record<string, string> = {
-  front_full: '正面全身',
-  front_left_45: '前左 45°',
-  front_right_45: '前右 45°',
-  left_90: '左侧 90°',
-  right_90: '右侧 90°',
-  back_left_45: '后左 45°',
-  back_right_45: '后右 45°',
-  back_full: '背面全身',
-  front_half: '正面半身',
-  side_half: '侧面半身',
-  portrait: '肖像特写',
-  side_portrait: '侧颜特写',
-}
-
+const patternGenerateQualityOptions = GENERATE_QUALITY_OPTIONS
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
-const modelAngleOptions = MODEL_ANGLE_OPTIONS
 const viewpointLightingLabels = VIEWPOINT_LIGHTING_LABELS
-const viewpointLabelMap = Object.values(VIEWPOINT_OPTIONS_BY_CATEGORY).reduce<Record<string, string>>((acc, options) => {
-  options.forEach((option) => {
-    acc[option.key] = option.label
-  })
-  return acc
-}, {})
 
-const modelDefaultPose = 'runway_stand'
-const modelDefaultExpression = 'cool'
 const nodeImageDragMime = 'application/x-feng-image-url'
 
 // 状态
@@ -673,7 +594,6 @@ const showSettings = ref(false)
 const imageNodes = ref<ImageNodeItem[]>([])
 const promptNodes = ref<PromptNodeItem[]>([])
 const modelNodes = ref<ModelNodeItem[]>([])
-const mannequinNodes = ref<MannequinNodeItem[]>([])
 const viewpointNodes = ref<ViewpointNodeItem[]>([])
 const maskNodes = ref<MaskNodeItem[]>([])
 const colorNodes = ref<ColorNodeItem[]>([])
@@ -681,17 +601,16 @@ const enhanceNodes = ref<EnhanceNodeItem[]>([])
 const editNodes = ref<EditNodeItem[]>([])
 const fusionNodes = ref<FusionNodeItem[]>([])
 const tryOnNodes = ref<TryOnNodeItem[]>([])
-const generateNodes = ref<GenerateNodeItem[]>([])
+const runningExecutionNodeKey = ref<string | null>(null)
+const executionNodeLastRunFailedMap = ref<Record<string, boolean>>({})
 const executionNodeWatchSources = [
   modelNodes,
-  mannequinNodes,
   viewpointNodes,
   colorNodes,
   enhanceNodes,
   editNodes,
   fusionNodes,
   tryOnNodes,
-  generateNodes,
 ] as const
 const connections = ref<CanvasConnection[]>([])
 const processedMaskPreviewUrls = ref<Record<number, string>>({})
@@ -704,9 +623,6 @@ const styleInnovateStrengthPct = computed(() => (styleInnovateStrength.value / 1
 const suppressStyleInnovateClick = ref(false)
 const canvasImageRefs = new Map<number, HTMLImageElement>()
 const styleStrengthMenuGap = 16
-const generateStyleOptions = ref<Record<string, string[]>>({})
-const generateStyleLoading = ref<Record<string, boolean>>({})
-
 let styleStrengthLongPressTimer: number | null = null
 let styleStrengthHideTimer: number | null = null
 let styleStrengthDragging = false
@@ -731,48 +647,10 @@ const editModeMeta = {
   },
 } as const
 
-const tryOnModeMeta = {
-  'fabric-on-body': {
-    feature: 'fabric-on-body',
-    promptPrefix: '[fabric-on-body]',
-    successLabel: 'Fabric try-on',
-  },
-  'pattern-on-body': {
-    feature: 'pattern-on-body',
-    promptPrefix: '[pattern-on-body]',
-    successLabel: 'Pattern try-on',
-  },
-} as const
-
-const generateModeMeta = {
-  'pattern-gen': {
-    feature: 'pattern-gen',
-    promptPrefix: '',
-    successLabel: 'Pattern generate',
-    requiresImage: false,
-    supportsStyleModel: true,
-  },
-  'style-clone': {
-    feature: 'style-clone',
-    promptPrefix: '',
-    successLabel: 'Style clone',
-    requiresImage: true,
-    supportsStyleModel: true,
-  },
-  'seamless-tile-classic': {
-    feature: 'seamless-tile-classic',
-    promptPrefix: '[seamless-tile-classic]',
-    successLabel: 'Tile classic',
-    requiresImage: true,
-    supportsStyleModel: false,
-  },
-  'seamless-tile-cartoon': {
-    feature: 'seamless-tile-cartoon',
-    promptPrefix: '[seamless-tile-cartoon]',
-    successLabel: 'Tile cartoon',
-    requiresImage: true,
-    supportsStyleModel: false,
-  },
+const tryOnFeatureMeta = {
+  feature: 'fabric-on-body',
+  promptPrefix: '[fabric-on-body]',
+  successLabel: 'Wear',
 } as const
 
 const processedMaskPreviewSignatures = new Map<number, string>()
@@ -829,7 +707,6 @@ const {
   activeImageNodeId,
   activePromptNodeId,
   activeModelNodeId,
-  activeMannequinNodeId,
   activeViewpointNodeId,
   activeMaskNodeId,
   activeColorNodeId,
@@ -837,14 +714,12 @@ const {
   activeFusionNodeId,
   activeEnhanceNodeId,
   activeTryOnNodeId,
-  activeGenerateNodeId,
   nodeContextMenu,
   isSelecting,
   selectionRect,
   activateImageNode,
   activatePromptNode,
   activateModelNode,
-  activateMannequinNode,
   activateViewpointNode,
   activateMaskNode,
   activateColorNode,
@@ -852,7 +727,6 @@ const {
   activateFusionNode,
   activateEnhanceNode,
   activateTryOnNode,
-  activateGenerateNode,
   isNodeSelected,
   isNodeDragging,
   closeNodeContextMenu,
@@ -864,7 +738,6 @@ const {
   onImageNodeMouseDown,
   onPromptNodeMouseDown,
   onModelNodeMouseDown,
-  onMannequinNodeMouseDown,
   onViewpointNodeMouseDown,
   onMaskNodeMouseDown,
   onEditNodeMouseDown,
@@ -872,7 +745,6 @@ const {
   onEnhanceNodeMouseDown,
   onTryOnNodeMouseDown,
   onColorNodeMouseDown,
-  onGenerateNodeMouseDown,
   onResizeMouseDown,
   readNodeImageDropPayload,
   handleDrop: handleCanvasDropCore,
@@ -885,7 +757,6 @@ const {
   imageNodes,
   promptNodes,
   modelNodes,
-  mannequinNodes,
   viewpointNodes,
   maskNodes,
   colorNodes,
@@ -893,7 +764,6 @@ const {
   editNodes,
   fusionNodes,
   tryOnNodes,
-  generateNodes,
   activeTool,
   showStyleStrengthControl,
   canvasX,
@@ -914,13 +784,9 @@ const {
   uploadImage: uploadApi.upload,
   importCanvasImageToImageNodeAtPoint: (clientX, clientY, item) => importCanvasImageToImageNodeAtPoint(clientX, clientY, item),
   importCanvasImageToMaskNodeAtPoint: (clientX, clientY, item) => importCanvasImageToMaskNodeAtPoint(clientX, clientY, item),
-  importCanvasImageToModelNodeAtPoint: (clientX, clientY, item) => importCanvasImageToModelNodeAtPoint(clientX, clientY, item),
-  importCanvasImageToMannequinNodeAtPoint: (clientX, clientY, item) => importCanvasImageToMannequinNodeAtPoint(clientX, clientY, item),
-  importCanvasImageToViewpointNodeAtPoint: (clientX, clientY, item) => importCanvasImageToViewpointNodeAtPoint(clientX, clientY, item),
   deleteImageNode,
   deletePromptNode,
   deleteModelNode,
-  deleteMannequinNode,
   deleteViewpointNode,
   deleteMaskNode,
   deleteColorNode,
@@ -928,7 +794,6 @@ const {
   deleteEditNode,
   deleteFusionNode,
   deleteTryOnNode,
-  deleteGenerateNode,
   hasSelectedConnection,
   clearSelectedConnection,
   deleteSelectedConnection,
@@ -987,53 +852,14 @@ const {
 })
 
 const {
-  getModelStageHeight,
-  toggleModelAngle,
-  clearModelAngles,
-  openModelNodeFilePicker,
-  clearModelNodeImage,
-  onModelStageDrop: handleModelStageDrop,
-  importCanvasImageToModelNodeAtPoint,
-} = useModelNode({
-  modelNodes,
-  message,
-  uploadImage: uploadApi.upload,
-  loadImageRatioFromFile,
-  loadImageRatioFromUrl,
-  readNodeImageDropPayload,
-})
+  updateModelAngleYaw,
+  updateModelAngleFraming,
+  clampModelAngleYaw,
+} = useModelNode()
 
 const {
-  getMannequinStageHeight,
-  openMannequinNodeFilePicker,
-  clearMannequinNodeImage,
-  onMannequinStageDrop: handleMannequinStageDrop,
-  importCanvasImageToMannequinNodeAtPoint,
-} = useMannequinNode({
-  mannequinNodes,
-  message,
-  uploadImage: uploadApi.upload,
-  loadImageRatioFromFile,
-  loadImageRatioFromUrl,
-  readNodeImageDropPayload,
-})
-
-const {
-  getViewpointStageHeight,
-  openViewpointNodeFilePicker,
-  clearViewpointNodeImages,
-  removeViewpointNodeImage,
-  onViewpointStageDrop: handleViewpointStageDrop,
-  importCanvasImageToViewpointNodeAtPoint,
-  toggleViewpointSelection,
-} = useViewpointNode({
-  viewpointNodes,
-  message,
-  uploadImage: uploadApi.upload,
-  loadImageRatioFromFile,
-  loadImageRatioFromUrl,
-  readNodeImageDropPayload,
-})
+  setViewpointSelection,
+} = useViewpointNode()
 
 const {
   stopTaskPolling,
@@ -1073,6 +899,10 @@ function cloneNodeOutputImages(outputs: { url: string; ratio: number }[]) {
   return outputs.map(output => ({ ...output }))
 }
 
+function cloneModelAngleSpec(angleSpec: ModelAngleSpec) {
+  return { ...angleSpec }
+}
+
 function toNormalizedColorNode(node: ColorNodeItem): ColorNodeItem {
   const colors = normalizeColorNodeColors(node.colors.map(color => normalizeHexColor(color)))
   return {
@@ -1096,6 +926,7 @@ function markExecutionNodeDirty(
   const node = getExecutionOutputNodeByType(nodeType, nodeId)
   if (!node) return
   setWorkflowNodeOutputStatus(node, node.outputImages.length > 0 ? 'stale' : 'idle')
+  setExecutionNodeLastRunFailed(nodeType, nodeId, false)
 
   getOutgoingConnections(nodeType, nodeId, 'image').forEach((connection) => {
     if (isCanvasExecutionOutputNodeType(connection.toNodeType)) {
@@ -1154,14 +985,63 @@ function appendWorkflowNodeOutputs(
       output.ratio = ratio
     })
   })
+  setExecutionNodeLastRunFailed(nodeType, nodeId, false)
 }
 
-function getModelAngleLabel(key: string): string {
-  return multiAngleLabelMap[key] || key
+function getExecutionNodeStateKey(nodeType: CanvasExecutionOutputNodeType, nodeId: number): string {
+  return `${nodeType}:${nodeId}`
+}
+
+function setExecutionNodeRunning(
+  nodeType: CanvasExecutionOutputNodeType,
+  nodeId: number,
+  running: boolean,
+) {
+  const key = getExecutionNodeStateKey(nodeType, nodeId)
+  if (running) {
+    runningExecutionNodeKey.value = key
+    return
+  }
+  if (runningExecutionNodeKey.value === key) {
+    runningExecutionNodeKey.value = null
+  }
+}
+
+function isExecutionNodeRunning(
+  nodeType: CanvasExecutionOutputNodeType,
+  nodeId: number,
+): boolean {
+  return runningExecutionNodeKey.value === getExecutionNodeStateKey(nodeType, nodeId)
+}
+
+function setExecutionNodeLastRunFailed(
+  nodeType: CanvasExecutionOutputNodeType,
+  nodeId: number,
+  failed: boolean,
+) {
+  const key = getExecutionNodeStateKey(nodeType, nodeId)
+  if (!failed) {
+    if (executionNodeLastRunFailedMap.value[key] == null) return
+    const nextMap = { ...executionNodeLastRunFailedMap.value }
+    delete nextMap[key]
+    executionNodeLastRunFailedMap.value = nextMap
+    return
+  }
+  executionNodeLastRunFailedMap.value = {
+    ...executionNodeLastRunFailedMap.value,
+    [key]: true,
+  }
+}
+
+function isExecutionNodeLastRunFailed(
+  nodeType: CanvasExecutionOutputNodeType,
+  nodeId: number,
+): boolean {
+  return !!executionNodeLastRunFailedMap.value[getExecutionNodeStateKey(nodeType, nodeId)]
 }
 
 function getViewpointLabel(key: string): string {
-  return viewpointLabelMap[key] || key
+  return describeViewpointOption(key)
 }
 
 function getViewpointLightingLabel(key: ViewpointNodeItem['lighting']): string {
@@ -1225,7 +1105,6 @@ function resetEditorState() {
   imageNodes.value = []
   promptNodes.value = []
   modelNodes.value = []
-  mannequinNodes.value = []
   viewpointNodes.value = []
   maskNodes.value = []
   colorNodes.value = []
@@ -1233,7 +1112,8 @@ function resetEditorState() {
   editNodes.value = []
   fusionNodes.value = []
   tryOnNodes.value = []
-  generateNodes.value = []
+  runningExecutionNodeKey.value = null
+  executionNodeLastRunFailedMap.value = {}
   connections.value = []
   processedMaskPreviewUrls.value = {}
   processedMaskPreviewSignatures.clear()
@@ -1289,21 +1169,16 @@ function buildExecutionInputSignatureMap(): Record<string, string> {
 
   modelNodes.value.forEach((node) => {
     result[`model:${node.id}`] = [
-      node.sourceImageUrl,
-      String(node.sourceImageRatio || 1),
-      node.selectedAngles.join(','),
+      `${node.angleSpec.yaw}:${node.angleSpec.framing}`,
+      String(node.modelStrength),
+      String(node.poseStrength),
       node.background,
     ].join('|')
   })
 
-  mannequinNodes.value.forEach((node) => {
-    result[`mannequin:${node.id}`] = [node.sourceImageUrl, String(node.sourceImageRatio || 1)].join('|')
-  })
-
   viewpointNodes.value.forEach((node) => {
     result[`viewpoint:${node.id}`] = [
-      node.sourceImages.map(image => `${image.url}@${image.ratio}`).join(','),
-      node.selectedViewpoints.join(','),
+      node.selectedViewpoint,
       node.lighting,
     ].join('|')
   })
@@ -1339,21 +1214,10 @@ function buildExecutionInputSignatureMap(): Record<string, string> {
 
   tryOnNodes.value.forEach((node) => {
     result[`tryon:${node.id}`] = [
-      node.mode,
       node.tileMode,
       String(node.rotation),
       String(node.scale),
       String(node.opacity),
-    ].join('|')
-  })
-
-  generateNodes.value.forEach((node) => {
-    result[`generate:${node.id}`] = [
-      node.mode,
-      node.styleModel,
-      node.ratio,
-      String(node.count),
-      node.quality,
     ].join('|')
   })
 
@@ -1374,15 +1238,12 @@ function buildExecutionOutputSignatureMap(): Record<string, string> {
   }
 
   assign('model', modelNodes.value)
-  assign('mannequin', mannequinNodes.value)
   assign('viewpoint', viewpointNodes.value)
   assign('color', colorNodes.value)
   assign('edit', editNodes.value)
   assign('fusion', fusionNodes.value)
   assign('enhance', enhanceNodes.value)
   assign('tryon', tryOnNodes.value)
-  assign('generate', generateNodes.value)
-
   return result
 }
 
@@ -1439,6 +1300,8 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
     messages.value = state.messages.map(item => ({ ...item }))
     resetEditorUiState()
     clearAllNodeConnectionErrors()
+    runningExecutionNodeKey.value = null
+    executionNodeLastRunFailedMap.value = {}
 
     imageNodes.value = state.imageNodes.map(node => ({
       ...node,
@@ -1449,20 +1312,16 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
 
     modelNodes.value = state.modelNodes.map(node => ({
       ...node,
+      modelStrength: clampModelReferenceStrength(node.modelStrength),
+      poseStrength: clampModelPoseStrength(node.poseStrength),
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      selectedAngles: [...node.selectedAngles],
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-    mannequinNodes.value = state.mannequinNodes.map(node => ({
-      ...node,
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
+      angleSpec: cloneModelAngleSpec(node.angleSpec),
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
     viewpointNodes.value = state.viewpointNodes.map(node => ({
       ...node,
+      selectedViewpoint: normalizeViewpointSelectionByCategory(node.activeCategory, node.selectedViewpoint),
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      sourceImages: cloneNodeOutputImages(node.sourceImages),
-      selectedViewpoints: [...node.selectedViewpoints],
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
     maskNodes.value = state.maskNodes.map(node => ({
@@ -1493,23 +1352,14 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
     }))
     tryOnNodes.value = state.tryOnNodes.map(node => ({
       ...node,
+      tileMode: normalizeTryOnTileMode(node.tileMode),
       outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      rotation: Math.max(0, Math.min(360, Math.round(node.rotation ?? 0))),
-      scale: Math.max(10, Math.min(300, Math.round(node.scale ?? 100))),
-      opacity: Math.max(0, Math.min(100, Math.round(node.opacity ?? 100))),
+      rotation: clampTryOnRotation(node.rotation),
+      scale: clampTryOnScale(node.scale),
+      opacity: clampTryOnOpacity(node.opacity),
       outputImages: cloneNodeOutputImages(node.outputImages),
     }))
     colorNodes.value = state.colorNodes.map(toNormalizedColorNode)
-    generateNodes.value = state.generateNodes.map(node => ({
-      ...node,
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-    generateNodes.value.forEach((node) => {
-      if (generateModeSupportsStyleModel(node.mode)) {
-        void ensureGenerateStyleOptions(node.mode)
-      }
-    })
     connections.value = state.connections.map(connection => ({ ...connection }))
     clearSelectedConnection()
     clearConnectionDraft()
@@ -1535,17 +1385,11 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
     promptNodes: promptNodes.value.map(node => ({ ...node })),
     modelNodes: modelNodes.value.map(node => ({
       ...node,
-      selectedAngles: [...node.selectedAngles],
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    mannequinNodes: mannequinNodes.value.map(node => ({
-      ...node,
+      angleSpec: cloneModelAngleSpec(node.angleSpec),
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
     viewpointNodes: viewpointNodes.value.map(node => ({
       ...node,
-      sourceImages: cloneNodeOutputImages(node.sourceImages),
-      selectedViewpoints: [...node.selectedViewpoints],
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
     maskNodes: maskNodes.value.map(node => ({ ...node })),
@@ -1563,10 +1407,6 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
     tryOnNodes: tryOnNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    generateNodes: generateNodes.value.map(node => ({
       ...node,
       outputImages: cloneNodeOutputImages(node.outputImages),
     })),
@@ -1745,7 +1585,7 @@ watch(
 )
 
 watch(
-  [messages, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, generateNodes, connections, canvasX, canvasY, zoomLevel],
+  [messages, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, connections, canvasX, canvasY, zoomLevel],
   () => {
     markBoardDirty()
     notifySnapshotChanged()
@@ -1754,7 +1594,7 @@ watch(
 )
 
 watch(
-  [connections, imageNodes, promptNodes, modelNodes, mannequinNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, generateNodes, canvasX, canvasY, zoomLevel],
+  [connections, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, tryOnNodes, canvasX, canvasY, zoomLevel],
   () => {
     refreshRenderedConnections()
   },
@@ -1790,14 +1630,6 @@ function deleteModelNode(id: number) {
   deleteNodeFromCollection(modelNodes, 'model', id, () => {
     if (activeModelNodeId.value === id) {
       activeModelNodeId.value = null
-    }
-  })
-}
-
-function deleteMannequinNode(id: number) {
-  deleteNodeFromCollection(mannequinNodes, 'mannequin', id, () => {
-    if (activeMannequinNodeId.value === id) {
-      activeMannequinNodeId.value = null
     }
   })
 }
@@ -1868,14 +1700,6 @@ function deleteTryOnNode(id: number) {
   })
 }
 
-function deleteGenerateNode(id: number) {
-  deleteNodeFromCollection(generateNodes, 'generate', id, () => {
-    if (activeGenerateNodeId.value === id) {
-      activeGenerateNodeId.value = null
-    }
-  })
-}
-
 function createNodeFromContextMenu<T extends { id: number }>(
   createAt: (point: { x: number; y: number }) => T,
   append: (node: T) => void,
@@ -1899,6 +1723,9 @@ function deleteNodeFromCollection<T extends { id: number }>(
 ) {
   collection.value = collection.value.filter(node => node.id !== id)
   clearNodeConnectionError(nodeType, id)
+  if (isCanvasExecutionOutputNodeType(nodeType)) {
+    setExecutionNodeLastRunFailed(nodeType, id, false)
+  }
   removeConnectionsForNode(nodeType, id)
   removeSelectedNodeKey(nodeType, id)
   afterDelete?.()
@@ -1922,7 +1749,6 @@ const nodeContextMenuHandlers: Record<CanvasNodeCreateActionKey, () => void> = {
   createImageNode: buildNodeCreateHandler(createImageNodeAt, imageNodes, activateImageNode),
   createPromptNode: buildNodeCreateHandler(createPromptNodeAt, promptNodes, activatePromptNode),
   createModelNode: buildNodeCreateHandler(createModelNodeAt, modelNodes, activateModelNode),
-  createMannequinNode: buildNodeCreateHandler(createMannequinNodeAt, mannequinNodes, activateMannequinNode),
   createViewpointNode: buildNodeCreateHandler(createViewpointNodeAt, viewpointNodes, activateViewpointNode),
   createMaskNode: buildNodeCreateHandler(createMaskNodeAt, maskNodes, activateMaskNode),
   createEditNode: buildNodeCreateHandler(createEditNodeAt, editNodes, activateEditNode),
@@ -1930,9 +1756,6 @@ const nodeContextMenuHandlers: Record<CanvasNodeCreateActionKey, () => void> = {
   createEnhanceNode: buildNodeCreateHandler(createEnhanceNodeAt, enhanceNodes, activateEnhanceNode),
   createTryOnNode: buildNodeCreateHandler(createTryOnNodeAt, tryOnNodes, activateTryOnNode),
   createColorNode: buildNodeCreateHandler(createColorNodeAt, colorNodes, activateColorNode),
-  createGenerateNode: buildNodeCreateHandler(createGenerateNodeAt, generateNodes, activateGenerateNode, (newNode) => {
-    void ensureGenerateStyleOptions(newNode.mode)
-  }),
 }
 
 function handleNodeMenuAction(actionKey: CanvasNodeCreateActionKey) {
@@ -1966,11 +1789,6 @@ function onConnectionPathMouseDown(event: MouseEvent, connectionId: number) {
   closeNodeContextMenu()
   clearSelectedConnection()
   selectConnection(connectionId)
-}
-
-function onModelStageDrop(e: DragEvent, node: ModelNodeItem) {
-  isDraggingFile.value = false
-  handleModelStageDrop(e, node)
 }
 
 function onMaskStageDrop(e: DragEvent, node: MaskNodeItem) {
@@ -2125,16 +1943,10 @@ const selectedPreviewItems = computed(() => {
 })
 const visiblePreviewItems = computed(() => selectedPreviewItems.value.slice(0, 6))
 const previewOverflowCount = computed(() => Math.max(0, selectedPreviewItems.value.length - visiblePreviewItems.value.length))
-const promptPlaceholder = computed(() =>
-  selectedIds.value.length > 0
-    ? 'Direct prompt for the selected image'
-    : 'Direct text-to-image prompt'
-)
+const promptPlaceholder = computed(() => 'Pattern generation prompt')
 const hasDirectPrompt = computed(() => !!userPrompt.value.trim())
-const styleCards = ref<StyleCard[]>([])
-const selectedCardIds = ref<number[]>([])
 const selectedRatio = ref('3:4')
-const selectedResolution = ref('1K')
+const selectedQuality = ref<'1k' | '2k' | '4k'>('1k')
 
 function getImageNodeConnectionOutput(node: ImageNodeItem | null): { url: string; ratio: number } | null {
   if (!node) return null
@@ -2291,85 +2103,9 @@ function getMaskNodeEffectiveSource(node: MaskNodeItem): { url: string; ratio: n
   }
 }
 
-function getModelNodeConnectedImageInput(node: ModelNodeItem): { url: string; ratio: number } | null {
-  return getConnectedImageInput('model', node.id, 'image')
-}
-
-function getModelNodeEffectiveSource(node: ModelNodeItem): { url: string; ratio: number; connected: boolean } {
-  const connectedImage = getModelNodeConnectedImageInput(node)
-  if (connectedImage) {
-    return {
-      url: connectedImage.url,
-      ratio: connectedImage.ratio,
-      connected: true,
-    }
-  }
-  return {
-    url: node.sourceImageUrl,
-    ratio: node.sourceImageRatio,
-    connected: false,
-  }
-}
-
-function getMannequinNodeConnectedImageInput(node: MannequinNodeItem): { url: string; ratio: number } | null {
-  return getConnectedImageInput('mannequin', node.id, 'image')
-}
-
-function getMannequinNodeEffectiveSource(node: MannequinNodeItem): { url: string; ratio: number; connected: boolean } {
-  const connectedImage = getMannequinNodeConnectedImageInput(node)
-  if (connectedImage) {
-    return {
-      url: connectedImage.url,
-      ratio: connectedImage.ratio,
-      connected: true,
-    }
-  }
-  return {
-    url: node.sourceImageUrl,
-    ratio: node.sourceImageRatio,
-    connected: false,
-  }
-}
-
-function getMannequinNodeStageHeight(node: MannequinNodeItem): number {
-  const source = getMannequinNodeEffectiveSource(node)
-  return getMannequinStageHeight(node, source.url, source.ratio)
-}
-
-function getViewpointNodeConnectedImageInput(node: ViewpointNodeItem): { url: string; ratio: number } | null {
-  return getConnectedImageInput('viewpoint', node.id, 'image')
-}
-
-function getViewpointNodeEffectiveSource(node: ViewpointNodeItem): { images: { url: string; ratio: number }[]; connected: boolean } {
-  const connectedImage = getViewpointNodeConnectedImageInput(node)
-  if (connectedImage) {
-    return {
-      images: [connectedImage],
-      connected: true,
-    }
-  }
-  return {
-    images: node.sourceImages.map(image => ({
-      url: image.url,
-      ratio: image.ratio,
-    })),
-    connected: false,
-  }
-}
-
-function getViewpointNodeEffectiveSourceImages(node: ViewpointNodeItem) {
-  return getViewpointNodeEffectiveSource(node).images
-}
-
-function getViewpointNodeStageHeight(node: ViewpointNodeItem): number {
-  const source = getViewpointNodeEffectiveSource(node).images[0]
-  return getViewpointStageHeight(node, source?.url ?? '', source?.ratio ?? 1)
-}
-
 function setViewpointNodeCategory(node: ViewpointNodeItem, category: ViewpointNodeItem['activeCategory']) {
   node.activeCategory = category
-  const allowedKeys = new Set((VIEWPOINT_OPTIONS_BY_CATEGORY[category] ?? []).map(option => option.key))
-  node.selectedViewpoints = node.selectedViewpoints.filter(key => allowedKeys.has(key))
+  node.selectedViewpoint = normalizeViewpointSelectionByCategory(category, node.selectedViewpoint)
 }
 
 function getCanvasConnectionNodeByType(
@@ -2387,8 +2123,6 @@ function getCanvasConnectionNodeByType(
       return colorNodes.value.find(item => item.id === nodeId) ?? null
     case 'model':
       return modelNodes.value.find(item => item.id === nodeId) ?? null
-    case 'mannequin':
-      return mannequinNodes.value.find(item => item.id === nodeId) ?? null
     case 'viewpoint':
       return viewpointNodes.value.find(item => item.id === nodeId) ?? null
     case 'edit':
@@ -2399,8 +2133,6 @@ function getCanvasConnectionNodeByType(
       return enhanceNodes.value.find(item => item.id === nodeId) ?? null
     case 'tryon':
       return tryOnNodes.value.find(item => item.id === nodeId) ?? null
-    case 'generate':
-      return generateNodes.value.find(item => item.id === nodeId) ?? null
     default:
       return null
   }
@@ -2419,10 +2151,6 @@ function buildPlacementSource(url: string, x: number, y: number): CanvasImageIte
     y,
     width: 300,
   }
-}
-
-function generateModeSupportsStyleModel(mode: GenerateNodeItem['mode']) {
-  return generateModeMeta[mode].supportsStyleModel
 }
 
 function warnMissingNodeInputs(
@@ -2462,48 +2190,6 @@ function clampEnhanceExtendPercent(value: number): number {
   return Math.max(ENHANCE_EXTEND_PERCENT_MIN, Math.min(ENHANCE_EXTEND_PERCENT_MAX, Math.round(value)))
 }
 
-function getGenerateStyleOptions(mode: GenerateNodeItem['mode']): string[] {
-  return generateStyleOptions.value[mode] ?? []
-}
-
-function isGenerateStyleLoading(mode: GenerateNodeItem['mode']): boolean {
-  return !!generateStyleLoading.value[mode]
-}
-
-async function ensureGenerateStyleOptions(mode: GenerateNodeItem['mode']) {
-  if (!generateModeSupportsStyleModel(mode)) return
-  if (!userStore.isLoggedIn) return
-  if (generateStyleLoading.value[mode]) return
-  if ((generateStyleOptions.value[mode] ?? []).length > 0) return
-  generateStyleLoading.value = { ...generateStyleLoading.value, [mode]: true }
-  try {
-    const res: any = await patternStyleApi.listEnabled(mode)
-    if (res.code === 0) {
-      const names = (res.data?.list || [])
-        .map((item: any) => item?.name)
-        .filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
-      const uniqueNames = Array.from(new Set<string>(names))
-      generateStyleOptions.value = {
-        ...generateStyleOptions.value,
-        [mode]: uniqueNames,
-      }
-    }
-  } catch {
-    // ignore and keep current options empty
-  } finally {
-    generateStyleLoading.value = { ...generateStyleLoading.value, [mode]: false }
-  }
-}
-
-function setGenerateNodeMode(node: GenerateNodeItem, mode: GenerateNodeItem['mode']) {
-  node.mode = mode
-  if (!generateModeSupportsStyleModel(mode)) {
-    node.styleModel = ''
-  } else {
-    void ensureGenerateStyleOptions(mode)
-  }
-}
-
 function getMaskNodeStageHeight(node: MaskNodeItem): number {
   const source = getMaskNodeEffectiveSource(node)
   return getMaskStageHeight({
@@ -2511,21 +2197,6 @@ function getMaskNodeStageHeight(node: MaskNodeItem): number {
     sourceImageUrl: source.url,
     sourceImageRatio: source.ratio,
   })
-}
-
-function getModelNodeStageHeight(node: ModelNodeItem): number {
-  const source = getModelNodeEffectiveSource(node)
-  return getModelStageHeight({
-    ...node,
-    sourceImageUrl: source.url,
-    sourceImageRatio: source.ratio,
-  })
-}
-
-function toggleCard(id: number) {
-  const idx = selectedCardIds.value.indexOf(id)
-  if (idx >= 0) selectedCardIds.value.splice(idx, 1)
-  else selectedCardIds.value.push(id)
 }
 
 function removeColorNodeColor(node: ColorNodeItem, index: number) {
@@ -2571,7 +2242,8 @@ const {
 } = useCanvasNodeUiState({
   getNodeConnectionStatus,
   lookupNodeByType: getCanvasConnectionNodeByType,
-  generateModeSupportsStyleModel,
+  isExecutionNodeRunning,
+  isNodeLastRunFailed: isExecutionNodeLastRunFailed,
 })
 
 function resolveWorkflowPromptText(
@@ -2587,7 +2259,6 @@ const nodeCopyMode = computed(() => isDuplicateModifierPressed.value && activeTo
 const getImageNodeUiState = (node: ImageNodeItem) => getNodeUiState('image', node)
 const getPromptNodeUiState = (node: PromptNodeItem) => getNodeUiState('prompt', node)
 const getModelNodeUiState = (node: ModelNodeItem) => getNodeUiState('model', node)
-const getMannequinNodeUiState = (node: MannequinNodeItem) => getNodeUiState('mannequin', node)
 const getViewpointNodeUiState = (node: ViewpointNodeItem) => getNodeUiState('viewpoint', node)
 const getMaskNodeUiState = (node: MaskNodeItem) => getNodeUiState('mask', node)
 const getEditNodeUiState = (node: EditNodeItem) => getNodeUiState('edit', node)
@@ -2595,7 +2266,6 @@ const getFusionNodeUiState = (node: FusionNodeItem) => getNodeUiState('fusion', 
 const getEnhanceNodeUiState = (node: EnhanceNodeItem) => getNodeUiState('enhance', node)
 const getTryOnNodeUiState = (node: TryOnNodeItem) => getNodeUiState('tryon', node)
 const getColorNodeUiState = (node: ColorNodeItem) => getNodeUiState('color', node)
-const getGenerateNodeUiState = (node: GenerateNodeItem) => getNodeUiState('generate', node)
 
 const onImageNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'image', nodeId, port)
@@ -2603,8 +2273,6 @@ const onPromptNodePortMouseDown = (event: MouseEvent, nodeId: number, port: Canv
   handleConnectionPortMouseDown(event, 'prompt', nodeId, port)
 const onModelNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'model', nodeId, port)
-const onMannequinNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'mannequin', nodeId, port)
 const onViewpointNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'viewpoint', nodeId, port)
 const onMaskNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
@@ -2619,8 +2287,6 @@ const onTryOnNodePortMouseDown = (event: MouseEvent, nodeId: number, port: Canva
   handleConnectionPortMouseDown(event, 'tryon', nodeId, port)
 const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'color', nodeId, port)
-const onGenerateNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'generate', nodeId, port)
 
 function onPromptNodeTextUpdate(node: PromptNodeItem, value: string) {
   node.text = value
@@ -2628,6 +2294,22 @@ function onPromptNodeTextUpdate(node: PromptNodeItem, value: string) {
 
 function onModelNodeSelectBackground(node: ModelNodeItem, key: string) {
   node.background = key
+}
+
+function onModelNodeUpdateAngleYaw(node: ModelNodeItem, value: number) {
+  updateModelAngleYaw(node, clampModelAngleYaw(value))
+}
+
+function onModelNodeUpdateAngleFraming(node: ModelNodeItem, value: ModelAngleFraming) {
+  updateModelAngleFraming(node, value)
+}
+
+function onModelNodeUpdateModelStrength(node: ModelNodeItem, value: number) {
+  node.modelStrength = clampModelReferenceStrength(value)
+}
+
+function onModelNodeUpdatePoseStrength(node: ModelNodeItem, value: number) {
+  node.poseStrength = clampModelPoseStrength(value)
 }
 
 function onViewpointNodeUpdateLighting(node: ViewpointNodeItem, value: ViewpointNodeItem['lighting']) {
@@ -2698,24 +2380,20 @@ function onEnhanceNodeUpdateExtendLeft(node: EnhanceNodeItem, value: number) {
   node.extendLeft = clampEnhanceExtendPercent(value)
 }
 
-function onTryOnNodeUpdateMode(node: TryOnNodeItem, value: TryOnNodeItem['mode']) {
-  node.mode = value
-}
-
 function onTryOnNodeUpdateTileMode(node: TryOnNodeItem, value: TryOnNodeItem['tileMode']) {
-  node.tileMode = value
+  node.tileMode = normalizeTryOnTileMode(value)
 }
 
 function onTryOnNodeUpdateRotation(node: TryOnNodeItem, value: number) {
-  node.rotation = Math.max(0, Math.min(360, Math.round(value)))
+  node.rotation = clampTryOnRotation(value)
 }
 
 function onTryOnNodeUpdateScale(node: TryOnNodeItem, value: number) {
-  node.scale = Math.max(10, Math.min(300, Math.round(value)))
+  node.scale = clampTryOnScale(value)
 }
 
 function onTryOnNodeUpdateOpacity(node: TryOnNodeItem, value: number) {
-  node.opacity = Math.max(0, Math.min(100, Math.round(value)))
+  node.opacity = clampTryOnOpacity(value)
 }
 
 function onColorNodeApplyPreset(node: ColorNodeItem, value: string[]) {
@@ -2727,58 +2405,29 @@ function onColorNodeStrengthInput(node: ColorNodeItem, value: number) {
   node.strength = Math.max(0, Math.min(100, Math.round(value)))
 }
 
-function onGenerateNodeUpdateMode(node: GenerateNodeItem, value: GenerateNodeItem['mode']) {
-  setGenerateNodeMode(node, value)
-}
-
-function onGenerateNodeUpdateStyleModel(node: GenerateNodeItem, value: string) {
-  node.styleModel = value
-}
-
-function onGenerateNodeUpdateRatio(node: GenerateNodeItem, value: GenerateNodeItem['ratio']) {
-  node.ratio = value
-}
-
-function onGenerateNodeUpdateCount(node: GenerateNodeItem, value: GenerateNodeItem['count']) {
-  node.count = value
-}
-
-function onGenerateNodeUpdateQuality(node: GenerateNodeItem, value: GenerateNodeItem['quality']) {
-  node.quality = value
-}
-
 const {
   handleModelNodeGenerate,
-  handleMannequinNodeGenerate,
   handleViewpointNodeGenerate,
   handleEditNodeGenerate,
   handleFusionNodeGenerate,
   handleEnhanceNodeGenerate,
   handleTryOnNodeGenerate,
   handleColorNodeGenerate,
-  handleGenerateNodeGenerate,
 } = useNodeExecutors({
   generating,
   message,
   messages,
   selectedIds,
   imageNodes,
-  modelNodes,
   maskNodes,
   activeImageNodeId,
-  activeModelNodeId,
   activeMaskNodeId,
-  modelDefaultPose,
-  modelDefaultExpression,
   editModeMeta,
-  tryOnModeMeta,
-  generateModeMeta,
-  getModelAngleLabel,
+  tryOnFeatureMeta,
   getViewpointLabel,
   getViewpointLightingLabel,
   getNodeConnectionStatus,
   triggerNodeConnectionError,
-  getModelNodeEffectiveSource,
   resolveNodePromptText: resolveWorkflowPromptText,
   getConnectedOutputImageTarget,
   resolvePreferredOutputNodeId,
@@ -2799,7 +2448,8 @@ const {
   upscaleImage: upscaleApi.upscale,
   segmentImage: segApi.segment,
   saveSegmentResult: segApi.save,
-  generateModeSupportsStyleModel,
+  setExecutionNodeRunning,
+  setExecutionNodeLastRunFailed,
 })
 
 const {
@@ -2813,9 +2463,8 @@ const {
   showStyleStrengthControl,
   hasDirectPrompt,
   showSettings,
-  selectedCardIds,
   selectedRatio,
-  selectedResolution,
+  selectedQuality,
   userPrompt,
   messages,
   styleInnovateStrength,
@@ -2851,12 +2500,6 @@ onMounted(async () => {
       scheduleRenderedConnectionsRefresh()
     })
     return
-  }
-  try {
-    const res: any = await styleCardApi.getEnabled()
-    if (res.code === 0) styleCards.value = res.data.list
-  } catch (error) {
-    console.error('[Home] Failed to load enabled style cards', error)
   }
   addGlobalConnectionListeners()
   nextTick(() => {
@@ -3006,41 +2649,6 @@ onUnmounted(() => {
   color: #6757c8;
 }
 
-.user-avatar-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: hidden;
-  cursor: pointer;
-  border: 1px solid #e2e4e8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f1f3f9;
-  transition: all 0.2s;
-  flex-shrink: 0;
-  color: #5f6368;
-}
-
-.user-avatar-wrap:hover {
-  border-color: #9278e6;
-  background: #fff;
-  color: #9278e6;
-  transform: scale(1.05);
-}
-
-.user-avatar {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.user-avatar-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .floating-toolbar { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: #fff; padding: 8px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #e2e4e8; z-index: 100; }
 .tool-item { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #5f6368; cursor: pointer; }
 .tool-item.active { background: #f1f3f9; color: #9278e6; }
@@ -3077,49 +2685,6 @@ onUnmounted(() => {
 }
 .ratio-btn:hover { border-color: #9278e6; color: #9278e6; }
 .ratio-btn.active { background: #9278e6; color: white; border-color: #9278e6; }
-
-.style-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 12px;
-}
-.style-card-item {
-  position: relative;
-  border-radius: 12px;
-  overflow: hidden;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: all 0.2s;
-  background: #f1f3f9;
-}
-.style-card-item.active { border-color: #9278e6; }
-.card-preview { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
-.card-info {
-  padding: 20px 8px 6px;
-  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-}
-.card-name { color: white; font-size: 11px; font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-check {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 18px;
-  height: 18px;
-  background: #9278e6;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transform: scale(0.8);
-  transition: all 0.2s;
-}
-.style-card-item.active .card-check { opacity: 1; transform: scale(1); }
 
 .slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .slide-up-enter-from, .slide-up-leave-to { opacity: 0; transform: translateY(20px); }

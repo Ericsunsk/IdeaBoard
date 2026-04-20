@@ -6,9 +6,7 @@ import type {
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
-  GenerateNodeItem,
   ImageNodeItem,
-  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
@@ -16,12 +14,11 @@ import type {
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
-type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'generate'
+type NodeDragKind = 'image' | 'prompt' | 'model' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon'
 type DraggableNode =
   | ImageNodeItem
   | PromptNodeItem
   | ModelNodeItem
-  | MannequinNodeItem
   | ViewpointNodeItem
   | MaskNodeItem
   | ColorNodeItem
@@ -29,7 +26,6 @@ type DraggableNode =
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | GenerateNodeItem
 type PendingInteraction = 'pan' | 'select' | 'item-drag' | 'node-drag' | 'resize'
 
 const POINTER_INTERACTION_THRESHOLD = 4
@@ -43,7 +39,6 @@ interface UseCanvasPointerInteractionsOptions {
   imageNodes: Ref<ImageNodeItem[]>
   promptNodes: Ref<PromptNodeItem[]>
   modelNodes: Ref<ModelNodeItem[]>
-  mannequinNodes: Ref<MannequinNodeItem[]>
   viewpointNodes: Ref<ViewpointNodeItem[]>
   maskNodes: Ref<MaskNodeItem[]>
   colorNodes: Ref<ColorNodeItem[]>
@@ -51,7 +46,6 @@ interface UseCanvasPointerInteractionsOptions {
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
-  generateNodes: Ref<GenerateNodeItem[]>
   activeTool: Ref<string>
   showStyleStrengthControl: Ref<boolean>
   canvasX: Ref<number>
@@ -64,7 +58,6 @@ interface UseCanvasPointerInteractionsOptions {
   activeImageNodeId: Ref<number | null>
   activePromptNodeId: Ref<number | null>
   activeModelNodeId: Ref<number | null>
-  activeMannequinNodeId: Ref<number | null>
   activeViewpointNodeId: Ref<number | null>
   activeMaskNodeId: Ref<number | null>
   activeColorNodeId: Ref<number | null>
@@ -72,7 +65,6 @@ interface UseCanvasPointerInteractionsOptions {
   activeFusionNodeId: Ref<number | null>
   activeEnhanceNodeId: Ref<number | null>
   activeTryOnNodeId: Ref<number | null>
-  activeGenerateNodeId: Ref<number | null>
   isPanning: Ref<boolean>
   isSelecting: Ref<boolean>
   isDraggingItem: Ref<boolean>
@@ -97,9 +89,6 @@ interface UseCanvasPointerInteractionsOptions {
   endHistoryBatch: (commit?: boolean) => void
   importCanvasImageToImageNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
   importCanvasImageToMaskNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
-  importCanvasImageToModelNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
-  importCanvasImageToMannequinNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
-  importCanvasImageToViewpointNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
   message: MessageApiLike
 }
 
@@ -176,14 +165,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       return {
         ...node,
         id: createCanvasEntityId(),
-        selectedAngles: [...node.selectedAngles],
-        outputImages: node.outputImages.map(output => ({ ...output })),
-      }
-    }
-    if (node.type === 'mannequin') {
-      return {
-        ...node,
-        id: createCanvasEntityId(),
+        angleSpec: { ...node.angleSpec },
         outputImages: node.outputImages.map(output => ({ ...output })),
       }
     }
@@ -191,8 +173,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       return {
         ...node,
         id: createCanvasEntityId(),
-        sourceImages: node.sourceImages.map(image => ({ ...image })),
-        selectedViewpoints: [...node.selectedViewpoints],
         outputImages: node.outputImages.map(output => ({ ...output })),
       }
     }
@@ -220,8 +200,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       node.type === 'edit' ||
       node.type === 'fusion' ||
       node.type === 'enhance' ||
-      node.type === 'tryon' ||
-      node.type === 'generate'
+      node.type === 'tryon'
     ) {
       return {
         ...node,
@@ -270,15 +249,13 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       if (kind === 'image') options.imageNodes.value.push(duplicate as ImageNodeItem)
       else if (kind === 'prompt') options.promptNodes.value.push(duplicate as PromptNodeItem)
       else if (kind === 'model') options.modelNodes.value.push(duplicate as ModelNodeItem)
-      else if (kind === 'mannequin') options.mannequinNodes.value.push(duplicate as MannequinNodeItem)
       else if (kind === 'viewpoint') options.viewpointNodes.value.push(duplicate as ViewpointNodeItem)
       else if (kind === 'mask') options.maskNodes.value.push(duplicate as MaskNodeItem)
       else if (kind === 'color') options.colorNodes.value.push(duplicate as ColorNodeItem)
       else if (kind === 'edit') options.editNodes.value.push(duplicate as EditNodeItem)
       else if (kind === 'fusion') options.fusionNodes.value.push(duplicate as FusionNodeItem)
       else if (kind === 'enhance') options.enhanceNodes.value.push(duplicate as EnhanceNodeItem)
-      else if (kind === 'tryon') options.tryOnNodes.value.push(duplicate as TryOnNodeItem)
-      else options.generateNodes.value.push(duplicate as GenerateNodeItem)
+      else options.tryOnNodes.value.push(duplicate as TryOnNodeItem)
 
       const duplicateKey = options.getNodeSelectionKey(kind as NodeDragKind, duplicate.id)
       nextSelectionKeys.push(duplicateKey)
@@ -526,10 +503,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     beginNodeDrag('model', node, e)
   }
 
-  function onMannequinNodeMouseDown(e: MouseEvent, node: MannequinNodeItem) {
-    beginNodeDrag('mannequin', node, e)
-  }
-
   function onViewpointNodeMouseDown(e: MouseEvent, node: ViewpointNodeItem) {
     beginNodeDrag('viewpoint', node, e)
   }
@@ -556,10 +529,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
 
   function onTryOnNodeMouseDown(e: MouseEvent, node: TryOnNodeItem) {
     beginNodeDrag('tryon', node, e)
-  }
-
-  function onGenerateNodeMouseDown(e: MouseEvent, node: GenerateNodeItem) {
-    beginNodeDrag('generate', node, e)
   }
 
   function applyNodeDragFrame() {
@@ -770,27 +739,14 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       const importedToMask = importedToImageNode
         ? false
         : options.importCanvasImageToMaskNodeAtPoint(e.clientX, e.clientY, draggedCanvasItem)
-      const importedToModel = importedToImageNode || importedToMask
-        ? false
-        : options.importCanvasImageToModelNodeAtPoint(e.clientX, e.clientY, draggedCanvasItem)
-      const importedToMannequin = importedToImageNode || importedToMask || importedToModel
-        ? false
-        : options.importCanvasImageToMannequinNodeAtPoint(e.clientX, e.clientY, draggedCanvasItem)
-      const importedToViewpoint = importedToImageNode || importedToMask || importedToModel || importedToMannequin
-        ? false
-        : options.importCanvasImageToViewpointNodeAtPoint(e.clientX, e.clientY, draggedCanvasItem)
 
-      if (importedToImageNode || importedToMask || importedToModel || importedToMannequin || importedToViewpoint) {
+      if (importedToImageNode || importedToMask) {
         draggedCanvasItem.x = initialX
         draggedCanvasItem.y = initialY
         if (importedToImageNode) {
           options.message.success('已导入 Image 节点')
-        } else if (importedToMannequin) {
-          options.message.success('已导入人台节点')
-        } else if (importedToViewpoint) {
-          options.message.success('已导入 Viewpoint 节点')
         } else {
-          options.message.success(importedToMask ? '已导入 Mask 节点' : '已导入为模特图')
+          options.message.success('已导入 Mask 节点')
         }
       }
     }
@@ -832,7 +788,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     onImageNodeMouseDown,
     onPromptNodeMouseDown,
     onModelNodeMouseDown,
-    onMannequinNodeMouseDown,
     onViewpointNodeMouseDown,
     onMaskNodeMouseDown,
     onColorNodeMouseDown,
@@ -840,7 +795,6 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     onFusionNodeMouseDown,
     onEnhanceNodeMouseDown,
     onTryOnNodeMouseDown,
-    onGenerateNodeMouseDown,
     onResizeMouseDown,
   }
 }

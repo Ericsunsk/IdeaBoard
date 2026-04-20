@@ -53,6 +53,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { NInput, NButton, useMessage } from 'naive-ui'
 import { featurePromptApi } from '../../api'
+import { TRYON_TILE_MODE_TEMPLATE_DESC } from '../../components/canvas/nodes/nodeOptionConfig'
 
 const message = useMessage()
 
@@ -72,17 +73,12 @@ const featureList = [
   { slug: 'style-fusion', title: 'Fusion · 双图融合' },
   { slug: 'series-color', title: 'Color · 多色配色' },
   { slug: 'directed-recolor', title: 'Color · 单色换色' },
-  { slug: 'fabric-on-body', title: 'TryOn · 面料上身' },
-  { slug: 'pattern-on-body', title: 'TryOn · 图案上身' },
-  { slug: 'multi-angle', title: 'Model · 多角度' },
-  { slug: 'virtual-3d', title: 'Viewpoint · 虚拟 3D' },
-  { slug: 'mannequin-to-model', title: 'Mannequin · 人台变模特' },
+  { slug: 'fabric-on-body', title: 'Wear · 上身贴合' },
+  { slug: 'multi-angle', title: 'Model · 视角控制（看画布输入口）' },
+  { slug: 'virtual-3d', title: 'Display · 商品展示' },
   { slug: 'face-swap', title: 'Edit · 定向换脸' },
   { slug: 'bg-swap', title: 'Edit · 换背景' },
-  { slug: 'pattern-gen', title: 'Generate · 图案生成' },
-  { slug: 'style-clone', title: 'Generate · 画风复刻' },
-  { slug: 'seamless-tile-classic', title: 'Generate · 四方连续 Classic' },
-  { slug: 'seamless-tile-cartoon', title: 'Generate · 四方连续 Cartoon' },
+  { slug: 'pattern-gen', title: 'Pattern · 图案生成' },
   { slug: 'to-vector', title: 'Quick · 转矢量图' },
   { slug: 'remove-bg', title: 'Quick · 抠图褪底' },
   { slug: 'hd-upscale', title: 'Enhance · 高清放大' },
@@ -110,30 +106,26 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词（单色模式可选）' },
   ],
   'fabric-on-body': [
-    { key: '{{tile_mode}}', desc: '替换方式（seamless=四方连续 / single=非四方连续）' },
-    { key: '{{fabric_rotation}}', desc: '面料旋转角度（0-360）' },
-    { key: '{{fabric_scale}}', desc: '面料大小百分比（10-300）' },
-    { key: '{{fabric_opacity}}', desc: '面料透明度百分比（0-100）' },
-  ],
-  'pattern-on-body': [
-    { key: '{{tile_mode}}', desc: '替换方式（seamless=四方连续 / single=非四方连续）' },
-    { key: '{{fabric_rotation}}', desc: '图案旋转角度（0-360）' },
-    { key: '{{fabric_scale}}', desc: '图案大小百分比（10-300）' },
-    { key: '{{fabric_opacity}}', desc: '图案透明度百分比（0-100）' },
+    { key: '{{tile_mode}}', desc: TRYON_TILE_MODE_TEMPLATE_DESC },
+    { key: '{{fabric_rotation}}', desc: 'Texture 方向角度（0-360）' },
+    { key: '{{fabric_scale}}', desc: 'Texture 大小百分比（10-300）' },
+    { key: '{{fabric_opacity}}', desc: 'Texture 融合强度百分比（0-100）' },
+    { key: '{{original_image_url}}', desc: 'Body 原图 URL（由 Wear 节点 Image 输入自动传入，无需手填）' },
+    { key: '{{mask_image_url}}', desc: 'Mask 节点输出上传后的 URL（连接 Mask 时自动传入，无需手填）' },
+    { key: '{{use_mask}}', desc: '是否启用蒙版（canonical，连接 Mask 时自动为 true，无需手填）' },
   ],
   'multi-angle': [
-    { key: '{{angles}}', desc: 'Model 节点勾选角度（逗号分隔）' },
-    { key: '{{pose}}', desc: '系统默认姿势' },
-    { key: '{{expression}}', desc: '系统默认表情' },
-    { key: '{{background}}', desc: 'Model 节点背景（original / studio）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点或底部兜底提示词' },
+    { key: '{{angle_spec}}', desc: '视角控制参数（JSON，系统按它决定 yaw 与景别）' },
+    { key: '{{model_url}}', desc: '画布里接到 Model 输入口的参考图（系统自动传值）' },
+    { key: '{{model_strength}}', desc: 'Model 输入口权重（0-100，越高越贴近参考图主体）' },
+    { key: '{{pose_url}}', desc: '画布里接到 Pose 输入口的姿态参考图（系统自动传值）' },
+    { key: '{{pose_strength}}', desc: 'Pose 输入口权重（0-100，越高越跟随姿态）' },
+    { key: '{{background}}', desc: 'Model 节点背景参数（original / studio）' },
+    { key: '{{user_prompt}}', desc: 'Prompt 输入口文本（弱修饰，用于氛围和细节）' },
   ],
   'virtual-3d': [
-    { key: '{{viewpoints}}', desc: 'Viewpoint 节点勾选视角（逗号分隔）' },
-    { key: '{{lighting}}', desc: 'Viewpoint 节点光影（warm_white / afternoon / hard_light）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点或底部兜底提示词' },
-  ],
-  'mannequin-to-model': [
+    { key: '{{viewpoint}}', desc: 'Display 节点所选展示视角，系统会自动转换成中文描述（如：45° 侧视）' },
+    { key: '{{lighting}}', desc: 'Display 节点光影（暖白 / 午后 / 硬光）' },
     { key: '{{user_prompt}}', desc: 'Prompt 节点或底部兜底提示词' },
   ],
   'face-swap': noVars,
@@ -141,18 +133,7 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{user_prompt}}', desc: 'Prompt 节点或底部兜底提示词（可选）' },
   ],
   'pattern-gen': [
-    { key: '{{style_model}}', desc: 'Generate 节点选择的 Style' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点提示词' },
-  ],
-  'style-clone': [
-    { key: '{{style_model}}', desc: 'Generate 节点选择的 Style' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点提示词' },
-  ],
-  'seamless-tile-classic': [
-    { key: '{{user_prompt}}', desc: '用户提示词' },
-  ],
-  'seamless-tile-cartoon': [
-    { key: '{{user_prompt}}', desc: '用户提示词' },
+    { key: '{{user_prompt}}', desc: '底部输入栏提交的图案生成提示词' },
   ],
   'style-fusion': [
     { key: '{{user_prompt}}', desc: '用于弱修饰/辅助修饰融合方式、质感、细节、氛围；Image A / Image B 主次建议通过滑块控制' },

@@ -126,10 +126,13 @@
       </div>
 
       <NodeConnectionChips :items="connectionChips" />
+      <div v-if="uiState?.secondaryStatus" class="node-secondary-status">
+        {{ uiState.secondaryStatus }}
+      </div>
 
       <div class="node-primary-action-slot">
         <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
-          {{ uiState?.primaryAction?.label || (singleColorMode ? '应用换色' : '生成') }}
+          {{ uiState?.primaryAction?.label || '应用' }}
         </NodeActionButton>
       </div>
     </div>
@@ -145,10 +148,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import {
-  isColorSingleColorMode,
-  MAX_COLOR_NODE_SWATCHES,
-} from '../../../types/canvasNodes'
+import { MAX_COLOR_NODE_SWATCHES } from '../../../types/canvasNodes'
 import type { ColorNodeItem } from '../../../types/canvasNodes'
 import type { NodeUiState } from '../../../types/canvasNodeUi'
 import { useColorPickerState } from '../../../composables/useColorPickerState'
@@ -198,7 +198,6 @@ const customColor = ref(DEFAULT_COLOR_HEX)
 const isPopoverOpen = ref(false)
 const colorFieldRef = ref<HTMLElement | null>(null)
 const eyedropperSupported = isEyeDropperSupported()
-const singleColorMode = computed(() => isColorSingleColorMode(props.node))
 const hasSelectedColors = computed(() => props.node.colors.length > 0)
 const io = computed(() =>
   buildNodeIoFromSlots(COLOR_NODE_IO_SLOTS, null, {

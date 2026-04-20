@@ -69,7 +69,6 @@
       :error-port-keys="getNodeConnectionErrorPorts('tryon', node.id)"
       @node-mousedown="emit('tryon-node-mousedown', $event, node)"
       @delete="emit('tryon-delete', node.id)"
-      @update:mode="emit('tryon-update-mode', node, $event)"
       @update:tile-mode="emit('tryon-update-tile-mode', node, $event)"
       @update:rotation="emit('tryon-update-rotation', node, $event)"
       @update:scale="emit('tryon-update-scale', node, $event)"
@@ -99,42 +98,18 @@
     />
   </template>
 
-  <template v-for="node in generateNodes" :key="node.id">
-    <GenerateNode
-      :node="node"
-      :active="isNodeSelected('generate', node.id)"
-      :dragging="isNodeDragging('generate', node.id)"
-      :copy-mode="copyMode"
-      :generating="generating"
-      :ui-state="getGenerateNodeUiState(node)"
-      :error-port-keys="getNodeConnectionErrorPorts('generate', node.id)"
-      :style-options="getGenerateStyleOptions(node.mode)"
-      :styles-loading="isGenerateStyleLoading(node.mode)"
-      @node-mousedown="emit('generate-node-mousedown', $event, node)"
-      @delete="emit('generate-delete', node.id)"
-      @update:mode="emit('generate-update-mode', node, $event)"
-      @update:style-model="emit('generate-update-style-model', node, $event)"
-      @update:ratio="emit('generate-update-ratio', node, $event)"
-      @update:count="emit('generate-update-count', node, $event)"
-      @update:quality="emit('generate-update-quality', node, $event)"
-      @generate="emit('generate-generate', node)"
-      @port-mousedown="(event, port) => emit('generate-port-mousedown', event, node.id, port)"
-    />
-  </template>
 </template>
 
 <script setup lang="ts">
 import EditNode from '../../../components/canvas/nodes/EditNode.vue'
 import EnhanceNode from '../../../components/canvas/nodes/EnhanceNode.vue'
 import FusionNode from '../../../components/canvas/nodes/FusionNode.vue'
-import GenerateNode from '../../../components/canvas/nodes/GenerateNode.vue'
 import ColorNode from '../../../components/canvas/nodes/ColorNode.vue'
 import TryOnNode from '../../../components/canvas/nodes/TryOnNode.vue'
 import type {
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
-  GenerateNodeItem,
   ColorNodeItem,
   TryOnNodeItem,
 } from '../../../types/canvasNodes'
@@ -146,15 +121,14 @@ const props = defineProps<{
   enhanceNodes: EnhanceNodeItem[]
   tryOnNodes: TryOnNodeItem[]
   colorNodes: ColorNodeItem[]
-  generateNodes: GenerateNodeItem[]
   generating: boolean
   copyMode: boolean
   isNodeSelected: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color',
     id: number,
   ) => boolean
   isNodeDragging: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color',
     id: number,
   ) => boolean
   getEditNodeUiState: (node: EditNodeItem) => NodeUiState | undefined
@@ -162,13 +136,10 @@ const props = defineProps<{
   getEnhanceNodeUiState: (node: EnhanceNodeItem) => NodeUiState | undefined
   getTryOnNodeUiState: (node: TryOnNodeItem) => NodeUiState | undefined
   getColorNodeUiState: (node: ColorNodeItem) => NodeUiState | undefined
-  getGenerateNodeUiState: (node: GenerateNodeItem) => NodeUiState | undefined
   getNodeConnectionErrorPorts: (
-    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color' | 'generate',
+    kind: 'edit' | 'fusion' | 'enhance' | 'tryon' | 'color',
     id: number,
   ) => string[]
-  getGenerateStyleOptions: (mode: GenerateNodeItem['mode']) => string[]
-  isGenerateStyleLoading: (mode: GenerateNodeItem['mode']) => boolean
 }>()
 
 const emit = defineEmits<{
@@ -200,7 +171,6 @@ const emit = defineEmits<{
 
   (e: 'tryon-node-mousedown', event: MouseEvent, node: TryOnNodeItem): void
   (e: 'tryon-delete', nodeId: number): void
-  (e: 'tryon-update-mode', node: TryOnNodeItem, value: TryOnNodeItem['mode']): void
   (e: 'tryon-update-tile-mode', node: TryOnNodeItem, value: TryOnNodeItem['tileMode']): void
   (e: 'tryon-update-rotation', node: TryOnNodeItem, value: number): void
   (e: 'tryon-update-scale', node: TryOnNodeItem, value: number): void
@@ -216,15 +186,5 @@ const emit = defineEmits<{
   (e: 'color-strength-input', node: ColorNodeItem, value: number): void
   (e: 'color-generate', node: ColorNodeItem): void
   (e: 'color-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
-
-  (e: 'generate-node-mousedown', event: MouseEvent, node: GenerateNodeItem): void
-  (e: 'generate-delete', nodeId: number): void
-  (e: 'generate-update-mode', node: GenerateNodeItem, value: GenerateNodeItem['mode']): void
-  (e: 'generate-update-style-model', node: GenerateNodeItem, value: string): void
-  (e: 'generate-update-ratio', node: GenerateNodeItem, value: GenerateNodeItem['ratio']): void
-  (e: 'generate-update-count', node: GenerateNodeItem, value: GenerateNodeItem['count']): void
-  (e: 'generate-update-quality', node: GenerateNodeItem, value: GenerateNodeItem['quality']): void
-  (e: 'generate-generate', node: GenerateNodeItem): void
-  (e: 'generate-port-mousedown', event: MouseEvent, nodeId: number, port: string): void
 }>()
 </script>

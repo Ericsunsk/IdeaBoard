@@ -267,32 +267,6 @@ export const bgTemplateApi = {
     api.delete('/admin/bg-templates/' + id) as any,
 }
 
-export const modelTemplateApi = {
-  listEnabled: (): Promise<ApiResponse<{ list: any[] }>> =>
-    api.get('/user/model-templates') as any,
-  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: any[]; total: number }>> =>
-    api.get('/admin/model-templates', { params }) as any,
-  adminCreate: (data: any): Promise<ApiResponse<{ model: any }>> =>
-    api.post('/admin/model-templates', data) as any,
-  adminUpdate: (id: number, data: any): Promise<ApiResponse<null>> =>
-    api.put('/admin/model-templates/' + id, data) as any,
-  adminDelete: (id: number): Promise<ApiResponse<null>> =>
-    api.delete('/admin/model-templates/' + id) as any,
-}
-
-export const poseTemplateApi = {
-  listEnabled: (): Promise<ApiResponse<{ list: any[] }>> =>
-    api.get('/user/pose-templates') as any,
-  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: any[]; total: number }>> =>
-    api.get('/admin/pose-templates', { params }) as any,
-  adminCreate: (data: any): Promise<ApiResponse<{ pose: any }>> =>
-    api.post('/admin/pose-templates', data) as any,
-  adminUpdate: (id: number, data: any): Promise<ApiResponse<null>> =>
-    api.put('/admin/pose-templates/' + id, data) as any,
-  adminDelete: (id: number): Promise<ApiResponse<null>> =>
-    api.delete('/admin/pose-templates/' + id) as any,
-}
-
 export const patternStyleApi = {
   listEnabled: (category?: string): Promise<ApiResponse<{ list: any[] }>> =>
     api.get('/user/pattern-styles', { params: category ? { category } : {} }) as any,

@@ -14,17 +14,12 @@ const CURRENT_PREFIX_LABELS: Record<string, string> = {
   'style-fusion': '双图融合',
   'series-color': '系列配色',
   'directed-recolor': '定向换色',
-  'fabric-on-body': '面料上身',
-  'pattern-on-body': '图案上身',
-  'multi-angle': '模特多角度',
-  'virtual-3d': '虚拟 3D',
-  'mannequin-to-model': '人台变模特',
+  'fabric-on-body': 'Wear 上身',
+  'multi-angle': '模特视角',
+  'virtual-3d': '商品展示',
   'face-swap': '定向换脸',
   'bg-swap': '换背景',
   'pattern-gen': '图案生成',
-  'style-clone': '画风复刻',
-  'seamless-tile-classic': '四方连续',
-  'seamless-tile-cartoon': '四方连续',
   'pattern-upscale': '图案变清晰',
   'to-vector': '转矢量图',
   'remove-bg': '抠图褪底',
@@ -41,6 +36,9 @@ function normalizeGroupKey(prefix: string | null): string {
     prefix === 'craft-fusion-style'
   ) {
     return 'style-fusion'
+  }
+  if (prefix === 'pattern-on-body') {
+    return 'fabric-on-body'
   }
   return prefix || '__text2img__'
 }

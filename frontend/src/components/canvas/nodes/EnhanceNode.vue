@@ -140,10 +140,13 @@
       </div>
 
       <NodeConnectionChips :items="connectionChips" />
+      <div v-if="uiState?.secondaryStatus" class="node-secondary-status">
+        {{ uiState.secondaryStatus }}
+      </div>
 
       <div class="node-primary-action-slot">
         <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
-          {{ uiState?.primaryAction?.label || '生成' }}
+          {{ uiState?.primaryAction?.label || '增强' }}
         </NodeActionButton>
       </div>
     </div>

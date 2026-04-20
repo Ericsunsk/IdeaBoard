@@ -5,9 +5,7 @@ import type {
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
-  GenerateNodeItem,
   ImageNodeItem,
-  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
@@ -24,13 +22,11 @@ export type CanvasConnectionContractNode =
   | MaskNodeItem
   | ColorNodeItem
   | ModelNodeItem
-  | MannequinNodeItem
   | ViewpointNodeItem
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | GenerateNodeItem
 
 export interface CanvasNodePortContract {
   port: CanvasConnectionPort
@@ -76,10 +72,6 @@ export function getEditNodePortLabel(
   }
 }
 
-export function generateModeRequiresImage(mode: GenerateNodeItem['mode']) {
-  return mode !== 'pattern-gen'
-}
-
 function input(
   port: CanvasConnectionPort,
   kind: CanvasConnectionKind,
@@ -109,7 +101,7 @@ export function getCanvasNodePortContracts(
     case 'mask':
       return [input('image', 'image', true), output('mask', 'mask')]
     case 'model':
-    case 'mannequin':
+      return [input('image', 'image', true), input('imageA', 'image', true), input('imageB', 'image'), input('prompt', 'prompt'), output('image', 'image')]
     case 'viewpoint':
       return [input('image', 'image', true), input('prompt', 'prompt'), output('image', 'image')]
     case 'edit': {
@@ -141,7 +133,12 @@ export function getCanvasNodePortContracts(
       ]
     }
     case 'tryon':
-      return [input('imageA', 'image', true), input('imageB', 'image', true), output('image', 'image')]
+      return [
+        input('imageA', 'image', true),
+        input('imageB', 'image', true),
+        input('mask', 'mask', false),
+        output('image', 'image'),
+      ]
     case 'color':
       return [
         input('image', 'image', true),
@@ -149,14 +146,6 @@ export function getCanvasNodePortContracts(
         input('prompt', 'prompt'),
         output('image', 'image'),
       ]
-    case 'generate': {
-      const generateNode = node as GenerateNodeItem
-      return [
-        input('image', 'image', generateModeRequiresImage(generateNode.mode)),
-        input('prompt', 'prompt', true),
-        output('image', 'image'),
-      ]
-    }
     default:
       return []
   }

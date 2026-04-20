@@ -24,6 +24,7 @@ interface MessageApiLike {
 interface SubmitTaskAndPollOptions {
   request: {
     prompt: string
+    feature?: string
     card_ids?: number[]
     params?: Record<string, unknown>
   }
@@ -40,9 +41,8 @@ interface UseCanvasDirectActionsOptions {
   showStyleStrengthControl: Ref<boolean>
   hasDirectPrompt: ComputedRef<boolean>
   showSettings: Ref<boolean>
-  selectedCardIds: Ref<number[]>
   selectedRatio: Ref<string>
-  selectedResolution: Ref<string>
+  selectedQuality: Ref<'1k' | '2k' | '4k'>
   userPrompt: Ref<string>
   messages: Ref<CanvasImageItem[]>
   styleInnovateStrength: Ref<number>
@@ -95,10 +95,11 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
     await options.submitTaskAndPoll({
       request: {
         prompt: promptText,
-        card_ids: options.selectedCardIds.value,
+        feature: 'pattern-gen',
         params: {
+          feature: 'pattern-gen',
           ratio: options.selectedRatio.value,
-          resolution: options.selectedResolution.value,
+          quality: options.selectedQuality.value,
         },
       },
       successMessage: '任务已提交',

@@ -36,7 +36,7 @@ func main() {
 			log.Fatalf("Failed to connect to database: %v", err)
 		}
 
-		db.AutoMigrate(&model.User{}, &model.ApiAccount{}, &model.Task{}, &model.StyleCard{}, &model.Channel{}, &model.SystemConfig{}, &model.LineDraftMode{}, &model.FaceTemplate{}, &model.BgTemplate{}, &model.ModelTemplate{}, &model.PoseTemplate{}, &model.PatternStyle{})
+		db.AutoMigrate(&model.User{}, &model.ApiAccount{}, &model.Task{}, &model.StyleCard{}, &model.Channel{}, &model.SystemConfig{}, &model.LineDraftMode{}, &model.FaceTemplate{}, &model.BgTemplate{}, &model.PatternStyle{})
 
 		userRepo := repository.NewUserRepository(db)
 		userService := service.NewUserService(userRepo)
@@ -68,7 +68,7 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	db.AutoMigrate(&model.User{}, &model.ApiAccount{}, &model.Task{}, &model.StyleCard{}, &model.Channel{}, &model.SystemConfig{}, &model.LineDraftMode{}, &model.FaceTemplate{}, &model.BgTemplate{}, &model.ModelTemplate{}, &model.PoseTemplate{}, &model.PatternStyle{})
+	db.AutoMigrate(&model.User{}, &model.ApiAccount{}, &model.Task{}, &model.StyleCard{}, &model.Channel{}, &model.SystemConfig{}, &model.LineDraftMode{}, &model.FaceTemplate{}, &model.BgTemplate{}, &model.PatternStyle{})
 
 	// Auto-fix admin role on startup
 	userRepoForInit := repository.NewUserRepository(db)
@@ -93,8 +93,6 @@ func main() {
 	lineDraftModeRepo := repository.NewLineDraftModeRepository(db)
 	faceTemplateRepo := repository.NewFaceTemplateRepository(db)
 	bgTemplateRepo := repository.NewBgTemplateRepository(db)
-	modelTemplateRepo := repository.NewModelTemplateRepository(db)
-	poseTemplateRepo := repository.NewPoseTemplateRepository(db)
 	patternStyleRepo := repository.NewPatternStyleRepository(db)
 
 	userService := service.NewUserService(userRepo)
@@ -115,8 +113,6 @@ func main() {
 	featurePromptHandler := handler.NewFeaturePromptHandler(systemConfigRepo)
 	faceTemplateHandler := handler.NewFaceTemplateHandler(faceTemplateRepo)
 	bgTemplateHandler := handler.NewBgTemplateHandler(bgTemplateRepo)
-	modelTemplateHandler := handler.NewModelTemplateHandler(modelTemplateRepo)
-	poseTemplateHandler := handler.NewPoseTemplateHandler(poseTemplateRepo)
 	patternStyleHandler := handler.NewPatternStyleHandler(patternStyleRepo)
 	vectorizeHandler := handler.NewVectorizeHandler(taskRepo, kodoService)
 
@@ -127,7 +123,7 @@ func main() {
 		log.Printf("[Main] Failed to load embedded frontend dist: %v", err)
 	}
 
-	registerRoutes(r, authHandler, adminHandler, accountHandler, cardHandler, channelHandler, kodoHandler, segHandler, lineDraftHandler, featurePromptHandler, faceTemplateHandler, bgTemplateHandler, modelTemplateHandler, poseTemplateHandler, patternStyleHandler, vectorizeHandler, kodoService, rdb, userRepo, frontendFS)
+	registerRoutes(r, authHandler, adminHandler, accountHandler, cardHandler, channelHandler, kodoHandler, segHandler, lineDraftHandler, featurePromptHandler, faceTemplateHandler, bgTemplateHandler, patternStyleHandler, vectorizeHandler, kodoService, rdb, userRepo, frontendFS)
 
 	consumer := worker.NewConsumer(accountRepo, channelRepo, taskRepo, redisMgr, kodoService)
 	go consumer.Start(5)
@@ -143,7 +139,7 @@ func main() {
 	}
 }
 
-func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandler *handler.AdminHandler, accountHandler *handler.AccountHandler, cardHandler *handler.StyleCardHandler, channelHandler *handler.ChannelHandler, kodoHandler *handler.KodoHandler, segHandler *handler.SegHandler, lineDraftHandler *handler.LineDraftHandler, featurePromptHandler *handler.FeaturePromptHandler, faceTemplateHandler *handler.FaceTemplateHandler, bgTemplateHandler *handler.BgTemplateHandler, modelTemplateHandler *handler.ModelTemplateHandler, poseTemplateHandler *handler.PoseTemplateHandler, patternStyleHandler *handler.PatternStyleHandler, vectorizeHandler *handler.VectorizeHandler, kodoService *service.KodoService, rdb *redis.Client, userRepo *repository.UserRepository, frontendFS iofs.FS) {
+func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandler *handler.AdminHandler, accountHandler *handler.AccountHandler, cardHandler *handler.StyleCardHandler, channelHandler *handler.ChannelHandler, kodoHandler *handler.KodoHandler, segHandler *handler.SegHandler, lineDraftHandler *handler.LineDraftHandler, featurePromptHandler *handler.FeaturePromptHandler, faceTemplateHandler *handler.FaceTemplateHandler, bgTemplateHandler *handler.BgTemplateHandler, patternStyleHandler *handler.PatternStyleHandler, vectorizeHandler *handler.VectorizeHandler, kodoService *service.KodoService, rdb *redis.Client, userRepo *repository.UserRepository, frontendFS iofs.FS) {
 	r.GET("/api/health", func(c *gin.Context) {
 		response.Success(c, gin.H{"status": "ok"})
 	})
@@ -174,12 +170,6 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 
 		// 背景模板（用户端）
 		userApi.GET("/bg-templates", bgTemplateHandler.ListEnabled)
-
-		// 模特模板（用户端）
-		userApi.GET("/model-templates", modelTemplateHandler.ListEnabled)
-
-		// 姿势模板（用户端）
-		userApi.GET("/pose-templates", poseTemplateHandler.ListEnabled)
 
 		// 风格模型（用户端，支持 ?category= 筛选）
 		userApi.GET("/pattern-styles", patternStyleHandler.ListEnabled)
@@ -369,18 +359,6 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 		adminApi.POST("/bg-templates", bgTemplateHandler.Create)
 		adminApi.PUT("/bg-templates/:id", bgTemplateHandler.Update)
 		adminApi.DELETE("/bg-templates/:id", bgTemplateHandler.Delete)
-
-		// 模特模板管理
-		adminApi.GET("/model-templates", modelTemplateHandler.List)
-		adminApi.POST("/model-templates", modelTemplateHandler.Create)
-		adminApi.PUT("/model-templates/:id", modelTemplateHandler.Update)
-		adminApi.DELETE("/model-templates/:id", modelTemplateHandler.Delete)
-
-		// 姿势模板管理
-		adminApi.GET("/pose-templates", poseTemplateHandler.List)
-		adminApi.POST("/pose-templates", poseTemplateHandler.Create)
-		adminApi.PUT("/pose-templates/:id", poseTemplateHandler.Update)
-		adminApi.DELETE("/pose-templates/:id", poseTemplateHandler.Delete)
 
 		// 风格模型管理
 		adminApi.GET("/pattern-styles", patternStyleHandler.List)

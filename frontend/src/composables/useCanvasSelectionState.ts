@@ -6,22 +6,19 @@ import type {
   EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
-  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  GenerateNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 
-export type NodeDragKind = 'image' | 'prompt' | 'model' | 'mannequin' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon' | 'generate'
+export type NodeDragKind = 'image' | 'prompt' | 'model' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'tryon'
 
 export type DraggableNode =
   | ImageNodeItem
   | PromptNodeItem
   | ModelNodeItem
-  | MannequinNodeItem
   | ViewpointNodeItem
   | MaskNodeItem
   | ColorNodeItem
@@ -29,14 +26,12 @@ export type DraggableNode =
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | GenerateNodeItem
 
 interface UseCanvasSelectionStateOptions {
   messages: Ref<CanvasImageItem[]>
   imageNodes: Ref<ImageNodeItem[]>
   promptNodes: Ref<PromptNodeItem[]>
   modelNodes: Ref<ModelNodeItem[]>
-  mannequinNodes: Ref<MannequinNodeItem[]>
   viewpointNodes: Ref<ViewpointNodeItem[]>
   maskNodes: Ref<MaskNodeItem[]>
   colorNodes: Ref<ColorNodeItem[]>
@@ -44,7 +39,6 @@ interface UseCanvasSelectionStateOptions {
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
-  generateNodes: Ref<GenerateNodeItem[]>
   showStyleStrengthControl: Ref<boolean>
   canvasX: Ref<number>
   canvasY: Ref<number>
@@ -52,7 +46,6 @@ interface UseCanvasSelectionStateOptions {
   deleteImageNode: (id: number) => void
   deletePromptNode: (id: number) => void
   deleteModelNode: (id: number) => void
-  deleteMannequinNode: (id: number) => void
   deleteViewpointNode: (id: number) => void
   deleteMaskNode: (id: number) => void
   deleteColorNode: (id: number) => void
@@ -60,7 +53,6 @@ interface UseCanvasSelectionStateOptions {
   deleteFusionNode: (id: number) => void
   deleteEnhanceNode: (id: number) => void
   deleteTryOnNode: (id: number) => void
-  deleteGenerateNode: (id: number) => void
 }
 
 export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions) {
@@ -71,7 +63,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   const activeImageNodeId = ref<number | null>(null)
   const activePromptNodeId = ref<number | null>(null)
   const activeModelNodeId = ref<number | null>(null)
-  const activeMannequinNodeId = ref<number | null>(null)
   const activeViewpointNodeId = ref<number | null>(null)
   const activeMaskNodeId = ref<number | null>(null)
   const activeColorNodeId = ref<number | null>(null)
@@ -79,13 +70,11 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   const activeFusionNodeId = ref<number | null>(null)
   const activeEnhanceNodeId = ref<number | null>(null)
   const activeTryOnNodeId = ref<number | null>(null)
-  const activeGenerateNodeId = ref<number | null>(null)
 
   function clearActiveNodes() {
     activeImageNodeId.value = null
     activePromptNodeId.value = null
     activeModelNodeId.value = null
-    activeMannequinNodeId.value = null
     activeViewpointNodeId.value = null
     activeMaskNodeId.value = null
     activeColorNodeId.value = null
@@ -93,7 +82,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeFusionNodeId.value = null
     activeEnhanceNodeId.value = null
     activeTryOnNodeId.value = null
-    activeGenerateNodeId.value = null
   }
 
   function getNodeSelectionKey(kind: NodeDragKind, id: number): string {
@@ -106,15 +94,13 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
       kind !== 'image' &&
       kind !== 'prompt' &&
       kind !== 'model' &&
-      kind !== 'mannequin' &&
       kind !== 'viewpoint' &&
       kind !== 'mask' &&
       kind !== 'color' &&
       kind !== 'edit' &&
       kind !== 'fusion' &&
       kind !== 'enhance' &&
-      kind !== 'tryon' &&
-      kind !== 'generate'
+      kind !== 'tryon'
     ) {
       return null
     }
@@ -130,15 +116,13 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'image') return options.imageNodes.value.find(node => node.id === id) ?? null
     if (kind === 'prompt') return options.promptNodes.value.find(node => node.id === id) ?? null
     if (kind === 'model') return options.modelNodes.value.find(node => node.id === id) ?? null
-    if (kind === 'mannequin') return options.mannequinNodes.value.find(node => node.id === id) ?? null
     if (kind === 'viewpoint') return options.viewpointNodes.value.find(node => node.id === id) ?? null
     if (kind === 'mask') return options.maskNodes.value.find(node => node.id === id) ?? null
     if (kind === 'color') return options.colorNodes.value.find(node => node.id === id) ?? null
     if (kind === 'edit') return options.editNodes.value.find(node => node.id === id) ?? null
     if (kind === 'fusion') return options.fusionNodes.value.find(node => node.id === id) ?? null
     if (kind === 'enhance') return options.enhanceNodes.value.find(node => node.id === id) ?? null
-    if (kind === 'tryon') return options.tryOnNodes.value.find(node => node.id === id) ?? null
-    return options.generateNodes.value.find(node => node.id === id) ?? null
+    return options.tryOnNodes.value.find(node => node.id === id) ?? null
   }
 
   function isNodeSelected(kind: NodeDragKind, id: number): boolean {
@@ -147,30 +131,26 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'image') return activeImageNodeId.value === id
     if (kind === 'prompt') return activePromptNodeId.value === id
     if (kind === 'model') return activeModelNodeId.value === id
-    if (kind === 'mannequin') return activeMannequinNodeId.value === id
     if (kind === 'viewpoint') return activeViewpointNodeId.value === id
     if (kind === 'mask') return activeMaskNodeId.value === id
     if (kind === 'color') return activeColorNodeId.value === id
     if (kind === 'edit') return activeEditNodeId.value === id
     if (kind === 'fusion') return activeFusionNodeId.value === id
     if (kind === 'enhance') return activeEnhanceNodeId.value === id
-    if (kind === 'tryon') return activeTryOnNodeId.value === id
-    return activeGenerateNodeId.value === id
+    return activeTryOnNodeId.value === id
   }
 
   function isNodeActive(kind: NodeDragKind, id: number): boolean {
     if (kind === 'image') return activeImageNodeId.value === id
     if (kind === 'prompt') return activePromptNodeId.value === id
     if (kind === 'model') return activeModelNodeId.value === id
-    if (kind === 'mannequin') return activeMannequinNodeId.value === id
     if (kind === 'viewpoint') return activeViewpointNodeId.value === id
     if (kind === 'mask') return activeMaskNodeId.value === id
     if (kind === 'color') return activeColorNodeId.value === id
     if (kind === 'edit') return activeEditNodeId.value === id
     if (kind === 'fusion') return activeFusionNodeId.value === id
     if (kind === 'enhance') return activeEnhanceNodeId.value === id
-    if (kind === 'tryon') return activeTryOnNodeId.value === id
-    return activeGenerateNodeId.value === id
+    return activeTryOnNodeId.value === id
   }
 
   function clearSelectedNodeKeys() {
@@ -195,11 +175,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   function activateModelNode(id: number) {
     clearActiveNodes()
     activeModelNodeId.value = id
-  }
-
-  function activateMannequinNode(id: number) {
-    clearActiveNodes()
-    activeMannequinNodeId.value = id
   }
 
   function activateViewpointNode(id: number) {
@@ -237,16 +212,10 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeTryOnNodeId.value = id
   }
 
-  function activateGenerateNode(id: number) {
-    clearActiveNodes()
-    activeGenerateNodeId.value = id
-  }
-
   function activateNodeByKind(kind: NodeDragKind, id: number) {
     if (kind === 'image') activateImageNode(id)
     else if (kind === 'prompt') activatePromptNode(id)
     else if (kind === 'model') activateModelNode(id)
-    else if (kind === 'mannequin') activateMannequinNode(id)
     else if (kind === 'viewpoint') activateViewpointNode(id)
     else if (kind === 'mask') activateMaskNode(id)
     else if (kind === 'color') activateColorNode(id)
@@ -254,7 +223,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     else if (kind === 'fusion') activateFusionNode(id)
     else if (kind === 'enhance') activateEnhanceNode(id)
     else if (kind === 'tryon') activateTryOnNode(id)
-    else activateGenerateNode(id)
   }
 
   function clearCanvasQuickActionState() {
@@ -273,7 +241,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     if (kind === 'image') options.deleteImageNode(id)
     else if (kind === 'prompt') options.deletePromptNode(id)
     else if (kind === 'model') options.deleteModelNode(id)
-    else if (kind === 'mannequin') options.deleteMannequinNode(id)
     else if (kind === 'viewpoint') options.deleteViewpointNode(id)
     else if (kind === 'mask') options.deleteMaskNode(id)
     else if (kind === 'color') options.deleteColorNode(id)
@@ -281,7 +248,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     else if (kind === 'fusion') options.deleteFusionNode(id)
     else if (kind === 'enhance') options.deleteEnhanceNode(id)
     else if (kind === 'tryon') options.deleteTryOnNode(id)
-    else options.deleteGenerateNode(id)
   }
 
   function deleteSelectedNodes(): boolean {
@@ -308,10 +274,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     }
     if (activeModelNodeId.value !== null) {
       options.deleteModelNode(activeModelNodeId.value)
-      return true
-    }
-    if (activeMannequinNodeId.value !== null) {
-      options.deleteMannequinNode(activeMannequinNodeId.value)
       return true
     }
     if (activeViewpointNodeId.value !== null) {
@@ -342,10 +304,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
       options.deleteTryOnNode(activeTryOnNodeId.value)
       return true
     }
-    if (activeGenerateNodeId.value !== null) {
-      options.deleteGenerateNode(activeGenerateNodeId.value)
-      return true
-    }
     return false
   }
 
@@ -373,18 +331,16 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   }
 
   const hasActiveNodeSelection = computed(() =>
-    activeImageNodeId.value !== null ||
-    activePromptNodeId.value !== null ||
-    activeModelNodeId.value !== null ||
-    activeMannequinNodeId.value !== null ||
-    activeViewpointNodeId.value !== null ||
+      activeImageNodeId.value !== null ||
+      activePromptNodeId.value !== null ||
+      activeModelNodeId.value !== null ||
+      activeViewpointNodeId.value !== null ||
     activeMaskNodeId.value !== null ||
     activeColorNodeId.value !== null ||
     activeEditNodeId.value !== null ||
     activeFusionNodeId.value !== null ||
     activeEnhanceNodeId.value !== null ||
     activeTryOnNodeId.value !== null ||
-    activeGenerateNodeId.value !== null ||
     selectedNodeKeys.value.length > 0,
   )
 
@@ -400,7 +356,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeImageNodeId,
     activePromptNodeId,
     activeModelNodeId,
-    activeMannequinNodeId,
     activeViewpointNodeId,
     activeMaskNodeId,
     activeColorNodeId,
@@ -408,7 +363,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activeFusionNodeId,
     activeEnhanceNodeId,
     activeTryOnNodeId,
-    activeGenerateNodeId,
     clearActiveNodes,
     getNodeSelectionKey,
     parseNodeSelectionKey,
@@ -420,7 +374,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activateImageNode,
     activatePromptNode,
     activateModelNode,
-    activateMannequinNode,
     activateViewpointNode,
     activateMaskNode,
     activateColorNode,
@@ -428,7 +381,6 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
     activateFusionNode,
     activateEnhanceNode,
     activateTryOnNode,
-    activateGenerateNode,
     activateNodeByKind,
     clearCanvasQuickActionState,
     clearSelectedIds,

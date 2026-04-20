@@ -7,11 +7,9 @@ import type {
   EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
-  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  GenerateNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
@@ -25,7 +23,6 @@ export interface UseCanvasEditorOptions {
   imageNodes: Ref<ImageNodeItem[]>
   promptNodes: Ref<PromptNodeItem[]>
   modelNodes: Ref<ModelNodeItem[]>
-  mannequinNodes: Ref<MannequinNodeItem[]>
   viewpointNodes: Ref<ViewpointNodeItem[]>
   maskNodes: Ref<MaskNodeItem[]>
   colorNodes: Ref<ColorNodeItem[]>
@@ -33,7 +30,6 @@ export interface UseCanvasEditorOptions {
   fusionNodes: Ref<FusionNodeItem[]>
   enhanceNodes: Ref<EnhanceNodeItem[]>
   tryOnNodes: Ref<TryOnNodeItem[]>
-  generateNodes: Ref<GenerateNodeItem[]>
   activeTool: Ref<string>
   showStyleStrengthControl: Ref<boolean>
   canvasX: Ref<number>
@@ -52,13 +48,9 @@ export interface UseCanvasEditorOptions {
   uploadImage: (file: File) => Promise<{ code?: number; data?: { url?: string } }>
   importCanvasImageToImageNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
   importCanvasImageToMaskNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
-  importCanvasImageToModelNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
-  importCanvasImageToMannequinNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
-  importCanvasImageToViewpointNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
   deleteImageNode: (id: number) => void
   deletePromptNode: (id: number) => void
   deleteModelNode: (id: number) => void
-  deleteMannequinNode: (id: number) => void
   deleteViewpointNode: (id: number) => void
   deleteMaskNode: (id: number) => void
   deleteColorNode: (id: number) => void
@@ -66,7 +58,6 @@ export interface UseCanvasEditorOptions {
   deleteFusionNode: (id: number) => void
   deleteEnhanceNode: (id: number) => void
   deleteTryOnNode: (id: number) => void
-  deleteGenerateNode: (id: number) => void
   hasSelectedConnection?: () => boolean
   clearSelectedConnection?: () => void
   deleteSelectedConnection?: () => boolean

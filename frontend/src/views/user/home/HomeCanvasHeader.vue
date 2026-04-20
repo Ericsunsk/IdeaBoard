@@ -210,4 +210,36 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 .share-btn:hover { background: #f1f3f9 !important; transform: none; }
 .btn-primary { background: #9278e6; color: white; }
 .btn-primary:disabled { background: #e2e4e8; color: #a8adb7; cursor: not-allowed; }
+.user-avatar-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid #e2e4e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f3f9;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  flex-shrink: 0;
+  color: #5f6368;
+}
+.user-avatar-wrap:hover {
+  border-color: #d8ddea;
+  background: #e8eaed;
+  color: #6757c8;
+}
+.user-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.user-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 </style>

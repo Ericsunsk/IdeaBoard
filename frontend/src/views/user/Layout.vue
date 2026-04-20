@@ -51,7 +51,6 @@ const menuOptions: MenuOption[] = [
     key: 'pattern-studio',
     children: [
       { label: '图案生成', key: 'pattern-gen' },
-      { label: '四方连续', key: 'seamless-tile' },
     ]
   },
   {
@@ -79,7 +78,6 @@ const keyToPath: Record<string, string> = {
   'partial-edit': '/user/picture',
   'directed-recolor': '/user/picture',
   'pattern-gen': '/user/picture',
-  'seamless-tile': '/user/picture',
   'hd-upscale': '/user/picture',
   'canvas-extend': '/user/picture',
 }

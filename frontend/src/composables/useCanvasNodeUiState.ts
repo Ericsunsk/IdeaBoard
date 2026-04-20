@@ -1,5 +1,9 @@
-import { getCanvasNodeRequiredInputPorts, getEditNodePortLabel } from '../config/canvasNodeConnectionContract'
-import { hasColorNodeColors, isColorSingleColorMode, resolveWorkflowNodeOutputStatus } from '../types/canvasNodes'
+import {
+  getCanvasNodeRequiredInputPorts,
+  getCanvasNodeVisibleInputPorts,
+  getEditNodePortLabel,
+} from '../config/canvasNodeConnectionContract'
+import { hasColorNodeColors, resolveWorkflowNodeOutputStatus } from '../types/canvasNodes'
 import type { NodeConnectionStatus } from './useCanvasNodeConnections'
 import type {
   CanvasConnectionNodeType,
@@ -11,8 +15,6 @@ import type {
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
-  GenerateNodeItem,
-  MannequinNodeItem,
   ModelNodeItem,
   PromptNodeItem,
   TryOnNodeItem,
@@ -35,10 +37,36 @@ type UseCanvasNodeUiStateOptions = {
     node: CanvasNodeItem & { id: number },
   ) => NodeConnectionStatus
   lookupNodeByType: (nodeType: CanvasConnectionNodeType, nodeId: number) => CanvasNodeItem | null
-  generateModeSupportsStyleModel: (mode: GenerateNodeItem['mode']) => boolean
+  isExecutionNodeRunning?: (nodeType: CanvasExecutionOutputNodeType, nodeId: number) => boolean
+  isNodeLastRunFailed?: (nodeType: CanvasExecutionOutputNodeType, nodeId: number) => boolean
+}
+
+type ExecutionActionLabels = { ready: string; running: string }
+
+type ExecutionActionState = {
+  primaryAction: NodePrimaryActionState
+  secondaryStatus?: string
 }
 
 export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
+  function resolveExecutionActionLabels(nodeType: CanvasExecutionOutputNodeType): ExecutionActionLabels {
+    switch (nodeType) {
+      case 'model':
+      case 'viewpoint':
+        return { ready: '生成', running: '生成中...' }
+      case 'color':
+        return { ready: '应用', running: '应用中...' }
+      case 'edit':
+        return { ready: '编辑', running: '编辑中...' }
+      case 'fusion':
+        return { ready: '融合', running: '融合中...' }
+      case 'enhance':
+        return { ready: '增强', running: '增强中...' }
+      case 'tryon':
+        return { ready: '上身', running: '上身中...' }
+    }
+  }
+
   function formatNodePortLabel(
     nodeType: CanvasConnectionNodeType,
     port: CanvasConnectionPort,
@@ -52,16 +80,21 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     ) {
       return getEditNodePortLabel(node.mode, port)
     }
+    if (nodeType === 'model') {
+      if (port === 'image') return 'Image'
+      if (port === 'imageA') return 'Model'
+      if (port === 'imageB') return 'Pose'
+    }
     if (port === 'image') return 'Image'
     if (port === 'mask') return 'Mask'
     if (port === 'prompt') return 'Prompt'
     if (port === 'imageA') {
-      if (nodeType === 'tryon') return 'Base'
+      if (nodeType === 'tryon') return 'Body'
       return 'Image A'
     }
     if (port === 'imageB') {
       if (nodeType === 'tryon') {
-        return node && node.type === 'tryon' && node.mode === 'pattern-on-body' ? 'Pattern' : 'Fabric'
+        return 'Texture'
       }
       return 'Image B'
     }
@@ -104,6 +137,37 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     }
   }
 
+  function getNodeConnectedPendingPortIssues(
+    nodeType: CanvasConnectionNodeType,
+    nodeId: number,
+    candidatePorts?: string[],
+  ) {
+    const node = options.lookupNodeByType(nodeType, nodeId)
+    if (!node) {
+      return {
+        node: null,
+        pendingPorts: [] as string[],
+      }
+    }
+
+    const status = options.getNodeConnectionStatus(nodeType, node)
+    const targetPorts = candidatePorts ?? getCanvasNodeVisibleInputPorts(nodeType, node).map(port => port.port)
+    const pendingPorts: string[] = []
+
+    targetPorts.forEach((port) => {
+      const typedPort = port as CanvasConnectionPort
+      if (!status.incoming[typedPort]) return
+      if (status.pendingIncoming[typedPort]) {
+        pendingPorts.push(port)
+      }
+    })
+
+    return {
+      node,
+      pendingPorts,
+    }
+  }
+
   function getNodeOutputPort(nodeType: CanvasConnectionNodeType): CanvasConnectionPort {
     if (nodeType === 'prompt') return 'prompt'
     if (nodeType === 'mask') return 'mask'
@@ -127,120 +191,119 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     }
   }
 
-  function buildExecutionPrimaryActionState(
-    nodeType: CanvasConnectionNodeType,
-    node: CanvasNodeItem & { id: number },
-    readyLabel: string,
-    blockedLabel?: string | null,
-  ): NodePrimaryActionState {
-    const { node: resolvedNode, disconnectedPorts, pendingPorts } = getNodeRequiredPortIssues(nodeType, node.id)
+  function buildExecutionActionState(
+    nodeType: CanvasExecutionOutputNodeType,
+    node: CanvasExecutionOutputNodeItem,
+  ): ExecutionActionState {
+    const actionLabels = resolveExecutionActionLabels(nodeType)
+    if (options.isExecutionNodeRunning?.(nodeType, node.id)) {
+      return {
+        primaryAction: {
+          label: actionLabels.running,
+          disabled: true,
+        },
+      }
+    }
+
+    const { node: resolvedNode, disconnectedPorts } = getNodeRequiredPortIssues(nodeType, node.id)
     if (disconnectedPorts.length > 0) {
+      const missingLabels = disconnectedPorts.map(
+        port => formatNodePortLabel(nodeType, port as CanvasConnectionPort, resolvedNode),
+      )
       return {
-        label: disconnectedPorts.length === 1
-          ? `连接 ${formatNodePortLabel(nodeType, disconnectedPorts[0] as CanvasConnectionPort, resolvedNode)}`
-          : `连接 ${disconnectedPorts.length} 个输入`,
-        disabled: true,
+        primaryAction: {
+          label: disconnectedPorts.length === 1
+            ? `连接 ${missingLabels[0]}`
+            : `连接 ${disconnectedPorts.length} 个输入`,
+          disabled: true,
+        },
+        secondaryStatus: `缺少：${missingLabels.join(' / ')}`,
       }
     }
+
+    const { node: pendingNode, pendingPorts } = getNodeConnectedPendingPortIssues(nodeType, node.id)
     if (pendingPorts.length > 0) {
+      const pendingLabels = pendingPorts.map(
+        port => formatNodePortLabel(nodeType, port as CanvasConnectionPort, pendingNode),
+      )
       return {
-        label: pendingPorts.length === 1
-          ? `等待 ${formatNodePortLabel(nodeType, pendingPorts[0] as CanvasConnectionPort, resolvedNode)}`
-          : `等待 ${pendingPorts.length} 个输入`,
-        disabled: true,
+        primaryAction: {
+          label: pendingPorts.length === 1
+            ? `等待 ${pendingLabels[0]}`
+            : `等待 ${pendingPorts.length} 个输入`,
+          disabled: true,
+        },
+        secondaryStatus: `等待上游：${pendingLabels.join(' / ')}`,
       }
     }
+
+    const blockedLabel = resolveExecutionBlockedLabel(nodeType, node)
     if (blockedLabel) {
       return {
-        label: blockedLabel,
-        disabled: true,
+        primaryAction: {
+          label: blockedLabel,
+          disabled: true,
+        },
       }
     }
-    if ('outputImages' in node && Array.isArray(node.outputImages)) {
-      const cacheStatus = resolveExecutionNodeCacheStatus(node as CanvasExecutionOutputNodeItem)
-      if (cacheStatus === 'stale') {
-        return {
+
+    const cacheStatus = resolveExecutionNodeCacheStatus(node)
+    if (cacheStatus === 'stale') {
+      return {
+        primaryAction: {
           label: '刷新缓存',
           disabled: false,
-        }
+        },
+        secondaryStatus: '当前结果已过期，需刷新',
       }
     }
+
+    if (options.isNodeLastRunFailed?.(nodeType, node.id)) {
+      return {
+        primaryAction: {
+          label: '重试',
+          disabled: false,
+        },
+        secondaryStatus: '上次执行失败，可重试',
+      }
+    }
+
+    if (cacheStatus === 'ready' && node.outputImages.length > 0) {
+      return {
+        primaryAction: {
+          label: '重新生成',
+          disabled: false,
+        },
+        secondaryStatus: '当前缓存可用',
+      }
+    }
+
     return {
-      label: readyLabel,
-      disabled: false,
+      primaryAction: {
+        label: actionLabels.ready,
+        disabled: false,
+      },
     }
   }
 
-  function getNodePrimaryActionState(nodeType: 'model', node: ModelNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'mannequin', node: MannequinNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'viewpoint', node: ViewpointNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'color', node: ColorNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'edit', node: EditNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'fusion', node: FusionNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'enhance', node: EnhanceNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'tryon', node: TryOnNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(nodeType: 'generate', node: GenerateNodeItem): NodePrimaryActionState
-  function getNodePrimaryActionState(
-    nodeType: CanvasExecutionOutputNodeType,
-    node: CanvasExecutionOutputNodeItem,
-  ): NodePrimaryActionState {
+  function resolveExecutionBlockedLabel(nodeType: CanvasExecutionOutputNodeType, node: CanvasExecutionOutputNodeItem): string | null {
     switch (nodeType) {
-      case 'model': {
-        const modelNode = node as ModelNodeItem
-        return buildExecutionPrimaryActionState(
-          nodeType,
-          modelNode,
-          '生成多角度',
-          modelNode.selectedAngles.length === 0 ? '选择角度' : null,
-        )
-      }
-      case 'mannequin':
-        return buildExecutionPrimaryActionState(nodeType, node, '生成人模')
-      case 'viewpoint': {
-        const viewpointNode = node as ViewpointNodeItem
-        return buildExecutionPrimaryActionState(
-          nodeType,
-          viewpointNode,
-          '生成',
-          viewpointNode.selectedViewpoints.length === 0 ? '选择视角' : null,
-        )
-      }
-      case 'color': {
-        const colorNode = node as ColorNodeItem
-        return buildExecutionPrimaryActionState(
-          nodeType,
-          colorNode,
-          isColorSingleColorMode(colorNode) ? '应用换色' : '生成',
-          !hasColorNodeColors(colorNode) ? '添加颜色' : null,
-        )
-      }
-      case 'edit':
-        return buildExecutionPrimaryActionState(nodeType, node as EditNodeItem, '生成')
-      case 'fusion':
-      case 'enhance':
-      case 'tryon':
-        return buildExecutionPrimaryActionState(nodeType, node, '生成')
-      case 'generate': {
-        const generateNode = node as GenerateNodeItem
-        return buildExecutionPrimaryActionState(
-          nodeType,
-          generateNode,
-          '生成',
-          options.generateModeSupportsStyleModel(generateNode.mode) && !generateNode.styleModel ? '选择 Style' : null,
-        )
-      }
+      case 'viewpoint':
+        return (node as ViewpointNodeItem).selectedViewpoint ? null : '选择视角'
+      case 'color':
+        return hasColorNodeColors(node as ColorNodeItem) ? null : '添加颜色'
+      default:
+        return null
     }
   }
 
   function getNodeUiState(nodeType: 'model', node: ModelNodeItem): NodeUiState
-  function getNodeUiState(nodeType: 'mannequin', node: MannequinNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'viewpoint', node: ViewpointNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'color', node: ColorNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'edit', node: EditNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'fusion', node: FusionNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'enhance', node: EnhanceNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'tryon', node: TryOnNodeItem): NodeUiState
-  function getNodeUiState(nodeType: 'generate', node: GenerateNodeItem): NodeUiState
   function getNodeUiState(nodeType: 'image', node: CanvasNodeItem & { id: number }): NodeUiState
   function getNodeUiState(nodeType: 'mask', node: CanvasNodeItem & { id: number }): NodeUiState
   function getNodeUiState(nodeType: 'prompt', node: PromptNodeItem): PromptNodeUiState
@@ -253,49 +316,22 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
       return { connection }
     }
 
-    let primaryAction: NodePrimaryActionState
-    switch (nodeType) {
-      case 'model':
-        primaryAction = getNodePrimaryActionState(nodeType, node as ModelNodeItem)
-        break
-      case 'mannequin':
-        primaryAction = getNodePrimaryActionState(nodeType, node as MannequinNodeItem)
-        break
-      case 'viewpoint':
-        primaryAction = getNodePrimaryActionState(nodeType, node as ViewpointNodeItem)
-        break
-      case 'color':
-        primaryAction = getNodePrimaryActionState(nodeType, node as ColorNodeItem)
-        break
-      case 'edit':
-        primaryAction = getNodePrimaryActionState(nodeType, node as EditNodeItem)
-        break
-      case 'fusion':
-        primaryAction = getNodePrimaryActionState(nodeType, node as FusionNodeItem)
-        break
-      case 'enhance':
-        primaryAction = getNodePrimaryActionState(nodeType, node as EnhanceNodeItem)
-        break
-      case 'tryon':
-        primaryAction = getNodePrimaryActionState(nodeType, node as TryOnNodeItem)
-        break
-      case 'generate':
-        primaryAction = getNodePrimaryActionState(nodeType, node as GenerateNodeItem)
-        break
-    }
+    const executionNode = node as CanvasExecutionOutputNodeItem
+    const executionState = buildExecutionActionState(nodeType, executionNode)
 
     return {
       connection,
-      primaryAction,
-      cacheStatus: resolveExecutionNodeCacheStatus(node as CanvasExecutionOutputNodeItem),
+      primaryAction: executionState.primaryAction,
+      secondaryStatus: executionState.secondaryStatus,
+      cacheStatus: resolveExecutionNodeCacheStatus(executionNode),
     }
   }
 
   return {
     formatNodePortLabel,
     getNodeRequiredPortIssues,
+    getNodeConnectedPendingPortIssues,
     getNodeConnectionState,
-    getNodePrimaryActionState,
     getNodeUiState,
   }
 }

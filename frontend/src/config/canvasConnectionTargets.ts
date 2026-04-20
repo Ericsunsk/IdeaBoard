@@ -9,13 +9,11 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
   'mask',
   'color',
   'model',
-  'mannequin',
   'viewpoint',
   'edit',
   'fusion',
   'enhance',
   'tryon',
-  'generate',
 ] as const
 
 export const CANVAS_CONNECTION_PORT_WHITELIST: readonly CanvasConnectionPort[] = [

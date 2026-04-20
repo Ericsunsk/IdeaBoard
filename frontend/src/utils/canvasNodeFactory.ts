@@ -1,7 +1,14 @@
 import {
   DEFAULT_COLOR_NODE_COLOR,
   DEFAULT_COLOR_STRENGTH,
+  createDefaultModelAngleSpec,
   ENHANCE_EXTEND_PERCENT_DEFAULT,
+  MODEL_REFERENCE_STRENGTH_DEFAULT,
+  MODEL_POSE_STRENGTH_DEFAULT,
+  TRYON_OPACITY_DEFAULT,
+  TRYON_ROTATION_DEFAULT,
+  TRYON_SCALE_DEFAULT,
+  TRYON_TILE_MODE_DEFAULT,
 } from '../types/canvasNodes'
 import type {
   CanvasImageItem,
@@ -11,11 +18,9 @@ import type {
   EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
-  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  GenerateNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
@@ -58,24 +63,10 @@ export function createModelNodeAt(point: CanvasPoint): ModelNodeItem {
     x: point.x,
     y: point.y,
     width: 280,
-    sourceImageUrl: '',
-    sourceImageRatio: 1,
-    selectedAngles: ['front_full'],
+    angleSpec: createDefaultModelAngleSpec(),
+    modelStrength: MODEL_REFERENCE_STRENGTH_DEFAULT,
+    poseStrength: MODEL_POSE_STRENGTH_DEFAULT,
     background: 'original',
-    outputStatus: 'idle',
-    outputImages: [],
-  }
-}
-
-export function createMannequinNodeAt(point: CanvasPoint): MannequinNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'mannequin',
-    x: point.x,
-    y: point.y,
-    width: 280,
-    sourceImageUrl: '',
-    sourceImageRatio: 1,
     outputStatus: 'idle',
     outputImages: [],
   }
@@ -88,9 +79,8 @@ export function createViewpointNodeAt(point: CanvasPoint): ViewpointNodeItem {
     x: point.x,
     y: point.y,
     width: 320,
-    sourceImages: [],
     activeCategory: 'top',
-    selectedViewpoints: [],
+    selectedViewpoint: '',
     lighting: 'warm_white',
     outputStatus: 'idle',
     outputImages: [],
@@ -181,11 +171,10 @@ export function createTryOnNodeAt(point: CanvasPoint): TryOnNodeItem {
     x: point.x,
     y: point.y,
     width: 286,
-    mode: 'fabric-on-body',
-    tileMode: 'seamless',
-    rotation: 0,
-    scale: 100,
-    opacity: 100,
+    tileMode: TRYON_TILE_MODE_DEFAULT,
+    rotation: TRYON_ROTATION_DEFAULT,
+    scale: TRYON_SCALE_DEFAULT,
+    opacity: TRYON_OPACITY_DEFAULT,
     outputStatus: 'idle',
     outputImages: [],
   }
@@ -200,23 +189,6 @@ export function createColorNodeAt(point: CanvasPoint): ColorNodeItem {
     width: 286,
     colors: [DEFAULT_COLOR_NODE_COLOR],
     strength: DEFAULT_COLOR_STRENGTH,
-    outputStatus: 'idle',
-    outputImages: [],
-  }
-}
-
-export function createGenerateNodeAt(point: CanvasPoint): GenerateNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'generate',
-    x: point.x,
-    y: point.y,
-    width: 286,
-    mode: 'pattern-gen',
-    styleModel: '',
-    ratio: '1:1',
-    count: 1,
-    quality: '1k',
     outputStatus: 'idle',
     outputImages: [],
   }

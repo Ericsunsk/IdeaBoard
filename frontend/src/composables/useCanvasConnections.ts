@@ -17,9 +17,7 @@ import {
   EDIT_NODE_IO_SLOTS,
   ENHANCE_NODE_IO_SLOTS,
   FUSION_NODE_IO_SLOTS,
-  GENERATE_NODE_IO_SLOTS,
   IMAGE_NODE_IO_SLOTS,
-  MANNEQUIN_NODE_IO_SLOTS,
   MASK_NODE_IO_SLOTS,
   MODEL_NODE_IO_SLOTS,
   PROMPT_NODE_IO_SLOTS,
@@ -79,13 +77,11 @@ const NODE_IO_SLOTS_BY_TYPE: Record<CanvasConnectionNodeType, readonly NodeIoSlo
   mask: MASK_NODE_IO_SLOTS,
   color: COLOR_NODE_IO_SLOTS,
   model: MODEL_NODE_IO_SLOTS,
-  mannequin: MANNEQUIN_NODE_IO_SLOTS,
   viewpoint: VIEWPOINT_NODE_IO_SLOTS,
   edit: EDIT_NODE_IO_SLOTS,
   fusion: FUSION_NODE_IO_SLOTS,
   enhance: ENHANCE_NODE_IO_SLOTS,
   tryon: TRYON_NODE_IO_SLOTS,
-  generate: GENERATE_NODE_IO_SLOTS,
 }
 
 function createConnectionId(): number {

@@ -8,7 +8,7 @@
     @mousedown.stop
   >
     <NodeHeader
-      title="TryOn"
+      title="Wear"
       @node-mousedown="emit('node-mousedown', $event)"
       @delete="emit('delete')"
     >
@@ -20,18 +20,7 @@
     </NodeHeader>
 
     <div class="tryon-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
-      <div class="tryon-mode-card node-mode-card">
-        <div class="tryon-mode-row node-option-row">
-          <NodeActionButton
-            v-for="option in tryOnModeOptions"
-            :key="option.value"
-            variant="chip"
-            :active="node.mode === option.value"
-            @click="emit('update:mode', option.value)"
-          >
-            {{ option.label }}
-          </NodeActionButton>
-        </div>
+      <div class="tryon-tile-card node-mode-card">
         <div class="tryon-tile-row node-option-row">
           <NodeActionButton
             v-for="option in tryOnTileModeOptions"
@@ -47,7 +36,7 @@
 
       <div class="tryon-control-group node-control-group">
         <div class="tryon-control-row">
-          <span class="node-control-label">Rotate</span>
+          <span class="node-control-label">Direction</span>
           <input
             class="tryon-slider node-inline-range"
             :style="{ '--slider-pct': `${(node.rotation / 360) * 100}%` }"
@@ -60,7 +49,7 @@
           />
         </div>
         <div class="tryon-control-row">
-          <span class="node-control-label">Scale</span>
+          <span class="node-control-label">Size</span>
           <input
             class="tryon-slider node-inline-range"
             :style="{ '--slider-pct': `${((node.scale - 10) / 290) * 100}%` }"
@@ -73,7 +62,7 @@
           />
         </div>
         <div class="tryon-control-row">
-          <span class="node-control-label">Opacity</span>
+          <span class="node-control-label">Blend</span>
           <input
             class="tryon-slider node-inline-range"
             :style="{ '--slider-pct': `${node.opacity}%` }"
@@ -88,10 +77,13 @@
       </div>
 
       <NodeConnectionChips :items="connectionChips" />
+      <div v-if="uiState?.secondaryStatus" class="node-secondary-status">
+        {{ uiState.secondaryStatus }}
+      </div>
 
       <div class="node-primary-action-slot">
         <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
-          {{ uiState?.primaryAction?.label || '生成' }}
+          {{ uiState?.primaryAction?.label || '上身' }}
         </NodeActionButton>
       </div>
     </div>
@@ -114,7 +106,7 @@ import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodePorts from './NodePorts.vue'
 import { buildNodeIoFromSlots, TRYON_NODE_IO_SLOTS } from './nodeIoConfig'
-import { TRYON_MODE_OPTIONS, TRYON_TILE_MODE_OPTIONS } from './nodeOptionConfig'
+import { TRYON_TILE_MODE_OPTIONS } from './nodeOptionConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -130,35 +122,30 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'delete'): void
-  (e: 'update:mode', value: TryOnNodeItem['mode']): void
   (e: 'update:tile-mode', value: TryOnNodeItem['tileMode']): void
   (e: 'update:rotation', value: number): void
   (e: 'update:scale', value: number): void
   (e: 'update:opacity', value: number): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image'): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'imageA' | 'imageB' | 'mask'): void
 }>()
 
-const tryOnModeOptions = TRYON_MODE_OPTIONS
 const tryOnTileModeOptions = TRYON_TILE_MODE_OPTIONS
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 
-const baseLabel = computed(() => 'Base')
-const layerLabel = computed(() => props.node.mode === 'pattern-on-body' ? 'Pattern' : 'Fabric')
 const io = computed(() =>
-  buildNodeIoFromSlots(TRYON_NODE_IO_SLOTS, {
-    baseLabel: baseLabel.value,
-    layerLabel: layerLabel.value,
-  }, {
+  buildNodeIoFromSlots(TRYON_NODE_IO_SLOTS, null, {
     connected: {
       imageA: props.uiState?.connection?.connected?.imageA,
       imageB: props.uiState?.connection?.connected?.imageB,
+      mask: props.uiState?.connection?.connected?.mask,
       output: props.uiState?.connection?.connected?.output,
     },
     pending: {
       imageA: props.uiState?.connection?.pending?.imageA,
       imageB: props.uiState?.connection?.pending?.imageB,
+      mask: props.uiState?.connection?.pending?.mask,
     },
     errorPortKeys: props.errorPortKeys,
   }),
@@ -167,7 +154,9 @@ const connectionChips = computed(() => io.value.connectionChips)
 const ports = computed(() => io.value.ports)
 
 function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image')
+  if (port === 'image' || port === 'imageA' || port === 'imageB' || port === 'mask') {
+    emit('port-mousedown', event, port)
+  }
 }
 </script>
 
@@ -177,7 +166,7 @@ function onPortMouseDown(event: MouseEvent, port: string) {
   gap: 7px;
 }
 
-.tryon-mode-card {
+.tryon-tile-card {
   gap: 6px;
 }
 
@@ -192,7 +181,8 @@ function onPortMouseDown(event: MouseEvent, port: string) {
 }
 
 .tryon-control-row .node-control-label {
-  min-width: 36px;
+  width: 56px;
+  flex: 0 0 56px;
   font-size: 10.5px;
   letter-spacing: 0.02em;
 }

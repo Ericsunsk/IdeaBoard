@@ -28,7 +28,6 @@
 |------|------|------|
 | 模特多角度 | `/multi-angle` | 生成模特多角度展示图 |
 | 虚拟 3D | `/virtual-3d` | 服装 3D 虚拟展示 |
-| 人台变模特 | `/mannequin-to-model` | 人台展示图转为模特上身图 |
 | 定向换脸 | `/face-swap` | 模特换脸 |
 | 换背景 | `/bg-swap` | 更换拍摄背景 |
 | 款式上身 | `/garment-on-model` | 服装虚拟试穿 |
@@ -38,8 +37,6 @@
 | 功能 | 路由 | 说明 |
 |------|------|------|
 | 图案生成 | `/pattern-gen` | AI 生成原创图案 |
-| 画风复刻 | `/style-clone` | 复刻参考图画风 |
-| 四方连续 | `/seamless-tile` | 生成无缝拼接图案 |
 | 图案融合 | `/pattern-fusion` | 多图案融合 |
 | 工艺融合 | `/craft-fusion` | 将工艺效果融入图案 |
 | 图案变清晰 | `/pattern-upscale` | 图案超分辨率（阿里云 ImageEnhance 超分 API，后端已接入） |

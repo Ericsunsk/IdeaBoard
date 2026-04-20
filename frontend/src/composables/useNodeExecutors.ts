@@ -1,10 +1,13 @@
 import type { Ref } from 'vue'
 import type { SubmitTaskData } from '../api/index'
+import { describeModelAngleSpec, describeTryOnTileMode } from '../components/canvas/nodes/nodeOptionConfig'
 import {
   enhanceModeSupportsPrompt,
   getEditNodePortLabel,
 } from '../config/canvasNodeConnectionContract'
 import {
+  clampModelPoseStrength,
+  clampModelReferenceStrength,
   DEFAULT_COLOR_STRENGTH,
   isColorSingleColorMode,
   normalizeColorNodeColors,
@@ -19,9 +22,7 @@ import type {
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
-  GenerateNodeItem,
   ImageNodeItem,
-  MannequinNodeItem,
   MaskNodeItem,
   ModelNodeItem,
   TryOnNodeItem,
@@ -48,6 +49,7 @@ interface SubmitTaskOptionsLike {
   successMessage: string
   failureMessage?: string
   onCompleted?: (urls: string[]) => void
+  onFailed?: () => void
 }
 
 type PlacedImageInput = { url: string; placementX: number; placementY: number }
@@ -68,8 +70,7 @@ type SegmentPayload = {
 
 type StandardEditMode = Exclude<EditNodeItem['mode'], 'face-swap'>
 type EditModeMeta = Record<StandardEditMode, { feature: string; promptPrefix: string; fallbackPrompt: string }>
-type TryOnModeMeta = Record<TryOnNodeItem['mode'], { feature: string; promptPrefix: string; successLabel: string }>
-type GenerateModeMeta = Record<GenerateNodeItem['mode'], { feature: string; promptPrefix: string; successLabel: string }>
+type TryOnFeatureMeta = { feature: string; promptPrefix: string; successLabel: string }
 
 const FUSION_META = {
   feature: 'style-fusion',
@@ -96,17 +97,11 @@ interface UseNodeExecutorsOptions {
   messages: Ref<CanvasImageItem[]>
   selectedIds: Ref<number[]>
   imageNodes: Ref<ImageNodeItem[]>
-  modelNodes: Ref<ModelNodeItem[]>
   maskNodes: Ref<MaskNodeItem[]>
   activeImageNodeId: Ref<number | null>
-  activeModelNodeId: Ref<number | null>
   activeMaskNodeId: Ref<number | null>
-  modelDefaultPose: string
-  modelDefaultExpression: string
   editModeMeta: EditModeMeta
-  tryOnModeMeta: TryOnModeMeta
-  generateModeMeta: GenerateModeMeta
-  getModelAngleLabel: (key: string) => string
+  tryOnFeatureMeta: TryOnFeatureMeta
   getViewpointLabel: (key: string) => string
   getViewpointLightingLabel: (key: ViewpointNodeItem['lighting']) => string
   getNodeConnectionStatus: (
@@ -114,7 +109,6 @@ interface UseNodeExecutorsOptions {
     node: { id: number },
   ) => NodeConnectionStatus
   triggerNodeConnectionError: (nodeType: CanvasConnectionNodeType, nodeId: number, ports: string[]) => void
-  getModelNodeEffectiveSource: (node: ModelNodeItem) => { url: string; ratio: number; connected: boolean }
   resolveNodePromptText: (nodeType: CanvasConnectionNodeType, nodeId: number, fallback?: string) => string
   getConnectedOutputImageTarget: (
     fromNodeType: CanvasConnectionNodeType,
@@ -160,12 +154,60 @@ interface UseNodeExecutorsOptions {
   upscaleImage: (payload: UpscalePayload) => Promise<ApiResponseLike<{ image_url?: string }>>
   segmentImage: (payload: SegmentPayload) => Promise<ApiResponseLike<{ result_url?: string }>>
   saveSegmentResult: (payload: { result_url: string; seg_type: string; feature: string }) => Promise<ApiResponseLike<{ image_url?: string }>>
-  generateModeSupportsStyleModel: (mode: GenerateNodeItem['mode']) => boolean
+  setExecutionNodeRunning: (
+    nodeType: CanvasExecutionOutputNodeType,
+    nodeId: number,
+    running: boolean,
+  ) => void
+  setExecutionNodeLastRunFailed: (
+    nodeType: CanvasExecutionOutputNodeType,
+    nodeId: number,
+    failed: boolean,
+  ) => void
 }
 
 export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   function getEditModeMeta(mode: StandardEditMode) {
     return options.editModeMeta[mode]
+  }
+
+  function resolveFailureMessage(error: unknown, fallback: string): string {
+    const maybeError = error as { msg?: string; message?: string } | null
+    return maybeError?.msg || maybeError?.message || fallback
+  }
+
+  function markExecutionRunning(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
+    options.setExecutionNodeRunning(nodeType, nodeId, true)
+    options.setExecutionNodeLastRunFailed(nodeType, nodeId, false)
+  }
+
+  function markExecutionSucceeded(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
+    options.setExecutionNodeRunning(nodeType, nodeId, false)
+    options.setExecutionNodeLastRunFailed(nodeType, nodeId, false)
+  }
+
+  function markExecutionFailed(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
+    options.setExecutionNodeRunning(nodeType, nodeId, false)
+    options.setExecutionNodeLastRunFailed(nodeType, nodeId, true)
+  }
+
+  function failExecution(
+    nodeType: CanvasExecutionOutputNodeType,
+    nodeId: number,
+    message: string,
+  ) {
+    options.message.error(message)
+    markExecutionFailed(nodeType, nodeId)
+    options.generating.value = false
+  }
+
+  function failExecutionFromError(
+    nodeType: CanvasExecutionOutputNodeType,
+    nodeId: number,
+    error: unknown,
+    fallback: string,
+  ) {
+    failExecution(nodeType, nodeId, resolveFailureMessage(error, fallback))
   }
 
   function cacheNodeOutputs(
@@ -176,12 +218,35 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     options.appendWorkflowNodeOutputs(nodeType, nodeId, urls)
   }
 
-  function resolveConnectedMannequinImageInput(node: MannequinNodeItem): PlacedImageInput | null {
-    return options.resolveConnectedPlacedImageInput('mannequin', node.id, 'image')
+  async function submitExecutionTask(
+    nodeType: CanvasExecutionOutputNodeType,
+    nodeId: number,
+    submitOptions: SubmitTaskOptionsLike,
+  ) {
+    markExecutionRunning(nodeType, nodeId)
+    return options.submitTaskAndPoll({
+      ...submitOptions,
+      onCompleted: (urls) => {
+        markExecutionSucceeded(nodeType, nodeId)
+        submitOptions.onCompleted?.(urls)
+      },
+      onFailed: () => {
+        markExecutionFailed(nodeType, nodeId)
+        submitOptions.onFailed?.()
+      },
+    })
   }
 
-  function resolveConnectedMannequinPromptInput(node: MannequinNodeItem, fallback = ''): string {
-    return options.resolveNodePromptText('mannequin', node.id, fallback)
+  function resolveConnectedModelPoseImageInput(node: ModelNodeItem): PlacedImageInput | null {
+    return options.resolveConnectedPlacedImageInput('model', node.id, 'imageB')
+  }
+
+  function resolveConnectedModelImageInput(node: ModelNodeItem): PlacedImageInput | null {
+    return options.resolveConnectedPlacedImageInput('model', node.id, 'image')
+  }
+
+  function resolveConnectedModelReferenceImageInput(node: ModelNodeItem): PlacedImageInput | null {
+    return options.resolveConnectedPlacedImageInput('model', node.id, 'imageA')
   }
 
   function resolveConnectedViewpointImageInput(node: ViewpointNodeItem): PlacedImageInput | null {
@@ -232,6 +297,10 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     return options.resolveConnectedPlacedImageInput('tryon', node.id, port)
   }
 
+  async function resolveConnectedTryOnMaskInput(node: TryOnNodeItem): Promise<PlacedMaskInput | null> {
+    return options.resolveConnectedPlacedMaskInput('tryon', node.id, 'mask')
+  }
+
   async function resolveColorGenerationContext(
     nodeType: 'color',
     node: { id: number; x: number; y: number },
@@ -258,13 +327,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const latestMaskNode = [...options.maskNodes.value]
       .reverse()
       .find(item => !!item.sourceImageUrl && !!item.maskDataUrl)
-    const activeModelNode =
-      options.activeModelNodeId.value !== null
-        ? options.modelNodes.value.find(item => item.id === options.activeModelNodeId.value)
-        : null
-    const latestModelNode = [...options.modelNodes.value]
-      .reverse()
-      .find(item => !!item.sourceImageUrl)
     const activeImageNode =
       options.activeImageNodeId.value !== null
         ? options.imageNodes.value.find(item => item.id === options.activeImageNodeId.value)
@@ -342,19 +404,10 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     }
 
     const pickedImageNode = options.getImageNodePreferredImage(activeImageNode ?? latestImageNode ?? null)
-    const pickedModelNode =
-      activeModelNode && activeModelNode.sourceImageUrl
-        ? activeModelNode
-        : latestModelNode
-
     if (pickedImageNode) {
       originalImageUrl = pickedImageNode.url
       placementX = (activeImageNode ?? latestImageNode)?.x ?? node.x
       placementY = ((activeImageNode ?? latestImageNode)?.y ?? node.y) + 18
-    } else if (pickedModelNode) {
-      originalImageUrl = pickedModelNode.sourceImageUrl
-      placementX = pickedModelNode.x - 340
-      placementY = pickedModelNode.y + 18
     } else if (latestCanvasImage) {
       originalImageUrl = latestCanvasImage.url
       placementX = latestCanvasImage.x - 340
@@ -392,6 +445,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return
     }
 
+    markExecutionRunning(nodeType, node.id)
     options.generating.value = true
     const connectedOutputNodeId = options.getConnectedOutputImageTarget(nodeType, node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
@@ -399,8 +453,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       const maskFile = await options.dataUrlToFile(resolvedContext.maskDataUrl, `mask-${Date.now()}.png`)
       const uploadRes = await options.uploadImage(maskFile)
       if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-        options.message.error(uploadRes.msg || '蒙版上传失败')
-        options.generating.value = false
+        failExecution(nodeType, node.id, uploadRes.msg || '蒙版上传失败')
         return
       }
 
@@ -410,7 +463,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         resolvedContext.placementY,
       )
 
-      await options.submitTaskAndPoll({
+      await submitExecutionTask(nodeType, node.id, {
         request: {
           prompt: `${DIRECTED_RECOLOR_META.promptPrefix} ${resolvedContext.promptText ? `${resolvedContext.promptText}，` : ''}目标颜色：${targetColor}，强度：${strength}`,
           params: {
@@ -429,18 +482,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         onCompleted: urls => cacheNodeOutputs(nodeType, node.id, urls),
       })
     } catch (error: unknown) {
-      const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || 'Failed to submit color task')
-      options.generating.value = false
+      failExecutionFromError(nodeType, node.id, error, 'Failed to submit color task')
     }
-  }
-
-  function resolveConnectedGenerateImageInput(node: GenerateNodeItem): PlacedImageInput | null {
-    return options.resolveConnectedPlacedImageInput('generate', node.id, 'image')
-  }
-
-  function resolveConnectedGeneratePromptInput(node: GenerateNodeItem, fallback = ''): string {
-    return options.resolveNodePromptText('generate', node.id, fallback)
   }
 
   async function buildMaskedImageDataUrl(imageUrl: string, maskDataUrl: string): Promise<string | null> {
@@ -495,43 +538,47 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
   async function handleModelNodeGenerate(node: ModelNodeItem) {
     if (options.generating.value) return
-    const connectionStatus = options.getNodeConnectionStatus('model', node)
-    const effectiveSource = options.getModelNodeEffectiveSource(node)
-    const sourceUrl = effectiveSource.url
-    if (!sourceUrl) {
-      options.triggerNodeConnectionError('model', node.id, ['image'])
-      options.message.warning(
-        connectionStatus.pendingIncoming.image
-          ? 'Model 节点等待上游 Image 输出'
-          : connectionStatus.hasAnyConnection
-            ? 'Model 节点缺少 image 连线'
-            : '请先上传模特图',
-      )
-      return
-    }
+    const sourceInput = resolveConnectedModelImageInput(node)
+    const modelImageInput = resolveConnectedModelReferenceImageInput(node)
+    const missingPorts = options.getMissingRequiredNodeInputs('model', node, {
+      image: sourceInput,
+      imageA: modelImageInput,
+    })
+    if (options.warnMissingNodeInputs('model', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
+      if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
+        return `Model 节点等待上游 ${pendingPorts.join(' / ')} 输出`
+      }
+      if (pendingPorts.length > 0) {
+        return `Model 节点缺少 ${disconnectedPorts.join(' / ')} 连线，且等待上游 ${pendingPorts.join(' / ')} 输出`
+      }
+      return `Model 节点缺少 ${disconnectedPorts.join(' / ')} 连线`
+    })) return
 
-    const angles = [...node.selectedAngles]
-    if (angles.length === 0) {
-      options.message.warning('请至少选择一个角度')
-      return
-    }
+    const sourceUrl = sourceInput!.url
 
     options.generating.value = true
-    const angleLabel = angles.map(options.getModelAngleLabel).join('、')
-    const promptText = options.resolveNodePromptText('model', node.id, `多角度：${angleLabel}`)
+    const angleSpec = { ...node.angleSpec }
+    const angleLabel = describeModelAngleSpec(angleSpec)
+    const promptText = options.resolveNodePromptText('model', node.id, `视角：${angleLabel}`)
+    const poseImageInput = resolveConnectedModelPoseImageInput(node)
+    const modelStrength = clampModelReferenceStrength(node.modelStrength)
+    const poseStrength = clampModelPoseStrength(node.poseStrength)
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('model', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
     const placementSource = options.buildPlacementSource(sourceUrl, node.x + 340, node.y + 18)
 
-    await options.submitTaskAndPoll({
+    await submitExecutionTask('model', node.id, {
       request: {
         prompt: `[multi-angle] ${promptText}`,
         params: {
           image_urls: [sourceUrl],
           feature: 'multi-angle',
-          angles: angles.join(','),
-          pose: options.modelDefaultPose,
-          expression: options.modelDefaultExpression,
+          angle_spec: {
+            yaw: angleSpec.yaw,
+            framing: angleSpec.framing,
+          },
+          ...(modelImageInput?.url ? { model_url: modelImageInput.url, model_strength: modelStrength } : {}),
+          ...(poseImageInput?.url ? { pose_url: poseImageInput.url, pose_strength: poseStrength } : {}),
           background: node.background,
         },
       },
@@ -543,110 +590,35 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     })
   }
 
-  async function handleMannequinNodeGenerate(node: MannequinNodeItem) {
-    if (options.generating.value) return
-    const connectionStatus = options.getNodeConnectionStatus('mannequin', node)
-    const connectedImage = resolveConnectedMannequinImageInput(node)
-    const sourceUrl = connectedImage?.url || node.sourceImageUrl
-    if (!sourceUrl) {
-      options.triggerNodeConnectionError('mannequin', node.id, ['image'])
-      options.message.warning(
-        connectionStatus.pendingIncoming.image
-          ? 'Mannequin 节点等待上游 Image 输出'
-          : connectionStatus.hasAnyConnection
-            ? 'Mannequin 节点缺少 image 连线'
-            : '请先上传人台图',
-      )
-      return
-    }
-
-    options.generating.value = true
-    let segmentedImageUrl = ''
-    try {
-      const segmentRes = await options.segmentImage({
-        image_url: sourceUrl,
-        seg_type: 'clothing',
-      })
-      const tempSegmentUrl = segmentRes.data?.result_url || segmentRes.result_url || ''
-      if (segmentRes.code !== 0 || !tempSegmentUrl) {
-        options.message.error(segmentRes.msg || '服饰分割失败')
-        options.generating.value = false
-        return
-      }
-
-      const saveRes = await options.saveSegmentResult({
-        result_url: tempSegmentUrl,
-        seg_type: 'clothing',
-        feature: 'mannequin-to-model',
-      })
-      segmentedImageUrl = saveRes.data?.image_url || ''
-      if (saveRes.code !== 0 || !segmentedImageUrl) {
-        options.message.error(saveRes.msg || '保存分割结果失败')
-        options.generating.value = false
-        return
-      }
-    } catch (error: unknown) {
-      const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || '服饰分割失败')
-      options.generating.value = false
-      return
-    }
-
-    const promptText = resolveConnectedMannequinPromptInput(node, '人台变模特')
-    const connectedOutputNodeId = options.getConnectedOutputImageTarget('mannequin', node.id)?.id ?? null
-    const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const placementSource = options.buildPlacementSource(sourceUrl, node.x + 340, node.y + 18)
-
-    await options.submitTaskAndPoll({
-      request: {
-        prompt: `[mannequin-to-model] ${promptText}`,
-        params: {
-          image_urls: [segmentedImageUrl],
-          feature: 'mannequin-to-model',
-          ...(promptText ? { user_prompt: promptText } : {}),
-        },
-      },
-      source: placementSource,
-      outputNodeId,
-      successMessage: 'Task submitted · Mannequin',
-      failureMessage: 'Failed to submit task',
-      onCompleted: urls => cacheNodeOutputs('mannequin', node.id, urls),
-    })
-  }
-
   async function handleViewpointNodeGenerate(node: ViewpointNodeItem) {
     if (options.generating.value) return
 
     const connectionStatus = options.getNodeConnectionStatus('viewpoint', node)
     const connectedImage = resolveConnectedViewpointImageInput(node)
-    const sourceUrls = connectedImage
-      ? [connectedImage.url]
-      : node.sourceImages
-          .map(image => image.url)
-          .filter((url): url is string => !!url)
+    const sourceUrls = connectedImage ? [connectedImage.url] : []
 
     if (sourceUrls.length === 0) {
       options.triggerNodeConnectionError('viewpoint', node.id, ['image'])
       options.message.warning(
         connectionStatus.pendingIncoming.image
-          ? 'Viewpoint 节点等待上游 Image 输出'
+          ? 'Display 节点等待上游 Image 输出'
           : connectionStatus.hasAnyConnection
-            ? 'Viewpoint 节点缺少 image 连线'
-            : '请先上传服装图或连接 Image 节点',
+            ? 'Display 节点缺少 image 连线'
+            : '请先连接 Image 节点',
       )
       return
     }
 
-    if (node.selectedViewpoints.length === 0) {
-      options.message.warning('请至少选择一个视角')
+    if (!node.selectedViewpoint) {
+      options.message.warning('请选择视角')
       return
     }
 
     options.generating.value = true
-    const viewpointLabels = node.selectedViewpoints.map(options.getViewpointLabel).join('、')
+    const viewpointLabel = options.getViewpointLabel(node.selectedViewpoint)
     const lightingLabel = options.getViewpointLightingLabel(node.lighting)
     const summaryPrompt = [
-      `视角：${viewpointLabels}`,
+      `视角：${viewpointLabel}`,
       `光影：${lightingLabel}`,
     ].filter(Boolean)
     const promptText = resolveConnectedViewpointPromptInput(node, summaryPrompt.join('，')).trim()
@@ -654,20 +626,20 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
     const placementSource = options.buildPlacementSource(sourceUrls[0], node.x + 340, node.y + 18)
 
-    await options.submitTaskAndPoll({
+    await submitExecutionTask('viewpoint', node.id, {
       request: {
         prompt: `[virtual-3d] ${promptText}`,
         params: {
           image_urls: sourceUrls,
           feature: 'virtual-3d',
-          viewpoints: node.selectedViewpoints.join(','),
+          viewpoint: node.selectedViewpoint,
           lighting: node.lighting,
         },
       },
       source: placementSource,
       outputNodeId,
-      successMessage: 'Viewpoint submitted',
-      failureMessage: 'Failed to submit viewpoint task',
+      successMessage: 'Display submitted',
+      failureMessage: 'Failed to submit display task',
       onCompleted: urls => cacheNodeOutputs('viewpoint', node.id, urls),
     })
   }
@@ -710,28 +682,26 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
 
     try {
-      if (node.mode === 'face-swap') {
-        let faceSourceUrl = connectedSourceImage!.url
-        if (connectedMask?.dataUrl) {
-          const maskedFaceDataUrl = await buildMaskedImageDataUrl(connectedSourceImage!.url, connectedMask.dataUrl)
-          if (!maskedFaceDataUrl) {
-            options.message.error('无法生成分割人脸，请重试')
-            options.generating.value = false
-            return
+        if (node.mode === 'face-swap') {
+          let faceSourceUrl = connectedSourceImage!.url
+          if (connectedMask?.dataUrl) {
+            const maskedFaceDataUrl = await buildMaskedImageDataUrl(connectedSourceImage!.url, connectedMask.dataUrl)
+            if (!maskedFaceDataUrl) {
+              failExecution('edit', node.id, '无法生成分割人脸，请重试')
+              return
+            }
+            const faceFile = await options.dataUrlToFile(maskedFaceDataUrl, `face-swap-face-${Date.now()}.png`)
+            const uploadRes = await options.uploadImage(faceFile)
+            if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+              failExecution('edit', node.id, uploadRes.msg || '分割人脸上传失败')
+              return
+            }
+            faceSourceUrl = uploadRes.data.url
           }
-          const faceFile = await options.dataUrlToFile(maskedFaceDataUrl, `face-swap-face-${Date.now()}.png`)
-          const uploadRes = await options.uploadImage(faceFile)
-          if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-            options.message.error(uploadRes.msg || '分割人脸上传失败')
-            options.generating.value = false
-            return
-          }
-          faceSourceUrl = uploadRes.data.url
-        }
 
         const placementSource = options.buildPlacementSource(resolvedImage.url, node.x + 340, node.y + 18)
 
-        await options.submitTaskAndPoll({
+        await submitExecutionTask('edit', node.id, {
           request: {
             prompt: '[face-swap] 换脸',
             params: {
@@ -752,14 +722,13 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       const maskFile = await options.dataUrlToFile(resolvedMask.dataUrl, `edit-mask-${Date.now()}.png`)
       const uploadRes = await options.uploadImage(maskFile)
       if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-        options.message.error(uploadRes.msg || '蒙版上传失败')
-        options.generating.value = false
+        failExecution('edit', node.id, uploadRes.msg || '蒙版上传失败')
         return
       }
 
       const placementSource = options.buildPlacementSource(resolvedImage.url, resolvedMask.placementX, resolvedMask.placementY)
 
-      await options.submitTaskAndPoll({
+      await submitExecutionTask('edit', node.id, {
         request: {
           prompt: `${editModeMeta!.promptPrefix} ${promptText}`,
           params: {
@@ -775,9 +744,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         onCompleted: urls => cacheNodeOutputs('edit', node.id, urls),
       })
     } catch (error: unknown) {
-      const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || 'Failed to submit edit task')
-      options.generating.value = false
+      failExecutionFromError('edit', node.id, error, 'Failed to submit edit task')
     }
   }
 
@@ -808,7 +775,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
     const placementSource = options.buildPlacementSource(connectedImageA!.url, node.x + 340, node.y + 18)
 
-    await options.submitTaskAndPoll({
+    await submitExecutionTask('fusion', node.id, {
       request: {
         prompt: `${FUSION_META.promptPrefix} ${promptText}`,
         feature: FUSION_META.feature,
@@ -862,24 +829,22 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         if (hasMaskConnection) {
           if (!connectedMask?.dataUrl) {
             options.triggerNodeConnectionError('enhance', node.id, ['mask'])
-            options.message.warning(
+            failExecution('enhance', node.id,
               connectionStatus.pendingIncoming.mask
                 ? 'Enhance 节点等待上游 Mask 输出'
                 : 'Enhance 节点蒙版不可用，请检查 Mask 节点',
             )
-            options.generating.value = false
             return
           }
 
           const maskFile = await options.dataUrlToFile(connectedMask.dataUrl, `enhance-mask-${Date.now()}.png`)
           const uploadRes = await options.uploadImage(maskFile)
           if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-            options.message.error(uploadRes.msg || '蒙版上传失败')
-            options.generating.value = false
+            failExecution('enhance', node.id, uploadRes.msg || '蒙版上传失败')
             return
           }
 
-          await options.submitTaskAndPoll({
+          await submitExecutionTask('enhance', node.id, {
             request: {
               prompt: '[hd-upscale] 局部高清放大，仅增强蒙版区域',
               params: {
@@ -906,6 +871,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           return
         }
 
+        markExecutionRunning('enhance', node.id)
         const res = await options.upscaleImage({
           image_url: connectedImage!.url,
           mode: node.upscaleMode,
@@ -916,19 +882,19 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         })
 
         if (res.code !== 0 || !res.data?.image_url) {
-          options.message.error(res.msg || '增强失败')
-          options.generating.value = false
+          failExecution('enhance', node.id, res.msg || '增强失败')
           return
         }
 
         options.appendGeneratedImages([res.data.image_url], placementSource, outputNodeId)
         cacheNodeOutputs('enhance', node.id, [res.data.image_url])
         options.message.success('HD upscale completed')
+        markExecutionSucceeded('enhance', node.id)
         options.generating.value = false
         return
       }
 
-      await options.submitTaskAndPoll({
+      await submitExecutionTask('enhance', node.id, {
         request: {
           prompt: `[canvas-extend] ${promptText || '画布延伸'}`,
           params: {
@@ -947,57 +913,89 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         onCompleted: urls => cacheNodeOutputs('enhance', node.id, urls),
       })
     } catch (error: unknown) {
-      const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || 'Failed to enhance image')
-      options.generating.value = false
+      failExecutionFromError('enhance', node.id, error, 'Failed to enhance image')
     }
   }
 
   async function handleTryOnNodeGenerate(node: TryOnNodeItem) {
     if (options.generating.value) return
 
+    const connectionStatus = options.getNodeConnectionStatus('tryon', node)
     const connectedImageA = resolveConnectedTryOnImageInput(node, 'imageA')
     const connectedImageB = resolveConnectedTryOnImageInput(node, 'imageB')
+    const connectedMask = await resolveConnectedTryOnMaskInput(node)
+    const hasMaskConnection = !!connectionStatus.incoming.mask
     const missingPorts = options.getMissingRequiredNodeInputs('tryon', node, {
       imageA: connectedImageA,
       imageB: connectedImageB,
     })
 
     if (options.warnMissingNodeInputs('tryon', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
-      const formatLabel = (port: string) => port === 'imageA' ? 'Base' : (node.mode === 'pattern-on-body' ? 'Pattern' : 'Fabric')
+      const formatLabel = (port: string) => port === 'imageA' ? 'Body' : 'Texture'
       if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
-        return `TryOn 节点等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
+        return `Wear 节点等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
       }
       if (pendingPorts.length > 0) {
-        return `TryOn 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线，且等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
+        return `Wear 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线，且等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
       }
-      return `TryOn 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线`
+      return `Wear 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线`
     })) return
+
+    if (hasMaskConnection && !connectedMask?.dataUrl) {
+      options.triggerNodeConnectionError('tryon', node.id, ['mask'])
+      options.message.warning(
+        connectionStatus.pendingIncoming.mask
+          ? 'Wear 节点等待上游 Mask 输出'
+          : 'Wear 节点蒙版不可用，请检查 Mask 节点',
+      )
+      return
+    }
 
     options.generating.value = true
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('tryon', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const tileModeLabel = node.tileMode === 'seamless' ? '四方连续' : '非四方连续'
+    const tileModeLabel = describeTryOnTileMode(node.tileMode)
     const placementSource = options.buildPlacementSource(connectedImageA!.url, node.x + 340, node.y + 18)
+    try {
+      let maskImageUrl = ''
+      if (connectedMask?.dataUrl) {
+        const maskFile = await options.dataUrlToFile(connectedMask.dataUrl, `tryon-mask-${Date.now()}.png`)
+        const uploadRes = await options.uploadImage(maskFile)
+        if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+          failExecution('tryon', node.id, uploadRes.msg || '蒙版上传失败')
+          return
+        }
+        maskImageUrl = uploadRes.data.url
+      }
 
-    await options.submitTaskAndPoll({
-      request: {
-        prompt: `${options.tryOnModeMeta[node.mode].promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，透明度${node.opacity}%`,
-        params: {
-          image_urls: [connectedImageA!.url, connectedImageB!.url],
-          feature: options.tryOnModeMeta[node.mode].feature,
-          fabric_rotation: node.rotation,
-          fabric_opacity: node.opacity,
-          fabric_scale: node.scale,
-          tile_mode: node.tileMode,
+      await submitExecutionTask('tryon', node.id, {
+        request: {
+          prompt: `${options.tryOnFeatureMeta.promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，融合强度${node.opacity}%`,
+          params: {
+            image_urls: [connectedImageA!.url, connectedImageB!.url],
+            original_image_url: connectedImageA!.url,
+            ...(maskImageUrl
+              ? {
+                  mask_image_url: maskImageUrl,
+                  use_mask: true,
+                }
+              : {}),
+            feature: options.tryOnFeatureMeta.feature,
+            fabric_rotation: node.rotation,
+            fabric_opacity: node.opacity,
+            fabric_scale: node.scale,
+            tile_mode: node.tileMode,
+          },
         },
-      },
-      source: placementSource,
-      outputNodeId,
-      successMessage: `${options.tryOnModeMeta[node.mode].successLabel} submitted`,
-      failureMessage: 'Failed to submit try-on task',
-      onCompleted: urls => cacheNodeOutputs('tryon', node.id, urls),
-    })
+        source: placementSource,
+        outputNodeId,
+        successMessage: `${options.tryOnFeatureMeta.successLabel} submitted`,
+        failureMessage: 'Failed to submit try-on task',
+        onCompleted: urls => cacheNodeOutputs('tryon', node.id, urls),
+      })
+    } catch (error: unknown) {
+      failExecutionFromError('tryon', node.id, error, 'Failed to submit try-on task')
+    }
   }
 
   async function handleColorNodeGenerate(node: ColorNodeItem) {
@@ -1024,6 +1022,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     }
 
     options.generating.value = true
+    markExecutionRunning('color', node.id)
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('color', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
     const placementSource = options.buildPlacementSource(
@@ -1036,8 +1035,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       const maskFile = await options.dataUrlToFile(resolvedContext.maskDataUrl, `color-mask-${Date.now()}.png`)
       const uploadRes = await options.uploadImage(maskFile)
       if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-        options.message.error(uploadRes.msg || '蒙版上传失败')
-        options.generating.value = false
+        failExecution('color', node.id, uploadRes.msg || '蒙版上传失败')
         return
       }
 
@@ -1049,7 +1047,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         promptText,
       ].filter(Boolean)
 
-      await options.submitTaskAndPoll({
+      await submitExecutionTask('color', node.id, {
         request: {
           prompt: promptParts.join('，'),
           params: {
@@ -1069,74 +1067,17 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         onCompleted: urls => cacheNodeOutputs('color', node.id, urls),
       })
     } catch (error: unknown) {
-      const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || 'Failed to submit color task')
-      options.generating.value = false
+      failExecutionFromError('color', node.id, error, 'Failed to submit color task')
     }
-  }
-
-  async function handleGenerateNodeGenerate(node: GenerateNodeItem) {
-    if (options.generating.value) return
-
-    const connectedImage = resolveConnectedGenerateImageInput(node)
-    const promptText = resolveConnectedGeneratePromptInput(node, '')
-    const missingPorts = options.getMissingRequiredNodeInputs('generate', node, {
-      image: connectedImage,
-      prompt: promptText,
-    })
-
-    if (options.warnMissingNodeInputs('generate', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
-      const formatLabel = (port: string) => port === 'image' ? 'Image' : 'Prompt'
-      if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
-        return `Generate 节点等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
-      }
-      if (pendingPorts.length > 0) {
-        return `Generate 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线，且等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
-      }
-      return `Generate 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线`
-    })) return
-
-    if (options.generateModeSupportsStyleModel(node.mode) && !node.styleModel) {
-      options.message.warning('请先选择 Style')
-      return
-    }
-
-    options.generating.value = true
-    const meta = options.generateModeMeta[node.mode]
-    const outputNodeId = options.getConnectedOutputImageTarget('generate', node.id)?.id ?? null
-    const resolvedOutputNodeId = options.resolvePreferredOutputNodeId(outputNodeId)
-    const placementSource = options.buildPlacementSource(connectedImage?.url || '', node.x + 340, node.y + 18)
-
-    await options.submitTaskAndPoll({
-      request: {
-        prompt: meta.promptPrefix ? `${meta.promptPrefix} ${promptText}` : promptText,
-        feature: meta.feature,
-        ...(connectedImage?.url ? { image_urls: [connectedImage.url] } : {}),
-        params: {
-          ratio: node.ratio,
-          count: node.count,
-          quality: node.quality,
-          ...(options.generateModeSupportsStyleModel(node.mode) ? { style_model: node.styleModel } : {}),
-          feature: meta.feature,
-        },
-      },
-      source: placementSource.url ? placementSource : undefined,
-      outputNodeId: resolvedOutputNodeId,
-      successMessage: `${meta.successLabel} submitted`,
-      failureMessage: 'Failed to submit generate task',
-      onCompleted: urls => cacheNodeOutputs('generate', node.id, urls),
-    })
   }
 
   return {
     handleModelNodeGenerate,
-    handleMannequinNodeGenerate,
     handleViewpointNodeGenerate,
     handleColorNodeGenerate,
     handleEditNodeGenerate,
     handleFusionNodeGenerate,
     handleEnhanceNodeGenerate,
     handleTryOnNodeGenerate,
-    handleGenerateNodeGenerate,
   }
 }

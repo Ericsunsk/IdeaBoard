@@ -16,6 +16,7 @@ export type NodeConnectionState<TPort extends string = string> = {
 export type NodeUiState<TPort extends string = string> = {
   connection: NodeConnectionState<TPort>
   primaryAction?: NodePrimaryActionState
+  secondaryStatus?: string
   cacheStatus?: WorkflowNodeOutputStatus
 }
 

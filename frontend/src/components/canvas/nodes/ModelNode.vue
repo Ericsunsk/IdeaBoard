@@ -21,59 +21,39 @@
     </NodeHeader>
 
     <div class="model-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
-      <div
-        class="model-stage"
-        :data-model-id="node.id"
-        :style="{ height: `${stageHeight}px` }"
-        @dragover.prevent
-        @drop.prevent.stop="emit('stage-drop', $event)"
-      >
-        <template v-if="effectiveSourceImageUrl">
-          <img :src="effectiveSourceImageUrl" class="model-stage-image" />
-          <div v-if="node.sourceImageUrl && !hasConnectedImageInput" class="model-stage-actions">
-            <NodeActionButton variant="stage" @click="emit('open-file-picker')">更换图片</NodeActionButton>
-            <NodeActionButton variant="stage-ghost" @click="emit('clear-image')">清空</NodeActionButton>
-          </div>
-        </template>
-        <div v-else class="model-stage-empty" @click="emit('open-file-picker')">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          <span>上传模特图（点击或拖拽）</span>
+      <div class="model-mode-card node-mode-card">
+        <div class="model-summary-row">
+          <span class="model-summary-value">{{ describeModelAngleSpec(node.angleSpec) }}</span>
         </div>
-      </div>
 
-      <div class="model-control-group node-control-group">
-        <div class="model-angle-head node-control-head">
-          <span class="model-control-label node-control-label">角度（最多 4 个）</span>
-          <button
-            v-if="node.selectedAngles.length > 0"
-            type="button"
-            class="model-angle-clear-btn"
-            @click="emit('clear-angles')"
-          >
-            清空
-          </button>
+        <div class="model-angle-row">
+          <span class="model-angle-anchor">L</span>
+          <input
+            class="model-angle-range node-inline-range"
+            :style="{ '--slider-pct': `${((node.angleSpec.yaw + 180) / 360) * 100}%` }"
+            :value="node.angleSpec.yaw"
+            type="range"
+            min="-180"
+            max="180"
+            step="1"
+            @input="emit('update-angle-yaw', Number(($event.target as HTMLInputElement).value || node.angleSpec.yaw))"
+          />
+          <span class="model-angle-anchor">R</span>
         </div>
-        <div class="model-control-options node-option-row">
+
+        <div class="node-option-row">
           <NodeActionButton
-            v-for="opt in angleOptions"
-            :key="`${node.id}-angle-${opt.key}`"
+            v-for="opt in framingOptions"
+            :key="`${node.id}-framing-${opt.key}`"
             variant="chip"
-            :active="node.selectedAngles.includes(opt.key)"
-            @click="emit('toggle-angle', opt.key)"
+            :active="node.angleSpec.framing === opt.key"
+            @click="emit('update-angle-framing', opt.key)"
           >
             {{ opt.label }}
           </NodeActionButton>
         </div>
-        <span v-if="node.selectedAngles.length === 0" class="model-angle-empty">请至少选择一个角度</span>
-      </div>
 
-      <div class="model-control-group node-control-group">
-        <span class="model-control-label node-control-label">背景</span>
-        <div class="model-control-options node-option-row">
+        <div class="node-option-row">
           <NodeActionButton
             v-for="opt in backgroundOptions"
             :key="`${node.id}-bg-${opt.key}`"
@@ -86,11 +66,48 @@
         </div>
       </div>
 
+      <div v-if="showModelStrength" class="model-control-group node-control-group">
+        <div class="node-control-head">
+          <span class="model-control-label node-control-label">Model</span>
+          <span class="model-strength-value">{{ node.modelStrength }}%</span>
+        </div>
+        <input
+          class="model-strength-range node-inline-range"
+          :value="node.modelStrength"
+          :style="{ '--slider-pct': `${node.modelStrength}%` }"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          @input="emit('update-model-strength', Number(($event.target as HTMLInputElement).value || node.modelStrength))"
+        />
+      </div>
+
+      <div v-if="showPoseStrength" class="model-control-group node-control-group">
+        <div class="node-control-head">
+          <span class="model-control-label node-control-label">Pose</span>
+          <span class="model-strength-value">{{ node.poseStrength }}%</span>
+        </div>
+        <input
+          class="model-strength-range node-inline-range"
+          :value="node.poseStrength"
+          :style="{ '--slider-pct': `${node.poseStrength}%` }"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          @input="emit('update-pose-strength', Number(($event.target as HTMLInputElement).value || node.poseStrength))"
+        />
+      </div>
+
       <NodeConnectionChips :items="connectionChips" />
+      <div v-if="uiState?.secondaryStatus" class="node-secondary-status">
+        {{ uiState.secondaryStatus }}
+      </div>
 
       <div class="node-primary-action-slot">
         <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
-          {{ uiState?.primaryAction?.label || '生成多角度' }}
+          {{ uiState?.primaryAction?.label || '生成' }}
         </NodeActionButton>
       </div>
     </div>
@@ -105,7 +122,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ModelNodeItem } from '../../../types/canvasNodes'
+import { MODEL_ANGLE_FRAMING_OPTIONS, describeModelAngleSpec } from './nodeOptionConfig'
+import type { ModelAngleFraming, ModelNodeItem } from '../../../types/canvasNodes'
 import type { NodeUiState } from '../../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeConnectionChips from './NodeConnectionChips.vue'
@@ -120,26 +138,21 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   generating: boolean
-  stageHeight: number
-  sourceImageUrl?: string
-  hasConnectedImageInput?: boolean
   uiState?: NodeUiState
   errorPortKeys: string[]
-  angleOptions: Array<{ key: string; label: string }>
   backgroundOptions: Array<{ key: string; label: string }>
 }>()
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'delete'): void
-  (e: 'open-file-picker'): void
-  (e: 'clear-image'): void
-  (e: 'stage-drop', event: DragEvent): void
-  (e: 'toggle-angle', key: string): void
-  (e: 'clear-angles'): void
+  (e: 'update-angle-yaw', value: number): void
+  (e: 'update-angle-framing', value: ModelAngleFraming): void
+  (e: 'update-model-strength', value: number): void
+  (e: 'update-pose-strength', value: number): void
   (e: 'select-background', key: string): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image'): void
+  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'imageA' | 'imageB' | 'prompt'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -147,22 +160,27 @@ const io = computed(() =>
   buildNodeIoFromSlots(MODEL_NODE_IO_SLOTS, null, {
     connected: {
       image: props.uiState?.connection?.connected?.image,
+      modelImage: props.uiState?.connection?.connected?.imageA,
+      poseImage: props.uiState?.connection?.connected?.imageB,
       prompt: props.uiState?.connection?.connected?.prompt,
       output: props.uiState?.connection?.connected?.output,
     },
     pending: {
       image: props.uiState?.connection?.pending?.image,
+      modelImage: props.uiState?.connection?.pending?.imageA,
+      poseImage: props.uiState?.connection?.pending?.imageB,
     },
     errorPortKeys: props.errorPortKeys,
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
 const ports = computed(() => io.value.ports)
-
-const effectiveSourceImageUrl = computed(() => props.sourceImageUrl ?? props.node.sourceImageUrl)
+const showModelStrength = computed(() => !!(props.uiState?.connection?.connected?.imageA || props.uiState?.connection?.pending?.imageA))
+const showPoseStrength = computed(() => !!(props.uiState?.connection?.connected?.imageB || props.uiState?.connection?.pending?.imageB))
+const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
 
 function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image')
+  emit('port-mousedown', event, port as 'image' | 'imageA' | 'imageB' | 'prompt')
 }
 </script>
 
@@ -173,28 +191,49 @@ function onPortMouseDown(event: MouseEvent, port: string) {
   gap: 8px;
 }
 
-.model-stage-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.model-mode-card {
+  gap: 8px;
 }
 
-.model-angle-empty {
-  font-size: 11px;
-  color: #94a3b8;
+.model-summary-row,
+.model-angle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.model-angle-clear-btn {
-  border: none;
-  background: transparent;
-  color: #7f8898;
-  font-size: 11px;
+.model-summary-row {
+  justify-content: space-between;
+}
+
+.model-summary-value {
+  font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
+  color: #475569;
 }
 
-.model-angle-clear-btn:hover {
-  color: #9278e6;
+.model-angle-anchor {
+  width: 16px;
+  flex: 0 0 16px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9aa4b2;
+  letter-spacing: 0.06em;
+}
+
+.model-angle-range {
+  flex: 1;
+}
+
+.model-strength-value {
+  font-size: 11px;
+  color: #667085;
+  font-weight: 700;
+}
+
+.model-strength-range {
+  width: 100%;
 }
 
 </style>

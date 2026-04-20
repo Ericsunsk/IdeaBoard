@@ -78,20 +78,16 @@ export const COLOR_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
 
 export const MODEL_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'model-image-input', top: 92 },
-  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'model-prompt-input', top: 148 },
+  { key: 'modelImage', label: 'Model', kind: 'image', required: true, direction: 'input', portName: 'imageA', portKey: 'model-reference-image-input', top: 136 },
+  { key: 'poseImage', label: 'Pose', kind: 'image', direction: 'input', portName: 'imageB', portKey: 'model-pose-image-input', top: 180 },
+  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'model-prompt-input', top: 224 },
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'model-output', top: 92 },
 ]
 
-export const MANNEQUIN_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'mannequin-image-input', top: 92 },
-  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'mannequin-prompt-input', top: 148 },
-  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'mannequin-output', top: 92 },
-]
-
 export const VIEWPOINT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'viewpoint-image-input', top: 92 },
-  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'viewpoint-prompt-input', top: 148 },
-  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'viewpoint-output', top: 92 },
+  { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'viewpoint-image-input', top: 112 },
+  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'viewpoint-prompt-input', top: 168 },
+  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'viewpoint-output', top: 112 },
 ]
 
 export type EditNodeIoContext = {
@@ -141,21 +137,11 @@ export const ENHANCE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EnhanceNodeIoCon
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'enhance-output', top: 92 },
 ]
 
-export type TryOnNodeIoContext = {
-  baseLabel: string
-  layerLabel: string
-}
-
-export const TRYON_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<TryOnNodeIoContext>[] = [
-  { key: 'imageA', label: (ctx) => ctx.baseLabel, kind: 'image', required: true, direction: 'input', portName: 'imageA', portKey: 'tryon-image-a', top: 92 },
-  { key: 'imageB', label: (ctx) => ctx.layerLabel, kind: 'image', required: true, direction: 'input', portName: 'imageB', portKey: 'tryon-image-b', top: 136 },
+export const TRYON_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
+  { key: 'imageA', label: 'Body', kind: 'image', required: true, direction: 'input', portName: 'imageA', portKey: 'tryon-image-a', top: 92 },
+  { key: 'imageB', label: 'Texture', kind: 'image', required: true, direction: 'input', portName: 'imageB', portKey: 'tryon-image-b', top: 136 },
+  { key: 'mask', label: 'Mask', kind: 'mask', direction: 'input', portName: 'mask', portKey: 'tryon-mask-input', top: 180 },
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'tryon-output', top: 92 },
-]
-
-export const GENERATE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'image', label: 'Image', kind: 'image', direction: 'input', portName: 'image', portKey: 'generate-image-input', top: 92 },
-  { key: 'prompt', label: 'Prompt', kind: 'prompt', required: true, direction: 'input', portName: 'prompt', portKey: 'generate-prompt-input', top: 136 },
-  { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'generate-output', top: 92 },
 ]
 
 export function buildNodeIoFromSlots<T>(

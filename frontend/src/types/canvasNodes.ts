@@ -19,9 +19,28 @@ export type WorkflowNodeOutputStatus = 'idle' | 'ready' | 'stale'
 export const DEFAULT_COLOR_STRENGTH = 70
 export const MAX_COLOR_NODE_SWATCHES = 8
 export const DEFAULT_COLOR_NODE_COLOR = DEFAULT_COLOR_HEX
+export const MODEL_POSE_STRENGTH_MIN = 0
+export const MODEL_POSE_STRENGTH_MAX = 100
+export const MODEL_POSE_STRENGTH_DEFAULT = 70
+export const MODEL_REFERENCE_STRENGTH_MIN = 0
+export const MODEL_REFERENCE_STRENGTH_MAX = 100
+export const MODEL_REFERENCE_STRENGTH_DEFAULT = 80
+export const MODEL_ANGLE_YAW_MIN = -180
+export const MODEL_ANGLE_YAW_MAX = 180
+export const MODEL_ANGLE_YAW_DEFAULT = 0
 export const ENHANCE_EXTEND_PERCENT_MIN = 0
 export const ENHANCE_EXTEND_PERCENT_MAX = 50
 export const ENHANCE_EXTEND_PERCENT_DEFAULT = 15
+export const TRYON_ROTATION_MIN = 0
+export const TRYON_ROTATION_MAX = 360
+export const TRYON_ROTATION_DEFAULT = 0
+export const TRYON_SCALE_MIN = 10
+export const TRYON_SCALE_MAX = 300
+export const TRYON_SCALE_DEFAULT = 88
+export const TRYON_OPACITY_MIN = 0
+export const TRYON_OPACITY_MAX = 100
+export const TRYON_OPACITY_DEFAULT = 82
+export const TRYON_TILE_MODE_DEFAULT = 'single'
 
 export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = ['idle', 'ready', 'stale']
 
@@ -48,28 +67,70 @@ export interface PromptNodeItem {
   text: string
 }
 
+export type ModelAngleFraming = 'full' | 'half' | 'portrait'
+
+export interface ModelAngleSpec {
+  yaw: number
+  framing: ModelAngleFraming
+}
+
+export function clampModelPoseStrength(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(MODEL_POSE_STRENGTH_MIN, Math.min(MODEL_POSE_STRENGTH_MAX, Math.round(value)))
+    : MODEL_POSE_STRENGTH_DEFAULT
+}
+
+export function clampModelReferenceStrength(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(MODEL_REFERENCE_STRENGTH_MIN, Math.min(MODEL_REFERENCE_STRENGTH_MAX, Math.round(value)))
+    : MODEL_REFERENCE_STRENGTH_DEFAULT
+}
+
+export function clampModelAngleYaw(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(MODEL_ANGLE_YAW_MIN, Math.min(MODEL_ANGLE_YAW_MAX, Math.round(value)))
+    : MODEL_ANGLE_YAW_DEFAULT
+}
+
+export function createDefaultModelAngleSpec(): ModelAngleSpec {
+  return {
+    yaw: MODEL_ANGLE_YAW_DEFAULT,
+    framing: 'full',
+  }
+}
+
+export function normalizeTryOnTileMode(value: unknown): TryOnNodeItem['tileMode'] {
+  return value === 'seamless' ? 'seamless' : TRYON_TILE_MODE_DEFAULT
+}
+
+export function clampTryOnRotation(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(TRYON_ROTATION_MIN, Math.min(TRYON_ROTATION_MAX, Math.round(value)))
+    : TRYON_ROTATION_DEFAULT
+}
+
+export function clampTryOnScale(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(TRYON_SCALE_MIN, Math.min(TRYON_SCALE_MAX, Math.round(value)))
+    : TRYON_SCALE_DEFAULT
+}
+
+export function clampTryOnOpacity(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(TRYON_OPACITY_MIN, Math.min(TRYON_OPACITY_MAX, Math.round(value)))
+    : TRYON_OPACITY_DEFAULT
+}
+
 export interface ModelNodeItem {
   id: number
   type: 'model'
   x: number
   y: number
   width: number
-  sourceImageUrl: string
-  sourceImageRatio: number
-  selectedAngles: string[]
+  angleSpec: ModelAngleSpec
+  modelStrength: number
+  poseStrength: number
   background: string
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
-export interface MannequinNodeItem {
-  id: number
-  type: 'mannequin'
-  x: number
-  y: number
-  width: number
-  sourceImageUrl: string
-  sourceImageRatio: number
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }
@@ -80,9 +141,8 @@ export interface ViewpointNodeItem {
   x: number
   y: number
   width: number
-  sourceImages: ImageNodeOutputItem[]
   activeCategory: 'top' | 'bottom' | 'set'
-  selectedViewpoints: string[]
+  selectedViewpoint: string
   lighting: 'warm_white' | 'afternoon' | 'hard_light'
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
@@ -178,7 +238,6 @@ export interface TryOnNodeItem {
   x: number
   y: number
   width: number
-  mode: 'fabric-on-body' | 'pattern-on-body'
   tileMode: 'seamless' | 'single'
   rotation: number
   scale: number
@@ -208,42 +267,23 @@ export function isColorSingleColorMode(node: { colors?: readonly string[] | null
   return (node.colors?.length ?? 0) === 1
 }
 
-export interface GenerateNodeItem {
-  id: number
-  type: 'generate'
-  x: number
-  y: number
-  width: number
-  mode: 'pattern-gen' | 'style-clone' | 'seamless-tile-classic' | 'seamless-tile-cartoon'
-  styleModel: string
-  ratio: '1:1' | '3:4' | '4:3' | '2:3' | '3:2'
-  count: 1 | 2 | 4
-  quality: '1k' | '2k' | '4k'
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
 export type CanvasExecutionOutputNodeType =
   | 'model'
-  | 'mannequin'
   | 'viewpoint'
   | 'color'
   | 'edit'
   | 'fusion'
   | 'enhance'
   | 'tryon'
-  | 'generate'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
   'model',
-  'mannequin',
   'viewpoint',
   'color',
   'edit',
   'fusion',
   'enhance',
   'tryon',
-  'generate',
 ]
 
 export function isCanvasExecutionOutputNodeType(value: unknown): value is CanvasExecutionOutputNodeType {
@@ -252,14 +292,12 @@ export function isCanvasExecutionOutputNodeType(value: unknown): value is Canvas
 
 export type CanvasExecutionOutputNodeItem =
   | ModelNodeItem
-  | MannequinNodeItem
   | ViewpointNodeItem
   | ColorNodeItem
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | GenerateNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
 
@@ -271,13 +309,11 @@ export type CanvasConnectionNodeType =
   | 'mask'
   | 'color'
   | 'model'
-  | 'mannequin'
   | 'viewpoint'
   | 'edit'
   | 'fusion'
   | 'enhance'
   | 'tryon'
-  | 'generate'
 export type CanvasConnectionPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
 
 export interface CanvasConnection {
@@ -293,7 +329,6 @@ export interface CanvasConnection {
 export type CanvasNodeItem =
   | PromptNodeItem
   | ModelNodeItem
-  | MannequinNodeItem
   | ViewpointNodeItem
   | MaskNodeItem
   | ImageNodeItem
@@ -302,7 +337,6 @@ export type CanvasNodeItem =
   | FusionNodeItem
   | EnhanceNodeItem
   | TryOnNodeItem
-  | GenerateNodeItem
 
 export interface CanvasViewportState {
   canvasX: number
@@ -315,7 +349,6 @@ export interface CanvasBoardSnapshot {
   imageNodes: ImageNodeItem[]
   promptNodes: PromptNodeItem[]
   modelNodes: ModelNodeItem[]
-  mannequinNodes: MannequinNodeItem[]
   viewpointNodes: ViewpointNodeItem[]
   maskNodes: MaskNodeItem[]
   colorNodes: ColorNodeItem[]
@@ -323,7 +356,6 @@ export interface CanvasBoardSnapshot {
   fusionNodes: FusionNodeItem[]
   enhanceNodes: EnhanceNodeItem[]
   tryOnNodes: TryOnNodeItem[]
-  generateNodes: GenerateNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState
 }

@@ -9,11 +9,11 @@ import type {
   FusionNodeItem,
   ImageNodeItem,
   ImageNodeOutputItem,
-  MannequinNodeItem,
   MaskNodeItem,
+  ModelAngleFraming,
+  ModelAngleSpec,
   ModelNodeItem,
   PromptNodeItem,
-  GenerateNodeItem,
   TryOnNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
@@ -22,14 +22,22 @@ import {
   ENHANCE_EXTEND_PERCENT_DEFAULT,
   ENHANCE_EXTEND_PERCENT_MAX,
   ENHANCE_EXTEND_PERCENT_MIN,
+  clampTryOnOpacity,
+  clampTryOnRotation,
+  clampTryOnScale,
+  clampModelAngleYaw,
+  clampModelReferenceStrength,
+  clampModelPoseStrength,
+  createDefaultModelAngleSpec,
+  normalizeTryOnTileMode,
   normalizeColorNodeColors,
   resolveWorkflowNodeOutputStatus,
 } from '../types/canvasNodes'
+import { normalizeViewpointSelectionByCategory } from '../components/canvas/nodes/nodeOptionConfig'
 
 export type CanvasBoardStateMessage = CanvasImageItem
 export type CanvasBoardStatePromptNode = PromptNodeItem
 export type CanvasBoardStateModelNode = ModelNodeItem
-export type CanvasBoardStateMannequinNode = MannequinNodeItem
 export type CanvasBoardStateViewpointNode = ViewpointNodeItem
 export type CanvasBoardStateMaskNode = MaskNodeItem
 export type CanvasBoardStateImageNodeOutput = ImageNodeOutputItem
@@ -39,7 +47,6 @@ export type CanvasBoardStateEditNode = EditNodeItem
 export type CanvasBoardStateFusionNode = FusionNodeItem
 export type CanvasBoardStateEnhanceNode = EnhanceNodeItem
 export type CanvasBoardStateTryOnNode = TryOnNodeItem
-export type CanvasBoardStateGenerateNode = GenerateNodeItem
 export type CanvasBoardStateConnection = CanvasConnection
 export type CanvasBoardStateViewport = CanvasViewportState
 
@@ -61,6 +68,24 @@ function clampEnhanceExtendPercent(value: unknown): number {
   return isFiniteNumber(value)
     ? Math.max(ENHANCE_EXTEND_PERCENT_MIN, Math.min(ENHANCE_EXTEND_PERCENT_MAX, Math.round(value)))
     : ENHANCE_EXTEND_PERCENT_DEFAULT
+}
+
+function isModelAngleFraming(value: unknown): value is ModelAngleFraming {
+  return value === 'full' || value === 'half' || value === 'portrait'
+}
+
+function toValidModelAngleSpec(spec: unknown): ModelAngleSpec | null {
+  if (!isObject(spec)) return null
+  return {
+    yaw: clampModelAngleYaw(spec.yaw),
+    framing: isModelAngleFraming(spec.framing) ? spec.framing : 'full',
+  }
+}
+
+function readModelAngleSpec(item: Record<string, unknown>): ModelAngleSpec {
+  const angleSpec = toValidModelAngleSpec(item.angleSpec)
+  if (angleSpec) return angleSpec
+  return createDefaultModelAngleSpec()
 }
 
 function readRawStateMap(): Record<string, CanvasBoardState> {
@@ -162,38 +187,16 @@ function toValidModelNode(item: unknown): CanvasBoardStateModelNode | null {
   if (!isFiniteNumber(item.id)) return null
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
-  const selectedAngles = Array.isArray(item.selectedAngles)
-    ? item.selectedAngles.filter((angle): angle is string => typeof angle === 'string')
-    : []
   return {
     id: item.id,
     type: 'model',
     x: item.x,
     y: item.y,
     width: item.width,
-    sourceImageUrl: typeof item.sourceImageUrl === 'string' ? item.sourceImageUrl : '',
-    sourceImageRatio: isFiniteNumber(item.sourceImageRatio) ? item.sourceImageRatio : 1,
-    selectedAngles,
+    angleSpec: readModelAngleSpec(item),
+    modelStrength: clampModelReferenceStrength(item.modelStrength),
+    poseStrength: clampModelPoseStrength(item.poseStrength),
     background: typeof item.background === 'string' ? item.background : 'original',
-    outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
-    outputImages,
-  }
-}
-
-function toValidMannequinNode(item: unknown): CanvasBoardStateMannequinNode | null {
-  if (!isObject(item)) return null
-  if (item.type !== 'mannequin') return null
-  if (!isFiniteNumber(item.id)) return null
-  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
-  const outputImages = readOutputImages(item)
-  return {
-    id: item.id,
-    type: 'mannequin',
-    x: item.x,
-    y: item.y,
-    width: item.width,
-    sourceImageUrl: typeof item.sourceImageUrl === 'string' ? item.sourceImageUrl : '',
-    sourceImageRatio: isFiniteNumber(item.sourceImageRatio) ? item.sourceImageRatio : 1,
     outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
     outputImages,
   }
@@ -205,20 +208,14 @@ function toValidViewpointNode(item: unknown): CanvasBoardStateViewpointNode | nu
   if (!isFiniteNumber(item.id)) return null
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
-  const rawSourceImages = Array.isArray(item.sourceImages) ? item.sourceImages : []
-  const sourceImages = rawSourceImages
-    .map(toValidImageNodeOutput)
-    .filter((image): image is CanvasBoardStateImageNodeOutput => !!image)
-    .slice(0, 3)
   const activeCategory =
     item.activeCategory === 'bottom' || item.activeCategory === 'set'
       ? item.activeCategory
       : 'top'
-  const selectedViewpoints = Array.isArray(item.selectedViewpoints)
-    ? item.selectedViewpoints
-        .filter((value): value is string => typeof value === 'string')
-        .slice(0, 4)
-    : []
+  const selectedViewpoint = normalizeViewpointSelectionByCategory(
+    activeCategory,
+    typeof item.selectedViewpoint === 'string' ? item.selectedViewpoint : '',
+  )
   const lighting =
     item.lighting === 'afternoon' || item.lighting === 'hard_light'
       ? item.lighting
@@ -229,9 +226,8 @@ function toValidViewpointNode(item: unknown): CanvasBoardStateViewpointNode | nu
     x: item.x,
     y: item.y,
     width: item.width,
-    sourceImages,
     activeCategory,
-    selectedViewpoints,
+    selectedViewpoint,
     lighting,
     outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
     outputImages,
@@ -295,13 +291,11 @@ function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
     item.fromNodeType === 'mask' ||
     item.fromNodeType === 'color' ||
     item.fromNodeType === 'model' ||
-    item.fromNodeType === 'mannequin' ||
     item.fromNodeType === 'viewpoint' ||
     item.fromNodeType === 'edit' ||
     item.fromNodeType === 'fusion' ||
     item.fromNodeType === 'enhance' ||
-    item.fromNodeType === 'tryon' ||
-    item.fromNodeType === 'generate'
+    item.fromNodeType === 'tryon'
       ? item.fromNodeType
       : null
   const rawToNodeType =
@@ -310,13 +304,11 @@ function toValidConnection(item: unknown): CanvasBoardStateConnection | null {
     item.toNodeType === 'mask' ||
     item.toNodeType === 'color' ||
     item.toNodeType === 'model' ||
-    item.toNodeType === 'mannequin' ||
     item.toNodeType === 'viewpoint' ||
     item.toNodeType === 'edit' ||
     item.toNodeType === 'fusion' ||
     item.toNodeType === 'enhance' ||
-    item.toNodeType === 'tryon' ||
-    item.toNodeType === 'generate'
+    item.toNodeType === 'tryon'
       ? item.toNodeType
       : null
   const fromPort =
@@ -430,59 +422,16 @@ function toValidTryOnNode(item: unknown): CanvasBoardStateTryOnNode | null {
   if (!isFiniteNumber(item.id)) return null
   if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
   const outputImages = readOutputImages(item)
-  const mode = item.mode === 'pattern-on-body' ? 'pattern-on-body' : 'fabric-on-body'
-  const tileMode = item.tileMode === 'single' ? 'single' : 'seamless'
-  const rotation = isFiniteNumber(item.rotation) ? Math.max(0, Math.min(360, Math.round(item.rotation))) : 0
-  const scale = isFiniteNumber(item.scale) ? Math.max(10, Math.min(300, Math.round(item.scale))) : 100
-  const opacity = isFiniteNumber(item.opacity) ? Math.max(0, Math.min(100, Math.round(item.opacity))) : 100
   return {
     id: item.id,
     type: 'tryon',
     x: item.x,
     y: item.y,
     width: item.width,
-    mode,
-    tileMode,
-    rotation,
-    scale,
-    opacity,
-    outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
-    outputImages,
-  }
-}
-
-function toValidGenerateNode(item: unknown): CanvasBoardStateGenerateNode | null {
-  if (!isObject(item)) return null
-  if (item.type !== 'generate') return null
-  if (!isFiniteNumber(item.id)) return null
-  if (!isFiniteNumber(item.x) || !isFiniteNumber(item.y) || !isFiniteNumber(item.width)) return null
-  const outputImages = readOutputImages(item)
-  const mode =
-    item.mode === 'style-clone' ||
-    item.mode === 'seamless-tile-classic' ||
-    item.mode === 'seamless-tile-cartoon'
-      ? item.mode
-      : 'pattern-gen'
-  const ratio =
-    item.ratio === '3:4' ||
-    item.ratio === '4:3' ||
-    item.ratio === '2:3' ||
-    item.ratio === '3:2'
-      ? item.ratio
-      : '1:1'
-  const count = item.count === 2 || item.count === 4 ? item.count : 1
-  const quality = item.quality === '2k' || item.quality === '4k' ? item.quality : '1k'
-  return {
-    id: item.id,
-    type: 'generate',
-    x: item.x,
-    y: item.y,
-    width: item.width,
-    mode,
-    styleModel: typeof item.styleModel === 'string' ? item.styleModel : '',
-    ratio,
-    count,
-    quality,
+    tileMode: normalizeTryOnTileMode(item.tileMode),
+    rotation: clampTryOnRotation(item.rotation),
+    scale: clampTryOnScale(item.scale),
+    opacity: clampTryOnOpacity(item.opacity),
     outputStatus: resolveWorkflowNodeOutputStatus(item.outputStatus, outputImages),
     outputImages,
   }
@@ -505,7 +454,6 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
   const rawImageNodes = Array.isArray(item.imageNodes) ? item.imageNodes : []
   const rawPromptNodes = Array.isArray(item.promptNodes) ? item.promptNodes : []
   const rawModelNodes = Array.isArray(item.modelNodes) ? item.modelNodes : []
-  const rawMannequinNodes = Array.isArray(item.mannequinNodes) ? item.mannequinNodes : []
   const rawViewpointNodes = Array.isArray(item.viewpointNodes) ? item.viewpointNodes : []
   const rawMaskNodes = Array.isArray(item.maskNodes) ? item.maskNodes : []
   const rawColorNodes = Array.isArray(item.colorNodes) ? item.colorNodes : []
@@ -513,14 +461,12 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
   const rawFusionNodes = Array.isArray(item.fusionNodes) ? item.fusionNodes : []
   const rawEnhanceNodes = Array.isArray(item.enhanceNodes) ? item.enhanceNodes : []
   const rawTryOnNodes = Array.isArray(item.tryOnNodes) ? item.tryOnNodes : []
-  const rawGenerateNodes = Array.isArray(item.generateNodes) ? item.generateNodes : []
   const rawConnections = Array.isArray(item.connections) ? item.connections : []
   return {
     messages: rawMessages.map(toValidMessage).filter((m): m is CanvasBoardStateMessage => !!m),
     imageNodes: rawImageNodes.map(toValidImageNode).filter((n): n is CanvasBoardStateImageNode => !!n),
     promptNodes: rawPromptNodes.map(toValidPromptNode).filter((n): n is CanvasBoardStatePromptNode => !!n),
     modelNodes: rawModelNodes.map(toValidModelNode).filter((n): n is CanvasBoardStateModelNode => !!n),
-    mannequinNodes: rawMannequinNodes.map(toValidMannequinNode).filter((n): n is CanvasBoardStateMannequinNode => !!n),
     viewpointNodes: rawViewpointNodes.map(toValidViewpointNode).filter((n): n is CanvasBoardStateViewpointNode => !!n),
     maskNodes: rawMaskNodes.map(toValidMaskNode).filter((n): n is CanvasBoardStateMaskNode => !!n),
     colorNodes: rawColorNodes.map(toValidColorNode).filter((n): n is CanvasBoardStateColorNode => !!n),
@@ -528,7 +474,6 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
     fusionNodes: rawFusionNodes.map(toValidFusionNode).filter((n): n is CanvasBoardStateFusionNode => !!n),
     enhanceNodes: rawEnhanceNodes.map(toValidEnhanceNode).filter((n): n is CanvasBoardStateEnhanceNode => !!n),
     tryOnNodes: rawTryOnNodes.map(toValidTryOnNode).filter((n): n is CanvasBoardStateTryOnNode => !!n),
-    generateNodes: rawGenerateNodes.map(toValidGenerateNode).filter((n): n is CanvasBoardStateGenerateNode => !!n),
     connections: rawConnections.map(toValidConnection).filter((n): n is CanvasBoardStateConnection => !!n),
     viewport: toValidViewport(item.viewport),
     updatedAt: isFiniteNumber(item.updatedAt) ? item.updatedAt : Date.now(),

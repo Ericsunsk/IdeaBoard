@@ -78,30 +78,13 @@ const filterCategory = ref<string | null>(null)
 const filterEnabled = ref<number | null>(null)
 
 const categoryOptions = [
-  { label: 'Generate · 图案生成', value: 'pattern-gen' },
-  { label: 'Generate · 画风复刻', value: 'style-clone' },
+  { label: 'Pattern · 图案生成', value: 'pattern-gen' },
 ]
 const statusOptions = [{ label: '已上架', value: 1 }, { label: '已下架', value: 0 }]
-const archivedCategoryLabelMap: Record<string, string> = {
-  'seamless-tile': 'Archived · 四方连续',
-  'pattern-fusion': 'Archived · 双图融合',
-  'craft-fusion': 'Archived · 双图融合',
-  'pattern-upscale': 'Archived · 图案变清晰',
-}
 const categoryLabelMap: Record<string, string> = {
   ...Object.fromEntries(categoryOptions.map(o => [o.value, o.label])),
-  ...archivedCategoryLabelMap,
 }
-const categoryFormOptions = computed(() => {
-  const currentValue = formData.value.category
-  if (!currentValue || categoryOptions.some(option => option.value === currentValue)) {
-    return categoryOptions
-  }
-  return [
-    { label: archivedCategoryLabelMap[currentValue] || `Archived · ${currentValue}`, value: currentValue, disabled: true },
-    ...categoryOptions,
-  ]
-})
+const categoryFormOptions = computed(() => categoryOptions)
 
 const filteredList = computed(() => {
   let result = list.value

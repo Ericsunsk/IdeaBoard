@@ -17,17 +17,53 @@ import (
 
 const (
 	MaxFailCount            = 5
+	fabricOnBodyFeatureSlug = "fabric-on-body"
 	styleFusionFeatureSlug  = "style-fusion"
 	canvasExtendFeatureSlug = "canvas-extend"
 	hdUpscaleFeatureSlug    = "hd-upscale"
 )
+
+var viewpointTemplateLabels = map[string]string{
+	"top_front":      "正面平视",
+	"top_side":       "微侧展示",
+	"top_45":         "45° 侧视",
+	"top_back":       "背面展示",
+	"btm_front":      "正面立体",
+	"btm_side":       "微侧立体",
+	"btm_half_side":  "半侧动态",
+	"btm_back":       "背面立体",
+	"set_front":      "正面展示",
+	"set_45_side":    "45° 微侧",
+	"set_side_stand": "侧面静立",
+	"set_back":       "背面展示",
+}
+
+var supportedTaskFeatureSlugs = map[string]struct{}{
+	"sketch-to-design": {},
+	"style-innovate":   {},
+	"partial-edit":     {},
+	"bg-swap":          {},
+	"face-swap":        {},
+	"style-fusion":     {},
+	"series-color":     {},
+	"directed-recolor": {},
+	"fabric-on-body":   {},
+	"multi-angle":      {},
+	"virtual-3d":       {},
+	"pattern-gen":      {},
+	"hd-upscale":       {},
+	"canvas-extend":    {},
+}
 
 const (
 	styleFusionHiddenConstraintGeneric  = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
 	styleFusionHiddenConstraintWithNum  = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息（Image A: %s，Image B: %s）。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
 	canvasExtendHiddenConstraintGeneric = "【执行语义】画布延伸以扩边参数为主导，决定上、右、下、左四个方向的延伸幅度。用户 prompt 只用于描述新扩展区域的内容、纹理、背景和补全方式；若与扩边方向冲突，以扩边参数为准。"
 	canvasExtendHiddenConstraintWithNum = "【执行语义】画布延伸以扩边参数为主导（上 %s，右 %s，下 %s，左 %s），决定四个方向的延伸幅度。用户 prompt 只用于描述新扩展区域的内容、纹理、背景和补全方式；若与扩边方向冲突，以扩边参数为准。"
-	hdUpscaleMaskedConstraint            = "【执行语义】当前请求为局部/遮罩高清增强（非整图放大）。请以原图（original_image_url）作为全局上下文，仅对蒙版（mask_image_url / mask_image_urls / mask_url）限定区域进行高清增强，未遮罩区域保持原图主体、结构与语义一致。"
+	multiAngleHiddenConstraintGeneric   = "【执行语义】当前请求仅输出单张、单视角结果，不允许拼接多视图。职责与优先级如下：1) Image 输入（image / image_urls）提供基础画面与主体语义；2) Model 输入（model_url + model_strength）约束主体身份与关键外观一致性；3) Pose 输入（pose_url + pose_strength）约束姿态与肢体方向；4) angle_spec 决定目标视角（yaw 为水平旋转角，framing 为景别）；5) Prompt 仅作为弱修饰，用于补充风格、材质、氛围与细节。若冲突，按以上顺序执行。"
+	multiAngleHiddenConstraintWithModel = "【Model 输入语义】当提供 model_url 时，必须优先保持主体身份与核心外观稳定，仅在该前提下按 angle_spec 与 Pose 约束做视角变化。"
+	hdUpscaleMaskedConstraint           = "【执行语义】当前请求为局部/遮罩高清增强（非整图放大）。请以原图（original_image_url）作为全局上下文，仅对蒙版（mask_image_url / mask_image_urls / mask_url）限定区域进行高清增强，未遮罩区域保持原图主体、结构与语义一致。"
+	fabricOnBodyMaskedConstraint        = "【执行语义】当前请求为 Wear 局部贴图。请以 Body 原图（original_image_url）作为基底，仅在蒙版（mask_image_url / mask_image_urls / mask_url）白色区域内应用 Texture；非蒙版区域必须保持 Body 原图的主体、轮廓、结构与细节不变。"
 )
 
 func buildStyleFusionHiddenConstraint(params map[string]interface{}) string {
@@ -66,6 +102,50 @@ func buildCanvasExtendHiddenConstraint(params map[string]interface{}) string {
 	}
 
 	return canvasExtendHiddenConstraintGeneric
+}
+
+func buildMultiAngleHiddenConstraint(params map[string]interface{}) string {
+	constraint := multiAngleHiddenConstraintGeneric
+	if params == nil {
+		return constraint
+	}
+	if hasNonEmptyString(params["model_url"]) {
+		constraint += "\n" + multiAngleHiddenConstraintWithModel
+		if modelURL, ok := params["model_url"].(string); ok {
+			constraint += "\n" + "model_url=" + strings.TrimSpace(modelURL)
+		}
+	}
+	if modelStrength, ok := readCanvasExtendPercent(params["model_strength"]); ok {
+		constraint += "\n" + "model_strength=" + formatWeightPercent(modelStrength)
+	}
+	if hasNonEmptyString(params["pose_url"]) {
+		if poseURL, ok := params["pose_url"].(string); ok {
+			constraint += "\n" + "pose_url=" + strings.TrimSpace(poseURL)
+		}
+	}
+	if poseStrength, ok := readCanvasExtendPercent(params["pose_strength"]); ok {
+		constraint += "\n" + "pose_strength=" + formatWeightPercent(poseStrength)
+	}
+	rawSpec, ok := params["angle_spec"]
+	if !ok {
+		return constraint
+	}
+	spec, err := utils.JSONMarshal(rawSpec)
+	if err != nil || len(spec) == 0 {
+		return constraint
+	}
+	return constraint + "\n" + "angle_spec=" + string(spec)
+}
+
+func describeViewpointTemplateValue(value string) string {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return ""
+	}
+	if label, ok := viewpointTemplateLabels[normalized]; ok {
+		return label
+	}
+	return normalized
 }
 
 func readStyleFusionWeights(params map[string]interface{}) (float64, float64, bool) {
@@ -241,6 +321,18 @@ func hasNonEmptyStringList(v interface{}) bool {
 	return false
 }
 
+func readMaskEnabledFlag(params map[string]interface{}) (bool, bool) {
+	if params == nil {
+		return false, false
+	}
+	if raw, ok := params["use_mask"]; ok {
+		if enabled, parsed := parseBoolLike(raw); parsed {
+			return enabled, true
+		}
+	}
+	return false, false
+}
+
 func isMaskedHDUpscaleRequest(params map[string]interface{}) bool {
 	if params == nil {
 		return false
@@ -275,6 +367,31 @@ func isMaskedHDUpscaleRequest(params map[string]interface{}) bool {
 	}
 
 	return hasNonEmptyString(params["original_image_url"]) && hasNonEmptyStringList(params["image_urls"])
+}
+
+func isMaskedFabricOnBodyRequest(params map[string]interface{}) bool {
+	if params == nil {
+		return false
+	}
+	if enabled, parsed := readMaskEnabledFlag(params); parsed && enabled {
+		return true
+	}
+	if hasNonEmptyString(params["mask_image_url"]) || hasNonEmptyString(params["mask_url"]) {
+		return true
+	}
+	return hasNonEmptyStringList(params["mask_image_urls"]) || hasNonEmptyStringList(params["mask_urls"])
+}
+
+func applyFabricOnBodyOptionalMaskTemplateDefaults(
+	featureSlug string,
+	params map[string]interface{},
+	varMap map[string]string,
+) {
+	if featureSlug != fabricOnBodyFeatureSlug || isMaskedFabricOnBodyRequest(params) {
+		return
+	}
+	varMap["{{mask_image_url}}"] = ""
+	varMap["{{use_mask}}"] = "false"
 }
 
 type AccountService struct {
@@ -503,6 +620,11 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 			}
 		}
 	}
+	if featureSlug != "" {
+		if _, ok := supportedTaskFeatureSlugs[featureSlug]; !ok {
+			return "", fmt.Errorf("feature %q 不支持", featureSlug)
+		}
+	}
 
 	// 功能页系统提示词：根据 feature slug 查找系统预设 prompt，支持模板变量替换
 	if req.Params != nil {
@@ -571,23 +693,28 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 					if v, ok := req.Params["tile_mode"]; ok {
 						varMap["{{tile_mode}}"] = fmt.Sprintf("%v", v)
 					}
+					if v, ok := req.Params["original_image_url"]; ok {
+						varMap["{{original_image_url}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["mask_image_url"]; ok {
+						varMap["{{mask_image_url}}"] = fmt.Sprintf("%v", v)
+					}
+					if enabled, parsed := readMaskEnabledFlag(req.Params); parsed {
+						varMap["{{use_mask}}"] = fmt.Sprintf("%t", enabled)
+					}
 					if v, ok := req.Params["pattern_mode"]; ok {
 						varMap["{{pattern_mode}}"] = fmt.Sprintf("%v", v)
 					}
-					if v, ok := req.Params["angles"]; ok {
-						varMap["{{angles}}"] = fmt.Sprintf("%v", v)
-					}
-					if v, ok := req.Params["pose"]; ok {
-						varMap["{{pose}}"] = fmt.Sprintf("%v", v)
-					}
-					if v, ok := req.Params["expression"]; ok {
-						varMap["{{expression}}"] = fmt.Sprintf("%v", v)
+					if v, ok := req.Params["angle_spec"]; ok {
+						if encoded, err := utils.JSONMarshal(v); err == nil {
+							varMap["{{angle_spec}}"] = string(encoded)
+						}
 					}
 					if v, ok := req.Params["background"]; ok {
 						varMap["{{background}}"] = fmt.Sprintf("%v", v)
 					}
-					if v, ok := req.Params["viewpoints"]; ok {
-						varMap["{{viewpoints}}"] = fmt.Sprintf("%v", v)
+					if v, ok := req.Params["viewpoint"]; ok {
+						varMap["{{viewpoint}}"] = describeViewpointTemplateValue(fmt.Sprintf("%v", v))
 					}
 					if v, ok := req.Params["lighting"]; ok {
 						varMap["{{lighting}}"] = fmt.Sprintf("%v", v)
@@ -598,10 +725,14 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 					if v, ok := req.Params["pose_url"]; ok {
 						varMap["{{pose_url}}"] = fmt.Sprintf("%v", v)
 					}
-					if v, ok := req.Params["style_model"]; ok {
-						varMap["{{style_model}}"] = fmt.Sprintf("%v", v)
+					if v, ok := req.Params["pose_strength"]; ok {
+						varMap["{{pose_strength}}"] = fmt.Sprintf("%v", v)
+					}
+					if v, ok := req.Params["model_strength"]; ok {
+						varMap["{{model_strength}}"] = fmt.Sprintf("%v", v)
 					}
 				}
+				applyFabricOnBodyOptionalMaskTemplateDefaults(featureSlug, req.Params, varMap)
 
 				// 检查是否包含模板变量
 				if strings.Contains(sysPrompt, "{{") {
@@ -641,11 +772,17 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 	if featureSlug == styleFusionFeatureSlug {
 		fullPrompt = appendHiddenConstraint(fullPrompt, buildStyleFusionHiddenConstraint(req.Params))
 	}
+	if featureSlug == "multi-angle" {
+		fullPrompt = appendHiddenConstraint(fullPrompt, buildMultiAngleHiddenConstraint(req.Params))
+	}
 	if featureSlug == canvasExtendFeatureSlug {
 		fullPrompt = appendHiddenConstraint(fullPrompt, buildCanvasExtendHiddenConstraint(req.Params))
 	}
 	if featureSlug == hdUpscaleFeatureSlug && isMaskedHDUpscaleRequest(req.Params) {
 		fullPrompt = appendHiddenConstraint(fullPrompt, hdUpscaleMaskedConstraint)
+	}
+	if featureSlug == fabricOnBodyFeatureSlug && isMaskedFabricOnBodyRequest(req.Params) {
+		fullPrompt = appendHiddenConstraint(fullPrompt, fabricOnBodyMaskedConstraint)
 	}
 
 	// 序列化参数

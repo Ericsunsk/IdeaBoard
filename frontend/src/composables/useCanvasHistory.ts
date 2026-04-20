@@ -18,17 +18,11 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
     promptNodes: snapshot.promptNodes.map(node => ({ ...node })),
     modelNodes: snapshot.modelNodes.map(node => ({
       ...node,
-      selectedAngles: [...node.selectedAngles],
-      outputImages: node.outputImages.map(output => ({ ...output })),
-    })),
-    mannequinNodes: snapshot.mannequinNodes.map(node => ({
-      ...node,
+      angleSpec: { ...node.angleSpec },
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),
     viewpointNodes: snapshot.viewpointNodes.map(node => ({
       ...node,
-      sourceImages: node.sourceImages.map(image => ({ ...image })),
-      selectedViewpoints: [...node.selectedViewpoints],
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),
     maskNodes: snapshot.maskNodes.map(node => ({ ...node })),
@@ -50,10 +44,6 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),
     tryOnNodes: snapshot.tryOnNodes.map(node => ({
-      ...node,
-      outputImages: node.outputImages.map(output => ({ ...output })),
-    })),
-    generateNodes: snapshot.generateNodes.map(node => ({
       ...node,
       outputImages: node.outputImages.map(output => ({ ...output })),
     })),

@@ -135,16 +135,6 @@ const menuOptions = [
     icon: () => h('span', { style: 'font-size:16px' }, '🖼️')
   },
   {
-    label: '模特库',
-    key: 'model-library',
-    icon: () => h('span', { style: 'font-size:16px' }, '💃')
-  },
-  {
-    label: '姿势库',
-    key: 'pose-library',
-    icon: () => h('span', { style: 'font-size:16px' }, '🕴️')
-  },
-  {
     label: '风格模型库',
     key: 'pattern-style-library',
     icon: () => h('span', { style: 'font-size:16px' }, '🎭')

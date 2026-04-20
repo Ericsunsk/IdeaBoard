@@ -7,7 +7,7 @@ type PatternStyle struct {
 	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
 	Name      string    `gorm:"type:varchar(100);not null" json:"name"`
 	ImageURL  string    `gorm:"type:text;not null" json:"image_url"`
-	Category  string    `gorm:"type:varchar(40);not null;index" json:"category"` // pattern-gen / style-clone / seamless-tile / ...
+	Category  string    `gorm:"type:varchar(40);not null;index" json:"category"` // pattern-gen / other active pattern categories
 	SortOrder int       `gorm:"type:int;default:0" json:"sort_order"`
 	IsEnabled bool      `gorm:"type:tinyint;default:1" json:"is_enabled"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
