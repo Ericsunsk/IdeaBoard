@@ -570,7 +570,7 @@ const patternGenerateQualityOptions = GENERATE_QUALITY_OPTIONS
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const viewpointLightingLabels = VIEWPOINT_LIGHTING_LABELS
 
-const nodeImageDragMime = 'application/x-feng-image-url'
+const nodeImageDragMime = 'application/x-ideaboard-image-url'
 
 // 状态
 const userPrompt = ref('')
@@ -634,25 +634,6 @@ const tools = [
 ]
 
 const canvasNodeMenuItems = CANVAS_NODE_MENU_ITEMS
-
-const editModeMeta = {
-  'partial-edit': {
-    feature: 'partial-edit',
-    promptPrefix: '[partial-edit]',
-    fallbackPrompt: '局部改款',
-  },
-  'bg-swap': {
-    feature: 'bg-swap',
-    promptPrefix: '[bg-swap]',
-    fallbackPrompt: '换背景',
-  },
-} as const
-
-const wearFeatureMeta = {
-  feature: 'fabric-on-body',
-  promptPrefix: '[fabric-on-body]',
-  successLabel: 'Wear',
-} as const
 
 const processedMaskPreviewSignatures = new Map<number, string>()
 const {
@@ -2439,8 +2420,6 @@ const {
   maskNodes,
   activeImageNodeId,
   activeMaskNodeId,
-  editModeMeta,
-  wearFeatureMeta,
   getViewpointLabel,
   getViewpointLightingLabel,
   getNodeConnectionStatus,

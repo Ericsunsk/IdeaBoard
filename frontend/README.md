@@ -1,6 +1,6 @@
-# FENG Frontend
+# IdeaBoard Frontend
 
-这是 FENG 的前端项目，基于 `Vue 3 + Vite + TypeScript + Naive UI`。
+这是 IdeaBoard 的前端项目，基于 `Vue 3 + Vite + TypeScript + Naive UI`。
 
 ## 启动
 
@@ -22,7 +22,7 @@ npm run build
 ## 开发说明
 
 - 当前 `axios` 的 `baseURL` 固定为 `/api`
-- Dev 环境通过 `vite.config.ts` 将 `/api` 和 `/uploads` 代理到 `http://localhost:8080`
+- Dev 环境通过 `vite.config.ts` 将 `/api` 和 `/uploads` 代理到 `http://localhost:6000`
 - 如果需要切换本地后端地址，请修改 `vite.config.ts`
 
 ## 主要目录

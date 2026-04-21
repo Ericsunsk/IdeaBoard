@@ -5,9 +5,8 @@ export interface GalleryGroup {
   images: string[]
 }
 
-// 当前前端仍会产出的 prompt 前缀 → 中文标签
+// 当前工作流链路仍会产出的 prompt 前缀 → 中文标签
 const CURRENT_PREFIX_LABELS: Record<string, string> = {
-  'line-draft': '线稿生成',
   'sketch-to-design': '线稿成款',
   'partial-edit': '局部改款',
   'style-innovate': '款式创新',
@@ -20,26 +19,14 @@ const CURRENT_PREFIX_LABELS: Record<string, string> = {
   'face-swap': '定向换脸',
   'bg-swap': '换背景',
   'pattern-gen': '图案生成',
-  'pattern-upscale': '图案变清晰',
   'to-vector': '转矢量图',
   'remove-bg': '抠图褪底',
   'hd-upscale': '高清放大',
-  'deblur': '模糊变清晰',
   'canvas-extend': '画布延伸',
 }
 
 function normalizeGroupKey(prefix: string | null): string {
-  if (
-    prefix === 'pattern-fusion-creative' ||
-    prefix === 'pattern-fusion-style' ||
-    prefix === 'craft-fusion-creative' ||
-    prefix === 'craft-fusion-style'
-  ) {
-    return 'style-fusion'
-  }
-  if (prefix === 'pattern-on-body') {
-    return 'fabric-on-body'
-  }
+  // 阶段 3 清理：legacy 前缀不再做别名映射
   return prefix || '__text2img__'
 }
 

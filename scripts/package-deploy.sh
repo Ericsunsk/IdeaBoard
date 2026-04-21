@@ -21,7 +21,7 @@ if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 RELEASE_ROOT="$ROOT_DIR/release/$TAG"
-BUNDLE_NAME="feng-bundle-${TAG}-linux-amd64"
+BUNDLE_NAME="ideaboard-bundle-${TAG}-linux-amd64"
 BUNDLE_DIR="$RELEASE_ROOT/$BUNDLE_NAME"
 ARCHIVE_PATH="$RELEASE_ROOT/${BUNDLE_NAME}.tar.gz"
 
@@ -31,8 +31,8 @@ GO_MOD_CACHE_DIR="$ROOT_DIR/.cache/go-mod"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIST_DIR="$FRONTEND_DIR/dist"
-BACKEND_BINARY_TMP="$ROOT_DIR/release-temp/feng-server"
-BACKEND_BINARY_DST="$BUNDLE_DIR/backend/feng-server"
+BACKEND_BINARY_TMP="$ROOT_DIR/release-temp/ideaboard-server"
+BACKEND_BINARY_DST="$BUNDLE_DIR/backend/ideaboard-server"
 BUILD_TIME_UTC="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 COMMIT_SHA="$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
 
@@ -66,28 +66,36 @@ cp "$ROOT_DIR/README.md" "$BUNDLE_DIR/README.md"
 cp "$ROOT_DIR/DEVELOPMENT.md" "$BUNDLE_DIR/DEVELOPMENT.md"
 cp "$BACKEND_DIR/.env.example" "$BUNDLE_DIR/backend/.env.example"
 
-cat > "$BUNDLE_DIR/deploy/systemd/feng.service" <<'EOF'
+cat > "$BUNDLE_DIR/deploy/systemd/ideaboard.service" <<'EOF'
 [Unit]
-Description=FENG Backend
+Description=IdeaBoard Backend
 After=network.target
 
 [Service]
-WorkingDirectory=/opt/feng/backend
-ExecStart=/opt/feng/backend/feng-server
+WorkingDirectory=/opt/ideaboard/backend
+ExecStart=/opt/ideaboard/backend/ideaboard-server
 Restart=always
 RestartSec=3
-EnvironmentFile=/opt/feng/backend/.env
+EnvironmentFile=/opt/ideaboard/backend/.env
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-cat > "$BUNDLE_DIR/deploy/nginx/feng.conf" <<'EOF'
+cat > "$BUNDLE_DIR/deploy/nginx/ideaboard.conf" <<'EOF'
 server {
     listen 80;
     server_name _;
 
-    root /opt/feng/frontend/dist;
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 30m;
+
+    root /opt/ideaboard/frontend/dist;
     index index.html;
 
     location / {
@@ -118,7 +126,7 @@ commit=$COMMIT_SHA
 built_at=$BUILD_TIME_UTC
 bundle=$BUNDLE_NAME
 frontend_dist=frontend/dist
-backend_binary=backend/feng-server
+backend_binary=backend/ideaboard-server
 EOF
 
 (

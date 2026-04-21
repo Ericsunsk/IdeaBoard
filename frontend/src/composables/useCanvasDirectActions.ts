@@ -1,5 +1,10 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { CanvasImageItem } from '../types/canvasNodes'
+import type { SubmitTaskData } from '../api/index'
+import {
+  buildExecutionTaskRequest,
+  EXECUTION_DIRECT_ACTION_META,
+} from '../config/executionContract'
 
 export type SegType = 'common' | 'commodity' | 'body'
 export type CanvasActionKey = 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'to-vector'
@@ -22,12 +27,7 @@ interface MessageApiLike {
 }
 
 interface SubmitTaskAndPollOptions {
-  request: {
-    prompt: string
-    feature?: string
-    card_ids?: number[]
-    params?: Record<string, unknown>
-  }
+  request: SubmitTaskData
   source?: CanvasImageItem
   successMessage: string
   failureMessage: string
@@ -93,15 +93,14 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
     if (!promptText) return
     options.generating.value = true
     await options.submitTaskAndPoll({
-      request: {
+      request: buildExecutionTaskRequest({
         prompt: promptText,
-        feature: 'pattern-gen',
+        feature: EXECUTION_DIRECT_ACTION_META.patternGen.feature,
         params: {
-          feature: 'pattern-gen',
           ratio: options.selectedRatio.value,
           quality: options.selectedQuality.value,
         },
-      },
+      }),
       successMessage: '任务已提交',
       failureMessage: '提交失败',
       onSubmitted: () => {
@@ -145,15 +144,16 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
 
   async function handleSketchToDesignGenerate(source: CanvasImageItem) {
     options.generating.value = true
-    const desc = resolveDirectPromptText(options.userPrompt.value, 'Sketch to design')
+    const desc = resolveDirectPromptText(
+      options.userPrompt.value,
+      EXECUTION_DIRECT_ACTION_META.sketchToDesign.fallbackPrompt,
+    )
     await options.submitTaskAndPoll({
-      request: {
-        prompt: `[sketch-to-design] ${desc}`,
-        params: {
-          image_urls: [source.url],
-          feature: 'sketch-to-design',
-        },
-      },
+      request: buildExecutionTaskRequest({
+        prompt: `${EXECUTION_DIRECT_ACTION_META.sketchToDesign.promptPrefix} ${desc}`,
+        feature: EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature,
+        imageUrls: [source.url],
+      }),
       source,
       successMessage: 'Task submitted',
       failureMessage: 'Failed to submit task',
@@ -165,17 +165,20 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
 
   async function handleStyleInnovateGenerate(source: CanvasImageItem) {
     options.generating.value = true
-    const desc = resolveDirectPromptText(options.userPrompt.value, 'Style innovate')
+    const desc = resolveDirectPromptText(
+      options.userPrompt.value,
+      EXECUTION_DIRECT_ACTION_META.styleInnovate.fallbackPrompt,
+    )
     const strength = options.styleInnovateStrength.value
     await options.submitTaskAndPoll({
-      request: {
-        prompt: `[style-innovate] 改变幅度：${strength}/10，${desc}`,
+      request: buildExecutionTaskRequest({
+        prompt: `${EXECUTION_DIRECT_ACTION_META.styleInnovate.promptPrefix} 改变幅度：${strength}/10，${desc}`,
+        feature: EXECUTION_DIRECT_ACTION_META.styleInnovate.feature,
+        imageUrls: [source.url],
         params: {
-          image_urls: [source.url],
-          feature: 'style-innovate',
           variation_strength: strength,
         },
-      },
+      }),
       source,
       successMessage: 'Task submitted',
       failureMessage: 'Failed to submit task',

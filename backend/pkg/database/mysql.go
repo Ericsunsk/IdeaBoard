@@ -2,6 +2,8 @@ package database
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"backend/internal/config"
 
@@ -19,8 +21,18 @@ func NewMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		cfg.Database,
 	)
 
+	logMode := logger.Warn
+	switch strings.ToLower(os.Getenv("DB_LOG_MODE")) {
+	case "info":
+		logMode = logger.Info
+	case "error":
+		logMode = logger.Error
+	case "silent":
+		logMode = logger.Silent
+	}
+
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logMode),
 	})
 	if err != nil {
 		return nil, err

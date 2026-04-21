@@ -54,7 +54,12 @@ export interface CanvasBoardState extends CanvasBoardSnapshot {
   updatedAt: number
 }
 
-const STORAGE_KEY = 'feng.canvas.boardStates.v1'
+const STORAGE_KEY = 'ideaboard.canvas.boardStates.v1'
+
+function readStorageValue(key: string): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(key)
+}
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -90,7 +95,7 @@ function readModelAngleSpec(item: Record<string, unknown>): ModelAngleSpec {
 
 function readRawStateMap(): Record<string, CanvasBoardState> {
   if (typeof window === 'undefined') return {}
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = readStorageValue(STORAGE_KEY)
   if (!raw) return {}
   try {
     const parsed = JSON.parse(raw)

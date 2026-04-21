@@ -21,7 +21,7 @@ if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 RELEASE_ROOT="$ROOT_DIR/release/$TAG"
-BUNDLE_NAME="feng-bt-go-${TAG}-linux-amd64"
+BUNDLE_NAME="ideaboard-bt-go-${TAG}-linux-amd64"
 BUNDLE_DIR="$RELEASE_ROOT/$BUNDLE_NAME"
 APP_DIR="$BUNDLE_DIR/app"
 ARCHIVE_PATH="$RELEASE_ROOT/${BUNDLE_NAME}.tar.gz"
@@ -33,7 +33,7 @@ FRONTEND_DIR="$ROOT_DIR/frontend"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIST_DIR="$FRONTEND_DIR/dist"
 BACKEND_BUILD_DIR="$ROOT_DIR/release-temp/backend-build"
-BACKEND_BINARY_TMP="$ROOT_DIR/release-temp/feng-server"
+BACKEND_BINARY_TMP="$ROOT_DIR/release-temp/ideaboard-server"
 
 mkdir -p "$NPM_CACHE_DIR" "$GO_CACHE_DIR" "$GO_MOD_CACHE_DIR" "$RELEASE_ROOT" "$ROOT_DIR/release-temp"
 
@@ -61,8 +61,8 @@ echo "[5/5] Assembling Baota Go bundle"
 rm -rf "$BUNDLE_DIR"
 mkdir -p "$APP_DIR"
 
-cp "$BACKEND_BINARY_TMP" "$APP_DIR/feng-server"
-chmod +x "$APP_DIR/feng-server"
+cp "$BACKEND_BINARY_TMP" "$APP_DIR/ideaboard-server"
+chmod +x "$APP_DIR/ideaboard-server"
 cp "$BACKEND_DIR/.env.example" "$BUNDLE_DIR/.env"
 
 (
@@ -75,5 +75,5 @@ echo "Done"
 echo "Bundle directory: $BUNDLE_DIR"
 echo "Archive: $ARCHIVE_PATH"
 echo "Contains:"
-echo "  - app/feng-server"
+echo "  - app/ideaboard-server"
 echo "  - .env"

@@ -3,13 +3,13 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">工作流系统提示词</h1>
-        <p class="page-desc">为当前画布节点和右键快捷动作配置系统预设提示词，提交任务时将自动拼接到用户输入之前（用户不可见）</p>
+        <p class="page-desc">为当前走任务链路的画布工作流配置系统预设提示词，提交任务时将自动拼接到用户输入之前（用户不可见）</p>
       </div>
     </div>
 
     <div class="tip-bar">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span>支持模板变量：在提示词中插入 <code v-pre>{{变量名}}</code>，系统会自动替换为用户实际选择的值。若不使用变量，系统会自动将提示词拼接在用户输入前面。</span>
+      <span>支持模板变量：在提示词中插入 <code v-pre>{{变量名}}</code>，系统会自动替换为用户实际选择的值。仅对当前工作流任务链生效。</span>
     </div>
 
     <div class="prompt-list">
@@ -79,8 +79,6 @@ const featureList = [
   { slug: 'face-swap', title: 'Edit · 定向换脸' },
   { slug: 'bg-swap', title: 'Edit · 换背景' },
   { slug: 'pattern-gen', title: 'Pattern · 图案生成' },
-  { slug: 'to-vector', title: 'Quick · 转矢量图' },
-  { slug: 'remove-bg', title: 'Quick · 抠图褪底' },
   { slug: 'hd-upscale', title: 'Enhance · 高清放大' },
   { slug: 'canvas-extend', title: 'Enhance · 画布延伸' },
 ] as const
@@ -141,8 +139,6 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{image_a_weight}}', desc: 'Image A 实际融合百分比' },
     { key: '{{image_b_weight}}', desc: 'Image B 实际融合百分比' },
   ],
-  'to-vector': noVars,
-  'remove-bg': noVars,
   'hd-upscale': [
     { key: '{{use_mask}}', desc: '是否启用局部增强（连接 Mask 时自动为 true，否则为 false）' },
     { key: '{{original_image_url}}', desc: 'Enhance 节点输入的原图 URL（自动传入）' },
@@ -160,8 +156,6 @@ function getVarsForSlug(slug: FeatureSlug): VarDef[] {
 }
 
 const featureNotes: Partial<Record<FeatureSlug, string>> = {
-  'remove-bg': '当前功能走直连接口，不经过任务模板变量替换。',
-  'to-vector': '当前功能走直连接口，不经过任务模板变量替换。',
   'hd-upscale': 'Enhance · HD 在未连接 Mask 时走直连超分，不使用这里的系统提示词；连接 Mask 进入局部增强任务链后，才会使用下方模板变量与系统提示词。',
 }
 

@@ -14,6 +14,10 @@ import (
 const defaultTimeout = 15 * time.Second
 
 func ValidateURL(rawURL string) (*url.URL, error) {
+	return ValidateURLWithAllowHosts(rawURL)
+}
+
+func ValidateURLWithAllowHosts(rawURL string, allowHosts ...string) (*url.URL, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("URL 格式错误")
@@ -28,12 +32,17 @@ func ValidateURL(rawURL string) (*url.URL, error) {
 		return nil, fmt.Errorf("URL 缺少主机名")
 	}
 
-	if strings.EqualFold(host, "localhost") {
-		return nil, fmt.Errorf("不允许访问本地地址")
-	}
-
 	resolveCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
+
+	normalizedAllowedHosts := normalizeAllowedHosts(allowHosts)
+	hostAllowed := normalizedAllowedHosts[normalizeHost(host)]
+	allowedIPs := resolveAllowedIPs(resolveCtx, normalizedAllowedHosts)
+	allowLoopback := normalizedAllowedHosts["localhost"]
+
+	if strings.EqualFold(host, "localhost") && !hostAllowed {
+		return nil, fmt.Errorf("不允许访问本地地址")
+	}
 
 	addrs, err := net.DefaultResolver.LookupIPAddr(resolveCtx, host)
 	if err != nil {
@@ -44,7 +53,10 @@ func ValidateURL(rawURL string) (*url.URL, error) {
 	}
 
 	for _, addr := range addrs {
-		if isPrivateOrLocal(addr.IP) {
+		if isLoopbackIP(addr.IP) && allowLoopback {
+			continue
+		}
+		if isPrivateOrLocal(addr.IP) && !hostAllowed && !allowedIPs[ipKey(addr.IP)] {
 			return nil, fmt.Errorf("不允许访问内网或本地地址")
 		}
 	}
@@ -53,7 +65,11 @@ func ValidateURL(rawURL string) (*url.URL, error) {
 }
 
 func Get(ctx context.Context, rawURL string, timeout time.Duration) (*http.Response, error) {
-	parsed, err := ValidateURL(rawURL)
+	return GetWithAllowHosts(ctx, rawURL, timeout)
+}
+
+func GetWithAllowHosts(ctx context.Context, rawURL string, timeout time.Duration, allowHosts ...string) (*http.Response, error) {
+	parsed, err := ValidateURLWithAllowHosts(rawURL, allowHosts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +80,7 @@ func Get(ctx context.Context, rawURL string, timeout time.Duration) (*http.Respo
 			if len(via) >= 5 {
 				return fmt.Errorf("重定向次数过多")
 			}
-			_, err := ValidateURL(req.URL.String())
+			_, err := ValidateURLWithAllowHosts(req.URL.String(), allowHosts...)
 			return err
 		},
 	}
@@ -75,6 +91,63 @@ func Get(ctx context.Context, rawURL string, timeout time.Duration) (*http.Respo
 	}
 
 	return client.Do(req)
+}
+
+func normalizeAllowedHosts(allowHosts []string) map[string]bool {
+	normalized := make(map[string]bool, len(allowHosts))
+	for _, raw := range allowHosts {
+		host := normalizeHost(raw)
+		if host == "" {
+			continue
+		}
+		normalized[host] = true
+	}
+	return normalized
+}
+
+func normalizeHost(raw string) string {
+	value := strings.TrimSpace(strings.ToLower(raw))
+	if value == "" {
+		return ""
+	}
+	if parsed, err := url.Parse(value); err == nil && parsed.Hostname() != "" {
+		return strings.ToLower(parsed.Hostname())
+	}
+	if strings.Contains(value, "/") {
+		return ""
+	}
+	host := value
+	if strings.Contains(host, ":") {
+		if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+			host = parsedHost
+		}
+	}
+	return strings.ToLower(strings.Trim(host, "[]"))
+}
+
+func resolveAllowedIPs(ctx context.Context, allowedHosts map[string]bool) map[string]bool {
+	ips := make(map[string]bool)
+	for host := range allowedHosts {
+		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			key := ipKey(addr.IP)
+			if key != "" {
+				ips[key] = true
+			}
+		}
+	}
+	return ips
+}
+
+func ipKey(ip net.IP) string {
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return ""
+	}
+	return addr.String()
 }
 
 func effectiveTimeout(timeout time.Duration) time.Duration {
@@ -96,4 +169,9 @@ func isPrivateOrLocal(ip net.IP) bool {
 		addr.IsLinkLocalMulticast() ||
 		addr.IsMulticast() ||
 		addr.IsUnspecified()
+}
+
+func isLoopbackIP(ip net.IP) bool {
+	addr, ok := netip.AddrFromSlice(ip)
+	return ok && addr.IsLoopback()
 }

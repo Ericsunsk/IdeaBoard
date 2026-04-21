@@ -2,6 +2,7 @@ package handler
 
 import (
 	"backend/internal/repository"
+	"backend/internal/service"
 	"backend/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -17,9 +18,14 @@ func NewFeaturePromptHandler(configRepo *repository.SystemConfigRepository) *Fea
 
 // GetPrompt 获取某功能的系统提示词
 func (h *FeaturePromptHandler) GetPrompt(c *gin.Context) {
-	slug := c.Param("slug")
-	if slug == "" {
+	rawSlug := c.Param("slug")
+	if rawSlug == "" {
 		response.Error(c, 400, "缺少 slug 参数")
+		return
+	}
+	slug, err := service.ValidateWorkflowFeatureSlug(rawSlug)
+	if err != nil {
+		response.Error(c, 400, err.Error())
 		return
 	}
 
@@ -34,9 +40,14 @@ func (h *FeaturePromptHandler) GetPrompt(c *gin.Context) {
 
 // SetPrompt 设置某功能的系统提示词
 func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
-	slug := c.Param("slug")
-	if slug == "" {
+	rawSlug := c.Param("slug")
+	if rawSlug == "" {
 		response.Error(c, 400, "缺少 slug 参数")
+		return
+	}
+	slug, err := service.ValidateWorkflowFeatureSlug(rawSlug)
+	if err != nil {
+		response.Error(c, 400, err.Error())
 		return
 	}
 

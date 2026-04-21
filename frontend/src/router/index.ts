@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import type { User } from '../types'
+import { getStoredToken, getStoredUser, clearStoredAuth } from '../utils/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -113,12 +113,6 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'line-draft-config',
-        name: 'AdminLineDraftConfig',
-        component: () => import('../views/admin/LineDraftConfig.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
         path: 'face-library',
         name: 'AdminFaceLibrary',
         component: () => import('../views/admin/FaceLibrary.vue'),
@@ -151,28 +145,9 @@ const router = createRouter({
   routes
 })
 
-function clearStoredAuth() {
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-}
-
-function readStoredUser(): User | null {
-  const userStr = localStorage.getItem('user')
-  if (!userStr) {
-    return null
-  }
-
-  try {
-    return JSON.parse(userStr) as User
-  } catch {
-    clearStoredAuth()
-    return null
-  }
-}
-
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
-  const user = readStoredUser()
+  const token = getStoredToken()
+  const user = getStoredUser()
   const isLoggedIn = !!(token && user)
 
   const isAdminRoute = to.path.startsWith('/admin')

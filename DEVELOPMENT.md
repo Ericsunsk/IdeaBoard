@@ -1,136 +1,351 @@
-# FENG 开发文档
+# <div align="center">IdeaBoard Development Guide</div>
 
-本文档聚焦开发信息，包含功能模块、提示词模板系统与项目结构。
+<p align="center">
+  <strong>面向仓库维护者与开发者的开发手册。</strong>
+</p>
 
-## 功能模块
+<p align="center">
+  聚焦当前系统结构、workflow contract、本地开发路径与关键目录边界。
+</p>
 
-### 图・文生图
+<p align="center">
+  <code>Private</code>
+  <code>Closed Source</code>
+  <code>Internal Engineering Document</code>
+</p>
 
-基础的文本/图片生成功能，支持自由创作。
+<p align="center">
+  <a href="#development-snapshot">系统概览</a> ·
+  <a href="#workflow-contract">Workflow Contract</a> ·
+  <a href="#task-lifecycle">任务链路</a> ·
+  <a href="#local-dev-fast-path">本地开发</a> ·
+  <a href="#repo-map">目录边界</a>
+</p>
 
-### 服装实验室
+---
 
-| 功能 | 路由 | 说明 |
-|------|------|------|
-| 线稿生成 | `/line-draft` | 从服装图片生成线稿 |
-| 线稿成款 | `/sketch-to-design` | 从线稿生成服装效果图 |
-| 局部改款 | `/partial-edit` | 涂抹选区 + 文字描述局部修改 |
-| 款式创新 | `/style-innovate` | 基于原图进行款式变化 |
-| 风格融合 | `/style-fusion` | 将参考图风格融合到原图 |
-| 系列配色 | `/series-color` | 为服装生成系列配色方案 |
-| 定向换色 | `/directed-recolor` | 涂抹选区 + 选择目标颜色精准换色 |
-| 面料上身 | `/fabric-on-body` | 将面料贴合到服装上 |
-| 图案上身 | `/pattern-on-body` | 将图案贴合到服装上 |
+> [!IMPORTANT]
+> 本文档仅供 IdeaBoard 授权成员内部使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
 
-### 摄影商拍
+## Development Snapshot
 
-| 功能 | 路由 | 说明 |
-|------|------|------|
-| 模特多角度 | `/multi-angle` | 生成模特多角度展示图 |
-| 虚拟 3D | `/virtual-3d` | 服装 3D 虚拟展示 |
-| 定向换脸 | `/face-swap` | 模特换脸 |
-| 换背景 | `/bg-swap` | 更换拍摄背景 |
-| 款式上身 | `/garment-on-model` | 服装虚拟试穿 |
+IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = 一个孤立功能模块”的方式组织产品语义。开发时应优先遵守 workflow feature contract、执行链 contract 和提示词模板 contract。
 
-### 图案工作室
+### At a Glance
 
-| 功能 | 路由 | 说明 |
-|------|------|------|
-| 图案生成 | `/pattern-gen` | AI 生成原创图案 |
-| 图案融合 | `/pattern-fusion` | 多图案融合 |
-| 工艺融合 | `/craft-fusion` | 将工艺效果融入图案 |
-| 图案变清晰 | `/pattern-upscale` | 图案超分辨率（阿里云 ImageEnhance 超分 API，后端已接入） |
+| 维度 | 当前配置 |
+|------|----------|
+| 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
+| 后端 | `Go` + `Gin` + `GORM` |
+| 基础设施 | `MySQL 8.0+`、`Redis 7+` |
+| 本地端口 | 前端 `5173`，后端 `6000` |
+| 当前主链 | 画布节点编排 -> 任务提交 -> Worker 执行 -> 结果回写 |
+| 技术标识 | `ideaboard-*` |
 
-### AI 工具箱
-
-| 功能 | 路由 | 说明 |
-|------|------|------|
-| 转矢量图 | `/to-vector` | 位图转矢量（后端调用 potrace 输出 SVG，支持参数调节） |
-| 抠图褪底 | `/remove-bg` | 调用阿里云分割接口完成抠图并保存到画廊 |
-| 高清放大 | `/hd-upscale` | 调用阿里云超分接口完成高清放大并保存到画廊 |
-| 模糊变清晰 | `/deblur` | 规划中 |
-| 画布延伸 | `/canvas-extend` | 规划中 |
-
-### 管理后台
-
-| 模块 | 说明 |
-|------|------|
-| 用户管理 | 用户列表、权限管理 |
-| 账户管理 | API 账号池管理（渠道、模型、密钥、并发、启停） |
-| 渠道管理 | AI 渠道配置 |
-| 绘图记录 | 全平台任务记录查看 |
-| 风格卡管理 | 预设风格卡的增删改查 |
-| 线稿配置 | 线稿生成相关参数 |
-| 功能提示词配置 | 各功能的系统提示词模板（支持 `{{变量}}` 模板语法） |
-| OSS 配置 | 对象存储配置 |
-| 分割配置 | 图像分割服务配置 |
-| 监控 | 系统运行状态 |
-
-## 提示词模板系统
-
-管理后台支持为每个功能配置系统提示词，使用 `{{变量}}` 语法实现动态替换。
-
-| 变量 | 适用功能 | 说明 |
-|------|----------|------|
-| `{{user_prompt}}` | 通用 | 用户输入的描述文本 |
-| `{{strength}}` | 款式创新 | 改变幅度（1-10） |
-| `{{category}}` | 风格融合、系列配色 | 用户选择的品类 |
-| `{{color_type}}` | 系列配色 | 配色类型（women/men/kids/reference） |
-| `{{colors}}` | 系列配色 | 颜色列表（如 `#8b3a3a, #6b2d3e`） |
-| `{{target_color}}` | 定向换色 | 目标颜色（如 `#ff5500`） |
-
-## 项目结构
+### Architecture Shape
 
 ```text
-FENG/
-├── frontend/                    # 前端项目
-│   ├── src/
-│   │   ├── api/                 # API 封装
-│   │   ├── assets/              # 静态资源
-│   │   ├── components/          # 公共组件
-│   │   ├── router/              # 路由配置
-│   │   ├── stores/              # Pinia 状态管理
-│   │   ├── types/               # TypeScript 类型定义
-│   │   ├── utils/               # 工具函数
-│   │   └── views/
-│   │       ├── user/            # 用户端页面
-│   │       └── admin/           # 管理后台页面
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/                     # 后端项目
-│   ├── cmd/                     # 入口文件
-│   │   └── main.go
-│   ├── internal/
-│   │   ├── config/              # 配置加载
-│   │   ├── handler/             # HTTP 处理器
-│   │   ├── middleware/          # 中间件
-│   │   ├── model/               # 数据模型
-│   │   ├── repository/          # 数据仓库层
-│   │   ├── service/             # 业务逻辑层
-│   │   └── worker/              # 异步任务消费者
-│   └── pkg/                     # 公共包
-│       ├── database/
-│       ├── redis/
-│       └── response/
-├── docker/                      # Docker 配置
-├── DEPLOYMENT.md                # 服务器部署详细步骤
-├── DEVELOPMENT.md               # 开发文档（本文件）
-└── README.md                    # 项目总览与快速部署
+Browser
+  -> Vite / Frontend SPA
+  -> Gin API
+  -> MySQL (users / tasks / configs / accounts)
+  -> Redis (token + task queue)
+  -> Worker Consumer
+  -> Upstream AI Channels
+  -> Kodo / Local uploads
 ```
 
-## 环境变量（后端）
+## Ownership Boundaries
+
+### Frontend Responsibilities
+
+前端主要负责：
+
+- 画布工作台、节点编排与连接交互
+- 任务请求装配
+- 结果展示与画板管理
+- 管理后台配置页
+- 登录态维护与权限路由
+
+主要页面入口：
+
+| 路径 | 说明 |
+|------|------|
+| `/user/home` | 用户首页与工作台入口 |
+| `/user/picture` | 画布工作台主页面 |
+| `/user/boards` | 画板列表 |
+| `/user/center` | 用户中心 |
+| `/admin/*` | 管理后台 |
+
+### Backend Responsibilities
+
+后端主要负责：
+
+- 用户鉴权与管理员权限控制
+- 任务提交、任务记录与状态轮询
+- 账号池、渠道商与任务调度
+- 系统提示词模板读取与变量替换
+- 分割、超分、向量化、上传与对象存储
+- Worker 异步执行与结果持久化
+
+## Workflow Contract
+
+当前受支持的 workflow feature slug：
+
+| Feature | 典型语义 |
+|---------|----------|
+| `sketch-to-design` | 线稿成款 |
+| `style-innovate` | 款式创新 |
+| `partial-edit` | 局部改款 |
+| `bg-swap` | 换背景 |
+| `face-swap` | 换脸 |
+| `style-fusion` | 双图融合 |
+| `series-color` | 多色配色 |
+| `directed-recolor` | 定向换色 |
+| `fabric-on-body` | Wear / 面料上身 |
+| `multi-angle` | 单图单视角展示 |
+| `virtual-3d` | 虚拟 3D 展示 |
+| `pattern-gen` | 图案生成 |
+| `hd-upscale` | 高清增强 |
+| `canvas-extend` | 画布延伸 |
+
+### Contract Rules
+
+- `feature` 应作为顶层任务字段传递，并在后端统一 canonicalize。
+- `image_urls` 应作为顶层任务字段传递，不再在 `params` 里双轨存放。
+- `params` 只承载 feature 专属参数，不再额外复制 `feature` 与 `image_urls`。
+- `mask`、`use_mask`、`upscale_mode` 等兼容别名由后端统一读取 canonical key。
+- 不保留已退休 feature 的产品文案与模板兼容。
+
+对应实现：
+
+- [executionContract.ts](./frontend/src/config/executionContract.ts)
+- [workflow_feature_helpers.go](./backend/internal/service/workflow_feature_helpers.go)
+
+### Direct Canvas Tools
+
+除 workflow feature 外，画布中还存在少量直接工具动作：
+
+- `remove-bg`
+- `to-vector`
+
+它们不进入 `feature_prompt:<slug>` 模板链，也不属于 workflow feature contract 的 active slug 集合。审计 prompt 系统或 admin 配置页时，不要把这类直连工具误当成 workflow feature 漏斗的一部分。
+
+## Task Lifecycle
+
+### Request Shape
+
+前端通过统一执行 contract 拼装请求，典型字段如下：
+
+```json
+{
+  "prompt": "用户提示词",
+  "feature": "style-fusion",
+  "image_urls": ["https://..."],
+  "params": {
+    "blend_ratio": 0.5
+  }
+}
+```
+
+### Frontend Entry Points
+
+- [useNodeExecutors.ts](./frontend/src/composables/useNodeExecutors.ts)
+- [useCanvasDirectActions.ts](./frontend/src/composables/useCanvasDirectActions.ts)
+- [Home.vue](./frontend/src/views/user/Home.vue)
+
+### Backend Flow
+
+1. 标准化 `feature` 与关键参数。
+2. 基于风格卡与系统提示词模板生成最终 prompt。
+3. 写入任务表并推入 Redis 队列。
+4. Worker 从队列消费任务并调度可用账号。
+5. 调用上游渠道商接口。
+6. 将结果持久化到对象存储或本地上传目录。
+7. 更新任务状态并返回给前端轮询。
+
+关键代码：
+
+- [account_service.go](./backend/internal/service/account_service.go)
+- [prompt_engine.go](./backend/internal/service/prompt_engine.go)
+- [consumer.go](./backend/internal/worker/consumer.go)
+
+## Prompt System
+
+系统提示词由后台配置项 `feature_prompt:<slug>` 驱动，支持 `{{变量}}` 模板语法。
+
+### Core Rules
+
+- `feature slug` 是唯一索引，不再维护旧兼容名称。
+- `{{user_prompt}}` 是用户输入信号，不与旧线稿模板主链混写。
+- `mode -> template` 映射仅保留必要项。
+- 执行语义相关 hidden constraint 由后端在特定 feature 下追加。
+
+### Common Variables
+
+| 变量 | 说明 |
+|------|------|
+| `{{user_prompt}}` | 用户输入文本 |
+| `{{colors}}` | 颜色列表 |
+| `{{target_color}}` | 定向换色目标色 |
+| `{{blend_ratio}}` | Fusion 融合比例 |
+| `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 画布延伸参数 |
+| `{{tile_mode}}` | Wear 贴图模式 |
+| `{{viewpoint}}` | 展示视角描述 |
+| `{{lighting}}` | 打光描述 |
+| `{{use_mask}}` | 是否启用 mask |
+| `{{mask_image_url}}` | Mask 图 URL |
+
+相关入口：
+
+- 管理页：[FeaturePromptConfig.vue](./frontend/src/views/admin/FeaturePromptConfig.vue)
+- 后端装配：[prompt_engine.go](./backend/internal/service/prompt_engine.go)
+
+## Auth and Session
+
+系统采用 `JWT + Redis token` 双重校验：
+
+- JWT 提供用户身份与角色信息。
+- Redis 保存当前有效 token，实现主动失效与登出控制。
+- 若 `JWT_SECRET` 未配置，开发环境会生成一次性随机密钥；服务重启后旧 token 会失效。
+
+关键代码：
+
+- [auth.go](./backend/internal/middleware/auth.go)
+- [auth.ts](./frontend/src/utils/auth.ts)
+- [user.ts](./frontend/src/stores/user.ts)
+
+## Local Dev Fast Path
+
+### Requirements
+
+| 组件 | 建议版本 |
+|------|----------|
+| Node.js | `18+` |
+| Go | `1.22+` |
+| MySQL | `8.0+` |
+| Redis | `7+` |
+
+### Startup
+
+1. 启动本地依赖：
+
+```bash
+cd docker
+docker compose up -d
+```
+
+2. 配置后端环境变量：
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+3. 启动后端：
+
+```bash
+cd backend
+go run cmd/main.go
+```
+
+4. 启动前端：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+5. 初始化管理员：
+
+```bash
+cd backend
+go run cmd/main.go init-admin
+```
+
+> [!IMPORTANT]
+> `backend/.env` 中的 `DB_USER / DB_PASSWORD` 是数据库连接账号，不是网站后台管理员账号。管理员登录账号来自业务库里的 `users` 表；本地首次启动时，建议执行一次 `go run cmd/main.go init-admin`。
+>
+> 若你完全跳过 `init-admin`，空库在 Docker 初始化 SQL 首次执行时可能会先落一个种子管理员记录；但开发与部署文档统一以 `init-admin` 作为标准初始化入口。
+
+## Verification Matrix
+
+### Frontend
+
+```bash
+cd frontend
+npm run build
+```
+
+### Backend
+
+```bash
+cd backend
+go test ./...
+go build ./...
+```
+
+### Cross-Layer Changes
+
+以下改动默认同时验证前后端：
+
+- 路由
+- 鉴权
+- 任务 contract
+- 上传
+- 提示词模板
+- 管理后台配置
+
+## Environment Variables
 
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `DB_HOST` | `localhost` | MySQL 主机 |
 | `DB_PORT` | `3306` | MySQL 端口 |
-| `DB_USER` | `root` | MySQL 用户 |
-| `DB_PASSWORD` | `root123` | MySQL 密码 |
-| `DB_NAME` | `feng` | 数据库名 |
+| `DB_USER` | `ideaboard` | MySQL 用户 |
+| `DB_PASSWORD` | 无默认值 | MySQL 密码；使用仓库自带 Docker Compose 时默认业务密码为 `ideaboard123` |
+| `DB_NAME` | `ideaboard` | 数据库名 |
 | `REDIS_HOST` | `localhost` | Redis 主机 |
 | `REDIS_PORT` | `6379` | Redis 端口 |
 | `REDIS_AUTH` | 空 | Redis 密码 |
-| `APP_PORT` | `6000` | 后端端口 |
-| `JWT_SECRET` | 空 | JWT 密钥（生产环境必须设置） |
+| `APP_PORT` | `6000` | 后端监听端口 |
+| `JWT_SECRET` | 空 | JWT 密钥；生产环境必须配置 |
+| `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |
+| `DB_LOG_MODE` | `warn` | GORM 日志等级，可选 `silent/error/warn/info` |
 
-说明：后端会在启动时自动加载 `.env`（也支持通过 `ENV_FILE=/path/to/.env` 指定配置文件）。
+## Repo Map
+
+```text
+frontend/src/
+├── api/                       # API 调用与类型
+├── components/                # 可复用组件
+├── composables/               # 画布与执行逻辑
+├── config/                    # 前端执行 contract 与常量
+├── router/                    # 路由
+├── stores/                    # Pinia store
+├── utils/                     # 通用工具
+└── views/
+    ├── admin/                 # 管理后台
+    └── user/                  # 用户端
+
+backend/
+├── cmd/main.go                # 服务入口
+├── internal/config/           # 配置加载
+├── internal/handler/          # HTTP handler
+├── internal/middleware/       # 鉴权与权限
+├── internal/model/            # GORM model
+├── internal/repository/       # 数据访问层
+├── internal/service/          # 业务逻辑与 prompt 组装
+├── internal/worker/           # 异步任务消费
+└── pkg/                       # safehttp、response、redis、database 等公共包
+```
+
+## Maintenance Rules
+
+在继续迭代时，优先遵守以下规则：
+
+1. 以 working tree 为准，不回滚用户未提交改动。
+2. 改任务 contract 时，优先同步前端执行链、后端 canonical helper 和 admin 配置页。
+3. 已退休 feature 不应继续出现在产品文案、模板兼容或展示分组里。
+4. 跨层变更默认需要同时验证前端与后端。

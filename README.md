@@ -1,89 +1,154 @@
-# FENG
+<p align="center">
+  <img src="./docs/assets/ideaboard-wordmark.png" alt="IdeaBoard" width="576">
+</p>
 
-> 面向服装行业的 AI 设计与商拍平台，覆盖从线稿、改款、图案生成到模特展示的核心工作流。
+<p align="center">
+  <strong>为服装设计与商品展示场景构建的 AI 画布工作流平台。</strong>
+</p>
 
-FENG 采用 `Vue 3 + Go` 全栈架构，前端负责交互与工作台体验，后端统一提供 API、任务处理、账户调度、图片上传和管理后台能力。项目同时支持传统 Linux 部署，以及适合宝塔面板的 Go 单体部署方案。
+<p align="center">
+  在统一画布中完成素材输入、节点编排、任务执行、结果沉淀与后台配置。
+</p>
 
-## 项目概览
+<p align="center">
+  <img src="https://img.shields.io/badge/repository-private-4b5563?style=flat-square" alt="Repository: Private" />
+  <img src="https://img.shields.io/badge/source-closed-374151?style=flat-square" alt="Source: Closed" />
+  <img src="https://img.shields.io/badge/distribution-internal_only-1f2937?style=flat-square" alt="Distribution: Internal Only" />
+</p>
 
-| 维度 | 说明 |
-|------|------|
-| 产品定位 | AI 服装设计平台 |
-| 前端技术 | `Vue 3`、`Vite`、`TypeScript`、`Naive UI`、`Pinia` |
-| 后端技术 | `Go`、`Gin`、`GORM` |
-| 基础设施 | `MySQL 5.7+`、`Redis 7+` |
-| 默认端口 | `6000` |
-| 部署方式 | 标准 Linux 部署、宝塔 Go 单体部署 |
+<p align="center">
+  <a href="#overview">Overview</a> ·
+  <a href="#highlights">Highlights</a> ·
+  <a href="#capabilities">Capabilities</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#deployment">Deployment</a> ·
+  <a href="#docs">Docs</a>
+</p>
 
-## 核心能力
+<p align="center">
+  <img src="https://img.shields.io/badge/frontend-Vue_3-42b883?style=flat-square&logo=vuedotjs&logoColor=white" alt="Frontend: Vue 3" />
+  <img src="https://img.shields.io/badge/language-TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="Language: TypeScript" />
+  <img src="https://img.shields.io/badge/ui-Naive_UI-18a058?style=flat-square" alt="UI: Naive UI" />
+  <img src="https://img.shields.io/badge/state-Pinia-ffd859?style=flat-square&logo=pinia&logoColor=1f2937" alt="State: Pinia" />
+  <img src="https://img.shields.io/badge/backend-Go-00add8?style=flat-square&logo=go&logoColor=white" alt="Backend: Go" />
+  <img src="https://img.shields.io/badge/framework-Gin-008ecf?style=flat-square" alt="Framework: Gin" />
+  <img src="https://img.shields.io/badge/orm-GORM-1f6feb?style=flat-square" alt="ORM: GORM" />
+  <img src="https://img.shields.io/badge/database-MySQL_8-4479a1?style=flat-square&logo=mysql&logoColor=white" alt="Database: MySQL 8" />
+  <img src="https://img.shields.io/badge/cache-Redis_7-dc382d?style=flat-square&logo=redis&logoColor=white" alt="Cache: Redis 7" />
+</p>
 
-| 模块 | 代表能力 |
+## Product Preview
+
+<p align="center">
+  <img src="./docs/assets/ideaboard-preview.png" alt="IdeaBoard canvas workflow preview" width="1400">
+</p>
+
+<p align="center">
+  <sub>统一画布工作流：输入、编辑、模型控制与输出回写在同一界面完成。</sub>
+</p>
+
+---
+
+## Overview
+
+IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供节点画布、任务入口与管理后台，后端负责鉴权、任务落库、提示词模板装配、账号调度、异步执行与结果持久化。
+
+### Product Snapshot
+
+| 维度 | 当前配置 |
 |------|----------|
-| 服装实验室 | 线稿生成、线稿成款、局部改款、款式创新、风格融合、系列配色、定向换色 |
-| 摄影商拍 | 模特多角度、虚拟 3D、人台变模特、换脸、换背景、款式上身 |
-| 图案工作室 | 图案生成、画风复刻、四方连续、图案融合、工艺融合、图案涂改、图案超分 |
-| AI 工具箱 | 转矢量图、抠图褪底、高清放大 |
-| 管理后台 | 用户管理、账号池管理、渠道配置、任务记录、提示词模板、OSS 与分割配置 |
+| 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
+| 后端 | `Go` + `Gin` + `GORM` |
+| 基础设施 | `MySQL 8.0+`、`Redis 7+` |
+| 默认本地端口 | 前端 `5173`，后端 `6000` |
+| 运行方式 | 本地开发、标准 Linux 部署、宝塔 Go 单体部署 |
+| 核心界面 | 用户画布工作台、画板管理、管理后台 |
 
-更完整的功能清单、路由和项目结构见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
+### Runtime Shape
 
-## 文档导航
+```text
+Canvas UI
+  -> API / Auth / Upload
+  -> Task Submission
+  -> Redis Queue
+  -> Worker Dispatch
+  -> Upstream AI Channels
+  -> Result Persistence
+```
 
-| 文档 | 用途 |
-|------|------|
-| [README.md](./README.md) | 项目总览、快速开始、部署入口 |
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | 开发文档、功能模块、提示词模板、目录结构 |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | 标准 Linux 生产部署流程 |
-| [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md) | 宝塔 Go 项目部署说明 |
+## Highlights
 
-## 快速开始
+<table>
+  <tr>
+    <td valign="top" width="25%">
+      <strong>Canvas Workflow</strong><br/>
+      以节点编排为中心，统一管理输入、连接、执行与结果回写。
+    </td>
+    <td valign="top" width="25%">
+      <strong>Task Runtime</strong><br/>
+      任务异步执行，支持队列调度、账号池分发与状态轮询。
+    </td>
+    <td valign="top" width="25%">
+      <strong>Prompt System</strong><br/>
+      支持按 feature 维度配置系统提示词与模板变量。
+    </td>
+    <td valign="top" width="25%">
+      <strong>Admin Console</strong><br/>
+      管理用户、账号、渠道、素材模板、提示词与配置项。
+    </td>
+  </tr>
+</table>
 
-### 环境要求
+## Capabilities
 
-| 组件 | 建议版本 |
-|------|----------|
-| Node.js | `18+` |
-| Go | `1.22+` |
-| MySQL | `5.7+` |
-| Redis | `7+` |
+当前产品主链路覆盖以下能力：
 
-### 1. 启动基础服务
+| 能力类别 | 示例能力 |
+|----------|----------|
+| 设计生成 | 线稿成款、款式创新、图案生成 |
+| 编辑调整 | 局部改款、换背景、换脸、双图融合 |
+| 色彩与材质 | 多色配色、定向换色、上身贴合 |
+| 展示与视角 | 单视角展示、商品展示 |
+| 后处理 | 高清增强、画布延伸 |
 
-推荐直接使用仓库内 Docker 配置启动 MySQL 和 Redis：
+更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
+
+## Quick Start
+
+### 1. Start Local Dependencies
 
 ```bash
 cd docker
 docker compose up -d
 ```
 
-### 2. 配置后端环境变量
+默认本地依赖：
+
+| 项目 | 默认值 |
+|------|--------|
+| MySQL Root 密码 | `root123` |
+| 业务数据库 | `ideaboard` |
+| 业务用户 | `ideaboard` |
+| 业务密码 | `ideaboard123` |
+| Redis | `127.0.0.1:6379` |
+
+### 2. Configure Backend Environment
 
 ```bash
 cd backend
 cp .env.example .env
 ```
 
-至少确认这些字段：
+至少确认数据库、Redis、端口和 `JWT_SECRET` 配置正确。
 
-- `DB_HOST`
-- `DB_PORT`
-- `DB_USER`
-- `DB_PASSWORD`
-- `DB_NAME`
-- `REDIS_HOST`
-- `REDIS_PORT`
-- `REDIS_AUTH`
-- `APP_PORT`
-- `JWT_SECRET`
-
-### 3. 启动后端
+### 3. Run the Backend
 
 ```bash
 cd backend
 go run cmd/main.go
 ```
 
-### 4. 启动前端
+### 4. Run the Frontend
 
 ```bash
 cd frontend
@@ -91,80 +156,84 @@ npm install
 npm run dev
 ```
 
-### 5. 初始化管理员账号
+### 5. Initialize the Admin Account
 
 ```bash
 cd backend
 go run cmd/main.go init-admin
 ```
 
-执行 `init-admin` 后会创建或重置管理员账号：
+默认管理员账号：
 
 - 用户名：`admin`
 - 密码：`admin123`
 
-首次登录后应立即修改密码。
+### Local Access
 
-## 本地开发访问
-
-| 地址 | 说明 |
+| 地址 | 用途 |
 |------|------|
 | `http://localhost:5173` | 前端开发环境 |
+| `http://localhost:5173/admin/login` | 管理后台登录 |
 | `http://localhost:6000/api/health` | 后端健康检查 |
 
-前端开发代理已指向 `http://localhost:6000`，相关配置见 [frontend/vite.config.ts](./frontend/vite.config.ts)。
+## Repository Layout
 
-## 部署方式
-
-### 方式一：宝塔 Go 单体部署
-
-适合希望直接在宝塔中以 Go 项目方式运行的场景。当前方案会将前端静态资源内嵌到 Go 二进制中，减少部署链路。
-
-打包命令：
-
-```bash
-./scripts/package-bt-go.sh
+```text
+IdeaBoard/
+├── frontend/                 # 前端与管理后台
+├── backend/                  # API、任务、Worker、服务逻辑
+├── docker/                   # 本地 MySQL / Redis 依赖
+├── scripts/                  # 打包与部署脚本
+├── README.md                 # 项目首页
+├── DEVELOPMENT.md            # 开发手册
+├── DEPLOYMENT.md             # 标准 Linux 部署
+└── DEPLOY_BAOTA_GO.md        # 宝塔 Go 部署
 ```
 
-说明文档见 [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md)。
+## Deployment
 
-### 方式二：标准 Linux 部署
+### Standard Linux Deployment
 
-适合使用 `systemd + Nginx` 的常规生产环境。
-
-打包命令：
+适用于 `systemd + Nginx` 的常规服务器环境。
 
 ```bash
 ./scripts/package-deploy.sh
 ```
 
-说明文档见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
-## 推荐验证项
+### Baota Go Deployment
 
-部署完成后，至少检查以下内容：
+适用于以前后端单可执行方式部署的场景。
 
-1. `curl http://127.0.0.1:6000/api/health` 返回成功。
-2. 首页可以正常打开，且没有重定向循环。
-3. 管理员账号可以登录。
-4. 图片上传与 `uploads` 访问正常。
-5. 关键功能页能正常提交任务。
-
-## 项目结构
-
-```text
-FENG/
-├── frontend/                 # Vue 3 前端
-├── backend/                  # Go 后端
-├── docker/                   # 本地依赖服务
-├── scripts/                  # 打包与辅助脚本
-├── DEVELOPMENT.md            # 开发文档
-├── DEPLOYMENT.md             # 标准部署文档
-├── DEPLOY_BAOTA_GO.md        # 宝塔部署文档
-└── README.md                 # 仓库入口文档
+```bash
+./scripts/package-bt-go.sh
 ```
 
-## 许可证
+详见 [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md)。
+
+## Docs
+
+| 文档 | 用途 |
+|------|------|
+| [README.md](./README.md) | 项目首页与快速启动 |
+| [DEVELOPMENT.md](./DEVELOPMENT.md) | 架构、contract、本地开发与目录边界 |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | 标准 Linux 部署、升级与回滚 |
+| [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md) | 宝塔 Go 部署 |
+| [docker/README.md](./docker/README.md) | 本地依赖说明 |
+| [CHANGELOG.md](./CHANGELOG.md) | 发布记录与未发布变更 |
+
+## Verification
+
+上线前建议至少确认：
+
+1. `curl http://127.0.0.1:6000/api/health` 返回成功。
+2. 用户端首页可正常访问。
+3. 管理员可登录后台。
+4. 图片上传与结果回写正常。
+5. 任务提交后能看到完整状态流转。
+
+## Rights
 
 本项目为闭源私有项目，未经授权不得复制、分发或使用。
 

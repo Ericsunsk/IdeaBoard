@@ -1,7 +1,7 @@
 -- 创建数据库（如果还没有创建）
-CREATE DATABASE IF NOT EXISTS feng CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS ideaboard CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-USE feng;
+USE ideaboard;
 
 -- 用户表（精简版：只保留必要的字段）
 DROP TABLE IF EXISTS `users`;

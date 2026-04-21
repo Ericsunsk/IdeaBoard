@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,13 +39,23 @@ var loadEnvOnce sync.Once
 func Load() *Config {
 	loadEnvFile()
 
+	dbPassword := getEnv("DB_PASSWORD", "")
+	if dbPassword == "" {
+		log.Println("[Config] WARNING: DB_PASSWORD 未设置，数据库连接可能失败")
+	}
+
+	jwtSecret := getEnv("JWT_SECRET", "")
+	if jwtSecret == "" {
+		log.Println("[Config] WARNING: JWT_SECRET 未设置，将使用随机密钥（重启后旧 token 失效）")
+	}
+
 	return &Config{
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "3306"),
-			User:     getEnv("DB_USER", "root"),
-			Password: getEnv("DB_PASSWORD", "root123"),
-			Database: getEnv("DB_NAME", "feng"),
+			User:     getEnv("DB_USER", "ideaboard"),
+			Password: dbPassword,
+			Database: getEnv("DB_NAME", "ideaboard"),
 		},
 		Redis: RedisConfig{
 			Host: getEnv("REDIS_HOST", "localhost"),

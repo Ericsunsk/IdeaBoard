@@ -20,6 +20,7 @@ import (
 	"backend/internal/repository"
 	"backend/internal/service"
 	"backend/pkg/redis"
+	"backend/pkg/safehttp"
 )
 
 type Consumer struct {
@@ -329,12 +330,12 @@ func (c *Consumer) callDrawingAPI(account *model.ApiAccount, task *redis.GlobalQ
 				log.Printf("[Consumer] 图片已通过七牛直抓存储: %s", reURL)
 			} else {
 				log.Printf("[Consumer] 七牛直抓失败，回退中转上传: %v", reErr)
-				reURL, reErr = c.reuploadToKodo(imageURL)
+				reURL, reErr = c.reuploadToKodo(imageURL, account.ProxyURL)
 			}
 		} else {
 			// 中转模式：下载到本服务器再上传到七牛
 			log.Printf("[Consumer] 使用中转上传模式")
-			reURL, reErr = c.reuploadToKodo(imageURL)
+			reURL, reErr = c.reuploadToKodo(imageURL, account.ProxyURL)
 		}
 
 		if reErr == nil {
@@ -600,15 +601,14 @@ func parseSizeFromParams(params map[string]interface{}) (int, int) {
 }
 
 // reuploadToKodo 下载远程图片并转存到七牛云
-func (c *Consumer) reuploadToKodo(imageURL string) (string, error) {
+func (c *Consumer) reuploadToKodo(imageURL string, allowHosts ...string) (string, error) {
 	if strings.HasPrefix(imageURL, "data:image/") {
 		// base64 图片，构建临时 multipart.FileHeader
 		return c.uploadBase64ToKodo(imageURL)
 	}
 
-	// 下载远程图片
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(imageURL)
+	// 下载远程图片。默认仍使用 safehttp 防 SSRF，只对白名单上游放开私网/回环回传。
+	resp, err := safehttp.GetWithAllowHosts(context.Background(), imageURL, 30*time.Second, allowHosts...)
 	if err != nil {
 		return "", fmt.Errorf("下载图片失败: %v", err)
 	}

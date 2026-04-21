@@ -2,6 +2,14 @@ import type { Ref } from 'vue'
 import type { SubmitTaskData } from '../api/index'
 import { describeModelAngleSpec, describeWearTileMode } from '../components/canvas/nodes/nodeOptionConfig'
 import {
+  buildExecutionTaskRequest,
+  EXECUTION_COLOR_SERIES_META,
+  EXECUTION_DIRECTED_RECOLOR_META,
+  EXECUTION_EDIT_MODE_META,
+  EXECUTION_FUSION_META,
+  EXECUTION_WEAR_META,
+} from '../config/executionContract'
+import {
   enhanceModeSupportsPrompt,
   getEditNodePortLabel,
 } from '../config/canvasNodeConnectionContract'
@@ -69,27 +77,6 @@ type SegmentPayload = {
 }
 
 type StandardEditMode = Exclude<EditNodeItem['mode'], 'face-swap'>
-type EditModeMeta = Record<StandardEditMode, { feature: string; promptPrefix: string; fallbackPrompt: string }>
-type WearFeatureMeta = { feature: string; promptPrefix: string; successLabel: string }
-
-const FUSION_META = {
-  feature: 'style-fusion',
-  promptPrefix: '[style-fusion]',
-  fallbackPrompt: '双图融合',
-  successLabel: 'Fusion',
-} as const
-
-const COLOR_SERIES_META = {
-  feature: 'series-color',
-  colorType: 'reference',
-  promptPrefix: '[series-color] 多色配色',
-} as const
-
-const DIRECTED_RECOLOR_META = {
-  feature: 'directed-recolor',
-  promptPrefix: '[directed-recolor]',
-  successLabel: 'Color',
-} as const
 
 interface UseNodeExecutorsOptions {
   generating: Ref<boolean>
@@ -100,8 +87,6 @@ interface UseNodeExecutorsOptions {
   maskNodes: Ref<MaskNodeItem[]>
   activeImageNodeId: Ref<number | null>
   activeMaskNodeId: Ref<number | null>
-  editModeMeta: EditModeMeta
-  wearFeatureMeta: WearFeatureMeta
   getViewpointLabel: (key: string) => string
   getViewpointLightingLabel: (key: ViewpointNodeItem['lighting']) => string
   getNodeConnectionStatus: (
@@ -168,7 +153,7 @@ interface UseNodeExecutorsOptions {
 
 export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   function getEditModeMeta(mode: StandardEditMode) {
-    return options.editModeMeta[mode]
+    return EXECUTION_EDIT_MODE_META[mode]
   }
 
   function resolveFailureMessage(error: unknown, fallback: string): string {
@@ -464,20 +449,20 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       )
 
       await submitExecutionTask(nodeType, node.id, {
-        request: {
-          prompt: `${DIRECTED_RECOLOR_META.promptPrefix} ${resolvedContext.promptText ? `${resolvedContext.promptText}，` : ''}目标颜色：${targetColor}，强度：${strength}`,
+        request: buildExecutionTaskRequest({
+          prompt: `${EXECUTION_DIRECTED_RECOLOR_META.promptPrefix} ${resolvedContext.promptText ? `${resolvedContext.promptText}，` : ''}目标颜色：${targetColor}，强度：${strength}`,
+          feature: EXECUTION_DIRECTED_RECOLOR_META.feature,
+          imageUrls: [uploadRes.data.url],
           params: {
-            image_urls: [uploadRes.data.url],
             original_image_url: resolvedContext.originalImageUrl,
-            feature: DIRECTED_RECOLOR_META.feature,
             target_color: targetColor,
             variation_strength: strength,
             strength,
           },
-        },
+        }),
         source: placementSource,
         outputNodeId,
-        successMessage: `${DIRECTED_RECOLOR_META.successLabel} submitted`,
+        successMessage: `${EXECUTION_DIRECTED_RECOLOR_META.successLabel} submitted`,
         failureMessage: 'Failed to submit color task',
         onCompleted: urls => cacheNodeOutputs(nodeType, node.id, urls),
       })
@@ -568,11 +553,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const placementSource = options.buildPlacementSource(sourceUrl, node.x + 340, node.y + 18)
 
     await submitExecutionTask('model', node.id, {
-      request: {
+      request: buildExecutionTaskRequest({
         prompt: `[multi-angle] ${promptText}`,
+        feature: 'multi-angle',
+        imageUrls: [sourceUrl],
         params: {
-          image_urls: [sourceUrl],
-          feature: 'multi-angle',
           angle_spec: {
             yaw: angleSpec.yaw,
             framing: angleSpec.framing,
@@ -581,7 +566,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           ...(poseImageInput?.url ? { pose_url: poseImageInput.url, pose_strength: poseStrength } : {}),
           background: node.background,
         },
-      },
+      }),
       source: placementSource,
       outputNodeId,
       successMessage: `Task submitted · ${angleLabel}`,
@@ -627,15 +612,15 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const placementSource = options.buildPlacementSource(sourceUrls[0], node.x + 340, node.y + 18)
 
     await submitExecutionTask('viewpoint', node.id, {
-      request: {
+      request: buildExecutionTaskRequest({
         prompt: `[virtual-3d] ${promptText}`,
+        feature: 'virtual-3d',
+        imageUrls: sourceUrls,
         params: {
-          image_urls: sourceUrls,
-          feature: 'virtual-3d',
           viewpoint: node.selectedViewpoint,
           lighting: node.lighting,
         },
-      },
+      }),
       source: placementSource,
       outputNodeId,
       successMessage: 'Display submitted',
@@ -702,13 +687,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         const placementSource = options.buildPlacementSource(resolvedImage.url, node.x + 340, node.y + 18)
 
         await submitExecutionTask('edit', node.id, {
-          request: {
+          request: buildExecutionTaskRequest({
             prompt: '[face-swap] 换脸',
-            params: {
-              image_urls: [resolvedImage.url, faceSourceUrl],
-              feature: 'face-swap',
-            },
-          },
+            feature: 'face-swap',
+            imageUrls: [resolvedImage.url, faceSourceUrl],
+          }),
           source: placementSource,
           outputNodeId,
           successMessage: connectedMask ? 'Face swap submitted · masked face' : 'Face swap submitted',
@@ -729,14 +712,14 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       const placementSource = options.buildPlacementSource(resolvedImage.url, resolvedMask.placementX, resolvedMask.placementY)
 
       await submitExecutionTask('edit', node.id, {
-        request: {
+        request: buildExecutionTaskRequest({
           prompt: `${editModeMeta!.promptPrefix} ${promptText}`,
+          feature: editModeMeta!.feature,
+          imageUrls: [uploadRes.data.url],
           params: {
-            image_urls: [uploadRes.data.url],
             original_image_url: resolvedImage.url,
-            feature: editModeMeta!.feature,
           },
-        },
+        }),
         source: placementSource,
         outputNodeId,
         successMessage: node.mode === 'bg-swap' ? 'Background swap submitted' : 'Partial edit submitted',
@@ -755,7 +738,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const connectedImageB = resolveConnectedFusionImageInput(node, 'imageB')
     const imageAWeight = node.blendRatio
     const imageBWeight = 100 - node.blendRatio
-    const promptText = resolveConnectedFusionPromptInput(node, FUSION_META.fallbackPrompt)
+    const promptText = resolveConnectedFusionPromptInput(node, EXECUTION_FUSION_META.fallbackPrompt)
     const missingPorts = options.getMissingRequiredNodeInputs('fusion', node, {
       imageA: connectedImageA,
       imageB: connectedImageB,
@@ -776,20 +759,19 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const placementSource = options.buildPlacementSource(connectedImageA!.url, node.x + 340, node.y + 18)
 
     await submitExecutionTask('fusion', node.id, {
-      request: {
-        prompt: `${FUSION_META.promptPrefix} ${promptText}`,
-        feature: FUSION_META.feature,
-        image_urls: [connectedImageA!.url, connectedImageB!.url],
+      request: buildExecutionTaskRequest({
+        prompt: `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`,
+        feature: EXECUTION_FUSION_META.feature,
+        imageUrls: [connectedImageA!.url, connectedImageB!.url],
         params: {
-          feature: FUSION_META.feature,
           blend_ratio: imageAWeight,
           image_a_weight: imageAWeight,
           image_b_weight: imageBWeight,
         },
-      },
+      }),
       source: placementSource,
       outputNodeId,
-      successMessage: `${FUSION_META.successLabel} submitted`,
+      successMessage: `${EXECUTION_FUSION_META.successLabel} submitted`,
       failureMessage: 'Failed to submit fusion task',
       onCompleted: urls => cacheNodeOutputs('fusion', node.id, urls),
     })
@@ -845,13 +827,13 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           }
 
           await submitExecutionTask('enhance', node.id, {
-            request: {
+            request: buildExecutionTaskRequest({
               prompt: '[hd-upscale] 局部高清放大，仅增强蒙版区域',
+              feature: 'hd-upscale',
+              imageUrls: [connectedImage!.url],
               params: {
-                image_urls: [connectedImage!.url],
                 original_image_url: connectedImage!.url,
                 mask_image_url: uploadRes.data.url,
-                feature: 'hd-upscale',
                 use_mask: true,
                 mask_enabled: true,
                 is_masked: true,
@@ -861,7 +843,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
                 output_format: node.outputFormat,
                 output_quality: node.outputQuality,
               },
-            },
+            }),
             source: placementSource,
             outputNodeId,
             successMessage: 'HD upscale submitted · masked area',
@@ -895,17 +877,17 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       }
 
       await submitExecutionTask('enhance', node.id, {
-        request: {
+        request: buildExecutionTaskRequest({
           prompt: `[canvas-extend] ${promptText || '画布延伸'}`,
+          feature: 'canvas-extend',
+          imageUrls: [connectedImage!.url],
           params: {
-            image_urls: [connectedImage!.url],
-            feature: 'canvas-extend',
             extend_top: node.extendTop,
             extend_right: node.extendRight,
             extend_bottom: node.extendBottom,
             extend_left: node.extendLeft,
           },
-        },
+        }),
         source: placementSource,
         outputNodeId,
         successMessage: 'Canvas extend submitted',
@@ -969,10 +951,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       }
 
       await submitExecutionTask('wear', node.id, {
-        request: {
-          prompt: `${options.wearFeatureMeta.promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，融合强度${node.opacity}%`,
+        request: buildExecutionTaskRequest({
+          prompt: `${EXECUTION_WEAR_META.promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，融合强度${node.opacity}%`,
+          feature: EXECUTION_WEAR_META.feature,
+          imageUrls: [connectedImageA!.url, connectedImageB!.url],
           params: {
-            image_urls: [connectedImageA!.url, connectedImageB!.url],
             original_image_url: connectedImageA!.url,
             ...(maskImageUrl
               ? {
@@ -980,16 +963,15 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
                   use_mask: true,
                 }
               : {}),
-            feature: options.wearFeatureMeta.feature,
             fabric_rotation: node.rotation,
             fabric_opacity: node.opacity,
             fabric_scale: node.scale,
             tile_mode: node.tileMode,
           },
-        },
+        }),
         source: placementSource,
         outputNodeId,
-        successMessage: `${options.wearFeatureMeta.successLabel} submitted`,
+        successMessage: `${EXECUTION_WEAR_META.successLabel} submitted`,
         failureMessage: 'Failed to submit wear task',
         onCompleted: urls => cacheNodeOutputs('wear', node.id, urls),
       })
@@ -1041,25 +1023,25 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
       const promptText = resolvedContext.promptText.trim()
       const promptParts = [
-        COLOR_SERIES_META.promptPrefix,
+        EXECUTION_COLOR_SERIES_META.promptPrefix,
         `目标配色：${node.colors.join(', ')}`,
         `强度：${node.strength}`,
         promptText,
       ].filter(Boolean)
 
       await submitExecutionTask('color', node.id, {
-        request: {
+        request: buildExecutionTaskRequest({
           prompt: promptParts.join('，'),
+          feature: EXECUTION_COLOR_SERIES_META.feature,
+          imageUrls: [uploadRes.data.url],
           params: {
-            image_urls: [uploadRes.data.url],
             original_image_url: resolvedContext.originalImageUrl,
-            feature: COLOR_SERIES_META.feature,
-            color_type: COLOR_SERIES_META.colorType,
+            color_type: EXECUTION_COLOR_SERIES_META.colorType,
             colors: node.colors,
             variation_strength: node.strength,
             strength: node.strength,
           },
-        },
+        }),
         source: placementSource,
         outputNodeId,
         successMessage: 'Color submitted',

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
-	"image/color"
 	_ "image/jpeg"
 	_ "image/png"
 	"math/rand"
@@ -30,7 +29,6 @@ var potraceBin = findPotrace()
 func findPotrace() string {
 	// 优先检查已知路径
 	known := []string{
-		`C:\Users\qingf\Desktop\下载\potrace-1.16.win64\potrace-1.16.win64\potrace.exe`,
 		`/usr/bin/potrace`,
 		`/usr/local/bin/potrace`,
 	}
@@ -401,6 +399,3 @@ func (h *VectorizeHandler) GetUsedColors(c *gin.Context) {
 	// 保留接口用于未来颜色分析功能
 	response.Success(c, gin.H{"message": "ok"})
 }
-
-// 辅助：确保未使用的 import 不报错
-var _ = color.GrayModel

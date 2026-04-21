@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	iofs "io/fs"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"backend/internal/config"
@@ -23,6 +26,7 @@ import (
 	"backend/pkg/redis"
 	"backend/pkg/response"
 	"backend/pkg/safehttp"
+	"backend/pkg/utils"
 	"backend/web"
 
 	"github.com/gin-gonic/gin"
@@ -133,10 +137,33 @@ func main() {
 		port = cfg.App.Port
 	}
 
-	log.Printf("Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
 	}
+
+	go func() {
+		log.Printf("Server starting on port %s", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// 等待中断信号
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("[Main] Shutting down server...")
+	consumer.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("[Main] Server exited")
 }
 
 func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandler *handler.AdminHandler, accountHandler *handler.AccountHandler, cardHandler *handler.StyleCardHandler, channelHandler *handler.ChannelHandler, kodoHandler *handler.KodoHandler, segHandler *handler.SegHandler, lineDraftHandler *handler.LineDraftHandler, featurePromptHandler *handler.FeaturePromptHandler, faceTemplateHandler *handler.FaceTemplateHandler, bgTemplateHandler *handler.BgTemplateHandler, patternStyleHandler *handler.PatternStyleHandler, vectorizeHandler *handler.VectorizeHandler, kodoService *service.KodoService, rdb *redis.Client, userRepo *repository.UserRepository, frontendFS iofs.FS) {
@@ -191,6 +218,10 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 				response.Error(c, 400, "仅支持 JPG 和 PNG 格式")
 				return
 			}
+			if err := utils.ValidateImageContent(file, ext); err != nil {
+				response.Error(c, 400, err.Error())
+				return
+			}
 			if kodoService.IsEnabled() {
 				url, err := kodoService.Upload(file)
 				if err != nil {
@@ -236,18 +267,18 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 			c.Status(resp.StatusCode)
 			io.Copy(c.Writer, resp.Body)
 		})
+
+		// 图片分割（用户端）
+		userApi.POST("/segment", segHandler.Segment)
+		userApi.POST("/segment/save", segHandler.SaveSegResult)
+
+		// 图像超分（用户端）
+		userApi.POST("/upscale", segHandler.Upscale)
+
+		// 转矢量图（用户端）
+		userApi.POST("/vectorize", vectorizeHandler.Vectorize)
+		userApi.GET("/vectorize/check", vectorizeHandler.CheckPotrace)
 	}
-
-	// 图片分割（用户端）
-	userApi.POST("/segment", segHandler.Segment)
-	userApi.POST("/segment/save", segHandler.SaveSegResult)
-
-	// 图像超分（用户端）
-	userApi.POST("/upscale", segHandler.Upscale)
-
-	// 转矢量图（用户端）
-	userApi.POST("/vectorize", vectorizeHandler.Vectorize)
-	userApi.GET("/vectorize/check", vectorizeHandler.CheckPotrace)
 
 	authApi := r.Group("/api/auth")
 	{
@@ -291,6 +322,10 @@ func registerRoutes(r *gin.Engine, authHandler *handler.AuthHandler, adminHandle
 			allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
 			if !allowed[ext] {
 				response.Error(c, 400, "仅支持 jpg/png/gif/webp 格式")
+				return
+			}
+			if err := utils.ValidateImageContent(file, ext); err != nil {
+				response.Error(c, 400, err.Error())
 				return
 			}
 

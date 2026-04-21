@@ -142,6 +142,7 @@ export interface StyleCard {
   id: number
   name: string
   cover_image: string
+  keywords?: string
   sort_order: number
   is_enabled: boolean
   is_exclusive: boolean
@@ -149,20 +150,23 @@ export interface StyleCard {
   updated_at: string
 }
 
+export interface StyleCardFormData {
+  name: string
+  cover_image: string
+  keywords: string
+  sort_order: number
+  is_enabled: boolean
+  is_exclusive: boolean
+}
+
 export const styleCardApi = {
   getEnabled: (): Promise<ApiResponse<{ list: StyleCard[] }>> =>
     api.get('/user/style-cards') as any,
   getList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: StyleCard[]; total: number }>> =>
     api.get('/admin/style-cards', { params }) as any,
-  create: (data: {
-    name: string; cover_image: string; keywords: string
-    sort_order: number; is_enabled: boolean; is_exclusive: boolean
-  }): Promise<ApiResponse<{ card: StyleCard }>> =>
+  create: (data: StyleCardFormData): Promise<ApiResponse<{ card: StyleCard }>> =>
     api.post('/admin/style-cards', data) as any,
-  update: (id: number, data: {
-    name: string; cover_image: string; keywords: string
-    sort_order: number; is_enabled: boolean; is_exclusive: boolean
-  }): Promise<ApiResponse<{ card: StyleCard }>> =>
+  update: (id: number, data: StyleCardFormData): Promise<ApiResponse<{ card: StyleCard }>> =>
     api.put('/admin/style-cards/' + id, data) as any,
   delete: (id: number): Promise<ApiResponse<null>> =>
     api.delete('/admin/style-cards/' + id) as any,
@@ -170,12 +174,51 @@ export const styleCardApi = {
 
 // ============ 账号管理 API ============
 
+export interface ApiAccount {
+  id: number
+  name: string
+  channel_id: number
+  platform: string
+  api_type: string
+  model_set: string
+  proxy_url: string
+  max_concurrent: number
+  timeout: number
+  extra_config: string
+  status: number
+  fail_count: number
+  weight: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ApiAccountWithLoad extends ApiAccount {
+  current_concurrent: number
+  wait_queue_count: number
+  running_status: string
+}
+
+export interface ApiAccountFormData {
+  name: string
+  channel_id: number
+  platform: string
+  api_type: string
+  model_set: string
+  api_key?: string
+  proxy_url: string
+  max_concurrent: number
+  timeout: number
+  extra_config: string
+  weight: number
+  status?: number
+}
+
 export const accountApi = {
-  getList: (params?: { keyword?: string; platform?: string; page?: number; page_size?: number }): Promise<ApiResponse<{ list: any[]; total: number }>> =>
+  getList: (params?: { keyword?: string; platform?: string; page?: number; page_size?: number }): Promise<ApiResponse<{ list: ApiAccountWithLoad[]; total: number }>> =>
     api.get('/admin/accounts', { params }) as any,
-  create: (data: any): Promise<ApiResponse<{ account: any }>> =>
+  create: (data: ApiAccountFormData): Promise<ApiResponse<{ account: ApiAccount }>> =>
     api.post('/admin/accounts', data) as any,
-  update: (id: number, data: any): Promise<ApiResponse<null>> =>
+  update: (id: number, data: ApiAccountFormData): Promise<ApiResponse<null>> =>
     api.put('/admin/accounts/' + id, data) as any,
   delete: (id: number): Promise<ApiResponse<null>> =>
     api.delete('/admin/accounts/' + id) as any,
@@ -219,14 +262,35 @@ export const segApi = {
     api.post('/user/segment/save', data) as any,
 }
 
+// ============ 线稿模式 API ============
+
+export interface LineDraftMode {
+  id: number
+  name: string
+  cover_image: string
+  prompt: string
+  sort_order: number
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface LineDraftModeFormData {
+  name: string
+  cover_image: string
+  prompt: string
+  sort_order: number
+  is_enabled: boolean
+}
+
 export const lineDraftApi = {
-  listModes: (): Promise<ApiResponse<{ list: any[] }>> =>
+  listModes: (): Promise<ApiResponse<{ list: LineDraftMode[] }>> =>
     api.get('/user/line-draft-modes') as any,
-  adminList: (): Promise<ApiResponse<{ list: any[] }>> =>
+  adminList: (): Promise<ApiResponse<{ list: LineDraftMode[] }>> =>
     api.get('/admin/line-draft-modes') as any,
-  adminCreate: (data: any): Promise<ApiResponse<{ mode: any }>> =>
+  adminCreate: (data: LineDraftModeFormData): Promise<ApiResponse<{ mode: LineDraftMode }>> =>
     api.post('/admin/line-draft-modes', data) as any,
-  adminUpdate: (id: number, data: any): Promise<ApiResponse<null>> =>
+  adminUpdate: (id: number, data: LineDraftModeFormData): Promise<ApiResponse<null>> =>
     api.put('/admin/line-draft-modes/' + id, data) as any,
   adminDelete: (id: number): Promise<ApiResponse<null>> =>
     api.delete('/admin/line-draft-modes/' + id) as any,
@@ -241,43 +305,126 @@ export const featurePromptApi = {
     api.put('/admin/feature-prompts/' + slug, { prompt }) as any,
 }
 
+// ============ 人脸模板 API ============
+
+export interface FaceTemplate {
+  id: number
+  name: string
+  image_url: string
+  category: 'male' | 'female'
+  sort_order: number
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface FaceTemplateFormData {
+  name: string
+  image_url: string
+  category: string
+  sort_order: number
+  is_enabled: boolean
+}
+
 export const faceTemplateApi = {
-  listEnabled: (): Promise<ApiResponse<{ list: any[] }>> =>
+  listEnabled: (): Promise<ApiResponse<{ list: FaceTemplate[] }>> =>
     api.get('/user/face-templates') as any,
-  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: any[]; total: number }>> =>
+  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: FaceTemplate[]; total: number }>> =>
     api.get('/admin/face-templates', { params }) as any,
-  adminCreate: (data: any): Promise<ApiResponse<{ face: any }>> =>
+  adminCreate: (data: FaceTemplateFormData): Promise<ApiResponse<{ face: FaceTemplate }>> =>
     api.post('/admin/face-templates', data) as any,
-  adminUpdate: (id: number, data: any): Promise<ApiResponse<null>> =>
+  adminUpdate: (id: number, data: FaceTemplateFormData): Promise<ApiResponse<null>> =>
     api.put('/admin/face-templates/' + id, data) as any,
   adminDelete: (id: number): Promise<ApiResponse<null>> =>
     api.delete('/admin/face-templates/' + id) as any,
 }
 
+// ============ 背景模板 API ============
+
+export interface BgTemplate {
+  id: number
+  name: string
+  image_url: string
+  category: string
+  sort_order: number
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface BgTemplateFormData {
+  name: string
+  image_url: string
+  category: string
+  sort_order: number
+  is_enabled: boolean
+}
+
 export const bgTemplateApi = {
-  listEnabled: (): Promise<ApiResponse<{ list: any[] }>> =>
+  listEnabled: (): Promise<ApiResponse<{ list: BgTemplate[] }>> =>
     api.get('/user/bg-templates') as any,
-  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: any[]; total: number }>> =>
+  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: BgTemplate[]; total: number }>> =>
     api.get('/admin/bg-templates', { params }) as any,
-  adminCreate: (data: any): Promise<ApiResponse<{ bg: any }>> =>
+  adminCreate: (data: BgTemplateFormData): Promise<ApiResponse<{ bg: BgTemplate }>> =>
     api.post('/admin/bg-templates', data) as any,
-  adminUpdate: (id: number, data: any): Promise<ApiResponse<null>> =>
+  adminUpdate: (id: number, data: BgTemplateFormData): Promise<ApiResponse<null>> =>
     api.put('/admin/bg-templates/' + id, data) as any,
   adminDelete: (id: number): Promise<ApiResponse<null>> =>
     api.delete('/admin/bg-templates/' + id) as any,
 }
 
+// ============ 图案风格 API ============
+
+export interface PatternStyle {
+  id: number
+  name: string
+  image_url: string
+  category: string
+  sort_order: number
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface PatternStyleFormData {
+  name: string
+  image_url: string
+  category: string
+  sort_order: number
+  is_enabled: boolean
+}
+
 export const patternStyleApi = {
-  listEnabled: (category?: string): Promise<ApiResponse<{ list: any[] }>> =>
+  listEnabled: (category?: string): Promise<ApiResponse<{ list: PatternStyle[] }>> =>
     api.get('/user/pattern-styles', { params: category ? { category } : {} }) as any,
-  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: any[]; total: number }>> =>
+  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: PatternStyle[]; total: number }>> =>
     api.get('/admin/pattern-styles', { params }) as any,
-  adminCreate: (data: any): Promise<ApiResponse<{ pattern_style: any }>> =>
+  adminCreate: (data: PatternStyleFormData): Promise<ApiResponse<{ pattern_style: PatternStyle }>> =>
     api.post('/admin/pattern-styles', data) as any,
-  adminUpdate: (id: number, data: any): Promise<ApiResponse<null>> =>
+  adminUpdate: (id: number, data: PatternStyleFormData): Promise<ApiResponse<null>> =>
     api.put('/admin/pattern-styles/' + id, data) as any,
   adminDelete: (id: number): Promise<ApiResponse<null>> =>
     api.delete('/admin/pattern-styles/' + id) as any,
+}
+
+// ============ 渠道商 API ============
+
+export interface Channel {
+  id: number
+  type: string
+  name: string
+  api_url: string
+  models: string
+  status: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ChannelFormData {
+  type: string
+  name: string
+  api_url: string
+  models: string
 }
 
 export const upscaleApi = {

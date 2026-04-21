@@ -2,31 +2,19 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User } from '../types'
 import { userApi, authApi } from '../api'
+import {
+  getStoredToken,
+  getStoredUser,
+  setStoredAuth,
+  clearStoredAuth,
+  hasValidStoredAuth,
+} from '../utils/auth'
 import router from '../router'
 
-function clearStoredAuth() {
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-}
-
-function readStoredUser(): User | null {
-  const raw = localStorage.getItem('user')
-  if (!raw) {
-    return null
-  }
-
-  try {
-    return JSON.parse(raw) as User
-  } catch {
-    clearStoredAuth()
-    return null
-  }
-}
-
 export const useUserStore = defineStore('user', () => {
-  const storedToken = localStorage.getItem('token')
-  const storedUser = readStoredUser()
-  const hasValidAuth = !!(storedToken && storedUser)
+  const storedToken = getStoredToken()
+  const storedUser = getStoredUser()
+  const hasValidAuth = hasValidStoredAuth()
 
   if (!hasValidAuth && (storedToken || storedUser)) {
     clearStoredAuth()
@@ -38,14 +26,13 @@ export const useUserStore = defineStore('user', () => {
   const isLoggedIn = computed(() => !!(token.value && user.value))
   const isAdmin = computed(() => user.value?.role === 'admin')
 
-  function setAuth(newToken: string, newUser: User) {
+  function updateAuth(newToken: string, newUser: User) {
     token.value = newToken
     user.value = newUser
-    localStorage.setItem('token', newToken)
-    localStorage.setItem('user', JSON.stringify(newUser))
+    setStoredAuth(newToken, newUser)
   }
 
-  function clearAuth() {
+  function resetAuth() {
     token.value = null
     user.value = null
     clearStoredAuth()
@@ -54,7 +41,7 @@ export const useUserStore = defineStore('user', () => {
   async function login(username: string, password: string) {
     const res: any = await authApi.login({ username, password })
     if (res.code === 0 && res.data) {
-      setAuth(res.data.token, res.data.user)
+      updateAuth(res.data.token, res.data.user)
       return true
     }
     throw new Error(res.msg)
@@ -73,7 +60,7 @@ export const useUserStore = defineStore('user', () => {
       await userApi.logout()
     } catch (e) {
     }
-    clearAuth()
+    resetAuth()
     router.push(redirectPath)
   }
 
@@ -83,10 +70,10 @@ export const useUserStore = defineStore('user', () => {
       const res: any = await userApi.getInfo()
       if (res.code === 0 && res.data) {
         user.value = res.data.user
-        localStorage.setItem('user', JSON.stringify(res.data.user))
+        setStoredAuth(token.value!, res.data.user)
       }
     } catch (e) {
-      clearAuth()
+      resetAuth()
     }
   }
 
@@ -106,8 +93,8 @@ export const useUserStore = defineStore('user', () => {
     user,
     isLoggedIn,
     isAdmin,
-    setAuth,
-    clearAuth,
+    setAuth: updateAuth,
+    clearAuth: resetAuth,
     login,
     register,
     logout,

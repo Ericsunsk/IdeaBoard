@@ -5,8 +5,13 @@ export interface CanvasBoardMeta {
   updatedAt: number
 }
 
-const STORAGE_KEY = 'feng.canvas.boards.v1'
+const STORAGE_KEY = 'ideaboard.canvas.boards.v1'
 const MAX_BOARD_NAME_LEN = 60
+
+function readStorageValue(key: string): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(key)
+}
 
 function createBoardId(now: number): string {
   return `board_${now}_${Math.random().toString(36).slice(2, 8)}`
@@ -35,7 +40,7 @@ function toValidBoardMeta(item: unknown): CanvasBoardMeta | null {
 
 function readRawBoards(): CanvasBoardMeta[] {
   if (typeof window === 'undefined') return []
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = readStorageValue(STORAGE_KEY)
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)

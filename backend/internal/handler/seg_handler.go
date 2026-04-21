@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -21,8 +20,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var featureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
-
 type SegHandler struct {
 	segService  *service.SegService
 	taskRepo    *repository.TaskRepository
@@ -31,17 +28,6 @@ type SegHandler struct {
 
 func NewSegHandler(segService *service.SegService, taskRepo *repository.TaskRepository, kodoService *service.KodoService) *SegHandler {
 	return &SegHandler{segService: segService, taskRepo: taskRepo, kodoService: kodoService}
-}
-
-func normalizeFeatureSlug(raw string, fallback string) string {
-	slug := strings.ToLower(strings.TrimSpace(raw))
-	if slug == "" {
-		return fallback
-	}
-	if !featureSlugRe.MatchString(slug) {
-		return fallback
-	}
-	return slug
 }
 
 // GetConfig 获取分割抠图配置
@@ -151,7 +137,7 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 	if modeName == "" {
 		modeName = req.Mode
 	}
-	featureSlug := normalizeFeatureSlug(req.Feature, "hd-upscale")
+	featureSlug := service.NormalizeWorkflowFeatureSlugOrFallback(req.Feature, "hd-upscale")
 	prompt := fmt.Sprintf("[%s] %s %dx", featureSlug, modeName, req.UpscaleFactor)
 
 	taskID := fmt.Sprintf("upscale_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
@@ -212,7 +198,7 @@ func (h *SegHandler) SaveSegResult(c *gin.Context) {
 	if typeName == "" {
 		typeName = "智能分割"
 	}
-	featureSlug := normalizeFeatureSlug(req.Feature, "")
+	featureSlug := service.NormalizeWorkflowFeatureSlugOrFallback(req.Feature, "")
 	prompt := typeName
 	if featureSlug != "" {
 		prompt = fmt.Sprintf("[%s] %s", featureSlug, typeName)

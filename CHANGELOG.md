@@ -1,6 +1,22 @@
 # 更新日志
 
-本文档记录 FENG 项目的对外发布变更。
+本文档记录 IdeaBoard 项目的对外发布变更。
+
+## Unreleased
+
+当前工作树中已完成、但尚未随正式版本发布的主要变更：
+
+### 调整
+
+- 产品名称与技术标识统一到 `IdeaBoard` / `ideaboard-*`
+- 本地 Docker、打包脚本、部署目录、systemd 与 Nginx 产物名称已同步更新
+- 画布执行链的 workflow prompt contract 已统一，前后端 `feature`、`image_urls` 与参数承载方式已收口
+- 文档体系已重排为统一的入口、开发、部署与本地依赖结构
+
+### 修复
+
+- 修复本地开发中数据库连接账号与网站管理员账号易混淆的问题，相关文档已明确区分
+- 修复上传与远程拉取链路中的部分安全与运行时问题，相关说明已更新到开发/部署文档
 
 ## v0.01 - 2026-04-10
 
@@ -39,8 +55,8 @@
 
 当前发布产物如下：
 
-- `feng-server-darwin-arm64-v0.01`
-- `feng-server-linux-amd64-v0.01`
+- `ideaboard-server-darwin-arm64-v0.01`
+- `ideaboard-server-linux-amd64-v0.01`
 - `frontend-dist-v0.01.tar.gz`
 
 ### 说明

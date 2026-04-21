@@ -60,7 +60,7 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 	userID := c.Param("id")
 
 	var req struct {
-		Status int8 `json:"status" binding:"required"`
+		Status *int8 `json:"status" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -74,13 +74,14 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.UpdateStatus(userIDUint, req.Status); err != nil {
+	if err := h.userService.UpdateStatus(userIDUint, *req.Status); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
 
 	response.Success(c, nil)
 }
+
 
 // UpdateUserPassword 管理员修改用户密码
 func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {

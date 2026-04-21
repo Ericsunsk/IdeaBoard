@@ -120,11 +120,6 @@ const menuOptions = [
     icon: () => h('span', { style: 'font-size:16px' }, '✂️')
   },
   {
-    label: '线稿模式',
-    key: 'line-draft-config',
-    icon: () => h('span', { style: 'font-size:16px' }, '✏️')
-  },
-  {
     label: '人脸库',
     key: 'face-library',
     icon: () => h('span', { style: 'font-size:16px' }, '🧑')
