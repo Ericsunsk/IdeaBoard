@@ -1,6 +1,12 @@
 <template>
-  <div class="kodo-page">
-    <!-- 顶部开关卡片 -->
+  <div class="admin-page kodo-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">Kodo 存储配置</h2>
+        <p class="page-desc">管理七牛云存储接入与高级上传策略，开启后仅影响新上传媒体。</p>
+      </div>
+    </div>
+
     <div class="switch-card">
       <div class="switch-left">
         <div class="switch-icon">☁️</div>
@@ -212,122 +218,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
+@import './admin-common.css';
+
 .kodo-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   max-width: 720px;
-}
-
-/* ---- 开关卡片 ---- */
-.switch-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 20px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.switch-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.switch-icon {
-  font-size: 28px;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(99,102,241,0.1);
-  border-radius: 12px;
-}
-.switch-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #fafafa;
-}
-.switch-desc {
-  font-size: 13px;
-  color: #71717a;
-  margin-top: 2px;
-}
-
-/* ---- 提示条 ---- */
-.tip-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: rgba(234,179,8,0.08);
-  border: 1px solid rgba(234,179,8,0.2);
-  font-size: 12px;
-  color: #ca8a04;
-  line-height: 1.6;
-}
-.tip-bar svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-  stroke: #ca8a04;
-}
-
-/* ---- 配置卡片 ---- */
-.config-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 24px;
-  transition: opacity 0.2s;
-}
-.config-card.disabled {
-  opacity: 0.45;
-  pointer-events: none;
-}
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #a1a1aa;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 16px;
 }
 .divider {
   height: 1px;
-  background: #27272a;
+  background: #2d394b;
   margin: 20px 0;
 }
 
-/* ---- 字段 ---- */
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-.field label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #d4d4d8;
-}
-.field-hint {
-  font-size: 11px;
-  color: #52525b;
-}
-.field-row {
-  display: flex;
-  gap: 16px;
-}
-
-/* ---- 高级选项行 ---- */
 .option-row {
   display: flex;
   align-items: center;
@@ -337,64 +239,13 @@ onMounted(() => {
 .option-label {
   font-size: 13px;
   font-weight: 500;
-  color: #d4d4d8;
+  color: #d4dde8;
 }
 .option-desc {
   font-size: 12px;
-  color: #52525b;
+  color: #8294a9;
   margin-top: 2px;
 }
-
-/* ---- 底部按钮 ---- */
-.action-bar {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-/* ---- naive-ui 样式覆盖 ---- */
-:deep(.n-input) {
-  --n-border: 1px solid #27272a;
-  --n-border-hover: 1px solid #6366f1;
-  --n-border-focus: 1px solid #6366f1;
-  --n-color: #09090b;
-  --n-color-focus: #09090b;
-  --n-text-color: #e4e4e7;
-  --n-placeholder-color: #3f3f46;
-  border-radius: 8px;
-}
-:deep(.n-button--primary-type) {
-  --n-color: #6366f1;
-  --n-color-hover: #818cf8;
-  --n-color-pressed: #4f46e5;
-  border-radius: 8px;
-}
-:deep(.n-button--default-type) {
-  --n-border: 1px solid #3f3f46;
-  --n-text-color: #d4d4d8;
-  --n-color: transparent;
-  --n-color-hover: rgba(99,102,241,0.08);
-  border-radius: 8px;
-}
-:deep(.n-switch) {
-  --n-rail-color: #3f3f46;
-  --n-rail-color-active: #6366f1;
-}
-
-/* ---- 链接 ---- */
-.tip-link {
-  color: #ca8a04;
-  text-decoration: underline;
-}
-.field-hint a {
-  color: #6366f1;
-  text-decoration: none;
-}
-.field-hint a:hover {
-  text-decoration: underline;
-}
-
-/* ---- 域名标签行 ---- */
 .field-label-row {
   display: flex;
   align-items: center;
@@ -409,18 +260,18 @@ onMounted(() => {
 }
 .domain-label {
   font-size: 11px;
-  color: #71717a;
+  color: #7d8ea4;
 }
 .domain-tag {
   font-size: 12px;
   padding: 2px 10px;
   border-radius: 6px;
-  background: rgba(99,102,241,0.1);
-  color: #818cf8;
+  background: rgba(60, 185, 194, 0.16);
+  color: #95dfe5;
   cursor: pointer;
   transition: background 0.15s;
 }
 .domain-tag:hover {
-  background: rgba(99,102,241,0.2);
+  background: rgba(60, 185, 194, 0.25);
 }
 </style>

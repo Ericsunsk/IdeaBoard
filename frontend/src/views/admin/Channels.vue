@@ -1,7 +1,40 @@
 <template>
-  <div class="channels-page">
+  <div class="admin-page channels-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">渠道商管理</h2>
+        <p class="page-desc">维护上游渠道信息、API 地址与模型池，为账号池提供可选来源。</p>
+      </div>
+      <div class="header-side-note">
+        <span>渠道数 {{ channels.length }}</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">总渠道</span>
+        <span class="summary-value">{{ channels.length }}</span>
+        <span class="summary-foot">当前配置</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Banana</span>
+        <span class="summary-value">{{ bananaCount }}</span>
+        <span class="summary-foot">已接入类型</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">模型总数</span>
+        <span class="summary-value">{{ totalModelCount }}</span>
+        <span class="summary-foot">跨渠道汇总</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">空模型配置</span>
+        <span class="summary-value">{{ emptyModelCount }}</span>
+        <span class="summary-foot">建议补齐</span>
+      </div>
+    </div>
+
     <div class="toolbar">
-      <h3>渠道商管理</h3>
+      <span class="toolbar-group-title">配置操作</span>
       <n-button type="primary" @click="openAddModal">
         <template #icon><n-icon><AddOutline /></n-icon></template>
         新增渠道商
@@ -9,6 +42,12 @@
     </div>
 
     <div class="table-card">
+      <div class="panel-header">
+        <div>
+          <h3 class="panel-title">渠道商列表</h3>
+          <p class="panel-desc">配置删除将影响账号池新增可选项，请谨慎执行。</p>
+        </div>
+      </div>
       <n-data-table
         :columns="columns"
         :data="channels"
@@ -47,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h } from 'vue'
+import { ref, onMounted, h, computed } from 'vue'
 import channelApi from '../../api/channel'
 import type { Channel } from '../../api/channel'
 import { NButton, NDataTable, NModal, NForm, NFormItem, NInput, NIcon, NSpace, NTag, NSelect, NDynamicTags, useMessage, useDialog } from 'naive-ui'
@@ -58,6 +97,14 @@ const message = useMessage()
 const dialog = useDialog()
 const loading = ref(false)
 const channels = ref<Channel[]>([])
+const bananaCount = computed(() => channels.value.filter(item => item.type === 'banana').length)
+const emptyModelCount = computed(() => channels.value.filter(item => !item.models || !item.models.trim()).length)
+const totalModelCount = computed(() => {
+  return channels.value.reduce((sum, item) => {
+    if (!item.models) return sum
+    return sum + item.models.split(',').filter(Boolean).length
+  }, 0)
+})
 
 const showModal = ref(false)
 const isEdit = ref(false)
@@ -191,41 +238,12 @@ onMounted(() => {
 <style scoped>
 @import './admin-common.css';
 .channels-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
+  gap: 14px;
 }
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #fafafa;
-  margin: 0;
-}
-.table-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 20px;
-}
-:deep(.n-data-table) {
-  --n-td-color: transparent;
-  --n-th-color: transparent;
-  --n-border-color: #27272a;
-  --n-td-color-hover: rgba(99,102,241,0.05);
-  --n-th-text-color: #71717a;
-  --n-td-text-color: #e4e4e7;
-}
-:deep(.n-button--primary-type) {
-  --n-color: #6366f1;
-  --n-color-hover: #818cf8;
-  --n-color-pressed: #4f46e5;
-  border-radius: 8px;
+
+@media (max-width: 720px) {
+  .channels-page .toolbar {
+    justify-content: flex-start;
+  }
 }
 </style>

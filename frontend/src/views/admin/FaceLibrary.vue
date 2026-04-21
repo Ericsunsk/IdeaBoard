@@ -1,7 +1,40 @@
 <template>
-  <div class="face-library-page">
-    <!-- 工具栏 -->
+  <div class="admin-page face-library-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">人脸素材库</h2>
+        <p class="page-desc">维护人脸模板素材与分类配置，支持排序和上下架，变更实时作用于素材选择面板。</p>
+      </div>
+      <div class="header-side-note">
+        <span>总数 {{ faces.length }}</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">人脸总数</span>
+        <span class="summary-value">{{ faces.length }}</span>
+        <span class="summary-foot">含下架素材</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">已上架</span>
+        <span class="summary-value">{{ enabledFaceCount }}</span>
+        <span class="summary-foot">用户可见</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">男性分类</span>
+        <span class="summary-value">{{ maleFaceCount }}</span>
+        <span class="summary-foot">male 分类</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">筛选结果</span>
+        <span class="summary-value">{{ filteredFaces.length }}</span>
+        <span class="summary-foot">当前列表</span>
+      </div>
+    </div>
+
     <div class="toolbar">
+      <span class="toolbar-group-title">筛选</span>
       <n-select
         v-model:value="filterCategory"
         :options="categoryOptions"
@@ -30,8 +63,13 @@
       </n-button>
     </div>
 
-    <!-- 列表 -->
     <div class="table-card">
+      <div class="panel-header">
+        <div>
+          <h3 class="panel-title">人脸列表</h3>
+          <p class="panel-desc">支持编辑、上下架与删除操作。分类用于工作流人脸维度筛选。</p>
+        </div>
+      </div>
       <n-data-table
         :columns="columns"
         :data="filteredFaces"
@@ -158,6 +196,8 @@ const filteredFaces = computed(() => {
   if (filterEnabled.value !== null) result = result.filter(f => f.is_enabled === (filterEnabled.value === 1))
   return result
 })
+const enabledFaceCount = computed(() => faces.value.filter(item => item.is_enabled).length)
+const maleFaceCount = computed(() => faces.value.filter(item => item.category === 'male').length)
 
 // ============ 表格列定义 ============
 const columns = [
@@ -284,24 +324,15 @@ onMounted(() => { loadFaces() })
 <style scoped>
 @import './admin-common.css';
 
-.face-library-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-}
-.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.table-card { background: #18181b; border-radius: 12px; border: 1px solid #27272a; padding: 16px; }
-.pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 .cover-upload-area { display: flex; align-items: center; gap: 16px; }
 .cover-preview { width: 80px; height: 106px; border-radius: 8px; overflow: hidden; background: #27272a; border: 1px solid #3f3f46; flex-shrink: 0; }
 .cover-preview img { width: 100%; height: 100%; object-fit: cover; }
 .cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #52525b; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 8px; }
 
-:deep(.n-input) { --n-border: 1px solid #27272a; --n-border-hover: 1px solid #6366f1; --n-border-focus: 1px solid #6366f1; --n-color: #18181b; --n-color-focus: #18181b; --n-text-color: #e4e4e7; --n-placeholder-color: #52525b; border-radius: 8px; }
-:deep(.n-button--primary-type) { --n-color: #6366f1; --n-color-hover: #818cf8; --n-color-pressed: #4f46e5; border-radius: 8px; }
-:deep(.n-button--error-type) { --n-color: #ef4444; --n-color-hover: #f87171; border-radius: 8px; }
-:deep(.n-data-table) { --n-td-color: transparent; --n-th-color: transparent; --n-border-color: #27272a; --n-td-color-hover: rgba(99, 102, 241, 0.05); --n-th-text-color: #71717a; --n-td-text-color: #e4e4e7; }
+@media (max-width: 720px) {
+  .face-library-page :deep(.n-select),
+  .face-library-page :deep(.n-button) {
+    width: 100%;
+  }
+}
 </style>

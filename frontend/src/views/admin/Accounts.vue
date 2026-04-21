@@ -1,6 +1,38 @@
 <template>
-  <div class="accounts-page">
-    <!-- 搜索栏 -->
+  <div class="admin-page accounts-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">账号池控制中心</h2>
+        <p class="page-desc">管理上游账号并发、超时与启停状态，保障任务队列稳定吞吐。</p>
+      </div>
+      <div class="header-side-note">
+        <span>分页 {{ page }}/{{ pageCount }}</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">账号总数</span>
+        <span class="summary-value">{{ accounts.length }}</span>
+        <span class="summary-foot">当前页数据</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">运行中</span>
+        <span class="summary-value">{{ runningCount }}</span>
+        <span class="summary-foot">status = 1</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">已停止</span>
+        <span class="summary-value">{{ stoppedCount }}</span>
+        <span class="summary-foot">手动停用</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">故障账号</span>
+        <span class="summary-value">{{ failedCount }}</span>
+        <span class="summary-foot">失败次数 ≥ 5</span>
+      </div>
+    </div>
+
     <div class="toolbar">
       <n-input
         v-model:value="searchKeyword"
@@ -23,8 +55,13 @@
       </n-button>
     </div>
 
-    <!-- 账号列表 -->
     <div class="table-card">
+      <div class="panel-header">
+        <div>
+          <h3 class="panel-title">账号列表</h3>
+          <p class="panel-desc">可编辑上游密钥、模型、并发和超时配置。</p>
+        </div>
+      </div>
       <n-data-table
         :columns="columns"
         :data="accounts"
@@ -181,6 +218,9 @@ const accounts = ref<ApiAccount[]>([])
 const searchKeyword = ref('')
 const page = ref(1)
 const pageCount = ref(1)
+const runningCount = computed(() => accounts.value.filter(item => item.status === 1 && item.fail_count < 5).length)
+const stoppedCount = computed(() => accounts.value.filter(item => item.status === 0).length)
+const failedCount = computed(() => accounts.value.filter(item => item.fail_count >= 5).length)
 
 const getChannelName = (channelId: number) => {
   const ch = channels.value.find(c => c.id === channelId)
@@ -430,63 +470,28 @@ onMounted(() => {
 <style scoped>
 @import './admin-common.css';
 .accounts-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.table-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 20px;
+  gap: 14px;
 }
 .pagination-wrapper {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
+  margin-top: 12px;
 }
 .channel-url-hint {
-  background: #27272a;
-  border-radius: 6px;
-  padding: 8px 12px;
-  margin-bottom: 16px;
+  background: rgba(113, 97, 239, 0.08);
+  border-radius: 14px;
+  border: 1px solid rgba(113, 97, 239, 0.2);
+  padding: 9px 12px;
+  margin-bottom: 12px;
   font-size: 12px;
-  color: #a1a1aa;
+  color: #64709a;
 }
 .channel-url-hint code {
-  color: #22c55e;
+  color: #4f58cc;
   font-family: monospace;
 }
-:deep(.n-data-table) {
-  --n-td-color: transparent;
-  --n-th-color: transparent;
-  --n-border-color: #27272a;
-  --n-td-color-hover: rgba(99,102,241,0.05);
-  --n-th-text-color: #71717a;
-  --n-td-text-color: #e4e4e7;
-}
-:deep(.n-input) {
-  --n-border: 1px solid #27272a;
-  --n-border-hover: 1px solid #6366f1;
-  --n-border-focus: 1px solid #6366f1;
-  --n-color: #09090b;
-  --n-color-focus: #09090b;
-  --n-text-color: #e4e4e7;
-  --n-placeholder-color: #3f3f46;
-  border-radius: 8px;
-}
-:deep(.n-button--primary-type) {
-  --n-color: #6366f1;
-  --n-color-hover: #818cf8;
-  --n-color-pressed: #4f46e5;
-  border-radius: 8px;
+
+@media (max-width: 720px) {
+  .accounts-page :deep(.n-input) {
+    width: 100% !important;
+  }
 }
 </style>

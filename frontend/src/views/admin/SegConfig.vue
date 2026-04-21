@@ -1,5 +1,12 @@
 <template>
-  <div class="seg-page">
+  <div class="admin-page seg-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">分割抠图配置</h2>
+        <p class="page-desc">配置阿里云分割服务开关和密钥，控制用户侧分割功能可用性。</p>
+      </div>
+    </div>
+
     <div class="switch-card">
       <div class="switch-left">
         <div class="switch-icon">✂️</div>
@@ -97,81 +104,10 @@ onMounted(loadConfig)
 </script>
 
 <style scoped>
+@import './admin-common.css';
+
 .seg-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   max-width: 720px;
-}
-.switch-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 20px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.switch-left { display: flex; align-items: center; gap: 16px; }
-.switch-icon {
-  font-size: 28px;
-  width: 48px; height: 48px;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(99,102,241,0.1);
-  border-radius: 12px;
-}
-.switch-title { font-size: 15px; font-weight: 600; color: #fafafa; }
-.switch-desc { font-size: 13px; color: #71717a; margin-top: 2px; }
-.tip-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: rgba(234,179,8,0.08);
-  border: 1px solid rgba(234,179,8,0.2);
-  font-size: 12px;
-  color: #ca8a04;
-  line-height: 1.6;
-}
-.tip-bar svg { flex-shrink: 0; margin-top: 2px; stroke: #ca8a04; }
-.tip-link { color: #ca8a04; text-decoration: underline; text-underline-offset: 2px; }
-.config-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 24px;
-  transition: opacity 0.2s;
-}
-.config-card.disabled { opacity: 0.45; pointer-events: none; }
-.card-title {
-  font-size: 14px; font-weight: 600; color: #a1a1aa;
-  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;
-}
-.field-group { display: flex; flex-direction: column; gap: 16px; }
-.field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.field label { font-size: 13px; font-weight: 500; color: #d4d4d8; }
-.field-hint { font-size: 11px; color: #52525b; }
-.action-bar { display: flex; justify-content: flex-end; gap: 10px; }
-:deep(.n-input) {
-  --n-border: 1px solid #27272a;
-  --n-border-hover: 1px solid #6366f1;
-  --n-border-focus: 1px solid #6366f1;
-  --n-color: #09090b;
-  --n-color-focus: #09090b;
-  --n-text-color: #e4e4e7;
-  --n-placeholder-color: #3f3f46;
-  border-radius: 8px;
-}
-:deep(.n-button--primary-type) {
-  --n-color: #6366f1;
-  --n-color-hover: #818cf8;
-  --n-color-pressed: #4f46e5;
-  border-radius: 8px;
-}
-:deep(.n-switch) {
-  --n-rail-color: #3f3f46;
-  --n-rail-color-active: #6366f1;
 }
 </style>

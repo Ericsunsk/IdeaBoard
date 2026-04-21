@@ -1,7 +1,40 @@
 <template>
-  <div class="face-library-page">
-    <!-- 工具栏 -->
+  <div class="admin-page bg-library-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">背景素材库</h2>
+        <p class="page-desc">维护背景模板的分类、排序与上下架状态，变更会直接影响管理员可选素材。</p>
+      </div>
+      <div class="header-side-note">
+        <span>总数 {{ list.length }}</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">背景总数</span>
+        <span class="summary-value">{{ list.length }}</span>
+        <span class="summary-foot">含下架素材</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">已上架</span>
+        <span class="summary-value">{{ enabledCount }}</span>
+        <span class="summary-foot">用户可见</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">场景类</span>
+        <span class="summary-value">{{ sceneCount }}</span>
+        <span class="summary-foot">scene 分类</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">筛选结果</span>
+        <span class="summary-value">{{ filteredList.length }}</span>
+        <span class="summary-foot">当前列表</span>
+      </div>
+    </div>
+
     <div class="toolbar">
+      <span class="toolbar-group-title">筛选</span>
       <n-select
         v-model:value="filterCategory"
         :options="categoryOptions"
@@ -30,8 +63,13 @@
       </n-button>
     </div>
 
-    <!-- 列表 -->
     <div class="table-card">
+      <div class="panel-header">
+        <div>
+          <h3 class="panel-title">背景列表</h3>
+          <p class="panel-desc">支持编辑、上下架和删除操作。分类用于业务流程内筛选。</p>
+        </div>
+      </div>
       <n-data-table
         :columns="columns"
         :data="filteredList"
@@ -108,7 +146,7 @@
 
     <!-- 删除确认弹窗 -->
     <n-modal v-model:show="showDeleteModal" preset="card" title="确认删除" :style="{ maxWidth: '400px' }">
-      <p style="color: #a1a1aa; line-height: 1.8;">确定要删除背景「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
+      <p style="color: #7884ad; line-height: 1.8;">确定要删除背景「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
       <template #footer>
         <div class="modal-footer">
           <n-button @click="showDeleteModal = false">取消</n-button>
@@ -166,13 +204,15 @@ const filteredList = computed(() => {
   if (filterEnabled.value !== null) result = result.filter(f => f.is_enabled === (filterEnabled.value === 1))
   return result
 })
+const enabledCount = computed(() => list.value.filter(item => item.is_enabled).length)
+const sceneCount = computed(() => list.value.filter(item => item.category === 'scene').length)
 
 // ============ 表格列定义 ============
 const columns = [
   {
     title: '图片', key: 'image_url', width: 100,
     render(row: BgItem) {
-      return h('div', { style: 'width: 70px; height: 50px; border-radius: 8px; overflow: hidden; background: #27272a;' }, [
+      return h('div', { style: 'width: 70px; height: 50px; border-radius: 10px; overflow: hidden; background: rgba(113, 97, 239, 0.1);' }, [
         h('img', { src: row.image_url, style: 'width: 100%; height: 100%; object-fit: cover;', onError: (e: Event) => { (e.target as HTMLImageElement).style.display = 'none' } })
       ])
     }
@@ -180,22 +220,22 @@ const columns = [
   { title: '名称', key: 'name', ellipsis: { tooltip: true } },
   {
     title: '分类', key: 'category', width: 80,
-    render(row: BgItem) { return h('span', { style: 'color: #a1a1aa;' }, categoryLabelMap[row.category] || row.category) }
+    render(row: BgItem) { return h('span', { style: 'color: #7c89b2;' }, categoryLabelMap[row.category] || row.category) }
   },
   {
     title: '排序', key: 'sort_order', width: 70,
-    render(row: BgItem) { return h('span', { style: 'color: #71717a;' }, row.sort_order) }
+    render(row: BgItem) { return h('span', { style: 'color: #8b95b8;' }, row.sort_order) }
   },
   {
     title: '状态', key: 'is_enabled', width: 80,
-    render(row: BgItem) { return h('span', { style: row.is_enabled ? 'color: #22c55e;' : 'color: #ef4444;' }, row.is_enabled ? '已上架' : '已下架') }
+    render(row: BgItem) { return h('span', { style: row.is_enabled ? 'color: #1f9d68;' : 'color: #d65478;' }, row.is_enabled ? '已上架' : '已下架') }
   },
   {
     title: '操作', key: 'actions', width: 140,
     render(row: BgItem) {
       return h('div', { style: 'display: flex; gap: 8px;' }, [
         h(NButton, { size: 'small', secondary: true, onClick: () => openEditModal(row) }, { default: () => '编辑' }),
-        h(NButton, { size: 'small', tertiary: true, style: 'color: #ef4444;', onClick: () => openDeleteModal(row) }, { default: () => '删除' }),
+        h(NButton, { size: 'small', tertiary: true, style: 'color: #d65478;', onClick: () => openDeleteModal(row) }, { default: () => '删除' }),
       ])
     }
   },
@@ -292,25 +332,16 @@ onMounted(() => { loadList() })
 <style scoped>
 @import './admin-common.css';
 
-.face-library-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-}
-.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.table-card { background: #18181b; border-radius: 12px; border: 1px solid #27272a; padding: 16px; }
-.pagination-wrapper { margin-top: 16px; display: flex; justify-content: flex-end; }
 .cover-upload-area { display: flex; align-items: center; gap: 16px; }
-.cover-preview { width: 80px; height: 106px; border-radius: 8px; overflow: hidden; background: #27272a; border: 1px solid #3f3f46; flex-shrink: 0; }
+.cover-preview { width: 80px; height: 106px; border-radius: 12px; overflow: hidden; background: rgba(113, 97, 239, 0.1); border: 1px solid rgba(136, 151, 208, 0.34); flex-shrink: 0; }
 .cover-preview.landscape { width: 120px; height: 80px; }
 .cover-preview img { width: 100%; height: 100%; object-fit: cover; }
-.cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #52525b; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 8px; }
+.cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #8b95b8; }
 
-:deep(.n-input) { --n-border: 1px solid #27272a; --n-border-hover: 1px solid #6366f1; --n-border-focus: 1px solid #6366f1; --n-color: #18181b; --n-color-focus: #18181b; --n-text-color: #e4e4e7; --n-placeholder-color: #52525b; border-radius: 8px; }
-:deep(.n-button--primary-type) { --n-color: #6366f1; --n-color-hover: #818cf8; --n-color-pressed: #4f46e5; border-radius: 8px; }
-:deep(.n-button--error-type) { --n-color: #ef4444; --n-color-hover: #f87171; border-radius: 8px; }
-:deep(.n-data-table) { --n-td-color: transparent; --n-th-color: transparent; --n-border-color: #27272a; --n-td-color-hover: rgba(99, 102, 241, 0.05); --n-th-text-color: #71717a; --n-td-text-color: #e4e4e7; }
+@media (max-width: 720px) {
+  .bg-library-page :deep(.n-select),
+  .bg-library-page :deep(.n-button) {
+    width: 100%;
+  }
+}
 </style>

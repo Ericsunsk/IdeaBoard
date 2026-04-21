@@ -225,9 +225,9 @@ onMounted(loadPrompts)
 }
 
 .prompt-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(28, 37, 49, 0.98), rgba(22, 30, 40, 0.96));
+  border: 1px solid #324154;
+  border-radius: 14px;
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
@@ -243,13 +243,13 @@ onMounted(loadPrompts)
 .prompt-card-title {
   font-size: 14px;
   font-weight: 600;
-  color: #e4e4e7;
+  color: #e6edf7;
 }
 
 .prompt-card-slug {
   font-size: 11px;
-  color: #52525b;
-  background: #27272a;
+  color: #7d8ca1;
+  background: #243040;
   padding: 2px 8px;
   border-radius: 4px;
   font-family: monospace;
@@ -263,7 +263,7 @@ onMounted(loadPrompts)
 
 .prompt-card-count {
   font-size: 11px;
-  color: #52525b;
+  color: #7d8ca1;
 }
 
 .var-buttons {
@@ -275,13 +275,13 @@ onMounted(loadPrompts)
 
 .var-buttons-label {
   font-size: 11px;
-  color: #71717a;
+  color: #8ca0b6;
   flex-shrink: 0;
 }
 
 .var-note {
   font-size: 11px;
-  color: #71717a;
+  color: #8ca0b6;
 }
 
 .var-btn {
@@ -290,25 +290,25 @@ onMounted(loadPrompts)
   gap: 4px;
   padding: 4px 10px;
   border-radius: 6px;
-  border: 1px solid #3f3f46;
-  background: #27272a;
+  border: 1px solid #3a4a5e;
+  background: #243040;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .var-btn:hover {
-  background: rgba(163,230,53,0.1);
-  border-color: #a3e635;
+  background: rgba(62, 190, 199, 0.12);
+  border-color: #52c7ce;
 }
 
 .var-btn-key {
-  color: #a3e635;
+  color: #7dd6dd;
   font-size: 11px;
   font-family: monospace;
 }
 
 .var-btn-desc {
-  color: #71717a;
+  color: #8ca0b6;
   font-size: 10px;
 }
 </style>

@@ -1,7 +1,46 @@
 <template>
-  <div class="line-draft-page">
+  <div class="admin-page line-draft-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">线稿模式管理</h2>
+        <p class="page-desc">维护线稿模式封面、提示词模板与启用状态，配置会直接影响任务提交流程。</p>
+      </div>
+      <div class="header-side-note">
+        <span>总数 {{ modes.length }}</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">模式总数</span>
+        <span class="summary-value">{{ modes.length }}</span>
+        <span class="summary-foot">含停用项</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">已启用</span>
+        <span class="summary-value">{{ enabledModeCount }}</span>
+        <span class="summary-foot">可被选择</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">含封面</span>
+        <span class="summary-value">{{ coverConfiguredCount }}</span>
+        <span class="summary-foot">图片已配置</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">缺提示词</span>
+        <span class="summary-value">{{ promptMissingCount }}</span>
+        <span class="summary-foot">建议补齐</span>
+      </div>
+    </div>
+
     <div class="toolbar">
-      <span style="font-size: 16px; font-weight: 600; color: #e4e4e7;">线稿模式管理</span>
+      <span class="toolbar-group-title">配置操作</span>
+      <n-button @click="loadModes">
+        <template #icon>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </template>
+        刷新
+      </n-button>
       <n-button type="primary" @click="openAddModal">
         <template #icon>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -11,6 +50,12 @@
     </div>
 
     <div class="table-card">
+      <div class="panel-header">
+        <div>
+          <h3 class="panel-title">线稿模式列表</h3>
+          <p class="panel-desc">提示词用于任务提交时拼接参数，请确保内容准确且可审计。</p>
+        </div>
+      </div>
       <n-data-table
         :columns="columns"
         :data="modes"
@@ -115,6 +160,9 @@ const message = useMessage()
 
 const modes = ref<any[]>([])
 const loading = ref(false)
+const enabledModeCount = computed(() => modes.value.filter(item => item.is_enabled).length)
+const coverConfiguredCount = computed(() => modes.value.filter(item => !!item.cover_image).length)
+const promptMissingCount = computed(() => modes.value.filter(item => !item.prompt || !item.prompt.trim()).length)
 
 async function loadModes() {
   loading.value = true
@@ -279,25 +327,6 @@ async function confirmDelete() {
 <style scoped>
 @import './admin-common.css';
 
-.line-draft-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.table-card {
-  background: #18181b;
-  border-radius: 12px;
-  padding: 16px;
-}
-
 .cover-upload-area {
   display: flex;
   align-items: center;
@@ -324,11 +353,5 @@ async function confirmDelete() {
 .cover-placeholder {
   font-size: 12px;
   color: #52525b;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 </style>

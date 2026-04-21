@@ -1,6 +1,38 @@
 <template>
-  <div class="style-cards-page">
-    <!-- 工具栏 -->
+  <div class="admin-page style-cards-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">风格卡片管理</h2>
+        <p class="page-desc">维护用户可见风格素材，支持上下架、互斥与排序控制。</p>
+      </div>
+      <div class="header-side-note">
+        <span>总数 {{ cards.length }}</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">总风格</span>
+        <span class="summary-value">{{ cards.length }}</span>
+        <span class="summary-foot">包含下架</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">已上架</span>
+        <span class="summary-value">{{ enabledCardCount }}</span>
+        <span class="summary-foot">用户可见</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">互斥模式</span>
+        <span class="summary-value">{{ exclusiveCardCount }}</span>
+        <span class="summary-foot">单选风格</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">筛选结果</span>
+        <span class="summary-value">{{ filteredCards.length }}</span>
+        <span class="summary-foot">当前列表</span>
+      </div>
+    </div>
+
     <div class="toolbar">
       <n-input
         v-model:value="searchKeyword"
@@ -103,7 +135,7 @@
             :rows="3"
           />
           <template #feedback>
-            <span style="color: #71717a; font-size: 12px;">用户选择此风格时，系统自动将此关键词拼接到描述前，全程用户不可见</span>
+            <span style="color: #8b95b8; font-size: 12px;">用户选择此风格时，系统自动将此关键词拼接到描述前，全程用户不可见</span>
           </template>
         </n-form-item>
 
@@ -129,7 +161,7 @@
             <template #unchecked>否</template>
           </n-switch>
           <template #feedback>
-            <span style="color: #71717a; font-size: 12px;">互斥模式下，用户只能选择该风格卡片中的一个；非互斥则可多选</span>
+            <span style="color: #8b95b8; font-size: 12px;">互斥模式下，用户只能选择该风格卡片中的一个；非互斥则可多选</span>
           </template>
         </n-form-item>
       </n-form>
@@ -149,7 +181,7 @@
       title="确认删除"
       :style="{ maxWidth: '400px' }"
     >
-      <p style="color: #a1a1aa; line-height: 1.8;">确定要删除风格「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
+      <p style="color: #7884ad; line-height: 1.8;">确定要删除风格「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
       <template #footer>
         <div class="modal-footer">
           <n-button @click="showDeleteModal = false">取消</n-button>
@@ -199,6 +231,8 @@ const filteredCards = computed(() => {
   }
   return result
 })
+const enabledCardCount = computed(() => cards.value.filter(item => item.is_enabled).length)
+const exclusiveCardCount = computed(() => cards.value.filter(item => item.is_exclusive).length)
 
 // ============ 表格列定义 ============
 const columns = [
@@ -208,7 +242,7 @@ const columns = [
     width: 80,
     render(row: StyleCard) {
       return h('div', {
-        style: 'width: 60px; height: 40px; border-radius: 6px; overflow: hidden; background: #27272a;'
+        style: 'width: 60px; height: 40px; border-radius: 10px; overflow: hidden; background: rgba(113, 97, 239, 0.1);'
       }, [
         h('img', {
           src: row.cover_image,
@@ -227,7 +261,7 @@ const columns = [
     key: 'keywords',
     ellipsis: { tooltip: true },
     render() {
-      return h('span', { style: 'font-size: 12px; color: #71717a;' }, '（隐藏）')
+      return h('span', { style: 'font-size: 12px; color: #8b95b8;' }, '（隐藏）')
     }
   },
   {
@@ -235,7 +269,7 @@ const columns = [
     key: 'sort_order',
     width: 70,
     render(row: StyleCard) {
-      return h('span', { style: 'color: #71717a;' }, row.sort_order)
+      return h('span', { style: 'color: #8b95b8;' }, row.sort_order)
     }
   },
   {
@@ -244,7 +278,7 @@ const columns = [
     width: 70,
     render(row: StyleCard) {
       return h('span', {
-        style: row.is_exclusive ? 'color: #6366f1;' : 'color: #52525b;'
+        style: row.is_exclusive ? 'color: #6460db;' : 'color: #8b95b8;'
       }, row.is_exclusive ? '是' : '否')
     }
   },
@@ -254,7 +288,7 @@ const columns = [
     width: 80,
     render(row: StyleCard) {
       return h('span', {
-        style: row.is_enabled ? 'color: #22c55e;' : 'color: #ef4444;'
+        style: row.is_enabled ? 'color: #1f9d68;' : 'color: #d65478;'
       }, row.is_enabled ? '已上架' : '已下架')
     }
   },
@@ -272,7 +306,7 @@ const columns = [
         h(NButton, {
           size: 'small',
           tertiary: true,
-          style: 'color: #ef4444;',
+          style: 'color: #d65478;',
           onClick: () => openDeleteModal(row)
         }, { default: () => '删除' })
       ])
@@ -429,32 +463,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
+@import './admin-common.css';
+
 .style-cards-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.table-card {
-  background: #18181b;
-  border-radius: 12px;
-  border: 1px solid #27272a;
-  padding: 16px;
-}
-
-.pagination-wrapper {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
+  gap: 14px;
 }
 
 .cover-upload-area {
@@ -466,10 +478,10 @@ onMounted(() => {
 .cover-preview {
   width: 120px;
   height: 80px;
-  border-radius: 8px;
+  border-radius: 14px;
   overflow: hidden;
-  background: #27272a;
-  border: 1px solid #3f3f46;
+  background: rgba(113, 97, 239, 0.1);
+  border: 1px solid rgba(136, 151, 208, 0.34);
   flex-shrink: 0;
 }
 
@@ -486,45 +498,10 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  color: #52525b;
+  color: #8b95b8;
 }
 
 .modal-footer {
-  display: flex;
-  justify-content: flex-end;
   gap: 8px;
-}
-
-:deep(.n-input) {
-  --n-border: 1px solid #27272a;
-  --n-border-hover: 1px solid #6366f1;
-  --n-border-focus: 1px solid #6366f1;
-  --n-color: #18181b;
-  --n-color-focus: #18181b;
-  --n-text-color: #e4e4e7;
-  --n-placeholder-color: #52525b;
-  border-radius: 8px;
-}
-
-:deep(.n-button--primary-type) {
-  --n-color: #6366f1;
-  --n-color-hover: #818cf8;
-  --n-color-pressed: #4f46e5;
-  border-radius: 8px;
-}
-
-:deep(.n-button--error-type) {
-  --n-color: #ef4444;
-  --n-color-hover: #f87171;
-  border-radius: 8px;
-}
-
-:deep(.n-data-table) {
-  --n-td-color: transparent;
-  --n-th-color: transparent;
-  --n-border-color: #27272a;
-  --n-td-color-hover: rgba(99, 102, 241, 0.05);
-  --n-th-text-color: #71717a;
-  --n-td-text-color: #e4e4e7;
 }
 </style>

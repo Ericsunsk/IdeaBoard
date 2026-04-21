@@ -1,85 +1,80 @@
 <template>
-  <div class="records-page">
-    <!-- 顶部统计卡片 -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon" style="background: #6366f1;">
-          <n-icon size="24"><ListOutline /></n-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ statsTotal }}</div>
-          <div class="stat-label">总任务数</div>
-        </div>
+  <div class="admin-page records-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">绘图记录审计台</h2>
+        <p class="page-desc">按任务状态回溯生成链路，支持查看失败原因、耗时与原始 API 结果。</p>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background: #22c55e;">
-          <n-icon size="24"><CheckmarkCircleOutline /></n-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ statsSuccess }}</div>
-          <div class="stat-label">成功</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background: #ef4444;">
-          <n-icon size="24"><CloseCircleOutline /></n-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ statsFailed }}</div>
-          <div class="stat-label">失败</div>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background: #f59e0b;">
-          <n-icon size="24"><TimeOutline /></n-icon>
-        </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ statsPending }}</div>
-          <div class="stat-label">进行中</div>
-        </div>
+      <div class="header-side-note">
+        <span>总量 {{ total }}</span>
       </div>
     </div>
 
-    <!-- 筛选 & 表格 -->
-    <div class="table-section">
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">总任务数</span>
+        <span class="summary-value">{{ statsTotal }}</span>
+        <span class="summary-foot">监控累计</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">成功</span>
+        <span class="summary-value">{{ statsSuccess }}</span>
+        <span class="summary-foot">completed</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">失败</span>
+        <span class="summary-value">{{ statsFailed }}</span>
+        <span class="summary-foot">failed</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">进行中</span>
+        <span class="summary-value">{{ statsPending }}</span>
+        <span class="summary-foot">pending + running</span>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <span class="toolbar-group-title">筛选条件</span>
+      <n-select
+        v-model:value="filterStatus"
+        :options="statusOptions"
+        placeholder="状态筛选"
+        clearable
+        style="width: 130px"
+        @update:value="() => { page = 1; loadRecords() }"
+      />
+      <n-button @click="loadRecords">
+        <template #icon><n-icon><RefreshOutline /></n-icon></template>
+        刷新
+      </n-button>
+    </div>
+
+    <div class="table-card">
       <div class="section-header">
-        <h3>绘图记录</h3>
-        <n-space>
-          <n-select
-            v-model:value="filterStatus"
-            :options="statusOptions"
-            placeholder="状态筛选"
-            clearable
-            style="width: 130px"
-            @update:value="() => { page = 1; loadRecords() }"
-          />
-          <n-button @click="loadRecords">
-            <template #icon><n-icon><RefreshOutline /></n-icon></template>
-            刷新
-          </n-button>
-        </n-space>
+        <div>
+          <h3 class="panel-title">绘图任务列表</h3>
+          <p class="panel-desc">按时间倒序展示，点击详情可查看完整上下文。</p>
+        </div>
       </div>
 
-      <div class="table-card">
-        <n-data-table
-          :columns="columns"
-          :data="records"
-          :loading="loading"
-          :pagination="false"
-          :bordered="false"
-          :row-key="(row: Task) => row.task_id"
-          size="small"
-          :scroll-x="1200"
+      <n-data-table
+        :columns="columns"
+        :data="records"
+        :loading="loading"
+        :pagination="false"
+        :bordered="false"
+        :row-key="(row: Task) => row.task_id"
+        size="small"
+        :scroll-x="1200"
+      />
+      <div class="pagination-wrapper">
+        <n-pagination
+          v-model:page="page"
+          :page-count="pageCount"
+          :page-size="pageSize"
+          show-quick-jumper
+          @update:page="loadRecords"
         />
-        <div class="pagination-wrapper">
-          <n-pagination
-            v-model:page="page"
-            :page-count="pageCount"
-            :page-size="pageSize"
-            show-quick-jumper
-            @update:page="loadRecords"
-          />
-        </div>
       </div>
     </div>
 
@@ -96,8 +91,8 @@
               </n-tag>
             </n-descriptions-item>
             <n-descriptions-item label="耗时" :span="1">
-              <span v-if="detailTask.completed_at" style="color: #22c55e; font-weight: 500;">{{ calcDuration(detailTask) }}</span>
-              <span v-else style="color: #71717a;">-</span>
+              <span v-if="detailTask.completed_at" style="color: #1f9d68; font-weight: 500;">{{ calcDuration(detailTask) }}</span>
+              <span v-else style="color: #8b95b8;">-</span>
             </n-descriptions-item>
             <n-descriptions-item label="创建时间" :span="2">{{ detailTask.created_at }}</n-descriptions-item>
           </n-descriptions>
@@ -106,7 +101,7 @@
           <div class="detail-block">{{ detailTask.prompt || '-' }}</div>
 
           <div v-if="detailTask.status === 'failed'">
-            <h4 class="detail-subtitle" style="color: #ef4444;">失败原因</h4>
+            <h4 class="detail-subtitle" style="color: #d65478;">失败原因</h4>
             <div class="detail-block error-block">{{ getErrorReason(detailTask) || '-' }}</div>
           </div>
 
@@ -131,13 +126,12 @@ import { ref, computed, onMounted, h } from 'vue'
 import accountApi from '../../api/account'
 import type { Task } from '../../api/account'
 import {
-  NIcon, NTag, NButton, NSpace, NSelect, NDataTable, NPagination,
-  NDrawer, NDrawerContent, NDescriptions, NDescriptionsItem, NText, NImage,
-  NEllipsis,
+  NIcon, NTag, NButton, NSelect, NDataTable, NPagination,
+  NDrawer, NDrawerContent, NDescriptions, NDescriptionsItem, NImage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import {
-  ListOutline, CheckmarkCircleOutline, CloseCircleOutline, TimeOutline, RefreshOutline,
+  RefreshOutline,
   EyeOutline,
 } from '@vicons/ionicons5'
 
@@ -233,11 +227,11 @@ const columns: DataTableColumns<Task> = [
     width: 100,
     align: 'center',
     render: (row) => h('span', { style: { fontSize: '12px', lineHeight: '1.6' } }, [
-      h('span', { style: { color: '#a1a1aa' } }, 'U:'),
-      h('span', { style: { color: '#fafafa', fontWeight: '500' } }, String(row.user_id)),
-      h('span', { style: { color: '#3f3f46', margin: '0 4px' } }, '/'),
-      h('span', { style: { color: '#a1a1aa' } }, 'A:'),
-      h('span', { style: { color: '#fafafa', fontWeight: '500' } }, row.account_id ? String(row.account_id) : '-'),
+      h('span', { style: { color: '#8390b5' } }, 'U:'),
+      h('span', { style: { color: '#2e385f', fontWeight: '500' } }, String(row.user_id)),
+      h('span', { style: { color: '#bbc4e0', margin: '0 4px' } }, '/'),
+      h('span', { style: { color: '#8390b5' } }, 'A:'),
+      h('span', { style: { color: '#2e385f', fontWeight: '500' } }, row.account_id ? String(row.account_id) : '-'),
     ]),
   },
   {
@@ -263,8 +257,8 @@ const columns: DataTableColumns<Task> = [
     align: 'center',
     render: (row) => {
       const dur = calcDuration(row)
-      if (dur === '-') return h('span', { style: { color: '#71717a' } }, '-')
-      return h('span', { style: { fontSize: '12px', color: '#22c55e', fontWeight: '500' } }, dur)
+      if (dur === '-') return h('span', { style: { color: '#8b95b8' } }, '-')
+      return h('span', { style: { fontSize: '12px', color: '#1f9d68', fontWeight: '500' } }, dur)
     },
   },
   {
@@ -272,17 +266,17 @@ const columns: DataTableColumns<Task> = [
     key: 'result',
     width: 120,
     render: (row) => {
-      if (!row.result) return h('span', { style: { color: '#71717a' } }, '-')
+      if (!row.result) return h('span', { style: { color: '#8b95b8' } }, '-')
       try {
         const r = JSON.parse(row.result)
         if (r.platform) {
           return h('span', { style: { fontSize: '12px' } }, [
             h(NTag, { size: 'tiny', type: 'info', bordered: false }, () => r.platform),
-            r.model_set ? h('span', { style: { marginLeft: '4px', color: '#71717a', fontSize: '11px' } }, r.model_set) : null,
+            r.model_set ? h('span', { style: { marginLeft: '4px', color: '#8b95b8', fontSize: '11px' } }, r.model_set) : null,
           ])
         }
       } catch {}
-      return h('span', { style: { color: '#71717a', fontSize: '12px' } }, '有结果')
+      return h('span', { style: { color: '#8b95b8', fontSize: '12px' } }, '有结果')
     },
   },
   {
@@ -293,8 +287,8 @@ const columns: DataTableColumns<Task> = [
     render: (row) => {
       const reason = getErrorReason(row)
       return reason
-        ? h('span', { style: { color: '#ef4444', fontSize: '12px' } }, reason)
-        : h('span', { style: { color: '#71717a' } }, '-')
+        ? h('span', { style: { color: '#d65478', fontSize: '12px' } }, reason)
+        : h('span', { style: { color: '#8b95b8' } }, '-')
     },
   },
   {
@@ -355,90 +349,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
+@import './admin-common.css';
+
 .records-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
-}
-
-.stat-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 18px 20px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-}
-
-.stat-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #fafafa;
-  line-height: 1;
-}
-
-.stat-label {
-  font-size: 13px;
-  color: #71717a;
-  margin-top: 2px;
-}
-
-.table-section {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #fafafa;
-  margin: 0;
-}
-
-.table-card {
-  background: #27272a;
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.pagination-wrapper {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
 }
 
 /* 详情抽屉 */
@@ -451,16 +365,17 @@ h3 {
 .detail-subtitle {
   font-size: 14px;
   font-weight: 600;
-  color: #d4d4d8;
+  color: #3c476f;
   margin: 0;
 }
 
 .detail-block {
-  background: #27272a;
-  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.76);
+  border-radius: 14px;
+  border: 1px solid rgba(136, 151, 208, 0.3);
   padding: 12px;
   font-size: 13px;
-  color: #a1a1aa;
+  color: #55618e;
   word-break: break-all;
   white-space: pre-wrap;
   max-height: 200px;
@@ -475,21 +390,9 @@ h3 {
 }
 
 .error-block {
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #c84e71;
+  border: 1px solid rgba(214, 84, 120, 0.24);
 }
 
-.detail-image {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-:deep(.n-data-table) {
-  --n-td-color: transparent;
-  --n-th-color: transparent;
-  --n-border-color: #27272a;
-  --n-td-color-hover: rgba(99,102,241,0.05);
-  --n-th-text-color: #71717a;
-  --n-td-text-color: #e4e4e7;
-}
+.detail-image { display: flex; flex-direction: column; gap: 8px; }
 </style>

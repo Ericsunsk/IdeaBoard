@@ -1,6 +1,38 @@
 <template>
-  <div class="users-page">
-    <!-- 搜索栏 -->
+  <div class="admin-page users-page">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">用户控制台</h2>
+        <p class="page-desc">管理用户状态、密码与账户生命周期。所有操作即时生效，并同步到任务权限链路。</p>
+      </div>
+      <div class="header-side-note">
+        <span>实时数据</span>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">总用户</span>
+        <span class="summary-value">{{ users.length }}</span>
+        <span class="summary-foot">当前筛选结果</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">正常</span>
+        <span class="summary-value">{{ activeUserCount }}</span>
+        <span class="summary-foot">状态可登录</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">封禁</span>
+        <span class="summary-value">{{ bannedUserCount }}</span>
+        <span class="summary-foot">建议定期复核</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">系统保留</span>
+        <span class="summary-value">{{ reservedUserCount }}</span>
+        <span class="summary-foot">不可删除账户</span>
+      </div>
+    </div>
+
     <div class="toolbar">
       <n-input
         v-model:value="searchKeyword"
@@ -23,8 +55,13 @@
       </n-button>
     </div>
 
-    <!-- 用户列表 -->
     <div class="table-card">
+      <div class="panel-header">
+        <div>
+          <h3 class="panel-title">用户列表</h3>
+          <p class="panel-desc">支持封禁、改密、删除操作。管理员主账号默认不可删除。</p>
+        </div>
+      </div>
       <n-data-table
         :columns="columns"
         :data="users"
@@ -71,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h } from 'vue'
+import { ref, onMounted, h, computed } from 'vue'
 import { adminApi } from '../../api'
 import { NInput, NButton, NDataTable, NModal, NForm, NFormItem, NIcon, NTag, NSpace, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
@@ -103,6 +140,9 @@ const pwdRules = {
 }
 
 const currentUserId = ref<number>(0)
+const activeUserCount = computed(() => users.value.filter(item => item.status === 1).length)
+const bannedUserCount = computed(() => users.value.filter(item => item.status !== 1).length)
+const reservedUserCount = computed(() => users.value.filter(item => item.id === 1).length)
 
 const columns: DataTableColumns<User> = [
   { title: 'ID', key: 'id', width: 80 },
@@ -205,46 +245,12 @@ onMounted(() => {
 <style scoped>
 @import './admin-common.css';
 .users-page {
-  padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1400px;
+  gap: 14px;
 }
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.table-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 20px;
-}
-:deep(.n-data-table) {
-  --n-td-color: transparent;
-  --n-th-color: transparent;
-  --n-border-color: #27272a;
-  --n-td-color-hover: rgba(99,102,241,0.05);
-  --n-th-text-color: #71717a;
-  --n-td-text-color: #e4e4e7;
-}
-:deep(.n-input) {
-  --n-border: 1px solid #27272a;
-  --n-border-hover: 1px solid #6366f1;
-  --n-border-focus: 1px solid #6366f1;
-  --n-color: #09090b;
-  --n-color-focus: #09090b;
-  --n-text-color: #e4e4e7;
-  --n-placeholder-color: #3f3f46;
-  border-radius: 8px;
-}
-:deep(.n-button--primary-type) {
-  --n-color: #6366f1;
-  --n-color-hover: #818cf8;
-  --n-color-pressed: #4f46e5;
-  border-radius: 8px;
+
+@media (max-width: 720px) {
+  .users-page :deep(.n-input) {
+    width: 100% !important;
+  }
 }
 </style>
