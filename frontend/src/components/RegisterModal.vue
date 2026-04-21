@@ -81,29 +81,23 @@ const formValue = ref({
   confirmPassword: ''
 })
 
-const ASCII_VISIBLE_NO_SPACE_REGEX = /^[\x21-\x7E]+$/
-
-function sanitizeCredentialInput(value: string) {
-  return value.replace(/[^\x21-\x7E]/g, '')
-}
-
-function validateCredentialChars(_: unknown, value: string) {
-  if (!value) return true
-  return ASCII_VISIBLE_NO_SPACE_REGEX.test(value)
-}
+const USERNAME_MIN_LEN = 3
+const USERNAME_MAX_LEN = 50
+const PASSWORD_MIN_LEN = 6
+const PASSWORD_MAX_LEN = 50
 
 const rules = {
   username: [
     { required: true, message: 'Please choose a username', trigger: 'blur' },
-    { validator: validateCredentialChars, message: 'Only letters, numbers, and symbols are allowed', trigger: ['input', 'blur'] }
+    { min: USERNAME_MIN_LEN, max: USERNAME_MAX_LEN, message: `Username length should be ${USERNAME_MIN_LEN}-${USERNAME_MAX_LEN} characters`, trigger: ['input', 'blur'] }
   ],
   password: [
     { required: true, message: 'Please choose a password', trigger: 'blur' },
-    { validator: validateCredentialChars, message: 'Only letters, numbers, and symbols are allowed', trigger: ['input', 'blur'] }
+    { min: PASSWORD_MIN_LEN, max: PASSWORD_MAX_LEN, message: `Password length should be ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} characters`, trigger: ['input', 'blur'] }
   ],
   confirmPassword: [
     { required: true, message: 'Please confirm your password', trigger: 'blur' },
-    { validator: validateCredentialChars, message: 'Only letters, numbers, and symbols are allowed', trigger: ['input', 'blur'] },
+    { min: PASSWORD_MIN_LEN, max: PASSWORD_MAX_LEN, message: `Password length should be ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} characters`, trigger: ['input', 'blur'] },
     {
       validator: (rule: any, value: string) => value === formValue.value.password,
       message: 'Passwords do not match',
@@ -136,36 +130,6 @@ watch(
   (visible) => {
     if (!visible) {
       resetForm()
-    }
-  }
-)
-
-watch(
-  () => formValue.value.username,
-  (value) => {
-    const sanitized = sanitizeCredentialInput(value)
-    if (sanitized !== value) {
-      formValue.value.username = sanitized
-    }
-  }
-)
-
-watch(
-  () => formValue.value.password,
-  (value) => {
-    const sanitized = sanitizeCredentialInput(value)
-    if (sanitized !== value) {
-      formValue.value.password = sanitized
-    }
-  }
-)
-
-watch(
-  () => formValue.value.confirmPassword,
-  (value) => {
-    const sanitized = sanitizeCredentialInput(value)
-    if (sanitized !== value) {
-      formValue.value.confirmPassword = sanitized
     }
   }
 )

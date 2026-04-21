@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"fmt"
 	"backend/internal/model"
 	"backend/internal/service"
 	"backend/pkg/response"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -57,8 +57,6 @@ func (h *AdminHandler) CreateUser(c *gin.Context) {
 
 // UpdateUserStatus 更新用户状态
 func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
-	userID := c.Param("id")
-
 	var req struct {
 		Status *int8 `json:"status" binding:"required"`
 	}
@@ -68,13 +66,17 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 		return
 	}
 
-	var userIDUint uint64
-	if _, err := fmt.Sscanf(userID, "%d", &userIDUint); err != nil {
-		response.Error(c, 400, "无效的用户ID")
+	targetUser, ok := h.getTargetUserByParam(c)
+	if !ok {
 		return
 	}
 
-	if err := h.userService.UpdateStatus(userIDUint, *req.Status); err != nil {
+	if targetUser.Role == "admin" {
+		response.Error(c, 400, "不能修改管理员状态")
+		return
+	}
+
+	if err := h.userService.UpdateStatus(targetUser.ID, *req.Status); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -82,10 +84,8 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-
 // UpdateUserPassword 管理员修改用户密码
 func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
-	userID := c.Param("id")
 	var req model.UpdateUserPasswordRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -93,19 +93,17 @@ func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
 		return
 	}
 
-	var userIDUint uint64
-	if _, err := fmt.Sscanf(userID, "%d", &userIDUint); err != nil {
-		response.Error(c, 400, "无效的用户ID")
+	targetUser, ok := h.getTargetUserByParam(c)
+	if !ok {
 		return
 	}
 
-	// 不能修改admin的密码
-	if userIDUint == 1 {
+	if targetUser.Role == "admin" {
 		response.Error(c, 400, "不能修改管理员密码")
 		return
 	}
 
-	if err := h.userService.AdminUpdatePassword(userIDUint, req.NewPassword); err != nil {
+	if err := h.userService.AdminUpdatePassword(targetUser.ID, req.NewPassword); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -115,24 +113,38 @@ func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
 
 // DeleteUser 删除用户
 func (h *AdminHandler) DeleteUser(c *gin.Context) {
-	userID := c.Param("id")
-
-	var userIDUint uint64
-	if _, err := fmt.Sscanf(userID, "%d", &userIDUint); err != nil {
-		response.Error(c, 400, "无效的用户ID")
+	targetUser, ok := h.getTargetUserByParam(c)
+	if !ok {
 		return
 	}
 
-	// 不能删除admin
-	if userIDUint == 1 {
+	if targetUser.Role == "admin" {
 		response.Error(c, 400, "不能删除管理员")
 		return
 	}
 
-	if err := h.userService.DeleteUser(userIDUint); err != nil {
+	if err := h.userService.DeleteUser(targetUser.ID); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
 
 	response.Success(c, nil)
+}
+
+func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*model.User, bool) {
+	userID := c.Param("id")
+
+	var userIDUint uint64
+	if _, err := fmt.Sscanf(userID, "%d", &userIDUint); err != nil {
+		response.Error(c, 400, "无效的用户ID")
+		return nil, false
+	}
+
+	user, err := h.userService.GetByID(userIDUint)
+	if err != nil {
+		response.Error(c, 400, "用户不存在")
+		return nil, false
+	}
+
+	return user, true
 }

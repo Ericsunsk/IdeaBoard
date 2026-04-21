@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import { getStoredToken, getStoredUser, clearStoredAuth } from '../utils/auth'
+import { userApi } from '../api'
+import { getStoredToken, getStoredUser, clearStoredAuth, setStoredAuth } from '../utils/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -145,34 +146,60 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
-  const token = getStoredToken()
-  const user = getStoredUser()
-  const isLoggedIn = !!(token && user)
-
+router.beforeEach(async (to) => {
+  let token = getStoredToken()
+  let user = getStoredUser()
   const isAdminRoute = to.path.startsWith('/admin')
 
   if (token && !user) {
     clearStoredAuth()
+    token = null
+    user = null
   }
+
+  if (token && (isAdminRoute || !!to.meta.requiresAuth)) {
+    try {
+      const res: any = await userApi.getInfo()
+      if (res.code === 0 && res.data?.user) {
+        const refreshedUser = res.data.user
+        user = refreshedUser
+        setStoredAuth(token, refreshedUser)
+      }
+    } catch (error: any) {
+      const code = Number(error?.status ?? error?.code)
+      if (code === 401 || code === 403) {
+        clearStoredAuth()
+        token = null
+        user = null
+      } else if (isAdminRoute) {
+        return '/user/home'
+      }
+    }
+  }
+
+  const isLoggedIn = !!(token && user)
 
   if (to.meta.requiresAuth && !isLoggedIn) {
     if (isAdminRoute) {
-      next({ path: '/admin/login', query: { redirect: to.fullPath } })
+      return { path: '/admin/login', query: { redirect: to.fullPath } }
     } else {
-      next({ path: '/user/login', query: { redirect: to.fullPath } })
+      return { path: '/user/login', query: { redirect: to.fullPath } }
     }
-  } else if (to.meta.guest && isLoggedIn) {
-    if (isAdminRoute) {
-      next(user?.role === 'admin' ? '/admin/users' : '/user/home')
-    } else {
-      next('/user/home')
-    }
-  } else if (isAdminRoute && user && user.role !== 'admin') {
-    next('/user/home')
-  } else {
-    next()
   }
+
+  if (to.meta.guest && isLoggedIn) {
+    if (isAdminRoute) {
+      return user?.role === 'admin' ? '/admin/users' : '/user/home'
+    } else {
+      return '/user/home'
+    }
+  }
+
+  if (isAdminRoute && user && user.role !== 'admin') {
+    return '/user/home'
+  }
+
+  return true
 })
 
 export default router

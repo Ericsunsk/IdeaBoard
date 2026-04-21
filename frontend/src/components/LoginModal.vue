@@ -70,25 +70,12 @@ const formValue = ref({
   password: ''
 })
 
-const ASCII_VISIBLE_NO_SPACE_REGEX = /^[\x21-\x7E]+$/
-
-function sanitizeCredentialInput(value: string) {
-  return value.replace(/[^\x21-\x7E]/g, '')
-}
-
-function validateCredentialChars(_: unknown, value: string) {
-  if (!value) return true
-  return ASCII_VISIBLE_NO_SPACE_REGEX.test(value)
-}
-
 const rules = {
   username: [
     { required: true, message: 'Please enter your username', trigger: 'blur' },
-    { validator: validateCredentialChars, message: 'Only letters, numbers, and symbols are allowed', trigger: ['input', 'blur'] }
   ],
   password: [
     { required: true, message: 'Please enter your password', trigger: 'blur' },
-    { validator: validateCredentialChars, message: 'Only letters, numbers, and symbols are allowed', trigger: ['input', 'blur'] }
   ]
 }
 
@@ -115,26 +102,6 @@ watch(
   (visible) => {
     if (!visible) {
       resetForm()
-    }
-  }
-)
-
-watch(
-  () => formValue.value.username,
-  (value) => {
-    const sanitized = sanitizeCredentialInput(value)
-    if (sanitized !== value) {
-      formValue.value.username = sanitized
-    }
-  }
-)
-
-watch(
-  () => formValue.value.password,
-  (value) => {
-    const sanitized = sanitizeCredentialInput(value)
-    if (sanitized !== value) {
-      formValue.value.password = sanitized
     }
   }
 )

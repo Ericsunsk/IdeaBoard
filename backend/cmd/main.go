@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	iofs "io/fs"
@@ -30,6 +31,7 @@ import (
 	"backend/web"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -45,16 +47,34 @@ func main() {
 		userRepo := repository.NewUserRepository(db)
 		userService := service.NewUserService(userRepo)
 
-		hashedPassword, _ := userService.HashPassword("admin123")
-		admin := &model.User{Username: "admin", Password: hashedPassword, Role: "admin", Status: 1}
+		adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
+		if adminPassword == "" {
+			adminPassword = "admin123"
+			log.Println("[Init] INIT_ADMIN_PASSWORD 未配置，使用默认密码 admin123")
+		}
 
-		exists, _ := userRepo.ExistsUsername("admin")
-		if exists {
-			userRepo.UpdateRoleAndPassword("admin", hashedPassword, "admin")
-			log.Println("Admin user updated successfully!")
-		} else {
-			userRepo.Create(admin)
+		hashedPassword, err := userService.HashPassword(adminPassword)
+		if err != nil {
+			log.Fatalf("Failed to hash admin password: %v", err)
+		}
+
+		existingAdmin, err := userRepo.GetByUsername("admin")
+		if err == nil {
+			if existingAdmin.Role != "admin" {
+				log.Fatalf("Refusing to elevate existing user 'admin' with role %q; please promote it explicitly before rerunning init-admin", existingAdmin.Role)
+			}
+			if err := userRepo.UpdatePassword(existingAdmin.ID, hashedPassword); err != nil {
+				log.Fatalf("Failed to reset admin password: %v", err)
+			}
+			log.Println("Admin password reset successfully!")
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			admin := &model.User{Username: "admin", Password: hashedPassword, Role: "admin", Status: 1}
+			if err := userRepo.Create(admin); err != nil {
+				log.Fatalf("Failed to create admin user: %v", err)
+			}
 			log.Println("Admin user created successfully!")
+		} else {
+			log.Fatalf("Failed to query admin user: %v", err)
 		}
 		return
 	}
@@ -73,16 +93,6 @@ func main() {
 	}
 
 	db.AutoMigrate(&model.User{}, &model.ApiAccount{}, &model.Task{}, &model.StyleCard{}, &model.Channel{}, &model.SystemConfig{}, &model.LineDraftMode{}, &model.FaceTemplate{}, &model.BgTemplate{}, &model.PatternStyle{})
-
-	// Auto-fix admin role on startup
-	userRepoForInit := repository.NewUserRepository(db)
-	exists, _ := userRepoForInit.ExistsUsername("admin")
-	if exists {
-		userRepoForInit.UpdateRole("admin", "admin")
-		log.Println("[Init] Admin role verified")
-	} else {
-		log.Println("[Init] Admin user does not exist")
-	}
 
 	rdb := redis.NewRedis(cfg.Redis)
 	redisMgr := redis.NewRedisManager(rdb.GetClient())

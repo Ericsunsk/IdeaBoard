@@ -9,6 +9,7 @@ import type {
   User,
   ApiResponse,
 } from '../types'
+import { getStoredToken, handleAuthFailure } from '../utils/auth'
 
 type ApiClientError = Error & {
   code?: number
@@ -35,48 +36,9 @@ function createApiError(payload?: any, status?: number): ApiClientError {
   return error
 }
 
-function clearStoredAuth() {
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-}
-
-function isAuthRequest(requestUrl: string) {
-  return requestUrl.includes('/auth/')
-}
-
-function isAdminApiRequest(requestUrl: string) {
-  return requestUrl.includes('/admin/')
-}
-
-function isAdminPage() {
-  return window.location.pathname.startsWith('/admin')
-}
-
-function buildLoginRedirectPath() {
-  const currentPath = window.location.pathname + window.location.search
-  const loginPath = isAdminPage() ? '/admin/login' : '/user/login'
-  return loginPath + '?redirect=' + encodeURIComponent(currentPath)
-}
-
-function handleAuthExpired(status: number | undefined, payload: any, requestUrl: string) {
-  const code = payload?.code ?? status
-
-  if (code === 403 && isAdminApiRequest(requestUrl) && isAdminPage()) {
-    window.location.href = '/user/home'
-    return
-  }
-
-  if (code !== 401 || isAuthRequest(requestUrl)) {
-    return
-  }
-
-  clearStoredAuth()
-  window.location.href = buildLoginRedirectPath()
-}
-
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = getStoredToken()
     if (token) {
       config.headers.Authorization = 'Bearer ' + token
     }
@@ -92,7 +54,7 @@ api.interceptors.response.use(
     const data = response.data
     if (data && typeof data.code === 'number' && data.code !== 0) {
       const requestUrl = response.config?.url || ''
-      handleAuthExpired(response.status, data, requestUrl)
+      handleAuthFailure({ status: response.status, payload: data, requestUrl })
       return Promise.reject(createApiError(data, response.status))
     }
     return data
@@ -100,7 +62,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       const requestUrl = error.config?.url || ''
-      handleAuthExpired(error.response.status, error.response.data, requestUrl)
+      handleAuthFailure({ status: error.response.status, payload: error.response.data, requestUrl })
       return Promise.reject(createApiError(error.response.data, error.response.status))
     }
     return Promise.reject(createApiError(error))

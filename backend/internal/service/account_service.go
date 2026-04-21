@@ -22,6 +22,8 @@ type AccountService struct {
 	systemConfigRepo *repository.SystemConfigRepository
 }
 
+const defaultAccountMaxConcurrent = 3
+
 func NewAccountService(
 	accountRepo *repository.AccountRepository,
 	taskRepo *repository.TaskRepository,
@@ -43,9 +45,7 @@ func NewAccountService(
 // ============ 账号池管理 ============
 
 func (s *AccountService) CreateAccount(req *model.CreateAccountRequest) (*model.ApiAccount, error) {
-	if req.MaxConcurrent <= 0 {
-		req.MaxConcurrent = 3
-	}
+	req.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
 	if req.Timeout <= 0 {
 		req.Timeout = 120
 	}
@@ -134,7 +134,7 @@ func (s *AccountService) UpdateAccount(id uint64, req *model.UpdateAccountReques
 	account.ApiType = req.ApiType
 	account.ModelSet = req.ModelSet
 	account.ProxyURL = req.ProxyURL
-	account.MaxConcurrent = req.MaxConcurrent
+	account.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
 	account.Timeout = req.Timeout
 	account.ExtraConfig = req.ExtraConfig
 	account.Weight = req.Weight
@@ -161,7 +161,18 @@ func (s *AccountService) DeleteAccount(id uint64) error {
 }
 
 func (s *AccountService) StartAccount(id uint64) error {
-	return s.accountRepo.UpdateStatus(id, 1)
+	account, err := s.accountRepo.GetByID(id)
+	if err != nil {
+		return fmt.Errorf("账号不存在")
+	}
+
+	account.MaxConcurrent = normalizeMaxConcurrent(account.MaxConcurrent)
+	if err := s.accountRepo.UpdateStatus(id, 1); err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	return s.redisMgr.EnsureAccountConcurrent(ctx, id, account.MaxConcurrent)
 }
 
 func (s *AccountService) StopAccount(id uint64) error {
@@ -362,6 +373,13 @@ func (s *AccountService) GetMonitorInfo() (*redis.MonitorInfo, error) {
 		accountIDs[i] = acc.ID
 	}
 	return s.redisMgr.GetMonitorInfo(ctx, accountIDs)
+}
+
+func normalizeMaxConcurrent(value int) int {
+	if value <= 0 {
+		return defaultAccountMaxConcurrent
+	}
+	return value
 }
 
 func (s *AccountService) GetTaskStats() (map[string]int64, error) {

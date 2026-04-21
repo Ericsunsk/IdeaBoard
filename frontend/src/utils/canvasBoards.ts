@@ -1,3 +1,5 @@
+import { getAuthStorageUserScope } from './auth'
+
 export interface CanvasBoardMeta {
   id: string
   name: string
@@ -5,7 +7,8 @@ export interface CanvasBoardMeta {
   updatedAt: number
 }
 
-const STORAGE_KEY = 'ideaboard.canvas.boards.v1'
+const LEGACY_STORAGE_KEY = 'ideaboard.canvas.boards.v1'
+const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boards.v2'
 const MAX_BOARD_NAME_LEN = 60
 
 function readStorageValue(key: string): string | null {
@@ -38,9 +41,27 @@ function toValidBoardMeta(item: unknown): CanvasBoardMeta | null {
   }
 }
 
+function getScopedStorageKey(): string | null {
+  const scope = getAuthStorageUserScope()
+  if (!scope) return null
+  return `${STORAGE_KEY_PREFIX}.${scope}`
+}
+
+function migrateLegacyBoardsIfNeeded(scopedKey: string): string | null {
+  const scopedRaw = readStorageValue(scopedKey)
+  if (scopedRaw) return scopedRaw
+  const legacyRaw = readStorageValue(LEGACY_STORAGE_KEY)
+  if (!legacyRaw) return null
+  localStorage.setItem(scopedKey, legacyRaw)
+  localStorage.removeItem(LEGACY_STORAGE_KEY)
+  return legacyRaw
+}
+
 function readRawBoards(): CanvasBoardMeta[] {
   if (typeof window === 'undefined') return []
-  const raw = readStorageValue(STORAGE_KEY)
+  const scopedKey = getScopedStorageKey()
+  if (!scopedKey) return []
+  const raw = migrateLegacyBoardsIfNeeded(scopedKey) || readStorageValue(scopedKey)
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)
@@ -53,7 +74,9 @@ function readRawBoards(): CanvasBoardMeta[] {
 
 function writeRawBoards(boards: CanvasBoardMeta[]) {
   if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(boards))
+  const scopedKey = getScopedStorageKey()
+  if (!scopedKey) return
+  localStorage.setItem(scopedKey, JSON.stringify(boards))
 }
 
 function compareByRecentDesc(a: CanvasBoardMeta, b: CanvasBoardMeta): number {

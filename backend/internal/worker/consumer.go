@@ -171,8 +171,16 @@ func (c *Consumer) refreshTaskAccounts(task *redis.GlobalQueueTask) error {
 		return err
 	}
 
+	ctx := context.Background()
 	task.AccountIDs = task.AccountIDs[:0]
 	for _, account := range accounts {
+		maxConcurrent := account.MaxConcurrent
+		if maxConcurrent <= 0 {
+			maxConcurrent = 3
+		}
+		if err := c.redisMgr.EnsureAccountConcurrent(ctx, account.ID, maxConcurrent); err != nil {
+			return err
+		}
 		task.AccountIDs = append(task.AccountIDs, account.ID)
 	}
 
@@ -205,7 +213,7 @@ func (c *Consumer) executeTask(task *redis.GlobalQueueTask, accountID uint64) {
 	if err != nil {
 		log.Printf("[Consumer] 任务 %s 执行失败: %v", task.TaskID, err)
 		elapsed := time.Since(startTime).Seconds()
-		c.completeTask(task, accountID, "failed", err.Error(), elapsed)
+		c.completeFailedTask(task, accountID, err.Error(), elapsed)
 		c.accountRepo.IncrementFailCount(accountID)
 		if account.FailCount+1 >= 5 {
 			c.accountRepo.UpdateStatus(accountID, 0)
@@ -253,16 +261,40 @@ func (c *Consumer) completeTask(task *redis.GlobalQueueTask, accountID uint64, s
 	log.Printf("[Consumer] 任务 %s 完成, 状态: %s, 耗时: %.1fs", task.TaskID, status, elapsedSec)
 }
 
-func (c *Consumer) failTask(task *redis.GlobalQueueTask, accountID uint64, reason string) {
+func (c *Consumer) completeFailedTask(task *redis.GlobalQueueTask, accountID uint64, reason string, elapsedSec float64) {
 	ctx := context.Background()
 	if accountID > 0 {
 		c.redisMgr.ReleaseTask(ctx, accountID, task.TaskID)
 	}
 
-	result := fmt.Sprintf(`{"task_id":"%s","status":"failed","error":"%s"}`, task.TaskID, reason)
-	c.completeTask(task, accountID, "failed", result, 0)
+	t, err := c.taskRepo.GetByTaskID(task.TaskID)
+	if err == nil {
+		now := time.Now()
+		t.Status = "failed"
+		t.ErrorMsg = reason
+		t.Result = formatTaskFailureResult(task.TaskID, reason)
+		t.CompletedAt = &now
+		c.taskRepo.Update(t)
+	}
 
-	log.Printf("[Consumer] 任务 %s 失败: %s", task.TaskID, reason)
+	log.Printf("[Consumer] 任务 %s 失败, 耗时: %.1fs, 原因: %s", task.TaskID, elapsedSec, reason)
+}
+
+func (c *Consumer) failTask(task *redis.GlobalQueueTask, accountID uint64, reason string) {
+	c.completeFailedTask(task, accountID, reason, 0)
+}
+
+func formatTaskFailureResult(taskID string, reason string) string {
+	result := map[string]string{
+		"task_id": taskID,
+		"status":  "failed",
+		"error":   reason,
+	}
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Sprintf(`{"task_id":"%s","status":"failed","error":"任务失败"}`, taskID)
+	}
+	return string(resultJSON)
 }
 
 func (c *Consumer) callDrawingAPI(account *model.ApiAccount, task *redis.GlobalQueueTask) (string, error) {

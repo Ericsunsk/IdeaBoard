@@ -10,11 +10,11 @@ import (
 
 const (
 	KeyAccountConcurrent = "drawing:api:concurrent"
-	KeyGlobalQueue      = "drawing:task:global_queue"
-	KeyWaitQueue        = "drawing:task:wait_queue"
-	KeyRunningTasks     = "drawing:task:running"
-	MaxGlobalQueueLen   = 10000
-	MaxWaitQueueLen     = 100
+	KeyGlobalQueue       = "drawing:task:global_queue"
+	KeyWaitQueue         = "drawing:task:wait_queue"
+	KeyRunningTasks      = "drawing:task:running"
+	MaxGlobalQueueLen    = 10000
+	MaxWaitQueueLen      = 100
 )
 
 // Lua 脚本：原子分配任务
@@ -93,6 +93,16 @@ func (r *RedisManager) InitAccountConcurrent(ctx context.Context, accountID uint
 	pipe := r.rdb.Pipeline()
 	pipe.HSet(ctx, key, "count", 0)
 	pipe.HSet(ctx, key, "max", maxConcurrent)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// EnsureAccountConcurrent 确保账号并发配置存在；不会重置已有 count。
+func (r *RedisManager) EnsureAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {
+	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
+	pipe := r.rdb.Pipeline()
+	pipe.HSet(ctx, key, "max", maxConcurrent)
+	pipe.HSetNX(ctx, key, "count", 0)
 	_, err := pipe.Exec(ctx)
 	return err
 }
@@ -290,9 +300,9 @@ type AccountLoad struct {
 
 // 监控信息
 type MonitorInfo struct {
-	GlobalQueueLen int64                  `json:"global_queue_len"`
-	WaitQueueLen   int64                  `json:"wait_queue_len"`
-	RunningTasks   int64                  `json:"running_tasks"`
+	GlobalQueueLen int64                   `json:"global_queue_len"`
+	WaitQueueLen   int64                   `json:"wait_queue_len"`
+	RunningTasks   int64                   `json:"running_tasks"`
 	AccountLoads   map[uint64]*AccountLoad `json:"account_loads"`
 }
 
