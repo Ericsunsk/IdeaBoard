@@ -1,4 +1,4 @@
-# <div align="center">IdeaBoard Linux Deployment Guide</div>
+# <div align="center">IdeaBoard Linux 部署手册</div>
 
 <p align="center">
   <strong>适用于标准 Linux 服务器的部署、升级与回滚手册。</strong>
@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <code>Private</code>
-  <code>Closed Source</code>
-  <code>Internal Operations Document</code>
+  <code>私有</code>
+  <code>闭源</code>
+  <code>内部运维文档</code>
 </p>
 
 <p align="center">
@@ -27,24 +27,25 @@
 > [!IMPORTANT]
 > 本文档仅供 IdeaBoard 授权成员在内部部署与运维场景下使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
 
-## Deployment Profile
+<a id="deployment-profile"></a>
+## 部署概览
 
 本文档适用于 `Linux amd64` 服务器，以 `Nginx + systemd + MySQL + Redis` 为基础运行方式。
 
-### Target Topology
+### 目标拓扑
 
 ```text
-Internet
+互联网
   -> Nginx :80
-    -> frontend/dist
+    -> apps/web/dist
     -> /api /uploads proxy
       -> ideaboard-server :6000
         -> MySQL
         -> Redis
-        -> OSS / Upstream AI Channels
+        -> OSS / 上游 AI 渠道
 ```
 
-### At a Glance
+### 当前约定
 
 | 项目 | 当前约定 |
 |------|----------|
@@ -53,9 +54,10 @@ Internet
 | Nginx 配置名 | `ideaboard.conf` |
 | 后端监听端口 | `6000` |
 | 发布包名 | `ideaboard-bundle-<tag>-linux-amd64.tar.gz` |
-| 后端可执行文件 | `ideaboard-server` |
+| API 可执行文件 | `apps/api/ideaboard-server` |
 
-## Release Artifact
+<a id="release-artifact"></a>
+## 发布产物
 
 标准发布包由以下脚本生成：
 
@@ -67,12 +69,13 @@ Internet
 
 ```text
 release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
-├── backend/
-│   ├── ideaboard-server
-│   ├── uploads/
-│   └── .env.example
-├── frontend/
-│   └── dist/
+├── apps/
+│   ├── api/
+│   │   ├── ideaboard-server
+│   │   ├── uploads/
+│   │   └── .env.example
+│   └── web/
+│       └── dist/
 ├── deploy/
 │   ├── nginx/
 │   │   └── ideaboard.conf
@@ -83,7 +86,7 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 └── DEPLOYMENT.md
 ```
 
-## Preconditions
+## 前置条件
 
 服务器建议满足：
 
@@ -100,9 +103,10 @@ sudo apt install -y nginx redis-server mysql-server
 sudo apt install -y potrace
 ```
 
-## Install Flow
+<a id="install-flow"></a>
+## 安装流程
 
-### 1. 下载与校验发布包
+### 1. 下载并校验发布包
 
 ```bash
 ssh root@你的服务器IP
@@ -114,7 +118,7 @@ curl -L -o "$BUNDLE" \
 sha256sum "$BUNDLE"
 ```
 
-校验值以 Release 页面中的 `SHA256SUMS.txt` 为准。
+校验值以 GitHub Release 页面中的 `SHA256SUMS.txt` 为准。
 
 ### 2. 解压到部署目录
 
@@ -122,8 +126,9 @@ sha256sum "$BUNDLE"
 
 ```text
 /opt/ideaboard/
-├── backend/
-├── frontend/
+├── apps/
+│   ├── api/
+│   └── web/
 ├── deploy/
 ├── logs/
 └── releases/
@@ -137,14 +142,13 @@ cd /opt/ideaboard/releases
 tar -xzf "/root/${BUNDLE}"
 RELEASE_DIR="/opt/ideaboard/releases/ideaboard-bundle-${TAG}-linux-amd64"
 
-rm -rf /opt/ideaboard/backend /opt/ideaboard/frontend /opt/ideaboard/deploy
-cp -R "${RELEASE_DIR}/backend" /opt/ideaboard/backend
-cp -R "${RELEASE_DIR}/frontend" /opt/ideaboard/frontend
-cp -R "${RELEASE_DIR}/deploy" /opt/ideaboard/deploy
+mkdir -p /opt/ideaboard/apps /opt/ideaboard/deploy
+cp -R "${RELEASE_DIR}/apps/." /opt/ideaboard/apps/
+cp -R "${RELEASE_DIR}/deploy/." /opt/ideaboard/deploy/
 ```
 
 > [!IMPORTANT]
-> 上面的覆盖步骤只适用于发布产物目录。不要顺手删除已有的 `.env`、上传目录或数据库数据。
+> 上面的覆盖步骤会合并复制新版本文件。不要顺手删除已有的 `.env`、上传目录或数据库数据。
 
 ### 3. 准备数据库与缓存
 
@@ -171,13 +175,14 @@ sudo systemctl status redis-server --no-pager
 
 如果你的系统服务名是 `redis`，请替换为对应名称。
 
-## Runtime Config
+<a id="runtime-config"></a>
+## 运行配置
 
 ### 1. 配置后端环境变量
 
 ```bash
-cp /opt/ideaboard/backend/.env.example /opt/ideaboard/backend/.env
-nano /opt/ideaboard/backend/.env
+cp /opt/ideaboard/apps/api/.env.example /opt/ideaboard/apps/api/.env
+nano /opt/ideaboard/apps/api/.env
 ```
 
 部署时至少确认：
@@ -198,9 +203,9 @@ nano /opt/ideaboard/backend/.env
 ### 2. 初始化管理员账号
 
 ```bash
-cd /opt/ideaboard/backend
+cd /opt/ideaboard/apps/api
 set -a
-source /opt/ideaboard/backend/.env
+source /opt/ideaboard/apps/api/.env
 set +a
 ./ideaboard-server init-admin
 ```
@@ -211,7 +216,7 @@ set +a
 - 密码：`admin123`
 
 > [!IMPORTANT]
-> 数据库连接账号和网站管理员账号是两套信息。`/opt/ideaboard/backend/.env` 只决定服务如何连接 MySQL；后台登录账号来自业务库的 `users` 表。首次部署完成后，建议立刻登录后台并修改默认管理员密码。
+> 数据库连接账号和网站管理员账号是两套信息。`/opt/ideaboard/apps/api/.env` 只决定服务如何连接 MySQL；后台登录账号来自业务库的 `users` 表。首次部署完成后，建议立刻登录后台并修改默认管理员密码。
 
 ### 3. 配置 systemd
 
@@ -248,7 +253,7 @@ server_name _;
 
 替换为真实域名。
 
-## Validation Checklist
+## 验证清单
 
 后端健康检查：
 
@@ -272,7 +277,7 @@ curl http://127.0.0.1/api/health
 5. `/uploads/*` 可以访问。
 6. 任务提交后能看到状态流转与结果落地。
 
-## Operator Commands
+## 运维命令
 
 重启后端：
 
@@ -298,29 +303,30 @@ journalctl -u ideaboard -f
 nginx -t && systemctl reload nginx
 ```
 
-## Upgrade and Rollback
+<a id="upgrade-and-rollback"></a>
+## 升级与回滚
 
-### Upgrade
+### 升级
 
 升级新版本时，重复以下步骤：
 
 1. 下载新的发布包。
 2. 解压到 `/opt/ideaboard/releases/`。
-3. 用新版本覆盖 `/opt/ideaboard/backend`、`/opt/ideaboard/frontend`、`/opt/ideaboard/deploy`。
-4. 保留原有 `/opt/ideaboard/backend/.env`。
+3. 用新版本覆盖 `/opt/ideaboard/apps`、`/opt/ideaboard/deploy`。
+4. 保留原有 `/opt/ideaboard/apps/api/.env`。
 5. 执行 `systemctl restart ideaboard`。
 6. 再次执行健康检查与页面验证。
 
 升级时不要删除：
 
-- `/opt/ideaboard/backend/.env`
-- `/opt/ideaboard/backend/uploads/`
+- `/opt/ideaboard/apps/api/.env`
+- `/opt/ideaboard/apps/api/uploads/`
 
-### Rollback
+### 回滚
 
 如果新版本异常：
 
 1. 回到 `/opt/ideaboard/releases/` 中上一个版本目录。
-2. 重新复制旧版 `backend`、`frontend`、`deploy`。
+2. 重新复制旧版 `apps`、`deploy`。
 3. 执行 `systemctl restart ideaboard`。
 4. 再次验证 `curl http://127.0.0.1:6000/api/health`。

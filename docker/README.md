@@ -40,7 +40,7 @@ docker compose logs -f redis
 
 - compose 已显式固定 `platform: linux/amd64`，便于 Apple Silicon 环境直接运行。
 - 如果本地已有旧的 `mysql:5.7` 数据卷，升级到 8.0 前请先备份；不兼容时建议删除开发卷后重新初始化。
-- 若你还会启动完整后端，推荐仍执行一次 `cd backend && go run cmd/main.go init-admin`，不要依赖初始化 SQL 里的种子管理员口径。
+- 若你还会启动完整后端，推荐仍执行一次 `cd apps/api && go run ./cmd init-admin`，不要依赖初始化 SQL 里的种子管理员口径。
 
 ### Redis
 
@@ -129,5 +129,5 @@ docker compose up -d
 请检查：
 
 1. `docker compose ps` 中 MySQL 是否为 `Up`。
-2. `backend/.env` 中 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 是否与 compose 配置一致。
+2. `apps/api/.env` 中 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 是否与 compose 配置一致。
 3. 若你改过 `MYSQL_DATABASE`、`MYSQL_USER` 或 `MYSQL_PASSWORD`，后端也必须同步修改。

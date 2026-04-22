@@ -11,36 +11,37 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/repository-private-4b5563?style=flat-square" alt="Repository: Private" />
-  <img src="https://img.shields.io/badge/source-closed-374151?style=flat-square" alt="Source: Closed" />
-  <img src="https://img.shields.io/badge/distribution-internal_only-1f2937?style=flat-square" alt="Distribution: Internal Only" />
+  <img src="https://img.shields.io/badge/repository-private-4b5563?style=flat-square" alt="仓库：私有" />
+  <img src="https://img.shields.io/badge/source-closed-374151?style=flat-square" alt="源码：闭源" />
+  <img src="https://img.shields.io/badge/distribution-internal_only-1f2937?style=flat-square" alt="分发：仅限内部" />
 </p>
 
 <p align="center">
-  <a href="#overview">Overview</a> ·
-  <a href="#highlights">Highlights</a> ·
-  <a href="#capabilities">Capabilities</a> ·
-  <a href="#quick-start">Quick Start</a> ·
-  <a href="#deployment">Deployment</a> ·
-  <a href="#docs">Docs</a>
+  <a href="#overview">项目概览</a> ·
+  <a href="#highlights">核心亮点</a> ·
+  <a href="#capabilities">能力范围</a> ·
+  <a href="#quick-start">快速开始</a> ·
+  <a href="#deployment">部署说明</a> ·
+  <a href="#docs">相关文档</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/frontend-Vue_3-42b883?style=flat-square&logo=vuedotjs&logoColor=white" alt="Frontend: Vue 3" />
+  <img src="https://img.shields.io/badge/web-Vue_3-42b883?style=flat-square&logo=vuedotjs&logoColor=white" alt="Web: Vue 3" />
   <img src="https://img.shields.io/badge/language-TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="Language: TypeScript" />
   <img src="https://img.shields.io/badge/ui-Naive_UI-18a058?style=flat-square" alt="UI: Naive UI" />
   <img src="https://img.shields.io/badge/state-Pinia-ffd859?style=flat-square&logo=pinia&logoColor=1f2937" alt="State: Pinia" />
-  <img src="https://img.shields.io/badge/backend-Go-00add8?style=flat-square&logo=go&logoColor=white" alt="Backend: Go" />
+  <img src="https://img.shields.io/badge/api-Go-00add8?style=flat-square&logo=go&logoColor=white" alt="API: Go" />
   <img src="https://img.shields.io/badge/framework-Gin-008ecf?style=flat-square" alt="Framework: Gin" />
   <img src="https://img.shields.io/badge/orm-GORM-1f6feb?style=flat-square" alt="ORM: GORM" />
   <img src="https://img.shields.io/badge/database-MySQL_8-4479a1?style=flat-square&logo=mysql&logoColor=white" alt="Database: MySQL 8" />
   <img src="https://img.shields.io/badge/cache-Redis_7-dc382d?style=flat-square&logo=redis&logoColor=white" alt="Cache: Redis 7" />
 </p>
 
-## Product Preview
+<a id="product-preview"></a>
+## 产品预览
 
 <p align="center">
-  <img src="./docs/assets/ideaboard-preview.png" alt="IdeaBoard canvas workflow preview" width="1400">
+  <img src="./docs/assets/ideaboard-preview.png" alt="IdeaBoard 画布工作流预览" width="1400">
 </p>
 
 <p align="center">
@@ -49,11 +50,12 @@
 
 ---
 
-## Overview
+<a id="overview"></a>
+## 项目概览
 
 IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供节点画布、任务入口与管理后台，后端负责鉴权、任务落库、提示词模板装配、账号调度、异步执行、结果持久化，以及 `Local / Kodo / S3-compatible` 存储配置接入。
 
-### Product Snapshot
+### 产品快照
 
 | 维度 | 当前配置 |
 |------|----------|
@@ -64,42 +66,44 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 | 运行方式 | 本地开发、标准 Linux 部署、宝塔 Go 单体部署 |
 | 核心界面 | 用户画布工作台、画板管理、管理后台 |
 
-### Runtime Shape
+### 运行链路
 
 ```text
-Canvas UI
+画布界面
   -> API / Auth / Upload
-  -> Task Submission
+  -> 任务提交
   -> Redis Queue
-  -> Worker Dispatch
-  -> Upstream AI Channels
-  -> Result Persistence
+  -> Worker 调度
+  -> 上游 AI 渠道
+  -> 结果持久化
 ```
 
-## Highlights
+<a id="highlights"></a>
+## 核心亮点
 
 <table>
   <tr>
     <td valign="top" width="25%">
-      <strong>Canvas Workflow</strong><br/>
+      <strong>画布工作流</strong><br/>
       以节点编排为中心，统一管理输入、连接、执行与结果回写。
     </td>
     <td valign="top" width="25%">
-      <strong>Task Runtime</strong><br/>
+      <strong>任务运行时</strong><br/>
       任务异步执行，支持队列调度、账号池分发与状态轮询。
     </td>
     <td valign="top" width="25%">
-      <strong>Prompt System</strong><br/>
+      <strong>提示词系统</strong><br/>
       支持按 feature 维度配置系统提示词与模板变量。
     </td>
     <td valign="top" width="25%">
-      <strong>Admin Console</strong><br/>
+      <strong>管理控制台</strong><br/>
       管理用户、账号、渠道、素材模板、提示词与配置项。
     </td>
   </tr>
 </table>
 
-## Capabilities
+<a id="capabilities"></a>
+## 能力范围
 
 当前产品主链路覆盖以下能力：
 
@@ -114,9 +118,10 @@ Canvas UI
 
 更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
-## Quick Start
+<a id="quick-start"></a>
+## 快速开始
 
-### 1. Start Local Dependencies
+### 1. 启动本地依赖
 
 ```bash
 cd docker
@@ -133,35 +138,35 @@ docker compose up -d
 | 业务密码 | `ideaboard123` |
 | Redis | `127.0.0.1:6379` |
 
-### 2. Configure Backend Environment
+### 2. 配置后端环境
 
 ```bash
-cd backend
+cd apps/api
 cp .env.example .env
 ```
 
 至少确认数据库、Redis、端口和 `JWT_SECRET` 配置正确。
 
-### 3. Run the Backend
+### 3. 启动后端
 
 ```bash
-cd backend
-go run cmd/main.go
+cd apps/api
+go run ./cmd
 ```
 
-### 4. Run the Frontend
+### 4. 启动前端
 
 ```bash
-cd frontend
+cd apps/web
 npm install
 npm run dev
 ```
 
-### 5. Initialize the Admin Account
+### 5. 初始化管理员账号
 
 ```bash
-cd backend
-INIT_ADMIN_PASSWORD='your-strong-password' go run cmd/main.go init-admin
+cd apps/api
+INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 ```
 
 默认管理员初始化：
@@ -169,7 +174,7 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run cmd/main.go init-admin
 - 用户名：`admin`
 - 密码：由 `INIT_ADMIN_PASSWORD` 指定
 
-### Local Access
+### 本地访问地址
 
 | 地址 | 用途 |
 |------|------|
@@ -177,12 +182,14 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run cmd/main.go init-admin
 | `http://localhost:5173/admin/login` | 管理后台登录 |
 | `http://localhost:6000/api/health` | 后端健康检查 |
 
-## Repository Layout
+## 仓库结构
 
 ```text
 IdeaBoard/
-├── frontend/                 # 前端与管理后台
-├── backend/                  # API、任务、Worker、服务逻辑
+├── apps/
+│   ├── web/                  # Vue 3 前端与管理后台
+│   └── api/                  # Go API、任务、Worker、服务逻辑
+├── docs/                     # 架构约束与补充文档
 ├── docker/                   # 本地 MySQL / Redis 依赖
 ├── scripts/                  # 打包与部署脚本
 ├── README.md                 # 项目首页
@@ -191,9 +198,10 @@ IdeaBoard/
 └── DEPLOY_BAOTA_GO.md        # 宝塔 Go 部署
 ```
 
-## Deployment
+<a id="deployment"></a>
+## 部署说明
 
-### Standard Linux Deployment
+### 标准 Linux 部署
 
 适用于 `systemd + Nginx` 的常规服务器环境。
 
@@ -203,7 +211,7 @@ IdeaBoard/
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
-### Baota Go Deployment
+### 宝塔 Go 部署
 
 适用于以前后端单可执行方式部署的场景。
 
@@ -213,7 +221,8 @@ IdeaBoard/
 
 详见 [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md)。
 
-## Docs
+<a id="docs"></a>
+## 相关文档
 
 | 文档 | 用途 |
 |------|------|
@@ -221,10 +230,11 @@ IdeaBoard/
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 架构、contract、本地开发与目录边界 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | 标准 Linux 部署、升级与回滚 |
 | [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md) | 宝塔 Go 部署 |
+| [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 新目录边界与命名约束 |
 | [docker/README.md](./docker/README.md) | 本地依赖说明 |
 | [CHANGELOG.md](./CHANGELOG.md) | 发布记录与未发布变更 |
 
-## Verification
+## 验证建议
 
 上线前建议至少确认：
 
@@ -234,8 +244,8 @@ IdeaBoard/
 4. 图片上传与结果回写正常。
 5. 任务提交后能看到完整状态流转。
 
-## Rights
+## 权利声明
 
 本项目为闭源私有项目，未经授权不得复制、分发或使用。
 
-`All Rights Reserved.`
+`保留所有权利。`

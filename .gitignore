@@ -2,6 +2,9 @@
 frontend/node_modules/
 frontend/dist/
 frontend/.vscode/
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.vscode/
 
 # ===== Backend =====
 backend/*.exe
@@ -15,6 +18,17 @@ backend/test_upload.png
 backend/bin/
 backend/web/dist/*
 !backend/web/dist/.placeholder
+apps/api/*.exe
+apps/api/*.exe~
+apps/api/feng-server
+apps/api/feng-server~
+apps/api/feng-server-linux
+apps/api/uploads/
+apps/api/*.log
+apps/api/test_upload.png
+apps/api/bin/
+apps/api/web/dist/*
+!apps/api/web/dist/.placeholder
 
 # ===== OS / IDE =====
 .DS_Store
@@ -30,6 +44,7 @@ Thumbs.db
 .env
 .env.*
 !backend/.env.example
+!apps/api/.env.example
 
 # ===== Release Artifacts =====
 release/

@@ -1,4 +1,4 @@
-# <div align="center">IdeaBoard Baota Go Deployment Guide</div>
+# <div align="center">IdeaBoard 宝塔 Go 部署手册</div>
 
 <p align="center">
   <strong>适用于宝塔面板 Go 项目模式的部署手册。</strong>
@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <code>Private</code>
-  <code>Closed Source</code>
-  <code>Internal Operations Document</code>
+  <code>私有</code>
+  <code>闭源</code>
+  <code>内部运维文档</code>
 </p>
 
 <p align="center">
@@ -27,21 +27,23 @@
 > [!IMPORTANT]
 > 本文档仅供 IdeaBoard 授权成员在内部部署与运维场景下使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
 
-## Deployment Profile
+<a id="deployment-profile"></a>
+## 部署概览
 
 本文档适用于前后端打成单可执行文件后，通过宝塔面板以 Go 项目方式运行的场景。
 
-### At a Glance
+### 当前约定
 
 | 项目 | 当前约定 |
 |------|----------|
 | 发布包名 | `ideaboard-bt-go-<tag>-linux-amd64` |
 | 部署目录 | `/www/wwwroot/ideaboard` |
-| 可执行文件 | `app/ideaboard-server` |
+| 可执行文件 | `apps/api/ideaboard-server` |
 | 默认端口 | `6000` |
 | 静态资源 | 已内嵌到 Go 二进制 |
 
-## Artifact Shape
+<a id="artifact-shape"></a>
+## 发布形态
 
 宝塔方案由以下脚本生成：
 
@@ -53,17 +55,19 @@
 
 ```text
 release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
-├── app/
-│   └── ideaboard-server
-└── .env
+└── apps/
+    └── api/
+        ├── ideaboard-server
+        └── .env
 ```
 
 该方案会将前端静态资源内嵌到 Go 二进制中，部署目录只需保留：
 
-- `app/ideaboard-server`
-- `.env`
+- `apps/api/ideaboard-server`
+- `apps/api/.env`
 
-## Setup Flow
+<a id="setup-flow"></a>
+## 部署流程
 
 ### 1. 本地打包
 
@@ -83,9 +87,10 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 
 ```text
 /www/wwwroot/ideaboard/
-├── app/
-│   └── ideaboard-server
-└── .env
+└── apps/
+    └── api/
+        ├── ideaboard-server
+        └── .env
 ```
 
 ### 3. 配置环境变量
@@ -104,7 +109,7 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 推荐配置：
 
 - 项目目录：`/www/wwwroot/ideaboard`
-- 启动命令：`./app/ideaboard-server`
+- 启动命令：`./apps/api/ideaboard-server`
 - 监听端口：`6000`
 
 说明：
@@ -119,9 +124,9 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 ```bash
 cd /www/wwwroot/ideaboard
 set -a
-source ./.env
+source ./apps/api/.env
 set +a
-./app/ideaboard-server init-admin
+./apps/api/ideaboard-server init-admin
 ```
 
 默认管理员账号：
@@ -132,7 +137,8 @@ set +a
 > [!IMPORTANT]
 > `.env` 中的数据库账号只用于后端连接 MySQL，不是网站管理员登录账号。管理员登录信息来自业务库中的 `users` 表；首次部署后建议立即修改默认管理员密码。
 
-## Validation
+<a id="validation"></a>
+## 验证
 
 ```bash
 curl http://127.0.0.1:6000/api/health
@@ -152,21 +158,22 @@ curl http://127.0.0.1:6000/api/health
 4. 管理员可以登录。
 5. 任务提交流程正常。
 
-## Upgrade and Rollback
+<a id="upgrade-and-rollback"></a>
+## 升级与回滚
 
-### Upgrade
+### 升级
 
 1. 使用新版本重新执行 `./scripts/package-bt-go.sh`。
-2. 上传新的 `app/` 与 `.env` 模板到服务器。
-3. 保留原有 `.env` 的实际配置值。
+2. 上传新的 `apps/api/` 到服务器。
+3. 保留原有 `apps/api/.env` 的实际配置值。
 4. 在宝塔中重启 Go 项目。
 5. 重新执行健康检查。
 
-### Rollback
+### 回滚
 
 如果新版本有问题：
 
-1. 用上一个稳定版本的 `app/ideaboard-server` 覆盖当前二进制。
-2. 保留现有 `.env`。
+1. 用上一个稳定版本的 `apps/api/ideaboard-server` 覆盖当前二进制。
+2. 保留现有 `apps/api/.env`。
 3. 在宝塔中重启 Go 项目。
 4. 再次检查 `/api/health`。

@@ -23,47 +23,47 @@ fi
 RELEASE_ROOT="$ROOT_DIR/release/$TAG"
 BUNDLE_NAME="ideaboard-bt-go-${TAG}-linux-amd64"
 BUNDLE_DIR="$RELEASE_ROOT/$BUNDLE_NAME"
-APP_DIR="$BUNDLE_DIR/app"
+API_APP_DIR="$BUNDLE_DIR/apps/api"
 ARCHIVE_PATH="$RELEASE_ROOT/${BUNDLE_NAME}.tar.gz"
 
 NPM_CACHE_DIR="$ROOT_DIR/.cache/npm"
 GO_CACHE_DIR="$ROOT_DIR/.cache/go-build"
 GO_MOD_CACHE_DIR="$ROOT_DIR/.cache/go-mod"
-FRONTEND_DIR="$ROOT_DIR/frontend"
-BACKEND_DIR="$ROOT_DIR/backend"
-FRONTEND_DIST_DIR="$FRONTEND_DIR/dist"
-BACKEND_BUILD_DIR="$ROOT_DIR/release-temp/backend-build"
-BACKEND_BINARY_TMP="$ROOT_DIR/release-temp/ideaboard-server"
+WEB_DIR="$ROOT_DIR/apps/web"
+API_DIR="$ROOT_DIR/apps/api"
+WEB_DIST_DIR="$WEB_DIR/dist"
+API_BUILD_DIR="$ROOT_DIR/release-temp/api-build"
+API_BINARY_TMP="$ROOT_DIR/release-temp/ideaboard-server"
 
 mkdir -p "$NPM_CACHE_DIR" "$GO_CACHE_DIR" "$GO_MOD_CACHE_DIR" "$RELEASE_ROOT" "$ROOT_DIR/release-temp"
 
-echo "[1/5] Installing frontend dependencies"
-npm --prefix "$FRONTEND_DIR" ci --cache "$NPM_CACHE_DIR"
+echo "[1/5] Installing web dependencies"
+npm --prefix "$WEB_DIR" ci --cache "$NPM_CACHE_DIR"
 
-echo "[2/5] Building frontend dist"
-npm --prefix "$FRONTEND_DIR" run build
+echo "[2/5] Building web dist"
+npm --prefix "$WEB_DIR" run build
 
-echo "[3/5] Preparing backend embed workspace"
-rm -rf "$BACKEND_BUILD_DIR"
-cp -R "$BACKEND_DIR" "$BACKEND_BUILD_DIR"
-rm -rf "$BACKEND_BUILD_DIR/web/dist"
-mkdir -p "$BACKEND_BUILD_DIR/web/dist"
-cp -R "$FRONTEND_DIST_DIR"/. "$BACKEND_BUILD_DIR/web/dist/"
+echo "[3/5] Preparing api embed workspace"
+rm -rf "$API_BUILD_DIR"
+cp -R "$API_DIR" "$API_BUILD_DIR"
+rm -rf "$API_BUILD_DIR/web/dist"
+mkdir -p "$API_BUILD_DIR/web/dist"
+cp -R "$WEB_DIST_DIR"/. "$API_BUILD_DIR/web/dist/"
 
-echo "[4/5] Building backend binary (linux/amd64)"
+echo "[4/5] Building api binary (linux/amd64)"
 (
-  cd "$BACKEND_BUILD_DIR"
+  cd "$API_BUILD_DIR"
   env GOCACHE="$GO_CACHE_DIR" GOMODCACHE="$GO_MOD_CACHE_DIR" CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o "$BACKEND_BINARY_TMP" ./cmd/main.go
+    go build -o "$API_BINARY_TMP" ./cmd
 )
 
 echo "[5/5] Assembling Baota Go bundle"
 rm -rf "$BUNDLE_DIR"
-mkdir -p "$APP_DIR"
+mkdir -p "$API_APP_DIR"
 
-cp "$BACKEND_BINARY_TMP" "$APP_DIR/ideaboard-server"
-chmod +x "$APP_DIR/ideaboard-server"
-cp "$BACKEND_DIR/.env.example" "$BUNDLE_DIR/.env"
+cp "$API_BINARY_TMP" "$API_APP_DIR/ideaboard-server"
+chmod +x "$API_APP_DIR/ideaboard-server"
+cp "$API_DIR/.env.example" "$API_APP_DIR/.env"
 
 (
   cd "$RELEASE_ROOT"
@@ -75,5 +75,5 @@ echo "Done"
 echo "Bundle directory: $BUNDLE_DIR"
 echo "Archive: $ARCHIVE_PATH"
 echo "Contains:"
-echo "  - app/ideaboard-server"
-echo "  - .env"
+echo "  - apps/api/ideaboard-server"
+echo "  - apps/api/.env"

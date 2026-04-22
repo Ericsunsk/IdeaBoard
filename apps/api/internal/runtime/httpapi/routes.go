@@ -1,0 +1,323 @@
+package httpapi
+
+import (
+	"io"
+	iofs "io/fs"
+	"log"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"api/internal/accounts"
+	"api/internal/assets"
+	"api/internal/auth"
+	"api/internal/channels"
+	"api/internal/imageproc"
+	"api/internal/platform/media"
+	"api/internal/platform/redis"
+	"api/internal/platform/response"
+	"api/internal/platform/safehttp"
+	"api/internal/prompts"
+	"api/internal/storage"
+	"api/internal/users"
+
+	"github.com/gin-gonic/gin"
+)
+
+type Dependencies struct {
+	AuthHandler          *auth.AuthHandler
+	AdminHandler         *users.AdminHandler
+	AccountHandler       *accounts.AccountHandler
+	CardHandler          *assets.StyleCardHandler
+	ChannelHandler       *channels.ChannelHandler
+	StorageHandler       *storage.StorageHandler
+	SegHandler           *imageproc.SegHandler
+	LineDraftHandler     *assets.LineDraftHandler
+	FeaturePromptHandler *prompts.FeaturePromptHandler
+	FaceTemplateHandler  *assets.FaceTemplateHandler
+	BgTemplateHandler    *assets.BgTemplateHandler
+	PatternStyleHandler  *assets.PatternStyleHandler
+	VectorizeHandler     *imageproc.VectorizeHandler
+	StorageService       *storage.StorageService
+	RedisClient          *redis.Client
+	UserRepo             *users.UserRepository
+}
+
+func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
+	r.GET("/api/health", func(c *gin.Context) {
+		response.Success(c, gin.H{"status": "ok"})
+	})
+
+	os.MkdirAll("uploads", 0755)
+	r.Static("/uploads", "./uploads")
+
+	userAPI := r.Group("/api/user")
+	userAPI.Use(auth.AuthMiddleware(deps.RedisClient, deps.UserRepo))
+	registerUserRoutes(userAPI, deps)
+
+	authAPI := r.Group("/api/auth")
+	registerAuthRoutes(authAPI, deps)
+
+	adminAPI := r.Group("/api/admin")
+	adminAPI.Use(auth.AuthMiddleware(deps.RedisClient, deps.UserRepo), auth.AdminMiddleware())
+	registerAdminRoutes(adminAPI, deps)
+
+	RegisterFrontendRoutes(r, frontendFS)
+}
+
+func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
+	if frontendFS == nil {
+		return
+	}
+
+	if _, err := iofs.Stat(frontendFS, "index.html"); err != nil {
+		log.Printf("[Main] Embedded frontend index.html not found, skip SPA routes: %v", err)
+		return
+	}
+
+	serveIndex := func(c *gin.Context) {
+		c.FileFromFS("/index.html", http.FS(frontendFS))
+	}
+
+	r.GET("/", serveIndex)
+
+	r.NoRoute(func(c *gin.Context) {
+		requestPath := strings.TrimPrefix(path.Clean(c.Request.URL.Path), "/")
+		if requestPath == "." {
+			requestPath = ""
+		}
+
+		if requestPath == "api" || strings.HasPrefix(requestPath, "api/") || requestPath == "uploads" || strings.HasPrefix(requestPath, "uploads/") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		if requestPath != "" {
+			if _, err := iofs.Stat(frontendFS, requestPath); err == nil {
+				c.FileFromFS("/"+requestPath, http.FS(frontendFS))
+				return
+			}
+		}
+
+		serveIndex(c)
+	})
+}
+
+func registerAuthRoutes(authApi *gin.RouterGroup, h Dependencies) {
+	authApi.POST("/register", h.AuthHandler.Register)
+	authApi.POST("/login", h.AuthHandler.Login)
+}
+
+func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
+	userApi.GET("/info", h.AuthHandler.GetCurrentUser)
+	userApi.POST("/password", h.AuthHandler.UpdatePassword)
+	userApi.POST("/logout", h.AuthHandler.Logout)
+	userApi.POST("/drawing/submit", h.AccountHandler.SubmitTask)
+	userApi.GET("/drawing/:task_id", h.AccountHandler.GetUserTask)
+	userApi.DELETE("/drawing/:task_id", h.AccountHandler.DeleteUserTask)
+	userApi.GET("/drawing", h.AccountHandler.GetUserTasks)
+
+	userApi.GET("/style-cards", h.CardHandler.ListEnabled)
+	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
+	userApi.GET("/face-templates", h.FaceTemplateHandler.ListEnabled)
+	userApi.GET("/bg-templates", h.BgTemplateHandler.ListEnabled)
+	userApi.GET("/pattern-styles", h.PatternStyleHandler.ListEnabled)
+
+	userApi.POST("/upload", func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			response.Error(c, 400, "请选择文件")
+			return
+		}
+		if file.Size > 30*1024*1024 {
+			response.Error(c, 400, "文件大小不能超过 30MB")
+			return
+		}
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true}
+		if !allowed[ext] {
+			response.Error(c, 400, "仅支持 JPG 和 PNG 格式")
+			return
+		}
+		if err := media.ValidateImageContent(file, ext); err != nil {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		url, err := h.StorageService.Upload(file)
+		if err != nil {
+			response.Error(c, 500, "上传失败: "+err.Error())
+			return
+		}
+		response.Success(c, gin.H{"url": url})
+	})
+
+	userApi.GET("/download", func(c *gin.Context) {
+		const maxDownloadSize = 50 * 1024 * 1024 // 50 MB
+
+		imgURL := c.Query("url")
+		if imgURL == "" {
+			response.Error(c, 400, "缺少 url 参数")
+			return
+		}
+		resp, err := safehttp.Get(c.Request.Context(), imgURL, 20*time.Second)
+		if err != nil {
+			response.Error(c, 400, "下载失败: "+err.Error())
+			return
+		}
+		defer resp.Body.Close()
+
+		contentType := strings.TrimSpace(strings.Split(resp.Header.Get("Content-Type"), ";")[0])
+		if !strings.HasPrefix(strings.ToLower(contentType), "image/") {
+			response.Error(c, 400, "仅支持下载图片类型文件")
+			return
+		}
+
+		if resp.ContentLength > maxDownloadSize {
+			response.Error(c, 400, "文件大小不能超过 50MB")
+			return
+		}
+
+		tmpFile, err := os.CreateTemp("", "feng-download-*")
+		if err != nil {
+			response.Error(c, 500, "创建临时文件失败")
+			return
+		}
+		defer os.Remove(tmpFile.Name())
+		defer tmpFile.Close()
+
+		written, err := io.Copy(tmpFile, io.LimitReader(resp.Body, maxDownloadSize+1))
+		if err != nil {
+			response.Error(c, 500, "读取远程文件失败")
+			return
+		}
+		if written > maxDownloadSize {
+			response.Error(c, 400, "文件大小不能超过 50MB")
+			return
+		}
+		if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+			response.Error(c, 500, "读取临时文件失败")
+			return
+		}
+
+		c.Header("Content-Disposition", "attachment; filename=image.png")
+		c.Header("Content-Type", contentType)
+		c.Header("Content-Length", strconv.FormatInt(written, 10))
+		c.Status(resp.StatusCode)
+		if _, err := io.Copy(c.Writer, tmpFile); err != nil {
+			c.Error(err)
+		}
+	})
+
+	userApi.POST("/segment", h.SegHandler.Segment)
+	userApi.POST("/segment/save", h.SegHandler.SaveSegResult)
+	userApi.POST("/upscale", h.SegHandler.Upscale)
+	userApi.POST("/vectorize", h.VectorizeHandler.Vectorize)
+	userApi.GET("/vectorize/check", h.VectorizeHandler.CheckPotrace)
+}
+
+func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
+	adminApi.GET("/users", h.AdminHandler.ListUsers)
+	adminApi.POST("/users", h.AdminHandler.CreateUser)
+	adminApi.PUT("/users/:id/status", h.AdminHandler.UpdateUserStatus)
+	adminApi.PUT("/users/:id/password", h.AdminHandler.UpdateUserPassword)
+	adminApi.DELETE("/users/:id", h.AdminHandler.DeleteUser)
+
+	adminApi.GET("/accounts", h.AccountHandler.ListAccounts)
+	adminApi.GET("/accounts/:id", h.AccountHandler.GetAccount)
+	adminApi.POST("/accounts", h.AccountHandler.CreateAccount)
+	adminApi.PUT("/accounts/:id", h.AccountHandler.UpdateAccount)
+	adminApi.DELETE("/accounts/:id", h.AccountHandler.DeleteAccount)
+	adminApi.POST("/accounts/:id/start", h.AccountHandler.StartAccount)
+	adminApi.POST("/accounts/:id/stop", h.AccountHandler.StopAccount)
+	adminApi.GET("/accounts/:id/queue", h.AccountHandler.GetAccountQueue)
+
+	adminApi.POST("/tasks/submit", h.AccountHandler.SubmitTask)
+	adminApi.GET("/tasks/:task_id", h.AccountHandler.GetTask)
+	adminApi.GET("/tasks", h.AccountHandler.ListTasks)
+	adminApi.GET("/monitor", h.AccountHandler.GetMonitor)
+
+	adminApi.POST("/upload", func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			response.Error(c, 400, "请选择文件")
+			return
+		}
+		if file.Size > 50*1024*1024 {
+			response.Error(c, 400, "文件大小不能超过 50MB")
+			return
+		}
+
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
+		if !allowed[ext] {
+			response.Error(c, 400, "仅支持 jpg/png/gif/webp 格式")
+			return
+		}
+		if err := media.ValidateImageContent(file, ext); err != nil {
+			response.Error(c, 400, err.Error())
+			return
+		}
+
+		url, err := h.StorageService.Upload(file)
+		if err != nil {
+			response.Error(c, 500, "上传失败: "+err.Error())
+			return
+		}
+		response.Success(c, gin.H{"url": url})
+	})
+
+	adminApi.GET("/storage/providers", h.StorageHandler.ListProviders)
+	adminApi.GET("/storage/profiles", h.StorageHandler.ListProfiles)
+	adminApi.POST("/storage/profiles", h.StorageHandler.CreateProfile)
+	adminApi.PUT("/storage/profiles/:id", h.StorageHandler.UpdateProfile)
+	adminApi.DELETE("/storage/profiles/:id", h.StorageHandler.DeleteProfile)
+	adminApi.POST("/storage/profiles/:id/apply", h.StorageHandler.ApplyProfile)
+	adminApi.POST("/storage/profiles/:id/test", h.StorageHandler.TestProfile)
+	adminApi.GET("/storage/profiles/:id/bucket-info", h.StorageHandler.GetBucketInfo)
+
+	adminApi.GET("/seg/config", h.SegHandler.GetConfig)
+	adminApi.POST("/seg/config", h.SegHandler.SaveConfig)
+
+	adminApi.GET("/style-cards", h.CardHandler.List)
+	adminApi.POST("/style-cards", h.CardHandler.Create)
+	adminApi.PUT("/style-cards/:id", h.CardHandler.Update)
+	adminApi.DELETE("/style-cards/:id", h.CardHandler.Delete)
+
+	adminApi.GET("/channels", h.ChannelHandler.List)
+	adminApi.POST("/channels", h.ChannelHandler.Create)
+	adminApi.PUT("/channels/:id", h.ChannelHandler.Update)
+	adminApi.DELETE("/channels/:id", h.ChannelHandler.Delete)
+
+	adminApi.GET("/line-draft-modes", h.LineDraftHandler.List)
+	adminApi.POST("/line-draft-modes", h.LineDraftHandler.Create)
+	adminApi.PUT("/line-draft-modes/:id", h.LineDraftHandler.Update)
+	adminApi.DELETE("/line-draft-modes/:id", h.LineDraftHandler.Delete)
+
+	adminApi.GET("/face-templates", h.FaceTemplateHandler.List)
+	adminApi.POST("/face-templates", h.FaceTemplateHandler.Create)
+	adminApi.PUT("/face-templates/:id", h.FaceTemplateHandler.Update)
+	adminApi.DELETE("/face-templates/:id", h.FaceTemplateHandler.Delete)
+
+	adminApi.GET("/bg-templates", h.BgTemplateHandler.List)
+	adminApi.POST("/bg-templates", h.BgTemplateHandler.Create)
+	adminApi.PUT("/bg-templates/:id", h.BgTemplateHandler.Update)
+	adminApi.DELETE("/bg-templates/:id", h.BgTemplateHandler.Delete)
+
+	adminApi.GET("/pattern-styles", h.PatternStyleHandler.List)
+	adminApi.POST("/pattern-styles", h.PatternStyleHandler.Create)
+	adminApi.PUT("/pattern-styles/:id", h.PatternStyleHandler.Update)
+	adminApi.DELETE("/pattern-styles/:id", h.PatternStyleHandler.Delete)
+
+	adminApi.GET("/feature-prompts", h.FeaturePromptHandler.ListPrompts)
+	adminApi.GET("/feature-prompts/:slug", h.FeaturePromptHandler.GetPrompt)
+	adminApi.PUT("/feature-prompts/:slug", h.FeaturePromptHandler.SetPrompt)
+}
