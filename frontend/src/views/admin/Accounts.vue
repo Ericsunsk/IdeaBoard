@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">账号总数</span>
-        <span class="summary-value">{{ accounts.length }}</span>
-        <span class="summary-foot">当前页数据</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">运行中</span>
-        <span class="summary-value">{{ runningCount }}</span>
-        <span class="summary-foot">status = 1</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">已停止</span>
-        <span class="summary-value">{{ stoppedCount }}</span>
-        <span class="summary-foot">手动停用</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">故障账号</span>
-        <span class="summary-value">{{ failedCount }}</span>
-        <span class="summary-foot">失败次数 ≥ 5</span>
-      </div>
+      <AdminSummaryCard label="账号总数" :value="accounts.length" foot="当前页数据" />
+      <AdminSummaryCard label="运行中" :value="runningCount" foot="status = 1" />
+      <AdminSummaryCard label="已停止" :value="stoppedCount" foot="手动停用" />
+      <AdminSummaryCard label="故障账号" :value="failedCount" foot="失败次数 ≥ 5" />
     </div>
 
     <div class="toolbar">
@@ -56,12 +40,7 @@
     </div>
 
     <div class="table-card">
-      <div class="panel-header">
-        <div>
-          <h3 class="panel-title">账号列表</h3>
-          <p class="panel-desc">可编辑上游密钥、模型、并发和超时配置。</p>
-        </div>
-      </div>
+      <AdminSectionHeader title="账号列表" description="可编辑上游密钥、模型、并发和超时配置。" />
       <n-data-table
         :columns="columns"
         :data="accounts"
@@ -193,6 +172,9 @@ import { NInput, NButton, NDataTable, NModal, NForm, NFormItem, NIcon, NTag, NSp
 import type { DataTableColumns } from 'naive-ui'
 import type { ApiAccount } from '../../api/account'
 import { SearchOutline, RefreshOutline, AddOutline } from '@vicons/ionicons5'
+import { extractApiErrorMessage, getChannelModelOptions } from './assetLibraryShared'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
+import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -209,7 +191,9 @@ async function loadChannels() {
   try {
     const res = await channelApi.list()
     if (res.code === 0) channels.value = res.data?.list || []
-  } catch {} finally { channelsLoading.value = false }
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, '加载渠道商失败'))
+  } finally { channelsLoading.value = false }
 }
 
 // === 账号列表 ===
@@ -291,8 +275,8 @@ async function loadAccounts() {
       accounts.value = res.data?.list || []
       pageCount.value = Math.ceil((res.data?.total || 0) / 20)
     }
-  } catch (e: any) {
-    message.error(e.msg || '加载账号列表失败')
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, '加载账号列表失败'))
   } finally {
     loading.value = false
   }
@@ -318,17 +302,11 @@ const selectedChannelUrl = computed(() => {
 })
 
 const addModelOptions = computed(() => {
-  if (!addFormData.value.channel_id) return []
-  const ch = channels.value.find(c => c.id === addFormData.value.channel_id)
-  if (!ch?.models) return []
-  return ch.models.split(',').filter(Boolean).map(m => ({ label: m, value: m }))
+  return getChannelModelOptions(channels.value, addFormData.value.channel_id)
 })
 
 const editModelOptions = computed(() => {
-  if (!editFormData.value.channel_id) return []
-  const ch = channels.value.find(c => c.id === editFormData.value.channel_id)
-  if (!ch?.models) return []
-  return ch.models.split(',').filter(Boolean).map(m => ({ label: m, value: m }))
+  return getChannelModelOptions(channels.value, editFormData.value.channel_id)
 })
 
 watch(() => addFormData.value.channel_id, () => {
@@ -367,8 +345,8 @@ async function handleAdd() {
     message.success('账号创建成功')
     showAddModal.value = false
     loadAccounts()
-  } catch (e: any) {
-    message.error(e.msg || e.message || '创建失败')
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, '创建失败'))
   } finally {
     saveLoading.value = false
   }
@@ -427,8 +405,8 @@ async function handleEdit() {
     message.success('更新成功')
     showEditModal.value = false
     loadAccounts()
-  } catch (e: any) {
-    message.error(e.msg || e.message || '更新失败')
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, '更新失败'))
   } finally {
     saveLoading.value = false
   }

@@ -1,277 +1,675 @@
 <template>
-  <div class="admin-page kodo-page">
+  <div class="admin-page storage-page">
     <div class="page-header">
       <div>
-        <h2 class="page-title">Kodo 存储配置</h2>
-        <p class="page-desc">管理七牛云存储接入与高级上传策略，开启后仅影响新上传媒体。</p>
+        <h2 class="page-title">存储</h2>
+      </div>
+      <div class="header-actions">
+        <n-button type="primary" :disabled="creatableProviders.length === 0" @click="openCreate">
+          添加存储
+        </n-button>
       </div>
     </div>
 
-    <div class="switch-card">
-      <div class="switch-left">
-        <div class="switch-icon">☁️</div>
-        <div class="switch-text">
-          <div class="switch-title">七牛云 Kodo 对象存储</div>
-          <div class="switch-desc">{{ form.enabled ? '已开启 — 新上传的媒体文件将存储至七牛云' : '已关闭 — 媒体文件存储在服务器本地' }}</div>
+    <div class="storage-grid">
+      <article v-for="storage in storages" :key="storage.id" class="storage-card" :class="{ current: storage.isCurrent }">
+        <AdminCardHeader
+          :provider="providerLabel(storage.provider)"
+          :status="statusText(storage)"
+          :status-variant="toChipVariant(statusClass(storage))"
+          :title="storage.name"
+          :subtitle="storageSubtitle(storage)"
+        />
+
+        <div class="storage-meta-grid">
+          <div v-for="item in storageMetaItems(storage)" :key="`${storage.id}-${item.label}`" class="meta-item">
+            <span class="meta-label">{{ item.label }}</span>
+            <span class="meta-value">{{ item.value }}</span>
+          </div>
+        </div>
+
+        <div class="feature-chips">
+          <AdminChip v-for="chip in storageFeatureChips(storage)" :key="`${storage.id}-${chip}`" :label="chip" />
+        </div>
+
+        <div class="storage-card-actions">
+          <n-button size="small" @click="openEdit(storage.id)">编辑</n-button>
+          <n-button
+            v-if="supportsTest(storage)"
+            size="small"
+            :loading="testingId === storage.id"
+            :disabled="!canTest(storage)"
+            @click="handleTest(storage)"
+          >
+            测试连接
+          </n-button>
+          <n-button
+            v-if="!storage.isCurrent"
+            size="small"
+            type="primary"
+            :loading="applyingId === storage.id"
+            :disabled="!canApply(storage)"
+            @click="applyStorage(storage.id)"
+          >
+            设为当前
+          </n-button>
+          <n-button v-if="!storage.isCurrent && !storage.builtin" size="small" tertiary type="error" @click="removeProfile(storage.id)">
+            删除
+          </n-button>
+        </div>
+      </article>
+
+      <button class="storage-add-card" type="button" :disabled="creatableProviders.length === 0" @click="openCreate">
+        <span class="add-mark">+</span>
+        <span class="add-title">添加存储</span>
+        <span class="add-desc">先选供应商，再创建新的存储卡片。保存后可直接切换为当前上传链路。</span>
+      </button>
+    </div>
+  </div>
+
+  <AdminEditorModal
+    :show="editorOpen"
+    :eyebrow="form.isCurrent ? '当前存储' : '存储配置'"
+    :title="editorMode === 'create' ? '添加存储' : '编辑存储'"
+    :description="editorMode === 'create'
+      ? ''
+      : selectedProviderMeta?.description || '维护上传存储配置，并切换系统当前生效的上传链路。'"
+    :width="920"
+    @close="closeEditor"
+  >
+    <template #header-copy-extra>
+      <div v-if="editorMode === 'create'" class="editor-provider-stack">
+        <div class="field vendor-select-field">
+          <div class="field-label-row">
+            <label>供应商</label>
+            <span class="field-hint-inline">仅已接入供应商可直接创建</span>
+          </div>
+          <n-select
+            :value="selectedVendorKey"
+            :options="vendorSelectOptions"
+            :render-label="renderVendorLabel"
+            :render-option="renderVendorOption"
+            placeholder="选择供应商"
+            @update:value="handleVendorSelect"
+          />
+        </div>
+        <div v-if="activeVendorPreset" class="editor-vendor-preview">
+          <img :src="activeVendorPreset.logoSrc" :alt="activeVendorPreset.label" class="vendor-preview-logo" />
+          <div class="editor-vendor-copy">
+            <div class="editor-vendor-row">
+              <span class="editor-vendor-name">{{ activeVendorPreset.label }}</span>
+              <span class="editor-provider-status" :class="{ supported: activeVendorPreset.supported }">
+                {{ activeVendorPreset.supported ? '已接入' : '即将支持' }}
+              </span>
+            </div>
+            <p class="editor-desc-tight">{{ activeVendorPreset.description }}</p>
+          </div>
         </div>
       </div>
-      <n-switch v-model:value="form.enabled" :loading="loading" />
-    </div>
+    </template>
 
-    <!-- 提示条 -->
-    <div class="tip-bar">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-      <span>建议绑定自定义域名用于访问存储空间。开启后仅影响新上传文件，已有本地文件不受影响。密钥请到 <a href="https://portal.qiniu.com/developer/user/key" target="_blank" class="tip-link">七牛云密钥管理</a> 获取。</span>
-    </div>
+    <template #header-aside>
+      <div v-if="editorMode !== 'create'" class="editor-provider">{{ providerLabel(form.provider) }}</div>
+    </template>
 
-    <!-- 配置表单卡片 -->
-    <div class="config-card" :class="{ disabled: !form.enabled }">
-      <div class="card-title">密钥配置</div>
-
+    <div class="editor-section">
       <div class="field-group">
         <div class="field-row">
           <div class="field">
-            <label>Access Key</label>
-            <n-input v-model:value="form.access_key" placeholder="请输入 Access Key" :disabled="!form.enabled" />
-            <span class="field-hint">前往 <a href="https://portal.qiniu.com/developer/user/key" target="_blank">密钥管理</a> 获取</span>
+            <label>存储名称</label>
+            <n-input v-model:value="form.name" placeholder="例如：生产存储 / 备用存储" />
           </div>
           <div class="field">
-            <label>Secret Key</label>
-            <n-input v-model:value="form.secret_key" type="password" show-password-on="click" :placeholder="hasExistingSecret ? '已配置，留空则保持不变' : '请输入 Secret Key'" :disabled="!form.enabled" />
-            <span v-if="hasExistingSecret && !form.secret_key" class="field-hint" style="color:#6366f1;">已保存密钥，留空保存将保持原密钥不变</span>
+            <label>启用状态</label>
+            <div class="switch-inline">
+              <span class="switch-text">{{ form.enabled ? '已启用' : '已关闭' }}</span>
+              <n-switch v-model:value="form.enabled" />
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="card-title">存储空间配置</div>
-      <div class="field-group">
-        <div class="field">
-          <label>存储空间名称</label>
-          <n-input v-model:value="form.bucket_name" placeholder="请输入 Bucket 名称" :disabled="!form.enabled" />
-          <span class="field-hint">前往 <a href="https://portal.qiniu.com/kodo/bucket" target="_blank">Kodo 控制台</a> 获取及管理</span>
-        </div>
-
-        <div class="field">
-          <label>存储空间源站上传域名（可选）</label>
-          <n-input v-model:value="form.upload_domain" placeholder="留空则自动检测区域，或手动填写如 up-z2.qiniup.com" :disabled="!form.enabled" />
-          <span class="field-hint">留空时 SDK 会自动检测 Bucket 所在区域并选择正确的上传域名。手动填写需确保区域一致，参考 <a href="https://developer.qiniu.com/kodo/1671/region-endpoint-fq" target="_blank">区域及域名文档</a></span>
-        </div>
-
-        <div class="field">
-          <div class="field-label-row">
-            <label>存储空间访问域名</label>
-            <n-button text type="primary" size="tiny" :loading="fetching" :disabled="!form.enabled || !form.access_key || !form.bucket_name" @click="fetchBucketDomains">
-              <template #icon>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              </template>
-              自动获取
-            </n-button>
-          </div>
-          <n-input v-model:value="form.access_domain" placeholder="例如：https://xxx.clouddn.com" :disabled="!form.enabled" />
-          <span class="field-hint">自定义域名或七牛云测试域名（自定义域名需要在 Kodo 控制台绑定可正常访问使用）</span>
-          <div v-if="bucketDomains.length > 0" class="domain-list">
-            <span class="domain-label">检测到的域名：</span>
-            <span v-for="d in bucketDomains" :key="d" class="domain-tag" @click="form.access_domain = 'https://' + d">{{ d }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="card-title">高级选项</div>
-      <div class="option-row">
-        <div class="option-info">
-          <div class="option-label">直传模式（Fetch）</div>
-          <div class="option-desc">开启后 AI 生成的图片将由七牛云服务器直接从上游 URL 抓取存储，不经过业务服务器中转，节省带宽和服务器流量。Base64 格式图片仍走中转上传。</div>
-        </div>
-        <n-switch v-model:value="form.direct_fetch" :disabled="!form.enabled" />
-      </div>
-
-      <div style="height:12px"></div>
-
-      <div class="option-row">
-        <div class="option-info">
-          <div class="option-label">缩略图模式支持</div>
-          <div class="option-desc">开启后绘画、画廊列表中的图片将以缩略图展示（七牛云测试域名是去参数保存的，会造成图片尺寸不一致，请务必绑定自定义域名。且此选项只适用于图片链接和【存储空间访问域名】配置中的域名相符才会生效）</div>
-        </div>
-        <n-switch v-model:value="form.thumbnail_mode" :disabled="!form.enabled" />
-      </div>
-
-      <div class="divider"></div>
-
-      <!-- 操作按钮 -->
-      <div class="action-bar">
-        <n-button :loading="testing" :disabled="!form.enabled" @click="handleTest">
-          <template #icon>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          </template>
-          测试连接
-        </n-button>
-        <n-button type="primary" :loading="saving" @click="handleSave">保存配置</n-button>
       </div>
     </div>
-  </div>
+
+    <div class="editor-section">
+      <div class="section-title">基础配置</div>
+      <div v-if="textFields.length > 0" class="field-group">
+        <div class="field-row">
+          <div v-for="field in textFields" :key="field.key" class="field">
+            <div class="field-label-row">
+              <label>{{ field.label }}</label>
+              <n-button
+                v-if="field.key === 'access_domain' && selectedProviderMeta?.supports_bucket_info"
+                text
+                type="primary"
+                size="tiny"
+                :loading="fetching"
+                @click="fetchBucketDomains"
+              >
+                自动获取
+              </n-button>
+            </div>
+            <n-input
+              :value="configTextValue(field.key)"
+              :type="field.type === 'password' ? 'password' : 'text'"
+              :show-password-on="field.type === 'password' ? 'click' : undefined"
+              :placeholder="field.secret && form.secretConfigured && !configTextValue(field.key)
+                ? '已配置，留空则保持不变'
+                : field.placeholder || `请输入${field.label}`"
+              @update:value="updateConfigValue(field.key, $event)"
+            />
+            <span v-if="field.hint" class="field-hint">{{ field.hint }}</span>
+            <div v-if="field.key === 'access_domain' && bucketDomains.length > 0" class="domain-list">
+              <span class="domain-label">检测到的域名：</span>
+              <span
+                v-for="domain in bucketDomains"
+                :key="domain"
+                class="domain-tag"
+                @click="updateConfigValue(field.key, `https://${domain}`)"
+              >
+                {{ domain }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-config-note">
+        当前存储类型无需额外密钥配置，保存后即可切换使用。
+      </div>
+    </div>
+
+    <div v-if="switchFields.length > 0" class="editor-section">
+      <div class="section-title">高级选项</div>
+      <div class="toggle-grid">
+        <div v-for="field in switchFields" :key="field.key" class="toggle-card">
+          <div>
+            <div class="toggle-title">{{ field.label }}</div>
+            <div v-if="field.hint" class="toggle-desc">{{ field.hint }}</div>
+          </div>
+          <n-switch :value="configBoolValue(field.key)" @update:value="updateConfigValue(field.key, $event)" />
+        </div>
+      </div>
+    </div>
+
+    <template #footer-note>
+      {{ form.isCurrent
+        ? '保存将直接更新系统当前使用中的上传存储。'
+        : '保存只更新这张卡片；点击“保存并设为当前”后才会切换系统上传链路。' }}
+    </template>
+
+    <template #footer-actions>
+      <n-button @click="closeEditor">取消</n-button>
+      <n-button :loading="saving" @click="saveDraft">仅保存卡片</n-button>
+      <n-button type="primary" :loading="savingAndApplying" @click="saveAndApply">
+        {{ form.isCurrent ? '保存当前配置' : '保存并设为当前' }}
+      </n-button>
+    </template>
+  </AdminEditorModal>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { NInput, NSwitch, NButton, useMessage } from 'naive-ui'
-import { kodoApi } from '../../api/index'
-import type { KodoConfig } from '../../api/index'
+import { NButton, NInput, NSelect, NSwitch } from 'naive-ui'
+import AdminEditorModal from './components/AdminEditorModal.vue'
+import AdminCardHeader from './components/AdminCardHeader.vue'
+import AdminChip from './components/AdminChip.vue'
+import { useStorageManager } from './useStorageManager'
 
-const message = useMessage()
-
-const loading = ref(false)
-const saving = ref(false)
-const testing = ref(false)
-const fetching = ref(false)
-
-const hasExistingSecret = ref(false)
-const bucketDomains = ref<string[]>([])
-
-const form = ref<KodoConfig>({
-  enabled: false,
-  access_key: '',
-  secret_key: '',
-  bucket_name: '',
-  upload_domain: '',
-  access_domain: '',
-  thumbnail_mode: false,
-  direct_fetch: false,
-})
-
-async function loadConfig() {
-  loading.value = true
-  try {
-    const res: any = await kodoApi.getConfig()
-    if (res.code === 0 && res.data?.config) {
-      const cfg = { ...res.data.config }
-      if (cfg.secret_key && cfg.secret_key.includes('*')) {
-        cfg.secret_key = ''
-        hasExistingSecret.value = true
-      }
-      form.value = { ...form.value, ...cfg }
-    }
-  } catch (e) {
-    console.error('Failed to load Kodo config', e)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handleSave() {
-  saving.value = true
-  try {
-    const res: any = await kodoApi.saveConfig(form.value)
-    if (res.code === 0) {
-      message.success('配置已保存')
-    } else {
-      message.error(res.msg || '保存失败')
-    }
-  } catch (e: any) {
-    message.error(e.msg || '保存失败')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function handleTest() {
-  testing.value = true
-  try {
-    const res: any = await kodoApi.testConnection()
-    if (res.code === 0) {
-      message.success('连接成功')
-    } else {
-      message.error(res.msg || '连接失败')
-    }
-  } catch (e: any) {
-    message.error(e.msg || '连接失败')
-  } finally {
-    testing.value = false
-  }
-}
-
-async function fetchBucketDomains() {
-  fetching.value = true
-  try {
-    // 先保存当前配置以便后端能读到 AK/SK/Bucket
-    await kodoApi.saveConfig(form.value)
-    const res: any = await kodoApi.getBucketInfo()
-    if (res.code === 0 && res.data?.info?.domains?.length) {
-      bucketDomains.value = res.data.info.domains
-      message.success(`检测到 ${bucketDomains.value.length} 个域名`)
-    } else {
-      message.warning(res.msg || '未检测到绑定域名')
-    }
-  } catch (e: any) {
-    message.error(e.msg || '获取失败')
-  } finally {
-    fetching.value = false
-  }
-}
-
-onMounted(() => {
-  loadConfig()
-})
+const {
+  saving,
+  savingAndApplying,
+  fetching,
+  applyingId,
+  testingId,
+  editorOpen,
+  editorMode,
+  editingId,
+  selectedVendorKey,
+  storages,
+  bucketDomains,
+  form,
+  creatableProviders,
+  selectedProviderMeta,
+  textFields,
+  switchFields,
+  activeVendorPreset,
+  vendorSelectOptions,
+  toChipVariant,
+  configTextValue,
+  configBoolValue,
+  updateConfigValue,
+  providerLabel,
+  supportsTest,
+  canTest,
+  canApply,
+  statusText,
+  statusClass,
+  storageSubtitle,
+  storageMetaItems,
+  storageFeatureChips,
+  handleVendorSelect,
+  renderVendorLabel,
+  renderVendorOption,
+  openCreate,
+  openEdit,
+  closeEditor,
+  saveDraft,
+  saveAndApply,
+  applyStorage,
+  handleTest,
+  fetchBucketDomains,
+  removeProfile,
+} = useStorageManager()
 </script>
 
 <style scoped>
 @import './admin-common.css';
 
-.kodo-page {
+.storage-page {
   gap: 14px;
-  max-width: 720px;
-}
-.divider {
-  height: 1px;
-  background: #2d394b;
-  margin: 20px 0;
 }
 
-.option-row {
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.storage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.storage-card,
+.storage-add-card {
+  min-height: 252px;
+  border-radius: 18px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card);
+  padding: 18px;
+}
+
+.storage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.storage-card:hover,
+.storage-add-card:hover {
+  border-color: #2e3034;
+  background: #141416;
+}
+
+.storage-card.current {
+  border-color: rgba(244, 244, 245, 0.24);
+}
+
+.storage-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.meta-label {
+  color: var(--admin-text-3);
+  font-size: 11px;
+}
+
+.meta-value {
+  color: var(--admin-text-1);
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.feature-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.storage-card-actions {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.storage-add-card {
+  appearance: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.storage-add-card:hover {
+  transform: translateY(-1px);
+}
+
+.storage-add-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.add-mark {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #17181a;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-1);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.add-title {
+  color: var(--admin-text-1);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.add-desc {
+  color: var(--admin-text-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.editor-provider {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #17181a;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-2);
+  font-size: 11px;
+}
+
+.editor-provider-stack {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 12px 16px;
+  align-items: end;
+}
+
+.vendor-select-field {
+  min-width: 0;
+}
+
+.field-hint-inline {
+  color: var(--admin-text-3);
+  font-size: 12px;
+}
+
+.editor-provider-status {
+  min-height: 24px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #1b1c1f;
+  color: var(--admin-text-3);
+  font-size: 11px;
+  border: 1px solid var(--admin-border);
+}
+
+.editor-provider-status.supported {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.24);
+  color: #d1fae5;
+}
+
+.editor-vendor-preview {
+  border-radius: 16px;
+  border: 1px solid var(--admin-border);
+  background: #151618;
+  min-height: 68px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.vendor-preview-logo {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 5px;
+}
+
+.editor-vendor-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.editor-vendor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editor-vendor-name {
+  color: var(--admin-text-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editor-desc-tight {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+:deep(.n-base-selection) {
+  min-height: 48px;
+}
+
+:deep(.vendor-select-option) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+:deep(.vendor-select-logo) {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 4px;
+}
+
+:deep(.vendor-select-copy) {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+:deep(.vendor-select-row) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:deep(.vendor-select-name) {
+  color: var(--admin-text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+:deep(.vendor-select-status) {
+  min-height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #1b1c1f;
+  color: var(--admin-text-3);
+  font-size: 10px;
+  border: 1px solid var(--admin-border);
+}
+
+:deep(.vendor-select-status.is-supported) {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.24);
+  color: #d1fae5;
+}
+
+:deep(.vendor-select-desc) {
+  color: var(--admin-text-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.editor-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+.section-title {
+  color: var(--admin-text-1);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.switch-inline {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--admin-border);
+  background: #151618;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
 }
-.option-label {
+
+.switch-text {
+  color: var(--admin-text-2);
   font-size: 13px;
-  font-weight: 500;
-  color: #d4dde8;
 }
-.option-desc {
+
+.toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.toggle-card {
+  border-radius: 14px;
+  border: 1px solid var(--admin-border);
+  background: #151618;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.toggle-title {
+  color: var(--admin-text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.toggle-desc {
+  color: var(--admin-text-3);
   font-size: 12px;
-  color: #8294a9;
-  margin-top: 2px;
+  line-height: 1.6;
+  margin-top: 4px;
 }
+
 .field-label-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.domain-list {
+
+.empty-config-note {
+  min-height: 84px;
+  border-radius: 14px;
+  border: 1px dashed var(--admin-border);
+  background: #151618;
+  color: var(--admin-text-2);
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 4px;
+  justify-content: center;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.7;
 }
+
+.domain-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .domain-label {
   font-size: 11px;
-  color: #7d8ea4;
+  color: var(--admin-text-3);
 }
+
 .domain-tag {
   font-size: 12px;
-  padding: 2px 10px;
-  border-radius: 6px;
-  background: rgba(60, 185, 194, 0.16);
-  color: #95dfe5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #bfdbfe;
   cursor: pointer;
-  transition: background 0.15s;
 }
-.domain-tag:hover {
-  background: rgba(60, 185, 194, 0.25);
+
+@media (max-width: 980px) {
+  .storage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .storage-meta-grid,
+  .toggle-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-provider-stack {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .storage-card,
+  .storage-add-card {
+    min-height: unset;
+  }
+
+  .storage-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 </style>

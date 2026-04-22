@@ -1,19 +1,12 @@
 <template>
   <router-view v-if="isLoginRoute" />
   <div v-else class="admin-layout-shell">
-    <div class="mesh-bg">
-      <div class="mesh-blob blob-1"></div>
-      <div class="mesh-blob blob-2"></div>
-      <div class="mesh-blob blob-3"></div>
-    </div>
-
     <div class="admin-shell-frame">
       <aside v-if="!isMobile" class="admin-shell-sider" :class="{ collapsed }">
         <div class="brand-area" @click="collapsed = !collapsed">
-          <div class="brand-mark">F</div>
+          <div class="brand-mark">I</div>
           <div v-if="!collapsed" class="brand-copy">
-            <p class="brand-title">FENG Admin</p>
-            <p class="brand-subtitle">Control Center</p>
+            <p class="brand-title">IdeaBoard</p>
           </div>
         </div>
         <n-menu
@@ -24,10 +17,6 @@
           :options="menuOptions"
           @update:value="handleMenuUpdate"
         />
-        <div class="sider-footer" :class="{ 'is-collapsed': collapsed }">
-          <span class="status-dot"></span>
-          <span v-if="!collapsed">System Online</span>
-        </div>
       </aside>
 
       <main class="admin-shell-main">
@@ -40,17 +29,14 @@
             </n-button>
             <div class="title-wrap">
               <h1 class="page-title">{{ currentMeta.title }}</h1>
-              <p class="page-subtitle">{{ currentMeta.desc }}</p>
             </div>
           </div>
           <div class="header-right">
-            <div class="header-state">
-              <span class="state-key">Role</span>
-              <span class="state-value">Admin</span>
-            </div>
             <n-dropdown :options="userOptions" @select="handleUserAction">
               <div class="user-badge">
-                <n-avatar size="small" round>{{ userStore.user?.username?.charAt(0).toUpperCase() }}</n-avatar>
+                <n-avatar size="small" round :style="{ backgroundColor: '#a3e635', color: '#111111', fontWeight: '700' }">
+                  {{ userStore.user?.username?.charAt(0).toUpperCase() }}
+                </n-avatar>
                 <span>{{ userStore.user?.username }}</span>
               </div>
             </n-dropdown>
@@ -65,7 +51,7 @@
   </div>
 
   <n-drawer v-model:show="mobileMenuOpen" :width="268" placement="left" class="admin-mobile-drawer">
-    <n-drawer-content title="FENG Admin" closable>
+    <n-drawer-content title="IdeaBoard" closable>
       <n-menu v-model:value="activeKey" :options="menuOptions" @update:value="handleMobileMenuSelect" />
     </n-drawer-content>
   </n-drawer>
@@ -120,19 +106,19 @@ watch(
   { immediate: true }
 )
 
-const pageMetaMap: Record<string, { title: string; desc: string }> = {
-  users: { title: '用户管理', desc: '维护管理员可控的账户与权限状态。' },
-  channels: { title: '渠道商管理', desc: '配置上游渠道、模型池与 API 接入。' },
-  accounts: { title: '账号池管理', desc: '监控账号并发、超时与健康度。' },
-  monitor: { title: '任务监控', desc: '追踪队列压力、任务状态与资源负载。' },
-  'drawing-records': { title: '绘图记录', desc: '审计最近任务、结果与失败详情。' },
-  'style-cards': { title: '风格卡片', desc: '管理用户侧风格素材与上架状态。' },
-  'face-library': { title: '人脸库', desc: '维护人脸模板资源与分类。' },
-  'bg-library': { title: '背景库', desc: '维护背景模板资源与分类。' },
-  'pattern-style-library': { title: '风格模型库', desc: '管理图案模型样式与展示素材。' },
-  'feature-prompts': { title: '功能提示词', desc: '配置工作流系统提示词模板。' },
-  'oss-config': { title: 'Kodo 存储', desc: '对象存储配置、域名和上传策略。' },
-  'seg-config': { title: '分割抠图', desc: '配置分割服务开关与密钥。' },
+const pageMetaMap: Record<string, { title: string }> = {
+  users: { title: '用户管理' },
+  channels: { title: '渠道商管理' },
+  accounts: { title: '账号池管理' },
+  monitor: { title: '任务监控' },
+  'drawing-records': { title: '绘图记录' },
+  'style-cards': { title: '风格卡片' },
+  'face-library': { title: '人脸库' },
+  'bg-library': { title: '背景库' },
+  'pattern-style-library': { title: '风格模型库' },
+  'feature-prompts': { title: '功能提示词' },
+  'oss-config': { title: '存储' },
+  'seg-config': { title: '图片处理' },
 }
 
 const renderMenuIcon = (iconComp: any) => () => h(NIcon, { class: 'menu-icon' }, { default: () => h(iconComp) })
@@ -167,14 +153,14 @@ const menuOptions = [
     key: 'group-system',
     type: 'group',
     children: [
-      { label: 'Kodo 存储', key: 'oss-config', icon: renderMenuIcon(CloudOutline) },
-      { label: '分割抠图', key: 'seg-config', icon: renderMenuIcon(CutOutline) },
+      { label: '存储', key: 'oss-config', icon: renderMenuIcon(CloudOutline) },
+      { label: '图片处理', key: 'seg-config', icon: renderMenuIcon(CutOutline) },
     ],
   },
 ] as any
 
 const currentMeta = computed(() => {
-  return pageMetaMap[activeKey.value] || { title: '管理后台', desc: '控制台' }
+  return pageMetaMap[activeKey.value] || { title: '管理后台' }
 })
 
 function handleMenuUpdate(key: string) {
@@ -228,67 +214,25 @@ onUnmounted(() => {
 <style scoped>
 .admin-layout-shell {
   min-height: 100vh;
-  position: relative;
-  background: #f5f7ff;
-  overflow: hidden;
-  padding: 18px;
-}
-
-.mesh-bg {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.mesh-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(48px);
-  opacity: 0.5;
-}
-
-.blob-1 {
-  width: 460px;
-  height: 460px;
-  background: #8374ff;
-  top: -170px;
-  left: -120px;
-}
-
-.blob-2 {
-  width: 400px;
-  height: 400px;
-  background: #58a2ff;
-  right: -110px;
-  top: 80px;
-}
-
-.blob-3 {
-  width: 340px;
-  height: 340px;
-  background: #9ec6ff;
-  bottom: -120px;
-  left: 32%;
+  background: #0a0a0b;
+  padding: 12px;
 }
 
 .admin-shell-frame {
-  position: relative;
-  z-index: 1;
-  min-height: calc(100vh - 36px);
+  min-height: calc(100vh - 24px);
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 14px;
+  gap: 12px;
 }
 
 .admin-shell-sider {
-  width: 258px;
+  width: 244px;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(140, 155, 209, 0.28);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.74);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 24px 64px rgba(76, 90, 154, 0.14);
+  border: 1px solid #232326;
+  border-radius: 16px;
+  background: #111214;
+  transition: width 0.24s ease;
 }
 
 .admin-shell-sider.collapsed {
@@ -296,86 +240,55 @@ onUnmounted(() => {
 }
 
 .brand-area {
-  height: 74px;
-  padding: 0 16px;
+  height: 68px;
+  padding: 0 18px;
   display: flex;
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(140, 155, 209, 0.24);
+  border-bottom: 1px solid #232326;
+}
+
+.brand-area:hover {
+  background: #141517;
 }
 
 .brand-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(145deg, #7161ef, #5390fb);
-  box-shadow: 0 10px 24px rgba(113, 97, 239, 0.32);
+  color: #f4f4f5;
+  background: #18191b;
+  border: 1px solid #2b2c2f;
 }
 
 .brand-title {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: #273156;
+  color: #f4f4f5;
   letter-spacing: 0.02em;
-}
-
-.brand-subtitle {
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: #8894bc;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.sider-footer {
-  margin: 12px;
-  padding: 10px 12px;
-  border-radius: 999px;
-  background: rgba(113, 97, 239, 0.08);
-  border: 1px solid rgba(113, 97, 239, 0.18);
-  color: #5a6491;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sider-footer.is-collapsed {
-  justify-content: center;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #22b573;
-  box-shadow: 0 0 0 4px rgba(34, 181, 115, 0.16);
 }
 
 .admin-shell-main {
   min-width: 0;
-  border: 1px solid rgba(140, 155, 209, 0.24);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 24px 64px rgba(76, 90, 154, 0.12);
+  border: 1px solid #232326;
+  border-radius: 16px;
+  background: #101113;
   display: flex;
   flex-direction: column;
 }
 
 .admin-shell-header {
-  height: 74px;
+  height: 68px;
   padding: 0 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(140, 155, 209, 0.2);
+  border-bottom: 1px solid #232326;
 }
 
 .header-left,
@@ -387,7 +300,15 @@ onUnmounted(() => {
 
 .shell-action-btn {
   font-size: 16px;
-  color: #566092;
+  color: #d4d4d8;
+  border: 1px solid #2b2c2f;
+  background: #17181a;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.shell-action-btn:hover {
+  border-color: #3a3b40;
+  background: #1c1d20;
 }
 
 .title-wrap {
@@ -398,32 +319,7 @@ onUnmounted(() => {
   margin: 0;
   font-size: 17px;
   font-weight: 700;
-  color: #273156;
-}
-
-.page-subtitle {
-  margin: 2px 0 0;
-  color: #8a95bc;
-  font-size: 12px;
-}
-
-.header-state {
-  border: 1px solid rgba(113, 97, 239, 0.2);
-  background: rgba(113, 97, 239, 0.08);
-  padding: 6px 10px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.state-key {
-  color: #7580ac;
-}
-
-.state-value {
-  color: #584fd1;
+  color: #f4f4f5;
 }
 
 .user-badge {
@@ -433,17 +329,18 @@ onUnmounted(() => {
   cursor: pointer;
   padding: 8px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(137, 151, 208, 0.3);
-  background: rgba(255, 255, 255, 0.82);
-  transition: background 0.2s;
+  border: 1px solid #2b2c2f;
+  background: #151618;
+  transition: border-color 0.18s ease, background 0.18s ease;
 }
 
 .user-badge:hover {
-  background: rgba(255, 255, 255, 0.96);
+  background: #1a1b1e;
+  border-color: #3a3b40;
 }
 
 .user-badge span {
-  color: #455081;
+  color: #f4f4f5;
   font-size: 13px;
   max-width: 120px;
   white-space: nowrap;
@@ -453,31 +350,35 @@ onUnmounted(() => {
 
 .admin-shell-content {
   min-height: calc(100vh - 110px);
-  padding: 20px 22px 24px;
+  padding: 18px 20px 22px;
 }
 
 :deep(.n-menu) {
-  --n-item-text-color: #6976a3;
-  --n-item-text-color-active: #2f3965;
-  --n-item-text-color-hover: #3f4a79;
-  --n-item-color-active: linear-gradient(90deg, rgba(113, 97, 239, 0.18), rgba(113, 97, 239, 0.04));
-  --n-item-color-hover: rgba(113, 97, 239, 0.1);
-  --n-item-icon-color: #7b87b3;
-  --n-item-icon-color-active: #5f54db;
-  --n-item-icon-color-hover: #48558b;
-  --n-group-header-text-color: #95a1c6;
-  padding: 10px;
+  --n-item-text-color: #8d8d93;
+  --n-item-text-color-active: #f4f4f5;
+  --n-item-text-color-hover: #f4f4f5;
+  --n-item-color-active: #18191b;
+  --n-item-color-hover: #151618;
+  --n-item-icon-color: #67676d;
+  --n-item-icon-color-active: #f4f4f5;
+  --n-item-icon-color-hover: #d4d4d8;
+  --n-group-header-text-color: #5a5a60;
+  padding: 10px 8px;
   gap: 4px;
 }
 
 :deep(.n-menu-item-content) {
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   font-size: 13px;
-  height: 38px;
+  height: 36px;
 }
 
 :deep(.n-menu-item-content__icon) {
   margin-right: 10px !important;
+}
+
+:deep(.n-menu-item-content--selected) {
+  font-weight: 600;
 }
 
 :deep(.n-menu-item-group-title) {
@@ -488,6 +389,25 @@ onUnmounted(() => {
 
 .menu-icon {
   font-size: 17px;
+}
+
+:deep(.admin-mobile-drawer .n-drawer-content) {
+  --n-color: #101113;
+  --n-border-color: #232326;
+}
+
+:deep(.admin-mobile-drawer .n-drawer-header) {
+  border-bottom: 1px solid #232326;
+}
+
+:deep(.admin-mobile-drawer .n-drawer-header__main) {
+  color: #f4f4f5;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+:deep(.admin-mobile-drawer .n-drawer-body-content-wrapper) {
+  background: #111214;
 }
 
 @media (max-width: 1079px) {
@@ -501,17 +421,12 @@ onUnmounted(() => {
   }
 
   .admin-shell-main {
-    border-radius: 22px;
+    border-radius: 14px;
   }
 
   .admin-shell-header {
     padding: 0 14px;
     height: 68px;
-  }
-
-  .page-subtitle,
-  .header-state {
-    display: none;
   }
 
   .admin-shell-content {

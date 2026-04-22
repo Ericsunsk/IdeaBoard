@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">背景总数</span>
-        <span class="summary-value">{{ list.length }}</span>
-        <span class="summary-foot">含下架素材</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">已上架</span>
-        <span class="summary-value">{{ enabledCount }}</span>
-        <span class="summary-foot">用户可见</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">场景类</span>
-        <span class="summary-value">{{ sceneCount }}</span>
-        <span class="summary-foot">scene 分类</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">筛选结果</span>
-        <span class="summary-value">{{ filteredList.length }}</span>
-        <span class="summary-foot">当前列表</span>
-      </div>
+      <AdminSummaryCard label="背景总数" :value="list.length" foot="含下架素材" />
+      <AdminSummaryCard label="已上架" :value="enabledCount" foot="用户可见" />
+      <AdminSummaryCard label="场景类" :value="sceneCount" foot="scene 分类" />
+      <AdminSummaryCard label="筛选结果" :value="filteredList.length" foot="当前列表" />
     </div>
 
     <div class="toolbar">
@@ -64,19 +48,14 @@
     </div>
 
     <div class="table-card">
-      <div class="panel-header">
-        <div>
-          <h3 class="panel-title">背景列表</h3>
-          <p class="panel-desc">支持编辑、上下架和删除操作。分类用于业务流程内筛选。</p>
-        </div>
-      </div>
+      <AdminSectionHeader title="背景列表" description="支持编辑、上下架和删除操作。分类用于业务流程内筛选。" />
       <n-data-table
         :columns="columns"
         :data="filteredList"
         :loading="loading"
         :pagination="false"
         :bordered="false"
-        :row-key="(row: any) => row.id"
+        :row-key="(row: BgTemplate) => row.id"
       />
       <div class="pagination-wrapper">
         <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadList" />
@@ -163,19 +142,32 @@ import {
   NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem,
   NInput, NSwitch, NGrid, NGi, NInputNumber, NUpload, useMessage
 } from 'naive-ui'
-import type { UploadFileInfo } from 'naive-ui'
 import { bgTemplateApi } from '../../api/index'
-import { IMAGE_UPLOAD_ACCEPT, UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../constants/media'
-import { adminUploadAction, parseAdminUploadResponse, useAdminUploadHeaders } from '../../utils/admin-upload'
+import type { BgTemplate, BgTemplateFormData } from '../../api/index'
+import { IMAGE_UPLOAD_ACCEPT } from '../../constants/media'
+import { adminUploadAction, useAdminUploadHeaders } from '../../utils/admin-upload'
+import {
+  ADMIN_ASSET_LIST_QUERY,
+  ADMIN_ASSET_PAGE_SIZE,
+  ADMIN_STATUS_OPTIONS,
+  createAdminUploadFinishHandler,
+  useAdminCrudModal,
+  useAdminDeleteModal,
+  useAdminListState,
+} from './assetLibraryShared'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
+import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
 const message = useMessage()
 
 // ============ 列表数据 ============
-interface BgItem { id: number; name: string; image_url: string; category: string; sort_order: number; is_enabled: boolean }
-const list = ref<BgItem[]>([])
-const loading = ref(false)
+const { list, loading, loadList } = useAdminListState<BgTemplate>({
+  fetcher: () => bgTemplateApi.adminList(ADMIN_ASSET_LIST_QUERY),
+  message,
+  errorMessage: '加载失败',
+})
 const page = ref(1)
-const pageSize = 50
+const pageSize = ADMIN_ASSET_PAGE_SIZE
 const pageCount = computed(() => Math.max(1, Math.ceil(list.value.length / pageSize)))
 
 const filterCategory = ref<string | null>(null)
@@ -191,10 +183,7 @@ const categoryFormOptions = [
   { label: '场景', value: 'scene' },
   { label: '自定义', value: 'custom' },
 ]
-const statusOptions = [
-  { label: '已上架', value: 1 },
-  { label: '已下架', value: 0 },
-]
+const statusOptions = ADMIN_STATUS_OPTIONS
 
 const categoryLabelMap: Record<string, string> = { solid: '纯色', scene: '场景', custom: '自定义' }
 
@@ -211,7 +200,7 @@ const sceneCount = computed(() => list.value.filter(item => item.category === 's
 const columns = [
   {
     title: '图片', key: 'image_url', width: 100,
-    render(row: BgItem) {
+    render(row: BgTemplate) {
       return h('div', { style: 'width: 70px; height: 50px; border-radius: 10px; overflow: hidden; background: rgba(113, 97, 239, 0.1);' }, [
         h('img', { src: row.image_url, style: 'width: 100%; height: 100%; object-fit: cover;', onError: (e: Event) => { (e.target as HTMLImageElement).style.display = 'none' } })
       ])
@@ -220,19 +209,19 @@ const columns = [
   { title: '名称', key: 'name', ellipsis: { tooltip: true } },
   {
     title: '分类', key: 'category', width: 80,
-    render(row: BgItem) { return h('span', { style: 'color: #7c89b2;' }, categoryLabelMap[row.category] || row.category) }
+    render(row: BgTemplate) { return h('span', { style: 'color: #7c89b2;' }, categoryLabelMap[row.category] || row.category) }
   },
   {
     title: '排序', key: 'sort_order', width: 70,
-    render(row: BgItem) { return h('span', { style: 'color: #8b95b8;' }, row.sort_order) }
+    render(row: BgTemplate) { return h('span', { style: 'color: #8b95b8;' }, row.sort_order) }
   },
   {
     title: '状态', key: 'is_enabled', width: 80,
-    render(row: BgItem) { return h('span', { style: row.is_enabled ? 'color: #1f9d68;' : 'color: #d65478;' }, row.is_enabled ? '已上架' : '已下架') }
+    render(row: BgTemplate) { return h('span', { style: row.is_enabled ? 'color: #1f9d68;' : 'color: #d65478;' }, row.is_enabled ? '已上架' : '已下架') }
   },
   {
     title: '操作', key: 'actions', width: 140,
-    render(row: BgItem) {
+    render(row: BgTemplate) {
       return h('div', { style: 'display: flex; gap: 8px;' }, [
         h(NButton, { size: 'small', secondary: true, onClick: () => openEditModal(row) }, { default: () => '编辑' }),
         h(NButton, { size: 'small', tertiary: true, style: 'color: #d65478;', onClick: () => openDeleteModal(row) }, { default: () => '删除' }),
@@ -242,27 +231,27 @@ const columns = [
 ]
 
 // ============ 新增/编辑 ============
-const showModal = ref(false)
-const isEditing = ref(false)
-const saving = ref(false)
-const formRef = ref()
-const formData = ref({ name: '', image_url: '', category: 'solid', sort_order: 0, is_enabled: true })
-const editingId = ref<number | null>(null)
+const {
+  showModal,
+  isEditing,
+  saving,
+  formRef,
+  formData,
+  openAddModal,
+  openEditModal,
+  handleSave,
+} = useAdminCrudModal<BgTemplate, BgTemplateFormData>({
+  createDefault: () => ({ name: '', image_url: '', category: 'solid', sort_order: 0, is_enabled: true }),
+  toForm: (item) => ({ name: item.name, image_url: item.image_url, category: item.category, sort_order: item.sort_order, is_enabled: item.is_enabled }),
+  create: (payload) => bgTemplateApi.adminCreate(payload),
+  update: (id, payload) => bgTemplateApi.adminUpdate(id, payload),
+  afterSave: loadList,
+  message,
+})
 const uploading = ref(false)
 
 const uploadHeaders = useAdminUploadHeaders()
-
-function handleUploadFinish({ file, event }: { file: UploadFileInfo; event?: ProgressEvent }) {
-  uploading.value = false
-  const res = parseAdminUploadResponse(event)
-  if (res.code === 0 && res.data?.url) {
-    formData.value.image_url = res.data.url
-    message.success(UPLOAD_SUCCESS_MESSAGE)
-  } else {
-    message.error(res.msg || UPLOAD_FAILED_MESSAGE)
-  }
-  return file
-}
+const handleUploadFinish = createAdminUploadFinishHandler(uploading, formData, 'image_url', message)
 
 const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
@@ -270,61 +259,12 @@ const rules = {
   category: [{ required: true, message: '请选择分类', trigger: 'change' }],
 }
 
-function openAddModal() {
-  isEditing.value = false; editingId.value = null
-  formData.value = { name: '', image_url: '', category: 'solid', sort_order: 0, is_enabled: true }
-  showModal.value = true
-}
-
-function openEditModal(item: BgItem) {
-  isEditing.value = true; editingId.value = item.id
-  formData.value = { name: item.name, image_url: item.image_url, category: item.category, sort_order: item.sort_order, is_enabled: item.is_enabled }
-  showModal.value = true
-}
-
-async function handleSave() {
-  try { await formRef.value?.validate() } catch { return }
-  saving.value = true
-  try {
-    if (isEditing.value && editingId.value) {
-      await bgTemplateApi.adminUpdate(editingId.value, formData.value)
-      message.success('更新成功')
-    } else {
-      await bgTemplateApi.adminCreate(formData.value)
-      message.success('创建成功')
-    }
-    showModal.value = false
-    await loadList()
-  } catch (e: any) { message.error(e.msg || '操作失败') }
-  finally { saving.value = false }
-}
-
 // ============ 删除 ============
-const showDeleteModal = ref(false)
-const deleting = ref(false)
-const deleteTarget = ref<BgItem | null>(null)
-
-function openDeleteModal(item: BgItem) { deleteTarget.value = item; showDeleteModal.value = true }
-
-async function confirmDelete() {
-  if (!deleteTarget.value) return
-  deleting.value = true
-  try {
-    await bgTemplateApi.adminDelete(deleteTarget.value.id)
-    message.success('删除成功'); showDeleteModal.value = false; await loadList()
-  } catch (e: any) { message.error(e.msg || '删除失败') }
-  finally { deleting.value = false }
-}
-
-// ============ 加载数据 ============
-async function loadList() {
-  loading.value = true
-  try {
-    const res: any = await bgTemplateApi.adminList({ page: 1, page_size: 200 })
-    if (res.code === 0) list.value = res.data?.list || []
-  } catch { message.error('加载失败') }
-  finally { loading.value = false }
-}
+const { showDeleteModal, deleting, deleteTarget, openDeleteModal, confirmDelete } = useAdminDeleteModal<BgTemplate>({
+  deleteById: (id) => bgTemplateApi.adminDelete(id),
+  afterDelete: loadList,
+  message,
+})
 
 onMounted(() => { loadList() })
 </script>

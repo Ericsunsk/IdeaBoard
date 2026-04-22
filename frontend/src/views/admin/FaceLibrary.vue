@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">人脸总数</span>
-        <span class="summary-value">{{ faces.length }}</span>
-        <span class="summary-foot">含下架素材</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">已上架</span>
-        <span class="summary-value">{{ enabledFaceCount }}</span>
-        <span class="summary-foot">用户可见</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">男性分类</span>
-        <span class="summary-value">{{ maleFaceCount }}</span>
-        <span class="summary-foot">male 分类</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">筛选结果</span>
-        <span class="summary-value">{{ filteredFaces.length }}</span>
-        <span class="summary-foot">当前列表</span>
-      </div>
+      <AdminSummaryCard label="人脸总数" :value="faces.length" foot="含下架素材" />
+      <AdminSummaryCard label="已上架" :value="enabledFaceCount" foot="用户可见" />
+      <AdminSummaryCard label="男性分类" :value="maleFaceCount" foot="male 分类" />
+      <AdminSummaryCard label="筛选结果" :value="filteredFaces.length" foot="当前列表" />
     </div>
 
     <div class="toolbar">
@@ -64,19 +48,14 @@
     </div>
 
     <div class="table-card">
-      <div class="panel-header">
-        <div>
-          <h3 class="panel-title">人脸列表</h3>
-          <p class="panel-desc">支持编辑、上下架与删除操作。分类用于工作流人脸维度筛选。</p>
-        </div>
-      </div>
+      <AdminSectionHeader title="人脸列表" description="支持编辑、上下架与删除操作。分类用于工作流人脸维度筛选。" />
       <n-data-table
         :columns="columns"
         :data="filteredFaces"
         :loading="loading"
         :pagination="false"
         :bordered="false"
-        :row-key="(row: any) => row.id"
+        :row-key="(row: FaceTemplate) => row.id"
       />
       <div class="pagination-wrapper">
         <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadFaces" />
@@ -163,19 +142,32 @@ import {
   NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem,
   NInput, NSwitch, NGrid, NGi, NInputNumber, NUpload, useMessage
 } from 'naive-ui'
-import type { UploadFileInfo } from 'naive-ui'
 import { faceTemplateApi } from '../../api/index'
-import { IMAGE_UPLOAD_ACCEPT, UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../constants/media'
-import { adminUploadAction, parseAdminUploadResponse, useAdminUploadHeaders } from '../../utils/admin-upload'
+import type { FaceTemplate, FaceTemplateFormData } from '../../api/index'
+import { IMAGE_UPLOAD_ACCEPT } from '../../constants/media'
+import { adminUploadAction, useAdminUploadHeaders } from '../../utils/admin-upload'
+import {
+  ADMIN_ASSET_LIST_QUERY,
+  ADMIN_ASSET_PAGE_SIZE,
+  ADMIN_STATUS_OPTIONS,
+  createAdminUploadFinishHandler,
+  useAdminCrudModal,
+  useAdminDeleteModal,
+  useAdminListState,
+} from './assetLibraryShared'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
+import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
 const message = useMessage()
 
 // ============ 列表数据 ============
-interface FaceItem { id: number; name: string; image_url: string; category: string; sort_order: number; is_enabled: boolean }
-const faces = ref<FaceItem[]>([])
-const loading = ref(false)
+const { list: faces, loading, loadList: loadFaces } = useAdminListState<FaceTemplate>({
+  fetcher: () => faceTemplateApi.adminList(ADMIN_ASSET_LIST_QUERY),
+  message,
+  errorMessage: '加载失败',
+})
 const page = ref(1)
-const pageSize = 50
+const pageSize = ADMIN_ASSET_PAGE_SIZE
 const pageCount = computed(() => Math.max(1, Math.ceil(faces.value.length / pageSize)))
 
 const filterCategory = ref<string | null>(null)
@@ -185,10 +177,7 @@ const categoryOptions = [
   { label: '男人', value: 'male' },
   { label: '女人', value: 'female' },
 ]
-const statusOptions = [
-  { label: '已上架', value: 1 },
-  { label: '已下架', value: 0 },
-]
+const statusOptions = ADMIN_STATUS_OPTIONS
 
 const filteredFaces = computed(() => {
   let result = faces.value
@@ -203,7 +192,7 @@ const maleFaceCount = computed(() => faces.value.filter(item => item.category ==
 const columns = [
   {
     title: '图片', key: 'image_url', width: 80,
-    render(row: FaceItem) {
+    render(row: FaceTemplate) {
       return h('div', { style: 'width: 50px; height: 66px; border-radius: 8px; overflow: hidden; background: #27272a;' }, [
         h('img', { src: row.image_url, style: 'width: 100%; height: 100%; object-fit: cover;', onError: (e: Event) => { (e.target as HTMLImageElement).style.display = 'none' } })
       ])
@@ -212,19 +201,19 @@ const columns = [
   { title: '名称', key: 'name', ellipsis: { tooltip: true } },
   {
     title: '分类', key: 'category', width: 80,
-    render(row: FaceItem) { return h('span', { style: row.category === 'male' ? 'color: #60a5fa;' : 'color: #f472b6;' }, row.category === 'male' ? '男人' : '女人') }
+    render(row: FaceTemplate) { return h('span', { style: row.category === 'male' ? 'color: #60a5fa;' : 'color: #f472b6;' }, row.category === 'male' ? '男人' : '女人') }
   },
   {
     title: '排序', key: 'sort_order', width: 70,
-    render(row: FaceItem) { return h('span', { style: 'color: #71717a;' }, row.sort_order) }
+    render(row: FaceTemplate) { return h('span', { style: 'color: #71717a;' }, row.sort_order) }
   },
   {
     title: '状态', key: 'is_enabled', width: 80,
-    render(row: FaceItem) { return h('span', { style: row.is_enabled ? 'color: #22c55e;' : 'color: #ef4444;' }, row.is_enabled ? '已上架' : '已下架') }
+    render(row: FaceTemplate) { return h('span', { style: row.is_enabled ? 'color: #22c55e;' : 'color: #ef4444;' }, row.is_enabled ? '已上架' : '已下架') }
   },
   {
     title: '操作', key: 'actions', width: 140,
-    render(row: FaceItem) {
+    render(row: FaceTemplate) {
       return h('div', { style: 'display: flex; gap: 8px;' }, [
         h(NButton, { size: 'small', secondary: true, onClick: () => openEditModal(row) }, { default: () => '编辑' }),
         h(NButton, { size: 'small', tertiary: true, style: 'color: #ef4444;', onClick: () => openDeleteModal(row) }, { default: () => '删除' }),
@@ -234,27 +223,27 @@ const columns = [
 ]
 
 // ============ 新增/编辑 ============
-const showModal = ref(false)
-const isEditing = ref(false)
-const saving = ref(false)
-const formRef = ref()
-const formData = ref({ name: '', image_url: '', category: 'male', sort_order: 0, is_enabled: true })
-const editingId = ref<number | null>(null)
+const {
+  showModal,
+  isEditing,
+  saving,
+  formRef,
+  formData,
+  openAddModal,
+  openEditModal,
+  handleSave,
+} = useAdminCrudModal<FaceTemplate, FaceTemplateFormData>({
+  createDefault: () => ({ name: '', image_url: '', category: 'male', sort_order: 0, is_enabled: true }),
+  toForm: (item) => ({ name: item.name, image_url: item.image_url, category: item.category, sort_order: item.sort_order, is_enabled: item.is_enabled }),
+  create: (payload) => faceTemplateApi.adminCreate(payload),
+  update: (id, payload) => faceTemplateApi.adminUpdate(id, payload),
+  afterSave: loadFaces,
+  message,
+})
 const uploading = ref(false)
 
 const uploadHeaders = useAdminUploadHeaders()
-
-function handleUploadFinish({ file, event }: { file: UploadFileInfo; event?: ProgressEvent }) {
-  uploading.value = false
-  const res = parseAdminUploadResponse(event)
-  if (res.code === 0 && res.data?.url) {
-    formData.value.image_url = res.data.url
-    message.success(UPLOAD_SUCCESS_MESSAGE)
-  } else {
-    message.error(res.msg || UPLOAD_FAILED_MESSAGE)
-  }
-  return file
-}
+const handleUploadFinish = createAdminUploadFinishHandler(uploading, formData, 'image_url', message)
 
 const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
@@ -262,61 +251,12 @@ const rules = {
   category: [{ required: true, message: '请选择分类', trigger: 'change' }],
 }
 
-function openAddModal() {
-  isEditing.value = false; editingId.value = null
-  formData.value = { name: '', image_url: '', category: 'male', sort_order: 0, is_enabled: true }
-  showModal.value = true
-}
-
-function openEditModal(face: FaceItem) {
-  isEditing.value = true; editingId.value = face.id
-  formData.value = { name: face.name, image_url: face.image_url, category: face.category, sort_order: face.sort_order, is_enabled: face.is_enabled }
-  showModal.value = true
-}
-
-async function handleSave() {
-  try { await formRef.value?.validate() } catch { return }
-  saving.value = true
-  try {
-    if (isEditing.value && editingId.value) {
-      await faceTemplateApi.adminUpdate(editingId.value, formData.value)
-      message.success('更新成功')
-    } else {
-      await faceTemplateApi.adminCreate(formData.value)
-      message.success('创建成功')
-    }
-    showModal.value = false
-    await loadFaces()
-  } catch (e: any) { message.error(e.msg || '操作失败') }
-  finally { saving.value = false }
-}
-
 // ============ 删除 ============
-const showDeleteModal = ref(false)
-const deleting = ref(false)
-const deleteTarget = ref<FaceItem | null>(null)
-
-function openDeleteModal(face: FaceItem) { deleteTarget.value = face; showDeleteModal.value = true }
-
-async function confirmDelete() {
-  if (!deleteTarget.value) return
-  deleting.value = true
-  try {
-    await faceTemplateApi.adminDelete(deleteTarget.value.id)
-    message.success('删除成功'); showDeleteModal.value = false; await loadFaces()
-  } catch (e: any) { message.error(e.msg || '删除失败') }
-  finally { deleting.value = false }
-}
-
-// ============ 加载数据 ============
-async function loadFaces() {
-  loading.value = true
-  try {
-    const res: any = await faceTemplateApi.adminList({ page: 1, page_size: 200 })
-    if (res.code === 0) faces.value = res.data?.list || []
-  } catch { message.error('加载失败') }
-  finally { loading.value = false }
-}
+const { showDeleteModal, deleting, deleteTarget, openDeleteModal, confirmDelete } = useAdminDeleteModal<FaceTemplate>({
+  deleteById: (id) => faceTemplateApi.adminDelete(id),
+  afterDelete: loadFaces,
+  message,
+})
 
 onMounted(() => { loadFaces() })
 </script>

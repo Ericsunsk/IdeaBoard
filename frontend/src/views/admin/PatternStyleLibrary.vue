@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">风格总数</span>
-        <span class="summary-value">{{ list.length }}</span>
-        <span class="summary-foot">含下架模型</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">已上架</span>
-        <span class="summary-value">{{ enabledCount }}</span>
-        <span class="summary-foot">用户可见</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">Pattern 流程</span>
-        <span class="summary-value">{{ patternWorkflowCount }}</span>
-        <span class="summary-foot">pattern-gen 分类</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">筛选结果</span>
-        <span class="summary-value">{{ filteredList.length }}</span>
-        <span class="summary-foot">当前列表</span>
-      </div>
+      <AdminSummaryCard label="风格总数" :value="list.length" foot="含下架模型" />
+      <AdminSummaryCard label="已上架" :value="enabledCount" foot="用户可见" />
+      <AdminSummaryCard label="Pattern 流程" :value="patternWorkflowCount" foot="pattern-gen 分类" />
+      <AdminSummaryCard label="筛选结果" :value="filteredList.length" foot="当前列表" />
     </div>
 
     <div class="toolbar">
@@ -48,13 +32,8 @@
     </div>
 
     <div class="table-card">
-      <div class="panel-header">
-        <div>
-          <h3 class="panel-title">风格模型列表</h3>
-          <p class="panel-desc">支持编辑、上下架与删除。工作流分类用于区分不同生成链路。</p>
-        </div>
-      </div>
-      <n-data-table :columns="columns" :data="filteredList" :loading="loading" :pagination="false" :bordered="false" :row-key="(row: any) => row.id" />
+      <AdminSectionHeader title="风格模型列表" description="支持编辑、上下架与删除。工作流分类用于区分不同生成链路。" />
+      <n-data-table :columns="columns" :data="filteredList" :loading="loading" :pagination="false" :bordered="false" :row-key="(row: PatternStyle) => row.id" />
       <div class="pagination-wrapper">
         <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadList" />
       </div>
@@ -100,18 +79,31 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
 import { NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem, NInput, NSwitch, NGrid, NGi, NInputNumber, NUpload, useMessage } from 'naive-ui'
-import type { UploadFileInfo } from 'naive-ui'
 import { patternStyleApi } from '../../api/index'
-import { IMAGE_UPLOAD_ACCEPT, UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../constants/media'
-import { adminUploadAction, parseAdminUploadResponse, useAdminUploadHeaders } from '../../utils/admin-upload'
+import type { PatternStyle, PatternStyleFormData } from '../../api/index'
+import { IMAGE_UPLOAD_ACCEPT } from '../../constants/media'
+import { adminUploadAction, useAdminUploadHeaders } from '../../utils/admin-upload'
+import {
+  ADMIN_ASSET_LIST_QUERY,
+  ADMIN_ASSET_PAGE_SIZE,
+  ADMIN_STATUS_OPTIONS,
+  createAdminUploadFinishHandler,
+  useAdminCrudModal,
+  useAdminDeleteModal,
+  useAdminListState,
+} from './assetLibraryShared'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
+import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
 const message = useMessage()
 
-interface Item { id: number; name: string; image_url: string; category: string; sort_order: number; is_enabled: boolean }
-const list = ref<Item[]>([])
-const loading = ref(false)
+const { list, loading, loadList } = useAdminListState<PatternStyle>({
+  fetcher: () => patternStyleApi.adminList(ADMIN_ASSET_LIST_QUERY),
+  message,
+  errorMessage: '加载失败',
+})
 const page = ref(1)
-const pageSize = 50
+const pageSize = ADMIN_ASSET_PAGE_SIZE
 const pageCount = computed(() => Math.max(1, Math.ceil(list.value.length / pageSize)))
 
 const filterCategory = ref<string | null>(null)
@@ -120,7 +112,7 @@ const filterEnabled = ref<number | null>(null)
 const categoryOptions = [
   { label: 'Pattern · 图案生成', value: 'pattern-gen' },
 ]
-const statusOptions = [{ label: '已上架', value: 1 }, { label: '已下架', value: 0 }]
+const statusOptions = ADMIN_STATUS_OPTIONS
 const categoryLabelMap: Record<string, string> = {
   ...Object.fromEntries(categoryOptions.map(o => [o.value, o.label])),
 }
@@ -138,19 +130,19 @@ const patternWorkflowCount = computed(() => list.value.filter(item => item.categ
 const columns = [
   {
     title: '预览', key: 'image_url', width: 70,
-    render(row: Item) {
+    render(row: PatternStyle) {
       return h('div', { style: 'width: 50px; height: 50px; border-radius: 8px; overflow: hidden; background: #27272a;' }, [
         h('img', { src: row.image_url, style: 'width: 100%; height: 100%; object-fit: cover;', onError: (e: Event) => { (e.target as HTMLImageElement).style.display = 'none' } })
       ])
     }
   },
   { title: '名称', key: 'name', ellipsis: { tooltip: true } },
-  { title: '工作流分类', key: 'category', width: 160, render(row: Item) { return h('span', { style: 'color: #a1a1aa; font-size: 12px;' }, categoryLabelMap[row.category] || row.category) } },
-  { title: '排序', key: 'sort_order', width: 70, render(row: Item) { return h('span', { style: 'color: #71717a;' }, row.sort_order) } },
-  { title: '状态', key: 'is_enabled', width: 80, render(row: Item) { return h('span', { style: row.is_enabled ? 'color: #22c55e;' : 'color: #ef4444;' }, row.is_enabled ? '已上架' : '已下架') } },
+  { title: '工作流分类', key: 'category', width: 160, render(row: PatternStyle) { return h('span', { style: 'color: #a1a1aa; font-size: 12px;' }, categoryLabelMap[row.category] || row.category) } },
+  { title: '排序', key: 'sort_order', width: 70, render(row: PatternStyle) { return h('span', { style: 'color: #71717a;' }, row.sort_order) } },
+  { title: '状态', key: 'is_enabled', width: 80, render(row: PatternStyle) { return h('span', { style: row.is_enabled ? 'color: #22c55e;' : 'color: #ef4444;' }, row.is_enabled ? '已上架' : '已下架') } },
   {
     title: '操作', key: 'actions', width: 140,
-    render(row: Item) {
+    render(row: PatternStyle) {
       return h('div', { style: 'display: flex; gap: 8px;' }, [
         h(NButton, { size: 'small', secondary: true, onClick: () => openEditModal(row) }, { default: () => '编辑' }),
         h(NButton, { size: 'small', tertiary: true, style: 'color: #ef4444;', onClick: () => openDeleteModal(row) }, { default: () => '删除' }),
@@ -159,66 +151,38 @@ const columns = [
   },
 ]
 
-const showModal = ref(false)
-const isEditing = ref(false)
-const saving = ref(false)
-const formRef = ref()
-const formData = ref({ name: '', image_url: '', category: 'pattern-gen', sort_order: 0, is_enabled: true })
-const editingId = ref<number | null>(null)
+const {
+  showModal,
+  isEditing,
+  saving,
+  formRef,
+  formData,
+  openAddModal,
+  openEditModal,
+  handleSave,
+} = useAdminCrudModal<PatternStyle, PatternStyleFormData>({
+  createDefault: () => ({ name: '', image_url: '', category: 'pattern-gen', sort_order: 0, is_enabled: true }),
+  toForm: (item) => ({ name: item.name, image_url: item.image_url, category: item.category, sort_order: item.sort_order, is_enabled: item.is_enabled }),
+  create: (payload) => patternStyleApi.adminCreate(payload),
+  update: (id, payload) => patternStyleApi.adminUpdate(id, payload),
+  afterSave: loadList,
+  message,
+})
 const uploading = ref(false)
 
 const uploadHeaders = useAdminUploadHeaders()
-
-function handleUploadFinish({ file, event }: { file: UploadFileInfo; event?: ProgressEvent }) {
-  uploading.value = false
-  const res = parseAdminUploadResponse(event)
-  if (res.code === 0 && res.data?.url) {
-    formData.value.image_url = res.data.url
-    message.success(UPLOAD_SUCCESS_MESSAGE)
-  } else {
-    message.error(res.msg || UPLOAD_FAILED_MESSAGE)
-  }
-  return file
-}
+const handleUploadFinish = createAdminUploadFinishHandler(uploading, formData, 'image_url', message)
 
 const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   image_url: [{ required: true, message: '请上传预览图', trigger: 'change' }],
   category: [{ required: true, message: '请选择功能分类', trigger: 'change' }],
 }
-
-function openAddModal() { isEditing.value = false; editingId.value = null; formData.value = { name: '', image_url: '', category: 'pattern-gen', sort_order: 0, is_enabled: true }; showModal.value = true }
-function openEditModal(item: Item) { isEditing.value = true; editingId.value = item.id; formData.value = { name: item.name, image_url: item.image_url, category: item.category, sort_order: item.sort_order, is_enabled: item.is_enabled }; showModal.value = true }
-
-async function handleSave() {
-  try { await formRef.value?.validate() } catch { return }
-  saving.value = true
-  try {
-    if (isEditing.value && editingId.value) { await patternStyleApi.adminUpdate(editingId.value, formData.value); message.success('更新成功') }
-    else { await patternStyleApi.adminCreate(formData.value); message.success('创建成功') }
-    showModal.value = false; await loadList()
-  } catch (e: any) { message.error(e.msg || '操作失败') }
-  finally { saving.value = false }
-}
-
-const showDeleteModal = ref(false)
-const deleting = ref(false)
-const deleteTarget = ref<Item | null>(null)
-function openDeleteModal(item: Item) { deleteTarget.value = item; showDeleteModal.value = true }
-async function confirmDelete() {
-  if (!deleteTarget.value) return
-  deleting.value = true
-  try { await patternStyleApi.adminDelete(deleteTarget.value.id); message.success('删除成功'); showDeleteModal.value = false; await loadList() }
-  catch (e: any) { message.error(e.msg || '删除失败') }
-  finally { deleting.value = false }
-}
-
-async function loadList() {
-  loading.value = true
-  try { const res: any = await patternStyleApi.adminList({ page: 1, page_size: 200 }); if (res.code === 0) list.value = res.data?.list || [] }
-  catch { message.error('加载失败') }
-  finally { loading.value = false }
-}
+const { showDeleteModal, deleting, deleteTarget, openDeleteModal, confirmDelete } = useAdminDeleteModal<PatternStyle>({
+  deleteById: (id) => patternStyleApi.adminDelete(id),
+  afterDelete: loadList,
+  message,
+})
 
 onMounted(() => { loadList() })
 </script>

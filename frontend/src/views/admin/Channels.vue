@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">总渠道</span>
-        <span class="summary-value">{{ channels.length }}</span>
-        <span class="summary-foot">当前配置</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">Banana</span>
-        <span class="summary-value">{{ bananaCount }}</span>
-        <span class="summary-foot">已接入类型</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">模型总数</span>
-        <span class="summary-value">{{ totalModelCount }}</span>
-        <span class="summary-foot">跨渠道汇总</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">空模型配置</span>
-        <span class="summary-value">{{ emptyModelCount }}</span>
-        <span class="summary-foot">建议补齐</span>
-      </div>
+      <AdminSummaryCard label="总渠道" :value="channels.length" foot="当前配置" />
+      <AdminSummaryCard label="Banana" :value="bananaCount" foot="已接入类型" />
+      <AdminSummaryCard label="模型总数" :value="totalModelCount" foot="跨渠道汇总" />
+      <AdminSummaryCard label="空模型配置" :value="emptyModelCount" foot="建议补齐" />
     </div>
 
     <div class="toolbar">
@@ -42,12 +26,7 @@
     </div>
 
     <div class="table-card">
-      <div class="panel-header">
-        <div>
-          <h3 class="panel-title">渠道商列表</h3>
-          <p class="panel-desc">配置删除将影响账号池新增可选项，请谨慎执行。</p>
-        </div>
-      </div>
+      <AdminSectionHeader title="渠道商列表" description="配置删除将影响账号池新增可选项，请谨慎执行。" />
       <n-data-table
         :columns="columns"
         :data="channels"
@@ -92,6 +71,9 @@ import type { Channel } from '../../api/channel'
 import { NButton, NDataTable, NModal, NForm, NFormItem, NInput, NIcon, NSpace, NTag, NSelect, NDynamicTags, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { AddOutline } from '@vicons/ionicons5'
+import { extractApiErrorMessage, splitCommaValues } from './assetLibraryShared'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
+import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -101,8 +83,7 @@ const bananaCount = computed(() => channels.value.filter(item => item.type === '
 const emptyModelCount = computed(() => channels.value.filter(item => !item.models || !item.models.trim()).length)
 const totalModelCount = computed(() => {
   return channels.value.reduce((sum, item) => {
-    if (!item.models) return sum
-    return sum + item.models.split(',').filter(Boolean).length
+    return sum + splitCommaValues(item.models).length
   }, 0)
 })
 
@@ -141,7 +122,7 @@ const columns: DataTableColumns<Channel> = [
   {
     title: '可用模型', key: 'models', width: 200,
     render: (row) => {
-      const models = row.models ? row.models.split(',').filter(Boolean) : []
+      const models = splitCommaValues(row.models)
       return models.length
         ? h(NSpace, { size: 'small', wrap: true }, () => models.map(m => h(NTag, { size: 'small', type: 'info', bordered: false }, () => m)))
         : h('span', { style: { color: '#71717a' } }, '未设置')
@@ -172,8 +153,8 @@ async function loadChannels() {
     if (res.code === 0) {
       channels.value = res.data?.list || []
     }
-  } catch (e: any) {
-    message.error(e.msg || '加载渠道商列表失败')
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, '加载渠道商列表失败'))
   } finally {
     loading.value = false
   }
@@ -190,7 +171,7 @@ function openEditModal(row: Channel) {
   isEdit.value = true
   currentId.value = row.id
   formData.value = { type: row.type, name: row.name, api_url: row.api_url, models: row.models || '' }
-  modelTags.value = row.models ? row.models.split(',').filter(Boolean) : []
+  modelTags.value = splitCommaValues(row.models)
   showModal.value = true
 }
 
@@ -209,8 +190,8 @@ async function handleSave() {
     }
     showModal.value = false
     await loadChannels()
-  } catch (e: any) {
-    message.error(e.msg || e.message || '操作失败')
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, '操作失败'))
   } finally {
     saveLoading.value = false
   }

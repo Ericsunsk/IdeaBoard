@@ -3,168 +3,151 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">工作流系统提示词</h1>
-        <p class="page-desc">为当前走任务链路的画布工作流配置系统预设提示词，提交任务时将自动拼接到用户输入之前（用户不可见）</p>
+        <p class="page-desc">按节点分组管理工作流提示词。列表页只做总览，具体内容在弹窗内编辑。</p>
       </div>
     </div>
 
     <div class="tip-bar">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span>支持模板变量：在提示词中插入 <code v-pre>{{变量名}}</code>，系统会自动替换为用户实际选择的值。仅对当前工作流任务链生效。</span>
+      <span>支持模板变量：在提示词中插入 <code v-pre>{{变量名}}</code>，系统会自动替换为实际值。页面按节点分组展示，但每个功能块仍单独保存。</span>
     </div>
 
-    <div class="prompt-list">
-      <div v-for="item in featureList" :key="item.slug" class="prompt-card">
-        <div class="prompt-card-header">
-          <span class="prompt-card-title">{{ item.title }}</span>
-          <span class="prompt-card-slug">{{ item.slug }}</span>
+    <div class="node-grid">
+      <section v-for="group in groupedFeatureGroups" :key="group.key" class="node-card">
+        <div class="node-card-header">
+          <div class="node-card-copy">
+            <div class="node-title-row">
+              <h2 class="node-card-title">{{ group.title }}</h2>
+              <span class="node-card-count">{{ group.items.length }} 项功能</span>
+            </div>
+            <p class="node-card-desc">{{ group.desc }}</p>
+          </div>
         </div>
+
+        <div class="node-card-meta">
+          <span class="meta-chip">{{ getGroupVariableCount(group) }} 个变量</span>
+          <span class="meta-chip">{{ getGroupFilledCount(group) }}/{{ group.items.length }} 已配置</span>
+        </div>
+
+        <div class="node-feature-preview">
+          <span v-for="item in group.items" :key="item.slug" class="feature-pill">{{ item.title }}</span>
+        </div>
+
+        <div class="node-card-actions">
+          <n-button size="small" type="primary" @click="openEditor(group.key)">编辑</n-button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <AdminEditorModal
+    :show="Boolean(activeGroup)"
+    :eyebrow="activeGroup?.title || ''"
+    :title="activeGroup ? `编辑 ${activeGroup.title} 节点提示词` : ''"
+    :description="activeGroup?.desc || ''"
+    @close="closeEditor"
+  >
+    <template #header-aside>
+      <div v-if="activeGroup" class="editor-meta">
+        <span class="meta-chip">{{ activeGroup.items.length }} 项功能</span>
+        <span class="meta-chip">{{ getGroupVariableCount(activeGroup) }} 个变量</span>
+      </div>
+    </template>
+
+    <div v-if="activeGroup" class="editor-feature-stack">
+      <article v-for="item in activeGroup.items" :key="item.slug" class="feature-block">
+        <div class="feature-header">
+          <div class="feature-title-row">
+            <span class="feature-title">{{ item.title }}</span>
+            <span class="feature-slug">{{ item.slug }}</span>
+          </div>
+        </div>
+
         <div v-if="getVarsForSlug(item.slug).length > 0" class="var-buttons">
-          <span class="var-buttons-label">插入变量：</span>
+          <span class="var-buttons-label">插入变量</span>
           <button
             v-for="v in getVarsForSlug(item.slug)"
             :key="v.key"
-            class="var-btn"
+            :class="['var-btn', `is-${getVarTone(v.key)}`]"
             @click="insertVar(item.slug, v.key)"
-          ><span class="var-btn-key">{{ v.key }}</span><span class="var-btn-desc">{{ v.desc }}</span></button>
+          >
+            <span class="var-btn-key">{{ v.key }}</span>
+            <span class="var-btn-desc">{{ v.desc }}</span>
+          </button>
         </div>
+
         <div v-if="getFeatureNote(item.slug)" class="var-note">
           {{ getFeatureNote(item.slug) }}
         </div>
+
         <n-input
           :ref="(el: any) => { if (el) textareaRefs[item.slug] = el }"
           v-model:value="promptMap[item.slug]"
           type="textarea"
           :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
-          :autosize="{ minRows: 3, maxRows: 8 }"
+          :autosize="{ minRows: 4, maxRows: 10 }"
           :loading="saving[item.slug]"
         />
-        <div class="prompt-card-actions">
-          <span class="prompt-card-count">{{ (promptMap[item.slug] || '').length }} 字</span>
+
+        <div class="feature-actions">
+          <span class="feature-count">{{ (promptMap[item.slug] || '').length }} 字</span>
           <n-button size="small" type="primary" :loading="saving[item.slug]" @click="savePrompt(item.slug)">
             保存
           </n-button>
         </div>
-      </div>
+      </article>
     </div>
-  </div>
+  </AdminEditorModal>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { NInput, NButton, useMessage } from 'naive-ui'
 import { featurePromptApi } from '../../api'
-import { WEAR_TILE_MODE_TEMPLATE_DESC } from '../../components/canvas/nodes/nodeOptionConfig'
+import AdminEditorModal from './components/AdminEditorModal.vue'
+import {
+  featureMap,
+  groupedFeatureGroups,
+  getFeatureNote,
+  getGroupFilledCount as calcGroupFilledCount,
+  getGroupVariableCount as calcGroupVariableCount,
+  getVarTone,
+  getVarsForSlug,
+  type FeatureGroup,
+  type FeatureSlug,
+} from './featurePromptMeta'
 
 const message = useMessage()
 
-// 模板变量定义
-interface VarDef { key: string; desc: string }
-
-const promptVars: VarDef[] = [
-  { key: '{{user_prompt}}', desc: '当前请求拼装后的提示词文本' },
-]
-
-const noVars: VarDef[] = []
-
-const featureList = [
-  { slug: 'sketch-to-design', title: 'Quick · 线稿成款' },
-  { slug: 'partial-edit', title: 'Edit · 局部改款' },
-  { slug: 'style-innovate', title: 'Quick · 款式创新' },
-  { slug: 'style-fusion', title: 'Fusion · 双图融合' },
-  { slug: 'series-color', title: 'Color · 多色配色' },
-  { slug: 'directed-recolor', title: 'Color · 单色换色' },
-  { slug: 'fabric-on-body', title: 'Wear · 上身贴合' },
-  { slug: 'multi-angle', title: 'Model · 单视角控制' },
-  { slug: 'virtual-3d', title: 'Display · 商品展示' },
-  { slug: 'face-swap', title: 'Edit · 定向换脸' },
-  { slug: 'bg-swap', title: 'Edit · 换背景' },
-  { slug: 'pattern-gen', title: 'Pattern · 图案生成' },
-  { slug: 'hd-upscale', title: 'Enhance · 高清放大' },
-  { slug: 'canvas-extend', title: 'Enhance · 画布延伸' },
-] as const
-
-type FeatureSlug = (typeof featureList)[number]['slug']
-
-const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
-  'sketch-to-design': promptVars,
-  'partial-edit': promptVars,
-  'style-innovate': [
-    { key: '{{strength}}', desc: '改变幅度分数（1-10）' },
-    { key: '{{user_prompt}}', desc: '当前提交的描述文本' },
-  ],
-  'series-color': [
-    { key: '{{color_type}}', desc: '配色类型，当前 Color 节点多色模式固定为 reference（自定义多色配色）' },
-    { key: '{{colors}}', desc: 'Color 节点多色模式下的配色列表（如 #8b3a3a, #6b2d3e）' },
-    { key: '{{strength}}', desc: 'Color 节点多色模式的配色强度百分比（0-100）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词，可用来描述颜色主次、比例倾向和整体换色方向' },
-  ],
-  'directed-recolor': [
-    { key: '{{target_color}}', desc: 'Color 节点单色模式下的目标颜色（如 #ff5500）' },
-    { key: '{{strength}}', desc: 'Color 节点单色模式的换色强度百分比（0-100）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词（单色模式可选）' },
-  ],
-  'fabric-on-body': [
-    { key: '{{tile_mode}}', desc: WEAR_TILE_MODE_TEMPLATE_DESC },
-    { key: '{{fabric_rotation}}', desc: 'Texture 方向角度（0-360）' },
-    { key: '{{fabric_scale}}', desc: 'Texture 大小百分比（10-300）' },
-    { key: '{{fabric_opacity}}', desc: 'Texture 融合强度百分比（0-100）' },
-    { key: '{{original_image_url}}', desc: 'Body 原图 URL（由 Wear 节点 Image 输入自动传入，无需手填）' },
-    { key: '{{mask_image_url}}', desc: 'Mask 节点输出上传后的 URL（连接 Mask 时自动传入；未连接时为空）' },
-    { key: '{{use_mask}}', desc: '是否启用蒙版（连接 Mask 时自动为 true，未连接时自动为 false）' },
-  ],
-  'multi-angle': [
-    { key: '{{angle_spec}}', desc: '视角控制参数（JSON，系统按它决定 yaw 与景别）' },
-    { key: '{{model_url}}', desc: '画布里接到 Model 输入口的参考图（系统自动传值）' },
-    { key: '{{model_strength}}', desc: 'Model 输入口权重（0-100，越高越贴近参考图主体）' },
-    { key: '{{pose_url}}', desc: '画布里接到 Pose 输入口的姿态参考图（系统自动传值）' },
-    { key: '{{pose_strength}}', desc: 'Pose 输入口权重（0-100，越高越跟随姿态）' },
-    { key: '{{background}}', desc: 'Model 节点背景参数（original / studio）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本（弱修饰，用于氛围和细节）' },
-  ],
-  'virtual-3d': [
-    { key: '{{viewpoint}}', desc: 'Display 节点所选展示视角，系统会自动转换成中文描述（如：45° 侧视）' },
-    { key: '{{lighting}}', desc: 'Display 节点光影，系统会自动转换成中文描述（如：高级暖白）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本；未连接时系统会用当前视角/光影摘要兜底' },
-  ],
-  'face-swap': noVars,
-  'bg-swap': [
-    { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本（可选，未连接时系统会用默认背景切换描述）' },
-  ],
-  'pattern-gen': [
-    { key: '{{user_prompt}}', desc: '底部输入栏提交的图案生成提示词' },
-  ],
-  'style-fusion': [
-    { key: '{{user_prompt}}', desc: '用于弱修饰/辅助修饰融合方式、质感、细节、氛围；Image A / Image B 主次建议通过滑块控制' },
-    { key: '{{blend_ratio}}', desc: 'Image A 占比（0-100）' },
-    { key: '{{image_a_weight}}', desc: 'Image A 实际融合百分比' },
-    { key: '{{image_b_weight}}', desc: 'Image B 实际融合百分比' },
-  ],
-  'hd-upscale': [
-    { key: '{{use_mask}}', desc: '是否启用局部增强（连接 Mask 时自动为 true，否则为 false）' },
-    { key: '{{original_image_url}}', desc: 'Enhance 节点输入的原图 URL（自动传入）' },
-    { key: '{{mask_image_url}}', desc: 'Mask 节点输出上传后的 URL（仅连接 Mask 时自动传入）' },
-    { key: '{{upscale_mode}}', desc: 'HD 模式（base / enhancement）' },
-    { key: '{{upscale_factor}}', desc: '放大倍数（2 / 3 / 4）' },
-    { key: '{{output_format}}', desc: '输出格式（jpg / png）' },
-    { key: '{{output_quality}}', desc: '输出质量（30-100）' },
-  ],
-  'canvas-extend': promptVars,
-}
-
-function getVarsForSlug(slug: FeatureSlug): VarDef[] {
-  return featureVarMap[slug] || noVars
-}
-
-const featureNotes: Partial<Record<FeatureSlug, string>> = {
-  'hd-upscale': 'Enhance · HD 在未连接 Mask 时走直连超分，不使用这里的系统提示词；连接 Mask 进入局部增强任务链后，才会使用下方模板变量与系统提示词。',
-}
-
-function getFeatureNote(slug: FeatureSlug) {
-  return featureNotes[slug] || ''
-}
-
 // textarea 引用 + 插入逻辑
 const textareaRefs = reactive<Record<string, any>>({})
+const activeGroupKey = ref<string | null>(null)
+const activeGroup = computed<FeatureGroup | null>(() => {
+  return groupedFeatureGroups.find((group) => group.key === activeGroupKey.value) || null
+})
+
+function openEditor(groupKey: string) {
+  const group = groupedFeatureGroups.find((item) => item.key === groupKey)
+  if (group) {
+    resetGroupDraftFromSaved(group)
+  }
+  activeGroupKey.value = groupKey
+}
+
+function closeEditor() {
+  if (activeGroup.value) {
+    resetGroupDraftFromSaved(activeGroup.value)
+  }
+  activeGroupKey.value = null
+}
+
+function getGroupVariableCount(group: FeatureGroup) {
+  return calcGroupVariableCount(group)
+}
+
+function getGroupFilledCount(group: FeatureGroup) {
+  return calcGroupFilledCount(group, savedPromptMap)
+}
 
 function insertVar(slug: FeatureSlug, varKey: string) {
   const current = promptMap[slug] || ''
@@ -178,8 +161,15 @@ function insertVar(slug: FeatureSlug, varKey: string) {
 }
 
 const promptMap = reactive<Record<string, string>>({})
+const savedPromptMap = reactive<Record<string, string>>({})
 const saving = reactive<Record<string, boolean>>({})
 const loading = ref(false)
+
+function resetGroupDraftFromSaved(group: FeatureGroup) {
+  for (const item of group.items) {
+    promptMap[item.slug] = savedPromptMap[item.slug] || ''
+  }
+}
 
 async function loadPrompts() {
   loading.value = true
@@ -187,7 +177,9 @@ async function loadPrompts() {
     const res: any = await featurePromptApi.adminList()
     if (res.code === 0 && res.data?.prompts) {
       for (const [slug, prompt] of Object.entries(res.data.prompts)) {
-        promptMap[slug] = prompt as string
+        const val = (prompt as string) || ''
+        savedPromptMap[slug] = val
+        promptMap[slug] = val
       }
     }
   } catch (error) {
@@ -202,7 +194,8 @@ async function savePrompt(slug: FeatureSlug) {
   try {
     const res: any = await featurePromptApi.adminSet(slug, promptMap[slug] || '')
     if (res.code === 0) {
-      message.success(`「${featureList.find(f => f.slug === slug)?.title}」提示词已保存`)
+      savedPromptMap[slug] = promptMap[slug] || ''
+      message.success(`「${featureMap[slug].title}」提示词已保存`)
     } else {
       message.error(res.msg || '保存失败')
     }
@@ -218,52 +211,171 @@ onMounted(loadPrompts)
 <style scoped>
 @import './admin-common.css';
 
-.prompt-list {
+.node-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.node-card {
+  background: var(--admin-card);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
+  gap: 14px;
+  min-height: 244px;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.node-card:hover {
+  border-color: #2e3034;
+  background: #141416;
+}
+
+.node-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
 }
 
-.prompt-card {
-  background: linear-gradient(180deg, rgba(28, 37, 49, 0.98), rgba(22, 30, 40, 0.96));
-  border: 1px solid #324154;
-  border-radius: 14px;
-  padding: 16px 20px;
+.node-card-copy {
+  min-width: 0;
+}
+
+.node-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.node-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--admin-text-1);
+}
+
+.node-card-count {
+  font-size: 11px;
+  color: var(--admin-text-3);
+  background: #17181a;
+  border: 1px solid var(--admin-border);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.node-card-desc {
+  margin: 6px 0 0;
+  color: var(--admin-text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.node-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  background: #17181a;
+  color: var(--admin-text-2);
+  font-size: 11px;
+}
+
+.node-feature-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+
+.feature-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #17181a;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-2);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.node-card-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.editor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editor-feature-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.feature-block {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 14px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.prompt-card-header {
+.feature-block:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.feature-header,
+.feature-title-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.prompt-card-title {
+.feature-title {
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf7;
+  color: var(--admin-text-1);
 }
 
-.prompt-card-slug {
+.feature-slug {
   font-size: 11px;
-  color: #7d8ca1;
-  background: #243040;
+  color: var(--admin-text-3);
+  background: #17181a;
+  border: 1px solid var(--admin-border);
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-family: monospace;
 }
 
-.prompt-card-actions {
+.feature-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.prompt-card-count {
+.feature-count {
   font-size: 11px;
-  color: #7d8ca1;
+  color: var(--admin-text-3);
 }
 
 .var-buttons {
@@ -275,40 +387,109 @@ onMounted(loadPrompts)
 
 .var-buttons-label {
   font-size: 11px;
-  color: #8ca0b6;
+  color: var(--admin-text-2);
   flex-shrink: 0;
 }
 
 .var-note {
   font-size: 11px;
-  color: #8ca0b6;
+  color: var(--admin-text-3);
 }
 
 .var-btn {
+  --var-accent: #5eead4;
+  --var-bg: #115e59;
+  --var-bg-hover: #0f766e;
+  --var-key: #ccfbf1;
+  --var-desc-color: #99f6e4;
+  appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid #3a4a5e;
-  background: #243040;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--var-bg);
   cursor: pointer;
-  transition: all 0.15s;
+  box-shadow: none;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.var-btn.is-prompt {
+  --var-accent: #5eead4;
+  --var-bg: #115e59;
+  --var-bg-hover: #0f766e;
+  --var-key: #ccfbf1;
+  --var-desc-color: #99f6e4;
+}
+
+.var-btn.is-control {
+  --var-accent: #fbbf24;
+  --var-bg: #92400e;
+  --var-bg-hover: #b45309;
+  --var-key: #fef3c7;
+  --var-desc-color: #fde68a;
+}
+
+.var-btn.is-asset {
+  --var-accent: #60a5fa;
+  --var-bg: #1d4ed8;
+  --var-bg-hover: #2563eb;
+  --var-key: #dbeafe;
+  --var-desc-color: #bfdbfe;
+}
+
+.var-btn.is-context {
+  --var-accent: #a78bfa;
+  --var-bg: #6d28d9;
+  --var-bg-hover: #7c3aed;
+  --var-key: #ede9fe;
+  --var-desc-color: #ddd6fe;
 }
 
 .var-btn:hover {
-  background: rgba(62, 190, 199, 0.12);
-  border-color: #52c7ce;
+  transform: translateY(-1px);
+  background: var(--var-bg-hover);
+}
+
+.var-btn:active {
+  transform: translateY(0);
 }
 
 .var-btn-key {
-  color: #7dd6dd;
+  color: var(--var-key);
   font-size: 11px;
+  font-weight: 600;
   font-family: monospace;
 }
 
 .var-btn-desc {
-  color: #8ca0b6;
+  color: var(--var-desc-color);
   font-size: 10px;
+}
+
+@media (max-width: 720px) {
+  .node-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .node-card {
+    padding: 14px;
+    min-height: unset;
+  }
+
+  .feature-actions {
+    gap: 10px;
+  }
+
+  .feature-count {
+    flex-shrink: 0;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1120px) {
+  .node-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

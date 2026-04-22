@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">总用户</span>
-        <span class="summary-value">{{ users.length }}</span>
-        <span class="summary-foot">当前筛选结果</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">正常</span>
-        <span class="summary-value">{{ activeUserCount }}</span>
-        <span class="summary-foot">状态可登录</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">封禁</span>
-        <span class="summary-value">{{ bannedUserCount }}</span>
-        <span class="summary-foot">建议定期复核</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">系统保留</span>
-        <span class="summary-value">{{ reservedUserCount }}</span>
-        <span class="summary-foot">不可删除账户</span>
-      </div>
+      <AdminSummaryCard label="总用户" :value="users.length" foot="当前筛选结果" />
+      <AdminSummaryCard label="正常" :value="activeUserCount" foot="状态可登录" />
+      <AdminSummaryCard label="封禁" :value="bannedUserCount" foot="建议定期复核" />
+      <AdminSummaryCard label="系统保留" :value="reservedUserCount" foot="不可删除账户" />
     </div>
 
     <div class="toolbar">
@@ -56,12 +40,7 @@
     </div>
 
     <div class="table-card">
-      <div class="panel-header">
-        <div>
-          <h3 class="panel-title">用户列表</h3>
-          <p class="panel-desc">支持封禁、改密、删除操作。管理员主账号默认不可删除。</p>
-        </div>
-      </div>
+      <AdminSectionHeader title="用户列表" description="支持封禁、改密、删除操作。管理员主账号默认不可删除。" />
       <n-data-table
         :columns="columns"
         :data="users"
@@ -114,6 +93,8 @@ import { NInput, NButton, NDataTable, NModal, NForm, NFormItem, NIcon, NTag, NSp
 import type { DataTableColumns } from 'naive-ui'
 import type { User } from '../../types'
 import { SearchOutline, RefreshOutline, AddOutline } from '@vicons/ionicons5'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
+import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
 const message = useMessage()
 const dialog = useDialog()

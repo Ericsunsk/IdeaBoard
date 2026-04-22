@@ -1,4 +1,7 @@
 import axios from 'axios'
+import { createAdminAssetsApi } from './admin/assets'
+import { createAdminSegApi } from './admin/seg'
+import { createStorageApi } from './admin/storage'
 import type {
   LoginRequest,
   RegisterRequest,
@@ -10,6 +13,23 @@ import type {
   ApiResponse,
 } from '../types'
 import { getStoredToken, handleAuthFailure } from '../utils/auth'
+export type {
+  BgTemplate,
+  BgTemplateFormData,
+  FaceTemplate,
+  FaceTemplateFormData,
+  PatternStyle,
+  PatternStyleFormData,
+} from './admin/assets'
+export type { SegConfig, SegConfigPayload } from './admin/seg'
+export type {
+  StorageFieldType,
+  StorageProfile,
+  StorageProfilePayload,
+  StorageProvider,
+  StorageProviderField,
+  StorageProviderMeta,
+} from './admin/storage'
 
 type ApiClientError = Error & {
   code?: number
@@ -224,6 +244,8 @@ export const segApi = {
     api.post('/user/segment/save', data) as any,
 }
 
+export const adminSegApi = createAdminSegApi(api)
+
 // ============ 线稿模式 API ============
 
 export interface LineDraftMode {
@@ -267,107 +289,10 @@ export const featurePromptApi = {
     api.put('/admin/feature-prompts/' + slug, { prompt }) as any,
 }
 
-// ============ 人脸模板 API ============
-
-export interface FaceTemplate {
-  id: number
-  name: string
-  image_url: string
-  category: 'male' | 'female'
-  sort_order: number
-  is_enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface FaceTemplateFormData {
-  name: string
-  image_url: string
-  category: string
-  sort_order: number
-  is_enabled: boolean
-}
-
-export const faceTemplateApi = {
-  listEnabled: (): Promise<ApiResponse<{ list: FaceTemplate[] }>> =>
-    api.get('/user/face-templates') as any,
-  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: FaceTemplate[]; total: number }>> =>
-    api.get('/admin/face-templates', { params }) as any,
-  adminCreate: (data: FaceTemplateFormData): Promise<ApiResponse<{ face: FaceTemplate }>> =>
-    api.post('/admin/face-templates', data) as any,
-  adminUpdate: (id: number, data: FaceTemplateFormData): Promise<ApiResponse<null>> =>
-    api.put('/admin/face-templates/' + id, data) as any,
-  adminDelete: (id: number): Promise<ApiResponse<null>> =>
-    api.delete('/admin/face-templates/' + id) as any,
-}
-
-// ============ 背景模板 API ============
-
-export interface BgTemplate {
-  id: number
-  name: string
-  image_url: string
-  category: string
-  sort_order: number
-  is_enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface BgTemplateFormData {
-  name: string
-  image_url: string
-  category: string
-  sort_order: number
-  is_enabled: boolean
-}
-
-export const bgTemplateApi = {
-  listEnabled: (): Promise<ApiResponse<{ list: BgTemplate[] }>> =>
-    api.get('/user/bg-templates') as any,
-  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: BgTemplate[]; total: number }>> =>
-    api.get('/admin/bg-templates', { params }) as any,
-  adminCreate: (data: BgTemplateFormData): Promise<ApiResponse<{ bg: BgTemplate }>> =>
-    api.post('/admin/bg-templates', data) as any,
-  adminUpdate: (id: number, data: BgTemplateFormData): Promise<ApiResponse<null>> =>
-    api.put('/admin/bg-templates/' + id, data) as any,
-  adminDelete: (id: number): Promise<ApiResponse<null>> =>
-    api.delete('/admin/bg-templates/' + id) as any,
-}
-
-// ============ 图案风格 API ============
-
-export interface PatternStyle {
-  id: number
-  name: string
-  image_url: string
-  category: string
-  sort_order: number
-  is_enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface PatternStyleFormData {
-  name: string
-  image_url: string
-  category: string
-  sort_order: number
-  is_enabled: boolean
-}
-
-export const patternStyleApi = {
-  listEnabled: (category?: string): Promise<ApiResponse<{ list: PatternStyle[] }>> =>
-    api.get('/user/pattern-styles', { params: category ? { category } : {} }) as any,
-  adminList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: PatternStyle[]; total: number }>> =>
-    api.get('/admin/pattern-styles', { params }) as any,
-  adminCreate: (data: PatternStyleFormData): Promise<ApiResponse<{ pattern_style: PatternStyle }>> =>
-    api.post('/admin/pattern-styles', data) as any,
-  adminUpdate: (id: number, data: PatternStyleFormData): Promise<ApiResponse<null>> =>
-    api.put('/admin/pattern-styles/' + id, data) as any,
-  adminDelete: (id: number): Promise<ApiResponse<null>> =>
-    api.delete('/admin/pattern-styles/' + id) as any,
-}
+const adminAssetsApi = createAdminAssetsApi(api)
+export const faceTemplateApi = adminAssetsApi.faceTemplateApi
+export const bgTemplateApi = adminAssetsApi.bgTemplateApi
+export const patternStyleApi = adminAssetsApi.patternStyleApi
 
 // ============ 渠道商 API ============
 
@@ -437,28 +362,6 @@ export const monitorApi = {
     api.get('/admin/monitor') as any,
 }
 
-// ============ 七牛云 Kodo 配置 API ============
-
-export interface KodoConfig {
-  enabled: boolean
-  access_key: string
-  secret_key: string
-  bucket_name: string
-  upload_domain: string
-  access_domain: string
-  thumbnail_mode: boolean
-  direct_fetch: boolean
-}
-
-export const kodoApi = {
-  getConfig: (): Promise<ApiResponse<{ config: KodoConfig }>> =>
-    api.get('/admin/kodo/config') as any,
-  saveConfig: (data: KodoConfig): Promise<ApiResponse<{ message: string }>> =>
-    api.post('/admin/kodo/config', data) as any,
-  testConnection: (): Promise<ApiResponse<{ message: string }>> =>
-    api.post('/admin/kodo/test') as any,
-  getBucketInfo: (): Promise<ApiResponse<{ info: { domains?: string[] } }>> =>
-    api.get('/admin/kodo/bucket-info') as any,
-}
+export const storageApi = createStorageApi(api)
 
 export default api

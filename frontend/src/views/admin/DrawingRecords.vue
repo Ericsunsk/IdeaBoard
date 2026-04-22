@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">总任务数</span>
-        <span class="summary-value">{{ statsTotal }}</span>
-        <span class="summary-foot">监控累计</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">成功</span>
-        <span class="summary-value">{{ statsSuccess }}</span>
-        <span class="summary-foot">completed</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">失败</span>
-        <span class="summary-value">{{ statsFailed }}</span>
-        <span class="summary-foot">failed</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">进行中</span>
-        <span class="summary-value">{{ statsPending }}</span>
-        <span class="summary-foot">pending + running</span>
-      </div>
+      <AdminSummaryCard label="总任务数" :value="statsTotal" foot="监控累计" />
+      <AdminSummaryCard label="成功" :value="statsSuccess" foot="completed" />
+      <AdminSummaryCard label="失败" :value="statsFailed" foot="failed" />
+      <AdminSummaryCard label="进行中" :value="statsPending" foot="pending + running" />
     </div>
 
     <div class="toolbar">
@@ -50,12 +34,11 @@
     </div>
 
     <div class="table-card">
-      <div class="section-header">
-        <div>
-          <h3 class="panel-title">绘图任务列表</h3>
-          <p class="panel-desc">按时间倒序展示，点击详情可查看完整上下文。</p>
-        </div>
-      </div>
+      <AdminSectionHeader
+        title="绘图任务列表"
+        description="按时间倒序展示，点击详情可查看完整上下文。"
+        variant="section"
+      />
 
       <n-data-table
         :columns="columns"
@@ -134,6 +117,8 @@ import {
   RefreshOutline,
   EyeOutline,
 } from '@vicons/ionicons5'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
+import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
 const records = ref<Task[]>([])
 const loading = ref(false)

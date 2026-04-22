@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">总风格</span>
-        <span class="summary-value">{{ cards.length }}</span>
-        <span class="summary-foot">包含下架</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">已上架</span>
-        <span class="summary-value">{{ enabledCardCount }}</span>
-        <span class="summary-foot">用户可见</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">互斥模式</span>
-        <span class="summary-value">{{ exclusiveCardCount }}</span>
-        <span class="summary-foot">单选风格</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">筛选结果</span>
-        <span class="summary-value">{{ filteredCards.length }}</span>
-        <span class="summary-foot">当前列表</span>
-      </div>
+      <AdminSummaryCard label="总风格" :value="cards.length" foot="包含下架" />
+      <AdminSummaryCard label="已上架" :value="enabledCardCount" foot="用户可见" />
+      <AdminSummaryCard label="互斥模式" :value="exclusiveCardCount" foot="单选风格" />
+      <AdminSummaryCard label="筛选结果" :value="filteredCards.length" foot="当前列表" />
     </div>
 
     <div class="toolbar">
@@ -73,7 +57,7 @@
         :loading="loading"
         :pagination="false"
         :bordered="false"
-        :row-key="(row: any) => row.id"
+        :row-key="(row: StyleCard) => row.id"
       />
       <div class="pagination-wrapper">
         <n-pagination
@@ -198,28 +182,37 @@ import {
   NDataTable, NPagination, NButton, NInput, NModal, NForm, NFormItem,
   NSwitch, NGrid, NGi, NInputNumber, NUpload, NSelect, useMessage
 } from 'naive-ui'
-import type { UploadFileInfo } from 'naive-ui'
 import { styleCardApi } from '../../api/index'
-import type { StyleCard } from '../../api/index'
-import { IMAGE_UPLOAD_ACCEPT_EXTENDED, UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../constants/media'
-import { adminUploadAction, parseAdminUploadResponse, useAdminUploadHeaders } from '../../utils/admin-upload'
+import type { StyleCard, StyleCardFormData } from '../../api/index'
+import { IMAGE_UPLOAD_ACCEPT_EXTENDED } from '../../constants/media'
+import { adminUploadAction, useAdminUploadHeaders } from '../../utils/admin-upload'
+import {
+  ADMIN_STATUS_OPTIONS,
+  ADMIN_STYLE_CARD_LIST_QUERY,
+  ADMIN_STYLE_CARD_PAGE_SIZE,
+  createAdminUploadFinishHandler,
+  useAdminCrudModal,
+  useAdminDeleteModal,
+  useAdminListState,
+} from './assetLibraryShared'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
 
 const message = useMessage()
 
 // ============ 列表数据 ============
-const cards = ref<StyleCard[]>([])
-const loading = ref(false)
+const { list: cards, loading, loadList: loadCards } = useAdminListState<StyleCard>({
+  fetcher: () => styleCardApi.getList(ADMIN_STYLE_CARD_LIST_QUERY),
+  message,
+  errorMessage: '加载失败',
+})
 const page = ref(1)
-const pageSize = 20
+const pageSize = ADMIN_STYLE_CARD_PAGE_SIZE
 const pageCount = computed(() => Math.max(1, Math.ceil(cards.value.length / pageSize)))
 
 const searchKeyword = ref('')
 const filterEnabled = ref<number | null>(null)
 
-const statusOptions = [
-  { label: '已上架', value: 1 },
-  { label: '已下架', value: 0 },
-]
+const statusOptions = ADMIN_STATUS_OPTIONS
 
 const filteredCards = computed(() => {
   let result = cards.value
@@ -315,147 +308,54 @@ const columns = [
 ]
 
 // ============ 新增/编辑 ============
-const showModal = ref(false)
-const isEditing = ref(false)
-const saving = ref(false)
-const formRef = ref()
-const formData = ref({
-  name: '',
-  cover_image: '',
-  keywords: '',
-  sort_order: 0,
-  is_enabled: true,
-  is_exclusive: false,
-})
-const editingId = ref<number | null>(null)
-const uploading = ref(false)
-
-const uploadHeaders = useAdminUploadHeaders()
-
-function handleUploadFinish({ file, event }: { file: UploadFileInfo; event?: ProgressEvent }) {
-  uploading.value = false
-  const res = parseAdminUploadResponse(event)
-  if (res.code === 0 && res.data?.url) {
-    formData.value.cover_image = res.data.url
-    message.success(UPLOAD_SUCCESS_MESSAGE)
-  } else {
-    message.error(res.msg || UPLOAD_FAILED_MESSAGE)
-  }
-  return file
-}
-
-const rules = {
-  name: [{ required: true, message: '请输入风格名称', trigger: 'blur' }],
-  keywords: [{ required: true, message: '请输入内部关键词', trigger: 'blur' }],
-}
-
-function openAddModal() {
-  isEditing.value = false
-  editingId.value = null
-  formData.value = {
+const {
+  showModal,
+  isEditing,
+  saving,
+  formRef,
+  formData,
+  openAddModal,
+  openEditModal,
+  handleSave,
+} = useAdminCrudModal<StyleCard, StyleCardFormData>({
+  createDefault: () => ({
     name: '',
     cover_image: '',
     keywords: '',
     sort_order: 0,
     is_enabled: true,
     is_exclusive: false,
-  }
-  showModal.value = true
-}
-
-function openEditModal(card: StyleCard) {
-  isEditing.value = true
-  editingId.value = card.id
-  formData.value = {
-    name: card.name,
-    cover_image: card.cover_image,
+  }),
+  toForm: (item) => ({
+    name: item.name,
+    cover_image: item.cover_image,
     keywords: '',
-    sort_order: card.sort_order,
-    is_enabled: card.is_enabled,
-    is_exclusive: card.is_exclusive,
-  }
-  showModal.value = true
-}
+    sort_order: item.sort_order,
+    is_enabled: item.is_enabled,
+    is_exclusive: item.is_exclusive,
+  }),
+  create: (payload) => styleCardApi.create(payload),
+  update: (id, payload) => styleCardApi.update(id, payload),
+  afterSave: loadCards,
+  message,
+  transformPayload: (payload) => ({ ...payload }),
+})
+const uploading = ref(false)
 
-async function handleSave() {
-  try {
-    await formRef.value?.validate()
-  } catch {
-    return
-  }
+const uploadHeaders = useAdminUploadHeaders()
+const handleUploadFinish = createAdminUploadFinishHandler(uploading, formData, 'cover_image', message)
 
-  saving.value = true
-  try {
-    if (isEditing.value && editingId.value) {
-      await (styleCardApi as any).update(editingId.value, {
-        name: formData.value.name,
-        cover_image: formData.value.cover_image,
-        keywords: formData.value.keywords,
-        sort_order: formData.value.sort_order,
-        is_enabled: formData.value.is_enabled,
-        is_exclusive: formData.value.is_exclusive,
-      })
-      message.success('更新成功')
-    } else {
-      await (styleCardApi as any).create({
-        name: formData.value.name,
-        cover_image: formData.value.cover_image,
-        keywords: formData.value.keywords,
-        sort_order: formData.value.sort_order,
-        is_enabled: formData.value.is_enabled,
-        is_exclusive: formData.value.is_exclusive,
-      })
-      message.success('创建成功')
-    }
-    showModal.value = false
-    await loadCards()
-  } catch (e: any) {
-    message.error(e.msg || '操作失败')
-  } finally {
-    saving.value = false
-  }
+const rules = {
+  name: [{ required: true, message: '请输入风格名称', trigger: 'blur' }],
+  keywords: [{ required: true, message: '请输入内部关键词', trigger: 'blur' }],
 }
 
 // ============ 删除 ============
-const showDeleteModal = ref(false)
-const deleting = ref(false)
-const deleteTarget = ref<StyleCard | null>(null)
-
-function openDeleteModal(card: StyleCard) {
-  deleteTarget.value = card
-  showDeleteModal.value = true
-}
-
-async function confirmDelete() {
-  if (!deleteTarget.value) return
-  deleting.value = true
-  try {
-    await (styleCardApi as any).delete(deleteTarget.value.id)
-    message.success('删除成功')
-    showDeleteModal.value = false
-    await loadCards()
-  } catch (e: any) {
-    message.error(e.msg || '删除失败')
-  } finally {
-    deleting.value = false
-  }
-}
-
-// ============ 加载数据 ============
-async function loadCards() {
-  loading.value = true
-  try {
-    const res: any = await (styleCardApi as any).getList({ page: 1, page_size: 100 })
-    if (res.code === 0) {
-      cards.value = res.data?.list || []
-    }
-  } catch (e) {
-    console.error('loadCards error:', e)
-    message.error('加载失败')
-  } finally {
-    loading.value = false
-  }
-}
+const { showDeleteModal, deleting, deleteTarget, openDeleteModal, confirmDelete } = useAdminDeleteModal<StyleCard>({
+  deleteById: (id) => styleCardApi.delete(id),
+  afterDelete: loadCards,
+  message,
+})
 
 onMounted(() => {
   loadCards()

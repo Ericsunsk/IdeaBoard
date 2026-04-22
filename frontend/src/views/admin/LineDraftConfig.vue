@@ -11,26 +11,10 @@
     </div>
 
     <div class="summary-grid">
-      <div class="summary-card">
-        <span class="summary-label">模式总数</span>
-        <span class="summary-value">{{ modes.length }}</span>
-        <span class="summary-foot">含停用项</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">已启用</span>
-        <span class="summary-value">{{ enabledModeCount }}</span>
-        <span class="summary-foot">可被选择</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">含封面</span>
-        <span class="summary-value">{{ coverConfiguredCount }}</span>
-        <span class="summary-foot">图片已配置</span>
-      </div>
-      <div class="summary-card">
-        <span class="summary-label">缺提示词</span>
-        <span class="summary-value">{{ promptMissingCount }}</span>
-        <span class="summary-foot">建议补齐</span>
-      </div>
+      <AdminSummaryCard label="模式总数" :value="modes.length" foot="含停用项" />
+      <AdminSummaryCard label="已启用" :value="enabledModeCount" foot="可被选择" />
+      <AdminSummaryCard label="含封面" :value="coverConfiguredCount" foot="图片已配置" />
+      <AdminSummaryCard label="缺提示词" :value="promptMissingCount" foot="建议补齐" />
     </div>
 
     <div class="toolbar">
@@ -50,12 +34,7 @@
     </div>
 
     <div class="table-card">
-      <div class="panel-header">
-        <div>
-          <h3 class="panel-title">线稿模式列表</h3>
-          <p class="panel-desc">提示词用于任务提交时拼接参数，请确保内容准确且可审计。</p>
-        </div>
-      </div>
+      <AdminSectionHeader title="线稿模式列表" description="提示词用于任务提交时拼接参数，请确保内容准确且可审计。" />
       <n-data-table
         :columns="columns"
         :data="modes"
@@ -155,6 +134,8 @@ import type { UploadFileInfo } from 'naive-ui'
 import { lineDraftApi } from '../../api/index'
 import { IMAGE_UPLOAD_ACCEPT_EXTENDED, UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../constants/media'
 import { adminUploadAction, parseAdminUploadResponse, useAdminUploadHeaders } from '../../utils/admin-upload'
+import AdminSummaryCard from './components/AdminSummaryCard.vue'
+import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
 const message = useMessage()
 
