@@ -1,5 +1,6 @@
 import { onUnmounted, ref, type Ref } from 'vue'
 import type { CanvasImageItem, CanvasPoint, ImageNodeItem } from '../types/canvasNodes'
+import { sanitizeApiErrorMessage, sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
 
 interface MessageApiLike {
   success(content: string): unknown
@@ -172,7 +173,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
             return
           }
           if (task.status === 'failed') {
-            options.message.error(task.error_msg || '生成失败')
+            options.message.error(sanitizeTaskErrorMessage(task.error_msg, '生成失败'))
             onFailed?.()
             currentTaskId.value = null
             options.generating.value = false
@@ -192,7 +193,9 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     try {
       const submitRes = await options.submitTask(submitOptions.request)
       if (submitRes.code !== 0 || !submitRes.data?.task_id) {
-        options.message.error(submitRes.msg || submitOptions.failureMessage || 'Submit failed')
+        options.message.error(
+          sanitizeApiErrorMessage(submitRes.msg, submitOptions.failureMessage || 'Failed to submit task'),
+        )
         submitOptions.onFailed?.()
         options.generating.value = false
         return null
@@ -213,7 +216,9 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     } catch (error: unknown) {
       const maybeError = error as { msg?: string; message?: string } | null
       const errorMessage = maybeError?.msg || maybeError?.message
-      options.message.error(errorMessage || submitOptions.failureMessage || 'Failed to submit task')
+      options.message.error(
+        sanitizeApiErrorMessage(errorMessage, submitOptions.failureMessage || 'Failed to submit task'),
+      )
       submitOptions.onFailed?.()
       options.generating.value = false
       return null

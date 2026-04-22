@@ -58,13 +58,13 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 └── apps/
     └── api/
         ├── ideaboard-server
-        └── .env
+        └── .env.example
 ```
 
 该方案会将前端静态资源内嵌到 Go 二进制中，部署目录只需保留：
 
 - `apps/api/ideaboard-server`
-- `apps/api/.env`
+- `apps/api/.env.example`
 
 <a id="setup-flow"></a>
 ## 部署流程
@@ -90,7 +90,7 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 └── apps/
     └── api/
         ├── ideaboard-server
-        └── .env
+        └── .env.example
 ```
 
 ### 3. 配置环境变量
@@ -100,6 +100,7 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`
 - `REDIS_HOST/REDIS_PORT/REDIS_AUTH`
 - `APP_PORT=6000`
+- `APP_HOST=127.0.0.1`
 - `JWT_SECRET`
 
 完整变量说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
@@ -123,19 +124,21 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 
 ```bash
 cd /www/wwwroot/ideaboard
+cp ./apps/api/.env.example ./apps/api/.env
 set -a
 source ./apps/api/.env
 set +a
+export INIT_ADMIN_PASSWORD='your-strong-password'
 ./apps/api/ideaboard-server init-admin
 ```
 
-默认管理员账号：
+初始化后的管理员账号：
 
 - 用户名：`admin`
-- 密码：`admin123`
+- 密码：由 `INIT_ADMIN_PASSWORD` 指定
 
 > [!IMPORTANT]
-> `.env` 中的数据库账号只用于后端连接 MySQL，不是网站管理员登录账号。管理员登录信息来自业务库中的 `users` 表；首次部署后建议立即修改默认管理员密码。
+> `.env` 中的数据库账号只用于后端连接 MySQL，不是网站管理员登录账号。管理员登录信息来自业务库中的 `users` 表；`init-admin` 未设置 `INIT_ADMIN_PASSWORD` 会直接失败。
 
 <a id="validation"></a>
 ## 验证

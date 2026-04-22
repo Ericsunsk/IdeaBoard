@@ -190,12 +190,14 @@ nano /opt/ideaboard/apps/api/.env
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`
 - `REDIS_HOST/REDIS_PORT/REDIS_AUTH`
 - `APP_PORT=6000`
+- `APP_HOST=127.0.0.1`（建议反向代理场景启用）
 - `JWT_SECRET`
 
 建议：
 
 - 不要在生产环境继续使用本地开发默认账号
 - 若 Redis 开启密码，必须同步配置 `REDIS_AUTH`
+- 若前面有 Nginx / 其他反向代理，建议设置 `APP_HOST=127.0.0.1`
 - `JWT_SECRET` 必须为足够长的随机字符串
 
 完整字段说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
@@ -207,16 +209,17 @@ cd /opt/ideaboard/apps/api
 set -a
 source /opt/ideaboard/apps/api/.env
 set +a
+export INIT_ADMIN_PASSWORD='your-strong-password'
 ./ideaboard-server init-admin
 ```
 
-默认管理员账号：
+初始化后的管理员账号：
 
 - 用户名：`admin`
-- 密码：`admin123`
+- 密码：由 `INIT_ADMIN_PASSWORD` 指定
 
 > [!IMPORTANT]
-> 数据库连接账号和网站管理员账号是两套信息。`/opt/ideaboard/apps/api/.env` 只决定服务如何连接 MySQL；后台登录账号来自业务库的 `users` 表。首次部署完成后，建议立刻登录后台并修改默认管理员密码。
+> 数据库连接账号和网站管理员账号是两套信息。`/opt/ideaboard/apps/api/.env` 只决定服务如何连接 MySQL；后台登录账号来自业务库的 `users` 表。`init-admin` 如果未设置 `INIT_ADMIN_PASSWORD` 会直接拒绝执行。
 
 ### 3. 配置 systemd
 

@@ -138,6 +138,11 @@ docker compose up -d
 | 业务密码 | `ideaboard123` |
 | Redis | `127.0.0.1:6379` |
 
+说明：
+
+- `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 MySQL / Redis 直接暴露到外网。
+- 若你需要 Redis 密码，可在 `docker/.env` 中设置 `REDIS_PASSWORD`，并在 `apps/api/.env` 中同步设置 `REDIS_AUTH`。
+
 ### 2. 配置后端环境
 
 ```bash
@@ -145,7 +150,15 @@ cd apps/api
 cp .env.example .env
 ```
 
-至少确认数据库、Redis、端口和 `JWT_SECRET` 配置正确。
+至少确认数据库、Redis、端口和 `JWT_SECRET` 配置正确；`.env.example` 里的敏感字段是占位值，不应直接用于部署。
+
+如果后端放在 Nginx / 宝塔等反向代理后面，建议额外设置：
+
+```env
+APP_HOST=127.0.0.1
+```
+
+这样 `ideaboard-server` 只监听本机回环地址，避免被绕过代理直接访问。
 
 ### 3. 启动后端
 
@@ -169,7 +182,7 @@ cd apps/api
 INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 ```
 
-默认管理员初始化：
+管理员初始化：
 
 - 用户名：`admin`
 - 密码：由 `INIT_ADMIN_PASSWORD` 指定

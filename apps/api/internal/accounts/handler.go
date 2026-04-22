@@ -27,7 +27,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 	}
 	accounts, total, err := h.accountService.ListAccounts(&req)
 	if err != nil {
-		response.Error(c, 500, "获取账号列表失败: "+err.Error())
+		response.InternalError(c, 500, "获取账号列表失败", err)
 		return
 	}
 	response.Success(c, gin.H{"total": total, "list": accounts})
@@ -52,12 +52,12 @@ func (h *AccountHandler) GetAccount(c *gin.Context) {
 func (h *AccountHandler) CreateAccount(c *gin.Context) {
 	var req CreateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 	account, err := h.accountService.CreateAccount(&req)
 	if err != nil {
-		response.Error(c, 500, "创建失败: "+err.Error())
+		response.InternalError(c, 500, "创建失败", err)
 		return
 	}
 	response.Success(c, gin.H{"account": account})
@@ -72,7 +72,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 	}
 	var req UpdateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 	if err := h.accountService.UpdateAccount(id, &req); err != nil {
@@ -90,7 +90,7 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 		return
 	}
 	if err := h.accountService.DeleteAccount(id); err != nil {
-		response.Error(c, 500, "删除失败: "+err.Error())
+		response.InternalError(c, 500, "删除失败", err)
 		return
 	}
 	response.Success(c, nil)
@@ -104,7 +104,7 @@ func (h *AccountHandler) StartAccount(c *gin.Context) {
 		return
 	}
 	if err := h.accountService.StartAccount(id); err != nil {
-		response.Error(c, 500, "启动失败: "+err.Error())
+		response.InternalError(c, 500, "启动失败", err)
 		return
 	}
 	response.Success(c, nil)
@@ -118,7 +118,7 @@ func (h *AccountHandler) StopAccount(c *gin.Context) {
 		return
 	}
 	if err := h.accountService.StopAccount(id); err != nil {
-		response.Error(c, 500, "停止失败: "+err.Error())
+		response.InternalError(c, 500, "停止失败", err)
 		return
 	}
 	response.Success(c, nil)
@@ -133,7 +133,7 @@ func (h *AccountHandler) GetAccountQueue(c *gin.Context) {
 	}
 	concurrent, maxConcurrent, err := h.accountService.GetAccountQueueInfo(id)
 	if err != nil {
-		response.Error(c, 500, "获取失败: "+err.Error())
+		response.InternalError(c, 500, "获取失败", err)
 		return
 	}
 	response.Success(c, gin.H{"current_concurrent": concurrent, "max_concurrent": maxConcurrent})
@@ -149,7 +149,7 @@ func (h *AccountHandler) SubmitTask(c *gin.Context) {
 	}
 	var req tasks.SubmitTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 	taskID, err := h.accountService.SubmitTask(userID, &req)
@@ -178,7 +178,7 @@ func (h *AccountHandler) ListTasks(c *gin.Context) {
 	}
 	tasks, total, err := h.accountService.ListTasks(&req)
 	if err != nil {
-		response.Error(c, 500, "获取任务列表失败: "+err.Error())
+		response.InternalError(c, 500, "获取任务列表失败", err)
 		return
 	}
 	response.Success(c, gin.H{"total": total, "list": tasks})

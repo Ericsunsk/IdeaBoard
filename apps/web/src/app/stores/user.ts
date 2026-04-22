@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import type { User } from '../../shared/types'
 import { userApi, authApi } from '../../shared/api'
 import {
-  getStoredToken,
   getStoredUser,
   setStoredAuth,
   clearStoredAuth,
@@ -12,30 +11,26 @@ import {
 import router from '../router'
 
 export const useUserStore = defineStore('user', () => {
-  const storedToken = getStoredToken()
   const storedUser = getStoredUser()
   const hasValidAuth = hasValidStoredAuth()
 
-  if (!hasValidAuth && (storedToken || storedUser)) {
+  if (!hasValidAuth && storedUser) {
     clearStoredAuth()
   }
 
-  const token = ref<string | null>(hasValidAuth ? storedToken : null)
   const user = ref<User | null>(hasValidAuth ? storedUser : null)
-  const userInfoLoaded = ref(hasValidAuth)
+  const userInfoLoaded = ref(false)
 
-  const isLoggedIn = computed(() => !!(token.value && user.value))
+  const isLoggedIn = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
 
-  function updateAuth(newToken: string, newUser: User) {
-    token.value = newToken
+  function updateAuth(newUser: User) {
     user.value = newUser
     userInfoLoaded.value = true
-    setStoredAuth(newToken, newUser)
+    setStoredAuth(newUser)
   }
 
   function resetAuth() {
-    token.value = null
     user.value = null
     userInfoLoaded.value = false
     clearStoredAuth()
@@ -43,8 +38,16 @@ export const useUserStore = defineStore('user', () => {
 
   async function login(username: string, password: string) {
     const res: any = await authApi.login({ username, password })
-    if (res.code === 0 && res.data) {
-      updateAuth(res.data.token, res.data.user)
+    if (res.code === 0) {
+      const loginUser = res.data?.user as User | undefined
+      if (loginUser) {
+        updateAuth(loginUser)
+      } else {
+        await fetchUserInfo(true)
+      }
+      if (!user.value) {
+        throw new Error('登录状态恢复失败')
+      }
       return true
     }
     throw new Error(res.msg)
@@ -68,14 +71,11 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function fetchUserInfo(force = false) {
-    if (!token.value) return
     if (userInfoLoaded.value && !force) return
     try {
       const res: any = await userApi.getInfo()
       if (res.code === 0 && res.data) {
-        user.value = res.data.user
-        userInfoLoaded.value = true
-        setStoredAuth(token.value!, res.data.user)
+        updateAuth(res.data.user)
       }
     } catch (e) {
       const code = Number((e as any)?.status ?? (e as any)?.code)
@@ -95,11 +95,11 @@ export const useUserStore = defineStore('user', () => {
     if (res.code !== 0) {
       throw new Error(res.msg)
     }
+    resetAuth()
     return true
   }
 
   return {
-    token,
     user,
     isLoggedIn,
     isAdmin,

@@ -32,8 +32,8 @@
                 <!-- 漂浮装饰元素 -->
                 <div class="floating-gallery">
                     <div class="float-item text-note">
-                        Feng-AI is an AI-powered concepting board that helps you
-                        explore, expand, and refine your ideas.
+                        IdeaBoard is an AI-powered concepting board that helps
+                        you explore, expand, and refine your ideas.
                     </div>
                     <div class="float-item pos-1 layers-icon">
                         <div class="layer bottom-layer"></div>
@@ -43,7 +43,6 @@
                     <div class="float-item pos-3 orange-rect"></div>
                     <div class="float-item pos-4 purple-sq"></div>
                 </div>
-
             </div>
         </div>
     </div>

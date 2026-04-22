@@ -1,7 +1,7 @@
 package storage
 
 import (
-			"api/internal/platform/response"
+	"api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,7 +36,7 @@ func (h *StorageHandler) CreateProfile(c *gin.Context) {
 
 	profile, err := h.storageService.SaveProfile(&req)
 	if err != nil {
-		response.Error(c, 400, err.Error())
+		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.Success(c, gin.H{"profile": profile, "message": "保存成功"})
@@ -52,7 +52,7 @@ func (h *StorageHandler) UpdateProfile(c *gin.Context) {
 
 	profile, err := h.storageService.SaveProfile(&req)
 	if err != nil {
-		response.Error(c, 400, err.Error())
+		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.Success(c, gin.H{"profile": profile, "message": "保存成功"})
@@ -60,7 +60,7 @@ func (h *StorageHandler) UpdateProfile(c *gin.Context) {
 
 func (h *StorageHandler) DeleteProfile(c *gin.Context) {
 	if err := h.storageService.DeleteProfile(c.Param("id")); err != nil {
-		response.Error(c, 400, err.Error())
+		response.InternalError(c, 400, "删除失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.Success(c, gin.H{"message": "删除成功"})
@@ -69,7 +69,7 @@ func (h *StorageHandler) DeleteProfile(c *gin.Context) {
 func (h *StorageHandler) ApplyProfile(c *gin.Context) {
 	profile, err := h.storageService.ApplyProfile(c.Param("id"))
 	if err != nil {
-		response.Error(c, 400, err.Error())
+		response.InternalError(c, 400, "设为当前失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.Success(c, gin.H{"profile": profile, "message": "已设为当前存储"})
@@ -77,7 +77,7 @@ func (h *StorageHandler) ApplyProfile(c *gin.Context) {
 
 func (h *StorageHandler) TestProfile(c *gin.Context) {
 	if err := h.storageService.TestProfile(c.Param("id")); err != nil {
-		response.Error(c, 400, err.Error())
+		response.InternalError(c, 400, "连接测试失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.Success(c, gin.H{"message": "连接成功"})
@@ -86,7 +86,7 @@ func (h *StorageHandler) TestProfile(c *gin.Context) {
 func (h *StorageHandler) GetBucketInfo(c *gin.Context) {
 	info, err := h.storageService.GetBucketInfo(c.Param("id"))
 	if err != nil {
-		response.Error(c, 400, err.Error())
+		response.InternalError(c, 400, "获取 Bucket 信息失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.Success(c, gin.H{"info": info})

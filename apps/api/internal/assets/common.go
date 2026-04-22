@@ -41,7 +41,7 @@ func parsePageQuery(c *gin.Context, maxPageSize int) (int, int) {
 
 func bindJSON(c *gin.Context, req any) bool {
 	if err := c.ShouldBindJSON(req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return false
 	}
 	return true

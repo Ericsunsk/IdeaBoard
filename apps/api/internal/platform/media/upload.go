@@ -3,6 +3,7 @@ package media
 import (
 	"fmt"
 	"mime/multipart"
+	"strings"
 )
 
 type imageSignature struct {
@@ -26,7 +27,7 @@ var imageMagic = map[string][]imageSignature{
 // the magic number matches the claimed extension. This prevents uploading
 // disguised files (e.g. an HTML file renamed to .png).
 func ValidateImageContent(fh *multipart.FileHeader, ext string) error {
-	signatures, ok := imageMagic[ext]
+	normalizedExt, ok := NormalizeImageExtension(ext)
 	if !ok {
 		return fmt.Errorf("不支持的图片格式: %s", ext)
 	}
@@ -37,13 +38,40 @@ func ValidateImageContent(fh *multipart.FileHeader, ext string) error {
 	}
 	defer f.Close()
 
+	signatures := imageMagic[normalizedExt]
 	buf := make([]byte, requiredImageHeaderLength(signatures))
 	n, err := f.Read(buf)
 	if err != nil || n < len(buf) {
 		return fmt.Errorf("文件内容不合法")
 	}
 
-	return validateImageMagic(buf, ext)
+	return validateImageMagic(buf, normalizedExt)
+}
+
+// ValidateImageBytes verifies in-memory bytes match the allowed image extension.
+func ValidateImageBytes(data []byte, ext string) error {
+	normalizedExt, ok := NormalizeImageExtension(ext)
+	if !ok {
+		return fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+
+	signatures := imageMagic[normalizedExt]
+	required := requiredImageHeaderLength(signatures)
+	if len(data) < required {
+		return fmt.Errorf("文件内容不合法")
+	}
+
+	return validateImageMagic(data[:required], normalizedExt)
+}
+
+// NormalizeImageExtension canonicalizes an extension and reports whether it is
+// one of the explicitly allowed raster image types.
+func NormalizeImageExtension(ext string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(ext))
+	if normalized == ".jpg" || normalized == ".jpeg" || normalized == ".png" || normalized == ".gif" || normalized == ".webp" {
+		return normalized, true
+	}
+	return "", false
 }
 
 func requiredImageHeaderLength(signatures []imageSignature) int {

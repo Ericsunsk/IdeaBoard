@@ -3,15 +3,15 @@ package accounts
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
+	"api/internal/assets"
 	"api/internal/platform/redis"
 	"api/internal/platform/settings"
-	"api/internal/assets"
 	"api/internal/prompts"
 	"api/internal/tasks"
 	"api/internal/workflow"
@@ -214,7 +214,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	// 获取所有可用的账号
 	accounts, err := s.accountRepo.GetAllEnabled()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
 	if len(accounts) == 0 {
@@ -306,7 +306,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	}
 
 	if err := s.taskRepo.Create(task); err != nil {
-		return "", err
+		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
 	// 获取所有可用账号ID
@@ -328,7 +328,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 
 	if err := s.redisMgr.PushGlobalQueue(context.Background(), queueTask); err != nil {
 		_ = s.taskRepo.MarkQueueFailed(taskID, "任务入队失败: "+err.Error())
-		return "", err
+		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
 	return taskID, nil
@@ -353,6 +353,12 @@ func (s *AccountService) ListTasks(req *tasks.TaskListRequest) ([]*tasks.Task, i
 }
 
 func (s *AccountService) DeleteUserTask(taskID string, userID uint64) error {
+	if _, err := s.taskRepo.GetByTaskIDAndUserID(taskID, userID); err != nil {
+		return err
+	}
+	if err := s.redisMgr.MarkTaskCancelled(context.Background(), taskID, 24*time.Hour); err != nil {
+		return err
+	}
 	return s.taskRepo.DeleteByTaskIDAndUserID(taskID, userID)
 }
 

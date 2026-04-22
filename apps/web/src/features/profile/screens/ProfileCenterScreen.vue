@@ -240,8 +240,9 @@ async function handleUpdatePassword() {
     await pwdFormRef.value?.validate()
     pwdLoading.value = true
     await userStore.updatePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
-    message.success('密码更新成功')
+    message.success('密码更新成功，请重新登录')
     pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+    await router.push('/user/login')
   } catch (error: any) {
     if (error.message) message.error(error.message)
   } finally {

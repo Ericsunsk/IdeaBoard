@@ -2,6 +2,7 @@ import { computed, h, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import { storageApi } from '../../../shared/api/index'
 import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../../shared/api/index'
+import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { buildVendorPresets, type VendorPresetOption } from './storageMeta'
 import {
   buildPayload,
@@ -289,10 +290,7 @@ export function useStorageManager() {
   }
 
   function errorMessage(error: unknown, fallback: string) {
-    if (typeof error === 'object' && error && 'msg' in error && typeof (error as { msg?: unknown }).msg === 'string') {
-      return (error as { msg: string }).msg
-    }
-    return fallback
+    return extractSafeApiErrorMessage(error, fallback)
   }
 
   function openCreate() {

@@ -126,6 +126,7 @@ import {
   RefreshOutline,
   EyeOutline,
 } from '@vicons/ionicons5'
+import { sanitizeApiErrorMessage, sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 import AdminSectionHeader from '../shared/components/AdminSectionHeader.vue'
 
@@ -164,7 +165,7 @@ const resultImageUrl = computed(() => {
 const resultSummaryText = computed(() => {
   if (!detailTask.value?.result) return ''
   const parsed = parseResultSafely(detailTask.value.result)
-  if (parsed == null) return truncateString(detailTask.value.result)
+  if (parsed == null) return sanitizeApiErrorMessage(detailTask.value.result, '[REDACTED]')
   if (Array.isArray(parsed)) {
     return JSON.stringify({ type: 'array', length: parsed.length, preview: sanitizeValue(parsed, 1) }, null, 2)
   }
@@ -208,7 +209,7 @@ const resultSummaryText = computed(() => {
 const resultDebugText = computed(() => {
   if (!detailTask.value?.result) return ''
   const parsed = parseResultSafely(detailTask.value.result)
-  if (parsed == null) return truncateString(detailTask.value.result, 1000)
+  if (parsed == null) return sanitizeApiErrorMessage(detailTask.value.result, '[REDACTED]')
   return JSON.stringify(sanitizeValue(parsed, 0), null, 2)
 })
 
@@ -246,7 +247,8 @@ function sanitizeValue(value: unknown, depth: number, keyCountState = { count: 0
   if (value == null) return value
 
   if (typeof value === 'string') {
-    return truncateString(value)
+    const sanitized = sanitizeApiErrorMessage(value, '[REDACTED]')
+    return sanitized === '[REDACTED]' ? sanitized : truncateString(sanitized)
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {
@@ -290,14 +292,14 @@ function showDetail(row: Task) {
 }
 
 function getErrorReason(row: Task): string {
-  if (row.error_msg) return row.error_msg
+  if (row.error_msg) return sanitizeTaskErrorMessage(row.error_msg)
   if (!row.result) return ''
   try {
     const r = JSON.parse(row.result)
-    if (r.error) return r.error
-    if (r.status === 'failed' && r.error) return r.error
+    if (r.error) return sanitizeTaskErrorMessage(r.error)
+    if (r.status === 'failed' && r.error) return sanitizeTaskErrorMessage(r.error)
   } catch {
-    if (row.status === 'failed') return row.result
+    if (row.status === 'failed') return sanitizeTaskErrorMessage(row.result)
   }
   return ''
 }

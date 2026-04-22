@@ -3,7 +3,7 @@ package assets
 import (
 	"strconv"
 
-			"api/internal/platform/response"
+	"api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,12 +49,12 @@ func (h *StyleCardHandler) List(c *gin.Context) {
 func (h *StyleCardHandler) Create(c *gin.Context) {
 	var req CreateStyleCardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 	card, err := h.cardService.Create(&req)
 	if err != nil {
-		response.Error(c, 500, "创建失败: "+err.Error())
+		response.InternalError(c, 500, "创建失败", err)
 		return
 	}
 	response.Success(c, gin.H{"card": card})
@@ -70,11 +70,11 @@ func (h *StyleCardHandler) Update(c *gin.Context) {
 	}
 	var req UpdateStyleCardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 	if err := h.cardService.Update(id, &req); err != nil {
-		response.Error(c, 500, "更新失败: "+err.Error())
+		response.InternalError(c, 500, "更新失败", err)
 		return
 	}
 	response.Success(c, nil)
@@ -89,7 +89,7 @@ func (h *StyleCardHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.cardService.Delete(id); err != nil {
-		response.Error(c, 500, "删除失败: "+err.Error())
+		response.InternalError(c, 500, "删除失败", err)
 		return
 	}
 	response.Success(c, nil)

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -202,7 +203,7 @@ func (c *Consumer) failTask(task *redis.GlobalQueueTask, accountID uint64, reaso
 	log.Printf("[Consumer] 任务 %s 失败, 原因: %s", task.TaskID, reason)
 }
 
-func (c *Consumer) callDrawingAPI(account *accounts.ApiAccount, task *redis.GlobalQueueTask) (string, error) {
+func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *redis.GlobalQueueTask) (string, error) {
 	log.Printf("[Consumer] 调用 API, 账号: %s, ChannelID: %d, ApiKey长度: %d",
 		account.Name, account.ChannelID, len(account.ApiKey))
 
@@ -244,13 +245,16 @@ func (c *Consumer) callDrawingAPI(account *accounts.ApiAccount, task *redis.Glob
 	platform := strings.ToLower(account.Platform)
 	switch {
 	case platform == "stability" || platform == "stable diffusion":
-		imageURL, err = c.callStabilityAI(account, task.Prompt, width, height, timeout)
+		imageURL, err = c.callStabilityAI(ctx, account, task.Prompt, width, height, timeout)
 	default:
 		// nano banana / openai / gemini 等 OpenAI 兼容平台（官方原生格式）
-		imageURL, err = c.callOpenAI(account, task.Prompt, width, height, timeout, params)
+		imageURL, err = c.callOpenAI(ctx, account, task.Prompt, width, height, timeout, params)
 	}
 
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return "", err
+		}
 		return "", fmt.Errorf("调用 API 失败 (渠道: %s): %v", channelName, err)
 	}
 
@@ -258,12 +262,14 @@ func (c *Consumer) callDrawingAPI(account *accounts.ApiAccount, task *redis.Glob
 	log.Printf("[Consumer] 存储检查: service=%v, objectStorage=%v", c.storageService != nil, c.storageService != nil && c.storageService.UsesObjectStorage())
 	if c.storageService != nil && c.storageService.UsesObjectStorage() {
 		log.Printf("[Consumer] 对象存储已启用，开始转存图片, directFetch=%v, imageURL=%.80s", c.storageService.IsDirectFetchEnabled(), imageURL)
-		reURL, reErr := c.storageService.StoreRemote(context.Background(), imageURL, storage.StorageStoreOptions{
+		reURL, reErr := c.storageService.StoreRemote(ctx, imageURL, storage.StorageStoreOptions{
 			AllowHosts: []string{account.ProxyURL},
 		})
 		if reErr == nil {
 			log.Printf("[Consumer] 转存成功: %s -> %s", imageURL[:min(80, len(imageURL))], reURL)
 			imageURL = reURL
+		} else if errors.Is(reErr, context.Canceled) {
+			return "", reErr
 		} else {
 			log.Printf("[Consumer] 转存对象存储失败，使用原始 URL: %v", reErr)
 		}
@@ -288,7 +294,7 @@ func (c *Consumer) callDrawingAPI(account *accounts.ApiAccount, task *redis.Glob
 }
 
 // callOpenAI 调用 OpenAI DALL-E 风格接口（也兼容其他 OpenAI 兼容平台）
-func (c *Consumer) callOpenAI(account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}) (string, error) {
+func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}) (string, error) {
 	baseURL := "https://api.openai.com"
 	if account.ProxyURL != "" {
 		baseURL = strings.TrimRight(account.ProxyURL, "/")
@@ -319,7 +325,7 @@ func (c *Consumer) callOpenAI(account *accounts.ApiAccount, prompt string, width
 	}
 
 	client := &http.Client{Timeout: timeout}
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(bodyJSON))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
 	if err != nil {
 		return "", err
 	}
@@ -330,12 +336,18 @@ func (c *Consumer) callOpenAI(account *accounts.ApiAccount, prompt string, width
 
 	resp, err := client.Do(req)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return "", err
+		}
 		return "", fmt.Errorf("HTTP 请求失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := readLimitedBody(resp.Body)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return "", err
+		}
 		return "", fmt.Errorf("读取 API 响应失败: %v", err)
 	}
 
@@ -415,7 +427,7 @@ func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string
 }
 
 // callStabilityAI 调用 Stability AI 接口
-func (c *Consumer) callStabilityAI(account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration) (string, error) {
+func (c *Consumer) callStabilityAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration) (string, error) {
 	baseURL := "https://api.stability.ai"
 	if account.ProxyURL != "" {
 		baseURL = account.ProxyURL
@@ -438,7 +450,7 @@ func (c *Consumer) callStabilityAI(account *accounts.ApiAccount, prompt string, 
 
 	client := &http.Client{Timeout: timeout}
 	url := fmt.Sprintf("%s/v1/generation/%s/text-to-image", baseURL, engine)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bodyJSON))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(bodyJSON))
 	if err != nil {
 		return "", err
 	}
@@ -450,12 +462,18 @@ func (c *Consumer) callStabilityAI(account *accounts.ApiAccount, prompt string, 
 
 	resp, err := client.Do(req)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return "", err
+		}
 		return "", fmt.Errorf("HTTP 请求失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := readLimitedBody(resp.Body)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return "", err
+		}
 		return "", fmt.Errorf("读取 API 响应失败: %v", err)
 	}
 

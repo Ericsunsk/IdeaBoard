@@ -12,7 +12,7 @@ import type {
   User,
   ApiResponse,
 } from '../types'
-import { getStoredToken, handleAuthFailure } from '../utils/auth'
+import { handleAuthFailure } from '../utils/auth'
 export type {
   BgTemplate,
   BgTemplateFormData,
@@ -40,6 +40,7 @@ type ApiClientError = Error & {
 
 const api = axios.create({
   baseURL: '/api',
+  withCredentials: true,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -55,19 +56,6 @@ function createApiError(payload?: any, status?: number): ApiClientError {
   error.data = payload?.data
   return error
 }
-
-api.interceptors.request.use(
-  (config) => {
-    const token = getStoredToken()
-    if (token) {
-      config.headers.Authorization = 'Bearer ' + token
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
 
 api.interceptors.response.use(
   (response) => {

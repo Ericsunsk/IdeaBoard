@@ -1,19 +1,23 @@
 package users
 
 import (
-			"api/internal/platform/response"
 	"fmt"
+
+	"api/internal/platform/redis"
+	"api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 type AdminHandler struct {
 	userService *UserService
+	rdb         *redis.Client
 }
 
-func NewAdminHandler(userService *UserService) *AdminHandler {
+func NewAdminHandler(userService *UserService, rdb *redis.Client) *AdminHandler {
 	return &AdminHandler{
 		userService: userService,
+		rdb:         rdb,
 	}
 }
 
@@ -21,13 +25,13 @@ func NewAdminHandler(userService *UserService) *AdminHandler {
 func (h *AdminHandler) ListUsers(c *gin.Context) {
 	var req UserListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
 	result, err := h.userService.ListUsers(&req)
 	if err != nil {
-		response.Error(c, 500, "获取用户列表失败: "+err.Error())
+		response.InternalError(c, 500, "获取用户列表失败", err)
 		return
 	}
 
@@ -38,7 +42,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 func (h *AdminHandler) CreateUser(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -60,7 +64,7 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -87,7 +91,7 @@ func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
 	var req UpdateUserPasswordRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -104,6 +108,9 @@ func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
 	if err := h.userService.AdminUpdatePassword(targetUser.ID, req.NewPassword); err != nil {
 		response.Error(c, 400, err.Error())
 		return
+	}
+	if h.rdb != nil {
+		_ = h.rdb.Del(c.Request.Context(), userSessionTokenKey(targetUser.ID))
 	}
 
 	response.Success(c, nil)
@@ -145,4 +152,8 @@ func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*User, bool) {
 	}
 
 	return user, true
+}
+
+func userSessionTokenKey(userID uint64) string {
+	return fmt.Sprintf("token:%d", userID)
 }

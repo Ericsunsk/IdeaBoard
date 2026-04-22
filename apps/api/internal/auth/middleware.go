@@ -55,22 +55,17 @@ func JWTSigningSecret() []byte {
 // AuthMiddleware 认证中间件
 func AuthMiddleware(rdb *redis.Client, userRepo *users.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			response.Error(c, http.StatusUnauthorized, "未提供认证令牌")
-			c.Abort()
-			return
-		}
-
-		// Bearer token
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
+		tokenString, err := extractTokenFromRequest(c)
+		if err == errInvalidBearerToken {
 			response.Error(c, http.StatusUnauthorized, "令牌格式错误")
 			c.Abort()
 			return
 		}
-
-		tokenString := parts[1]
+		if tokenString == "" {
+			response.Error(c, http.StatusUnauthorized, "未提供认证令牌")
+			c.Abort()
+			return
+		}
 
 		// 解析token
 		token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {

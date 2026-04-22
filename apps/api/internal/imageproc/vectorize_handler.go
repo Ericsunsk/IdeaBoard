@@ -1,6 +1,7 @@
 package imageproc
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -9,6 +10,8 @@ import (
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +25,11 @@ import (
 	"api/internal/tasks"
 
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	maxVectorizeDownloadSize = 20 * 1024 * 1024
+	maxVectorizePixels       = 40_000_000
 )
 
 // potraceBin potrace 可执行文件路径，优先使用绝对路径
@@ -101,7 +109,8 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 	// 下载图片
 	imgResp, err := safehttp.Get(context.Background(), req.ImageURL, 20*time.Second)
 	if err != nil {
-		response.Error(c, 400, "下载图片失败: "+err.Error())
+		log.Printf("[Vectorize] download failed: err=%v", err)
+		response.Error(c, 400, "下载图片失败")
 		return
 	}
 	defer imgResp.Body.Close()
@@ -109,10 +118,44 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 		response.Error(c, 500, fmt.Sprintf("下载图片返回 %d", imgResp.StatusCode))
 		return
 	}
+	if imgResp.ContentLength > maxVectorizeDownloadSize {
+		response.Error(c, 400, fmt.Sprintf("图片大小不能超过 %dMB", maxVectorizeDownloadSize/1024/1024))
+		return
+	}
+	contentType := strings.TrimSpace(strings.Split(imgResp.Header.Get("Content-Type"), ";")[0])
+	if contentType != "" && !strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		response.Error(c, 400, "仅支持位图图片输入")
+		return
+	}
 
-	img, _, err := image.Decode(imgResp.Body)
+	body, err := io.ReadAll(io.LimitReader(imgResp.Body, maxVectorizeDownloadSize+1))
 	if err != nil {
-		response.Error(c, 500, "解码图片失败: "+err.Error())
+		log.Printf("[Vectorize] read body failed: err=%v", err)
+		response.Error(c, 500, "读取图片失败")
+		return
+	}
+	if len(body) > maxVectorizeDownloadSize {
+		response.Error(c, 400, fmt.Sprintf("图片大小不能超过 %dMB", maxVectorizeDownloadSize/1024/1024))
+		return
+	}
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(body))
+	if err != nil {
+		response.Error(c, 400, "图片格式不受支持或内容不合法")
+		return
+	}
+	if format != "jpeg" && format != "png" {
+		response.Error(c, 400, "仅支持 JPEG / PNG 图片")
+		return
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > maxVectorizePixels {
+		response.Error(c, 400, "图片像素过大，请缩小后重试")
+		return
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(body))
+	if err != nil {
+		log.Printf("[Vectorize] decode image failed: err=%v", err)
+		response.Error(c, 500, "解码图片失败")
 		return
 	}
 
@@ -141,7 +184,8 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 	}
 
 	if err != nil {
-		response.Error(c, 500, "转换矢量图失败: "+err.Error())
+		log.Printf("[Vectorize] trace failed: err=%v", err)
+		response.Error(c, 500, "转换矢量图失败")
 		return
 	}
 
@@ -155,7 +199,8 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 	// 持久化 SVG 文件
 	persistedURL, err := h.persistSVG(svgData)
 	if err != nil {
-		response.Error(c, 500, "保存SVG失败: "+err.Error())
+		log.Printf("[Vectorize] persist svg failed: err=%v", err)
+		response.Error(c, 500, "保存SVG失败")
 		return
 	}
 

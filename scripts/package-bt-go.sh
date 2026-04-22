@@ -63,7 +63,7 @@ mkdir -p "$API_APP_DIR"
 
 cp "$API_BINARY_TMP" "$API_APP_DIR/ideaboard-server"
 chmod +x "$API_APP_DIR/ideaboard-server"
-cp "$API_DIR/.env.example" "$API_APP_DIR/.env"
+cp "$API_DIR/.env.example" "$API_APP_DIR/.env.example"
 
 (
   cd "$RELEASE_ROOT"
@@ -76,4 +76,4 @@ echo "Bundle directory: $BUNDLE_DIR"
 echo "Archive: $ARCHIVE_PATH"
 echo "Contains:"
 echo "  - apps/api/ideaboard-server"
-echo "  - apps/api/.env"
+echo "  - apps/api/.env.example"

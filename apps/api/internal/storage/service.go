@@ -1,8 +1,6 @@
 package storage
 
 import (
-			"api/internal/platform/settings"
-	"api/internal/platform/safehttp"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -17,6 +15,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"api/internal/platform/media"
+	"api/internal/platform/safehttp"
+	"api/internal/platform/settings"
 
 	"gorm.io/gorm"
 )
@@ -710,6 +712,9 @@ func (s *StorageService) storeRemoteWithProfile(ctx context.Context, profile Sto
 		if err != nil {
 			return "", err
 		}
+		if err := validateRemoteImageBytes(filename, data); err != nil {
+			return "", err
+		}
 		fileHeader := createMemoryFileHeader(filename, data)
 		return s.uploadWithProfile(profile, fileHeader, opts)
 	case profile.Provider == StorageProviderKodo:
@@ -798,23 +803,48 @@ func (s *StorageService) downloadRemoteFile(ctx context.Context, remoteURL strin
 		return nil, "", fmt.Errorf("远程文件超过大小限制 (%d MB)", maxRemoteFileSize/1024/1024)
 	}
 
-	ext := path.Ext(strings.Split(remoteURL, "?")[0])
+	ext := strings.ToLower(path.Ext(strings.Split(remoteURL, "?")[0]))
+	if normalized, ok := media.NormalizeImageExtension(ext); ok {
+		ext = normalized
+	} else {
+		ext = imageExtensionFromContentType(resp.Header.Get("Content-Type"))
+	}
 	if ext == "" {
-		ct := resp.Header.Get("Content-Type")
-		switch {
-		case strings.Contains(ct, "png"):
-			ext = ".png"
-		case strings.Contains(ct, "webp"):
-			ext = ".webp"
-		case strings.Contains(ct, "gif"):
-			ext = ".gif"
-		default:
-			ext = ".jpg"
-		}
+		return nil, "", fmt.Errorf("仅支持 JPG / PNG / GIF / WEBP 图片")
+	}
+	if err := validateRemoteImageBytes("remote"+ext, data); err != nil {
+		return nil, "", err
 	}
 
 	filename := fmt.Sprintf("remote_%d%s", time.Now().UnixNano(), ext)
 	return data, filename, nil
+}
+
+func imageExtensionFromContentType(contentType string) string {
+	ct := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+	switch ct {
+	case "image/jpeg", "image/jpg":
+		return ".jpg"
+	case "image/png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	default:
+		return ""
+	}
+}
+
+func validateRemoteImageBytes(filename string, data []byte) error {
+	ext, ok := media.NormalizeImageExtension(filepath.Ext(filename))
+	if !ok {
+		return fmt.Errorf("仅支持 JPG / PNG / GIF / WEBP 图片")
+	}
+	if err := media.ValidateImageBytes(data, ext); err != nil {
+		return fmt.Errorf("远程文件校验失败: %v", err)
+	}
+	return nil
 }
 
 func (s *StorageService) findProfile(profiles []StorageProfile, id string) (*StorageProfile, error) {

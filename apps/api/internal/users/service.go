@@ -2,7 +2,7 @@ package users
 
 import (
 	"errors"
-		
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -19,7 +19,7 @@ func (s *UserService) Register(req *RegisterRequest) (*User, error) {
 	// 检查用户名是否已存在
 	exists, err := s.repo.ExistsUsername(req.Username)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("注册失败，请稍后重试")
 	}
 	if exists {
 		return nil, errors.New("用户名已存在")
@@ -28,7 +28,7 @@ func (s *UserService) Register(req *RegisterRequest) (*User, error) {
 	// 加密密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("注册失败，请稍后重试")
 	}
 
 	// 创建用户
@@ -39,7 +39,7 @@ func (s *UserService) Register(req *RegisterRequest) (*User, error) {
 	}
 
 	if err := s.repo.Create(user); err != nil {
-		return nil, err
+		return nil, errors.New("注册失败，请稍后重试")
 	}
 
 	return user, nil
@@ -85,10 +85,13 @@ func (s *UserService) UpdatePassword(userID uint64, oldPassword, newPassword str
 	// 加密新密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return errors.New("密码更新失败，请稍后重试")
 	}
 
-	return s.repo.UpdatePassword(userID, string(hashedPassword))
+	if err := s.repo.UpdatePassword(userID, string(hashedPassword)); err != nil {
+		return errors.New("密码更新失败，请稍后重试")
+	}
+	return nil
 }
 
 // AdminUpdatePassword 管理员修改用户密码
@@ -101,10 +104,13 @@ func (s *UserService) AdminUpdatePassword(userID uint64, newPassword string) err
 	// 加密新密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return errors.New("用户操作失败，请稍后重试")
 	}
 
-	return s.repo.UpdatePassword(user.ID, string(hashedPassword))
+	if err := s.repo.UpdatePassword(user.ID, string(hashedPassword)); err != nil {
+		return errors.New("用户操作失败，请稍后重试")
+	}
+	return nil
 }
 
 // CreateUser 管理员创建用户
@@ -112,7 +118,7 @@ func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
 	// 检查用户名是否已存在
 	exists, err := s.repo.ExistsUsername(req.Username)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("用户操作失败，请稍后重试")
 	}
 	if exists {
 		return nil, errors.New("用户名已存在")
@@ -121,7 +127,7 @@ func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
 	// 加密密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("用户操作失败，请稍后重试")
 	}
 
 	// 创建用户
@@ -132,7 +138,7 @@ func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
 	}
 
 	if err := s.repo.Create(user); err != nil {
-		return nil, err
+		return nil, errors.New("用户操作失败，请稍后重试")
 	}
 
 	return user, nil

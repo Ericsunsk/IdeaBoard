@@ -104,6 +104,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { NButton, NInput, NSwitch, useMessage } from 'naive-ui'
 import { adminSegApi } from '../../../shared/api/index'
+import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import AdminEditorModal from '../shared/components/AdminEditorModal.vue'
 import AdminCardHeader from '../shared/components/AdminCardHeader.vue'
 import AdminChip from '../shared/components/AdminChip.vue'
@@ -151,10 +152,7 @@ function toChipVariant(status: string): 'neutral' | 'current' | 'enabled' | 'emp
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  if (typeof error === 'object' && error && 'msg' in error && typeof (error as { msg?: unknown }).msg === 'string') {
-    return (error as { msg: string }).msg
-  }
-  return fallback
+  return extractSafeApiErrorMessage(error, fallback)
 }
 
 async function loadConfig() {

@@ -55,12 +55,12 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 		Prompt string `json:"prompt"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
 	if err := h.configRepo.Set(FeaturePromptConfigKey(slug), req.Prompt); err != nil {
-		response.Error(c, 500, "保存失败: "+err.Error())
+		response.InternalError(c, 500, "保存失败", err)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 func (h *FeaturePromptHandler) ListPrompts(c *gin.Context) {
 	prompts, err := h.configRepo.GetByPrefix(FeaturePromptConfigKeyPrefix)
 	if err != nil {
-		response.Error(c, 500, "获取失败: "+err.Error())
+		response.InternalError(c, 500, "获取失败", err)
 		return
 	}
 	response.Success(c, gin.H{"prompts": prompts})

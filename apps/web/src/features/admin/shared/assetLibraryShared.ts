@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import type { UploadFileInfo } from 'naive-ui'
 import { UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../../shared/constants/media'
+import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { parseAdminUploadResponse } from './adminUpload'
 
 export const ADMIN_STATUS_OPTIONS = [
@@ -18,15 +19,7 @@ type Message = { success: MessageFn; error: MessageFn }
 type ListResponse<T> = { code?: number; data?: { list?: T[] } | null }
 
 export function extractApiErrorMessage(error: unknown, fallback: string): string {
-  if (
-    typeof error === 'object' &&
-    error &&
-    'msg' in error &&
-    typeof (error as { msg?: unknown }).msg === 'string'
-  ) {
-    return (error as { msg: string }).msg
-  }
-  return fallback
+  return extractSafeApiErrorMessage(error, fallback)
 }
 
 export function createAdminUploadFinishHandler<T extends object>(

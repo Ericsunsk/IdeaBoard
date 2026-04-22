@@ -3,7 +3,7 @@ package channels
 import (
 	"strconv"
 
-			"api/internal/platform/response"
+	"api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,7 +28,7 @@ func (h *ChannelHandler) List(c *gin.Context) {
 func (h *ChannelHandler) Create(c *gin.Context) {
 	var req CreateChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.channelRepo.Create(channel); err != nil {
-		response.Error(c, 500, "创建渠道商失败: "+err.Error())
+		response.InternalError(c, 500, "创建渠道商失败", err)
 		return
 	}
 
@@ -57,7 +57,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 
 	var req UpdateChannelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 	channel.Models = req.Models
 
 	if err := h.channelRepo.Update(channel); err != nil {
-		response.Error(c, 500, "更新渠道商失败: "+err.Error())
+		response.InternalError(c, 500, "更新渠道商失败", err)
 		return
 	}
 
@@ -88,7 +88,7 @@ func (h *ChannelHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.channelRepo.Delete(id); err != nil {
-		response.Error(c, 500, "删除渠道商失败: "+err.Error())
+		response.InternalError(c, 500, "删除渠道商失败", err)
 		return
 	}
 

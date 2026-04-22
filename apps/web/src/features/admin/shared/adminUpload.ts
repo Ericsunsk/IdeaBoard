@@ -4,7 +4,7 @@ import {
   ADMIN_UPLOAD_ENDPOINT,
   UPLOAD_FAILED_MESSAGE,
 } from '../../../shared/constants/media'
-import { getStoredToken, handleAuthFailure } from '../../../shared/utils/auth'
+import { handleAuthFailure } from '../../../shared/utils/auth'
 
 type UploadResponse = {
   code?: number
@@ -15,7 +15,7 @@ type UploadResponse = {
 export const adminUploadAction = ADMIN_UPLOAD_ENDPOINT
 
 export function useAdminUploadHeaders() {
-  return computed(() => ({ Authorization: `Bearer ${getStoredToken() || ''}` }))
+  return computed(() => ({}))
 }
 
 export function parseAdminUploadResponse(event?: ProgressEvent): UploadResponse {

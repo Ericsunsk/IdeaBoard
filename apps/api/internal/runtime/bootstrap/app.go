@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -79,7 +80,7 @@ func Run(args []string) {
 	segService := imageproc.NewSegService(systemConfigRepo)
 
 	authHandler := auth.NewAuthHandler(userService, rdb)
-	adminHandler := users.NewAdminHandler(userService)
+	adminHandler := users.NewAdminHandler(userService, rdb)
 	cardHandler := assets.NewStyleCardHandler(styleCardService)
 	channelHandler := channels.NewChannelHandler(channelRepo)
 	storageHandler := storage.NewStorageHandler(storageService)
@@ -127,12 +128,12 @@ func Run(args []string) {
 	}
 
 	server := &http.Server{
-		Addr:    ":" + port,
+		Addr:    listenerAddr(cfg.App.Host, port),
 		Handler: r,
 	}
 
 	go func() {
-		log.Printf("Server starting on port %s", port)
+		log.Printf("Server starting on %s", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}
@@ -152,6 +153,13 @@ func Run(args []string) {
 	}
 
 	log.Println("[Main] Server exited")
+}
+
+func listenerAddr(host, port string) string {
+	if strings.TrimSpace(host) == "" {
+		return ":" + port
+	}
+	return net.JoinHostPort(host, port)
 }
 
 func runInitAdmin() {

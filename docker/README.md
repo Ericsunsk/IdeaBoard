@@ -30,7 +30,7 @@ docker compose logs -f redis
 |------|------|
 | 镜像 | `mysql:8.0` |
 | 容器名 | `ideaboard-mysql` |
-| 端口 | `3306` |
+| 宿主机端口 | `127.0.0.1:${MYSQL_PORT:-3306}` |
 | Root 密码 | `${MYSQL_ROOT_PASSWORD:-root123}` |
 | 默认数据库 | `${MYSQL_DATABASE:-ideaboard}` |
 | 默认业务用户 | `${MYSQL_USER:-ideaboard}` |
@@ -40,7 +40,7 @@ docker compose logs -f redis
 
 - compose 已显式固定 `platform: linux/amd64`，便于 Apple Silicon 环境直接运行。
 - 如果本地已有旧的 `mysql:5.7` 数据卷，升级到 8.0 前请先备份；不兼容时建议删除开发卷后重新初始化。
-- 若你还会启动完整后端，推荐仍执行一次 `cd apps/api && go run ./cmd init-admin`，不要依赖初始化 SQL 里的种子管理员口径。
+- compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请显式执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
 
 ### Redis
 
@@ -48,9 +48,9 @@ docker compose logs -f redis
 |------|------|
 | 镜像 | `redis:7` |
 | 容器名 | `ideaboard-redis` |
-| 端口 | `6379` |
+| 宿主机端口 | `127.0.0.1:${REDIS_PORT:-6379}` |
 | 持久化 | `appendonly yes` |
-| 默认密码 | 无 |
+| 默认密码 | `${REDIS_PASSWORD:-无}` |
 
 ## 3. 连接信息
 
@@ -74,13 +74,14 @@ GUI 客户端：
 命令行：
 
 ```bash
-redis-cli -h localhost -p 6379
+redis-cli -h localhost -p 6379 ${REDIS_PASSWORD:+-a "$REDIS_PASSWORD"}
 ```
 
 GUI 客户端：
 
 - Host：`localhost`
 - Port：`6379`
+- Password：若设置了 `REDIS_PASSWORD`，客户端也必须同步填写；后端请同步配置 `REDIS_AUTH`
 
 ## 4. 常用操作
 

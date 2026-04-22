@@ -1,6 +1,7 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { CanvasImageItem } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/index'
+import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
@@ -119,7 +120,7 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
         seg_type: options.defaultSegType,
       })
       if (segmentRes.code !== 0 || !segmentRes.data?.result_url) {
-        options.message.error(segmentRes.msg || 'Segmentation failed')
+        options.message.error(sanitizeApiErrorMessage(segmentRes.msg, 'Segmentation failed'))
         return
       }
 
@@ -129,14 +130,14 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
         feature: 'remove-bg',
       })
       if (saveRes.code !== 0 || !saveRes.data?.image_url) {
-        options.message.error(saveRes.msg || 'Save result failed')
+        options.message.error(sanitizeApiErrorMessage(saveRes.msg, 'Save result failed'))
         return
       }
 
       options.appendGeneratedImages([saveRes.data.image_url], source)
       options.message.success(`Background removed in ${((Date.now() - startTime) / 1000).toFixed(1)}s`)
     } catch (error: any) {
-      options.message.error(error?.msg || error?.message || 'Failed to remove background')
+      options.message.error(sanitizeApiErrorMessage(error?.msg || error?.message, 'Failed to remove background'))
     } finally {
       options.generating.value = false
     }
@@ -204,14 +205,14 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       })
 
       if (res.code !== 0 || !res.data?.svg_url) {
-        options.message.error(res.msg || 'Vectorize failed')
+        options.message.error(sanitizeApiErrorMessage(res.msg, 'Vectorize failed'))
         return
       }
 
       options.appendGeneratedImages([res.data.svg_url], source)
       options.message.success(`Vectorized in ${((Date.now() - startTime) / 1000).toFixed(1)}s`)
     } catch (error: any) {
-      options.message.error(error?.msg || error?.message || 'Failed to vectorize image')
+      options.message.error(sanitizeApiErrorMessage(error?.msg || error?.message, 'Failed to vectorize image'))
     } finally {
       options.generating.value = false
     }

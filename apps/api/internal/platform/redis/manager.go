@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -13,6 +14,7 @@ const (
 	KeyGlobalQueue       = "drawing:task:global_queue"
 	KeyWaitQueue         = "drawing:task:wait_queue"
 	KeyRunningTasks      = "drawing:task:running"
+	KeyTaskCancelPrefix  = "drawing:task:cancelled"
 	MaxGlobalQueueLen    = 10000
 	MaxWaitQueueLen      = 100
 )
@@ -281,6 +283,22 @@ func (r *RedisManager) GetAllRunningTasks(ctx context.Context) ([]string, error)
 	return r.rdb.SMembers(ctx, KeyRunningTasks).Result()
 }
 
+func (r *RedisManager) MarkTaskCancelled(ctx context.Context, taskID string, ttl time.Duration) error {
+	return r.rdb.Set(ctx, taskCancelKey(taskID), "1", ttl).Err()
+}
+
+func (r *RedisManager) IsTaskCancelled(ctx context.Context, taskID string) (bool, error) {
+	exists, err := r.rdb.Exists(ctx, taskCancelKey(taskID)).Result()
+	if err != nil {
+		return false, err
+	}
+	return exists > 0, nil
+}
+
+func (r *RedisManager) ClearTaskCancelled(ctx context.Context, taskID string) error {
+	return r.rdb.Del(ctx, taskCancelKey(taskID)).Err()
+}
+
 // 全局队列任务结构
 type GlobalQueueTask struct {
 	TaskID     string   `json:"task_id"`
@@ -320,4 +338,8 @@ func (r *RedisManager) GetMonitorInfo(ctx context.Context, accountIDs []uint64) 
 	info.AccountLoads = loads
 
 	return info, nil
+}
+
+func taskCancelKey(taskID string) string {
+	return fmt.Sprintf("%s:%s", KeyTaskCancelPrefix, taskID)
 }

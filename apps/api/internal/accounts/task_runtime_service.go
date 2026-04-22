@@ -55,6 +55,39 @@ func (s *TaskRuntimeService) ReleaseTask(accountID uint64, taskID string) error 
 	return s.redisMgr.ReleaseTask(context.Background(), accountID, taskID)
 }
 
+func (s *TaskRuntimeService) IsTaskCancelled(taskID string) (bool, error) {
+	return s.redisMgr.IsTaskCancelled(context.Background(), taskID)
+}
+
+func (s *TaskRuntimeService) ClearTaskCancelled(taskID string) error {
+	return s.redisMgr.ClearTaskCancelled(context.Background(), taskID)
+}
+
+func (s *TaskRuntimeService) WatchTaskCancellation(parent context.Context, taskID string) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
+
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cancelled, err := s.IsTaskCancelled(taskID)
+				if err != nil || !cancelled {
+					continue
+				}
+				cancel()
+				return
+			}
+		}
+	}()
+
+	return ctx, cancel
+}
+
 func (s *TaskRuntimeService) MarkTaskRunning(taskID string, accountID uint64) error {
 	task, err := s.taskRepo.GetByTaskID(taskID)
 	if err != nil {

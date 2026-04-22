@@ -2,6 +2,7 @@ import { h } from 'vue'
 import { NTag } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../shared/api/account'
+import { sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
 
 export interface AccountLoad {
   current_concurrent: number
@@ -107,7 +108,9 @@ export function createMonitorTaskColumns(): DataTableColumns<Task> {
       key: 'error_msg',
       ellipsis: { tooltip: true },
       render: (row) =>
-        row.error_msg ? h('span', { style: { color: ERROR_TEXT_COLOR, fontSize: '12px' } }, row.error_msg) : '-',
+        row.error_msg
+          ? h('span', { style: { color: ERROR_TEXT_COLOR, fontSize: '12px' } }, sanitizeTaskErrorMessage(row.error_msg))
+          : '-',
     },
   ]
 }

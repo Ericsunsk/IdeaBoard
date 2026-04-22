@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { userApi } from '../../shared/api'
-import { getStoredToken, getStoredUser, clearStoredAuth, setStoredAuth } from '../../shared/utils/auth'
+import { getStoredUser, clearStoredAuth, setStoredAuth } from '../../shared/utils/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -147,29 +147,22 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  let token = getStoredToken()
   let user = getStoredUser()
   const isAdminRoute = to.path.startsWith('/admin')
+  const shouldRefreshSession = isAdminRoute || !!to.meta.requiresAuth || !!to.meta.guest
 
-  if (token && !user) {
-    clearStoredAuth()
-    token = null
-    user = null
-  }
-
-  if (token && (isAdminRoute || !!to.meta.requiresAuth)) {
+  if (shouldRefreshSession) {
     try {
       const res: any = await userApi.getInfo()
       if (res.code === 0 && res.data?.user) {
         const refreshedUser = res.data.user
         user = refreshedUser
-        setStoredAuth(token, refreshedUser)
+        setStoredAuth(refreshedUser)
       }
     } catch (error: any) {
       const code = Number(error?.status ?? error?.code)
       if (code === 401 || code === 403) {
         clearStoredAuth()
-        token = null
         user = null
       } else if (isAdminRoute) {
         return '/user/home'
@@ -177,7 +170,7 @@ router.beforeEach(async (to) => {
     }
   }
 
-  const isLoggedIn = !!(token && user)
+  const isLoggedIn = !!user
 
   if (to.meta.requiresAuth && !isLoggedIn) {
     if (isAdminRoute) {

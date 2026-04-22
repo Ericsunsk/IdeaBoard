@@ -1,5 +1,6 @@
 import { nextTick, onUnmounted, type ComponentPublicInstance, type Ref } from 'vue'
 import type { CanvasImageItem, MaskNodeItem } from '../types/canvasNodes'
+import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
 interface UploadResponse {
   code: number
@@ -500,10 +501,10 @@ export function useMaskNode(options: UseMaskNodeOptions) {
         options.message.success('节点图片已更新')
         return
       }
-      options.message.error(res.msg || '上传失败')
+      options.message.error(sanitizeApiErrorMessage(res.msg, '上传失败'))
     } catch (error: unknown) {
       const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || '上传失败')
+      options.message.error(sanitizeApiErrorMessage(maybeError?.msg || maybeError?.message, '上传失败'))
     }
   }
 

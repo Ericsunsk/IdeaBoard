@@ -1,7 +1,7 @@
 package assets
 
 import (
-			"api/internal/platform/response"
+	"api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -53,7 +53,7 @@ func (h *PatternStyleHandler) Create(c *gin.Context) {
 		SortOrder: req.SortOrder, IsEnabled: req.IsEnabled,
 	}
 	if err := h.repo.Create(ps); err != nil {
-		response.Error(c, 500, "创建失败: "+err.Error())
+		response.InternalError(c, 500, "创建失败", err)
 		return
 	}
 	response.Success(c, gin.H{"pattern_style": ps})
@@ -80,7 +80,7 @@ func (h *PatternStyleHandler) Update(c *gin.Context) {
 	ps.SortOrder = req.SortOrder
 	ps.IsEnabled = req.IsEnabled
 	if err := h.repo.Update(ps); err != nil {
-		response.Error(c, 500, "更新失败: "+err.Error())
+		response.InternalError(c, 500, "更新失败", err)
 		return
 	}
 	response.Success(c, nil)
@@ -93,7 +93,7 @@ func (h *PatternStyleHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {
-		response.Error(c, 500, "删除失败: "+err.Error())
+		response.InternalError(c, 500, "删除失败", err)
 		return
 	}
 	response.Success(c, nil)

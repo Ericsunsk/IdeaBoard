@@ -17,6 +17,5 @@ CREATE TABLE `users` (
   UNIQUE KEY `idx_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
--- 创建默认管理员账号 admin/123456
-INSERT INTO `users` (`username`, `password`, `status`, `role`) VALUES
-('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 1, 'admin');
+-- 管理员账号必须在后端启动后通过 init-admin 显式创建：
+-- cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin

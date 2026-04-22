@@ -154,7 +154,7 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 		}
 		url, err := h.StorageService.Upload(file)
 		if err != nil {
-			response.Error(c, 500, "上传失败: "+err.Error())
+			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
 		response.Success(c, gin.H{"url": url})
@@ -170,7 +170,7 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 		}
 		resp, err := safehttp.Get(c.Request.Context(), imgURL, 20*time.Second)
 		if err != nil {
-			response.Error(c, 400, "下载失败: "+err.Error())
+			response.Error(c, 400, "下载失败")
 			return
 		}
 		defer resp.Body.Close()
@@ -269,7 +269,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 
 		url, err := h.StorageService.Upload(file)
 		if err != nil {
-			response.Error(c, 500, "上传失败: "+err.Error())
+			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
 		response.Success(c, gin.H{"url": url})

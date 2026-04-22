@@ -1,10 +1,10 @@
 import type { User } from '../types'
 
-const TOKEN_KEY = 'token'
+const LEGACY_TOKEN_KEY = 'token'
 const USER_KEY = 'user'
 
-export function getStoredToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+function clearLegacyToken() {
+  localStorage.removeItem(LEGACY_TOKEN_KEY)
 }
 
 export function getStoredUser(): User | null {
@@ -19,18 +19,18 @@ export function getStoredUser(): User | null {
   }
 }
 
-export function setStoredAuth(token: string, user: User) {
-  localStorage.setItem(TOKEN_KEY, token)
+export function setStoredAuth(user: User) {
+  clearLegacyToken()
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
 export function clearStoredAuth() {
-  localStorage.removeItem(TOKEN_KEY)
+  clearLegacyToken()
   localStorage.removeItem(USER_KEY)
 }
 
 export function hasValidStoredAuth(): boolean {
-  return !!(getStoredToken() && getStoredUser())
+  return !!getStoredUser()
 }
 
 function normalizeScopePart(value: string): string {
@@ -55,6 +55,10 @@ export function getAuthStorageUserScope(): string | null {
 
 function isAuthRequest(requestUrl: string) {
   return requestUrl.includes('/auth/')
+}
+
+function isSessionProbeRequest(requestUrl: string) {
+  return requestUrl.includes('/user/info')
 }
 
 function isAdminApiRequest(requestUrl: string) {
@@ -83,6 +87,11 @@ export function handleAuthFailure(params: {
   if (code === 403 && isAdminApiRequest(requestUrl) && isAdminPage()) {
     window.location.href = '/user/home'
     return true
+  }
+
+  if (code === 401 && isSessionProbeRequest(requestUrl)) {
+    clearStoredAuth()
+    return false
   }
 
   if (code !== 401 || isAuthRequest(requestUrl)) {

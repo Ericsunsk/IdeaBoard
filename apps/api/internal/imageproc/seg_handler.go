@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"api/internal/accounts"
@@ -53,7 +54,7 @@ func (h *SegHandler) SaveConfig(c *gin.Context) {
 		return
 	}
 	if err := h.segService.SaveConfig(&req); err != nil {
-		response.Error(c, 500, "保存失败: "+err.Error())
+		response.InternalError(c, 500, "保存失败", err)
 		return
 	}
 	response.Success(c, gin.H{"message": "保存成功"})
@@ -67,7 +68,7 @@ func (h *SegHandler) Segment(c *gin.Context) {
 		ReturnForm string `json:"return_form"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -79,7 +80,8 @@ func (h *SegHandler) Segment(c *gin.Context) {
 
 	resultURL, err := h.segService.Segment(req.ImageURL, req.SegType, req.ReturnForm)
 	if err != nil {
-		response.Error(c, 500, err.Error())
+		log.Printf("[Seg] segment failed: seg_type=%s err=%v", req.SegType, err)
+		response.Error(c, 500, "图像处理失败，请稍后重试")
 		return
 	}
 
@@ -103,7 +105,7 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 		Feature       string `json:"feature"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -126,14 +128,16 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 
 	resultURL, err := h.segService.Upscale(req.ImageURL, req.Mode, req.UpscaleFactor, req.OutputFormat, req.OutputQuality)
 	if err != nil {
-		response.Error(c, 500, err.Error())
+		log.Printf("[Seg] upscale failed: mode=%s factor=%d err=%v", req.Mode, req.UpscaleFactor, err)
+		response.Error(c, 500, "图像处理失败，请稍后重试")
 		return
 	}
 
 	// 持久化结果图片
 	persistedURL, err := h.persistImage(resultURL)
 	if err != nil {
-		response.Error(c, 500, "保存结果图片失败: "+err.Error())
+		log.Printf("[Seg] persist upscale image failed: err=%v", err)
+		response.Error(c, 500, "保存结果图片失败")
 		return
 	}
 
@@ -192,7 +196,8 @@ func (h *SegHandler) SaveSegResult(c *gin.Context) {
 	// 持久化图片：优先对象存储，否则下载到本地
 	persistedURL, err := h.persistImage(req.ResultURL)
 	if err != nil {
-		response.Error(c, 500, "保存图片失败: "+err.Error())
+		log.Printf("[Seg] persist segmented image failed: err=%v", err)
+		response.Error(c, 500, "保存图片失败")
 		return
 	}
 
@@ -228,7 +233,8 @@ func (h *SegHandler) SaveSegResult(c *gin.Context) {
 		CompletedAt: &now,
 	}
 	if err := h.taskRepo.Create(task); err != nil {
-		response.Error(c, 500, "保存记录失败: "+err.Error())
+		log.Printf("[Seg] save segment task failed: task_id=%s err=%v", taskID, err)
+		response.Error(c, 500, "保存记录失败")
 		return
 	}
 

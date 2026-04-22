@@ -28,7 +28,7 @@ func NewAuthHandler(userService *users.UserService, rdb *redis.Client) *AuthHand
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req users.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req users.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
@@ -70,10 +70,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		response.Error(c, 500, "存储令牌失败")
 		return
 	}
+	setAuthTokenCookie(c, token)
 
 	response.Success(c, gin.H{
-		"token": token,
-		"user":  user,
+		"user": user,
 	})
 }
 
@@ -81,7 +81,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	tokenKey := TokenRedisKey(userID.(uint64))
-	h.rdb.Del(context.Background(), tokenKey)
+	_ = h.rdb.Del(context.Background(), tokenKey)
+	clearAuthTokenCookie(c)
 
 	response.Success(c, nil)
 }
@@ -106,16 +107,19 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 
 	var req users.UpdatePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误: "+err.Error())
+		response.Error(c, 400, "参数错误")
 		return
 	}
 
-	if err := h.userService.UpdatePassword(userID.(uint64), req.OldPassword, req.NewPassword); err != nil {
+	currentUserID := userID.(uint64)
+	if err := h.userService.UpdatePassword(currentUserID, req.OldPassword, req.NewPassword); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
+	_ = h.rdb.Del(context.Background(), TokenRedisKey(currentUserID))
+	clearAuthTokenCookie(c)
 
-	response.Success(c, nil)
+	response.Success(c, gin.H{"message": "密码更新成功，请重新登录"})
 }
 
 // generateToken 生成JWT token

@@ -4,6 +4,7 @@ import type {
   ImageNodeItem,
   ImageNodeOutputItem,
 } from '../types/canvasNodes'
+import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
 interface UploadResponse {
   code: number
@@ -96,10 +97,10 @@ export function useImageNode(options: UseImageNodeOptions) {
         options.message.success('Image 节点输入已更新')
         return
       }
-      options.message.error(res.msg || '上传失败')
+      options.message.error(sanitizeApiErrorMessage(res.msg, '上传失败'))
     } catch (error: unknown) {
       const maybeError = error as { msg?: string; message?: string } | null
-      options.message.error(maybeError?.msg || maybeError?.message || '上传失败')
+      options.message.error(sanitizeApiErrorMessage(maybeError?.msg || maybeError?.message, '上传失败'))
     }
   }
 

@@ -34,6 +34,7 @@ type RedisConfig struct {
 
 type AppConfig struct {
 	Port string
+	Host string
 	Env  string
 }
 
@@ -75,6 +76,7 @@ func Load() *Config {
 		},
 		App: AppConfig{
 			Port: getEnv("APP_PORT", "6000"),
+			Host: getFirstEnv("APP_HOST", "APP_BIND_HOST"),
 			Env:  detectAppEnv(),
 		},
 		JWT: JWTConfig{
@@ -152,4 +154,13 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getFirstEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
 }

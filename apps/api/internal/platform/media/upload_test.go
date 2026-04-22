@@ -27,3 +27,17 @@ func TestValidateImageMagicRejectsRiffWithoutWebPChunk(t *testing.T) {
 		t.Fatal("expected non-webp RIFF payload to be rejected")
 	}
 }
+
+func TestValidateImageBytesRejectsHTMLPayload(t *testing.T) {
+	buf := []byte("<html><body>not an image</body></html>")
+
+	if err := ValidateImageBytes(buf, ".png"); err == nil {
+		t.Fatal("expected html payload to be rejected for png extension")
+	}
+}
+
+func TestNormalizeImageExtensionRejectsSVG(t *testing.T) {
+	if _, ok := NormalizeImageExtension(".svg"); ok {
+		t.Fatal("expected svg to be rejected")
+	}
+}
