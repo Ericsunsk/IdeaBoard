@@ -25,6 +25,8 @@ import (
 
 const (
 	legacyAliyunOSSProviderID = "aliyun-oss"
+	// maxRemoteFileSize caps remote downloads to prevent OOM from unbounded streams.
+	maxRemoteFileSize = 100 * 1024 * 1024 // 100 MB
 )
 
 type StorageStoreOptions struct {
@@ -790,9 +792,12 @@ func (s *StorageService) downloadRemoteFile(ctx context.Context, remoteURL strin
 		return nil, "", fmt.Errorf("下载图片返回 %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxRemoteFileSize+1))
 	if err != nil {
 		return nil, "", fmt.Errorf("读取图片数据失败: %v", err)
+	}
+	if len(data) > maxRemoteFileSize {
+		return nil, "", fmt.Errorf("远程文件超过大小限制 (%d MB)", maxRemoteFileSize/1024/1024)
 	}
 
 	ext := path.Ext(strings.Split(remoteURL, "?")[0])

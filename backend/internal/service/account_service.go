@@ -3,9 +3,10 @@ package service
 import (
 	"backend/internal/constants"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
-	"math/rand"
 	"time"
 
 	"backend/internal/model"
@@ -219,7 +220,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 	}
 
 	// 生成任务ID
-	taskID := fmt.Sprintf("task_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+	taskID := generateSecureTaskID("task")
 
 	params := req.Params
 	if params == nil {
@@ -422,4 +423,14 @@ func (s *AccountService) MarkTaskCompleted(taskID string, result string) error {
 
 func (s *AccountService) MarkTaskFailed(taskID string, accountID uint64, errMsg string) error {
 	return s.taskRuntime.MarkTaskFailedWithRetry(taskID, accountID, errMsg)
+}
+
+// generateSecureTaskID produces a non-guessable task identifier using crypto/rand.
+func generateSecureTaskID(prefix string) string {
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		// Extremely unlikely; fall back to timestamp only.
+		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
+	}
+	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
 }

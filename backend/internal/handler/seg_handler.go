@@ -2,9 +2,10 @@ package handler
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"backend/internal/model"
@@ -66,6 +67,12 @@ func (h *SegHandler) Segment(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	validSegTypes := map[string]bool{"body": true, "head": true, "clothing": true, "commodity": true, "common": true}
+	if !validSegTypes[req.SegType] {
+		response.Error(c, 400, "不支持的分割类型: "+req.SegType)
 		return
 	}
 
@@ -138,7 +145,7 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 	featureSlug := service.NormalizeWorkflowFeatureSlugOrFallback(req.Feature, "hd-upscale")
 	prompt := fmt.Sprintf("[%s] %s %dx", featureSlug, modeName, req.UpscaleFactor)
 
-	taskID := fmt.Sprintf("upscale_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+	taskID := segSecureTaskID("upscale")
 	now := time.Now()
 	resultJSON, _ := json.Marshal(map[string]interface{}{
 		"image_url":      persistedURL,
@@ -202,7 +209,7 @@ func (h *SegHandler) SaveSegResult(c *gin.Context) {
 		prompt = fmt.Sprintf("[%s] %s", featureSlug, typeName)
 	}
 
-	taskID := fmt.Sprintf("seg_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+	taskID := segSecureTaskID("seg")
 	now := time.Now()
 	resultJSON, _ := json.Marshal(map[string]interface{}{
 		"image_url": persistedURL,
@@ -240,4 +247,12 @@ func (h *SegHandler) persistImage(imageURL string) (string, error) {
 	return h.storageService.StoreRemote(context.Background(), imageURL, service.StorageStoreOptions{
 		DirPrefix: "seg",
 	})
+}
+
+func segSecureTaskID(prefix string) string {
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
+	}
+	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
 }

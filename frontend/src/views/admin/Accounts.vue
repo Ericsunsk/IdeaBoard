@@ -414,15 +414,23 @@ async function handleEdit() {
 
 // === 启停/删除 ===
 async function handleStart(row: ApiAccount) {
-  await accountApi.startAccount(row.id)
-  message.success('账号已启动')
-  loadAccounts()
+  try {
+    await accountApi.startAccount(row.id)
+    message.success('账号已启动')
+    loadAccounts()
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, '账号启动失败'))
+  }
 }
 
 async function handleStop(row: ApiAccount) {
-  await accountApi.stopAccount(row.id)
-  message.success('账号已停止')
-  loadAccounts()
+  try {
+    await accountApi.stopAccount(row.id)
+    message.success('账号已停止')
+    loadAccounts()
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, '账号停止失败'))
+  }
 }
 
 async function handleDelete(row: ApiAccount) {
@@ -432,9 +440,13 @@ async function handleDelete(row: ApiAccount) {
     positiveText: '确定',
     negativeText: '取消',
     onPositiveClick: async () => {
-      await accountApi.deleteAccount(row.id)
-      message.success('删除成功')
-      loadAccounts()
+      try {
+        await accountApi.deleteAccount(row.id)
+        message.success('删除成功')
+        loadAccounts()
+      } catch (error) {
+        message.error(extractApiErrorMessage(error, '删除失败'))
+      }
     }
   })
 }

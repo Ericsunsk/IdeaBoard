@@ -2,12 +2,13 @@ package handler
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -165,7 +166,7 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 	}
 	prompt := fmt.Sprintf("[to-vector] %s 阈值%.2f", modeDesc, req.Threshold)
 
-	taskID := fmt.Sprintf("vec_%d_%d", time.Now().UnixNano(), rand.Intn(10000))
+	taskID := vecSecureTaskID("vec")
 	now := time.Now()
 	resultJSON, _ := json.Marshal(map[string]interface{}{
 		"image_url":   persistedURL,
@@ -394,4 +395,12 @@ func (h *VectorizeHandler) CheckPotrace(c *gin.Context) {
 func (h *VectorizeHandler) GetUsedColors(c *gin.Context) {
 	// 保留接口用于未来颜色分析功能
 	response.Success(c, gin.H{"message": "ok"})
+}
+
+func vecSecureTaskID(prefix string) string {
+	b := make([]byte, 12)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
+	}
+	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
 }

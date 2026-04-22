@@ -167,16 +167,41 @@ const runningPressureRate = computed(() =>
 const columns = createMonitorTaskColumns()
 
 let refreshTimer: number | null = null
+let visibilityListenerAttached = false
+const MAX_MONITOR_BACKOFF_MS = 60000
+const MONITOR_HARD_PAUSE_MS = 120000
+const MONITOR_FAILS_BEFORE_PAUSE = 6
+const HIDDEN_PAGE_MIN_REFRESH_MS = 15000
+const monitorConsecutiveFailures = ref(0)
+const monitorPausedUntil = ref(0)
+const monitorCurrentDelay = ref(MONITOR_REFRESH_INTERVAL_MS)
 
-async function loadMonitor() {
+function clearRefreshTimer() {
+  if (refreshTimer !== null) {
+    clearTimeout(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+function scheduleMonitorPoll(delayMs: number) {
+  clearRefreshTimer()
+  refreshTimer = window.setTimeout(() => {
+    void pollMonitor()
+  }, Math.max(0, delayMs))
+}
+
+async function loadMonitor(): Promise<boolean> {
   try {
     const res = await accountApi.getMonitor()
     if (res.code === 0) {
       monitor.value = res.data?.monitor || monitor.value
       stats.value = res.data?.stats || stats.value
+      return true
     }
+    return false
   } catch (e) {
     console.error('加载监控数据失败', e)
+    return false
   }
 }
 
@@ -201,20 +226,61 @@ async function loadTasks() {
 
 watch(filterStatus, () => {
   page.value = 1
-  loadTasks()
+  void loadTasks()
 })
 
+async function pollMonitor(forceImmediate = false) {
+  const now = Date.now()
+  if (!forceImmediate && monitorPausedUntil.value > now) {
+    scheduleMonitorPoll(monitorPausedUntil.value - now)
+    return
+  }
+
+  const success = await loadMonitor()
+  if (success) {
+    monitorConsecutiveFailures.value = 0
+    monitorPausedUntil.value = 0
+    monitorCurrentDelay.value = MONITOR_REFRESH_INTERVAL_MS
+  } else {
+    monitorConsecutiveFailures.value += 1
+    if (monitorConsecutiveFailures.value >= MONITOR_FAILS_BEFORE_PAUSE) {
+      monitorPausedUntil.value = Date.now() + MONITOR_HARD_PAUSE_MS
+      monitorCurrentDelay.value = MONITOR_HARD_PAUSE_MS
+      monitorConsecutiveFailures.value = 0
+    } else {
+      monitorCurrentDelay.value = Math.min(
+        MONITOR_REFRESH_INTERVAL_MS * (2 ** monitorConsecutiveFailures.value),
+        MAX_MONITOR_BACKOFF_MS
+      )
+    }
+  }
+
+  const nextDelay = document.hidden
+    ? Math.max(monitorCurrentDelay.value, HIDDEN_PAGE_MIN_REFRESH_MS)
+    : monitorCurrentDelay.value
+  scheduleMonitorPoll(nextDelay)
+}
+
+function onVisibilityChange() {
+  if (!document.hidden) {
+    void pollMonitor(true)
+  }
+}
+
 onMounted(() => {
-  loadMonitor()
-  loadTasks()
-  refreshTimer = window.setInterval(() => {
-    loadMonitor()
-  }, MONITOR_REFRESH_INTERVAL_MS)
+  void pollMonitor(true)
+  void loadTasks()
+  if (!visibilityListenerAttached) {
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    visibilityListenerAttached = true
+  }
 })
 
 onUnmounted(() => {
-  if (refreshTimer) {
-    clearInterval(refreshTimer)
+  clearRefreshTimer()
+  if (visibilityListenerAttached) {
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    visibilityListenerAttached = false
   }
 })
 </script>

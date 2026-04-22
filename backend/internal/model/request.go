@@ -32,7 +32,7 @@ type UserListResponse struct {
 }
 
 type UpdateStatusRequest struct {
-	Status int8 `json:"status" binding:"required"`
+	Status *int8 `json:"status" binding:"required"`
 }
 
 type UpdateUserPasswordRequest struct {

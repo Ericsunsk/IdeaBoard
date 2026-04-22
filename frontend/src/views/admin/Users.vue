@@ -93,6 +93,7 @@ import { NInput, NButton, NDataTable, NModal, NForm, NFormItem, NIcon, NTag, NSp
 import type { DataTableColumns } from 'naive-ui'
 import type { User } from '../../types'
 import { SearchOutline, RefreshOutline, AddOutline } from '@vicons/ionicons5'
+import { extractApiErrorMessage } from './assetLibraryShared'
 import AdminSummaryCard from './components/AdminSummaryCard.vue'
 import AdminSectionHeader from './components/AdminSectionHeader.vue'
 
@@ -179,9 +180,13 @@ async function handleAddUser() {
 
 async function handleToggleStatus(row: User) {
   const newStatus = row.status === 1 ? 0 : 1
-  await adminApi.updateUserStatus(row.id, newStatus)
-  message.success(newStatus === 1 ? '已解封' : '已封禁')
-  loadUsers()
+  try {
+    await adminApi.updateUserStatus(row.id, newStatus)
+    message.success(newStatus === 1 ? '已解封' : '已封禁')
+    loadUsers()
+  } catch (error) {
+    message.error(extractApiErrorMessage(error, newStatus === 1 ? '解封失败' : '封禁失败'))
+  }
 }
 
 function openPwdModal(id: number) {
@@ -211,9 +216,13 @@ async function handleDelete(row: User) {
     positiveText: '确定',
     negativeText: '取消',
     onPositiveClick: async () => {
-      await adminApi.deleteUser(row.id)
-      message.success('删除成功')
-      loadUsers()
+      try {
+        await adminApi.deleteUser(row.id)
+        message.success('删除成功')
+        loadUsers()
+      } catch (error) {
+        message.error(extractApiErrorMessage(error, '删除失败'))
+      }
     }
   })
 }

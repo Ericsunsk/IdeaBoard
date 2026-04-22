@@ -19,6 +19,31 @@ import (
 	"backend/pkg/redis"
 )
 
+const (
+	// maxAPIResponseBody caps upstream API reads to prevent OOM from malicious or broken streams.
+	maxAPIResponseBody = 50 * 1024 * 1024 // 50 MB
+	// maxErrorBodyLen caps error messages stored in task records.
+	maxErrorBodyLen = 500
+)
+
+func readLimitedBody(body io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(body, maxAPIResponseBody+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxAPIResponseBody {
+		return nil, fmt.Errorf("响应体超过大小限制 (%d MB)", maxAPIResponseBody/1024/1024)
+	}
+	return data, nil
+}
+
+func truncateErrorBody(body string) string {
+	if len(body) > maxErrorBodyLen {
+		return body[:maxErrorBodyLen] + "...(truncated)"
+	}
+	return body
+}
+
 type Consumer struct {
 	accountRepo    *repository.AccountRepository
 	channelRepo    *repository.ChannelRepository
@@ -200,7 +225,9 @@ func (c *Consumer) callDrawingAPI(account *model.ApiAccount, task *redis.GlobalQ
 	// 解析任务参数（ratio, count 等）
 	var params map[string]interface{}
 	if task.Params != "" {
-		json.Unmarshal([]byte(task.Params), &params)
+		if err := json.Unmarshal([]byte(task.Params), &params); err != nil {
+			log.Printf("[Consumer] 解析任务参数失败: task=%s err=%v", task.TaskID, err)
+		}
 	}
 
 	// 根据 ratio 计算尺寸
@@ -307,10 +334,13 @@ func (c *Consumer) callOpenAI(account *model.ApiAccount, prompt string, width, h
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := readLimitedBody(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取 API 响应失败: %v", err)
+	}
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("API 返回 %d: %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("API 返回 %d: %s", resp.StatusCode, truncateErrorBody(string(respBody)))
 	}
 
 	var respData struct {
@@ -424,10 +454,13 @@ func (c *Consumer) callStabilityAI(account *model.ApiAccount, prompt string, wid
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := readLimitedBody(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取 API 响应失败: %v", err)
+	}
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("API 返回 %d: %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("API 返回 %d: %s", resp.StatusCode, truncateErrorBody(string(respBody)))
 	}
 
 	var respData struct {

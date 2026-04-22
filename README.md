@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/assets/ideaboard-wordmark.png" alt="IdeaBoard" width="576">
+  <img src="./docs/assets/ideaboard-wordmark.png" alt="IdeaBoard" width="461">
 </p>
 
 <p align="center">
@@ -51,7 +51,7 @@
 
 ## Overview
 
-IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供节点画布、任务入口与管理后台，后端负责鉴权、任务落库、提示词模板装配、账号调度、异步执行与结果持久化。
+IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供节点画布、任务入口与管理后台，后端负责鉴权、任务落库、提示词模板装配、账号调度、异步执行、结果持久化，以及 `Local / Kodo / S3-compatible` 存储配置接入。
 
 ### Product Snapshot
 
@@ -110,6 +110,7 @@ Canvas UI
 | 色彩与材质 | 多色配色、定向换色、上身贴合 |
 | 展示与视角 | 单视角展示、商品展示 |
 | 后处理 | 高清增强、画布延伸 |
+| 存储接入 | 本地存储、Kodo、S3-compatible 对象存储 |
 
 更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
@@ -160,13 +161,13 @@ npm run dev
 
 ```bash
 cd backend
-go run cmd/main.go init-admin
+INIT_ADMIN_PASSWORD='your-strong-password' go run cmd/main.go init-admin
 ```
 
-默认管理员账号：
+默认管理员初始化：
 
 - 用户名：`admin`
-- 密码：`admin123`
+- 密码：由 `INIT_ADMIN_PASSWORD` 指定
 
 ### Local Access
 

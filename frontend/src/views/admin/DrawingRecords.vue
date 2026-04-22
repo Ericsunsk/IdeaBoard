@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h2 class="page-title">绘图记录审计台</h2>
-        <p class="page-desc">按任务状态回溯生成链路，支持查看失败原因、耗时与原始 API 结果。</p>
+        <p class="page-desc">按任务状态回溯生成链路，支持查看失败原因、耗时与结果摘要。</p>
       </div>
       <div class="header-side-note">
         <span>总量 {{ total }}</span>
@@ -36,7 +36,7 @@
     <div class="table-card">
       <AdminSectionHeader
         title="绘图任务列表"
-        description="按时间倒序展示，点击详情可查看完整上下文。"
+        description="按时间倒序展示，点击详情可查看排障上下文。"
         variant="section"
       />
 
@@ -93,10 +93,19 @@
             <n-image :src="resultImageUrl" :width="460" object-fit="contain" />
           </div>
 
-          <h4 class="detail-subtitle">API 调用结果</h4>
+          <h4 class="detail-subtitle">API 调用结果摘要</h4>
           <div class="detail-block">
-            <pre v-if="detailTask.result">{{ formatJSON(detailTask.result) }}</pre>
+            <pre v-if="resultSummaryText">{{ resultSummaryText }}</pre>
             <span v-else>-</span>
+          </div>
+
+          <div v-if="resultDebugText" class="result-debug-toggle">
+            <n-button text size="small" @click="showDebugResult = !showDebugResult">
+              {{ showDebugResult ? '隐藏排障详情' : '显示排障详情（脱敏）' }}
+            </n-button>
+          </div>
+          <div v-if="showDebugResult && resultDebugText" class="detail-block debug-block">
+            <pre>{{ resultDebugText }}</pre>
           </div>
         </div>
       </n-drawer-content>
@@ -135,6 +144,12 @@ const statsPending = ref(0)
 
 const drawerVisible = ref(false)
 const detailTask = ref<Task | null>(null)
+const showDebugResult = ref(false)
+const RESULT_MAX_STRING_LENGTH = 300
+const RESULT_DEBUG_MAX_DEPTH = 4
+const RESULT_DEBUG_MAX_KEYS = 40
+const RESULT_ARRAY_PREVIEW_LENGTH = 5
+const SENSITIVE_KEY_PATTERN = /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
 
 const resultImageUrl = computed(() => {
   if (!detailTask.value?.result) return ''
@@ -144,6 +159,57 @@ const resultImageUrl = computed(() => {
   } catch {
     return ''
   }
+})
+
+const resultSummaryText = computed(() => {
+  if (!detailTask.value?.result) return ''
+  const parsed = parseResultSafely(detailTask.value.result)
+  if (parsed == null) return truncateString(detailTask.value.result)
+  if (Array.isArray(parsed)) {
+    return JSON.stringify({ type: 'array', length: parsed.length, preview: sanitizeValue(parsed, 1) }, null, 2)
+  }
+  if (typeof parsed !== 'object') {
+    return truncateString(String(parsed))
+  }
+
+  const summary: Record<string, unknown> = {}
+  const source = parsed as Record<string, unknown>
+  const preferredKeys = [
+    'status',
+    'platform',
+    'model_set',
+    'model',
+    'request_id',
+    'task_id',
+    'code',
+    'message',
+    'error',
+    'duration',
+    'image_url',
+  ]
+
+  preferredKeys.forEach((key) => {
+    if (key in source) summary[key] = sanitizeValue(source[key], 0)
+  })
+
+  if ('images' in source) {
+    const images = Array.isArray(source.images) ? source.images.length : 0
+    summary.images = images
+  }
+
+  if (Object.keys(summary).length === 0) {
+    summary.keys = Object.keys(source).slice(0, 12)
+    summary.preview = sanitizeValue(source, 1)
+  }
+
+  return JSON.stringify(summary, null, 2)
+})
+
+const resultDebugText = computed(() => {
+  if (!detailTask.value?.result) return ''
+  const parsed = parseResultSafely(detailTask.value.result)
+  if (parsed == null) return truncateString(detailTask.value.result, 1000)
+  return JSON.stringify(sanitizeValue(parsed, 0), null, 2)
 })
 
 const statusOptions = [
@@ -163,16 +229,63 @@ const getStatusConfig = (status: string) => {
   }
 }
 
-function formatJSON(str: string) {
+function parseResultSafely(str: string): unknown | null {
   try {
-    return JSON.stringify(JSON.parse(str), null, 2)
+    return JSON.parse(str)
   } catch {
-    return str
+    return null
   }
+}
+
+function truncateString(value: string, maxLength = RESULT_MAX_STRING_LENGTH): string {
+  if (value.length <= maxLength) return value
+  return `${value.slice(0, maxLength)}...(+${value.length - maxLength} chars)`
+}
+
+function sanitizeValue(value: unknown, depth: number, keyCountState = { count: 0 }): unknown {
+  if (value == null) return value
+
+  if (typeof value === 'string') {
+    return truncateString(value)
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    if (depth >= RESULT_DEBUG_MAX_DEPTH) return `[array:${value.length}]`
+    const preview = value.slice(0, RESULT_ARRAY_PREVIEW_LENGTH).map((item) => sanitizeValue(item, depth + 1, keyCountState))
+    if (value.length > RESULT_ARRAY_PREVIEW_LENGTH) preview.push(`...(+${value.length - RESULT_ARRAY_PREVIEW_LENGTH} items)`)
+    return preview
+  }
+
+  if (typeof value === 'object') {
+    if (depth >= RESULT_DEBUG_MAX_DEPTH) return '[object]'
+    const obj = value as Record<string, unknown>
+    const entries = Object.entries(obj)
+    const result: Record<string, unknown> = {}
+    for (const [k, v] of entries) {
+      if (keyCountState.count >= RESULT_DEBUG_MAX_KEYS) {
+        result.__truncated__ = `...(+${entries.length - Object.keys(result).length} keys)`
+        break
+      }
+      keyCountState.count += 1
+      if (SENSITIVE_KEY_PATTERN.test(k)) {
+        result[k] = '[REDACTED]'
+      } else {
+        result[k] = sanitizeValue(v, depth + 1, keyCountState)
+      }
+    }
+    return result
+  }
+
+  return String(value)
 }
 
 function showDetail(row: Task) {
   detailTask.value = row
+  showDebugResult.value = false
   drawerVisible.value = true
 }
 
@@ -372,6 +485,14 @@ onMounted(() => {
   font-family: monospace;
   font-size: 12px;
   white-space: pre-wrap;
+}
+
+.result-debug-toggle {
+  margin-top: -8px;
+}
+
+.debug-block {
+  max-height: 260px;
 }
 
 .error-block {
