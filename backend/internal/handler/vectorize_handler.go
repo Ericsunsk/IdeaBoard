@@ -45,12 +45,12 @@ func findPotrace() string {
 }
 
 type VectorizeHandler struct {
-	taskRepo    *repository.TaskRepository
-	kodoService *service.KodoService
+	taskRepo       *repository.TaskRepository
+	storageService *service.StorageService
 }
 
-func NewVectorizeHandler(taskRepo *repository.TaskRepository, kodoService *service.KodoService) *VectorizeHandler {
-	return &VectorizeHandler{taskRepo: taskRepo, kodoService: kodoService}
+func NewVectorizeHandler(taskRepo *repository.TaskRepository, storageService *service.StorageService) *VectorizeHandler {
+	return &VectorizeHandler{taskRepo: taskRepo, storageService: storageService}
 }
 
 // Vectorize 执行位图转矢量图（用户端调用）
@@ -369,17 +369,13 @@ func mergeSVGLayers(layerPaths []string, outputPath string, w, h, colorCount int
 
 // persistSVG 将 SVG 数据保存到存储
 func (h *VectorizeHandler) persistSVG(svgData []byte) (string, error) {
-	dir := filepath.Join("uploads", "vector", time.Now().Format("2006/01/02"))
-	os.MkdirAll(dir, 0755)
-
-	filename := fmt.Sprintf("%d_%d.svg", time.Now().UnixNano(), rand.Intn(10000))
-	dst := filepath.Join(dir, filename)
-
-	if err := os.WriteFile(dst, svgData, 0644); err != nil {
-		return "", fmt.Errorf("写入文件失败: %v", err)
+	if h.storageService == nil {
+		return "", fmt.Errorf("存储服务不可用")
 	}
 
-	return "/" + strings.ReplaceAll(dst, "\\", "/"), nil
+	return h.storageService.StoreBytes("vector.svg", svgData, service.StorageStoreOptions{
+		DirPrefix: "vector",
+	})
 }
 
 // CheckPotrace 检查 potrace 是否已安装

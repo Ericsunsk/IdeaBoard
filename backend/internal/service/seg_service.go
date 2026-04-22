@@ -1,6 +1,7 @@
 package service
 
 import (
+	"backend/internal/constants"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,8 +20,6 @@ import (
 	"backend/pkg/safehttp"
 )
 
-const aliyunSegConfigKey = "aliyun_seg_config"
-
 type SegService struct {
 	configRepo *repository.SystemConfigRepository
 }
@@ -30,7 +29,7 @@ func NewSegService(configRepo *repository.SystemConfigRepository) *SegService {
 }
 
 func (s *SegService) GetConfig() (*model.AliyunSegConfig, error) {
-	val, err := s.configRepo.Get(aliyunSegConfigKey)
+	val, err := s.configRepo.Get(constants.AliyunSegConfigKey)
 	if err != nil {
 		return &model.AliyunSegConfig{RegionID: "cn-shanghai"}, nil
 	}
@@ -41,12 +40,28 @@ func (s *SegService) GetConfig() (*model.AliyunSegConfig, error) {
 	return &cfg, nil
 }
 
-func (s *SegService) SaveConfig(cfg *model.AliyunSegConfig) error {
-	if cfg.RegionID == "" {
-		cfg.RegionID = "cn-shanghai"
+func (s *SegService) SaveConfig(req *model.AliyunSegConfigUpdateRequest) error {
+	currentCfg, err := s.GetConfig()
+	if err != nil {
+		return err
 	}
-	data, _ := json.Marshal(cfg)
-	return s.configRepo.Set(aliyunSegConfigKey, string(data))
+	if currentCfg == nil {
+		currentCfg = &model.AliyunSegConfig{}
+	}
+
+	nextCfg := *currentCfg
+	nextCfg.Enabled = req.Enabled
+	nextCfg.AccessKeyID = req.AccessKeyID
+	nextCfg.RegionID = req.RegionID
+	if nextCfg.RegionID == "" {
+		nextCfg.RegionID = "cn-shanghai"
+	}
+	if req.AccessKeySecret != nil {
+		nextCfg.AccessKeySecret = *req.AccessKeySecret
+	}
+
+	data, _ := json.Marshal(&nextCfg)
+	return s.configRepo.Set(constants.AliyunSegConfigKey, string(data))
 }
 
 // createClient 创建阿里云分割抠图 SDK 客户端

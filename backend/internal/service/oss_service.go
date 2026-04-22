@@ -54,6 +54,13 @@ func (s *KodoService) IsEnabled() bool {
 	if err != nil {
 		return false
 	}
+	return s.IsConfigEnabled(cfg)
+}
+
+func (s *KodoService) IsConfigEnabled(cfg *model.KodoConfig) bool {
+	if cfg == nil {
+		return false
+	}
 	return cfg.Enabled && cfg.AccessKey != "" && cfg.SecretKey != "" && cfg.BucketName != ""
 }
 
@@ -71,6 +78,13 @@ func (s *KodoService) FetchURL(remoteURL string) (string, error) {
 	cfg, err := s.GetConfig()
 	if err != nil {
 		return "", fmt.Errorf("获取配置失败: %v", err)
+	}
+	return s.FetchURLWithConfig(remoteURL, cfg)
+}
+
+func (s *KodoService) FetchURLWithConfig(remoteURL string, cfg *model.KodoConfig) (string, error) {
+	if !s.IsConfigEnabled(cfg) {
+		return "", fmt.Errorf("七牛云配置未启用或不完整")
 	}
 
 	mac := qbox.NewMac(cfg.AccessKey, cfg.SecretKey)
@@ -110,6 +124,10 @@ func (s *KodoService) TestConnection() error {
 	if err != nil {
 		return fmt.Errorf("获取配置失败: %v", err)
 	}
+	return s.TestConnectionWithConfig(cfg)
+}
+
+func (s *KodoService) TestConnectionWithConfig(cfg *model.KodoConfig) error {
 	if cfg.AccessKey == "" || cfg.SecretKey == "" || cfg.BucketName == "" {
 		return fmt.Errorf("请先完整填写七牛云配置")
 	}
@@ -118,7 +136,7 @@ func (s *KodoService) TestConnection() error {
 	bucketManager := storage.NewBucketManager(mac, nil)
 
 	// 获取 Bucket 的域名列表来验证连接
-	_, err = bucketManager.ListBucketDomains(cfg.BucketName)
+	_, err := bucketManager.ListBucketDomains(cfg.BucketName)
 	if err != nil {
 		return fmt.Errorf("验证失败: %v", err)
 	}
@@ -131,6 +149,10 @@ func (s *KodoService) GetBucketInfo() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("获取配置失败: %v", err)
 	}
+	return s.GetBucketInfoWithConfig(cfg)
+}
+
+func (s *KodoService) GetBucketInfoWithConfig(cfg *model.KodoConfig) (map[string]interface{}, error) {
 	if cfg.AccessKey == "" || cfg.SecretKey == "" || cfg.BucketName == "" {
 		return nil, fmt.Errorf("请先填写 AK/SK 和 Bucket 名称")
 	}
@@ -158,6 +180,13 @@ func (s *KodoService) Upload(file *multipart.FileHeader) (string, error) {
 	cfg, err := s.GetConfig()
 	if err != nil {
 		return "", fmt.Errorf("获取配置失败: %v", err)
+	}
+	return s.UploadWithConfig(file, cfg)
+}
+
+func (s *KodoService) UploadWithConfig(file *multipart.FileHeader, cfg *model.KodoConfig) (string, error) {
+	if !s.IsConfigEnabled(cfg) {
+		return "", fmt.Errorf("七牛云配置未启用或不完整")
 	}
 
 	mac := qbox.NewMac(cfg.AccessKey, cfg.SecretKey)

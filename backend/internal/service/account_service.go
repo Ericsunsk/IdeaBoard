@@ -1,6 +1,7 @@
 package service
 
 import (
+	"backend/internal/constants"
 	"context"
 	"fmt"
 	"log"
@@ -17,8 +18,8 @@ type AccountService struct {
 	accountRepo      *repository.AccountRepository
 	taskRepo         *repository.TaskRepository
 	redisMgr         *redis.RedisManager
+	taskRuntime      *TaskRuntimeService
 	cardService      *StyleCardService
-	lineDraftRepo    *repository.LineDraftModeRepository
 	systemConfigRepo *repository.SystemConfigRepository
 }
 
@@ -29,15 +30,14 @@ func NewAccountService(
 	taskRepo *repository.TaskRepository,
 	redisMgr *redis.RedisManager,
 	cardService *StyleCardService,
-	lineDraftRepo *repository.LineDraftModeRepository,
 	systemConfigRepo *repository.SystemConfigRepository,
 ) *AccountService {
 	return &AccountService{
 		accountRepo:      accountRepo,
 		taskRepo:         taskRepo,
 		redisMgr:         redisMgr,
+		taskRuntime:      NewTaskRuntimeService(accountRepo, taskRepo, redisMgr),
 		cardService:      cardService,
-		lineDraftRepo:    lineDraftRepo,
 		systemConfigRepo: systemConfigRepo,
 	}
 }
@@ -258,7 +258,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 		if s.systemConfigRepo == nil {
 			return "", fmt.Errorf("system config repo 未配置")
 		}
-		return s.systemConfigRepo.Get("feature_prompt:" + slug)
+		return s.systemConfigRepo.Get(constants.FeaturePromptConfigKey(slug))
 	})
 
 	// line-draft 已退休：line_draft_mode_id 不再参与系统提示词主链覆盖。
@@ -299,7 +299,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *model.SubmitTaskRequest)
 		Prompt:     fullPrompt,
 		UserPrompt: req.Prompt,
 		Params:     paramsJSON,
-		Status:     "pending",
+		Status:     constants.TaskStatusPending,
 	}
 
 	if err := s.taskRepo.Create(task); err != nil {
@@ -383,16 +383,16 @@ func normalizeMaxConcurrent(value int) int {
 }
 
 func (s *AccountService) GetTaskStats() (map[string]int64, error) {
-	pending, _ := s.taskRepo.CountByStatus("pending")
-	running, _ := s.taskRepo.CountByStatus("running")
-	completed, _ := s.taskRepo.CountByStatus("completed")
-	failed, _ := s.taskRepo.CountByStatus("failed")
+	pending, _ := s.taskRepo.CountByStatus(constants.TaskStatusPending)
+	running, _ := s.taskRepo.CountByStatus(constants.TaskStatusRunning)
+	completed, _ := s.taskRepo.CountByStatus(constants.TaskStatusCompleted)
+	failed, _ := s.taskRepo.CountByStatus(constants.TaskStatusFailed)
 
 	return map[string]int64{
-		"pending":   pending,
-		"running":   running,
-		"completed": completed,
-		"failed":    failed,
+		constants.TaskStatusPending:   pending,
+		constants.TaskStatusRunning:   running,
+		constants.TaskStatusCompleted: completed,
+		constants.TaskStatusFailed:    failed,
 	}, nil
 }
 
@@ -413,50 +413,13 @@ func (s *AccountService) ReleaseTask(accountID uint64, taskID string) error {
 }
 
 func (s *AccountService) MarkTaskRunning(taskID string, accountID uint64) error {
-	task, err := s.taskRepo.GetByTaskID(taskID)
-	if err != nil {
-		return err
-	}
-	task.Status = "running"
-	task.AccountID = accountID
-	return s.taskRepo.Update(task)
+	return s.taskRuntime.MarkTaskRunning(taskID, accountID)
 }
 
 func (s *AccountService) MarkTaskCompleted(taskID string, result string) error {
-	task, err := s.taskRepo.GetByTaskID(taskID)
-	if err != nil {
-		return err
-	}
-	task.Status = "completed"
-	task.Result = result
-	now := time.Now()
-	task.CompletedAt = &now
-	return s.taskRepo.Update(task)
+	return s.taskRuntime.MarkTaskCompleted(taskID, result)
 }
 
 func (s *AccountService) MarkTaskFailed(taskID string, accountID uint64, errMsg string) error {
-	task, err := s.taskRepo.GetByTaskID(taskID)
-	if err != nil {
-		return err
-	}
-
-	task.RetryCount++
-	task.ErrorMsg = errMsg
-
-	if task.RetryCount >= 3 {
-		task.Status = "failed"
-		now := time.Now()
-		task.CompletedAt = &now
-	} else {
-		task.Status = "pending"
-	}
-
-	s.accountRepo.IncrementFailCount(accountID)
-
-	account, _ := s.accountRepo.GetByID(accountID)
-	if account != nil && account.FailCount >= MaxFailCount {
-		s.accountRepo.UpdateStatus(accountID, 0)
-	}
-
-	return s.taskRepo.Update(task)
+	return s.taskRuntime.MarkTaskFailedWithRetry(taskID, accountID, errMsg)
 }

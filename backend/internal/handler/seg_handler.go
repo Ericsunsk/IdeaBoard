@@ -4,11 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math/rand"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"backend/internal/model"
@@ -21,13 +17,13 @@ import (
 )
 
 type SegHandler struct {
-	segService  *service.SegService
-	taskRepo    *repository.TaskRepository
-	kodoService *service.KodoService
+	segService     *service.SegService
+	taskRepo       *repository.TaskRepository
+	storageService *service.StorageService
 }
 
-func NewSegHandler(segService *service.SegService, taskRepo *repository.TaskRepository, kodoService *service.KodoService) *SegHandler {
-	return &SegHandler{segService: segService, taskRepo: taskRepo, kodoService: kodoService}
+func NewSegHandler(segService *service.SegService, taskRepo *repository.TaskRepository, storageService *service.StorageService) *SegHandler {
+	return &SegHandler{segService: segService, taskRepo: taskRepo, storageService: storageService}
 }
 
 // GetConfig 获取分割抠图配置
@@ -41,13 +37,15 @@ func (h *SegHandler) GetConfig(c *gin.Context) {
 	masked := *cfg
 	if len(masked.AccessKeySecret) > 6 {
 		masked.AccessKeySecret = masked.AccessKeySecret[:3] + "****" + masked.AccessKeySecret[len(masked.AccessKeySecret)-3:]
+	} else if masked.AccessKeySecret != "" {
+		masked.AccessKeySecret = "****"
 	}
 	response.Success(c, gin.H{"config": masked})
 }
 
 // SaveConfig 保存分割抠图配置
 func (h *SegHandler) SaveConfig(c *gin.Context) {
-	var req model.AliyunSegConfig
+	var req model.AliyunSegConfigUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
@@ -235,43 +233,11 @@ func (h *SegHandler) persistImage(imageURL string) (string, error) {
 		return "", err
 	}
 
-	// 优先使用对象存储
-	if h.kodoService != nil && h.kodoService.IsEnabled() {
-		return h.kodoService.FetchURL(imageURL)
+	if h.storageService == nil {
+		return "", fmt.Errorf("存储服务不可用")
 	}
 
-	// 回退：下载到本地
-	resp, err := safehttp.Get(context.Background(), imageURL, 20*time.Second)
-	if err != nil {
-		return "", fmt.Errorf("下载图片失败: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("下载图片返回 %d", resp.StatusCode)
-	}
-
-	ext := ".png"
-	ct := resp.Header.Get("Content-Type")
-	if strings.Contains(ct, "jpeg") || strings.Contains(ct, "jpg") {
-		ext = ".jpg"
-	}
-
-	dir := filepath.Join("uploads", "seg", time.Now().Format("2006/01/02"))
-	os.MkdirAll(dir, 0755)
-
-	filename := fmt.Sprintf("%d_%d%s", time.Now().UnixNano(), rand.Intn(10000), ext)
-	dst := filepath.Join(dir, filename)
-
-	file, err := os.Create(dst)
-	if err != nil {
-		return "", fmt.Errorf("创建文件失败: %v", err)
-	}
-	defer file.Close()
-
-	if _, err := io.Copy(file, resp.Body); err != nil {
-		return "", fmt.Errorf("写入文件失败: %v", err)
-	}
-
-	return "/" + strings.ReplaceAll(dst, "\\", "/"), nil
+	return h.storageService.StoreRemote(context.Background(), imageURL, service.StorageStoreOptions{
+		DirPrefix: "seg",
+	})
 }

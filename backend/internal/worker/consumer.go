@@ -1,17 +1,14 @@
 package worker
 
 import (
+	"backend/internal/constants"
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
-	"net/textproto"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -20,15 +17,16 @@ import (
 	"backend/internal/repository"
 	"backend/internal/service"
 	"backend/pkg/redis"
-	"backend/pkg/safehttp"
 )
 
 type Consumer struct {
-	accountRepo *repository.AccountRepository
-	channelRepo *repository.ChannelRepository
-	taskRepo    *repository.TaskRepository
-	redisMgr    *redis.RedisManager
-	kodoService *service.KodoService
+	accountRepo    *repository.AccountRepository
+	channelRepo    *repository.ChannelRepository
+	taskRepo       *repository.TaskRepository
+	redisMgr       *redis.RedisManager
+	storageService *service.StorageService
+	taskRuntime    *service.TaskRuntimeService
+	orchestrator   *taskExecutionOrchestrator
 
 	wg      sync.WaitGroup
 	stopCh  chan struct{}
@@ -41,16 +39,20 @@ func NewConsumer(
 	channelRepo *repository.ChannelRepository,
 	taskRepo *repository.TaskRepository,
 	redisMgr *redis.RedisManager,
-	kodoService *service.KodoService,
+	storageService *service.StorageService,
 ) *Consumer {
-	return &Consumer{
-		accountRepo: accountRepo,
-		channelRepo: channelRepo,
-		taskRepo:    taskRepo,
-		redisMgr:    redisMgr,
-		kodoService: kodoService,
-		stopCh:      make(chan struct{}),
+	taskRuntime := service.NewTaskRuntimeService(accountRepo, taskRepo, redisMgr)
+	consumer := &Consumer{
+		accountRepo:    accountRepo,
+		channelRepo:    channelRepo,
+		taskRepo:       taskRepo,
+		redisMgr:       redisMgr,
+		storageService: storageService,
+		taskRuntime:    taskRuntime,
+		stopCh:         make(chan struct{}),
 	}
+	consumer.orchestrator = newTaskExecutionOrchestrator(accountRepo, redisMgr, taskRuntime, consumer.callDrawingAPI)
+	return consumer
 }
 
 func (c *Consumer) Start(workerCount int) {
@@ -118,7 +120,7 @@ func (c *Consumer) processQueue() {
 
 	log.Printf("[Consumer] 拉到任务: %s", task.TaskID)
 
-	if err := c.refreshTaskAccounts(task); err != nil {
+	if err := c.taskRuntime.RefreshTaskAccounts(task); err != nil {
 		log.Printf("[Consumer] 刷新任务账号失败: %v", err)
 		c.failTask(task, 0, "刷新可用账号失败: "+err.Error())
 		return
@@ -137,18 +139,18 @@ func (c *Consumer) processQueue() {
 		return
 	}
 
-	if status == "queue_full" {
+	if status == constants.QueueAssignStatusQueueFull {
 		log.Printf("[Consumer] 等待队列满，将任务放回: %s", task.TaskID)
 		c.redisMgr.PushGlobalQueueFront(ctx, task)
 		return
 	}
 
-	if status == "wait_queue" {
+	if status == constants.QueueAssignStatusWaitQueue {
 		log.Printf("[Consumer] 任务进入等待队列: %s", task.TaskID)
 		return
 	}
 
-	go c.executeTask(task, accountID)
+	go c.orchestrator.execute(task, accountID)
 }
 
 func (c *Consumer) promoteWaitQueue(ctx context.Context) {
@@ -165,136 +167,14 @@ func (c *Consumer) promoteWaitQueue(ctx context.Context) {
 	}
 }
 
-func (c *Consumer) refreshTaskAccounts(task *redis.GlobalQueueTask) error {
-	accounts, err := c.accountRepo.GetAllEnabled()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	task.AccountIDs = task.AccountIDs[:0]
-	for _, account := range accounts {
-		maxConcurrent := account.MaxConcurrent
-		if maxConcurrent <= 0 {
-			maxConcurrent = 3
-		}
-		if err := c.redisMgr.EnsureAccountConcurrent(ctx, account.ID, maxConcurrent); err != nil {
-			return err
-		}
-		task.AccountIDs = append(task.AccountIDs, account.ID)
-	}
-
-	return nil
-}
-
-func (c *Consumer) executeTask(task *redis.GlobalQueueTask, accountID uint64) {
-	log.Printf("[Consumer] 执行任务: %s, 账号: %d", task.TaskID, accountID)
-	startTime := time.Now()
-
-	account, err := c.accountRepo.GetByID(accountID)
-	if err != nil {
-		c.requeueTask(task, accountID, "账号不存在，重新调度")
-		return
-	}
-	if account.Status != 1 {
-		c.requeueTask(task, accountID, "账号已停用，重新调度")
-		return
-	}
-
-	t, _ := c.taskRepo.GetByTaskID(task.TaskID)
-	if t != nil {
-		t.Status = "running"
-		t.AccountID = accountID
-		c.taskRepo.Update(t)
-	}
-
-	result, err := c.callDrawingAPI(account, task)
-
-	if err != nil {
-		log.Printf("[Consumer] 任务 %s 执行失败: %v", task.TaskID, err)
-		elapsed := time.Since(startTime).Seconds()
-		c.completeFailedTask(task, accountID, err.Error(), elapsed)
-		c.accountRepo.IncrementFailCount(accountID)
-		if account.FailCount+1 >= 5 {
-			c.accountRepo.UpdateStatus(accountID, 0)
-			log.Printf("[Consumer] 账号 %d 失败次数过多，已自动禁用", accountID)
-		}
-		return
-	}
-
-	elapsed := time.Since(startTime).Seconds()
-	c.completeTask(task, accountID, "completed", result, elapsed)
-	c.accountRepo.ResetFailCount(accountID)
-}
-
-func (c *Consumer) requeueTask(task *redis.GlobalQueueTask, accountID uint64, reason string) {
-	ctx := context.Background()
-	if accountID > 0 {
-		_ = c.redisMgr.ReleaseTask(ctx, accountID, task.TaskID)
-	}
-	if err := c.refreshTaskAccounts(task); err != nil {
-		c.failTask(task, 0, reason)
-		return
-	}
-	if len(task.AccountIDs) == 0 {
-		c.failTask(task, 0, reason)
-		return
-	}
-	if err := c.redisMgr.PushGlobalQueueFront(ctx, task); err != nil {
-		c.failTask(task, 0, reason)
-	}
-}
-
-func (c *Consumer) completeTask(task *redis.GlobalQueueTask, accountID uint64, status, result string, elapsedSec float64) {
-	ctx := context.Background()
-	c.redisMgr.ReleaseTask(ctx, accountID, task.TaskID)
-
-	t, err := c.taskRepo.GetByTaskID(task.TaskID)
-	if err == nil {
-		t.Status = status
-		t.Result = result
-		now := time.Now()
-		t.CompletedAt = &now
-		c.taskRepo.Update(t)
-	}
-
-	log.Printf("[Consumer] 任务 %s 完成, 状态: %s, 耗时: %.1fs", task.TaskID, status, elapsedSec)
-}
-
-func (c *Consumer) completeFailedTask(task *redis.GlobalQueueTask, accountID uint64, reason string, elapsedSec float64) {
-	ctx := context.Background()
-	if accountID > 0 {
-		c.redisMgr.ReleaseTask(ctx, accountID, task.TaskID)
-	}
-
-	t, err := c.taskRepo.GetByTaskID(task.TaskID)
-	if err == nil {
-		now := time.Now()
-		t.Status = "failed"
-		t.ErrorMsg = reason
-		t.Result = formatTaskFailureResult(task.TaskID, reason)
-		t.CompletedAt = &now
-		c.taskRepo.Update(t)
-	}
-
-	log.Printf("[Consumer] 任务 %s 失败, 耗时: %.1fs, 原因: %s", task.TaskID, elapsedSec, reason)
-}
-
 func (c *Consumer) failTask(task *redis.GlobalQueueTask, accountID uint64, reason string) {
-	c.completeFailedTask(task, accountID, reason, 0)
-}
-
-func formatTaskFailureResult(taskID string, reason string) string {
-	result := map[string]string{
-		"task_id": taskID,
-		"status":  "failed",
-		"error":   reason,
+	if err := c.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
+		log.Printf("[Consumer] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 	}
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return fmt.Sprintf(`{"task_id":"%s","status":"failed","error":"任务失败"}`, taskID)
+	if err := c.taskRuntime.MarkTaskFailed(task.TaskID, reason); err != nil {
+		log.Printf("[Consumer] 标记任务失败失败: task=%s err=%v", task.TaskID, err)
 	}
-	return string(resultJSON)
+	log.Printf("[Consumer] 任务 %s 失败, 原因: %s", task.TaskID, reason)
 }
 
 func (c *Consumer) callDrawingAPI(account *model.ApiAccount, task *redis.GlobalQueueTask) (string, error) {
@@ -347,37 +227,21 @@ func (c *Consumer) callDrawingAPI(account *model.ApiAccount, task *redis.GlobalQ
 		return "", fmt.Errorf("调用 API 失败 (渠道: %s): %v", channelName, err)
 	}
 
-	// 如果七牛云 Kodo 已启用，将图片转存到 Kodo
-	log.Printf("[Consumer] Kodo 检查: service=%v, enabled=%v", c.kodoService != nil, c.kodoService != nil && c.kodoService.IsEnabled())
-	if c.kodoService != nil && c.kodoService.IsEnabled() {
-		log.Printf("[Consumer] 七牛云已启用，开始转存图片, directFetch=%v, imageURL=%.80s", c.kodoService.IsDirectFetch(), imageURL)
-		var reURL string
-		var reErr error
-
-		if c.kodoService.IsDirectFetch() && !strings.HasPrefix(imageURL, "data:image/") {
-			// 直传模式：七牛云直接从上游 URL 抓取，不经过业务服务器
-			log.Printf("[Consumer] 使用七牛直抓模式")
-			reURL, reErr = c.kodoService.FetchURL(imageURL)
-			if reErr == nil {
-				log.Printf("[Consumer] 图片已通过七牛直抓存储: %s", reURL)
-			} else {
-				log.Printf("[Consumer] 七牛直抓失败，回退中转上传: %v", reErr)
-				reURL, reErr = c.reuploadToKodo(imageURL, account.ProxyURL)
-			}
-		} else {
-			// 中转模式：下载到本服务器再上传到七牛
-			log.Printf("[Consumer] 使用中转上传模式")
-			reURL, reErr = c.reuploadToKodo(imageURL, account.ProxyURL)
-		}
-
+	// 如果对象存储已启用，将图片转存到当前存储
+	log.Printf("[Consumer] 存储检查: service=%v, objectStorage=%v", c.storageService != nil, c.storageService != nil && c.storageService.UsesObjectStorage())
+	if c.storageService != nil && c.storageService.UsesObjectStorage() {
+		log.Printf("[Consumer] 对象存储已启用，开始转存图片, directFetch=%v, imageURL=%.80s", c.storageService.IsDirectFetchEnabled(), imageURL)
+		reURL, reErr := c.storageService.StoreRemote(context.Background(), imageURL, service.StorageStoreOptions{
+			AllowHosts: []string{account.ProxyURL},
+		})
 		if reErr == nil {
 			log.Printf("[Consumer] 转存成功: %s -> %s", imageURL[:min(80, len(imageURL))], reURL)
 			imageURL = reURL
 		} else {
-			log.Printf("[Consumer] 转存七牛云失败，使用原始 URL: %v", reErr)
+			log.Printf("[Consumer] 转存对象存储失败，使用原始 URL: %v", reErr)
 		}
 	} else {
-		log.Printf("[Consumer] 七牛云未启用，跳过转存")
+		log.Printf("[Consumer] 对象存储未启用，跳过转存")
 	}
 
 	result := map[string]interface{}{
@@ -388,7 +252,7 @@ func (c *Consumer) callDrawingAPI(account *model.ApiAccount, task *redis.GlobalQ
 		"platform":     account.Platform,
 		"api_type":     account.ApiType,
 		"model_set":    account.ModelSet,
-		"status":       "success",
+		"status":       constants.TaskResultStatusSuccess,
 		"image_url":    imageURL,
 	}
 
@@ -630,95 +494,4 @@ func parseSizeFromParams(params map[string]interface{}) (int, int) {
 	}
 
 	return w, h
-}
-
-// reuploadToKodo 下载远程图片并转存到七牛云
-func (c *Consumer) reuploadToKodo(imageURL string, allowHosts ...string) (string, error) {
-	if strings.HasPrefix(imageURL, "data:image/") {
-		// base64 图片，构建临时 multipart.FileHeader
-		return c.uploadBase64ToKodo(imageURL)
-	}
-
-	// 下载远程图片。默认仍使用 safehttp 防 SSRF，只对白名单上游放开私网/回环回传。
-	resp, err := safehttp.GetWithAllowHosts(context.Background(), imageURL, 30*time.Second, allowHosts...)
-	if err != nil {
-		return "", fmt.Errorf("下载图片失败: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("下载图片返回 %d", resp.StatusCode)
-	}
-
-	imgData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("读取图片数据失败: %v", err)
-	}
-
-	// 从 URL 推断扩展名
-	ext := path.Ext(strings.Split(imageURL, "?")[0])
-	if ext == "" {
-		ct := resp.Header.Get("Content-Type")
-		switch {
-		case strings.Contains(ct, "png"):
-			ext = ".png"
-		case strings.Contains(ct, "webp"):
-			ext = ".webp"
-		case strings.Contains(ct, "gif"):
-			ext = ".gif"
-		default:
-			ext = ".jpg"
-		}
-	}
-
-	filename := fmt.Sprintf("gen_%d%s", time.Now().UnixNano(), ext)
-	fh := createFileHeader(filename, imgData)
-	return c.kodoService.Upload(fh)
-}
-
-// uploadBase64ToKodo 将 base64 图片上传到七牛云
-func (c *Consumer) uploadBase64ToKodo(dataURL string) (string, error) {
-	// 格式: data:image/png;base64,xxxxx
-	parts := strings.SplitN(dataURL, ",", 2)
-	if len(parts) != 2 {
-		return "", fmt.Errorf("无效的 base64 图片格式")
-	}
-
-	b64Data := parts[1]
-	decoded, err := base64.StdEncoding.DecodeString(b64Data)
-	if err != nil {
-		return "", fmt.Errorf("base64 解码失败: %v", err)
-	}
-
-	ext := ".png"
-	if strings.Contains(parts[0], "jpeg") || strings.Contains(parts[0], "jpg") {
-		ext = ".jpg"
-	} else if strings.Contains(parts[0], "webp") {
-		ext = ".webp"
-	}
-
-	filename := fmt.Sprintf("gen_%d%s", time.Now().UnixNano(), ext)
-	fh := createFileHeader(filename, decoded)
-	return c.kodoService.Upload(fh)
-}
-
-// createFileHeader 从内存数据创建 multipart.FileHeader
-func createFileHeader(filename string, data []byte) *multipart.FileHeader {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	h := make(textproto.MIMEHeader)
-	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, filename))
-	h.Set("Content-Type", "application/octet-stream")
-
-	part, _ := writer.CreatePart(h)
-	part.Write(data)
-	writer.Close()
-
-	reader := multipart.NewReader(body, writer.Boundary())
-	form, _ := reader.ReadForm(int64(len(data) + 1024))
-	if files, ok := form.File["file"]; ok && len(files) > 0 {
-		return files[0]
-	}
-	return nil
 }

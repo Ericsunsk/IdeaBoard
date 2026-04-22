@@ -1,10 +1,10 @@
-﻿package handler
+package handler
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"backend/internal/constants"
 	"backend/internal/middleware"
 	"backend/internal/model"
 	"backend/internal/service"
@@ -68,7 +68,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// 存储token到Redis
-	tokenKey := "token:" + fmt.Sprintf("%d", user.ID)
+	tokenKey := constants.TokenRedisKey(user.ID)
 	if err := h.rdb.SetWithExpiry(context.Background(), tokenKey, token, 24*time.Hour); err != nil {
 		response.Error(c, 500, "存储令牌失败")
 		return
@@ -83,7 +83,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // Logout 登出
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	tokenKey := "token:" + fmt.Sprintf("%d", userID.(uint64))
+	tokenKey := constants.TokenRedisKey(userID.(uint64))
 	h.rdb.Del(context.Background(), tokenKey)
 
 	response.Success(c, nil)

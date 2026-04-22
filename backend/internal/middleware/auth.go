@@ -1,12 +1,12 @@
 package middleware
 
 import (
+	"backend/internal/config"
+	"backend/internal/constants"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 
@@ -32,9 +32,13 @@ type Claims struct {
 
 func JWTSigningSecret() []byte {
 	jwtSecretOnce.Do(func() {
-		if secret := strings.TrimSpace(os.Getenv("JWT_SECRET")); secret != "" {
+		cfg := config.Load()
+		if secret := strings.TrimSpace(cfg.JWT.Secret); secret != "" {
 			jwtSecret = []byte(secret)
 			return
+		}
+		if config.IsProductionEnv() {
+			log.Fatal("[Auth] JWT_SECRET 未配置；生产环境必须显式设置固定密钥")
 		}
 
 		buf := make([]byte, 32)
@@ -43,7 +47,7 @@ func JWTSigningSecret() []byte {
 		}
 
 		jwtSecret = []byte(base64.StdEncoding.EncodeToString(buf))
-		log.Printf("[Auth] JWT_SECRET 未配置，已生成一次性开发密钥；服务重启后旧 token 会失效")
+		log.Printf("[Auth] JWT_SECRET 未配置，当前运行在非生产环境；已生成一次性开发密钥，服务重启后旧 token 会失效")
 	})
 
 	return jwtSecret
@@ -88,7 +92,7 @@ func AuthMiddleware(rdb *redis.Client, userRepo *repository.UserRepository) gin.
 		}
 
 		// 检查Redis中是否还有这个token
-		tokenKey := "token:" + fmt.Sprintf("%d", claims.UserID)
+		tokenKey := constants.TokenRedisKey(claims.UserID)
 		storedToken, err := rdb.Get(c.Request.Context(), tokenKey)
 		if err != nil || storedToken != tokenString {
 			response.Error(c, http.StatusUnauthorized, "令牌已失效")

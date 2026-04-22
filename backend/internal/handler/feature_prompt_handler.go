@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"backend/internal/constants"
 	"backend/internal/repository"
 	"backend/internal/service"
 	"backend/pkg/response"
@@ -29,7 +30,7 @@ func (h *FeaturePromptHandler) GetPrompt(c *gin.Context) {
 		return
 	}
 
-	prompt, err := h.configRepo.Get("feature_prompt:" + slug)
+	prompt, err := h.configRepo.Get(constants.FeaturePromptConfigKey(slug))
 	if err != nil {
 		// 不存在则返回空
 		response.Success(c, gin.H{"slug": slug, "prompt": ""})
@@ -59,7 +60,7 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 		return
 	}
 
-	if err := h.configRepo.Set("feature_prompt:"+slug, req.Prompt); err != nil {
+	if err := h.configRepo.Set(constants.FeaturePromptConfigKey(slug), req.Prompt); err != nil {
 		response.Error(c, 500, "保存失败: "+err.Error())
 		return
 	}
@@ -69,7 +70,7 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 
 // ListPrompts 获取所有功能的系统提示词
 func (h *FeaturePromptHandler) ListPrompts(c *gin.Context) {
-	prompts, err := h.configRepo.GetByPrefix("feature_prompt:")
+	prompts, err := h.configRepo.GetByPrefix(constants.FeaturePromptConfigKeyPrefix)
 	if err != nil {
 		response.Error(c, 500, "获取失败: "+err.Error())
 		return
