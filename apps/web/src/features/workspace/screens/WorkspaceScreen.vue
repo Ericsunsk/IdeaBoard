@@ -284,55 +284,32 @@
         @color-port-mousedown="onColorNodePortMouseDown"
       />
 
-       <div 
-          v-for="msg in messages" 
-          :key="msg.id" 
-          class="canvas-item"
-          :class="{ active: selectedIds.includes(msg.id), 'is-pending': isCanvasImagePending(msg) }"
-          :style="{ 
-            left: '50%',
-            top: '50%',
-            transform: `translate(${msg.x}px, ${msg.y}px)`,
-            width: msg.width ? `${msg.width}px` : 'auto',
-          }"
-          @mousedown.stop="onItemMouseDown($event, msg)"
-          @contextmenu.prevent.stop="onItemContextMenu($event, msg)"
-       >
-          <HomeCanvasImageDisplay
-            :item="msg"
-            :is-pending="isCanvasImagePending(msg)"
-            :display-height="getImageDisplayHeight(msg)"
-            :set-image-ref="(el) => setCanvasImageRef(msg.id, el)"
-            @image-load="onImageLoad(msg, $event)"
-          />
-          <HomeCanvasImageActionMenu
-            v-if="activeImageActionId === msg.id && !isCanvasImagePending(msg)"
-            :show-style-strength-control="showStyleStrengthControl"
-            :style-strength-menu-style="showStyleStrengthControl ? getStyleStrengthMenuStyle(msg) : undefined"
-            :direct-generating="directGenerating"
-            :display-height="getImageDisplayHeight(msg)"
-            :style-innovate-strength-pct="styleInnovateStrengthPct"
-            :set-style-strength-track-ref="setStyleStrengthTrackRef"
-            @action-remove-bg="runCanvasAction('remove-bg', msg)"
-            @style-innovate-mousedown="onStyleInnovateMouseDown"
-            @style-innovate-click="onStyleInnovateClick(msg)"
-            @action-to-vector="runCanvasAction('to-vector', msg)"
-            @action-sketch-to-design="runCanvasAction('sketch-to-design', msg)"
-            @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
-          />
-          
-          <!-- 全方位缩放手柄 (仅在单选时显示) -->
-          <template v-if="selectedIds.length === 1 && selectedIds[0] === msg.id && !isCanvasImagePending(msg)">
-            <div class="resize-edge n" @mousedown.stop="onResizeMouseDown($event, msg, 'n')"></div>
-            <div class="resize-edge s" @mousedown.stop="onResizeMouseDown($event, msg, 's')"></div>
-            <div class="resize-edge e" @mousedown.stop="onResizeMouseDown($event, msg, 'e')"></div>
-            <div class="resize-edge w" @mousedown.stop="onResizeMouseDown($event, msg, 'w')"></div>
-            <div class="resize-corner nw" @mousedown.stop="onResizeMouseDown($event, msg, 'nw')"></div>
-            <div class="resize-corner ne" @mousedown.stop="onResizeMouseDown($event, msg, 'ne')"></div>
-            <div class="resize-corner sw" @mousedown.stop="onResizeMouseDown($event, msg, 'sw')"></div>
-            <div class="resize-corner se" @mousedown.stop="onResizeMouseDown($event, msg, 'se')"></div>
-          </template>
-       </div>
+      <HomeCanvasImageItem
+        v-for="msg in messages"
+        :key="msg.id"
+        :item="msg"
+        :is-active="selectedIds.includes(msg.id)"
+        :is-pending="isCanvasImagePending(msg)"
+        :show-action-menu="activeImageActionId === msg.id && !isCanvasImagePending(msg)"
+        :show-style-strength-control="showStyleStrengthControl"
+        :style-strength-menu-style="showStyleStrengthControl ? getStyleStrengthMenuStyle(msg) : undefined"
+        :direct-generating="directGenerating"
+        :display-height="getImageDisplayHeight(msg)"
+        :style-innovate-strength-pct="styleInnovateStrengthPct"
+        :show-resize-handles="selectedIds.length === 1 && selectedIds[0] === msg.id && !isCanvasImagePending(msg)"
+        :set-image-ref="(el) => setCanvasImageRef(msg.id, el)"
+        :set-style-strength-track-ref="setStyleStrengthTrackRef"
+        @item-mousedown="onItemMouseDown($event, msg)"
+        @item-contextmenu="onItemContextMenu($event, msg)"
+        @image-load="onImageLoad(msg, $event)"
+        @action-remove-bg="runCanvasAction('remove-bg', msg)"
+        @style-innovate-mousedown="onStyleInnovateMouseDown"
+        @style-innovate-click="onStyleInnovateClick(msg)"
+        @action-to-vector="runCanvasAction('to-vector', msg)"
+        @action-sketch-to-design="runCanvasAction('sketch-to-design', msg)"
+        @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
+        @resize-mousedown="onResizeMouseDown($event.event, msg, $event.direction)"
+      />
     </div>
 
   </div>
@@ -361,8 +338,7 @@ import { useModelNode } from '../composables/useModelNode'
 import { useNodeExecutors } from '../composables/useNodeExecutors'
 import { useViewpointNode } from '../composables/useViewpointNode'
 import HomeCanvasConnectionLayer from '../components/home/HomeCanvasConnectionLayer.vue'
-import HomeCanvasImageActionMenu from '../components/home/HomeCanvasImageActionMenu.vue'
-import HomeCanvasImageDisplay from '../components/home/HomeCanvasImageDisplay.vue'
+import HomeCanvasImageItem from '../components/home/HomeCanvasImageItem.vue'
 import HomeBottomGenerateBar from '../components/home/HomeBottomGenerateBar.vue'
 import HomeCanvasHeader from '../components/home/HomeCanvasHeader.vue'
 import HomeCanvasNodesBasic from '../components/home/HomeCanvasNodesBasic.vue'
@@ -2631,31 +2607,4 @@ onUnmounted(() => {
   transition: none;
 }
 
-.canvas-item {
-  position: absolute;
-  background: #fff;
-  padding: 4px;
-  border-radius: 12px;
-  border: 1.5px solid #e2e4e8;
-  user-select: none;
-  -webkit-user-select: none;
-  pointer-events: auto;
-}
-.canvas-item.active { border-color: #9278e6; z-index: 10; }
-.canvas-item.is-pending {
-  border-color: rgba(146, 120, 230, 0.44);
-}
-
-/* 8方位缩放手柄 */
-.resize-edge, .resize-corner { position: absolute; z-index: 11; }
-.resize-edge.n { top: -4px; left: 10px; right: 10px; height: 8px; cursor: ns-resize; }
-.resize-edge.s { bottom: -4px; left: 10px; right: 10px; height: 8px; cursor: ns-resize; }
-.resize-edge.e { right: -4px; top: 10px; bottom: 10px; width: 8px; cursor: ew-resize; }
-.resize-edge.w { left: -4px; top: 10px; bottom: 10px; width: 8px; cursor: ew-resize; }
-
-.resize-corner { width: 16px; height: 16px; background: transparent; border: none; border-radius: 50%; }
-.resize-corner.nw { top: -8px; left: -8px; cursor: nwse-resize; }
-.resize-corner.ne { top: -8px; right: -8px; cursor: nesw-resize; }
-.resize-corner.sw { bottom: -8px; left: -8px; cursor: nesw-resize; }
-.resize-corner.se { bottom: -8px; right: -8px; cursor: nwse-resize; }
 </style>
