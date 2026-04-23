@@ -475,11 +475,11 @@ const executionNodeWatchSources = [
 const connections = ref<CanvasConnection[]>([])
 const processedMaskPreviewUrls = ref<Record<number, string>>({})
 const defaultSegType: SegType = 'common'
-const styleInnovateDefaultStrength = 5
+const styleInnovateDefaultStrength = 50
 const styleInnovateStrength = ref(styleInnovateDefaultStrength)
 const styleStrengthTrackRef = ref<HTMLElement | HTMLElement[] | null>(null)
 const showStyleStrengthControl = ref(false)
-const styleInnovateStrengthPct = computed(() => (styleInnovateStrength.value / 10) * 100)
+const styleInnovateStrengthPct = computed(() => styleInnovateStrength.value)
 const suppressStyleInnovateClick = ref(false)
 const canvasImageRefs = new Map<number, HTMLImageElement>()
 const styleStrengthMenuGap = 16
@@ -1746,7 +1746,7 @@ function updateStyleStrengthFromClientY(clientY: number) {
   if (rect.height <= 0) return
   const ratio = 1 - (clientY - rect.top) / rect.height
   const clamped = Math.max(0, Math.min(1, ratio))
-  styleInnovateStrength.value = Math.max(1, Math.min(10, Math.round(clamped * 9 + 1)))
+  styleInnovateStrength.value = Math.max(0, Math.min(100, Math.round(clamped * 100)))
 }
 
 function beginStyleStrengthDragging(clientY: number) {
@@ -2335,6 +2335,7 @@ const {
   userPrompt,
   messages,
   styleInnovateStrength,
+  loadImageSizeFromUrl,
   defaultSegType,
   message,
   submitTaskAndPoll: submitDirectTaskAndPoll,

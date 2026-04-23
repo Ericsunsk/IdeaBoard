@@ -3,7 +3,6 @@ package prompts
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"api/internal/workflow"
@@ -42,88 +41,6 @@ var wearTileModeTemplateLabels = map[string]string{
 	"single":   "单张贴合",
 }
 
-const (
-	styleFusionHiddenConstraintGeneric  = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
-	styleFusionHiddenConstraintWithNum  = "【执行语义】图片输入与 Image A / Image B 的来源权重是主导信息（Image A: %s，Image B: %s）。用户 prompt 作为辅助/弱修饰信号，用于描述融合方式、质感、细节、氛围、构图；若与主导信息冲突，以图片来源与滑块权重为准。"
-	canvasExtendHiddenConstraintGeneric = "【执行语义】画布延伸以扩边参数为主导，决定上、右、下、左四个方向的延伸幅度。用户 prompt 只用于描述新扩展区域的内容、纹理、背景和补全方式；若与扩边方向冲突，以扩边参数为准。"
-	canvasExtendHiddenConstraintWithNum = "【执行语义】画布延伸以扩边参数为主导（上 %s，右 %s，下 %s，左 %s），决定四个方向的延伸幅度。用户 prompt 只用于描述新扩展区域的内容、纹理、背景和补全方式；若与扩边方向冲突，以扩边参数为准。"
-	multiAngleHiddenConstraintGeneric   = "【执行语义】当前请求仅输出单张、单视角结果，不允许拼接多视图。职责与优先级如下：1) Image 输入（image / image_urls）提供基础画面与主体语义；2) Model 输入（model_url + model_strength）约束主体身份与关键外观一致性；3) Pose 输入（pose_url + pose_strength）约束姿态与肢体方向；4) angle_spec 决定目标视角（yaw 为水平旋转角，framing 为景别）；5) Prompt 仅作为弱修饰，用于补充风格、材质、氛围与细节。若冲突，按以上顺序执行。"
-	multiAngleHiddenConstraintWithModel = "【Model 输入语义】当提供 model_url 时，必须优先保持主体身份与核心外观稳定，仅在该前提下按 angle_spec 与 Pose 约束做视角变化。"
-	HDUpscaleMaskedConstraint           = "【执行语义】当前请求为局部/遮罩高清增强（非整图放大）。请以原图（original_image_url）作为全局上下文，仅对蒙版（mask_image_url / mask_image_urls / mask_url）限定区域进行高清增强，未遮罩区域保持原图主体、结构与语义一致。"
-	FabricOnBodyMaskedConstraint        = "【执行语义】当前请求为 Wear 局部贴图。请以 Body 原图（original_image_url）作为基底，仅在蒙版（mask_image_url / mask_image_urls / mask_url）白色区域内应用 Texture；非蒙版区域必须保持 Body 原图的主体、轮廓、结构与细节不变。"
-)
-
-func BuildStyleFusionHiddenConstraint(params map[string]interface{}) string {
-	if params == nil {
-		return styleFusionHiddenConstraintGeneric
-	}
-
-	if imageAWeight, imageBWeight, ok := readStyleFusionWeights(params); ok {
-		return fmt.Sprintf(
-			styleFusionHiddenConstraintWithNum,
-			formatWeightPercent(imageAWeight),
-			formatWeightPercent(imageBWeight),
-		)
-	}
-
-	return styleFusionHiddenConstraintGeneric
-}
-
-func BuildCanvasExtendHiddenConstraint(params map[string]interface{}) string {
-	if params == nil {
-		return canvasExtendHiddenConstraintGeneric
-	}
-
-	top, hasTop := readCanvasExtendPercent(params["extend_top"])
-	right, hasRight := readCanvasExtendPercent(params["extend_right"])
-	bottom, hasBottom := readCanvasExtendPercent(params["extend_bottom"])
-	left, hasLeft := readCanvasExtendPercent(params["extend_left"])
-	if hasTop || hasRight || hasBottom || hasLeft {
-		return fmt.Sprintf(
-			canvasExtendHiddenConstraintWithNum,
-			formatWeightPercent(top),
-			formatWeightPercent(right),
-			formatWeightPercent(bottom),
-			formatWeightPercent(left),
-		)
-	}
-
-	return canvasExtendHiddenConstraintGeneric
-}
-
-func BuildMultiAngleHiddenConstraint(params map[string]interface{}) string {
-	constraint := multiAngleHiddenConstraintGeneric
-	if params == nil {
-		return constraint
-	}
-	if hasNonEmptyString(params["model_url"]) {
-		constraint += "\n" + multiAngleHiddenConstraintWithModel
-		if modelURL, ok := params["model_url"].(string); ok {
-			constraint += "\n" + "model_url=" + strings.TrimSpace(modelURL)
-		}
-	}
-	if modelStrength, ok := readCanvasExtendPercent(params["model_strength"]); ok {
-		constraint += "\n" + "model_strength=" + formatWeightPercent(modelStrength)
-	}
-	if hasNonEmptyString(params["pose_url"]) {
-		if poseURL, ok := params["pose_url"].(string); ok {
-			constraint += "\n" + "pose_url=" + strings.TrimSpace(poseURL)
-		}
-	}
-	if poseStrength, ok := readCanvasExtendPercent(params["pose_strength"]); ok {
-		constraint += "\n" + "pose_strength=" + formatWeightPercent(poseStrength)
-	}
-	rawSpec, ok := params["angle_spec"]
-	if !ok {
-		return constraint
-	}
-	spec, err := json.Marshal(rawSpec)
-	if err != nil || len(spec) == 0 {
-		return constraint
-	}
-	return constraint + "\n" + "angle_spec=" + string(spec)
-}
-
 func DescribeViewpointTemplateValue(value string) string {
 	return describeTemplateLabel(value, viewpointTemplateLabels)
 }
@@ -145,111 +62,6 @@ func describeTemplateLabel(value string, labels map[string]string) string {
 		return label
 	}
 	return normalized
-}
-
-func readStyleFusionWeights(params map[string]interface{}) (float64, float64, bool) {
-	if params == nil {
-		return 0, 0, false
-	}
-
-	if rawA, okA := params["image_a_weight"]; okA {
-		if rawB, okB := params["image_b_weight"]; okB {
-			if imageAWeight, ok := parseWeight(rawA); ok {
-				if imageBWeight, ok := parseWeight(rawB); ok {
-					return normalizeWeights(imageAWeight, imageBWeight)
-				}
-			}
-		}
-	}
-
-	if blendRatio, ok := params["blend_ratio"]; ok {
-		if imageAWeight, ok := parseWeight(blendRatio); ok {
-			if imageAWeight >= 0 && imageAWeight <= 1 {
-				return normalizeWeights(imageAWeight, 1-imageAWeight)
-			}
-			return normalizeWeights(imageAWeight, 100-imageAWeight)
-		}
-	}
-
-	return 0, 0, false
-}
-
-func parseWeight(v interface{}) (float64, bool) {
-	switch n := v.(type) {
-	case float64:
-		return n, true
-	case float32:
-		return float64(n), true
-	case int:
-		return float64(n), true
-	case int8:
-		return float64(n), true
-	case int16:
-		return float64(n), true
-	case int32:
-		return float64(n), true
-	case int64:
-		return float64(n), true
-	case uint:
-		return float64(n), true
-	case uint8:
-		return float64(n), true
-	case uint16:
-		return float64(n), true
-	case uint32:
-		return float64(n), true
-	case uint64:
-		return float64(n), true
-	case string:
-		parsed, err := strconv.ParseFloat(strings.TrimSpace(n), 64)
-		if err != nil {
-			return 0, false
-		}
-		return parsed, true
-	default:
-		return 0, false
-	}
-}
-
-func readCanvasExtendPercent(v interface{}) (float64, bool) {
-	value, ok := parseWeight(v)
-	if !ok {
-		return 0, false
-	}
-	if value < 0 {
-		value = 0
-	}
-	if value > 100 {
-		value = 100
-	}
-	return value, true
-}
-
-func normalizeWeights(a, b float64) (float64, float64, bool) {
-	if a < 0 || b < 0 {
-		return 0, 0, false
-	}
-	total := a + b
-	if total <= 0 {
-		return 0, 0, false
-	}
-	return a / total * 100, b / total * 100, true
-}
-
-func formatWeightPercent(weight float64) string {
-	value := strconv.FormatFloat(weight, 'f', 1, 64)
-	value = strings.TrimSuffix(value, ".0")
-	return value + "%"
-}
-
-func AppendHiddenConstraint(fullPrompt, constraint string) string {
-	if strings.TrimSpace(constraint) == "" {
-		return fullPrompt
-	}
-	if strings.TrimSpace(fullPrompt) == "" {
-		return constraint
-	}
-	return fullPrompt + "\n\n" + constraint
 }
 
 func parseBoolLike(v interface{}) (bool, bool) {
@@ -513,7 +325,13 @@ func ApplyFeatureSystemPrompt(
 		for k, v := range varMap {
 			result = strings.ReplaceAll(result, k, v)
 		}
+		if featureSlug == workflow.FeatureSlugStyleInnovate {
+			return result
+		}
 		return result
+	}
+	if featureSlug == workflow.FeatureSlugStyleInnovate {
+		return sysPrompt
 	}
 	return sysPrompt + " " + basePrompt
 }

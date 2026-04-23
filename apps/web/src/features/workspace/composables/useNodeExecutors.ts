@@ -837,7 +837,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const connectedMask = node.mode === 'hd-upscale' ? await resolveConnectedEnhanceMaskInput(node) : null
     const hasMaskConnection = node.mode === 'hd-upscale' && !!connectionStatus.incoming.mask
     const promptText = enhanceModeSupportsPrompt(node.mode)
-      ? resolveConnectedEnhancePromptInput(node, '画布延伸')
+      ? resolveConnectedEnhancePromptInput(node, EXECUTION_ENHANCE_META.canvasExtend.fallbackPrompt)
       : ''
     const missingPorts = options.getMissingRequiredNodeInputs('enhance', node, {
       image: connectedImage,

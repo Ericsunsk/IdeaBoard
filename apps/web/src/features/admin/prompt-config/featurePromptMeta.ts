@@ -37,8 +37,8 @@ const featureGroupDefs: Array<{ key: string; title: string; desc: string; slugs:
   {
     key: 'prompt',
     title: 'Prompt',
-    desc: '通用文本驱动和创意生成类工作流。',
-    slugs: ['sketch-to-design', 'partial-edit', 'style-innovate', 'pattern-gen'],
+    desc: '线稿成款、款式创新和图案生成类工作流。',
+    slugs: ['sketch-to-design', 'style-innovate', 'pattern-gen'],
   },
   {
     key: 'color',
@@ -73,8 +73,8 @@ const featureGroupDefs: Array<{ key: string; title: string; desc: string; slugs:
   {
     key: 'edit',
     title: 'Edit',
-    desc: '局部编辑、换脸和背景切换。',
-    slugs: ['face-swap', 'bg-swap'],
+    desc: '局部改款、换背景和定向换脸。',
+    slugs: ['partial-edit', 'bg-swap', 'face-swap'],
   },
   {
     key: 'enhance',
@@ -92,11 +92,10 @@ export const groupedFeatureGroups = featureGroupDefs.map((group) => ({
 export type FeatureGroup = (typeof groupedFeatureGroups)[number]
 
 const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
-  'sketch-to-design': promptVars,
+  'sketch-to-design': noVars,
   'partial-edit': promptVars,
   'style-innovate': [
-    { key: '{{strength}}', desc: '改变幅度分数（1-10）' },
-    { key: '{{user_prompt}}', desc: '当前提交的描述文本' },
+    { key: '{{strength}}', desc: '款式创新强度百分比（0-100）' },
   ],
   'series-color': [
     { key: '{{color_type}}', desc: '配色类型，当前 Color 节点多色模式固定为 reference（自定义多色配色）' },
@@ -136,9 +135,7 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   'bg-swap': [
     { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本（可选，未连接时系统会用默认背景切换描述）' },
   ],
-  'pattern-gen': [
-    { key: '{{user_prompt}}', desc: '底部输入栏提交的图案生成提示词' },
-  ],
+  'pattern-gen': noVars,
   'style-fusion': [
     { key: '{{user_prompt}}', desc: '用于弱修饰/辅助修饰融合方式、质感、细节、氛围；Image A / Image B 主次建议通过滑块控制' },
     { key: '{{blend_ratio}}', desc: 'Image A 占比（0-100）' },
@@ -158,6 +155,9 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
 }
 
 const featureNotes: Partial<Record<FeatureSlug, string>> = {
+  'sketch-to-design': '画布右键「线稿成款」仍需要配置固定 system prompt，只是不使用 {{user_prompt}} 模板变量。',
+  'style-innovate': '画布右键「款式创新」仍需要配置固定 system prompt，只使用 {{strength}} 控制创新幅度百分比（0-100），不使用 {{user_prompt}} 模板变量。',
+  'pattern-gen': '底部输入栏「图案生成」建议保持后台 system prompt 为空，让用户输入自由发挥。',
   'hd-upscale': 'Enhance · HD 在未连接 Mask 时走直连超分，不使用这里的系统提示词；连接 Mask 进入局部增强任务链后，才会使用下方模板变量与系统提示词。',
 }
 

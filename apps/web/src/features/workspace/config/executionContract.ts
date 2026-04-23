@@ -70,7 +70,7 @@ export const EXECUTION_DIRECT_ACTION_META = {
   styleInnovate: {
     feature: EXECUTION_FEATURE.styleInnovate,
     promptPrefix: '[style-innovate]',
-    fallbackPrompt: 'Style innovate',
+    fallbackPrompt: '保持原图主体身份、服装品类、版型轮廓、构图与光影关系不变，只在此基础上按强度做可控款式创新与细节变化',
   },
 } as const
 
@@ -98,7 +98,7 @@ export const EXECUTION_ENHANCE_META = {
   canvasExtend: {
     feature: EXECUTION_FEATURE.canvasExtend,
     promptPrefix: '[canvas-extend]',
-    fallbackPrompt: '画布延伸',
+    fallbackPrompt: '保持原图主体、人物、服装、构图、光影与透视不变，仅按扩边方向在新增画布区域自然补全连续背景与缺失内容',
   },
 } as const
 

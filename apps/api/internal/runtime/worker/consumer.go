@@ -4,12 +4,17 @@ import (
 	"api/internal/accounts"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +23,7 @@ import (
 	"api/internal/platform/redis"
 	"api/internal/storage"
 	"api/internal/tasks"
+	"api/internal/workflow"
 )
 
 const (
@@ -203,6 +209,235 @@ func (c *Consumer) failTask(task *redis.GlobalQueueTask, accountID uint64, reaso
 	log.Printf("[Consumer] 任务 %s 失败, 原因: %s", task.TaskID, reason)
 }
 
+func resolvePublicAssetBaseURL() *url.URL {
+	for _, key := range []string{"APP_PUBLIC_BASE_URL", "APP_BASE_URL", "PUBLIC_BASE_URL"} {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			log.Printf("[Consumer] 忽略无效的公网基址配置: %s=%q", key, raw)
+			continue
+		}
+		return parsed
+	}
+	return nil
+}
+
+func resolveLocalUploadFilePath(raw string) (string, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "/uploads/") {
+		return "", false
+	}
+	cleaned := path.Clean(trimmed)
+	if !strings.HasPrefix(cleaned, "/uploads/") {
+		return "", false
+	}
+	relative := filepath.FromSlash(strings.TrimPrefix(cleaned, "/"))
+	candidates := []string{
+		relative,
+		filepath.Join("apps", "api", relative),
+	}
+	for _, candidate := range candidates {
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		return candidate, true
+	}
+	return "", false
+}
+
+func inferLocalAssetMimeType(filename string, data []byte) string {
+	if len(data) > 0 {
+		detected := strings.ToLower(strings.TrimSpace(http.DetectContentType(data)))
+		if strings.HasPrefix(detected, "image/") {
+			return detected
+		}
+	}
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	case ".gif":
+		return "image/gif"
+	default:
+		return "image/png"
+	}
+}
+
+func inlineLocalAssetDataURL(raw string) (string, bool, error) {
+	localPath, ok := resolveLocalUploadFilePath(raw)
+	if !ok {
+		return "", false, nil
+	}
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		return "", true, err
+	}
+	mimeType := inferLocalAssetMimeType(localPath, data)
+	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data), true, nil
+}
+
+func absolutizeAssetURL(base *url.URL, raw string) (string, bool, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || strings.HasPrefix(trimmed, "data:") {
+		return trimmed, false, false
+	}
+	parsed, err := url.Parse(trimmed)
+	if err == nil && parsed.Scheme != "" && parsed.Host != "" {
+		return trimmed, false, false
+	}
+	if !strings.HasPrefix(trimmed, "/") {
+		return trimmed, false, false
+	}
+	if base == nil {
+		return trimmed, false, true
+	}
+	rel, err := url.Parse(trimmed)
+	if err != nil {
+		return trimmed, false, true
+	}
+	return base.ResolveReference(rel).String(), true, false
+}
+
+func (c *Consumer) normalizeUpstreamMediaParams(params map[string]interface{}) {
+	if len(params) == 0 {
+		return
+	}
+
+	base := resolvePublicAssetBaseURL()
+	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
+	converted := 0
+	inlined := 0
+	unresolvedKeys := map[string]struct{}{}
+
+	normalizeStringKey := func(key string) {
+		raw, ok := params[key]
+		if !ok {
+			return
+		}
+		value, ok := raw.(string)
+		if !ok {
+			return
+		}
+		normalized, changed, unresolved := absolutizeAssetURL(base, value)
+		if changed {
+			params[key] = normalized
+			converted++
+			return
+		}
+		if unresolved {
+			if inlinedValue, handled, err := inlineLocalAssetDataURL(value); handled {
+				if err != nil {
+					log.Printf("[Consumer] 本地媒体内联失败: feature=%s key=%s err=%v", featureSlug, key, err)
+				} else {
+					params[key] = inlinedValue
+					inlined++
+					return
+				}
+			}
+		}
+		if unresolved {
+			unresolvedKeys[key] = struct{}{}
+		}
+	}
+
+	normalizeListKey := func(key string) {
+		raw, ok := params[key]
+		if !ok {
+			return
+		}
+		switch values := raw.(type) {
+		case []string:
+			updated := false
+			for index, item := range values {
+				normalized, changed, unresolved := absolutizeAssetURL(base, item)
+				if changed {
+					values[index] = normalized
+					updated = true
+					converted++
+					continue
+				}
+				if unresolved {
+					if inlinedValue, handled, err := inlineLocalAssetDataURL(item); handled {
+						if err != nil {
+							log.Printf("[Consumer] 本地媒体内联失败: feature=%s key=%s index=%d err=%v", featureSlug, key, index, err)
+						} else {
+							values[index] = inlinedValue
+							updated = true
+							inlined++
+							continue
+						}
+					}
+				}
+				if unresolved {
+					unresolvedKeys[key] = struct{}{}
+				}
+			}
+			if updated {
+				params[key] = values
+			}
+		case []interface{}:
+			updated := false
+			for index, item := range values {
+				text, ok := item.(string)
+				if !ok {
+					continue
+				}
+				normalized, changed, unresolved := absolutizeAssetURL(base, text)
+				if changed {
+					values[index] = normalized
+					updated = true
+					converted++
+					continue
+				}
+				if unresolved {
+					if inlinedValue, handled, err := inlineLocalAssetDataURL(text); handled {
+						if err != nil {
+							log.Printf("[Consumer] 本地媒体内联失败: feature=%s key=%s index=%d err=%v", featureSlug, key, index, err)
+						} else {
+							values[index] = inlinedValue
+							updated = true
+							inlined++
+							continue
+						}
+					}
+				}
+				if unresolved {
+					unresolvedKeys[key] = struct{}{}
+				}
+			}
+			if updated {
+				params[key] = values
+			}
+		}
+	}
+
+	for _, key := range []string{"image_url", "original_image_url", "mask_image_url", "mask_url", "model_url", "pose_url"} {
+		normalizeStringKey(key)
+	}
+	for _, key := range []string{"image_urls", "mask_image_urls", "mask_urls"} {
+		normalizeListKey(key)
+	}
+
+	if converted > 0 {
+		log.Printf("[Consumer] 已补全上游媒体地址: feature=%s converted=%d", featureSlug, converted)
+	}
+	if inlined > 0 {
+		log.Printf("[Consumer] 已内联本地媒体到上游请求: feature=%s inlined=%d", featureSlug, inlined)
+	}
+	if len(unresolvedKeys) > 0 {
+		keys := make([]string, 0, len(unresolvedKeys))
+		for key := range unresolvedKeys {
+			keys = append(keys, key)
+		}
+		log.Printf("[Consumer] 上游媒体地址仍为相对路径，请配置 APP_PUBLIC_BASE_URL: feature=%s keys=%s", featureSlug, strings.Join(keys, ","))
+	}
+}
+
 func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *redis.GlobalQueueTask) (string, error) {
 	log.Printf("[Consumer] 调用 API, 账号: %s, ChannelID: %d, ApiKey长度: %d",
 		account.Name, account.ChannelID, len(account.ApiKey))
@@ -230,6 +465,7 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 			log.Printf("[Consumer] 解析任务参数失败: task=%s err=%v", task.TaskID, err)
 		}
 	}
+	c.normalizeUpstreamMediaParams(params)
 
 	// 根据 ratio 计算尺寸
 	width, height := parseSizeFromParams(params)
@@ -255,7 +491,7 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		if errors.Is(err, context.Canceled) {
 			return "", err
 		}
-		return "", fmt.Errorf("调用 API 失败 (渠道: %s): %v", channelName, err)
+		return "", fmt.Errorf("调用 API 失败 (渠道: %s): %w", channelName, err)
 	}
 
 	// 如果对象存储已启用，将图片转存到当前存储
@@ -306,6 +542,9 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	}
 
 	size := fmt.Sprintf("%dx%d", width, height)
+	useEditEndpoint := shouldUseOpenAIEditEndpoint(params)
+	imageInputCount := countOpenAIImageInputs(params)
+	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
 
 	reqBody := map[string]interface{}{
 		"model":  model,
@@ -314,7 +553,12 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 		"size":   size,
 	}
 
-	appendOpenAIAllowedParams(reqBody, params)
+	if useEditEndpoint {
+		appendOpenAIEditParams(reqBody, params)
+	} else {
+		appendOpenAIAllowedParams(reqBody, params)
+	}
+	finalizeOpenAIRequestBody(reqBody, params)
 
 	bodyJSON, _ := json.Marshal(reqBody)
 
@@ -322,6 +566,12 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	endpoint := baseURL + "/v1/images/generations"
 	if strings.HasSuffix(baseURL, "/v1") {
 		endpoint = baseURL + "/images/generations"
+	}
+	if useEditEndpoint {
+		endpoint = baseURL + "/v1/images/edits"
+		if strings.HasSuffix(baseURL, "/v1") {
+			endpoint = baseURL + "/images/edits"
+		}
 	}
 
 	client := &http.Client{Timeout: timeout}
@@ -332,14 +582,22 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
 
-	log.Printf("[Consumer] OpenAI 请求: model=%s, size=%s, prompt=%.50s...", model, size, prompt)
+	log.Printf(
+		"[Consumer] OpenAI 请求: feature=%s endpoint=%s model=%s size=%s edit=%t images=%d",
+		featureSlug,
+		endpoint,
+		model,
+		size,
+		useEditEndpoint,
+		imageInputCount,
+	)
 
 	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return "", err
 		}
-		return "", fmt.Errorf("HTTP 请求失败: %v", err)
+		return "", fmt.Errorf("HTTP 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -348,26 +606,14 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 		if errors.Is(err, context.Canceled) {
 			return "", err
 		}
-		return "", fmt.Errorf("读取 API 响应失败: %v", err)
+		return "", fmt.Errorf("读取 API 响应失败: %w", err)
 	}
 
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("API 返回 %d: %s", resp.StatusCode, truncateErrorBody(string(respBody)))
 	}
 
-	var respData struct {
-		Data []struct {
-			URL string `json:"url"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(respBody, &respData); err != nil {
-		return "", fmt.Errorf("解析响应失败: %v", err)
-	}
-	if len(respData.Data) == 0 {
-		return "", fmt.Errorf("API 未返回图片")
-	}
-
-	return respData.Data[0].URL, nil
+	return extractOpenAIImageResponse(respBody, params)
 }
 
 func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string]interface{}) {
@@ -375,9 +621,11 @@ func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string
 		return
 	}
 
-	// OpenAI 兼容图像接口通常接收 image 字段；前端沿用 image_urls，这里做受控映射。
-	if imgURLs, ok := params["image_urls"]; ok {
-		reqBody["image"] = imgURLs
+	// OpenAI 兼容图像接口通常接收单个 image URL，这里显式传首图，避免中转站忽略数组型字段。
+	// 同时保留 image_urls，兼容需要读取完整图片列表的上游实现。
+	if imageURLs := normalizeOpenAIImageURLStrings(params); len(imageURLs) > 0 {
+		reqBody["image"] = imageURLs[0]
+		reqBody["image_urls"] = imageURLs
 	}
 
 	allowedKeys := []string{
@@ -426,6 +674,191 @@ func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string
 	}
 }
 
+func finalizeOpenAIRequestBody(reqBody map[string]interface{}, params map[string]interface{}) {
+	if reqBody == nil || params == nil {
+		return
+	}
+	image, ok := reqBody["image"].(string)
+	if !ok || !strings.HasPrefix(image, "data:") {
+		return
+	}
+	switch imageURLs := reqBody["image_urls"].(type) {
+	case []string:
+		if len(imageURLs) == 1 && imageURLs[0] == image {
+			delete(reqBody, "image_urls")
+		}
+	case []interface{}:
+		if len(imageURLs) == 1 {
+			if first, ok := imageURLs[0].(string); ok && first == image {
+				delete(reqBody, "image_urls")
+			}
+		}
+	}
+	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
+	if featureSlug != workflow.FeatureSlugStyleInnovate {
+		return
+	}
+	if original, ok := reqBody["original_image_url"].(string); ok && original == image {
+		delete(reqBody, "original_image_url")
+	}
+}
+
+func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
+	if len(normalizeOpenAIImageInputs(params)) == 0 {
+		return false
+	}
+	featureSlug, ok := workflow.ReadWorkflowStringParam(params, "feature")
+	if !ok {
+		return false
+	}
+	return featureSlug == workflow.FeatureSlugCanvasExtend
+}
+
+func countOpenAIImageInputs(params map[string]interface{}) int {
+	return len(normalizeOpenAIImageInputs(params))
+}
+
+func normalizeOpenAIImageURLStrings(params map[string]interface{}) []string {
+	refs := normalizeOpenAIImageInputs(params)
+	if len(refs) == 0 {
+		return nil
+	}
+	urls := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		url := strings.TrimSpace(ref["image_url"])
+		if url == "" {
+			continue
+		}
+		urls = append(urls, url)
+	}
+	return urls
+}
+
+func normalizeOpenAIImageInputs(params map[string]interface{}) []map[string]string {
+	if params == nil {
+		return nil
+	}
+	raw, ok := params["image_urls"]
+	if !ok {
+		return nil
+	}
+
+	var refs []map[string]string
+	appendRef := func(url string) {
+		trimmed := strings.TrimSpace(url)
+		if trimmed == "" {
+			return
+		}
+		refs = append(refs, map[string]string{"image_url": trimmed})
+	}
+
+	switch urls := raw.(type) {
+	case []string:
+		for _, url := range urls {
+			appendRef(url)
+		}
+	case []interface{}:
+		for _, item := range urls {
+			if url, ok := item.(string); ok {
+				appendRef(url)
+			}
+		}
+	}
+	return refs
+}
+
+func appendOpenAIEditParams(reqBody map[string]interface{}, params map[string]interface{}) {
+	if params == nil {
+		return
+	}
+	if refs := normalizeOpenAIImageInputs(params); len(refs) > 0 {
+		reqBody["images"] = refs
+	}
+	if maskURL, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
+		reqBody["mask"] = map[string]string{"image_url": maskURL}
+	}
+
+	allowedKeys := []string{
+		"variation_strength",
+		"angle_spec",
+		"background",
+		"viewpoint",
+		"model_url",
+		"model_strength",
+		"pose_url",
+		"pose_strength",
+		"blend_ratio",
+		"extend_top",
+		"extend_right",
+		"extend_bottom",
+		"extend_left",
+		"image_a_weight",
+		"image_b_weight",
+		"original_image_url",
+		"mask_image_urls",
+		"mask_url",
+		"mask_urls",
+		"use_mask",
+		"mask_enabled",
+		"is_masked",
+		"masked",
+		"local_enhance",
+		"is_local_enhance",
+		"partial_enhance",
+		"is_partial_enhance",
+		"fabric_rotation",
+		"fabric_scale",
+		"fabric_opacity",
+		"tile_mode",
+		"mode",
+		"upscale_mode",
+		"upscale_factor",
+		"output_format",
+		"output_quality",
+	}
+	for _, key := range allowedKeys {
+		if v, ok := params[key]; ok {
+			reqBody[key] = v
+		}
+	}
+}
+
+func extractOpenAIImageResponse(respBody []byte, params map[string]interface{}) (string, error) {
+	var respData struct {
+		Data []struct {
+			URL     string `json:"url"`
+			B64JSON string `json:"b64_json"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &respData); err != nil {
+		return "", fmt.Errorf("解析响应失败: %v", err)
+	}
+	if len(respData.Data) == 0 {
+		return "", fmt.Errorf("API 未返回图片")
+	}
+	if strings.TrimSpace(respData.Data[0].URL) != "" {
+		return strings.TrimSpace(respData.Data[0].URL), nil
+	}
+	if strings.TrimSpace(respData.Data[0].B64JSON) != "" {
+		return "data:" + inferOpenAIImageMimeType(params) + ";base64," + strings.TrimSpace(respData.Data[0].B64JSON), nil
+	}
+	return "", fmt.Errorf("API 未返回可用图片")
+}
+
+func inferOpenAIImageMimeType(params map[string]interface{}) string {
+	if params != nil {
+		if format, ok := params["output_format"].(string); ok {
+			switch strings.ToLower(strings.TrimSpace(format)) {
+			case "jpg", "jpeg":
+				return "image/jpeg"
+			case "webp":
+				return "image/webp"
+			}
+		}
+	}
+	return "image/png"
+}
+
 // callStabilityAI 调用 Stability AI 接口
 func (c *Consumer) callStabilityAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration) (string, error) {
 	baseURL := "https://api.stability.ai"
@@ -465,7 +898,7 @@ func (c *Consumer) callStabilityAI(ctx context.Context, account *accounts.ApiAcc
 		if errors.Is(err, context.Canceled) {
 			return "", err
 		}
-		return "", fmt.Errorf("HTTP 请求失败: %v", err)
+		return "", fmt.Errorf("HTTP 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -474,7 +907,7 @@ func (c *Consumer) callStabilityAI(ctx context.Context, account *accounts.ApiAcc
 		if errors.Is(err, context.Canceled) {
 			return "", err
 		}
-		return "", fmt.Errorf("读取 API 响应失败: %v", err)
+		return "", fmt.Errorf("读取 API 响应失败: %w", err)
 	}
 
 	if resp.StatusCode != 200 {

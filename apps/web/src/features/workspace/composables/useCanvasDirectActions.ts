@@ -51,6 +51,7 @@ interface UseCanvasDirectActionsOptions {
   userPrompt: Ref<string>
   messages: Ref<CanvasImageItem[]>
   styleInnovateStrength: Ref<number>
+  loadImageSizeFromUrl: (url: string) => Promise<{ width: number; height: number } | null>
   defaultSegType: SegType
   message: MessageApiLike
   submitTaskAndPoll: (options: SubmitTaskAndPollOptions) => Promise<string | null>
@@ -224,14 +225,23 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       EXECUTION_DIRECT_ACTION_META.styleInnovate.fallbackPrompt,
     )
     const strength = options.styleInnovateStrength.value
+    const imageSize = await options.loadImageSizeFromUrl(source.url)
     let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
-        prompt: `${EXECUTION_DIRECT_ACTION_META.styleInnovate.promptPrefix} 改变幅度：${strength}/10，${desc}`,
+        prompt: `${EXECUTION_DIRECT_ACTION_META.styleInnovate.promptPrefix} 创新强度：${strength}%，${desc}`,
         feature: EXECUTION_DIRECT_ACTION_META.styleInnovate.feature,
         imageUrls: [source.url],
         params: {
+          original_image_url: source.url,
+          ...(imageSize ? {
+            custom_width: imageSize.width,
+            custom_height: imageSize.height,
+            original_image_width: imageSize.width,
+            original_image_height: imageSize.height,
+          } : {}),
           variation_strength: strength,
+          strength,
         },
       }),
       source,

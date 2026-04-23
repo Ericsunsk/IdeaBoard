@@ -256,8 +256,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		}
 	}
 
-	// 功能页系统提示词：根据 feature slug 查找系统预设 prompt，支持模板变量替换
-	fullPrompt = prompts.ApplyFeatureSystemPrompt(fullPrompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {
+	fullPrompt = applyTaskSystemPrompt(fullPrompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {
 		if s.systemConfigRepo == nil {
 			return "", fmt.Errorf("system config repo 未配置")
 		}
@@ -269,22 +268,6 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		if _, exists := req.Params["line_draft_mode_id"]; exists {
 			// 保留参数透传，避免破坏旧调用方；这里只显式不再介入 fullPrompt 优先级。
 		}
-	}
-
-	if featureSlug == workflow.FeatureSlugStyleFusion {
-		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.BuildStyleFusionHiddenConstraint(req.Params))
-	}
-	if featureSlug == workflow.FeatureSlugMultiAngle {
-		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.BuildMultiAngleHiddenConstraint(req.Params))
-	}
-	if featureSlug == workflow.FeatureSlugCanvasExtend {
-		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.BuildCanvasExtendHiddenConstraint(req.Params))
-	}
-	if featureSlug == workflow.FeatureSlugHDUpscale && prompts.IsMaskedHDUpscaleRequest(req.Params) {
-		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.HDUpscaleMaskedConstraint)
-	}
-	if featureSlug == workflow.FeatureSlugFabricOnBody && prompts.IsMaskedFabricOnBodyRequest(req.Params) {
-		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.FabricOnBodyMaskedConstraint)
 	}
 
 	// 序列化参数
@@ -441,4 +424,15 @@ func generateSecureTaskID(prefix string) string {
 		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
 	}
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
+}
+
+func applyTaskSystemPrompt(
+	basePrompt string,
+	userPrompt string,
+	featureSlug string,
+	params map[string]interface{},
+	loadPrompt func(string) (string, error),
+) string {
+	// 管理员后台配置是系统提示词唯一来源；这里不再追加代码层隐藏约束。
+	return prompts.ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug, params, loadPrompt)
 }
