@@ -52,9 +52,6 @@
           :row-key="(row: FaceTemplate) => row.id"
         />
       </template>
-      <template #pagination>
-        <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadFaces" />
-      </template>
       <template #modals>
 
     <!-- 新增/编辑弹窗 -->
@@ -126,7 +123,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
 import {
-  NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem,
+  NDataTable, NButton, NSelect, NModal, NForm, NFormItem,
   NInput, NSwitch, NGrid, NGi, NInputNumber, useMessage
 } from 'naive-ui'
 import { faceTemplateApi } from '../../../shared/api/index'
@@ -135,7 +132,6 @@ import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import { adminUploadAction, useAdminUploadHeaders } from '../shared/adminUpload'
 import {
   ADMIN_ASSET_LIST_QUERY,
-  ADMIN_ASSET_PAGE_SIZE,
   ADMIN_STATUS_OPTIONS,
   createAdminUploadFinishHandler,
   useAdminCrudModal,
@@ -154,9 +150,6 @@ const { list: faces, loading, loadList: loadFaces } = useAdminListState<FaceTemp
   message,
   errorMessage: '加载失败',
 })
-const page = ref(1)
-const pageSize = ADMIN_ASSET_PAGE_SIZE
-const pageCount = computed(() => Math.max(1, Math.ceil(faces.value.length / pageSize)))
 
 const filterCategory = ref<string | null>(null)
 const filterEnabled = ref<number | null>(null)

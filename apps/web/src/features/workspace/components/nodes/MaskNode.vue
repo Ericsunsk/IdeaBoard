@@ -157,6 +157,7 @@ import NodeHeader from './NodeHeader.vue'
 import NodeIconButton from './NodeIconButton.vue'
 import NodePorts from './NodePorts.vue'
 import { buildNodeIoFromSlots, MASK_NODE_IO_SLOTS } from './nodeIoConfig'
+import { toNumber } from './numberUtils'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -242,11 +243,6 @@ const maskCanvasCursorStyle = computed(() => {
     cursor,
   }
 })
-
-function toNumber(rawValue: string, fallback: number): number {
-  const value = Number(rawValue)
-  return Number.isFinite(value) ? value : fallback
-}
 
 function clampBrushSize(value: number): number {
   if (!Number.isFinite(value)) return props.node.brushSize

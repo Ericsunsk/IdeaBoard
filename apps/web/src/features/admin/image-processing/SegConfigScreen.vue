@@ -151,10 +151,6 @@ function toChipVariant(status: string): 'neutral' | 'current' | 'enabled' | 'emp
   }
 }
 
-function errorMessage(error: unknown, fallback: string) {
-  return extractSafeApiErrorMessage(error, fallback)
-}
-
 async function loadConfig() {
   loading.value = true
   try {
@@ -204,7 +200,7 @@ async function handleSave() {
       message.error(res.msg || copy.saveFailed)
     }
   } catch (error) {
-    message.error(errorMessage(error, copy.saveFailed))
+    message.error(extractSafeApiErrorMessage(error, copy.saveFailed))
   } finally {
     saving.value = false
   }

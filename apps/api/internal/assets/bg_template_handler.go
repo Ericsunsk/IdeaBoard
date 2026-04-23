@@ -1,10 +1,6 @@
 package assets
 
-import (
-	"api/internal/platform/response"
-
-	"github.com/gin-gonic/gin"
-)
+import "github.com/gin-gonic/gin"
 
 type BgTemplateHandler struct {
 	repo *BgTemplateRepository
@@ -18,83 +14,56 @@ func NewBgTemplateHandler(repo *BgTemplateRepository) *BgTemplateHandler {
 
 // ListEnabled 获取已上架的背景模板
 func (h *BgTemplateHandler) ListEnabled(c *gin.Context) {
-	list, err := h.repo.ListEnabled()
-	if err != nil {
-		response.Error(c, 500, "获取背景列表失败")
-		return
-	}
-	response.Success(c, gin.H{"list": list})
+	handleListEnabled(c, func() (any, error) {
+		return h.repo.ListEnabled()
+	}, "获取背景列表失败")
 }
 
 // ============ 管理端接口 ============
 
 // List 获取背景模板列表
 func (h *BgTemplateHandler) List(c *gin.Context) {
-	page, pageSize := parsePageQuery(c, 100)
-	list, total, err := h.repo.List(page, pageSize)
-	if err != nil {
-		response.Error(c, 500, "获取列表失败")
-		return
-	}
-	response.Success(c, gin.H{"total": total, "list": list})
+	handlePagedList(c, 100, func(page, pageSize int) (any, int64, error) {
+		return h.repo.List(page, pageSize)
+	})
 }
 
 // Create 创建背景模板
 func (h *BgTemplateHandler) Create(c *gin.Context) {
-	var req CreateBgTemplateRequest
-	if !bindJSON(c, &req) {
-		return
-	}
-	tpl := &BgTemplate{
-		Name:      req.Name,
-		ImageURL:  req.ImageURL,
-		Category:  req.Category,
-		SortOrder: req.SortOrder,
-		IsEnabled: req.IsEnabled,
-	}
-	if err := h.repo.Create(tpl); err != nil {
-		response.InternalError(c, 500, "创建失败", err)
-		return
-	}
-	response.Success(c, gin.H{"bg": tpl})
+	handleCreate[CreateBgTemplateRequest, BgTemplate](
+		c,
+		func(req *CreateBgTemplateRequest) *BgTemplate {
+			return &BgTemplate{
+				Name:      req.Name,
+				ImageURL:  req.ImageURL,
+				Category:  req.Category,
+				SortOrder: req.SortOrder,
+				IsEnabled: req.IsEnabled,
+			}
+		},
+		h.repo.Create,
+		"bg",
+	)
 }
 
 // Update 更新背景模板
 func (h *BgTemplateHandler) Update(c *gin.Context) {
-	id, ok := parseIDParam(c)
-	if !ok {
-		return
-	}
-	var req UpdateBgTemplateRequest
-	if !bindJSON(c, &req) {
-		return
-	}
-	tpl, err := h.repo.GetByID(id)
-	if err != nil {
-		response.Error(c, 404, "未找到该背景")
-		return
-	}
-	tpl.Name = req.Name
-	tpl.ImageURL = req.ImageURL
-	tpl.Category = req.Category
-	tpl.SortOrder = req.SortOrder
-	tpl.IsEnabled = req.IsEnabled
-	if err := h.repo.Update(tpl); err != nil {
-		response.InternalError(c, 500, "更新失败", err)
-		return
-	}
-	response.Success(c, nil)
+	handleUpdate[UpdateBgTemplateRequest, BgTemplate](
+		c,
+		h.repo.GetByID,
+		func(tpl *BgTemplate, req *UpdateBgTemplateRequest) {
+			tpl.Name = req.Name
+			tpl.ImageURL = req.ImageURL
+			tpl.Category = req.Category
+			tpl.SortOrder = req.SortOrder
+			tpl.IsEnabled = req.IsEnabled
+		},
+		h.repo.Update,
+		"未找到该背景",
+	)
 }
 
 // Delete 删除背景模板
 func (h *BgTemplateHandler) Delete(c *gin.Context) {
-	id, ok := parseIDParam(c)
-	if !ok {
-		return
-	}
-	if err := h.repo.Delete(id); err != nil {
-		response.InternalError(c, 500, "删除失败", err)
-		return
-	}
-	response.Success(c, nil)
+	handleDelete(c, h.repo.Delete)
 }

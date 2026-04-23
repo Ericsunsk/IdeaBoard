@@ -157,6 +157,7 @@ import NodeIconButton from './NodeIconButton.vue'
 import NodePorts from './NodePorts.vue'
 import { buildNodeIoFromSlots, COLOR_NODE_IO_SLOTS } from './nodeIoConfig'
 import { DEFAULT_COLOR_HEX, normalizeHexColor } from './colorPopoverUtils'
+import { toNumber } from './numberUtils'
 import { isEyeDropperSupported } from '../../utils/eyedropper'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
@@ -319,11 +320,6 @@ watch(
   },
   { immediate: true },
 )
-
-function toNumber(rawValue: string, fallback: number): number {
-  const value = Number(rawValue)
-  return Number.isFinite(value) ? value : fallback
-}
 
 onMounted(() => {
   document.addEventListener('mousedown', handleDocumentPointerDown)

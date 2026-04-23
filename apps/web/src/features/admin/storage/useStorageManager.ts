@@ -289,10 +289,6 @@ export function useStorageManager() {
     ])
   }
 
-  function errorMessage(error: unknown, fallback: string) {
-    return extractSafeApiErrorMessage(error, fallback)
-  }
-
   function openCreate() {
     const firstVendor = vendorPresets.value.find((vendor) => vendor.supported)
     if (!firstVendor) {
@@ -405,7 +401,7 @@ export function useStorageManager() {
       if (!saved) return
       closeEditor()
     } catch (error) {
-      message.error(errorMessage(error, '保存失败'))
+      message.error(extractSafeApiErrorMessage(error, '保存失败'))
     } finally {
       saving.value = false
     }
@@ -427,7 +423,7 @@ export function useStorageManager() {
       message.success(response.data?.message || '已设为当前存储')
       closeEditor()
     } catch (error) {
-      message.error(errorMessage(error, '设为当前失败'))
+      message.error(extractSafeApiErrorMessage(error, '设为当前失败'))
     } finally {
       savingAndApplying.value = false
     }
@@ -444,7 +440,7 @@ export function useStorageManager() {
         message.error(response.msg || '设为当前失败')
       }
     } catch (error) {
-      message.error(errorMessage(error, '设为当前失败'))
+      message.error(extractSafeApiErrorMessage(error, '设为当前失败'))
     } finally {
       applyingId.value = null
     }
@@ -460,7 +456,7 @@ export function useStorageManager() {
         message.error(response.msg || '连接失败')
       }
     } catch (error) {
-      message.error(errorMessage(error, '连接失败'))
+      message.error(extractSafeApiErrorMessage(error, '连接失败'))
     } finally {
       testingId.value = null
     }
@@ -482,7 +478,7 @@ export function useStorageManager() {
         message.warning(response.msg || '未检测到绑定域名')
       }
     } catch (error) {
-      message.error(errorMessage(error, '获取失败'))
+      message.error(extractSafeApiErrorMessage(error, '获取失败'))
     } finally {
       fetching.value = false
     }
@@ -499,7 +495,7 @@ export function useStorageManager() {
         message.error(response.msg || '删除失败')
       }
     } catch (error) {
-      message.error(errorMessage(error, '删除失败'))
+      message.error(extractSafeApiErrorMessage(error, '删除失败'))
     }
   }
 

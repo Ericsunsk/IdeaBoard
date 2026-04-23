@@ -59,13 +59,6 @@
         :bordered="false"
         :row-key="(row: StyleCard) => row.id"
       />
-      <div class="pagination-wrapper">
-        <n-pagination
-          v-model:page="page"
-          :page-count="pageCount"
-          @update:page="loadCards"
-        />
-      </div>
     </div>
 
     <!-- 新增/编辑弹窗 -->
@@ -169,7 +162,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
 import {
-  NDataTable, NPagination, NButton, NInput, NModal, NForm, NFormItem,
+  NDataTable, NButton, NInput, NModal, NForm, NFormItem,
   NSwitch, NGrid, NGi, NInputNumber, NSelect, useMessage
 } from 'naive-ui'
 import { styleCardApi } from '../../../shared/api/index'
@@ -179,7 +172,6 @@ import { adminUploadAction, useAdminUploadHeaders } from '../shared/adminUpload'
 import {
   ADMIN_STATUS_OPTIONS,
   ADMIN_STYLE_CARD_LIST_QUERY,
-  ADMIN_STYLE_CARD_PAGE_SIZE,
   createAdminUploadFinishHandler,
   useAdminCrudModal,
   useAdminDeleteModal,
@@ -196,9 +188,6 @@ const { list: cards, loading, loadList: loadCards } = useAdminListState<StyleCar
   message,
   errorMessage: '加载失败',
 })
-const page = ref(1)
-const pageSize = ADMIN_STYLE_CARD_PAGE_SIZE
-const pageCount = computed(() => Math.max(1, Math.ceil(cards.value.length / pageSize)))
 
 const searchKeyword = ref('')
 const filterEnabled = ref<number | null>(null)

@@ -68,6 +68,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { toNumber } from './numberUtils'
 
 defineProps<{
   hex: string
@@ -95,11 +96,6 @@ const spectrumRefEl = ref<HTMLElement | null>(null)
 watch(spectrumRefEl, (value) => {
   emit('set-spectrum-ref', value ?? null)
 }, { immediate: true })
-
-function toNumber(rawValue: string, fallback: number): number {
-  const value = Number(rawValue)
-  return Number.isFinite(value) ? value : fallback
-}
 </script>
 
 <style scoped>

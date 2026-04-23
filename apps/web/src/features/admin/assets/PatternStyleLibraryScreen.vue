@@ -29,9 +29,6 @@
       <template #table>
         <n-data-table :columns="columns" :data="filteredList" :loading="loading" :pagination="false" :bordered="false" :row-key="(row: PatternStyle) => row.id" />
       </template>
-      <template #pagination>
-        <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadList" />
-      </template>
       <template #modals>
 
     <n-modal v-model:show="showModal" preset="card" :title="isEditing ? '编辑风格模型' : '新增风格模型'" :style="{ maxWidth: '520px' }">
@@ -75,14 +72,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
-import { NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem, NInput, NSwitch, NGrid, NGi, NInputNumber, useMessage } from 'naive-ui'
+import { NDataTable, NButton, NSelect, NModal, NForm, NFormItem, NInput, NSwitch, NGrid, NGi, NInputNumber, useMessage } from 'naive-ui'
 import { patternStyleApi } from '../../../shared/api/index'
 import type { PatternStyle, PatternStyleFormData } from '../../../shared/api/index'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import { adminUploadAction, useAdminUploadHeaders } from '../shared/adminUpload'
 import {
   ADMIN_ASSET_LIST_QUERY,
-  ADMIN_ASSET_PAGE_SIZE,
   ADMIN_STATUS_OPTIONS,
   createAdminUploadFinishHandler,
   useAdminCrudModal,
@@ -100,9 +96,6 @@ const { list, loading, loadList } = useAdminListState<PatternStyle>({
   message,
   errorMessage: '加载失败',
 })
-const page = ref(1)
-const pageSize = ADMIN_ASSET_PAGE_SIZE
-const pageCount = computed(() => Math.max(1, Math.ceil(list.value.length / pageSize)))
 
 const filterCategory = ref<string | null>(null)
 const filterEnabled = ref<number | null>(null)

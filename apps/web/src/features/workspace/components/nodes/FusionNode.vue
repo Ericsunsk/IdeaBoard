@@ -79,6 +79,7 @@ import NodeExecutionFooter from './NodeExecutionFooter.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodePorts from './NodePorts.vue'
 import { buildNodeIoFromSlots, FUSION_NODE_IO_SLOTS } from './nodeIoConfig'
+import { toNumber } from './numberUtils'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -119,11 +120,6 @@ const connectionChips = computed(() => io.value.connectionChips)
 const ports = computed(() => io.value.ports)
 const imageAWeight = computed(() => props.node.blendRatio)
 const imageBWeight = computed(() => 100 - props.node.blendRatio)
-
-function toNumber(rawValue: string, fallback: number): number {
-  const value = Number(rawValue)
-  return Number.isFinite(value) ? value : fallback
-}
 
 function onPortMouseDown(event: MouseEvent, port: string) {
   emit('port-mousedown', event, port as 'image')

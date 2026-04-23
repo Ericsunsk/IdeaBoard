@@ -1,8 +1,9 @@
 import { ref, type Ref } from 'vue'
 import type { UploadFileInfo } from 'naive-ui'
 import { UPLOAD_FAILED_MESSAGE, UPLOAD_SUCCESS_MESSAGE } from '../../../shared/constants/media'
-import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { parseAdminUploadResponse } from './adminUpload'
+import { extractSafeApiErrorMessage as extractApiErrorMessage } from '../../../shared/utils/errorMessages'
+export { extractApiErrorMessage }
 
 export const ADMIN_STATUS_OPTIONS = [
   { label: '已上架', value: 1 },
@@ -11,16 +12,10 @@ export const ADMIN_STATUS_OPTIONS = [
 
 export const ADMIN_ASSET_LIST_QUERY = { page: 1, page_size: 200 } as const
 export const ADMIN_STYLE_CARD_LIST_QUERY = { page: 1, page_size: 100 } as const
-export const ADMIN_ASSET_PAGE_SIZE = 50
-export const ADMIN_STYLE_CARD_PAGE_SIZE = 20
 
 type MessageFn = (text: string) => void
 type Message = { success: MessageFn; error: MessageFn }
 type ListResponse<T> = { code?: number; data?: { list?: T[] } | null }
-
-export function extractApiErrorMessage(error: unknown, fallback: string): string {
-  return extractSafeApiErrorMessage(error, fallback)
-}
 
 export function createAdminUploadFinishHandler<T extends object>(
   uploading: Ref<boolean>,

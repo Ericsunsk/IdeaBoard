@@ -64,6 +64,17 @@ interface SubmitTaskOptionsLike {
   onFailed?: () => void
 }
 
+interface StandardSubmitBuildOptions {
+  nodeType: CanvasExecutionOutputNodeType
+  nodeId: number
+  request: SubmitTaskData
+  sourceUrl: string
+  placementX: number
+  placementY: number
+  successMessage: string
+  failureMessage: string
+}
+
 type PlacedImageInput = { url: string; placementX: number; placementY: number }
 type PlacedMaskInput = { dataUrl: string; placementX: number; placementY: number }
 type UpscalePayload = {
@@ -205,6 +216,34 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     urls: string[],
   ) {
     options.appendWorkflowNodeOutputs(nodeType, nodeId, urls)
+  }
+
+  function resolveExecutionOutputNodeId(
+    nodeType: CanvasExecutionOutputNodeType,
+    nodeId: number,
+  ): number | null {
+    const connectedOutputNodeId = options.getConnectedOutputImageTarget(nodeType, nodeId)?.id ?? null
+    return options.resolvePreferredOutputNodeId(connectedOutputNodeId)
+  }
+
+  function buildStandardSubmitOptions({
+    nodeType,
+    nodeId,
+    request,
+    sourceUrl,
+    placementX,
+    placementY,
+    successMessage,
+    failureMessage,
+  }: StandardSubmitBuildOptions): SubmitTaskOptionsLike {
+    return {
+      request,
+      source: options.buildPlacementSource(sourceUrl, placementX, placementY),
+      outputNodeId: resolveExecutionOutputNodeId(nodeType, nodeId),
+      successMessage,
+      failureMessage,
+      onCompleted: urls => cacheNodeOutputs(nodeType, nodeId, urls),
+    }
   }
 
   async function submitExecutionTask(
@@ -552,31 +591,34 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const poseImageInput = resolveConnectedModelPoseImageInput(node)
     const modelStrength = clampModelReferenceStrength(node.modelStrength)
     const poseStrength = clampModelPoseStrength(node.poseStrength)
-    const connectedOutputNodeId = options.getConnectedOutputImageTarget('model', node.id)?.id ?? null
-    const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const placementSource = options.buildPlacementSource(sourceUrl, node.x + 340, node.y + 18)
 
-    await submitExecutionTask('model', node.id, {
-      request: buildExecutionTaskRequest({
-        prompt: `${EXECUTION_MODEL_META.promptPrefix} ${promptText}`,
-        feature: EXECUTION_MODEL_META.feature,
-        imageUrls: [sourceUrl],
-        params: {
-          angle_spec: {
-            yaw: angleSpec.yaw,
-            framing: angleSpec.framing,
+    await submitExecutionTask(
+      'model',
+      node.id,
+      buildStandardSubmitOptions({
+        nodeType: 'model',
+        nodeId: node.id,
+        request: buildExecutionTaskRequest({
+          prompt: `${EXECUTION_MODEL_META.promptPrefix} ${promptText}`,
+          feature: EXECUTION_MODEL_META.feature,
+          imageUrls: [sourceUrl],
+          params: {
+            angle_spec: {
+              yaw: angleSpec.yaw,
+              framing: angleSpec.framing,
+            },
+            ...(modelImageInput?.url ? { model_url: modelImageInput.url, model_strength: modelStrength } : {}),
+            ...(poseImageInput?.url ? { pose_url: poseImageInput.url, pose_strength: poseStrength } : {}),
+            background: node.background,
           },
-          ...(modelImageInput?.url ? { model_url: modelImageInput.url, model_strength: modelStrength } : {}),
-          ...(poseImageInput?.url ? { pose_url: poseImageInput.url, pose_strength: poseStrength } : {}),
-          background: node.background,
-        },
+        }),
+        sourceUrl,
+        placementX: node.x + 340,
+        placementY: node.y + 18,
+        successMessage: `Task submitted · ${angleLabel}`,
+        failureMessage: 'Failed to submit task',
       }),
-      source: placementSource,
-      outputNodeId,
-      successMessage: `Task submitted · ${angleLabel}`,
-      failureMessage: 'Failed to submit task',
-      onCompleted: urls => cacheNodeOutputs('model', node.id, urls),
-    })
+    )
   }
 
   async function handleViewpointNodeGenerate(node: ViewpointNodeItem) {
@@ -611,26 +653,29 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       `光影：${lightingLabel}`,
     ].filter(Boolean)
     const promptText = resolveConnectedViewpointPromptInput(node, summaryPrompt.join('，')).trim()
-    const connectedOutputNodeId = options.getConnectedOutputImageTarget('viewpoint', node.id)?.id ?? null
-    const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const placementSource = options.buildPlacementSource(sourceUrls[0], node.x + 340, node.y + 18)
 
-    await submitExecutionTask('viewpoint', node.id, {
-      request: buildExecutionTaskRequest({
-        prompt: `${EXECUTION_VIEWPOINT_META.promptPrefix} ${promptText}`,
-        feature: EXECUTION_VIEWPOINT_META.feature,
-        imageUrls: sourceUrls,
-        params: {
-          viewpoint: node.selectedViewpoint,
-          lighting: node.lighting,
-        },
+    await submitExecutionTask(
+      'viewpoint',
+      node.id,
+      buildStandardSubmitOptions({
+        nodeType: 'viewpoint',
+        nodeId: node.id,
+        request: buildExecutionTaskRequest({
+          prompt: `${EXECUTION_VIEWPOINT_META.promptPrefix} ${promptText}`,
+          feature: EXECUTION_VIEWPOINT_META.feature,
+          imageUrls: sourceUrls,
+          params: {
+            viewpoint: node.selectedViewpoint,
+            lighting: node.lighting,
+          },
+        }),
+        sourceUrl: sourceUrls[0],
+        placementX: node.x + 340,
+        placementY: node.y + 18,
+        successMessage: `${EXECUTION_VIEWPOINT_META.successLabel} submitted`,
+        failureMessage: 'Failed to submit display task',
       }),
-      source: placementSource,
-      outputNodeId,
-      successMessage: `${EXECUTION_VIEWPOINT_META.successLabel} submitted`,
-      failureMessage: 'Failed to submit display task',
-      onCompleted: urls => cacheNodeOutputs('viewpoint', node.id, urls),
-    })
+    )
   }
 
   async function handleEditNodeGenerate(node: EditNodeItem) {
@@ -758,27 +803,30 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return `Fusion 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线`
     })) return
     options.generating.value = true
-    const connectedOutputNodeId = options.getConnectedOutputImageTarget('fusion', node.id)?.id ?? null
-    const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const placementSource = options.buildPlacementSource(connectedImageA!.url, node.x + 340, node.y + 18)
 
-    await submitExecutionTask('fusion', node.id, {
-      request: buildExecutionTaskRequest({
-        prompt: `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`,
-        feature: EXECUTION_FUSION_META.feature,
-        imageUrls: [connectedImageA!.url, connectedImageB!.url],
-        params: {
-          blend_ratio: imageAWeight,
-          image_a_weight: imageAWeight,
-          image_b_weight: imageBWeight,
-        },
+    await submitExecutionTask(
+      'fusion',
+      node.id,
+      buildStandardSubmitOptions({
+        nodeType: 'fusion',
+        nodeId: node.id,
+        request: buildExecutionTaskRequest({
+          prompt: `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`,
+          feature: EXECUTION_FUSION_META.feature,
+          imageUrls: [connectedImageA!.url, connectedImageB!.url],
+          params: {
+            blend_ratio: imageAWeight,
+            image_a_weight: imageAWeight,
+            image_b_weight: imageBWeight,
+          },
+        }),
+        sourceUrl: connectedImageA!.url,
+        placementX: node.x + 340,
+        placementY: node.y + 18,
+        successMessage: `${EXECUTION_FUSION_META.successLabel} submitted`,
+        failureMessage: 'Failed to submit fusion task',
       }),
-      source: placementSource,
-      outputNodeId,
-      successMessage: `${EXECUTION_FUSION_META.successLabel} submitted`,
-      failureMessage: 'Failed to submit fusion task',
-      onCompleted: urls => cacheNodeOutputs('fusion', node.id, urls),
-    })
+    )
   }
 
   async function handleEnhanceNodeGenerate(node: EnhanceNodeItem) {
@@ -802,8 +850,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     ))) return
 
     options.generating.value = true
-    const connectedOutputNodeId = options.getConnectedOutputImageTarget('enhance', node.id)?.id ?? null
-    const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
+    const outputNodeId = resolveExecutionOutputNodeId('enhance', node.id)
     const placementSource = options.buildPlacementSource(
       connectedImage!.url,
       node.x + 340,
@@ -880,24 +927,30 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         return
       }
 
-      await submitExecutionTask('enhance', node.id, {
-        request: buildExecutionTaskRequest({
-          prompt: `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${promptText || EXECUTION_ENHANCE_META.canvasExtend.fallbackPrompt}`,
-          feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
-          imageUrls: [connectedImage!.url],
-          params: {
-            extend_top: node.extendTop,
-            extend_right: node.extendRight,
-            extend_bottom: node.extendBottom,
-            extend_left: node.extendLeft,
-          },
+      await submitExecutionTask(
+        'enhance',
+        node.id,
+        buildStandardSubmitOptions({
+          nodeType: 'enhance',
+          nodeId: node.id,
+          request: buildExecutionTaskRequest({
+            prompt: `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${promptText || EXECUTION_ENHANCE_META.canvasExtend.fallbackPrompt}`,
+            feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
+            imageUrls: [connectedImage!.url],
+            params: {
+              extend_top: node.extendTop,
+              extend_right: node.extendRight,
+              extend_bottom: node.extendBottom,
+              extend_left: node.extendLeft,
+            },
+          }),
+          sourceUrl: connectedImage!.url,
+          placementX: node.x + 340,
+          placementY: node.y + 18,
+          successMessage: 'Canvas extend submitted',
+          failureMessage: 'Failed to submit enhance task',
         }),
-        source: placementSource,
-        outputNodeId,
-        successMessage: 'Canvas extend submitted',
-        failureMessage: 'Failed to submit enhance task',
-        onCompleted: urls => cacheNodeOutputs('enhance', node.id, urls),
-      })
+      )
     } catch (error: unknown) {
       failExecutionFromError('enhance', node.id, error, 'Failed to enhance image')
     }
@@ -938,10 +991,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     }
 
     options.generating.value = true
-    const connectedOutputNodeId = options.getConnectedOutputImageTarget('wear', node.id)?.id ?? null
-    const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
     const tileModeLabel = describeWearTileMode(node.tileMode)
-    const placementSource = options.buildPlacementSource(connectedImageA!.url, node.x + 340, node.y + 18)
     try {
       let maskImageUrl = ''
       if (connectedMask?.dataUrl) {
@@ -954,31 +1004,37 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         maskImageUrl = uploadRes.data.url
       }
 
-      await submitExecutionTask('wear', node.id, {
-        request: buildExecutionTaskRequest({
-          prompt: `${EXECUTION_WEAR_META.promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，融合强度${node.opacity}%`,
-          feature: EXECUTION_WEAR_META.feature,
-          imageUrls: [connectedImageA!.url, connectedImageB!.url],
-          params: {
-            original_image_url: connectedImageA!.url,
-            ...(maskImageUrl
-              ? {
-                  mask_image_url: maskImageUrl,
-                  use_mask: true,
-                }
-              : {}),
-            fabric_rotation: node.rotation,
-            fabric_opacity: node.opacity,
-            fabric_scale: node.scale,
-            tile_mode: node.tileMode,
-          },
+      await submitExecutionTask(
+        'wear',
+        node.id,
+        buildStandardSubmitOptions({
+          nodeType: 'wear',
+          nodeId: node.id,
+          request: buildExecutionTaskRequest({
+            prompt: `${EXECUTION_WEAR_META.promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，融合强度${node.opacity}%`,
+            feature: EXECUTION_WEAR_META.feature,
+            imageUrls: [connectedImageA!.url, connectedImageB!.url],
+            params: {
+              original_image_url: connectedImageA!.url,
+              ...(maskImageUrl
+                ? {
+                    mask_image_url: maskImageUrl,
+                    use_mask: true,
+                  }
+                : {}),
+              fabric_rotation: node.rotation,
+              fabric_opacity: node.opacity,
+              fabric_scale: node.scale,
+              tile_mode: node.tileMode,
+            },
+          }),
+          sourceUrl: connectedImageA!.url,
+          placementX: node.x + 340,
+          placementY: node.y + 18,
+          successMessage: `${EXECUTION_WEAR_META.successLabel} submitted`,
+          failureMessage: 'Failed to submit wear task',
         }),
-        source: placementSource,
-        outputNodeId,
-        successMessage: `${EXECUTION_WEAR_META.successLabel} submitted`,
-        failureMessage: 'Failed to submit wear task',
-        onCompleted: urls => cacheNodeOutputs('wear', node.id, urls),
-      })
+      )
     } catch (error: unknown) {
       failExecutionFromError('wear', node.id, error, 'Failed to submit wear task')
     }
