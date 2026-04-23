@@ -13,6 +13,11 @@ export interface CanvasImageItem {
   y: number
   width?: number
   height_ratio?: number
+  renderState?: 'ready' | 'pending'
+}
+
+export function isCanvasImagePending(item: { renderState?: CanvasImageItem['renderState'] | null | undefined }) {
+  return item.renderState === 'pending'
 }
 
 export type WorkflowNodeOutputStatus = 'idle' | 'ready' | 'stale'

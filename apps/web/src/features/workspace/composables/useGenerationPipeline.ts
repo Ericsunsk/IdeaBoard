@@ -1,5 +1,6 @@
 import { onUnmounted, ref, type Ref } from 'vue'
 import type { CanvasImageItem, CanvasPoint, ImageNodeItem } from '../types/canvasNodes'
+import { isCanvasImagePending } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage, sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
 
 interface MessageApiLike {
@@ -35,6 +36,7 @@ interface SubmitAndPollOptions<TSubmitPayload extends object> {
   failureMessage?: string
   source?: CanvasImageItem
   outputNodeId?: number | null
+  suppressDefaultAppend?: boolean
   onSubmitted?: (taskId: string) => void
   onCompleted?: (urls: string[]) => void
   onFailed?: () => void
@@ -52,6 +54,11 @@ interface UseGenerationPipelineOptions<TSubmitPayload extends object> {
   submitTask: (payload: TSubmitPayload) => Promise<TaskSubmitResponseLike>
   getTask: (taskId: string) => Promise<TaskGetResponseLike>
 }
+
+const GENERATED_CANVAS_IMAGE_WIDTH = 300
+const GENERATED_CANVAS_IMAGE_STEP_X = 170
+const GENERATED_CANVAS_IMAGE_SOURCE_OFFSET_X = 50
+const GENERATED_CANVAS_IMAGE_SOURCE_OFFSET_Y = 26
 
 function extractImageUrlsFromTask(task: TaskRecordLike | null | undefined): string[] {
   if (!task?.result) return []
@@ -112,30 +119,140 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     })
   }
 
+  function syncCanvasImageRatio(itemId: number, url: string) {
+    void options.loadImageRatioFromUrl(url).then((ratio) => {
+      if (!ratio) return
+      const target = options.messages.value.find(item => item.id === itemId)
+      if (!target || target.url !== url) return
+      target.height_ratio = ratio
+    })
+  }
+
+  function buildGeneratedCanvasPlacements(source: CanvasImageItem | undefined, count: number): CanvasPoint[] {
+    const baseX = source
+      ? source.x - GENERATED_CANVAS_IMAGE_WIDTH - GENERATED_CANVAS_IMAGE_SOURCE_OFFSET_X
+      : -((count - 1) * GENERATED_CANVAS_IMAGE_STEP_X) / 2
+    const baseY = source ? source.y + GENERATED_CANVAS_IMAGE_SOURCE_OFFSET_Y : 0
+
+    return Array.from({ length: count }, (_, index) => ({
+      x: source ? baseX - index * GENERATED_CANVAS_IMAGE_STEP_X : baseX + index * GENERATED_CANVAS_IMAGE_STEP_X,
+      y: baseY + index * 22,
+    }))
+  }
+
+  function createPendingGeneratedImages(config: {
+    count?: number
+    source?: CanvasImageItem
+    outputNodeId?: number | null
+    heightRatios?: number[]
+  }): CanvasImageItem[] {
+    const outputNode = resolvePreferredImageOutputNode(config.outputNodeId)
+    if (outputNode) return []
+
+    const count = Math.max(1, config.count ?? 1)
+    const placements = buildGeneratedCanvasPlacements(config.source, count)
+    const items = placements.map((point, index) => {
+      const item = options.createCanvasImageAt(point, '', config.heightRatios?.[index])
+      item.width = GENERATED_CANVAS_IMAGE_WIDTH
+      item.renderState = 'pending'
+      return item
+    })
+
+    if (items.length > 0) {
+      options.messages.value.push(...items)
+      options.selectedIds.value = items.map(item => item.id)
+    }
+
+    return items
+  }
+
+  function removePendingGeneratedImages(pendingItems: CanvasImageItem[]) {
+    const ids = new Set(pendingItems.map(item => item.id))
+    if (ids.size === 0) return
+    options.messages.value = options.messages.value.filter(item => !ids.has(item.id))
+    if (options.selectedIds.value.some(id => ids.has(id))) {
+      options.selectedIds.value = options.selectedIds.value.filter(id => !ids.has(id))
+    }
+  }
+
+  function replacePendingGeneratedImages(
+    urls: string[],
+    pendingItems: CanvasImageItem[],
+    source?: CanvasImageItem,
+    outputNodeId?: number | null,
+  ) {
+    const outputNode = resolvePreferredImageOutputNode(outputNodeId)
+    if (outputNode) {
+      appendUrlsToImageNodeOutputs(urls, outputNode)
+      return
+    }
+    if (urls.length === 0) {
+      removePendingGeneratedImages(pendingItems)
+      return
+    }
+
+    const livePending = pendingItems
+      .map(item => options.messages.value.find(candidate => candidate.id === item.id) ?? null)
+      .filter((item): item is CanvasImageItem => !!item && isCanvasImagePending(item))
+
+    if (livePending.length === 0) {
+      appendGeneratedImages(urls, source, outputNodeId)
+      return
+    }
+
+    const placements = buildGeneratedCanvasPlacements(source, urls.length)
+    const nextSelectedIds: number[] = []
+
+    urls.forEach((url, index) => {
+      const point = placements[index]
+      const target = livePending[index]
+      if (target && point) {
+        target.url = url
+        target.x = point.x
+        target.y = point.y
+        target.width = GENERATED_CANVAS_IMAGE_WIDTH
+        target.renderState = 'ready'
+        syncCanvasImageRatio(target.id, url)
+        nextSelectedIds.push(target.id)
+        return
+      }
+
+      if (!point) return
+      const item = options.createCanvasImageAt(point, url)
+      item.width = GENERATED_CANVAS_IMAGE_WIDTH
+      item.renderState = 'ready'
+      options.messages.value.push(item)
+      syncCanvasImageRatio(item.id, url)
+      nextSelectedIds.push(item.id)
+    })
+
+    if (livePending.length > urls.length) {
+      const staleIds = new Set(livePending.slice(urls.length).map(item => item.id))
+      options.messages.value = options.messages.value.filter(item => !staleIds.has(item.id))
+    }
+
+    if (nextSelectedIds.length > 0) {
+      options.selectedIds.value = nextSelectedIds
+    }
+  }
+
   function appendGeneratedImages(urls: string[], source?: CanvasImageItem, outputNodeId?: number | null) {
     if (!urls.length) return
     const outputNode = resolvePreferredImageOutputNode(outputNodeId)
     appendUrlsToImageNodeOutputs(urls, outputNode)
     if (outputNode) return
 
-    const generatedWidth = 300
-    const stepX = 170
-    const baseX = source
-      ? source.x - generatedWidth - 50
-      : -((urls.length - 1) * stepX) / 2
-    const baseY = source ? source.y + 26 : 0
+    const placements = buildGeneratedCanvasPlacements(source, urls.length)
     const newIds: number[] = []
 
     urls.forEach((url, index) => {
-      const item = options.createCanvasImageAt(
-        {
-          x: source ? baseX - index * stepX : baseX + index * stepX,
-          y: baseY + index * 22,
-        },
-        url,
-      )
-      item.width = generatedWidth
+      const point = placements[index]
+      if (!point) return
+      const item = options.createCanvasImageAt(point, url)
+      item.width = GENERATED_CANVAS_IMAGE_WIDTH
+      item.renderState = 'ready'
       options.messages.value.push(item)
+      syncCanvasImageRatio(item.id, url)
       newIds.push(item.id)
     })
 
@@ -148,6 +265,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     taskId: string,
     source?: CanvasImageItem,
     outputNodeId?: number | null,
+    suppressDefaultAppend?: boolean,
     onCompleted?: (urls: string[]) => void,
     onFailed?: () => void,
   ) {
@@ -162,7 +280,9 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
             const urls = extractImageUrlsFromTask(task)
             if (urls.length > 0) {
               onCompleted?.(urls)
-              appendGeneratedImages(urls, source, outputNodeId)
+              if (!suppressDefaultAppend) {
+                appendGeneratedImages(urls, source, outputNodeId)
+              }
               options.message.success('生成完成')
             } else {
               onFailed?.()
@@ -209,6 +329,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
         taskId,
         submitOptions.source,
         submitOptions.outputNodeId,
+        submitOptions.suppressDefaultAppend,
         submitOptions.onCompleted,
         submitOptions.onFailed,
       )
@@ -235,6 +356,9 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     resolvePreferredImageOutputNode,
     appendUrlsToImageNodeOutputs,
     appendGeneratedImages,
+    createPendingGeneratedImages,
+    replacePendingGeneratedImages,
+    removePendingGeneratedImages,
     extractImageUrls: extractImageUrlsFromTask,
     startTaskPolling,
     submitTaskAndPoll,

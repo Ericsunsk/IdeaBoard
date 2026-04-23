@@ -125,12 +125,12 @@
         </div>
       </div>
 
-      <NodeConnectionChips :items="connectionChips" />
-      <div class="node-primary-action-slot">
-        <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
-          {{ uiState?.primaryAction?.label || '应用' }}
-        </NodeActionButton>
-      </div>
+      <NodeExecutionFooter
+        :items="connectionChips"
+        :disabled="generating || uiState?.primaryAction?.disabled"
+        :label="uiState?.primaryAction?.label || '应用'"
+        @generate="emit('generate')"
+      />
     </div>
 
     <NodePorts
@@ -148,11 +148,10 @@ import { MAX_COLOR_NODE_SWATCHES } from '../../types/canvasNodes'
 import type { ColorNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useColorPickerState } from '../../composables/useColorPickerState'
-import NodeActionButton from './NodeActionButton.vue'
-import NodeConnectionChips from './NodeConnectionChips.vue'
 import NodeColorField from './NodeColorField.vue'
 import NodeColorPopover from './NodeColorPopover.vue'
 import NodeColorSwatch from './NodeColorSwatch.vue'
+import NodeExecutionFooter from './NodeExecutionFooter.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodeIconButton from './NodeIconButton.vue'
 import NodePorts from './NodePorts.vue'

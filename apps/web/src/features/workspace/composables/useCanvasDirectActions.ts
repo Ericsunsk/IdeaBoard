@@ -32,7 +32,10 @@ interface SubmitTaskAndPollOptions {
   source?: CanvasImageItem
   successMessage: string
   failureMessage: string
+  suppressDefaultAppend?: boolean
   onSubmitted?: () => void
+  onCompleted?: (urls: string[]) => void
+  onFailed?: () => void
 }
 
 interface UseCanvasDirectActionsOptions {
@@ -51,6 +54,17 @@ interface UseCanvasDirectActionsOptions {
   message: MessageApiLike
   submitTaskAndPoll: (options: SubmitTaskAndPollOptions) => Promise<string | null>
   appendGeneratedImages: (urls: string[], source?: CanvasImageItem) => void
+  createPendingGeneratedImages: (config: {
+    count?: number
+    source?: CanvasImageItem
+    heightRatios?: number[]
+  }) => CanvasImageItem[]
+  replacePendingGeneratedImages: (
+    urls: string[],
+    pendingItems: CanvasImageItem[],
+    source?: CanvasImageItem,
+  ) => void
+  removePendingGeneratedImages: (pendingItems: CanvasImageItem[]) => void
   segmentImage: (payload: { image_url: string; seg_type: SegType }) => Promise<any>
   saveSegmentResult: (payload: { result_url: string; seg_type: SegType; feature: string }) => Promise<any>
   vectorizeImage: (payload: {
@@ -86,6 +100,14 @@ export function buildExportFileName(url: string, index: number, total: number, t
   return safeName
 }
 
+function parseAspectRatio(rawRatio: string): number {
+  const [width, height] = rawRatio.split(':').map(part => Number(part))
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return 1
+  }
+  return height / width
+}
+
 export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
   let exportLoading: MessageLoadingHandle | null = null
 
@@ -93,6 +115,7 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
     const promptText = resolveDirectPromptText(options.userPrompt.value)
     if (!promptText) return
     options.generating.value = true
+    let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
         prompt: promptText,
@@ -104,7 +127,17 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       }),
       successMessage: '任务已提交',
       failureMessage: '提交失败',
+      suppressDefaultAppend: true,
+      onCompleted: (urls) => {
+        options.replacePendingGeneratedImages(urls, pendingItems)
+      },
+      onFailed: () => {
+        options.removePendingGeneratedImages(pendingItems)
+      },
       onSubmitted: () => {
+        pendingItems = options.createPendingGeneratedImages({
+          heightRatios: [parseAspectRatio(options.selectedRatio.value)],
+        })
         options.userPrompt.value = ''
         options.showSettings.value = false
       },
@@ -114,12 +147,17 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
   async function handleRemoveBgGenerate(source: CanvasImageItem) {
     options.generating.value = true
     const startTime = Date.now()
+    const pendingItems = options.createPendingGeneratedImages({
+      source,
+      heightRatios: [source.height_ratio || 1],
+    })
     try {
       const segmentRes: any = await options.segmentImage({
         image_url: source.url,
         seg_type: options.defaultSegType,
       })
       if (segmentRes.code !== 0 || !segmentRes.data?.result_url) {
+        options.removePendingGeneratedImages(pendingItems)
         options.message.error(sanitizeApiErrorMessage(segmentRes.msg, 'Segmentation failed'))
         return
       }
@@ -130,13 +168,15 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
         feature: 'remove-bg',
       })
       if (saveRes.code !== 0 || !saveRes.data?.image_url) {
+        options.removePendingGeneratedImages(pendingItems)
         options.message.error(sanitizeApiErrorMessage(saveRes.msg, 'Save result failed'))
         return
       }
 
-      options.appendGeneratedImages([saveRes.data.image_url], source)
+      options.replacePendingGeneratedImages([saveRes.data.image_url], pendingItems, source)
       options.message.success(`Background removed in ${((Date.now() - startTime) / 1000).toFixed(1)}s`)
     } catch (error: any) {
+      options.removePendingGeneratedImages(pendingItems)
       options.message.error(sanitizeApiErrorMessage(error?.msg || error?.message, 'Failed to remove background'))
     } finally {
       options.generating.value = false
@@ -149,6 +189,7 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       options.userPrompt.value,
       EXECUTION_DIRECT_ACTION_META.sketchToDesign.fallbackPrompt,
     )
+    let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
         prompt: `${EXECUTION_DIRECT_ACTION_META.sketchToDesign.promptPrefix} ${desc}`,
@@ -158,7 +199,18 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       source,
       successMessage: 'Task submitted',
       failureMessage: 'Failed to submit task',
+      suppressDefaultAppend: true,
+      onCompleted: (urls) => {
+        options.replacePendingGeneratedImages(urls, pendingItems, source)
+      },
+      onFailed: () => {
+        options.removePendingGeneratedImages(pendingItems)
+      },
       onSubmitted: () => {
+        pendingItems = options.createPendingGeneratedImages({
+          source,
+          heightRatios: [source.height_ratio || 1],
+        })
         options.userPrompt.value = ''
       },
     })
@@ -171,6 +223,7 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       EXECUTION_DIRECT_ACTION_META.styleInnovate.fallbackPrompt,
     )
     const strength = options.styleInnovateStrength.value
+    let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
         prompt: `${EXECUTION_DIRECT_ACTION_META.styleInnovate.promptPrefix} 改变幅度：${strength}/10，${desc}`,
@@ -183,7 +236,18 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       source,
       successMessage: 'Task submitted',
       failureMessage: 'Failed to submit task',
+      suppressDefaultAppend: true,
+      onCompleted: (urls) => {
+        options.replacePendingGeneratedImages(urls, pendingItems, source)
+      },
+      onFailed: () => {
+        options.removePendingGeneratedImages(pendingItems)
+      },
       onSubmitted: () => {
+        pendingItems = options.createPendingGeneratedImages({
+          source,
+          heightRatios: [source.height_ratio || 1],
+        })
         options.userPrompt.value = ''
       },
     })
@@ -192,6 +256,10 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
   async function handleToVectorGenerate(source: CanvasImageItem) {
     options.generating.value = true
     const startTime = Date.now()
+    const pendingItems = options.createPendingGeneratedImages({
+      source,
+      heightRatios: [source.height_ratio || 1],
+    })
     try {
       const res: any = await options.vectorizeImage({
         image_url: source.url,
@@ -205,13 +273,15 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       })
 
       if (res.code !== 0 || !res.data?.svg_url) {
+        options.removePendingGeneratedImages(pendingItems)
         options.message.error(sanitizeApiErrorMessage(res.msg, 'Vectorize failed'))
         return
       }
 
-      options.appendGeneratedImages([res.data.svg_url], source)
+      options.replacePendingGeneratedImages([res.data.svg_url], pendingItems, source)
       options.message.success(`Vectorized in ${((Date.now() - startTime) / 1000).toFixed(1)}s`)
     } catch (error: any) {
+      options.removePendingGeneratedImages(pendingItems)
       options.message.error(sanitizeApiErrorMessage(error?.msg || error?.message, 'Failed to vectorize image'))
     } finally {
       options.generating.value = false

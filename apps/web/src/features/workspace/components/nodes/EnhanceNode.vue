@@ -139,12 +139,12 @@
         </div>
       </div>
 
-      <NodeConnectionChips :items="connectionChips" />
-      <div class="node-primary-action-slot">
-        <NodeActionButton variant="primary" :disabled="generating || uiState?.primaryAction?.disabled" full @click="emit('generate')">
-          {{ uiState?.primaryAction?.label || '增强' }}
-        </NodeActionButton>
-      </div>
+      <NodeExecutionFooter
+        :items="connectionChips"
+        :disabled="generating || uiState?.primaryAction?.disabled"
+        :label="uiState?.primaryAction?.label || '增强'"
+        @generate="emit('generate')"
+      />
     </div>
 
     <NodePorts
@@ -165,7 +165,7 @@ import {
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
-import NodeConnectionChips from './NodeConnectionChips.vue'
+import NodeExecutionFooter from './NodeExecutionFooter.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodePorts from './NodePorts.vue'
 import { buildNodeIoFromSlots, ENHANCE_NODE_IO_SLOTS } from './nodeIoConfig'

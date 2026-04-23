@@ -72,77 +72,26 @@
     </aside>
 
     <!-- ④ 底部指令栏 -->
-    <footer class="floating-bottom-bar">
-      <!-- 设置面板 -->
-      <transition name="slide-up">
-        <div v-if="showSettings" class="settings-panel">
-          <div class="settings-section">
-            <div class="section-header">
-              <span class="section-title">Aspect Ratio</span>
-              <div class="ratio-group">
-                <button 
-                  v-for="r in ['1:1', '3:4', '4:3', '9:16', '16:9']" 
-                  :key="r"
-                  class="ratio-btn"
-                  :class="{ active: selectedRatio === r }"
-                  @click="selectedRatio = r"
-                >
-                  {{ r }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-section">
-            <div class="section-header">
-              <span class="section-title">Quality</span>
-              <div class="ratio-group">
-                <button 
-                  v-for="quality in patternGenerateQualityOptions" 
-                  :key="quality"
-                  class="ratio-btn"
-                  :class="{ active: selectedQuality === quality }"
-                  @click="selectedQuality = quality"
-                >
-                  {{ quality.toUpperCase() }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </transition>
-
-      <div v-if="selectedPreviewItems.length > 0" class="selected-preview-bar" @mousedown.stop>
-        <div class="selected-preview-header">
-          <span class="selected-preview-count">{{ selectedPreviewItems.length }} selected</span>
-          <button class="clear-selected-btn" type="button" @click="clearSelectedIds">Clear</button>
-        </div>
-        <div class="selected-preview-list">
-          <button
-            v-for="item in visiblePreviewItems"
-            :key="item.id"
-            type="button"
-            class="selected-preview-item"
-            @click="focusSelectedItem(item.id)"
-          >
-            <img :src="item.url" class="selected-preview-image" />
-            <span class="selected-preview-remove" @click.stop="removeSelectedId(item.id)">×</span>
-          </button>
-          <div v-if="previewOverflowCount > 0" class="selected-preview-overflow">+{{ previewOverflowCount }}</div>
-        </div>
-      </div>
-
-      <div class="prompt-container" @mousedown.stop>
-        <button class="add-btn" :class="{ active: showSettings }" @click="showSettings = !showSettings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-        <input v-model="userPrompt" type="text" :placeholder="promptPlaceholder" @keyup.enter="handleGenerate" />
-        <button class="send-btn" :disabled="!hasDirectPrompt || directGenerating" @click="handleGenerate">
-          <svg v-if="!directGenerating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          <n-spin v-else size="small" />
-        </button>
-      </div>
-    </footer>
+    <HomeBottomGenerateBar
+      :show-settings="showSettings"
+      :ratio-options="patternGenerateRatioOptions"
+      :quality-options="patternGenerateQualityOptions"
+      :selected-ratio="selectedRatio"
+      :selected-quality="selectedQuality"
+      :selected-preview-items="selectedPreviewItems"
+      :user-prompt="userPrompt"
+      :prompt-placeholder="promptPlaceholder"
+      :has-direct-prompt="hasDirectPrompt"
+      :direct-generating="directGenerating"
+      @toggle-settings="showSettings = !showSettings"
+      @select-ratio="selectedRatio = $event"
+      @select-quality="selectedQuality = $event"
+      @clear-selected="clearSelectedIds"
+      @focus-selected="focusSelectedItem"
+      @remove-selected="removeSelectedId"
+      @update:user-prompt="userPrompt = $event"
+      @generate="handleGenerate"
+    />
 
     <!-- ⑤ 右下角控件 -->
     <div class="floating-status">
@@ -339,7 +288,7 @@
           v-for="msg in messages" 
           :key="msg.id" 
           class="canvas-item"
-          :class="{ active: selectedIds.includes(msg.id) }"
+          :class="{ active: selectedIds.includes(msg.id), 'is-pending': isCanvasImagePending(msg) }"
           :style="{ 
             left: '50%',
             top: '50%',
@@ -349,16 +298,30 @@
           @mousedown.stop="onItemMouseDown($event, msg)"
           @contextmenu.prevent.stop="onItemContextMenu($event, msg)"
        >
-          <img
-            v-if="msg.type === 'image'"
-            :src="msg.url"
-            class="canvas-img"
-            draggable="false"
-            :ref="(el) => setCanvasImageRef(msg.id, el)"
-            @load="onImageLoad(msg, $event)"
-          />
+          <transition name="canvas-image-content" mode="out-in">
+            <div
+              v-if="isCanvasImagePending(msg)"
+              :key="`pending-${msg.id}`"
+              class="canvas-image-placeholder"
+              :style="{ height: `${getImageDisplayHeight(msg)}px` }"
+            >
+              <div class="canvas-image-placeholder-shimmer"></div>
+              <div class="canvas-image-placeholder-center">
+                <span class="canvas-image-placeholder-spinner" aria-hidden="true"></span>
+              </div>
+            </div>
+            <img
+              v-else-if="msg.type === 'image'"
+              :key="`image-${msg.id}-${msg.url}`"
+              :src="msg.url"
+              class="canvas-img"
+              draggable="false"
+              :ref="(el) => setCanvasImageRef(msg.id, el)"
+              @load="onImageLoad(msg, $event)"
+            />
+          </transition>
           <div
-            v-if="activeImageActionId === msg.id"
+            v-if="activeImageActionId === msg.id && !isCanvasImagePending(msg)"
             class="image-action-menu"
             :class="{ 'strength-mode': showStyleStrengthControl }"
             :style="showStyleStrengthControl ? getStyleStrengthMenuStyle(msg) : undefined"
@@ -447,7 +410,7 @@
           </div>
           
           <!-- 全方位缩放手柄 (仅在单选时显示) -->
-          <template v-if="selectedIds.length === 1 && selectedIds[0] === msg.id">
+          <template v-if="selectedIds.length === 1 && selectedIds[0] === msg.id && !isCanvasImagePending(msg)">
             <div class="resize-edge n" @mousedown.stop="onResizeMouseDown($event, msg, 'n')"></div>
             <div class="resize-edge s" @mousedown.stop="onResizeMouseDown($event, msg, 's')"></div>
             <div class="resize-edge e" @mousedown.stop="onResizeMouseDown($event, msg, 'e')"></div>
@@ -467,7 +430,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import type { ComponentPublicInstance, Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useMessage, NSpin } from 'naive-ui'
+import { useMessage } from 'naive-ui'
 import { segApi, taskApi, uploadApi, upscaleApi, vectorizeApi } from '../../../shared/api/index'
 import { useUserStore } from '../../../app/stores/user'
 import { CANVAS_NODE_MENU_ITEMS, type CanvasNodeCreateActionKey } from '../config/canvasNodeMenu'
@@ -486,6 +449,7 @@ import { useModelNode } from '../composables/useModelNode'
 import { useNodeExecutors } from '../composables/useNodeExecutors'
 import { useViewpointNode } from '../composables/useViewpointNode'
 import HomeCanvasConnectionLayer from '../components/home/HomeCanvasConnectionLayer.vue'
+import HomeBottomGenerateBar from '../components/home/HomeBottomGenerateBar.vue'
 import HomeCanvasHeader from '../components/home/HomeCanvasHeader.vue'
 import HomeCanvasNodesBasic from '../components/home/HomeCanvasNodesBasic.vue'
 import HomeCanvasNodesExecution from '../components/home/HomeCanvasNodesExecution.vue'
@@ -493,8 +457,11 @@ import HomeCanvasNodesStructured from '../components/home/HomeCanvasNodesStructu
 import {
   describeViewpointOption,
   GENERATE_QUALITY_OPTIONS,
+  PATTERN_GENERATE_RATIO_OPTIONS,
   MODEL_BACKGROUND_OPTIONS,
   VIEWPOINT_LIGHTING_LABELS,
+  type GenerateQualityOption,
+  type PatternGenerateRatioOption,
   normalizeViewpointSelectionByCategory,
   VIEWPOINT_OPTIONS_BY_CATEGORY,
 } from '../components/nodes/nodeOptionConfig'
@@ -530,6 +497,7 @@ import {
   clampModelPoseStrength,
   clampModelReferenceStrength,
   isCanvasExecutionOutputNodeType,
+  isCanvasImagePending,
   isColorNodePlaceholderState,
   MAX_COLOR_NODE_SWATCHES,
   normalizeWearTileMode,
@@ -566,6 +534,7 @@ const message = useMessage()
 const userStore = useUserStore()
 const defaultCanvasName = 'Untitled'
 
+const patternGenerateRatioOptions = PATTERN_GENERATE_RATIO_OPTIONS
 const patternGenerateQualityOptions = GENERATE_QUALITY_OPTIONS
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const viewpointLightingLabels = VIEWPOINT_LIGHTING_LABELS
@@ -864,6 +833,9 @@ const {
 const {
   stopTaskPolling: stopDirectTaskPolling,
   submitTaskAndPoll: submitDirectTaskAndPoll,
+  createPendingGeneratedImages,
+  replacePendingGeneratedImages,
+  removePendingGeneratedImages,
 } = useGenerationPipeline({
   generating: directGenerating,
   messages,
@@ -1937,14 +1909,13 @@ const selectedPreviewItems = computed(() => {
   const messageMap = new Map(messages.value.map(item => [item.id, item]))
   return selectedIds.value
     .map(id => messageMap.get(id))
-    .filter((item): item is any => !!item && item.type === 'image' && !!item.url)
+    .filter((item): item is CanvasImageItem => !!item && item.type === 'image' && !!item.url)
+    .map(item => ({ id: item.id, url: item.url }))
 })
-const visiblePreviewItems = computed(() => selectedPreviewItems.value.slice(0, 6))
-const previewOverflowCount = computed(() => Math.max(0, selectedPreviewItems.value.length - visiblePreviewItems.value.length))
 const promptPlaceholder = computed(() => 'Pattern generation prompt')
 const hasDirectPrompt = computed(() => !!userPrompt.value.trim())
-const selectedRatio = ref('3:4')
-const selectedQuality = ref<'1k' | '2k' | '4k'>('1k')
+const selectedRatio = ref<PatternGenerateRatioOption>('3:4')
+const selectedQuality = ref<GenerateQualityOption>('1k')
 
 function getImageNodeConnectionOutput(node: ImageNodeItem | null): { url: string; ratio: number } | null {
   if (!node) return null
@@ -2468,6 +2439,9 @@ const {
   message,
   submitTaskAndPoll: submitDirectTaskAndPoll,
   appendGeneratedImages,
+  createPendingGeneratedImages,
+  replacePendingGeneratedImages,
+  removePendingGeneratedImages,
   segmentImage: segApi.segment,
   saveSegmentResult: segApi.save,
   vectorizeImage: vectorizeApi.vectorize,
@@ -2651,144 +2625,6 @@ onUnmounted(() => {
 .tool-item.active { background: #f1f3f9; color: #9278e6; }
 .toolbar-divider { width: 24px; height: 1px; background: #f1f3f9; margin: 4px auto; }
 
-.floating-bottom-bar { position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); width: 100%; max-width: 600px; z-index: 100; }
-.settings-panel {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(226, 228, 232, 0.8);
-  border-radius: 24px;
-  padding: 20px;
-  margin-bottom: 16px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
-  max-height: 480px;
-  overflow-y: auto;
-}
-.settings-section { margin-bottom: 20px; }
-.settings-section:last-child { margin-bottom: 0; }
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.section-title { font-size: 14px; font-weight: 600; color: #202124; }
-.section-subtitle { font-size: 12px; color: #5f6368; }
-
-.ratio-group { display: flex; gap: 8px; }
-.ratio-btn {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #e2e4e8;
-  background: #fff;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: #5f6368;
-}
-.ratio-btn:hover { border-color: #9278e6; color: #9278e6; }
-.ratio-btn.active { background: #9278e6; color: white; border-color: #9278e6; }
-
-.slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-.slide-up-enter-from, .slide-up-leave-to { opacity: 0; transform: translateY(20px); }
-
-.selected-preview-bar {
-  margin-bottom: 10px;
-  border-radius: 16px;
-  border: 1px solid rgba(226, 228, 232, 0.95);
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(10px);
-  padding: 10px 12px;
-}
-
-.selected-preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.selected-preview-count {
-  font-size: 12px;
-  font-weight: 600;
-  color: #5f6368;
-}
-
-.clear-selected-btn {
-  border: none;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 600;
-  color: #9278e6;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-.selected-preview-list {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.selected-preview-list::-webkit-scrollbar {
-  height: 4px;
-}
-
-.selected-preview-list::-webkit-scrollbar-thumb {
-  background: #d7dbe3;
-  border-radius: 999px;
-}
-
-.selected-preview-item {
-  position: relative;
-  flex: 0 0 38px;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: 2px solid #9278e6;
-  padding: 0;
-  background: #fff;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.selected-preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.selected-preview-remove {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.68);
-  color: #fff;
-  font-size: 11px;
-  line-height: 14px;
-  text-align: center;
-}
-
-.selected-preview-overflow {
-  flex: 0 0 38px;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: 1px dashed #cfd5e3;
-  color: #6f7787;
-  font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f7f8fb;
-}
-
-.prompt-container { background: #fff; height: 56px; border-radius: 28px; padding: 0 8px; display: flex; align-items: center; gap: 12px; border: 1px solid #e2e4e8; }
-.prompt-container input { flex: 1; border: none; outline: none; font-size: 16px; }
-.add-btn, .send-btn { width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.send-btn { background: #f1f3f9; color: #9278e6; }
-
 .floating-status { position: absolute; bottom: 24px; right: 24px; display: flex; gap: 16px; z-index: 100; }
 .zoom-controls { background: #f1f3f9; padding: 4px; border-radius: 12px; display: flex; align-items: center; gap: 8px; }
 .zoom-btn { 
@@ -2874,7 +2710,7 @@ onUnmounted(() => {
 .canvas-item {
   position: absolute;
   background: #fff;
-  padding: 8px;
+  padding: 4px;
   border-radius: 12px;
   border: 1.5px solid #e2e4e8;
   user-select: none;
@@ -2882,6 +2718,9 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 .canvas-item.active { border-color: #9278e6; z-index: 10; }
+.canvas-item.is-pending {
+  border-color: rgba(146, 120, 230, 0.44);
+}
 .canvas-img {
   width: 100%;
   display: block;
@@ -2890,6 +2729,55 @@ onUnmounted(() => {
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
+}
+.canvas-image-placeholder {
+  position: relative;
+  width: 100%;
+  min-height: 72px;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 58%),
+    linear-gradient(135deg, rgba(240, 239, 248, 0.94), rgba(231, 228, 244, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.75);
+}
+.canvas-image-placeholder-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(123, 103, 209, 0.12));
+  animation: canvas-placeholder-shimmer 1.7s ease-in-out infinite;
+}
+.canvas-image-placeholder-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7b67d1;
+}
+.canvas-image-placeholder-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(123, 103, 209, 0.18);
+  border-top-color: #7b67d1;
+  animation: canvas-placeholder-spin 0.8s linear infinite;
+}
+.canvas-image-content-enter-active,
+.canvas-image-content-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.canvas-image-content-enter-from,
+.canvas-image-content-leave-to {
+  opacity: 0;
+  transform: scale(0.985);
+}
+@keyframes canvas-placeholder-shimmer {
+  0%, 100% { opacity: 0.34; }
+  50% { opacity: 0.82; }
+}
+@keyframes canvas-placeholder-spin {
+  100% { transform: rotate(360deg); }
 }
 .image-action-menu {
   position: absolute;

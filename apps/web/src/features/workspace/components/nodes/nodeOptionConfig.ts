@@ -14,6 +14,10 @@ type ViewpointOptionItem = { key: string; label: string }
 export const GENERATE_RATIO_OPTIONS = ['1:1', '3:4', '4:3', '2:3', '3:2'] as const
 export const GENERATE_COUNT_OPTIONS = [1, 2, 4] as const
 export const GENERATE_QUALITY_OPTIONS = ['1k', '2k', '4k'] as const
+export const PATTERN_GENERATE_RATIO_OPTIONS = ['1:1', '3:4', '4:3', '9:16', '16:9'] as const
+
+export type GenerateQualityOption = typeof GENERATE_QUALITY_OPTIONS[number]
+export type PatternGenerateRatioOption = typeof PATTERN_GENERATE_RATIO_OPTIONS[number]
 
 export const ENHANCE_MODE_OPTIONS: OptionItem<EnhanceNodeItem['mode']>[] = [
   { label: 'HD', value: 'hd-upscale' },
