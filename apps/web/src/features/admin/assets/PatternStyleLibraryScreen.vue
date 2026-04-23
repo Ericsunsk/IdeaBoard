@@ -1,43 +1,38 @@
 <template>
   <div class="admin-page pattern-style-library-page">
-    <div class="page-header">
-      <div>
-        <h2 class="page-title">图案风格库</h2>
-        <p class="page-desc">维护图案生成工作流的风格模型，支持排序与上下架，变更会影响前台可选风格。</p>
-      </div>
-      <div class="header-side-note">
-        <span>总数 {{ list.length }}</span>
-      </div>
-    </div>
-
-    <div class="summary-grid">
-      <AdminSummaryCard label="风格总数" :value="list.length" foot="含下架模型" />
-      <AdminSummaryCard label="已上架" :value="enabledCount" foot="用户可见" />
-      <AdminSummaryCard label="Pattern 流程" :value="patternWorkflowCount" foot="pattern-gen 分类" />
-      <AdminSummaryCard label="筛选结果" :value="filteredList.length" foot="当前列表" />
-    </div>
-
-    <div class="toolbar">
-      <span class="toolbar-group-title">筛选</span>
-      <n-select v-model:value="filterCategory" :options="categoryOptions" placeholder="工作流分类" clearable style="width: 180px" />
-      <n-select v-model:value="filterEnabled" :options="statusOptions" placeholder="上下架状态" clearable style="width: 140px" />
-      <n-button @click="loadList">
-        <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></template>
-        刷新
-      </n-button>
-      <n-button type="primary" @click="openAddModal">
-        <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></template>
-        新增风格模型
-      </n-button>
-    </div>
-
-    <div class="table-card">
-      <AdminSectionHeader title="风格模型列表" description="支持编辑、上下架与删除。工作流分类用于区分不同生成链路。" />
-      <n-data-table :columns="columns" :data="filteredList" :loading="loading" :pagination="false" :bordered="false" :row-key="(row: PatternStyle) => row.id" />
-      <div class="pagination-wrapper">
+    <AdminAssetPageLayout
+      title="图案风格库"
+      description="维护图案生成工作流的风格模型，支持排序与上下架，变更会影响前台可选风格。"
+      :total="list.length"
+      table-title="风格模型列表"
+      table-description="支持编辑、上下架与删除。工作流分类用于区分不同生成链路。"
+    >
+      <template #summary>
+        <AdminSummaryCard label="风格总数" :value="list.length" foot="含下架模型" />
+        <AdminSummaryCard label="已上架" :value="enabledCount" foot="用户可见" />
+        <AdminSummaryCard label="Pattern 流程" :value="patternWorkflowCount" foot="pattern-gen 分类" />
+        <AdminSummaryCard label="筛选结果" :value="filteredList.length" foot="当前列表" />
+      </template>
+      <template #toolbar>
+        <span class="toolbar-group-title">筛选</span>
+        <n-select v-model:value="filterCategory" :options="categoryOptions" placeholder="工作流分类" clearable style="width: 180px" />
+        <n-select v-model:value="filterEnabled" :options="statusOptions" placeholder="上下架状态" clearable style="width: 140px" />
+        <n-button @click="loadList">
+          <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></template>
+          刷新
+        </n-button>
+        <n-button type="primary" @click="openAddModal">
+          <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></template>
+          新增风格模型
+        </n-button>
+      </template>
+      <template #table>
+        <n-data-table :columns="columns" :data="filteredList" :loading="loading" :pagination="false" :bordered="false" :row-key="(row: PatternStyle) => row.id" />
+      </template>
+      <template #pagination>
         <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadList" />
-      </div>
-    </div>
+      </template>
+      <template #modals>
 
     <n-modal v-model:show="showModal" preset="card" :title="isEditing ? '编辑风格模型' : '新增风格模型'" :style="{ maxWidth: '520px' }">
       <n-form ref="formRef" :model="formData" :rules="rules" label-placement="top" size="large">
@@ -48,18 +43,18 @@
           <n-select v-model:value="formData.category" :options="categoryFormOptions" placeholder="选择所属工作流" />
         </n-form-item>
         <n-form-item label="风格预览图" path="image_url">
-          <div class="cover-upload-area">
-            <div class="cover-preview square">
-              <img v-if="formData.image_url" :src="formData.image_url" alt="预览" @error="e => (e.target as HTMLImageElement).style.display='none'" />
-              <div v-else class="cover-placeholder">暂无图片</div>
-            </div>
-            <n-upload :action="adminUploadAction" :headers="uploadHeaders" :max="1" :show-file-list="false" :accept="IMAGE_UPLOAD_ACCEPT" @finish="handleUploadFinish" @before-upload="() => { uploading = true; return true }">
-              <n-button :loading="uploading" secondary>
-                <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></template>
-                {{ formData.image_url ? '重新上传' : '上传图片' }}
-              </n-button>
-            </n-upload>
-          </div>
+          <AdminImageUploadField
+            :image-url="formData.image_url"
+            empty-text="暂无图片"
+            alt="风格预览"
+            :accept="IMAGE_UPLOAD_ACCEPT"
+            :loading="uploading"
+            :action="adminUploadAction"
+            :headers="uploadHeaders"
+            preview-variant="square"
+            @finish="handleUploadFinish"
+            @start-upload="uploading = true"
+          />
         </n-form-item>
         <n-grid :cols="2" :x-gap="16">
           <n-gi><n-form-item label="排序权重" path="sort_order"><n-input-number v-model:value="formData.sort_order" :min="0" :max="9999" style="width: 100%" /></n-form-item></n-gi>
@@ -69,16 +64,18 @@
       <template #footer><div class="modal-footer"><n-button @click="showModal = false">取消</n-button><n-button type="primary" :loading="saving" @click="handleSave">保存</n-button></div></template>
     </n-modal>
 
-    <n-modal v-model:show="showDeleteModal" preset="card" title="确认删除" :style="{ maxWidth: '400px' }">
-      <p style="color: #a1a1aa; line-height: 1.8;">确定要删除风格模型「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
-      <template #footer><div class="modal-footer"><n-button @click="showDeleteModal = false">取消</n-button><n-button type="error" :loading="deleting" @click="confirmDelete">删除</n-button></div></template>
-    </n-modal>
+      <n-modal v-model:show="showDeleteModal" preset="card" title="确认删除" :style="{ maxWidth: '400px' }">
+        <p style="color: #a1a1aa; line-height: 1.8;">确定要删除风格模型「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
+        <template #footer><div class="modal-footer"><n-button @click="showDeleteModal = false">取消</n-button><n-button type="error" :loading="deleting" @click="confirmDelete">删除</n-button></div></template>
+      </n-modal>
+      </template>
+    </AdminAssetPageLayout>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
-import { NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem, NInput, NSwitch, NGrid, NGi, NInputNumber, NUpload, useMessage } from 'naive-ui'
+import { NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem, NInput, NSwitch, NGrid, NGi, NInputNumber, useMessage } from 'naive-ui'
 import { patternStyleApi } from '../../../shared/api/index'
 import type { PatternStyle, PatternStyleFormData } from '../../../shared/api/index'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
@@ -92,8 +89,9 @@ import {
   useAdminDeleteModal,
   useAdminListState,
 } from '../shared/assetLibraryShared'
+import AdminAssetPageLayout from '../shared/components/AdminAssetPageLayout.vue'
+import AdminImageUploadField from '../shared/components/AdminImageUploadField.vue'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
-import AdminSectionHeader from '../shared/components/AdminSectionHeader.vue'
 
 const message = useMessage()
 
@@ -189,10 +187,6 @@ onMounted(() => { loadList() })
 
 <style scoped>
 @import '../shared/adminCommon.css';
-.cover-upload-area { display: flex; align-items: center; gap: 16px; }
-.cover-preview.square { width: 80px; height: 80px; border-radius: 8px; overflow: hidden; background: #27272a; border: 1px solid #3f3f46; flex-shrink: 0; }
-.cover-preview img { width: 100%; height: 100%; object-fit: cover; }
-.cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #52525b; }
 
 @media (max-width: 720px) {
   .pattern-style-library-page :deep(.n-select),

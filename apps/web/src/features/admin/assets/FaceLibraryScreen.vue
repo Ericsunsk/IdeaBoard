@@ -1,66 +1,61 @@
 <template>
   <div class="admin-page face-library-page">
-    <div class="page-header">
-      <div>
-        <h2 class="page-title">人脸素材库</h2>
-        <p class="page-desc">维护人脸模板素材与分类配置，支持排序和上下架，变更实时作用于素材选择面板。</p>
-      </div>
-      <div class="header-side-note">
-        <span>总数 {{ faces.length }}</span>
-      </div>
-    </div>
-
-    <div class="summary-grid">
-      <AdminSummaryCard label="人脸总数" :value="faces.length" foot="含下架素材" />
-      <AdminSummaryCard label="已上架" :value="enabledFaceCount" foot="用户可见" />
-      <AdminSummaryCard label="男性分类" :value="maleFaceCount" foot="male 分类" />
-      <AdminSummaryCard label="筛选结果" :value="filteredFaces.length" foot="当前列表" />
-    </div>
-
-    <div class="toolbar">
-      <span class="toolbar-group-title">筛选</span>
-      <n-select
-        v-model:value="filterCategory"
-        :options="categoryOptions"
-        placeholder="分类筛选"
-        clearable
-        style="width: 140px"
-      />
-      <n-select
-        v-model:value="filterEnabled"
-        :options="statusOptions"
-        placeholder="上下架状态"
-        clearable
-        style="width: 140px"
-      />
-      <n-button @click="loadFaces">
-        <template #icon>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        </template>
-        刷新
-      </n-button>
-      <n-button type="primary" @click="openAddModal">
-        <template #icon>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </template>
-        新增人脸
-      </n-button>
-    </div>
-
-    <div class="table-card">
-      <AdminSectionHeader title="人脸列表" description="支持编辑、上下架与删除操作。分类用于工作流人脸维度筛选。" />
-      <n-data-table
-        :columns="columns"
-        :data="filteredFaces"
-        :loading="loading"
-        :pagination="false"
-        :bordered="false"
-        :row-key="(row: FaceTemplate) => row.id"
-      />
-      <div class="pagination-wrapper">
+    <AdminAssetPageLayout
+      title="人脸素材库"
+      description="维护人脸模板素材与分类配置，支持排序和上下架，变更实时作用于素材选择面板。"
+      :total="faces.length"
+      table-title="人脸列表"
+      table-description="支持编辑、上下架与删除操作。分类用于工作流人脸维度筛选。"
+    >
+      <template #summary>
+        <AdminSummaryCard label="人脸总数" :value="faces.length" foot="含下架素材" />
+        <AdminSummaryCard label="已上架" :value="enabledFaceCount" foot="用户可见" />
+        <AdminSummaryCard label="男性分类" :value="maleFaceCount" foot="male 分类" />
+        <AdminSummaryCard label="筛选结果" :value="filteredFaces.length" foot="当前列表" />
+      </template>
+      <template #toolbar>
+        <span class="toolbar-group-title">筛选</span>
+        <n-select
+          v-model:value="filterCategory"
+          :options="categoryOptions"
+          placeholder="分类筛选"
+          clearable
+          style="width: 140px"
+        />
+        <n-select
+          v-model:value="filterEnabled"
+          :options="statusOptions"
+          placeholder="上下架状态"
+          clearable
+          style="width: 140px"
+        />
+        <n-button @click="loadFaces">
+          <template #icon>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </template>
+          刷新
+        </n-button>
+        <n-button type="primary" @click="openAddModal">
+          <template #icon>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </template>
+          新增人脸
+        </n-button>
+      </template>
+      <template #table>
+        <n-data-table
+          :columns="columns"
+          :data="filteredFaces"
+          :loading="loading"
+          :pagination="false"
+          :bordered="false"
+          :row-key="(row: FaceTemplate) => row.id"
+        />
+      </template>
+      <template #pagination>
         <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadFaces" />
-      </div>
-    </div>
+      </template>
+      <template #modals>
 
     <!-- 新增/编辑弹窗 -->
     <n-modal v-model:show="showModal" preset="card" :title="isEditing ? '编辑人脸' : '新增人脸'" :style="{ maxWidth: '520px' }">
@@ -74,28 +69,18 @@
         </n-form-item>
 
         <n-form-item label="人脸图片" path="image_url">
-          <div class="cover-upload-area">
-            <div class="cover-preview">
-              <img v-if="formData.image_url" :src="formData.image_url" alt="人脸预览" @error="e => (e.target as HTMLImageElement).style.display='none'" />
-              <div v-else class="cover-placeholder">暂无图片</div>
-            </div>
-            <n-upload
-              :action="adminUploadAction"
-              :headers="uploadHeaders"
-              :max="1"
-              :show-file-list="false"
-              :accept="IMAGE_UPLOAD_ACCEPT"
-              @finish="handleUploadFinish"
-              @before-upload="() => { uploading = true; return true }"
-            >
-              <n-button :loading="uploading" secondary>
-                <template #icon>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                </template>
-                {{ formData.image_url ? '重新上传' : '上传图片' }}
-              </n-button>
-            </n-upload>
-          </div>
+          <AdminImageUploadField
+            :image-url="formData.image_url"
+            empty-text="暂无图片"
+            alt="人脸预览"
+            :accept="IMAGE_UPLOAD_ACCEPT"
+            :loading="uploading"
+            :action="adminUploadAction"
+            :headers="uploadHeaders"
+            preview-variant="portrait"
+            @finish="handleUploadFinish"
+            @start-upload="uploading = true"
+          />
         </n-form-item>
 
         <n-grid :cols="2" :x-gap="16">
@@ -123,16 +108,18 @@
       </template>
     </n-modal>
 
-    <!-- 删除确认弹窗 -->
-    <n-modal v-model:show="showDeleteModal" preset="card" title="确认删除" :style="{ maxWidth: '400px' }">
-      <p style="color: #a1a1aa; line-height: 1.8;">确定要删除人脸「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
-      <template #footer>
-        <div class="modal-footer">
-          <n-button @click="showDeleteModal = false">取消</n-button>
-          <n-button type="error" :loading="deleting" @click="confirmDelete">删除</n-button>
-        </div>
+      <!-- 删除确认弹窗 -->
+      <n-modal v-model:show="showDeleteModal" preset="card" title="确认删除" :style="{ maxWidth: '400px' }">
+        <p style="color: #a1a1aa; line-height: 1.8;">确定要删除人脸「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
+        <template #footer>
+          <div class="modal-footer">
+            <n-button @click="showDeleteModal = false">取消</n-button>
+            <n-button type="error" :loading="deleting" @click="confirmDelete">删除</n-button>
+          </div>
+        </template>
+      </n-modal>
       </template>
-    </n-modal>
+    </AdminAssetPageLayout>
   </div>
 </template>
 
@@ -140,7 +127,7 @@
 import { ref, computed, onMounted, h } from 'vue'
 import {
   NDataTable, NPagination, NButton, NSelect, NModal, NForm, NFormItem,
-  NInput, NSwitch, NGrid, NGi, NInputNumber, NUpload, useMessage
+  NInput, NSwitch, NGrid, NGi, NInputNumber, useMessage
 } from 'naive-ui'
 import { faceTemplateApi } from '../../../shared/api/index'
 import type { FaceTemplate, FaceTemplateFormData } from '../../../shared/api/index'
@@ -155,8 +142,9 @@ import {
   useAdminDeleteModal,
   useAdminListState,
 } from '../shared/assetLibraryShared'
+import AdminAssetPageLayout from '../shared/components/AdminAssetPageLayout.vue'
+import AdminImageUploadField from '../shared/components/AdminImageUploadField.vue'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
-import AdminSectionHeader from '../shared/components/AdminSectionHeader.vue'
 
 const message = useMessage()
 
@@ -263,11 +251,6 @@ onMounted(() => { loadFaces() })
 
 <style scoped>
 @import '../shared/adminCommon.css';
-
-.cover-upload-area { display: flex; align-items: center; gap: 16px; }
-.cover-preview { width: 80px; height: 106px; border-radius: 8px; overflow: hidden; background: #27272a; border: 1px solid #3f3f46; flex-shrink: 0; }
-.cover-preview img { width: 100%; height: 100%; object-fit: cover; }
-.cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #52525b; }
 
 @media (max-width: 720px) {
   .face-library-page :deep(.n-select),

@@ -87,28 +87,18 @@
         </n-form-item>
 
         <n-form-item label="封面图片" path="cover_image">
-          <div class="cover-upload-area">
-            <div class="cover-preview">
-              <img v-if="formData.cover_image" :src="formData.cover_image" alt="封面预览" @error="e => (e.target as HTMLImageElement).style.display='none'" />
-              <div v-else class="cover-placeholder">暂无封面</div>
-            </div>
-            <n-upload
-              :action="adminUploadAction"
-              :headers="uploadHeaders"
-              :max="1"
-              :show-file-list="false"
-              :accept="IMAGE_UPLOAD_ACCEPT_EXTENDED"
-              @finish="handleUploadFinish"
-              @before-upload="() => { uploading = true; return true }"
-            >
-              <n-button :loading="uploading" secondary>
-                <template #icon>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                </template>
-                {{ formData.cover_image ? '重新上传' : '上传封面' }}
-              </n-button>
-            </n-upload>
-          </div>
+          <AdminImageUploadField
+            :image-url="formData.cover_image"
+            empty-text="暂无封面"
+            alt="封面预览"
+            :accept="IMAGE_UPLOAD_ACCEPT_EXTENDED"
+            :loading="uploading"
+            :action="adminUploadAction"
+            :headers="uploadHeaders"
+            upload-text="上传封面"
+            @finish="handleUploadFinish"
+            @start-upload="uploading = true"
+          />
         </n-form-item>
 
         <n-form-item label="内部关键词（用户不可见）" path="keywords">
@@ -180,7 +170,7 @@
 import { ref, computed, onMounted, h } from 'vue'
 import {
   NDataTable, NPagination, NButton, NInput, NModal, NForm, NFormItem,
-  NSwitch, NGrid, NGi, NInputNumber, NUpload, NSelect, useMessage
+  NSwitch, NGrid, NGi, NInputNumber, NSelect, useMessage
 } from 'naive-ui'
 import { styleCardApi } from '../../../shared/api/index'
 import type { StyleCard, StyleCardFormData } from '../../../shared/api/index'
@@ -195,6 +185,7 @@ import {
   useAdminDeleteModal,
   useAdminListState,
 } from '../shared/assetLibraryShared'
+import AdminImageUploadField from '../shared/components/AdminImageUploadField.vue'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 
 const message = useMessage()
@@ -367,38 +358,6 @@ onMounted(() => {
 
 .style-cards-page {
   gap: 14px;
-}
-
-.cover-upload-area {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.cover-preview {
-  width: 120px;
-  height: 80px;
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(113, 97, 239, 0.1);
-  border: 1px solid rgba(136, 151, 208, 0.34);
-  flex-shrink: 0;
-}
-
-.cover-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #8b95b8;
 }
 
 .modal-footer {
