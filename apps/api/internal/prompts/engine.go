@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	fabricOnBodyFeatureSlug = "fabric-on-body"
-	styleFusionFeatureSlug  = "style-fusion"
-	canvasExtendFeatureSlug = "canvas-extend"
-	hdUpscaleFeatureSlug    = "hd-upscale"
+	fabricOnBodyFeatureSlug = workflow.FeatureSlugFabricOnBody
+	styleFusionFeatureSlug  = workflow.FeatureSlugStyleFusion
+	canvasExtendFeatureSlug = workflow.FeatureSlugCanvasExtend
+	hdUpscaleFeatureSlug    = workflow.FeatureSlugHDUpscale
 )
 
 var viewpointTemplateLabels = map[string]string{

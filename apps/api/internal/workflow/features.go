@@ -8,21 +8,38 @@ import (
 
 var workflowFeatureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
+const (
+	FeatureSlugSketchToDesign  = "sketch-to-design"
+	FeatureSlugStyleInnovate   = "style-innovate"
+	FeatureSlugPartialEdit     = "partial-edit"
+	FeatureSlugBgSwap          = "bg-swap"
+	FeatureSlugFaceSwap        = "face-swap"
+	FeatureSlugStyleFusion     = "style-fusion"
+	FeatureSlugSeriesColor     = "series-color"
+	FeatureSlugDirectedRecolor = "directed-recolor"
+	FeatureSlugFabricOnBody    = "fabric-on-body"
+	FeatureSlugMultiAngle      = "multi-angle"
+	FeatureSlugVirtual3D       = "virtual-3d"
+	FeatureSlugPatternGen      = "pattern-gen"
+	FeatureSlugHDUpscale       = "hd-upscale"
+	FeatureSlugCanvasExtend    = "canvas-extend"
+)
+
 var supportedTaskFeatureSlugs = map[string]struct{}{
-	"sketch-to-design": {},
-	"style-innovate":   {},
-	"partial-edit":     {},
-	"bg-swap":          {},
-	"face-swap":        {},
-	"style-fusion":     {},
-	"series-color":     {},
-	"directed-recolor": {},
-	"fabric-on-body":   {},
-	"multi-angle":      {},
-	"virtual-3d":       {},
-	"pattern-gen":      {},
-	"hd-upscale":       {},
-	"canvas-extend":    {},
+	FeatureSlugSketchToDesign:  {},
+	FeatureSlugStyleInnovate:   {},
+	FeatureSlugPartialEdit:     {},
+	FeatureSlugBgSwap:          {},
+	FeatureSlugFaceSwap:        {},
+	FeatureSlugStyleFusion:     {},
+	FeatureSlugSeriesColor:     {},
+	FeatureSlugDirectedRecolor: {},
+	FeatureSlugFabricOnBody:    {},
+	FeatureSlugMultiAngle:      {},
+	FeatureSlugVirtual3D:       {},
+	FeatureSlugPatternGen:      {},
+	FeatureSlugHDUpscale:       {},
+	FeatureSlugCanvasExtend:    {},
 }
 
 var workflowParamAliases = map[string][]string{

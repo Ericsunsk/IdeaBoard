@@ -271,19 +271,19 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		}
 	}
 
-	if featureSlug == "style-fusion" {
+	if featureSlug == workflow.FeatureSlugStyleFusion {
 		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.BuildStyleFusionHiddenConstraint(req.Params))
 	}
-	if featureSlug == "multi-angle" {
+	if featureSlug == workflow.FeatureSlugMultiAngle {
 		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.BuildMultiAngleHiddenConstraint(req.Params))
 	}
-	if featureSlug == "canvas-extend" {
+	if featureSlug == workflow.FeatureSlugCanvasExtend {
 		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.BuildCanvasExtendHiddenConstraint(req.Params))
 	}
-	if featureSlug == "hd-upscale" && prompts.IsMaskedHDUpscaleRequest(req.Params) {
+	if featureSlug == workflow.FeatureSlugHDUpscale && prompts.IsMaskedHDUpscaleRequest(req.Params) {
 		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.HDUpscaleMaskedConstraint)
 	}
-	if featureSlug == "fabric-on-body" && prompts.IsMaskedFabricOnBodyRequest(req.Params) {
+	if featureSlug == workflow.FeatureSlugFabricOnBody && prompts.IsMaskedFabricOnBodyRequest(req.Params) {
 		fullPrompt = prompts.AppendHiddenConstraint(fullPrompt, prompts.FabricOnBodyMaskedConstraint)
 	}
 
