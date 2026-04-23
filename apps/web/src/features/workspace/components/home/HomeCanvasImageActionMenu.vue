@@ -1,0 +1,224 @@
+<template>
+  <div
+    class="image-action-menu"
+    :class="{ 'strength-mode': showStyleStrengthControl }"
+    :style="showStyleStrengthControl ? styleStrengthMenuStyle : undefined"
+    @mousedown.stop
+    @click.stop
+  >
+    <template v-if="!showStyleStrengthControl">
+      <button
+        type="button"
+        class="image-action-icon-btn"
+        :disabled="directGenerating"
+        title="抠图退底"
+        @click="emit('action-remove-bg')"
+      >
+        <span class="action-logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M12 8v8M8 12h8" />
+          </svg>
+        </span>
+        <span class="action-tooltip">抠图退底</span>
+      </button>
+      <button
+        type="button"
+        class="image-action-icon-btn"
+        :disabled="directGenerating"
+        title="款式创新"
+        @mousedown.stop="emit('style-innovate-mousedown', $event)"
+        @click="emit('style-innovate-click')"
+      >
+        <span class="action-logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
+          </svg>
+        </span>
+        <span class="action-tooltip">款式创新</span>
+      </button>
+      <button
+        type="button"
+        class="image-action-icon-btn"
+        :disabled="directGenerating"
+        title="转矢量图"
+        @click="emit('action-to-vector')"
+      >
+        <span class="action-logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="5" cy="19" r="2" />
+            <circle cx="19" cy="5" r="2" />
+            <path d="M5 17C5 10 10 5 19 5" />
+          </svg>
+        </span>
+        <span class="action-tooltip">转矢量图</span>
+      </button>
+      <button
+        type="button"
+        class="image-action-icon-btn"
+        :disabled="directGenerating"
+        title="线稿成款"
+        @click="emit('action-sketch-to-design')"
+      >
+        <span class="action-logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 2l-6.3 6.3M12 14l-4 4" />
+            <path d="M3 21l3.5-3.5" />
+            <path d="M15 6l4 4" />
+            <path d="M20 7l-2-2" />
+          </svg>
+        </span>
+        <span class="action-tooltip">线稿成款</span>
+      </button>
+    </template>
+    <div
+      v-else
+      class="style-strength-pop"
+      :style="{ height: `${displayHeight}px` }"
+      @mousedown.stop
+    >
+      <div
+        :ref="setStyleStrengthTrackRef"
+        class="style-strength-track"
+        @mousedown.stop.prevent="emit('style-strength-track-mousedown', $event)"
+      >
+        <div class="style-strength-fill" :style="{ height: `${styleInnovateStrengthPct}%` }"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { ComponentPublicInstance } from 'vue'
+
+defineProps<{
+  showStyleStrengthControl: boolean
+  styleStrengthMenuStyle?: string | Record<string, string>
+  directGenerating: boolean
+  displayHeight: number
+  styleInnovateStrengthPct: number
+  setStyleStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
+}>()
+
+const emit = defineEmits<{
+  (event: 'action-remove-bg'): void
+  (event: 'style-innovate-mousedown', value: MouseEvent): void
+  (event: 'style-innovate-click'): void
+  (event: 'action-to-vector'): void
+  (event: 'action-sketch-to-design'): void
+  (event: 'style-strength-track-mousedown', value: MouseEvent): void
+}>()
+</script>
+
+<style scoped>
+.image-action-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 12px);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  z-index: 14;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.image-action-menu.strength-mode {
+  top: 8px;
+  gap: 0;
+}
+
+.image-action-icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(122, 107, 213, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 10px;
+  padding: 0;
+  position: relative;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.18s ease, color 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  color: #6f61c6;
+}
+
+.image-action-icon-btn:hover:not(:disabled) {
+  border-color: #7a6bd5;
+  background: rgba(122, 107, 213, 0.12);
+  color: #7a6bd5;
+  transform: scale(1.06);
+}
+
+.image-action-icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.action-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-logo svg {
+  width: 21.3px;
+  height: 21.3px;
+}
+
+.action-tooltip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  background: rgba(24, 24, 27, 0.94);
+  color: #f4f4f5;
+  border: 1px solid rgba(122, 107, 213, 0.26);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.image-action-icon-btn:hover:not(:disabled) .action-tooltip {
+  opacity: 1;
+  transform: translate(2px, -50%);
+}
+
+.style-strength-pop {
+  position: relative;
+  width: 5px;
+  min-height: 72px;
+}
+
+.style-strength-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  border: none;
+  background: rgba(122, 107, 213, 0.2);
+  cursor: ns-resize;
+}
+
+.style-strength-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #7a6bd5;
+  transition: height 0.06s linear;
+}
+</style>

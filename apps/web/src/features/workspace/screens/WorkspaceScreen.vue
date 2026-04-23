@@ -298,116 +298,28 @@
           @mousedown.stop="onItemMouseDown($event, msg)"
           @contextmenu.prevent.stop="onItemContextMenu($event, msg)"
        >
-          <transition name="canvas-image-content" mode="out-in">
-            <div
-              v-if="isCanvasImagePending(msg)"
-              :key="`pending-${msg.id}`"
-              class="canvas-image-placeholder"
-              :style="{ height: `${getImageDisplayHeight(msg)}px` }"
-            >
-              <div class="canvas-image-placeholder-shimmer"></div>
-              <div class="canvas-image-placeholder-center">
-                <span class="canvas-image-placeholder-spinner" aria-hidden="true"></span>
-              </div>
-            </div>
-            <img
-              v-else-if="msg.type === 'image'"
-              :key="`image-${msg.id}-${msg.url}`"
-              :src="msg.url"
-              class="canvas-img"
-              draggable="false"
-              :ref="(el) => setCanvasImageRef(msg.id, el)"
-              @load="onImageLoad(msg, $event)"
-            />
-          </transition>
-          <div
+          <HomeCanvasImageDisplay
+            :item="msg"
+            :is-pending="isCanvasImagePending(msg)"
+            :display-height="getImageDisplayHeight(msg)"
+            :set-image-ref="(el) => setCanvasImageRef(msg.id, el)"
+            @image-load="onImageLoad(msg, $event)"
+          />
+          <HomeCanvasImageActionMenu
             v-if="activeImageActionId === msg.id && !isCanvasImagePending(msg)"
-            class="image-action-menu"
-            :class="{ 'strength-mode': showStyleStrengthControl }"
-            :style="showStyleStrengthControl ? getStyleStrengthMenuStyle(msg) : undefined"
-            @mousedown.stop
-            @click.stop
-          >
-            <template v-if="!showStyleStrengthControl">
-              <button
-                type="button"
-                class="image-action-icon-btn"
-                :disabled="directGenerating"
-                title="抠图退底"
-                @click="runCanvasAction('remove-bg', msg)"
-              >
-                <span class="action-logo">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <path d="M12 8v8M8 12h8" />
-                  </svg>
-                </span>
-                <span class="action-tooltip">抠图退底</span>
-              </button>
-              <button
-                type="button"
-                class="image-action-icon-btn"
-                :disabled="directGenerating"
-                title="款式创新"
-                @mousedown.stop="onStyleInnovateMouseDown($event)"
-                @click="onStyleInnovateClick(msg)"
-              >
-                <span class="action-logo">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
-                  </svg>
-                </span>
-                <span class="action-tooltip">款式创新</span>
-              </button>
-              <button
-                type="button"
-                class="image-action-icon-btn"
-                :disabled="directGenerating"
-                title="转矢量图"
-                @click="runCanvasAction('to-vector', msg)"
-              >
-                <span class="action-logo">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="5" cy="19" r="2" />
-                    <circle cx="19" cy="5" r="2" />
-                    <path d="M5 17C5 10 10 5 19 5" />
-                  </svg>
-                </span>
-                <span class="action-tooltip">转矢量图</span>
-              </button>
-              <button
-                type="button"
-                class="image-action-icon-btn"
-                :disabled="directGenerating"
-                title="线稿成款"
-                @click="runCanvasAction('sketch-to-design', msg)"
-              >
-                <span class="action-logo">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 2l-6.3 6.3M12 14l-4 4" />
-                    <path d="M3 21l3.5-3.5" />
-                    <path d="M15 6l4 4" />
-                    <path d="M20 7l-2-2" />
-                  </svg>
-                </span>
-                <span class="action-tooltip">线稿成款</span>
-              </button>
-            </template>
-            <div
-              v-else
-              class="style-strength-pop"
-              :style="{ height: `${getImageDisplayHeight(msg)}px` }"
-              @mousedown.stop
-            >
-              <div
-                ref="styleStrengthTrackRef"
-                class="style-strength-track"
-                @mousedown.stop.prevent="onStyleStrengthTrackMouseDown($event)"
-              >
-                <div class="style-strength-fill" :style="{ height: `${styleInnovateStrengthPct}%` }"></div>
-              </div>
-            </div>
-          </div>
+            :show-style-strength-control="showStyleStrengthControl"
+            :style-strength-menu-style="showStyleStrengthControl ? getStyleStrengthMenuStyle(msg) : undefined"
+            :direct-generating="directGenerating"
+            :display-height="getImageDisplayHeight(msg)"
+            :style-innovate-strength-pct="styleInnovateStrengthPct"
+            :set-style-strength-track-ref="setStyleStrengthTrackRef"
+            @action-remove-bg="runCanvasAction('remove-bg', msg)"
+            @style-innovate-mousedown="onStyleInnovateMouseDown"
+            @style-innovate-click="onStyleInnovateClick(msg)"
+            @action-to-vector="runCanvasAction('to-vector', msg)"
+            @action-sketch-to-design="runCanvasAction('sketch-to-design', msg)"
+            @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
+          />
           
           <!-- 全方位缩放手柄 (仅在单选时显示) -->
           <template v-if="selectedIds.length === 1 && selectedIds[0] === msg.id && !isCanvasImagePending(msg)">
@@ -449,6 +361,8 @@ import { useModelNode } from '../composables/useModelNode'
 import { useNodeExecutors } from '../composables/useNodeExecutors'
 import { useViewpointNode } from '../composables/useViewpointNode'
 import HomeCanvasConnectionLayer from '../components/home/HomeCanvasConnectionLayer.vue'
+import HomeCanvasImageActionMenu from '../components/home/HomeCanvasImageActionMenu.vue'
+import HomeCanvasImageDisplay from '../components/home/HomeCanvasImageDisplay.vue'
 import HomeBottomGenerateBar from '../components/home/HomeBottomGenerateBar.vue'
 import HomeCanvasHeader from '../components/home/HomeCanvasHeader.vue'
 import HomeCanvasNodesBasic from '../components/home/HomeCanvasNodesBasic.vue'
@@ -1805,6 +1719,16 @@ function getStyleStrengthTrackEl(): HTMLElement | null {
   return styleStrengthTrackRef.value
 }
 
+function setStyleStrengthTrackRef(el: Element | ComponentPublicInstance | null) {
+  const targetEl =
+    el instanceof HTMLElement
+      ? el
+      : el && '$el' in el && (el as ComponentPublicInstance).$el instanceof HTMLElement
+        ? (el as ComponentPublicInstance).$el
+        : null
+  styleStrengthTrackRef.value = targetEl
+}
+
 function setCanvasImageRef(id: number, el: Element | ComponentPublicInstance | null) {
   const imageEl =
     el instanceof HTMLImageElement
@@ -2720,163 +2644,6 @@ onUnmounted(() => {
 .canvas-item.active { border-color: #9278e6; z-index: 10; }
 .canvas-item.is-pending {
   border-color: rgba(146, 120, 230, 0.44);
-}
-.canvas-img {
-  width: 100%;
-  display: block;
-  border-radius: 8px;
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-user-drag: none;
-}
-.canvas-image-placeholder {
-  position: relative;
-  width: 100%;
-  min-height: 72px;
-  overflow: hidden;
-  border-radius: 8px;
-  background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 58%),
-    linear-gradient(135deg, rgba(240, 239, 248, 0.94), rgba(231, 228, 244, 0.9));
-  border: 1px solid rgba(255, 255, 255, 0.75);
-}
-.canvas-image-placeholder-shimmer {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(123, 103, 209, 0.12));
-  animation: canvas-placeholder-shimmer 1.7s ease-in-out infinite;
-}
-.canvas-image-placeholder-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #7b67d1;
-}
-.canvas-image-placeholder-spinner {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid rgba(123, 103, 209, 0.18);
-  border-top-color: #7b67d1;
-  animation: canvas-placeholder-spin 0.8s linear infinite;
-}
-.canvas-image-content-enter-active,
-.canvas-image-content-leave-active {
-  transition: opacity 0.28s ease, transform 0.28s ease;
-}
-.canvas-image-content-enter-from,
-.canvas-image-content-leave-to {
-  opacity: 0;
-  transform: scale(0.985);
-}
-@keyframes canvas-placeholder-shimmer {
-  0%, 100% { opacity: 0.34; }
-  50% { opacity: 0.82; }
-}
-@keyframes canvas-placeholder-spin {
-  100% { transform: rotate(360deg); }
-}
-.image-action-menu {
-  position: absolute;
-  top: 0;
-  left: calc(100% + 12px);
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-  backdrop-filter: none;
-  box-shadow: none;
-  z-index: 14;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.image-action-menu.strength-mode {
-  top: 8px;
-  gap: 0;
-}
-.image-action-icon-btn {
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(122, 107, 213, 0.28);
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 10px;
-  padding: 0;
-  position: relative;
-  overflow: visible;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.18s ease, color 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-  color: #6f61c6;
-}
-.image-action-icon-btn:hover:not(:disabled) {
-  border-color: #7a6bd5;
-  background: rgba(122, 107, 213, 0.12);
-  color: #7a6bd5;
-  transform: scale(1.06);
-}
-.image-action-icon-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-.action-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.action-logo svg {
-  width: 21.3px;
-  height: 21.3px;
-}
-.action-tooltip {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  background: rgba(24, 24, 27, 0.94);
-  color: #f4f4f5;
-  border: 1px solid rgba(122, 107, 213, 0.26);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.16s ease, transform 0.16s ease;
-}
-.image-action-icon-btn:hover:not(:disabled) .action-tooltip {
-  opacity: 1;
-  transform: translate(2px, -50%);
-}
-.style-strength-pop {
-  position: relative;
-  width: 5px;
-  min-height: 72px;
-}
-.style-strength-track {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 999px;
-  overflow: hidden;
-  border: none;
-  background: rgba(122, 107, 213, 0.2);
-  cursor: ns-resize;
-}
-.style-strength-fill {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #7a6bd5;
-  transition: height 0.06s linear;
 }
 
 /* 8方位缩放手柄 */
