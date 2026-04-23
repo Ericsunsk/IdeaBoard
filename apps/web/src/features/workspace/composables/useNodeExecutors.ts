@@ -4,9 +4,13 @@ import { describeModelAngleSpec, describeWearTileMode } from '../components/node
 import {
   buildExecutionTaskRequest,
   EXECUTION_COLOR_SERIES_META,
+  EXECUTION_ENHANCE_META,
   EXECUTION_DIRECTED_RECOLOR_META,
   EXECUTION_EDIT_MODE_META,
+  EXECUTION_FACE_SWAP_META,
   EXECUTION_FUSION_META,
+  EXECUTION_MODEL_META,
+  EXECUTION_VIEWPOINT_META,
   EXECUTION_WEAR_META,
 } from '../config/executionContract'
 import {
@@ -554,8 +558,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
     await submitExecutionTask('model', node.id, {
       request: buildExecutionTaskRequest({
-        prompt: `[multi-angle] ${promptText}`,
-        feature: 'multi-angle',
+        prompt: `${EXECUTION_MODEL_META.promptPrefix} ${promptText}`,
+        feature: EXECUTION_MODEL_META.feature,
         imageUrls: [sourceUrl],
         params: {
           angle_spec: {
@@ -613,8 +617,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
     await submitExecutionTask('viewpoint', node.id, {
       request: buildExecutionTaskRequest({
-        prompt: `[virtual-3d] ${promptText}`,
-        feature: 'virtual-3d',
+        prompt: `${EXECUTION_VIEWPOINT_META.promptPrefix} ${promptText}`,
+        feature: EXECUTION_VIEWPOINT_META.feature,
         imageUrls: sourceUrls,
         params: {
           viewpoint: node.selectedViewpoint,
@@ -623,7 +627,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       }),
       source: placementSource,
       outputNodeId,
-      successMessage: 'Display submitted',
+      successMessage: `${EXECUTION_VIEWPOINT_META.successLabel} submitted`,
       failureMessage: 'Failed to submit display task',
       onCompleted: urls => cacheNodeOutputs('viewpoint', node.id, urls),
     })
@@ -688,8 +692,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
         await submitExecutionTask('edit', node.id, {
           request: buildExecutionTaskRequest({
-            prompt: '[face-swap] 换脸',
-            feature: 'face-swap',
+            prompt: EXECUTION_FACE_SWAP_META.prompt,
+            feature: EXECUTION_FACE_SWAP_META.feature,
             imageUrls: [resolvedImage.url, faceSourceUrl],
           }),
           source: placementSource,
@@ -828,8 +832,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
           await submitExecutionTask('enhance', node.id, {
             request: buildExecutionTaskRequest({
-              prompt: '[hd-upscale] 局部高清放大，仅增强蒙版区域',
-              feature: 'hd-upscale',
+              prompt: EXECUTION_ENHANCE_META.hdUpscale.prompt,
+              feature: EXECUTION_ENHANCE_META.hdUpscale.feature,
               imageUrls: [connectedImage!.url],
               params: {
                 original_image_url: connectedImage!.url,
@@ -860,7 +864,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           upscale_factor: node.upscaleFactor,
           output_format: node.outputFormat,
           output_quality: node.outputQuality,
-          feature: 'hd-upscale',
+          feature: EXECUTION_ENHANCE_META.hdUpscale.feature,
         })
 
         if (res.code !== 0 || !res.data?.image_url) {
@@ -878,8 +882,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
       await submitExecutionTask('enhance', node.id, {
         request: buildExecutionTaskRequest({
-          prompt: `[canvas-extend] ${promptText || '画布延伸'}`,
-          feature: 'canvas-extend',
+          prompt: `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${promptText || EXECUTION_ENHANCE_META.canvasExtend.fallbackPrompt}`,
+          feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
           imageUrls: [connectedImage!.url],
           params: {
             extend_top: node.extendTop,

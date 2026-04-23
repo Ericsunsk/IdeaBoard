@@ -5,6 +5,7 @@ import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
+  EXECUTION_REMOVE_BG_META,
 } from '../config/executionContract'
 
 export type SegType = 'common' | 'commodity' | 'body'
@@ -165,7 +166,7 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       const saveRes: any = await options.saveSegmentResult({
         result_url: segmentRes.data.result_url,
         seg_type: options.defaultSegType,
-        feature: 'remove-bg',
+        feature: EXECUTION_REMOVE_BG_META.feature,
       })
       if (saveRes.code !== 0 || !saveRes.data?.image_url) {
         options.removePendingGeneratedImages(pendingItems)
