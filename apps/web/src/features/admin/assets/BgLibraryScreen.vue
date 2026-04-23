@@ -107,7 +107,7 @@
 
       <!-- 删除确认弹窗 -->
       <n-modal v-model:show="showDeleteModal" preset="card" title="确认删除" :style="{ maxWidth: '400px' }">
-        <p style="color: #7884ad; line-height: 1.8;">确定要删除背景「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
+        <p class="admin-modal-text">确定要删除背景「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
         <template #footer>
           <div class="modal-footer">
             <n-button @click="showDeleteModal = false">取消</n-button>
@@ -182,7 +182,7 @@ const columns = [
   {
     title: '图片', key: 'image_url', width: 100,
     render(row: BgTemplate) {
-      return h('div', { style: 'width: 70px; height: 50px; border-radius: 10px; overflow: hidden; background: rgba(113, 97, 239, 0.1);' }, [
+      return h('div', { style: 'width: 70px; height: 50px; border-radius: 10px; overflow: hidden; background: var(--admin-preview-bg); border: 1px solid var(--admin-border);' }, [
         h('img', { src: row.image_url, style: 'width: 100%; height: 100%; object-fit: cover;', onError: (e: Event) => { (e.target as HTMLImageElement).style.display = 'none' } })
       ])
     }
@@ -190,22 +190,22 @@ const columns = [
   { title: '名称', key: 'name', ellipsis: { tooltip: true } },
   {
     title: '分类', key: 'category', width: 80,
-    render(row: BgTemplate) { return h('span', { style: 'color: #7c89b2;' }, categoryLabelMap[row.category] || row.category) }
+    render(row: BgTemplate) { return h('span', { style: 'color: var(--admin-text-2);' }, categoryLabelMap[row.category] || row.category) }
   },
   {
     title: '排序', key: 'sort_order', width: 70,
-    render(row: BgTemplate) { return h('span', { style: 'color: #8b95b8;' }, row.sort_order) }
+    render(row: BgTemplate) { return h('span', { style: 'color: var(--admin-text-3);' }, row.sort_order) }
   },
   {
     title: '状态', key: 'is_enabled', width: 80,
-    render(row: BgTemplate) { return h('span', { style: row.is_enabled ? 'color: #1f9d68;' : 'color: #d65478;' }, row.is_enabled ? '已上架' : '已下架') }
+    render(row: BgTemplate) { return h('span', { style: row.is_enabled ? 'color: var(--admin-success);' : 'color: var(--admin-danger);' }, row.is_enabled ? '已上架' : '已下架') }
   },
   {
     title: '操作', key: 'actions', width: 140,
     render(row: BgTemplate) {
       return h('div', { style: 'display: flex; gap: 8px;' }, [
         h(NButton, { size: 'small', secondary: true, onClick: () => openEditModal(row) }, { default: () => '编辑' }),
-        h(NButton, { size: 'small', tertiary: true, style: 'color: #d65478;', onClick: () => openDeleteModal(row) }, { default: () => '删除' }),
+        h(NButton, { size: 'small', tertiary: true, type: 'error', onClick: () => openDeleteModal(row) }, { default: () => '删除' }),
       ])
     }
   },

@@ -28,7 +28,7 @@ withDefaults(defineProps<{
   gap: 6px;
   padding: 18px;
   border-radius: 18px;
-  background: var(--admin-panel);
+  background: var(--admin-card-strong, var(--admin-card));
   border: 1px solid var(--admin-border);
 }
 

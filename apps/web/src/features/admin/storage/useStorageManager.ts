@@ -29,6 +29,10 @@ type VendorSelectOption = {
   vendor: VendorPresetOption
 }
 
+function vendorAccessLabel(vendor: VendorPresetOption) {
+  return vendor.provider === 'kodo' ? '原生接入' : 'S3-compatible'
+}
+
 export function useStorageManager() {
   const message = useMessage()
 
@@ -175,117 +179,20 @@ export function useStorageManager() {
     const parsed = asVendorSelectOption(option)
     if (!parsed) return ''
     const vendor = parsed.vendor
-    return h('div', {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        minWidth: '0',
-        width: '100%',
-      },
-    }, [
-      h('img', {
-        src: vendor.logoSrc,
-        alt: vendor.label,
-        style: {
-          width: '24px',
-          height: '24px',
-          flex: '0 0 24px',
-          objectFit: 'contain',
-          borderRadius: '7px',
-          background: '#ffffff',
-          padding: '3px',
-        },
-      }),
-      h('span', {
-        style: {
-          minWidth: '0',
-          color: '#f4f4f5',
-          fontSize: '14px',
-          fontWeight: 600,
-          lineHeight: 1.2,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        },
-      }, vendor.label),
-      h('span', {
-        style: {
-          marginLeft: 'auto',
-          minHeight: '20px',
-          padding: '0 6px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          borderRadius: '999px',
-          background: vendor.supported ? 'rgba(16, 185, 129, 0.12)' : '#1b1c1f',
-          border: vendor.supported ? '1px solid rgba(16, 185, 129, 0.24)' : '1px solid #232326',
-          color: vendor.supported ? '#d1fae5' : '#6b6b71',
-          fontSize: '10px',
-          lineHeight: 1,
-          whiteSpace: 'nowrap',
-          flex: '0 0 auto',
-        },
-      }, vendor.supported ? '已接入' : '即将支持'),
-    ])
-  }
-
-  function renderVendorOption(payload: { option: unknown }) {
-    const parsed = asVendorSelectOption(payload.option)
-    if (!parsed) return ''
-    const vendor = parsed.vendor
-    const supported = vendor.supported
-    return h('div', {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        minWidth: '0',
-        width: '100%',
-        padding: '2px 0',
-      },
-    }, [
-      h('img', {
-        src: vendor.logoSrc,
-        alt: vendor.label,
-        style: {
-          width: '28px',
-          height: '28px',
-          flex: '0 0 28px',
-          objectFit: 'contain',
-          borderRadius: '8px',
-          background: '#ffffff',
-          padding: '4px',
-        },
-      }),
-      h('span', {
-        style: {
-          minWidth: '0',
-          flex: '1',
-          color: '#f4f4f5',
-          fontSize: '13px',
-          fontWeight: 600,
-          lineHeight: 1.2,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        },
-      }, vendor.label),
-      h('span', {
-        style: {
-          minHeight: '20px',
-          padding: '0 6px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          borderRadius: '999px',
-          background: supported ? 'rgba(16, 185, 129, 0.12)' : '#1b1c1f',
-          border: supported ? '1px solid rgba(16, 185, 129, 0.24)' : '1px solid #232326',
-          color: supported ? '#d1fae5' : '#6b6b71',
-          fontSize: '10px',
-          lineHeight: 1,
-          whiteSpace: 'nowrap',
-          flex: '0 0 auto',
-        },
-      }, supported ? '已接入' : '即将支持'),
+    return h('div', { class: 'vendor-select-entry' }, [
+      h('div', { class: 'vendor-select-entry-brand' }, [
+        h('img', {
+          src: vendor.logoSrc,
+          alt: vendor.label,
+          class: 'vendor-select-entry-logo',
+        }),
+      ]),
+      h('div', { class: 'vendor-select-entry-copy' }, [
+        h('div', { class: 'vendor-select-entry-top' }, [
+          h('span', { class: 'vendor-select-entry-name' }, vendor.label),
+          h('span', { class: 'vendor-select-entry-family' }, vendorAccessLabel(vendor)),
+        ]),
+      ]),
     ])
   }
 
@@ -536,7 +443,6 @@ export function useStorageManager() {
     storageFeatureChips,
     handleVendorSelect,
     renderVendorLabel,
-    renderVendorOption,
     openCreate,
     openEdit,
     closeEditor,

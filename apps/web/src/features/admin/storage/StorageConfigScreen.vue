@@ -88,7 +88,8 @@
             :value="selectedVendorKey"
             :options="vendorSelectOptions"
             :render-label="renderVendorLabel"
-            :render-option="renderVendorOption"
+            :menu-props="{ class: 'admin-storage-vendor-menu' }"
+            :show-checkmark="false"
             placeholder="选择供应商"
             @update:value="handleVendorSelect"
           />
@@ -98,9 +99,6 @@
           <div class="editor-vendor-copy">
             <div class="editor-vendor-row">
               <span class="editor-vendor-name">{{ activeVendorPreset.label }}</span>
-              <span class="editor-provider-status" :class="{ supported: activeVendorPreset.supported }">
-                {{ activeVendorPreset.supported ? '已接入' : '即将支持' }}
-              </span>
             </div>
             <p class="editor-desc-tight">{{ activeVendorPreset.description }}</p>
           </div>
@@ -133,8 +131,8 @@
     <div class="editor-section">
       <div class="section-title">基础配置</div>
       <div v-if="textFields.length > 0" class="field-group">
-        <div class="field-row">
-          <div v-for="field in textFields" :key="field.key" class="field">
+        <div class="field-row config-field-row">
+          <div v-for="field in textFields" :key="field.key" :class="['field', { 'field-region': field.key === 'region_id' }]">
             <div class="field-label-row">
               <label>{{ field.label }}</label>
               <n-button
@@ -247,7 +245,6 @@ const {
   storageFeatureChips,
   handleVendorSelect,
   renderVendorLabel,
-  renderVendorOption,
   openCreate,
   openEdit,
   closeEditor,
@@ -419,24 +416,6 @@ const {
   font-size: 12px;
 }
 
-.editor-provider-status {
-  min-height: 24px;
-  padding: 0 8px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  background: #1b1c1f;
-  color: var(--admin-text-3);
-  font-size: 11px;
-  border: 1px solid var(--admin-border);
-}
-
-.editor-provider-status.supported {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.24);
-  color: #d1fae5;
-}
-
 .editor-vendor-preview {
   border-radius: 16px;
   border: 1px solid var(--admin-border);
@@ -482,67 +461,96 @@ const {
 }
 
 :deep(.n-base-selection) {
-  min-height: 48px;
+  min-height: 60px;
 }
 
-:deep(.vendor-select-option) {
+:deep(.n-base-selection-label) {
+  min-height: 60px;
+}
+
+:deep(.n-base-selection-input) {
+  height: 100%;
+  padding: 0 14px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
 }
 
-:deep(.vendor-select-logo) {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  object-fit: contain;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 4px;
+:deep(.n-base-selection-input__content) {
+  width: 100%;
 }
 
-:deep(.vendor-select-copy) {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  gap: 2px;
+:deep(.n-base-selection-overlay) {
+  padding: 0 14px;
 }
 
-:deep(.vendor-select-row) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-:deep(.vendor-select-name) {
-  color: var(--admin-text-1);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-:deep(.vendor-select-status) {
-  min-height: 20px;
-  padding: 0 6px;
+:deep(.n-base-selection-placeholder) {
+  height: 100%;
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  background: #1b1c1f;
-  color: var(--admin-text-3);
-  font-size: 10px;
-  border: 1px solid var(--admin-border);
 }
 
-:deep(.vendor-select-status.is-supported) {
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.24);
-  color: #d1fae5;
+:deep(.n-base-selection-placeholder__inner) {
+  color: var(--admin-text-3);
 }
 
-:deep(.vendor-select-desc) {
+:deep(.n-base-suffix) {
+  right: 14px;
+}
+
+:deep(.n-base-suffix__arrow) {
   color: var(--admin-text-3);
-  font-size: 11px;
-  line-height: 1.5;
+}
+
+:deep(.vendor-select-entry) {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+:deep(.vendor-select-entry-brand) {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #fcfcfd 0%, #ededf0 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.06);
+}
+
+:deep(.vendor-select-entry-logo) {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+:deep(.vendor-select-entry-copy) {
+  min-width: 0;
+  flex: 1;
+}
+
+:deep(.vendor-select-entry-top) {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+:deep(.vendor-select-entry-name) {
+  display: block;
+  color: var(--admin-text-1);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:deep(.vendor-select-entry-family) {
+  display: none;
 }
 
 .editor-section {
@@ -610,6 +618,21 @@ const {
   justify-content: space-between;
 }
 
+.config-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.config-field-row > .field {
+  min-width: 0;
+}
+
+.config-field-row .field-region :deep(.n-input) {
+  width: 100%;
+  max-width: 220px;
+}
+
 .empty-config-note {
   min-height: 84px;
   border-radius: 14px;
@@ -641,8 +664,9 @@ const {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(59, 130, 246, 0.12);
-  color: #bfdbfe;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-2);
   cursor: pointer;
 }
 
@@ -659,6 +683,14 @@ const {
   .editor-provider-stack {
     grid-template-columns: 1fr;
   }
+
+  .config-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .config-field-row .field-region :deep(.n-input) {
+    max-width: none;
+  }
 }
 
 @media (max-width: 720px) {
@@ -672,4 +704,135 @@ const {
     align-items: stretch;
   }
 }
+</style>
+
+<style>
+.admin-storage-vendor-menu {
+  --n-height: min(360px, calc(100vh - 160px));
+  padding: 10px;
+  border-radius: 20px;
+  border: 1px solid #2c2d31;
+  background: linear-gradient(180deg, #101113 0%, #151618 100%);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.46);
+}
+
+.admin-storage-vendor-menu .n-base-select-option {
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.admin-storage-vendor-menu .n-base-select-option::before {
+  display: none;
+}
+
+.admin-storage-vendor-menu .n-base-select-option + .n-base-select-option {
+  margin-top: 6px;
+}
+
+.admin-storage-vendor-menu .n-base-select-option__content {
+  width: 100%;
+  overflow: visible;
+}
+
+.admin-storage-vendor-menu .n-base-select-option:hover,
+.admin-storage-vendor-menu .n-base-select-option.n-base-select-option--selected {
+  color: inherit;
+}
+
+.admin-storage-vendor-menu .n-base-select-option--disabled {
+  opacity: 1;
+}
+
+.admin-storage-vendor-menu .n-scrollbar-rail--vertical,
+.admin-storage-vendor-menu .n-scrollbar-rail--horizontal {
+  display: none !important;
+}
+
+.admin-storage-vendor-menu .vendor-select-entry {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  border: 1px solid #26282d;
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.admin-storage-vendor-menu .n-base-select-option:not(.n-base-select-option--disabled):hover .vendor-select-entry,
+.admin-storage-vendor-menu .n-base-select-option--pending .vendor-select-entry {
+  border-color: #34363c;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.admin-storage-vendor-menu .n-base-select-option--selected .vendor-select-entry {
+  border-color: rgba(244, 244, 245, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.03) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.admin-storage-vendor-menu .n-base-select-option--disabled .vendor-select-entry {
+  opacity: 0.64;
+}
+
+.admin-storage-vendor-menu .vendor-select-entry-brand {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #fcfcfd 0%, #ededf0 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.06);
+}
+
+.admin-storage-vendor-menu .vendor-select-entry-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.admin-storage-vendor-menu .vendor-select-entry-copy {
+  min-width: 0;
+}
+
+.admin-storage-vendor-menu .vendor-select-entry-top {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.admin-storage-vendor-menu .vendor-select-entry-name {
+  color: #f4f4f5;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-storage-vendor-menu .vendor-select-entry-family {
+  min-height: 18px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #a1a1aa;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  flex: 0 0 auto;
+}
+
 </style>

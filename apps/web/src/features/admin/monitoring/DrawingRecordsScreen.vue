@@ -74,8 +74,8 @@
               </n-tag>
             </n-descriptions-item>
             <n-descriptions-item label="耗时" :span="1">
-              <span v-if="detailTask.completed_at" style="color: #1f9d68; font-weight: 500;">{{ calcDuration(detailTask) }}</span>
-              <span v-else style="color: #8b95b8;">-</span>
+              <span v-if="detailTask.completed_at" class="detail-duration is-completed">{{ calcDuration(detailTask) }}</span>
+              <span v-else class="detail-duration is-empty">-</span>
             </n-descriptions-item>
             <n-descriptions-item label="创建时间" :span="2">{{ detailTask.created_at }}</n-descriptions-item>
           </n-descriptions>
@@ -84,7 +84,7 @@
           <div class="detail-block">{{ detailTask.prompt || '-' }}</div>
 
           <div v-if="detailTask.status === 'failed'">
-            <h4 class="detail-subtitle" style="color: #d65478;">失败原因</h4>
+            <h4 class="detail-subtitle is-danger">失败原因</h4>
             <div class="detail-block error-block">{{ getErrorReason(detailTask) || '-' }}</div>
           </div>
 
@@ -327,11 +327,11 @@ const columns: DataTableColumns<Task> = [
     width: 100,
     align: 'center',
     render: (row) => h('span', { style: { fontSize: '12px', lineHeight: '1.6' } }, [
-      h('span', { style: { color: '#8390b5' } }, 'U:'),
-      h('span', { style: { color: '#2e385f', fontWeight: '500' } }, String(row.user_id)),
-      h('span', { style: { color: '#bbc4e0', margin: '0 4px' } }, '/'),
-      h('span', { style: { color: '#8390b5' } }, 'A:'),
-      h('span', { style: { color: '#2e385f', fontWeight: '500' } }, row.account_id ? String(row.account_id) : '-'),
+      h('span', { style: { color: 'var(--admin-text-3)' } }, 'U:'),
+      h('span', { style: { color: 'var(--admin-text-1)', fontWeight: '500' } }, String(row.user_id)),
+      h('span', { style: { color: 'var(--admin-text-3)', margin: '0 4px' } }, '/'),
+      h('span', { style: { color: 'var(--admin-text-3)' } }, 'A:'),
+      h('span', { style: { color: 'var(--admin-text-1)', fontWeight: '500' } }, row.account_id ? String(row.account_id) : '-'),
     ]),
   },
   {
@@ -357,8 +357,8 @@ const columns: DataTableColumns<Task> = [
     align: 'center',
     render: (row) => {
       const dur = calcDuration(row)
-      if (dur === '-') return h('span', { style: { color: '#8b95b8' } }, '-')
-      return h('span', { style: { fontSize: '12px', color: '#1f9d68', fontWeight: '500' } }, dur)
+      if (dur === '-') return h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
+      return h('span', { style: { fontSize: '12px', color: 'var(--admin-success)', fontWeight: '500' } }, dur)
     },
   },
   {
@@ -366,17 +366,17 @@ const columns: DataTableColumns<Task> = [
     key: 'result',
     width: 120,
     render: (row) => {
-      if (!row.result) return h('span', { style: { color: '#8b95b8' } }, '-')
+      if (!row.result) return h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
       try {
         const r = JSON.parse(row.result)
         if (r.platform) {
           return h('span', { style: { fontSize: '12px' } }, [
             h(NTag, { size: 'tiny', type: 'info', bordered: false }, () => r.platform),
-            r.model_set ? h('span', { style: { marginLeft: '4px', color: '#8b95b8', fontSize: '11px' } }, r.model_set) : null,
+            r.model_set ? h('span', { style: { marginLeft: '4px', color: 'var(--admin-text-3)', fontSize: '11px' } }, r.model_set) : null,
           ])
         }
       } catch {}
-      return h('span', { style: { color: '#8b95b8', fontSize: '12px' } }, '有结果')
+      return h('span', { style: { color: 'var(--admin-text-2)', fontSize: '12px' } }, '有结果')
     },
   },
   {
@@ -387,8 +387,8 @@ const columns: DataTableColumns<Task> = [
     render: (row) => {
       const reason = getErrorReason(row)
       return reason
-        ? h('span', { style: { color: '#d65478', fontSize: '12px' } }, reason)
-        : h('span', { style: { color: '#8b95b8' } }, '-')
+        ? h('span', { style: { color: 'var(--admin-danger)', fontSize: '12px' } }, reason)
+        : h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
     },
   },
   {
@@ -465,17 +465,17 @@ onMounted(() => {
 .detail-subtitle {
   font-size: 14px;
   font-weight: 600;
-  color: #3c476f;
+  color: var(--admin-text-1);
   margin: 0;
 }
 
 .detail-block {
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--admin-surface-muted);
   border-radius: 14px;
-  border: 1px solid rgba(136, 151, 208, 0.3);
+  border: 1px solid var(--admin-border);
   padding: 12px;
   font-size: 13px;
-  color: #55618e;
+  color: var(--admin-text-2);
   word-break: break-all;
   white-space: pre-wrap;
   max-height: 200px;
@@ -493,13 +493,26 @@ onMounted(() => {
   margin-top: -8px;
 }
 
+.detail-duration.is-completed {
+  color: var(--admin-success);
+  font-weight: 500;
+}
+
+.detail-duration.is-empty {
+  color: var(--admin-text-3);
+}
+
+.detail-subtitle.is-danger {
+  color: var(--admin-danger);
+}
+
 .debug-block {
   max-height: 260px;
 }
 
 .error-block {
-  color: #c84e71;
-  border: 1px solid rgba(214, 84, 120, 0.24);
+  color: var(--admin-danger);
+  border: 1px solid rgba(251, 113, 133, 0.28);
 }
 
 .detail-image { display: flex; flex-direction: column; gap: 8px; }

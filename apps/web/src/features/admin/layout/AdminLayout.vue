@@ -1,60 +1,64 @@
 <template>
-  <router-view v-if="isLoginRoute" />
-  <div v-else class="admin-layout-shell">
-    <div class="admin-shell-frame">
-      <aside v-if="!isMobile" class="admin-shell-sider" :class="{ collapsed }">
-        <div class="brand-area" @click="collapsed = !collapsed">
-          <div class="brand-mark">I</div>
-          <div v-if="!collapsed" class="brand-copy">
-            <p class="brand-title">IdeaBoard</p>
-          </div>
-        </div>
-        <n-menu
-          v-model:value="activeKey"
-          :collapsed="collapsed"
-          :collapsed-width="76"
-          :collapsed-icon-size="18"
-          :options="menuOptions"
-          @update:value="handleMenuUpdate"
-        />
-      </aside>
-
-      <main class="admin-shell-main">
-        <header class="admin-shell-header">
-          <div class="header-left">
-            <n-button quaternary circle class="shell-action-btn" @click="handleToggleMenu">
-              <template #icon>
-                <span>{{ isMobile ? '☰' : collapsed ? '☰' : '⟨' }}</span>
-              </template>
-            </n-button>
-            <div class="title-wrap">
-              <h1 class="page-title">{{ currentMeta.title }}</h1>
-            </div>
-          </div>
-          <div class="header-right">
-            <n-dropdown :options="userOptions" @select="handleUserAction">
-              <div class="user-badge">
-                <n-avatar size="small" round :style="{ backgroundColor: '#a3e635', color: '#111111', fontWeight: '700' }">
-                  {{ userStore.user?.username?.charAt(0).toUpperCase() }}
-                </n-avatar>
-                <span>{{ userStore.user?.username }}</span>
+  <n-config-provider :theme-overrides="adminThemeOverrides">
+    <router-view v-if="isLoginRoute" />
+    <template v-else>
+      <div class="admin-layout-shell">
+        <div class="admin-shell-frame">
+          <aside v-if="!isMobile" class="admin-shell-sider" :class="{ collapsed }">
+            <div class="brand-area" @click="collapsed = !collapsed">
+              <div class="brand-mark">I</div>
+              <div v-if="!collapsed" class="brand-copy">
+                <p class="brand-title">IdeaBoard</p>
               </div>
-            </n-dropdown>
-          </div>
-        </header>
+            </div>
+            <n-menu
+              v-model:value="activeKey"
+              :collapsed="collapsed"
+              :collapsed-width="76"
+              :collapsed-icon-size="18"
+              :options="menuOptions"
+              @update:value="handleMenuUpdate"
+            />
+          </aside>
 
-        <section class="admin-shell-content">
-          <router-view />
-        </section>
-      </main>
-    </div>
-  </div>
+          <main class="admin-shell-main">
+            <header class="admin-shell-header">
+              <div class="header-left">
+                <n-button quaternary circle class="shell-action-btn" @click="handleToggleMenu">
+                  <template #icon>
+                    <span>{{ isMobile ? '☰' : collapsed ? '☰' : '⟨' }}</span>
+                  </template>
+                </n-button>
+                <div class="title-wrap">
+                  <h1 class="page-title">{{ currentMeta.title }}</h1>
+                </div>
+              </div>
+              <div class="header-right">
+                <n-dropdown :options="userOptions" @select="handleUserAction">
+                  <div class="user-badge">
+                    <n-avatar size="small" round class="user-avatar">
+                      {{ userStore.user?.username?.charAt(0).toUpperCase() }}
+                    </n-avatar>
+                    <span>{{ userStore.user?.username }}</span>
+                  </div>
+                </n-dropdown>
+              </div>
+            </header>
 
-  <n-drawer v-model:show="mobileMenuOpen" :width="268" placement="left" class="admin-mobile-drawer">
-    <n-drawer-content title="IdeaBoard" closable>
-      <n-menu v-model:value="activeKey" :options="menuOptions" @update:value="handleMobileMenuSelect" />
-    </n-drawer-content>
-  </n-drawer>
+            <section class="admin-shell-content">
+              <router-view />
+            </section>
+          </main>
+        </div>
+      </div>
+
+      <n-drawer v-model:show="mobileMenuOpen" :width="268" placement="left" class="admin-mobile-drawer">
+        <n-drawer-content title="IdeaBoard" closable>
+          <n-menu v-model:value="activeKey" :options="menuOptions" @update:value="handleMobileMenuSelect" />
+        </n-drawer-content>
+      </n-drawer>
+    </template>
+  </n-config-provider>
 </template>
 
 <script setup lang="ts">
@@ -62,6 +66,7 @@ import { ref, computed, h, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../../../app/stores/user'
 import {
+  NConfigProvider,
   NMenu,
   NDropdown,
   NAvatar,
@@ -69,6 +74,7 @@ import {
   NIcon,
   NDrawer,
   NDrawerContent,
+  type GlobalThemeOverrides,
 } from 'naive-ui'
 import {
   PeopleOutline,
@@ -94,6 +100,68 @@ const activeKey = ref('users')
 const mobileMenuOpen = ref(false)
 const isMobile = ref(false)
 const isLoginRoute = computed(() => route.path === '/admin/login')
+
+const adminThemeOverrides: GlobalThemeOverrides = {
+  common: {
+    primaryColor: '#f4f4f5',
+    primaryColorHover: '#ffffff',
+    primaryColorPressed: '#d4d4d8',
+    primaryColorSuppl: '#f4f4f5',
+  },
+  Button: {
+    colorPrimary: '#f4f4f5',
+    colorHoverPrimary: '#ffffff',
+    colorPressedPrimary: '#d4d4d8',
+    colorFocusPrimary: '#ffffff',
+    textColorPrimary: '#111111',
+    textColorHoverPrimary: '#111111',
+    textColorPressedPrimary: '#111111',
+    textColorFocusPrimary: '#111111',
+    borderPrimary: '1px solid #f4f4f5',
+    borderHoverPrimary: '1px solid #ffffff',
+    borderPressedPrimary: '1px solid #d4d4d8',
+    borderFocusPrimary: '1px solid #ffffff',
+    textColorTextPrimary: '#f4f4f5',
+    textColorTextHoverPrimary: '#ffffff',
+    textColorTextPressedPrimary: '#d4d4d8',
+    textColorTextFocusPrimary: '#ffffff',
+    textColorGhostPrimary: '#f4f4f5',
+    textColorGhostHoverPrimary: '#ffffff',
+    textColorGhostPressedPrimary: '#d4d4d8',
+    textColorGhostFocusPrimary: '#ffffff',
+  },
+  Card: {
+    colorModal: '#101113',
+    borderColor: '#232326',
+    titleTextColor: '#f4f4f5',
+    textColor: '#a1a1aa',
+    actionColor: '#151618',
+    borderRadius: '18px',
+    closeIconColor: '#d4d4d8',
+    closeIconColorHover: '#ffffff',
+    closeIconColorPressed: '#f4f4f5',
+    closeColorHover: 'rgba(255, 255, 255, 0.08)',
+    closeColorPressed: 'rgba(255, 255, 255, 0.12)',
+    boxShadow: '0 28px 80px rgba(0, 0, 0, 0.42)',
+  },
+  Dialog: {
+    color: '#101113',
+    titleTextColor: '#f4f4f5',
+    textColor: '#a1a1aa',
+    border: '1px solid #232326',
+    borderRadius: '18px',
+    closeIconColor: '#d4d4d8',
+    closeIconColorHover: '#ffffff',
+    closeIconColorPressed: '#f4f4f5',
+    closeColorHover: 'rgba(255, 255, 255, 0.08)',
+    closeColorPressed: 'rgba(255, 255, 255, 0.12)',
+    iconColor: '#f4f4f5',
+    iconColorInfo: '#f4f4f5',
+    iconColorSuccess: '#4ade80',
+    iconColorWarning: '#fbbf24',
+    iconColorError: '#fb7185',
+  },
+}
 
 watch(
   () => route.path,
@@ -346,6 +414,12 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.user-avatar {
+  background: #f4f4f5;
+  color: #111111;
+  font-weight: 700;
 }
 
 .admin-shell-content {

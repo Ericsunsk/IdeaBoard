@@ -21,6 +21,9 @@
   --admin-text-3: #6b6b71;
   --admin-accent: #f4f4f5;
   --admin-accent-soft: rgba(255, 255, 255, 0.05);
+  --admin-surface-muted: #151618;
+  --admin-preview-bg: #1a1b1e;
+  --admin-divider: rgba(255, 255, 255, 0.06);
   --admin-success: #4ade80;
   --admin-warning: #fbbf24;
   --admin-danger: #fb7185;
@@ -72,7 +75,7 @@
   border-radius: 999px;
   padding: 8px 14px;
   border: 1px solid var(--admin-border);
-  background: #151618;
+  background: var(--admin-surface-muted);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -235,7 +238,7 @@ h3 {
   gap: 8px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: #151618;
+  background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   font-size: 12px;
   color: #d4d4d8;
@@ -252,6 +255,118 @@ h3 {
   color: #f4f4f5;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.admin-helper-text {
+  color: var(--admin-text-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.admin-modal-text {
+  color: var(--admin-text-2);
+  line-height: 1.8;
+}
+
+.admin-preview-surface {
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--admin-preview-bg);
+  border: 1px solid var(--admin-border);
+}
+
+.admin-inline-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-text-muted {
+  color: var(--admin-text-3);
+}
+
+.admin-text-main {
+  color: var(--admin-text-1);
+}
+
+.admin-text-success {
+  color: var(--admin-success);
+}
+
+.admin-text-warning {
+  color: var(--admin-warning);
+}
+
+.admin-text-danger {
+  color: var(--admin-danger);
+}
+
+:deep(.n-modal .n-card) {
+  --n-color: #101113;
+  --n-color-modal: #101113;
+  --n-border-color: #232326;
+  --n-title-text-color: #f4f4f5;
+  --n-text-color: #a1a1aa;
+  --n-action-color: #151618;
+  --n-close-icon-color: #d4d4d8;
+  --n-close-icon-color-hover: #ffffff;
+  --n-close-icon-color-pressed: #f4f4f5;
+  --n-close-color-hover: rgba(255, 255, 255, 0.08);
+  --n-close-color-pressed: rgba(255, 255, 255, 0.12);
+  --n-border-radius: 18px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+}
+
+:deep(.n-modal .n-card > .n-card-header) {
+  padding: 20px 20px 14px;
+}
+
+:deep(.n-modal .n-card > .n-card-header .n-card-header__main) {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+:deep(.n-modal .n-card > .n-card__content) {
+  padding: 0 20px 20px;
+}
+
+:deep(.n-modal .n-card > .n-card__action),
+:deep(.n-modal .n-card > .n-card__footer) {
+  padding: 14px 20px;
+  background: var(--admin-surface-muted);
+  border-top: 1px solid var(--admin-divider);
+}
+
+:deep(.n-modal .n-card > .n-card__action .n-space),
+:deep(.n-modal .n-card > .n-card__footer .n-space) {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+:deep(.n-modal .n-card .n-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+:deep(.n-modal .n-card .n-button),
+:deep(.n-dialog .n-button) {
+  min-width: 88px;
+}
+
+:deep(.n-dialog) {
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+}
+
+:deep(.n-dialog__title) {
+  font-size: 18px;
+  letter-spacing: 0.01em;
+}
+
+:deep(.n-dialog__content) {
+  color: var(--admin-text-2);
+}
+
+:deep(.n-dialog__action) {
+  padding-top: 14px;
 }
 
 .config-card {
@@ -354,9 +469,9 @@ h3 {
 }
 
 .status-chip.is-info {
-  color: #c4b5fd;
-  border-color: rgba(129, 140, 248, 0.24);
-  background: rgba(129, 140, 248, 0.12);
+  color: var(--admin-text-2);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .empty-state {
@@ -433,6 +548,65 @@ h3 {
   --n-text-color: #111111;
 }
 
+:deep(.n-button--secondary-type:not(.n-button--warning-type):not(.n-button--error-type)) {
+  --n-color: rgba(255, 255, 255, 0.04);
+  --n-color-hover: rgba(255, 255, 255, 0.08);
+  --n-color-pressed: rgba(255, 255, 255, 0.12);
+  --n-color-focus: rgba(255, 255, 255, 0.08);
+  --n-color-disabled: rgba(255, 255, 255, 0.03);
+  --n-border: 1px solid #2b2c2f;
+  --n-border-hover: 1px solid #3a3b40;
+  --n-border-pressed: 1px solid #4a4b50;
+  --n-border-focus: 1px solid #3a3b40;
+  --n-border-disabled: 1px solid #232326;
+  --n-ripple-color: rgba(255, 255, 255, 0.12);
+  --n-text-color: #f4f4f5;
+  --n-text-color-hover: #ffffff;
+  --n-text-color-pressed: #f4f4f5;
+  --n-text-color-focus: #ffffff;
+  --n-text-color-disabled: #6b6b71;
+}
+
+/* Admin buttons should stay grayscale even when Naive UI inherits global primary purple tokens. */
+:deep(.n-button--tertiary-type:not(.n-button--warning-type):not(.n-button--error-type)),
+:deep(.n-button--quaternary-type:not(.n-button--warning-type):not(.n-button--error-type)) {
+  --n-color: rgba(255, 255, 255, 0.02);
+  --n-color-hover: rgba(255, 255, 255, 0.06);
+  --n-color-pressed: rgba(255, 255, 255, 0.1);
+  --n-color-focus: rgba(255, 255, 255, 0.06);
+  --n-color-disabled: transparent;
+  --n-border: 1px solid transparent;
+  --n-border-hover: 1px solid transparent;
+  --n-border-pressed: 1px solid transparent;
+  --n-border-focus: 1px solid transparent;
+  --n-border-disabled: 1px solid transparent;
+  --n-ripple-color: transparent;
+  --n-text-color: #d4d4d8;
+  --n-text-color-hover: #f4f4f5;
+  --n-text-color-pressed: #ffffff;
+  --n-text-color-focus: #f4f4f5;
+  --n-text-color-disabled: #6b6b71;
+}
+
+:deep(.n-button--text-type:not(.n-button--warning-type):not(.n-button--error-type)) {
+  --n-color: transparent;
+  --n-color-hover: transparent;
+  --n-color-pressed: transparent;
+  --n-color-focus: transparent;
+  --n-color-disabled: transparent;
+  --n-border: none;
+  --n-border-hover: none;
+  --n-border-pressed: none;
+  --n-border-focus: none;
+  --n-border-disabled: none;
+  --n-ripple-color: transparent;
+  --n-text-color: #d4d4d8;
+  --n-text-color-hover: #f4f4f5;
+  --n-text-color-pressed: #ffffff;
+  --n-text-color-focus: #f4f4f5;
+  --n-text-color-disabled: #6b6b71;
+}
+
 :deep(.n-button--warning-type) {
   --n-color: #f59e0b;
   --n-color-hover: #fbbf24;
@@ -454,6 +628,12 @@ h3 {
 
 :deep(.n-tag) {
   --n-border-radius: 999px;
+}
+
+:deep(.n-tag--info-type) {
+  --n-color: rgba(255, 255, 255, 0.05);
+  --n-border: 1px solid #2b2c2f;
+  --n-text-color: #d4d4d8;
 }
 
 :deep(.n-pagination .n-pagination-item),

@@ -35,7 +35,7 @@ const chipClasses = computed(() => ({
   min-height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  background: #17181a;
+  background: var(--admin-surface-muted, #151618);
   border: 1px solid var(--admin-border);
   color: var(--admin-text-2);
   font-size: 11px;
@@ -46,20 +46,20 @@ const chipClasses = computed(() => ({
 }
 
 .admin-chip.is-current {
-  color: #dbeafe;
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.24);
+  color: var(--admin-text-1);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .admin-chip.is-enabled {
-  color: #d1fae5;
-  background: rgba(16, 185, 129, 0.12);
-  border-color: rgba(16, 185, 129, 0.24);
+  color: var(--admin-success);
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.24);
 }
 
 .admin-chip.is-empty {
-  color: #fef3c7;
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.24);
+  color: var(--admin-warning);
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.24);
 }
 </style>

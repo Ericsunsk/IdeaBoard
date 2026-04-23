@@ -227,18 +227,18 @@ const columns: DataTableColumns<ApiAccount> = [
   { title: 'ID', key: 'id', width: 60 },
   {
     title: '渠道商', key: 'channel_id', width: 140,
-    render: (row) => h(NTag, { type: 'info', size: 'small', bordered: false },
+    render: (row) => h(NTag, { size: 'small', bordered: false },
       () => getChannelName((row as any).channel_id))
   },
   {
     title: '模型', key: 'model_set', width: 130,
-    render: (row) => h(NTag, { size: 'small', type: 'success', bordered: false },
+    render: (row) => h(NTag, { size: 'small', bordered: false },
       () => (row as any).model_set || '-')
   },
   { title: '最大并发', key: 'max_concurrent', width: 90, align: 'center' },
   {
     title: '当前并发', key: 'current_concurrent', width: 90, align: 'center',
-    render: (row) => h('span', { style: { color: (row.current_concurrent || 0) >= row.max_concurrent ? '#f59e0b' : '#22c55e' } },
+    render: (row) => h('span', { style: { color: (row.current_concurrent || 0) >= row.max_concurrent ? 'var(--admin-warning)' : 'var(--admin-success)' } },
       `${row.current_concurrent || 0}/${row.max_concurrent}`)
   },
   { title: '超时(s)', key: 'timeout', width: 80, align: 'center' },
@@ -466,16 +466,16 @@ onMounted(() => {
   margin-top: 12px;
 }
 .channel-url-hint {
-  background: rgba(113, 97, 239, 0.08);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 14px;
-  border: 1px solid rgba(113, 97, 239, 0.2);
+  border: 1px solid #2b2c2f;
   padding: 9px 12px;
   margin-bottom: 12px;
   font-size: 12px;
-  color: #64709a;
+  color: var(--admin-text-2);
 }
 .channel-url-hint code {
-  color: #4f58cc;
+  color: var(--admin-text-1);
   font-family: monospace;
 }
 

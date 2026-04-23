@@ -280,7 +280,7 @@ onMounted(loadConfig)
   min-height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  background: #17181a;
+  background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   color: var(--admin-text-2);
   font-size: 11px;
@@ -293,7 +293,7 @@ onMounted(loadConfig)
 }
 
 .editor-section {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--admin-divider);
   padding-top: 16px;
   margin-top: 16px;
 }
@@ -310,7 +310,7 @@ onMounted(loadConfig)
   padding: 0 12px;
   border-radius: 12px;
   border: 1px solid var(--admin-border);
-  background: #151618;
+  background: var(--admin-surface-muted);
   display: flex;
   align-items: center;
   justify-content: space-between;

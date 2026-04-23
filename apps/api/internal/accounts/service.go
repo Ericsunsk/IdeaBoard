@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"api/internal/assets"
@@ -24,6 +25,11 @@ type AccountService struct {
 	taskRuntime      *TaskRuntimeService
 	cardService      *assets.StyleCardService
 	systemConfigRepo *settings.SystemConfigRepository
+	previewResolver  previewURLResolver
+}
+
+type previewURLResolver interface {
+	PreviewURLTransformer() func(string) string
 }
 
 const defaultAccountMaxConcurrent = 3
@@ -35,6 +41,7 @@ func NewAccountService(
 	redisMgr *redis.RedisManager,
 	cardService *assets.StyleCardService,
 	systemConfigRepo *settings.SystemConfigRepository,
+	previewResolver previewURLResolver,
 ) *AccountService {
 	return &AccountService{
 		accountRepo:      accountRepo,
@@ -43,6 +50,7 @@ func NewAccountService(
 		taskRuntime:      NewTaskRuntimeService(accountRepo, taskRepo, redisMgr),
 		cardService:      cardService,
 		systemConfigRepo: systemConfigRepo,
+		previewResolver:  previewResolver,
 	}
 }
 
@@ -334,11 +342,21 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 }
 
 func (s *AccountService) GetTask(taskID string) (*tasks.Task, error) {
-	return s.taskRepo.GetByTaskID(taskID)
+	task, err := s.taskRepo.GetByTaskID(taskID)
+	if err != nil {
+		return nil, err
+	}
+	s.applyPreviewForTasks([]*tasks.Task{task})
+	return task, nil
 }
 
 func (s *AccountService) GetUserTask(taskID string, userID uint64) (*tasks.Task, error) {
-	return s.taskRepo.GetByTaskIDAndUserID(taskID, userID)
+	task, err := s.taskRepo.GetByTaskIDAndUserID(taskID, userID)
+	if err != nil {
+		return nil, err
+	}
+	s.applyPreviewForTasks([]*tasks.Task{task})
+	return task, nil
 }
 
 func (s *AccountService) ListTasks(req *tasks.TaskListRequest) ([]*tasks.Task, int64, error) {
@@ -348,7 +366,12 @@ func (s *AccountService) ListTasks(req *tasks.TaskListRequest) ([]*tasks.Task, i
 	if req.PageSize < 1 || req.PageSize > 100 {
 		req.PageSize = 20
 	}
-	return s.taskRepo.List(req.AccountID, req.Status, req.Page, req.PageSize)
+	items, total, err := s.taskRepo.List(req.AccountID, req.Status, req.Page, req.PageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	s.applyPreviewForTasks(items)
+	return items, total, nil
 }
 
 func (s *AccountService) DeleteUserTask(taskID string, userID uint64) error {
@@ -368,7 +391,12 @@ func (s *AccountService) GetUserTasks(userID uint64, page, pageSize int) ([]*tas
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
-	return s.taskRepo.GetByUserID(userID, page, pageSize)
+	items, total, err := s.taskRepo.GetByUserID(userID, page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	s.applyPreviewForTasks(items)
+	return items, total, nil
 }
 
 // ============ 监控 ============
@@ -451,4 +479,62 @@ func applyTaskSystemPrompt(
 ) string {
 	// 管理员后台配置是系统提示词唯一来源；这里不再追加代码层隐藏约束。
 	return prompts.ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug, params, loadPrompt)
+}
+
+func (s *AccountService) applyPreviewForTasks(items []*tasks.Task) {
+	if len(items) == 0 || s.previewResolver == nil {
+		return
+	}
+	transform := s.previewResolver.PreviewURLTransformer()
+	if transform == nil {
+		return
+	}
+	for _, item := range items {
+		s.applyPreviewForTask(item, transform)
+	}
+}
+
+func (s *AccountService) applyPreviewForTask(task *tasks.Task, transform func(string) string) {
+	if task == nil || strings.TrimSpace(task.Result) == "" {
+		return
+	}
+	if !strings.Contains(task.Result, "image_url") && !strings.Contains(task.Result, "image_urls") {
+		return
+	}
+
+	var resultMap map[string]interface{}
+	if err := json.Unmarshal([]byte(task.Result), &resultMap); err != nil {
+		return
+	}
+
+	changed := false
+	if raw, ok := resultMap["image_url"].(string); ok {
+		next := transform(strings.TrimSpace(raw))
+		if next != raw {
+			resultMap["image_url"] = next
+			changed = true
+		}
+	}
+
+	if rawList, ok := resultMap["image_urls"].([]interface{}); ok {
+		for i, item := range rawList {
+			raw, ok := item.(string)
+			if !ok {
+				continue
+			}
+			next := transform(strings.TrimSpace(raw))
+			if next != raw {
+				rawList[i] = next
+				changed = true
+			}
+		}
+		resultMap["image_urls"] = rawList
+	}
+
+	if !changed {
+		return
+	}
+	if encoded, err := json.Marshal(resultMap); err == nil {
+		task.Result = string(encoded)
+	}
 }

@@ -83,7 +83,7 @@
             :percentage="calculateAccountLoadRate(load)"
             :height="12"
             :border-radius="6"
-            :color="isAccountSaturated(load) ? ERROR_TEXT_COLOR : '#6366f1'"
+            :color="isAccountSaturated(load) ? ERROR_TEXT_COLOR : 'var(--admin-text-1)'"
           />
           <div class="load-info">
             <span>当前: {{ load.current_concurrent }}</span>
@@ -299,8 +299,8 @@ onUnmounted(() => {
 }
 
 .queue-card {
-  background: #141416;
-  border: 1px solid #232326;
+  background: var(--admin-card-strong);
+  border: 1px solid var(--admin-border);
   border-radius: 14px;
   padding: 12px;
   transition: border-color 0.18s ease, background 0.18s ease;
@@ -331,13 +331,13 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #b3b3ba;
+  color: var(--admin-text-2);
 }
 
 .queue-title {
   font-size: 13px;
   font-weight: 500;
-  color: #f4f4f5;
+  color: var(--admin-text-1);
 }
 
 .queue-info {
@@ -345,7 +345,7 @@ onUnmounted(() => {
   justify-content: space-between;
   margin-top: 8px;
   font-size: 11px;
-  color: #a1a1aa;
+  color: var(--admin-text-2);
 }
 
 .load-grid {
@@ -355,8 +355,8 @@ onUnmounted(() => {
 }
 
 .load-card {
-  background: #141416;
-  border: 1px solid #232326;
+  background: var(--admin-card-strong);
+  border: 1px solid var(--admin-border);
   border-radius: 14px;
   padding: 12px;
   transition: border-color 0.18s ease, background 0.18s ease;
@@ -376,7 +376,7 @@ onUnmounted(() => {
 .load-title {
   font-size: 13px;
   font-weight: 500;
-  color: #f4f4f5;
+  color: var(--admin-text-1);
 }
 
 .load-info {
@@ -384,7 +384,7 @@ onUnmounted(() => {
   justify-content: space-between;
   margin-top: 8px;
   font-size: 11px;
-  color: #a1a1aa;
+  color: var(--admin-text-2);
 }
 
 @media (max-width: 920px) {

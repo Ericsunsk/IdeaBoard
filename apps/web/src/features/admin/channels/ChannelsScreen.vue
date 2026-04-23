@@ -51,7 +51,7 @@
         </n-form-item>
         <n-form-item label="可用模型" path="models">
           <n-dynamic-tags v-model:value="modelTags" />
-          <div style="font-size: 12px; color: #71717a; margin-top: 4px">输入模型名后按回车添加，如 dall-e-3、gpt-image-1</div>
+          <div class="admin-helper-text" style="margin-top: 4px">输入模型名后按回车添加，如 dall-e-3、gpt-image-1</div>
         </n-form-item>
       </n-form>
       <template #footer>
@@ -116,7 +116,7 @@ const columns: DataTableColumns<Channel> = [
   { title: 'ID', key: 'id', width: 70 },
   {
     title: '渠道类型', key: 'channel_type', width: 120,
-    render: (row) => h(NTag, { type: 'warning', size: 'small', bordered: false }, () => getTypeLabel(row.type))
+    render: (row) => h(NTag, { size: 'small', bordered: false }, () => getTypeLabel(row.type))
   },
   { title: '渠道商名称', key: 'name', width: 200 },
   {
@@ -124,8 +124,8 @@ const columns: DataTableColumns<Channel> = [
     render: (row) => {
       const models = splitCommaValues(row.models)
       return models.length
-        ? h(NSpace, { size: 'small', wrap: true }, () => models.map(m => h(NTag, { size: 'small', type: 'info', bordered: false }, () => m)))
-        : h('span', { style: { color: '#71717a' } }, '未设置')
+        ? h(NSpace, { size: 'small', wrap: true }, () => models.map(m => h(NTag, { size: 'small', bordered: false }, () => m)))
+        : h('span', { style: { color: 'var(--admin-text-3)' } }, '未设置')
     }
   },
   {

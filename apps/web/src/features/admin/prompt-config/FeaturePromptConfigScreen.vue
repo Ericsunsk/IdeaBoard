@@ -72,7 +72,6 @@
             @click="insertVar(item.slug, v.key)"
           >
             <span class="var-btn-key">{{ v.key }}</span>
-            <span class="var-btn-desc">{{ v.desc }}</span>
           </button>
         </div>
 
@@ -335,7 +334,7 @@ onMounted(loadPrompts)
   flex-direction: column;
   gap: 10px;
   padding: 14px 0 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--admin-divider);
 }
 
 .feature-block:first-child {
@@ -397,16 +396,14 @@ onMounted(loadPrompts)
 }
 
 .var-btn {
-  --var-accent: #5eead4;
   --var-bg: #115e59;
   --var-bg-hover: #0f766e;
   --var-key: #ccfbf1;
-  --var-desc-color: #99f6e4;
   appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
+  gap: 0;
+  padding: 8px 12px;
   border-radius: 10px;
   border: 0;
   background: var(--var-bg);
@@ -416,35 +413,27 @@ onMounted(loadPrompts)
 }
 
 .var-btn.is-prompt {
-  --var-accent: #5eead4;
   --var-bg: #115e59;
   --var-bg-hover: #0f766e;
   --var-key: #ccfbf1;
-  --var-desc-color: #99f6e4;
 }
 
 .var-btn.is-control {
-  --var-accent: #fbbf24;
   --var-bg: #92400e;
   --var-bg-hover: #b45309;
   --var-key: #fef3c7;
-  --var-desc-color: #fde68a;
 }
 
 .var-btn.is-asset {
-  --var-accent: #60a5fa;
   --var-bg: #1d4ed8;
   --var-bg-hover: #2563eb;
   --var-key: #dbeafe;
-  --var-desc-color: #bfdbfe;
 }
 
 .var-btn.is-context {
-  --var-accent: #a78bfa;
   --var-bg: #6d28d9;
   --var-bg-hover: #7c3aed;
   --var-key: #ede9fe;
-  --var-desc-color: #ddd6fe;
 }
 
 .var-btn:hover {
@@ -461,11 +450,6 @@ onMounted(loadPrompts)
   font-size: 11px;
   font-weight: 600;
   font-family: monospace;
-}
-
-.var-btn-desc {
-  color: var(--var-desc-color);
-  font-size: 10px;
 }
 
 @media (max-width: 720px) {

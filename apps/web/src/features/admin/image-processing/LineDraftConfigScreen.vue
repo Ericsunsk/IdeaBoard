@@ -82,7 +82,7 @@
             :rows="3"
           />
           <template #feedback>
-            <span style="color: #71717a; font-size: 12px;">用户选择此模式后，系统将此提示词与上传图片一起发送给 API</span>
+            <span class="admin-helper-text">用户选择此模式后，系统将此提示词与上传图片一起发送给 API</span>
           </template>
         </n-form-item>
 
@@ -113,7 +113,7 @@
 
     <!-- 删除确认 -->
     <n-modal v-model:show="showDeleteModal" preset="card" title="确认删除" :style="{ maxWidth: '400px' }">
-      <p style="color: #a1a1aa; line-height: 1.8;">确定要删除「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
+      <p class="admin-modal-text">确定要删除「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
       <template #footer>
         <div class="modal-footer">
           <n-button @click="showDeleteModal = false">取消</n-button>
@@ -164,7 +164,7 @@ const columns = [
     width: 100,
     render(row: any) {
       return h('div', {
-        style: 'width: 70px; height: 50px; border-radius: 6px; overflow: hidden; background: #27272a;'
+        style: 'width: 70px; height: 50px; border-radius: 6px; overflow: hidden; background: var(--admin-preview-bg); border: 1px solid var(--admin-border);'
       }, [
         row.cover_image ? h('img', {
           src: row.cover_image,
@@ -178,22 +178,22 @@ const columns = [
   { title: '提示词', key: 'prompt', ellipsis: { tooltip: true } },
   {
     title: '排序', key: 'sort_order', width: 70,
-    render(row: any) { return h('span', { style: 'color: #71717a;' }, row.sort_order) }
+    render(row: any) { return h('span', { style: 'color: var(--admin-text-3);' }, row.sort_order) }
   },
   {
     title: '状态', key: 'is_enabled', width: 80,
     render(row: any) {
       return h('span', {
-        style: row.is_enabled ? 'color: #22c55e;' : 'color: #ef4444;'
+        style: row.is_enabled ? 'color: var(--admin-success);' : 'color: var(--admin-danger);'
       }, row.is_enabled ? '启用' : '禁用')
     }
   },
   {
     title: '操作', key: 'actions', width: 140,
     render(row: any) {
-      return h('div', { style: 'display: flex; gap: 8px;' }, [
+      return h('div', { class: 'admin-inline-actions' }, [
         h(NButton, { size: 'small', secondary: true, onClick: () => openEditModal(row) }, { default: () => '编辑' }),
-        h(NButton, { size: 'small', tertiary: true, style: 'color: #ef4444;', onClick: () => openDeleteModal(row) }, { default: () => '删除' })
+        h(NButton, { size: 'small', tertiary: true, type: 'error', onClick: () => openDeleteModal(row) }, { default: () => '删除' })
       ])
     }
   }
@@ -319,7 +319,8 @@ async function confirmDelete() {
   height: 56px;
   border-radius: 8px;
   overflow: hidden;
-  background: #27272a;
+  background: var(--admin-preview-bg);
+  border: 1px solid var(--admin-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -333,6 +334,6 @@ async function confirmDelete() {
 
 .cover-placeholder {
   font-size: 12px;
-  color: #52525b;
+  color: var(--admin-text-3);
 }
 </style>

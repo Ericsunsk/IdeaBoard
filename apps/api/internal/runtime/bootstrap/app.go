@@ -77,8 +77,8 @@ func Run(args []string) {
 
 	userService := users.NewUserService(userRepo)
 	styleCardService := assets.NewStyleCardService(styleCardRepo)
-	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, styleCardService, systemConfigRepo)
 	storageService := storage.NewStorageService(systemConfigRepo)
+	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, styleCardService, systemConfigRepo, storageService)
 	segService := imageproc.NewSegService(systemConfigRepo)
 
 	authHandler := auth.NewAuthHandler(userService, rdb)

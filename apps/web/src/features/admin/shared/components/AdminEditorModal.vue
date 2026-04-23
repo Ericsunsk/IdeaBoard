@@ -78,6 +78,7 @@ const modalStyle = computed(() => {
   --admin-text-1: #f4f4f5;
   --admin-text-2: #a1a1aa;
   --admin-text-3: #6b6b71;
+  --admin-divider: rgba(255, 255, 255, 0.06);
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -95,8 +96,8 @@ const modalStyle = computed(() => {
   overflow: auto;
   position: relative;
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(18, 18, 20, 0.96);
+  border: 1px solid var(--admin-border);
+  background: rgba(18, 18, 20, 0.98);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
   padding: 28px 28px 24px;
 }
@@ -112,14 +113,14 @@ const modalStyle = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
   color: #f4f4f5;
   cursor: pointer;
   transition: background 0.18s ease, transform 0.18s ease;
 }
 
 .admin-editor-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.14);
   transform: scale(1.03);
 }
 
@@ -150,7 +151,7 @@ const modalStyle = computed(() => {
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--admin-border);
-  background: #17181a;
+  background: var(--admin-card-strong);
   color: var(--admin-text-2);
   font-size: 11px;
 }
@@ -177,7 +178,7 @@ const modalStyle = computed(() => {
   gap: 16px;
   padding-top: 18px;
   margin-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--admin-divider);
 }
 
 .admin-editor-note {

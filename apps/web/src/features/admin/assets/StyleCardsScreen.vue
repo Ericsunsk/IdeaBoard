@@ -102,7 +102,7 @@
             :rows="3"
           />
           <template #feedback>
-            <span style="color: #8b95b8; font-size: 12px;">用户选择此风格时，系统自动将此关键词拼接到描述前，全程用户不可见</span>
+            <span class="admin-helper-text">用户选择此风格时，系统自动将此关键词拼接到描述前，全程用户不可见</span>
           </template>
         </n-form-item>
 
@@ -128,7 +128,7 @@
             <template #unchecked>否</template>
           </n-switch>
           <template #feedback>
-            <span style="color: #8b95b8; font-size: 12px;">互斥模式下，用户只能选择该风格卡片中的一个；非互斥则可多选</span>
+            <span class="admin-helper-text">互斥模式下，用户只能选择该风格卡片中的一个；非互斥则可多选</span>
           </template>
         </n-form-item>
       </n-form>
@@ -148,7 +148,7 @@
       title="确认删除"
       :style="{ maxWidth: '400px' }"
     >
-      <p style="color: #7884ad; line-height: 1.8;">确定要删除风格「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
+      <p class="admin-modal-text">确定要删除风格「{{ deleteTarget?.name }}」吗？此操作不可撤销。</p>
       <template #footer>
         <div class="modal-footer">
           <n-button @click="showDeleteModal = false">取消</n-button>
@@ -215,7 +215,7 @@ const columns = [
     width: 80,
     render(row: StyleCard) {
       return h('div', {
-        style: 'width: 60px; height: 40px; border-radius: 10px; overflow: hidden; background: rgba(113, 97, 239, 0.1);'
+        style: 'width: 60px; height: 40px; border-radius: 10px; overflow: hidden; background: var(--admin-preview-bg); border: 1px solid var(--admin-border);'
       }, [
         h('img', {
           src: row.cover_image,
@@ -234,7 +234,7 @@ const columns = [
     key: 'keywords',
     ellipsis: { tooltip: true },
     render() {
-      return h('span', { style: 'font-size: 12px; color: #8b95b8;' }, '（隐藏）')
+      return h('span', { style: 'font-size: 12px; color: var(--admin-text-3);' }, '（隐藏）')
     }
   },
   {
@@ -242,7 +242,7 @@ const columns = [
     key: 'sort_order',
     width: 70,
     render(row: StyleCard) {
-      return h('span', { style: 'color: #8b95b8;' }, row.sort_order)
+      return h('span', { style: 'color: var(--admin-text-3);' }, row.sort_order)
     }
   },
   {
@@ -251,7 +251,7 @@ const columns = [
     width: 70,
     render(row: StyleCard) {
       return h('span', {
-        style: row.is_exclusive ? 'color: #6460db;' : 'color: #8b95b8;'
+        style: row.is_exclusive ? 'color: var(--admin-text-1); font-weight: 600;' : 'color: var(--admin-text-3);'
       }, row.is_exclusive ? '是' : '否')
     }
   },
@@ -261,7 +261,7 @@ const columns = [
     width: 80,
     render(row: StyleCard) {
       return h('span', {
-        style: row.is_enabled ? 'color: #1f9d68;' : 'color: #d65478;'
+        style: row.is_enabled ? 'color: var(--admin-success);' : 'color: var(--admin-danger);'
       }, row.is_enabled ? '已上架' : '已下架')
     }
   },
@@ -270,7 +270,7 @@ const columns = [
     key: 'actions',
     width: 140,
     render(row: StyleCard) {
-      return h('div', { style: 'display: flex; gap: 8px;' }, [
+      return h('div', { class: 'admin-inline-actions' }, [
         h(NButton, {
           size: 'small',
           secondary: true,
@@ -279,7 +279,7 @@ const columns = [
         h(NButton, {
           size: 'small',
           tertiary: true,
-          style: 'color: #d65478;',
+          type: 'error',
           onClick: () => openDeleteModal(row)
         }, { default: () => '删除' })
       ])
