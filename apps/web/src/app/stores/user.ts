@@ -62,12 +62,15 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function logout(redirectPath = '/user/login') {
+    let logoutSuccess = true
     try {
       await userApi.logout()
     } catch (e) {
+      logoutSuccess = false
     }
     resetAuth()
     router.push(redirectPath)
+    return logoutSuccess
   }
 
   async function fetchUserInfo(force = false) {

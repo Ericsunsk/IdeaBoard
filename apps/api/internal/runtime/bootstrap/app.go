@@ -40,7 +40,7 @@ func Run(args []string) {
 		return
 	}
 
-	logFile, _ := os.OpenFile("server_debug.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	logFile, _ := os.OpenFile("server.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if logFile != nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, logFile))
 	}
@@ -50,6 +50,8 @@ func Run(args []string) {
 	if err := config.ValidateJWTSecret(cfg); err != nil {
 		log.Fatalf("Invalid JWT configuration: %v. 请设置 JWT_SECRET 后重新启动", err)
 	}
+	gin.SetMode(cfg.App.GinMode)
+	log.Printf("[Main] Gin mode: %s (app env: %s)", gin.Mode(), cfg.App.Env)
 
 	db, err := database.NewMySQL(cfg.Database)
 	if err != nil {

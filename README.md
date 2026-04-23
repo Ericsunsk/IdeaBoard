@@ -116,7 +116,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 | 后处理 | 高清增强、画布延伸 |
 | 存储接入 | 本地存储、Kodo、S3-compatible 对象存储 |
 
-更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
+更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。如需按 feature 配置 admin 后台系统提示词，可参考 [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)。
 
 <a id="quick-start"></a>
 ## 快速开始
@@ -241,6 +241,7 @@ IdeaBoard/
 |------|------|
 | [README.md](./README.md) | 项目首页与快速启动 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 架构、contract、本地开发与目录边界 |
+| [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) | Feature System Prompt 配置手册与推荐模板 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | 标准 Linux 部署、升级与回滚 |
 | [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md) | 宝塔 Go 部署 |
 | [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 新目录边界与命名约束 |

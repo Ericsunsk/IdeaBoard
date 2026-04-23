@@ -33,9 +33,10 @@ type RedisConfig struct {
 }
 
 type AppConfig struct {
-	Port string
-	Host string
-	Env  string
+	Port    string
+	Host    string
+	Env     string
+	GinMode string
 }
 
 type JWTConfig struct {
@@ -61,6 +62,9 @@ func Load() *Config {
 		}
 	}
 
+	appEnv := detectAppEnv()
+	ginMode := detectGinMode()
+
 	return &Config{
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -75,9 +79,10 @@ func Load() *Config {
 			Auth: getEnv("REDIS_AUTH", ""),
 		},
 		App: AppConfig{
-			Port: getEnv("APP_PORT", "6000"),
-			Host: getFirstEnv("APP_HOST", "APP_BIND_HOST"),
-			Env:  detectAppEnv(),
+			Port:    getEnv("APP_PORT", "6000"),
+			Host:    getFirstEnv("APP_HOST", "APP_BIND_HOST"),
+			Env:     appEnv,
+			GinMode: ginMode,
 		},
 		JWT: JWTConfig{
 			Secret: jwtSecret,
@@ -112,6 +117,22 @@ func detectAppEnv() string {
 		return ginMode
 	}
 	return "development"
+}
+
+func detectGinMode() string {
+	raw := strings.TrimSpace(getFirstEnv("APP_GIN_MODE", "GIN_MODE"))
+	if raw == "" {
+		// Default to release so local startup keeps request logging but skips Gin's route dump.
+		return "release"
+	}
+
+	switch strings.ToLower(raw) {
+	case "debug", "release", "test":
+		return strings.ToLower(raw)
+	default:
+		log.Printf("[Config] WARNING: APP_GIN_MODE/GIN_MODE=%q 无效，已回退为 release", raw)
+		return "release"
+	}
 }
 
 func isProductionAppEnv(env string) bool {

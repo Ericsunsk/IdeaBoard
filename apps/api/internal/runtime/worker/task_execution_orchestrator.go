@@ -62,6 +62,10 @@ func (o *taskExecutionOrchestrator) execute(task *redis.GlobalQueueTask, account
 	defer stop()
 
 	if err := o.taskRuntime.MarkTaskRunning(task.TaskID, accountID); err != nil {
+		if errors.Is(err, accounts.ErrTaskNotFound) || errors.Is(err, accounts.ErrTaskTerminal) || errors.Is(err, accounts.ErrTaskStateConflict) {
+			o.dropTask(task, accountID, "任务状态已收敛，丢弃脏队列任务")
+			return
+		}
 		cancelled, checkErr := o.taskRuntime.IsTaskCancelled(task.TaskID)
 		if checkErr != nil {
 			log.Printf("[Consumer] 检查任务取消状态失败: task=%s err=%v", task.TaskID, checkErr)
@@ -106,9 +110,10 @@ func (o *taskExecutionOrchestrator) execute(task *redis.GlobalQueueTask, account
 	}
 
 	elapsed := time.Since(startTime).Seconds()
-	o.completeTask(task, accountID, result, elapsed)
-	if err := o.taskRuntime.ResetAccountFailure(accountID); err != nil {
-		log.Printf("[Consumer] 重置账号失败计数异常: account=%d err=%v", accountID, err)
+	if o.completeTask(task, accountID, result, elapsed) {
+		if err := o.taskRuntime.ResetAccountFailure(accountID); err != nil {
+			log.Printf("[Consumer] 重置账号失败计数异常: account=%d err=%v", accountID, err)
+		}
 	}
 }
 
@@ -116,6 +121,13 @@ func (o *taskExecutionOrchestrator) requeueTask(task *redis.GlobalQueueTask, acc
 	ctx := context.Background()
 	if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
 		log.Printf("[Consumer] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
+	}
+	cancelled, err := o.taskRuntime.IsTaskCancelled(task.TaskID)
+	if err != nil {
+		log.Printf("[Consumer] 检查任务取消状态失败: task=%s err=%v", task.TaskID, err)
+	} else if cancelled {
+		o.skipCancelledTask(task, 0)
+		return
 	}
 	if err := o.taskRuntime.RefreshTaskAccounts(task); err != nil {
 		o.failTask(task, reason)
@@ -130,14 +142,20 @@ func (o *taskExecutionOrchestrator) requeueTask(task *redis.GlobalQueueTask, acc
 	}
 }
 
-func (o *taskExecutionOrchestrator) completeTask(task *redis.GlobalQueueTask, accountID uint64, result string, elapsedSec float64) {
+func (o *taskExecutionOrchestrator) completeTask(task *redis.GlobalQueueTask, accountID uint64, result string, elapsedSec float64) bool {
 	if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
 		log.Printf("[Consumer] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 	}
 	if err := o.taskRuntime.MarkTaskCompleted(task.TaskID, result); err != nil {
+		if errors.Is(err, accounts.ErrTaskNotFound) || errors.Is(err, accounts.ErrTaskTerminal) || errors.Is(err, accounts.ErrTaskStateConflict) {
+			log.Printf("[Consumer] 任务状态已收敛，跳过完成回写: task=%s err=%v", task.TaskID, err)
+			return false
+		}
 		log.Printf("[Consumer] 标记任务完成失败: task=%s err=%v", task.TaskID, err)
+		return false
 	}
 	log.Printf("[Consumer] 任务 %s 完成, 状态: completed, 耗时: %.1fs", task.TaskID, elapsedSec)
+	return true
 }
 
 func (o *taskExecutionOrchestrator) completeFailedTask(task *redis.GlobalQueueTask, accountID uint64, reason string, elapsedSec float64) {
@@ -145,7 +163,12 @@ func (o *taskExecutionOrchestrator) completeFailedTask(task *redis.GlobalQueueTa
 		log.Printf("[Consumer] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 	}
 	if err := o.taskRuntime.MarkTaskFailed(task.TaskID, reason); err != nil {
+		if errors.Is(err, accounts.ErrTaskNotFound) || errors.Is(err, accounts.ErrTaskTerminal) || errors.Is(err, accounts.ErrTaskStateConflict) {
+			log.Printf("[Consumer] 任务状态已收敛，跳过失败回写: task=%s err=%v", task.TaskID, err)
+			return
+		}
 		log.Printf("[Consumer] 标记任务失败失败: task=%s err=%v", task.TaskID, err)
+		return
 	}
 	log.Printf("[Consumer] 任务 %s 失败, 耗时: %.1fs, 原因: %s", task.TaskID, elapsedSec, reason)
 }
@@ -162,6 +185,13 @@ func (o *taskExecutionOrchestrator) skipCancelledTask(task *redis.GlobalQueueTas
 		log.Printf("[Consumer] 清理任务取消标记失败: task=%s err=%v", task.TaskID, err)
 	}
 	log.Printf("[Consumer] 任务 %s 已取消，停止执行", task.TaskID)
+}
+
+func (o *taskExecutionOrchestrator) dropTask(task *redis.GlobalQueueTask, accountID uint64, reason string) {
+	if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
+		log.Printf("[Consumer] 释放脏任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
+	}
+	log.Printf("[Consumer] 任务 %s 已丢弃: %s", task.TaskID, reason)
 }
 
 func userFacingProviderError(err error) string {

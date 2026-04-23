@@ -2,6 +2,7 @@ package users
 
 import (
 	"fmt"
+	"strconv"
 
 	"api/internal/platform/redis"
 	"api/internal/platform/response"
@@ -82,6 +83,9 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 		response.Error(c, 400, err.Error())
 		return
 	}
+	if *req.Status == 0 {
+		h.revokeUserSessionToken(c, targetUser.ID)
+	}
 
 	response.Success(c, nil)
 }
@@ -109,9 +113,7 @@ func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
 		response.Error(c, 400, err.Error())
 		return
 	}
-	if h.rdb != nil {
-		_ = h.rdb.Del(c.Request.Context(), userSessionTokenKey(targetUser.ID))
-	}
+	h.revokeUserSessionToken(c, targetUser.ID)
 
 	response.Success(c, nil)
 }
@@ -132,15 +134,15 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 		response.Error(c, 400, err.Error())
 		return
 	}
+	h.revokeUserSessionToken(c, targetUser.ID)
 
 	response.Success(c, nil)
 }
 
 func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*User, bool) {
 	userID := c.Param("id")
-
-	var userIDUint uint64
-	if _, err := fmt.Sscanf(userID, "%d", &userIDUint); err != nil {
+	userIDUint, err := strconv.ParseUint(userID, 10, 64)
+	if err != nil {
 		response.Error(c, 400, "无效的用户ID")
 		return nil, false
 	}
@@ -156,4 +158,11 @@ func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*User, bool) {
 
 func userSessionTokenKey(userID uint64) string {
 	return fmt.Sprintf("token:%d", userID)
+}
+
+func (h *AdminHandler) revokeUserSessionToken(c *gin.Context, userID uint64) {
+	if h.rdb == nil {
+		return
+	}
+	_ = h.rdb.Del(c.Request.Context(), userSessionTokenKey(userID))
 }

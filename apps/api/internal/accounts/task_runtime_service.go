@@ -3,14 +3,22 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"api/internal/platform/redis"
 	"api/internal/tasks"
+	"gorm.io/gorm"
 )
 
 const defaultTaskRetryLimit = 3
+
+var (
+	ErrTaskNotFound      = errors.New("task not found")
+	ErrTaskTerminal      = errors.New("task already in terminal state")
+	ErrTaskStateConflict = errors.New("task state conflict")
+)
 
 type TaskRuntimeService struct {
 	accountRepo *AccountRepository
@@ -89,39 +97,93 @@ func (s *TaskRuntimeService) WatchTaskCancellation(parent context.Context, taskI
 }
 
 func (s *TaskRuntimeService) MarkTaskRunning(taskID string, accountID uint64) error {
-	task, err := s.taskRepo.GetByTaskID(taskID)
+	if accountID == 0 {
+		return ErrTaskStateConflict
+	}
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusPending}, map[string]interface{}{
+		"status":     tasks.StatusRunning,
+		"account_id": accountID,
+	})
 	if err != nil {
 		return err
 	}
-	task.Status = "running"
-	task.AccountID = accountID
-	return s.taskRepo.Update(task)
+	if rows > 0 {
+		return nil
+	}
+
+	task, err := s.taskRepo.GetByTaskID(taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if task.Status == tasks.StatusRunning && task.AccountID == accountID {
+		return nil
+	}
+	if isTaskTerminalStatus(task.Status) {
+		return ErrTaskTerminal
+	}
+	return ErrTaskStateConflict
 }
 
 func (s *TaskRuntimeService) MarkTaskCompleted(taskID string, result string) error {
-	task, err := s.taskRepo.GetByTaskID(taskID)
+	now := time.Now()
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+		"status":       tasks.StatusCompleted,
+		"result":       result,
+		"error_msg":    "",
+		"completed_at": now,
+	})
 	if err != nil {
 		return err
 	}
-	now := time.Now()
-	task.Status = "completed"
-	task.Result = result
-	task.CompletedAt = &now
-	return s.taskRepo.Update(task)
+	if rows > 0 {
+		return nil
+	}
+
+	task, err := s.taskRepo.GetByTaskID(taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if isTaskTerminalStatus(task.Status) {
+		return ErrTaskTerminal
+	}
+	return ErrTaskStateConflict
 }
 
 func (s *TaskRuntimeService) MarkTaskFailed(taskID string, reason string) error {
-	task, err := s.taskRepo.GetByTaskID(taskID)
+	now := time.Now()
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusPending, tasks.StatusRunning}, map[string]interface{}{
+		"status":       tasks.StatusFailed,
+		"error_msg":    reason,
+		"result":       formatTaskFailureResult(taskID, reason),
+		"completed_at": now,
+	})
 	if err != nil {
 		return err
 	}
+	if rows > 0 {
+		return nil
+	}
 
-	now := time.Now()
-	task.Status = "failed"
-	task.ErrorMsg = reason
-	task.Result = formatTaskFailureResult(taskID, reason)
-	task.CompletedAt = &now
-	return s.taskRepo.Update(task)
+	task, err := s.taskRepo.GetByTaskID(taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if task.Status == tasks.StatusFailed {
+		return nil
+	}
+	if task.Status == tasks.StatusCompleted {
+		return ErrTaskTerminal
+	}
+	return ErrTaskStateConflict
 }
 
 func (s *TaskRuntimeService) MarkTaskFailedWithRetry(taskID string, accountID uint64, errMsg string) error {
@@ -191,4 +253,8 @@ func formatTaskFailureResult(taskID string, reason string) string {
 		return fmt.Sprintf(`{"task_id":"%s","status":"failed","error":"任务失败"}`, taskID)
 	}
 	return string(resultJSON)
+}
+
+func isTaskTerminalStatus(status string) bool {
+	return status == tasks.StatusCompleted || status == tasks.StatusFailed
 }

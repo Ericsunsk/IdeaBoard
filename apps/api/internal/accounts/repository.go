@@ -122,6 +122,13 @@ func (r *TaskRepository) Update(task *tasks.Task) error {
 	return r.db.Save(task).Error
 }
 
+func (r *TaskRepository) UpdateByTaskIDAndStatuses(taskID string, statuses []string, updates map[string]interface{}) (int64, error) {
+	result := r.db.Model(&tasks.Task{}).
+		Where("task_id = ? AND status IN ?", taskID, statuses).
+		Updates(updates)
+	return result.RowsAffected, result.Error
+}
+
 func (r *TaskRepository) List(accountID uint64, status string, page, pageSize int) ([]*tasks.Task, int64, error) {
 	var items []*tasks.Task
 	var total int64
@@ -163,6 +170,22 @@ func (r *TaskRepository) GetByUserID(userID uint64, page, pageSize int) ([]*task
 	}
 
 	return items, total, nil
+}
+
+func (r *TaskRepository) ListTaskIDsByAccountIDAndStatuses(accountID uint64, statuses ...string) ([]string, error) {
+	var taskIDs []string
+
+	query := r.db.Model(&tasks.Task{}).
+		Where("account_id = ?", accountID)
+	if len(statuses) > 0 {
+		query = query.Where("status IN ?", statuses)
+	}
+
+	if err := query.Pluck("task_id", &taskIDs).Error; err != nil {
+		return nil, err
+	}
+
+	return taskIDs, nil
 }
 
 func (r *TaskRepository) DeleteByTaskIDAndUserID(taskID string, userID uint64) error {

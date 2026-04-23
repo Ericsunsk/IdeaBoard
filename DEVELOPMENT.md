@@ -226,7 +226,7 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 | 组件 | 建议版本 |
 |------|----------|
 | Node.js | `18+` |
-| Go | `1.22+` |
+| Go | `1.25+` |
 | MySQL | `8.0+` |
 | Redis | `7+` |
 
@@ -265,13 +265,14 @@ npm run dev
 
 ```bash
 cd apps/api
+export INIT_ADMIN_PASSWORD='your-strong-password'
 go run ./cmd init-admin
 ```
 
 > [!IMPORTANT]
-> `apps/api/.env` 中的 `DB_USER / DB_PASSWORD` 是数据库连接账号，不是网站后台管理员账号。管理员登录账号来自业务库里的 `users` 表；本地首次启动时，建议执行一次 `go run ./cmd init-admin`。
+> `apps/api/.env` 中的 `DB_USER / DB_PASSWORD` 是数据库连接账号，不是网站后台管理员账号。管理员登录账号来自业务库里的 `users` 表；本地首次启动时，建议执行一次 `INIT_ADMIN_PASSWORD=... go run ./cmd init-admin`。
 >
-> 若你完全跳过 `init-admin`，空库在 Docker 初始化 SQL 首次执行时可能会先落一个种子管理员记录；但开发与部署文档统一以 `init-admin` 作为标准初始化入口。
+> 当前仓库不再通过 SQL 种子管理员；若跳过 `init-admin`，空库不会自动生成可登录管理员账号。`init-admin` 既是创建入口，也可在 `admin` 用户已存在且角色为 `admin` 时执行密码重置。
 
 ## 验证矩阵
 
@@ -313,6 +314,7 @@ go build ./...
 | `REDIS_HOST` | `localhost` | Redis 主机 |
 | `REDIS_PORT` | `6379` | Redis 端口 |
 | `REDIS_AUTH` | 空 | Redis 密码 |
+| `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
 | `APP_PORT` | `6000` | 后端监听端口 |
 | `JWT_SECRET` | 空 | JWT 密钥；生产环境必须配置 |
 | `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |

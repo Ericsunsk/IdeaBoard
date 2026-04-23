@@ -27,6 +27,7 @@ type AccountService struct {
 }
 
 const defaultAccountMaxConcurrent = 3
+const taskCancelTTL = 24 * time.Hour
 
 func NewAccountService(
 	accountRepo *AccountRepository,
@@ -179,6 +180,22 @@ func (s *AccountService) StartAccount(id uint64) error {
 }
 
 func (s *AccountService) StopAccount(id uint64) error {
+	ctx := context.Background()
+
+	taskIDs, err := s.taskRepo.ListTaskIDsByAccountIDAndStatuses(id, tasks.StatusPending, tasks.StatusRunning)
+	if err != nil {
+		log.Printf("[StopAccount] 查询账号 %d 进行中任务失败: %v", id, err)
+	} else {
+		for _, taskID := range taskIDs {
+			if cancelErr := s.redisMgr.MarkTaskCancelled(ctx, taskID, taskCancelTTL); cancelErr != nil {
+				log.Printf("[StopAccount] 标记任务取消失败: account=%d task=%s err=%v", id, taskID, cancelErr)
+			}
+		}
+		if len(taskIDs) > 0 {
+			log.Printf("[StopAccount] 账号 %d 已标记 %d 个任务取消", id, len(taskIDs))
+		}
+	}
+
 	// 1. 将该账号下所有 running/pending 的任务标记为 failed
 	affected, err := s.taskRepo.FailRunningByAccountID(id, "账号已停用")
 	if err != nil {
@@ -188,7 +205,6 @@ func (s *AccountService) StopAccount(id uint64) error {
 	}
 
 	// 2. 清除 Redis 中该账号的并发计数（释放占位）
-	ctx := context.Background()
 	s.redisMgr.DeleteAccountConcurrent(ctx, id)
 
 	// 3. 停用账号
@@ -339,7 +355,7 @@ func (s *AccountService) DeleteUserTask(taskID string, userID uint64) error {
 	if _, err := s.taskRepo.GetByTaskIDAndUserID(taskID, userID); err != nil {
 		return err
 	}
-	if err := s.redisMgr.MarkTaskCancelled(context.Background(), taskID, 24*time.Hour); err != nil {
+	if err := s.redisMgr.MarkTaskCancelled(context.Background(), taskID, taskCancelTTL); err != nil {
 		return err
 	}
 	return s.taskRepo.DeleteByTaskIDAndUserID(taskID, userID)

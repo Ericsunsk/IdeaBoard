@@ -150,7 +150,21 @@ cp -R "${RELEASE_DIR}/deploy/." /opt/ideaboard/deploy/
 > [!IMPORTANT]
 > 上面的覆盖步骤会合并复制新版本文件。不要顺手删除已有的 `.env`、上传目录或数据库数据。
 
-### 3. 准备数据库与缓存
+### 3. 创建 systemd 运行用户并校准目录权限
+
+首次部署建议执行：
+
+```bash
+id -u ideaboard >/dev/null 2>&1 || useradd --system --home /opt/ideaboard --shell /usr/sbin/nologin ideaboard
+chown -R ideaboard:ideaboard /opt/ideaboard/apps /opt/ideaboard/deploy /opt/ideaboard/logs
+```
+
+说明：
+
+- `ideaboard` 为 systemd 服务默认运行用户（非 root）。
+- 升级时请保留该用户与目录权限设置，避免服务因权限不足启动失败。
+
+### 4. 准备数据库与缓存
 
 #### MySQL
 
@@ -189,6 +203,7 @@ nano /opt/ideaboard/apps/api/.env
 
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`
 - `REDIS_HOST/REDIS_PORT/REDIS_AUTH`
+- `APP_ENV=production`（生产环境必须显式设置）
 - `APP_PORT=6000`
 - `APP_HOST=127.0.0.1`（建议反向代理场景启用）
 - `JWT_SECRET`
@@ -198,6 +213,7 @@ nano /opt/ideaboard/apps/api/.env
 - 不要在生产环境继续使用本地开发默认账号
 - 若 Redis 开启密码，必须同步配置 `REDIS_AUTH`
 - 若前面有 Nginx / 其他反向代理，建议设置 `APP_HOST=127.0.0.1`
+- 生产环境请固定设置 `APP_ENV=production`，不要依赖默认值
 - `JWT_SECRET` 必须为足够长的随机字符串
 
 完整字段说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
@@ -230,6 +246,12 @@ systemctl enable ideaboard
 systemctl restart ideaboard
 systemctl status ideaboard --no-pager
 ```
+
+发布包内置的 `ideaboard.service` 默认包含：
+
+- `User=ideaboard`、`Group=ideaboard`（非 root 运行）
+- `Environment=APP_ENV=production`（显式生产环境）
+- `EnvironmentFile=/opt/ideaboard/apps/api/.env`
 
 查看日志：
 

@@ -95,10 +95,17 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 
 ### 3. 配置环境变量
 
-编辑 `.env`，至少确认：
+先创建 `.env`，再编辑并确认至少包含：
+
+```bash
+cp ./apps/api/.env.example ./apps/api/.env
+```
+
+需要确认：
 
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`
 - `REDIS_HOST/REDIS_PORT/REDIS_AUTH`
+- `APP_ENV=production`（生产环境必须显式设置）
 - `APP_PORT=6000`
 - `APP_HOST=127.0.0.1`
 - `JWT_SECRET`
@@ -117,6 +124,7 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 
 - 前端已内嵌到二进制，不需要单独配置静态站点目录。
 - 反向代理仍建议由宝塔的 Nginx 站点承担。
+- 宝塔环境变量与 `.env` 至少需显式包含 `APP_ENV=production`。
 
 ### 5. 初始化管理员账号
 
@@ -124,7 +132,6 @@ release/v0.1.0/ideaboard-bt-go-v0.1.0-linux-amd64/
 
 ```bash
 cd /www/wwwroot/ideaboard
-cp ./apps/api/.env.example ./apps/api/.env
 set -a
 source ./apps/api/.env
 set +a

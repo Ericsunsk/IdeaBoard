@@ -149,6 +149,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   let user = getStoredUser()
   const isAdminRoute = to.path.startsWith('/admin')
+  const requiresFreshAuth = !!to.meta.requiresAuth || !!to.meta.guest
   const shouldRefreshSession = isAdminRoute || !!to.meta.requiresAuth || !!to.meta.guest
 
   if (shouldRefreshSession) {
@@ -164,8 +165,14 @@ router.beforeEach(async (to) => {
       if (code === 401 || code === 403) {
         clearStoredAuth()
         user = null
-      } else if (isAdminRoute) {
-        return '/user/home'
+      } else {
+        if (requiresFreshAuth) {
+          clearStoredAuth()
+          user = null
+        }
+        if (isAdminRoute) {
+          return '/user/home'
+        }
       }
     }
   }

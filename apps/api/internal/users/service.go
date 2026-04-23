@@ -2,9 +2,16 @@ package users
 
 import (
 	"errors"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+var reservedUsernames = map[string]struct{}{
+	"admin":  {},
+	"root":   {},
+	"system": {},
+}
 
 type UserService struct {
 	repo *UserRepository
@@ -16,6 +23,10 @@ func NewUserService(repo *UserRepository) *UserService {
 
 // Register 用户注册
 func (s *UserService) Register(req *RegisterRequest) (*User, error) {
+	if isReservedUsername(req.Username) {
+		return nil, errors.New("用户名不可用")
+	}
+
 	// 检查用户名是否已存在
 	exists, err := s.repo.ExistsUsername(req.Username)
 	if err != nil {
@@ -115,6 +126,10 @@ func (s *UserService) AdminUpdatePassword(userID uint64, newPassword string) err
 
 // CreateUser 管理员创建用户
 func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
+	if isReservedUsername(req.Username) {
+		return nil, errors.New("用户名不可用")
+	}
+
 	// 检查用户名是否已存在
 	exists, err := s.repo.ExistsUsername(req.Username)
 	if err != nil {
@@ -166,6 +181,10 @@ func (s *UserService) ListUsers(req *UserListRequest) (*UserListResponse, error)
 
 // UpdateStatus 更新用户状态
 func (s *UserService) UpdateStatus(userID uint64, status int8) error {
+	if status != 0 && status != 1 {
+		return errors.New("状态值无效，仅支持0或1")
+	}
+
 	return s.repo.UpdateStatus(userID, status)
 }
 
@@ -181,4 +200,9 @@ func (s *UserService) HashPassword(password string) (string, error) {
 		return "", err
 	}
 	return string(hashedPassword), nil
+}
+
+func isReservedUsername(username string) bool {
+	_, ok := reservedUsernames[strings.ToLower(strings.TrimSpace(username))]
+	return ok
 }

@@ -80,7 +80,10 @@ async function handleLogin() {
       message.success('管理员登录成功')
       await router.replace(resolveAdminRedirectPath())
     } else {
-      userStore.clearAuth()
+      const logoutSuccess = await userStore.logout('/admin/login')
+      if (!logoutSuccess) {
+        message.warning('会话撤销失败，请稍后重试')
+      }
       message.error('该账号不是管理员')
     }
   } catch (error: any) {

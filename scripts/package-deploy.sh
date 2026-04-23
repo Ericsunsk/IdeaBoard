@@ -73,6 +73,9 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/ideaboard/apps/api
+User=ideaboard
+Group=ideaboard
+Environment=APP_ENV=production
 ExecStart=/opt/ideaboard/apps/api/ideaboard-server
 Restart=always
 RestartSec=3
