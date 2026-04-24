@@ -31,7 +31,7 @@
       @confirm-board-rename="confirmBoardRename"
       @select-board="handleBoardSelect"
       @export="handleExport"
-      @open-center="router.push('/user/center')"
+      @open-center="navigateAway('/user/center')"
     />
 
     <!-- 框选视觉矩形 -->
@@ -65,7 +65,7 @@
         :key="t.title" 
         :class="{ active: route.path === t.path }" 
         :title="t.title" 
-        @click="router.push(t.path)"
+        @click="navigateAway(t.path)"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" v-html="t.icon"></svg>
       </div>
@@ -100,7 +100,7 @@
         <span class="zoom-level">{{ zoomLevel }}%</span>
         <button class="zoom-btn" @click="updateZoom(10)">+</button>
       </div>
-      <button class="logo-btn" title="返回画布列表" @click="router.push('/user/boards')">
+      <button class="logo-btn" title="返回画布列表" @click="navigateAway('/user/boards')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="16" y1="12" x2="6" y2="12" />
           <polyline points="10 8 6 12 10 16" />
@@ -1546,6 +1546,13 @@ primeWorkflowCacheSignatureMaps()
 
 function setBoardNameInputRef(element: HTMLInputElement | null) {
   boardNameInputRef.value = element
+}
+
+async function navigateAway(path: string) {
+  if (path === route.path) return
+  const canLeave = await confirmSaveBeforeLeave()
+  if (!canLeave) return
+  void router.push(path)
 }
 
 watch(

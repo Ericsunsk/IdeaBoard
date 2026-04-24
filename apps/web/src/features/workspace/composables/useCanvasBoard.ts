@@ -38,8 +38,6 @@ function resolveBoardIdFromQueryValue(
 }
 
 export function useCanvasBoard(options: UseCanvasBoardOptions) {
-  const AUTO_PERSIST_DELAY_MS = 600
-
   const route = useRoute()
   const router = useRouter()
   const defaultBoardName = options.defaultBoardName ?? 'Untitled'
@@ -58,7 +56,6 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
 
   let leaveConfirmResolver: ((choice: LeaveChoice) => void) | null = null
   let leaveConfirmPromise: Promise<LeaveChoice> | null = null
-  let autoPersistTimer: ReturnType<typeof setTimeout> | null = null
 
   function refreshBoardOptions() {
     boardOptions.value = listCanvasBoards()
@@ -126,6 +123,11 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
       isBoardMenuOpen.value = false
       return
     }
+    const canLeave = await confirmSaveBeforeLeave()
+    if (!canLeave) {
+      isBoardMenuOpen.value = false
+      return
+    }
     isBoardMenuOpen.value = false
     void router.push({
       path: '/user/picture',
@@ -184,24 +186,7 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     return true
   }
 
-  function clearAutoPersistTimer() {
-    if (!autoPersistTimer) return
-    clearTimeout(autoPersistTimer)
-    autoPersistTimer = null
-  }
-
-  function scheduleAutoPersist() {
-    if (!isBoardDirty.value || !currentBoardId.value || isApplyingBoardState.value) return
-    clearAutoPersistTimer()
-    autoPersistTimer = setTimeout(() => {
-      autoPersistTimer = null
-      if (!isBoardDirty.value || isApplyingBoardState.value || !currentBoardId.value) return
-      persistBoardStateNow()
-    }, AUTO_PERSIST_DELAY_MS)
-  }
-
   function flushPendingBoardState() {
-    clearAutoPersistTimer()
     if (isBoardDirty.value && !isApplyingBoardState.value) {
       persistBoardStateNow()
     }
@@ -223,7 +208,6 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
   function markBoardDirty() {
     if (isApplyingBoardState.value || !currentBoardId.value) return
     isBoardDirty.value = true
-    scheduleAutoPersist()
   }
 
   function requestLeaveConfirm(): Promise<LeaveChoice> {
@@ -245,8 +229,6 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
   }
 
   async function confirmSaveBeforeLeave(): Promise<boolean> {
-    if (!isBoardDirty.value) return true
-    flushPendingBoardState()
     if (!isBoardDirty.value) return true
     const choice = await requestLeaveConfirm()
     if (choice === 'save') {
@@ -293,7 +275,6 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
   }
 
   onUnmounted(() => {
-    clearAutoPersistTimer()
     if (typeof window !== 'undefined') {
       window.removeEventListener('pagehide', handlePageHide)
       window.removeEventListener('beforeunload', handleBeforeUnload)
