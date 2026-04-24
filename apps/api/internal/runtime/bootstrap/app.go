@@ -235,7 +235,7 @@ func runInitAdmin() {
 }
 
 func migrateModels(db *gorm.DB) error {
-	return db.AutoMigrate(
+	models := []interface{}{
 		&users.User{},
 		&users.UsedUID{},
 		&accounts.ApiAccount{},
@@ -250,7 +250,17 @@ func migrateModels(db *gorm.DB) error {
 		&boards.UserBoard{},
 		&boards.BoardMember{},
 		&boards.BoardShareToken{},
-	)
+	}
+	for _, model := range models {
+		if err := db.AutoMigrate(model); err != nil {
+			if isIgnorableDuplicateIndexError(err) {
+				log.Printf("[Main] Skip duplicate index migration error for model %T: %v", model, err)
+				continue
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 type bootstrapUserStorageUIDRow struct {
@@ -311,4 +321,13 @@ func generateBootstrapUniqueStorageUID(seen map[string]struct{}) (string, error)
 		return uid, nil
 	}
 	return "", fmt.Errorf("生成迁移前唯一用户存储标识失败")
+}
+
+func isIgnorableDuplicateIndexError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(msg, "duplicate key name") ||
+		strings.Contains(msg, "error 1061")
 }
