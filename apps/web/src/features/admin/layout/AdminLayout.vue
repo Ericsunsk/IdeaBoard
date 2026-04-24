@@ -213,114 +213,142 @@ watch(
     { immediate: true },
 );
 
-const pageMetaMap: Record<string, { title: string }> = {
-    users: { title: "用户管理" },
-    channels: { title: "渠道商管理" },
-    accounts: { title: "账号池管理" },
-    monitor: { title: "任务监控" },
-    "drawing-records": { title: "绘图记录" },
-    "style-cards": { title: "风格卡片" },
-    "face-library": { title: "人脸库" },
-    "bg-library": { title: "背景库" },
-    "pattern-style-library": { title: "风格模型库" },
-    "feature-prompts": { title: "系统提示词" },
-    "oss-config": { title: "系统存储" },
-    "seg-config": { title: "图片处理" },
-};
-
 const renderMenuIcon = (iconComp: any) => () =>
     h(NIcon, { class: "menu-icon" }, { default: () => h(iconComp) });
 
-const menuOptions = [
+type AdminMenuItem = {
+    key: string;
+    label: string;
+    title?: string;
+    icon: any;
+};
+
+type AdminMenuGroup = {
+    key: string;
+    label: string;
+    children: AdminMenuItem[];
+};
+
+const adminMenuGroups: AdminMenuGroup[] = [
     {
-        label: "运营总览",
         key: "group-ops",
-        type: "group",
+        label: "运营总览",
         children: [
             {
-                label: "用户管理",
                 key: "users",
-                icon: renderMenuIcon(PeopleOutline),
+                label: "用户管理",
+                title: "用户管理",
+                icon: PeopleOutline,
             },
             {
-                label: "渠道商管理",
                 key: "channels",
-                icon: renderMenuIcon(LinkOutline),
+                label: "渠道商管理",
+                title: "渠道商管理",
+                icon: LinkOutline,
             },
             {
-                label: "Banana 账号池",
                 key: "accounts",
-                icon: renderMenuIcon(KeyOutline),
+                label: "Banana 账号池",
+                title: "账号池管理",
+                icon: KeyOutline,
             },
             {
-                label: "任务监控",
                 key: "monitor",
-                icon: renderMenuIcon(PulseOutline),
+                label: "任务监控",
+                title: "任务监控",
+                icon: PulseOutline,
             },
             {
-                label: "绘图记录",
                 key: "drawing-records",
-                icon: renderMenuIcon(DocumentTextOutline),
+                label: "绘图记录",
+                title: "绘图记录",
+                icon: DocumentTextOutline,
             },
         ],
     },
     {
-        label: "素材资产",
         key: "group-assets",
-        type: "group",
+        label: "素材资产",
         children: [
             {
-                label: "风格卡片",
                 key: "style-cards",
-                icon: renderMenuIcon(ColorPaletteOutline),
+                label: "风格卡片",
+                title: "风格卡片",
+                icon: ColorPaletteOutline,
             },
             {
-                label: "人脸库",
                 key: "face-library",
-                icon: renderMenuIcon(PersonCircleOutline),
+                label: "人脸库",
+                title: "人脸库",
+                icon: PersonCircleOutline,
             },
             {
-                label: "背景库",
                 key: "bg-library",
-                icon: renderMenuIcon(ImageOutline),
+                label: "背景库",
+                title: "背景库",
+                icon: ImageOutline,
             },
             {
-                label: "风格模型库",
                 key: "pattern-style-library",
-                icon: renderMenuIcon(AppsOutline),
+                label: "风格模型库",
+                title: "风格模型库",
+                icon: AppsOutline,
             },
             {
-                label: "系统提示词",
                 key: "feature-prompts",
-                icon: renderMenuIcon(ChatbubbleEllipsesOutline),
+                label: "系统提示词",
+                title: "系统提示词",
+                icon: ChatbubbleEllipsesOutline,
             },
         ],
     },
     {
-        label: "系统配置",
         key: "group-system",
-        type: "group",
+        label: "系统配置",
         children: [
             {
-                label: "系统存储",
                 key: "oss-config",
-                icon: renderMenuIcon(CloudOutline),
+                label: "系统存储",
+                title: "系统存储",
+                icon: CloudOutline,
             },
             {
-                label: "图片处理",
                 key: "seg-config",
-                icon: renderMenuIcon(CutOutline),
+                label: "图片处理",
+                title: "图片处理",
+                icon: CutOutline,
             },
         ],
     },
-] as any;
+] as const;
+
+const menuOptions = adminMenuGroups.map((group) => ({
+    label: group.label,
+    key: group.key,
+    type: "group",
+    children: group.children.map((item) => ({
+        label: item.label,
+        key: item.key,
+        icon: renderMenuIcon(item.icon),
+    })),
+})) as any;
+
+const pageMetaMap = adminMenuGroups.reduce<Record<string, { title: string }>>(
+    (acc, group) => {
+        group.children.forEach((item) => {
+            acc[item.key] = { title: item.title || item.label };
+        });
+        return acc;
+    },
+    {},
+);
 
 const currentMeta = computed(() => {
     return pageMetaMap[activeKey.value] || { title: "管理后台" };
 });
 
 function handleMenuUpdate(key: string) {
-    router.push(`/admin/${key}`);
+    void router.push(`/admin/${key}`);
 }
 
 function handleMobileMenuSelect(key: string) {
@@ -376,11 +404,14 @@ onUnmounted(() => {
 <style scoped>
 .admin-layout-shell {
     min-height: 100vh;
+    height: 100vh;
     background: #0a0a0b;
     padding: 12px;
+    overflow: hidden;
 }
 
 .admin-shell-frame {
+    height: calc(100vh - 24px);
     min-height: calc(100vh - 24px);
     display: grid;
     grid-template-columns: auto 1fr;
@@ -389,6 +420,7 @@ onUnmounted(() => {
 
 .admin-shell-sider {
     width: 244px;
+    height: 100%;
     display: flex;
     flex-direction: column;
     border: 1px solid #232326;
@@ -437,11 +469,13 @@ onUnmounted(() => {
 
 .admin-shell-main {
     min-width: 0;
+    min-height: 0;
     border: 1px solid #232326;
     border-radius: 16px;
     background: #101113;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .admin-shell-header {
@@ -521,8 +555,11 @@ onUnmounted(() => {
 }
 
 .admin-shell-content {
-    min-height: calc(100vh - 110px);
+    flex: 1;
+    min-height: 0;
     padding: 18px 20px 22px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 :deep(.n-menu) {
@@ -537,6 +574,12 @@ onUnmounted(() => {
     --n-group-header-text-color: #5a5a60;
     padding: 10px 8px;
     gap: 4px;
+}
+
+.admin-shell-sider :deep(.n-menu) {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 :deep(.n-menu-item-content) {
@@ -584,16 +627,21 @@ onUnmounted(() => {
 
 @media (max-width: 1079px) {
     .admin-layout-shell {
+        height: auto;
         padding: 10px;
+        overflow: visible;
     }
 
     .admin-shell-frame {
         display: block;
+        height: auto;
         min-height: calc(100vh - 20px);
     }
 
     .admin-shell-main {
+        min-height: unset;
         border-radius: 14px;
+        overflow: visible;
     }
 
     .admin-shell-header {
@@ -602,6 +650,7 @@ onUnmounted(() => {
     }
 
     .admin-shell-content {
+        overflow-y: visible;
         padding: 12px;
         min-height: calc(100vh - 90px);
     }

@@ -234,40 +234,6 @@ export const segApi = {
 
 export const adminSegApi = createAdminSegApi(api)
 
-// ============ 线稿模式 API ============
-
-export interface LineDraftMode {
-  id: number
-  name: string
-  cover_image: string
-  prompt: string
-  sort_order: number
-  is_enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface LineDraftModeFormData {
-  name: string
-  cover_image: string
-  prompt: string
-  sort_order: number
-  is_enabled: boolean
-}
-
-export const lineDraftApi = {
-  listModes: (): Promise<ApiResponse<{ list: LineDraftMode[] }>> =>
-    api.get('/user/line-draft-modes') as any,
-  adminList: (): Promise<ApiResponse<{ list: LineDraftMode[] }>> =>
-    api.get('/admin/line-draft-modes') as any,
-  adminCreate: (data: LineDraftModeFormData): Promise<ApiResponse<{ mode: LineDraftMode }>> =>
-    api.post('/admin/line-draft-modes', data) as any,
-  adminUpdate: (id: number, data: LineDraftModeFormData): Promise<ApiResponse<null>> =>
-    api.put('/admin/line-draft-modes/' + id, data) as any,
-  adminDelete: (id: number): Promise<ApiResponse<null>> =>
-    api.delete('/admin/line-draft-modes/' + id) as any,
-}
-
 export const featurePromptApi = {
   adminList: (): Promise<ApiResponse<{ prompts: Record<string, string> }>> =>
     api.get('/admin/feature-prompts') as any,
