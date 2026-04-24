@@ -1,6 +1,9 @@
 package storage
 
-import "api/internal/platform/settings"
+import (
+	"api/internal/platform/settings"
+	"sync"
+)
 
 type StorageStoreOptions struct {
 	DirPrefix  string
@@ -13,6 +16,10 @@ type StorageService struct {
 	s3CompatibleService *S3CompatibleService
 	adapterRegistry     *storageAdapterRegistry
 	providerMeta        map[StorageProvider]StorageProviderMeta
+	previewMu           sync.RWMutex
+	previewTransformer  func(string) string
+	previewDirty        bool
+	previewResolver     func() (*StorageProfile, error)
 }
 
 func NewStorageService(configRepo *settings.SystemConfigRepository) *StorageService {
@@ -21,6 +28,7 @@ func NewStorageService(configRepo *settings.SystemConfigRepository) *StorageServ
 		kodoService:         NewKodoService(configRepo),
 		s3CompatibleService: NewS3CompatibleService(),
 		providerMeta:        make(map[StorageProvider]StorageProviderMeta),
+		previewDirty:        true,
 	}
 	for _, meta := range []StorageProviderMeta{
 		{

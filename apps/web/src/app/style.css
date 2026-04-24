@@ -54,3 +54,78 @@ a {
 .n-config-provider {
   background: #0a0a0f;
 }
+
+/* Admin-only Naive UI teleported overlays (modal/dialog/mask). */
+body.admin-route .n-modal .n-card {
+  --n-color: #101113;
+  --n-color-modal: #101113;
+  --n-border-color: #232326;
+  --n-title-text-color: #f4f4f5;
+  --n-text-color: #a1a1aa;
+  --n-action-color: #151618;
+  --n-close-icon-color: #d4d4d8;
+  --n-close-icon-color-hover: #ffffff;
+  --n-close-icon-color-pressed: #f4f4f5;
+  --n-close-color-hover: rgba(255, 255, 255, 0.08);
+  --n-close-color-pressed: rgba(255, 255, 255, 0.12);
+  --n-border-radius: 18px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+}
+
+body.admin-route .n-modal .n-card > .n-card-header {
+  padding: 20px 20px 14px;
+}
+
+body.admin-route .n-modal .n-card > .n-card-header .n-card-header__main {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+body.admin-route .n-modal .n-card > .n-card__content {
+  padding: 0 20px 20px;
+}
+
+body.admin-route .n-modal .n-card > .n-card__action,
+body.admin-route .n-modal .n-card > .n-card__footer {
+  padding: 14px 20px;
+  background: #151618;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+body.admin-route .n-modal .n-card > .n-card__action .n-space,
+body.admin-route .n-modal .n-card > .n-card__footer .n-space {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+body.admin-route .n-modal .n-card .n-form-item:last-child {
+  margin-bottom: 0;
+}
+
+body.admin-route .n-modal .n-card .n-button,
+body.admin-route .n-dialog .n-button {
+  min-width: 88px;
+}
+
+body.admin-route .n-dialog {
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+}
+
+body.admin-route .n-dialog__title {
+  font-size: 18px;
+  letter-spacing: 0.01em;
+}
+
+body.admin-route .n-dialog__content {
+  color: #a1a1aa;
+}
+
+body.admin-route .n-dialog__action {
+  padding-top: 14px;
+}
+
+body.admin-route .n-modal-mask {
+  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.56);
+}

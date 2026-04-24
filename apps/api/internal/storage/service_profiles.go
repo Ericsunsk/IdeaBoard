@@ -184,7 +184,11 @@ func (s *StorageService) persistProfiles(profiles []StorageProfile) error {
 	if err != nil {
 		return err
 	}
-	return s.configRepo.Set(StorageProfilesConfigKey, string(b))
+	if err := s.configRepo.Set(StorageProfilesConfigKey, string(b)); err != nil {
+		return err
+	}
+	s.invalidatePreviewURLTransformerCache()
+	return nil
 }
 
 func (s *StorageService) migrateLegacyConfig() ([]StorageProfile, error) {

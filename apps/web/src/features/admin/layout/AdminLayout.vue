@@ -269,12 +269,18 @@ function handleUserAction(key: string) {
   }
 }
 
+function setAdminRouteClass(enabled: boolean) {
+  document.body.classList.toggle('admin-route', enabled)
+}
+
 onMounted(() => {
+  setAdminRouteClass(true)
   syncViewport()
   window.addEventListener('resize', syncViewport)
 })
 
 onUnmounted(() => {
+  setAdminRouteClass(false)
   window.removeEventListener('resize', syncViewport)
 })
 </script>
