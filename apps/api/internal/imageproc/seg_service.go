@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"time"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
@@ -78,7 +83,21 @@ func (s *SegService) createClient(cfg *AliyunSegConfig) (*imageseg.Client, error
 
 // fetchImageStream 从 URL 获取图片流
 func fetchImageStream(imageURL string) (io.ReadCloser, error) {
-	resp, err := safehttp.Get(context.Background(), imageURL, 20*time.Second)
+	if localPath, ok := resolveLocalUploadFilePath(imageURL); ok {
+		stream, err := os.Open(localPath)
+		if err != nil {
+			return nil, fmt.Errorf("获取图片失败: 打开本地上传文件失败: %v", err)
+		}
+		return stream, nil
+	}
+	normalizedURL, err := normalizeImageFetchURL(imageURL)
+	if err != nil {
+		return nil, fmt.Errorf("获取图片失败: %v", err)
+	}
+	if err := validateRemoteImageURL(normalizedURL); err != nil {
+		return nil, fmt.Errorf("获取图片失败: %v", err)
+	}
+	resp, err := safehttp.Get(context.Background(), normalizedURL, 20*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("获取图片失败: %v", err)
 	}
@@ -87,6 +106,78 @@ func fetchImageStream(imageURL string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("获取图片返回 %d", resp.StatusCode)
 	}
 	return resp.Body, nil
+}
+
+func resolveLocalUploadFilePath(raw string) (string, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "/uploads/") {
+		return "", false
+	}
+	cleaned := path.Clean(trimmed)
+	if !strings.HasPrefix(cleaned, "/uploads/") {
+		return "", false
+	}
+	relative := filepath.FromSlash(strings.TrimPrefix(cleaned, "/"))
+	candidates := []string{
+		relative,
+		filepath.Join("apps", "api", relative),
+	}
+	for _, candidate := range candidates {
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		return candidate, true
+	}
+	return "", false
+}
+
+func validateRemoteImageURL(raw string) error {
+	trimmed := strings.TrimSpace(raw)
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("图片 URL 必须为 http(s) 绝对地址")
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return fmt.Errorf("图片 URL 必须为 http(s) 绝对地址")
+	}
+	return nil
+}
+
+func normalizeImageFetchURL(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "/uploads/") {
+		return trimmed, nil
+	}
+	cleaned := path.Clean(trimmed)
+	if !strings.HasPrefix(cleaned, "/uploads/") {
+		return trimmed, nil
+	}
+	base, err := resolveImagePublicBaseURL()
+	if err != nil {
+		return "", err
+	}
+	rel, err := url.Parse(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("图片路径格式错误")
+	}
+	return base.ResolveReference(rel).String(), nil
+}
+
+func resolveImagePublicBaseURL() (*url.URL, error) {
+	for _, key := range []string{"APP_PUBLIC_BASE_URL", "APP_BASE_URL", "PUBLIC_BASE_URL"} {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			continue
+		}
+		return parsed, nil
+	}
+	return nil, fmt.Errorf("图片 URL 为本地上传路径，本地文件不存在且未配置 APP_PUBLIC_BASE_URL")
 }
 
 // createImageEnhanClient 创建阿里云图像生产 SDK 客户端（图像超分等）

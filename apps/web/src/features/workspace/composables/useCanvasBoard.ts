@@ -2,6 +2,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import type { LocationQueryValue } from 'vue-router'
 import {
+  createCanvasBoard,
   getCanvasBoardById,
   listCanvasBoards,
   renameCanvasBoard,
@@ -36,6 +37,8 @@ function resolveBoardIdFromQueryValue(
 }
 
 export function useCanvasBoard(options: UseCanvasBoardOptions) {
+  const AUTO_PERSIST_DELAY_MS = 600
+
   const route = useRoute()
   const router = useRouter()
   const defaultBoardName = options.defaultBoardName ?? 'Untitled'
@@ -50,9 +53,11 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
   const leaveConfirmVisible = ref(false)
   const isApplyingBoardState = ref(false)
   const currentBoardId = computed(() => resolveBoardIdFromQueryValue(route.query.boardId))
+  const isNormalizingBoardId = ref(false)
 
   let leaveConfirmResolver: ((choice: LeaveChoice) => void) | null = null
   let leaveConfirmPromise: Promise<LeaveChoice> | null = null
+  let autoPersistTimer: ReturnType<typeof setTimeout> | null = null
 
   function refreshBoardOptions() {
     boardOptions.value = listCanvasBoards()
@@ -127,6 +132,27 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     })
   }
 
+  async function ensureWorkspaceBoardId(): Promise<string | null> {
+    const boardId = currentBoardId.value
+    if (boardId || route.path !== '/user/picture' || isNormalizingBoardId.value) {
+      return boardId
+    }
+    const fallbackBoard = listCanvasBoards()[0] ?? createCanvasBoard(defaultBoardName)
+    isNormalizingBoardId.value = true
+    try {
+      await router.replace({
+        path: '/user/picture',
+        query: {
+          ...route.query,
+          boardId: fallbackBoard.id,
+        },
+      })
+    } finally {
+      isNormalizingBoardId.value = false
+    }
+    return fallbackBoard.id
+  }
+
   async function loadBoardStateFor(boardId: string | null) {
     isApplyingBoardState.value = true
     try {
@@ -148,9 +174,46 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     return true
   }
 
+  function clearAutoPersistTimer() {
+    if (!autoPersistTimer) return
+    clearTimeout(autoPersistTimer)
+    autoPersistTimer = null
+  }
+
+  function scheduleAutoPersist() {
+    if (!isBoardDirty.value || !currentBoardId.value || isApplyingBoardState.value) return
+    clearAutoPersistTimer()
+    autoPersistTimer = setTimeout(() => {
+      autoPersistTimer = null
+      if (!isBoardDirty.value || isApplyingBoardState.value || !currentBoardId.value) return
+      persistBoardStateNow()
+    }, AUTO_PERSIST_DELAY_MS)
+  }
+
+  function flushPendingBoardState() {
+    clearAutoPersistTimer()
+    if (isBoardDirty.value && !isApplyingBoardState.value) {
+      persistBoardStateNow()
+    }
+  }
+
+  function handlePageHide() {
+    flushPendingBoardState()
+  }
+
+  function handleBeforeUnload(event: BeforeUnloadEvent) {
+    if (!isBoardDirty.value) return
+    flushPendingBoardState()
+    if (isBoardDirty.value) {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+  }
+
   function markBoardDirty() {
     if (isApplyingBoardState.value || !currentBoardId.value) return
     isBoardDirty.value = true
+    scheduleAutoPersist()
   }
 
   function requestLeaveConfirm(): Promise<LeaveChoice> {
@@ -173,6 +236,8 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
 
   async function confirmSaveBeforeLeave(): Promise<boolean> {
     if (!isBoardDirty.value) return true
+    flushPendingBoardState()
+    if (!isBoardDirty.value) return true
     const choice = await requestLeaveConfirm()
     if (choice === 'save') {
       const ok = persistBoardStateNow()
@@ -192,8 +257,10 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     async () => {
       isBoardMenuOpen.value = false
       isRenamingBoard.value = false
+      const boardId = await ensureWorkspaceBoardId()
       syncCurrentBoardName()
-      await loadBoardStateFor(currentBoardId.value)
+      if (!boardId && route.path === '/user/picture') return
+      await loadBoardStateFor(boardId)
     },
     { immediate: true },
   )
@@ -209,7 +276,17 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     return true
   })
 
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', handlePageHide)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+  }
+
   onUnmounted(() => {
+    clearAutoPersistTimer()
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', handlePageHide)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
     if (leaveConfirmPromise) {
       resolveLeaveConfirm('cancel')
     }

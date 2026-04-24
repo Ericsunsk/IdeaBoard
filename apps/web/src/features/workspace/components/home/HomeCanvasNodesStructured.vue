@@ -5,7 +5,6 @@
       :active="isNodeSelected('model', node.id)"
       :dragging="isNodeDragging('model', node.id)"
       :copy-mode="copyMode"
-      :generating="generating"
       :ui-state="getModelNodeUiState(node)"
       :error-port-keys="getNodeConnectionErrorPorts('model', node.id)"
       :background-options="modelBackgroundOptions"
@@ -27,7 +26,6 @@
       :active="isNodeSelected('viewpoint', node.id)"
       :dragging="isNodeDragging('viewpoint', node.id)"
       :copy-mode="copyMode"
-      :generating="generating"
       :ui-state="getViewpointNodeUiState(node)"
       :error-port-keys="getNodeConnectionErrorPorts('viewpoint', node.id)"
       @node-mousedown="emit('viewpoint-node-mousedown', $event, node)"
@@ -83,7 +81,6 @@ const props = defineProps<{
   modelNodes: ModelNodeItem[]
   viewpointNodes: ViewpointNodeItem[]
   maskNodes: MaskNodeItem[]
-  generating: boolean
   copyMode: boolean
   isNodeSelected: (
     kind: 'model' | 'viewpoint' | 'mask',

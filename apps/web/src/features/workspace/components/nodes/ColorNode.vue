@@ -127,7 +127,7 @@
 
       <NodeExecutionFooter
         :items="connectionChips"
-        :disabled="generating || uiState?.primaryAction?.disabled"
+        :disabled="uiState?.primaryAction?.disabled"
         :label="uiState?.primaryAction?.label || '应用'"
         @generate="emit('generate')"
       />
@@ -166,7 +166,6 @@ const props = defineProps<{
   active: boolean
   dragging: boolean
   copyMode: boolean
-  generating: boolean
   uiState?: NodeUiState
   errorPortKeys: string[]
 }>()

@@ -114,7 +114,7 @@ export const EDIT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EditNodeIoContext>[
   { key: 'image', label: (ctx) => ctx.imageLabel, kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'edit-image-input', top: 92 },
   { key: 'imageB', label: (ctx) => ctx.sourceLabel, kind: 'image', required: (ctx) => ctx.supportsSourceImage, direction: 'input', portName: 'imageB', portKey: 'edit-image-b-input', top: 136, visible: (ctx) => ctx.supportsSourceImage },
   { key: 'mask', label: (ctx) => ctx.maskLabel, kind: 'mask', required: (ctx) => ctx.requiresMask, direction: 'input', portName: 'mask', portKey: 'edit-mask-input', top: (ctx) => ctx.supportsSourceImage ? 180 : 136 },
-  { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'edit-prompt-input', top: (ctx) => ctx.supportsSourceImage ? 224 : 180, visible: (ctx) => ctx.supportsPrompt },
+  { key: 'prompt', label: 'Prompt', kind: 'prompt', required: (ctx) => ctx.supportsPrompt, direction: 'input', portName: 'prompt', portKey: 'edit-prompt-input', top: (ctx) => ctx.supportsSourceImage ? 224 : 180, visible: (ctx) => ctx.supportsPrompt },
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'edit-output', top: 92 },
 ]
 

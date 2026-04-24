@@ -279,6 +279,10 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 			req.Params["feature"] = featureSlug
 		}
 	}
+	accounts = filterAccountsByFeature(accounts, featureSlug)
+	if len(accounts) == 0 {
+		return "", fmt.Errorf("没有可用的 API 账号，请先添加账号")
+	}
 
 	fullPrompt = applyTaskSystemPrompt(fullPrompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {
 		if s.systemConfigRepo == nil {

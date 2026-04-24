@@ -81,7 +81,8 @@ func (h *SegHandler) Segment(c *gin.Context) {
 	resultURL, err := h.segService.Segment(req.ImageURL, req.SegType, req.ReturnForm)
 	if err != nil {
 		log.Printf("[Seg] segment failed: seg_type=%s err=%v", req.SegType, err)
-		response.Error(c, 500, "图像处理失败，请稍后重试")
+		status, message := classifyImageProcError(err)
+		response.Error(c, status, message)
 		return
 	}
 
@@ -129,7 +130,8 @@ func (h *SegHandler) Upscale(c *gin.Context) {
 	resultURL, err := h.segService.Upscale(req.ImageURL, req.Mode, req.UpscaleFactor, req.OutputFormat, req.OutputQuality)
 	if err != nil {
 		log.Printf("[Seg] upscale failed: mode=%s factor=%d err=%v", req.Mode, req.UpscaleFactor, err)
-		response.Error(c, 500, "图像处理失败，请稍后重试")
+		status, message := classifyImageProcError(err)
+		response.Error(c, status, message)
 		return
 	}
 

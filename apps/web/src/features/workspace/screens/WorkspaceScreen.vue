@@ -184,7 +184,6 @@
         :model-nodes="modelNodes"
         :viewpoint-nodes="viewpointNodes"
         :mask-nodes="maskNodes"
-        :generating="nodeGenerating"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
@@ -233,7 +232,6 @@
         :enhance-nodes="enhanceNodes"
         :wear-nodes="wearNodes"
         :color-nodes="colorNodes"
-        :generating="nodeGenerating"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
@@ -461,7 +459,7 @@ const enhanceNodes = ref<EnhanceNodeItem[]>([])
 const editNodes = ref<EditNodeItem[]>([])
 const fusionNodes = ref<FusionNodeItem[]>([])
 const wearNodes = ref<WearNodeItem[]>([])
-const runningExecutionNodeKey = ref<string | null>(null)
+const runningExecutionNodeKeys = ref<Set<string>>(new Set())
 const executionNodeLastRunFailedMap = ref<Record<string, boolean>>({})
 const executionNodeWatchSources = [
   modelNodes,
@@ -859,19 +857,23 @@ function setExecutionNodeRunning(
 ) {
   const key = getExecutionNodeStateKey(nodeType, nodeId)
   if (running) {
-    runningExecutionNodeKey.value = key
+    if (runningExecutionNodeKeys.value.has(key)) return
+    const nextKeys = new Set(runningExecutionNodeKeys.value)
+    nextKeys.add(key)
+    runningExecutionNodeKeys.value = nextKeys
     return
   }
-  if (runningExecutionNodeKey.value === key) {
-    runningExecutionNodeKey.value = null
-  }
+  if (!runningExecutionNodeKeys.value.has(key)) return
+  const nextKeys = new Set(runningExecutionNodeKeys.value)
+  nextKeys.delete(key)
+  runningExecutionNodeKeys.value = nextKeys
 }
 
 function isExecutionNodeRunning(
   nodeType: CanvasExecutionOutputNodeType,
   nodeId: number,
 ): boolean {
-  return runningExecutionNodeKey.value === getExecutionNodeStateKey(nodeType, nodeId)
+  return runningExecutionNodeKeys.value.has(getExecutionNodeStateKey(nodeType, nodeId))
 }
 
 function setExecutionNodeLastRunFailed(
@@ -972,7 +974,7 @@ function resetEditorState() {
   editNodes.value = []
   fusionNodes.value = []
   wearNodes.value = []
-  runningExecutionNodeKey.value = null
+  runningExecutionNodeKeys.value = new Set()
   executionNodeLastRunFailedMap.value = {}
   connections.value = []
   processedMaskPreviewUrls.value = {}
@@ -1160,7 +1162,7 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
     messages.value = state.messages.map(item => ({ ...item }))
     resetEditorUiState()
     clearAllNodeConnectionErrors()
-    runningExecutionNodeKey.value = null
+    runningExecutionNodeKeys.value = new Set()
     executionNodeLastRunFailedMap.value = {}
 
     imageNodes.value = state.imageNodes.map(node => ({
@@ -2030,8 +2032,12 @@ function warnMissingNodeInputs(
 ): boolean {
   if (missingPorts.length === 0) return false
   const { disconnectedPorts, pendingPorts } = getNodeRequiredPortIssues(nodeType, nodeId, missingPorts)
+  const unresolvedPorts = missingPorts.filter(
+    port => !disconnectedPorts.includes(port) && !pendingPorts.includes(port),
+  )
+  const mergedDisconnectedPorts = disconnectedPorts.concat(unresolvedPorts)
   triggerNodeConnectionError(nodeType, nodeId, missingPorts)
-  message.warning(formatMessage({ disconnectedPorts, pendingPorts }))
+  message.warning(formatMessage({ disconnectedPorts: mergedDisconnectedPorts, pendingPorts }))
   return true
 }
 
@@ -2283,7 +2289,6 @@ const {
   handleWearNodeGenerate,
   handleColorNodeGenerate,
 } = useNodeExecutors({
-  generating: nodeGenerating,
   message,
   messages,
   selectedIds,
@@ -2317,6 +2322,7 @@ const {
   saveSegmentResult: segApi.save,
   setExecutionNodeRunning,
   setExecutionNodeLastRunFailed,
+  isExecutionNodeRunning,
 })
 
 const {

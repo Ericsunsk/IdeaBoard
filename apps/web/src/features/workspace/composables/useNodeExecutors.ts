@@ -1,4 +1,3 @@
-import type { Ref } from 'vue'
 import type { SubmitTaskData } from '../../../shared/api/index'
 import { describeModelAngleSpec, describeWearTileMode } from '../components/nodes/nodeOptionConfig'
 import {
@@ -94,14 +93,13 @@ type SegmentPayload = {
 type StandardEditMode = Exclude<EditNodeItem['mode'], 'face-swap'>
 
 interface UseNodeExecutorsOptions {
-  generating: Ref<boolean>
   message: MessageApiLike
-  messages: Ref<CanvasImageItem[]>
-  selectedIds: Ref<number[]>
-  imageNodes: Ref<ImageNodeItem[]>
-  maskNodes: Ref<MaskNodeItem[]>
-  activeImageNodeId: Ref<number | null>
-  activeMaskNodeId: Ref<number | null>
+  messages: import('vue').Ref<CanvasImageItem[]>
+  selectedIds: import('vue').Ref<number[]>
+  imageNodes: import('vue').Ref<ImageNodeItem[]>
+  maskNodes: import('vue').Ref<MaskNodeItem[]>
+  activeImageNodeId: import('vue').Ref<number | null>
+  activeMaskNodeId: import('vue').Ref<number | null>
   getViewpointLabel: (key: string) => string
   getViewpointLightingLabel: (key: ViewpointNodeItem['lighting']) => string
   getNodeConnectionStatus: (
@@ -164,6 +162,10 @@ interface UseNodeExecutorsOptions {
     nodeId: number,
     failed: boolean,
   ) => void
+  isExecutionNodeRunning?: (
+    nodeType: CanvasExecutionOutputNodeType,
+    nodeId: number,
+  ) => boolean
 }
 
 export function useNodeExecutors(options: UseNodeExecutorsOptions) {
@@ -191,6 +193,14 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     options.setExecutionNodeLastRunFailed(nodeType, nodeId, true)
   }
 
+  function beginExecution(nodeType: CanvasExecutionOutputNodeType, nodeId: number): boolean {
+    if (options.isExecutionNodeRunning?.(nodeType, nodeId)) {
+      return false
+    }
+    markExecutionRunning(nodeType, nodeId)
+    return true
+  }
+
   function failExecution(
     nodeType: CanvasExecutionOutputNodeType,
     nodeId: number,
@@ -198,7 +208,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   ) {
     options.message.error(message)
     markExecutionFailed(nodeType, nodeId)
-    options.generating.value = false
   }
 
   function failExecutionFromError(
@@ -208,6 +217,31 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     fallback: string,
   ) {
     failExecution(nodeType, nodeId, resolveFailureMessage(error, fallback))
+  }
+
+  function formatStrictMissingInputMessage(
+    nodeLabel: string,
+    disconnectedPorts: string[],
+    pendingPorts: string[],
+    formatLabel: (port: string) => string,
+    promptContentMissing = false,
+  ) {
+    const missingLabels = [
+      ...disconnectedPorts.map(formatLabel),
+      ...(promptContentMissing ? ['Prompt 内容（请填写 Prompt 节点）'] : []),
+    ]
+    const pendingLabels = pendingPorts.map(formatLabel)
+
+    if (pendingLabels.length > 0 && missingLabels.length === 0) {
+      return `${nodeLabel} 节点等待上游 ${pendingLabels.join(' / ')} 输出`
+    }
+    if (pendingLabels.length > 0) {
+      return `${nodeLabel} 节点缺少 ${missingLabels.join(' / ')}，且等待上游 ${pendingLabels.join(' / ')} 输出`
+    }
+    if (missingLabels.length > 0) {
+      return `${nodeLabel} 节点缺少 ${missingLabels.join(' / ')}`
+    }
+    return `${nodeLabel} 节点缺少必填输入`
   }
 
   function cacheNodeOutputs(
@@ -281,8 +315,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     return options.resolveConnectedPlacedImageInput('viewpoint', node.id, 'image')
   }
 
-  function resolveConnectedViewpointPromptInput(node: ViewpointNodeItem, fallback = ''): string {
-    return options.resolveNodePromptText('viewpoint', node.id, fallback)
+  function resolveConnectedViewpointPromptInput(node: ViewpointNodeItem): string {
+    return options.resolveNodePromptText('viewpoint', node.id, '')
   }
 
   function resolveConnectedEditImageInput(node: EditNodeItem): PlacedImageInput | null {
@@ -297,16 +331,16 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     return options.resolveConnectedPlacedMaskInput('edit', node.id, 'mask')
   }
 
-  function resolveConnectedEditPromptInput(node: EditNodeItem, fallback = ''): string {
-    return options.resolveNodePromptText('edit', node.id, fallback)
+  function resolveConnectedEditPromptInput(node: EditNodeItem): string {
+    return options.resolveNodePromptText('edit', node.id, '')
   }
 
   function resolveConnectedFusionImageInput(node: FusionNodeItem, port: 'imageA' | 'imageB'): PlacedImageInput | null {
     return options.resolveConnectedPlacedImageInput('fusion', node.id, port)
   }
 
-  function resolveConnectedFusionPromptInput(node: FusionNodeItem, fallback = ''): string {
-    return options.resolveNodePromptText('fusion', node.id, fallback)
+  function resolveConnectedFusionPromptInput(node: FusionNodeItem): string {
+    return options.resolveNodePromptText('fusion', node.id, '')
   }
 
   function resolveConnectedEnhanceImageInput(node: EnhanceNodeItem): PlacedImageInput | null {
@@ -317,8 +351,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     return options.resolveConnectedPlacedMaskInput('enhance', node.id, 'mask')
   }
 
-  function resolveConnectedEnhancePromptInput(node: EnhanceNodeItem, fallback = ''): string {
-    return options.resolveNodePromptText('enhance', node.id, fallback)
+  function resolveConnectedEnhancePromptInput(node: EnhanceNodeItem): string {
+    return options.resolveNodePromptText('enhance', node.id, '')
   }
 
   function resolveConnectedWearImageInput(node: WearNodeItem, port: 'imageA' | 'imageB'): PlacedImageInput | null {
@@ -339,122 +373,30 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     placementY: number
     promptText: string
   } | null> {
-    let originalImageUrl = ''
-    let maskDataUrl = ''
-    let placementX = node.x + 340
-    let placementY = node.y + 18
-    const connectionStatus = options.getNodeConnectionStatus(nodeType, node)
-    const selectedCanvasImage =
-      options.selectedIds.value.length === 1
-        ? options.messages.value.find(item => item.id === options.selectedIds.value[0])
-        : null
-    const activeMaskNode =
-      options.activeMaskNodeId.value !== null
-        ? options.maskNodes.value.find(item => item.id === options.activeMaskNodeId.value)
-        : null
-    const latestMaskNode = [...options.maskNodes.value]
-      .reverse()
-      .find(item => !!item.sourceImageUrl && !!item.maskDataUrl)
-    const activeImageNode =
-      options.activeImageNodeId.value !== null
-        ? options.imageNodes.value.find(item => item.id === options.activeImageNodeId.value)
-        : null
-    const latestImageNode = [...options.imageNodes.value]
-      .reverse()
-      .find(item => !!item.sourceImageUrl || item.outputImages.length > 0)
-    const latestCanvasImage = [...options.messages.value].reverse()[0] ?? null
+    const connectedImage = options.resolveConnectedPlacedImageInput(nodeType, node.id, 'image')
+    const connectedMask = await options.resolveConnectedPlacedMaskInput(nodeType, node.id, 'mask')
     const promptText = options.resolveNodePromptText(nodeType, node.id, '')
+    const connectionStatus = options.getNodeConnectionStatus(nodeType, node)
+    const missingPorts = options.getMissingRequiredNodeInputs(nodeType, node, {
+      image: connectedImage,
+      mask: connectedMask,
+    })
+    if (options.warnMissingNodeInputs(nodeType, node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
+      const formatLabel = (port: string) => port === 'image'
+          ? 'Image'
+          : port === 'mask'
+            ? 'Mask'
+            : port
+      return formatStrictMissingInputMessage('Color', disconnectedPorts, pendingPorts, formatLabel)
+    })) return null
 
-    if (connectionStatus.hasAnyConnection) {
-      const connectedImage = options.resolveConnectedPlacedImageInput(nodeType, node.id, 'image')
-      const connectedMask = await options.resolveConnectedPlacedMaskInput(nodeType, node.id, 'mask')
-      const missingPorts = options.getMissingRequiredNodeInputs(nodeType, node, {
-        image: connectedImage,
-        mask: connectedMask,
-      })
-      if (options.warnMissingNodeInputs(nodeType, node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
-        if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
-          return `Color 节点等待上游 ${pendingPorts.join(' / ')} 输出`
-        }
-        if (pendingPorts.length > 0) {
-          return `Color 节点缺少 ${disconnectedPorts.join(' / ')} 连线，且等待上游 ${pendingPorts.join(' / ')} 输出`
-        }
-        return `Color 节点缺少 ${disconnectedPorts.join(' / ')} 连线`
-      })) return null
-
-      const resolvedImage = connectedImage!
-      const resolvedMask = connectedMask!
-
-      return {
-        originalImageUrl: resolvedImage.url,
-        maskDataUrl: resolvedMask.dataUrl,
-        placementX: resolvedMask.placementX,
-        placementY: resolvedMask.placementY,
-        promptText,
-      }
-    }
-
-    if (selectedCanvasImage) {
-      originalImageUrl = selectedCanvasImage.url
-      placementX = selectedCanvasImage.x - 340
-      placementY = selectedCanvasImage.y + 18
-      const autoMask = await options.buildFullMaskDataUrl(originalImageUrl)
-      if (!autoMask) {
-        options.message.error('无法生成全图蒙版，请重试')
-        return null
-      }
-      return {
-        originalImageUrl,
-        maskDataUrl: autoMask,
-        placementX,
-        placementY,
-        promptText,
-      }
-    }
-
-    const pickedMaskNode =
-      activeMaskNode && activeMaskNode.sourceImageUrl && activeMaskNode.maskDataUrl
-        ? activeMaskNode
-        : latestMaskNode
-    if (pickedMaskNode) {
-      maskDataUrl = await options.refineMaskDataUrl(
-        pickedMaskNode.maskDataUrl,
-        pickedMaskNode.refineAmount ?? 0,
-        !!pickedMaskNode.invertMask,
-      )
-      return {
-        originalImageUrl: pickedMaskNode.sourceImageUrl,
-        maskDataUrl,
-        placementX: pickedMaskNode.x + 340,
-        placementY: pickedMaskNode.y + 18,
-        promptText,
-      }
-    }
-
-    const pickedImageNode = options.getImageNodePreferredImage(activeImageNode ?? latestImageNode ?? null)
-    if (pickedImageNode) {
-      originalImageUrl = pickedImageNode.url
-      placementX = (activeImageNode ?? latestImageNode)?.x ?? node.x
-      placementY = ((activeImageNode ?? latestImageNode)?.y ?? node.y) + 18
-    } else if (latestCanvasImage) {
-      originalImageUrl = latestCanvasImage.url
-      placementX = latestCanvasImage.x - 340
-      placementY = latestCanvasImage.y + 18
-    } else {
-      options.message.warning('暂无可用输入，请先准备图片或 Mask 节点')
-      return null
-    }
-
-    const autoMask = await options.buildFullMaskDataUrl(originalImageUrl)
-    if (!autoMask) {
-      options.message.error('无法生成全图蒙版，请重试')
-      return null
-    }
+    const resolvedImage = connectedImage!
+    const resolvedMask = connectedMask!
     return {
-      originalImageUrl,
-      maskDataUrl: autoMask,
-      placementX,
-      placementY,
+      originalImageUrl: resolvedImage.url,
+      maskDataUrl: resolvedMask.dataUrl,
+      placementX: resolvedMask.placementX,
+      placementY: resolvedMask.placementY,
       promptText,
     }
   }
@@ -465,7 +407,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     targetColor: string,
     strength: number,
   ) {
-    if (options.generating.value) return
     const resolvedContext = await resolveColorGenerationContext(nodeType, node)
     if (!resolvedContext) return
     if (!resolvedContext.maskDataUrl) {
@@ -473,8 +414,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return
     }
 
-    markExecutionRunning(nodeType, node.id)
-    options.generating.value = true
+    if (!beginExecution(nodeType, node.id)) return
     const connectedOutputNodeId = options.getConnectedOutputImageTarget(nodeType, node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
     try {
@@ -565,29 +505,28 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   }
 
   async function handleModelNodeGenerate(node: ModelNodeItem) {
-    if (options.generating.value) return
+    const connectionStatus = options.getNodeConnectionStatus('model', node)
     const sourceInput = resolveConnectedModelImageInput(node)
     const modelImageInput = resolveConnectedModelReferenceImageInput(node)
+    const promptText = options.resolveNodePromptText('model', node.id, '')
     const missingPorts = options.getMissingRequiredNodeInputs('model', node, {
       image: sourceInput,
       imageA: modelImageInput,
     })
     if (options.warnMissingNodeInputs('model', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
-      if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
-        return `Model 节点等待上游 ${pendingPorts.join(' / ')} 输出`
-      }
-      if (pendingPorts.length > 0) {
-        return `Model 节点缺少 ${disconnectedPorts.join(' / ')} 连线，且等待上游 ${pendingPorts.join(' / ')} 输出`
-      }
-      return `Model 节点缺少 ${disconnectedPorts.join(' / ')} 连线`
+      const formatLabel = (port: string) => port === 'image'
+          ? 'Image'
+          : port === 'imageA'
+            ? 'Model'
+            : port
+      return formatStrictMissingInputMessage('Model', disconnectedPorts, pendingPorts, formatLabel)
     })) return
 
     const sourceUrl = sourceInput!.url
 
-    options.generating.value = true
+    if (!beginExecution('model', node.id)) return
     const angleSpec = { ...node.angleSpec }
     const angleLabel = describeModelAngleSpec(angleSpec)
-    const promptText = options.resolveNodePromptText('model', node.id, `视角：${angleLabel}`)
     const poseImageInput = resolveConnectedModelPoseImageInput(node)
     const modelStrength = clampModelReferenceStrength(node.modelStrength)
     const poseStrength = clampModelPoseStrength(node.poseStrength)
@@ -622,37 +561,24 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   }
 
   async function handleViewpointNodeGenerate(node: ViewpointNodeItem) {
-    if (options.generating.value) return
-
     const connectionStatus = options.getNodeConnectionStatus('viewpoint', node)
     const connectedImage = resolveConnectedViewpointImageInput(node)
-    const sourceUrls = connectedImage ? [connectedImage.url] : []
-
-    if (sourceUrls.length === 0) {
-      options.triggerNodeConnectionError('viewpoint', node.id, ['image'])
-      options.message.warning(
-        connectionStatus.pendingIncoming.image
-          ? 'Display 节点等待上游 Image 输出'
-          : connectionStatus.hasAnyConnection
-            ? 'Display 节点缺少 image 连线'
-            : '请先连接 Image 节点',
-      )
-      return
-    }
+    const promptText = resolveConnectedViewpointPromptInput(node).trim()
+    const missingPorts = options.getMissingRequiredNodeInputs('viewpoint', node, {
+      image: connectedImage,
+    })
+    if (options.warnMissingNodeInputs('viewpoint', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
+      const formatLabel = () => 'Image'
+      return formatStrictMissingInputMessage('Display', disconnectedPorts, pendingPorts, formatLabel)
+    })) return
 
     if (!node.selectedViewpoint) {
       options.message.warning('请选择视角')
       return
     }
 
-    options.generating.value = true
-    const viewpointLabel = options.getViewpointLabel(node.selectedViewpoint)
-    const lightingLabel = options.getViewpointLightingLabel(node.lighting)
-    const summaryPrompt = [
-      `视角：${viewpointLabel}`,
-      `光影：${lightingLabel}`,
-    ].filter(Boolean)
-    const promptText = resolveConnectedViewpointPromptInput(node, summaryPrompt.join('，')).trim()
+    const sourceUrls = [connectedImage!.url]
+    if (!beginExecution('viewpoint', node.id)) return
 
     await submitExecutionTask(
       'viewpoint',
@@ -679,8 +605,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   }
 
   async function handleEditNodeGenerate(node: EditNodeItem) {
-    if (options.generating.value) return
-
+    const connectionStatus = options.getNodeConnectionStatus('edit', node)
     const connectedImage = resolveConnectedEditImageInput(node)
     const connectedSourceImage = node.mode === 'face-swap'
       ? resolveConnectedEditSourceImageInput(node)
@@ -688,30 +613,30 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const connectedMask = await resolveConnectedEditMaskInput(node)
     const editModeMeta = node.mode === 'face-swap' ? null : getEditModeMeta(node.mode)
     const promptText = editModeMeta
-      ? resolveConnectedEditPromptInput(node, editModeMeta.fallbackPrompt)
+      ? resolveConnectedEditPromptInput(node)
       : ''
     const missingPorts = options.getMissingRequiredNodeInputs('edit', node, {
       image: connectedImage,
       ...(node.mode === 'face-swap'
         ? { imageB: connectedSourceImage }
-        : { mask: connectedMask }),
+        : { mask: connectedMask, prompt: promptText }),
     })
     if (options.warnMissingNodeInputs('edit', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
+      const promptContentMissing = missingPorts.includes('prompt')
+        && !!connectionStatus.incoming.prompt
+        && !connectionStatus.pendingIncoming.prompt
+        && !promptText.trim()
       const formatLabel = (port: string) =>
-        port === 'image' || port === 'imageB' || port === 'mask' || port === 'prompt'
+        port === 'prompt'
+          ? 'Prompt（请连接 Prompt 节点并填写内容）'
+          : port === 'image' || port === 'imageB' || port === 'mask' || port === 'prompt'
           ? getEditNodePortLabel(node.mode, port)
           : port
-      if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
-        return `Edit 节点等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
-      }
-      if (pendingPorts.length > 0) {
-        return `Edit 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线，且等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
-      }
-      return `Edit 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线`
+      return formatStrictMissingInputMessage('Edit', disconnectedPorts, pendingPorts, formatLabel, promptContentMissing)
     })) return
     const resolvedImage = connectedImage!
 
-    options.generating.value = true
+    if (!beginExecution('edit', node.id)) return
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('edit', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
 
@@ -781,29 +706,23 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   }
 
   async function handleFusionNodeGenerate(node: FusionNodeItem) {
-    if (options.generating.value) return
-
+    const connectionStatus = options.getNodeConnectionStatus('fusion', node)
     const connectedImageA = resolveConnectedFusionImageInput(node, 'imageA')
     const connectedImageB = resolveConnectedFusionImageInput(node, 'imageB')
     const imageAWeight = node.blendRatio
     const imageBWeight = 100 - node.blendRatio
-    const promptText = resolveConnectedFusionPromptInput(node, EXECUTION_FUSION_META.fallbackPrompt)
+    const promptText = resolveConnectedFusionPromptInput(node)
     const missingPorts = options.getMissingRequiredNodeInputs('fusion', node, {
       imageA: connectedImageA,
       imageB: connectedImageB,
     })
     if (options.warnMissingNodeInputs('fusion', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
-      const formatLabel = (port: string) => port === 'imageA' ? 'Image A' : 'Image B'
-      if (pendingPorts.length > 0 && disconnectedPorts.length === 0) {
-        return `Fusion 节点等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
-      }
-      if (pendingPorts.length > 0) {
-        return `Fusion 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线，且等待上游 ${pendingPorts.map(formatLabel).join(' / ')} 输出`
-      }
-      return `Fusion 节点缺少 ${disconnectedPorts.map(formatLabel).join(' / ')} 连线`
+      const formatLabel = (port: string) => port === 'imageA'
+          ? 'Image A'
+          : 'Image B'
+      return formatStrictMissingInputMessage('Fusion', disconnectedPorts, pendingPorts, formatLabel)
     })) return
-    options.generating.value = true
-
+    if (!beginExecution('fusion', node.id)) return
     await submitExecutionTask(
       'fusion',
       node.id,
@@ -830,26 +749,28 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   }
 
   async function handleEnhanceNodeGenerate(node: EnhanceNodeItem) {
-    if (options.generating.value) return
-
     const connectionStatus = options.getNodeConnectionStatus('enhance', node)
     const connectedImage = resolveConnectedEnhanceImageInput(node)
     const connectedMask = node.mode === 'hd-upscale' ? await resolveConnectedEnhanceMaskInput(node) : null
     const hasMaskConnection = node.mode === 'hd-upscale' && !!connectionStatus.incoming.mask
     const promptText = enhanceModeSupportsPrompt(node.mode)
-      ? resolveConnectedEnhancePromptInput(node, EXECUTION_ENHANCE_META.canvasExtend.fallbackPrompt)
+      ? resolveConnectedEnhancePromptInput(node)
       : ''
     const missingPorts = options.getMissingRequiredNodeInputs('enhance', node, {
       image: connectedImage,
-      ...(enhanceModeSupportsPrompt(node.mode) ? { prompt: promptText } : {}),
     })
-    if (options.warnMissingNodeInputs('enhance', node.id, missingPorts, ({ pendingPorts }) => (
-      pendingPorts.length > 0
-        ? 'Enhance 节点等待上游 Image 输出'
-        : 'Enhance 节点缺少 Image 连线'
-    ))) return
+    if (options.warnMissingNodeInputs('enhance', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
+      const promptContentMissing = missingPorts.includes('prompt')
+        && !!connectionStatus.incoming.prompt
+        && !connectionStatus.pendingIncoming.prompt
+        && !promptText.trim()
+      const formatLabel = (port: string) => port === 'prompt'
+        ? 'Prompt（请连接 Prompt 节点并填写内容）'
+        : 'Image'
+      return formatStrictMissingInputMessage('Enhance', disconnectedPorts, pendingPorts, formatLabel, promptContentMissing)
+    })) return
 
-    options.generating.value = true
+    if (!beginExecution('enhance', node.id)) return
     const outputNodeId = resolveExecutionOutputNodeId('enhance', node.id)
     const placementSource = options.buildPlacementSource(
       connectedImage!.url,
@@ -904,7 +825,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           return
         }
 
-        markExecutionRunning('enhance', node.id)
         const res = await options.upscaleImage({
           image_url: connectedImage!.url,
           mode: node.upscaleMode,
@@ -923,7 +843,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         cacheNodeOutputs('enhance', node.id, [res.data.image_url])
         options.message.success('HD upscale completed')
         markExecutionSucceeded('enhance', node.id)
-        options.generating.value = false
         return
       }
 
@@ -934,7 +853,9 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           nodeType: 'enhance',
           nodeId: node.id,
           request: buildExecutionTaskRequest({
-            prompt: `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${promptText || EXECUTION_ENHANCE_META.canvasExtend.fallbackPrompt}`,
+            prompt: promptText.trim()
+              ? `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${promptText}`
+              : '',
             feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
             imageUrls: [connectedImage!.url],
             params: {
@@ -957,8 +878,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   }
 
   async function handleWearNodeGenerate(node: WearNodeItem) {
-    if (options.generating.value) return
-
     const connectionStatus = options.getNodeConnectionStatus('wear', node)
     const connectedImageA = resolveConnectedWearImageInput(node, 'imageA')
     const connectedImageB = resolveConnectedWearImageInput(node, 'imageB')
@@ -990,7 +909,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return
     }
 
-    options.generating.value = true
+    if (!beginExecution('wear', node.id)) return
     const tileModeLabel = describeWearTileMode(node.tileMode)
     try {
       let maskImageUrl = ''
@@ -1041,8 +960,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   }
 
   async function handleColorNodeGenerate(node: ColorNodeItem) {
-    if (options.generating.value) return
-
     node.colors = normalizeColorNodeColors(node.colors.map(color => options.normalizeHexColor(color)))
     node.strength = Math.max(0, Math.min(100, Math.round(node.strength ?? DEFAULT_COLOR_STRENGTH)))
 
@@ -1063,8 +980,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return
     }
 
-    options.generating.value = true
-    markExecutionRunning('color', node.id)
+    if (!beginExecution('color', node.id)) return
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('color', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
     const placementSource = options.buildPlacementSource(

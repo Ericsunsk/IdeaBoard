@@ -115,7 +115,10 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
 
   async function handlePictureGenerate() {
     const promptText = resolveDirectPromptText(options.userPrompt.value)
-    if (!promptText) return
+    if (!promptText) {
+      options.message.warning('请输入提示词后再执行 Pattern Generate')
+      return
+    }
     options.generating.value = true
     let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
@@ -186,11 +189,12 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
   }
 
   async function handleSketchToDesignGenerate(source: CanvasImageItem) {
+    const desc = resolveDirectPromptText(options.userPrompt.value)
+    if (!desc) {
+      options.message.warning('请输入提示词后再执行 Sketch to Design')
+      return
+    }
     options.generating.value = true
-    const desc = resolveDirectPromptText(
-      options.userPrompt.value,
-      EXECUTION_DIRECT_ACTION_META.sketchToDesign.fallbackPrompt,
-    )
     let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
@@ -219,11 +223,12 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
   }
 
   async function handleStyleInnovateGenerate(source: CanvasImageItem) {
+    const desc = resolveDirectPromptText(options.userPrompt.value)
+    if (!desc) {
+      options.message.warning('请输入提示词后再执行 Style Innovate')
+      return
+    }
     options.generating.value = true
-    const desc = resolveDirectPromptText(
-      options.userPrompt.value,
-      EXECUTION_DIRECT_ACTION_META.styleInnovate.fallbackPrompt,
-    )
     const strength = options.styleInnovateStrength.value
     const imageSize = await options.loadImageSizeFromUrl(source.url)
     let pendingItems: CanvasImageItem[] = []
@@ -321,7 +326,6 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
 
   async function handleGenerate() {
     if (options.generating.value) return
-    if (!options.hasDirectPrompt.value) return
     await handlePictureGenerate()
   }
 

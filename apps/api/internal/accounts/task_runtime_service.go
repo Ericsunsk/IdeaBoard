@@ -43,16 +43,32 @@ func (s *TaskRuntimeService) RefreshTaskAccounts(task *redis.GlobalQueueTask) er
 	if err != nil {
 		return err
 	}
+	featureSlug := parseTaskFeatureSlug(task.Params)
+	accounts = filterAccountsByFeature(accounts, featureSlug)
+
+	// nil means "not constrained yet" (legacy/default behavior).
+	// non-nil means "task-scoped candidate pool", even if empty.
+	hasScopedCandidates := task.AccountIDs != nil
+	scoped := make(map[uint64]struct{}, len(task.AccountIDs))
+	for _, id := range task.AccountIDs {
+		scoped[id] = struct{}{}
+	}
 
 	ctx := context.Background()
-	task.AccountIDs = task.AccountIDs[:0]
+	next := make([]uint64, 0, len(accounts))
 	for _, account := range accounts {
+		if hasScopedCandidates {
+			if _, ok := scoped[account.ID]; !ok {
+				continue
+			}
+		}
 		maxConcurrent := normalizeMaxConcurrent(account.MaxConcurrent)
 		if err := s.redisMgr.EnsureAccountConcurrent(ctx, account.ID, maxConcurrent); err != nil {
 			return err
 		}
-		task.AccountIDs = append(task.AccountIDs, account.ID)
+		next = append(next, account.ID)
 	}
+	task.AccountIDs = next
 	return nil
 }
 
@@ -209,6 +225,39 @@ func (s *TaskRuntimeService) MarkTaskFailedWithRetry(taskID string, accountID ui
 	}
 
 	return s.taskRepo.Update(task)
+}
+
+func (s *TaskRuntimeService) RequeueTaskForFailover(taskID string, accountID uint64, errMsg string) error {
+	if accountID == 0 {
+		return ErrTaskStateConflict
+	}
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+		"status":      tasks.StatusPending,
+		"account_id":  0,
+		"error_msg":   errMsg,
+		"retry_count": gorm.Expr("retry_count + 1"),
+	})
+	if err != nil {
+		return err
+	}
+	if rows > 0 {
+		return nil
+	}
+
+	task, err := s.taskRepo.GetByTaskID(taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if isTaskTerminalStatus(task.Status) {
+		return ErrTaskTerminal
+	}
+	if task.Status == tasks.StatusPending {
+		return nil
+	}
+	return ErrTaskStateConflict
 }
 
 func (s *TaskRuntimeService) RecordAccountFailure(accountID uint64) (disabled bool, failCount int, err error) {

@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,23 +18,91 @@ import (
 	"api/internal/accounts"
 )
 
+type multipartFilePart struct {
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
+type multipartRequestCapture struct {
+	Fields map[string][]string
+	Files  map[string][]multipartFilePart
+}
+
+func mustDecodeBase64(t *testing.T, value string) []byte {
+	t.Helper()
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		t.Fatalf("decode base64: %v", err)
+	}
+	return decoded
+}
+
+func readMultipartRequest(t *testing.T, r *http.Request) multipartRequestCapture {
+	t.Helper()
+	mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil {
+		t.Fatalf("parse media type: %v", err)
+	}
+	if mediaType != "multipart/form-data" {
+		t.Fatalf("expected multipart/form-data, got %q", mediaType)
+	}
+	boundary := params["boundary"]
+	if boundary == "" {
+		t.Fatalf("missing multipart boundary")
+	}
+
+	reader := multipart.NewReader(r.Body, boundary)
+	capture := multipartRequestCapture{
+		Fields: map[string][]string{},
+		Files:  map[string][]multipartFilePart{},
+	}
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("read multipart part: %v", err)
+		}
+		data, err := io.ReadAll(part)
+		if err != nil {
+			t.Fatalf("read multipart part body: %v", err)
+		}
+		name := part.FormName()
+		if part.FileName() == "" {
+			capture.Fields[name] = append(capture.Fields[name], string(data))
+			continue
+		}
+		capture.Files[name] = append(capture.Files[name], multipartFilePart{
+			Filename:    part.FileName(),
+			ContentType: part.Header.Get("Content-Type"),
+			Data:        data,
+		})
+	}
+	return capture
+}
+
 func TestCallOpenAIUsesEditEndpointForCanvasExtend(t *testing.T) {
 	var gotPath string
-	var gotBody map[string]interface{}
+	var gotContentType string
+	var gotMultipart multipartRequestCapture
+	sourcePNG := mustDecodeBase64(t, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCwkAAAAASUVORK5CYII=")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/source.png" {
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(sourcePNG)
+			return
+		}
 		gotPath = r.URL.Path
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		if err := json.Unmarshal(body, &gotBody); err != nil {
-			t.Fatalf("unmarshal body: %v", err)
-		}
+		gotContentType = r.Header.Get("Content-Type")
+		gotMultipart = readMultipartRequest(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/extended.png"}]}`))
 	}))
 	defer server.Close()
+	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
 	c := &Consumer{}
 	account := &accounts.ApiAccount{
@@ -42,7 +112,7 @@ func TestCallOpenAIUsesEditEndpointForCanvasExtend(t *testing.T) {
 	}
 	params := map[string]interface{}{
 		"feature":      "canvas-extend",
-		"image_urls":   []interface{}{"https://img.example/source.png"},
+		"image_urls":   []interface{}{server.URL + "/source.png"},
 		"extend_right": 22,
 	}
 
@@ -56,19 +126,27 @@ func TestCallOpenAIUsesEditEndpointForCanvasExtend(t *testing.T) {
 	if gotPath != "/v1/images/edits" {
 		t.Fatalf("expected edit endpoint, got %s", gotPath)
 	}
-	if _, exists := gotBody["image"]; exists {
-		t.Fatalf("did not expect legacy image field in edit request")
+	if !strings.HasPrefix(gotContentType, "multipart/form-data; boundary=") {
+		t.Fatalf("expected multipart content-type, got %q", gotContentType)
 	}
-	images, ok := gotBody["images"].([]interface{})
-	if !ok || len(images) != 1 {
-		t.Fatalf("expected one images entry, got %#v", gotBody["images"])
+	if gotMultipart.Fields["prompt"][0] != "extend prompt" {
+		t.Fatalf("unexpected prompt field: %#v", gotMultipart.Fields["prompt"])
 	}
-	firstRef, ok := images[0].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected image ref object, got %#v", images[0])
+	if gotMultipart.Fields["model"][0] != "gpt-image-1" {
+		t.Fatalf("unexpected model field: %#v", gotMultipart.Fields["model"])
 	}
-	if firstRef["image_url"] != "https://img.example/source.png" {
-		t.Fatalf("unexpected image_url: %#v", firstRef["image_url"])
+	if gotMultipart.Fields["extend_right"][0] != "22" {
+		t.Fatalf("unexpected extend_right field: %#v", gotMultipart.Fields["extend_right"])
+	}
+	images := gotMultipart.Files["image"]
+	if len(images) != 1 {
+		t.Fatalf("expected one image multipart file, got %#v", images)
+	}
+	if images[0].ContentType != "image/png" {
+		t.Fatalf("unexpected image content-type: %s", images[0].ContentType)
+	}
+	if string(images[0].Data) != string(sourcePNG) {
+		t.Fatalf("unexpected image payload bytes")
 	}
 }
 
@@ -215,17 +293,13 @@ func TestCallOpenAIStyleInnovateDataURLDropsRedundantImageCopies(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIPartialEditDataURLDropsOnlyRedundantImageURLs(t *testing.T) {
-	var gotBody map[string]interface{}
+func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
+	var gotPath string
+	var gotMultipart multipartRequestCapture
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		if err := json.Unmarshal(body, &gotBody); err != nil {
-			t.Fatalf("unmarshal body: %v", err)
-		}
+		gotPath = r.URL.Path
+		gotMultipart = readMultipartRequest(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/edit.png"}]}`))
 	}))
@@ -243,35 +317,35 @@ func TestCallOpenAIPartialEditDataURLDropsOnlyRedundantImageURLs(t *testing.T) {
 		"feature":            "partial-edit",
 		"image_urls":         []interface{}{maskDataURL},
 		"original_image_url": sourceDataURL,
+		"mask_image_url":     maskDataURL,
 	}
 
 	if _, err := c.callOpenAI(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
-	image, ok := gotBody["image"].(string)
-	if !ok || image != maskDataURL {
-		t.Fatalf("expected image field to keep mask data url, got %#v", gotBody["image"])
+	if gotPath != "/v1/images/edits" {
+		t.Fatalf("expected edit endpoint, got %s", gotPath)
 	}
-	if _, exists := gotBody["image_urls"]; exists {
-		t.Fatalf("did not expect redundant image_urls field for single-image data-url request")
+	images := gotMultipart.Files["image"]
+	if len(images) != 1 {
+		t.Fatalf("expected one image file, got %#v", images)
 	}
-	originalImageURL, ok := gotBody["original_image_url"].(string)
-	if !ok || originalImageURL != sourceDataURL {
-		t.Fatalf("expected original_image_url to stay, got %#v", gotBody["original_image_url"])
+	masks := gotMultipart.Files["mask"]
+	if len(masks) != 1 {
+		t.Fatalf("expected one mask file, got %#v", masks)
+	}
+	if gotMultipart.Fields["original_image_url"][0] != sourceDataURL {
+		t.Fatalf("expected original_image_url field to stay, got %#v", gotMultipart.Fields["original_image_url"])
 	}
 }
 
-func TestCallOpenAIHDUpscaleMaskedDataURLDropsOnlyRedundantImageURLs(t *testing.T) {
-	var gotBody map[string]interface{}
+func TestCallOpenAIHDUpscaleMaskedUsesMultipartFiles(t *testing.T) {
+	var gotPath string
+	var gotMultipart multipartRequestCapture
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		if err := json.Unmarshal(body, &gotBody); err != nil {
-			t.Fatalf("unmarshal body: %v", err)
-		}
+		gotPath = r.URL.Path
+		gotMultipart = readMultipartRequest(t, r)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/upscale-masked.png"}]}`))
 	}))
@@ -296,19 +370,46 @@ func TestCallOpenAIHDUpscaleMaskedDataURLDropsOnlyRedundantImageURLs(t *testing.
 	if _, err := c.callOpenAI(context.Background(), account, "upscale prompt", 1024, 1024, 2*time.Second, params); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
-	if gotBody["image"] != sourceDataURL {
-		t.Fatalf("expected image to stay, got %#v", gotBody["image"])
+	if gotPath != "/v1/images/edits" {
+		t.Fatalf("expected edit endpoint, got %s", gotPath)
 	}
-	if _, exists := gotBody["image_urls"]; exists {
-		t.Fatalf("did not expect redundant image_urls field for single-image data-url request")
+	images := gotMultipart.Files["image"]
+	if len(images) != 1 {
+		t.Fatalf("expected one image file, got %#v", images)
 	}
-	originalImageURL, ok := gotBody["original_image_url"].(string)
-	if !ok || originalImageURL != sourceDataURL {
-		t.Fatalf("expected original_image_url to stay for masked hd-upscale, got %#v", gotBody["original_image_url"])
+	if gotMultipart.Fields["original_image_url"][0] != sourceDataURL {
+		t.Fatalf("expected original_image_url field to stay, got %#v", gotMultipart.Fields["original_image_url"])
 	}
-	maskImageURL, ok := gotBody["mask_image_url"].(string)
-	if !ok || maskImageURL != maskDataURL {
-		t.Fatalf("expected mask_image_url to stay for masked hd-upscale, got %#v", gotBody["mask_image_url"])
+	masks := gotMultipart.Files["mask"]
+	if len(masks) != 1 {
+		t.Fatalf("expected one mask file, got %#v", masks)
+	}
+}
+
+func TestShouldUseOpenAIEditEndpointOnlyForKnownEditFeatures(t *testing.T) {
+	if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
+		"feature":    "canvas-extend",
+		"image_urls": []interface{}{"https://img.example/source.png"},
+	}) {
+		t.Fatalf("expected canvas-extend to use edit endpoint")
+	}
+
+	if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
+		"feature":    "hd-upscale",
+		"image_urls": []interface{}{"https://img.example/source.png"},
+		"use_mask":   true,
+	}) {
+		t.Fatalf("expected masked hd-upscale to use edit endpoint")
+	}
+
+	if shouldUseOpenAIEditEndpoint(map[string]interface{}{
+		"feature":            "fabric-on-body",
+		"image_urls":         []interface{}{"https://img.example/source.png"},
+		"mask_image_url":     "https://img.example/mask.png",
+		"use_mask":           true,
+		"original_image_url": "https://img.example/source.png",
+	}) {
+		t.Fatalf("did not expect masked fabric-on-body to use edit endpoint")
 	}
 }
 

@@ -80,12 +80,47 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
   options: UseGenerationPipelineOptions<TSubmitPayload>,
 ) {
   const currentTaskId = ref<string | null>(null)
-  let pollTimer: number | null = null
+  const activeTaskIds = ref<string[]>([])
+  const pollTimers = new Map<string, number>()
 
-  function stopTaskPolling() {
-    if (!pollTimer) return
-    clearTimeout(pollTimer)
-    pollTimer = null
+  function syncCurrentTaskId() {
+    currentTaskId.value = activeTaskIds.value[activeTaskIds.value.length - 1] ?? null
+  }
+
+  function setTaskActive(taskId: string, active: boolean) {
+    if (active) {
+      if (!activeTaskIds.value.includes(taskId)) {
+        activeTaskIds.value = [...activeTaskIds.value, taskId]
+      }
+    } else if (activeTaskIds.value.includes(taskId)) {
+      activeTaskIds.value = activeTaskIds.value.filter(id => id !== taskId)
+    }
+    syncCurrentTaskId()
+    options.generating.value = activeTaskIds.value.length > 0
+  }
+
+  function isTaskActive(taskId: string) {
+    return activeTaskIds.value.includes(taskId)
+  }
+
+  function stopTaskPolling(taskId?: string) {
+    if (taskId) {
+      const timer = pollTimers.get(taskId)
+      if (timer != null) {
+        clearTimeout(timer)
+        pollTimers.delete(taskId)
+      }
+      setTaskActive(taskId, false)
+      return
+    }
+
+    pollTimers.forEach((timer) => {
+      clearTimeout(timer)
+    })
+    pollTimers.clear()
+    activeTaskIds.value = []
+    syncCurrentTaskId()
+    options.generating.value = false
   }
 
   function resolvePreferredImageOutputNode(providedNodeId?: number | null): ImageNodeItem | null {
@@ -269,11 +304,13 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     onCompleted?: (urls: string[]) => void,
     onFailed?: () => void,
   ) {
-    stopTaskPolling()
+    stopTaskPolling(taskId)
+    setTaskActive(taskId, true)
 
     const check = async () => {
       try {
         const res = await options.getTask(taskId)
+        if (!isTaskActive(taskId)) return
         if (res.code === 0 && res.data?.task) {
           const task = res.data.task
           if (task.status === 'completed') {
@@ -288,21 +325,23 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
               onFailed?.()
               options.message.warning('任务完成，但未返回图片')
             }
-            currentTaskId.value = null
-            options.generating.value = false
+            stopTaskPolling(taskId)
             return
           }
           if (task.status === 'failed') {
             options.message.error(sanitizeTaskErrorMessage(task.error_msg, '生成失败'))
             onFailed?.()
-            currentTaskId.value = null
-            options.generating.value = false
+            stopTaskPolling(taskId)
             return
           }
         }
-        pollTimer = window.setTimeout(check, 2000)
+        if (!isTaskActive(taskId)) return
+        const timer = window.setTimeout(check, 2000)
+        pollTimers.set(taskId, timer)
       } catch {
-        pollTimer = window.setTimeout(check, 3000)
+        if (!isTaskActive(taskId)) return
+        const timer = window.setTimeout(check, 3000)
+        pollTimers.set(taskId, timer)
       }
     }
 
@@ -317,7 +356,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
           sanitizeApiErrorMessage(submitRes.msg, submitOptions.failureMessage || 'Failed to submit task'),
         )
         submitOptions.onFailed?.()
-        options.generating.value = false
+        options.generating.value = activeTaskIds.value.length > 0
         return null
       }
 
@@ -341,7 +380,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
         sanitizeApiErrorMessage(errorMessage, submitOptions.failureMessage || 'Failed to submit task'),
       )
       submitOptions.onFailed?.()
-      options.generating.value = false
+      options.generating.value = activeTaskIds.value.length > 0
       return null
     }
   }

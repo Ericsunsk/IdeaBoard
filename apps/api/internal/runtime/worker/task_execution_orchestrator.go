@@ -87,7 +87,19 @@ func (o *taskExecutionOrchestrator) execute(task *redis.GlobalQueueTask, account
 		}
 		log.Printf("[Consumer] 上游调用失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 		elapsed := time.Since(startTime).Seconds()
-		o.completeFailedTask(task, accountID, userFacingProviderError(err), elapsed)
+		reason := userFacingProviderError(err)
+		if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
+			log.Printf("[Consumer] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
+		}
+		if requeueErr := o.taskRuntime.RequeueTaskForFailover(task.TaskID, accountID, reason); requeueErr != nil {
+			if errors.Is(requeueErr, accounts.ErrTaskNotFound) || errors.Is(requeueErr, accounts.ErrTaskTerminal) || errors.Is(requeueErr, accounts.ErrTaskStateConflict) {
+				o.dropTask(task, 0, "任务状态已收敛，丢弃脏队列任务")
+				return
+			}
+			log.Printf("[Consumer] 重置任务为待重试失败: task=%s err=%v", task.TaskID, requeueErr)
+			o.completeFailedTask(task, 0, reason, elapsed)
+			return
+		}
 		disabled, failCount, statErr := o.taskRuntime.RecordAccountFailure(accountID)
 		if statErr != nil {
 			log.Printf("[Consumer] 记录账号失败状态异常: account=%d err=%v", accountID, statErr)
@@ -95,6 +107,12 @@ func (o *taskExecutionOrchestrator) execute(task *redis.GlobalQueueTask, account
 		if disabled {
 			log.Printf("[Consumer] 账号 %d 失败次数过多(%d)，已自动禁用", accountID, failCount)
 		}
+		task.AccountIDs = removeAccountCandidate(task.AccountIDs, accountID)
+		if len(task.AccountIDs) == 0 {
+			o.completeFailedTask(task, 0, reason, elapsed)
+			return
+		}
+		o.requeueTask(task, 0, reason)
 		return
 	}
 
@@ -199,4 +217,18 @@ func userFacingProviderError(err error) string {
 		return "上游图像服务响应超时"
 	}
 	return "上游图像服务调用失败"
+}
+
+func removeAccountCandidate(accountIDs []uint64, accountID uint64) []uint64 {
+	if len(accountIDs) == 0 {
+		return accountIDs
+	}
+	next := make([]uint64, 0, len(accountIDs))
+	for _, id := range accountIDs {
+		if id == accountID {
+			continue
+		}
+		next = append(next, id)
+	}
+	return next
 }

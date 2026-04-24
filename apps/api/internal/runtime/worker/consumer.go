@@ -10,17 +10,22 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"api/internal/channels"
 	"api/internal/platform/redis"
+	"api/internal/platform/safehttp"
 	"api/internal/storage"
 	"api/internal/tasks"
 	"api/internal/workflow"
@@ -560,8 +565,6 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	}
 	finalizeOpenAIRequestBody(reqBody, params)
 
-	bodyJSON, _ := json.Marshal(reqBody)
-
 	// 如果 ProxyURL 已包含 /v1，则不再拼接 /v1
 	endpoint := baseURL + "/v1/images/generations"
 	if strings.HasSuffix(baseURL, "/v1") {
@@ -575,11 +578,26 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	}
 
 	client := &http.Client{Timeout: timeout}
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
-	if err != nil {
-		return "", err
+	var req *http.Request
+	var err error
+	if useEditEndpoint {
+		body, contentType, buildErr := buildOpenAIEditMultipartRequestBody(ctx, reqBody, timeout)
+		if buildErr != nil {
+			return "", buildErr
+		}
+		req, err = http.NewRequestWithContext(ctx, "POST", endpoint, body)
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Content-Type", contentType)
+	} else {
+		bodyJSON, _ := json.Marshal(reqBody)
+		req, err = http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
 
 	log.Printf(
@@ -614,6 +632,238 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	}
 
 	return extractOpenAIImageResponse(respBody, params)
+}
+
+func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody map[string]interface{}, timeout time.Duration) (*bytes.Buffer, string, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	for key, value := range reqBody {
+		if key == "images" || key == "mask" {
+			continue
+		}
+		if err := writeOpenAIMultipartField(writer, key, value); err != nil {
+			return nil, "", err
+		}
+	}
+
+	imageRefs := extractOpenAIImageRefs(reqBody["images"])
+	for index, ref := range imageRefs {
+		if err := writeOpenAIMultipartImagePart(ctx, writer, "image", ref, index, timeout); err != nil {
+			return nil, "", err
+		}
+	}
+	if len(imageRefs) == 0 {
+		return nil, "", fmt.Errorf("OpenAI 编辑请求缺少 image")
+	}
+
+	if maskRef := extractOpenAIImageRef(reqBody["mask"]); strings.TrimSpace(maskRef) != "" {
+		if err := writeOpenAIMultipartImagePart(ctx, writer, "mask", maskRef, 0, timeout); err != nil {
+			return nil, "", err
+		}
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, "", err
+	}
+	return &body, writer.FormDataContentType(), nil
+}
+
+func writeOpenAIMultipartField(writer *multipart.Writer, key string, value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	switch typed := value.(type) {
+	case string:
+		return writer.WriteField(key, typed)
+	case bool:
+		return writer.WriteField(key, strconv.FormatBool(typed))
+	case float32:
+		return writer.WriteField(key, strconv.FormatFloat(float64(typed), 'f', -1, 32))
+	case float64:
+		return writer.WriteField(key, strconv.FormatFloat(typed, 'f', -1, 64))
+	case int:
+		return writer.WriteField(key, strconv.Itoa(typed))
+	case int8:
+		return writer.WriteField(key, strconv.FormatInt(int64(typed), 10))
+	case int16:
+		return writer.WriteField(key, strconv.FormatInt(int64(typed), 10))
+	case int32:
+		return writer.WriteField(key, strconv.FormatInt(int64(typed), 10))
+	case int64:
+		return writer.WriteField(key, strconv.FormatInt(typed, 10))
+	case uint:
+		return writer.WriteField(key, strconv.FormatUint(uint64(typed), 10))
+	case uint8:
+		return writer.WriteField(key, strconv.FormatUint(uint64(typed), 10))
+	case uint16:
+		return writer.WriteField(key, strconv.FormatUint(uint64(typed), 10))
+	case uint32:
+		return writer.WriteField(key, strconv.FormatUint(uint64(typed), 10))
+	case uint64:
+		return writer.WriteField(key, strconv.FormatUint(typed, 10))
+	default:
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("序列化 multipart 字段失败 %s: %w", key, err)
+		}
+		return writer.WriteField(key, string(encoded))
+	}
+}
+
+func writeOpenAIMultipartImagePart(ctx context.Context, writer *multipart.Writer, fieldName, ref string, index int, timeout time.Duration) error {
+	filename, mimeType, data, err := resolveOpenAIImageBytes(ctx, strings.TrimSpace(ref), index, timeout)
+	if err != nil {
+		return err
+	}
+
+	headers := make(textproto.MIMEHeader)
+	headers.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, filename))
+	headers.Set("Content-Type", mimeType)
+	part, err := writer.CreatePart(headers)
+	if err != nil {
+		return err
+	}
+	_, err = part.Write(data)
+	return err
+}
+
+func resolveOpenAIImageBytes(ctx context.Context, ref string, index int, timeout time.Duration) (filename string, mimeType string, data []byte, err error) {
+	if strings.HasPrefix(ref, "data:") {
+		decodedMimeType, decodedData, decodeErr := decodeOpenAIDataURL(ref)
+		if decodeErr != nil {
+			return "", "", nil, fmt.Errorf("解析 data URL 失败: %w", decodeErr)
+		}
+		ext := inferOpenAIImageFileExtension(decodedMimeType)
+		return fmt.Sprintf("image-%d.%s", index+1, ext), decodedMimeType, decodedData, nil
+	}
+
+	parsed, parseErr := url.Parse(ref)
+	if parseErr != nil || parsed == nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", "", nil, fmt.Errorf("不支持的图像引用: %q", ref)
+	}
+
+	allowHosts := trustedOpenAIAssetHosts()
+	resp, doErr := safehttp.GetWithAllowHosts(ctx, ref, timeout, allowHosts...)
+	if doErr != nil {
+		return "", "", nil, fmt.Errorf("拉取图像失败: %w", doErr)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := readLimitedBody(resp.Body)
+		return "", "", nil, fmt.Errorf("拉取图像返回 %d: %s", resp.StatusCode, truncateErrorBody(string(body)))
+	}
+
+	body, readErr := readLimitedBody(resp.Body)
+	if readErr != nil {
+		return "", "", nil, readErr
+	}
+	if len(body) == 0 {
+		return "", "", nil, fmt.Errorf("拉取图像为空: %q", ref)
+	}
+
+	detectedMimeType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if parsedMimeType, _, parseMimeErr := mime.ParseMediaType(detectedMimeType); parseMimeErr == nil && strings.HasPrefix(parsedMimeType, "image/") {
+		detectedMimeType = parsedMimeType
+	} else {
+		detectedMimeType = inferLocalAssetMimeType(path.Base(parsed.Path), body)
+	}
+
+	filename = path.Base(parsed.Path)
+	if filename == "" || filename == "." || filename == "/" {
+		filename = fmt.Sprintf("image-%d.%s", index+1, inferOpenAIImageFileExtension(detectedMimeType))
+	}
+	if ext := strings.TrimSpace(path.Ext(filename)); ext == "" {
+		filename += "." + inferOpenAIImageFileExtension(detectedMimeType)
+	}
+
+	return filename, detectedMimeType, body, nil
+}
+
+func decodeOpenAIDataURL(raw string) (string, []byte, error) {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "data:") {
+		return "", nil, fmt.Errorf("不是 data URL")
+	}
+	comma := strings.Index(trimmed, ",")
+	if comma <= 5 {
+		return "", nil, fmt.Errorf("data URL 格式无效")
+	}
+	header := trimmed[5:comma]
+	payload := trimmed[comma+1:]
+	parts := strings.Split(header, ";")
+	mimeType := strings.TrimSpace(parts[0])
+	if mimeType == "" {
+		mimeType = "image/png"
+	}
+
+	isBase64 := false
+	for _, part := range parts[1:] {
+		if strings.EqualFold(strings.TrimSpace(part), "base64") {
+			isBase64 = true
+			break
+		}
+	}
+	if !isBase64 {
+		decoded, err := url.QueryUnescape(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		return mimeType, []byte(decoded), nil
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		return "", nil, err
+	}
+	return mimeType, decoded, nil
+}
+
+func inferOpenAIImageFileExtension(mimeType string) string {
+	switch strings.ToLower(strings.TrimSpace(mimeType)) {
+	case "image/jpeg", "image/jpg":
+		return "jpg"
+	case "image/webp":
+		return "webp"
+	case "image/gif":
+		return "gif"
+	default:
+		return "png"
+	}
+}
+
+func extractOpenAIImageRef(raw interface{}) string {
+	switch value := raw.(type) {
+	case map[string]string:
+		return value["image_url"]
+	case map[string]interface{}:
+		if text, ok := value["image_url"].(string); ok {
+			return text
+		}
+	}
+	return ""
+}
+
+func extractOpenAIImageRefs(raw interface{}) []string {
+	switch values := raw.(type) {
+	case []map[string]string:
+		out := make([]string, 0, len(values))
+		for _, value := range values {
+			if ref := strings.TrimSpace(value["image_url"]); ref != "" {
+				out = append(out, ref)
+			}
+		}
+		return out
+	case []interface{}:
+		out := make([]string, 0, len(values))
+		for _, value := range values {
+			if ref := strings.TrimSpace(extractOpenAIImageRef(value)); ref != "" {
+				out = append(out, ref)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string]interface{}) {
@@ -711,7 +961,51 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 	if !ok {
 		return false
 	}
-	return featureSlug == workflow.FeatureSlugCanvasExtend
+	if featureSlug == workflow.FeatureSlugCanvasExtend ||
+		featureSlug == workflow.FeatureSlugPartialEdit ||
+		featureSlug == workflow.FeatureSlugBgSwap {
+		return true
+	}
+	return featureSlug == workflow.FeatureSlugHDUpscale && hasOpenAIMaskInput(params)
+}
+
+func hasOpenAIMaskInput(params map[string]interface{}) bool {
+	if params == nil {
+		return false
+	}
+	for _, key := range []string{"mask_image_url", "mask_url"} {
+		if value, ok := params[key].(string); ok && strings.TrimSpace(value) != "" {
+			return true
+		}
+	}
+	for _, key := range []string{"mask_image_urls", "mask_urls"} {
+		switch values := params[key].(type) {
+		case []string:
+			if len(values) > 0 {
+				return true
+			}
+		case []interface{}:
+			for _, value := range values {
+				if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
+					return true
+				}
+			}
+		}
+	}
+	for _, key := range []string{"use_mask", "mask_enabled", "is_masked", "masked"} {
+		if enabled, ok := params[key].(bool); ok && enabled {
+			return true
+		}
+	}
+	return false
+}
+
+func trustedOpenAIAssetHosts() []string {
+	base := resolvePublicAssetBaseURL()
+	if base == nil || strings.TrimSpace(base.Hostname()) == "" {
+		return nil
+	}
+	return []string{base.Hostname()}
 }
 
 func countOpenAIImageInputs(params map[string]interface{}) int {

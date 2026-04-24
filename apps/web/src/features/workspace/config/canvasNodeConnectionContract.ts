@@ -110,7 +110,7 @@ export function getCanvasNodePortContracts(
         input('image', 'image', true),
         input('imageB', 'image', editModeSupportsSourceImage(editNode.mode), editModeSupportsSourceImage(editNode.mode)),
         input('mask', 'mask', editModeRequiresMask(editNode.mode), true),
-        input('prompt', 'prompt', false, editModeSupportsPrompt(editNode.mode)),
+        input('prompt', 'prompt', editModeSupportsPrompt(editNode.mode), editModeSupportsPrompt(editNode.mode)),
         output('image', 'image'),
       ]
     }

@@ -5,7 +5,6 @@
       :active="isNodeSelected('edit', node.id)"
       :dragging="isNodeDragging('edit', node.id)"
       :copy-mode="copyMode"
-      :generating="generating"
       :ui-state="getEditNodeUiState(node)"
       :error-port-keys="getNodeConnectionErrorPorts('edit', node.id)"
       @node-mousedown="emit('edit-node-mousedown', $event, node)"
@@ -22,7 +21,6 @@
       :active="isNodeSelected('fusion', node.id)"
       :dragging="isNodeDragging('fusion', node.id)"
       :copy-mode="copyMode"
-      :generating="generating"
       :ui-state="getFusionNodeUiState(node)"
       :error-port-keys="getNodeConnectionErrorPorts('fusion', node.id)"
       @node-mousedown="emit('fusion-node-mousedown', $event, node)"
@@ -39,7 +37,6 @@
       :active="isNodeSelected('enhance', node.id)"
       :dragging="isNodeDragging('enhance', node.id)"
       :copy-mode="copyMode"
-      :generating="generating"
       :ui-state="getEnhanceNodeUiState(node)"
       :error-port-keys="getNodeConnectionErrorPorts('enhance', node.id)"
       @node-mousedown="emit('enhance-node-mousedown', $event, node)"
@@ -64,7 +61,6 @@
       :active="isNodeSelected('wear', node.id)"
       :dragging="isNodeDragging('wear', node.id)"
       :copy-mode="copyMode"
-      :generating="generating"
       :ui-state="getWearNodeUiState(node)"
       :error-port-keys="getNodeConnectionErrorPorts('wear', node.id)"
       @node-mousedown="emit('wear-node-mousedown', $event, node)"
@@ -84,7 +80,6 @@
       :active="isNodeSelected('color', node.id)"
       :dragging="isNodeDragging('color', node.id)"
       :copy-mode="copyMode"
-      :generating="generating"
       :ui-state="getColorNodeUiState(node)"
       :error-port-keys="getNodeConnectionErrorPorts('color', node.id)"
       @node-mousedown="emit('color-node-mousedown', $event, node)"
@@ -121,7 +116,6 @@ const props = defineProps<{
   enhanceNodes: EnhanceNodeItem[]
   wearNodes: WearNodeItem[]
   colorNodes: ColorNodeItem[]
-  generating: boolean
   copyMode: boolean
   isNodeSelected: (
     kind: 'edit' | 'fusion' | 'enhance' | 'wear' | 'color',

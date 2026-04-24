@@ -71,7 +71,7 @@
         @input="onPromptInput"
         @keyup.enter="emit('generate')"
       />
-      <button type="button" class="send-btn" :disabled="!hasDirectPrompt || directGenerating" @click="emit('generate')">
+      <button type="button" class="send-btn" :disabled="directGenerating" @click="emit('generate')">
         <svg v-if="!directGenerating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         <n-spin v-else size="small" />
       </button>
