@@ -1,7 +1,7 @@
 package storage
 
 import (
-		"testing"
+	"testing"
 )
 
 func TestCanonicalizeStorageProfileMigratesLegacyAliyunProvider(t *testing.T) {
@@ -33,12 +33,12 @@ func TestCanonicalizeStorageProfileMigratesLegacyAliyunProvider(t *testing.T) {
 
 func TestCanonicalizeStorageProfileKeepsCurrentS3CompatibleConfig(t *testing.T) {
 	original := map[string]interface{}{
-		"access_key_id":      "test-ak",
-		"secret_access_key":  "test-sk",
-		"bucket_name":        "feng-assets",
-		"endpoint":           "s3.us-east-1.amazonaws.com",
-		"access_domain":      "https://feng-assets.s3.us-east-1.amazonaws.com",
-		"force_path_style":   true,
+		"access_key_id":     "test-ak",
+		"secret_access_key": "test-sk",
+		"bucket_name":       "feng-assets",
+		"endpoint":          "s3.us-east-1.amazonaws.com",
+		"access_domain":     "https://feng-assets.s3.us-east-1.amazonaws.com",
+		"force_path_style":  true,
 	}
 
 	provider, migrated, changed := canonicalizeStorageProfile(StorageProviderS3Compatible, original)

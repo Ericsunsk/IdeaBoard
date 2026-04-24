@@ -89,6 +89,11 @@ import {
   buildBoardPreviewItemsFromState,
   type BoardPreviewItem,
 } from '../lib/boardPreviewSerializer'
+import {
+  hydrateCanvasBoardsFromServer,
+  syncCanvasBoardToServer,
+  syncDeleteCanvasBoardToServer,
+} from '../lib/boardSync'
 
 const router = useRouter()
 const message = useMessage()
@@ -137,15 +142,23 @@ function refreshBoardPreviews() {
   boardPreviewMap.value = nextMap
 }
 
-function createAndOpenBoard() {
+async function createAndOpenBoard() {
   activeMenuBoardId.value = null
   const board = createCanvasBoard('Untitled')
+  try {
+    await syncCanvasBoardToServer(board.id)
+  } catch (error) {
+    console.warn('[boards] failed to sync new board', error)
+  }
   reloadBoards()
   router.push({ path: '/user/picture', query: { boardId: board.id } })
 }
 
 function openBoard(board: CanvasBoardMeta) {
   touchCanvasBoard(board.id)
+  void syncCanvasBoardToServer(board.id).catch((error) => {
+    console.warn('[boards] failed to sync board open touch', error)
+  })
   router.push({ path: '/user/picture', query: { boardId: board.id } })
 }
 
@@ -171,7 +184,7 @@ function onRenameInput(nextName: string) {
   renameDraft.value = nextName
 }
 
-function commitRename() {
+async function commitRename() {
   const boardId = renamingBoardId.value
   if (!boardId) return
   const renamed = renameCanvasBoard(boardId, renameDraft.value)
@@ -180,6 +193,11 @@ function commitRename() {
   if (!renamed) {
     message.warning('画布名称不能为空')
     return
+  }
+  try {
+    await syncCanvasBoardToServer(boardId)
+  } catch (error) {
+    console.warn('[boards] failed to sync renamed board', error)
   }
   reloadBoards()
   message.success('画布已重命名')
@@ -202,7 +220,7 @@ function handleRenameAction(board: CanvasBoardMeta) {
   startRename(board)
 }
 
-function handleDuplicateAction(board: CanvasBoardMeta) {
+async function handleDuplicateAction(board: CanvasBoardMeta) {
   activeMenuBoardId.value = null
   const copy = duplicateCanvasBoard(board.id)
   if (!copy) {
@@ -210,11 +228,16 @@ function handleDuplicateAction(board: CanvasBoardMeta) {
     return
   }
   duplicateCanvasBoardState(board.id, copy.id)
+  try {
+    await syncCanvasBoardToServer(copy.id)
+  } catch (error) {
+    console.warn('[boards] failed to sync duplicated board', error)
+  }
   reloadBoards()
   message.success('已复制画布')
 }
 
-function handleDeleteAction(board: CanvasBoardMeta) {
+async function handleDeleteAction(board: CanvasBoardMeta) {
   activeMenuBoardId.value = null
   if (!window.confirm(`确认删除画布「${board.name}」？`)) return
   const ok = deleteCanvasBoard(board.id)
@@ -223,6 +246,11 @@ function handleDeleteAction(board: CanvasBoardMeta) {
     return
   }
   deleteCanvasBoardState(board.id)
+  try {
+    await syncDeleteCanvasBoardToServer(board.id)
+  } catch (error) {
+    console.warn('[boards] failed to sync deleted board', error)
+  }
   if (renamingBoardId.value === board.id) {
     cancelRename()
   }
@@ -238,7 +266,8 @@ function handleWindowMouseDown(e: MouseEvent) {
   activeMenuBoardId.value = null
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await hydrateCanvasBoardsFromServer()
   reloadBoards()
   window.addEventListener('mousedown', handleWindowMouseDown)
 })

@@ -8,9 +8,11 @@ import (
 	"io"
 	"mime/multipart"
 	"net/textproto"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,11 +62,15 @@ func (s *StorageService) GetBucketInfo(id string) (map[string]interface{}, error
 }
 
 func (s *StorageService) Upload(file *multipart.FileHeader) (string, error) {
+	return s.UploadWithOptions(file, StorageStoreOptions{})
+}
+
+func (s *StorageService) UploadWithOptions(file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
 	profile, err := s.resolveActiveProfile()
 	if err != nil {
 		return "", err
 	}
-	return s.uploadWithProfile(*profile, file, StorageStoreOptions{})
+	return s.uploadWithProfile(*profile, file, opts)
 }
 
 func (s *StorageService) StoreRemote(ctx context.Context, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -85,6 +91,32 @@ func (s *StorageService) StoreBytes(filename string, data []byte, opts StorageSt
 		return "", err
 	}
 	return adapter.StoreBytes(profile, filename, data, opts)
+}
+
+func (s *StorageService) DeleteWorkspaceUploadByURL(userID uint64, rawURL string) error {
+	if userID == 0 {
+		return fmt.Errorf("用户信息无效")
+	}
+
+	profile, err := s.resolveActiveProfile()
+	if err != nil {
+		return err
+	}
+	key, err := s.extractObjectKeyFromUserUploadURL(*profile, rawURL)
+	if err != nil {
+		return err
+	}
+
+	prefix := workspaceUploadPrefix(userID)
+	if !strings.HasPrefix(key, prefix) {
+		return fmt.Errorf("仅允许删除当前用户工作区上传文件")
+	}
+
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	return adapter.Delete(profile, key)
 }
 
 func (s *StorageService) UsesObjectStorage() bool {
@@ -230,6 +262,109 @@ func (s *StorageService) saveBytesLocal(filename string, data []byte, opts Stora
 		return "", fmt.Errorf("保存文件失败: %v", err)
 	}
 	return "/" + strings.ReplaceAll(dst, "\\", "/"), nil
+}
+
+func (s *StorageService) deleteLocalByObjectKey(objectKey string) error {
+	normalized, err := normalizeUploadObjectKey(objectKey)
+	if err != nil {
+		return err
+	}
+
+	localPath := filepath.FromSlash(normalized)
+	if err := os.Remove(localPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("删除文件失败: %v", err)
+	}
+	return nil
+}
+
+func (s *StorageService) extractObjectKeyFromUserUploadURL(profile StorageProfile, raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", fmt.Errorf("图片地址不能为空")
+	}
+
+	if strings.HasPrefix(trimmed, "/") {
+		return normalizeUploadObjectKey(strings.TrimPrefix(trimmed, "/"))
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("图片地址格式错误")
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", fmt.Errorf("图片地址格式错误")
+	}
+
+	switch canonicalizeStorageProvider(profile.Provider) {
+	case StorageProviderLocal:
+		return normalizeUploadObjectKey(strings.TrimPrefix(parsed.Path, "/"))
+	case StorageProviderKodo:
+		cfg := s.kodoConfigFromProfile(&profile)
+		return extractObjectKeyFromAccessDomainURL(cfg.AccessDomain, parsed, "", false)
+	case StorageProviderS3Compatible:
+		cfg := s.s3CompatibleConfigFromProfile(&profile)
+		return extractObjectKeyFromAccessDomainURL(cfg.AccessDomain, parsed, strings.TrimSpace(cfg.BucketName), cfg.ForcePathStyle)
+	default:
+		return "", fmt.Errorf("不支持的存储类型")
+	}
+}
+
+func workspaceUploadPrefix(userID uint64) string {
+	return path.Join("uploads", "workspace", strconv.FormatUint(userID, 10)) + "/"
+}
+
+func normalizeUploadObjectKey(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", fmt.Errorf("文件路径不能为空")
+	}
+	cleaned := path.Clean("/" + strings.TrimPrefix(trimmed, "/"))
+	if !strings.HasPrefix(cleaned, "/uploads/") {
+		return "", fmt.Errorf("仅允许删除 uploads 目录下的文件")
+	}
+	return strings.TrimPrefix(cleaned, "/"), nil
+}
+
+func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL, bucketName string, forcePathStyle bool) (string, error) {
+	if parsed == nil {
+		return "", fmt.Errorf("图片地址格式错误")
+	}
+	base, err := normalizePublicDomain(accessDomain)
+	if err != nil {
+		return "", fmt.Errorf("访问域名配置无效")
+	}
+	baseURL, err := url.Parse(base)
+	if err != nil || baseURL.Host == "" {
+		return "", fmt.Errorf("访问域名配置无效")
+	}
+	if !strings.EqualFold(parsed.Hostname(), baseURL.Hostname()) {
+		return "", fmt.Errorf("仅允许删除当前存储域名下的文件")
+	}
+
+	relativePath := parsed.Path
+	basePath := strings.TrimSuffix(baseURL.EscapedPath(), "/")
+	if basePath != "" && basePath != "/" {
+		basePrefix := basePath + "/"
+		if strings.HasPrefix(relativePath, basePrefix) {
+			relativePath = strings.TrimPrefix(relativePath, basePrefix)
+		} else if relativePath == basePath {
+			relativePath = ""
+		}
+	}
+
+	candidate := strings.TrimPrefix(relativePath, "/")
+	if forcePathStyle && strings.TrimSpace(bucketName) != "" {
+		bucketPrefix := strings.Trim(strings.TrimSpace(bucketName), "/") + "/"
+		if strings.HasPrefix(candidate, bucketPrefix) {
+			candidate = strings.TrimPrefix(candidate, bucketPrefix)
+		}
+	}
+
+	return normalizeUploadObjectKey(candidate)
 }
 
 func (s *StorageService) downloadRemoteFile(ctx context.Context, remoteURL string, allowHosts []string) ([]byte, string, error) {

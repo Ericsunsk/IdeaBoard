@@ -42,6 +42,10 @@ func (a *localStorageAdapter) Upload(profile *StorageProfile, file *multipart.Fi
 	return a.service.saveUploadedFileLocal(file, opts)
 }
 
+func (a *localStorageAdapter) Delete(profile *StorageProfile, objectKey string) error {
+	return a.service.deleteLocalByObjectKey(objectKey)
+}
+
 func (a *localStorageAdapter) StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
 	return a.service.saveBytesLocal(filename, data, opts)
 }

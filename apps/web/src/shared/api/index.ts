@@ -290,6 +290,8 @@ export const uploadApi = {
     form.append('file', file)
     return api.post('/user/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } }) as any
   },
+  recycle: (url: string): Promise<ApiResponse<{ deleted: boolean }>> =>
+    api.delete('/user/upload', { data: { url } }) as any,
 }
 
 export const taskApi = {

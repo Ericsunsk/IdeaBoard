@@ -56,6 +56,20 @@ function serializeSnapshot(snapshot: CanvasBoardSnapshot): string {
   return JSON.stringify(snapshot)
 }
 
+function snapshotHasImageUrlReference(snapshot: CanvasBoardSnapshot, url: string): boolean {
+  return (
+    snapshot.messages.some(item => item.url === url) ||
+    snapshot.imageNodes.some(node => node.sourceImageUrl === url) ||
+    snapshot.maskNodes.some(node => node.sourceImageUrl === url)
+  )
+}
+
+interface HasImageUrlReferenceOptions {
+  recentUndoSteps?: number
+  includeRedo?: boolean
+  includeCurrent?: boolean
+}
+
 export function useCanvasHistory(options: UseCanvasHistoryOptions) {
   const maxEntries = options.maxEntries ?? 50
   const debounceMs = options.debounceMs ?? 120
@@ -64,6 +78,7 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
   const canRedo = ref(false)
   const undoDepth = ref(0)
   const redoDepth = ref(0)
+  const historyVersion = ref(0)
 
   const undoStack: CanvasBoardSnapshot[] = []
   const redoStack: CanvasBoardSnapshot[] = []
@@ -79,6 +94,10 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
     canUndo.value = undoStack.length > 0
     redoDepth.value = redoStack.length
     canRedo.value = redoStack.length > 0
+  }
+
+  function bumpHistoryVersion() {
+    historyVersion.value += 1
   }
 
   function clearPendingTimer() {
@@ -100,6 +119,7 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
     const baseline = cloneBoardSnapshot(snapshot ?? options.createSnapshot())
     lastCommittedSnapshot = baseline
     lastCommittedSerialized = serializeSnapshot(baseline)
+    bumpHistoryVersion()
   }
 
   function commitCurrentSnapshot() {
@@ -117,6 +137,7 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
 
     lastCommittedSnapshot = currentSnapshot
     lastCommittedSerialized = currentSerialized
+    bumpHistoryVersion()
   }
 
   function notifySnapshotChanged() {
@@ -184,6 +205,7 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
       await options.applySnapshot(restoreTarget)
       lastCommittedSnapshot = restoreTarget
       lastCommittedSerialized = serializeSnapshot(restoreTarget)
+      bumpHistoryVersion()
       return true
     } finally {
       isRestoring = false
@@ -213,10 +235,34 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
       await options.applySnapshot(restoreTarget)
       lastCommittedSnapshot = restoreTarget
       lastCommittedSerialized = serializeSnapshot(restoreTarget)
+      bumpHistoryVersion()
       return true
     } finally {
       isRestoring = false
     }
+  }
+
+  function hasImageUrlReference(url: string, queryOptions?: HasImageUrlReferenceOptions): boolean {
+    const targetURL = url.trim()
+    if (!targetURL) return false
+    const recentUndoSteps = queryOptions?.recentUndoSteps
+    const includeRedo = queryOptions?.includeRedo ?? true
+    const includeCurrent = queryOptions?.includeCurrent ?? true
+    const normalizedRecentUndoSteps = typeof recentUndoSteps === 'number' && Number.isFinite(recentUndoSteps)
+      ? Math.max(0, Math.floor(recentUndoSteps))
+      : null
+    const undoCandidates = normalizedRecentUndoSteps !== null
+      ? undoStack.slice(Math.max(0, undoStack.length - normalizedRecentUndoSteps))
+      : undoStack
+
+    if (includeCurrent && lastCommittedSnapshot && snapshotHasImageUrlReference(lastCommittedSnapshot, targetURL)) {
+      return true
+    }
+    if (undoCandidates.some(snapshot => snapshotHasImageUrlReference(snapshot, targetURL))) {
+      return true
+    }
+    if (!includeRedo) return false
+    return redoStack.some(snapshot => snapshotHasImageUrlReference(snapshot, targetURL))
   }
 
   return {
@@ -224,11 +270,13 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
     canRedo,
     undoDepth,
     redoDepth,
+    historyVersion,
     notifySnapshotChanged,
     beginBatch,
     endBatch,
     resetHistoryBaseline,
     undo,
     redo,
+    hasImageUrlReference,
   }
 }

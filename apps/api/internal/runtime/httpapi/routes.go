@@ -15,6 +15,7 @@ import (
 	"api/internal/accounts"
 	"api/internal/assets"
 	"api/internal/auth"
+	"api/internal/boards"
 	"api/internal/channels"
 	"api/internal/imageproc"
 	"api/internal/platform/media"
@@ -32,6 +33,7 @@ type Dependencies struct {
 	AuthHandler          *auth.AuthHandler
 	AdminHandler         *users.AdminHandler
 	AccountHandler       *accounts.AccountHandler
+	BoardHandler         *boards.BoardHandler
 	CardHandler          *assets.StyleCardHandler
 	ChannelHandler       *channels.ChannelHandler
 	StorageHandler       *storage.StorageHandler
@@ -125,6 +127,9 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 	userApi.GET("/drawing/:task_id", h.AccountHandler.GetUserTask)
 	userApi.DELETE("/drawing/:task_id", h.AccountHandler.DeleteUserTask)
 	userApi.GET("/drawing", h.AccountHandler.GetUserTasks)
+	userApi.GET("/boards", h.BoardHandler.ListBoards)
+	userApi.PUT("/boards/:board_id", h.BoardHandler.UpsertBoard)
+	userApi.DELETE("/boards/:board_id", h.BoardHandler.DeleteBoard)
 
 	userApi.GET("/style-cards", h.CardHandler.ListEnabled)
 	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
@@ -152,12 +157,39 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 400, err.Error())
 			return
 		}
-		url, err := h.StorageService.Upload(file)
+		userID := c.GetUint64("user_id")
+		if userID == 0 {
+			response.Error(c, 401, "未登录")
+			return
+		}
+		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
+			DirPrefix: path.Join("workspace", strconv.FormatUint(userID, 10)),
+		})
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
 		response.Success(c, gin.H{"url": url})
+	})
+
+	userApi.DELETE("/upload", func(c *gin.Context) {
+		var req struct {
+			URL string `json:"url"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Error(c, 400, "请求参数错误")
+			return
+		}
+		userID := c.GetUint64("user_id")
+		if userID == 0 {
+			response.Error(c, 401, "未登录")
+			return
+		}
+		if err := h.StorageService.DeleteWorkspaceUploadByURL(userID, req.URL); err != nil {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.Success(c, gin.H{"deleted": true})
 	})
 
 	userApi.GET("/download", func(c *gin.Context) {

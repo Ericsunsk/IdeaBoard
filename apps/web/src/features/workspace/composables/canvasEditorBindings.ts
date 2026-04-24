@@ -132,6 +132,7 @@ export function createCanvasSurfaceBindings(
     getCanvasPointFromClient: options.getCanvasPointFromClient,
     createCanvasImageAt: options.createCanvasImageAt,
     uploadImage: options.uploadImage,
+    resolveCanvasImageUploadMeta: options.resolveCanvasImageUploadMeta,
   }
 }
 

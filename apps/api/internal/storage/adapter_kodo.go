@@ -41,11 +41,15 @@ func (a *kodoStorageAdapter) GetBucketInfo(profile *StorageProfile) (map[string]
 }
 
 func (a *kodoStorageAdapter) Upload(profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
-	return a.service.kodoService.UploadWithConfig(file, a.service.kodoConfigFromProfile(profile))
+	return a.service.kodoService.UploadWithConfig(file, a.service.kodoConfigFromProfile(profile), opts)
+}
+
+func (a *kodoStorageAdapter) Delete(profile *StorageProfile, objectKey string) error {
+	return a.service.kodoService.DeleteWithConfig(objectKey, a.service.kodoConfigFromProfile(profile))
 }
 
 func (a *kodoStorageAdapter) StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	return a.service.kodoService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.kodoConfigFromProfile(profile))
+	return a.service.kodoService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.kodoConfigFromProfile(profile), opts)
 }
 
 func (a *kodoStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -61,5 +65,5 @@ func (a *kodoStorageAdapter) StoreRemote(ctx context.Context, profile *StoragePr
 		return "", err
 	}
 
-	return a.service.kodoService.UploadWithConfig(createMemoryFileHeader(filename, data), cfg)
+	return a.service.kodoService.UploadWithConfig(createMemoryFileHeader(filename, data), cfg, opts)
 }

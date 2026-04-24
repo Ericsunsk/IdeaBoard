@@ -13,6 +13,7 @@ interface UseCanvasSurfaceInteractionsOptions {
   getCanvasPointFromClient: (clientX: number, clientY: number) => CanvasPoint
   createCanvasImageAt: (point: CanvasPoint, url: string, ratio?: number) => CanvasImageItem
   uploadImage: (file: File) => Promise<{ code?: number; data?: { url?: string } }>
+  resolveCanvasImageUploadMeta?: (url: string) => CanvasImageItem['uploadMeta'] | undefined
 }
 
 export function useCanvasSurfaceInteractions(options: UseCanvasSurfaceInteractionsOptions) {
@@ -76,7 +77,12 @@ export function useCanvasSurfaceInteractions(options: UseCanvasSurfaceInteractio
       try {
         const res = await options.uploadImage(file)
         if (res.code === 0 && res.data?.url) {
-          options.messages.value.push(options.createCanvasImageAt({ x, y }, res.data.url))
+          const item = options.createCanvasImageAt({ x, y }, res.data.url)
+          const uploadMeta = options.resolveCanvasImageUploadMeta?.(res.data.url)
+          if (uploadMeta) {
+            item.uploadMeta = uploadMeta
+          }
+          options.messages.value.push(item)
         }
       } catch {
         // Keep drop interaction resilient; upload failure is already surfaced elsewhere.

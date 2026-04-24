@@ -98,6 +98,7 @@ export function useCanvasEditor(options: UseCanvasEditorOptions) {
     deleteFusionNode: options.deleteFusionNode,
     deleteEnhanceNode: options.deleteEnhanceNode,
     deleteWearNode: options.deleteWearNode,
+    onDeleteCanvasImages: options.onDeleteCanvasImages,
   })
 
   const {

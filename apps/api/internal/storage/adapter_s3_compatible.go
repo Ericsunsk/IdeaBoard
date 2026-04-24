@@ -38,11 +38,15 @@ func (a *s3CompatibleStorageAdapter) GetBucketInfo(profile *StorageProfile) (map
 }
 
 func (a *s3CompatibleStorageAdapter) Upload(profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
-	return a.service.s3CompatibleService.UploadWithConfig(file, a.service.s3CompatibleConfigFromProfile(profile))
+	return a.service.s3CompatibleService.UploadWithConfig(file, a.service.s3CompatibleConfigFromProfile(profile), opts)
+}
+
+func (a *s3CompatibleStorageAdapter) Delete(profile *StorageProfile, objectKey string) error {
+	return a.service.s3CompatibleService.DeleteWithConfig(objectKey, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
 func (a *s3CompatibleStorageAdapter) StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	return a.service.s3CompatibleService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile))
+	return a.service.s3CompatibleService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
 
 func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -50,5 +54,5 @@ func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *S
 	if err != nil {
 		return "", err
 	}
-	return a.service.s3CompatibleService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile))
+	return a.service.s3CompatibleService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
 }

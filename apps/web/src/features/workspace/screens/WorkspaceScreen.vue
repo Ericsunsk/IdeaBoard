@@ -320,6 +320,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { segApi, taskApi, uploadApi, upscaleApi, vectorizeApi } from '../../../shared/api/index'
 import { useUserStore } from '../../../app/stores/user'
+import { getAuthStorageUserScope } from '../../../shared/utils/auth'
+import { isImageUrlReferencedInOtherCanvasBoardStates } from '../../boards/lib/canvasBoardState'
 import { CANVAS_NODE_MENU_ITEMS, type CanvasNodeCreateActionKey } from '../config/canvasNodeMenu'
 import { useCanvasConnections } from '../composables/useCanvasConnections'
 import { useCanvasViewport } from '../composables/useCanvasViewport'
@@ -459,6 +461,223 @@ const enhanceNodes = ref<EnhanceNodeItem[]>([])
 const editNodes = ref<EditNodeItem[]>([])
 const fusionNodes = ref<FusionNodeItem[]>([])
 const wearNodes = ref<WearNodeItem[]>([])
+const RECENT_HISTORY_RECYCLE_GUARD_STEPS = 10
+const PENDING_RECYCLE_STORAGE_KEY_PREFIX = 'ideaboard.canvas.pendingUploadRecycle.v1'
+
+interface PendingRecycleUploadEntry {
+  url: string
+  userId: number
+  boardId: string
+}
+
+const pendingRecycleEntries = ref<PendingRecycleUploadEntry[]>(readPendingRecycleEntries())
+let pendingRecycleScanInFlight = false
+let pendingRecycleScanQueued = false
+let pendingRecycleScanTimer: number | null = null
+
+function getPendingRecycleStorageKey(): string | null {
+  const scope = getAuthStorageUserScope()
+  return scope ? `${PENDING_RECYCLE_STORAGE_KEY_PREFIX}.${scope}` : null
+}
+
+function normalizePendingRecycleEntry(entry: unknown): PendingRecycleUploadEntry | null {
+  if (!entry || typeof entry !== 'object') return null
+  const rawUrl = typeof (entry as { url?: unknown }).url === 'string' ? (entry as { url: string }).url.trim() : ''
+  const rawBoardId = typeof (entry as { boardId?: unknown }).boardId === 'string' ? (entry as { boardId: string }).boardId.trim() : ''
+  const rawUserId = Number((entry as { userId?: unknown }).userId)
+  if (!rawUrl || !rawBoardId || !Number.isFinite(rawUserId) || rawUserId <= 0) return null
+  return {
+    url: rawUrl,
+    userId: Math.floor(rawUserId),
+    boardId: rawBoardId,
+  }
+}
+
+function dedupePendingRecycleEntries(entries: PendingRecycleUploadEntry[]): PendingRecycleUploadEntry[] {
+  const entryMap = new Map<string, PendingRecycleUploadEntry>()
+  entries.forEach((entry) => {
+    const normalized = normalizePendingRecycleEntry(entry)
+    if (!normalized) return
+    entryMap.set(normalized.url, normalized)
+  })
+  return Array.from(entryMap.values())
+}
+
+function readPendingRecycleEntries(): PendingRecycleUploadEntry[] {
+  if (typeof window === 'undefined') return []
+  const storageKey = getPendingRecycleStorageKey()
+  if (!storageKey) return []
+  const raw = localStorage.getItem(storageKey)
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed)
+      ? dedupePendingRecycleEntries(parsed as PendingRecycleUploadEntry[])
+      : []
+  } catch {
+    return []
+  }
+}
+
+function writePendingRecycleEntries(entries: PendingRecycleUploadEntry[]) {
+  if (typeof window === 'undefined') return
+  const storageKey = getPendingRecycleStorageKey()
+  if (!storageKey) return
+  if (!entries.length) {
+    localStorage.removeItem(storageKey)
+    return
+  }
+  localStorage.setItem(storageKey, JSON.stringify(entries))
+}
+
+function setPendingRecycleEntries(entries: PendingRecycleUploadEntry[]) {
+  const nextEntries = dedupePendingRecycleEntries(entries)
+  pendingRecycleEntries.value = nextEntries
+  writePendingRecycleEntries(nextEntries)
+}
+
+function clearPendingRecycleScanTimer() {
+  if (pendingRecycleScanTimer === null) return
+  window.clearTimeout(pendingRecycleScanTimer)
+  pendingRecycleScanTimer = null
+}
+
+function parseCanvasImagePath(url: string): string | null {
+  const raw = url.trim()
+  if (!raw) return null
+  if (raw.startsWith('/')) return raw
+  try {
+    const parsed = new URL(raw, window.location.origin)
+    return parsed.pathname || null
+  } catch {
+    return null
+  }
+}
+
+function resolveCurrentWorkspaceUploadPrefix(): string | null {
+  const userID = Number(userStore.user?.id)
+  if (!Number.isFinite(userID) || userID <= 0) return null
+  return `/uploads/workspace/${Math.floor(userID)}/`
+}
+
+function resolveCanvasWorkspaceUploadMeta(url: string): CanvasImageItem['uploadMeta'] | undefined {
+  const prefix = resolveCurrentWorkspaceUploadPrefix()
+  if (!prefix) return undefined
+  const path = parseCanvasImagePath(url)
+  if (!path || !path.startsWith(prefix)) return undefined
+  return {
+    kind: 'workspace-local-drop-upload',
+    userId: Number(userStore.user?.id),
+  }
+}
+
+function isReferencedInActiveWorkspaceState(url: string): boolean {
+  return (
+    messages.value.some(item => item.url === url) ||
+    imageNodes.value.some(node => node.sourceImageUrl === url) ||
+    maskNodes.value.some(node => node.sourceImageUrl === url)
+  )
+}
+
+function queueDeletedCanvasUploadsForRecycle(deletedItems: CanvasImageItem[]) {
+  if (!deletedItems.length) return
+  const currentUserID = Number(userStore.user?.id)
+  const boardId = currentBoardId.value?.trim()
+  if (!Number.isFinite(currentUserID) || currentUserID <= 0 || !boardId) return
+
+  const nextEntryMap = new Map(
+    pendingRecycleEntries.value.map(entry => [entry.url, entry] as const),
+  )
+  deletedItems
+    .filter((item) => item.uploadMeta?.kind === 'workspace-local-drop-upload')
+    .filter((item) => item.uploadMeta?.userId === currentUserID)
+    .map(item => item.url.trim())
+    .filter(url => !!url)
+    .forEach((url) => {
+      nextEntryMap.set(url, {
+        url,
+        userId: currentUserID,
+        boardId,
+      })
+    })
+
+  setPendingRecycleEntries(Array.from(nextEntryMap.values()))
+  void schedulePendingRecycleScan()
+}
+
+async function flushPendingRecycleUploads() {
+  if (pendingRecycleScanInFlight) {
+    pendingRecycleScanQueued = true
+    return
+  }
+  clearPendingRecycleScanTimer()
+  if (pendingRecycleEntries.value.length === 0) return
+  pendingRecycleScanInFlight = true
+  try {
+    const activeBoardId = currentBoardId.value?.trim() || ''
+    const recycleTargets: PendingRecycleUploadEntry[] = []
+    const retainedEntries: PendingRecycleUploadEntry[] = []
+
+    pendingRecycleEntries.value.forEach((entry) => {
+      const normalized = normalizePendingRecycleEntry(entry)
+      if (!normalized) return
+      const { url } = normalized
+
+      if (isReferencedInActiveWorkspaceState(url)) {
+        return
+      }
+
+      if (hasHistoryImageUrlReference(url, {
+        recentUndoSteps: RECENT_HISTORY_RECYCLE_GUARD_STEPS,
+        includeRedo: true,
+        includeCurrent: false,
+      })) {
+        retainedEntries.push(normalized)
+        return
+      }
+
+      const excludeBoardId = normalized.boardId === activeBoardId ? activeBoardId : undefined
+      if (isImageUrlReferencedInOtherCanvasBoardStates(url, excludeBoardId)) {
+        retainedEntries.push(normalized)
+        return
+      }
+
+      recycleTargets.push(normalized)
+    })
+
+    setPendingRecycleEntries(retainedEntries)
+    if (!recycleTargets.length) return
+
+    const results = await Promise.allSettled(recycleTargets.map(entry => uploadApi.recycle(entry.url)))
+    const failedCount = results.filter(result => result.status === 'rejected').length
+    if (failedCount > 0) {
+      message.warning(`有 ${failedCount} 张图片回收失败，已保留文件`)
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          retainedEntries.push(recycleTargets[index])
+        }
+      })
+      setPendingRecycleEntries(retainedEntries)
+    }
+  } finally {
+    pendingRecycleScanInFlight = false
+    if (pendingRecycleScanQueued) {
+      pendingRecycleScanQueued = false
+      if (pendingRecycleEntries.value.length > 0) {
+        void flushPendingRecycleUploads()
+      }
+    }
+  }
+}
+
+async function schedulePendingRecycleScan() {
+  if (pendingRecycleEntries.value.length === 0) return
+  if (pendingRecycleScanTimer !== null) return
+  pendingRecycleScanTimer = window.setTimeout(() => {
+    pendingRecycleScanTimer = null
+    void flushPendingRecycleUploads()
+  }, 120)
+}
 const runningExecutionNodeKeys = ref<Set<string>>(new Set())
 const executionNodeLastRunFailedMap = ref<Record<string, boolean>>({})
 const executionNodeWatchSources = [
@@ -621,6 +840,7 @@ const {
   getCanvasPointFromClient,
   createCanvasImageAt: createCanvasImageItemAt,
   uploadImage: uploadApi.upload,
+  resolveCanvasImageUploadMeta: (url) => resolveCanvasWorkspaceUploadMeta(url),
   importCanvasImageToImageNodeAtPoint: (clientX, clientY, item) => importCanvasImageToImageNodeAtPoint(clientX, clientY, item),
   importCanvasImageToMaskNodeAtPoint: (clientX, clientY, item) => importCanvasImageToMaskNodeAtPoint(clientX, clientY, item),
   deleteImageNode,
@@ -633,6 +853,9 @@ const {
   deleteEditNode,
   deleteFusionNode,
   deleteWearNode,
+  onDeleteCanvasImages: (deletedItems) => {
+    queueDeletedCanvasUploadsForRecycle(deletedItems)
+  },
   hasSelectedConnection,
   clearSelectedConnection,
   deleteSelectedConnection,
@@ -1284,9 +1507,12 @@ const {
   resetHistoryBaseline: syncCanvasHistoryBaseline,
   undo: undoCanvasSnapshot,
   redo: redoCanvasSnapshot,
+  historyVersion: canvasHistoryVersion,
+  hasImageUrlReference: hasHistoryImageUrlReference,
 } = useCanvasHistory({
   createSnapshot: createBoardSnapshot,
   applySnapshot: applyBoardSnapshot,
+  maxEntries: RECENT_HISTORY_RECYCLE_GUARD_STEPS,
 })
 
 resetHistoryBaseline = syncCanvasHistoryBaseline
@@ -1453,6 +1679,37 @@ watch(
     notifySnapshotChanged()
   },
   { deep: true }
+)
+
+watch(
+  [messages, imageNodes, maskNodes],
+  () => {
+    void schedulePendingRecycleScan()
+  },
+  { deep: true },
+)
+
+watch(
+  () => canvasHistoryVersion.value,
+  () => {
+    void schedulePendingRecycleScan()
+  },
+)
+
+watch(
+  () => currentBoardId.value,
+  () => {
+    void schedulePendingRecycleScan()
+  },
+)
+
+watch(
+  () => userStore.user?.id,
+  () => {
+    setPendingRecycleEntries(readPendingRecycleEntries())
+    void schedulePendingRecycleScan()
+  },
+  { immediate: true },
 )
 
 watch(
@@ -2382,9 +2639,12 @@ onMounted(async () => {
   nextTick(() => {
     scheduleRenderedConnectionsRefresh()
   })
+  void schedulePendingRecycleScan()
 })
 
 onUnmounted(() => {
+  clearPendingRecycleScanTimer()
+  void flushPendingRecycleUploads()
   stopNodeTaskPolling()
   stopDirectTaskPolling()
   clearStyleStrengthLongPressTimer()

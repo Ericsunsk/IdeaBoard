@@ -87,6 +87,14 @@ export function listCanvasBoards(): CanvasBoardMeta[] {
   return readRawBoards().sort(compareByRecentDesc)
 }
 
+export function replaceCanvasBoards(boards: CanvasBoardMeta[]) {
+  const normalized = boards
+    .map(toValidBoardMeta)
+    .filter((item): item is CanvasBoardMeta => !!item)
+    .sort(compareByRecentDesc)
+  writeRawBoards(normalized)
+}
+
 export function getCanvasBoardById(boardId: string): CanvasBoardMeta | null {
   const id = boardId.trim()
   if (!id) return null

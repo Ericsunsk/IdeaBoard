@@ -53,6 +53,7 @@ interface UseCanvasSelectionStateOptions {
   deleteFusionNode: (id: number) => void
   deleteEnhanceNode: (id: number) => void
   deleteWearNode: (id: number) => void
+  onDeleteCanvasImages?: (deletedItems: CanvasImageItem[]) => void
 }
 
 export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions) {
@@ -308,8 +309,13 @@ export function useCanvasSelectionState(options: UseCanvasSelectionStateOptions)
   }
 
   function deleteSelectedCanvasImages() {
-    options.messages.value = options.messages.value.filter(item => !selectedIds.value.includes(item.id))
+    const selectedIdSet = new Set(selectedIds.value)
+    const deletedItems = options.messages.value.filter(item => selectedIdSet.has(item.id))
+    options.messages.value = options.messages.value.filter(item => !selectedIdSet.has(item.id))
     selectedIds.value = []
+    if (deletedItems.length > 0) {
+      options.onDeleteCanvasImages?.(deletedItems)
+    }
   }
 
   function removeSelectedId(id: number) {

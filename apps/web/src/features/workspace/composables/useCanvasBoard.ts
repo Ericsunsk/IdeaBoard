@@ -10,6 +10,7 @@ import {
 } from '../../boards/lib/canvasBoards'
 import type { CanvasBoardMeta } from '../../boards/lib/canvasBoards'
 import { getCanvasBoardState, setCanvasBoardState } from '../../boards/lib/canvasBoardState'
+import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from '../../boards/lib/boardSync'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 
 type LeaveChoice = 'save' | 'discard' | 'cancel'
@@ -113,6 +114,9 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     }
     currentBoardName.value = renamed.name
     boardNameDraft.value = ''
+    void syncCanvasBoardToServer(boardId).catch((error) => {
+      console.warn('[boards] failed to sync renamed board', error)
+    })
     refreshBoardOptions()
     options.message.success('已重命名画布')
   }
@@ -138,6 +142,9 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
       return boardId
     }
     const fallbackBoard = listCanvasBoards()[0] ?? createCanvasBoard(defaultBoardName)
+    void syncCanvasBoardToServer(fallbackBoard.id).catch((error) => {
+      console.warn('[boards] failed to sync fallback board', error)
+    })
     isNormalizingBoardId.value = true
     try {
       await router.replace({
@@ -169,6 +176,9 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     const saved = setCanvasBoardState(boardId, options.createSnapshot())
     if (!saved) return false
     touchCanvasBoard(boardId)
+    void syncCanvasBoardToServer(boardId).catch((error) => {
+      console.warn('[boards] failed to sync board snapshot', error)
+    })
     refreshBoardOptions()
     isBoardDirty.value = false
     return true
@@ -255,6 +265,7 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
   watch(
     () => route.query.boardId,
     async () => {
+      await hydrateCanvasBoardsFromServer()
       isBoardMenuOpen.value = false
       isRenamingBoard.value = false
       const boardId = await ensureWorkspaceBoardId()

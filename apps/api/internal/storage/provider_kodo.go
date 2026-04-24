@@ -1,7 +1,7 @@
 package storage
 
 import (
-		"api/internal/platform/settings"
+	"api/internal/platform/settings"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -180,10 +180,10 @@ func (s *KodoService) Upload(file *multipart.FileHeader) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("获取配置失败: %v", err)
 	}
-	return s.UploadWithConfig(file, cfg)
+	return s.UploadWithConfig(file, cfg, StorageStoreOptions{})
 }
 
-func (s *KodoService) UploadWithConfig(file *multipart.FileHeader, cfg *KodoConfig) (string, error) {
+func (s *KodoService) UploadWithConfig(file *multipart.FileHeader, cfg *KodoConfig, opts StorageStoreOptions) (string, error) {
 	if !s.IsConfigEnabled(cfg) {
 		return "", fmt.Errorf("七牛云配置未启用或不完整")
 	}
@@ -221,7 +221,7 @@ func (s *KodoService) UploadWithConfig(file *multipart.FileHeader, cfg *KodoConf
 	defer src.Close()
 
 	ext := strings.ToLower(filepath.Ext(file.Filename))
-	key := fmt.Sprintf("uploads/%s/%d%s", time.Now().Format("2006/01/02"), time.Now().UnixNano(), ext)
+	key := buildObjectKey(opts.DirPrefix, ext)
 
 	ret := storage.PutRet{}
 	err = formUploader.Put(context.Background(), &ret, upToken, key, src, file.Size, nil)
@@ -239,4 +239,21 @@ func (s *KodoService) UploadWithConfig(file *multipart.FileHeader, cfg *KodoConf
 	}
 	url := fmt.Sprintf("%s/%s", domain, ret.Key)
 	return url, nil
+}
+
+func (s *KodoService) DeleteWithConfig(objectKey string, cfg *KodoConfig) error {
+	if !s.IsConfigEnabled(cfg) {
+		return fmt.Errorf("七牛云配置未启用或不完整")
+	}
+	key := strings.TrimSpace(objectKey)
+	if key == "" {
+		return fmt.Errorf("文件路径不能为空")
+	}
+
+	mac := qbox.NewMac(cfg.AccessKey, cfg.SecretKey)
+	bucketManager := storage.NewBucketManager(mac, nil)
+	if err := bucketManager.Delete(cfg.BucketName, key); err != nil {
+		return fmt.Errorf("删除失败: %v", err)
+	}
+	return nil
 }

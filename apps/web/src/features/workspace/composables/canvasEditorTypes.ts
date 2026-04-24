@@ -46,6 +46,7 @@ export interface UseCanvasEditorOptions {
   getCanvasPointFromClient: (clientX: number, clientY: number) => CanvasPoint
   createCanvasImageAt: (point: CanvasPoint, url: string, ratio?: number) => CanvasImageItem
   uploadImage: (file: File) => Promise<{ code?: number; data?: { url?: string } }>
+  resolveCanvasImageUploadMeta?: (url: string) => CanvasImageItem['uploadMeta'] | undefined
   importCanvasImageToImageNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
   importCanvasImageToMaskNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
   deleteImageNode: (id: number) => void
@@ -58,6 +59,7 @@ export interface UseCanvasEditorOptions {
   deleteFusionNode: (id: number) => void
   deleteEnhanceNode: (id: number) => void
   deleteWearNode: (id: number) => void
+  onDeleteCanvasImages?: (deletedItems: CanvasImageItem[]) => void
   hasSelectedConnection?: () => boolean
   clearSelectedConnection?: () => void
   deleteSelectedConnection?: () => boolean

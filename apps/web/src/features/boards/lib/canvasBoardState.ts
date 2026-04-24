@@ -71,6 +71,16 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object'
 }
 
+function toValidCanvasImageUploadMeta(item: unknown): CanvasImageItem['uploadMeta'] | undefined {
+  if (!isObject(item)) return undefined
+  if (item.kind !== 'workspace-local-drop-upload') return undefined
+  if (!isFiniteNumber(item.userId) || item.userId <= 0) return undefined
+  return {
+    kind: 'workspace-local-drop-upload',
+    userId: Math.floor(item.userId),
+  }
+}
+
 function clampEnhanceExtendPercent(value: unknown): number {
   return isFiniteNumber(value)
     ? Math.max(ENHANCE_EXTEND_PERCENT_MIN, Math.min(ENHANCE_EXTEND_PERCENT_MAX, Math.round(value)))
@@ -139,6 +149,16 @@ function writeRawStateMap(stateMap: Record<string, CanvasBoardState>) {
   localStorage.setItem(scopedKey, JSON.stringify(stateMap))
 }
 
+export function replaceCanvasBoardStateMap(stateMap: Record<string, CanvasBoardState>) {
+  const normalized: Record<string, CanvasBoardState> = {}
+  Object.entries(stateMap).forEach(([boardId, state]) => {
+    const validState = toValidBoardState(state)
+    if (!validState) return
+    normalized[normalizeBoardId(boardId)] = validState
+  })
+  writeRawStateMap(normalized)
+}
+
 function toValidMessage(item: unknown): CanvasBoardStateMessage | null {
   if (!isObject(item)) return null
   if (item.type !== 'image') return null
@@ -155,6 +175,7 @@ function toValidMessage(item: unknown): CanvasBoardStateMessage | null {
     y: item.y,
     width,
     height_ratio: heightRatio,
+    uploadMeta: toValidCanvasImageUploadMeta(item.uploadMeta),
   }
 }
 
@@ -560,4 +581,19 @@ export function duplicateCanvasBoardState(sourceBoardId: string, targetBoardId: 
   stateMap[targetId] = copiedState
   writeRawStateMap(stateMap)
   return true
+}
+
+export function isImageUrlReferencedInOtherCanvasBoardStates(url: string, excludeBoardId?: string): boolean {
+  const targetURL = url.trim()
+  if (!targetURL) return false
+  const excluded = excludeBoardId?.trim() || ''
+  const stateMap = readRawStateMap()
+  return Object.entries(stateMap).some(([boardId, state]) => {
+    if (excluded && boardId === excluded) return false
+    return (
+      state.messages.some(item => item.url === targetURL) ||
+      state.imageNodes.some(node => node.sourceImageUrl === targetURL) ||
+      state.maskNodes.some(node => node.sourceImageUrl === targetURL)
+    )
+  })
 }

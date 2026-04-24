@@ -1,16 +1,14 @@
 package storage
 
 import (
-		"bytes"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -94,7 +92,7 @@ func ensureS3BucketAccessible(client s3BucketExistenceChecker, bucketName string
 	return nil
 }
 
-func (s *S3CompatibleService) UploadWithConfig(file *multipart.FileHeader, cfg *S3CompatibleConfig) (string, error) {
+func (s *S3CompatibleService) UploadWithConfig(file *multipart.FileHeader, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
 	if !s.IsConfigEnabled(cfg) {
 		return "", fmt.Errorf("S3 兼容存储配置未启用或不完整")
 	}
@@ -115,7 +113,7 @@ func (s *S3CompatibleService) UploadWithConfig(file *multipart.FileHeader, cfg *
 		return "", fmt.Errorf("读取文件失败: %v", err)
 	}
 
-	key := s.objectKey(file.Filename)
+	key := buildObjectKey(opts.DirPrefix, filepathExt(file.Filename))
 	contentType := file.Header.Get("Content-Type")
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
@@ -134,6 +132,24 @@ func (s *S3CompatibleService) UploadWithConfig(file *multipart.FileHeader, cfg *
 	}
 
 	return s.publicObjectURL(cfg, key)
+}
+
+func (s *S3CompatibleService) DeleteWithConfig(objectKey string, cfg *S3CompatibleConfig) error {
+	if !s.IsConfigEnabled(cfg) {
+		return fmt.Errorf("S3 兼容存储配置未启用或不完整")
+	}
+	key := strings.TrimSpace(objectKey)
+	if key == "" {
+		return fmt.Errorf("文件路径不能为空")
+	}
+	client, err := s.clientWithConfig(cfg)
+	if err != nil {
+		return err
+	}
+	if err := client.RemoveObject(context.Background(), strings.TrimSpace(cfg.BucketName), key, minio.RemoveObjectOptions{}); err != nil {
+		return fmt.Errorf("删除失败: %v", err)
+	}
+	return nil
 }
 
 func (s *S3CompatibleService) validateBaseConfig(cfg *S3CompatibleConfig) error {
@@ -172,14 +188,6 @@ func (s *S3CompatibleService) clientWithConfig(cfg *S3CompatibleConfig) (*minio.
 	return client, nil
 }
 
-func (s *S3CompatibleService) objectKey(filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
-	if ext == "" {
-		ext = ".png"
-	}
-	return fmt.Sprintf("uploads/%s/%d%s", time.Now().Format("2006/01/02"), time.Now().UnixNano(), ext)
-}
-
 func (s *S3CompatibleService) publicObjectURL(cfg *S3CompatibleConfig, key string) (string, error) {
 	base, err := normalizePublicDomain(cfg.AccessDomain)
 	if err != nil {
@@ -193,6 +201,14 @@ func (s *S3CompatibleService) publicObjectURL(cfg *S3CompatibleConfig, key strin
 		return fmt.Sprintf("%s/%s/%s", base, bucketName, key), nil
 	}
 	return fmt.Sprintf("%s/%s", base, key), nil
+}
+
+func filepathExt(filename string) string {
+	idx := strings.LastIndex(filename, ".")
+	if idx < 0 || idx >= len(filename)-1 {
+		return ".png"
+	}
+	return strings.ToLower(filename[idx:])
 }
 
 func parseS3Endpoint(raw string) (string, bool, error) {

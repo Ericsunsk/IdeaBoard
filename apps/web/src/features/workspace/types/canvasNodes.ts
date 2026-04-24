@@ -14,6 +14,12 @@ export interface CanvasImageItem {
   width?: number
   height_ratio?: number
   renderState?: 'ready' | 'pending'
+  uploadMeta?: CanvasImageUploadMeta
+}
+
+export interface CanvasImageUploadMeta {
+  kind: 'workspace-local-drop-upload'
+  userId: number
 }
 
 export function isCanvasImagePending(item: { renderState?: CanvasImageItem['renderState'] | null | undefined }) {

@@ -16,6 +16,7 @@ import (
 	"api/internal/accounts"
 	"api/internal/assets"
 	"api/internal/auth"
+	"api/internal/boards"
 	"api/internal/channels"
 	"api/internal/imageproc"
 	"api/internal/platform/config"
@@ -74,12 +75,14 @@ func Run(args []string) {
 	faceTemplateRepo := assets.NewFaceTemplateRepository(db)
 	bgTemplateRepo := assets.NewBgTemplateRepository(db)
 	patternStyleRepo := assets.NewPatternStyleRepository(db)
+	boardRepo := boards.NewBoardRepository(db)
 
 	userService := users.NewUserService(userRepo)
 	styleCardService := assets.NewStyleCardService(styleCardRepo)
 	storageService := storage.NewStorageService(systemConfigRepo)
 	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, styleCardService, systemConfigRepo, storageService)
 	segService := imageproc.NewSegService(systemConfigRepo)
+	boardService := boards.NewBoardService(boardRepo)
 
 	authHandler := auth.NewAuthHandler(userService, rdb)
 	adminHandler := users.NewAdminHandler(userService, rdb)
@@ -94,6 +97,7 @@ func Run(args []string) {
 	bgTemplateHandler := assets.NewBgTemplateHandler(bgTemplateRepo)
 	patternStyleHandler := assets.NewPatternStyleHandler(patternStyleRepo)
 	vectorizeHandler := imageproc.NewVectorizeHandler(taskRepo, storageService)
+	boardHandler := boards.NewBoardHandler(boardService)
 
 	r := gin.Default()
 
@@ -106,6 +110,7 @@ func Run(args []string) {
 		AuthHandler:          authHandler,
 		AdminHandler:         adminHandler,
 		AccountHandler:       accountHandler,
+		BoardHandler:         boardHandler,
 		CardHandler:          cardHandler,
 		ChannelHandler:       channelHandler,
 		StorageHandler:       storageHandler,
@@ -221,5 +226,6 @@ func migrateModels(db *gorm.DB) error {
 		&assets.FaceTemplate{},
 		&assets.BgTemplate{},
 		&assets.PatternStyle{},
+		&boards.UserBoard{},
 	)
 }
