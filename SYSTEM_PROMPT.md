@@ -455,10 +455,10 @@
 4. 避免边缘断裂、背景跳变、重复粘贴感、结构错位和无关主体。
 
 扩边参数：
-- 上：{{extend_top}}
-- 右：{{extend_right}}
-- 下：{{extend_bottom}}
-- 左：{{extend_left}}
+- 基于原图上：{{extend_top}}%
+- 基于原图右：{{extend_right}}%
+- 基于原图下：{{extend_bottom}}%
+- 基于原图左：{{extend_left}}%
 
 新增区域补充要求：
 {{user_prompt}}

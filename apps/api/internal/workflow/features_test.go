@@ -101,3 +101,45 @@ func TestResolveWorkflowFeatureSlug(t *testing.T) {
 		})
 	}
 }
+
+func TestIsStabilityTextToImagePlatform(t *testing.T) {
+	tests := []struct {
+		name     string
+		platform string
+		want     bool
+	}{
+		{name: "stability exact", platform: "stability", want: true},
+		{name: "stability ai exact", platform: "Stability AI", want: true},
+		{name: "stable diffusion contains", platform: "custom stable diffusion proxy", want: true},
+		{name: "openai", platform: "openai", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsStabilityTextToImagePlatform(tt.platform); got != tt.want {
+				t.Fatalf("platform=%q got=%v, want=%v", tt.platform, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsReferenceImageFeature(t *testing.T) {
+	tests := []struct {
+		feature string
+		want    bool
+	}{
+		{feature: FeatureSlugStyleFusion, want: true},
+		{feature: FeatureSlugFaceSwap, want: true},
+		{feature: FeatureSlugFabricOnBody, want: true},
+		{feature: FeatureSlugMultiAngle, want: true},
+		{feature: FeatureSlugCanvasExtend, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.feature, func(t *testing.T) {
+			if got := IsReferenceImageFeature(tt.feature); got != tt.want {
+				t.Fatalf("feature=%q got=%v, want=%v", tt.feature, got, tt.want)
+			}
+		})
+	}
+}

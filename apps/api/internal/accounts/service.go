@@ -290,6 +290,9 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		}
 		return s.systemConfigRepo.Get(prompts.FeaturePromptConfigKey(slug))
 	})
+	if err := validateExecutablePrompt(fullPrompt); err != nil {
+		return "", err
+	}
 
 	// line-draft 已退休：line_draft_mode_id 不再参与系统提示词主链覆盖。
 	if req.Params != nil {
@@ -483,6 +486,13 @@ func applyTaskSystemPrompt(
 ) string {
 	// 管理员后台配置是系统提示词唯一来源；这里不再追加代码层隐藏约束。
 	return prompts.ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug, params, loadPrompt)
+}
+
+func validateExecutablePrompt(fullPrompt string) error {
+	if strings.TrimSpace(fullPrompt) == "" {
+		return fmt.Errorf("缺少提示词，请填写 Prompt 或配置后台 system prompt")
+	}
+	return nil
 }
 
 func (s *AccountService) applyPreviewForTasks(items []*tasks.Task) {

@@ -46,6 +46,9 @@ func accountAllowsFeature(account *ApiAccount, featureSlug string) bool {
 	if account == nil || featureSlug == "" {
 		return true
 	}
+	if !isFeatureCompatibleWithPlatform(featureSlug, account.Platform) {
+		return false
+	}
 	allowed, blocked, constrained := parseFeatureRulesFromExtraConfig(account.ExtraConfig)
 	if !constrained {
 		return true
@@ -58,6 +61,16 @@ func accountAllowsFeature(account *ApiAccount, featureSlug string) bool {
 	}
 	_, ok := allowed[featureSlug]
 	return ok
+}
+
+func isFeatureCompatibleWithPlatform(featureSlug, platform string) bool {
+	if featureSlug == "" {
+		return true
+	}
+	if workflow.IsStabilityTextToImagePlatform(platform) && workflow.IsReferenceImageFeature(featureSlug) {
+		return false
+	}
+	return true
 }
 
 func parseTaskFeatureSlug(paramsJSON string) string {

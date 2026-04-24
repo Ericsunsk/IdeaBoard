@@ -471,6 +471,11 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		}
 	}
 	c.normalizeUpstreamMediaParams(params)
+	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
+
+	if workflow.IsStabilityTextToImagePlatform(account.Platform) && workflow.IsReferenceImageFeature(featureSlug) {
+		return "", fmt.Errorf("当前渠道不支持该图像参考能力")
+	}
 
 	// 根据 ratio 计算尺寸
 	width, height := parseSizeFromParams(params)
@@ -483,9 +488,9 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 	var imageURL string
 	var err error
 
-	platform := strings.ToLower(account.Platform)
+	platform := strings.ToLower(strings.TrimSpace(account.Platform))
 	switch {
-	case platform == "stability" || platform == "stable diffusion":
+	case workflow.IsStabilityTextToImagePlatform(platform):
 		imageURL, err = c.callStabilityAI(ctx, account, task.Prompt, width, height, timeout)
 	default:
 		// nano banana / openai / gemini 等 OpenAI 兼容平台（官方原生格式）
@@ -871,10 +876,12 @@ func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string
 		return
 	}
 
-	// OpenAI 兼容图像接口通常接收单个 image URL，这里显式传首图，避免中转站忽略数组型字段。
-	// 同时保留 image_urls，兼容需要读取完整图片列表的上游实现。
 	if imageURLs := normalizeOpenAIImageURLStrings(params); len(imageURLs) > 0 {
-		reqBody["image"] = imageURLs[0]
+		// 默认保留首图 image 字段以兼容部分只接收单图的上游实现。
+		// 但多图输入必须避免回退成单图字段，防止上游优先读取首图导致退化。
+		if len(imageURLs) == 1 {
+			reqBody["image"] = imageURLs[0]
+		}
 		reqBody["image_urls"] = imageURLs
 	}
 
@@ -928,6 +935,10 @@ func finalizeOpenAIRequestBody(reqBody map[string]interface{}, params map[string
 	if reqBody == nil || params == nil {
 		return
 	}
+	// 兜底保护：当 image_urls 已是多图时，确保不会携带退化的单图 image 字段。
+	if hasMultipleOpenAIImageURLs(reqBody["image_urls"]) {
+		delete(reqBody, "image")
+	}
 	image, ok := reqBody["image"].(string)
 	if !ok || !strings.HasPrefix(image, "data:") {
 		return
@@ -954,7 +965,7 @@ func finalizeOpenAIRequestBody(reqBody map[string]interface{}, params map[string
 }
 
 func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
-	if len(normalizeOpenAIImageInputs(params)) == 0 {
+	if len(collectOpenAIEditImageInputs(params)) == 0 {
 		return false
 	}
 	featureSlug, ok := workflow.ReadWorkflowStringParam(params, "feature")
@@ -963,7 +974,11 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 	}
 	if featureSlug == workflow.FeatureSlugCanvasExtend ||
 		featureSlug == workflow.FeatureSlugPartialEdit ||
-		featureSlug == workflow.FeatureSlugBgSwap {
+		featureSlug == workflow.FeatureSlugBgSwap ||
+		featureSlug == workflow.FeatureSlugStyleFusion ||
+		featureSlug == workflow.FeatureSlugFaceSwap ||
+		featureSlug == workflow.FeatureSlugFabricOnBody ||
+		featureSlug == workflow.FeatureSlugMultiAngle {
 		return true
 	}
 	return featureSlug == workflow.FeatureSlugHDUpscale && hasOpenAIMaskInput(params)
@@ -1009,7 +1024,24 @@ func trustedOpenAIAssetHosts() []string {
 }
 
 func countOpenAIImageInputs(params map[string]interface{}) int {
-	return len(normalizeOpenAIImageInputs(params))
+	return len(collectOpenAIEditImageInputs(params))
+}
+
+func hasMultipleOpenAIImageURLs(raw interface{}) bool {
+	switch imageURLs := raw.(type) {
+	case []string:
+		return len(imageURLs) > 1
+	case []interface{}:
+		count := 0
+		for _, value := range imageURLs {
+			if imageURL, ok := value.(string); ok && strings.TrimSpace(imageURL) != "" {
+				count++
+			}
+		}
+		return count > 1
+	default:
+		return false
+	}
 }
 
 func normalizeOpenAIImageURLStrings(params map[string]interface{}) []string {
@@ -1065,7 +1097,7 @@ func appendOpenAIEditParams(reqBody map[string]interface{}, params map[string]in
 	if params == nil {
 		return
 	}
-	if refs := normalizeOpenAIImageInputs(params); len(refs) > 0 {
+	if refs := collectOpenAIEditImageInputs(params); len(refs) > 0 {
 		reqBody["images"] = refs
 	}
 	if maskURL, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
@@ -1115,6 +1147,43 @@ func appendOpenAIEditParams(reqBody map[string]interface{}, params map[string]in
 			reqBody[key] = v
 		}
 	}
+}
+
+func collectOpenAIEditImageInputs(params map[string]interface{}) []map[string]string {
+	baseRefs := normalizeOpenAIImageInputs(params)
+	if params == nil {
+		return baseRefs
+	}
+
+	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
+	refs := make([]map[string]string, 0, len(baseRefs)+2)
+	seen := make(map[string]struct{}, len(baseRefs)+2)
+
+	appendUniqueRef := func(raw string) {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			return
+		}
+		if _, exists := seen[trimmed]; exists {
+			return
+		}
+		seen[trimmed] = struct{}{}
+		refs = append(refs, map[string]string{"image_url": trimmed})
+	}
+
+	for _, ref := range baseRefs {
+		appendUniqueRef(ref["image_url"])
+	}
+
+	if featureSlug == workflow.FeatureSlugMultiAngle {
+		for _, key := range []string{"model_url", "pose_url"} {
+			if ref, ok := workflow.ReadWorkflowStringParam(params, key); ok {
+				appendUniqueRef(ref)
+			}
+		}
+	}
+
+	return refs
 }
 
 func extractOpenAIImageResponse(respBody []byte, params map[string]interface{}) (string, error) {

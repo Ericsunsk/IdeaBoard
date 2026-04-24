@@ -56,7 +56,7 @@ func (t *Task) ToUserView() map[string]interface{} {
 }
 
 type SubmitTaskRequest struct {
-	Prompt    string                 `json:"prompt" binding:"required"`
+	Prompt    string                 `json:"prompt"`
 	CardIDs   []uint64               `json:"card_ids"`
 	Feature   string                 `json:"feature"`
 	ImageURLs []string               `json:"image_urls"`

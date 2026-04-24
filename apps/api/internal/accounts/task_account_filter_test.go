@@ -62,6 +62,37 @@ func TestFilterAccountsByFeatureIgnoresMalformedFeatureConfig(t *testing.T) {
 	}
 }
 
+func TestFilterAccountsByFeatureFiltersStabilityPlatformsForIncompatibleFeatures(t *testing.T) {
+	accounts := []*ApiAccount{
+		{ID: 1, Platform: "stability"},
+		{ID: 2, Platform: "stable diffusion"},
+		{ID: 3, Platform: "Stability AI"},
+		{ID: 4, Platform: "openai"},
+	}
+
+	testCases := []struct {
+		name    string
+		feature string
+	}{
+		{name: "style-fusion", feature: workflow.FeatureSlugStyleFusion},
+		{name: "face-swap", feature: workflow.FeatureSlugFaceSwap},
+		{name: "fabric-on-body", feature: workflow.FeatureSlugFabricOnBody},
+		{name: "multi-angle", feature: workflow.FeatureSlugMultiAngle},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := filterAccountsByFeature(accounts, tc.feature)
+			if len(got) != 1 {
+				t.Fatalf("expected only non-stability accounts, got=%d", len(got))
+			}
+			if got[0].ID != 4 {
+				t.Fatalf("unexpected account id: got=%d, want=4", got[0].ID)
+			}
+		})
+	}
+}
+
 func TestParseTaskFeatureSlugReturnsEmptyForInvalidJSON(t *testing.T) {
 	if got := parseTaskFeatureSlug("{invalid-json"); got != "" {
 		t.Fatalf("expected empty feature slug for invalid params json, got=%q", got)

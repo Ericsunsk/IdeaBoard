@@ -226,3 +226,35 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 		})
 	}
 }
+
+func TestCanvasExtendEmptyUserPromptCanStillBuildExecutablePrompt(t *testing.T) {
+	fullPrompt := applyTaskSystemPrompt(
+		"",
+		"",
+		workflow.FeatureSlugCanvasExtend,
+		map[string]interface{}{
+			"extend_right": 30,
+		},
+		func(string) (string, error) {
+			return "SYS 扩图 right={{extend_right}}", nil
+		},
+	)
+
+	if strings.TrimSpace(fullPrompt) == "" {
+		t.Fatalf("expected non-empty full prompt")
+	}
+	if err := validateExecutablePrompt(fullPrompt); err != nil {
+		t.Fatalf("expected executable prompt, got err: %v", err)
+	}
+}
+
+func TestValidateExecutablePromptReturnsExplicitErrorWhenFinalPromptEmpty(t *testing.T) {
+	err := validateExecutablePrompt("   ")
+	if err == nil {
+		t.Fatalf("expected validation error for empty prompt")
+	}
+	want := "缺少提示词，请填写 Prompt 或配置后台 system prompt"
+	if err.Error() != want {
+		t.Fatalf("got %q, want %q", err.Error(), want)
+	}
+}
