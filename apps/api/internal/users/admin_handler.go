@@ -131,7 +131,7 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	}
 
 	if err := h.userService.DeleteUser(targetUser.ID); err != nil {
-		response.Error(c, 400, err.Error())
+		response.InternalError(c, 500, "删除用户失败", err)
 		return
 	}
 	h.revokeUserSessionToken(c, targetUser.ID)

@@ -129,3 +129,56 @@ body.admin-route .n-modal-mask {
   backdrop-filter: blur(4px);
   background: rgba(0, 0, 0, 0.56);
 }
+
+/* User-only Naive UI message/toast skin */
+.user-message-container {
+  padding-top: 16px;
+}
+
+.user-message-container .n-message {
+  border-radius: 14px;
+  border: 1px solid #dbe2f1;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(154, 129, 233, 0.14) 0%, rgba(154, 129, 233, 0) 58%),
+    rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(50, 63, 95, 0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.user-message-container .n-message .n-message__content {
+  color: #2b3245;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.user-message-container .n-message .n-message__icon {
+  margin-right: 12px;
+}
+
+.user-message-container .n-message .n-message__icon > * {
+  color: #7a6bd5;
+}
+
+.user-message-container .n-message .n-message__icon--success-type > * {
+  color: #2f9a64;
+}
+
+.user-message-container .n-message .n-message__icon--warning-type > * {
+  color: #c9892b;
+}
+
+.user-message-container .n-message .n-message__icon--error-type > * {
+  color: #cb4a5c;
+}
+
+.user-message-container .n-message .n-message__close {
+  color: #7d86a0;
+  border-radius: 999px;
+}
+
+.user-message-container .n-message .n-message__close:hover {
+  background: rgba(122, 107, 213, 0.08);
+  color: #5f6780;
+}

@@ -152,6 +152,36 @@ func (s *S3CompatibleService) DeleteWithConfig(objectKey string, cfg *S3Compatib
 	return nil
 }
 
+func (s *S3CompatibleService) DeletePrefixWithConfig(objectKeyPrefix string, cfg *S3CompatibleConfig) error {
+	if !s.IsConfigEnabled(cfg) {
+		return fmt.Errorf("S3 兼容存储配置未启用或不完整")
+	}
+	prefix := strings.TrimSpace(objectKeyPrefix)
+	if prefix == "" {
+		return fmt.Errorf("文件前缀不能为空")
+	}
+
+	client, err := s.clientWithConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	bucketName := strings.TrimSpace(cfg.BucketName)
+	objectCh := client.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+	for object := range objectCh {
+		if object.Err != nil {
+			return fmt.Errorf("列举前缀对象失败: %v", object.Err)
+		}
+		if err := client.RemoveObject(context.Background(), bucketName, object.Key, minio.RemoveObjectOptions{}); err != nil {
+			return fmt.Errorf("删除对象失败: %v", err)
+		}
+	}
+	return nil
+}
+
 func (s *S3CompatibleService) validateBaseConfig(cfg *S3CompatibleConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("配置不能为空")

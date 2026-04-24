@@ -2,6 +2,7 @@ package users
 
 import (
 	"errors"
+	"log"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -14,11 +15,23 @@ var reservedUsernames = map[string]struct{}{
 }
 
 type UserService struct {
-	repo *UserRepository
+	repo             *UserRepository
+	workspaceCleaner UserWorkspaceCleaner
 }
 
-func NewUserService(repo *UserRepository) *UserService {
-	return &UserService{repo: repo}
+type UserWorkspaceCleaner interface {
+	DeleteWorkspaceByStorageUID(storageUID string) error
+}
+
+func NewUserService(repo *UserRepository, workspaceCleaner ...UserWorkspaceCleaner) *UserService {
+	var cleaner UserWorkspaceCleaner
+	if len(workspaceCleaner) > 0 {
+		cleaner = workspaceCleaner[0]
+	}
+	return &UserService{
+		repo:             repo,
+		workspaceCleaner: cleaner,
+	}
 }
 
 // Register 用户注册
@@ -190,6 +203,18 @@ func (s *UserService) UpdateStatus(userID uint64, status int8) error {
 
 // DeleteUser 删除用户
 func (s *UserService) DeleteUser(userID uint64) error {
+	targetUser, err := s.repo.GetByID(userID)
+	if err != nil {
+		return errors.New("用户不存在")
+	}
+
+	if s.workspaceCleaner != nil {
+		if err := s.workspaceCleaner.DeleteWorkspaceByStorageUID(targetUser.StorageUID); err != nil {
+			log.Printf("[users] delete workspace uploads failed for user_id=%d uid=%s: %v", targetUser.ID, targetUser.StorageUID, err)
+			return errors.New("删除失败：用户工作区文件清理失败，请查看服务日志")
+		}
+	}
+
 	return s.repo.Delete(userID)
 }
 

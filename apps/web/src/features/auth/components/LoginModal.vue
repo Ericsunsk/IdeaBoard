@@ -11,32 +11,33 @@
           </button>
           
           <div class="modal-header">
-            <h2 class="gradient-text">Welcome Back</h2>
-            <p>Please sign in to your account</p>
+            <h2 class="heading-text">欢迎回来</h2>
+            <p>登录 IdeaBoard，继续你的创作</p>
           </div>
 
           <n-form ref="formRef" :model="formValue" :rules="rules" size="large">
-            <n-form-item path="username" label="Username">
-              <n-input v-model:value="formValue.username" class="apple-input" />
+            <n-form-item path="username" label="账号">
+              <n-input v-model:value="formValue.username" placeholder="请输入账号" class="auth-input" />
             </n-form-item>
 
-            <n-form-item path="password" label="Password">
+            <n-form-item path="password" label="密码">
               <n-input
                 v-model:value="formValue.password"
                 type="password"
                 show-password-on="click"
-                class="apple-input"
+                placeholder="请输入密码"
+                class="auth-input"
               />
             </n-form-item>
           </n-form>
 
-          <n-button type="primary" block size="large" :loading="loading" :disabled="loading" class="apple-login-btn" @click="handleLogin">
-            {{ loading ? 'Signing in...' : 'Sign in' }}
+          <n-button type="primary" block size="large" :loading="loading" :disabled="loading" class="auth-primary-btn" @click="handleLogin">
+            {{ loading ? '登录中...' : '登录' }}
           </n-button>
 
           <div class="modal-footer">
-            <span>Don't have an account?</span>
-            <button type="button" class="signup-link" :disabled="loading" @click="handleSwitchToRegister">Sign up</button>
+            <span>还没有账号？</span>
+            <button type="button" class="signup-link" :disabled="loading" @click="handleSwitchToRegister">立即注册</button>
           </div>
         </div>
       </div>
@@ -72,10 +73,10 @@ const formValue = ref({
 
 const rules = {
   username: [
-    { required: true, message: 'Please enter your username', trigger: 'blur' },
+    { required: true, message: '请输入账号', trigger: 'blur' },
   ],
   password: [
-    { required: true, message: 'Please enter your password', trigger: 'blur' },
+    { required: true, message: '请输入密码', trigger: 'blur' },
   ]
 }
 
@@ -111,13 +112,13 @@ async function handleLogin() {
     await formRef.value?.validate()
     loading.value = true
     await userStore.login(formValue.value.username, formValue.value.password)
-    message.success('Sign in successful')
+    message.success('登录成功')
     resetForm()
     emit('login-success')
     emit('update:show', false)
   } catch (error: any) {
     if (Array.isArray(error)) return
-    message.error(error?.message || 'Sign in failed, please try again.')
+    message.error(error?.message || '登录失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -129,8 +130,8 @@ async function handleLogin() {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
+  background: rgba(21, 27, 43, 0.24);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -139,14 +140,14 @@ async function handleLogin() {
 
 .login-modal-content {
   background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(14px);
   width: 100%;
   max-width: 440px;
   padding: 48px;
-  border-radius: 32px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border-radius: 22px;
+  box-shadow: 0 24px 40px rgba(34, 45, 76, 0.16);
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid #d9dfec;
   animation: modalIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -187,11 +188,11 @@ async function handleLogin() {
   margin-bottom: 32px;
 }
 
-.gradient-text {
+.heading-text {
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 8px;
-  background: linear-gradient(135deg, #1d1d1f 0%, #434343 100%);
+  background: linear-gradient(135deg, #2b3142 0%, #4f5a76 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.02em;
@@ -202,26 +203,26 @@ async function handleLogin() {
   font-size: 16px;
 }
 
-.apple-input :deep(.n-input-wrapper) {
+.auth-input :deep(.n-input-wrapper) {
   padding-left: 12px;
   padding-right: 12px;
 }
 
-.apple-input :deep(.n-input) {
+.auth-input :deep(.n-input) {
   --n-border: 1px solid #d2d2d7;
-  --n-border-hover: 1px solid #9278e6;
-  --n-border-focus: 1px solid #9278e6;
+  --n-border-hover: 1px solid #7a6bd5;
+  --n-border-focus: 1px solid #7a6bd5;
   --n-color: rgba(255, 255, 255, 0.8);
   --n-color-focus: #ffffff;
   --n-text-color: #1d1d1f !important;
   --n-placeholder-color: #86868b;
-  --n-caret-color: #9278e6;
+  --n-caret-color: #7a6bd5;
   border-radius: 14px;
   font-size: 16px;
   height: 52px;
 }
 
-.apple-input :deep(input) {
+.auth-input :deep(input) {
   color: #1d1d1f !important;
 }
 
@@ -232,8 +233,8 @@ async function handleLogin() {
   margin-left: 4px;
 }
 
-.apple-login-btn {
-  background: #9278e6 !important;
+.auth-primary-btn {
+  background: #7a6bd5 !important;
   color: #ffffff !important;
   height: 52px !important;
   border-radius: 16px !important;
@@ -242,16 +243,16 @@ async function handleLogin() {
   margin-top: 12px !important;
   border: none !important;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  box-shadow: 0 8px 24px rgba(146, 120, 230, 0.3) !important;
+  box-shadow: 0 8px 24px rgba(122, 107, 213, 0.28) !important;
 }
 
-.apple-login-btn:hover {
-  background: #8065d6 !important;
+.auth-primary-btn:hover {
+  background: #6d5fd0 !important;
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(146, 120, 230, 0.4) !important;
+  box-shadow: 0 12px 32px rgba(122, 107, 213, 0.36) !important;
 }
 
-.apple-login-btn:active {
+.auth-primary-btn:active {
   transform: translateY(0);
 }
 
@@ -265,7 +266,7 @@ async function handleLogin() {
 .signup-link {
   background: none;
   border: none;
-  color: #9278e6;
+  color: #7a6bd5;
   font-weight: 600;
   margin-left: 8px;
   text-decoration: none;

@@ -15,6 +15,7 @@ type storageProviderAdapter interface {
 	GetBucketInfo(profile *StorageProfile) (map[string]interface{}, error)
 	Upload(profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error)
 	Delete(profile *StorageProfile, objectKey string) error
+	DeleteByPrefix(profile *StorageProfile, objectKeyPrefix string) error
 	StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error)
 	StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error)
 }

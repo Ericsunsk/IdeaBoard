@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"mime/multipart"
 	"strings"
 )
@@ -46,6 +47,10 @@ func (a *kodoStorageAdapter) Upload(profile *StorageProfile, file *multipart.Fil
 
 func (a *kodoStorageAdapter) Delete(profile *StorageProfile, objectKey string) error {
 	return a.service.kodoService.DeleteWithConfig(objectKey, a.service.kodoConfigFromProfile(profile))
+}
+
+func (a *kodoStorageAdapter) DeleteByPrefix(profile *StorageProfile, objectKeyPrefix string) error {
+	return fmt.Errorf("当前存储类型暂不支持按前缀删除对象: provider=%s prefix=%s", StorageProviderKodo, strings.TrimSpace(objectKeyPrefix))
 }
 
 func (a *kodoStorageAdapter) StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {

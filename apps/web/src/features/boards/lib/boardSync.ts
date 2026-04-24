@@ -2,6 +2,7 @@ import boardApi, { type UserBoardItem } from '../../../shared/api/board'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import {
   getCanvasBoardById,
+  normalizeCanvasBoardName,
   replaceCanvasBoards,
   type CanvasBoardMeta,
 } from './canvasBoards'
@@ -15,7 +16,7 @@ const hydrateInFlight = new Map<string, Promise<void>>()
 
 function toLocalMeta(board: UserBoardItem): CanvasBoardMeta | null {
   const boardId = board.board_id?.trim()
-  const name = board.name?.trim()
+  const name = normalizeCanvasBoardName(board.name || '')
   if (!boardId || !name) return null
   return {
     id: boardId,
@@ -84,4 +85,14 @@ export async function syncCanvasBoardToServer(boardId: string) {
 
 export async function syncDeleteCanvasBoardToServer(boardId: string) {
   await boardApi.remove(boardId)
+}
+
+export function isBoardNameConflictError(error: unknown): boolean {
+  if (typeof error !== 'object' || !error) return false
+  const status = 'status' in error ? (error as { status?: unknown }).status : undefined
+  if (status === 409) return true
+  const code = 'code' in error ? (error as { code?: unknown }).code : undefined
+  if (code === 409) return true
+  const msg = 'msg' in error ? (error as { msg?: unknown }).msg : undefined
+  return typeof msg === 'string' && msg.includes('画布名称已存在')
 }

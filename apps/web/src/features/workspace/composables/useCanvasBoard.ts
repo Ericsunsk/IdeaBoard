@@ -4,13 +4,18 @@ import type { LocationQueryValue } from 'vue-router'
 import {
   createCanvasBoard,
   getCanvasBoardById,
+  isCanvasBoardNameTaken,
   listCanvasBoards,
   renameCanvasBoard,
   touchCanvasBoard,
 } from '../../boards/lib/canvasBoards'
 import type { CanvasBoardMeta } from '../../boards/lib/canvasBoards'
 import { getCanvasBoardState, setCanvasBoardState } from '../../boards/lib/canvasBoardState'
-import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from '../../boards/lib/boardSync'
+import {
+  hydrateCanvasBoardsFromServer,
+  isBoardNameConflictError,
+  syncCanvasBoardToServer,
+} from '../../boards/lib/boardSync'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 
 type LeaveChoice = 'save' | 'discard' | 'cancel'
@@ -103,6 +108,10 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
       boardNameDraft.value = ''
       return
     }
+    if (isCanvasBoardNameTaken(nextName, boardId)) {
+      options.message.warning('名称已存在')
+      return
+    }
     const renamed = renameCanvasBoard(boardId, nextName)
     if (!renamed) {
       options.message.warning('重命名失败')
@@ -112,6 +121,13 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     currentBoardName.value = renamed.name
     boardNameDraft.value = ''
     void syncCanvasBoardToServer(boardId).catch((error) => {
+      if (isBoardNameConflictError(error)) {
+        void hydrateCanvasBoardsFromServer().finally(() => {
+          syncCurrentBoardName()
+        })
+        options.message.error('名称已存在，请更换后重试')
+        return
+      }
       console.warn('[boards] failed to sync renamed board', error)
     })
     refreshBoardOptions()
@@ -145,6 +161,13 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     }
     const fallbackBoard = listCanvasBoards()[0] ?? createCanvasBoard(defaultBoardName)
     void syncCanvasBoardToServer(fallbackBoard.id).catch((error) => {
+      if (isBoardNameConflictError(error)) {
+        void hydrateCanvasBoardsFromServer().finally(() => {
+          syncCurrentBoardName()
+        })
+        options.message.error('名称已存在，请刷新后重试')
+        return
+      }
       console.warn('[boards] failed to sync fallback board', error)
     })
     isNormalizingBoardId.value = true
@@ -179,6 +202,13 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     if (!saved) return false
     touchCanvasBoard(boardId)
     void syncCanvasBoardToServer(boardId).catch((error) => {
+      if (isBoardNameConflictError(error)) {
+        void hydrateCanvasBoardsFromServer().finally(() => {
+          syncCurrentBoardName()
+        })
+        options.message.error('名称已存在，请重命名后再保存')
+        return
+      }
       console.warn('[boards] failed to sync board snapshot', error)
     })
     refreshBoardOptions()

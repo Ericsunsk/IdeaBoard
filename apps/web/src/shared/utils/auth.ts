@@ -41,6 +41,11 @@ export function getAuthStorageUserScope(): string | null {
   const user = getStoredUser()
   if (!user) return null
 
+  const uid = typeof user.uid === 'string' ? user.uid.trim() : ''
+  if (/^[A-Z0-9]{6}$/.test(uid)) {
+    return `uid_${uid}`
+  }
+
   if (typeof user.id === 'number' && Number.isFinite(user.id)) {
     return `uid_${user.id}`
   }

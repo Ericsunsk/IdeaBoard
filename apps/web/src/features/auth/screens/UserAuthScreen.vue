@@ -3,7 +3,7 @@
     <div class="auth-bg"></div>
     <div class="auth-brand">
       <h1>IdeaBoard</h1>
-      <p>Sign in to continue</p>
+      <p>登录 IdeaBoard，继续你的创作流程。</p>
     </div>
 
     <LoginModal
@@ -88,15 +88,17 @@ function onRegisterVisibleChange(visible: boolean) {
   min-height: 100vh;
   position: relative;
   overflow: hidden;
-  background: #f7f8fc;
+  background: #f8f9fd;
 }
 
 .auth-bg {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size: 24px 24px;
-  opacity: 0.9;
+  background:
+    radial-gradient(40% 30% at 50% 20%, rgba(146, 120, 230, 0.14) 0%, rgba(146, 120, 230, 0) 100%),
+    radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
+  background-size: 100% 100%, 24px 24px;
+  opacity: 1;
 }
 
 .auth-brand {
@@ -113,12 +115,12 @@ function onRegisterVisibleChange(visible: boolean) {
   font-size: 30px;
   line-height: 1.1;
   font-weight: 700;
-  color: #2a3142;
+  color: #222a3c;
 }
 
 .auth-brand p {
   margin-top: 6px;
   font-size: 13px;
-  color: #7a8295;
+  color: #6f768a;
 }
 </style>

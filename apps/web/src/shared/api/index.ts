@@ -285,13 +285,22 @@ export const vectorizeApi = {
 }
 
 export const uploadApi = {
-  upload: (file: File): Promise<ApiResponse<{ url: string }>> => {
+  upload: (file: File, boardId?: string): Promise<ApiResponse<{ url: string }>> => {
     const form = new FormData()
     form.append('file', file)
+    const normalizedBoardId = `${boardId ?? ''}`.trim()
+    if (normalizedBoardId) {
+      form.append('board_id', normalizedBoardId)
+    }
     return api.post('/user/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } }) as any
   },
-  recycle: (url: string): Promise<ApiResponse<{ deleted: boolean }>> =>
-    api.delete('/user/upload', { data: { url } }) as any,
+  recycle: (url: string, boardId: string): Promise<ApiResponse<{ deleted: boolean }>> =>
+    api.delete('/user/upload', {
+      data: {
+        url,
+        board_id: boardId.trim(),
+      },
+    }) as any,
 }
 
 export const taskApi = {

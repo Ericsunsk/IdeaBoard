@@ -1,6 +1,9 @@
 // 用户类型
+export type UserUid = string // /^[A-Z0-9]{6}$/
+
 export interface User {
   id: number
+  uid: UserUid
   username: string
   avatar?: string
   role: string

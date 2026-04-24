@@ -46,6 +46,10 @@ func (a *localStorageAdapter) Delete(profile *StorageProfile, objectKey string) 
 	return a.service.deleteLocalByObjectKey(objectKey)
 }
 
+func (a *localStorageAdapter) DeleteByPrefix(profile *StorageProfile, objectKeyPrefix string) error {
+	return a.service.deleteLocalByPrefix(objectKeyPrefix)
+}
+
 func (a *localStorageAdapter) StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
 	return a.service.saveBytesLocal(filename, data, opts)
 }

@@ -13,6 +13,7 @@ export interface UserBoardItem {
   board_id: string
   name: string
   state: unknown
+  access_role?: 'owner' | 'editor' | 'viewer'
   created_at: number
   updated_at: number
 }

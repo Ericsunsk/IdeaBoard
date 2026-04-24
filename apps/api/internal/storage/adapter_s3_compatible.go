@@ -45,6 +45,10 @@ func (a *s3CompatibleStorageAdapter) Delete(profile *StorageProfile, objectKey s
 	return a.service.s3CompatibleService.DeleteWithConfig(objectKey, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
+func (a *s3CompatibleStorageAdapter) DeleteByPrefix(profile *StorageProfile, objectKeyPrefix string) error {
+	return a.service.s3CompatibleService.DeletePrefixWithConfig(objectKeyPrefix, a.service.s3CompatibleConfigFromProfile(profile))
+}
+
 func (a *s3CompatibleStorageAdapter) StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
 	return a.service.s3CompatibleService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
 }

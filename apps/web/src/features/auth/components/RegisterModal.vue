@@ -26,8 +26,8 @@
                     </button>
 
                     <div class="modal-header">
-                        <h2 class="gradient-text">Create Account</h2>
-                        <p>Start your creative journey with IdeaBoard</p>
+                        <h2 class="heading-text">创建账号</h2>
+                        <p>创建你的 IdeaBoard 账号，开始创作</p>
                     </div>
 
                     <n-form
@@ -36,34 +36,34 @@
                         :rules="rules"
                         size="large"
                     >
-                        <n-form-item path="username" label="Username">
+                        <n-form-item path="username" label="账号">
                             <n-input
                                 v-model:value="formValue.username"
-                                placeholder="Choose a username"
-                                class="apple-input"
+                                placeholder="设置你的账号"
+                                class="auth-input"
                             />
                         </n-form-item>
 
-                        <n-form-item path="password" label="Password">
+                        <n-form-item path="password" label="密码">
                             <n-input
                                 v-model:value="formValue.password"
                                 type="password"
-                                placeholder="Choose a password"
+                                placeholder="设置登录密码"
                                 show-password-on="click"
-                                class="apple-input"
+                                class="auth-input"
                             />
                         </n-form-item>
 
                         <n-form-item
                             path="confirmPassword"
-                            label="Confirm Password"
+                            label="确认密码"
                         >
                             <n-input
                                 v-model:value="formValue.confirmPassword"
                                 type="password"
-                                placeholder="Confirm your password"
+                                placeholder="再次输入密码"
                                 show-password-on="click"
-                                class="apple-input"
+                                class="auth-input"
                             />
                         </n-form-item>
                     </n-form>
@@ -74,21 +74,21 @@
                         size="large"
                         :loading="loading"
                         :disabled="loading"
-                        class="apple-register-btn"
+                        class="auth-primary-btn"
                         @click="handleRegister"
                     >
-                        {{ loading ? "Creating Account..." : "Create Account" }}
+                        {{ loading ? "创建中..." : "创建账号" }}
                     </n-button>
 
                     <div class="modal-footer">
-                        <span>Already have an account?</span>
+                        <span>已经有账号？</span>
                         <button
                             type="button"
                             class="login-link"
                             :disabled="loading"
                             @click="handleSwitchToLogin"
                         >
-                            Sign in
+                            去登录
                         </button>
                     </div>
                 </div>
@@ -132,45 +132,45 @@ const rules = {
     username: [
         {
             required: true,
-            message: "Please choose a username",
+            message: "请输入账号",
             trigger: "blur",
         },
         {
             min: USERNAME_MIN_LEN,
             max: USERNAME_MAX_LEN,
-            message: `Username length should be ${USERNAME_MIN_LEN}-${USERNAME_MAX_LEN} characters`,
+            message: `账号长度需为 ${USERNAME_MIN_LEN}-${USERNAME_MAX_LEN} 个字符`,
             trigger: ["input", "blur"],
         },
     ],
     password: [
         {
             required: true,
-            message: "Please choose a password",
+            message: "请输入密码",
             trigger: "blur",
         },
         {
             min: PASSWORD_MIN_LEN,
             max: PASSWORD_MAX_LEN,
-            message: `Password length should be ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} characters`,
+            message: `密码长度需为 ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} 个字符`,
             trigger: ["input", "blur"],
         },
     ],
     confirmPassword: [
         {
             required: true,
-            message: "Please confirm your password",
+            message: "请确认密码",
             trigger: "blur",
         },
         {
             min: PASSWORD_MIN_LEN,
             max: PASSWORD_MAX_LEN,
-            message: `Password length should be ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} characters`,
+            message: `密码长度需为 ${PASSWORD_MIN_LEN}-${PASSWORD_MAX_LEN} 个字符`,
             trigger: ["input", "blur"],
         },
         {
             validator: (rule: any, value: string) =>
                 value === formValue.value.password,
-            message: "Passwords do not match",
+            message: "两次输入的密码不一致",
             trigger: "blur",
         },
     ],
@@ -212,13 +212,13 @@ async function handleRegister() {
             formValue.value.username,
             formValue.value.password,
         );
-        message.success("Registration successful! Please sign in.");
+        message.success("注册成功，请登录");
         resetForm();
         emit("to-login");
     } catch (error: any) {
         if (Array.isArray(error)) return;
         message.error(
-            error?.message || "Registration failed, please try again.",
+            error?.message || "注册失败，请稍后重试",
         );
     } finally {
         loading.value = false;
@@ -231,8 +231,8 @@ async function handleRegister() {
     position: fixed;
     inset: 0;
     z-index: 9999;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(8px);
+    background: rgba(21, 27, 43, 0.24);
+    backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -241,14 +241,14 @@ async function handleRegister() {
 
 .register-modal-content {
     background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(14px);
     width: 100%;
     max-width: 440px;
     padding: 40px 48px;
-    border-radius: 32px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border-radius: 22px;
+    box-shadow: 0 24px 40px rgba(34, 45, 76, 0.16);
     position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid #d9dfec;
     animation: modalIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -295,11 +295,11 @@ async function handleRegister() {
     margin-bottom: 24px;
 }
 
-.gradient-text {
+.heading-text {
     font-size: 32px;
     font-weight: 700;
     margin-bottom: 8px;
-    background: linear-gradient(135deg, #1d1d1f 0%, #434343 100%);
+    background: linear-gradient(135deg, #2b3142 0%, #4f5a76 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.02em;
@@ -310,21 +310,21 @@ async function handleRegister() {
     font-size: 16px;
 }
 
-.apple-input :deep(.n-input) {
+.auth-input :deep(.n-input) {
     --n-border: 1px solid #d2d2d7;
-    --n-border-hover: 1px solid #9278e6;
-    --n-border-focus: 1px solid #9278e6;
+    --n-border-hover: 1px solid #7a6bd5;
+    --n-border-focus: 1px solid #7a6bd5;
     --n-color: rgba(255, 255, 255, 0.8);
     --n-color-focus: #ffffff;
     --n-text-color: #1d1d1f !important;
     --n-placeholder-color: #86868b;
-    --n-caret-color: #9278e6;
+    --n-caret-color: #7a6bd5;
     border-radius: 14px;
     font-size: 16px;
     height: 52px;
 }
 
-.apple-input :deep(input) {
+.auth-input :deep(input) {
     color: #1d1d1f !important;
 }
 
@@ -335,8 +335,8 @@ async function handleRegister() {
     margin-left: 4px;
 }
 
-.apple-register-btn {
-    background: #9278e6 !important;
+.auth-primary-btn {
+    background: #7a6bd5 !important;
     color: #ffffff !important;
     height: 52px !important;
     border-radius: 16px !important;
@@ -345,13 +345,13 @@ async function handleRegister() {
     margin-top: 12px !important;
     border: none !important;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    box-shadow: 0 8px 24px rgba(146, 120, 230, 0.3) !important;
+    box-shadow: 0 8px 24px rgba(122, 107, 213, 0.28) !important;
 }
 
-.apple-register-btn:hover {
-    background: #8065d6 !important;
+.auth-primary-btn:hover {
+    background: #6d5fd0 !important;
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px rgba(146, 120, 230, 0.4) !important;
+    box-shadow: 0 12px 32px rgba(122, 107, 213, 0.36) !important;
 }
 
 .modal-footer {
@@ -364,7 +364,7 @@ async function handleRegister() {
 .login-link {
     background: none;
     border: none;
-    color: #9278e6;
+    color: #7a6bd5;
     font-weight: 600;
     margin-left: 8px;
     text-decoration: none;

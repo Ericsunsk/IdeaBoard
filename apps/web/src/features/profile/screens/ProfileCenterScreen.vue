@@ -1,17 +1,14 @@
 <template>
   <div class="center-page">
-    <!-- 苹果风背景 -->
     <div class="mesh-bg">
         <div class="mesh-blob blob-1"></div>
         <div class="mesh-blob blob-2"></div>
-        <div class="mesh-noise"></div>
     </div>
 
     <div class="center-container">
-      <!-- 侧边栏：保留导航和操作 -->
       <aside class="center-sidebar">
         <div class="sidebar-header">
-          <div class="logo-text" @click="router.push('/user/home')">Feng-AI</div>
+          <div class="logo-text" @click="router.push('/user/home')">IdeaBoard</div>
         </div>
         
         <nav class="sidebar-nav">
@@ -28,7 +25,6 @@
         </nav>
 
         <div class="sidebar-footer">
-          <!-- 返回按钮 -->
           <button class="action-btn back-btn" @click="router.back()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
             返回上级
@@ -41,7 +37,6 @@
         </div>
       </aside>
 
-      <!-- 主内容区 -->
       <main class="center-main">
         <div class="main-header">
           <div class="user-brief">
@@ -51,7 +46,7 @@
             </div>
             <div class="user-info-text">
               <h1>{{ userStore.user?.username }}</h1>
-              <p>{{ userStore.user?.role === 'admin' ? '管理员' : '高级会员' }}</p>
+              <p>{{ userStore.user?.role === 'admin' ? '管理员' : '创作者' }}</p>
             </div>
           </div>
           <div class="stats-row">
@@ -60,16 +55,14 @@
               <span class="stat-label">累计作品</span>
             </div>
             <div class="stat-card">
-              <span class="stat-value">{{ userStore.user?.id || '0' }}</span>
+              <span class="stat-value">{{ userStore.user?.uid || '-' }}</span>
               <span class="stat-label">会员编号</span>
             </div>
           </div>
         </div>
 
-        <!-- 标签页内容 -->
         <div class="main-body">
           <Transition name="fade-slide" mode="out-in">
-            <!-- 个人资料页 -->
             <div v-if="activeTab === 'profile'" class="tab-content" key="profile">
               <div class="content-card">
                 <h2 class="section-title">个人基本资料</h2>
@@ -94,7 +87,6 @@
               </div>
             </div>
 
-            <!-- 我的作品页 -->
             <div v-else-if="activeTab === 'tasks'" class="tab-content" key="tasks">
               <div class="content-card">
                 <div class="card-header">
@@ -111,30 +103,29 @@
                   :pagination="taskPagination"
                   :bordered="false"
                   size="medium"
-                  class="apple-table"
+                  class="profile-table"
                 />
               </div>
             </div>
 
-            <!-- 安全设置页 -->
             <div v-else-if="activeTab === 'security'" class="tab-content" key="security">
               <div class="content-card">
                 <h2 class="section-title">账号安全设置</h2>
                 <n-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-placement="top">
                   <div class="security-grid">
                     <n-form-item label="当前原密码" path="oldPassword">
-                      <n-input v-model:value="pwdForm.oldPassword" type="password" placeholder="请输入当前使用的密码" show-password-on="click" class="apple-input" />
+                      <n-input v-model:value="pwdForm.oldPassword" type="password" placeholder="请输入当前使用的密码" show-password-on="click" class="profile-input" />
                     </n-form-item>
                     <div class="new-password-row">
                       <n-form-item label="设置新密码" path="newPassword">
-                        <n-input v-model:value="pwdForm.newPassword" type="password" placeholder="不少于6位字符" show-password-on="click" class="apple-input" />
+                        <n-input v-model:value="pwdForm.newPassword" type="password" placeholder="不少于6位字符" show-password-on="click" class="profile-input" />
                       </n-form-item>
                       <n-form-item label="重复新密码" path="confirmPassword">
-                        <n-input v-model:value="pwdForm.confirmPassword" type="password" placeholder="请再次输入新密码" show-password-on="click" class="apple-input" />
+                        <n-input v-model:value="pwdForm.confirmPassword" type="password" placeholder="请再次输入新密码" show-password-on="click" class="profile-input" />
                       </n-form-item>
                     </div>
                   </div>
-                  <n-button type="primary" block :loading="pwdLoading" class="apple-btn" @click="handleUpdatePassword">
+                  <n-button type="primary" block :loading="pwdLoading" class="profile-btn" @click="handleUpdatePassword">
                     确认更新密码
                   </n-button>
                 </n-form>
@@ -166,7 +157,6 @@ const navItems = [
   { key: 'security', label: '账号安全', icon: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>' },
 ]
 
-// 任务列表逻辑
 const tasks = ref<any[]>([])
 const taskLoading = ref(false)
 const taskPagination = ref({
@@ -219,7 +209,6 @@ async function loadTasks() {
   }
 }
 
-// 密码修改逻辑
 const pwdFormRef = ref()
 const pwdLoading = ref(false)
 const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
@@ -264,29 +253,37 @@ onMounted(() => {
 .center-page {
   width: 100%;
   height: 100vh;
-  background-color: #f5f5f7;
-  color: #1d1d1f;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  background: #f8f9fd;
+  color: #1f2430;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
   overflow: hidden;
   position: relative;
 }
 
-.mesh-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.mesh-blob { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.3; }
-.blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: #e0e7ff; }
-.blob-2 { bottom: -10%; right: -10%; width: 50vw; height: 50vw; background: #fae8ff; }
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(50% 35% at 30% 18%, rgba(146, 120, 230, 0.14) 0%, rgba(146, 120, 230, 0) 100%),
+    radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
+  background-size: 100% 100%, 24px 24px;
+}
+.mesh-blob { display: none; }
 
 .center-container {
   max-width: 1200px;
   height: 90vh;
   margin: 5vh auto;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(30px);
-  border-radius: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  border-radius: 24px;
+  border: 1px solid #d9dfec;
   display: flex;
   overflow: hidden;
-  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 20px 40px rgba(34, 45, 76, 0.08);
   position: relative;
   z-index: 1;
 }
@@ -301,12 +298,12 @@ onMounted(() => {
 }
 
 .sidebar-header { margin-bottom: 48px; }
-.logo-text { 
-  font-size: 22px; 
-  font-weight: 700; 
-  color: #1d1d1f; 
+.logo-text {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2a3142;
   cursor: pointer;
-  background: linear-gradient(135deg, #9278e6, #6366f1);
+  background: linear-gradient(135deg, #7f68d5, #9f8fe6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -325,8 +322,8 @@ onMounted(() => {
   transition: all 0.2s;
 }
 
-.nav-item:hover { background: rgba(0, 0, 0, 0.03); color: #1d1d1f; }
-.nav-item.active { background: #9278e6; color: #fff; box-shadow: 0 8px 16px rgba(146, 120, 230, 0.2); }
+.nav-item:hover { background: #eef1fa; color: #2c3448; }
+.nav-item.active { background: #7a6bd5; color: #fff; box-shadow: 0 8px 16px rgba(122, 107, 213, 0.24); }
 .nav-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
 
 .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
@@ -345,13 +342,10 @@ onMounted(() => {
   transition: all 0.2s;
 }
 
-.back-btn {
-  color: #515154;
-  background: rgba(0, 0, 0, 0.03);
-}
+.back-btn { color: #4d556a; background: #f1f3f9; }
 .back-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: #1d1d1f;
+  background: #e8ecf7;
+  color: #2a3142;
 }
 
 .logout-btn {
@@ -360,7 +354,7 @@ onMounted(() => {
 .logout-btn:hover { background: rgba(255, 59, 48, 0.05); }
 
 /* Main Content */
-.center-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 48px 60px; }
+.center-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 44px 52px; }
 
 .main-header {
   display: flex;
@@ -405,10 +399,10 @@ onMounted(() => {
 
 .content-card {
   background: #ffffff;
-  padding: 40px;
-  border-radius: 24px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(0, 0, 0, 0.03);
+  padding: 34px;
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgba(35, 45, 73, 0.06);
+  border: 1px solid #e2e7f3;
 }
 
 .section-title { font-size: 20px; font-weight: 600; margin: 0 0 32px; color: #1d1d1f; }
@@ -434,7 +428,7 @@ onMounted(() => {
 .new-password-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
 /* Custom Naive UI Styles */
-:deep(.n-input.apple-input) {
+:deep(.n-input.profile-input) {
   --n-border: 1px solid #d2d2d7 !important;
   --n-border-hover: 1px solid #9278e6 !important;
   --n-border-focus: 1px solid #9278e6 !important;
@@ -447,7 +441,7 @@ onMounted(() => {
   height: 48px;
 }
 
-:deep(.n-input.apple-input input) {
+:deep(.n-input.profile-input input) {
   color: #1d1d1f !important;
   height: 48px !important;
 }
@@ -459,7 +453,7 @@ onMounted(() => {
   margin-left: 4px;
 }
 
-.apple-btn {
+.profile-btn {
   background: #9278e6 !important;
   color: #fff !important;
   height: 48px !important;
@@ -469,7 +463,7 @@ onMounted(() => {
   border: none !important;
 }
 
-.apple-table :deep(.n-data-table-th) {
+.profile-table :deep(.n-data-table-th) {
   background: transparent;
   color: #86868b;
   font-size: 13px;
@@ -477,14 +471,14 @@ onMounted(() => {
   border-bottom: 1px solid #f5f5f7;
 }
 
-.apple-table :deep(.n-data-table-td) {
+.profile-table :deep(.n-data-table-td) {
   padding: 16px 12px;
   color: #1d1d1f !important;
   border-bottom: 1px solid #f5f5f7;
 }
 
-.apple-table :deep(.n-pagination-item) { color: #1d1d1f !important; }
-.apple-table :deep(.n-pagination-item--active) { color: #fff !important; background-color: #9278e6 !important; border-color: #9278e6 !important; }
+.profile-table :deep(.n-pagination-item) { color: #1d1d1f !important; }
+.profile-table :deep(.n-pagination-item--active) { color: #fff !important; background-color: #7a6bd5 !important; border-color: #7a6bd5 !important; }
 
 /* Transitions */
 .fade-slide-enter-active, .fade-slide-leave-active {

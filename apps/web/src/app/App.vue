@@ -1,6 +1,9 @@
 <template>
   <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides" :locale="naiveLocale">
-    <n-message-provider>
+    <n-message-provider
+      :container-class="messageContainerClass"
+      :theme-overrides="messageThemeOverrides"
+    >
       <n-dialog-provider>
         <n-notification-provider>
           <router-view />
@@ -21,9 +24,22 @@ import {
   NBreadcrumb,
   NBreadcrumbItem,
 } from 'naive-ui'
-import { defineComponent, h } from 'vue'
+import { computed, defineComponent, h } from 'vue'
+import { useRoute } from 'vue-router'
 
 const naiveLocale = zhCN
+const route = useRoute()
+const isUserRoute = computed(() => route.path.startsWith('/user'))
+const messageContainerClass = computed(() => (isUserRoute.value ? 'user-message-container' : undefined))
+
+const userMessageThemeOverrides = {
+  borderRadius: '14px',
+  closeBorderRadius: '999px',
+  closeSize: '22px',
+  closeIconSize: '16px',
+  fontSize: '13px',
+}
+const messageThemeOverrides = computed(() => (isUserRoute.value ? userMessageThemeOverrides : undefined))
 
 const themeOverrides = {
   common: {

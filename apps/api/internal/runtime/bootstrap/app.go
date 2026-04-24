@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -58,6 +59,12 @@ func Run(args []string) {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	if err := ensureUserStorageUIDsBeforeMigration(db); err != nil {
+		log.Fatalf("Failed to prepare user storage uid before migration: %v", err)
+	}
+	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
+		log.Fatalf("Failed to cleanup duplicate board names: %v", err)
+	}
 	if err := migrateModels(db); err != nil {
 		log.Fatalf("Failed to migrate database schema: %v", err)
 	}
@@ -66,6 +73,9 @@ func Run(args []string) {
 	redisMgr := redis.NewRedisManager(rdb.GetClient())
 
 	userRepo := users.NewUserRepository(db)
+	if err := userRepo.EnsureStorageUIDs(); err != nil {
+		log.Fatalf("Failed to ensure user storage uid: %v", err)
+	}
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := accounts.NewTaskRepository(db)
 	styleCardRepo := assets.NewStyleCardRepository(db)
@@ -77,12 +87,12 @@ func Run(args []string) {
 	patternStyleRepo := assets.NewPatternStyleRepository(db)
 	boardRepo := boards.NewBoardRepository(db)
 
-	userService := users.NewUserService(userRepo)
-	styleCardService := assets.NewStyleCardService(styleCardRepo)
 	storageService := storage.NewStorageService(systemConfigRepo)
+	userService := users.NewUserService(userRepo, storageService)
+	styleCardService := assets.NewStyleCardService(styleCardRepo)
 	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, styleCardService, systemConfigRepo, storageService)
 	segService := imageproc.NewSegService(systemConfigRepo)
-	boardService := boards.NewBoardService(boardRepo)
+	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
 	authHandler := auth.NewAuthHandler(userService, rdb)
 	adminHandler := users.NewAdminHandler(userService, rdb)
@@ -111,6 +121,7 @@ func Run(args []string) {
 		AdminHandler:         adminHandler,
 		AccountHandler:       accountHandler,
 		BoardHandler:         boardHandler,
+		BoardService:         boardService,
 		CardHandler:          cardHandler,
 		ChannelHandler:       channelHandler,
 		StorageHandler:       storageHandler,
@@ -175,11 +186,20 @@ func runInitAdmin() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	if err := ensureUserStorageUIDsBeforeMigration(db); err != nil {
+		log.Fatalf("Failed to prepare user storage uid before migration: %v", err)
+	}
+	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
+		log.Fatalf("Failed to cleanup duplicate board names: %v", err)
+	}
 	if err := migrateModels(db); err != nil {
 		log.Fatalf("Failed to migrate database schema: %v", err)
 	}
 
 	userRepo := users.NewUserRepository(db)
+	if err := userRepo.EnsureStorageUIDs(); err != nil {
+		log.Fatalf("Failed to ensure user storage uid: %v", err)
+	}
 	userService := users.NewUserService(userRepo)
 
 	adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
@@ -217,6 +237,7 @@ func runInitAdmin() {
 func migrateModels(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&users.User{},
+		&users.UsedUID{},
 		&accounts.ApiAccount{},
 		&tasks.Task{},
 		&assets.StyleCard{},
@@ -227,5 +248,67 @@ func migrateModels(db *gorm.DB) error {
 		&assets.BgTemplate{},
 		&assets.PatternStyle{},
 		&boards.UserBoard{},
+		&boards.BoardMember{},
+		&boards.BoardShareToken{},
 	)
+}
+
+type bootstrapUserStorageUIDRow struct {
+	ID         uint64 `gorm:"column:id"`
+	StorageUID string `gorm:"column:storage_uid"`
+}
+
+func ensureUserStorageUIDsBeforeMigration(db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	if !db.Migrator().HasTable(&users.User{}) {
+		return nil
+	}
+	if !db.Migrator().HasColumn(&users.User{}, "storage_uid") {
+		return nil
+	}
+
+	var rows []bootstrapUserStorageUIDRow
+	if err := db.Table("users").Select("id, storage_uid").Order("id ASC").Find(&rows).Error; err != nil {
+		return err
+	}
+
+	seen := make(map[string]struct{}, len(rows))
+	for _, row := range rows {
+		if row.ID == 0 {
+			continue
+		}
+		uid := strings.TrimSpace(row.StorageUID)
+		if users.IsValidStorageUID(uid) {
+			if _, duplicated := seen[uid]; !duplicated {
+				seen[uid] = struct{}{}
+				continue
+			}
+		}
+
+		newUID, err := generateBootstrapUniqueStorageUID(seen)
+		if err != nil {
+			return err
+		}
+		if err := db.Table("users").Where("id = ?", row.ID).Update("storage_uid", newUID).Error; err != nil {
+			return err
+		}
+		seen[newUID] = struct{}{}
+	}
+	return nil
+}
+
+func generateBootstrapUniqueStorageUID(seen map[string]struct{}) (string, error) {
+	for i := 0; i < 256; i++ {
+		uid, err := users.NewStorageUID()
+		if err != nil {
+			return "", err
+		}
+		if _, exists := seen[uid]; exists {
+			continue
+		}
+		return uid, nil
+	}
+	return "", fmt.Errorf("生成迁移前唯一用户存储标识失败")
 }

@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	iofs "io/fs"
 	"log"
@@ -34,6 +36,7 @@ type Dependencies struct {
 	AdminHandler         *users.AdminHandler
 	AccountHandler       *accounts.AccountHandler
 	BoardHandler         *boards.BoardHandler
+	BoardService         *boards.BoardService
 	CardHandler          *assets.StyleCardHandler
 	ChannelHandler       *channels.ChannelHandler
 	StorageHandler       *storage.StorageHandler
@@ -130,6 +133,14 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 	userApi.GET("/boards", h.BoardHandler.ListBoards)
 	userApi.PUT("/boards/:board_id", h.BoardHandler.UpsertBoard)
 	userApi.DELETE("/boards/:board_id", h.BoardHandler.DeleteBoard)
+	userApi.GET("/boards/:board_id/members", h.BoardHandler.ListMembers)
+	userApi.POST("/boards/:board_id/members/invite", h.BoardHandler.InviteMember)
+	userApi.PUT("/boards/:board_id/members/:member_uid/role", h.BoardHandler.UpdateMemberRole)
+	userApi.DELETE("/boards/:board_id/members/:member_uid", h.BoardHandler.RemoveMember)
+	userApi.GET("/boards/:board_id/share-tokens", h.BoardHandler.ListShareTokens)
+	userApi.POST("/boards/:board_id/share-tokens", h.BoardHandler.CreateShareToken)
+	userApi.POST("/boards/:board_id/share-tokens/:token/revoke", h.BoardHandler.RevokeShareToken)
+	userApi.POST("/boards/share-tokens/join", h.BoardHandler.JoinByShareToken)
 
 	userApi.GET("/style-cards", h.CardHandler.ListEnabled)
 	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
@@ -162,8 +173,42 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 401, "未登录")
 			return
 		}
+		boardID := strings.TrimSpace(c.PostForm("board_id"))
+		if h.BoardService == nil {
+			response.InternalError(c, 500, "上传失败", fmt.Errorf("board service not configured"))
+			return
+		}
+		board, _, err := h.BoardService.ResolveBoardWriteAccess(userID, boardID)
+		if err != nil {
+			switch {
+			case errors.Is(err, boards.ErrInvalidBoardInput):
+				response.Error(c, 400, "缺少画布ID")
+			case errors.Is(err, boards.ErrBoardNotFound):
+				response.Error(c, 404, "画布不存在")
+			case errors.Is(err, boards.ErrBoardPermissionDenied):
+				response.Error(c, 403, "无权编辑该画布")
+			default:
+				response.InternalError(c, 500, "上传失败", err)
+			}
+			return
+		}
+		owner, err := h.UserRepo.GetByID(board.UserID)
+		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		userSegment, err := storage.NormalizeWorkspaceStorageUserSegment(owner.StorageUID)
+		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		boardSegment, err := storage.NormalizeWorkspaceBoardSegment(board.BoardID)
+		if err != nil {
+			response.Error(c, 400, err.Error())
+			return
+		}
 		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
-			DirPrefix: path.Join("workspace", strconv.FormatUint(userID, 10)),
+			DirPrefix: path.Join("workspace", userSegment, boardSegment, "content"),
 		})
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
@@ -174,7 +219,8 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 
 	userApi.DELETE("/upload", func(c *gin.Context) {
 		var req struct {
-			URL string `json:"url"`
+			URL     string `json:"url"`
+			BoardID string `json:"board_id"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			response.Error(c, 400, "请求参数错误")
@@ -185,7 +231,30 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 401, "未登录")
 			return
 		}
-		if err := h.StorageService.DeleteWorkspaceUploadByURL(userID, req.URL); err != nil {
+		if h.BoardService == nil {
+			response.InternalError(c, 500, "删除失败", fmt.Errorf("board service not configured"))
+			return
+		}
+		board, _, err := h.BoardService.ResolveBoardWriteAccess(userID, req.BoardID)
+		if err != nil {
+			switch {
+			case errors.Is(err, boards.ErrInvalidBoardInput):
+				response.Error(c, 400, "缺少画布ID")
+			case errors.Is(err, boards.ErrBoardNotFound):
+				response.Error(c, 404, "画布不存在")
+			case errors.Is(err, boards.ErrBoardPermissionDenied):
+				response.Error(c, 403, "无权编辑该画布")
+			default:
+				response.InternalError(c, 500, "删除失败", err)
+			}
+			return
+		}
+		owner, err := h.UserRepo.GetByID(board.UserID)
+		if err != nil {
+			response.InternalError(c, 500, "删除失败", err)
+			return
+		}
+		if err := h.StorageService.DeleteWorkspaceUploadByURL(owner.StorageUID, board.BoardID, req.URL); err != nil {
 			response.Error(c, 400, err.Error())
 			return
 		}

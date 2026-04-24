@@ -12,7 +12,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -93,9 +92,14 @@ func (s *StorageService) StoreBytes(filename string, data []byte, opts StorageSt
 	return adapter.StoreBytes(profile, filename, data, opts)
 }
 
-func (s *StorageService) DeleteWorkspaceUploadByURL(userID uint64, rawURL string) error {
-	if userID == 0 {
-		return fmt.Errorf("用户信息无效")
+func (s *StorageService) DeleteWorkspaceUploadByURL(storageUID string, boardID string, rawURL string) error {
+	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	if err != nil {
+		return err
+	}
+	boardSegment, err := NormalizeWorkspaceBoardSegment(boardID)
+	if err != nil {
+		return err
 	}
 
 	profile, err := s.resolveActiveProfile()
@@ -107,9 +111,9 @@ func (s *StorageService) DeleteWorkspaceUploadByURL(userID uint64, rawURL string
 		return err
 	}
 
-	prefix := workspaceUploadPrefix(userID)
+	prefix := workspaceUploadPrefix(userSegment, boardSegment)
 	if !strings.HasPrefix(key, prefix) {
-		return fmt.Errorf("仅允许删除当前用户工作区上传文件")
+		return fmt.Errorf("仅允许删除当前画布工作区上传文件")
 	}
 
 	adapter, err := s.adapterRegistry.get(profile.Provider)
@@ -117,6 +121,57 @@ func (s *StorageService) DeleteWorkspaceUploadByURL(userID uint64, rawURL string
 		return err
 	}
 	return adapter.Delete(profile, key)
+}
+
+func (s *StorageService) DeleteWorkspaceByStorageUID(storageUID string) error {
+	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	if err != nil {
+		return err
+	}
+	profile, err := s.resolveActiveProfile()
+	if err != nil {
+		return err
+	}
+
+	prefix := path.Join("uploads", "workspace", userSegment) + "/"
+	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
+	if err != nil {
+		return err
+	}
+
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	return adapter.DeleteByPrefix(profile, normalizedPrefix)
+}
+
+func (s *StorageService) DeleteWorkspaceBoardByStorageUID(storageUID string, boardID string) error {
+	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	if err != nil {
+		return err
+	}
+	boardSegment, err := NormalizeWorkspaceBoardSegment(boardID)
+	if err != nil {
+		return err
+	}
+
+	profile, err := s.resolveActiveProfile()
+	if err != nil {
+		return err
+	}
+
+	prefix := path.Join("uploads", "workspace", userSegment, boardSegment) + "/"
+	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
+	if err != nil {
+		return err
+	}
+
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	return adapter.DeleteByPrefix(profile, normalizedPrefix)
 }
 
 func (s *StorageService) UsesObjectStorage() bool {
@@ -280,6 +335,18 @@ func (s *StorageService) deleteLocalByObjectKey(objectKey string) error {
 	return nil
 }
 
+func (s *StorageService) deleteLocalByPrefix(prefix string) error {
+	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
+	if err != nil {
+		return err
+	}
+	localPath := filepath.FromSlash(strings.TrimSuffix(normalizedPrefix, "/"))
+	if err := os.RemoveAll(localPath); err != nil {
+		return fmt.Errorf("按前缀删除本地文件失败: %v", err)
+	}
+	return nil
+}
+
 func (s *StorageService) extractObjectKeyFromUserUploadURL(profile StorageProfile, raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -313,8 +380,8 @@ func (s *StorageService) extractObjectKeyFromUserUploadURL(profile StorageProfil
 	}
 }
 
-func workspaceUploadPrefix(userID uint64) string {
-	return path.Join("uploads", "workspace", strconv.FormatUint(userID, 10)) + "/"
+func workspaceUploadPrefix(userSegment string, boardSegment string) string {
+	return path.Join("uploads", "workspace", userSegment, boardSegment, "content") + "/"
 }
 
 func normalizeUploadObjectKey(raw string) (string, error) {
@@ -327,6 +394,18 @@ func normalizeUploadObjectKey(raw string) (string, error) {
 		return "", fmt.Errorf("仅允许删除 uploads 目录下的文件")
 	}
 	return strings.TrimPrefix(cleaned, "/"), nil
+}
+
+func normalizeUploadObjectPrefix(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", fmt.Errorf("文件前缀不能为空")
+	}
+	normalized, err := normalizeUploadObjectKey(strings.TrimSuffix(trimmed, "/"))
+	if err != nil {
+		return "", err
+	}
+	return normalized + "/", nil
 }
 
 func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL, bucketName string, forcePathStyle bool) (string, error) {

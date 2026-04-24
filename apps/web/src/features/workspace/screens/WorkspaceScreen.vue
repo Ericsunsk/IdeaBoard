@@ -554,17 +554,37 @@ function parseCanvasImagePath(url: string): string | null {
   }
 }
 
-function resolveCurrentWorkspaceUploadPrefix(): string | null {
-  const userID = Number(userStore.user?.id)
-  if (!Number.isFinite(userID) || userID <= 0) return null
-  return `/uploads/workspace/${Math.floor(userID)}/`
+function encodeWorkspacePathSegment(segment: string): string {
+  return encodeURIComponent(segment).replace(
+    /[!'()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
+}
+
+function uploadWorkspaceImage(file: File) {
+  const boardId = `${currentBoardId.value ?? ''}`.trim()
+  if (!boardId) {
+    throw new Error('缺少画布ID')
+  }
+  return uploadApi.upload(file, boardId)
 }
 
 function resolveCanvasWorkspaceUploadMeta(url: string): CanvasImageItem['uploadMeta'] | undefined {
-  const prefix = resolveCurrentWorkspaceUploadPrefix()
-  if (!prefix) return undefined
   const path = parseCanvasImagePath(url)
-  if (!path || !path.startsWith(prefix)) return undefined
+  if (!path) return undefined
+  const boardId = `${currentBoardId.value ?? ''}`.trim()
+  if (!boardId) return undefined
+  const encodedBoardId = encodeWorkspacePathSegment(boardId)
+  const segments = path.split('/').filter(Boolean)
+  if (segments.length < 6) return undefined
+  let matched = false
+  for (let i = 0; i + 4 < segments.length; i += 1) {
+    if (segments[i] !== 'uploads' || segments[i + 1] !== 'workspace') continue
+    if (segments[i + 3] !== encodedBoardId || segments[i + 4] !== 'content') continue
+    matched = true
+    break
+  }
+  if (!matched) return undefined
   return {
     kind: 'workspace-local-drop-upload',
     userId: Number(userStore.user?.id),
@@ -648,7 +668,7 @@ async function flushPendingRecycleUploads() {
     setPendingRecycleEntries(retainedEntries)
     if (!recycleTargets.length) return
 
-    const results = await Promise.allSettled(recycleTargets.map(entry => uploadApi.recycle(entry.url)))
+    const results = await Promise.allSettled(recycleTargets.map(entry => uploadApi.recycle(entry.url, entry.boardId)))
     const failedCount = results.filter(result => result.status === 'rejected').length
     if (failedCount > 0) {
       message.warning(`有 ${failedCount} 张图片回收失败，已保留文件`)
@@ -839,7 +859,7 @@ const {
   updateZoom,
   getCanvasPointFromClient,
   createCanvasImageAt: createCanvasImageItemAt,
-  uploadImage: uploadApi.upload,
+  uploadImage: uploadWorkspaceImage,
   resolveCanvasImageUploadMeta: (url) => resolveCanvasWorkspaceUploadMeta(url),
   importCanvasImageToImageNodeAtPoint: (clientX, clientY, item) => importCanvasImageToImageNodeAtPoint(clientX, clientY, item),
   importCanvasImageToMaskNodeAtPoint: (clientX, clientY, item) => importCanvasImageToMaskNodeAtPoint(clientX, clientY, item),
@@ -888,7 +908,7 @@ const {
   activeImageActionId,
   showStyleStrengthControl,
   message,
-  uploadImage: uploadApi.upload,
+  uploadImage: uploadWorkspaceImage,
   loadImageRatioFromFile,
   loadImageRatioFromUrl,
   loadImageSizeFromUrl,
@@ -906,7 +926,7 @@ const {
 } = useImageNode({
   imageNodes,
   message,
-  uploadImage: uploadApi.upload,
+  uploadImage: uploadWorkspaceImage,
   loadImageRatioFromFile,
   loadImageRatioFromUrl,
   readNodeImageDropPayload,
@@ -2580,7 +2600,7 @@ const {
   buildFullMaskDataUrl,
   refineMaskDataUrl,
   dataUrlToFile,
-  uploadImage: uploadApi.upload,
+  uploadImage: uploadWorkspaceImage,
   upscaleImage: upscaleApi.upscale,
   segmentImage: segApi.segment,
   saveSegmentResult: segApi.save,
