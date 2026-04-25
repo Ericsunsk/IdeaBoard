@@ -167,6 +167,7 @@ export interface MaskNodeItem {
   width: number
   sourceImageUrl: string
   sourceImageRatio: number
+  executionMaskDataUrl: string
   maskDataUrl: string
   brushSize: number
   drawMode: 'paint' | 'erase'

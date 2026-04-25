@@ -485,6 +485,12 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		timeout = 120 * time.Second
 	}
 
+	localRedrawCtx, redrawErr := c.prepareLocalRedrawPipeline(ctx, account, params, timeout)
+	if redrawErr != nil {
+		return "", redrawErr
+	}
+	localRedrawStored := false
+
 	var imageURL string
 	var err error
 
@@ -504,9 +510,19 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		return "", fmt.Errorf("调用 API 失败 (渠道: %s): %w", channelName, err)
 	}
 
+	if localRedrawCtx != nil {
+		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, localRedrawCtx, imageURL, timeout)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return "", err
+			}
+			return "", err
+		}
+	}
+
 	// 如果对象存储已启用，将图片转存到当前存储
 	log.Printf("[Consumer] 存储检查: service=%v, objectStorage=%v", c.storageService != nil, c.storageService != nil && c.storageService.UsesObjectStorage())
-	if c.storageService != nil && c.storageService.UsesObjectStorage() {
+	if !localRedrawStored && c.storageService != nil && c.storageService.UsesObjectStorage() {
 		log.Printf("[Consumer] 对象存储已启用，开始转存图片, directFetch=%v, imageURL=%.80s", c.storageService.IsDirectFetchEnabled(), imageURL)
 		reURL, reErr := c.storageService.StoreRemote(ctx, imageURL, storage.StorageStoreOptions{
 			AllowHosts: []string{account.ProxyURL},
@@ -975,13 +991,24 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 	if featureSlug == workflow.FeatureSlugCanvasExtend ||
 		featureSlug == workflow.FeatureSlugPartialEdit ||
 		featureSlug == workflow.FeatureSlugBgSwap ||
+		featureSlug == workflow.FeatureSlugRemoveBg ||
 		featureSlug == workflow.FeatureSlugStyleFusion ||
+		featureSlug == workflow.FeatureSlugSeriesColor ||
+		featureSlug == workflow.FeatureSlugDirectedRecolor ||
 		featureSlug == workflow.FeatureSlugFaceSwap ||
 		featureSlug == workflow.FeatureSlugFabricOnBody ||
 		featureSlug == workflow.FeatureSlugMultiAngle {
 		return true
 	}
-	return featureSlug == workflow.FeatureSlugHDUpscale && hasOpenAIMaskInput(params)
+	return featureSlug == workflow.FeatureSlugHDUpscale && (hasOpenAIMaskInput(params) || isLocalRedrawEnabled(params))
+}
+
+func isLocalRedrawEnabled(params map[string]interface{}) bool {
+	if params == nil {
+		return false
+	}
+	enabled, ok := params[localRedrawEnabledParam].(bool)
+	return ok && enabled
 }
 
 func hasOpenAIMaskInput(params map[string]interface{}) bool {

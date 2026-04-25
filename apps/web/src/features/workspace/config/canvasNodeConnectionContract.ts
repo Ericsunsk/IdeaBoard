@@ -53,7 +53,8 @@ export function editModeSupportsSourceImage(mode: EditNodeItem['mode']) {
 }
 
 export function editModeRequiresMask(mode: EditNodeItem['mode']) {
-  return mode !== 'face-swap'
+  void mode
+  return false
 }
 
 export function getEditNodePortLabel(
@@ -142,7 +143,7 @@ export function getCanvasNodePortContracts(
     case 'color':
       return [
         input('image', 'image', true),
-        input('mask', 'mask', true),
+        input('mask', 'mask'),
         input('prompt', 'prompt'),
         output('image', 'image'),
       ]

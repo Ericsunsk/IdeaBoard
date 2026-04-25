@@ -275,13 +275,11 @@ func reserveStorageUID(tx *gorm.DB, storageUID string, excludeID uint64) (bool, 
 		return false, nil
 	}
 
-	if err := recordUsedUID(tx, storageUID); err != nil {
-		if isUniqueConstraintError(err) {
-			return false, nil
-		}
+	recorded, err := recordUsedUID(tx, storageUID)
+	if err != nil {
 		return false, err
 	}
-	return true, nil
+	return recorded, nil
 }
 
 func storageUIDTaken(tx *gorm.DB, storageUID string, excludeID uint64) (bool, error) {
@@ -311,15 +309,19 @@ func usedUIDExists(tx *gorm.DB, storageUID string) (bool, error) {
 	return count > 0, err
 }
 
-func recordUsedUID(tx *gorm.DB, storageUID string) error {
-	return tx.Create(&UsedUID{StorageUID: storageUID}).Error
+func recordUsedUID(tx *gorm.DB, storageUID string) (bool, error) {
+	result := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "storage_uid"}},
+		DoNothing: true,
+	}).Create(&UsedUID{StorageUID: storageUID})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
 }
 
 func ensureUsedUIDRecorded(tx *gorm.DB, storageUID string) error {
-	err := recordUsedUID(tx, storageUID)
-	if err != nil && isUniqueConstraintError(err) {
-		return nil
-	}
+	_, err := recordUsedUID(tx, storageUID)
 	return err
 }
 

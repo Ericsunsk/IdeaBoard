@@ -12,7 +12,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 		{name: "canonical slug", raw: FeatureSlugStyleFusion, want: FeatureSlugStyleFusion, ok: true},
 		{name: "underscore alias", raw: "style_fusion", want: FeatureSlugStyleFusion, ok: true},
 		{name: "mixed case", raw: "  HD_Upscale  ", want: FeatureSlugHDUpscale, ok: true},
-		{name: "special case remove-bg is not in allowlist", raw: "remove-bg", want: "", ok: false},
+		{name: "legacy feature is not in allowlist", raw: "legacy-feature", want: "", ok: false},
 		{name: "unsupported slug", raw: "line-draft", want: "", ok: false},
 		{name: "invalid characters", raw: "style fusion", want: "", ok: false},
 		{name: "empty", raw: "", want: "", ok: false},
@@ -34,6 +34,7 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 		FeatureSlugStyleInnovate,
 		FeatureSlugPartialEdit,
 		FeatureSlugBgSwap,
+		FeatureSlugRemoveBg,
 		FeatureSlugFaceSwap,
 		FeatureSlugStyleFusion,
 		FeatureSlugSeriesColor,
@@ -86,7 +87,7 @@ func TestResolveWorkflowFeatureSlug(t *testing.T) {
 	}{
 		{name: "missing feature returns empty", params: map[string]interface{}{}, want: "", wantErr: false},
 		{name: "feature alias key", params: map[string]interface{}{"feature_slug": "STYLE_FUSION"}, want: FeatureSlugStyleFusion, wantErr: false},
-		{name: "unsupported feature returns error", params: map[string]interface{}{"feature": "remove-bg"}, want: "", wantErr: true},
+		{name: "unsupported feature returns error", params: map[string]interface{}{"feature": "legacy-feature"}, want: "", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -132,6 +133,7 @@ func TestIsReferenceImageFeature(t *testing.T) {
 		{feature: FeatureSlugFaceSwap, want: true},
 		{feature: FeatureSlugFabricOnBody, want: true},
 		{feature: FeatureSlugMultiAngle, want: true},
+		{feature: FeatureSlugRemoveBg, want: false},
 		{feature: FeatureSlugCanvasExtend, want: false},
 	}
 

@@ -34,6 +34,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func Run(args []string) {
@@ -91,7 +92,6 @@ func Run(args []string) {
 	userService := users.NewUserService(userRepo, storageService)
 	styleCardService := assets.NewStyleCardService(styleCardRepo)
 	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, styleCardService, systemConfigRepo, storageService)
-	segService := imageproc.NewSegService(systemConfigRepo)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
 	authHandler := auth.NewAuthHandler(userService, rdb)
@@ -99,7 +99,6 @@ func Run(args []string) {
 	cardHandler := assets.NewStyleCardHandler(styleCardService)
 	channelHandler := channels.NewChannelHandler(channelRepo)
 	storageHandler := storage.NewStorageHandler(storageService)
-	segHandler := imageproc.NewSegHandler(segService, taskRepo, storageService)
 	lineDraftHandler := assets.NewLineDraftHandler(lineDraftModeRepo)
 	accountHandler := accounts.NewAccountHandler(accountService)
 	featurePromptHandler := prompts.NewFeaturePromptHandler(systemConfigRepo)
@@ -125,7 +124,6 @@ func Run(args []string) {
 		CardHandler:          cardHandler,
 		ChannelHandler:       channelHandler,
 		StorageHandler:       storageHandler,
-		SegHandler:           segHandler,
 		LineDraftHandler:     lineDraftHandler,
 		FeaturePromptHandler: featurePromptHandler,
 		FaceTemplateHandler:  faceTemplateHandler,
@@ -235,6 +233,9 @@ func runInitAdmin() {
 }
 
 func migrateModels(db *gorm.DB) error {
+	migratorDB := db.Session(&gorm.Session{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	models := []interface{}{
 		&users.User{},
 		&users.UsedUID{},
@@ -252,7 +253,7 @@ func migrateModels(db *gorm.DB) error {
 		&boards.BoardShareToken{},
 	}
 	for _, model := range models {
-		if err := db.AutoMigrate(model); err != nil {
+		if err := migratorDB.AutoMigrate(model); err != nil {
 			if isIgnorableDuplicateIndexError(err) {
 				log.Printf("[Main] Skip duplicate index migration error for model %T: %v", model, err)
 				continue

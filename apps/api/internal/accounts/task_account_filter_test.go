@@ -93,6 +93,20 @@ func TestFilterAccountsByFeatureFiltersStabilityPlatformsForIncompatibleFeatures
 	}
 }
 
+func TestFilterAccountsByFeatureKeepsStabilityPlatformsForRemoveBg(t *testing.T) {
+	accounts := []*ApiAccount{
+		{ID: 1, Platform: "stability"},
+		{ID: 2, Platform: "stable diffusion"},
+		{ID: 3, Platform: "Stability AI"},
+		{ID: 4, Platform: "openai"},
+	}
+
+	got := filterAccountsByFeature(accounts, workflow.FeatureSlugRemoveBg)
+	if len(got) != 4 {
+		t.Fatalf("expected remove-bg to stay platform-compatible, got=%d", len(got))
+	}
+}
+
 func TestParseTaskFeatureSlugReturnsEmptyForInvalidJSON(t *testing.T) {
 	if got := parseTaskFeatureSlug("{invalid-json"); got != "" {
 		t.Fatalf("expected empty feature slug for invalid params json, got=%q", got)

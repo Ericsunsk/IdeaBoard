@@ -3,6 +3,7 @@ import type { SubmitTaskData } from '../../../shared/api/index'
 export const EXECUTION_FEATURE = {
   partialEdit: 'partial-edit',
   bgSwap: 'bg-swap',
+  removeBg: 'remove-bg',
   fabricOnBody: 'fabric-on-body',
   styleFusion: 'style-fusion',
   seriesColor: 'series-color',
@@ -15,7 +16,6 @@ export const EXECUTION_FEATURE = {
   faceSwap: 'face-swap',
   hdUpscale: 'hd-upscale',
   canvasExtend: 'canvas-extend',
-  removeBg: 'remove-bg',
 } as const
 
 export type ExecutionFeature = (typeof EXECUTION_FEATURE)[keyof typeof EXECUTION_FEATURE]
@@ -72,6 +72,9 @@ export const EXECUTION_DIRECT_ACTION_META = {
     promptPrefix: '[style-innovate]',
     fallbackPrompt: '保持原图主体身份、服装品类、版型轮廓、构图与光影关系不变，只在此基础上按强度做可控款式创新与细节变化',
   },
+  removeBg: {
+    feature: EXECUTION_FEATURE.removeBg,
+  },
 } as const
 
 export const EXECUTION_MODEL_META = {
@@ -100,10 +103,6 @@ export const EXECUTION_ENHANCE_META = {
     promptPrefix: '[canvas-extend]',
     fallbackPrompt: '保持原图主体、人物、服装、构图、光影与透视不变，仅按扩边方向在新增画布区域自然补全连续背景与缺失内容',
   },
-} as const
-
-export const EXECUTION_REMOVE_BG_META = {
-  feature: EXECUTION_FEATURE.removeBg,
 } as const
 
 interface BuildExecutionTaskRequestOptions {

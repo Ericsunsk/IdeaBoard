@@ -71,7 +71,7 @@ export const MASK_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
 
 export const COLOR_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   { key: 'image', label: 'Image', kind: 'image', required: true, direction: 'input', portName: 'image', portKey: 'color-image-input', top: 96 },
-  { key: 'mask', label: 'Mask', kind: 'mask', required: true, direction: 'input', portName: 'mask', portKey: 'color-mask-input', top: 152 },
+  { key: 'mask', label: 'Mask', kind: 'mask', direction: 'input', portName: 'mask', portKey: 'color-mask-input', top: 152 },
   { key: 'prompt', label: 'Prompt', kind: 'prompt', direction: 'input', portName: 'prompt', portKey: 'color-prompt-input', top: 208 },
   { key: 'output', label: 'Output', kind: 'image', direction: 'output', portName: 'image', portKey: 'color-output', top: 96 },
 ]

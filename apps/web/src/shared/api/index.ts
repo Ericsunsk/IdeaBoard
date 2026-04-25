@@ -1,6 +1,5 @@
 import axios from 'axios'
 import { createAdminAssetsApi } from './admin/assets'
-import { createAdminSegApi } from './admin/seg'
 import { createStorageApi } from './admin/storage'
 import type {
   LoginRequest,
@@ -21,7 +20,6 @@ export type {
   PatternStyle,
   PatternStyleFormData,
 } from './admin/assets'
-export type { SegConfig, SegConfigPayload } from './admin/seg'
 export type {
   StorageFieldType,
   StorageProfile,
@@ -225,15 +223,6 @@ export interface SubmitTaskData {
   params?: Record<string, any>
 }
 
-export const segApi = {
-  segment: (data: { image_url: string; seg_type: string; return_form?: string }): Promise<ApiResponse<{ result_url: string }>> =>
-    api.post('/user/segment', data) as any,
-  save: (data: { result_url: string; seg_type: string; feature?: string }): Promise<ApiResponse<{ image_url: string; task_id: string }>> =>
-    api.post('/user/segment/save', data) as any,
-}
-
-export const adminSegApi = createAdminSegApi(api)
-
 export const featurePromptApi = {
   adminList: (): Promise<ApiResponse<{ prompts: Record<string, string> }>> =>
     api.get('/admin/feature-prompts') as any,
@@ -266,11 +255,6 @@ export interface ChannelFormData {
   name: string
   api_url: string
   models: string
-}
-
-export const upscaleApi = {
-  upscale: (data: { image_url: string; mode: string; upscale_factor: number; output_format: string; output_quality: number; feature?: string }): Promise<ApiResponse<{ image_url: string; task_id: string }>> =>
-    api.post('/user/upscale', data, { timeout: 120000 }) as any,
 }
 
 export const vectorizeApi = {

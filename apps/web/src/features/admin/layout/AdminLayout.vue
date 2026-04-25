@@ -127,7 +127,6 @@ import {
     AppsOutline,
     ChatbubbleEllipsesOutline,
     CloudOutline,
-    CutOutline,
 } from "@vicons/ionicons5";
 
 const router = useRouter();
@@ -311,12 +310,6 @@ const adminMenuGroups: AdminMenuGroup[] = [
                 label: "系统存储",
                 title: "系统存储",
                 icon: CloudOutline,
-            },
-            {
-                key: "seg-config",
-                label: "图片处理",
-                title: "图片处理",
-                icon: CutOutline,
             },
         ],
     },

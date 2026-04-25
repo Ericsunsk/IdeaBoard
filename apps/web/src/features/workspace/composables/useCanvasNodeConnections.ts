@@ -17,7 +17,14 @@ import type {
 
 type ConnectedImageInput = { url: string; ratio: number }
 type PlacedImageInput = ConnectedImageInput & { placementX: number; placementY: number }
-type PlacedMaskInput = { dataUrl: string; placementX: number; placementY: number }
+type PlacedMaskInput = {
+  dataUrl: string
+  placementX: number
+  placementY: number
+  sourceImageUrl: string
+  sourceImageRatio: number
+  sourceConnected: boolean
+}
 
 type ConnectionStatusMap = Partial<Record<CanvasConnectionPort, boolean>>
 
@@ -61,7 +68,7 @@ interface UseCanvasNodeConnectionsOptions {
   }[]
   getImageNodePreferredImage: (node: ImageNodeItem | null) => ConnectedImageInput | null
   lookupNodeByType: (nodeType: CanvasConnectionNodeType, nodeId: number) => CanvasNodeItem | null
-  refineMaskDataUrl: (maskDataUrl: string, refineAmount: number, invertMask: boolean) => Promise<string>
+  refineExecutionMaskDataUrl: (maskDataUrl: string, refineAmount: number, invertMask: boolean) => Promise<string>
 }
 
 export function useCanvasNodeConnections(options: UseCanvasNodeConnectionsOptions) {
@@ -151,18 +158,48 @@ export function useCanvasNodeConnections(options: UseCanvasNodeConnectionsOption
     const connection = options.findIncomingConnection(toNodeType, toNodeId, toPort)
     if (!connection || connection.fromNodeType !== 'mask') return null
     const sourceNode = options.maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
-    if (!sourceNode?.maskDataUrl) return null
-    const dataUrl = await options.refineMaskDataUrl(
-      sourceNode.maskDataUrl,
+    if (!sourceNode) return null
+    const executionMaskDataUrl = resolveMaskExecutionDataUrl(sourceNode)
+    if (!executionMaskDataUrl) return null
+    const dataUrl = await options.refineExecutionMaskDataUrl(
+      executionMaskDataUrl,
       sourceNode.refineAmount ?? 0,
       !!sourceNode.invertMask,
     )
     if (!dataUrl) return null
+    const sourceImage = resolveMaskSourceImage(sourceNode)
+    if (!sourceImage) return null
     return {
       dataUrl,
       placementX: sourceNode.x + 340,
       placementY: sourceNode.y + 18,
+      sourceImageUrl: sourceImage.url,
+      sourceImageRatio: sourceImage.ratio,
+      sourceConnected: sourceImage.connected,
     }
+  }
+
+  function resolveMaskSourceImage(node: MaskNodeItem): { url: string; ratio: number; connected: boolean } | null {
+    const connectedImage = getConnectedImageInput('mask', node.id, 'image')
+    if (connectedImage?.url) {
+      return {
+        url: connectedImage.url,
+        ratio: connectedImage.ratio > 0 ? connectedImage.ratio : 1,
+        connected: true,
+      }
+    }
+
+    const fallbackUrl = node.sourceImageUrl.trim()
+    if (!fallbackUrl) return null
+    return {
+      url: fallbackUrl,
+      ratio: node.sourceImageRatio > 0 ? node.sourceImageRatio : 1,
+      connected: false,
+    }
+  }
+
+  function resolveMaskExecutionDataUrl(node: MaskNodeItem): string {
+    return node.executionMaskDataUrl || node.maskDataUrl || ''
   }
 
   function resolveConnectedImageSource(
@@ -208,7 +245,8 @@ export function useCanvasNodeConnections(options: UseCanvasNodeConnectionsOption
       const sourceNode = connection.fromNodeType === 'mask'
         ? options.maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
         : null
-      return !sourceNode?.maskDataUrl
+      if (!sourceNode || !resolveMaskExecutionDataUrl(sourceNode)) return true
+      return !resolveMaskSourceImage(sourceNode)
     }
 
     return false

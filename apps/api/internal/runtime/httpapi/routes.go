@@ -40,7 +40,6 @@ type Dependencies struct {
 	CardHandler          *assets.StyleCardHandler
 	ChannelHandler       *channels.ChannelHandler
 	StorageHandler       *storage.StorageHandler
-	SegHandler           *imageproc.SegHandler
 	LineDraftHandler     *assets.LineDraftHandler
 	FeaturePromptHandler *prompts.FeaturePromptHandler
 	FaceTemplateHandler  *assets.FaceTemplateHandler
@@ -318,9 +317,6 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 		}
 	})
 
-	userApi.POST("/segment", h.SegHandler.Segment)
-	userApi.POST("/segment/save", h.SegHandler.SaveSegResult)
-	userApi.POST("/upscale", h.SegHandler.Upscale)
 	userApi.POST("/vectorize", h.VectorizeHandler.Vectorize)
 	userApi.GET("/vectorize/check", h.VectorizeHandler.CheckPotrace)
 }
@@ -384,9 +380,6 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 	adminApi.POST("/storage/profiles/:id/apply", h.StorageHandler.ApplyProfile)
 	adminApi.POST("/storage/profiles/:id/test", h.StorageHandler.TestProfile)
 	adminApi.GET("/storage/profiles/:id/bucket-info", h.StorageHandler.GetBucketInfo)
-
-	adminApi.GET("/seg/config", h.SegHandler.GetConfig)
-	adminApi.POST("/seg/config", h.SegHandler.SaveConfig)
 
 	adminApi.GET("/style-cards", h.CardHandler.List)
 	adminApi.POST("/style-cards", h.CardHandler.Create)

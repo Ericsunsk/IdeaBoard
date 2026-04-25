@@ -300,9 +300,9 @@
         @item-mousedown="onItemMouseDown($event, msg)"
         @item-contextmenu="onItemContextMenu($event, msg)"
         @image-load="onImageLoad(msg, $event)"
-        @action-remove-bg="runCanvasAction('remove-bg', msg)"
         @style-innovate-mousedown="onStyleInnovateMouseDown"
         @style-innovate-click="onStyleInnovateClick(msg)"
+        @action-remove-bg="runCanvasAction('remove-bg', msg)"
         @action-to-vector="runCanvasAction('to-vector', msg)"
         @action-sketch-to-design="runCanvasAction('sketch-to-design', msg)"
         @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
@@ -318,7 +318,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import type { ComponentPublicInstance, Ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
-import { segApi, taskApi, uploadApi, upscaleApi, vectorizeApi } from '../../../shared/api/index'
+import { taskApi, uploadApi, vectorizeApi } from '../../../shared/api/index'
 import { useUserStore } from '../../../app/stores/user'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import { isImageUrlReferencedInOtherCanvasBoardStates } from '../../boards/lib/canvasBoardState'
@@ -330,7 +330,7 @@ import { useCanvasEditor } from '../composables/useCanvasEditor'
 import { useCanvasHistory } from '../composables/useCanvasHistory'
 import { useCanvasNodeConnections } from '../composables/useCanvasNodeConnections'
 import { useCanvasNodeUiState } from '../composables/useCanvasNodeUiState'
-import { useCanvasDirectActions, type SegType } from '../composables/useCanvasDirectActions'
+import { useCanvasDirectActions } from '../composables/useCanvasDirectActions'
 import { useGenerationPipeline } from '../composables/useGenerationPipeline'
 import { useImageNode } from '../composables/useImageNode'
 import { clampMaskRefineAmount, useMaskNode } from '../composables/useMaskNode'
@@ -711,7 +711,6 @@ const executionNodeWatchSources = [
 ] as const
 const connections = ref<CanvasConnection[]>([])
 const processedMaskPreviewUrls = ref<Record<number, string>>({})
-const defaultSegType: SegType = 'common'
 const styleInnovateDefaultStrength = 50
 const styleInnovateStrength = ref(styleInnovateDefaultStrength)
 const styleStrengthTrackRef = ref<HTMLElement | HTMLElement[] | null>(null)
@@ -895,7 +894,8 @@ const {
   onMaskCanvasMouseDown,
   dataUrlToFile,
   buildFullMaskDataUrl,
-  refineMaskDataUrl,
+  refineExecutionMaskDataUrl,
+  buildPreviewMaskDataUrlFromExecutionMask,
   openMaskNodeFilePicker,
   clearMaskNodeImage,
   clearMaskNodeMask,
@@ -1261,6 +1261,7 @@ function buildMaskSignatureMap(): Record<string, string> {
     acc[String(node.id)] = [
       node.sourceImageUrl,
       String(node.sourceImageRatio || 1),
+      node.executionMaskDataUrl || '',
       node.maskDataUrl,
       String(clampMaskRefineAmount(node.refineAmount ?? 0)),
       node.invertMask ? '1' : '0',
@@ -2120,11 +2121,16 @@ function clearProcessedMaskPreview(id: number) {
 }
 
 function getMaskPreviewSignature(node: MaskNodeItem): string {
-  return `${node.maskDataUrl}|${clampMaskRefineAmount(node.refineAmount ?? 0)}|${node.invertMask ? 1 : 0}`
+  return `${getMaskExecutionDataUrl(node)}|${clampMaskRefineAmount(node.refineAmount ?? 0)}|${node.invertMask ? 1 : 0}`
+}
+
+function getMaskExecutionDataUrl(node: MaskNodeItem): string {
+  return node.executionMaskDataUrl || node.maskDataUrl || ''
 }
 
 async function refreshProcessedMaskPreview(node: MaskNodeItem) {
-  if (!node.maskDataUrl) {
+  const baseExecutionMaskDataUrl = getMaskExecutionDataUrl(node)
+  if (!baseExecutionMaskDataUrl) {
     clearProcessedMaskPreview(node.id)
     return
   }
@@ -2134,24 +2140,33 @@ async function refreshProcessedMaskPreview(node: MaskNodeItem) {
   processedMaskPreviewSignatures.set(node.id, signature)
 
   if (refineAmount === 0 && !node.invertMask) {
+    const previewMaskDataUrl = await buildPreviewMaskDataUrlFromExecutionMask(baseExecutionMaskDataUrl)
+    if (processedMaskPreviewSignatures.get(node.id) !== signature) return
     processedMaskPreviewUrls.value = {
       ...processedMaskPreviewUrls.value,
-      [node.id]: node.maskDataUrl,
+      [node.id]: previewMaskDataUrl || node.maskDataUrl || baseExecutionMaskDataUrl,
     }
     return
   }
 
-  const refinedUrl = await refineMaskDataUrl(node.maskDataUrl, refineAmount, !!node.invertMask)
+  const refinedExecutionMaskDataUrl = await refineExecutionMaskDataUrl(
+    baseExecutionMaskDataUrl,
+    refineAmount,
+    !!node.invertMask,
+  )
+  if (processedMaskPreviewSignatures.get(node.id) !== signature) return
+  const refinedPreviewMaskDataUrl = await buildPreviewMaskDataUrlFromExecutionMask(refinedExecutionMaskDataUrl)
   if (processedMaskPreviewSignatures.get(node.id) !== signature) return
   processedMaskPreviewUrls.value = {
     ...processedMaskPreviewUrls.value,
-    [node.id]: refinedUrl || node.maskDataUrl,
+    [node.id]: refinedPreviewMaskDataUrl || node.maskDataUrl || baseExecutionMaskDataUrl,
   }
 }
 
 function getMaskNodeProcessedOutputUrl(node: MaskNodeItem): string {
-  if (!node.maskDataUrl) return ''
-  return processedMaskPreviewUrls.value[node.id] || node.maskDataUrl
+  const baseExecutionMaskDataUrl = getMaskExecutionDataUrl(node)
+  if (!baseExecutionMaskDataUrl) return ''
+  return processedMaskPreviewUrls.value[node.id] || node.maskDataUrl || baseExecutionMaskDataUrl
 }
 
 function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: number; mode: 'mask' | 'linked-output' | 'node-output' } | null {
@@ -2159,7 +2174,7 @@ function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: 
   if (!connection) return null
   if (connection.fromNodeType === 'mask') {
     const sourceNode = maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
-    if (!sourceNode?.maskDataUrl) return null
+    if (!sourceNode || !getMaskExecutionDataUrl(sourceNode)) return null
     const source = getMaskNodeEffectiveSource(sourceNode)
     return {
       url: getMaskNodeProcessedOutputUrl(sourceNode),
@@ -2392,7 +2407,7 @@ const {
   getOutgoingConnections,
   getImageNodePreferredImage,
   lookupNodeByType: getCanvasConnectionNodeByType,
-  refineMaskDataUrl,
+  refineExecutionMaskDataUrl,
 })
 
 const {
@@ -2598,12 +2613,9 @@ const {
   resolveConnectedPlacedImageInput,
   resolveConnectedPlacedMaskInput,
   buildFullMaskDataUrl,
-  refineMaskDataUrl,
+  refineExecutionMaskDataUrl,
   dataUrlToFile,
   uploadImage: uploadWorkspaceImage,
-  upscaleImage: upscaleApi.upscale,
-  segmentImage: segApi.segment,
-  saveSegmentResult: segApi.save,
   setExecutionNodeRunning,
   setExecutionNodeLastRunFailed,
   isExecutionNodeRunning,
@@ -2626,15 +2638,12 @@ const {
   messages,
   styleInnovateStrength,
   loadImageSizeFromUrl,
-  defaultSegType,
   message,
   submitTaskAndPoll: submitDirectTaskAndPoll,
   appendGeneratedImages,
   createPendingGeneratedImages,
   replacePendingGeneratedImages,
   removePendingGeneratedImages,
-  segmentImage: segApi.segment,
-  saveSegmentResult: segApi.save,
   vectorizeImage: vectorizeApi.vectorize,
 })
 

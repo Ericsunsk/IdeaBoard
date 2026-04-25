@@ -1,15 +1,14 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { CanvasImageItem } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/index'
+import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
-  EXECUTION_REMOVE_BG_META,
 } from '../config/executionContract'
 
-export type SegType = 'common' | 'commodity' | 'body'
-export type CanvasActionKey = 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'to-vector'
+export type CanvasActionKey = 'style-innovate' | 'sketch-to-design' | 'to-vector' | 'remove-bg'
 
 interface MessageLoadingHandle {
   destroy: () => void
@@ -52,7 +51,6 @@ interface UseCanvasDirectActionsOptions {
   messages: Ref<CanvasImageItem[]>
   styleInnovateStrength: Ref<number>
   loadImageSizeFromUrl: (url: string) => Promise<{ width: number; height: number } | null>
-  defaultSegType: SegType
   message: MessageApiLike
   submitTaskAndPoll: (options: SubmitTaskAndPollOptions) => Promise<string | null>
   appendGeneratedImages: (urls: string[], source?: CanvasImageItem) => void
@@ -67,8 +65,6 @@ interface UseCanvasDirectActionsOptions {
     source?: CanvasImageItem,
   ) => void
   removePendingGeneratedImages: (pendingItems: CanvasImageItem[]) => void
-  segmentImage: (payload: { image_url: string; seg_type: SegType }) => Promise<any>
-  saveSegmentResult: (payload: { result_url: string; seg_type: SegType; feature: string }) => Promise<any>
   vectorizeImage: (payload: {
     image_url: string
     threshold: number
@@ -110,6 +106,23 @@ function parseAspectRatio(rawRatio: string): number {
   return height / width
 }
 
+function buildExportDownloadHref(rawUrl: string): string {
+  const url = rawUrl.trim()
+  if (!url) return ''
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('/')) {
+    return url
+  }
+  try {
+    const parsed = new URL(url, window.location.origin)
+    if (parsed.origin === window.location.origin) {
+      return parsed.toString()
+    }
+  } catch {
+    return url
+  }
+  return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(url)}`
+}
+
 export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
   let exportLoading: MessageLoadingHandle | null = null
 
@@ -147,45 +160,6 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
         options.showSettings.value = false
       },
     })
-  }
-
-  async function handleRemoveBgGenerate(source: CanvasImageItem) {
-    options.generating.value = true
-    const startTime = Date.now()
-    const pendingItems = options.createPendingGeneratedImages({
-      source,
-      heightRatios: [source.height_ratio || 1],
-    })
-    try {
-      const segmentRes: any = await options.segmentImage({
-        image_url: source.url,
-        seg_type: options.defaultSegType,
-      })
-      if (segmentRes.code !== 0 || !segmentRes.data?.result_url) {
-        options.removePendingGeneratedImages(pendingItems)
-        options.message.error(sanitizeApiErrorMessage(segmentRes.msg, 'Segmentation failed'))
-        return
-      }
-
-      const saveRes: any = await options.saveSegmentResult({
-        result_url: segmentRes.data.result_url,
-        seg_type: options.defaultSegType,
-        feature: EXECUTION_REMOVE_BG_META.feature,
-      })
-      if (saveRes.code !== 0 || !saveRes.data?.image_url) {
-        options.removePendingGeneratedImages(pendingItems)
-        options.message.error(sanitizeApiErrorMessage(saveRes.msg, 'Save result failed'))
-        return
-      }
-
-      options.replacePendingGeneratedImages([saveRes.data.image_url], pendingItems, source)
-      options.message.success(`Background removed in ${((Date.now() - startTime) / 1000).toFixed(1)}s`)
-    } catch (error: any) {
-      options.removePendingGeneratedImages(pendingItems)
-      options.message.error(sanitizeApiErrorMessage(error?.msg || error?.message, 'Failed to remove background'))
-    } finally {
-      options.generating.value = false
-    }
   }
 
   async function handleSketchToDesignGenerate(source: CanvasImageItem) {
@@ -304,21 +278,49 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
     }
   }
 
+  async function handleRemoveBgGenerate(source: CanvasImageItem) {
+    options.generating.value = true
+    let pendingItems: CanvasImageItem[] = []
+    await options.submitTaskAndPoll({
+      request: buildExecutionTaskRequest({
+        prompt: '',
+        feature: EXECUTION_DIRECT_ACTION_META.removeBg.feature,
+        imageUrls: [source.url],
+      }),
+      source,
+      successMessage: 'Task submitted',
+      failureMessage: 'Failed to submit task',
+      suppressDefaultAppend: true,
+      onCompleted: (urls) => {
+        options.replacePendingGeneratedImages(urls, pendingItems, source)
+      },
+      onFailed: () => {
+        options.removePendingGeneratedImages(pendingItems)
+      },
+      onSubmitted: () => {
+        pendingItems = options.createPendingGeneratedImages({
+          source,
+          heightRatios: [source.height_ratio || 1],
+        })
+      },
+    })
+  }
+
   async function runCanvasAction(action: CanvasActionKey, item: CanvasImageItem) {
     if (options.generating.value) return
     options.selectedIds.value = [item.id]
     options.activeImageActionId.value = null
     options.showStyleStrengthControl.value = false
-    if (action === 'remove-bg') {
-      await handleRemoveBgGenerate(item)
-      return
-    }
     if (action === 'style-innovate') {
       await handleStyleInnovateGenerate(item)
       return
     }
     if (action === 'to-vector') {
       await handleToVectorGenerate(item)
+      return
+    }
+    if (action === 'remove-bg') {
+      await handleRemoveBgGenerate(item)
       return
     }
     await handleSketchToDesignGenerate(item)
@@ -362,7 +364,7 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
 
         try {
           const link = document.createElement('a')
-          link.href = item.url
+          link.href = buildExportDownloadHref(item.url)
           link.download = fileName
           link.rel = 'noopener'
           link.style.display = 'none'
@@ -394,9 +396,9 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
     runCanvasAction,
     handleGenerate,
     handlePictureGenerate,
-    handleRemoveBgGenerate,
     handleSketchToDesignGenerate,
     handleStyleInnovateGenerate,
+    handleRemoveBgGenerate,
     handleToVectorGenerate,
     handleExport,
   }

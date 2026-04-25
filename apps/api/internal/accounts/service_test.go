@@ -53,6 +53,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 		ok   bool
 	}{
 		{name: "canonical slug is valid", raw: "style-fusion", want: "style-fusion", ok: true},
+		{name: "remove-bg slug is valid", raw: "remove-bg", want: "remove-bg", ok: true},
 		{name: "underscore alias canonicalized", raw: "style_fusion", want: "style-fusion", ok: true},
 		{name: "unsupported slug is invalid", raw: "line-draft", want: "", ok: false},
 		{name: "invalid chars are rejected", raw: "style fusion", want: "", ok: false},
@@ -245,6 +246,24 @@ func TestCanvasExtendEmptyUserPromptCanStillBuildExecutablePrompt(t *testing.T) 
 	}
 	if err := validateExecutablePrompt(fullPrompt); err != nil {
 		t.Fatalf("expected executable prompt, got err: %v", err)
+	}
+}
+
+func TestRemoveBgWithoutConfiguredSystemPromptIsRejected(t *testing.T) {
+	fullPrompt := applyTaskSystemPrompt(
+		"",
+		"",
+		workflow.FeatureSlugRemoveBg,
+		map[string]interface{}{
+			"feature": workflow.FeatureSlugRemoveBg,
+		},
+		func(string) (string, error) {
+			return "", nil
+		},
+	)
+
+	if err := validateExecutablePrompt(fullPrompt); err == nil {
+		t.Fatalf("expected validation error when remove-bg has no executable prompt")
 	}
 }
 

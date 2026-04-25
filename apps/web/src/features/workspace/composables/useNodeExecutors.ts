@@ -75,19 +75,13 @@ interface StandardSubmitBuildOptions {
 }
 
 type PlacedImageInput = { url: string; placementX: number; placementY: number }
-type PlacedMaskInput = { dataUrl: string; placementX: number; placementY: number }
-type UpscalePayload = {
-  image_url: string
-  mode: string
-  upscale_factor: number
-  output_format: string
-  output_quality: number
-  feature?: string
-}
-type SegmentPayload = {
-  image_url: string
-  seg_type: string
-  return_form?: string
+type PlacedMaskInput = {
+  dataUrl: string
+  placementX: number
+  placementY: number
+  sourceImageUrl: string
+  sourceImageRatio: number
+  sourceConnected: boolean
 }
 
 type StandardEditMode = Exclude<EditNodeItem['mode'], 'face-swap'>
@@ -146,12 +140,9 @@ interface UseNodeExecutorsOptions {
     toPort: 'mask',
   ) => Promise<PlacedMaskInput | null>
   buildFullMaskDataUrl: (imageUrl: string) => Promise<string | null>
-  refineMaskDataUrl: (maskDataUrl: string, refineAmount: number, invertMask: boolean) => Promise<string>
+  refineExecutionMaskDataUrl: (maskDataUrl: string, refineAmount: number, invertMask: boolean) => Promise<string>
   dataUrlToFile: (dataUrl: string, fileName: string) => Promise<File>
   uploadImage: (file: File) => Promise<ApiResponseLike<{ url?: string }>>
-  upscaleImage: (payload: UpscalePayload) => Promise<ApiResponseLike<{ image_url?: string }>>
-  segmentImage: (payload: SegmentPayload) => Promise<ApiResponseLike<{ result_url?: string }>>
-  saveSegmentResult: (payload: { result_url: string; seg_type: string; feature: string }) => Promise<ApiResponseLike<{ image_url?: string }>>
   setExecutionNodeRunning: (
     nodeType: CanvasExecutionOutputNodeType,
     nodeId: number,
@@ -377,9 +368,19 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const connectedMask = await options.resolveConnectedPlacedMaskInput(nodeType, node.id, 'mask')
     const promptText = options.resolveNodePromptText(nodeType, node.id, '')
     const connectionStatus = options.getNodeConnectionStatus(nodeType, node)
+
+    if (connectionStatus.incoming.mask && !connectedMask) {
+      options.triggerNodeConnectionError(nodeType, node.id, ['mask'])
+      options.message.warning(
+        connectionStatus.pendingIncoming.mask
+          ? 'Color 节点等待上游 Mask 输出'
+          : 'Color 节点蒙版不可用，请检查 Mask 节点是否存在有效源图',
+      )
+      return null
+    }
+
     const missingPorts = options.getMissingRequiredNodeInputs(nodeType, node, {
       image: connectedImage,
-      mask: connectedMask,
     })
     if (options.warnMissingNodeInputs(nodeType, node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
       const formatLabel = (port: string) => port === 'image'
@@ -390,13 +391,17 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return formatStrictMissingInputMessage('Color', disconnectedPorts, pendingPorts, formatLabel)
     })) return null
 
-    const resolvedImage = connectedImage!
-    const resolvedMask = connectedMask!
+    if (connectedMask && connectedImage!.url !== connectedMask.sourceImageUrl) {
+      options.triggerNodeConnectionError(nodeType, node.id, ['image', 'mask'])
+      options.message.warning('Color 节点的 Image 与 Mask 来源不一致，请连接同一张图片或只连接 Mask')
+      return null
+    }
+
     return {
-      originalImageUrl: resolvedImage.url,
-      maskDataUrl: resolvedMask.dataUrl,
-      placementX: resolvedMask.placementX,
-      placementY: resolvedMask.placementY,
+      originalImageUrl: connectedImage!.url,
+      maskDataUrl: connectedMask?.dataUrl || '',
+      placementX: connectedImage!.placementX,
+      placementY: connectedImage!.placementY,
       promptText,
     }
   }
@@ -409,10 +414,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   ) {
     const resolvedContext = await resolveColorGenerationContext(nodeType, node)
     if (!resolvedContext) return
-    if (!resolvedContext.maskDataUrl) {
-      options.message.warning('请先准备可用蒙版')
-      return
-    }
 
     if (!beginExecution(nodeType, node.id)) return
     const connectedOutputNodeId = options.getConnectedOutputImageTarget(nodeType, node.id)?.id ?? null
@@ -430,14 +431,30 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         resolvedContext.placementX,
         resolvedContext.placementY,
       )
+      let maskImageUrl = ''
+      if (resolvedContext.maskDataUrl) {
+        const maskFile = await options.dataUrlToFile(resolvedContext.maskDataUrl, `mask-${Date.now()}.png`)
+        const uploadRes = await options.uploadImage(maskFile)
+        if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+          failExecution(nodeType, node.id, uploadRes.msg || '蒙版上传失败')
+          return
+        }
+        maskImageUrl = uploadRes.data.url
+      }
 
       await submitExecutionTask(nodeType, node.id, {
         request: buildExecutionTaskRequest({
           prompt: `${EXECUTION_DIRECTED_RECOLOR_META.promptPrefix} ${resolvedContext.promptText ? `${resolvedContext.promptText}，` : ''}目标颜色：${targetColor}，强度：${strength}`,
           feature: EXECUTION_DIRECTED_RECOLOR_META.feature,
-          imageUrls: [uploadRes.data.url],
+          imageUrls: [resolvedContext.originalImageUrl],
           params: {
             original_image_url: resolvedContext.originalImageUrl,
+            ...(maskImageUrl
+              ? {
+                  mask_image_url: maskImageUrl,
+                  use_mask: true,
+                }
+              : {}),
             target_color: targetColor,
             variation_strength: strength,
             strength,
@@ -611,6 +628,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       ? resolveConnectedEditSourceImageInput(node)
       : null
     const connectedMask = await resolveConnectedEditMaskInput(node)
+    const hasMaskConnection = !!connectionStatus.incoming.mask
     const editModeMeta = node.mode === 'face-swap' ? null : getEditModeMeta(node.mode)
     const promptText = editModeMeta
       ? resolveConnectedEditPromptInput(node)
@@ -619,7 +637,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       image: connectedImage,
       ...(node.mode === 'face-swap'
         ? { imageB: connectedSourceImage }
-        : { mask: connectedMask, prompt: promptText }),
+        : { prompt: promptText }),
     })
     if (options.warnMissingNodeInputs('edit', node.id, missingPorts, ({ disconnectedPorts, pendingPorts }) => {
       const promptContentMissing = missingPorts.includes('prompt')
@@ -675,23 +693,46 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         return
       }
 
-      const resolvedMask = connectedMask!
-      const maskFile = await options.dataUrlToFile(resolvedMask.dataUrl, `edit-mask-${Date.now()}.png`)
-      const uploadRes = await options.uploadImage(maskFile)
-      if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-        failExecution('edit', node.id, uploadRes.msg || '蒙版上传失败')
+      if (hasMaskConnection && !connectedMask?.dataUrl) {
+        options.triggerNodeConnectionError('edit', node.id, ['mask'])
+        options.message.warning(
+          connectionStatus.pendingIncoming.mask
+            ? 'Edit 节点等待上游 Mask 输出'
+            : 'Edit 节点蒙版不可用，请检查 Mask 节点',
+        )
         return
       }
 
-      const placementSource = options.buildPlacementSource(resolvedImage.url, resolvedMask.placementX, resolvedMask.placementY)
+      let maskImageUrl = ''
+      if (connectedMask?.dataUrl) {
+        const maskFile = await options.dataUrlToFile(connectedMask.dataUrl, `edit-mask-${Date.now()}.png`)
+        const uploadRes = await options.uploadImage(maskFile)
+        if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+          failExecution('edit', node.id, uploadRes.msg || '蒙版上传失败')
+          return
+        }
+        maskImageUrl = uploadRes.data.url
+      }
+
+      const placementSource = options.buildPlacementSource(
+        resolvedImage.url,
+        connectedMask?.placementX ?? (node.x + 340),
+        connectedMask?.placementY ?? (node.y + 18),
+      )
 
       await submitExecutionTask('edit', node.id, {
         request: buildExecutionTaskRequest({
           prompt: `${editModeMeta!.promptPrefix} ${promptText}`,
           feature: editModeMeta!.feature,
-          imageUrls: [uploadRes.data.url],
+          imageUrls: [resolvedImage.url],
           params: {
             original_image_url: resolvedImage.url,
+            ...(maskImageUrl
+              ? {
+                  mask_image_url: maskImageUrl,
+                  use_mask: true,
+                }
+              : {}),
           },
         }),
         source: placementSource,
@@ -825,24 +866,25 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           return
         }
 
-        const res = await options.upscaleImage({
-          image_url: connectedImage!.url,
-          mode: node.upscaleMode,
-          upscale_factor: node.upscaleFactor,
-          output_format: node.outputFormat,
-          output_quality: node.outputQuality,
-          feature: EXECUTION_ENHANCE_META.hdUpscale.feature,
+        await submitExecutionTask('enhance', node.id, {
+          request: buildExecutionTaskRequest({
+            prompt: EXECUTION_ENHANCE_META.hdUpscale.prompt,
+            feature: EXECUTION_ENHANCE_META.hdUpscale.feature,
+            imageUrls: [connectedImage!.url],
+            params: {
+              original_image_url: connectedImage!.url,
+              upscale_mode: node.upscaleMode,
+              upscale_factor: node.upscaleFactor,
+              output_format: node.outputFormat,
+              output_quality: node.outputQuality,
+            },
+          }),
+          source: placementSource,
+          outputNodeId,
+          successMessage: 'HD upscale submitted',
+          failureMessage: 'Failed to submit enhance task',
+          onCompleted: urls => cacheNodeOutputs('enhance', node.id, urls),
         })
-
-        if (res.code !== 0 || !res.data?.image_url) {
-          failExecution('enhance', node.id, res.msg || '增强失败')
-          return
-        }
-
-        options.appendGeneratedImages([res.data.image_url], placementSource, outputNodeId)
-        cacheNodeOutputs('enhance', node.id, [res.data.image_url])
-        options.message.success('HD upscale completed')
-        markExecutionSucceeded('enhance', node.id)
         return
       }
 
@@ -975,10 +1017,6 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
     const resolvedContext = await resolveColorGenerationContext('color', node)
     if (!resolvedContext) return
-    if (!resolvedContext.maskDataUrl) {
-      options.message.warning('请先准备可用蒙版')
-      return
-    }
 
     if (!beginExecution('color', node.id)) return
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('color', node.id)?.id ?? null
@@ -990,11 +1028,15 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     )
 
     try {
-      const maskFile = await options.dataUrlToFile(resolvedContext.maskDataUrl, `color-mask-${Date.now()}.png`)
-      const uploadRes = await options.uploadImage(maskFile)
-      if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-        failExecution('color', node.id, uploadRes.msg || '蒙版上传失败')
-        return
+      let maskImageUrl = ''
+      if (resolvedContext.maskDataUrl) {
+        const maskFile = await options.dataUrlToFile(resolvedContext.maskDataUrl, `color-mask-${Date.now()}.png`)
+        const uploadRes = await options.uploadImage(maskFile)
+        if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+          failExecution('color', node.id, uploadRes.msg || '蒙版上传失败')
+          return
+        }
+        maskImageUrl = uploadRes.data.url
       }
 
       const promptText = resolvedContext.promptText.trim()
@@ -1009,9 +1051,15 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         request: buildExecutionTaskRequest({
           prompt: promptParts.join('，'),
           feature: EXECUTION_COLOR_SERIES_META.feature,
-          imageUrls: [uploadRes.data.url],
+          imageUrls: [resolvedContext.originalImageUrl],
           params: {
             original_image_url: resolvedContext.originalImageUrl,
+            ...(maskImageUrl
+              ? {
+                  mask_image_url: maskImageUrl,
+                  use_mask: true,
+                }
+              : {}),
             color_type: EXECUTION_COLOR_SERIES_META.colorType,
             colors: node.colors,
             variation_strength: node.strength,

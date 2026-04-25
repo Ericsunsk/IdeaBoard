@@ -23,6 +23,7 @@ export const featureList = [
   { slug: 'virtual-3d', title: 'Display · 商品展示' },
   { slug: 'face-swap', title: 'Edit · 定向换脸' },
   { slug: 'bg-swap', title: 'Edit · 换背景' },
+  { slug: 'remove-bg', title: 'Quick · 抠图' },
   { slug: 'pattern-gen', title: 'Pattern · 图案生成' },
   { slug: 'hd-upscale', title: 'Enhance · 高清放大' },
   { slug: 'canvas-extend', title: 'Enhance · 画布延伸' },
@@ -37,8 +38,8 @@ const featureGroupDefs: Array<{ key: string; title: string; desc: string; slugs:
   {
     key: 'prompt',
     title: 'Prompt',
-    desc: '线稿成款、款式创新和图案生成类工作流。',
-    slugs: ['sketch-to-design', 'style-innovate', 'pattern-gen'],
+    desc: '线稿成款、款式创新、抠图和图案生成类右键/生成工作流。',
+    slugs: ['sketch-to-design', 'style-innovate', 'remove-bg', 'pattern-gen'],
   },
   {
     key: 'color',
@@ -101,11 +102,17 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{color_type}}', desc: '配色类型，当前 Color 节点多色模式固定为 reference（自定义多色配色）' },
     { key: '{{colors}}', desc: 'Color 节点多色模式下的配色列表（如 #8b3a3a, #6b2d3e）' },
     { key: '{{strength}}', desc: 'Color 节点多色模式的配色强度百分比（0-100）' },
+    { key: '{{original_image_url}}', desc: 'Color 节点输入原图 URL（自动传入主图）' },
+    { key: '{{mask_image_url}}', desc: 'Color 节点 Mask 输出上传后的 URL（自动传入蒙版）' },
+    { key: '{{use_mask}}', desc: 'Color 节点是否启用蒙版（当前节点执行时固定为 true）' },
     { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词，可用来描述颜色主次、比例倾向和整体换色方向' },
   ],
   'directed-recolor': [
     { key: '{{target_color}}', desc: 'Color 节点单色模式下的目标颜色（如 #ff5500）' },
     { key: '{{strength}}', desc: 'Color 节点单色模式的换色强度百分比（0-100）' },
+    { key: '{{original_image_url}}', desc: 'Color 节点输入原图 URL（自动传入主图）' },
+    { key: '{{mask_image_url}}', desc: 'Color 节点 Mask 输出上传后的 URL（自动传入蒙版）' },
+    { key: '{{use_mask}}', desc: 'Color 节点是否启用蒙版（当前节点执行时固定为 true）' },
     { key: '{{user_prompt}}', desc: 'Prompt 节点拼装后的提示词（单色模式可选）' },
   ],
   'fabric-on-body': [
@@ -135,6 +142,7 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   'bg-swap': [
     { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本（可选，未连接时系统会用默认背景切换描述）' },
   ],
+  'remove-bg': noVars,
   'pattern-gen': noVars,
   'style-fusion': [
     { key: '{{user_prompt}}', desc: '用于弱修饰/辅助修饰融合方式、质感、细节、氛围；Image A / Image B 主次建议通过滑块控制' },
@@ -157,8 +165,9 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
 const featureNotes: Partial<Record<FeatureSlug, string>> = {
   'sketch-to-design': '画布右键「线稿成款」仍需要配置固定 system prompt，只是不使用 {{user_prompt}} 模板变量。',
   'style-innovate': '画布右键「款式创新」仍需要配置固定 system prompt，只使用 {{strength}} 控制创新幅度百分比（0-100），不使用 {{user_prompt}} 模板变量。',
+  'remove-bg': '画布右键「抠图」是快捷工具，不接收用户输入；必须配置固定 system prompt，并且不要使用 {{user_prompt}} 模板变量。',
   'pattern-gen': '底部输入栏「图案生成」建议保持后台 system prompt 为空，让用户输入自由发挥。',
-  'hd-upscale': 'Enhance · HD 在未连接 Mask 时走直连超分，不使用这里的系统提示词；连接 Mask 进入局部增强任务链后，才会使用下方模板变量与系统提示词。',
+  'hd-upscale': 'Enhance · HD 无论是否连接 Mask 都统一走任务链并使用这里的系统提示词；连接 Mask 时 use_mask=true（并自动带入 mask 相关参数），未连接时 use_mask=false。',
 }
 
 const CONTROL_VAR_KEYS = new Set([

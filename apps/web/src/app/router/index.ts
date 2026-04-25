@@ -108,12 +108,6 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'seg-config',
-        name: 'AdminSegConfig',
-        component: () => import('../../pages/admin/AdminImageProcessingPage.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
         path: 'face-library',
         name: 'AdminFaceLibrary',
         component: () => import('../../pages/admin/AdminFaceLibraryPage.vue'),

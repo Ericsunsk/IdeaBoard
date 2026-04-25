@@ -96,6 +96,7 @@ export function createMaskNodeAt(point: CanvasPoint): MaskNodeItem {
     width: 280,
     sourceImageUrl: '',
     sourceImageRatio: 1,
+    executionMaskDataUrl: '',
     maskDataUrl: '',
     brushSize: 18,
     drawMode: 'paint',

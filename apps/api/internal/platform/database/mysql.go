@@ -2,8 +2,11 @@ package database
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"api/internal/platform/config"
 
@@ -31,12 +34,45 @@ func NewMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		logMode = logger.Silent
 	}
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logMode),
-	})
-	if err != nil {
-		return nil, err
-	}
+	maxRetries := getEnvInt("DB_CONNECT_MAX_RETRIES", 60)
+	retryInterval := time.Duration(getEnvInt("DB_CONNECT_RETRY_INTERVAL_MS", 1000)) * time.Millisecond
 
-	return db, nil
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+			Logger: logger.Default.LogMode(logMode),
+		})
+		if err == nil {
+			sqlDB, dbErr := db.DB()
+			if dbErr == nil {
+				if pingErr := sqlDB.Ping(); pingErr == nil {
+					return db, nil
+				} else {
+					err = pingErr
+				}
+			} else {
+				err = dbErr
+			}
+		}
+
+		lastErr = err
+		if attempt >= maxRetries {
+			break
+		}
+		log.Printf("[Database] MySQL connect attempt %d/%d failed: %v; retrying in %s", attempt, maxRetries, err, retryInterval)
+		time.Sleep(retryInterval)
+	}
+	return nil, lastErr
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return defaultValue
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return defaultValue
+	}
+	return value
 }

@@ -109,18 +109,19 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    if (!node.maskDataUrl) return
+    const previewMaskDataUrl = getMaskPreviewDataUrl(node)
+    if (!previewMaskDataUrl) return
 
     const cached = maskRasterCache.get(node.id)
-    if (cached && cached.src === node.maskDataUrl && cached.complete) {
+    if (cached && cached.src === previewMaskDataUrl && cached.complete) {
       drawMaskRasterPreviewToCanvas(cached, canvas)
       return
     }
 
-    const maskUrl = node.maskDataUrl
+    const maskUrl = previewMaskDataUrl
     const raster = new Image()
     raster.onload = () => {
-      if (node.maskDataUrl !== maskUrl) return
+      if (getMaskPreviewDataUrl(node) !== maskUrl) return
       const latestCanvas = maskCanvasRefs.get(node.id)
       if (!latestCanvas) return
       drawMaskRasterPreviewToCanvas(raster, latestCanvas)
@@ -160,6 +161,38 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     tempCtx.putImageData(imageData, 0, 0)
     targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height)
     targetCtx.drawImage(tempCanvas, 0, 0, targetCanvas.width, targetCanvas.height)
+  }
+
+  function paintExecutionMaskValuesToCanvas(
+    targetCanvas: HTMLCanvasElement,
+    values: Float32Array,
+    width: number,
+    height: number,
+  ) {
+    const tempCanvas = document.createElement('canvas')
+    tempCanvas.width = width
+    tempCanvas.height = height
+    const tempCtx = tempCanvas.getContext('2d')
+    const targetCtx = targetCanvas.getContext('2d')
+    if (!tempCtx || !targetCtx) return
+
+    const imageData = tempCtx.createImageData(width, height)
+    const { data } = imageData
+    for (let i = 0; i < values.length; i += 1) {
+      const base = i * 4
+      const alpha = Math.max(0, Math.min(1, values[i]))
+      data[base] = 255
+      data[base + 1] = 255
+      data[base + 2] = 255
+      data[base + 3] = Math.round(alpha * 255)
+    }
+    tempCtx.putImageData(imageData, 0, 0)
+    targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height)
+    targetCtx.drawImage(tempCanvas, 0, 0, targetCanvas.width, targetCanvas.height)
+  }
+
+  function getMaskPreviewDataUrl(node: MaskNodeItem): string {
+    return node.maskDataUrl || node.executionMaskDataUrl || ''
   }
 
   function drawMaskRasterPreviewToCanvas(raster: CanvasImageSource, targetCanvas: HTMLCanvasElement) {
@@ -235,11 +268,17 @@ export function useMaskNode(options: UseMaskNodeOptions) {
       if (!ctx) return
       const source = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const values = extractMaskIntensity(source.data, canvas.width, canvas.height)
-      const exportCanvas = document.createElement('canvas')
-      exportCanvas.width = canvas.width
-      exportCanvas.height = canvas.height
-      paintMaskValuesToCanvas(exportCanvas, values, canvas.width, canvas.height, maskPaintAlpha)
-      node.maskDataUrl = exportCanvas.toDataURL('image/png')
+      const executionCanvas = document.createElement('canvas')
+      executionCanvas.width = canvas.width
+      executionCanvas.height = canvas.height
+      paintExecutionMaskValuesToCanvas(executionCanvas, values, canvas.width, canvas.height)
+      node.executionMaskDataUrl = executionCanvas.toDataURL('image/png')
+
+      const previewCanvas = document.createElement('canvas')
+      previewCanvas.width = canvas.width
+      previewCanvas.height = canvas.height
+      paintMaskValuesToCanvas(previewCanvas, values, canvas.width, canvas.height, maskPaintAlpha)
+      node.maskDataUrl = previewCanvas.toDataURL('image/png')
       const raster = new Image()
       raster.src = node.maskDataUrl
       maskRasterCache.set(node.id, raster)
@@ -330,7 +369,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     canvas.height = height
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
-    ctx.fillStyle = `rgba(${maskColorR}, ${maskColorG}, ${maskColorB}, ${maskPaintAlpha})`
+    ctx.fillStyle = 'rgba(255, 255, 255, 1)'
     ctx.fillRect(0, 0, width, height)
     return canvas.toDataURL('image/png')
   }
@@ -421,7 +460,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     return input
   }
 
-  async function refineMaskDataUrl(maskDataUrl: string, refineAmount = 0, invertMask = false): Promise<string> {
+  async function refineExecutionMaskDataUrl(maskDataUrl: string, refineAmount = 0, invertMask = false): Promise<string> {
     if (!maskDataUrl) return ''
     try {
       const image = new Image()
@@ -441,7 +480,6 @@ export function useMaskNode(options: UseMaskNodeOptions) {
       if (!sourceCtx) return maskDataUrl
       sourceCtx.drawImage(image, 0, 0, width, height)
       const source = sourceCtx.getImageData(0, 0, width, height)
-
       let maskValues = extractMaskIntensity(source.data, width, height)
       if (invertMask) {
         for (let i = 0; i < maskValues.length; i += 1) {
@@ -468,18 +506,52 @@ export function useMaskNode(options: UseMaskNodeOptions) {
       for (let i = 0; i < maskValues.length; i += 1) {
         const base = i * 4
         const value = Math.max(0, Math.min(1, maskValues[i]))
-        data[base] = maskColorR
-        data[base + 1] = maskColorG
-        data[base + 2] = maskColorB
-        data[base + 3] = Math.round(value * maskPaintAlpha * 255)
+        data[base] = 255
+        data[base + 1] = 255
+        data[base + 2] = 255
+        data[base + 3] = Math.round(value * 255)
       }
       outputCtx.putImageData(output, 0, 0)
       return outputCanvas.toDataURL('image/png')
     } catch (error: unknown) {
-      logMaskNodeError('Failed to refine mask data URL.', error, {
+      logMaskNodeError('Failed to refine execution mask data URL.', error, {
         refineAmount,
         invertMask,
       })
+      return maskDataUrl
+    }
+  }
+
+  async function buildPreviewMaskDataUrlFromExecutionMask(maskDataUrl: string): Promise<string> {
+    if (!maskDataUrl) return ''
+    try {
+      const image = new Image()
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve()
+        image.onerror = () => reject(new Error('Failed to decode mask image'))
+        image.src = maskDataUrl
+      })
+
+      const width = image.naturalWidth || image.width
+      const height = image.naturalHeight || image.height
+      if (!width || !height) return maskDataUrl
+
+      const sourceCanvas = document.createElement('canvas')
+      sourceCanvas.width = width
+      sourceCanvas.height = height
+      const sourceCtx = sourceCanvas.getContext('2d')
+      if (!sourceCtx) return maskDataUrl
+      sourceCtx.drawImage(image, 0, 0, width, height)
+      const source = sourceCtx.getImageData(0, 0, width, height)
+      const maskValues = extractMaskIntensity(source.data, width, height)
+
+      const outputCanvas = document.createElement('canvas')
+      outputCanvas.width = width
+      outputCanvas.height = height
+      paintMaskValuesToCanvas(outputCanvas, maskValues, width, height, maskPaintAlpha)
+      return outputCanvas.toDataURL('image/png')
+    } catch (error: unknown) {
+      logMaskNodeError('Failed to build preview mask data URL from execution mask.', error)
       return maskDataUrl
     }
   }
@@ -494,6 +566,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
       const res = await options.uploadImage(file)
       if (res.code === 0 && res.data?.url) {
         node.sourceImageUrl = res.data.url
+        node.executionMaskDataUrl = ''
         node.maskDataUrl = ''
         if (ratioFromFile) node.sourceImageRatio = ratioFromFile
         else void syncMaskNodeImageRatioByUrl(node, res.data.url)
@@ -523,11 +596,13 @@ export function useMaskNode(options: UseMaskNodeOptions) {
   function clearMaskNodeImage(node: MaskNodeItem) {
     node.sourceImageUrl = ''
     node.sourceImageRatio = 1
+    node.executionMaskDataUrl = ''
     node.maskDataUrl = ''
     renderMaskNodeMask(node)
   }
 
   function clearMaskNodeMask(node: MaskNodeItem) {
+    node.executionMaskDataUrl = ''
     node.maskDataUrl = ''
     renderMaskNodeMask(node)
   }
@@ -536,6 +611,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     const payload = options.readNodeImageDropPayload(event)
     if (payload) {
       node.sourceImageUrl = payload.url
+      node.executionMaskDataUrl = ''
       node.maskDataUrl = ''
       if (payload.ratio > 0) node.sourceImageRatio = payload.ratio
       else void syncMaskNodeImageRatioByUrl(node, payload.url)
@@ -556,6 +632,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     const node = options.maskNodes.value.find(n => n.id === maskId)
     if (!node) return false
     node.sourceImageUrl = item.url
+    node.executionMaskDataUrl = ''
     node.maskDataUrl = ''
     if (item.height_ratio && item.height_ratio > 0) node.sourceImageRatio = item.height_ratio
     else void syncMaskNodeImageRatioByUrl(node, item.url)
@@ -587,7 +664,8 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     clampMaskRefineAmount,
     dataUrlToFile,
     buildFullMaskDataUrl,
-    refineMaskDataUrl,
+    refineExecutionMaskDataUrl,
+    buildPreviewMaskDataUrlFromExecutionMask,
     openMaskNodeFilePicker,
     clearMaskNodeImage,
     clearMaskNodeMask,

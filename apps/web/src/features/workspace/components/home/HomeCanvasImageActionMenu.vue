@@ -11,16 +11,16 @@
         type="button"
         class="image-action-icon-btn"
         :disabled="directGenerating"
-        title="抠图退底"
+        title="抠图"
         @click="emit('action-remove-bg')"
       >
         <span class="action-logo">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M12 8v8M8 12h8" />
+            <path d="M4 5h10v10H4z" />
+            <path d="M10 9h10v10H10z" />
           </svg>
         </span>
-        <span class="action-tooltip">抠图退底</span>
+        <span class="action-tooltip">抠图</span>
       </button>
       <button
         type="button"
@@ -101,9 +101,9 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (event: 'action-remove-bg'): void
   (event: 'style-innovate-mousedown', value: MouseEvent): void
   (event: 'style-innovate-click'): void
+  (event: 'action-remove-bg'): void
   (event: 'action-to-vector'): void
   (event: 'action-sketch-to-design'): void
   (event: 'style-strength-track-mousedown', value: MouseEvent): void

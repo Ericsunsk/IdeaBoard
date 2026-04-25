@@ -594,6 +594,46 @@ func TestCallOpenAIHDUpscaleMaskedUsesMultipartFiles(t *testing.T) {
 	}
 }
 
+func TestCallOpenAIDirectedRecolorUsesEditEndpointAndMaskMultipartFile(t *testing.T) {
+	var gotPath string
+	var gotMultipart multipartRequestCapture
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMultipart = readMultipartRequest(t, r)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/recolor.png"}]}`))
+	}))
+	defer server.Close()
+
+	c := &Consumer{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL,
+		ApiKey:   "test-key",
+		ModelSet: "gpt-image-1",
+	}
+	sourceDataURL := "data:image/png;base64,c291cmNl"
+	maskDataURL := "data:image/png;base64,bWFzaw=="
+	params := map[string]interface{}{
+		"feature":            "directed-recolor",
+		"image_urls":         []interface{}{sourceDataURL},
+		"original_image_url": sourceDataURL,
+		"mask_image_url":     maskDataURL,
+		"use_mask":           true,
+	}
+
+	if _, err := c.callOpenAI(context.Background(), account, "recolor prompt", 1024, 1024, 2*time.Second, params); err != nil {
+		t.Fatalf("callOpenAI returned error: %v", err)
+	}
+	if gotPath != "/v1/images/edits" {
+		t.Fatalf("expected edit endpoint, got %s", gotPath)
+	}
+	masks := gotMultipart.Files["mask"]
+	if len(masks) != 1 {
+		t.Fatalf("expected one mask file, got %#v", masks)
+	}
+}
+
 func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
 		"feature":    "canvas-extend",
@@ -610,7 +650,7 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 		t.Fatalf("expected masked hd-upscale to use edit endpoint")
 	}
 
-	for _, feature := range []string{"style-fusion", "face-swap", "fabric-on-body", "multi-angle"} {
+	for _, feature := range []string{"style-fusion", "series-color", "directed-recolor", "face-swap", "fabric-on-body", "multi-angle", "remove-bg"} {
 		if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
 			"feature":    feature,
 			"image_urls": []interface{}{"https://img.example/source.png", "https://img.example/ref.png"},

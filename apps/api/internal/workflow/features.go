@@ -13,6 +13,7 @@ const (
 	FeatureSlugStyleInnovate   = "style-innovate"
 	FeatureSlugPartialEdit     = "partial-edit"
 	FeatureSlugBgSwap          = "bg-swap"
+	FeatureSlugRemoveBg        = "remove-bg"
 	FeatureSlugFaceSwap        = "face-swap"
 	FeatureSlugStyleFusion     = "style-fusion"
 	FeatureSlugSeriesColor     = "series-color"
@@ -30,6 +31,7 @@ var supportedTaskFeatureSlugs = map[string]struct{}{
 	FeatureSlugStyleInnovate:   {},
 	FeatureSlugPartialEdit:     {},
 	FeatureSlugBgSwap:          {},
+	FeatureSlugRemoveBg:        {},
 	FeatureSlugFaceSwap:        {},
 	FeatureSlugStyleFusion:     {},
 	FeatureSlugSeriesColor:     {},

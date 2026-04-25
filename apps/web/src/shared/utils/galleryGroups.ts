@@ -18,9 +18,9 @@ const CURRENT_PREFIX_LABELS: Record<string, string> = {
   'virtual-3d': '商品展示',
   'face-swap': '定向换脸',
   'bg-swap': '换背景',
+  'remove-bg': '抠图',
   'pattern-gen': '图案生成',
   'to-vector': '转矢量图',
-  'remove-bg': '抠图褪底',
   'hd-upscale': '高清放大',
   'canvas-extend': '画布延伸',
 }

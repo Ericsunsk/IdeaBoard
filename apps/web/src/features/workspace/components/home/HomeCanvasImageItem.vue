@@ -27,9 +27,9 @@
       :display-height="displayHeight"
       :style-innovate-strength-pct="styleInnovateStrengthPct"
       :set-style-strength-track-ref="setStyleStrengthTrackRef"
-      @action-remove-bg="emit('action-remove-bg')"
       @style-innovate-mousedown="emit('style-innovate-mousedown', $event)"
       @style-innovate-click="emit('style-innovate-click')"
+      @action-remove-bg="emit('action-remove-bg')"
       @action-to-vector="emit('action-to-vector')"
       @action-sketch-to-design="emit('action-sketch-to-design')"
       @style-strength-track-mousedown="emit('style-strength-track-mousedown', $event)"
@@ -75,9 +75,9 @@ const emit = defineEmits<{
   (event: 'item-mousedown', value: MouseEvent): void
   (event: 'item-contextmenu', value: MouseEvent): void
   (event: 'image-load', value: Event): void
-  (event: 'action-remove-bg'): void
   (event: 'style-innovate-mousedown', value: MouseEvent): void
   (event: 'style-innovate-click'): void
+  (event: 'action-remove-bg'): void
   (event: 'action-to-vector'): void
   (event: 'action-sketch-to-design'): void
   (event: 'style-strength-track-mousedown', value: MouseEvent): void

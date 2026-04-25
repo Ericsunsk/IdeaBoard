@@ -290,6 +290,11 @@ function toValidMaskNode(item: unknown): CanvasBoardStateMaskNode | null {
   const brushSize = isFiniteNumber(item.brushSize) ? item.brushSize : 18
   const drawMode = item.drawMode === 'erase' ? 'erase' : 'paint'
   const refineAmount = isFiniteNumber(item.refineAmount) ? Math.max(-100, Math.min(100, Math.round(item.refineAmount))) : 0
+  const previewMaskDataUrl = typeof item.maskDataUrl === 'string' ? item.maskDataUrl : ''
+  const executionMaskDataUrl =
+    typeof item.executionMaskDataUrl === 'string'
+      ? item.executionMaskDataUrl
+      : previewMaskDataUrl
   return {
     id: item.id,
     type: 'mask',
@@ -298,7 +303,8 @@ function toValidMaskNode(item: unknown): CanvasBoardStateMaskNode | null {
     width: item.width,
     sourceImageUrl: typeof item.sourceImageUrl === 'string' ? item.sourceImageUrl : '',
     sourceImageRatio: isFiniteNumber(item.sourceImageRatio) ? item.sourceImageRatio : 1,
-    maskDataUrl: typeof item.maskDataUrl === 'string' ? item.maskDataUrl : '',
+    executionMaskDataUrl,
+    maskDataUrl: previewMaskDataUrl,
     brushSize: Math.max(2, Math.min(64, brushSize)),
     drawMode,
     refineAmount,

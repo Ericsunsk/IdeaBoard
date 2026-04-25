@@ -100,6 +100,7 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 | `style-innovate` | 款式创新 |
 | `partial-edit` | 局部改款 |
 | `bg-swap` | 换背景 |
+| `remove-bg` | 抠图 |
 | `face-swap` | 换脸 |
 | `style-fusion` | 双图融合 |
 | `series-color` | 多色配色 |
@@ -128,7 +129,6 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 
 除 workflow feature 外，画布中还存在少量直接工具动作：
 
-- `remove-bg`
 - `to-vector`
 
 它们不进入 `feature_prompt:<slug>` 模板链，也不属于 workflow feature contract 的 active slug 集合。审计 prompt 系统或 admin 配置页时，不要把这类直连工具误当成 workflow feature 漏斗的一部分。
