@@ -40,7 +40,8 @@ export interface UseCanvasEditorOptions {
   setBoardMenuOpen: (visible: boolean) => void
   isBoardRenaming: () => boolean
   isLeaveConfirmVisible: () => boolean
-  confirmBoardRename: () => void
+  confirmBoardRename: () => Promise<boolean> | boolean
+  saveBoard: () => Promise<boolean> | boolean
   resolveLeaveConfirm: (decision: 'save' | 'discard' | 'cancel') => void
   updateZoom: (delta: number, anchor?: { clientX: number; clientY: number }) => void
   getCanvasPointFromClient: (clientX: number, clientY: number) => CanvasPoint

@@ -31,6 +31,8 @@ interface UseCanvasBoardOptions {
   message: CanvasBoardMessageApi
   createSnapshot: () => CanvasBoardSnapshot
   applySnapshot: (snapshot: CanvasBoardSnapshot | null) => void | Promise<void>
+  prepareSnapshotBeforePersist?: () => void | Promise<void>
+  onPersisted?: () => void | Promise<void>
 }
 
 function resolveBoardIdFromQueryValue(
@@ -99,39 +101,43 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     boardNameDraft.value = ''
   }
 
-  function confirmBoardRename() {
-    if (!isRenamingBoard.value) return
+  async function confirmBoardRename(): Promise<boolean> {
+    if (!isRenamingBoard.value) return true
     const boardId = currentBoardId.value
     const nextName = boardNameDraft.value.trim()
     isRenamingBoard.value = false
     if (!boardId || !nextName || nextName === currentBoardName.value) {
       boardNameDraft.value = ''
-      return
+      return !!boardId && (!!nextName || nextName === currentBoardName.value)
     }
     if (isCanvasBoardNameTaken(nextName, boardId)) {
       options.message.warning('名称已存在')
-      return
+      return false
     }
     const renamed = renameCanvasBoard(boardId, nextName)
     if (!renamed) {
       options.message.warning('重命名失败')
       boardNameDraft.value = ''
-      return
+      return false
     }
     currentBoardName.value = renamed.name
     boardNameDraft.value = ''
-    void syncCanvasBoardToServer(boardId).catch((error) => {
+    try {
+      await syncCanvasBoardToServer(boardId)
+    } catch (error) {
       if (isBoardNameConflictError(error)) {
-        void hydrateCanvasBoardsFromServer().finally(() => {
-          syncCurrentBoardName()
-        })
+        await hydrateCanvasBoardsFromServer()
+        syncCurrentBoardName()
         options.message.error('名称已存在，请更换后重试')
-        return
+        return false
       }
       console.warn('[boards] failed to sync renamed board', error)
-    })
+      options.message.error('重命名同步失败，请重试')
+      return false
+    }
     refreshBoardOptions()
     options.message.success('已重命名画布')
+    return true
   }
 
   async function handleBoardSelect(boardId: string) {
@@ -195,30 +201,54 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     }
   }
 
-  function persistBoardStateNow(): boolean {
+  async function writeBoardStateNow(syncRemote = true): Promise<boolean> {
     const boardId = currentBoardId.value
     if (!boardId || isApplyingBoardState.value) return false
     const saved = setCanvasBoardState(boardId, options.createSnapshot())
     if (!saved) return false
     touchCanvasBoard(boardId)
-    void syncCanvasBoardToServer(boardId).catch((error) => {
+    refreshBoardOptions()
+    if (!syncRemote) {
+      isBoardDirty.value = false
+      return true
+    }
+    try {
+      await syncCanvasBoardToServer(boardId)
+    } catch (error) {
       if (isBoardNameConflictError(error)) {
         void hydrateCanvasBoardsFromServer().finally(() => {
           syncCurrentBoardName()
         })
         options.message.error('名称已存在，请重命名后再保存')
-        return
+      } else {
+        console.warn('[boards] failed to sync board snapshot', error)
+        options.message.error('同步画布失败，请重试')
       }
-      console.warn('[boards] failed to sync board snapshot', error)
-    })
-    refreshBoardOptions()
+      isBoardDirty.value = true
+      return false
+    }
     isBoardDirty.value = false
+    await options.onPersisted?.()
     return true
+  }
+
+  async function persistBoardStateNow(): Promise<boolean> {
+    const boardId = currentBoardId.value
+    if (!boardId || isApplyingBoardState.value) return false
+    try {
+      await options.prepareSnapshotBeforePersist?.()
+    } catch (error) {
+      const reason = error instanceof Error && error.message ? error.message : '保存前处理失败，请重试'
+      options.message.error(reason)
+      return false
+    }
+    if (currentBoardId.value !== boardId || isApplyingBoardState.value) return false
+    return writeBoardStateNow(true)
   }
 
   function flushPendingBoardState() {
     if (isBoardDirty.value && !isApplyingBoardState.value) {
-      persistBoardStateNow()
+      void writeBoardStateNow(false)
     }
   }
 
@@ -262,11 +292,8 @@ export function useCanvasBoard(options: UseCanvasBoardOptions) {
     if (!isBoardDirty.value) return true
     const choice = await requestLeaveConfirm()
     if (choice === 'save') {
-      const ok = persistBoardStateNow()
-      if (!ok) {
-        options.message.error('保存失败，请重试')
-        return false
-      }
+      const ok = await persistBoardStateNow()
+      if (!ok) return false
       options.message.success('已保存画布')
       return true
     }

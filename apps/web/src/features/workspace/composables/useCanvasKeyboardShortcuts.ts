@@ -3,6 +3,8 @@ import { onMounted, onUnmounted, type Ref } from 'vue'
 interface UseCanvasKeyboardShortcutsOptions {
   isLeaveConfirmVisible: () => boolean
   resolveLeaveConfirm: (decision: 'save' | 'discard' | 'cancel') => void
+  isBoardRenaming: () => boolean
+  confirmBoardRename: () => Promise<boolean> | boolean
   isNodeContextMenuVisible: () => boolean
   closeNodeContextMenu: () => void
   hasSelectedConnection: () => boolean
@@ -21,6 +23,8 @@ interface UseCanvasKeyboardShortcutsOptions {
   isDuplicateModifierPressed: Ref<boolean>
   undo: () => Promise<boolean> | boolean
   redo: () => Promise<boolean> | boolean
+  saveBoard: () => Promise<boolean> | boolean
+  onBoardSaved: () => void
 }
 
 function isInputLike(target: EventTarget | null): target is HTMLInputElement | HTMLTextAreaElement {
@@ -65,6 +69,27 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
       if (options.selectedIds.value.length > 0) {
         options.clearSelectedIds()
       }
+      return
+    }
+
+    if (
+      e.type === 'keydown' &&
+      !e.repeat &&
+      (e.metaKey || e.ctrlKey) &&
+      !e.altKey &&
+      e.key.toLowerCase() === 's'
+    ) {
+      e.preventDefault()
+      void (async () => {
+        if (options.isBoardRenaming()) {
+          const renamed = await Promise.resolve(options.confirmBoardRename())
+          if (!renamed) return
+        }
+        const saved = await Promise.resolve(options.saveBoard())
+        if (saved) {
+          options.onBoardSaved()
+        }
+      })()
       return
     }
 

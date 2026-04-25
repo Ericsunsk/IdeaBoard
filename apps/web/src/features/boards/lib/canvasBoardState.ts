@@ -52,6 +52,8 @@ export type CanvasBoardStateConnection = CanvasConnection
 export type CanvasBoardStateViewport = CanvasViewportState
 
 export interface CanvasBoardState extends CanvasBoardSnapshot {
+  previewSnapshotDataUrl?: string
+  previewSnapshotUpdatedAt?: number
   updatedAt: number
 }
 
@@ -502,6 +504,16 @@ function toValidViewport(item: unknown): CanvasBoardStateViewport {
   }
 }
 
+function toValidPreviewSnapshotDataUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  return normalized || undefined
+}
+
+function toValidPreviewSnapshotUpdatedAt(value: unknown): number | undefined {
+  return isFiniteNumber(value) ? value : undefined
+}
+
 function toValidBoardState(item: unknown): CanvasBoardState | null {
   if (!isObject(item)) return null
   const rawMessages = Array.isArray(item.messages) ? item.messages : []
@@ -530,12 +542,65 @@ function toValidBoardState(item: unknown): CanvasBoardState | null {
     wearNodes: rawWearNodes.map(toValidWearNode).filter((n): n is CanvasBoardStateWearNode => !!n),
     connections: rawConnections.map(toValidConnection).filter((n): n is CanvasBoardStateConnection => !!n),
     viewport: toValidViewport(item.viewport),
+    previewSnapshotDataUrl: toValidPreviewSnapshotDataUrl(item.previewSnapshotDataUrl),
+    previewSnapshotUpdatedAt: toValidPreviewSnapshotUpdatedAt(item.previewSnapshotUpdatedAt),
     updatedAt: isFiniteNumber(item.updatedAt) ? item.updatedAt : Date.now(),
   }
 }
 
 function normalizeBoardId(boardId: string): string {
   return boardId.trim()
+}
+
+function appendOutputNodeImageUrls(
+  target: Set<string>,
+  nodes: Array<{ outputImages: Array<{ url: string }> }>,
+) {
+  nodes.forEach((node) => {
+    node.outputImages.forEach((output) => {
+      const normalized = `${output.url ?? ''}`.trim()
+      if (normalized) {
+        target.add(normalized)
+      }
+    })
+  })
+}
+
+export function collectCanvasBoardImageUrls(snapshot: CanvasBoardSnapshot | null | undefined): Set<string> {
+  const urls = new Set<string>()
+  if (!snapshot) return urls
+
+  snapshot.messages.forEach((item) => {
+    const normalized = `${item.url ?? ''}`.trim()
+    if (normalized) {
+      urls.add(normalized)
+    }
+  })
+
+  snapshot.imageNodes.forEach((node) => {
+    const normalized = `${node.sourceImageUrl ?? ''}`.trim()
+    if (normalized) {
+      urls.add(normalized)
+    }
+  })
+
+  snapshot.maskNodes.forEach((node) => {
+    const normalized = `${node.sourceImageUrl ?? ''}`.trim()
+    if (normalized) {
+      urls.add(normalized)
+    }
+  })
+
+  appendOutputNodeImageUrls(urls, snapshot.imageNodes)
+  appendOutputNodeImageUrls(urls, snapshot.modelNodes)
+  appendOutputNodeImageUrls(urls, snapshot.viewpointNodes)
+  appendOutputNodeImageUrls(urls, snapshot.colorNodes)
+  appendOutputNodeImageUrls(urls, snapshot.enhanceNodes)
+  appendOutputNodeImageUrls(urls, snapshot.editNodes)
+  appendOutputNodeImageUrls(urls, snapshot.fusionNodes)
+  appendOutputNodeImageUrls(urls, snapshot.wearNodes)
+
+  return urls
 }
 
 export function getCanvasBoardState(boardId: string): CanvasBoardState | null {
@@ -551,12 +616,37 @@ export function setCanvasBoardState(
 ): CanvasBoardState | null {
   const id = normalizeBoardId(boardId)
   if (!id) return null
+  const stateMap = readRawStateMap()
+  const existing = stateMap[id]
   const validState = toValidBoardState({
     ...state,
+    previewSnapshotDataUrl: existing?.previewSnapshotDataUrl,
+    previewSnapshotUpdatedAt: existing?.previewSnapshotUpdatedAt,
     updatedAt: Date.now(),
   })
   if (!validState) return null
+  stateMap[id] = validState
+  writeRawStateMap(stateMap)
+  return validState
+}
+
+export function setCanvasBoardPreviewSnapshot(
+  boardId: string,
+  previewSnapshotDataUrl: string | undefined,
+  previewSnapshotUpdatedAt: number | undefined,
+): CanvasBoardState | null {
+  const id = normalizeBoardId(boardId)
+  if (!id) return null
   const stateMap = readRawStateMap()
+  const existing = stateMap[id]
+  if (!existing) return null
+  const validState = toValidBoardState({
+    ...existing,
+    previewSnapshotDataUrl,
+    previewSnapshotUpdatedAt,
+    updatedAt: existing.updatedAt,
+  })
+  if (!validState) return null
   stateMap[id] = validState
   writeRawStateMap(stateMap)
   return validState
@@ -596,10 +686,6 @@ export function isImageUrlReferencedInOtherCanvasBoardStates(url: string, exclud
   const stateMap = readRawStateMap()
   return Object.entries(stateMap).some(([boardId, state]) => {
     if (excluded && boardId === excluded) return false
-    return (
-      state.messages.some(item => item.url === targetURL) ||
-      state.imageNodes.some(node => node.sourceImageUrl === targetURL) ||
-      state.maskNodes.some(node => node.sourceImageUrl === targetURL)
-    )
+    return collectCanvasBoardImageUrls(state).has(targetURL)
   })
 }

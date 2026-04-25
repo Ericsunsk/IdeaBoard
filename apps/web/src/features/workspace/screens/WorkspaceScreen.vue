@@ -321,7 +321,11 @@ import { useMessage } from 'naive-ui'
 import { taskApi, uploadApi, vectorizeApi } from '../../../shared/api/index'
 import { useUserStore } from '../../../app/stores/user'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
-import { isImageUrlReferencedInOtherCanvasBoardStates } from '../../boards/lib/canvasBoardState'
+import {
+  collectCanvasBoardImageUrls,
+  getCanvasBoardState,
+  isImageUrlReferencedInOtherCanvasBoardStates,
+} from '../../boards/lib/canvasBoardState'
 import { CANVAS_NODE_MENU_ITEMS, type CanvasNodeCreateActionKey } from '../config/canvasNodeMenu'
 import { useCanvasConnections } from '../composables/useCanvasConnections'
 import { useCanvasViewport } from '../composables/useCanvasViewport'
@@ -423,6 +427,7 @@ const route = useRoute()
 const message = useMessage()
 const userStore = useUserStore()
 const defaultCanvasName = 'Untitled'
+const USER_DOWNLOAD_ENDPOINT = '/api/user/download'
 
 const patternGenerateRatioOptions = PATTERN_GENERATE_RATIO_OPTIONS
 const patternGenerateQualityOptions = GENERATE_QUALITY_OPTIONS
@@ -569,6 +574,200 @@ function uploadWorkspaceImage(file: File) {
   return uploadApi.upload(file, boardId)
 }
 
+interface PersistedImageUrlReference {
+  path: string
+  getUrl: () => string
+  setUrl: (url: string) => void
+}
+
+function resolveAbsoluteCanvasUrl(rawUrl: string): URL | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return new URL(rawUrl, window.location.origin)
+  } catch {
+    return null
+  }
+}
+
+function isStableWorkspaceUploadUrl(rawUrl: string): boolean {
+  if (typeof window === 'undefined') return true
+  const normalized = rawUrl.trim()
+  if (!normalized) return true
+  if (normalized.startsWith('/uploads/')) return true
+  const parsed = resolveAbsoluteCanvasUrl(normalized)
+  if (!parsed) return false
+  return parsed.origin === window.location.origin && parsed.pathname.startsWith('/uploads/')
+}
+
+function getProxyTargetUrl(rawUrl: string): string | null {
+  const parsed = resolveAbsoluteCanvasUrl(rawUrl.trim())
+  if (!parsed) return null
+  if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith(USER_DOWNLOAD_ENDPOINT)) {
+    return null
+  }
+  const target = parsed.searchParams.get('url')
+  return target?.trim() || null
+}
+
+function resolveImageFetchRequestUrl(rawUrl: string): string {
+  const normalized = rawUrl.trim()
+  const proxyTarget = getProxyTargetUrl(normalized)
+  if (proxyTarget) {
+    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(proxyTarget)}`
+  }
+  const parsed = resolveAbsoluteCanvasUrl(normalized)
+  if (parsed && (parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
+    if (parsed.origin !== window.location.origin) {
+      return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(parsed.href)}`
+    }
+    return parsed.href
+  }
+  return normalized
+}
+
+function inferFileExtensionFromMimeType(mimeType: string): string {
+  const normalized = mimeType.toLowerCase()
+  if (normalized.includes('png')) return 'png'
+  if (normalized.includes('webp')) return 'webp'
+  if (normalized.includes('gif')) return 'gif'
+  if (normalized.includes('bmp')) return 'bmp'
+  if (normalized.includes('jpeg') || normalized.includes('jpg')) return 'jpg'
+  if (normalized.includes('svg')) return 'svg'
+  return 'jpg'
+}
+
+function toUploadFilename(rawUrl: string, mimeType: string): string {
+  const parsed = resolveAbsoluteCanvasUrl(rawUrl.trim())
+  const pathname = parsed?.pathname || rawUrl
+  const leaf = pathname.split('/').filter(Boolean).pop() || ''
+  const safeLeaf = leaf.replace(/[^A-Za-z0-9._-]/g, '')
+  const hasExtension = /\.[A-Za-z0-9]{2,8}$/.test(safeLeaf)
+  if (hasExtension) return safeLeaf
+  return `workspace-image-${Date.now()}.${inferFileExtensionFromMimeType(mimeType)}`
+}
+
+async function fetchAndUploadStableWorkspaceUrl(rawUrl: string): Promise<string> {
+  const requestUrl = resolveImageFetchRequestUrl(rawUrl)
+  let response: Response
+  try {
+    response = await fetch(requestUrl, { credentials: 'include' })
+  } catch (error) {
+    throw new Error(`下载图片失败：${error instanceof Error ? error.message : '网络异常'}`)
+  }
+  if (!response.ok) {
+    throw new Error(`下载图片失败：HTTP ${response.status}`)
+  }
+  const blob = await response.blob()
+  if (!blob.size) {
+    throw new Error('下载图片失败：响应为空')
+  }
+  const uploadFile = new File([blob], toUploadFilename(rawUrl, blob.type || 'image/jpeg'), {
+    type: blob.type || 'image/jpeg',
+  })
+  let uploadResult: Awaited<ReturnType<typeof uploadWorkspaceImage>>
+  try {
+    uploadResult = await uploadWorkspaceImage(uploadFile)
+  } catch (error) {
+    throw new Error(`上传图片失败：${error instanceof Error ? error.message : '未知错误'}`)
+  }
+  const stableUrl = `${uploadResult?.data?.url ?? ''}`.trim()
+  if (!stableUrl) {
+    throw new Error('上传图片失败：服务端未返回可用链接')
+  }
+  if (!isStableWorkspaceUploadUrl(stableUrl)) {
+    throw new Error('上传图片失败：返回链接不是 workspace uploads 地址')
+  }
+  return stableUrl
+}
+
+function appendOutputImageReferences(
+  target: PersistedImageUrlReference[],
+  prefix: string,
+  nodes: Array<{ outputImages: Array<{ url: string }> }>,
+) {
+  nodes.forEach((node, nodeIndex) => {
+    node.outputImages.forEach((output, outputIndex) => {
+      target.push({
+        path: `${prefix}[${nodeIndex}].outputImages[${outputIndex}].url`,
+        getUrl: () => output.url,
+        setUrl: (url) => {
+          output.url = url
+        },
+      })
+    })
+  })
+}
+
+function collectPersistedImageUrlReferences(): PersistedImageUrlReference[] {
+  const references: PersistedImageUrlReference[] = []
+  messages.value.forEach((item, index) => {
+    references.push({
+      path: `messages[${index}].url`,
+      getUrl: () => item.url,
+      setUrl: (url) => {
+        item.url = url
+      },
+    })
+  })
+  imageNodes.value.forEach((node, index) => {
+    references.push({
+      path: `imageNodes[${index}].sourceImageUrl`,
+      getUrl: () => node.sourceImageUrl,
+      setUrl: (url) => {
+        node.sourceImageUrl = url
+      },
+    })
+  })
+  maskNodes.value.forEach((node, index) => {
+    references.push({
+      path: `maskNodes[${index}].sourceImageUrl`,
+      getUrl: () => node.sourceImageUrl,
+      setUrl: (url) => {
+        node.sourceImageUrl = url
+      },
+    })
+  })
+  appendOutputImageReferences(references, 'imageNodes', imageNodes.value)
+  appendOutputImageReferences(references, 'modelNodes', modelNodes.value)
+  appendOutputImageReferences(references, 'viewpointNodes', viewpointNodes.value)
+  appendOutputImageReferences(references, 'colorNodes', colorNodes.value)
+  appendOutputImageReferences(references, 'enhanceNodes', enhanceNodes.value)
+  appendOutputImageReferences(references, 'editNodes', editNodes.value)
+  appendOutputImageReferences(references, 'fusionNodes', fusionNodes.value)
+  appendOutputImageReferences(references, 'wearNodes', wearNodes.value)
+  return references
+}
+
+async function stabilizePersistedImageUrlsBeforeSave() {
+  const normalizeAndUploadTasks = new Map<string, Promise<string>>()
+  const references = collectPersistedImageUrlReferences()
+  for (const reference of references) {
+    const original = reference.getUrl()
+    const normalized = original.trim()
+    if (!normalized) continue
+    if (normalized !== original) {
+      reference.setUrl(normalized)
+    }
+    if (isStableWorkspaceUploadUrl(normalized)) {
+      continue
+    }
+    let uploadTask = normalizeAndUploadTasks.get(normalized)
+    if (!uploadTask) {
+      uploadTask = fetchAndUploadStableWorkspaceUrl(normalized)
+      normalizeAndUploadTasks.set(normalized, uploadTask)
+    }
+    try {
+      const stableUrl = await uploadTask
+      reference.setUrl(stableUrl)
+    } catch (error) {
+      const reason = error instanceof Error && error.message ? error.message : '未知错误'
+      throw new Error(`保存失败：${reference.path} 使用了不稳定图片链接，${reason}`)
+    }
+  }
+}
+
+let pendingSaveRecycleEntriesBuffer: PendingRecycleUploadEntry[] = []
+
 function resolveCanvasWorkspaceUploadMeta(url: string): CanvasImageItem['uploadMeta'] | undefined {
   const path = parseCanvasImagePath(url)
   if (!path) return undefined
@@ -591,38 +790,53 @@ function resolveCanvasWorkspaceUploadMeta(url: string): CanvasImageItem['uploadM
   }
 }
 
-function isReferencedInActiveWorkspaceState(url: string): boolean {
-  return (
-    messages.value.some(item => item.url === url) ||
-    imageNodes.value.some(node => node.sourceImageUrl === url) ||
-    maskNodes.value.some(node => node.sourceImageUrl === url)
+function resolvePendingRecycleEntryForUrl(
+  url: string,
+  boardIdOverride?: string,
+): PendingRecycleUploadEntry | null {
+  const normalizedUrl = url.trim()
+  if (!normalizedUrl || !isStableWorkspaceUploadUrl(normalizedUrl)) return null
+  const currentUserID = Number(userStore.user?.id)
+  const boardId = `${boardIdOverride ?? currentBoardId.value ?? ''}`.trim()
+  if (!Number.isFinite(currentUserID) || currentUserID <= 0 || !boardId) return null
+  const path = parseCanvasImagePath(normalizedUrl)
+  const encodedBoardId = encodeWorkspacePathSegment(boardId)
+  const segments = path?.split('/').filter(Boolean) ?? []
+  let matched = false
+  for (let i = 0; i + 4 < segments.length; i += 1) {
+    if (segments[i] !== 'uploads' || segments[i + 1] !== 'workspace') continue
+    if (segments[i + 3] !== encodedBoardId || segments[i + 4] !== 'content') continue
+    matched = true
+    break
+  }
+  if (!matched) return null
+  return {
+    url: normalizedUrl,
+    userId: currentUserID,
+    boardId,
+  }
+}
+
+function queueWorkspaceUploadUrlsForRecycle(
+  urls: Iterable<string>,
+  boardIdOverride?: string,
+) {
+  const nextEntryMap = new Map(
+    pendingRecycleEntries.value.map(entry => [entry.url, entry] as const),
   )
+  for (const url of urls) {
+    const entry = resolvePendingRecycleEntryForUrl(url, boardIdOverride)
+    if (!entry) continue
+    nextEntryMap.set(entry.url, entry)
+  }
+  setPendingRecycleEntries(Array.from(nextEntryMap.values()))
 }
 
 function queueDeletedCanvasUploadsForRecycle(deletedItems: CanvasImageItem[]) {
   if (!deletedItems.length) return
-  const currentUserID = Number(userStore.user?.id)
-  const boardId = currentBoardId.value?.trim()
-  if (!Number.isFinite(currentUserID) || currentUserID <= 0 || !boardId) return
-
-  const nextEntryMap = new Map(
-    pendingRecycleEntries.value.map(entry => [entry.url, entry] as const),
+  queueWorkspaceUploadUrlsForRecycle(
+    deletedItems.map(item => item.url),
   )
-  deletedItems
-    .filter((item) => item.uploadMeta?.kind === 'workspace-local-drop-upload')
-    .filter((item) => item.uploadMeta?.userId === currentUserID)
-    .map(item => item.url.trim())
-    .filter(url => !!url)
-    .forEach((url) => {
-      nextEntryMap.set(url, {
-        url,
-        userId: currentUserID,
-        boardId,
-      })
-    })
-
-  setPendingRecycleEntries(Array.from(nextEntryMap.values()))
-  void schedulePendingRecycleScan()
 }
 
 async function flushPendingRecycleUploads() {
@@ -635,6 +849,7 @@ async function flushPendingRecycleUploads() {
   pendingRecycleScanInFlight = true
   try {
     const activeBoardId = currentBoardId.value?.trim() || ''
+    const activeSnapshotUrls = collectCanvasBoardImageUrls(createBoardSnapshotBase())
     const recycleTargets: PendingRecycleUploadEntry[] = []
     const retainedEntries: PendingRecycleUploadEntry[] = []
 
@@ -643,7 +858,7 @@ async function flushPendingRecycleUploads() {
       if (!normalized) return
       const { url } = normalized
 
-      if (isReferencedInActiveWorkspaceState(url)) {
+      if (activeSnapshotUrls.has(url.trim())) {
         return
       }
 
@@ -854,6 +1069,7 @@ const {
   isBoardRenaming: () => isRenamingBoard.value,
   isLeaveConfirmVisible: () => leaveConfirmVisible.value,
   confirmBoardRename: () => confirmBoardRename(),
+  saveBoard: () => persistBoardStateNow(),
   resolveLeaveConfirm: (decision) => resolveLeaveConfirm(decision),
   updateZoom,
   getCanvasPointFromClient,
@@ -1399,7 +1615,7 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
       resetEditorState()
       await nextTick()
       primeWorkflowCacheSignatureMaps()
-      resetHistoryBaseline?.(createBoardSnapshot())
+      resetHistoryBaseline?.(createBoardSnapshotBase())
       return
     }
 
@@ -1475,13 +1691,13 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
     maskNodes.value.forEach(node => renderMaskNodeMask(node))
     scheduleRenderedConnectionsRefresh()
     primeWorkflowCacheSignatureMaps()
-    resetHistoryBaseline?.(createBoardSnapshot())
+    resetHistoryBaseline?.(createBoardSnapshotBase())
   } finally {
     suspendWorkflowCacheReactions = false
   }
 }
 
-function createBoardSnapshot(): CanvasBoardSnapshot {
+function createBoardSnapshotBase(): CanvasBoardSnapshot {
   return {
     messages: messages.value.map(item => ({ ...item })),
     imageNodes: imageNodes.value.map(node => ({
@@ -1521,6 +1737,46 @@ function createBoardSnapshot(): CanvasBoardSnapshot {
   }
 }
 
+function collectRemovedWorkspaceUploadEntries(
+  previousSnapshot: CanvasBoardSnapshot | null | undefined,
+  nextSnapshot: CanvasBoardSnapshot | null | undefined,
+  boardId: string,
+): PendingRecycleUploadEntry[] {
+  const previousUrls = collectCanvasBoardImageUrls(previousSnapshot)
+  const nextUrls = collectCanvasBoardImageUrls(nextSnapshot)
+  const removedEntries: PendingRecycleUploadEntry[] = []
+
+  previousUrls.forEach((url) => {
+    if (nextUrls.has(url)) return
+    const entry = resolvePendingRecycleEntryForUrl(url, boardId)
+    if (entry) {
+      removedEntries.push(entry)
+    }
+  })
+
+  return removedEntries
+}
+
+async function prepareBoardSnapshotBeforePersist() {
+  const boardId = `${currentBoardId.value ?? ''}`.trim()
+  const previousSnapshot = boardId ? getCanvasBoardState(boardId) : null
+  await stabilizePersistedImageUrlsBeforeSave()
+  pendingSaveRecycleEntriesBuffer = boardId
+    ? collectRemovedWorkspaceUploadEntries(previousSnapshot, createBoardSnapshotBase(), boardId)
+    : []
+}
+
+async function handleBoardPersisted() {
+  if (pendingSaveRecycleEntriesBuffer.length > 0) {
+    setPendingRecycleEntries([
+      ...pendingRecycleEntries.value,
+      ...pendingSaveRecycleEntriesBuffer,
+    ])
+    pendingSaveRecycleEntriesBuffer = []
+  }
+  await schedulePendingRecycleScan()
+}
+
 const {
   notifySnapshotChanged,
   beginBatch: beginCanvasHistoryBatch,
@@ -1528,10 +1784,9 @@ const {
   resetHistoryBaseline: syncCanvasHistoryBaseline,
   undo: undoCanvasSnapshot,
   redo: redoCanvasSnapshot,
-  historyVersion: canvasHistoryVersion,
   hasImageUrlReference: hasHistoryImageUrlReference,
 } = useCanvasHistory({
-  createSnapshot: createBoardSnapshot,
+  createSnapshot: createBoardSnapshotBase,
   applySnapshot: applyBoardSnapshot,
   maxEntries: RECENT_HISTORY_RECYCLE_GUARD_STEPS,
 })
@@ -1555,12 +1810,15 @@ const {
   handleBoardSelect,
   resolveLeaveConfirm,
   confirmSaveBeforeLeave,
+  persistBoardStateNow,
   markBoardDirty,
 } = useCanvasBoard({
   defaultBoardName: defaultCanvasName,
   message,
-  createSnapshot: createBoardSnapshot,
+  createSnapshot: createBoardSnapshotBase,
   applySnapshot: applyBoardSnapshot,
+  prepareSnapshotBeforePersist: prepareBoardSnapshotBeforePersist,
+  onPersisted: handleBoardPersisted,
 })
 
 primeWorkflowCacheSignatureMaps()
@@ -1701,7 +1959,7 @@ watch(
 )
 
 watch(
-  [messages, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, wearNodes, connections, canvasX, canvasY, zoomLevel],
+  [messages, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, wearNodes, connections],
   () => {
     markBoardDirty()
     notifySnapshotChanged()
@@ -1710,32 +1968,9 @@ watch(
 )
 
 watch(
-  [messages, imageNodes, maskNodes],
-  () => {
-    void schedulePendingRecycleScan()
-  },
-  { deep: true },
-)
-
-watch(
-  () => canvasHistoryVersion.value,
-  () => {
-    void schedulePendingRecycleScan()
-  },
-)
-
-watch(
-  () => currentBoardId.value,
-  () => {
-    void schedulePendingRecycleScan()
-  },
-)
-
-watch(
   () => userStore.user?.id,
   () => {
     setPendingRecycleEntries(readPendingRecycleEntries())
-    void schedulePendingRecycleScan()
   },
   { immediate: true },
 )
@@ -1862,12 +2097,35 @@ function createNodeFromContextMenu<T extends { id: number }>(
   closeNodeContextMenu()
 }
 
+function collectWorkspaceUploadUrlsFromNodeLike(
+  node: { sourceImageUrl?: string; outputImages?: Array<{ url: string }> },
+): string[] {
+  const urls = new Set<string>()
+  const sourceImageUrl = `${node.sourceImageUrl ?? ''}`.trim()
+  if (sourceImageUrl) {
+    urls.add(sourceImageUrl)
+  }
+  node.outputImages?.forEach((output) => {
+    const outputUrl = `${output.url ?? ''}`.trim()
+    if (outputUrl) {
+      urls.add(outputUrl)
+    }
+  })
+  return Array.from(urls)
+}
+
 function deleteNodeFromCollection<T extends { id: number }>(
   collection: Ref<T[]>,
   nodeType: CanvasConnectionNodeType,
   id: number,
   afterDelete?: () => void,
 ) {
+  const removedNode = collection.value.find(node => node.id === id) as
+    | (T & { sourceImageUrl?: string; outputImages?: Array<{ url: string }> })
+    | undefined
+  if (removedNode) {
+    queueWorkspaceUploadUrlsForRecycle(collectWorkspaceUploadUrlsFromNodeLike(removedNode))
+  }
   collection.value = collection.value.filter(node => node.id !== id)
   clearNodeConnectionError(nodeType, id)
   if (isCanvasExecutionOutputNodeType(nodeType)) {

@@ -155,6 +155,8 @@ export function createCanvasKeyboardBindings(
   return {
     isLeaveConfirmVisible: options.isLeaveConfirmVisible,
     resolveLeaveConfirm: options.resolveLeaveConfirm,
+    isBoardRenaming: options.isBoardRenaming,
+    confirmBoardRename: options.confirmBoardRename,
     isNodeContextMenuVisible: () => uiState.nodeContextMenu.value.visible,
     closeNodeContextMenu,
     hasSelectedConnection: () => options.hasSelectedConnection?.() ?? false,
@@ -173,5 +175,7 @@ export function createCanvasKeyboardBindings(
     isDuplicateModifierPressed: uiState.isDuplicateModifierPressed,
     undo: options.undo,
     redo: options.redo,
+    saveBoard: options.saveBoard,
+    onBoardSaved: () => options.message.success('已保存画布'),
   }
 }

@@ -43,7 +43,7 @@
           v-for="board in visibleBoards"
           :key="board.id"
           :board="board"
-          :preview-items="boardPreviewMap[board.id] || []"
+          :preview-snapshot-data-url="boardPreviewMap[board.id] || ''"
           :is-renaming="renamingBoardId === board.id"
           :rename-draft="renameDraft"
           :is-menu-open="activeMenuBoardId === board.id"
@@ -85,11 +85,9 @@ import {
   deleteCanvasBoardState,
   duplicateCanvasBoardState,
   getCanvasBoardState,
+  setCanvasBoardPreviewSnapshot,
 } from '../lib/canvasBoardState'
-import {
-  buildBoardPreviewItemsFromState,
-  type BoardPreviewItem,
-} from '../lib/boardPreviewSerializer'
+import { renderBoardPreviewDataUrl } from '../lib/boardPreviewSerializer'
 import {
   hydrateCanvasBoardsFromServer,
   isBoardNameConflictError,
@@ -108,7 +106,10 @@ const renameDraft = ref('')
 const suppressNextBoardOpen = ref(false)
 const activeMenuBoardId = ref<string | null>(null)
 
-const boardPreviewMap = ref<Record<string, BoardPreviewItem[]>>({})
+const boardPreviewMap = ref<Record<string, string>>({})
+const previewRefreshQueue: string[] = []
+const queuedPreviewBoardIds = new Set<string>()
+let previewRefreshInFlight = false
 
 const visibleBoards = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -125,6 +126,7 @@ const visibleBoards = computed(() => {
 function reloadBoards() {
   boards.value = listCanvasBoards()
   refreshBoardPreviews()
+  scheduleBoardPreviewRefresh()
 }
 
 function formatDate(ts: number): string {
@@ -137,11 +139,86 @@ function formatDate(ts: number): string {
 }
 
 function refreshBoardPreviews() {
-  const nextMap: Record<string, BoardPreviewItem[]> = {}
+  const nextMap: Record<string, string> = {}
   boards.value.forEach((board) => {
-    nextMap[board.id] = buildBoardPreviewItemsFromState(getCanvasBoardState(board.id))
+    nextMap[board.id] = getCanvasBoardState(board.id)?.previewSnapshotDataUrl || ''
   })
   boardPreviewMap.value = nextMap
+}
+
+function isBoardPreviewStale(boardId: string): boolean {
+  const state = getCanvasBoardState(boardId)
+  if (!state) return false
+  if (!state.previewSnapshotDataUrl) return true
+  if (!Number.isFinite(state.previewSnapshotUpdatedAt)) return true
+  return (state.previewSnapshotUpdatedAt || 0) < state.updatedAt
+}
+
+function enqueueBoardPreviewRefresh(boardId: string) {
+  if (!boardId || queuedPreviewBoardIds.has(boardId)) return
+  queuedPreviewBoardIds.add(boardId)
+  previewRefreshQueue.push(boardId)
+}
+
+async function refreshBoardPreviewInBackground(boardId: string) {
+  const startState = getCanvasBoardState(boardId)
+  if (!startState || !isBoardPreviewStale(boardId)) return
+  const baseUpdatedAt = startState.updatedAt
+  let snapshotDataUrl = ''
+  try {
+    snapshotDataUrl = await renderBoardPreviewDataUrl(startState)
+  } catch (error) {
+    console.warn('[boards] failed to render board preview', boardId, error)
+    return
+  }
+  const latestState = getCanvasBoardState(boardId)
+  if (!latestState) return
+  if (latestState.updatedAt !== baseUpdatedAt) {
+    enqueueBoardPreviewRefresh(boardId)
+    return
+  }
+  const updatedState = setCanvasBoardPreviewSnapshot(
+    boardId,
+    snapshotDataUrl || undefined,
+    snapshotDataUrl ? Date.now() : undefined,
+  )
+  if (!updatedState) return
+  boardPreviewMap.value = {
+    ...boardPreviewMap.value,
+    [boardId]: updatedState.previewSnapshotDataUrl || '',
+  }
+  void syncCanvasBoardToServer(boardId).catch((error) => {
+    if (isBoardNameConflictError(error)) return
+    console.warn('[boards] failed to sync refreshed preview', boardId, error)
+  })
+}
+
+async function runBoardPreviewRefreshQueue() {
+  if (previewRefreshInFlight) return
+  previewRefreshInFlight = true
+  try {
+    while (previewRefreshQueue.length > 0) {
+      const boardId = previewRefreshQueue.shift()
+      if (!boardId) continue
+      queuedPreviewBoardIds.delete(boardId)
+      if (!isBoardPreviewStale(boardId)) continue
+      await refreshBoardPreviewInBackground(boardId)
+    }
+  } finally {
+    previewRefreshInFlight = false
+    if (previewRefreshQueue.length > 0) {
+      void runBoardPreviewRefreshQueue()
+    }
+  }
+}
+
+function scheduleBoardPreviewRefresh() {
+  boards.value.forEach((board) => {
+    if (isBoardPreviewStale(board.id)) {
+      enqueueBoardPreviewRefresh(board.id)
+    }
+  })
+  void runBoardPreviewRefreshQueue()
 }
 
 async function createAndOpenBoard() {
@@ -488,6 +565,7 @@ onUnmounted(() => {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
   overflow: hidden;
+  height: 244px;
   text-align: left;
 }
 
