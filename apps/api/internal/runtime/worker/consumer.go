@@ -477,9 +477,6 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		return "", fmt.Errorf("当前渠道不支持该图像参考能力")
 	}
 
-	// 根据 ratio 计算尺寸
-	width, height := parseSizeFromParams(params)
-
 	timeout := time.Duration(account.Timeout) * time.Second
 	if timeout == 0 {
 		timeout = 120 * time.Second
@@ -490,6 +487,9 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		return "", redrawErr
 	}
 	localRedrawStored := false
+
+	// 根据 ratio 或自定义尺寸计算输出尺寸；local redraw 会先改写为 ROI 尺寸。
+	width, height := parseSizeFromParams(params)
 
 	var imageURL string
 	var err error
@@ -1328,9 +1328,9 @@ func parseSizeFromParams(params map[string]interface{}) (int, int) {
 	var w, h int
 
 	// 自定义尺寸优先
-	if cw, ok := params["custom_width"].(float64); ok && cw > 0 {
-		if ch, okh := params["custom_height"].(float64); okh && ch > 0 {
-			w, h = int(cw), int(ch)
+	if cw, ok := readPositiveSizeParam(params, "custom_width"); ok {
+		if ch, okh := readPositiveSizeParam(params, "custom_height"); okh {
+			w, h = cw, ch
 			// 根据清晰度缩放
 			switch quality {
 			case "2k":
@@ -1368,4 +1368,37 @@ func parseSizeFromParams(params map[string]interface{}) (int, int) {
 	}
 
 	return w, h
+}
+
+func readPositiveSizeParam(params map[string]interface{}, key string) (int, bool) {
+	if params == nil {
+		return 0, false
+	}
+	switch value := params[key].(type) {
+	case float64:
+		if value > 0 {
+			return int(value), true
+		}
+	case float32:
+		if value > 0 {
+			return int(value), true
+		}
+	case int:
+		if value > 0 {
+			return value, true
+		}
+	case int64:
+		if value > 0 {
+			return int(value), true
+		}
+	case int32:
+		if value > 0 {
+			return int(value), true
+		}
+	case json.Number:
+		if parsed, err := strconv.Atoi(string(value)); err == nil && parsed > 0 {
+			return parsed, true
+		}
+	}
+	return 0, false
 }

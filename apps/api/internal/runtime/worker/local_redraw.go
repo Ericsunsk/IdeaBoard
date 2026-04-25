@@ -108,7 +108,7 @@ func (c *Consumer) prepareLocalRedrawPipeline(ctx context.Context, account *acco
 		return nil, fmt.Errorf("local redraw 裁剪 ROI 失败: feature=%s err=%w", featureSlug, err)
 	}
 
-	if err := rewriteLocalRedrawUpstreamInputs(params, featureSlug, roiDataURL); err != nil {
+	if err := rewriteLocalRedrawUpstreamInputs(params, featureSlug, roiDataURL, roi); err != nil {
 		return nil, err
 	}
 	stripLocalRedrawMaskParams(params)
@@ -254,7 +254,7 @@ func readLocalRedrawMaskRef(params map[string]interface{}) (string, bool) {
 	return "", false
 }
 
-func rewriteLocalRedrawUpstreamInputs(params map[string]interface{}, featureSlug, roiDataURL string) error {
+func rewriteLocalRedrawUpstreamInputs(params map[string]interface{}, featureSlug, roiDataURL string, roi image.Rectangle) error {
 	imageURLs := readImageURLValues(params)
 	switch featureSlug {
 	case workflow.FeatureSlugFabricOnBody:
@@ -268,6 +268,8 @@ func rewriteLocalRedrawUpstreamInputs(params map[string]interface{}, featureSlug
 	params["image_urls"] = toInterfaceSlice(imageURLs)
 	params["image_url"] = roiDataURL
 	params["original_image_url"] = roiDataURL
+	params["custom_width"] = float64(roi.Dx())
+	params["custom_height"] = float64(roi.Dy())
 	return nil
 }
 

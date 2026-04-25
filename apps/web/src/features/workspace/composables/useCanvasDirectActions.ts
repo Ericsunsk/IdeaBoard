@@ -3,6 +3,7 @@ import type { CanvasImageItem } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/index'
 import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import {
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
@@ -169,12 +170,14 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
       return
     }
     options.generating.value = true
+    const imageSize = await options.loadImageSizeFromUrl(source.url)
     let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
         prompt: `${EXECUTION_DIRECT_ACTION_META.sketchToDesign.promptPrefix} ${desc}`,
         feature: EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature,
         imageUrls: [source.url],
+        params: buildExecutionSizeParams(imageSize),
       }),
       source,
       successMessage: 'Task submitted',
@@ -213,12 +216,7 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
         imageUrls: [source.url],
         params: {
           original_image_url: source.url,
-          ...(imageSize ? {
-            custom_width: imageSize.width,
-            custom_height: imageSize.height,
-            original_image_width: imageSize.width,
-            original_image_height: imageSize.height,
-          } : {}),
+          ...buildExecutionSizeParams(imageSize),
           variation_strength: strength,
           strength,
         },
@@ -280,12 +278,14 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
 
   async function handleRemoveBgGenerate(source: CanvasImageItem) {
     options.generating.value = true
+    const imageSize = await options.loadImageSizeFromUrl(source.url)
     let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
         prompt: '',
         feature: EXECUTION_DIRECT_ACTION_META.removeBg.feature,
         imageUrls: [source.url],
+        params: buildExecutionSizeParams(imageSize),
       }),
       source,
       successMessage: 'Task submitted',

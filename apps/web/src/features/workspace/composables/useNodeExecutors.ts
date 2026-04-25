@@ -23,6 +23,12 @@ import {
   isColorSingleColorMode,
   normalizeColorNodeColors,
 } from '../types/canvasNodes'
+import {
+  buildExecutionSizeParams,
+  extendExecutionImageSize,
+  scaleExecutionImageSize,
+  type ExecutionImageSize,
+} from '../utils/executionSizeParams'
 import type { NodeConnectionStatus } from './useCanvasNodeConnections'
 import type {
   CanvasConnectionNodeType,
@@ -143,6 +149,7 @@ interface UseNodeExecutorsOptions {
   refineExecutionMaskDataUrl: (maskDataUrl: string, refineAmount: number, invertMask: boolean) => Promise<string>
   dataUrlToFile: (dataUrl: string, fileName: string) => Promise<File>
   uploadImage: (file: File) => Promise<ApiResponseLike<{ url?: string }>>
+  loadImageSizeFromUrl: (url: string) => Promise<{ width: number; height: number } | null>
   setExecutionNodeRunning: (
     nodeType: CanvasExecutionOutputNodeType,
     nodeId: number,
@@ -167,6 +174,10 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
   function resolveFailureMessage(error: unknown, fallback: string): string {
     const maybeError = error as { msg?: string; message?: string } | null
     return maybeError?.msg || maybeError?.message || fallback
+  }
+
+  async function loadExecutionImageSize(url: string): Promise<ExecutionImageSize | null> {
+    return options.loadImageSizeFromUrl(url)
   }
 
   function markExecutionRunning(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
@@ -419,18 +430,12 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     const connectedOutputNodeId = options.getConnectedOutputImageTarget(nodeType, node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
     try {
-      const maskFile = await options.dataUrlToFile(resolvedContext.maskDataUrl, `mask-${Date.now()}.png`)
-      const uploadRes = await options.uploadImage(maskFile)
-      if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-        failExecution(nodeType, node.id, uploadRes.msg || '蒙版上传失败')
-        return
-      }
-
       const placementSource = options.buildPlacementSource(
         resolvedContext.originalImageUrl,
         resolvedContext.placementX,
         resolvedContext.placementY,
       )
+      const imageSize = await loadExecutionImageSize(resolvedContext.originalImageUrl)
       let maskImageUrl = ''
       if (resolvedContext.maskDataUrl) {
         const maskFile = await options.dataUrlToFile(resolvedContext.maskDataUrl, `mask-${Date.now()}.png`)
@@ -449,6 +454,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           imageUrls: [resolvedContext.originalImageUrl],
           params: {
             original_image_url: resolvedContext.originalImageUrl,
+            ...buildExecutionSizeParams(imageSize),
             ...(maskImageUrl
               ? {
                   mask_image_url: maskImageUrl,
@@ -539,9 +545,10 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return formatStrictMissingInputMessage('Model', disconnectedPorts, pendingPorts, formatLabel)
     })) return
 
-    const sourceUrl = sourceInput!.url
+	    const sourceUrl = sourceInput!.url
+	    const imageSize = await loadExecutionImageSize(sourceUrl)
 
-    if (!beginExecution('model', node.id)) return
+	    if (!beginExecution('model', node.id)) return
     const angleSpec = { ...node.angleSpec }
     const angleLabel = describeModelAngleSpec(angleSpec)
     const poseImageInput = resolveConnectedModelPoseImageInput(node)
@@ -557,10 +564,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         request: buildExecutionTaskRequest({
           prompt: `${EXECUTION_MODEL_META.promptPrefix} ${promptText}`,
           feature: EXECUTION_MODEL_META.feature,
-          imageUrls: [sourceUrl],
-          params: {
-            angle_spec: {
-              yaw: angleSpec.yaw,
+	          imageUrls: [sourceUrl],
+	          params: {
+	            ...buildExecutionSizeParams(imageSize),
+	            angle_spec: {
+	              yaw: angleSpec.yaw,
               framing: angleSpec.framing,
             },
             ...(modelImageInput?.url ? { model_url: modelImageInput.url, model_strength: modelStrength } : {}),
@@ -594,8 +602,9 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return
     }
 
-    const sourceUrls = [connectedImage!.url]
-    if (!beginExecution('viewpoint', node.id)) return
+	    const sourceUrls = [connectedImage!.url]
+	    const imageSize = await loadExecutionImageSize(sourceUrls[0])
+	    if (!beginExecution('viewpoint', node.id)) return
 
     await submitExecutionTask(
       'viewpoint',
@@ -606,9 +615,10 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         request: buildExecutionTaskRequest({
           prompt: `${EXECUTION_VIEWPOINT_META.promptPrefix} ${promptText}`,
           feature: EXECUTION_VIEWPOINT_META.feature,
-          imageUrls: sourceUrls,
-          params: {
-            viewpoint: node.selectedViewpoint,
+	          imageUrls: sourceUrls,
+	          params: {
+	            ...buildExecutionSizeParams(imageSize),
+	            viewpoint: node.selectedViewpoint,
             lighting: node.lighting,
           },
         }),
@@ -676,14 +686,16 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
             faceSourceUrl = uploadRes.data.url
           }
 
-        const placementSource = options.buildPlacementSource(resolvedImage.url, node.x + 340, node.y + 18)
+	        const placementSource = options.buildPlacementSource(resolvedImage.url, node.x + 340, node.y + 18)
+	        const imageSize = await loadExecutionImageSize(resolvedImage.url)
 
-        await submitExecutionTask('edit', node.id, {
-          request: buildExecutionTaskRequest({
-            prompt: EXECUTION_FACE_SWAP_META.prompt,
-            feature: EXECUTION_FACE_SWAP_META.feature,
-            imageUrls: [resolvedImage.url, faceSourceUrl],
-          }),
+	        await submitExecutionTask('edit', node.id, {
+	          request: buildExecutionTaskRequest({
+	            prompt: EXECUTION_FACE_SWAP_META.prompt,
+	            feature: EXECUTION_FACE_SWAP_META.feature,
+	            imageUrls: [resolvedImage.url, faceSourceUrl],
+	            params: buildExecutionSizeParams(imageSize),
+	          }),
           source: placementSource,
           outputNodeId,
           successMessage: connectedMask ? 'Face swap submitted · masked face' : 'Face swap submitted',
@@ -720,6 +732,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         connectedMask?.placementY ?? (node.y + 18),
       )
 
+      const imageSize = await loadExecutionImageSize(resolvedImage.url)
+
       await submitExecutionTask('edit', node.id, {
         request: buildExecutionTaskRequest({
           prompt: `${editModeMeta!.promptPrefix} ${promptText}`,
@@ -727,6 +741,7 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           imageUrls: [resolvedImage.url],
           params: {
             original_image_url: resolvedImage.url,
+            ...buildExecutionSizeParams(imageSize),
             ...(maskImageUrl
               ? {
                   mask_image_url: maskImageUrl,
@@ -763,8 +778,9 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           : 'Image B'
       return formatStrictMissingInputMessage('Fusion', disconnectedPorts, pendingPorts, formatLabel)
     })) return
-    if (!beginExecution('fusion', node.id)) return
-    await submitExecutionTask(
+	    if (!beginExecution('fusion', node.id)) return
+	    const imageSize = await loadExecutionImageSize(connectedImageA!.url)
+	    await submitExecutionTask(
       'fusion',
       node.id,
       buildStandardSubmitOptions({
@@ -773,9 +789,10 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         request: buildExecutionTaskRequest({
           prompt: `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`,
           feature: EXECUTION_FUSION_META.feature,
-          imageUrls: [connectedImageA!.url, connectedImageB!.url],
-          params: {
-            blend_ratio: imageAWeight,
+	          imageUrls: [connectedImageA!.url, connectedImageB!.url],
+	          params: {
+	            ...buildExecutionSizeParams(imageSize),
+	            blend_ratio: imageAWeight,
             image_a_weight: imageAWeight,
             image_b_weight: imageBWeight,
           },
@@ -813,13 +830,14 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 
     if (!beginExecution('enhance', node.id)) return
     const outputNodeId = resolveExecutionOutputNodeId('enhance', node.id)
-    const placementSource = options.buildPlacementSource(
-      connectedImage!.url,
-      node.x + 340,
-      node.y + 18,
-    )
+	    const placementSource = options.buildPlacementSource(
+	      connectedImage!.url,
+	      node.x + 340,
+	      node.y + 18,
+	    )
+	    const imageSize = await loadExecutionImageSize(connectedImage!.url)
 
-    try {
+	    try {
       if (node.mode === 'hd-upscale') {
         if (hasMaskConnection) {
           if (!connectedMask?.dataUrl) {
@@ -843,10 +861,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
             request: buildExecutionTaskRequest({
               prompt: EXECUTION_ENHANCE_META.hdUpscale.prompt,
               feature: EXECUTION_ENHANCE_META.hdUpscale.feature,
-              imageUrls: [connectedImage!.url],
-              params: {
-                original_image_url: connectedImage!.url,
-                mask_image_url: uploadRes.data.url,
+	              imageUrls: [connectedImage!.url],
+	              params: {
+	                original_image_url: connectedImage!.url,
+	                ...buildExecutionSizeParams(imageSize),
+	                mask_image_url: uploadRes.data.url,
                 use_mask: true,
                 mask_enabled: true,
                 is_masked: true,
@@ -870,10 +889,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           request: buildExecutionTaskRequest({
             prompt: EXECUTION_ENHANCE_META.hdUpscale.prompt,
             feature: EXECUTION_ENHANCE_META.hdUpscale.feature,
-            imageUrls: [connectedImage!.url],
-            params: {
-              original_image_url: connectedImage!.url,
-              upscale_mode: node.upscaleMode,
+	            imageUrls: [connectedImage!.url],
+	            params: {
+	              original_image_url: connectedImage!.url,
+	              ...buildExecutionSizeParams(imageSize, scaleExecutionImageSize(imageSize, node.upscaleFactor)),
+	              upscale_mode: node.upscaleMode,
               upscale_factor: node.upscaleFactor,
               output_format: node.outputFormat,
               output_quality: node.outputQuality,
@@ -894,15 +914,21 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         buildStandardSubmitOptions({
           nodeType: 'enhance',
           nodeId: node.id,
-          request: buildExecutionTaskRequest({
-            prompt: promptText.trim()
-              ? `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${promptText}`
-              : '',
-            feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
-            imageUrls: [connectedImage!.url],
-            params: {
-              extend_top: node.extendTop,
-              extend_right: node.extendRight,
+	          request: buildExecutionTaskRequest({
+	            prompt: promptText.trim()
+	              ? `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${promptText}`
+	              : '',
+	            feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
+	            imageUrls: [connectedImage!.url],
+	            params: {
+	              ...buildExecutionSizeParams(imageSize, extendExecutionImageSize(imageSize, {
+	                top: node.extendTop,
+	                right: node.extendRight,
+	                bottom: node.extendBottom,
+	                left: node.extendLeft,
+	              })),
+	              extend_top: node.extendTop,
+	              extend_right: node.extendRight,
               extend_bottom: node.extendBottom,
               extend_left: node.extendLeft,
             },
@@ -951,11 +977,12 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
       return
     }
 
-    if (!beginExecution('wear', node.id)) return
-    const tileModeLabel = describeWearTileMode(node.tileMode)
-    try {
-      let maskImageUrl = ''
-      if (connectedMask?.dataUrl) {
+	    if (!beginExecution('wear', node.id)) return
+	    const tileModeLabel = describeWearTileMode(node.tileMode)
+	    try {
+	      const imageSize = await loadExecutionImageSize(connectedImageA!.url)
+	      let maskImageUrl = ''
+	      if (connectedMask?.dataUrl) {
         const maskFile = await options.dataUrlToFile(connectedMask.dataUrl, `wear-mask-${Date.now()}.png`)
         const uploadRes = await options.uploadImage(maskFile)
         if (uploadRes.code !== 0 || !uploadRes.data?.url) {
@@ -974,10 +1001,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
           request: buildExecutionTaskRequest({
             prompt: `${EXECUTION_WEAR_META.promptPrefix} ${tileModeLabel}，旋转${node.rotation}°，大小${node.scale}%，融合强度${node.opacity}%`,
             feature: EXECUTION_WEAR_META.feature,
-            imageUrls: [connectedImageA!.url, connectedImageB!.url],
-            params: {
-              original_image_url: connectedImageA!.url,
-              ...(maskImageUrl
+	            imageUrls: [connectedImageA!.url, connectedImageB!.url],
+	            params: {
+	              original_image_url: connectedImageA!.url,
+	              ...buildExecutionSizeParams(imageSize),
+	              ...(maskImageUrl
                 ? {
                     mask_image_url: maskImageUrl,
                     use_mask: true,
@@ -1021,13 +1049,14 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
     if (!beginExecution('color', node.id)) return
     const connectedOutputNodeId = options.getConnectedOutputImageTarget('color', node.id)?.id ?? null
     const outputNodeId = options.resolvePreferredOutputNodeId(connectedOutputNodeId)
-    const placementSource = options.buildPlacementSource(
-      resolvedContext.originalImageUrl,
-      resolvedContext.placementX,
-      resolvedContext.placementY,
-    )
+	    const placementSource = options.buildPlacementSource(
+	      resolvedContext.originalImageUrl,
+	      resolvedContext.placementX,
+	      resolvedContext.placementY,
+	    )
+	    const imageSize = await loadExecutionImageSize(resolvedContext.originalImageUrl)
 
-    try {
+	    try {
       let maskImageUrl = ''
       if (resolvedContext.maskDataUrl) {
         const maskFile = await options.dataUrlToFile(resolvedContext.maskDataUrl, `color-mask-${Date.now()}.png`)
@@ -1051,10 +1080,11 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
         request: buildExecutionTaskRequest({
           prompt: promptParts.join('，'),
           feature: EXECUTION_COLOR_SERIES_META.feature,
-          imageUrls: [resolvedContext.originalImageUrl],
-          params: {
-            original_image_url: resolvedContext.originalImageUrl,
-            ...(maskImageUrl
+	          imageUrls: [resolvedContext.originalImageUrl],
+	          params: {
+	            original_image_url: resolvedContext.originalImageUrl,
+	            ...buildExecutionSizeParams(imageSize),
+	            ...(maskImageUrl
               ? {
                   mask_image_url: maskImageUrl,
                   use_mask: true,

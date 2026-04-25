@@ -2616,6 +2616,7 @@ const {
   refineExecutionMaskDataUrl,
   dataUrlToFile,
   uploadImage: uploadWorkspaceImage,
+  loadImageSizeFromUrl,
   setExecutionNodeRunning,
   setExecutionNodeLastRunFailed,
   isExecutionNodeRunning,
