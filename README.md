@@ -60,10 +60,10 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 | 维度 | 当前配置 |
 |------|----------|
 | 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
-| 后端 | `Go` + `Gin` + `GORM` |
+| 后端 | `Go` + `Gin` + `GORM` + `Better Auth (Node.js/TypeScript)` |
 | 基础设施 | `MySQL 8.0+`、`Redis 7+` |
-| 默认本地端口 | 前端 `5173`，后端 `6000` |
-| 运行方式 | 本地开发、标准 Linux 部署、宝塔 Go 单体部署 |
+| 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
+| 运行方式 | 本地开发、标准 Linux 部署、宝塔双服务托管（需单独配置 Auth Service） |
 | 核心界面 | 用户画布工作台、画板管理、管理后台 |
 
 ### 运行链路
@@ -150,7 +150,7 @@ cd apps/api
 cp .env.example .env
 ```
 
-至少确认数据库、Redis、端口和 `JWT_SECRET` 配置正确；`.env.example` 里的敏感字段是占位值，不应直接用于部署。
+至少确认数据库、Redis、端口以及 `AUTH_SERVICE_BASE_URL / AUTH_SERVICE_INTERNAL_KEY` 配置正确；`.env.example` 里的敏感字段是占位值，不应直接用于部署。
 
 如果后端放在 Nginx / 宝塔等反向代理后面，建议额外设置：
 
@@ -160,14 +160,30 @@ APP_HOST=127.0.0.1
 
 这样 `ideaboard-server` 只监听本机回环地址，避免被绕过代理直接访问。
 
-### 3. 启动后端
+### 3. 启动 Auth 服务
+
+```bash
+cd apps/auth
+cp .env.example .env
+npm install
+npm run migrate
+npm run dev
+```
+
+Auth 服务建议额外确认：
+
+- `AUTH_REGISTRATION_ENABLED`：开发环境可设为 `true`；生产建议显式设为 `false`（按运营策略再开启）
+- `AUTH_RATE_LIMIT_WINDOW_SECONDS` / `AUTH_RATE_LIMIT_MAX_REQUESTS`：控制 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 的内存限流窗口与阈值
+- 可选前端变量 `VITE_AUTH_STUDIO_URL`：用于后台“身份安全管理”页面与“用户管理”页快捷打开 Better Auth Studio
+
+### 4. 启动后端（Go API）
 
 ```bash
 cd apps/api
 go run ./cmd
 ```
 
-### 4. 启动前端
+### 5. 启动前端
 
 ```bash
 cd apps/web
@@ -175,7 +191,12 @@ npm install
 npm run dev
 ```
 
-### 5. 初始化管理员账号
+开发环境代理说明：
+
+- `apps/web/vite.config.ts` 已将 `/api/auth` 代理到 `http://localhost:6001`
+- 其余 `/api/*` 与 `/uploads/*` 仍代理到 `http://localhost:6000`
+
+### 6. 初始化管理员账号
 
 ```bash
 cd apps/api
@@ -194,6 +215,7 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 | `http://localhost:5173` | 前端开发环境 |
 | `http://localhost:5173/admin/login` | 管理后台登录 |
 | `http://localhost:6000/api/health` | 后端健康检查 |
+| `http://localhost:6001/api/health` | Better Auth 健康检查 |
 
 ## 仓库结构
 
@@ -201,6 +223,7 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 IdeaBoard/
 ├── apps/
 │   ├── web/                  # Vue 3 前端与管理后台
+│   ├── auth/                 # Better Auth 服务（登录/注册/session）
 │   └── api/                  # Go API、任务、Worker、服务逻辑
 ├── docs/                     # 架构约束与补充文档
 ├── docker/                   # 本地 MySQL / Redis 依赖
@@ -208,7 +231,7 @@ IdeaBoard/
 ├── README.md                 # 项目首页
 ├── DEVELOPMENT.md            # 开发手册
 ├── DEPLOYMENT.md             # 标准 Linux 部署
-└── DEPLOY_BAOTA_GO.md        # 宝塔 Go 部署
+└── DEPLOY_BAOTA_GO.md        # 宝塔旧单 Go 模式停用说明
 ```
 
 <a id="deployment"></a>
@@ -224,13 +247,9 @@ IdeaBoard/
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
-### 宝塔 Go 部署
+### 宝塔 Go 模式已停用
 
-适用于以前后端单可执行方式部署的场景。
-
-```bash
-./scripts/package-bt-go.sh
-```
+Better Auth 迁移后需要独立的 `apps/auth` Node Service，旧的单 Go 二进制部署方式已停用；`scripts/package-bt-go.sh` 会直接失败以避免生成不可登录的发布包。
 
 详见 [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md)。
 
@@ -243,7 +262,8 @@ IdeaBoard/
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 架构、contract、本地开发与目录边界 |
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) | Feature System Prompt 配置手册与推荐模板 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | 标准 Linux 部署、升级与回滚 |
-| [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md) | 宝塔 Go 部署 |
+| [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md) | 宝塔旧单 Go 模式停用说明 |
+| [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md) | Auth 运维边界与应急流程 |
 | [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 新目录边界与命名约束 |
 | [docker/README.md](./docker/README.md) | 本地依赖说明 |
 | [CHANGELOG.md](./CHANGELOG.md) | 发布记录与未发布变更 |
@@ -253,10 +273,11 @@ IdeaBoard/
 上线前建议至少确认：
 
 1. `curl http://127.0.0.1:6000/api/health` 返回成功。
-2. 用户端首页可正常访问。
-3. 管理员可登录后台。
-4. 图片上传与结果回写正常。
-5. 任务提交后能看到完整状态流转。
+2. `curl http://127.0.0.1:6001/api/health` 返回成功。
+3. 用户端首页可正常访问。
+4. 管理员可登录后台。
+5. 图片上传与结果回写正常。
+6. 任务提交后能看到完整状态流转。
 
 ## 权利声明
 

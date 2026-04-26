@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h2 class="page-title">用户控制台</h2>
-        <p class="page-desc">管理用户状态、密码与账户生命周期。所有操作即时生效，并同步到任务权限链路。</p>
+        <p class="page-desc">管理用户状态与账户生命周期。所有操作即时生效，并同步到任务权限链路。</p>
       </div>
       <div class="header-side-note">
         <span>实时数据</span>
@@ -14,7 +14,7 @@
       <AdminSummaryCard label="总用户" :value="users.length" foot="当前筛选结果" />
       <AdminSummaryCard label="正常" :value="activeUserCount" foot="状态可登录" />
       <AdminSummaryCard label="封禁" :value="bannedUserCount" foot="建议定期复核" />
-      <AdminSummaryCard label="系统保留" :value="reservedUserCount" foot="不可删除账户" />
+      <AdminSummaryCard label="系统保留" :value="reservedUserCount" foot="不可操作账户" />
     </div>
 
     <div class="toolbar">
@@ -33,14 +33,14 @@
         <template #icon><n-icon><RefreshOutline /></n-icon></template>
         刷新
       </n-button>
-      <n-button type="primary" @click="showAddModal = true">
-        <template #icon><n-icon><AddOutline /></n-icon></template>
-        新增用户
+      <n-button type="primary" ghost :disabled="!authStudioURL" @click="openAuthStudio">
+        身份安全管理
       </n-button>
     </div>
 
     <div class="table-card">
-      <AdminSectionHeader title="用户列表" description="支持封禁、改密、删除操作。管理员主账号默认不可删除。" />
+      <AdminSectionHeader title="用户列表" description="支持封禁与解封。管理员账号默认不可操作。" />
+      <p class="ops-tip">账号安全操作（改密、会话吊销、物理删号）请在 Better Auth Studio 执行；此处仅做业务侧封禁治理。</p>
       <n-data-table
         :columns="columns"
         :data="users"
@@ -50,81 +50,29 @@
         :row-key="(row: User) => row.id"
       />
     </div>
-
-    <!-- 新增用户弹窗 -->
-    <n-modal v-model:show="showAddModal" preset="card" title="新增用户" style="width: 400px">
-      <n-form :model="addForm" :rules="addRules" ref="addFormRef" label-placement="top">
-        <n-form-item label="账号" path="username">
-          <n-input v-model:value="addForm.username" placeholder="请输入账号" />
-        </n-form-item>
-        <n-form-item label="密码" path="password">
-          <n-input v-model:value="addForm.password" type="password" placeholder="请输入密码" show-password-on="click" />
-        </n-form-item>
-      </n-form>
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="showAddModal = false">取消</n-button>
-          <n-button type="primary" :loading="addLoading" @click="handleAddUser">确定</n-button>
-        </n-space>
-      </template>
-    </n-modal>
-
-    <!-- 修改密码弹窗 -->
-    <n-modal v-model:show="showPwdModal" preset="card" title="修改密码" style="width: 400px">
-      <n-form :model="pwdForm" :rules="pwdRules" ref="pwdFormRef" label-placement="top">
-        <n-form-item label="新密码" path="new_password">
-          <n-input v-model:value="pwdForm.new_password" type="password" placeholder="请输入新密码" show-password-on="click" />
-        </n-form-item>
-      </n-form>
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="showPwdModal = false">取消</n-button>
-          <n-button type="primary" :loading="pwdLoading" @click="handleUpdatePassword">确定</n-button>
-        </n-space>
-      </template>
-    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, h, computed } from 'vue'
 import { adminApi } from '../../../shared/api'
-import { NInput, NButton, NDataTable, NModal, NForm, NFormItem, NIcon, NTag, NSpace, useMessage, useDialog } from 'naive-ui'
+import { NInput, NButton, NDataTable, NIcon, NTag, NSpace, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import type { User } from '../../../shared/types'
-import { SearchOutline, RefreshOutline, AddOutline } from '@vicons/ionicons5'
+import { SearchOutline, RefreshOutline } from '@vicons/ionicons5'
 import { extractApiErrorMessage } from '../shared/assetLibraryShared'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 import AdminSectionHeader from '../shared/components/AdminSectionHeader.vue'
 
 const message = useMessage()
-const dialog = useDialog()
 
 const loading = ref(false)
 const users = ref<User[]>([])
 const searchKeyword = ref('')
-
-const showAddModal = ref(false)
-const addFormRef = ref()
-const addLoading = ref(false)
-const addForm = ref({ username: '', password: '' })
-const addRules = {
-  username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
-}
-
-const showPwdModal = ref(false)
-const pwdFormRef = ref()
-const pwdLoading = ref(false)
-const pwdForm = ref({ new_password: '' })
-const pwdRules = {
-  new_password: [{ required: true, message: '请输入新密码', trigger: 'blur' }]
-}
-
-const currentUserId = ref<number>(0)
 const activeUserCount = computed(() => users.value.filter(item => item.status === 1).length)
 const bannedUserCount = computed(() => users.value.filter(item => item.status !== 1).length)
-const reservedUserCount = computed(() => users.value.filter(item => item.id === 1).length)
+const reservedUserCount = computed(() => users.value.filter(item => item.role === 'admin').length)
+const authStudioURL = (import.meta.env.VITE_AUTH_STUDIO_URL || '').trim()
 
 const columns: DataTableColumns<User> = [
   { title: 'ID', key: 'id', width: 80 },
@@ -139,11 +87,9 @@ const columns: DataTableColumns<User> = [
   {
     title: '操作',
     key: 'actions',
-    width: 180,
+    width: 120,
     render: (row) => h(NSpace, { size: 'small' }, () => [
-      h(NButton, { size: 'small', type: row.status === 1 ? 'warning' : 'success', onClick: () => handleToggleStatus(row) }, () => row.status === 1 ? '封禁' : '解封'),
-      h(NButton, { size: 'small', onClick: () => openPwdModal(row.id) }, () => '改密'),
-      row.id !== 1 ? h(NButton, { size: 'small', type: 'error', onClick: () => handleDelete(row) }, () => '删除') : null
+      row.role !== 'admin' ? h(NButton, { size: 'small', type: row.status === 1 ? 'warning' : 'success', onClick: () => handleToggleStatus(row) }, () => row.status === 1 ? '封禁' : '解封') : null
     ].filter(Boolean))
   }
 ]
@@ -162,22 +108,6 @@ async function loadUsers() {
   }
 }
 
-async function handleAddUser() {
-  try {
-    await addFormRef.value?.validate()
-    addLoading.value = true
-    await adminApi.createUser(addForm.value)
-    message.success('添加成功')
-    showAddModal.value = false
-    addForm.value = { username: '', password: '' }
-    loadUsers()
-  } catch (error: any) {
-    message.error(error.message || '添加失败')
-  } finally {
-    addLoading.value = false
-  }
-}
-
 async function handleToggleStatus(row: User) {
   const newStatus = row.status === 1 ? 0 : 1
   try {
@@ -189,42 +119,12 @@ async function handleToggleStatus(row: User) {
   }
 }
 
-function openPwdModal(id: number) {
-  currentUserId.value = id
-  pwdForm.value.new_password = ''
-  showPwdModal.value = true
-}
-
-async function handleUpdatePassword() {
-  try {
-    await pwdFormRef.value?.validate()
-    pwdLoading.value = true
-    await adminApi.updateUserPassword(currentUserId.value, pwdForm.value.new_password)
-    message.success('密码修改成功')
-    showPwdModal.value = false
-  } catch (error: any) {
-    message.error(error.message || '修改失败')
-  } finally {
-    pwdLoading.value = false
+function openAuthStudio() {
+  if (!authStudioURL) {
+    message.warning('未配置 VITE_AUTH_STUDIO_URL')
+    return
   }
-}
-
-async function handleDelete(row: User) {
-  dialog.warning({
-    title: '确认删除',
-    content: `确定删除用户 "${row.username}" 吗？`,
-    positiveText: '确定',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      try {
-        await adminApi.deleteUser(row.id)
-        message.success('删除成功')
-        loadUsers()
-      } catch (error) {
-        message.error(extractApiErrorMessage(error, '删除失败'))
-      }
-    }
-  })
+  window.open(authStudioURL, '_blank', 'noopener,noreferrer')
 }
 
 onMounted(() => {
@@ -236,6 +136,13 @@ onMounted(() => {
 @import '../shared/adminCommon.css';
 .users-page {
   gap: 14px;
+}
+
+.ops-tip {
+  margin: 10px 2px 12px;
+  color: #5f6c86;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 @media (max-width: 720px) {

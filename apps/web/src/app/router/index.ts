@@ -23,6 +23,12 @@ const routes: RouteRecordRaw[] = [
     meta: { guest: true }
   },
   {
+    path: '/share',
+    name: 'ShareJoin',
+    component: () => import('../../pages/user/UserShareJoinPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/user',
     component: () => import('../../pages/user/UserLayoutPage.vue'),
     children: [
@@ -69,6 +75,12 @@ const routes: RouteRecordRaw[] = [
         path: 'users',
         name: 'AdminUsers',
         component: () => import('../../pages/admin/AdminUsersPage.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'user-security',
+        name: 'AdminUserSecurity',
+        component: () => import('../../pages/admin/AdminUserSecurityPage.vue'),
         meta: { requiresAuth: true }
       },
       {
