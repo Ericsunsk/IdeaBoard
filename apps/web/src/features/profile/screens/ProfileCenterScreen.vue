@@ -288,7 +288,6 @@ onMounted(() => {
   border: 1px solid #d9dfec;
   display: flex;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(34, 45, 76, 0.08);
   position: relative;
   z-index: 1;
 }
@@ -328,7 +327,7 @@ onMounted(() => {
 }
 
 .nav-item:hover { background: #eef1fa; color: #2c3448; }
-.nav-item.active { background: #7a6bd5; color: #fff; box-shadow: 0 8px 16px rgba(122, 107, 213, 0.24); }
+.nav-item.active { background: #7a6bd5; color: #fff; }
 .nav-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
 
 .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
@@ -356,7 +355,6 @@ onMounted(() => {
 .admin-btn { color: #fff; background: linear-gradient(135deg, #7f68d5, #9f8fe6); }
 .admin-btn:hover {
   background: linear-gradient(135deg, #6c54c4, #8b7ad6);
-  box-shadow: 0 4px 12px rgba(122, 107, 213, 0.3);
 }
 
 .logout-btn {
@@ -365,7 +363,29 @@ onMounted(() => {
 .logout-btn:hover { background: rgba(255, 59, 48, 0.05); }
 
 /* Main Content */
-.center-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 44px 52px; }
+.center-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: 44px 52px; }
+
+.center-main {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(146, 120, 230, 0.38) transparent;
+}
+
+.center-main::-webkit-scrollbar {
+  width: 8px;
+}
+
+.center-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.center-main::-webkit-scrollbar-thumb {
+  background: rgba(146, 120, 230, 0.34);
+  border-radius: 999px;
+}
+
+.center-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(122, 107, 213, 0.5);
+}
 
 .main-header {
   display: flex;
@@ -381,7 +401,6 @@ onMounted(() => {
   border-radius: 50%;
   background: #fff;
   border: 4px solid #fff;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
 .avatar-big img { width: 100%; height: 100%; object-fit: cover; }
@@ -412,7 +431,6 @@ onMounted(() => {
   background: #ffffff;
   padding: 34px;
   border-radius: 18px;
-  box-shadow: 0 10px 26px rgba(35, 45, 73, 0.06);
   border: 1px solid #e2e7f3;
 }
 
