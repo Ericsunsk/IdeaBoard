@@ -63,8 +63,7 @@ function startJourney() {
 .home-blank {
     width: 100%;
     height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
     position: relative;
     background-color: #ffffff;
     /* Google Mixboard style dotted background */
@@ -184,7 +183,8 @@ function startJourney() {
 
 /* ===== Hero Section ===== */
 .hero-section {
-    min-height: 100vh;
+    height: 100%;
+    min-height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -421,4 +421,3 @@ function startJourney() {
     }
 }
 </style>
->
