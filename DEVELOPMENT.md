@@ -214,7 +214,7 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 - Go 仅维护本地业务用户档案（`id/username/auth_user_id/storage_uid/role/status`）与权限判定。
 - `apps/auth` 支持 `AUTH_REGISTRATION_ENABLED` 开关控制公开注册（默认开发开、生产关）。
 - `apps/auth` 对 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 启用基于来源 IP 的内存限流；反向代理场景优先读取 `x-forwarded-for` 的首个 IP。
-- 账号安全运维边界见 [AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)，遵循“业务治理在 Admin、身份安全在 Better Auth Studio”。
+- 账号安全运维边界见 [AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)，遵循“业务治理在 Admin、已上线的身份侧操作在用户管理 -> 高级选项（Better Auth Admin plugin）”。
 
 关键代码：
 
@@ -260,6 +260,8 @@ npm install
 npm run migrate
 npm run dev
 ```
+
+> 启用 Better Auth Admin plugin 后必须先执行迁移：开发环境 `npm --prefix apps/auth run migrate`，生产环境 `npm --prefix apps/auth run migrate:dist`。不要手写 DDL，统一由 Better Auth migrate 管理字段变更。
 
 4. 配置后端环境变量：
 

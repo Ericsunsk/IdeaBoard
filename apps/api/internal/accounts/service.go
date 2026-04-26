@@ -34,6 +34,7 @@ type previewURLResolver interface {
 
 const defaultAccountMaxConcurrent = 3
 const taskCancelTTL = 24 * time.Hour
+const defaultAccountTimeoutSeconds = 120
 
 func NewAccountService(
 	accountRepo *AccountRepository,
@@ -58,9 +59,7 @@ func NewAccountService(
 
 func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, error) {
 	req.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
-	if req.Timeout <= 0 {
-		req.Timeout = 120
-	}
+	req.Timeout = NormalizeAccountTimeout(req.Timeout)
 	if req.Weight <= 0 {
 		req.Weight = 1
 	}
@@ -84,8 +83,10 @@ func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, 
 		return nil, err
 	}
 
-	ctx := context.Background()
-	s.redisMgr.InitAccountConcurrent(ctx, account.ID, account.MaxConcurrent)
+	if s.redisMgr != nil {
+		ctx := context.Background()
+		s.redisMgr.InitAccountConcurrent(ctx, account.ID, account.MaxConcurrent)
+	}
 
 	return account, nil
 }
@@ -147,7 +148,7 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 	account.ModelSet = req.ModelSet
 	account.ProxyURL = req.ProxyURL
 	account.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
-	account.Timeout = req.Timeout
+	account.Timeout = NormalizeAccountTimeout(req.Timeout)
 	account.ExtraConfig = req.ExtraConfig
 	account.Weight = req.Weight
 	account.Status = req.Status
@@ -160,8 +161,10 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 		return err
 	}
 
-	ctx := context.Background()
-	s.redisMgr.SetAccountMaxConcurrent(ctx, account.ID, account.MaxConcurrent)
+	if s.redisMgr != nil {
+		ctx := context.Background()
+		s.redisMgr.SetAccountMaxConcurrent(ctx, account.ID, account.MaxConcurrent)
+	}
 
 	return nil
 }
@@ -421,6 +424,13 @@ func (s *AccountService) GetMonitorInfo() (*redis.MonitorInfo, error) {
 func normalizeMaxConcurrent(value int) int {
 	if value <= 0 {
 		return defaultAccountMaxConcurrent
+	}
+	return value
+}
+
+func NormalizeAccountTimeout(value int) int {
+	if value <= 0 {
+		return defaultAccountTimeoutSeconds
 	}
 	return value
 }

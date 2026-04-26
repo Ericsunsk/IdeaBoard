@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User } from '../../shared/types'
-import { userApi, authApi } from '../../shared/api'
+import { userApi } from '../../shared/api'
+import { authClient, extractBetterAuthErrorMessage } from '../../shared/auth/client'
 import {
   getStoredUser,
   setStoredAuth,
@@ -37,34 +38,44 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function login(username: string, password: string) {
-    const res: any = await authApi.login({ username, password })
-    if (res.code === 0) {
-      const loginUser = res.data?.user as User | undefined
-      if (loginUser) {
-        updateAuth(loginUser)
-      } else {
-        await fetchUserInfo(true)
-      }
-      if (!user.value) {
-        throw new Error('登录状态恢复失败')
-      }
-      return true
+    const result = await authClient.signIn.username({ username, password })
+    if (result?.error) {
+      throw new Error(extractBetterAuthErrorMessage(result.error, '登录失败'))
     }
-    throw new Error(res.msg)
+
+    await fetchUserInfo(true)
+    if (!user.value) {
+      throw new Error('登录状态恢复失败')
+    }
+    return true
   }
 
   async function register(username: string, password: string) {
-    const res: any = await authApi.register({ username, password })
-    if (res.code === 0) {
-      return true
+    const safeLocalPart = username
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '_')
+    const email = `${safeLocalPart || 'user'}@ideaboard.local`
+
+    const result = await authClient.signUp.email({
+      email,
+      password,
+      name: username,
+      username,
+    })
+    if (result?.error) {
+      throw new Error(extractBetterAuthErrorMessage(result.error, '注册失败'))
     }
-    throw new Error(res.msg)
+    return true
   }
 
   async function logout(redirectPath = '/user/login') {
     let logoutSuccess = true
     try {
-      await userApi.logout()
+      const result = await authClient.signOut()
+      if (result?.error) {
+        logoutSuccess = false
+      }
     } catch (e) {
       logoutSuccess = false
     }
@@ -91,13 +102,34 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function updatePassword(oldPassword: string, newPassword: string) {
-    const res: any = await userApi.updatePassword({
-      old_password: oldPassword,
-      new_password: newPassword
+    const response = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        currentPassword: oldPassword,
+        newPassword,
+        revokeOtherSessions: true,
+      }),
     })
-    if (res.code !== 0) {
-      throw new Error(res.msg)
+
+    if (!response.ok) {
+      let errorMessage = '密码更新失败'
+      try {
+        const payload = await response.json()
+        errorMessage =
+          extractBetterAuthErrorMessage(payload, errorMessage) ||
+          payload?.message ||
+          payload?.msg ||
+          errorMessage
+      } catch {
+        // keep fallback error message
+      }
+      throw new Error(errorMessage)
     }
+
     resetAuth()
     return true
   }

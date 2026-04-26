@@ -50,11 +50,10 @@ func Run(args []string) {
 	log.Println("[Main] ===== Server starting (build with storage profiles) =====")
 
 	cfg := config.Load()
-	if err := config.ValidateJWTSecret(cfg); err != nil {
-		log.Fatalf("Invalid JWT configuration: %v. 请设置 JWT_SECRET 后重新启动", err)
-	}
+	requireAuthInternalKeyForProduction(cfg)
 	gin.SetMode(cfg.App.GinMode)
 	log.Printf("[Main] Gin mode: %s (app env: %s)", gin.Mode(), cfg.App.Env)
+	authServiceClient := auth.NewServiceClient(cfg.Auth)
 
 	db, err := database.NewMySQL(cfg.Database)
 	if err != nil {
@@ -94,8 +93,8 @@ func Run(args []string) {
 	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, styleCardService, systemConfigRepo, storageService)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
-	authHandler := auth.NewAuthHandler(userService, rdb)
-	adminHandler := users.NewAdminHandler(userService, rdb)
+	authHandler := auth.NewAuthHandler(userService)
+	adminHandler := users.NewAdminHandler(userService)
 	cardHandler := assets.NewStyleCardHandler(styleCardService)
 	channelHandler := channels.NewChannelHandler(channelRepo)
 	storageHandler := storage.NewStorageHandler(storageService)
@@ -131,8 +130,8 @@ func Run(args []string) {
 		PatternStyleHandler:  patternStyleHandler,
 		VectorizeHandler:     vectorizeHandler,
 		StorageService:       storageService,
-		RedisClient:          rdb,
 		UserRepo:             userRepo,
+		AuthServiceClient:    authServiceClient,
 	}, frontendFS)
 
 	consumer := worker.NewConsumer(accountRepo, channelRepo, taskRepo, redisMgr, storageService)
@@ -144,8 +143,12 @@ func Run(args []string) {
 	}
 
 	server := &http.Server{
-		Addr:    listenerAddr(cfg.App.Host, port),
-		Handler: r,
+		Addr:              listenerAddr(cfg.App.Host, port),
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {
@@ -180,6 +183,7 @@ func listenerAddr(host, port string) string {
 
 func runInitAdmin() {
 	cfg := config.Load()
+	requireAuthInternalKeyForProduction(cfg)
 	db, err := database.NewMySQL(cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -198,38 +202,121 @@ func runInitAdmin() {
 	if err := userRepo.EnsureStorageUIDs(); err != nil {
 		log.Fatalf("Failed to ensure user storage uid: %v", err)
 	}
-	userService := users.NewUserService(userRepo)
-
 	adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
 	if adminPassword == "" {
-		log.Fatal("[Init] INIT_ADMIN_PASSWORD 未配置；拒绝创建或重置为可预测默认密码，请显式设置安全密码后重试")
+		log.Fatal("[Init] INIT_ADMIN_PASSWORD 未配置；请显式设置强密码后重试")
 	}
 
-	hashedPassword, err := userService.HashPassword(adminPassword)
+	authServiceClient := auth.NewServiceClient(cfg.Auth)
+	provisioned, err := authServiceClient.EnsureUser(context.Background(), "admin", adminPassword, true, "admin")
 	if err != nil {
-		log.Fatalf("Failed to hash admin password: %v", err)
+		log.Fatalf("Failed to ensure Better Auth admin user: %v", err)
 	}
 
-	existingAdmin, err := userRepo.GetByUsername("admin")
+	ensureLocalAdminRole := func(user *users.User) error {
+		if user == nil {
+			return fmt.Errorf("local admin user is nil")
+		}
+		changed := false
+		if strings.TrimSpace(valueOrEmpty(user.AuthUserID)) == "" {
+			user.AuthUserID = stringPtr(provisioned.AuthUserID)
+			changed = true
+		}
+		if user.Role != "admin" {
+			user.Role = "admin"
+			changed = true
+		}
+		if user.Status != 1 {
+			user.Status = 1
+			changed = true
+		}
+		if changed {
+			return userRepo.Update(user)
+		}
+		return nil
+	}
+
+	localAdmin, err := userRepo.GetByAuthUserID(provisioned.AuthUserID)
 	if err == nil {
-		if existingAdmin.Role != "admin" {
-			log.Fatalf("Refusing to elevate existing user 'admin' with role %q; please promote it explicitly before rerunning init-admin", existingAdmin.Role)
+		if err := ensureLocalAdminRole(localAdmin); err != nil {
+			log.Fatalf("Failed to update local admin profile by auth_user_id: %v", err)
 		}
-		if err := userRepo.UpdatePassword(existingAdmin.ID, hashedPassword); err != nil {
-			log.Fatalf("Failed to reset admin password: %v", err)
-		}
-		log.Println("Admin password reset successfully!")
+		log.Println("Better Auth admin user verified; local admin profile is ready")
 		return
 	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		admin := &users.User{Username: "admin", Password: hashedPassword, Role: "admin", Status: 1}
-		if err := userRepo.Create(admin); err != nil {
-			log.Fatalf("Failed to create admin user: %v", err)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Fatalf("Failed to query local admin by auth_user_id: %v", err)
+	}
+
+	localAdminByName, err := userRepo.GetByUsername("admin")
+	if err == nil {
+		if existing := strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)); existing != "" && existing != provisioned.AuthUserID {
+			log.Fatalf("Local username 'admin' already bound to another auth user (%s), expected %s", existing, provisioned.AuthUserID)
 		}
-		log.Println("Admin user created successfully!")
+		if strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)) == "" {
+			if err := userRepo.UpdateAuthUserID(localAdminByName.ID, provisioned.AuthUserID); err != nil {
+				log.Fatalf("Failed to bind local admin to Better Auth user: %v", err)
+			}
+			localAdminByName.AuthUserID = stringPtr(provisioned.AuthUserID)
+		}
+		if err := ensureLocalAdminRole(localAdminByName); err != nil {
+			log.Fatalf("Failed to update local admin profile: %v", err)
+		}
+		log.Println("Bound existing local admin profile to Better Auth admin user")
 		return
 	}
-	log.Fatalf("Failed to query admin user: %v", err)
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Fatalf("Failed to query local admin username: %v", err)
+	}
+
+	localAdmin = &users.User{
+		Username:   "admin",
+		AuthUserID: stringPtr(provisioned.AuthUserID),
+		Password:   "__better_auth_managed__",
+		Role:       "admin",
+		Status:     1,
+	}
+	if err := userRepo.Create(localAdmin); err != nil {
+		log.Fatalf("Failed to create local admin profile: %v", err)
+	}
+
+	log.Println("Created Better Auth admin account and local admin profile successfully")
+}
+
+func requireAuthInternalKeyForProduction(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+	if !isProductionRuntime(cfg.App.Env) {
+		return
+	}
+	if strings.TrimSpace(cfg.Auth.InternalAPIKey) == "" {
+		log.Fatal("[Config] AUTH_SERVICE_INTERNAL_KEY must be set when APP_ENV=production")
+	}
+}
+
+func isProductionRuntime(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "prod", "production", "release":
+		return true
+	default:
+		return false
+	}
+}
+
+func stringPtr(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func migrateModels(db *gorm.DB) error {

@@ -16,6 +16,7 @@ import (
 )
 
 const kodoConfigKey = "kodo_config"
+const kodoDeleteListLimit = 1000
 
 type KodoService struct {
 	configRepo *settings.SystemConfigRepository
@@ -256,4 +257,50 @@ func (s *KodoService) DeleteWithConfig(objectKey string, cfg *KodoConfig) error 
 		return fmt.Errorf("删除失败: %v", err)
 	}
 	return nil
+}
+
+func (s *KodoService) DeletePrefixWithConfig(objectKeyPrefix string, cfg *KodoConfig) error {
+	if !s.IsConfigEnabled(cfg) {
+		return fmt.Errorf("七牛云配置未启用或不完整")
+	}
+	prefix, err := normalizeKodoDeletePrefix(objectKeyPrefix)
+	if err != nil {
+		return err
+	}
+
+	mac := qbox.NewMac(cfg.AccessKey, cfg.SecretKey)
+	bucketManager := storage.NewBucketManager(mac, nil)
+	bucketName := strings.TrimSpace(cfg.BucketName)
+
+	marker := ""
+	for {
+		entries, _, nextMarker, hasNext, err := bucketManager.ListFiles(bucketName, prefix, "", marker, kodoDeleteListLimit)
+		if err != nil {
+			return fmt.Errorf("列举前缀对象失败: bucket=%s prefix=%s marker=%s err=%w", bucketName, prefix, marker, err)
+		}
+
+		for _, entry := range entries {
+			key := strings.TrimSpace(entry.Key)
+			if key == "" {
+				continue
+			}
+			if err := bucketManager.Delete(bucketName, key); err != nil {
+				return fmt.Errorf("删除对象失败: bucket=%s key=%s err=%w", bucketName, key, err)
+			}
+		}
+
+		if !hasNext || strings.TrimSpace(nextMarker) == "" {
+			break
+		}
+		marker = nextMarker
+	}
+	return nil
+}
+
+func normalizeKodoDeletePrefix(prefix string) (string, error) {
+	normalized := strings.TrimSpace(prefix)
+	if normalized == "" {
+		return "", fmt.Errorf("文件前缀不能为空")
+	}
+	return normalized, nil
 }

@@ -71,7 +71,7 @@ func (r *UserRepository) Create(user *User) error {
 // GetByID 根据ID获取用户
 func (r *UserRepository) GetByID(id uint64) (*User, error) {
 	var user User
-	err := r.db.Select("id, username, storage_uid, password, role, status, created_at, updated_at").Where("id = ?", id).First(&user).Error
+	err := r.db.Select("id, username, auth_user_id, storage_uid, password, role, status, created_at, updated_at").Where("id = ?", id).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,19 @@ func (r *UserRepository) GetByID(id uint64) (*User, error) {
 // GetByUsername 根据用户名获取用户
 func (r *UserRepository) GetByUsername(username string) (*User, error) {
 	var user User
-	err := r.db.Select("id, username, storage_uid, password, role, status, created_at, updated_at").Where("username = ?", username).First(&user).Error
+	err := r.db.Select("id, username, auth_user_id, storage_uid, password, role, status, created_at, updated_at").Where("username = ?", username).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetByAuthUserID 根据 Better Auth user id 获取用户
+func (r *UserRepository) GetByAuthUserID(authUserID string) (*User, error) {
+	var user User
+	err := r.db.Select("id, username, auth_user_id, storage_uid, password, role, status, created_at, updated_at").
+		Where("auth_user_id = ?", strings.TrimSpace(authUserID)).
+		First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +107,7 @@ func (r *UserRepository) GetByStorageUID(storageUID string) (*User, error) {
 		return nil, gorm.ErrRecordNotFound
 	}
 	var user User
-	err := r.db.Select("id, username, storage_uid, password, role, status, created_at, updated_at").Where("storage_uid = ?", normalized).First(&user).Error
+	err := r.db.Select("id, username, auth_user_id, storage_uid, password, role, status, created_at, updated_at").Where("storage_uid = ?", normalized).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +209,14 @@ func (r *UserRepository) UpdateRoleAndPassword(username string, password string,
 // UpdateRole 更新用户角色
 func (r *UserRepository) UpdateRole(username string, role string) error {
 	return r.db.Model(&User{}).Where("username = ?", username).Update("role", role).Error
+}
+
+func (r *UserRepository) UpdateAuthUserID(id uint64, authUserID string) error {
+	normalized := strings.TrimSpace(authUserID)
+	if normalized == "" {
+		return fmt.Errorf("auth_user_id 不能为空")
+	}
+	return r.db.Model(&User{}).Where("id = ?", id).Update("auth_user_id", normalized).Error
 }
 
 func (r *UserRepository) EnsureStorageUIDs() error {
@@ -348,4 +368,8 @@ func isUniqueConstraintError(err error) bool {
 	return strings.Contains(msg, "duplicate") ||
 		strings.Contains(msg, "unique constraint") ||
 		strings.Contains(msg, "unique failed")
+}
+
+func IsDuplicateConstraintError(err error) bool {
+	return isUniqueConstraintError(err)
 }

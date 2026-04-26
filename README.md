@@ -170,11 +170,13 @@ npm run migrate
 npm run dev
 ```
 
+> 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（生产环境执行 `npm --prefix apps/auth run migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。
+
 Auth 服务建议额外确认：
 
 - `AUTH_REGISTRATION_ENABLED`：开发环境可设为 `true`；生产建议显式设为 `false`（按运营策略再开启）
 - `AUTH_RATE_LIMIT_WINDOW_SECONDS` / `AUTH_RATE_LIMIT_MAX_REQUESTS`：控制 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 的内存限流窗口与阈值
-- 可选前端变量 `VITE_AUTH_STUDIO_URL`：用于后台“身份安全管理”页面与“用户管理”页快捷打开 Better Auth Studio
+- 身份侧高级管理入口：后台 `用户管理 -> 高级选项`（当前支持身份用户列表、身份侧封禁/解封、伪装登录/停止伪装；不暴露后台改密或物理删号）
 
 ### 4. 启动后端（Go API）
 

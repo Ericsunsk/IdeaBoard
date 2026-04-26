@@ -25,6 +25,8 @@ export const boardApi = {
     api.put('/user/boards/' + encodeURIComponent(boardId), payload) as any,
   remove: (boardId: string): Promise<ApiResponse<{ deleted: boolean }>> =>
     api.delete('/user/boards/' + encodeURIComponent(boardId)) as any,
+  joinByShareToken: (token: string): Promise<ApiResponse<{ board: UserBoardItem }>> =>
+    api.post('/user/boards/share-tokens/join', { token }) as any,
 }
 
 export default boardApi

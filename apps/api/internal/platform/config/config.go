@@ -1,10 +1,10 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -15,7 +15,7 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	App      AppConfig
-	JWT      JWTConfig
+	Auth     AuthServiceConfig
 }
 
 type DatabaseConfig struct {
@@ -39,8 +39,10 @@ type AppConfig struct {
 	GinMode string
 }
 
-type JWTConfig struct {
-	Secret string
+type AuthServiceConfig struct {
+	BaseURL        string
+	InternalAPIKey string
+	TimeoutSeconds int
 }
 
 var loadEnvOnce sync.Once
@@ -51,15 +53,6 @@ func Load() *Config {
 	dbPassword := getEnv("DB_PASSWORD", "")
 	if dbPassword == "" {
 		log.Println("[Config] WARNING: DB_PASSWORD 未设置，数据库连接可能失败")
-	}
-
-	jwtSecret := strings.TrimSpace(getEnv("JWT_SECRET", ""))
-	if jwtSecret == "" {
-		if IsProductionEnv() {
-			log.Println("[Config] ERROR: JWT_SECRET 未设置；生产环境启动将被拒绝")
-		} else {
-			log.Println("[Config] WARNING: JWT_SECRET 未设置；当前仅允许非生产环境使用一次性开发密钥，重启后旧 token 会失效")
-		}
 	}
 
 	appEnv := detectAppEnv()
@@ -84,27 +77,12 @@ func Load() *Config {
 			Env:     appEnv,
 			GinMode: ginMode,
 		},
-		JWT: JWTConfig{
-			Secret: jwtSecret,
+		Auth: AuthServiceConfig{
+			BaseURL:        getEnv("AUTH_SERVICE_BASE_URL", "http://127.0.0.1:6001"),
+			InternalAPIKey: strings.TrimSpace(getEnv("AUTH_SERVICE_INTERNAL_KEY", "")),
+			TimeoutSeconds: getEnvInt("AUTH_SERVICE_TIMEOUT_SECONDS", 5),
 		},
 	}
-}
-
-func ValidateJWTSecret(cfg *Config) error {
-	if cfg == nil {
-		return nil
-	}
-	if strings.TrimSpace(cfg.JWT.Secret) != "" {
-		return nil
-	}
-	if !isProductionAppEnv(cfg.App.Env) {
-		return nil
-	}
-	return fmt.Errorf("JWT_SECRET is required when APP_ENV/GO_ENV/ENV or GIN_MODE indicates production (current: %s)", cfg.App.Env)
-}
-
-func IsProductionEnv() bool {
-	return isProductionAppEnv(detectAppEnv())
 }
 
 func detectAppEnv() string {
@@ -184,4 +162,17 @@ func getFirstEnv(keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	raw := strings.TrimSpace(getEnv(key, ""))
+	if raw == "" {
+		return defaultValue
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		log.Printf("[Config] WARNING: %s=%q 不是有效正整数，已回退默认值 %d", key, raw, defaultValue)
+		return defaultValue
+	}
+	return value
 }

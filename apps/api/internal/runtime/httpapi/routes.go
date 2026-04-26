@@ -21,7 +21,6 @@ import (
 	"api/internal/channels"
 	"api/internal/imageproc"
 	"api/internal/platform/media"
-	"api/internal/platform/redis"
 	"api/internal/platform/response"
 	"api/internal/platform/safehttp"
 	"api/internal/prompts"
@@ -47,11 +46,15 @@ type Dependencies struct {
 	PatternStyleHandler  *assets.PatternStyleHandler
 	VectorizeHandler     *imageproc.VectorizeHandler
 	StorageService       *storage.StorageService
-	RedisClient          *redis.Client
 	UserRepo             *users.UserRepository
+	AuthServiceClient    *auth.ServiceClient
 }
 
+const globalRequestBodyLimitBytes int64 = 64 * 1024 * 1024
+
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
+	r.Use(requestBodyLimitMiddleware(globalRequestBodyLimitBytes))
+
 	r.GET("/api/health", func(c *gin.Context) {
 		response.Success(c, gin.H{"status": "ok"})
 	})
@@ -60,17 +63,41 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
 	r.Static("/uploads", "./uploads")
 
 	userAPI := r.Group("/api/user")
-	userAPI.Use(auth.AuthMiddleware(deps.RedisClient, deps.UserRepo))
+	userAPI.Use(auth.AuthMiddleware(deps.AuthServiceClient, deps.UserRepo))
 	registerUserRoutes(userAPI, deps)
 
-	authAPI := r.Group("/api/auth")
-	registerAuthRoutes(authAPI, deps)
-
 	adminAPI := r.Group("/api/admin")
-	adminAPI.Use(auth.AuthMiddleware(deps.RedisClient, deps.UserRepo), auth.AdminMiddleware())
+	adminAPI.Use(auth.AuthMiddleware(deps.AuthServiceClient, deps.UserRepo), auth.AdminMiddleware())
 	registerAdminRoutes(adminAPI, deps)
 
 	RegisterFrontendRoutes(r, frontendFS)
+}
+
+func requestBodyLimitMiddleware(limitBytes int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request == nil || c.Request.Body == nil || limitBytes <= 0 {
+			c.Next()
+			return
+		}
+
+		method := strings.ToUpper(strings.TrimSpace(c.Request.Method))
+		switch method {
+		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+			// continue
+		default:
+			c.Next()
+			return
+		}
+
+		if c.Request.ContentLength > limitBytes {
+			response.Error(c, http.StatusRequestEntityTooLarge, "请求体过大")
+			c.Abort()
+			return
+		}
+
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limitBytes)
+		c.Next()
+	}
 }
 
 func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
@@ -116,15 +143,8 @@ func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 	})
 }
 
-func registerAuthRoutes(authApi *gin.RouterGroup, h Dependencies) {
-	authApi.POST("/register", h.AuthHandler.Register)
-	authApi.POST("/login", h.AuthHandler.Login)
-}
-
 func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 	userApi.GET("/info", h.AuthHandler.GetCurrentUser)
-	userApi.POST("/password", h.AuthHandler.UpdatePassword)
-	userApi.POST("/logout", h.AuthHandler.Logout)
 	userApi.POST("/drawing/submit", h.AccountHandler.SubmitTask)
 	userApi.GET("/drawing/:task_id", h.AccountHandler.GetUserTask)
 	userApi.DELETE("/drawing/:task_id", h.AccountHandler.DeleteUserTask)

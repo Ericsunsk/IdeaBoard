@@ -40,7 +40,7 @@ docker compose logs -f redis
 
 - compose 已显式固定 `platform: linux/amd64`，便于 Apple Silicon 环境直接运行。
 - 如果本地已有旧的 `mysql:5.7` 数据卷，升级到 8.0 前请先备份；不兼容时建议删除开发卷后重新初始化。
-- compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请显式执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
+- compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
 
 ### Redis
 

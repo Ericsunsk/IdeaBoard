@@ -1,90 +1,20 @@
 package auth
 
 import (
-	"context"
-	"time"
-
-	"api/internal/platform/redis"
 	"api/internal/platform/response"
 	"api/internal/users"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type AuthHandler struct {
 	userService *users.UserService
-	rdb         *redis.Client
 }
 
-func NewAuthHandler(userService *users.UserService, rdb *redis.Client) *AuthHandler {
+func NewAuthHandler(userService *users.UserService) *AuthHandler {
 	return &AuthHandler{
 		userService: userService,
-		rdb:         rdb,
 	}
-}
-
-// Register 注册
-func (h *AuthHandler) Register(c *gin.Context) {
-	var req users.RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	user, err := h.userService.Register(&req)
-	if err != nil {
-		response.Error(c, 400, err.Error())
-		return
-	}
-
-	response.Success(c, gin.H{
-		"user": user,
-	})
-}
-
-// Login 登录
-func (h *AuthHandler) Login(c *gin.Context) {
-	var req users.LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	user, err := h.userService.Login(&req)
-	if err != nil {
-		response.Error(c, 401, err.Error())
-		return
-	}
-
-	// 生成JWT token
-	token, err := h.generateToken(user)
-	if err != nil {
-		response.Error(c, 500, "生成令牌失败")
-		return
-	}
-
-	// 存储token到Redis
-	tokenKey := TokenRedisKey(user.ID)
-	if err := h.rdb.SetWithExpiry(context.Background(), tokenKey, token, 24*time.Hour); err != nil {
-		response.Error(c, 500, "存储令牌失败")
-		return
-	}
-	setAuthTokenCookie(c, token)
-
-	response.Success(c, gin.H{
-		"user": user,
-	})
-}
-
-// Logout 登出
-func (h *AuthHandler) Logout(c *gin.Context) {
-	userID, _ := c.Get("user_id")
-	tokenKey := TokenRedisKey(userID.(uint64))
-	_ = h.rdb.Del(context.Background(), tokenKey)
-	clearAuthTokenCookie(c)
-
-	response.Success(c, nil)
 }
 
 // GetCurrentUser 获取当前用户信息
@@ -99,41 +29,4 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	response.Success(c, gin.H{
 		"user": user,
 	})
-}
-
-// UpdatePassword 修改密码
-func (h *AuthHandler) UpdatePassword(c *gin.Context) {
-	userID, _ := c.Get("user_id")
-
-	var req users.UpdatePasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	currentUserID := userID.(uint64)
-	if err := h.userService.UpdatePassword(currentUserID, req.OldPassword, req.NewPassword); err != nil {
-		response.Error(c, 400, err.Error())
-		return
-	}
-	_ = h.rdb.Del(context.Background(), TokenRedisKey(currentUserID))
-	clearAuthTokenCookie(c)
-
-	response.Success(c, gin.H{"message": "密码更新成功，请重新登录"})
-}
-
-// generateToken 生成JWT token
-func (h *AuthHandler) generateToken(user *users.User) (string, error) {
-	claims := &Claims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Role:     user.Role,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(JWTSigningSecret())
 }

@@ -2,10 +2,6 @@ import axios from 'axios'
 import { createAdminAssetsApi } from './admin/assets'
 import { createStorageApi } from './admin/storage'
 import type {
-  LoginRequest,
-  RegisterRequest,
-  LoginResponse,
-  UpdatePasswordRequest,
   CreateUserRequest,
   UserListResponse,
   User,
@@ -75,20 +71,9 @@ api.interceptors.response.use(
   }
 )
 
-export const authApi = {
-  login: (data: LoginRequest): Promise<ApiResponse<LoginResponse>> =>
-    api.post('/auth/login', data) as any,
-  register: (data: RegisterRequest): Promise<ApiResponse<{ user: User }>> =>
-    api.post('/auth/register', data) as any,
-}
-
 export const userApi = {
   getInfo: (): Promise<ApiResponse<{ user: User }>> =>
     api.get('/user/info') as any,
-  updatePassword: (data: UpdatePasswordRequest): Promise<ApiResponse<null>> =>
-    api.post('/user/password', data) as any,
-  logout: (): Promise<ApiResponse<null>> =>
-    api.post('/user/logout') as any,
 }
 
 export const adminApi = {
@@ -98,8 +83,6 @@ export const adminApi = {
     api.post('/admin/users', data) as any,
   updateUserStatus: (id: number, status: number): Promise<ApiResponse<null>> =>
     api.put('/admin/users/' + id + '/status', { status }) as any,
-  updateUserPassword: (id: number, new_password: string): Promise<ApiResponse<null>> =>
-    api.put('/admin/users/' + id + '/password', { new_password }) as any,
   deleteUser: (id: number): Promise<ApiResponse<null>> =>
     api.delete('/admin/users/' + id) as any,
 }

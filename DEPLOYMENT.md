@@ -247,6 +247,9 @@ npm run migrate:dist
 npm prune --omit=dev
 ```
 
+> [!IMPORTANT]
+> 启用 Better Auth Admin plugin 后，必须先执行 `npm run migrate:dist`（开发环境对应 `npm --prefix apps/auth run migrate`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 字段；不要手写 DDL。
+
 部署时至少确认：
 
 - `AUTH_HOST=127.0.0.1`

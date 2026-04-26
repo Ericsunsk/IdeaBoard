@@ -117,7 +117,6 @@ import {
 } from "naive-ui";
 import {
     PeopleOutline,
-    ShieldCheckmarkOutline,
     LinkOutline,
     KeyOutline,
     PulseOutline,
@@ -239,12 +238,6 @@ const adminMenuGroups: AdminMenuGroup[] = [
                 label: "用户管理",
                 title: "用户管理",
                 icon: PeopleOutline,
-            },
-            {
-                key: "user-security",
-                label: "用户安全管理",
-                title: "用户安全管理",
-                icon: ShieldCheckmarkOutline,
             },
             {
                 key: "channels",

@@ -5,6 +5,8 @@ frontend/.vscode/
 apps/web/node_modules/
 apps/web/dist/
 apps/web/.vscode/
+apps/auth/node_modules/
+apps/auth/dist/
 
 # ===== Backend =====
 backend/*.exe
@@ -45,6 +47,7 @@ Thumbs.db
 .env.*
 !backend/.env.example
 !apps/api/.env.example
+!apps/auth/.env.example
 
 # ===== Release Artifacts =====
 release/

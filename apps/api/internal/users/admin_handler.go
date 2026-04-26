@@ -71,12 +71,12 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 
 // UpdateUserPassword 管理员修改用户密码
 func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
-	response.Error(c, 400, "Better Auth 接管后不支持后台改密，请在 Better Auth Studio 或前台找回流程处理")
+	response.Error(c, 400, "Better Auth 接管后不支持 Go 后台改密；当前高级选项未暴露改密，请走前台找回流程或受控身份运维流程")
 }
 
 // DeleteUser 删除用户
 func (h *AdminHandler) DeleteUser(c *gin.Context) {
-	response.Error(c, 400, "Better Auth 接管后已停用后台删除，请先封禁，再在 Better Auth Studio 执行物理删号")
+	response.Error(c, 400, "Better Auth 接管后已停用 Go 后台删除；请先封禁，确需物理删号时走受控身份运维流程")
 }
 
 func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*User, bool) {

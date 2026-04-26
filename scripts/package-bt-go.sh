@@ -1,79 +1,18 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-export LC_ALL=C
-export LANG=C
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION_FILE="$ROOT_DIR/VERSION"
+cat >&2 <<'EOF'
+package-bt-go.sh has been disabled.
 
-if [[ -n "${1:-}" ]]; then
-  TAG="$1"
-elif [[ -f "$VERSION_FILE" ]]; then
-  TAG="v$(tr -d '[:space:]' < "$VERSION_FILE")"
-else
-  echo "Missing version. Pass a tag like v0.1.0 or create VERSION." >&2
-  exit 1
-fi
+Better Auth now runs as an independent Node service under apps/auth, so the old
+single Go binary Baota bundle would produce a broken login/register flow.
 
-if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "Warning: non-SemVer tag '$TAG' (recommended: vMAJOR.MINOR.PATCH)." >&2
-fi
+Use the standard deployment bundle instead:
 
-RELEASE_ROOT="$ROOT_DIR/release/$TAG"
-BUNDLE_NAME="ideaboard-bt-go-${TAG}-linux-amd64"
-BUNDLE_DIR="$RELEASE_ROOT/$BUNDLE_NAME"
-API_APP_DIR="$BUNDLE_DIR/apps/api"
-ARCHIVE_PATH="$RELEASE_ROOT/${BUNDLE_NAME}.tar.gz"
+  ./scripts/package-deploy.sh
 
-NPM_CACHE_DIR="$ROOT_DIR/.cache/npm"
-GO_CACHE_DIR="$ROOT_DIR/.cache/go-build"
-GO_MOD_CACHE_DIR="$ROOT_DIR/.cache/go-mod"
-WEB_DIR="$ROOT_DIR/apps/web"
-API_DIR="$ROOT_DIR/apps/api"
-WEB_DIST_DIR="$WEB_DIR/dist"
-API_BUILD_DIR="$ROOT_DIR/release-temp/api-build"
-API_BINARY_TMP="$ROOT_DIR/release-temp/ideaboard-server"
+See DEPLOYMENT.md for the two-service topology and Nginx routing.
+EOF
 
-mkdir -p "$NPM_CACHE_DIR" "$GO_CACHE_DIR" "$GO_MOD_CACHE_DIR" "$RELEASE_ROOT" "$ROOT_DIR/release-temp"
-
-echo "[1/5] Installing web dependencies"
-npm --prefix "$WEB_DIR" ci --cache "$NPM_CACHE_DIR"
-
-echo "[2/5] Building web dist"
-npm --prefix "$WEB_DIR" run build
-
-echo "[3/5] Preparing api embed workspace"
-rm -rf "$API_BUILD_DIR"
-cp -R "$API_DIR" "$API_BUILD_DIR"
-rm -rf "$API_BUILD_DIR/web/dist"
-mkdir -p "$API_BUILD_DIR/web/dist"
-cp -R "$WEB_DIST_DIR"/. "$API_BUILD_DIR/web/dist/"
-
-echo "[4/5] Building api binary (linux/amd64)"
-(
-  cd "$API_BUILD_DIR"
-  env GOCACHE="$GO_CACHE_DIR" GOMODCACHE="$GO_MOD_CACHE_DIR" CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o "$API_BINARY_TMP" ./cmd
-)
-
-echo "[5/5] Assembling Baota Go bundle"
-rm -rf "$BUNDLE_DIR"
-mkdir -p "$API_APP_DIR"
-
-cp "$API_BINARY_TMP" "$API_APP_DIR/ideaboard-server"
-chmod +x "$API_APP_DIR/ideaboard-server"
-cp "$API_DIR/.env.example" "$API_APP_DIR/.env.example"
-
-(
-  cd "$RELEASE_ROOT"
-  tar -czf "$ARCHIVE_PATH" "$BUNDLE_NAME"
-  shasum -a 256 "$(basename "$ARCHIVE_PATH")" > SHA256SUMS.txt
-)
-
-echo "Done"
-echo "Bundle directory: $BUNDLE_DIR"
-echo "Archive: $ARCHIVE_PATH"
-echo "Contains:"
-echo "  - apps/api/ideaboard-server"
-echo "  - apps/api/.env.example"
+exit 1

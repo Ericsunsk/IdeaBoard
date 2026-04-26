@@ -477,10 +477,7 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		return "", fmt.Errorf("当前渠道不支持该图像参考能力")
 	}
 
-	timeout := time.Duration(account.Timeout) * time.Second
-	if timeout == 0 {
-		timeout = 120 * time.Second
-	}
+	timeout := resolveAccountTimeout(account)
 
 	localRedrawCtx, redrawErr := c.prepareLocalRedrawPipeline(ctx, account, params, timeout)
 	if redrawErr != nil {
@@ -553,6 +550,14 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
+}
+
+func resolveAccountTimeout(account *accounts.ApiAccount) time.Duration {
+	if account == nil {
+		return time.Duration(accounts.NormalizeAccountTimeout(0)) * time.Second
+	}
+	timeoutSeconds := accounts.NormalizeAccountTimeout(account.Timeout)
+	return time.Duration(timeoutSeconds) * time.Second
 }
 
 // callOpenAI 调用 OpenAI DALL-E 风格接口（也兼容其他 OpenAI 兼容平台）

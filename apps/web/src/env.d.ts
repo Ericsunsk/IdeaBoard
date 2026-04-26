@@ -8,7 +8,6 @@ declare module '*.vue' {
 
 interface ImportMetaEnv {
   readonly VITE_AUTH_BASE_URL?: string
-  readonly VITE_AUTH_STUDIO_URL?: string
 }
 
 interface ImportMeta {

@@ -29,8 +29,10 @@ NPM_CACHE_DIR="$ROOT_DIR/.cache/npm"
 GO_CACHE_DIR="$ROOT_DIR/.cache/go-build"
 GO_MOD_CACHE_DIR="$ROOT_DIR/.cache/go-mod"
 WEB_DIR="$ROOT_DIR/apps/web"
+AUTH_DIR="$ROOT_DIR/apps/auth"
 API_DIR="$ROOT_DIR/apps/api"
 WEB_DIST_DIR="$WEB_DIR/dist"
+AUTH_DIST_DIR="$AUTH_DIR/dist"
 API_BINARY_TMP="$ROOT_DIR/release-temp/ideaboard-server"
 API_BINARY_DST="$BUNDLE_DIR/apps/api/ideaboard-server"
 BUILD_TIME_UTC="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
@@ -38,22 +40,29 @@ COMMIT_SHA="$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf 'u
 
 mkdir -p "$NPM_CACHE_DIR" "$GO_CACHE_DIR" "$GO_MOD_CACHE_DIR" "$RELEASE_ROOT" "$ROOT_DIR/release-temp"
 
-echo "[1/5] Installing web dependencies"
+echo "[1/7] Installing web dependencies"
 npm --prefix "$WEB_DIR" ci --cache "$NPM_CACHE_DIR"
 
-echo "[2/5] Building web app"
+echo "[2/7] Installing auth dependencies"
+npm --prefix "$AUTH_DIR" ci --cache "$NPM_CACHE_DIR"
+
+echo "[3/7] Building web app"
 npm --prefix "$WEB_DIR" run build
 
-echo "[3/5] Building api binary (linux/amd64)"
+echo "[4/7] Building auth service"
+npm --prefix "$AUTH_DIR" run build
+
+echo "[5/7] Building api binary (linux/amd64)"
 (
   cd "$API_DIR"
   env GOCACHE="$GO_CACHE_DIR" GOMODCACHE="$GO_MOD_CACHE_DIR" CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -o "$API_BINARY_TMP" ./cmd
 )
 
-echo "[4/5] Assembling release bundle"
+echo "[6/7] Assembling release bundle"
 rm -rf "$BUNDLE_DIR"
 mkdir -p \
+  "$BUNDLE_DIR/apps/auth" \
   "$BUNDLE_DIR/apps/api/uploads" \
   "$BUNDLE_DIR/apps/web" \
   "$BUNDLE_DIR/deploy/nginx" \
@@ -61,6 +70,10 @@ mkdir -p \
 
 cp "$API_BINARY_TMP" "$API_BINARY_DST"
 cp -R "$WEB_DIST_DIR" "$BUNDLE_DIR/apps/web/dist"
+cp -R "$AUTH_DIST_DIR" "$BUNDLE_DIR/apps/auth/dist"
+cp "$AUTH_DIR/package.json" "$BUNDLE_DIR/apps/auth/package.json"
+cp "$AUTH_DIR/package-lock.json" "$BUNDLE_DIR/apps/auth/package-lock.json"
+cp "$AUTH_DIR/.env.example" "$BUNDLE_DIR/apps/auth/.env.example"
 cp "$ROOT_DIR/DEPLOYMENT.md" "$BUNDLE_DIR/DEPLOYMENT.md"
 cp "$ROOT_DIR/README.md" "$BUNDLE_DIR/README.md"
 cp "$ROOT_DIR/DEVELOPMENT.md" "$BUNDLE_DIR/DEVELOPMENT.md"
@@ -85,6 +98,25 @@ EnvironmentFile=/opt/ideaboard/apps/api/.env
 WantedBy=multi-user.target
 EOF
 
+cat > "$BUNDLE_DIR/deploy/systemd/ideaboard-auth.service" <<'EOF'
+[Unit]
+Description=IdeaBoard Auth Service
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/ideaboard/apps/auth
+User=ideaboard
+Group=ideaboard
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/ideaboard/apps/auth/.env
+ExecStart=/usr/bin/env node /opt/ideaboard/apps/auth/dist/index.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 cat > "$BUNDLE_DIR/deploy/nginx/ideaboard.conf" <<'EOF'
 server {
     listen 80;
@@ -103,6 +135,14 @@ server {
 
     location / {
         try_files $uri $uri/ /index.html;
+    }
+
+    location /api/auth/ {
+        proxy_pass http://127.0.0.1:6001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location /api/ {
@@ -130,6 +170,7 @@ built_at=$BUILD_TIME_UTC
 bundle=$BUNDLE_NAME
 web_dist=apps/web/dist
 api_binary=apps/api/ideaboard-server
+auth_service=apps/auth/dist/index.js
 EOF
 
 (
@@ -138,5 +179,5 @@ EOF
   shasum -a 256 "$(basename "$ARCHIVE_PATH")" > SHA256SUMS.txt
 )
 
-echo "[5/5] Done"
+echo "[7/7] Done"
 echo "Archive: $ARCHIVE_PATH"
