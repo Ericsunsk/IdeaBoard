@@ -1,17 +1,5 @@
 <template>
   <div class="admin-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">工作流系统提示词</h1>
-        <p class="page-desc">按节点分组管理工作流提示词。列表页只做总览，具体内容在弹窗内编辑。</p>
-      </div>
-    </div>
-
-    <div class="tip-bar">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span>支持模板变量：在提示词中插入 <code v-pre>{{变量名}}</code>，系统会自动替换为实际值。页面按节点分组展示，但每个功能块仍单独保存。</span>
-    </div>
-
     <div class="node-grid">
       <section v-for="group in groupedFeatureGroups" :key="group.key" class="node-card">
         <div class="node-card-header">
@@ -20,7 +8,6 @@
               <h2 class="node-card-title">{{ group.title }}</h2>
               <span class="node-card-count">{{ group.items.length }} 项功能</span>
             </div>
-            <p class="node-card-desc">{{ group.desc }}</p>
           </div>
         </div>
 
@@ -217,10 +204,10 @@ onMounted(loadPrompts)
 }
 
 .node-card {
-  background: var(--admin-card);
-  border: 1px solid var(--admin-border);
+  background: var(--admin-card-strong);
+  border: 1px solid var(--admin-border-soft);
   border-radius: 16px;
-  padding: 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -409,7 +396,7 @@ onMounted(loadPrompts)
   background: var(--var-bg);
   cursor: pointer;
   box-shadow: none;
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .var-btn.is-prompt {
@@ -437,12 +424,7 @@ onMounted(loadPrompts)
 }
 
 .var-btn:hover {
-  transform: translateY(-1px);
   background: var(--var-bg-hover);
-}
-
-.var-btn:active {
-  transform: translateY(0);
 }
 
 .var-btn-key {

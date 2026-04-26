@@ -98,7 +98,7 @@ func parseBoolLike(v interface{}) (bool, bool) {
 			return false, false
 		}
 		switch s {
-		case "1", "true", "yes", "y", "on", "enabled", "masked", "local", "partial":
+		case "1", "true", "yes", "y", "on", "enabled":
 			return true, true
 		case "0", "false", "no", "n", "off", "disabled":
 			return false, true

@@ -63,7 +63,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 | 后端 | `Go` + `Gin` + `GORM` + `Better Auth (Node.js/TypeScript)` |
 | 基础设施 | `MySQL 8.0+`、`Redis 7+` |
 | 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
-| 运行方式 | 本地开发、标准 Linux 部署、宝塔双服务托管（需单独配置 Auth Service） |
+| 运行方式 | 本地开发、标准 Linux 部署（Nginx + systemd + 双服务） |
 | 核心界面 | 用户画布工作台、画板管理、管理后台 |
 
 ### 运行链路
@@ -97,7 +97,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
     </td>
     <td valign="top" width="25%">
       <strong>管理控制台</strong><br/>
-      管理用户、账号、渠道、素材模板、提示词与配置项。
+      管理用户、账号、渠道、线稿模式、提示词与配置项。
     </td>
   </tr>
 </table>
@@ -116,7 +116,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 | 后处理 | 高清增强、画布延伸 |
 | 存储接入 | 本地存储、Kodo、S3-compatible 对象存储 |
 
-更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。如需按 feature 配置 admin 后台系统提示词，可参考 [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)。
+更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。如需按 feature 配置管理后台系统提示词，可参考 [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)。
 
 <a id="quick-start"></a>
 ## 快速开始
@@ -175,8 +175,8 @@ npm run dev
 Auth 服务建议额外确认：
 
 - 身份侧高级管理入口：后台 `用户管理` 页。
-- 当前支持：身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、开放注册开关、防刷限流设置。
-- 仍不开放：后台改密、物理删号（如需执行高风险动作，走受控身份运维流程）。
+- 当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销、开放注册开关、防刷限流设置。
+- 仍不开放：后台改密；彻底注销必须经由 Go Admin API 编排，不允许前端直连 Better Auth 删除身份数据。
 
 ### 4. 启动后端（Go API）
 
@@ -233,7 +233,7 @@ IdeaBoard/
 ├── README.md                 # 项目首页
 ├── DEVELOPMENT.md            # 开发手册
 ├── DEPLOYMENT.md             # 标准 Linux 部署
-└── DEPLOY_BAOTA_GO.md        # 宝塔旧单 Go 模式停用说明
+└── CHANGELOG.md              # 发布记录
 ```
 
 <a id="deployment"></a>
@@ -249,11 +249,9 @@ IdeaBoard/
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
-### 宝塔 Go 模式已停用
+### 运行拓扑
 
-Better Auth 迁移后需要独立的 `apps/auth` Node Service，旧的单 Go 二进制部署方式已停用；`scripts/package-bt-go.sh` 会直接失败以避免生成不可登录的发布包。
-
-详见 [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md)。
+生产环境采用 Go API 与 Better Auth Node Service 双服务拓扑，并由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`。
 
 <a id="docs"></a>
 ## 相关文档
@@ -264,11 +262,10 @@ Better Auth 迁移后需要独立的 `apps/auth` Node Service，旧的单 Go 二
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 架构、contract、本地开发与目录边界 |
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) | Feature System Prompt 配置手册与推荐模板 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | 标准 Linux 部署、升级与回滚 |
-| [DEPLOY_BAOTA_GO.md](./DEPLOY_BAOTA_GO.md) | 宝塔旧单 Go 模式停用说明 |
 | [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md) | Auth 运维边界与应急流程 |
-| [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 新目录边界与命名约束 |
+| [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 目录边界与命名约束 |
 | [docker/README.md](./docker/README.md) | 本地依赖说明 |
-| [CHANGELOG.md](./CHANGELOG.md) | 发布记录与未发布变更 |
+| [CHANGELOG.md](./CHANGELOG.md) | 发布记录 |
 
 ## 验证建议
 

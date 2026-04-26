@@ -6,8 +6,7 @@ import (
 )
 
 const (
-	StorageProfilesConfigKey  = "storage_profiles_v1"
-	legacyAliyunOSSProviderID = "aliyun-oss"
+	StorageProfilesConfigKey = "storage_profiles_v1"
 )
 
 func (s *StorageService) kodoConfigFromProfile(profile *StorageProfile) *KodoConfig {
@@ -51,34 +50,11 @@ func builtinKodoProfileID() string {
 }
 
 func canonicalizeStorageProvider(provider StorageProvider) StorageProvider {
-	switch provider {
-	case StorageProviderS3Compatible:
-		return StorageProviderS3Compatible
-	case StorageProvider(legacyAliyunOSSProviderID):
-		return StorageProviderS3Compatible
-	default:
-		return provider
-	}
+	return provider
 }
 
 func canonicalizeStorageProfile(provider StorageProvider, cfg map[string]interface{}) (StorageProvider, map[string]interface{}, bool) {
-	canonicalProvider := canonicalizeStorageProvider(provider)
-	if canonicalProvider != StorageProviderS3Compatible {
-		return canonicalProvider, cfg, canonicalProvider != provider
-	}
-	if provider != StorageProvider(legacyAliyunOSSProviderID) {
-		return canonicalProvider, cfg, canonicalProvider != provider
-	}
-
-	migrated := cloneConfig(cfg)
-	if secret := strings.TrimSpace(configString(migrated, "access_key_secret")); secret != "" && configString(migrated, "secret_access_key") == "" {
-		migrated["secret_access_key"] = secret
-	}
-	delete(migrated, "access_key_secret")
-	if _, ok := migrated["force_path_style"]; !ok {
-		migrated["force_path_style"] = false
-	}
-	return canonicalProvider, migrated, true
+	return canonicalizeStorageProvider(provider), cfg, false
 }
 
 func configString(cfg map[string]interface{}, key string) string {

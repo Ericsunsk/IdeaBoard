@@ -36,14 +36,10 @@ type Dependencies struct {
 	AccountHandler       *accounts.AccountHandler
 	BoardHandler         *boards.BoardHandler
 	BoardService         *boards.BoardService
-	CardHandler          *assets.StyleCardHandler
 	ChannelHandler       *channels.ChannelHandler
 	StorageHandler       *storage.StorageHandler
 	LineDraftHandler     *assets.LineDraftHandler
 	FeaturePromptHandler *prompts.FeaturePromptHandler
-	FaceTemplateHandler  *assets.FaceTemplateHandler
-	BgTemplateHandler    *assets.BgTemplateHandler
-	PatternStyleHandler  *assets.PatternStyleHandler
 	VectorizeHandler     *imageproc.VectorizeHandler
 	StorageService       *storage.StorageService
 	UserRepo             *users.UserRepository
@@ -161,11 +157,7 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 	userApi.POST("/boards/:board_id/share-tokens/:token/revoke", h.BoardHandler.RevokeShareToken)
 	userApi.POST("/boards/share-tokens/join", h.BoardHandler.JoinByShareToken)
 
-	userApi.GET("/style-cards", h.CardHandler.ListEnabled)
 	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
-	userApi.GET("/face-templates", h.FaceTemplateHandler.ListEnabled)
-	userApi.GET("/bg-templates", h.BgTemplateHandler.ListEnabled)
-	userApi.GET("/pattern-styles", h.PatternStyleHandler.ListEnabled)
 
 	userApi.POST("/upload", func(c *gin.Context) {
 		file, err := c.FormFile("file")
@@ -348,9 +340,8 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 	adminApi.PUT("/settings/rate-limit", h.AdminHandler.UpdateRateLimitSettings)
 
 	adminApi.GET("/users", h.AdminHandler.ListUsers)
-	adminApi.POST("/users", h.AdminHandler.CreateUser)
 	adminApi.PUT("/users/:id/status", h.AdminHandler.UpdateUserStatus)
-	adminApi.PUT("/users/:id/password", h.AdminHandler.UpdateUserPassword)
+	adminApi.PUT("/users/:id/role", h.AdminHandler.UpdateUserRole)
 	adminApi.DELETE("/users/:id", h.AdminHandler.DeleteUser)
 
 	adminApi.GET("/accounts", h.AccountHandler.ListAccounts)
@@ -406,11 +397,6 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 	adminApi.POST("/storage/profiles/:id/test", h.StorageHandler.TestProfile)
 	adminApi.GET("/storage/profiles/:id/bucket-info", h.StorageHandler.GetBucketInfo)
 
-	adminApi.GET("/style-cards", h.CardHandler.List)
-	adminApi.POST("/style-cards", h.CardHandler.Create)
-	adminApi.PUT("/style-cards/:id", h.CardHandler.Update)
-	adminApi.DELETE("/style-cards/:id", h.CardHandler.Delete)
-
 	adminApi.GET("/channels", h.ChannelHandler.List)
 	adminApi.POST("/channels", h.ChannelHandler.Create)
 	adminApi.PUT("/channels/:id", h.ChannelHandler.Update)
@@ -420,21 +406,6 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 	adminApi.POST("/line-draft-modes", h.LineDraftHandler.Create)
 	adminApi.PUT("/line-draft-modes/:id", h.LineDraftHandler.Update)
 	adminApi.DELETE("/line-draft-modes/:id", h.LineDraftHandler.Delete)
-
-	adminApi.GET("/face-templates", h.FaceTemplateHandler.List)
-	adminApi.POST("/face-templates", h.FaceTemplateHandler.Create)
-	adminApi.PUT("/face-templates/:id", h.FaceTemplateHandler.Update)
-	adminApi.DELETE("/face-templates/:id", h.FaceTemplateHandler.Delete)
-
-	adminApi.GET("/bg-templates", h.BgTemplateHandler.List)
-	adminApi.POST("/bg-templates", h.BgTemplateHandler.Create)
-	adminApi.PUT("/bg-templates/:id", h.BgTemplateHandler.Update)
-	adminApi.DELETE("/bg-templates/:id", h.BgTemplateHandler.Delete)
-
-	adminApi.GET("/pattern-styles", h.PatternStyleHandler.List)
-	adminApi.POST("/pattern-styles", h.PatternStyleHandler.Create)
-	adminApi.PUT("/pattern-styles/:id", h.PatternStyleHandler.Update)
-	adminApi.DELETE("/pattern-styles/:id", h.PatternStyleHandler.Delete)
 
 	adminApi.GET("/feature-prompts", h.FeaturePromptHandler.ListPrompts)
 	adminApi.GET("/feature-prompts/:slug", h.FeaturePromptHandler.GetPrompt)

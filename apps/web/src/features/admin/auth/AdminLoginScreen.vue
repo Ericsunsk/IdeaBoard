@@ -159,7 +159,8 @@ async function handleLogin() {
 :deep(.n-input) {
   --n-border: 1px solid #2b2c2f;
   --n-border-hover: 1px solid #3a3b40;
-  --n-border-focus: 1px solid #e4e4e7;
+  --n-border-focus: 1px solid #3a3b40;
+  --n-box-shadow-focus: none;
   --n-color: #151618;
   --n-color-focus: #151618;
   --n-text-color: #f4f4f5;
@@ -167,15 +168,31 @@ async function handleLogin() {
   border-radius: 12px;
 }
 
+:deep(.n-input:focus),
+:deep(.n-input:focus-visible),
+:deep(.n-input.n-input--focus),
+:deep(.n-input .n-input__state-border) {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 :deep(.n-button--primary-type) {
   --n-color: #f4f4f5;
   --n-color-hover: #ffffff;
   --n-color-pressed: #d4d4d8;
   --n-border: 1px solid #f4f4f5;
+  --n-ripple-color: transparent;
   --n-text-color: #111111;
   border-radius: 12px;
   height: 48px;
   margin-top: 6px;
+}
+
+:deep(.n-button:focus),
+:deep(.n-button:focus-visible),
+:deep(.n-button .n-button__state-border) {
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .footer {

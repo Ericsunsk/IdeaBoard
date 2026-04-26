@@ -421,10 +421,10 @@ func (c *Consumer) normalizeUpstreamMediaParams(params map[string]interface{}) {
 		}
 	}
 
-	for _, key := range []string{"image_url", "original_image_url", "mask_image_url", "mask_url", "model_url", "pose_url"} {
+	for _, key := range []string{"image_url", "original_image_url", "mask_image_url", "model_url", "pose_url"} {
 		normalizeStringKey(key)
 	}
-	for _, key := range []string{"image_urls", "mask_image_urls", "mask_urls"} {
+	for _, key := range []string{"image_urls", "mask_image_urls"} {
 		normalizeListKey(key)
 	}
 
@@ -925,21 +925,11 @@ func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string
 		"original_image_url",
 		"mask_image_url",
 		"mask_image_urls",
-		"mask_url",
-		"mask_urls",
 		"use_mask",
-		"mask_enabled",
-		"is_masked",
-		"masked",
-		"local_enhance",
-		"is_local_enhance",
-		"partial_enhance",
-		"is_partial_enhance",
 		"fabric_rotation",
 		"fabric_scale",
 		"fabric_opacity",
 		"tile_mode",
-		"mode",
 		"upscale_mode",
 		"upscale_factor",
 		"output_format",
@@ -1020,29 +1010,23 @@ func hasOpenAIMaskInput(params map[string]interface{}) bool {
 	if params == nil {
 		return false
 	}
-	for _, key := range []string{"mask_image_url", "mask_url"} {
-		if value, ok := params[key].(string); ok && strings.TrimSpace(value) != "" {
+	if value, ok := params["mask_image_url"].(string); ok && strings.TrimSpace(value) != "" {
+		return true
+	}
+	switch values := params["mask_image_urls"].(type) {
+	case []string:
+		if len(values) > 0 {
 			return true
 		}
-	}
-	for _, key := range []string{"mask_image_urls", "mask_urls"} {
-		switch values := params[key].(type) {
-		case []string:
-			if len(values) > 0 {
+	case []interface{}:
+		for _, value := range values {
+			if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
 				return true
 			}
-		case []interface{}:
-			for _, value := range values {
-				if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
-					return true
-				}
-			}
 		}
 	}
-	for _, key := range []string{"use_mask", "mask_enabled", "is_masked", "masked"} {
-		if enabled, ok := params[key].(bool); ok && enabled {
-			return true
-		}
+	if enabled, ok := params["use_mask"].(bool); ok && enabled {
+		return true
 	}
 	return false
 }
@@ -1154,21 +1138,11 @@ func appendOpenAIEditParams(reqBody map[string]interface{}, params map[string]in
 		"image_b_weight",
 		"original_image_url",
 		"mask_image_urls",
-		"mask_url",
-		"mask_urls",
 		"use_mask",
-		"mask_enabled",
-		"is_masked",
-		"masked",
-		"local_enhance",
-		"is_local_enhance",
-		"partial_enhance",
-		"is_partial_enhance",
 		"fabric_rotation",
 		"fabric_scale",
 		"fabric_opacity",
 		"tile_mode",
-		"mode",
 		"upscale_mode",
 		"upscale_factor",
 		"output_format",

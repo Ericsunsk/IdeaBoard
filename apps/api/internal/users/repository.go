@@ -71,7 +71,7 @@ func (r *UserRepository) Create(user *User) error {
 // GetByID 根据ID获取用户
 func (r *UserRepository) GetByID(id uint64) (*User, error) {
 	var user User
-	err := r.db.Select("id, username, auth_user_id, storage_uid, password, role, status, created_at, updated_at").Where("id = ?", id).First(&user).Error
+	err := r.db.Select("id, username, auth_user_id, storage_uid, role, status, created_at, updated_at").Where("id = ?", id).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (r *UserRepository) GetByID(id uint64) (*User, error) {
 // GetByUsername 根据用户名获取用户
 func (r *UserRepository) GetByUsername(username string) (*User, error) {
 	var user User
-	err := r.db.Select("id, username, auth_user_id, storage_uid, password, role, status, created_at, updated_at").Where("username = ?", username).First(&user).Error
+	err := r.db.Select("id, username, auth_user_id, storage_uid, role, status, created_at, updated_at").Where("username = ?", username).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (r *UserRepository) GetByUsername(username string) (*User, error) {
 // GetByAuthUserID 根据 Better Auth user id 获取用户
 func (r *UserRepository) GetByAuthUserID(authUserID string) (*User, error) {
 	var user User
-	err := r.db.Select("id, username, auth_user_id, storage_uid, password, role, status, created_at, updated_at").
+	err := r.db.Select("id, username, auth_user_id, storage_uid, role, status, created_at, updated_at").
 		Where("auth_user_id = ?", strings.TrimSpace(authUserID)).
 		First(&user).Error
 	if err != nil {
@@ -107,7 +107,7 @@ func (r *UserRepository) GetByStorageUID(storageUID string) (*User, error) {
 		return nil, gorm.ErrRecordNotFound
 	}
 	var user User
-	err := r.db.Select("id, username, auth_user_id, storage_uid, password, role, status, created_at, updated_at").Where("storage_uid = ?", normalized).First(&user).Error
+	err := r.db.Select("id, username, auth_user_id, storage_uid, role, status, created_at, updated_at").Where("storage_uid = ?", normalized).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -185,30 +185,8 @@ func (r *UserRepository) UpdateStatus(id uint64, status int8) error {
 	return r.db.Model(&User{}).Where("id = ?", id).Update("status", status).Error
 }
 
-// UpdatePassword 更新密码
-func (r *UserRepository) UpdatePassword(id uint64, password string) error {
-	return r.db.Model(&User{}).Where("id = ?", id).Update("password", password).Error
-}
-
-// ExistsUsername 检查用户名是否存在
-func (r *UserRepository) ExistsUsername(username string) (bool, error) {
-	var count int64
-	err := r.db.Model(&User{}).Where("username = ?", username).Count(&count).Error
-	return count > 0, err
-}
-
-// UpdateRoleAndPassword 更新用户的角色和密码（用于初始化管理员）
-func (r *UserRepository) UpdateRoleAndPassword(username string, password string, role string) error {
-	return r.db.Model(&User{}).Where("username = ?", username).
-		Updates(map[string]interface{}{
-			"password": password,
-			"role":     role,
-		}).Error
-}
-
-// UpdateRole 更新用户角色
-func (r *UserRepository) UpdateRole(username string, role string) error {
-	return r.db.Model(&User{}).Where("username = ?", username).Update("role", role).Error
+func (r *UserRepository) UpdateRoleByID(id uint64, role string) error {
+	return r.db.Model(&User{}).Where("id = ?", id).Update("role", role).Error
 }
 
 func (r *UserRepository) UpdateAuthUserID(id uint64, authUserID string) error {

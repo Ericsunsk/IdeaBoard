@@ -8,27 +8,13 @@ import (
 )
 
 var featureAllowConfigKeys = map[string]struct{}{
-	"features":           {},
-	"feature_slugs":      {},
-	"enabled_features":   {},
-	"supported_features": {},
-	"workflow_features":  {},
-	"allowed_features":   {},
-	"feature_allowlist":  {},
-	"feature_whitelist":  {},
+	"features": {},
 }
 
 var featureDenyConfigKeys = map[string]struct{}{
-	"disabled_features":    {},
-	"blocked_features":     {},
-	"unsupported_features": {},
-	"feature_blocklist":    {},
-	"feature_blacklist":    {},
+	"disabled_features": {},
 }
 
-// filterAccountsByFeature keeps backward compatibility:
-// - no feature requested => all accounts stay eligible
-// - no explicit feature config on account => still eligible
 func filterAccountsByFeature(accounts []*ApiAccount, featureSlug string) []*ApiAccount {
 	if featureSlug == "" {
 		return accounts

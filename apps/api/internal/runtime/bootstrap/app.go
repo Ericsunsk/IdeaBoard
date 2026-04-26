@@ -78,32 +78,23 @@ func Run(args []string) {
 	}
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := accounts.NewTaskRepository(db)
-	styleCardRepo := assets.NewStyleCardRepository(db)
 	channelRepo := channels.NewChannelRepository(db)
 	systemConfigRepo := settings.NewSystemConfigRepository(db)
 	lineDraftModeRepo := assets.NewLineDraftModeRepository(db)
-	faceTemplateRepo := assets.NewFaceTemplateRepository(db)
-	bgTemplateRepo := assets.NewBgTemplateRepository(db)
-	patternStyleRepo := assets.NewPatternStyleRepository(db)
 	boardRepo := boards.NewBoardRepository(db)
 
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
-	styleCardService := assets.NewStyleCardService(styleCardRepo)
-	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, styleCardService, systemConfigRepo, storageService)
+	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, systemConfigRepo, storageService)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
 	authHandler := auth.NewAuthHandler(userService)
-	adminHandler := users.NewAdminHandler(userService, systemConfigRepo)
-	cardHandler := assets.NewStyleCardHandler(styleCardService)
+	adminHandler := users.NewAdminHandler(userService, systemConfigRepo, authServiceClient)
 	channelHandler := channels.NewChannelHandler(channelRepo)
 	storageHandler := storage.NewStorageHandler(storageService)
 	lineDraftHandler := assets.NewLineDraftHandler(lineDraftModeRepo)
 	accountHandler := accounts.NewAccountHandler(accountService)
 	featurePromptHandler := prompts.NewFeaturePromptHandler(systemConfigRepo)
-	faceTemplateHandler := assets.NewFaceTemplateHandler(faceTemplateRepo)
-	bgTemplateHandler := assets.NewBgTemplateHandler(bgTemplateRepo)
-	patternStyleHandler := assets.NewPatternStyleHandler(patternStyleRepo)
 	vectorizeHandler := imageproc.NewVectorizeHandler(taskRepo, storageService)
 	boardHandler := boards.NewBoardHandler(boardService)
 
@@ -120,14 +111,10 @@ func Run(args []string) {
 		AccountHandler:       accountHandler,
 		BoardHandler:         boardHandler,
 		BoardService:         boardService,
-		CardHandler:          cardHandler,
 		ChannelHandler:       channelHandler,
 		StorageHandler:       storageHandler,
 		LineDraftHandler:     lineDraftHandler,
 		FeaturePromptHandler: featurePromptHandler,
-		FaceTemplateHandler:  faceTemplateHandler,
-		BgTemplateHandler:    bgTemplateHandler,
-		PatternStyleHandler:  patternStyleHandler,
 		VectorizeHandler:     vectorizeHandler,
 		StorageService:       storageService,
 		UserRepo:             userRepo,
@@ -272,7 +259,6 @@ func runInitAdmin() {
 	localAdmin = &users.User{
 		Username:   "admin",
 		AuthUserID: stringPtr(provisioned.AuthUserID),
-		Password:   "__better_auth_managed__",
 		Role:       "admin",
 		Status:     1,
 	}
@@ -328,13 +314,9 @@ func migrateModels(db *gorm.DB) error {
 		&users.UsedUID{},
 		&accounts.ApiAccount{},
 		&tasks.Task{},
-		&assets.StyleCard{},
 		&channels.Channel{},
 		&settings.SystemConfig{},
 		&assets.LineDraftMode{},
-		&assets.FaceTemplate{},
-		&assets.BgTemplate{},
-		&assets.PatternStyle{},
 		&boards.UserBoard{},
 		&boards.BoardMember{},
 		&boards.BoardShareToken{},

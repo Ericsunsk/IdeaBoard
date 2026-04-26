@@ -25,25 +25,25 @@ withDefaults(defineProps<{
 .summary-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 18px;
-  border-radius: 18px;
+  justify-content: space-between;
+  min-height: 96px;
+  padding: 16px 18px;
+  border-radius: 14px;
   background: var(--admin-card-strong, var(--admin-card));
-  border: 1px solid var(--admin-border);
+  border: 1px solid var(--admin-border-soft, var(--admin-border));
 }
 
 .summary-label {
   font-size: 12px;
   color: var(--admin-text-3);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .summary-value {
-  font-size: clamp(24px, 3vw, 34px);
+  font-size: 28px;
   font-weight: 700;
+  letter-spacing: 0.01em;
   color: var(--admin-text-1);
-  line-height: 1.05;
 }
 
 .summary-foot {

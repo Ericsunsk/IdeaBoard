@@ -107,7 +107,6 @@ export const EXECUTION_ENHANCE_META = {
 
 interface BuildExecutionTaskRequestOptions {
   prompt: string
-  cardIds?: number[]
   feature?: ExecutionFeature
   imageUrls?: string[]
   params?: Record<string, unknown>
@@ -118,9 +117,6 @@ export function buildExecutionTaskRequest(options: BuildExecutionTaskRequestOpti
     prompt: options.prompt,
   }
 
-  if (options.cardIds && options.cardIds.length > 0) {
-    request.card_ids = options.cardIds
-  }
   if (options.feature) {
     request.feature = options.feature
   }

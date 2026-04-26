@@ -1,6 +1,6 @@
 # IdeaBoard 本地依赖手册
 
-`docker/` 目录用于本地开发时快速启动 `MySQL + Redis`。它只面向开发与内部调试，不应直接视为生产环境模板。
+`docker/` 目录用于本地开发时快速启动 `MySQL + Redis`。生产环境请使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的部署方式。
 
 ## 1. 快速启动
 
@@ -39,7 +39,6 @@ docker compose logs -f redis
 补充：
 
 - compose 已显式固定 `platform: linux/amd64`，便于 Apple Silicon 环境直接运行。
-- 如果本地已有旧的 `mysql:5.7` 数据卷，升级到 8.0 前请先备份；不兼容时建议删除开发卷后重新初始化。
 - compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
 
 ### Redis

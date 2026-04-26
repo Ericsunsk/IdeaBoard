@@ -7,7 +7,6 @@ export interface CanvasBoardMeta {
   updatedAt: number
 }
 
-const LEGACY_STORAGE_KEY = 'ideaboard.canvas.boards.v1'
 const STORAGE_KEY_PREFIX = 'ideaboard.canvas.boards.v2'
 const MAX_BOARD_NAME_LEN = 60
 
@@ -51,21 +50,11 @@ function getScopedStorageKey(): string | null {
   return `${STORAGE_KEY_PREFIX}.${scope}`
 }
 
-function migrateLegacyBoardsIfNeeded(scopedKey: string): string | null {
-  const scopedRaw = readStorageValue(scopedKey)
-  if (scopedRaw) return scopedRaw
-  const legacyRaw = readStorageValue(LEGACY_STORAGE_KEY)
-  if (!legacyRaw) return null
-  localStorage.setItem(scopedKey, legacyRaw)
-  localStorage.removeItem(LEGACY_STORAGE_KEY)
-  return legacyRaw
-}
-
 function readRawBoards(): CanvasBoardMeta[] {
   if (typeof window === 'undefined') return []
   const scopedKey = getScopedStorageKey()
   if (!scopedKey) return []
-  const raw = migrateLegacyBoardsIfNeeded(scopedKey) || readStorageValue(scopedKey)
+  const raw = readStorageValue(scopedKey)
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)

@@ -21,7 +21,7 @@
 - `apps/api/internal/platform` 负责 config 和基础设施适配层。
 - `apps/api/internal/runtime` 负责 HTTP 注册、bootstrap 和 worker。
 - 各领域包在同一包内收口自己的 handler、service、repository 和 model。
-- 对外 HTTP 路由、JSON 字段名、环境变量语义和数据库结构，除非明确变更，否则保持向后兼容。
+- 对外 contract 以当前 HTTP 路由、JSON 字段名、环境变量语义和数据库结构为准；不提供已下线能力或历史字段别名的适配层。
 
 ## 命名规范
 

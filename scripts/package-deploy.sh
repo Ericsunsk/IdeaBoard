@@ -65,6 +65,8 @@ mkdir -p \
   "$BUNDLE_DIR/apps/auth" \
   "$BUNDLE_DIR/apps/api/uploads" \
   "$BUNDLE_DIR/apps/web" \
+  "$BUNDLE_DIR/docker" \
+  "$BUNDLE_DIR/docs" \
   "$BUNDLE_DIR/deploy/nginx" \
   "$BUNDLE_DIR/deploy/systemd"
 
@@ -77,6 +79,10 @@ cp "$AUTH_DIR/.env.example" "$BUNDLE_DIR/apps/auth/.env.example"
 cp "$ROOT_DIR/DEPLOYMENT.md" "$BUNDLE_DIR/DEPLOYMENT.md"
 cp "$ROOT_DIR/README.md" "$BUNDLE_DIR/README.md"
 cp "$ROOT_DIR/DEVELOPMENT.md" "$BUNDLE_DIR/DEVELOPMENT.md"
+cp "$ROOT_DIR/SYSTEM_PROMPT.md" "$BUNDLE_DIR/SYSTEM_PROMPT.md"
+cp "$ROOT_DIR/CHANGELOG.md" "$BUNDLE_DIR/CHANGELOG.md"
+cp -R "$ROOT_DIR/docs/." "$BUNDLE_DIR/docs/"
+cp "$ROOT_DIR/docker/README.md" "$BUNDLE_DIR/docker/README.md"
 cp "$API_DIR/.env.example" "$BUNDLE_DIR/apps/api/.env.example"
 
 cat > "$BUNDLE_DIR/deploy/systemd/ideaboard.service" <<'EOF'

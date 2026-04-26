@@ -1,44 +1,35 @@
 <template>
   <div class="admin-page records-page">
-    <div class="page-header">
-      <div>
-        <h2 class="page-title">绘图记录审计台</h2>
-        <p class="page-desc">按任务状态回溯生成链路，支持查看失败原因、耗时与结果摘要。</p>
-      </div>
-      <div class="header-side-note">
-        <span>总量 {{ total }}</span>
-      </div>
-    </div>
-
     <div class="summary-grid">
-      <AdminSummaryCard label="总任务数" :value="statsTotal" foot="监控累计" />
-      <AdminSummaryCard label="成功" :value="statsSuccess" foot="completed" />
-      <AdminSummaryCard label="失败" :value="statsFailed" foot="failed" />
-      <AdminSummaryCard label="进行中" :value="statsPending" foot="pending + running" />
+      <AdminSummaryCard label="总任务数" :value="statsTotal" />
+      <AdminSummaryCard label="成功" :value="statsSuccess" />
+      <AdminSummaryCard label="失败" :value="statsFailed" />
+      <AdminSummaryCard label="进行中" :value="statsPending" />
     </div>
 
     <div class="toolbar">
-      <span class="toolbar-group-title">筛选条件</span>
-      <n-select
-        v-model:value="filterStatus"
-        :options="statusOptions"
-        placeholder="状态筛选"
-        clearable
-        style="width: 130px"
-        @update:value="() => { page = 1; loadRecords() }"
-      />
-      <n-button @click="loadRecords">
-        <template #icon><n-icon><RefreshOutline /></n-icon></template>
-        刷新
-      </n-button>
+      <div class="toolbar-left">
+        <n-select
+          v-model:value="filterStatus"
+          :options="statusOptions"
+          placeholder="状态筛选"
+          clearable
+          style="width: 130px"
+          @update:value="() => { page = 1; loadRecords() }"
+        />
+        <n-button secondary class="icon-btn" @click="loadRecords">
+          <template #icon><n-icon><RefreshOutline /></n-icon></template>
+        </n-button>
+      </div>
     </div>
 
-    <div class="table-card">
-      <AdminSectionHeader
-        title="绘图任务列表"
-        description="按时间倒序展示，点击详情可查看排障上下文。"
-        variant="section"
-      />
+    <div class="table-card admin-table-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title-wrapper">
+          <n-icon size="18" class="admin-card-title-icon"><ListOutline /></n-icon>
+          <h3 class="admin-card-title">近期任务记录</h3>
+        </div>
+      </div>
 
       <n-data-table
         :columns="columns"
@@ -49,6 +40,7 @@
         :row-key="(row: Task) => row.task_id"
         size="small"
         :scroll-x="1200"
+        class="admin-table-dense"
       />
       <div class="pagination-wrapper">
         <n-pagination
@@ -125,10 +117,10 @@ import type { DataTableColumns } from 'naive-ui'
 import {
   RefreshOutline,
   EyeOutline,
+  ListOutline,
 } from '@vicons/ionicons5'
 import { sanitizeApiErrorMessage, sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
-import AdminSectionHeader from '../shared/components/AdminSectionHeader.vue'
 
 const records = ref<Task[]>([])
 const loading = ref(false)

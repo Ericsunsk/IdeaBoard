@@ -1,46 +1,45 @@
 <template>
   <div class="admin-page accounts-page">
-    <div class="page-header">
-      <div>
-        <h2 class="page-title">账号池控制中心</h2>
-        <p class="page-desc">管理上游账号并发、超时与启停状态，保障任务队列稳定吞吐。</p>
-      </div>
-      <div class="header-side-note">
-        <span>分页 {{ page }}/{{ pageCount }}</span>
-      </div>
-    </div>
-
     <div class="summary-grid">
-      <AdminSummaryCard label="账号总数" :value="accounts.length" foot="当前页数据" />
-      <AdminSummaryCard label="运行中" :value="runningCount" foot="status = 1" />
-      <AdminSummaryCard label="已停止" :value="stoppedCount" foot="手动停用" />
-      <AdminSummaryCard label="故障账号" :value="failedCount" foot="失败次数 ≥ 5" />
+      <AdminSummaryCard label="账号总数" :value="accounts.length" />
+      <AdminSummaryCard label="运行中" :value="runningCount" />
+      <AdminSummaryCard label="已停止" :value="stoppedCount" />
+      <AdminSummaryCard label="故障账号" :value="failedCount" />
     </div>
 
     <div class="toolbar">
-      <n-input
-        v-model:value="searchKeyword"
-        placeholder="搜索账号名称..."
-        clearable
-        style="width: 200px"
-        @keyup.enter="loadAccounts"
-      >
-        <template #prefix>
-          <n-icon><SearchOutline /></n-icon>
-        </template>
-      </n-input>
-      <n-button @click="loadAccounts">
-        <template #icon><n-icon><RefreshOutline /></n-icon></template>
-        刷新
-      </n-button>
-      <n-button type="primary" @click="openAddModal">
-        <template #icon><n-icon><AddOutline /></n-icon></template>
-        新增账号
-      </n-button>
+      <div class="toolbar-left">
+        <n-input
+          v-model:value="searchKeyword"
+          placeholder="搜索账号名称..."
+          clearable
+          class="admin-search-input"
+          @keyup.enter="loadAccounts"
+        >
+          <template #prefix>
+            <n-icon><SearchOutline /></n-icon>
+          </template>
+        </n-input>
+        <n-button secondary class="icon-btn" @click="loadAccounts">
+          <template #icon><n-icon><RefreshOutline /></n-icon></template>
+        </n-button>
+      </div>
+      <div class="toolbar-spacer" />
+      <div class="toolbar-right">
+        <n-button type="primary" @click="openAddModal">
+          <template #icon><n-icon><AddOutline /></n-icon></template>
+          新增账号
+        </n-button>
+      </div>
     </div>
 
-    <div class="table-card">
-      <AdminSectionHeader title="账号列表" description="可编辑上游密钥、模型、并发和超时配置。" />
+    <div class="table-card admin-table-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title-wrapper">
+          <n-icon size="18" class="admin-card-title-icon"><ListOutline /></n-icon>
+          <h3 class="admin-card-title">账号列表</h3>
+        </div>
+      </div>
       <n-data-table
         :columns="columns"
         :data="accounts"
@@ -48,6 +47,7 @@
         :pagination="false"
         :bordered="false"
         :row-key="(row: ApiAccount) => row.id"
+        class="admin-table-dense"
       />
       <div class="pagination-wrapper">
         <n-pagination
@@ -171,10 +171,9 @@ import type { Channel } from '../../../shared/api/channel'
 import { NInput, NButton, NDataTable, NModal, NForm, NFormItem, NIcon, NTag, NSpace, NSelect, NRadioGroup, NRadio, NInputNumber, NPagination, NGrid, NGi, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import type { ApiAccount } from '../../../shared/api/account'
-import { SearchOutline, RefreshOutline, AddOutline } from '@vicons/ionicons5'
+import { SearchOutline, RefreshOutline, AddOutline, ListOutline } from '@vicons/ionicons5'
 import { extractApiErrorMessage, getChannelModelOptions } from '../shared/assetLibraryShared'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
-import AdminSectionHeader from '../shared/components/AdminSectionHeader.vue'
 
 const message = useMessage()
 const dialog = useDialog()

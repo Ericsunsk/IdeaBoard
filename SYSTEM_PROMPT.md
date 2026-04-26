@@ -1,24 +1,26 @@
 # Feature System Prompt 配置手册
 
-本文为 admin 后台 `feature system prompt` 的运营配置版说明，面向日常配置、上线检查与模板维护。内容聚焦可直接执行的规则与推荐模板，不展开实现过程。
+本文为管理后台 `feature system prompt` 的运营配置说明，面向日常配置、上线检查与模板维护。内容聚焦可直接执行的规则与推荐模板。
 
 ## 适用范围
 
-当前以下 feature 的 `system prompt` 以 admin 后台配置为准：
-
-- `style-innovate`
-- `style-fusion`
-- `multi-angle`
-- `canvas-extend`
-- `hd-upscale`
-- `fabric-on-body`
-- `remove-bg`
-
-以下画布右键功能进入本套配置：
+当前以下 workflow feature 的 `system prompt` 以管理后台配置为准：
 
 - `sketch-to-design`
+- `partial-edit`
 - `style-innovate`
+- `style-fusion`
+- `series-color`
+- `directed-recolor`
+- `fabric-on-body`
+- `multi-angle`
+- `virtual-3d`
+- `face-swap`
+- `bg-swap`
+- `canvas-extend`
+- `hd-upscale`
 - `remove-bg`
+- `pattern-gen`
 
 以下功能不在本套后台 `system prompt` 中配置：
 
@@ -51,9 +53,9 @@
 - `{{model_url}}`
 - `{{pose_url}}`
 
-## 首批配置策略
+## 推荐配置策略
 
-建议优先按以下策略上线：
+建议按以下策略配置：
 
 - `sketch-to-design`：配置固定 `system prompt`，不依赖 `{{user_prompt}}`
 - `style-innovate`：配置固定 `system prompt`，只使用 `{{strength}}`

@@ -1,40 +1,53 @@
 <template>
   <div class="admin-page channels-page">
-    <div class="page-header">
-      <div>
-        <h2 class="page-title">渠道商管理</h2>
-        <p class="page-desc">维护上游渠道信息、API 地址与模型池，为账号池提供可选来源。</p>
-      </div>
-      <div class="header-side-note">
-        <span>渠道数 {{ channels.length }}</span>
-      </div>
-    </div>
-
     <div class="summary-grid">
-      <AdminSummaryCard label="总渠道" :value="channels.length" foot="当前配置" />
-      <AdminSummaryCard label="Banana" :value="bananaCount" foot="已接入类型" />
-      <AdminSummaryCard label="模型总数" :value="totalModelCount" foot="跨渠道汇总" />
-      <AdminSummaryCard label="空模型配置" :value="emptyModelCount" foot="建议补齐" />
+      <AdminSummaryCard label="总渠道" :value="channels.length" />
+      <AdminSummaryCard label="Banana" :value="bananaCount" />
+      <AdminSummaryCard label="模型总数" :value="totalModelCount" />
+      <AdminSummaryCard label="空模型配置" :value="emptyModelCount" />
     </div>
 
     <div class="toolbar">
-      <span class="toolbar-group-title">配置操作</span>
-      <n-button type="primary" @click="openAddModal">
-        <template #icon><n-icon><AddOutline /></n-icon></template>
-        新增渠道商
-      </n-button>
+      <div class="toolbar-left">
+        <n-input
+          v-model:value="searchKeyword"
+          placeholder="搜索渠道商名称..."
+          clearable
+          class="admin-search-input"
+        >
+          <template #prefix><n-icon><SearchOutline /></n-icon></template>
+        </n-input>
+        <n-button secondary class="icon-btn" @click="loadChannels">
+          <template #icon><n-icon><RefreshOutline /></n-icon></template>
+        </n-button>
+      </div>
+      <div class="toolbar-spacer" />
+      <div class="toolbar-right">
+        <n-button type="primary" @click="openAddModal">
+          <template #icon><n-icon><AddOutline /></n-icon></template>
+          新增渠道商
+        </n-button>
+      </div>
     </div>
 
-    <div class="table-card">
-      <AdminSectionHeader title="渠道商列表" description="配置删除将影响账号池新增可选项，请谨慎执行。" />
+    <div class="table-card admin-table-card">
+      <div class="admin-card-header">
+        <div class="admin-card-title-wrapper">
+          <n-icon size="18" class="admin-card-title-icon"><ListOutline /></n-icon>
+          <div>
+            <h3 class="admin-card-title">渠道商列表</h3>
+          </div>
+        </div>
+      </div>
       <n-data-table
         :columns="columns"
-        :data="channels"
+        :data="filteredChannels"
         :loading="loading"
         :pagination="false"
         :bordered="false"
         :row-key="(row: Channel) => row.id"
         size="small"
+        class="admin-table-dense"
       />
     </div>
 
@@ -70,15 +83,20 @@ import channelApi from '../../../shared/api/channel'
 import type { Channel } from '../../../shared/api/channel'
 import { NButton, NDataTable, NModal, NForm, NFormItem, NInput, NIcon, NSpace, NTag, NSelect, NDynamicTags, useMessage, useDialog } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { AddOutline } from '@vicons/ionicons5'
+import { AddOutline, RefreshOutline, ListOutline, SearchOutline } from '@vicons/ionicons5'
 import { extractApiErrorMessage, splitCommaValues } from '../shared/assetLibraryShared'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
-import AdminSectionHeader from '../shared/components/AdminSectionHeader.vue'
 
 const message = useMessage()
 const dialog = useDialog()
 const loading = ref(false)
 const channels = ref<Channel[]>([])
+const searchKeyword = ref('')
+const filteredChannels = computed(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  if (!keyword) return channels.value
+  return channels.value.filter((item) => (item.name || '').toLowerCase().includes(keyword))
+})
 const bananaCount = computed(() => channels.value.filter(item => item.type === 'banana').length)
 const emptyModelCount = computed(() => channels.value.filter(item => !item.models || !item.models.trim()).length)
 const totalModelCount = computed(() => {

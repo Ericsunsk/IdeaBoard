@@ -51,7 +51,6 @@ func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
 
 	user := &User{
 		Username:   "u1",
-		Password:   "secret",
 		Status:     1,
 		StorageUID: "ABC123",
 	}
@@ -82,7 +81,6 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 	originalUID := "ZZ9Y88"
 	first := &User{
 		Username:   "u_delete_1",
-		Password:   "secret",
 		Status:     1,
 		StorageUID: originalUID,
 	}
@@ -140,7 +138,6 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 
 	second := &User{
 		Username:   "u_delete_2",
-		Password:   "secret",
 		Status:     1,
 		StorageUID: originalUID,
 	}

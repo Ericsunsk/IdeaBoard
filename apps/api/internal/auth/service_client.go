@@ -8,14 +8,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	"api/internal/autherrors"
 	"api/internal/platform/config"
 )
 
 var (
 	ErrSessionUnauthorized = errors.New("auth session unauthorized")
+	ErrAuthUserNotFound    = autherrors.ErrAuthUserNotFound
 )
 
 type SessionIdentity struct {
@@ -128,6 +131,93 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, username, password strin
 		return nil, fmt.Errorf("auth service returned empty auth_user_id")
 	}
 	return &user, nil
+}
+
+func (c *ServiceClient) DeleteUser(ctx context.Context, authUserID string) error {
+	if c == nil {
+		return fmt.Errorf("auth service client not configured")
+	}
+	normalizedID := strings.TrimSpace(authUserID)
+	if normalizedID == "" {
+		return fmt.Errorf("auth user id is required")
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodDelete,
+		c.baseURL+"/internal/users/"+url.PathEscape(normalizedID),
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
+	var resp authServiceEnvelope
+	status, err := c.doJSON(req, &resp)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusNotFound || resp.Code == http.StatusNotFound {
+		return ErrAuthUserNotFound
+	}
+	if status != http.StatusOK {
+		if resp.Msg != "" {
+			return fmt.Errorf("auth service delete user failed: %s", resp.Msg)
+		}
+		return fmt.Errorf("auth service delete user failed with status %d", status)
+	}
+	if resp.Code != 0 {
+		return fmt.Errorf("auth service delete user rejected: %s", nonEmpty(resp.Msg, "unknown error"))
+	}
+	return nil
+}
+
+func (c *ServiceClient) SetUserRole(ctx context.Context, authUserID string, role string) error {
+	if c == nil {
+		return fmt.Errorf("auth service client not configured")
+	}
+	normalizedID := strings.TrimSpace(authUserID)
+	normalizedRole := normalizeEnsureRole(role)
+	if normalizedID == "" {
+		return fmt.Errorf("auth user id is required")
+	}
+
+	payload := map[string]any{
+		"role": normalizedRole,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPut,
+		c.baseURL+"/internal/users/"+url.PathEscape(normalizedID)+"/role",
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	var resp authServiceEnvelope
+	status, err := c.doJSON(req, &resp)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusNotFound || resp.Code == http.StatusNotFound {
+		return ErrAuthUserNotFound
+	}
+	if status != http.StatusOK {
+		if resp.Msg != "" {
+			return fmt.Errorf("auth service set user role failed: %s", resp.Msg)
+		}
+		return fmt.Errorf("auth service set user role failed with status %d", status)
+	}
+	if resp.Code != 0 {
+		return fmt.Errorf("auth service set user role rejected: %s", nonEmpty(resp.Msg, "unknown error"))
+	}
+	return nil
 }
 
 func (c *ServiceClient) doJSON(req *http.Request, out *authServiceEnvelope) (int, error) {

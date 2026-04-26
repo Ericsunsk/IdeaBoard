@@ -865,11 +865,8 @@ export function useNodeExecutors(options: UseNodeExecutorsOptions) {
 	              params: {
 	                original_image_url: connectedImage!.url,
 	                ...buildExecutionSizeParams(imageSize),
-	                mask_image_url: uploadRes.data.url,
+                mask_image_url: uploadRes.data.url,
                 use_mask: true,
-                mask_enabled: true,
-                is_masked: true,
-                local_enhance: true,
                 upscale_mode: node.upscaleMode,
                 upscale_factor: node.upscaleFactor,
                 output_format: node.outputFormat,

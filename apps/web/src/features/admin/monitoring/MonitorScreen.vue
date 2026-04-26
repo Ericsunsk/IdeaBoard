@@ -1,12 +1,5 @@
 <template>
   <div class="admin-page monitor-page">
-    <div class="page-header">
-      <div>
-        <h2 class="page-title">任务监控中心</h2>
-        <p class="page-desc">实时监控任务与账号负载。</p>
-      </div>
-    </div>
-
     <div class="summary-grid">
       <AdminSummaryCard label="等待中" :value="stats.pending" />
       <AdminSummaryCard label="执行中" :value="stats.running" />
@@ -96,17 +89,20 @@
       </div>
     </div>
 
-    <div class="tasks-section">
-      <AdminSectionHeader title="最近任务" variant="section">
-        <n-space>
-          <n-select v-model:value="filterStatus" :options="taskStatusOptions" placeholder="筛选状态" clearable style="width: 120px" />
-          <n-button @click="loadTasks">
-            <template #icon><n-icon><RefreshOutline /></n-icon></template>
-            刷新
-          </n-button>
-        </n-space>
-      </AdminSectionHeader>
-      <div class="table-card">
+    <div class="tasks-section tasks-shell">
+      <div class="table-card admin-table-card">
+        <div class="admin-card-header">
+          <div class="admin-card-title-wrapper">
+            <n-icon size="18" class="admin-card-title-icon"><ListOutline /></n-icon>
+            <h3 class="admin-card-title">最近任务</h3>
+          </div>
+          <div class="admin-card-actions">
+            <n-select v-model:value="filterStatus" :options="taskStatusOptions" placeholder="筛选状态" clearable style="width: 120px" />
+            <n-button secondary class="icon-btn" @click="loadTasks">
+              <template #icon><n-icon><RefreshOutline /></n-icon></template>
+            </n-button>
+          </div>
+        </div>
         <n-data-table
           :columns="columns"
           :data="tasks"
@@ -114,6 +110,7 @@
           :pagination="false"
           :bordered="false"
           size="small"
+          class="admin-table-dense"
         />
         <div class="pagination-wrapper">
           <n-pagination
@@ -131,7 +128,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import accountApi from '../../../shared/api/account'
 import type { Task } from '../../../shared/api/account'
-import { NIcon, NTag, NProgress, NButton, NSpace, NSelect, NDataTable, NPagination } from 'naive-ui'
+import { NIcon, NTag, NProgress, NButton, NSelect, NDataTable, NPagination } from 'naive-ui'
 import { ListOutline, PlayCircleOutline, RefreshOutline } from '@vicons/ionicons5'
 import {
   TASK_PAGE_SIZE,
@@ -290,6 +287,12 @@ onUnmounted(() => {
 
 .monitor-page {
   gap: 14px;
+}
+
+.tasks-shell {
+  border: none;
+  background: transparent;
+  padding: 0;
 }
 
 .queue-grid {

@@ -54,7 +54,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 	}{
 		{name: "canonical slug is valid", raw: "style-fusion", want: "style-fusion", ok: true},
 		{name: "remove-bg slug is valid", raw: "remove-bg", want: "remove-bg", ok: true},
-		{name: "underscore alias canonicalized", raw: "style_fusion", want: "style-fusion", ok: true},
+		{name: "underscore slug is invalid", raw: "style_fusion", want: "", ok: false},
 		{name: "unsupported slug is invalid", raw: "line-draft", want: "", ok: false},
 		{name: "invalid chars are rejected", raw: "style fusion", want: "", ok: false},
 	}
@@ -69,12 +69,11 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 	}
 }
 
-func TestApplyFeatureSystemPromptUsesAliasKeysAndIgnoresLineDraftOverride(t *testing.T) {
+func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	params := map[string]interface{}{
-		"mask_url":           "https://mask.example/a.png",
-		"mask_enabled":       true,
-		"mode":               "enhancement",
-		"line_draft_mode_id": 12,
+		"mask_image_url": "https://mask.example/a.png",
+		"use_mask":       true,
+		"upscale_mode":   "enhancement",
 	}
 
 	got := prompts.ApplyFeatureSystemPrompt(
@@ -95,21 +94,21 @@ func TestApplyFeatureSystemPromptUsesAliasKeysAndIgnoresLineDraftOverride(t *tes
 
 func TestMaskedRequestDetectionUsesCanonicalAliases(t *testing.T) {
 	hdUpscaleParams := map[string]interface{}{
-		"mask_url": "https://mask.example/1.png",
+		"mask_image_url": "https://mask.example/1.png",
 	}
 	if !prompts.IsMaskedHDUpscaleRequest(hdUpscaleParams) {
-		t.Fatalf("expected hd-upscale masked request to be detected by mask_url alias")
+		t.Fatalf("expected hd-upscale masked request to be detected by canonical mask_image_url")
 	}
 
 	fabricParams := map[string]interface{}{
-		"mask_urls": []interface{}{"https://mask.example/2.png"},
+		"mask_image_urls": []interface{}{"https://mask.example/2.png"},
 	}
 	if !prompts.IsMaskedFabricOnBodyRequest(fabricParams) {
-		t.Fatalf("expected fabric-on-body masked request to be detected by mask_urls alias")
+		t.Fatalf("expected fabric-on-body masked request to be detected by canonical mask_image_urls")
 	}
 }
 
-func TestFeatureSystemPromptDoesNotContainLegacyHiddenConstraintSnippet(t *testing.T) {
+func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) {
 	got := prompts.ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
@@ -126,7 +125,7 @@ func TestFeatureSystemPromptDoesNotContainLegacyHiddenConstraintSnippet(t *testi
 		t.Fatalf("got %q, want only configured system prompt + base prompt", got)
 	}
 	if strings.Contains(got, "【执行语义】") {
-		t.Fatalf("expected no legacy hidden constraint text, got %q", got)
+		t.Fatalf("expected no hidden constraint text, got %q", got)
 	}
 }
 
@@ -189,9 +188,9 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			userPrompt: "",
 			params: map[string]interface{}{
 				"original_image_url": "https://example.com/original.png",
-				"mask_url":           "https://example.com/mask.png",
+				"mask_image_url":     "https://example.com/mask.png",
 				"use_mask":           true,
-				"mode":               "enhancement",
+				"upscale_mode":       "enhancement",
 			},
 			template: "SYS original={{original_image_url}} mask={{mask_image_url}} use_mask={{use_mask}} mode={{upscale_mode}}",
 			want:     "SYS original=https://example.com/original.png mask=https://example.com/mask.png use_mask=true mode=enhancement",
@@ -203,7 +202,7 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			userPrompt: "把面料贴到主体上",
 			params: map[string]interface{}{
 				"original_image_url": "https://example.com/body.png",
-				"mask_url":           "https://example.com/wear-mask.png",
+				"mask_image_url":     "https://example.com/wear-mask.png",
 				"use_mask":           true,
 				"tile_mode":          "seamless",
 			},

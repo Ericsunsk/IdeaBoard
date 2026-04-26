@@ -1,20 +1,5 @@
 <template>
     <div class="admin-page storage-page">
-        <div class="page-header">
-            <div>
-                <h2 class="page-title">系统存储</h2>
-            </div>
-            <div class="header-actions">
-                <n-button
-                    type="primary"
-                    :disabled="creatableProviders.length === 0"
-                    @click="openCreate"
-                >
-                    添加存储
-                </n-button>
-            </div>
-        </div>
-
         <div class="storage-grid">
             <article
                 v-for="storage in storages"
@@ -378,10 +363,10 @@ const {
 .storage-card,
 .storage-add-card {
     min-height: 252px;
-    border-radius: 18px;
-    border: 1px solid var(--admin-border);
-    background: var(--admin-card);
-    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid var(--admin-border-soft);
+    background: var(--admin-card-strong);
+    padding: 16px;
 }
 
 .storage-card {
@@ -453,12 +438,7 @@ const {
     text-align: left;
     transition:
         border-color 0.18s ease,
-        background 0.18s ease,
-        transform 0.18s ease;
-}
-
-.storage-add-card:hover {
-    transform: translateY(-1px);
+        background 0.18s ease;
 }
 
 .storage-add-card:disabled {

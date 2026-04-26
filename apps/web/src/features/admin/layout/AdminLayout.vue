@@ -121,10 +121,6 @@ import {
     KeyOutline,
     PulseOutline,
     DocumentTextOutline,
-    ColorPaletteOutline,
-    PersonCircleOutline,
-    ImageOutline,
-    AppsOutline,
     ChatbubbleEllipsesOutline,
     CloudOutline,
 } from "@vicons/ionicons5";
@@ -199,6 +195,30 @@ const adminThemeOverrides: GlobalThemeOverrides = {
         iconColorWarning: "#fbbf24",
         iconColorError: "#fb7185",
     },
+    Input: {
+        boxShadowFocus: "none",
+        borderFocus: "1px solid #3f3f46",
+        borderHover: "1px solid #27272a",
+    },
+    Select: {
+        boxShadowActive: "none",
+        boxShadowFocus: "none",
+        borderActive: "1px solid #3f3f46",
+        borderFocus: "1px solid #3f3f46",
+        borderHover: "1px solid #27272a",
+    },
+    InputNumber: {
+        boxShadowFocus: "none",
+        borderFocus: "1px solid #3f3f46",
+        borderHover: "1px solid #27272a",
+    },
+    InternalSelectMenu: {
+        color: "#101113",
+        optionTextColor: "#a1a1aa",
+        optionTextColorActive: "#f4f4f5",
+        optionColorActive: "rgba(255, 255, 255, 0.04)",
+        optionColorPending: "rgba(255, 255, 255, 0.04)",
+    },
 };
 
 watch(
@@ -222,115 +242,60 @@ type AdminMenuItem = {
     icon: any;
 };
 
-type AdminMenuGroup = {
-    key: string;
-    label: string;
-    children: AdminMenuItem[];
-};
-
-const adminMenuGroups: AdminMenuGroup[] = [
+const adminMenuItems: AdminMenuItem[] = [
     {
-        key: "group-ops",
-        label: "运营总览",
-        children: [
-            {
-                key: "users",
-                label: "用户管理",
-                title: "用户管理",
-                icon: PeopleOutline,
-            },
-            {
-                key: "channels",
-                label: "渠道商管理",
-                title: "渠道商管理",
-                icon: LinkOutline,
-            },
-            {
-                key: "accounts",
-                label: "Banana 账号池",
-                title: "账号池管理",
-                icon: KeyOutline,
-            },
-            {
-                key: "monitor",
-                label: "任务监控",
-                title: "任务监控",
-                icon: PulseOutline,
-            },
-            {
-                key: "drawing-records",
-                label: "绘图记录",
-                title: "绘图记录",
-                icon: DocumentTextOutline,
-            },
-        ],
+        key: "users",
+        label: "用户管理",
+        title: "用户管理",
+        icon: PeopleOutline,
     },
     {
-        key: "group-assets",
-        label: "素材资产",
-        children: [
-            {
-                key: "style-cards",
-                label: "风格卡片",
-                title: "风格卡片",
-                icon: ColorPaletteOutline,
-            },
-            {
-                key: "face-library",
-                label: "人脸库",
-                title: "人脸库",
-                icon: PersonCircleOutline,
-            },
-            {
-                key: "bg-library",
-                label: "背景库",
-                title: "背景库",
-                icon: ImageOutline,
-            },
-            {
-                key: "pattern-style-library",
-                label: "风格模型库",
-                title: "风格模型库",
-                icon: AppsOutline,
-            },
-            {
-                key: "feature-prompts",
-                label: "系统提示词",
-                title: "系统提示词",
-                icon: ChatbubbleEllipsesOutline,
-            },
-        ],
+        key: "channels",
+        label: "渠道商管理",
+        title: "渠道商管理",
+        icon: LinkOutline,
     },
     {
-        key: "group-system",
-        label: "系统配置",
-        children: [
-            {
-                key: "oss-config",
-                label: "系统存储",
-                title: "系统存储",
-                icon: CloudOutline,
-            },
-        ],
+        key: "accounts",
+        label: "模型账号池",
+        title: "模型账号池",
+        icon: KeyOutline,
+    },
+    {
+        key: "monitor",
+        label: "任务监控",
+        title: "任务监控",
+        icon: PulseOutline,
+    },
+    {
+        key: "drawing-records",
+        label: "绘图记录",
+        title: "绘图记录",
+        icon: DocumentTextOutline,
+    },
+    {
+        key: "feature-prompts",
+        label: "系统提示词",
+        title: "系统提示词",
+        icon: ChatbubbleEllipsesOutline,
+    },
+    {
+        key: "oss-config",
+        label: "系统存储",
+        title: "系统存储",
+        icon: CloudOutline,
     },
 ] as const;
 
-const menuOptions = adminMenuGroups.map((group) => ({
-    label: group.label,
-    key: group.key,
-    type: "group",
-    children: group.children.map((item) => ({
-        label: item.label,
-        key: item.key,
-        icon: renderMenuIcon(item.icon),
-    })),
+const menuOptions = adminMenuItems.map((item) => ({
+    label: item.label,
+    key: item.key,
+    icon: renderMenuIcon(item.icon),
 })) as any;
 
-const pageMetaMap = adminMenuGroups.reduce<Record<string, { title: string }>>(
-    (acc, group) => {
-        group.children.forEach((item) => {
-            acc[item.key] = { title: item.title || item.label };
-        });
+const pageMetaMap = adminMenuItems.reduce<Record<string, { title: string }>>(
+    (acc, item) => {
+        acc[item.key] = { title: item.title || item.label };
         return acc;
     },
     {},
@@ -552,7 +517,35 @@ onUnmounted(() => {
     min-height: 0;
     padding: 18px 20px 22px;
     overflow-y: auto;
+    overflow-y: overlay;
     overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.admin-shell-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.admin-shell-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.admin-shell-content::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    background-clip: padding-box;
+}
+
+.admin-shell-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
+    background-clip: padding-box;
+}
+
+.admin-shell-content::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 :deep(.n-menu) {
@@ -573,6 +566,25 @@ onUnmounted(() => {
     flex: 1;
     overflow-y: auto;
     overscroll-behavior: contain;
+}
+
+.admin-shell-sider.collapsed :deep(.n-menu-item-content) {
+    grid-template-areas: "icon" !important;
+    grid-template-columns: 1fr !important;
+    justify-items: center;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.admin-shell-sider.collapsed :deep(.n-menu-item-content__icon) {
+    grid-area: icon;
+    justify-self: center;
+    margin-right: 0 !important;
+}
+
+.admin-shell-sider.collapsed :deep(.n-menu-item-content-header),
+.admin-shell-sider.collapsed :deep(.n-menu-item-content__arrow) {
+    display: none;
 }
 
 :deep(.n-menu-item-content) {

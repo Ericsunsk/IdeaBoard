@@ -1,21 +1,11 @@
 import axios from 'axios'
-import { createAdminAssetsApi } from './admin/assets'
 import { createStorageApi } from './admin/storage'
 import type {
-  CreateUserRequest,
   UserListResponse,
   User,
   ApiResponse,
 } from '../types'
 import { handleAuthFailure } from '../utils/auth'
-export type {
-  BgTemplate,
-  BgTemplateFormData,
-  FaceTemplate,
-  FaceTemplateFormData,
-  PatternStyle,
-  PatternStyleFormData,
-} from './admin/assets'
 export type {
   StorageFieldType,
   StorageProfile,
@@ -89,48 +79,12 @@ export const adminApi = {
 
   getUsers: (params: { keyword?: string; page?: number; page_size?: number }): Promise<ApiResponse<UserListResponse>> =>
     api.get('/admin/users', { params }) as any,
-  createUser: (data: CreateUserRequest): Promise<ApiResponse<{ user: User }>> =>
-    api.post('/admin/users', data) as any,
   updateUserStatus: (id: number, status: number): Promise<ApiResponse<null>> =>
     api.put('/admin/users/' + id + '/status', { status }) as any,
+  updateUserRole: (id: number, role: 'admin' | 'user'): Promise<ApiResponse<null>> =>
+    api.put('/admin/users/' + id + '/role', { role }) as any,
   deleteUser: (id: number): Promise<ApiResponse<null>> =>
     api.delete('/admin/users/' + id) as any,
-}
-
-// ============ 风格卡片 API ============
-
-export interface StyleCard {
-  id: number
-  name: string
-  cover_image: string
-  keywords?: string
-  sort_order: number
-  is_enabled: boolean
-  is_exclusive: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface StyleCardFormData {
-  name: string
-  cover_image: string
-  keywords: string
-  sort_order: number
-  is_enabled: boolean
-  is_exclusive: boolean
-}
-
-export const styleCardApi = {
-  getEnabled: (): Promise<ApiResponse<{ list: StyleCard[] }>> =>
-    api.get('/user/style-cards') as any,
-  getList: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: StyleCard[]; total: number }>> =>
-    api.get('/admin/style-cards', { params }) as any,
-  create: (data: StyleCardFormData): Promise<ApiResponse<{ card: StyleCard }>> =>
-    api.post('/admin/style-cards', data) as any,
-  update: (id: number, data: StyleCardFormData): Promise<ApiResponse<{ card: StyleCard }>> =>
-    api.put('/admin/style-cards/' + id, data) as any,
-  delete: (id: number): Promise<ApiResponse<null>> =>
-    api.delete('/admin/style-cards/' + id) as any,
 }
 
 // ============ 账号管理 API ============
@@ -210,7 +164,6 @@ export interface Task {
 
 export interface SubmitTaskData {
   prompt: string
-  card_ids?: number[]
   feature?: string
   image_urls?: string[]
   params?: Record<string, any>
@@ -224,11 +177,6 @@ export const featurePromptApi = {
   adminSet: (slug: string, prompt: string): Promise<ApiResponse<{ slug: string; prompt: string }>> =>
     api.put('/admin/feature-prompts/' + slug, { prompt }) as any,
 }
-
-const adminAssetsApi = createAdminAssetsApi(api)
-export const faceTemplateApi = adminAssetsApi.faceTemplateApi
-export const bgTemplateApi = adminAssetsApi.bgTemplateApi
-export const patternStyleApi = adminAssetsApi.patternStyleApi
 
 // ============ 渠道商 API ============
 

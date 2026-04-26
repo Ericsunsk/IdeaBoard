@@ -13,8 +13,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const betterAuthManagedPasswordPlaceholder = "__better_auth_managed__"
-
 // AuthMiddleware 认证中间件：通过 Better Auth session 校验并映射本地业务用户。
 func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -103,7 +101,6 @@ func resolveLocalUserByAuthIdentity(userRepo *users.UserRepository, identity *Se
 		localUser := &users.User{
 			Username:   candidateUsername,
 			AuthUserID: ptrString(authUserID),
-			Password:   betterAuthManagedPasswordPlaceholder,
 			Status:     1,
 			Role:       "user",
 		}

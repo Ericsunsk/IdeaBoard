@@ -3,11 +3,7 @@
 .accounts-page,
 .channels-page,
 .monitor-page,
-.records-page,
-.style-cards-page,
-.face-library-page,
-.bg-library-page,
-.pattern-style-library-page {
+.records-page {
   --admin-bg: #09090b;
   --admin-card: #111214;
   --admin-card-strong: #141416;
@@ -127,6 +123,49 @@
   background: var(--admin-card);
 }
 
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.admin-search-input {
+  width: 260px;
+  max-width: 100%;
+}
+
+.admin-search-input :deep(.n-input) {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.icon-btn {
+  border-radius: 12px;
+  min-width: 38px;
+}
+
+.control-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+}
+
+.control-label {
+  font-size: 13px;
+  color: var(--admin-text-2);
+  font-weight: 500;
+}
+
 .toolbar-group-title {
   color: var(--admin-text-3);
   font-size: 12px;
@@ -152,6 +191,86 @@
 .tasks-section:hover,
 .table-section:hover {
   border-color: #2e3034;
+}
+
+.admin-table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-card-header {
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.admin-card-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-card-title-icon {
+  color: var(--admin-text-2);
+  display: flex;
+  flex-shrink: 0;
+}
+
+.admin-card-title {
+  margin: 0;
+  color: var(--admin-text-1);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.admin-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-table-container {
+  padding: 0;
+}
+
+.admin-popover-panel {
+  border-radius: 16px !important;
+  padding: 0 !important;
+  border: 1px solid var(--admin-border) !important;
+  background: var(--admin-card) !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.admin-compact-table :deep(.n-data-table-thead),
+.admin-compact-table :deep(thead) {
+  display: none !important;
+}
+
+.admin-compact-table :deep(.n-data-table-td) {
+  padding: 8px 24px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  background-color: transparent !important;
+}
+
+.admin-compact-table :deep(.n-data-table-tr:hover .n-data-table-td) {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+.admin-compact-table :deep(.n-data-table-tr:last-child .n-data-table-td) {
+  border-bottom: none !important;
+}
+
+.admin-table-dense :deep(.n-data-table-th),
+.admin-table-dense :deep(.n-data-table-td) {
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
 }
 
 .panel-header,
@@ -439,7 +558,9 @@ h3 {
   --n-color-focus: #151618;
   --n-border: 1px solid #2b2c2f;
   --n-border-hover: 1px solid #3a3b40;
-  --n-border-focus: 1px solid #e4e4e7;
+  --n-border-focus: 1px solid #3a3b40;
+  --n-box-shadow-focus: none;
+  --n-box-shadow-active: none;
   --n-text-color: #f4f4f5;
   --n-placeholder-color: #6b6b71;
   border-radius: 12px;
@@ -454,6 +575,26 @@ h3 {
 :deep(.n-base-selection:hover),
 :deep(.n-input-number:hover) {
   box-shadow: none;
+}
+
+:deep(.n-input.n-input--focus),
+:deep(.n-base-selection.n-base-selection--focus),
+:deep(.n-base-selection.n-base-selection--active),
+:deep(.n-input-number.n-input-number--focus),
+:deep(.n-input:focus),
+:deep(.n-input:focus-visible),
+:deep(.n-base-selection:focus),
+:deep(.n-base-selection:focus-visible),
+:deep(.n-input-number:focus),
+:deep(.n-input-number:focus-visible) {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+:deep(.n-input .n-input-wrapper),
+:deep(.n-base-selection .n-base-selection-label),
+:deep(.n-input-number .n-input-wrapper) {
+  box-shadow: none !important;
 }
 
 :deep(.n-button) {
@@ -553,6 +694,46 @@ h3 {
 :deep(.n-switch) {
   --n-rail-color: #3f3f46;
   --n-rail-color-active: #f4f4f5;
+  --n-box-shadow-focus: none;
+  --n-box-shadow: none;
+}
+
+:deep(.n-switch:focus),
+:deep(.n-switch:focus-visible),
+:deep(.n-switch.n-switch--focus),
+:deep(.n-switch .n-switch__rail),
+:deep(.n-switch .n-switch__button),
+:deep(.n-button:focus),
+:deep(.n-button:focus-visible),
+:deep(.n-button.n-button--focus),
+:deep(.n-checkbox:focus),
+:deep(.n-checkbox:focus-visible),
+:deep(.n-radio:focus),
+:deep(.n-radio:focus-visible) {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+:deep(.n-input .n-input__state-border),
+:deep(.n-base-selection .n-base-selection__state-border),
+:deep(.n-input-number .n-input__state-border),
+:deep(.n-button .n-button__state-border),
+:deep(.n-checkbox .n-checkbox-box),
+:deep(.n-radio .n-radio__dot),
+:deep(.n-radio-button .n-radio-button__state-border) {
+  box-shadow: none !important;
+}
+
+:deep(.n-button) {
+  --n-ripple-color: transparent;
+}
+
+:deep(.n-menu-item-content:focus),
+:deep(.n-menu-item-content:focus-visible),
+:deep(.n-base-selection-menu .n-base-select-option:focus),
+:deep(.n-base-selection-menu .n-base-select-option:focus-visible) {
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 :deep(.n-tag) {
@@ -628,6 +809,11 @@ h3 {
   .toolbar {
     padding: 10px;
   }
+
+  .admin-search-input {
+    width: 100%;
+    flex: 1;
+  }
 }
 
 @media (max-width: 720px) {
@@ -655,5 +841,23 @@ h3 {
 
   .field-row {
     flex-direction: column;
+  }
+
+  .toolbar {
+    gap: 12px;
+  }
+
+  .toolbar-left,
+  .toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-card-header {
+    padding: 12px 14px;
+  }
+
+  .admin-compact-table :deep(.n-data-table-td) {
+    padding: 8px 14px !important;
   }
 }

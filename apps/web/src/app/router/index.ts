@@ -90,12 +90,6 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'style-cards',
-        name: 'AdminStyleCards',
-        component: () => import('../../pages/admin/AdminStyleCardsPage.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
         path: 'drawing-records',
         name: 'AdminDrawingRecords',
         component: () => import('../../pages/admin/AdminDrawingRecordsPage.vue'),
@@ -111,24 +105,6 @@ const routes: RouteRecordRaw[] = [
         path: 'oss-config',
         name: 'AdminOSSConfig',
         component: () => import('../../pages/admin/AdminStoragePage.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: 'face-library',
-        name: 'AdminFaceLibrary',
-        component: () => import('../../pages/admin/AdminFaceLibraryPage.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: 'bg-library',
-        name: 'AdminBgLibrary',
-        component: () => import('../../pages/admin/AdminBgLibraryPage.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: 'pattern-style-library',
-        name: 'AdminPatternStyleLibrary',
-        component: () => import('../../pages/admin/AdminPatternStyleLibraryPage.vue'),
         meta: { requiresAuth: true }
       },
       {

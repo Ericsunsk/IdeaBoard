@@ -4,33 +4,6 @@ import (
 	"testing"
 )
 
-func TestCanonicalizeStorageProfileMigratesLegacyAliyunProvider(t *testing.T) {
-	provider, migrated, changed := canonicalizeStorageProfile(StorageProvider("aliyun-oss"), map[string]interface{}{
-		"access_key_id":     "test-ak",
-		"access_key_secret": "test-sk",
-		"bucket_name":       "feng-assets",
-		"endpoint":          "oss-cn-shanghai.aliyuncs.com",
-		"region_id":         "cn-shanghai",
-		"access_domain":     "https://feng-assets.oss-cn-shanghai.aliyuncs.com",
-	})
-
-	if provider != StorageProviderS3Compatible {
-		t.Fatalf("provider = %q, want %q", provider, StorageProviderS3Compatible)
-	}
-	if !changed {
-		t.Fatalf("expected legacy aliyun provider migration to report changed=true")
-	}
-	if got := configString(migrated, "secret_access_key"); got != "test-sk" {
-		t.Fatalf("secret_access_key = %q, want %q", got, "test-sk")
-	}
-	if got := configString(migrated, "access_key_secret"); got != "" {
-		t.Fatalf("access_key_secret should be removed after migration, got %q", got)
-	}
-	if configBool(migrated, "force_path_style") {
-		t.Fatalf("force_path_style should default to false")
-	}
-}
-
 func TestCanonicalizeStorageProfileKeepsCurrentS3CompatibleConfig(t *testing.T) {
 	original := map[string]interface{}{
 		"access_key_id":     "test-ak",

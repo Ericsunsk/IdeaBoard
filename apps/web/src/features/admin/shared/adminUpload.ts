@@ -1,5 +1,3 @@
-import { computed } from 'vue'
-
 import {
   ADMIN_UPLOAD_ENDPOINT,
   UPLOAD_FAILED_MESSAGE,
@@ -10,12 +8,6 @@ type UploadResponse = {
   code?: number
   msg?: string
   data?: { url?: string }
-}
-
-export const adminUploadAction = ADMIN_UPLOAD_ENDPOINT
-
-export function useAdminUploadHeaders() {
-  return computed(() => ({}))
 }
 
 export function parseAdminUploadResponse(event?: ProgressEvent): UploadResponse {

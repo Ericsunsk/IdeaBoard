@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/assets"
 	"api/internal/platform/redis"
 	"api/internal/platform/settings"
 	"api/internal/prompts"
@@ -23,7 +22,6 @@ type AccountService struct {
 	taskRepo         *TaskRepository
 	redisMgr         *redis.RedisManager
 	taskRuntime      *TaskRuntimeService
-	cardService      *assets.StyleCardService
 	systemConfigRepo *settings.SystemConfigRepository
 	previewResolver  previewURLResolver
 }
@@ -40,7 +38,6 @@ func NewAccountService(
 	accountRepo *AccountRepository,
 	taskRepo *TaskRepository,
 	redisMgr *redis.RedisManager,
-	cardService *assets.StyleCardService,
 	systemConfigRepo *settings.SystemConfigRepository,
 	previewResolver previewURLResolver,
 ) *AccountService {
@@ -49,7 +46,6 @@ func NewAccountService(
 		taskRepo:         taskRepo,
 		redisMgr:         redisMgr,
 		taskRuntime:      NewTaskRuntimeService(accountRepo, taskRepo, redisMgr),
-		cardService:      cardService,
 		systemConfigRepo: systemConfigRepo,
 		previewResolver:  previewResolver,
 	}
@@ -263,14 +259,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	}
 	req.Params = params
 
-	// 使用风格卡片拼接完整提示词
 	fullPrompt := req.Prompt
-	if req.CardIDs != nil && len(req.CardIDs) > 0 {
-		p, err := s.cardService.BuildPrompt(req.Prompt, req.CardIDs)
-		if err == nil {
-			fullPrompt = p
-		}
-	}
 
 	featureSlug := ""
 	if req.Params != nil {
@@ -295,13 +284,6 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	})
 	if err := validateExecutablePrompt(fullPrompt); err != nil {
 		return "", err
-	}
-
-	// line-draft 已退休：line_draft_mode_id 不再参与系统提示词主链覆盖。
-	if req.Params != nil {
-		if _, exists := req.Params["line_draft_mode_id"]; exists {
-			// 保留参数透传，避免破坏旧调用方；这里只显式不再介入 fullPrompt 优先级。
-		}
 	}
 
 	// 序列化参数

@@ -94,8 +94,16 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 │   └── systemd/
 │       ├── ideaboard.service
 │       └── ideaboard-auth.service
+├── docs/
+│   ├── AUTH_OPERATION_RUNBOOK.md
+│   ├── architecture-constraints.md
+│   └── assets/
+├── docker/
+│   └── README.md
 ├── README.md
 ├── DEVELOPMENT.md
+├── SYSTEM_PROMPT.md
+├── CHANGELOG.md
 └── DEPLOYMENT.md
 ```
 
@@ -261,7 +269,7 @@ npm prune --omit=dev
 > [!IMPORTANT]
 > Better Auth 会在同一个 MySQL 库里维护 `user/session/account/verification` 等认证表。`npm run migrate:dist` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
 >
-> 后台 `用户管理` 页当前支持：身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、开放注册开关、防刷限流设置；不开放物理删号与后台改密。限流配置来源于后台设置并写入 `system_configs`，不通过环境变量注入。
+> 后台 `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销、开放注册开关、防刷限流设置；不开放后台改密。角色升降级与彻底注销均由 Go Admin API 编排，并依赖 `AUTH_SERVICE_INTERNAL_KEY` 调用 Auth Service internal endpoint；限流配置来源于后台设置并写入 `system_configs`，不通过环境变量注入。
 
 ### 3. 配置 systemd
 
@@ -414,7 +422,7 @@ nginx -t && systemctl reload nginx
 如果新版本异常：
 
 1. 回到 `/opt/ideaboard/releases/` 中上一个版本目录。
-2. 重新复制旧版 `apps`、`deploy`。
+2. 重新复制上一版本的 `apps`、`deploy`。
 3. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && npm run migrate:dist && npm prune --omit=dev`。
 4. 执行 `systemctl restart ideaboard-auth ideaboard`。
 5. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。

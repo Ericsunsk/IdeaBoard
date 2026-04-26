@@ -153,6 +153,63 @@ app.post('/internal/users/ensure', requireInternalKey, async (req, res) => {
   }
 })
 
+app.put('/internal/users/:id/role', requireInternalKey, async (req, res) => {
+  const authUserID = String(req.params?.id || '').trim()
+  const role = normalizeAuthRole(req.body?.role)
+  if (!authUserID) {
+    sendError(res, 400, 'auth user id is required')
+    return
+  }
+  if (authUserID.length > 191) {
+    sendError(res, 400, 'auth user id is invalid')
+    return
+  }
+  if (!role) {
+    sendError(res, 400, 'role must be admin or user')
+    return
+  }
+
+  try {
+    const updated = await updateAuthUserRole(authUserID, role)
+    if (!updated) {
+      sendError(res, 404, 'auth user not found')
+      return
+    }
+    sendSuccess(res, {
+      auth_user_id: authUserID,
+      role,
+    })
+  } catch (error) {
+    sendError(res, 500, extractErrorMessage(error, 'failed to update auth user role'))
+  }
+})
+
+app.delete('/internal/users/:id', requireInternalKey, async (req, res) => {
+  const authUserID = String(req.params?.id || '').trim()
+  if (!authUserID) {
+    sendError(res, 400, 'auth user id is required')
+    return
+  }
+  if (authUserID.length > 191) {
+    sendError(res, 400, 'auth user id is invalid')
+    return
+  }
+
+  try {
+    const deleted = await removeAuthUserCascade(authUserID)
+    if (!deleted) {
+      sendError(res, 404, 'auth user not found')
+      return
+    }
+    sendSuccess(res, {
+      deleted: true,
+      auth_user_id: authUserID,
+    })
+  } catch (error) {
+    sendError(res, 500, extractErrorMessage(error, 'failed to delete auth user'))
+  }
+})
+
 if (isProductionRuntime() && !env.auth.internalKey) {
   throw new Error('AUTH_INTERNAL_KEY is required when NODE_ENV=production')
 }
@@ -422,5 +479,46 @@ async function findUserByUsernameOrEmail(username: string, email: string): Promi
 }
 
 async function syncAuthUserRole(authUserID: string, role: 'admin' | 'user') {
-  await authDB.query('UPDATE `user` SET `role` = ? WHERE id = ? LIMIT 1', [role, authUserID])
+  await updateAuthUserRole(authUserID, role)
+}
+
+async function updateAuthUserRole(authUserID: string, role: 'admin' | 'user'): Promise<boolean> {
+  const [result] = await authDB.query('UPDATE `user` SET `role` = ? WHERE id = ? LIMIT 1', [role, authUserID])
+  return Number((result as any)?.affectedRows || 0) > 0
+}
+
+async function removeAuthUserCascade(authUserID: string): Promise<boolean> {
+  const conn = await authDB.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [rows] = await conn.query(
+      'SELECT id, email, username FROM `user` WHERE id = ? LIMIT 1',
+      [authUserID],
+    )
+    if (!Array.isArray(rows) || rows.length === 0) {
+      await conn.rollback()
+      return false
+    }
+
+    const row = rows[0] as any
+    const email = typeof row?.email === 'string' ? row.email.trim() : ''
+    const username = typeof row?.username === 'string' ? row.username.trim() : ''
+
+    await conn.query('DELETE FROM `session` WHERE userId = ?', [authUserID])
+    await conn.query('DELETE FROM `account` WHERE userId = ?', [authUserID])
+
+    const verificationIdentifiers = [email, username, authUserID].filter(Boolean)
+    if (verificationIdentifiers.length > 0) {
+      await conn.query('DELETE FROM `verification` WHERE identifier IN (?)', [verificationIdentifiers])
+    }
+
+    await conn.query('DELETE FROM `user` WHERE id = ? LIMIT 1', [authUserID])
+    await conn.commit()
+    return true
+  } catch (error) {
+    await conn.rollback()
+    throw error
+  } finally {
+    conn.release()
+  }
 }

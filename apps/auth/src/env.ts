@@ -16,30 +16,6 @@ function getEnvInt(name: string, fallback: number): number {
   return value
 }
 
-function getEnvBool(name: string, fallback: boolean): boolean {
-  const raw = getEnv(name, '')
-  if (!raw) return fallback
-  switch (raw.toLowerCase()) {
-    case '1':
-    case 'true':
-    case 'yes':
-    case 'on':
-      return true
-    case '0':
-    case 'false':
-    case 'no':
-    case 'off':
-      return false
-    default:
-      return fallback
-  }
-}
-
-function isProductionRuntime(): boolean {
-  const value = getEnv('NODE_ENV', getEnv('APP_ENV', '')).toLowerCase()
-  return value === 'production' || value === 'prod' || value === 'release'
-}
-
 const trustedOrigins = getEnv('AUTH_TRUSTED_ORIGINS', '')
   .split(',')
   .map((item) => item.trim())

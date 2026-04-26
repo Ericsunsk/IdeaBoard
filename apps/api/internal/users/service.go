@@ -4,15 +4,7 @@ import (
 	"errors"
 	"log"
 	"strings"
-
-	"golang.org/x/crypto/bcrypt"
 )
-
-var reservedUsernames = map[string]struct{}{
-	"admin":  {},
-	"root":   {},
-	"system": {},
-}
 
 type UserService struct {
 	repo             *UserRepository
@@ -34,142 +26,9 @@ func NewUserService(repo *UserRepository, workspaceCleaner ...UserWorkspaceClean
 	}
 }
 
-// Register 用户注册
-func (s *UserService) Register(req *RegisterRequest) (*User, error) {
-	if isReservedUsername(req.Username) {
-		return nil, errors.New("用户名不可用")
-	}
-
-	// 检查用户名是否已存在
-	exists, err := s.repo.ExistsUsername(req.Username)
-	if err != nil {
-		return nil, errors.New("注册失败，请稍后重试")
-	}
-	if exists {
-		return nil, errors.New("用户名已存在")
-	}
-
-	// 加密密码
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, errors.New("注册失败，请稍后重试")
-	}
-
-	// 创建用户
-	user := &User{
-		Username: req.Username,
-		Password: string(hashedPassword),
-		Status:   1,
-	}
-
-	if err := s.repo.Create(user); err != nil {
-		return nil, errors.New("注册失败，请稍后重试")
-	}
-
-	return user, nil
-}
-
-// Login 用户登录
-func (s *UserService) Login(req *LoginRequest) (*User, error) {
-	user, err := s.repo.GetByUsername(req.Username)
-	if err != nil {
-		return nil, errors.New("用户名或密码错误")
-	}
-
-	// 验证密码
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, errors.New("用户名或密码错误")
-	}
-
-	// 检查用户状态
-	if user.Status == 0 {
-		return nil, errors.New("账号已被封禁")
-	}
-
-	return user, nil
-}
-
 // GetByID 根据ID获取用户
 func (s *UserService) GetByID(id uint64) (*User, error) {
 	return s.repo.GetByID(id)
-}
-
-// UpdatePassword 修改密码
-func (s *UserService) UpdatePassword(userID uint64, oldPassword, newPassword string) error {
-	user, err := s.repo.GetByID(userID)
-	if err != nil {
-		return errors.New("用户不存在")
-	}
-
-	// 验证旧密码
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
-		return errors.New("原密码错误")
-	}
-
-	// 加密新密码
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return errors.New("密码更新失败，请稍后重试")
-	}
-
-	if err := s.repo.UpdatePassword(userID, string(hashedPassword)); err != nil {
-		return errors.New("密码更新失败，请稍后重试")
-	}
-	return nil
-}
-
-// AdminUpdatePassword 管理员修改用户密码
-func (s *UserService) AdminUpdatePassword(userID uint64, newPassword string) error {
-	user, err := s.repo.GetByID(userID)
-	if err != nil {
-		return errors.New("用户不存在")
-	}
-
-	// 加密新密码
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return errors.New("用户操作失败，请稍后重试")
-	}
-
-	if err := s.repo.UpdatePassword(user.ID, string(hashedPassword)); err != nil {
-		return errors.New("用户操作失败，请稍后重试")
-	}
-	return nil
-}
-
-// CreateUser 管理员创建用户
-func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
-	if isReservedUsername(req.Username) {
-		return nil, errors.New("用户名不可用")
-	}
-
-	// 检查用户名是否已存在
-	exists, err := s.repo.ExistsUsername(req.Username)
-	if err != nil {
-		return nil, errors.New("用户操作失败，请稍后重试")
-	}
-	if exists {
-		return nil, errors.New("用户名已存在")
-	}
-
-	// 加密密码
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, errors.New("用户操作失败，请稍后重试")
-	}
-
-	// 创建用户
-	user := &User{
-		Username: req.Username,
-		Password: string(hashedPassword),
-		Status:   1,
-	}
-
-	if err := s.repo.Create(user); err != nil {
-		return nil, errors.New("用户操作失败，请稍后重试")
-	}
-
-	return user, nil
 }
 
 // ListUsers 获取用户列表
@@ -201,6 +60,15 @@ func (s *UserService) UpdateStatus(userID uint64, status int8) error {
 	return s.repo.UpdateStatus(userID, status)
 }
 
+func (s *UserService) UpdateRole(userID uint64, role string) error {
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	if normalizedRole != "admin" && normalizedRole != "user" {
+		return errors.New("角色值无效，仅支持 admin 或 user")
+	}
+
+	return s.repo.UpdateRoleByID(userID, normalizedRole)
+}
+
 // DeleteUser 删除用户
 func (s *UserService) DeleteUser(userID uint64) error {
 	targetUser, err := s.repo.GetByID(userID)
@@ -216,18 +84,4 @@ func (s *UserService) DeleteUser(userID uint64) error {
 	}
 
 	return s.repo.Delete(userID)
-}
-
-// HashPassword 哈希密码（用于初始化）
-func (s *UserService) HashPassword(password string) (string, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hashedPassword), nil
-}
-
-func isReservedUsername(username string) bool {
-	_, ok := reservedUsernames[strings.ToLower(strings.TrimSpace(username))]
-	return ok
 }

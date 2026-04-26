@@ -94,12 +94,40 @@ const modalStyle = computed(() => {
   width: min(980px, 100%);
   max-height: calc(100vh - 48px);
   overflow: auto;
+  overflow: overlay;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   position: relative;
   border-radius: 28px;
   border: 1px solid var(--admin-border);
   background: rgba(18, 18, 20, 0.98);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
   padding: 28px 28px 24px;
+}
+
+.admin-editor-modal::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.admin-editor-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-editor-modal::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  background-clip: padding-box;
+}
+
+.admin-editor-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+  background-clip: padding-box;
+}
+
+.admin-editor-modal::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .admin-editor-close {

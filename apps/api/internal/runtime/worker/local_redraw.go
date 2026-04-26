@@ -226,28 +226,24 @@ func readLocalRedrawOriginalImageRef(params map[string]interface{}) (string, boo
 }
 
 func readLocalRedrawMaskRef(params map[string]interface{}) (string, bool) {
-	for _, key := range []string{"mask_image_url", "mask_url"} {
-		if ref, ok := workflow.ReadWorkflowStringParam(params, key); ok {
-			return ref, true
-		}
+	if ref, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
+		return ref, true
 	}
-	for _, key := range []string{"mask_image_urls", "mask_urls"} {
-		switch values := params[key].(type) {
-		case []string:
-			for _, value := range values {
-				if trimmed := strings.TrimSpace(value); trimmed != "" {
-					return trimmed, true
-				}
+	switch values := params["mask_image_urls"].(type) {
+	case []string:
+		for _, value := range values {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				return trimmed, true
 			}
-		case []interface{}:
-			for _, value := range values {
-				text, ok := value.(string)
-				if !ok {
-					continue
-				}
-				if trimmed := strings.TrimSpace(text); trimmed != "" {
-					return trimmed, true
-				}
+		}
+	case []interface{}:
+		for _, value := range values {
+			text, ok := value.(string)
+			if !ok {
+				continue
+			}
+			if trimmed := strings.TrimSpace(text); trimmed != "" {
+				return trimmed, true
 			}
 		}
 	}
@@ -277,12 +273,7 @@ func stripLocalRedrawMaskParams(params map[string]interface{}) {
 	for _, key := range []string{
 		"mask_image_url",
 		"mask_image_urls",
-		"mask_url",
-		"mask_urls",
 		"use_mask",
-		"mask_enabled",
-		"is_masked",
-		"masked",
 	} {
 		delete(params, key)
 	}

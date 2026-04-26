@@ -22,7 +22,7 @@ func TestFilterAccountsByFeatureSupportsExplicitAllowList(t *testing.T) {
 	accounts := []*ApiAccount{
 		{ID: 1, ExtraConfig: `{"features":["canvas-extend","hd-upscale"]}`},
 		{ID: 2, ExtraConfig: `{"features":["style-fusion"]}`},
-		{ID: 3, ExtraConfig: `{"enabled_features":{"canvas_extend":true,"style-fusion":false}}`},
+		{ID: 3, ExtraConfig: `{"timeout":120}`},
 	}
 
 	got := filterAccountsByFeature(accounts, workflow.FeatureSlugCanvasExtend)
@@ -37,8 +37,8 @@ func TestFilterAccountsByFeatureSupportsExplicitAllowList(t *testing.T) {
 func TestFilterAccountsByFeatureSupportsExplicitBlockList(t *testing.T) {
 	accounts := []*ApiAccount{
 		{ID: 1, ExtraConfig: `{"disabled_features":["canvas-extend"]}`},
-		{ID: 2, ExtraConfig: `{"feature_blacklist":"style-fusion, canvas-extend"}`},
-		{ID: 3, ExtraConfig: `{"supported_features":["canvas-extend"],"disabled_features":["style-fusion"]}`},
+		{ID: 2, ExtraConfig: `{"disabled_features":"style-fusion, canvas-extend"}`},
+		{ID: 3, ExtraConfig: `{"features":["canvas-extend"],"disabled_features":["style-fusion"]}`},
 	}
 
 	got := filterAccountsByFeature(accounts, workflow.FeatureSlugCanvasExtend)
@@ -53,7 +53,7 @@ func TestFilterAccountsByFeatureSupportsExplicitBlockList(t *testing.T) {
 func TestFilterAccountsByFeatureIgnoresMalformedFeatureConfig(t *testing.T) {
 	accounts := []*ApiAccount{
 		{ID: 1, ExtraConfig: `{"features":123}`},
-		{ID: 2, ExtraConfig: `{"supported_features":{"not-a-feature":true}}`},
+		{ID: 2, ExtraConfig: `{"features":{"not-a-feature":true}}`},
 	}
 
 	got := filterAccountsByFeature(accounts, workflow.FeatureSlugCanvasExtend)

@@ -10,9 +10,9 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 		ok   bool
 	}{
 		{name: "canonical slug", raw: FeatureSlugStyleFusion, want: FeatureSlugStyleFusion, ok: true},
-		{name: "underscore alias", raw: "style_fusion", want: FeatureSlugStyleFusion, ok: true},
-		{name: "mixed case", raw: "  HD_Upscale  ", want: FeatureSlugHDUpscale, ok: true},
-		{name: "legacy feature is not in allowlist", raw: "legacy-feature", want: "", ok: false},
+		{name: "underscore slug is rejected", raw: "style_fusion", want: "", ok: false},
+		{name: "mixed case is rejected", raw: "  HD_Upscale  ", want: "", ok: false},
+		{name: "unknown feature is not in allowlist", raw: "unknown-feature", want: "", ok: false},
 		{name: "unsupported slug", raw: "line-draft", want: "", ok: false},
 		{name: "invalid characters", raw: "style fusion", want: "", ok: false},
 		{name: "empty", raw: "", want: "", ok: false},
@@ -57,27 +57,6 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	}
 }
 
-func TestNormalizeWorkflowFeatureSlugOrFallback(t *testing.T) {
-	tests := []struct {
-		name     string
-		raw      string
-		fallback string
-		want     string
-	}{
-		{name: "returns canonical when valid", raw: "canvas_extend", fallback: "fallback", want: FeatureSlugCanvasExtend},
-		{name: "returns fallback when invalid", raw: "not-supported", fallback: FeatureSlugStyleFusion, want: FeatureSlugStyleFusion},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NormalizeWorkflowFeatureSlugOrFallback(tt.raw, tt.fallback)
-			if got != tt.want {
-				t.Fatalf("raw=%q fallback=%q got=%q, want=%q", tt.raw, tt.fallback, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestResolveWorkflowFeatureSlug(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -86,8 +65,8 @@ func TestResolveWorkflowFeatureSlug(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "missing feature returns empty", params: map[string]interface{}{}, want: "", wantErr: false},
-		{name: "feature alias key", params: map[string]interface{}{"feature_slug": "STYLE_FUSION"}, want: FeatureSlugStyleFusion, wantErr: false},
-		{name: "unsupported feature returns error", params: map[string]interface{}{"feature": "legacy-feature"}, want: "", wantErr: true},
+		{name: "canonical feature key", params: map[string]interface{}{"feature": FeatureSlugStyleFusion}, want: FeatureSlugStyleFusion, wantErr: false},
+		{name: "unsupported feature returns error", params: map[string]interface{}{"feature": "unknown-feature"}, want: "", wantErr: true},
 	}
 
 	for _, tt := range tests {

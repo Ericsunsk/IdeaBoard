@@ -30,7 +30,7 @@
 <a id="development-snapshot"></a>
 ## 开发概览
 
-IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = 一个孤立功能模块”的方式组织产品语义。开发时应优先遵守 workflow feature contract、执行链 contract 和提示词模板 contract。
+IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵守 workflow feature contract、执行链 contract 和提示词模板 contract。
 
 ### 当前速览
 
@@ -115,11 +115,11 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 
 ### 契约规则
 
-- `feature` 应作为顶层任务字段传递，并在后端统一 canonicalize。
+- `feature` 应作为顶层任务字段传递，并在后端统一校验。
 - `image_urls` 应作为顶层任务字段传递，不再在 `params` 里双轨存放。
 - `params` 只承载 feature 专属参数，不再额外复制 `feature` 与 `image_urls`。
-- `mask`、`use_mask`、`upscale_mode` 等兼容别名由后端统一读取 canonical key。
-- 不保留已退休 feature 的产品文案与模板兼容。
+- 工作流参数只接受最新 canonical key，例如 `feature`、`use_mask`、`mask_image_url`、`mask_image_urls`、`upscale_mode`。
+- 已下线能力不进入产品文案、展示分组或模板 contract。
 
 对应实现：
 
@@ -161,7 +161,7 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 ### 后端流程
 
 1. 标准化 `feature` 与关键参数。
-2. 基于风格卡与系统提示词模板生成最终 prompt。
+2. 基于系统提示词模板生成最终 prompt。
 3. 写入任务表并推入 Redis 队列。
 4. Worker 从队列消费任务并调度可用账号。
 5. 调用上游渠道商接口。
@@ -180,8 +180,8 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 
 ### 核心规则
 
-- `feature slug` 是唯一索引，不再维护旧兼容名称。
-- `{{user_prompt}}` 是用户输入信号，不与旧线稿模板主链混写。
+- `feature slug` 是唯一索引，只接受当前 canonical slug。
+- `{{user_prompt}}` 是用户输入信号，与系统提示词模板分层装配。
 - `mode -> template` 映射仅保留必要项。
 - 执行语义相关 hidden constraint 由后端在特定 feature 下追加。
 
@@ -215,8 +215,10 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 - 可在管理后台通过“开放注册”开关实时控制注册入口，状态持久化在 `system_configs` 表中。
 - 可在管理后台通过“防刷限流设置”调整登录/注册入口限流参数，配置落在 `system_configs`（`auth_rate_limit_window`、`auth_rate_limit_max_requests`）。
 - `apps/auth` 对 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 启用基于来源 IP 的内存限流；反向代理场景优先读取 `x-forwarded-for` 的首个 IP。
-- `用户管理` 页当前支持：身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装；不开放物理删号与后台改密。
-- 账号安全运维边界见 [AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)，遵循“业务治理在 Admin、已上线的身份侧操作在用户管理页（Better Auth Admin plugin）”。
+- `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销；不开放后台改密。
+- 角色升降级必须经由 Go Admin API：前端不直连 `authClient.admin.setRole`，由 Go 校验后同步 Auth Service 与业务侧 `users.role`。
+- 彻底注销必须经由 Go Admin API：先校验目标不是当前管理员/管理员账号，再调用 Auth Service internal endpoint 删除身份、会话与凭据，最后清理业务侧用户数据；前端不得直接调用 `authClient.admin.removeUser`。
+- 账号安全运维边界见 [AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)，遵循“业务治理在 Admin，高风险身份操作由 Go Admin API 编排”的原则。
 
 关键代码：
 
@@ -376,7 +378,7 @@ apps/api/
 ├── internal/workflow/         # feature contract
 ├── internal/prompts/          # 提示词模板与装配
 ├── internal/storage/          # 对象存储配置与实现
-├── internal/assets/           # 风格卡、人脸库、背景库等资产
+├── internal/assets/           # 线稿模式等业务模板
 └── internal/imageproc/        # 分割、线稿、向量化等图片处理
 
 apps/auth/
@@ -391,5 +393,5 @@ apps/auth/
 
 1. 以 working tree 为准，不回滚用户未提交改动。
 2. 改任务 contract 时，优先同步前端执行链、后端 canonical helper 和 admin 配置页。
-3. 已退休 feature 不应继续出现在产品文案、模板兼容或展示分组里。
+3. 已下线能力不应继续出现在产品文案、模板 contract 或展示分组里。
 4. 跨层变更默认需要同时验证前端与后端。

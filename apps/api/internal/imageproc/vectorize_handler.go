@@ -436,12 +436,6 @@ func (h *VectorizeHandler) CheckPotrace(c *gin.Context) {
 	response.Success(c, gin.H{"version": version})
 }
 
-// GetUsedColors 分析图片的主要颜色（辅助功能）
-func (h *VectorizeHandler) GetUsedColors(c *gin.Context) {
-	// 保留接口用于未来颜色分析功能
-	response.Success(c, gin.H{"message": "ok"})
-}
-
 func vecSecureTaskID(prefix string) string {
 	b := make([]byte, 12)
 	if _, err := rand.Read(b); err != nil {

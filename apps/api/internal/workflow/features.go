@@ -44,42 +44,8 @@ var supportedTaskFeatureSlugs = map[string]struct{}{
 	FeatureSlugCanvasExtend:    {},
 }
 
-var workflowParamAliases = map[string][]string{
-	"feature": {
-		"feature",
-		"feature_slug",
-	},
-	"use_mask": {
-		"use_mask",
-		"mask_enabled",
-		"is_masked",
-		"masked",
-		"local_enhance",
-		"is_local_enhance",
-		"partial_enhance",
-		"is_partial_enhance",
-	},
-	"mask_image_url": {
-		"mask_image_url",
-		"mask_url",
-		"mask_image",
-	},
-	"mask_image_urls": {
-		"mask_image_urls",
-		"mask_urls",
-	},
-	"upscale_mode": {
-		"upscale_mode",
-		"mode",
-	},
-}
-
 func normalizeWorkflowFeatureSlug(raw string) string {
-	slug := strings.ToLower(strings.TrimSpace(raw))
-	if slug == "" {
-		return ""
-	}
-	return strings.ReplaceAll(slug, "_", "-")
+	return strings.TrimSpace(raw)
 }
 
 func ParseWorkflowFeatureSlug(raw string) (string, bool) {
@@ -91,13 +57,6 @@ func ParseWorkflowFeatureSlug(raw string) (string, bool) {
 		return "", false
 	}
 	return slug, true
-}
-
-func NormalizeWorkflowFeatureSlugOrFallback(raw, fallback string) string {
-	if slug, ok := ParseWorkflowFeatureSlug(raw); ok {
-		return slug
-	}
-	return fallback
 }
 
 func ValidateWorkflowFeatureSlug(raw string) (string, error) {
@@ -112,17 +71,8 @@ func ReadWorkflowParam(params map[string]interface{}, canonicalKey string) (inte
 	if params == nil {
 		return nil, false
 	}
-	keys := workflowParamAliases[canonicalKey]
-	if len(keys) == 0 {
-		v, ok := params[canonicalKey]
-		return v, ok
-	}
-	for _, key := range keys {
-		if v, ok := params[key]; ok {
-			return v, true
-		}
-	}
-	return nil, false
+	v, ok := params[canonicalKey]
+	return v, ok
 }
 
 func ReadWorkflowStringParam(params map[string]interface{}, canonicalKey string) (string, bool) {

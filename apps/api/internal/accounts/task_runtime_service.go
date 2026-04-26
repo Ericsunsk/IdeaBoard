@@ -46,8 +46,6 @@ func (s *TaskRuntimeService) RefreshTaskAccounts(task *redis.GlobalQueueTask) er
 	featureSlug := parseTaskFeatureSlug(task.Params)
 	accounts = filterAccountsByFeature(accounts, featureSlug)
 
-	// nil means "not constrained yet" (legacy/default behavior).
-	// non-nil means "task-scoped candidate pool", even if empty.
 	hasScopedCandidates := task.AccountIDs != nil
 	scoped := make(map[uint64]struct{}, len(task.AccountIDs))
 	for _, id := range task.AccountIDs {

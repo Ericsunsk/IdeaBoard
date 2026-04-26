@@ -39,7 +39,7 @@ func TestApplyFeatureSystemPromptNonStyleInnovateStillAppendsBasePrompt(t *testi
 	}
 }
 
-func TestApplyFeatureSystemPromptDoesNotAppendLegacyHiddenConstraints(t *testing.T) {
+func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 	features := []string{
 		"style-fusion",
 		"multi-angle",
@@ -55,9 +55,9 @@ func TestApplyFeatureSystemPromptDoesNotAppendLegacyHiddenConstraints(t *testing
 				"user prompt",
 				feature,
 				map[string]interface{}{
-					"mask_url":  "https://mask.example/a.png",
-					"use_mask":  true,
-					"model_url": "https://img.example/model.png",
+					"mask_image_url": "https://mask.example/a.png",
+					"use_mask":       true,
+					"model_url":      "https://img.example/model.png",
 				},
 				func(string) (string, error) {
 					return "SYS-CONFIG", nil
@@ -68,7 +68,7 @@ func TestApplyFeatureSystemPromptDoesNotAppendLegacyHiddenConstraints(t *testing
 				t.Fatalf("got %q, want only configured system prompt + base prompt", got)
 			}
 			if strings.Contains(got, "【执行语义】") {
-				t.Fatalf("expected no legacy hidden constraint injection, got %q", got)
+				t.Fatalf("expected no hidden constraint injection, got %q", got)
 			}
 		})
 	}
