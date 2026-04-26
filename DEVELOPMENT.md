@@ -37,9 +37,9 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 | 维度 | 当前配置 |
 |------|----------|
 | 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
-| 后端 | `Go` + `Gin` + `GORM` |
+| 后端 | `Go` + `Gin` + `GORM` + `Better Auth (Node.js/TypeScript)` |
 | 基础设施 | `MySQL 8.0+`、`Redis 7+` |
-| 本地端口 | 前端 `5173`，后端 `6000` |
+| 本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
 | 当前主链 | 画布节点编排 -> 任务提交 -> Worker 执行 -> 结果回写 |
 | 技术标识 | `ideaboard-*` |
 
@@ -48,9 +48,10 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 ```text
 浏览器
   -> Vite / 前端 SPA
+  -> Better Auth Service (apps/auth)
   -> Gin API
   -> MySQL (users / tasks / configs / accounts)
-  -> Redis (token + task queue)
+  -> Redis (task queue)
   -> Worker 消费者
   -> 上游 AI 渠道
   -> Kodo / 本地上传目录
@@ -206,16 +207,21 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 
 ## 鉴权与会话
 
-系统采用 `JWT + Redis token` 双重校验：
+系统采用 `Better Auth session + Go 业务授权模型`：
 
-- JWT 提供用户身份与角色信息。
-- Redis 保存当前有效 token，实现主动失效与登出控制。
-- 若 `JWT_SECRET` 未配置，开发环境会生成一次性随机密钥；服务重启后旧 token 会失效。
+- 登录、注册、登出、session 校验由 `apps/auth` 负责。
+- Go API 中间件读取 `Cookie`，通过 auth service 的 internal endpoint 校验 session。
+- Go 仅维护本地业务用户档案（`id/username/auth_user_id/storage_uid/role/status`）与权限判定。
+- `apps/auth` 支持 `AUTH_REGISTRATION_ENABLED` 开关控制公开注册（默认开发开、生产关）。
+- `apps/auth` 对 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 启用基于来源 IP 的内存限流；反向代理场景优先读取 `x-forwarded-for` 的首个 IP。
+- 账号安全运维边界见 [AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)，遵循“业务治理在 Admin、身份安全在 Better Auth Studio”。
 
 关键代码：
 
 - [middleware.go](./apps/api/internal/auth/middleware.go)
-- [auth.ts](./apps/web/src/shared/utils/auth.ts)
+- [service_client.go](./apps/api/internal/auth/service_client.go)
+- [index.ts](./apps/auth/src/index.ts)
+- [client.ts](./apps/web/src/shared/auth/client.ts)
 - [user.ts](./apps/web/src/app/stores/user.ts)
 
 <a id="local-dev-fast-path"></a>
@@ -225,7 +231,7 @@ IdeaBoard 当前以画布工作流为中心演进，不再以“每个页面 = �
 
 | 组件 | 建议版本 |
 |------|----------|
-| Node.js | `18+` |
+| Node.js | `20+` |
 | Go | `1.25+` |
 | MySQL | `8.0+` |
 | Redis | `7+` |
@@ -239,21 +245,37 @@ cd docker
 docker compose up -d
 ```
 
-2. 配置后端环境变量：
+2. 配置 auth 服务环境变量：
+
+```bash
+cd apps/auth
+cp .env.example .env
+```
+
+3. 启动 auth 服务：
+
+```bash
+cd apps/auth
+npm install
+npm run migrate
+npm run dev
+```
+
+4. 配置后端环境变量：
 
 ```bash
 cd apps/api
 cp .env.example .env
 ```
 
-3. 启动后端：
+5. 启动后端：
 
 ```bash
 cd apps/api
 go run ./cmd
 ```
 
-4. 启动前端：
+6. 启动前端：
 
 ```bash
 cd apps/web
@@ -261,7 +283,12 @@ npm install
 npm run dev
 ```
 
-5. 初始化管理员：
+开发代理约定（`apps/web/vite.config.ts`）：
+
+- `/api/auth/*` -> `http://localhost:6001`
+- `/api/*` 与 `/uploads/*` -> `http://localhost:6000`
+
+7. 初始化管理员：
 
 ```bash
 cd apps/api
@@ -270,9 +297,9 @@ go run ./cmd init-admin
 ```
 
 > [!IMPORTANT]
-> `apps/api/.env` 中的 `DB_USER / DB_PASSWORD` 是数据库连接账号，不是网站后台管理员账号。管理员登录账号来自业务库里的 `users` 表；本地首次启动时，建议执行一次 `INIT_ADMIN_PASSWORD=... go run ./cmd init-admin`。
+> `apps/api/.env` 与 `apps/auth/.env` 中的 `DB_USER / DB_PASSWORD` 是数据库连接账号，不是网站后台管理员账号。管理员登录账号来自 Better Auth 与本地 `users` 业务档案映射。
 >
-> 当前仓库不再通过 SQL 种子管理员；若跳过 `init-admin`，空库不会自动生成可登录管理员账号。`init-admin` 既是创建入口，也可在 `admin` 用户已存在且角色为 `admin` 时执行密码重置。
+> `init-admin` 会调用 auth service 确保 Better Auth 存在 `admin` 账号，并绑定/创建本地 admin profile；执行该命令前请先启动 `apps/auth`。
 
 ## 验证矩阵
 
@@ -316,7 +343,9 @@ go build ./...
 | `REDIS_AUTH` | 空 | Redis 密码 |
 | `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
 | `APP_PORT` | `6000` | 后端监听端口 |
-| `JWT_SECRET` | 空 | JWT 密钥；生产环境必须配置 |
+| `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
+| `AUTH_SERVICE_INTERNAL_KEY` | 空 | Go 调用 auth service 的 internal key |
+| `AUTH_SERVICE_TIMEOUT_SECONDS` | `5` | Go 调用 auth service 的超时秒数 |
 | `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |
 | `DB_LOG_MODE` | `warn` | GORM 日志等级，可选 `silent/error/warn/info` |
 
@@ -335,7 +364,7 @@ apps/api/
 ├── cmd/                       # 服务入口
 ├── internal/platform/         # config、database、redis、response、safehttp
 ├── internal/runtime/          # bootstrap、http 路由、worker
-├── internal/auth/             # 鉴权与 token
+├── internal/auth/             # 鉴权中间件与 auth service client
 ├── internal/users/            # 用户管理
 ├── internal/accounts/         # 账号池与任务调度
 ├── internal/channels/         # 渠道管理
@@ -345,6 +374,11 @@ apps/api/
 ├── internal/storage/          # 对象存储配置与实现
 ├── internal/assets/           # 风格卡、人脸库、背景库等资产
 └── internal/imageproc/        # 分割、线稿、向量化等图片处理
+
+apps/auth/
+├── src/auth.ts                # Better Auth 配置
+├── src/index.ts               # /api/auth/* 与 /internal/* 路由
+└── .env.example               # auth 服务环境变量模板
 ```
 
 ## 维护规则

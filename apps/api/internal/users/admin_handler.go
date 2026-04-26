@@ -1,10 +1,8 @@
 package users
 
 import (
-	"fmt"
 	"strconv"
 
-	"api/internal/platform/redis"
 	"api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -12,13 +10,11 @@ import (
 
 type AdminHandler struct {
 	userService *UserService
-	rdb         *redis.Client
 }
 
-func NewAdminHandler(userService *UserService, rdb *redis.Client) *AdminHandler {
+func NewAdminHandler(userService *UserService) *AdminHandler {
 	return &AdminHandler{
 		userService: userService,
-		rdb:         rdb,
 	}
 }
 
@@ -41,21 +37,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 // CreateUser 创建用户
 func (h *AdminHandler) CreateUser(c *gin.Context) {
-	var req CreateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	user, err := h.userService.CreateUser(&req)
-	if err != nil {
-		response.Error(c, 400, err.Error())
-		return
-	}
-
-	response.Success(c, gin.H{
-		"user": user,
-	})
+	response.Error(c, 400, "请使用注册页面创建账号，管理员后台已停用手工建号")
 }
 
 // UpdateUserStatus 更新用户状态
@@ -83,60 +65,18 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 		response.Error(c, 400, err.Error())
 		return
 	}
-	if *req.Status == 0 {
-		h.revokeUserSessionToken(c, targetUser.ID)
-	}
 
 	response.Success(c, nil)
 }
 
 // UpdateUserPassword 管理员修改用户密码
 func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
-	var req UpdateUserPasswordRequest
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	targetUser, ok := h.getTargetUserByParam(c)
-	if !ok {
-		return
-	}
-
-	if targetUser.Role == "admin" {
-		response.Error(c, 400, "不能修改管理员密码")
-		return
-	}
-
-	if err := h.userService.AdminUpdatePassword(targetUser.ID, req.NewPassword); err != nil {
-		response.Error(c, 400, err.Error())
-		return
-	}
-	h.revokeUserSessionToken(c, targetUser.ID)
-
-	response.Success(c, nil)
+	response.Error(c, 400, "Better Auth 接管后不支持后台改密，请在 Better Auth Studio 或前台找回流程处理")
 }
 
 // DeleteUser 删除用户
 func (h *AdminHandler) DeleteUser(c *gin.Context) {
-	targetUser, ok := h.getTargetUserByParam(c)
-	if !ok {
-		return
-	}
-
-	if targetUser.Role == "admin" {
-		response.Error(c, 400, "不能删除管理员")
-		return
-	}
-
-	if err := h.userService.DeleteUser(targetUser.ID); err != nil {
-		response.InternalError(c, 500, "删除用户失败", err)
-		return
-	}
-	h.revokeUserSessionToken(c, targetUser.ID)
-
-	response.Success(c, nil)
+	response.Error(c, 400, "Better Auth 接管后已停用后台删除，请先封禁，再在 Better Auth Studio 执行物理删号")
 }
 
 func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*User, bool) {
@@ -154,15 +94,4 @@ func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*User, bool) {
 	}
 
 	return user, true
-}
-
-func userSessionTokenKey(userID uint64) string {
-	return fmt.Sprintf("token:%d", userID)
-}
-
-func (h *AdminHandler) revokeUserSessionToken(c *gin.Context, userID uint64) {
-	if h.rdb == nil {
-		return
-	}
-	_ = h.rdb.Del(c.Request.Context(), userSessionTokenKey(userID))
 }

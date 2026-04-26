@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  目标运行形态：<code>Nginx + systemd + MySQL + Redis</code>
+  目标运行形态：<code>Nginx + systemd + MySQL + Redis + Better Auth</code>
 </p>
 
 <p align="center">
@@ -26,11 +26,13 @@
 
 > [!IMPORTANT]
 > 本文档仅供 IdeaBoard 授权成员在内部部署与运维场景下使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
+>
+> 账号安全与业务运维的职责边界请同时参考 [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)。
 
 <a id="deployment-profile"></a>
 ## 部署概览
 
-本文档适用于 `Linux amd64` 服务器，以 `Nginx + systemd + MySQL + Redis` 为基础运行方式。
+本文档适用于 `Linux amd64` 服务器，以 `Nginx + systemd + MySQL + Redis + Better Auth Node Service` 为基础运行方式。
 
 ### 目标拓扑
 
@@ -38,6 +40,9 @@
 互联网
   -> Nginx :80
     -> apps/web/dist
+    -> /api/auth proxy
+      -> ideaboard-auth :6001
+        -> MySQL
     -> /api /uploads proxy
       -> ideaboard-server :6000
         -> MySQL
@@ -50,11 +55,13 @@
 | 项目 | 当前约定 |
 |------|----------|
 | 部署根目录 | `/opt/ideaboard` |
-| systemd 服务名 | `ideaboard` |
+| systemd 服务名 | `ideaboard`、`ideaboard-auth` |
 | Nginx 配置名 | `ideaboard.conf` |
 | 后端监听端口 | `6000` |
+| 认证服务监听端口 | `6001` |
 | 发布包名 | `ideaboard-bundle-<tag>-linux-amd64.tar.gz` |
 | API 可执行文件 | `apps/api/ideaboard-server` |
+| Auth 入口文件 | `apps/auth/dist/index.js` |
 
 <a id="release-artifact"></a>
 ## 发布产物
@@ -74,13 +81,19 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 │   │   ├── ideaboard-server
 │   │   ├── uploads/
 │   │   └── .env.example
+│   ├── auth/
+│   │   ├── dist/
+│   │   ├── package.json
+│   │   ├── package-lock.json
+│   │   └── .env.example
 │   └── web/
 │       └── dist/
 ├── deploy/
 │   ├── nginx/
 │   │   └── ideaboard.conf
 │   └── systemd/
-│       └── ideaboard.service
+│       ├── ideaboard.service
+│       └── ideaboard-auth.service
 ├── README.md
 ├── DEVELOPMENT.md
 └── DEPLOYMENT.md
@@ -92,16 +105,19 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 
 - 系统：`Linux amd64`
 - 端口：`80`
-- 软件：`nginx`、`mysql`、`redis-server`、`tar`
+- 软件：`nginx`、`mysql`、`redis-server`、`nodejs >= 20`、`npm`、`tar`
 - 可选依赖：`potrace`，用于转矢量能力
 
 Ubuntu / Debian 参考安装命令：
 
 ```bash
 sudo apt update
-sudo apt install -y nginx redis-server mysql-server
+sudo apt install -y nginx redis-server mysql-server nodejs npm
 sudo apt install -y potrace
 ```
+
+> [!NOTE]
+> 如果发行版仓库里的 Node.js 版本低于 20，请通过 NodeSource、nvm 或你的标准运维镜像安装 Node.js 20+。
 
 <a id="install-flow"></a>
 ## 安装流程
@@ -128,6 +144,7 @@ sha256sum "$BUNDLE"
 /opt/ideaboard/
 ├── apps/
 │   ├── api/
+│   ├── auth/
 │   └── web/
 ├── deploy/
 ├── logs/
@@ -206,7 +223,8 @@ nano /opt/ideaboard/apps/api/.env
 - `APP_ENV=production`（生产环境必须显式设置）
 - `APP_PORT=6000`
 - `APP_HOST=127.0.0.1`（建议反向代理场景启用）
-- `JWT_SECRET`
+- `AUTH_SERVICE_BASE_URL=http://127.0.0.1:6001`
+- `AUTH_SERVICE_INTERNAL_KEY`（必须与认证服务的 `AUTH_INTERNAL_KEY` 完全一致）
 
 建议：
 
@@ -214,11 +232,63 @@ nano /opt/ideaboard/apps/api/.env
 - 若 Redis 开启密码，必须同步配置 `REDIS_AUTH`
 - 若前面有 Nginx / 其他反向代理，建议设置 `APP_HOST=127.0.0.1`
 - 生产环境请固定设置 `APP_ENV=production`，不要依赖默认值
-- `JWT_SECRET` 必须为足够长的随机字符串
+- `AUTH_SERVICE_INTERNAL_KEY` 建议使用足够长的随机字符串，并只在 API 与 Auth Service 两侧共享
 
 完整字段说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
-### 2. 初始化管理员账号
+### 2. 配置认证服务环境变量并安装运行依赖
+
+```bash
+cp /opt/ideaboard/apps/auth/.env.example /opt/ideaboard/apps/auth/.env
+nano /opt/ideaboard/apps/auth/.env
+cd /opt/ideaboard/apps/auth
+npm ci
+npm run migrate:dist
+npm prune --omit=dev
+```
+
+部署时至少确认：
+
+- `AUTH_HOST=127.0.0.1`
+- `AUTH_PORT=6001`
+- `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的 `AUTH_SERVICE_INTERNAL_KEY` 一致
+- `AUTH_TRUSTED_ORIGINS` 包含你的正式访问源，例如 `https://example.com`
+- `AUTH_REGISTRATION_ENABLED=false`（生产建议默认关闭公开注册，按运营策略临时开启）
+- `AUTH_RATE_LIMIT_WINDOW_SECONDS` 与 `AUTH_RATE_LIMIT_MAX_REQUESTS` 已按预期配置（用于 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 限流）
+- `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
+
+> [!IMPORTANT]
+> Better Auth 会在同一个 MySQL 库里维护 `user/session/account/verification` 等认证表。`npm run migrate:dist` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
+
+### 3. 配置 systemd
+
+```bash
+cp /opt/ideaboard/deploy/systemd/ideaboard.service /etc/systemd/system/ideaboard.service
+cp /opt/ideaboard/deploy/systemd/ideaboard-auth.service /etc/systemd/system/ideaboard-auth.service
+systemctl daemon-reload
+systemctl enable ideaboard-auth ideaboard
+systemctl restart ideaboard-auth
+systemctl restart ideaboard
+systemctl status ideaboard-auth --no-pager
+systemctl status ideaboard --no-pager
+```
+
+发布包内置的 systemd 服务默认包含：
+
+- `ideaboard.service`：运行 Go API，读取 `/opt/ideaboard/apps/api/.env`
+- `ideaboard-auth.service`：运行 Better Auth Node Service，读取 `/opt/ideaboard/apps/auth/.env`
+- 两个服务都以 `ideaboard` 非 root 用户运行
+
+查看日志：
+
+```bash
+journalctl -u ideaboard-auth -n 100 --no-pager
+journalctl -u ideaboard -n 100 --no-pager
+```
+
+### 4. 初始化管理员账号
+
+`init-admin` 会同时确保 Better Auth 侧账号存在，因此必须先启动 `ideaboard-auth`。
 
 ```bash
 cd /opt/ideaboard/apps/api
@@ -235,31 +305,9 @@ export INIT_ADMIN_PASSWORD='your-strong-password'
 - 密码：由 `INIT_ADMIN_PASSWORD` 指定
 
 > [!IMPORTANT]
-> 数据库连接账号和网站管理员账号是两套信息。`/opt/ideaboard/apps/api/.env` 只决定服务如何连接 MySQL；后台登录账号来自业务库的 `users` 表。`init-admin` 如果未设置 `INIT_ADMIN_PASSWORD` 会直接拒绝执行。
+> 数据库连接账号和网站管理员账号是两套信息。`/opt/ideaboard/apps/api/.env` 只决定服务如何连接 MySQL；后台登录账号来自 Better Auth 与业务库的关联数据。`init-admin` 如果未设置 `INIT_ADMIN_PASSWORD` 会直接拒绝执行。
 
-### 3. 配置 systemd
-
-```bash
-cp /opt/ideaboard/deploy/systemd/ideaboard.service /etc/systemd/system/ideaboard.service
-systemctl daemon-reload
-systemctl enable ideaboard
-systemctl restart ideaboard
-systemctl status ideaboard --no-pager
-```
-
-发布包内置的 `ideaboard.service` 默认包含：
-
-- `User=ideaboard`、`Group=ideaboard`（非 root 运行）
-- `Environment=APP_ENV=production`（显式生产环境）
-- `EnvironmentFile=/opt/ideaboard/apps/api/.env`
-
-查看日志：
-
-```bash
-journalctl -u ideaboard -n 100 --no-pager
-```
-
-### 4. 配置 Nginx
+### 5. 配置 Nginx
 
 ```bash
 cp /opt/ideaboard/deploy/nginx/ideaboard.conf /etc/nginx/sites-available/ideaboard.conf
@@ -286,6 +334,12 @@ server_name _;
 curl http://127.0.0.1:6000/api/health
 ```
 
+认证服务健康检查：
+
+```bash
+curl http://127.0.0.1:6001/api/health
+```
+
 Nginx 验证：
 
 ```bash
@@ -297,28 +351,31 @@ curl http://127.0.0.1/api/health
 
 1. 首页可正常访问。
 2. `/api/health` 返回成功。
-3. 管理员可登录。
-4. 图片上传正常。
-5. `/uploads/*` 可以访问。
-6. 任务提交后能看到状态流转与结果落地。
+3. `ideaboard-auth` 运行正常，登录/注册请求走 `/api/auth/*`。
+4. 管理员可登录。
+5. 图片上传正常。
+6. `/uploads/*` 可以访问。
+7. 任务提交后能看到状态流转与结果落地。
 
 ## 运维命令
 
-重启后端：
+重启后端与认证服务：
 
 ```bash
-systemctl restart ideaboard
+systemctl restart ideaboard-auth ideaboard
 ```
 
 查看后端状态：
 
 ```bash
+systemctl status ideaboard-auth --no-pager
 systemctl status ideaboard --no-pager
 ```
 
 查看后端日志：
 
 ```bash
+journalctl -u ideaboard-auth -f
 journalctl -u ideaboard -f
 ```
 
@@ -338,14 +395,16 @@ nginx -t && systemctl reload nginx
 1. 下载新的发布包。
 2. 解压到 `/opt/ideaboard/releases/`。
 3. 用新版本覆盖 `/opt/ideaboard/apps`、`/opt/ideaboard/deploy`。
-4. 保留原有 `/opt/ideaboard/apps/api/.env`。
-5. 执行 `systemctl restart ideaboard`。
-6. 再次执行健康检查与页面验证。
+4. 保留原有 `/opt/ideaboard/apps/api/.env` 与 `/opt/ideaboard/apps/auth/.env`。
+5. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && npm run migrate:dist && npm prune --omit=dev`。
+6. 执行 `systemctl restart ideaboard-auth ideaboard`。
+7. 再次执行健康检查与页面验证。
 
 升级时不要删除：
 
 - `/opt/ideaboard/apps/api/.env`
 - `/opt/ideaboard/apps/api/uploads/`
+- `/opt/ideaboard/apps/auth/.env`
 
 ### 回滚
 
@@ -353,5 +412,6 @@ nginx -t && systemctl reload nginx
 
 1. 回到 `/opt/ideaboard/releases/` 中上一个版本目录。
 2. 重新复制旧版 `apps`、`deploy`。
-3. 执行 `systemctl restart ideaboard`。
-4. 再次验证 `curl http://127.0.0.1:6000/api/health`。
+3. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && npm run migrate:dist && npm prune --omit=dev`。
+4. 执行 `systemctl restart ideaboard-auth ideaboard`。
+5. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
