@@ -5,6 +5,7 @@ export interface User {
   id: number
   uid: UserUid
   username: string
+  auth_user_id?: string
   avatar?: string
   role: string
   status: number

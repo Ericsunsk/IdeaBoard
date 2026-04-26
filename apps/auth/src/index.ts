@@ -16,15 +16,35 @@ type MemoryRateLimitEntry = {
   resetAtMs: number
 }
 
+type AuthGuardSettings = {
+  registrationEnabled: boolean
+  windowSeconds: number
+  maxRequests: number
+}
+
+type AuthGuardSettingsCache = {
+  value: AuthGuardSettings
+  expiresAtMs: number
+}
+
 const app = express()
 const authRateLimitStore = new Map<string, MemoryRateLimitEntry>()
 let authRateLimitCheckCounter = 0
+const AUTH_GUARD_SETTINGS_TTL_MS = 10_000
+const DEFAULT_AUTH_GUARD_SETTINGS: AuthGuardSettings = {
+  registrationEnabled: false,
+  windowSeconds: 60,
+  maxRequests: 30,
+}
+let authGuardSettingsCache: AuthGuardSettingsCache | null = null
 
 app.get('/api/health', (_req, res) => {
   sendSuccess(res, { status: 'ok' })
 })
 
-app.use('/api/auth', authEntryGuardMiddleware)
+app.use('/api/auth', (req, res, next) => {
+  authEntryGuardMiddleware(req, res, next).catch(next)
+})
 app.all('/api/auth/*', toNodeHandler(auth))
 app.use(express.json({ limit: '1mb' }))
 
@@ -149,17 +169,59 @@ function isProductionRuntime(): boolean {
   return value === 'production' || value === 'prod' || value === 'release'
 }
 
-function authEntryGuardMiddleware(req: Request, res: Response, next: NextFunction) {
-  const path = normalizeAuthPath(req.path)
+async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
+  const nowMs = Date.now()
+  if (authGuardSettingsCache && nowMs < authGuardSettingsCache.expiresAtMs) {
+    return authGuardSettingsCache.value
+  }
 
-  if (isSignUpPath(path) && !env.auth.registrationEnabled) {
-    sendError(res, 403, '注册已关闭')
-    return
+  let nextSettings: AuthGuardSettings = {
+    ...DEFAULT_AUTH_GUARD_SETTINGS,
+  }
+  try {
+    const [rows] = await authDB.query(
+      "SELECT `key`, `value` FROM system_configs WHERE `key` IN ('auth_registration_enabled', 'auth_rate_limit_window', 'auth_rate_limit_max_requests')"
+    )
+    if (Array.isArray(rows)) {
+      for (const row of rows as any[]) {
+        if (row?.key === 'auth_registration_enabled' && typeof row?.value === 'string') {
+          nextSettings.registrationEnabled = row.value === 'true'
+        }
+        if (row?.key === 'auth_rate_limit_window' && row?.value) {
+          nextSettings.windowSeconds = clampInteger(row.value, 1, 3600, DEFAULT_AUTH_GUARD_SETTINGS.windowSeconds)
+        }
+        if (row?.key === 'auth_rate_limit_max_requests' && row?.value) {
+          nextSettings.maxRequests = clampInteger(row.value, 1, 10000, DEFAULT_AUTH_GUARD_SETTINGS.maxRequests)
+        }
+      }
+    }
+  } catch (error) {
+    // If query fails (including missing table), apply safe defaults and avoid hammering DB.
+    console.error('[auth] Failed to query system_configs for auth guard settings', error)
+    nextSettings = { ...DEFAULT_AUTH_GUARD_SETTINGS }
+  }
+
+  authGuardSettingsCache = {
+    value: nextSettings,
+    expiresAtMs: nowMs + AUTH_GUARD_SETTINGS_TTL_MS,
+  }
+  return nextSettings
+}
+
+async function authEntryGuardMiddleware(req: Request, res: Response, next: NextFunction) {
+  const path = normalizeAuthPath(req.path)
+  const settings = await getAuthGuardSettings()
+
+  if (isSignUpPath(path)) {
+    if (!settings.registrationEnabled) {
+      sendError(res, 403, '注册已关闭')
+      return
+    }
   }
 
   if (isRateLimitedAuthPath(path)) {
     const limiterKey = buildRateLimitKey(req, path)
-    const check = checkAndHitRateLimit(limiterKey)
+    const check = checkAndHitRateLimit(limiterKey, settings.windowSeconds, settings.maxRequests)
     if (!check.allowed) {
       res.setHeader('Retry-After', String(check.retryAfterSeconds))
       sendError(res, 429, '请求过于频繁，请稍后重试')
@@ -206,10 +268,20 @@ function getRequestIP(req: Request): string {
   return 'unknown'
 }
 
-function checkAndHitRateLimit(key: string): { allowed: boolean; retryAfterSeconds: number } {
+function clampInteger(value: unknown, min: number, max: number, fallback: number): number {
+  const parsed = Number.parseInt(String(value), 10)
+  if (!Number.isFinite(parsed)) {
+    return fallback
+  }
+  if (parsed < min || parsed > max) {
+    return fallback
+  }
+  return parsed
+}
+
+function checkAndHitRateLimit(key: string, windowSeconds: number, maxRequests: number): { allowed: boolean; retryAfterSeconds: number } {
   const nowMs = Date.now()
-  const windowMs = env.auth.rateLimitWindowSeconds * 1000
-  const maxRequests = env.auth.rateLimitMaxRequests
+  const windowMs = windowSeconds * 1000
 
   let entry = authRateLimitStore.get(key)
   if (!entry || nowMs >= entry.resetAtMs) {

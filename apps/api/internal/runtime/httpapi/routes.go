@@ -342,6 +342,11 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 }
 
 func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
+	adminApi.GET("/settings/registration", h.AdminHandler.GetRegistrationSetting)
+	adminApi.PUT("/settings/registration", h.AdminHandler.UpdateRegistrationSetting)
+	adminApi.GET("/settings/rate-limit", h.AdminHandler.GetRateLimitSettings)
+	adminApi.PUT("/settings/rate-limit", h.AdminHandler.UpdateRateLimitSettings)
+
 	adminApi.GET("/users", h.AdminHandler.ListUsers)
 	adminApi.POST("/users", h.AdminHandler.CreateUser)
 	adminApi.PUT("/users/:id/status", h.AdminHandler.UpdateUserStatus)

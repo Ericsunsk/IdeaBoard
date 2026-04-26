@@ -4,18 +4,111 @@ import (
 	"strconv"
 
 	"api/internal/platform/response"
+	"api/internal/platform/settings"
 
 	"github.com/gin-gonic/gin"
 )
 
 type AdminHandler struct {
 	userService *UserService
+	configRepo  *settings.SystemConfigRepository
 }
 
-func NewAdminHandler(userService *UserService) *AdminHandler {
+func NewAdminHandler(userService *UserService, configRepo *settings.SystemConfigRepository) *AdminHandler {
 	return &AdminHandler{
 		userService: userService,
+		configRepo:  configRepo,
 	}
+}
+
+// GetRegistrationSetting 获取注册开关状态
+func (h *AdminHandler) GetRegistrationSetting(c *gin.Context) {
+	val, err := h.configRepo.Get("auth_registration_enabled")
+	if err != nil {
+		response.Success(c, gin.H{"enabled": false})
+		return
+	}
+	response.Success(c, gin.H{"enabled": val == "true"})
+}
+
+// UpdateRegistrationSetting 更新注册开关状态
+func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+
+	val := "false"
+	if req.Enabled {
+		val = "true"
+	}
+
+	if err := h.configRepo.Set("auth_registration_enabled", val); err != nil {
+		response.InternalError(c, 500, "保存设置失败", err)
+		return
+	}
+
+	response.Success(c, gin.H{"enabled": req.Enabled})
+}
+
+// GetRateLimitSettings 获取频率限制设置
+func (h *AdminHandler) GetRateLimitSettings(c *gin.Context) {
+	windowStr, err1 := h.configRepo.Get("auth_rate_limit_window")
+	maxReqStr, err2 := h.configRepo.Get("auth_rate_limit_max_requests")
+
+	window := 60
+	maxReq := 30
+
+	if err1 == nil {
+		if w, err := strconv.Atoi(windowStr); err == nil {
+			window = w
+		}
+	}
+	if err2 == nil {
+		if m, err := strconv.Atoi(maxReqStr); err == nil {
+			maxReq = m
+		}
+	}
+
+	response.Success(c, gin.H{
+		"window_seconds": window,
+		"max_requests":   maxReq,
+	})
+}
+
+// UpdateRateLimitSettings 更新频率限制设置
+func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
+	var req struct {
+		WindowSeconds int `json:"window_seconds"`
+		MaxRequests   int `json:"max_requests"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+
+	if req.WindowSeconds < 1 || req.WindowSeconds > 3600 {
+		response.Error(c, 400, "window_seconds 必须在 1 到 3600 秒之间")
+		return
+	}
+	if req.MaxRequests < 1 || req.MaxRequests > 10000 {
+		response.Error(c, 400, "max_requests 必须在 1 到 10000 之间")
+		return
+	}
+
+	if err := h.configRepo.Set("auth_rate_limit_window", strconv.Itoa(req.WindowSeconds)); err != nil {
+		response.InternalError(c, 500, "保存设置失败", err)
+		return
+	}
+	if err := h.configRepo.Set("auth_rate_limit_max_requests", strconv.Itoa(req.MaxRequests)); err != nil {
+		response.InternalError(c, 500, "保存设置失败", err)
+		return
+	}
+
+	response.Success(c, req)
 }
 
 // ListUsers 获取用户列表

@@ -94,7 +94,7 @@ func Run(args []string) {
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
 	authHandler := auth.NewAuthHandler(userService)
-	adminHandler := users.NewAdminHandler(userService)
+	adminHandler := users.NewAdminHandler(userService, systemConfigRepo)
 	cardHandler := assets.NewStyleCardHandler(styleCardService)
 	channelHandler := channels.NewChannelHandler(channelRepo)
 	storageHandler := storage.NewStorageHandler(storageService)

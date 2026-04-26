@@ -256,12 +256,12 @@ npm prune --omit=dev
 - `AUTH_PORT=6001`
 - `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的 `AUTH_SERVICE_INTERNAL_KEY` 一致
 - `AUTH_TRUSTED_ORIGINS` 包含你的正式访问源，例如 `https://example.com`
-- `AUTH_REGISTRATION_ENABLED=false`（生产建议默认关闭公开注册，按运营策略临时开启）
-- `AUTH_RATE_LIMIT_WINDOW_SECONDS` 与 `AUTH_RATE_LIMIT_MAX_REQUESTS` 已按预期配置（用于 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 限流）
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
 
 > [!IMPORTANT]
 > Better Auth 会在同一个 MySQL 库里维护 `user/session/account/verification` 等认证表。`npm run migrate:dist` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
+>
+> 后台 `用户管理` 页当前支持：身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、开放注册开关、防刷限流设置；不开放物理删号与后台改密。限流配置来源于后台设置并写入 `system_configs`，不通过环境变量注入。
 
 ### 3. 配置 systemd
 

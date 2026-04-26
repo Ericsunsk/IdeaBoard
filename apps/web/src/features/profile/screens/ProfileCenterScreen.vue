@@ -25,6 +25,11 @@
         </nav>
 
         <div class="sidebar-footer">
+          <button v-if="userStore.user?.role === 'admin'" class="action-btn admin-btn" @click="router.push('/admin/users')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            管理后台
+          </button>
+          
           <button class="action-btn back-btn" @click="router.back()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
             返回上级
@@ -346,6 +351,12 @@ onMounted(() => {
 .back-btn:hover {
   background: #e8ecf7;
   color: #2a3142;
+}
+
+.admin-btn { color: #fff; background: linear-gradient(135deg, #7f68d5, #9f8fe6); }
+.admin-btn:hover {
+  background: linear-gradient(135deg, #6c54c4, #8b7ad6);
+  box-shadow: 0 4px 12px rgba(122, 107, 213, 0.3);
 }
 
 .logout-btn {

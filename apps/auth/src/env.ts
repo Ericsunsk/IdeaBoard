@@ -51,9 +51,6 @@ export const env = {
     host: getEnv('AUTH_HOST', '127.0.0.1'),
     internalKey: getEnv('AUTH_INTERNAL_KEY', ''),
     trustedOrigins,
-    registrationEnabled: getEnvBool('AUTH_REGISTRATION_ENABLED', !isProductionRuntime()),
-    rateLimitWindowSeconds: getEnvInt('AUTH_RATE_LIMIT_WINDOW_SECONDS', 60),
-    rateLimitMaxRequests: getEnvInt('AUTH_RATE_LIMIT_MAX_REQUESTS', 30),
   },
   database: {
     host: getEnv('DB_HOST', '127.0.0.1'),

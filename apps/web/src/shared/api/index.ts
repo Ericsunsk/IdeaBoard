@@ -77,7 +77,17 @@ export const userApi = {
 }
 
 export const adminApi = {
-  getUsers: (params?: { keyword?: string; page?: number; page_size?: number }): Promise<ApiResponse<UserListResponse>> =>
+  getRegistrationSetting: (): Promise<ApiResponse<{ enabled: boolean }>> =>
+    api.get('/admin/settings/registration') as any,
+  updateRegistrationSetting: (enabled: boolean): Promise<ApiResponse<{ enabled: boolean }>> =>
+    api.put('/admin/settings/registration', { enabled }) as any,
+
+  getRateLimitSettings: (): Promise<ApiResponse<{ window_seconds: number; max_requests: number }>> =>
+    api.get('/admin/settings/rate-limit') as any,
+  updateRateLimitSettings: (data: { window_seconds: number; max_requests: number }): Promise<ApiResponse<{ window_seconds: number; max_requests: number }>> =>
+    api.put('/admin/settings/rate-limit', data) as any,
+
+  getUsers: (params: { keyword?: string; page?: number; page_size?: number }): Promise<ApiResponse<UserListResponse>> =>
     api.get('/admin/users', { params }) as any,
   createUser: (data: CreateUserRequest): Promise<ApiResponse<{ user: User }>> =>
     api.post('/admin/users', data) as any,

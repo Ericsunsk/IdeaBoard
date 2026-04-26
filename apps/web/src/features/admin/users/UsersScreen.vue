@@ -4,12 +4,46 @@
       <div>
         <div class="title-row">
           <h2 class="page-title">用户控制台</h2>
-          <n-button type="primary" ghost size="small" @click="openAdvancedOptions">高级选项</n-button>
         </div>
         <p class="page-desc">管理用户状态与账户生命周期。所有操作即时生效，并同步到任务权限链路。</p>
       </div>
       <div class="header-side-note">
-        <span>实时数据</span>
+        <n-space align="center" :size="20">
+          <n-popover placement="bottom" trigger="click">
+            <template #trigger>
+              <n-button size="small" secondary>
+                防刷限流设置
+              </n-button>
+            </template>
+            <div style="width: 240px; padding: 4px;">
+              <h3 style="margin: 0 0 12px; font-size: 14px;">登录/注册接口限流</h3>
+              <n-form :model="rateLimitForm" size="small" label-placement="left" label-width="70">
+                <n-form-item label="时间窗口">
+                  <n-input-number v-model:value="rateLimitForm.window_seconds" :min="1" :max="3600">
+                    <template #suffix>秒</template>
+                  </n-input-number>
+                </n-form-item>
+                <n-form-item label="最大请求">
+                  <n-input-number v-model:value="rateLimitForm.max_requests" :min="1" :max="10000">
+                    <template #suffix>次</template>
+                  </n-input-number>
+                </n-form-item>
+                <n-button type="primary" block :loading="rateLimitSaving" @click="handleSaveRateLimit">
+                  保存设置
+                </n-button>
+              </n-form>
+            </div>
+          </n-popover>
+          <n-space align="center" :size="6">
+            <span>开放注册</span>
+            <n-switch
+              v-model:value="registrationEnabled"
+              :loading="registrationSettingLoading"
+              size="small"
+              @update:value="handleToggleRegistration"
+            />
+          </n-space>
+        </n-space>
       </div>
     </div>
 
@@ -36,10 +70,13 @@
         <template #icon><n-icon><RefreshOutline /></n-icon></template>
         刷新
       </n-button>
+      <n-button type="warning" ghost :loading="stopImpersonatingLoading" @click="handleStopImpersonating">
+        停止伪装
+      </n-button>
     </div>
 
     <div class="table-card">
-      <AdminSectionHeader title="用户列表" description="支持封禁与解封。管理员账号默认不可操作。" />
+      <AdminSectionHeader title="用户列表" description="支持封禁与解封、以及踢下线等身份侧管理动作。管理员账号不可删除。" />
       <n-data-table
         :columns="columns"
         :data="users"
@@ -49,45 +86,6 @@
         :row-key="(row: User) => row.id"
       />
     </div>
-
-    <n-modal
-      v-model:show="advancedModalVisible"
-      preset="card"
-      title="高级选项"
-      :style="{ width: 'min(1120px, calc(100vw - 40px))' }"
-    >
-      <div class="advanced-toolbar">
-        <n-input
-          v-model:value="authSearchValue"
-          placeholder="搜索身份用户..."
-          clearable
-          style="width: 240px"
-          @keyup.enter="loadAuthUsers"
-        />
-        <n-select
-          v-model:value="authSearchField"
-          style="width: 140px"
-          :options="authSearchFieldOptions"
-        />
-        <n-button :loading="authUsersLoading" @click="loadAuthUsers">
-          <template #icon><n-icon><RefreshOutline /></n-icon></template>
-          刷新
-        </n-button>
-        <n-button type="warning" ghost :loading="stopImpersonatingLoading" @click="handleStopImpersonating">
-          停止伪装
-        </n-button>
-      </div>
-      <n-data-table
-        :columns="authUserColumns"
-        :data="authUsers"
-        :loading="authUsersLoading"
-        :pagination="false"
-        :bordered="false"
-        size="small"
-        :max-height="460"
-        :row-key="(row: BetterAuthAdminUser) => row.id"
-      />
-    </n-modal>
   </div>
 </template>
 
@@ -102,8 +100,11 @@ import {
   NIcon,
   NTag,
   NSpace,
-  NModal,
-  NSelect,
+  NSwitch,
+  NPopover,
+  NInputNumber,
+  NForm,
+  NFormItem,
   useMessage,
   useDialog,
 } from 'naive-ui'
@@ -117,33 +118,18 @@ import AdminSectionHeader from '../shared/components/AdminSectionHeader.vue'
 const message = useMessage()
 const dialog = useDialog()
 
-type BetterAuthSearchField = 'email' | 'name'
-type BetterAuthAdminUser = {
-  id: string
-  email: string
-  name: string
-  role: string
-  banned: boolean
-  banReason: string
-  createdAt: string
-}
-
 const loading = ref(false)
 const users = ref<User[]>([])
 const searchKeyword = ref('')
 const activeUserCount = computed(() => users.value.filter(item => item.status === 1).length)
 const bannedUserCount = computed(() => users.value.filter(item => item.status !== 1).length)
 const reservedUserCount = computed(() => users.value.filter(item => item.role === 'admin').length)
-const advancedModalVisible = ref(false)
-const authUsers = ref<BetterAuthAdminUser[]>([])
-const authUsersLoading = ref(false)
-const authSearchValue = ref('')
-const authSearchField = ref<BetterAuthSearchField>('email')
+
 const stopImpersonatingLoading = ref(false)
-const authSearchFieldOptions = [
-  { label: '按邮箱', value: 'email' },
-  { label: '按名称', value: 'name' },
-]
+const registrationEnabled = ref(false)
+const registrationSettingLoading = ref(false)
+const rateLimitForm = ref({ window_seconds: 60, max_requests: 30 })
+const rateLimitSaving = ref(false)
 
 const columns: DataTableColumns<User> = [
   { title: 'ID', key: 'id', width: 80 },
@@ -158,38 +144,24 @@ const columns: DataTableColumns<User> = [
   {
     title: '操作',
     key: 'actions',
-    width: 120,
-    render: (row) => h(NSpace, { size: 'small' }, () => [
-      row.role !== 'admin' ? h(NButton, { size: 'small', type: row.status === 1 ? 'warning' : 'success', onClick: () => handleToggleStatus(row) }, () => row.status === 1 ? '封禁' : '解封') : null
-    ].filter(Boolean))
-  }
-]
+    width: 320,
+    render: (row) => {
+      const isSystemAdmin = row.role === 'admin'
+      const authId = row.auth_user_id
 
-const authUserColumns: DataTableColumns<BetterAuthAdminUser> = [
-  { title: 'Email', key: 'email', ellipsis: { tooltip: true } },
-  { title: 'Name', key: 'name', ellipsis: { tooltip: true } },
-  { title: 'Role', key: 'role', width: 100 },
-  {
-    title: '状态',
-    key: 'banned',
-    width: 100,
-    render: (row) =>
-      h(NTag, { type: row.banned ? 'warning' : 'success', size: 'small' }, () => (row.banned ? '封禁' : '正常')),
-  },
-  { title: '封禁原因', key: 'banReason', ellipsis: { tooltip: true } },
-  { title: '创建时间', key: 'createdAt', width: 180, ellipsis: { tooltip: true } },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 210,
-    render: (row) =>
-      h(NSpace, { size: 'small' }, () => [
-        row.banned
-          ? h(NButton, { size: 'tiny', type: 'success', onClick: () => handleUnbanAuthUser(row) }, () => '解封')
-          : h(NButton, { size: 'tiny', type: 'warning', onClick: () => handleBanAuthUser(row) }, () => '封禁'),
-        h(NButton, { size: 'tiny', type: 'primary', ghost: true, onClick: () => handleImpersonate(row) }, () => '伪装登录'),
-      ]),
-  },
+      return h(NSpace, { size: 'small' }, () => [
+        !isSystemAdmin
+          ? h(NButton, { size: 'tiny', type: row.status === 1 ? 'warning' : 'success', onClick: () => handleToggleStatus(row) }, () => row.status === 1 ? '业务封禁' : '业务解封')
+          : null,
+        authId
+          ? h(NButton, { size: 'tiny', type: 'error', ghost: true, onClick: () => handleRevokeSessions(row) }, () => '踢下线')
+          : null,
+        authId
+          ? h(NButton, { size: 'tiny', type: 'primary', ghost: true, onClick: () => handleImpersonate(row) }, () => '伪装登录')
+          : null,
+      ].filter(Boolean))
+    }
+  }
 ]
 
 async function loadUsers() {
@@ -217,101 +189,51 @@ async function handleToggleStatus(row: User) {
   }
 }
 
-function openAdvancedOptions() {
-  advancedModalVisible.value = true
-  loadAuthUsers()
-}
+function handleRevokeSessions(row: User) {
+  if (!row.auth_user_id) return
+  const authId = row.auth_user_id
 
-async function loadAuthUsers() {
-  authUsersLoading.value = true
-  try {
-    const searchValue = authSearchValue.value.trim()
-    const result = await authClient.admin.listUsers({
-      query: {
-        searchValue: searchValue || undefined,
-        searchField: authSearchField.value,
-        searchOperator: 'contains',
-        limit: 50,
-        offset: 0,
-        sortBy: 'createdAt',
-        sortDirection: 'desc',
-      },
-    })
-    if ((result as any)?.error) {
-      throw (result as any).error
-    }
-    authUsers.value = normalizeAuthUsersResult(result)
-  } catch (error) {
-    message.error(extractBetterAuthErrorMessage(error, '加载身份用户失败'))
-  } finally {
-    authUsersLoading.value = false
-  }
-}
-
-function normalizeAuthUsersResult(result: unknown): BetterAuthAdminUser[] {
-  const payload = result as any
-  const list = payload?.data?.users ?? payload?.users ?? []
-  if (!Array.isArray(list)) {
-    return []
-  }
-  return list
-    .map((item: any): BetterAuthAdminUser | null => {
-      const id = String(item?.id || '').trim()
-      if (!id) return null
-      return {
-        id,
-        email: String(item?.email || ''),
-        name: String(item?.name || ''),
-        role: String(item?.role || 'user'),
-        banned: Boolean(item?.banned),
-        banReason: String(item?.banReason || ''),
-        createdAt: formatDateTime(item?.createdAt),
-      }
-    })
-    .filter((item: BetterAuthAdminUser | null): item is BetterAuthAdminUser => !!item)
-}
-
-async function handleBanAuthUser(row: BetterAuthAdminUser) {
-  try {
-    const result = await authClient.admin.banUser({
-      userId: row.id,
-      banReason: '管理员在高级选项中执行封禁',
-    })
-    if ((result as any)?.error) {
-      throw (result as any).error
-    }
-    message.success('身份侧已封禁')
-    loadAuthUsers()
-  } catch (error) {
-    message.error(extractBetterAuthErrorMessage(error, '身份侧封禁失败'))
-  }
-}
-
-async function handleUnbanAuthUser(row: BetterAuthAdminUser) {
-  try {
-    const result = await authClient.admin.unbanUser({ userId: row.id })
-    if ((result as any)?.error) {
-      throw (result as any).error
-    }
-    message.success('身份侧已解封')
-    loadAuthUsers()
-  } catch (error) {
-    message.error(extractBetterAuthErrorMessage(error, '身份侧解封失败'))
-  }
-}
-
-function handleImpersonate(row: BetterAuthAdminUser) {
   dialog.warning({
-    title: '确认伪装登录',
-    content: `将切换到 ${row.email || row.name || row.id} 的身份会话，是否继续？`,
+    title: '确认踢下线',
+    content: `将强制吊销账号 ${row.username} 的所有活跃会话，是否继续？`,
     positiveText: '确认',
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        const result = await authClient.admin.impersonateUser({ userId: row.id })
-        if ((result as any)?.error) {
-          throw (result as any).error
+        const result = await authClient.admin.revokeUserSessions({ userId: authId })
+        if ((result as any)?.error) throw (result as any).error
+        message.success('已强制踢下线')
+      } catch (error) {
+        if (error && String(error).includes('revokeUserSessions is not a function')) {
+          try {
+            const resultFallback = await (authClient.admin as any).revokeUserSession({ userId: authId })
+            if (resultFallback?.error) throw resultFallback.error
+            message.success('已强制踢下线')
+            return
+          } catch (fallbackError) {
+            message.error(extractBetterAuthErrorMessage(fallbackError, '踢下线失败'))
+            return
+          }
         }
+        message.error(extractBetterAuthErrorMessage(error, '踢下线失败'))
+      }
+    },
+  })
+}
+
+function handleImpersonate(row: User) {
+  if (!row.auth_user_id) return
+  const authId = row.auth_user_id
+
+  dialog.warning({
+    title: '确认伪装登录',
+    content: `将切换到账号 ${row.username} 的身份会话，是否继续？`,
+    positiveText: '确认',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        const result = await authClient.admin.impersonateUser({ userId: authId })
+        if ((result as any)?.error) throw (result as any).error
         message.success('会话已切换，正在跳转用户中心')
         window.location.href = '/user/center'
       } catch (error) {
@@ -325,28 +247,80 @@ async function handleStopImpersonating() {
   stopImpersonatingLoading.value = true
   try {
     const result = await authClient.admin.stopImpersonating()
-    if ((result as any)?.error) {
-      throw (result as any).error
-    }
+    if ((result as any)?.error) throw (result as any).error
     message.success('已停止伪装会话')
-    window.location.href = '/admin/users'
+    loadUsers()
   } catch (error) {
-    message.error(extractBetterAuthErrorMessage(error, '停止伪装失败'))
+    message.error(extractBetterAuthErrorMessage(error, '停止伪装失败（或未处于伪装状态）'))
   } finally {
     stopImpersonatingLoading.value = false
   }
 }
 
-function formatDateTime(value: unknown): string {
-  const text = String(value || '').trim()
-  if (!text) return '-'
-  const time = new Date(text)
-  if (Number.isNaN(time.getTime())) return text
-  return time.toLocaleString()
+async function loadRegistrationSetting() {
+  registrationSettingLoading.value = true
+  try {
+    const res = await adminApi.getRegistrationSetting()
+    if (res.code === 0) {
+      registrationEnabled.value = res.data?.enabled ?? false
+    }
+  } catch {
+    message.error('加载注册状态失败')
+  } finally {
+    registrationSettingLoading.value = false
+  }
+}
+
+async function handleToggleRegistration(newValue: boolean) {
+  registrationSettingLoading.value = true
+  try {
+    const res = await adminApi.updateRegistrationSetting(newValue)
+    if (res.code === 0) {
+      registrationEnabled.value = res.data?.enabled ?? newValue
+      message.success(`注册入口已${newValue ? '开放' : '关闭'}`)
+    } else {
+      throw new Error(res.msg)
+    }
+  } catch (error: any) {
+    registrationEnabled.value = !newValue // 恢复原状
+    message.error(error.message || '更新注册状态失败')
+  } finally {
+    registrationSettingLoading.value = false
+  }
+}
+
+async function loadRateLimitSettings() {
+  try {
+    const res = await adminApi.getRateLimitSettings()
+    if (res.code === 0 && res.data) {
+      rateLimitForm.value.window_seconds = res.data.window_seconds
+      rateLimitForm.value.max_requests = res.data.max_requests
+    }
+  } catch {
+    message.error('加载频率限制配置失败')
+  }
+}
+
+async function handleSaveRateLimit() {
+  rateLimitSaving.value = true
+  try {
+    const res = await adminApi.updateRateLimitSettings(rateLimitForm.value)
+    if (res.code === 0) {
+      message.success('防刷限流设置已保存')
+    } else {
+      throw new Error(res.msg)
+    }
+  } catch (error: any) {
+    message.error(error.message || '保存设置失败')
+  } finally {
+    rateLimitSaving.value = false
+  }
 }
 
 onMounted(() => {
   loadUsers()
+  loadRegistrationSetting()
+  loadRateLimitSettings()
 })
 </script>
 
@@ -360,14 +334,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.advanced-toolbar {
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 
 @media (max-width: 720px) {
