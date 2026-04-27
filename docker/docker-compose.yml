@@ -19,7 +19,7 @@ services:
       - ideaboard-network
 
   redis:
-    image: redis:7
+    image: redis:8.6.2
     container_name: ideaboard-redis
     restart: always
     environment:

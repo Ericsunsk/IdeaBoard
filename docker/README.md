@@ -45,7 +45,7 @@ docker compose logs -f redis
 
 | 项目 | 说明 |
 |------|------|
-| 镜像 | `redis:7` |
+| 镜像 | `redis:8.6.2` |
 | 容器名 | `ideaboard-redis` |
 | 宿主机端口 | `127.0.0.1:${REDIS_PORT:-6379}` |
 | 持久化 | `appendonly yes` |

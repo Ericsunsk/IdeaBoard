@@ -34,7 +34,7 @@
   <img src="https://img.shields.io/badge/framework-Gin-008ecf?style=flat-square" alt="Framework: Gin" />
   <img src="https://img.shields.io/badge/orm-GORM-1f6feb?style=flat-square" alt="ORM: GORM" />
   <img src="https://img.shields.io/badge/database-MySQL_8-4479a1?style=flat-square&logo=mysql&logoColor=white" alt="Database: MySQL 8" />
-  <img src="https://img.shields.io/badge/cache-Redis_7-dc382d?style=flat-square&logo=redis&logoColor=white" alt="Cache: Redis 7" />
+  <img src="https://img.shields.io/badge/cache-Redis_8.6-dc382d?style=flat-square&logo=redis&logoColor=white" alt="Cache: Redis 8.6" />
 </p>
 
 <a id="product-preview"></a>
