@@ -96,11 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import EditNode from '../nodes/EditNode.vue'
-import EnhanceNode from '../nodes/EnhanceNode.vue'
-import FusionNode from '../nodes/FusionNode.vue'
-import ColorNode from '../nodes/ColorNode.vue'
-import WearNode from '../nodes/WearNode.vue'
+import { defineAsyncComponent } from 'vue'
 import type {
   EditNodeItem,
   EnhanceNodeItem,
@@ -109,6 +105,12 @@ import type {
   WearNodeItem,
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
+
+const EditNode = defineAsyncComponent(() => import('../nodes/EditNode.vue'))
+const EnhanceNode = defineAsyncComponent(() => import('../nodes/EnhanceNode.vue'))
+const FusionNode = defineAsyncComponent(() => import('../nodes/FusionNode.vue'))
+const ColorNode = defineAsyncComponent(() => import('../nodes/ColorNode.vue'))
+const WearNode = defineAsyncComponent(() => import('../nodes/WearNode.vue'))
 
 const props = defineProps<{
   editNodes: EditNodeItem[]

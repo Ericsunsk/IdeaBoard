@@ -33,6 +33,7 @@ interface UseMaskNodeOptions {
   activateMaskNode: (id: number) => void
   closeNodeContextMenu: () => void
   readNodeImageDropPayload: (event: DragEvent) => DragPayload | null
+  onMaskNodeContentChanged?: (node: MaskNodeItem) => void
 }
 
 const maskPaintColor = 'rgba(122, 107, 213, 1)'
@@ -74,6 +75,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     const ratio = await options.loadImageRatioFromUrl(url)
     if (!ratio || node.sourceImageUrl !== url) return
     node.sourceImageRatio = ratio
+    options.onMaskNodeContentChanged?.(node)
   }
 
   function logMaskNodeError(context: string, error: unknown, detail?: Record<string, unknown>) {
@@ -282,6 +284,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
       const raster = new Image()
       raster.src = node.maskDataUrl
       maskRasterCache.set(node.id, raster)
+      options.onMaskNodeContentChanged?.(node)
     } catch (error: unknown) {
       logMaskNodeError('Failed to commit mask canvas to data URL.', error, {
         nodeId: node.id,
@@ -570,6 +573,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
         node.maskDataUrl = ''
         if (ratioFromFile) node.sourceImageRatio = ratioFromFile
         else void syncMaskNodeImageRatioByUrl(node, res.data.url)
+        options.onMaskNodeContentChanged?.(node)
         void nextTick(() => renderMaskNodeMask(node))
         options.message.success('节点图片已更新')
         return
@@ -598,12 +602,14 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     node.sourceImageRatio = 1
     node.executionMaskDataUrl = ''
     node.maskDataUrl = ''
+    options.onMaskNodeContentChanged?.(node)
     renderMaskNodeMask(node)
   }
 
   function clearMaskNodeMask(node: MaskNodeItem) {
     node.executionMaskDataUrl = ''
     node.maskDataUrl = ''
+    options.onMaskNodeContentChanged?.(node)
     renderMaskNodeMask(node)
   }
 
@@ -615,6 +621,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
       node.maskDataUrl = ''
       if (payload.ratio > 0) node.sourceImageRatio = payload.ratio
       else void syncMaskNodeImageRatioByUrl(node, payload.url)
+      options.onMaskNodeContentChanged?.(node)
       void nextTick(() => renderMaskNodeMask(node))
       return
     }
@@ -636,6 +643,7 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     node.maskDataUrl = ''
     if (item.height_ratio && item.height_ratio > 0) node.sourceImageRatio = item.height_ratio
     else void syncMaskNodeImageRatioByUrl(node, item.url)
+    options.onMaskNodeContentChanged?.(node)
     void nextTick(() => renderMaskNodeMask(node))
     return true
   }

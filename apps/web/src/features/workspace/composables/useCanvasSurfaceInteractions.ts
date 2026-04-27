@@ -14,6 +14,8 @@ interface UseCanvasSurfaceInteractionsOptions {
   createCanvasImageAt: (point: CanvasPoint, url: string, ratio?: number) => CanvasImageItem
   uploadImage: (file: File) => Promise<{ code?: number; data?: { url?: string } }>
   resolveCanvasImageUploadMeta?: (url: string) => CanvasImageItem['uploadMeta'] | undefined
+  onCanvasViewportChanged?: () => void
+  onCanvasContentChanged?: () => void
 }
 
 export function useCanvasSurfaceInteractions(options: UseCanvasSurfaceInteractionsOptions) {
@@ -41,6 +43,7 @@ export function useCanvasSurfaceInteractions(options: UseCanvasSurfaceInteractio
     if (e.altKey) {
       e.preventDefault()
       options.updateZoom(e.deltaY > 0 ? -5 : 5, { clientX: e.clientX, clientY: e.clientY })
+      options.onCanvasViewportChanged?.()
       return
     }
 
@@ -48,12 +51,14 @@ export function useCanvasSurfaceInteractions(options: UseCanvasSurfaceInteractio
       e.preventDefault()
       const horizontalDelta = (Math.abs(e.deltaX) > 0 ? e.deltaX : e.deltaY) * wheelPanSpeed
       options.canvasX.value -= horizontalDelta
+      options.onCanvasViewportChanged?.()
       return
     }
 
     e.preventDefault()
     options.canvasX.value -= e.deltaX * wheelPanSpeed
     options.canvasY.value -= e.deltaY * wheelPanSpeed
+    options.onCanvasViewportChanged?.()
   }
 
   async function handleDrop(e: DragEvent) {
@@ -65,6 +70,7 @@ export function useCanvasSurfaceInteractions(options: UseCanvasSurfaceInteractio
       options.messages.value.push(newItem)
       options.selectedIds.value = [newItem.id]
       options.activeImageActionId.value = null
+      options.onCanvasContentChanged?.()
       return
     }
 
@@ -83,6 +89,7 @@ export function useCanvasSurfaceInteractions(options: UseCanvasSurfaceInteractio
             item.uploadMeta = uploadMeta
           }
           options.messages.value.push(item)
+          options.onCanvasContentChanged?.()
         }
       } catch {
         // Keep drop interaction resilient; upload failure is already surfaced elsewhere.

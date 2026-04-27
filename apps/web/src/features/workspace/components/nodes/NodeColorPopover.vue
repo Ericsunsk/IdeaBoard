@@ -108,7 +108,6 @@ watch(spectrumRefEl, (value) => {
   border-radius: 12px;
   border: 1px solid #dce2f1;
   background: #ffffff;
-  box-shadow: 0 12px 30px rgba(23, 31, 56, 0.12);
   z-index: 24;
   display: flex;
   flex-direction: column;

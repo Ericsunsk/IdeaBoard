@@ -66,6 +66,10 @@ export interface UseCanvasEditorOptions {
   deleteSelectedConnection?: () => boolean
   beginHistoryBatch: () => void
   endHistoryBatch: (commit?: boolean) => void
+  onCanvasViewportChanged?: () => void
+  onCanvasLayoutFrameChanged?: () => void
+  onCanvasLayoutMutationCommitted?: () => void
+  onCanvasContentChanged?: () => void
   undo: () => Promise<boolean> | boolean
   redo: () => Promise<boolean> | boolean
   message: MessageApiLike

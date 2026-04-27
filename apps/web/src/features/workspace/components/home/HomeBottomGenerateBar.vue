@@ -139,7 +139,6 @@ function onPromptInput(event: Event) {
   border-radius: 24px;
   padding: 20px;
   margin-bottom: 16px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   max-height: 480px;
   overflow-y: auto;
 }

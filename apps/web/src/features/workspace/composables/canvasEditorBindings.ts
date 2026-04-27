@@ -109,6 +109,9 @@ export function createCanvasPointerBindings(
     getNodeSelectionKey: selection.getNodeSelectionKey,
     beginHistoryBatch: options.beginHistoryBatch,
     endHistoryBatch: options.endHistoryBatch,
+    onCanvasViewportChanged: options.onCanvasViewportChanged,
+    onCanvasLayoutFrameChanged: options.onCanvasLayoutFrameChanged,
+    onCanvasLayoutMutationCommitted: options.onCanvasLayoutMutationCommitted,
     importCanvasImageToImageNodeAtPoint: options.importCanvasImageToImageNodeAtPoint,
     importCanvasImageToMaskNodeAtPoint: options.importCanvasImageToMaskNodeAtPoint,
     message: options.message,
@@ -133,6 +136,8 @@ export function createCanvasSurfaceBindings(
     createCanvasImageAt: options.createCanvasImageAt,
     uploadImage: options.uploadImage,
     resolveCanvasImageUploadMeta: options.resolveCanvasImageUploadMeta,
+    onCanvasViewportChanged: options.onCanvasViewportChanged,
+    onCanvasContentChanged: options.onCanvasContentChanged,
   }
 }
 

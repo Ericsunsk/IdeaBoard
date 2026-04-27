@@ -248,7 +248,7 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     if (cacheStatus === 'stale') {
       return {
         primaryAction: {
-          label: node.outputImages.length > 0 ? '重新生成' : actionLabels.ready,
+          label: actionLabels.ready,
           disabled: false,
         },
       }
@@ -257,7 +257,7 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     if (options.isNodeLastRunFailed?.(nodeType, node.id)) {
       return {
         primaryAction: {
-          label: '重试',
+          label: actionLabels.ready,
           disabled: false,
         },
       }
@@ -266,7 +266,7 @@ export function useCanvasNodeUiState(options: UseCanvasNodeUiStateOptions) {
     if (cacheStatus === 'ready' && node.outputImages.length > 0) {
       return {
         primaryAction: {
-          label: '重新生成',
+          label: actionLabels.ready,
           disabled: false,
         },
       }

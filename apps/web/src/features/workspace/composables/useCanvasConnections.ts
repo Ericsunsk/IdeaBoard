@@ -55,7 +55,12 @@ export interface UseCanvasConnectionsOptions {
   canvasY: Ref<number>
   zoomLevel: Ref<number>
   isConnectionAllowed: (from: ConnectionEndpoint, to: ConnectionEndpoint) => boolean
+  isConnectionRenderable?: (connection: CanvasConnection) => boolean
   lookupNodeByType: (nodeType: CanvasConnectionNodeType, nodeId: number) => CanvasNodeItem | null
+  onConnectionsChanged?: (
+    previousConnections: CanvasConnection[],
+    nextConnections: CanvasConnection[],
+  ) => void
   onConnectionNotAllowed?: () => void
   onInvalidDirection?: () => void
 }
@@ -92,6 +97,26 @@ function getNodeConnectionErrorKey(nodeType: CanvasConnectionNodeType, nodeId: n
   return `${nodeType}:${nodeId}`
 }
 
+function getIncomingNodeKey(toNodeType: CanvasConnectionNodeType, toNodeId: number): string {
+  return `${toNodeType}:${toNodeId}`
+}
+
+function getIncomingPortKey(
+  toNodeType: CanvasConnectionNodeType,
+  toNodeId: number,
+  toPort: CanvasConnectionPort,
+): string {
+  return `${toNodeType}:${toNodeId}:${toPort}`
+}
+
+function getOutgoingPortKey(
+  fromNodeType: CanvasConnectionNodeType,
+  fromNodeId: number,
+  fromPort: CanvasConnectionPort,
+): string {
+  return `${fromNodeType}:${fromNodeId}:${fromPort}`
+}
+
 export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
   const selectedConnectionId = ref<number | null>(null)
   const renderedConnections = ref<RenderedConnection[]>([])
@@ -100,6 +125,42 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
   const draftConnectionKind = ref<CanvasConnectionTone>('image')
   const nodeConnectionErrorPorts = ref<Record<string, string[]>>({})
   const reconnectingConnectionId = computed(() => connectionDragState.value?.reconnectConnectionId ?? null)
+  const incomingByNodeKey = computed(() => {
+    const index = new Map<string, CanvasConnection[]>()
+    options.connections.value.forEach((connection) => {
+      const key = getIncomingNodeKey(connection.toNodeType, connection.toNodeId)
+      const existing = index.get(key)
+      if (existing) {
+        existing.push(connection)
+        return
+      }
+      index.set(key, [connection])
+    })
+    return index
+  })
+  const incomingByPortKey = computed(() => {
+    const index = new Map<string, CanvasConnection>()
+    options.connections.value.forEach((connection) => {
+      const key = getIncomingPortKey(connection.toNodeType, connection.toNodeId, connection.toPort)
+      if (!index.has(key)) {
+        index.set(key, connection)
+      }
+    })
+    return index
+  })
+  const outgoingByPortKey = computed(() => {
+    const index = new Map<string, CanvasConnection[]>()
+    options.connections.value.forEach((connection) => {
+      const key = getOutgoingPortKey(connection.fromNodeType, connection.fromNodeId, connection.fromPort)
+      const existing = index.get(key)
+      if (existing) {
+        existing.push(connection)
+        return
+      }
+      index.set(key, [connection])
+    })
+    return index
+  })
 
   const connectionDragState = ref<{
     from: ConnectionEndpoint
@@ -189,17 +250,14 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     toNodeId: number,
     toPort: CanvasConnectionPort,
   ): CanvasConnection | null {
-    return (
-      options.connections.value.find(connection =>
-        connection.toNodeType === toNodeType &&
-        connection.toNodeId === toNodeId &&
-        connection.toPort === toPort,
-      ) ?? null
-    )
+    const key = getIncomingPortKey(toNodeType, toNodeId, toPort)
+    return incomingByPortKey.value.get(key) ?? null
   }
 
   function getIncomingConnections(toNodeType: CanvasConnectionNodeType, toNodeId: number): CanvasConnection[] {
-    return options.connections.value.filter(connection => connection.toNodeType === toNodeType && connection.toNodeId === toNodeId)
+    const key = getIncomingNodeKey(toNodeType, toNodeId)
+    const connections = incomingByNodeKey.value.get(key)
+    return connections ? [...connections] : []
   }
 
   function hasIncomingPortConnection(
@@ -215,13 +273,8 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     fromNodeId: number,
     fromPort: CanvasConnectionPort,
   ): CanvasConnection | null {
-    return (
-      options.connections.value.find(connection =>
-        connection.fromNodeType === fromNodeType &&
-        connection.fromNodeId === fromNodeId &&
-        connection.fromPort === fromPort,
-      ) ?? null
-    )
+    const key = getOutgoingPortKey(fromNodeType, fromNodeId, fromPort)
+    return outgoingByPortKey.value.get(key)?.[0] ?? null
   }
 
   function getOutgoingConnections(
@@ -229,11 +282,9 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     fromNodeId: number,
     fromPort: CanvasConnectionPort,
   ): CanvasConnection[] {
-    return options.connections.value.filter(connection =>
-      connection.fromNodeType === fromNodeType &&
-      connection.fromNodeId === fromNodeId &&
-      connection.fromPort === fromPort,
-    )
+    const key = getOutgoingPortKey(fromNodeType, fromNodeId, fromPort)
+    const connections = outgoingByPortKey.value.get(key)
+    return connections ? [...connections] : []
   }
 
   function hasOutgoingPortConnection(
@@ -245,6 +296,7 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
   }
 
   function removeConnectionsForNode(nodeType: CanvasConnectionNodeType, nodeId: number) {
+    const previousConnections = options.connections.value
     const removedSelected = options.connections.value.some(connection =>
       connection.id === selectedConnectionId.value &&
       (
@@ -252,23 +304,29 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
         (connection.toNodeType === nodeType && connection.toNodeId === nodeId)
       ),
     )
-    options.connections.value = options.connections.value.filter(connection =>
+    const nextConnections = options.connections.value.filter(connection =>
       !(
         (connection.fromNodeType === nodeType && connection.fromNodeId === nodeId) ||
         (connection.toNodeType === nodeType && connection.toNodeId === nodeId)
       ),
     )
+    options.connections.value = nextConnections
     if (removedSelected) {
       clearSelectedConnection()
+    }
+    if (nextConnections.length !== previousConnections.length) {
+      options.onConnectionsChanged?.(previousConnections, nextConnections)
     }
   }
 
   function deleteSelectedConnection(): boolean {
     if (selectedConnectionId.value === null) return false
+    const previousConnections = options.connections.value
     const nextConnections = options.connections.value.filter(connection => connection.id !== selectedConnectionId.value)
     if (nextConnections.length === options.connections.value.length) return false
     options.connections.value = nextConnections
     clearSelectedConnection()
+    options.onConnectionsChanged?.(previousConnections, nextConnections)
     return true
   }
 
@@ -453,7 +511,9 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
 
   function refreshRenderedConnections() {
     const nextRendered: RenderedConnection[] = []
+    const isConnectionRenderable = options.isConnectionRenderable
     options.connections.value.forEach((connection) => {
+      if (isConnectionRenderable && !isConnectionRenderable(connection)) return
       const start = getPortCenter('output', {
         nodeType: connection.fromNodeType,
         nodeId: connection.fromNodeId,
@@ -502,9 +562,17 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     clearConnectionPortHighlights()
   }
 
-  function upsertConnection(from: ConnectionEndpoint, to: ConnectionEndpoint) {
+  function upsertConnection(
+    from: ConnectionEndpoint,
+    to: ConnectionEndpoint,
+    previousConnections = options.connections.value,
+    replacingConnectionId?: number | null,
+  ) {
     if (!options.isConnectionAllowed(from, to)) return false
-    const existingExact = options.connections.value.find(connection =>
+    const baseConnections = replacingConnectionId == null
+      ? options.connections.value
+      : options.connections.value.filter(connection => connection.id !== replacingConnectionId)
+    const existingExact = baseConnections.find(connection =>
       connection.fromNodeType === from.nodeType &&
       connection.fromNodeId === from.nodeId &&
       connection.fromPort === from.port &&
@@ -513,21 +581,23 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
       connection.toPort === to.port,
     )
     if (existingExact) {
-      options.connections.value = options.connections.value.filter(connection => connection.id !== existingExact.id)
+      const nextConnections = baseConnections.filter(connection => connection.id !== existingExact.id)
+      options.connections.value = nextConnections
       if (selectedConnectionId.value === existingExact.id) {
         clearSelectedConnection()
       }
+      options.onConnectionsChanged?.(previousConnections, nextConnections)
       return true
     }
 
-    const filtered = options.connections.value.filter(connection =>
+    const filtered = baseConnections.filter(connection =>
       !(
         connection.toNodeType === to.nodeType &&
         connection.toNodeId === to.nodeId &&
         connection.toPort === to.port
       ),
     )
-    options.connections.value = [
+    const nextConnections = [
       ...filtered,
       {
         id: createConnectionId(),
@@ -539,7 +609,9 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
         toPort: to.port,
       },
     ]
+    options.connections.value = nextConnections
     clearSelectedConnection()
+    options.onConnectionsChanged?.(previousConnections, nextConnections)
     return true
   }
 
@@ -548,21 +620,26 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
     toNodeId: number,
     toPort: CanvasConnectionPort,
   ) {
+    const previousConnections = options.connections.value
     const removedSelected = options.connections.value.some(connection =>
       connection.id === selectedConnectionId.value &&
       connection.toNodeType === toNodeType &&
       connection.toNodeId === toNodeId &&
       connection.toPort === toPort,
     )
-    options.connections.value = options.connections.value.filter(connection =>
+    const nextConnections = options.connections.value.filter(connection =>
       !(
         connection.toNodeType === toNodeType &&
         connection.toNodeId === toNodeId &&
         connection.toPort === toPort
       ),
     )
+    options.connections.value = nextConnections
     if (removedSelected) {
       clearSelectedConnection()
+    }
+    if (nextConnections.length !== previousConnections.length) {
+      options.onConnectionsChanged?.(previousConnections, nextConnections)
     }
   }
 
@@ -650,25 +727,33 @@ export function useCanvasConnections(options: UseCanvasConnectionsOptions) {
 
   function finishConnectionDrag(clientX: number, clientY: number): 'linked' | 'invalid-pair' | 'invalid-direction' | 'noop' {
     if (!connectionDragState.value) return 'noop'
+    const previousConnections = options.connections.value
     const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null
     const parsedPort = parsePortTarget(target)
     const reconnectConnectionId = connectionDragState.value.reconnectConnectionId ?? null
     const reconnectConnectionSnapshot = connectionDragState.value.reconnectConnectionSnapshot
     let result: 'linked' | 'invalid-pair' | 'invalid-direction' | 'noop' = 'noop'
     if (parsedPort?.direction === 'input') {
-      if (reconnectConnectionId !== null) {
-        options.connections.value = options.connections.value.filter(connection => connection.id !== reconnectConnectionId)
-      }
-      const linked = upsertConnection(connectionDragState.value.from, parsedPort.endpoint)
+      const linked = upsertConnection(
+        connectionDragState.value.from,
+        parsedPort.endpoint,
+        previousConnections,
+        reconnectConnectionId,
+      )
       result = linked ? 'linked' : 'invalid-pair'
     } else if (parsedPort) {
       result = 'invalid-direction'
     }
     if (result !== 'linked' && reconnectConnectionSnapshot) {
-      options.connections.value = [
-        ...options.connections.value.filter(connection => connection.id !== reconnectConnectionSnapshot.id),
-        reconnectConnectionSnapshot,
-      ]
+      const hasSnapshot = options.connections.value.some(connection => connection.id === reconnectConnectionSnapshot.id)
+      if (!hasSnapshot) {
+        const nextConnections = [
+          ...options.connections.value,
+          reconnectConnectionSnapshot,
+        ]
+        options.connections.value = nextConnections
+        options.onConnectionsChanged?.(previousConnections, nextConnections)
+      }
     }
     clearConnectionDraft()
     return result

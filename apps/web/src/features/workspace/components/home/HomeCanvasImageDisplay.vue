@@ -14,7 +14,7 @@
     <img
       v-else-if="item.type === 'image'"
       :key="`image-${item.id}-${item.url}`"
-      :src="item.url"
+      :src="displayUrl"
       class="canvas-img"
       draggable="false"
       :ref="setImageRef"
@@ -24,10 +24,12 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import type { CanvasImageItem } from '../../types/canvasNodes'
+import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 
-defineProps<{
+const props = defineProps<{
   item: CanvasImageItem
   isPending: boolean
   displayHeight: number
@@ -37,6 +39,9 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'image-load', value: Event): void
 }>()
+
+const sourceDisplayUrl = computed(() => (props.item.type === 'image' ? props.item.url : null))
+const { displayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
 </script>
 
 <style scoped>

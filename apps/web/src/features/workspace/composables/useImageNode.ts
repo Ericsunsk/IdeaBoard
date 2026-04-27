@@ -33,6 +33,7 @@ interface UseImageNodeOptions {
   loadImageRatioFromUrl: (url: string) => Promise<number | null>
   readNodeImageDropPayload: (event: DragEvent) => DragPayload | null
   hasIncomingImageConnection?: (nodeId: number) => boolean
+  onImageNodeInputChanged?: (node: ImageNodeItem) => void
 }
 
 export function useImageNode(options: UseImageNodeOptions) {
@@ -48,6 +49,7 @@ export function useImageNode(options: UseImageNodeOptions) {
     const ratio = await options.loadImageRatioFromUrl(url)
     if (!ratio || node.sourceImageUrl !== url) return
     node.sourceImageRatio = ratio
+    options.onImageNodeInputChanged?.(node)
   }
 
   function getImageNodePreferredImage(node: ImageNodeItem | null): ImageNodeOutputItem | null {
@@ -78,6 +80,7 @@ export function useImageNode(options: UseImageNodeOptions) {
     if (clearOutputs) {
       node.outputImages = []
     }
+    options.onImageNodeInputChanged?.(node)
   }
 
   async function uploadImageNodeFile(node: ImageNodeItem, file: File) {
@@ -132,6 +135,7 @@ export function useImageNode(options: UseImageNodeOptions) {
     }
     clearImageNodeSource(node)
     node.outputImages = []
+    options.onImageNodeInputChanged?.(node)
   }
 
   function onImageNodeStageDrop(event: DragEvent, node: ImageNodeItem) {

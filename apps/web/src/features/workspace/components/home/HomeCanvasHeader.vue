@@ -174,7 +174,6 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   border: 1px solid #d8ddea;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
-  box-shadow: 0 10px 30px rgba(25, 30, 45, 0.12);
   z-index: 140;
 }
 .board-switch-item {

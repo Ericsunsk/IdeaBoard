@@ -67,15 +67,17 @@
 </template>
 
 <script setup lang="ts">
-import MaskNode from '../nodes/MaskNode.vue'
-import ModelNode from '../nodes/ModelNode.vue'
-import ViewpointNode from '../nodes/ViewpointNode.vue'
+import { defineAsyncComponent } from 'vue'
 import type {
   MaskNodeItem,
   ModelNodeItem,
   ViewpointNodeItem,
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
+
+const ModelNode = defineAsyncComponent(() => import('../nodes/ModelNode.vue'))
+const ViewpointNode = defineAsyncComponent(() => import('../nodes/ViewpointNode.vue'))
+const MaskNode = defineAsyncComponent(() => import('../nodes/MaskNode.vue'))
 
 const props = defineProps<{
   modelNodes: ModelNodeItem[]

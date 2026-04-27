@@ -406,7 +406,6 @@ onBeforeUnmount(() => {
 .mask-paint-popup-stage {
   position: relative;
   border: 1px solid #d8ddea;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
 .mask-paint-popup-canvas {

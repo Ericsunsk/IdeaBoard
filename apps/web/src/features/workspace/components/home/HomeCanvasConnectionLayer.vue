@@ -21,16 +21,14 @@
         :class="[ `tone-${draftConnectionKind}`, `is-${draftConnectionTone}` ]"
         :d="draftConnectionPath"
       />
-      <template v-for="connection in visibleConnections" :key="`endpoints-${connection.id}`">
-        <circle
-          v-if="selectedConnectionId === connection.id"
-          class="canvas-connection-endpoint"
-          :class="`tone-${connection.tone}`"
-          :cx="connection.startX"
-          :cy="connection.startY"
-          r="4"
-        />
-      </template>
+      <circle
+        v-if="selectedVisibleConnection"
+        class="canvas-connection-endpoint"
+        :class="`tone-${selectedVisibleConnection.tone}`"
+        :cx="selectedVisibleConnection.startX"
+        :cy="selectedVisibleConnection.startY"
+        r="4"
+      />
     </svg>
   </div>
 </template>
@@ -55,6 +53,10 @@ const visibleConnections = computed(() =>
     : props.renderedConnections.filter(connection => connection.id !== props.hiddenConnectionId),
 )
 
+const selectedVisibleConnection = computed(() =>
+  visibleConnections.value.find(connection => connection.id === props.selectedConnectionId) ?? null,
+)
+
 const emit = defineEmits<{
   (e: 'path-mousedown', event: MouseEvent, connectionId: number): void
 }>()
@@ -66,8 +68,10 @@ const emit = defineEmits<{
   inset: 0;
   z-index: 1;
   overflow: visible;
-  transform: translate(var(--offset-x, 0px), var(--offset-y, 0px)) scale(var(--zoom, 1));
+  transform: translate3d(var(--offset-x, 0px), var(--offset-y, 0px), 0) scale(var(--zoom, 1));
   transform-origin: center center;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .canvas-connections-layer {
@@ -147,6 +151,5 @@ const emit = defineEmits<{
   fill: var(--connection-color, #5b8def);
   stroke: #fff;
   stroke-width: 2;
-  filter: drop-shadow(0 0 6px var(--connection-glow, rgba(91, 141, 239, 0.18)));
 }
 </style>

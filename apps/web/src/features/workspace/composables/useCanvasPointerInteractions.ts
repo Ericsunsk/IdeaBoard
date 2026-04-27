@@ -12,6 +12,7 @@ import type {
   PromptNodeItem,
   WearNodeItem,
   ViewpointNodeItem,
+  ImageNodeOutputItem,
 } from '../types/canvasNodes'
 
 type NodeDragKind = 'image' | 'prompt' | 'model' | 'viewpoint' | 'mask' | 'color' | 'edit' | 'fusion' | 'enhance' | 'wear'
@@ -87,6 +88,9 @@ interface UseCanvasPointerInteractionsOptions {
   getNodeSelectionKey: (kind: NodeDragKind, id: number) => string
   beginHistoryBatch: () => void
   endHistoryBatch: (commit?: boolean) => void
+  onCanvasViewportChanged?: () => void
+  onCanvasLayoutFrameChanged?: () => void
+  onCanvasLayoutMutationCommitted?: () => void
   importCanvasImageToImageNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
   importCanvasImageToMaskNodeAtPoint: (clientX: number, clientY: number, imageItem: CanvasImageItem) => boolean
   message: MessageApiLike
@@ -94,6 +98,10 @@ interface UseCanvasPointerInteractionsOptions {
 
 function createCanvasEntityId(): number {
   return Date.now() + Math.random()
+}
+
+function cloneOutputImages(outputImages: ImageNodeOutputItem[]): ImageNodeOutputItem[] {
+  return outputImages.map(output => ({ ...output }))
 }
 
 export function useCanvasPointerInteractions(options: UseCanvasPointerInteractionsOptions) {
@@ -117,6 +125,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
   let nodeDragClientY = 0
   let nodeDragRAF: number | null = null
   let historyBatchActive = false
+  let hasCanvasLayoutMutation = false
 
   function closeNodeContextMenu() {
     if (!options.nodeContextMenu.value.visible) return
@@ -166,14 +175,14 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
         ...node,
         id: createCanvasEntityId(),
         angleSpec: { ...node.angleSpec },
-        outputImages: node.outputImages.map(output => ({ ...output })),
+        outputImages: cloneOutputImages(node.outputImages),
       }
     }
     if (node.type === 'viewpoint') {
       return {
         ...node,
         id: createCanvasEntityId(),
-        outputImages: node.outputImages.map(output => ({ ...output })),
+        outputImages: cloneOutputImages(node.outputImages),
       }
     }
     if (node.type === 'mask') {
@@ -186,14 +195,14 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       return {
         ...node,
         id: createCanvasEntityId(),
-        outputImages: node.outputImages.map(output => ({ ...output })),
+        outputImages: cloneOutputImages(node.outputImages),
       }
     }
     if (node.type === 'color') {
       return {
         ...node,
         id: createCanvasEntityId(),
-        outputImages: node.outputImages.map(output => ({ ...output })),
+        outputImages: cloneOutputImages(node.outputImages),
       }
     }
     if (
@@ -205,7 +214,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       return {
         ...node,
         id: createCanvasEntityId(),
-        outputImages: node.outputImages.map(output => ({ ...output })),
+        outputImages: cloneOutputImages(node.outputImages),
       }
     }
     throw new Error('Unsupported canvas node type')
@@ -230,6 +239,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     initialX = activeClone.x
     initialY = activeClone.y
     pendingDuplicateCanvasSourceIds = []
+    hasCanvasLayoutMutation = true
   }
 
   function applyDuplicatedNodeSelection() {
@@ -284,6 +294,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     draggedNodeOffsets = nextOffsets
     draggedNodePrimaryKey = nextPrimaryKey
     pendingDuplicateNodeKeys = []
+    hasCanvasLayoutMutation = true
   }
 
   function cancelNodeDrag() {
@@ -310,6 +321,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     clearPendingInteraction()
     marqueeBaseSelectionIds = []
     marqueeBaseNodeSelectionKeys = []
+    hasCanvasLayoutMutation = false
     endHistoryBatch(false)
     draggedCanvasItem = null
     draggedSelectionOffsets.clear()
@@ -541,6 +553,8 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       node.x = x + dx
       node.y = y + dy
     })
+    hasCanvasLayoutMutation = true
+    options.onCanvasLayoutFrameChanged?.()
   }
 
   function onResizeMouseDown(e: MouseEvent, msg: CanvasImageItem, dir: string) {
@@ -617,6 +631,7 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     if (options.isPanning.value) {
       options.canvasX.value = initialX + (e.clientX - startX)
       options.canvasY.value = initialY + (e.clientY - startY)
+      options.onCanvasViewportChanged?.()
       return
     }
 
@@ -653,6 +668,8 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
         draggedCanvasItem.x = initialX + dx
         draggedCanvasItem.y = initialY + dy
       }
+      hasCanvasLayoutMutation = true
+      options.onCanvasLayoutFrameChanged?.()
       return
     }
 
@@ -680,6 +697,8 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
       }
 
       draggedCanvasItem.width = newW
+      hasCanvasLayoutMutation = true
+      options.onCanvasLayoutFrameChanged?.()
     }
   }
 
@@ -759,6 +778,10 @@ export function useCanvasPointerInteractions(options: UseCanvasPointerInteractio
     marqueeBaseSelectionIds = []
     marqueeBaseNodeSelectionKeys = []
     endHistoryBatch(true)
+    if (hasCanvasLayoutMutation) {
+      options.onCanvasLayoutMutationCommitted?.()
+    }
+    hasCanvasLayoutMutation = false
     draggedCanvasItem = null
     draggedSelectionOffsets.clear()
     cancelNodeDrag()

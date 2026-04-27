@@ -54,6 +54,8 @@ interface UseGenerationPipelineOptions<TSubmitPayload extends object> {
   createCanvasImageAt: (point: CanvasPoint, url: string, ratio?: number) => CanvasImageItem
   submitTask: (payload: TSubmitPayload) => Promise<TaskSubmitResponseLike>
   getTask: (taskId: string) => Promise<TaskGetResponseLike>
+  onCanvasImagesChanged?: () => void
+  onImageNodeOutputsChanged?: (node: ImageNodeItem) => void
 }
 
 const GENERATED_CANVAS_IMAGE_WIDTH = 300
@@ -153,8 +155,10 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
         const output = targetNode.outputImages[outputIndex]
         if (!output || output.url !== url) return
         output.ratio = ratio
+        options.onImageNodeOutputsChanged?.(targetNode)
       })
     })
+    options.onImageNodeOutputsChanged?.(node)
   }
 
   function syncCanvasImageRatio(itemId: number, url: string) {
@@ -163,6 +167,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
       const target = options.messages.value.find(item => item.id === itemId)
       if (!target || target.url !== url) return
       target.height_ratio = ratio
+      options.onCanvasImagesChanged?.()
     })
   }
 
@@ -199,6 +204,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     if (items.length > 0) {
       options.messages.value.push(...items)
       options.selectedIds.value = items.map(item => item.id)
+      options.onCanvasImagesChanged?.()
     }
 
     return items
@@ -211,6 +217,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     if (options.selectedIds.value.some(id => ids.has(id))) {
       options.selectedIds.value = options.selectedIds.value.filter(id => !ids.has(id))
     }
+    options.onCanvasImagesChanged?.()
   }
 
   function replacePendingGeneratedImages(
@@ -272,6 +279,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     if (nextSelectedIds.length > 0) {
       options.selectedIds.value = nextSelectedIds
     }
+    options.onCanvasImagesChanged?.()
   }
 
   function appendGeneratedImages(urls: string[], source?: CanvasImageItem, outputNodeId?: number | null) {
@@ -297,6 +305,7 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
     if (newIds.length > 0) {
       options.selectedIds.value = newIds
     }
+    options.onCanvasImagesChanged?.()
   }
 
   function startTaskPolling(

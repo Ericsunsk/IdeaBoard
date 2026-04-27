@@ -626,11 +626,8 @@ function drawConnection(
   ctx.lineWidth = connection.tone === 'prompt' ? 2.2 : 2.6
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.shadowColor = withAlpha(stroke, 0.18)
-  ctx.shadowBlur = 6
   ctx.globalAlpha = 0.92
   ctx.stroke()
-  ctx.shadowBlur = 0
   ctx.globalAlpha = 1
   ctx.fillStyle = withAlpha(stroke, 0.72)
   ctx.beginPath()
@@ -658,9 +655,6 @@ function drawFrame(
   const accent = frame.nodeType ? NODE_ACCENT_COLORS[frame.nodeType] : '#7a90bf'
 
   ctx.save()
-  ctx.shadowColor = 'rgba(37, 48, 77, 0.12)'
-  ctx.shadowBlur = 16
-  ctx.shadowOffsetY = 7
   ctx.fillStyle = '#ffffff'
   roundedRectPath(ctx, x, y, width, height, radius)
   ctx.fill()

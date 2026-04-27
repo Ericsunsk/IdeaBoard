@@ -59,7 +59,7 @@ const emit = defineEmits<{
   overflow: hidden;
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -67,7 +67,6 @@ const emit = defineEmits<{
 
 .node-color-field-swatch-btn:hover {
   border-color: #b6a6f0;
-  box-shadow: 0 0 0 3px rgba(122, 107, 213, 0.12);
 }
 
 .node-color-field-input {

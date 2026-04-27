@@ -1,7 +1,10 @@
 <template>
   <div 
     class="canvas-layout" 
-    :class="{ 'copy-mode': isDuplicateModifierPressed && activeTool === 'select' }"
+    :class="{
+      'copy-mode': isDuplicateModifierPressed && activeTool === 'select',
+      'interaction-lite': isCanvasInteractionActive,
+    }"
     ref="canvasLayoutRef"
     :style="canvasStyle" 
     @mousedown="onCanvasMouseDown"
@@ -96,9 +99,9 @@
     <!-- ⑤ 右下角控件 -->
     <div class="floating-status">
       <div class="zoom-controls">
-        <button class="zoom-btn" @click="updateZoom(-10)">−</button>
+        <button class="zoom-btn" @click="updateCanvasZoom(-10)">−</button>
         <span class="zoom-level">{{ zoomLevel }}%</span>
-        <button class="zoom-btn" @click="updateZoom(10)">+</button>
+        <button class="zoom-btn" @click="updateCanvasZoom(10)">+</button>
       </div>
       <button class="logo-btn" title="返回画布列表" @click="navigateAway('/user/boards')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -156,8 +159,8 @@
     <!-- ⑥ 内容展示区 -->
     <div class="canvas-content">
       <HomeCanvasNodesBasic
-        :image-nodes="imageNodes"
-        :prompt-nodes="promptNodes"
+        :image-nodes="visibleImageNodes"
+        :prompt-nodes="visiblePromptNodes"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
@@ -181,9 +184,9 @@
       />
 
       <HomeCanvasNodesStructured
-        :model-nodes="modelNodes"
-        :viewpoint-nodes="viewpointNodes"
-        :mask-nodes="maskNodes"
+        :model-nodes="visibleModelNodes"
+        :viewpoint-nodes="visibleViewpointNodes"
+        :mask-nodes="visibleMaskNodes"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
@@ -227,11 +230,11 @@
       />
 
       <HomeCanvasNodesExecution
-        :edit-nodes="editNodes"
-        :fusion-nodes="fusionNodes"
-        :enhance-nodes="enhanceNodes"
-        :wear-nodes="wearNodes"
-        :color-nodes="colorNodes"
+        :edit-nodes="visibleEditNodes"
+        :fusion-nodes="visibleFusionNodes"
+        :enhance-nodes="visibleEnhanceNodes"
+        :wear-nodes="visibleWearNodes"
+        :color-nodes="visibleColorNodes"
         :copy-mode="nodeCopyMode"
         :is-node-selected="isNodeSelected"
         :is-node-dragging="isNodeDragging"
@@ -283,7 +286,7 @@
       />
 
       <HomeCanvasImageItem
-        v-for="msg in messages"
+        v-for="msg in visibleMessages"
         :key="msg.id"
         :item="msg"
         :is-active="selectedIds.includes(msg.id)"
@@ -329,6 +332,7 @@ import {
 import { CANVAS_NODE_MENU_ITEMS, type CanvasNodeCreateActionKey } from '../config/canvasNodeMenu'
 import { useCanvasConnections } from '../composables/useCanvasConnections'
 import { useCanvasViewport } from '../composables/useCanvasViewport'
+import { useCanvasViewportCulling } from '../composables/useCanvasViewportCulling'
 import { useCanvasBoard } from '../composables/useCanvasBoard'
 import { useCanvasEditor } from '../composables/useCanvasEditor'
 import { useCanvasHistory } from '../composables/useCanvasHistory'
@@ -453,6 +457,18 @@ const {
   resetViewport,
   createViewportSnapshot,
 } = useCanvasViewport()
+const cullingBuffer = computed(() => {
+  const zoomScale = Math.max(0.1, zoomLevel.value / 100)
+  return Math.max(800, Math.min(1400, Math.round(1000 / Math.max(zoomScale, 0.7))))
+})
+const { isNodeRectVisible, filterVisible } = useCanvasViewportCulling({
+  canvasLayoutRef,
+  canvasX,
+  canvasY,
+  zoomLevel,
+  buffer: cullingBuffer,
+  onViewportRectChanged: () => markCanvasViewportChanged(),
+})
 const activeTool = ref('select')
 const isDraggingFile = ref(false)
 const showSettings = ref(false)
@@ -920,15 +936,6 @@ async function schedulePendingRecycleScan() {
 }
 const runningExecutionNodeKeys = ref<Set<string>>(new Set())
 const executionNodeLastRunFailedMap = ref<Record<string, boolean>>({})
-const executionNodeWatchSources = [
-  modelNodes,
-  viewpointNodes,
-  colorNodes,
-  enhanceNodes,
-  editNodes,
-  fusionNodes,
-  wearNodes,
-] as const
 const connections = ref<CanvasConnection[]>([])
 const processedMaskPreviewUrls = ref<Record<number, string>>({})
 const styleInnovateDefaultStrength = 50
@@ -975,7 +982,6 @@ const {
   triggerNodeConnectionError,
   clearConnectionDraft,
   beginConnectionReconnect,
-  refreshRenderedConnections,
   scheduleRenderedConnectionsRefresh,
   startConnectionDrag,
   addGlobalConnectionListeners,
@@ -987,8 +993,15 @@ const {
   canvasX,
   canvasY,
   zoomLevel,
+  isConnectionRenderable: (connection) => {
+    if (connection.id === selectedConnectionId.value || connection.id === reconnectingConnectionId.value) {
+      return true
+    }
+    return isConnectionRetainedByNodes(connection, retainedNodeKeys.value)
+  },
   lookupNodeByType: getCanvasConnectionNodeByType,
   isConnectionAllowed: (from, to) => isCanvasConnectionAllowed(from, to, getCanvasConnectionNodeByType),
+  onConnectionsChanged: applyConnectionMutationEffects,
   onConnectionNotAllowed: () => {
     message.warning('当前这两个端口不能连接')
   },
@@ -1012,7 +1025,10 @@ const {
   activeEnhanceNodeId,
   activeWearNodeId,
   nodeContextMenu,
+  isPanning,
   isSelecting,
+  isDraggingItem,
+  isResizingItem,
   selectionRect,
   activateImageNode,
   activatePromptNode,
@@ -1076,7 +1092,7 @@ const {
   confirmBoardRename: () => confirmBoardRename(),
   saveBoard: () => persistBoardStateNow(),
   resolveLeaveConfirm: (decision) => resolveLeaveConfirm(decision),
-  updateZoom,
+  updateZoom: updateCanvasZoom,
   getCanvasPointFromClient,
   createCanvasImageAt: createCanvasImageItemAt,
   uploadImage: uploadWorkspaceImage,
@@ -1101,11 +1117,22 @@ const {
   deleteSelectedConnection,
   beginHistoryBatch: () => beginCanvasHistoryBatch(),
   endHistoryBatch: (commit) => endCanvasHistoryBatch(commit),
+  onCanvasViewportChanged: markCanvasViewportChanged,
+  onCanvasLayoutFrameChanged: markCanvasLayoutFrameChanged,
+  onCanvasLayoutMutationCommitted: markCanvasLayoutChanged,
+  onCanvasContentChanged: markCanvasContentChanged,
   undo: () => undoCanvasSnapshot(),
   redo: () => redoCanvasSnapshot(),
   message,
   nodeImageDragMime,
 })
+
+const isCanvasInteractionActive = computed(() =>
+  isSelecting.value ||
+  isPanning.value ||
+  isDraggingItem.value ||
+  isResizingItem.value,
+)
 
 const {
   getMaskCanvasWidth,
@@ -1136,6 +1163,7 @@ const {
   activateMaskNode,
   closeNodeContextMenu,
   readNodeImageDropPayload,
+  onMaskNodeContentChanged: markMaskNodeChanged,
 })
 
 const {
@@ -1152,6 +1180,10 @@ const {
   loadImageRatioFromUrl,
   readNodeImageDropPayload,
   hasIncomingImageConnection: (nodeId) => hasIncomingPortConnection('image', nodeId, 'image'),
+  onImageNodeInputChanged: (node) => {
+    markWorkflowInputChanged('image', node.id)
+    markCanvasLayoutChanged()
+  },
 })
 
 const {
@@ -1180,6 +1212,11 @@ const {
   createCanvasImageAt: createCanvasImageItemAt,
   submitTask: taskApi.submit,
   getTask: taskApi.get,
+  onCanvasImagesChanged: markCanvasContentChanged,
+  onImageNodeOutputsChanged: (node) => {
+    markWorkflowInputChanged('image', node.id)
+    markCanvasLayoutChanged()
+  },
 })
 
 const {
@@ -1200,6 +1237,11 @@ const {
   createCanvasImageAt: createCanvasImageItemAt,
   submitTask: taskApi.submit,
   getTask: taskApi.get,
+  onCanvasImagesChanged: markCanvasContentChanged,
+  onImageNodeOutputsChanged: (node) => {
+    markWorkflowInputChanged('image', node.id)
+    markCanvasLayoutChanged()
+  },
 })
 
 function getExecutionOutputNodeByType(
@@ -1306,9 +1348,13 @@ function appendWorkflowNodeOutputs(
       const output = targetNode.outputImages[outputIndex]
       if (!output || output.url !== url) return
       output.ratio = ratio
+      markExecutionOutputChanged(nodeType, nodeId)
+      markCanvasLayoutChanged()
     })
   })
   setExecutionNodeLastRunFailed(nodeType, nodeId, false)
+  markExecutionOutputChanged(nodeType, nodeId)
+  markCanvasContentChanged()
 }
 
 function getExecutionNodeStateKey(nodeType: CanvasExecutionOutputNodeType, nodeId: number): string {
@@ -1450,177 +1496,36 @@ function resetEditorState() {
 }
 
 let suspendWorkflowCacheReactions = false
-let previousPromptSignatureMap: Record<string, string> = {}
-let previousImageSourceSignatureMap: Record<string, string> = {}
-let previousMaskSignatureMap: Record<string, string> = {}
-let previousExecutionInputSignatureMap: Record<string, string> = {}
-let previousExecutionOutputSignatureMap: Record<string, string> = {}
-let previousConnectionTargetSignatureMap: Record<string, string> = {}
 
-function buildPromptSignatureMap(): Record<string, string> {
-  return promptNodes.value.reduce<Record<string, string>>((acc, node) => {
-    acc[String(node.id)] = node.text
-    return acc
-  }, {})
+const canvasMutationVersions = {
+  content: ref(0),
+  layout: ref(0),
+  layoutFrame: ref(0),
+  viewport: ref(0),
+  workflowInput: ref(0),
+  executionInput: ref(0),
+  executionOutput: ref(0),
+  preview: ref(0),
+  system: ref(0),
 }
 
-function buildImageSourceSignatureMap(): Record<string, string> {
-  return imageNodes.value.reduce<Record<string, string>>((acc, node) => {
-    const latestOutput = node.outputImages[node.outputImages.length - 1]
-    acc[String(node.id)] = [
-      node.sourceImageUrl,
-      String(node.sourceImageRatio || 1),
-      latestOutput?.url || '',
-      String(latestOutput?.ratio || 1),
-      String(node.outputImages.length),
-    ].join('|')
-    return acc
-  }, {})
+function bumpCanvasMutationVersion(scope: keyof typeof canvasMutationVersions) {
+  canvasMutationVersions[scope].value += 1
 }
 
-function buildMaskSignatureMap(): Record<string, string> {
-  return maskNodes.value.reduce<Record<string, string>>((acc, node) => {
-    acc[String(node.id)] = [
-      node.sourceImageUrl,
-      String(node.sourceImageRatio || 1),
-      node.executionMaskDataUrl || '',
-      node.maskDataUrl,
-      String(clampMaskRefineAmount(node.refineAmount ?? 0)),
-      node.invertMask ? '1' : '0',
-    ].join('|')
-    return acc
-  }, {})
-}
-
-function buildExecutionInputSignatureMap(): Record<string, string> {
-  const result: Record<string, string> = {}
-
-  modelNodes.value.forEach((node) => {
-    result[`model:${node.id}`] = [
-      `${node.angleSpec.yaw}:${node.angleSpec.framing}`,
-      String(node.modelStrength),
-      String(node.poseStrength),
-      node.background,
-    ].join('|')
-  })
-
-  viewpointNodes.value.forEach((node) => {
-    result[`viewpoint:${node.id}`] = [
-      node.selectedViewpoint,
-      node.lighting,
-    ].join('|')
-  })
-
-  colorNodes.value.forEach((node) => {
-    result[`color:${node.id}`] = [
-      node.colors.join(','),
-      String(node.strength),
-    ].join('|')
-  })
-
-  editNodes.value.forEach((node) => {
-    result[`edit:${node.id}`] = node.mode
-  })
-
-  fusionNodes.value.forEach((node) => {
-    result[`fusion:${node.id}`] = String(node.blendRatio)
-  })
-
-  enhanceNodes.value.forEach((node) => {
-    result[`enhance:${node.id}`] = [
-      node.mode,
-      node.upscaleMode,
-      String(node.upscaleFactor),
-      node.outputFormat,
-      String(node.outputQuality),
-      String(node.extendTop),
-      String(node.extendRight),
-      String(node.extendBottom),
-      String(node.extendLeft),
-    ].join('|')
-  })
-
-  wearNodes.value.forEach((node) => {
-    result[`wear:${node.id}`] = [
-      node.tileMode,
-      String(node.rotation),
-      String(node.scale),
-      String(node.opacity),
-    ].join('|')
-  })
-
-  return result
-}
-
-function buildExecutionOutputSignatureMap(): Record<string, string> {
-  const result: Record<string, string> = {}
-  const assign = (nodeType: CanvasExecutionOutputNodeType, nodes: { id: number; outputImages: { url: string; ratio: number }[] }[]) => {
-    nodes.forEach((node) => {
-      const latestOutput = node.outputImages[node.outputImages.length - 1]
-      result[`${nodeType}:${node.id}`] = [
-        latestOutput?.url || '',
-        String(latestOutput?.ratio || 1),
-        String(node.outputImages.length),
-      ].join('|')
-    })
-  }
-
-  assign('model', modelNodes.value)
-  assign('viewpoint', viewpointNodes.value)
-  assign('color', colorNodes.value)
-  assign('edit', editNodes.value)
-  assign('fusion', fusionNodes.value)
-  assign('enhance', enhanceNodes.value)
-  assign('wear', wearNodes.value)
-  return result
-}
-
-function buildConnectionTargetSignatureMap(): Record<string, string> {
-  const grouped: Record<string, string[]> = {}
-  connections.value.forEach((connection) => {
-    const targetKey = `${connection.toNodeType}:${connection.toNodeId}`
-    if (!grouped[targetKey]) {
-      grouped[targetKey] = []
-    }
-    grouped[targetKey].push(`${connection.fromNodeType}:${connection.fromNodeId}:${connection.fromPort}->${connection.toPort}`)
-  })
-  return Object.entries(grouped).reduce<Record<string, string>>((acc, [key, values]) => {
-    acc[key] = values.sort().join('|')
-    return acc
-  }, {})
-}
-
-function primeWorkflowCacheSignatureMaps() {
-  previousPromptSignatureMap = buildPromptSignatureMap()
-  previousImageSourceSignatureMap = buildImageSourceSignatureMap()
-  previousMaskSignatureMap = buildMaskSignatureMap()
-  previousExecutionInputSignatureMap = buildExecutionInputSignatureMap()
-  previousExecutionOutputSignatureMap = buildExecutionOutputSignatureMap()
-  previousConnectionTargetSignatureMap = buildConnectionTargetSignatureMap()
-}
-
-function forEachChangedSignature(
-  previousMap: Record<string, string>,
-  nextMap: Record<string, string>,
-  onChanged: (key: string) => void,
-) {
-  const keys = new Set([...Object.keys(previousMap), ...Object.keys(nextMap)])
-  keys.forEach((key) => {
-    if (previousMap[key] !== nextMap[key]) {
-      onChanged(key)
-    }
-  })
+function getCanvasMutationVersionTotal() {
+  return Object.values(canvasMutationVersions).reduce((sum, version) => sum + version.value, 0)
 }
 
 let resetHistoryBaseline: ((snapshot?: CanvasBoardSnapshot | null) => void) | null = null
 
 async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
   suspendWorkflowCacheReactions = true
+  bumpCanvasMutationVersion('system')
   try {
     if (!state) {
       resetEditorState()
       await nextTick()
-      primeWorkflowCacheSignatureMaps()
       resetHistoryBaseline?.(createBoardSnapshotBase())
       return
     }
@@ -1694,9 +1599,18 @@ async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
     setViewport(state.viewport)
 
     await nextTick()
+    const nextMaskNodeIds = new Set(maskNodes.value.map(node => node.id))
+    Object.keys(processedMaskPreviewUrls.value).forEach((rawId) => {
+      const id = Number(rawId)
+      if (!nextMaskNodeIds.has(id)) {
+        clearProcessedMaskPreview(id)
+      }
+    })
     maskNodes.value.forEach(node => renderMaskNodeMask(node))
+    maskNodes.value.forEach((node) => {
+      void refreshProcessedMaskPreview(node)
+    })
     scheduleRenderedConnectionsRefresh()
-    primeWorkflowCacheSignatureMaps()
     resetHistoryBaseline?.(createBoardSnapshotBase())
   } finally {
     suspendWorkflowCacheReactions = false
@@ -1741,6 +1655,49 @@ function createBoardSnapshotBase(): CanvasBoardSnapshot {
     connections: connections.value.map(connection => ({ ...connection })),
     viewport: createViewportSnapshot(),
   }
+}
+
+function compactCanvasMutationGuardValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    if (value.length <= 256) return value
+    return `${value.slice(0, 32)}:${value.length}:${value.slice(-16)}`
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => compactCanvasMutationGuardValue(item))
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        compactCanvasMutationGuardValue(item),
+      ]),
+    )
+  }
+  return value
+}
+
+function createCanvasMutationGuardSnapshot(): string {
+  return JSON.stringify(compactCanvasMutationGuardValue(createBoardSnapshotBase()))
+}
+
+function installCanvasMutationDevGuard() {
+  if (!import.meta.env.DEV) return
+  let lastVersionTotal = getCanvasMutationVersionTotal()
+  watch(
+    createCanvasMutationGuardSnapshot,
+    () => {
+      const nextVersionTotal = getCanvasMutationVersionTotal()
+      if (!suspendWorkflowCacheReactions && nextVersionTotal === lastVersionTotal) {
+        console.warn(
+          '[canvas] Canvas state changed without an explicit mutation side effect. ' +
+          'Route the update through markCanvasContentChanged, markCanvasLayoutChanged, ' +
+          'markWorkflowInputChanged, markExecutionInputChanged, or markExecutionOutputChanged.',
+        )
+      }
+      lastVersionTotal = nextVersionTotal
+    },
+    { flush: 'post' },
+  )
 }
 
 function collectRemovedWorkspaceUploadEntries(
@@ -1795,6 +1752,7 @@ const {
   createSnapshot: createBoardSnapshotBase,
   applySnapshot: applyBoardSnapshot,
   maxEntries: RECENT_HISTORY_RECYCLE_GUARD_STEPS,
+  debounceMs: 280,
 })
 
 resetHistoryBaseline = syncCanvasHistoryBaseline
@@ -1827,10 +1785,13 @@ const {
   onPersisted: handleBoardPersisted,
 })
 
-primeWorkflowCacheSignatureMaps()
-
 function setBoardNameInputRef(element: HTMLInputElement | null) {
   boardNameInputRef.value = element
+}
+
+function updateCanvasZoom(delta: number, anchor?: { clientX: number; clientY: number }) {
+  updateZoom(delta, anchor)
+  markCanvasViewportChanged()
 }
 
 async function navigateAway(path: string) {
@@ -1840,138 +1801,155 @@ async function navigateAway(path: string) {
   void router.push(path)
 }
 
-watch(
-  promptNodes,
-  () => {
-    const nextMap = buildPromptSignatureMap()
-    if (suspendWorkflowCacheReactions) {
-      previousPromptSignatureMap = nextMap
+let boardDirtySnapshotRafId: number | null = null
+
+function flushBoardDirtySnapshotSchedule() {
+  boardDirtySnapshotRafId = null
+  markBoardDirty()
+  notifySnapshotChanged()
+}
+
+function scheduleBoardDirtySnapshot() {
+  if (boardDirtySnapshotRafId !== null) return
+  boardDirtySnapshotRafId = window.requestAnimationFrame(flushBoardDirtySnapshotSchedule)
+}
+
+function cancelBoardDirtySnapshotSchedule() {
+  if (boardDirtySnapshotRafId === null) return
+  window.cancelAnimationFrame(boardDirtySnapshotRafId)
+  boardDirtySnapshotRafId = null
+}
+
+interface CanvasMutationOptions {
+  content?: boolean
+  layout?: boolean
+  layoutFrame?: boolean
+  viewport?: boolean
+}
+
+function applyCanvasMutationEffects(options: CanvasMutationOptions | undefined) {
+  if (options?.viewport) {
+    bumpCanvasMutationVersion('viewport')
+    scheduleRenderedConnectionsRefresh()
+  }
+  if (suspendWorkflowCacheReactions) return
+  if (options?.layoutFrame) {
+    bumpCanvasMutationVersion('layoutFrame')
+    scheduleRenderedConnectionsRefresh()
+  }
+  if (options?.layout) {
+    bumpCanvasMutationVersion('layout')
+    bumpCanvasMutationVersion('content')
+    scheduleRenderedConnectionsRefresh()
+    scheduleBoardDirtySnapshot()
+    return
+  }
+  if (options?.content) {
+    bumpCanvasMutationVersion('content')
+    scheduleBoardDirtySnapshot()
+  }
+}
+
+function commitCanvasMutation<T>(mutator: () => T, options?: CanvasMutationOptions): T {
+  const result = mutator()
+  applyCanvasMutationEffects(options)
+  return result
+}
+
+function runCanvasMutation(mutator: () => void, options?: CanvasMutationOptions) {
+  commitCanvasMutation(mutator, options)
+}
+
+function markCanvasContentChanged() {
+  applyCanvasMutationEffects({ content: true })
+}
+
+function markCanvasLayoutFrameChanged() {
+  applyCanvasMutationEffects({ layoutFrame: true })
+}
+
+function markCanvasLayoutChanged() {
+  applyCanvasMutationEffects({ layout: true })
+}
+
+function markCanvasViewportChanged() {
+  applyCanvasMutationEffects({ viewport: true })
+}
+
+function markWorkflowInputChanged(fromNodeType: 'prompt' | 'image' | 'mask', fromNodeId: number) {
+  if (suspendWorkflowCacheReactions) return
+  bumpCanvasMutationVersion('workflowInput')
+  markConnectedExecutionTargetsDirty(fromNodeType, fromNodeId)
+}
+
+function markExecutionInputChanged(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
+  if (suspendWorkflowCacheReactions) return
+  bumpCanvasMutationVersion('executionInput')
+  markExecutionNodeDirty(nodeType, nodeId)
+}
+
+function markExecutionInputContentChanged(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
+  markExecutionInputChanged(nodeType, nodeId)
+  markCanvasContentChanged()
+}
+
+function markExecutionOutputChanged(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
+  if (suspendWorkflowCacheReactions) return
+  const node = getExecutionOutputNodeByType(nodeType, nodeId)
+  if (!node) return
+  bumpCanvasMutationVersion('executionOutput')
+  bumpCanvasMutationVersion('preview')
+  setWorkflowNodeOutputStatus(node)
+  markConnectedExecutionTargetsDirty(nodeType, nodeId)
+}
+
+function markMaskNodeChanged(node: MaskNodeItem) {
+  markWorkflowInputChanged('mask', node.id)
+  bumpCanvasMutationVersion('preview')
+  markCanvasLayoutChanged()
+  void refreshProcessedMaskPreview(node)
+}
+
+function buildConnectionTargetSignatureMapFromConnections(
+  sourceConnections: CanvasConnection[],
+): Record<string, string> {
+  const grouped: Record<string, string[]> = {}
+  sourceConnections.forEach((connection) => {
+    const targetKey = `${connection.toNodeType}:${connection.toNodeId}`
+    if (!grouped[targetKey]) {
+      grouped[targetKey] = []
+    }
+    grouped[targetKey].push(`${connection.fromNodeType}:${connection.fromNodeId}:${connection.fromPort}->${connection.toPort}`)
+  })
+  return Object.entries(grouped).reduce<Record<string, string>>((acc, [key, values]) => {
+    acc[key] = values.sort().join('|')
+    return acc
+  }, {})
+}
+
+function applyConnectionMutationEffects(
+  previousConnections: CanvasConnection[],
+  nextConnections: CanvasConnection[],
+) {
+  if (suspendWorkflowCacheReactions) return
+  markCanvasLayoutChanged()
+  const previousMap = buildConnectionTargetSignatureMapFromConnections(previousConnections)
+  const nextMap = buildConnectionTargetSignatureMapFromConnections(nextConnections)
+  const keys = new Set([...Object.keys(previousMap), ...Object.keys(nextMap)])
+  keys.forEach((key) => {
+    if (previousMap[key] === nextMap[key]) return
+    const [nodeType, rawNodeId] = key.split(':')
+    const nodeId = Number(rawNodeId)
+    if (!Number.isFinite(nodeId)) return
+    if (isCanvasExecutionOutputNodeType(nodeType)) {
+      markExecutionInputChanged(nodeType, nodeId)
       return
     }
-    forEachChangedSignature(previousPromptSignatureMap, nextMap, (key) => {
-      const nodeId = Number(key)
-      if (Number.isFinite(nodeId)) {
-        markConnectedExecutionTargetsDirty('prompt', nodeId)
-      }
-    })
-    previousPromptSignatureMap = nextMap
-  },
-  { deep: true },
-)
-
-watch(
-  imageNodes,
-  () => {
-    const nextMap = buildImageSourceSignatureMap()
-    if (suspendWorkflowCacheReactions) {
-      previousImageSourceSignatureMap = nextMap
-      return
+    if (nodeType === 'mask') {
+      markWorkflowInputChanged('mask', nodeId)
     }
-    forEachChangedSignature(previousImageSourceSignatureMap, nextMap, (key) => {
-      const nodeId = Number(key)
-      if (Number.isFinite(nodeId)) {
-        markConnectedExecutionTargetsDirty('image', nodeId)
-      }
-    })
-    previousImageSourceSignatureMap = nextMap
-  },
-  { deep: true },
-)
-
-watch(
-  maskNodes,
-  () => {
-    const nextMap = buildMaskSignatureMap()
-    if (suspendWorkflowCacheReactions) {
-      previousMaskSignatureMap = nextMap
-      return
-    }
-    forEachChangedSignature(previousMaskSignatureMap, nextMap, (key) => {
-      const nodeId = Number(key)
-      if (Number.isFinite(nodeId)) {
-        markConnectedExecutionTargetsDirty('mask', nodeId)
-      }
-    })
-    previousMaskSignatureMap = nextMap
-  },
-  { deep: true },
-)
-
-watch(
-  executionNodeWatchSources,
-  () => {
-    const nextMap = buildExecutionInputSignatureMap()
-    if (suspendWorkflowCacheReactions) {
-      previousExecutionInputSignatureMap = nextMap
-      return
-    }
-    forEachChangedSignature(previousExecutionInputSignatureMap, nextMap, (key) => {
-      const [nodeType, rawNodeId] = key.split(':')
-      const nodeId = Number(rawNodeId)
-      if (isCanvasExecutionOutputNodeType(nodeType) && Number.isFinite(nodeId)) {
-        markExecutionNodeDirty(nodeType, nodeId)
-      }
-    })
-    previousExecutionInputSignatureMap = nextMap
-  },
-  { deep: true },
-)
-
-watch(
-  executionNodeWatchSources,
-  () => {
-    const nextMap = buildExecutionOutputSignatureMap()
-    if (suspendWorkflowCacheReactions) {
-      previousExecutionOutputSignatureMap = nextMap
-      return
-    }
-    forEachChangedSignature(previousExecutionOutputSignatureMap, nextMap, (key) => {
-      const [nodeType, rawNodeId] = key.split(':')
-      const nodeId = Number(rawNodeId)
-      if (!isCanvasExecutionOutputNodeType(nodeType) || !Number.isFinite(nodeId)) return
-      const node = getExecutionOutputNodeByType(nodeType, nodeId)
-      if (!node) return
-      setWorkflowNodeOutputStatus(node)
-      markConnectedExecutionTargetsDirty(nodeType, nodeId)
-    })
-    previousExecutionOutputSignatureMap = nextMap
-  },
-  { deep: true },
-)
-
-watch(
-  connections,
-  () => {
-    const nextMap = buildConnectionTargetSignatureMap()
-    if (suspendWorkflowCacheReactions) {
-      previousConnectionTargetSignatureMap = nextMap
-      return
-    }
-    forEachChangedSignature(previousConnectionTargetSignatureMap, nextMap, (key) => {
-      const [nodeType, rawNodeId] = key.split(':')
-      const nodeId = Number(rawNodeId)
-      if (!Number.isFinite(nodeId)) return
-      if (isCanvasExecutionOutputNodeType(nodeType)) {
-        markExecutionNodeDirty(nodeType, nodeId)
-        return
-      }
-      if (nodeType === 'mask') {
-        markConnectedExecutionTargetsDirty('mask', nodeId)
-      }
-    })
-    previousConnectionTargetSignatureMap = nextMap
-  },
-  { deep: true },
-)
-
-watch(
-  [messages, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, wearNodes, connections],
-  () => {
-    markBoardDirty()
-    notifySnapshotChanged()
-  },
-  { deep: true }
-)
+  })
+}
 
 watch(
   () => userStore.user?.id,
@@ -1981,30 +1959,7 @@ watch(
   { immediate: true },
 )
 
-watch(
-  [connections, imageNodes, promptNodes, modelNodes, viewpointNodes, maskNodes, colorNodes, enhanceNodes, editNodes, fusionNodes, wearNodes, canvasX, canvasY, zoomLevel],
-  () => {
-    refreshRenderedConnections()
-  },
-  { deep: true, flush: 'post' }
-)
-
-watch(
-  maskNodes,
-  (nodes) => {
-    const nextIds = new Set(nodes.map(node => node.id))
-    Object.keys(processedMaskPreviewUrls.value).forEach((rawId) => {
-      const id = Number(rawId)
-      if (!nextIds.has(id)) {
-        clearProcessedMaskPreview(id)
-      }
-    })
-    nodes.forEach((node) => {
-      void refreshProcessedMaskPreview(node)
-    })
-  },
-  { deep: true, immediate: true }
-)
+installCanvasMutationDevGuard()
 
 function deletePromptNode(id: number) {
   deleteNodeFromCollection(promptNodes, 'prompt', id, () => {
@@ -2096,10 +2051,12 @@ function createNodeFromContextMenu<T extends { id: number }>(
 ) {
   const { clientX, clientY } = nodeContextMenu.value
   const point = getCanvasPointFromClient(clientX, clientY)
-  const newNode = createAt(point)
-  append(newNode)
-  activate(newNode.id)
-  afterCreate?.(newNode)
+  runCanvasMutation(() => {
+    const newNode = createAt(point)
+    append(newNode)
+    activate(newNode.id)
+    afterCreate?.(newNode)
+  }, { layout: true })
   closeNodeContextMenu()
 }
 
@@ -2140,6 +2097,7 @@ function deleteNodeFromCollection<T extends { id: number }>(
   removeConnectionsForNode(nodeType, id)
   removeSelectedNodeKey(nodeType, id)
   afterDelete?.()
+  markCanvasLayoutChanged()
 }
 
 function buildNodeCreateHandler<T extends { id: number }>(
@@ -2500,13 +2458,15 @@ function getImageNodeStageHeight(node: ImageNodeItem): number {
 function appendImageNodeDisplayToCanvas(node: ImageNodeItem) {
   const display = getResolvedImageNodeDisplay(node).image
   if (!display) return
-  const item = createCanvasImageItemAt(
-    { x: node.x - 360, y: node.y + 18 },
-    display.url,
-    display.ratio,
-  )
-  messages.value.push(item)
-  selectedIds.value = [item.id]
+  runCanvasMutation(() => {
+    const item = createCanvasImageItemAt(
+      { x: node.x - 360, y: node.y + 18 },
+      display.url,
+      display.ratio,
+    )
+    messages.value.push(item)
+    selectedIds.value = [item.id]
+  }, { layout: true })
 }
 
 function onImageNodeDisplayDragStart(event: DragEvent, node: ImageNodeItem) {
@@ -2538,8 +2498,11 @@ function getMaskNodeEffectiveSource(node: MaskNodeItem): { url: string; ratio: n
 }
 
 function setViewpointNodeCategory(node: ViewpointNodeItem, category: ViewpointNodeItem['activeCategory']) {
-  node.activeCategory = category
-  node.selectedViewpoint = normalizeViewpointSelectionByCategory(category, node.selectedViewpoint)
+  runCanvasMutation(() => {
+    node.activeCategory = category
+    node.selectedViewpoint = normalizeViewpointSelectionByCategory(category, node.selectedViewpoint)
+  }, { content: true })
+  markExecutionInputChanged('viewpoint', node.id)
 }
 
 function getCanvasConnectionNodeByType(
@@ -2605,6 +2568,7 @@ function warnMissingNodeInputs(
 }
 
 function setEnhanceNodeMode(node: EnhanceNodeItem, mode: EnhanceNodeItem['mode']) {
+  if (node.mode === mode) return
   node.mode = mode
   if (!enhanceModeSupportsPrompt(mode)) {
     removeIncomingConnectionsForPort('enhance', node.id, 'prompt')
@@ -2612,9 +2576,11 @@ function setEnhanceNodeMode(node: EnhanceNodeItem, mode: EnhanceNodeItem['mode']
   if (!enhanceModeSupportsMask(mode)) {
     removeIncomingConnectionsForPort('enhance', node.id, 'mask')
   }
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function setEditNodeMode(node: EditNodeItem, mode: EditNodeItem['mode']) {
+  if (node.mode === mode) return
   node.mode = mode
   if (!editModeSupportsPrompt(mode)) {
     removeIncomingConnectionsForPort('edit', node.id, 'prompt')
@@ -2622,6 +2588,7 @@ function setEditNodeMode(node: EditNodeItem, mode: EditNodeItem['mode']) {
   if (!editModeSupportsSourceImage(mode)) {
     removeIncomingConnectionsForPort('edit', node.id, 'imageB')
   }
+  markExecutionInputContentChanged('edit', node.id)
 }
 
 function clampEnhanceExtendPercent(value: number): number {
@@ -2640,6 +2607,7 @@ function getMaskNodeStageHeight(node: MaskNodeItem): number {
 function removeColorNodeColor(node: ColorNodeItem, index: number) {
   if (index < 0 || index >= node.colors.length) return
   node.colors.splice(index, 1)
+  markExecutionInputContentChanged('color', node.id)
 }
 
 function addColorNodeColor(node: ColorNodeItem, rawColor: string) {
@@ -2650,6 +2618,7 @@ function addColorNodeColor(node: ColorNodeItem, rawColor: string) {
   const nextColor = normalizeHexColor(rawColor)
   if (node.colors.includes(nextColor)) return
   node.colors.push(nextColor)
+  markExecutionInputContentChanged('color', node.id)
 }
 
 const {
@@ -2694,6 +2663,178 @@ function resolveWorkflowPromptText(
 
 const nodeCopyMode = computed(() => isDuplicateModifierPressed.value && activeTool.value === 'select')
 
+interface CanvasRectLike {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+function toNodeRenderKey(nodeType: CanvasConnectionNodeType, nodeId: number): string {
+  return `${nodeType}:${nodeId}`
+}
+
+function isNodeKeyRetained(nodeType: CanvasConnectionNodeType, nodeId: number, retainedKeys: Set<string>): boolean {
+  return retainedKeys.has(toNodeRenderKey(nodeType, nodeId))
+}
+
+function filterRetainedNodes<T extends { id: number }>(nodeType: CanvasConnectionNodeType, nodes: T[]): T[] {
+  return nodes.filter(node => isNodeKeyRetained(nodeType, node.id, retainedNodeKeys.value))
+}
+
+function isConnectionRetainedByNodes(connection: CanvasConnection, retainedKeys: Set<string>): boolean {
+  return (
+    retainedKeys.has(toNodeRenderKey(connection.fromNodeType, connection.fromNodeId)) &&
+    retainedKeys.has(toNodeRenderKey(connection.toNodeType, connection.toNodeId))
+  )
+}
+
+function estimateNodeRect(
+  node: { x: number; y: number; width: number },
+  estimatedHeight: number,
+): CanvasRectLike {
+  return {
+    x: node.x,
+    y: node.y,
+    width: Math.max(120, node.width || 0),
+    height: Math.max(96, estimatedHeight),
+  }
+}
+
+function estimateMessageRect(item: CanvasImageItem): CanvasRectLike {
+  const width = Math.max(120, item.width || 300)
+  const ratio = Number.isFinite(item.height_ratio) && (item.height_ratio ?? 0) > 0
+    ? Number(item.height_ratio)
+    : 1
+  const displayHeight = Math.max(72, Math.round(width * ratio))
+  return {
+    x: item.x,
+    y: item.y,
+    width,
+    height: displayHeight + 12,
+  }
+}
+
+function estimateImageNodeHeight(node: ImageNodeItem): number {
+  return getImageNodeStageHeight(node) + 220
+}
+
+function estimateMaskNodeHeight(node: MaskNodeItem): number {
+  return getMaskNodeStageHeight(node) + 240
+}
+
+function collectForcedNodeKeys(): Set<string> {
+  const forcedKeys = new Set<string>()
+  const collect = <T extends { id: number }>(
+    nodeType: CanvasConnectionNodeType,
+    source: T[],
+  ) => {
+    source.forEach((node) => {
+      if (isNodeSelected(nodeType, node.id) || isNodeDragging(nodeType, node.id)) {
+        forcedKeys.add(toNodeRenderKey(nodeType, node.id))
+      }
+    })
+  }
+  collect('image', imageNodes.value)
+  collect('prompt', promptNodes.value)
+  collect('model', modelNodes.value)
+  collect('viewpoint', viewpointNodes.value)
+  collect('mask', maskNodes.value)
+  collect('color', colorNodes.value)
+  collect('edit', editNodes.value)
+  collect('fusion', fusionNodes.value)
+  collect('enhance', enhanceNodes.value)
+  collect('wear', wearNodes.value)
+  return forcedKeys
+}
+
+const baseVisibleNodeKeys = computed(() => {
+  const forcedKeys = collectForcedNodeKeys()
+  const visibleKeys = new Set(forcedKeys)
+
+  const collectVisible = <T extends { id: number }>(
+    nodeType: CanvasConnectionNodeType,
+    source: T[],
+    resolveRect: (node: T) => CanvasRectLike,
+  ) => {
+    source.forEach((node) => {
+      if (isNodeRectVisible(resolveRect(node))) {
+        visibleKeys.add(toNodeRenderKey(nodeType, node.id))
+      }
+    })
+  }
+
+  collectVisible('image', imageNodes.value, node => estimateNodeRect(node, estimateImageNodeHeight(node)))
+  collectVisible('prompt', promptNodes.value, node => estimateNodeRect(node, 240))
+  collectVisible('model', modelNodes.value, node => estimateNodeRect(node, 420))
+  collectVisible('viewpoint', viewpointNodes.value, node => estimateNodeRect(node, 430))
+  collectVisible('mask', maskNodes.value, node => estimateNodeRect(node, estimateMaskNodeHeight(node)))
+  collectVisible('color', colorNodes.value, node => estimateNodeRect(node, 360))
+  collectVisible('edit', editNodes.value, node => estimateNodeRect(node, 320))
+  collectVisible('fusion', fusionNodes.value, node => estimateNodeRect(node, 320))
+  collectVisible('enhance', enhanceNodes.value, node => estimateNodeRect(node, 420))
+  collectVisible('wear', wearNodes.value, node => estimateNodeRect(node, 360))
+
+  return visibleKeys
+})
+
+const prioritizedConnectionIds = computed(() => {
+  const ids = new Set<number>()
+  if (selectedConnectionId.value !== null) {
+    ids.add(selectedConnectionId.value)
+  }
+  if (reconnectingConnectionId.value !== null) {
+    ids.add(reconnectingConnectionId.value)
+  }
+  return ids
+})
+
+const retainedNodeKeys = computed(() => {
+  const seedKeys = baseVisibleNodeKeys.value
+  const retainedKeys = new Set(seedKeys)
+
+  if (seedKeys.size > 0) {
+    connections.value.forEach((connection) => {
+      const fromKey = toNodeRenderKey(connection.fromNodeType, connection.fromNodeId)
+      const toKey = toNodeRenderKey(connection.toNodeType, connection.toNodeId)
+      if (!seedKeys.has(fromKey) && !seedKeys.has(toKey)) return
+      retainedKeys.add(fromKey)
+      retainedKeys.add(toKey)
+    })
+  }
+
+  const priorityIds = prioritizedConnectionIds.value
+  if (priorityIds.size > 0) {
+    connections.value.forEach((connection) => {
+      if (!priorityIds.has(connection.id)) return
+      retainedKeys.add(toNodeRenderKey(connection.fromNodeType, connection.fromNodeId))
+      retainedKeys.add(toNodeRenderKey(connection.toNodeType, connection.toNodeId))
+    })
+  }
+
+  return retainedKeys
+})
+
+const visibleMessages = computed(() => {
+  const forcedMessageIds = new Set<number>(selectedIds.value)
+  if (activeImageActionId.value !== null) {
+    forcedMessageIds.add(activeImageActionId.value)
+  }
+  const visibleMessageIds = new Set(filterVisible(messages.value, estimateMessageRect).map(item => item.id))
+  return messages.value.filter(item => forcedMessageIds.has(item.id) || visibleMessageIds.has(item.id))
+})
+
+const visibleImageNodes = computed(() => filterRetainedNodes('image', imageNodes.value))
+const visiblePromptNodes = computed(() => filterRetainedNodes('prompt', promptNodes.value))
+const visibleModelNodes = computed(() => filterRetainedNodes('model', modelNodes.value))
+const visibleViewpointNodes = computed(() => filterRetainedNodes('viewpoint', viewpointNodes.value))
+const visibleMaskNodes = computed(() => filterRetainedNodes('mask', maskNodes.value))
+const visibleColorNodes = computed(() => filterRetainedNodes('color', colorNodes.value))
+const visibleEditNodes = computed(() => filterRetainedNodes('edit', editNodes.value))
+const visibleFusionNodes = computed(() => filterRetainedNodes('fusion', fusionNodes.value))
+const visibleEnhanceNodes = computed(() => filterRetainedNodes('enhance', enhanceNodes.value))
+const visibleWearNodes = computed(() => filterRetainedNodes('wear', wearNodes.value))
+
 const getImageNodeUiState = (node: ImageNodeItem) => getNodeUiState('image', node)
 const getPromptNodeUiState = (node: PromptNodeItem) => getNodeUiState('prompt', node)
 const getModelNodeUiState = (node: ModelNodeItem) => getNodeUiState('model', node)
@@ -2727,31 +2868,50 @@ const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: Canva
   handleConnectionPortMouseDown(event, 'color', nodeId, port)
 
 function onPromptNodeTextUpdate(node: PromptNodeItem, value: string) {
+  if (node.text === value) return
   node.text = value
+  markWorkflowInputChanged('prompt', node.id)
+  markCanvasContentChanged()
 }
 
 function onModelNodeSelectBackground(node: ModelNodeItem, key: string) {
+  if (node.background === key) return
   node.background = key
+  markExecutionInputContentChanged('model', node.id)
 }
 
 function onModelNodeUpdateAngleYaw(node: ModelNodeItem, value: number) {
+  const previousYaw = node.angleSpec.yaw
   updateModelAngleYaw(node, clampModelAngleYaw(value))
+  if (node.angleSpec.yaw === previousYaw) return
+  markExecutionInputContentChanged('model', node.id)
 }
 
 function onModelNodeUpdateAngleFraming(node: ModelNodeItem, value: ModelAngleFraming) {
+  const previousFraming = node.angleSpec.framing
   updateModelAngleFraming(node, value)
+  if (node.angleSpec.framing === previousFraming) return
+  markExecutionInputContentChanged('model', node.id)
 }
 
 function onModelNodeUpdateModelStrength(node: ModelNodeItem, value: number) {
-  node.modelStrength = clampModelReferenceStrength(value)
+  const nextValue = clampModelReferenceStrength(value)
+  if (node.modelStrength === nextValue) return
+  node.modelStrength = nextValue
+  markExecutionInputContentChanged('model', node.id)
 }
 
 function onModelNodeUpdatePoseStrength(node: ModelNodeItem, value: number) {
-  node.poseStrength = clampModelPoseStrength(value)
+  const nextValue = clampModelPoseStrength(value)
+  if (node.poseStrength === nextValue) return
+  node.poseStrength = nextValue
+  markExecutionInputContentChanged('model', node.id)
 }
 
 function onViewpointNodeUpdateLighting(node: ViewpointNodeItem, value: ViewpointNodeItem['lighting']) {
+  if (node.lighting === value) return
   node.lighting = value
+  markExecutionInputContentChanged('viewpoint', node.id)
 }
 
 function onMaskNodeCanvasMouseDownBridge(event: MouseEvent, node: MaskNodeItem) {
@@ -2767,11 +2927,15 @@ function onMaskNodeUpdateBrushSize(node: MaskNodeItem, value: number) {
 }
 
 function onMaskNodeUpdateRefineAmount(node: MaskNodeItem, value: number) {
-  node.refineAmount = clampMaskRefineAmount(value)
+  const nextValue = clampMaskRefineAmount(value)
+  if (node.refineAmount === nextValue) return
+  node.refineAmount = nextValue
+  markMaskNodeChanged(node)
 }
 
 function onMaskNodeToggleInvert(node: MaskNodeItem) {
   node.invertMask = !node.invertMask
+  markMaskNodeChanged(node)
 }
 
 function onEditNodeUpdateMode(node: EditNodeItem, value: EditNodeItem['mode']) {
@@ -2779,7 +2943,10 @@ function onEditNodeUpdateMode(node: EditNodeItem, value: EditNodeItem['mode']) {
 }
 
 function onFusionNodeUpdateBlendRatio(node: FusionNodeItem, value: number) {
-  node.blendRatio = Math.max(0, Math.min(100, Math.round(value)))
+  const nextValue = Math.max(0, Math.min(100, Math.round(value)))
+  if (node.blendRatio === nextValue) return
+  node.blendRatio = nextValue
+  markExecutionInputContentChanged('fusion', node.id)
 }
 
 function onEnhanceNodeUpdateMode(node: EnhanceNodeItem, value: EnhanceNodeItem['mode']) {
@@ -2787,60 +2954,99 @@ function onEnhanceNodeUpdateMode(node: EnhanceNodeItem, value: EnhanceNodeItem['
 }
 
 function onEnhanceNodeUpdateUpscaleMode(node: EnhanceNodeItem, value: EnhanceNodeItem['upscaleMode']) {
+  if (node.upscaleMode === value) return
   node.upscaleMode = value
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function onEnhanceNodeUpdateUpscaleFactor(node: EnhanceNodeItem, value: EnhanceNodeItem['upscaleFactor']) {
+  if (node.upscaleFactor === value) return
   node.upscaleFactor = value
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function onEnhanceNodeUpdateOutputFormat(node: EnhanceNodeItem, value: EnhanceNodeItem['outputFormat']) {
+  if (node.outputFormat === value) return
   node.outputFormat = value
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function onEnhanceNodeUpdateOutputQuality(node: EnhanceNodeItem, value: number) {
-  node.outputQuality = Math.max(30, Math.min(100, Math.round(value)))
+  const nextValue = Math.max(30, Math.min(100, Math.round(value)))
+  if (node.outputQuality === nextValue) return
+  node.outputQuality = nextValue
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function onEnhanceNodeUpdateExtendTop(node: EnhanceNodeItem, value: number) {
-  node.extendTop = clampEnhanceExtendPercent(value)
+  const nextValue = clampEnhanceExtendPercent(value)
+  if (node.extendTop === nextValue) return
+  node.extendTop = nextValue
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function onEnhanceNodeUpdateExtendRight(node: EnhanceNodeItem, value: number) {
-  node.extendRight = clampEnhanceExtendPercent(value)
+  const nextValue = clampEnhanceExtendPercent(value)
+  if (node.extendRight === nextValue) return
+  node.extendRight = nextValue
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function onEnhanceNodeUpdateExtendBottom(node: EnhanceNodeItem, value: number) {
-  node.extendBottom = clampEnhanceExtendPercent(value)
+  const nextValue = clampEnhanceExtendPercent(value)
+  if (node.extendBottom === nextValue) return
+  node.extendBottom = nextValue
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function onEnhanceNodeUpdateExtendLeft(node: EnhanceNodeItem, value: number) {
-  node.extendLeft = clampEnhanceExtendPercent(value)
+  const nextValue = clampEnhanceExtendPercent(value)
+  if (node.extendLeft === nextValue) return
+  node.extendLeft = nextValue
+  markExecutionInputContentChanged('enhance', node.id)
 }
 
 function onWearNodeUpdateTileMode(node: WearNodeItem, value: WearNodeItem['tileMode']) {
-  node.tileMode = normalizeWearTileMode(value)
+  const nextValue = normalizeWearTileMode(value)
+  if (node.tileMode === nextValue) return
+  node.tileMode = nextValue
+  markExecutionInputContentChanged('wear', node.id)
 }
 
 function onWearNodeUpdateRotation(node: WearNodeItem, value: number) {
-  node.rotation = clampWearRotation(value)
+  const nextValue = clampWearRotation(value)
+  if (node.rotation === nextValue) return
+  node.rotation = nextValue
+  markExecutionInputContentChanged('wear', node.id)
 }
 
 function onWearNodeUpdateScale(node: WearNodeItem, value: number) {
-  node.scale = clampWearScale(value)
+  const nextValue = clampWearScale(value)
+  if (node.scale === nextValue) return
+  node.scale = nextValue
+  markExecutionInputContentChanged('wear', node.id)
 }
 
 function onWearNodeUpdateOpacity(node: WearNodeItem, value: number) {
-  node.opacity = clampWearOpacity(value)
+  const nextValue = clampWearOpacity(value)
+  if (node.opacity === nextValue) return
+  node.opacity = nextValue
+  markExecutionInputContentChanged('wear', node.id)
 }
 
 function onColorNodeApplyPreset(node: ColorNodeItem, value: string[]) {
   const baseColors = isColorNodePlaceholderState(node) ? [] : node.colors
-  node.colors = normalizeColorNodeColors([...baseColors, ...value])
+  const nextColors = normalizeColorNodeColors([...baseColors, ...value])
+  if (nextColors.join(',') === node.colors.join(',')) return
+  node.colors = nextColors
+  markExecutionInputContentChanged('color', node.id)
 }
 
 function onColorNodeStrengthInput(node: ColorNodeItem, value: number) {
-  node.strength = Math.max(0, Math.min(100, Math.round(value)))
+  const nextValue = Math.max(0, Math.min(100, Math.round(value)))
+  if (node.strength === nextValue) return
+  node.strength = nextValue
+  markExecutionInputContentChanged('color', node.id)
 }
 
 const {
@@ -2915,7 +3121,10 @@ const {
 function onImageLoad(msg: any, event: Event) {
   const target = event.target as HTMLImageElement | null
   if (!target || !target.naturalWidth || !target.naturalHeight) return
-  msg.height_ratio = target.naturalHeight / target.naturalWidth
+  const nextRatio = target.naturalHeight / target.naturalWidth
+  if (msg.height_ratio === nextRatio) return
+  msg.height_ratio = nextRatio
+  markCanvasContentChanged()
 }
 
 function getImageDisplayHeight(item: CanvasImageItem): number {
@@ -2933,17 +3142,24 @@ onMounted(async () => {
     addGlobalConnectionListeners()
     nextTick(() => {
       scheduleRenderedConnectionsRefresh()
+      maskNodes.value.forEach((node) => {
+        void refreshProcessedMaskPreview(node)
+      })
     })
     return
   }
   addGlobalConnectionListeners()
   nextTick(() => {
     scheduleRenderedConnectionsRefresh()
+    maskNodes.value.forEach((node) => {
+      void refreshProcessedMaskPreview(node)
+    })
   })
   void schedulePendingRecycleScan()
 })
 
 onUnmounted(() => {
+  cancelBoardDirtySnapshotSchedule()
   clearPendingRecycleScanTimer()
   void flushPendingRecycleUploads()
   stopNodeTaskPolling()
@@ -2991,7 +3207,6 @@ onUnmounted(() => {
   border-radius: 12px;
   border: 1px solid #d9deea;
   background: #fff;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
   padding: 16px;
 }
 
@@ -3066,7 +3281,6 @@ onUnmounted(() => {
   border: 1px solid #d8ddea;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
-  box-shadow: 0 10px 30px rgba(25, 30, 45, 0.12);
 }
 
 .node-context-item {
@@ -3149,7 +3363,36 @@ onUnmounted(() => {
   transform: rotate(360deg);
 }
 
-.canvas-content { position: absolute; inset: 0; z-index: 2; pointer-events: none; transform: translate(var(--offset-x, 0px), var(--offset-y, 0px)) scale(var(--zoom, 1)); transform-origin: center center; }
+.canvas-content {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  transform: translate3d(var(--offset-x, 0px), var(--offset-y, 0px), 0) scale(var(--zoom, 1));
+  transform-origin: center center;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.canvas-layout.interaction-lite .canvas-content {
+  will-change: transform;
+}
+
+.canvas-layout.interaction-lite :deep(.workflow-node) {
+  transition: none !important;
+}
+
+.canvas-layout.interaction-lite :deep(.canvas-connection-path) {
+  transition: none !important;
+}
+
+.canvas-layout.interaction-lite :deep(.canvas-connection-path.selected) {
+  filter: none !important;
+}
+
+.canvas-layout.interaction-lite :deep(.canvas-connection-endpoint) {
+  filter: none !important;
+}
 :deep(.workflow-node) {
   position: absolute;
   z-index: 12;

@@ -114,14 +114,12 @@ function onRenameInput(event: Event) {
   cursor: pointer;
   transition:
     transform 0.14s ease,
-    box-shadow 0.14s ease,
     border-color 0.14s ease;
 }
 
 .board-item:hover {
   border-color: #cdd4e6;
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(20, 26, 45, 0.12);
 }
 
 .board-preview {
@@ -228,7 +226,6 @@ function onRenameInput(event: Event) {
   border-radius: 10px;
   border: 1px solid #d8ddea;
   background: #ffffff;
-  box-shadow: 0 10px 24px rgba(24, 34, 56, 0.14);
 }
 
 .board-action-item {

@@ -45,7 +45,7 @@
             {{ displayModeLabel }}
           </div>
           <img
-            :src="displayImage.url"
+            :src="stageDisplayUrl"
             class="image-node-stage-image"
             draggable="true"
             @dragstart="emit('display-dragstart', $event)"
@@ -111,6 +111,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { ImageNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
+import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodePorts from './NodePorts.vue'
@@ -142,6 +143,8 @@ const emit = defineEmits<{
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 const previewPopupOpen = ref(false)
+const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
+const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
 const displayModeLabel = computed(() => {
   if (props.displayMode === 'pending') return 'Pending'
   if (props.displayMode === 'linked-output') return 'Linked'
