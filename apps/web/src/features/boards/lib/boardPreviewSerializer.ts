@@ -71,9 +71,9 @@ const BOARD_NODE_COLLECTIONS = [
   { key: 'wearNodes', nodeType: 'wear' },
 ] as const satisfies ReadonlyArray<{ key: keyof CanvasBoardSnapshot; nodeType: CanvasConnectionNodeType }>
 
-const PREVIEW_VIEWPORT_WIDTH = 1180
-const PREVIEW_VIEWPORT_HEIGHT = 760
-const PREVIEW_PADDING = 50
+const PREVIEW_VIEWPORT_WIDTH = 760
+const PREVIEW_VIEWPORT_HEIGHT = 490
+const PREVIEW_PADDING = 36
 const PREVIEW_BACKGROUND = '#eef3fb'
 const PREVIEW_DOT_COLOR = 'rgba(201, 209, 225, 0.68)'
 const PREVIEW_STAGE_GLOW_PRIMARY = 'rgba(180, 199, 255, 0.28)'
@@ -232,18 +232,8 @@ function resolveNodeHeight(nodeType: CanvasConnectionNodeType, width: number, no
     const preview = resolveNodePreview(nodeType, node)
     return getMaskNodeHeight(width, preview?.ratio ?? 1, !!preview)
   }
-  if (nodeType === 'prompt') {
-    const text = typeof node.text === 'string' ? node.text.trim() : ''
-    return Math.max(128, 94 + Math.min(48, Math.ceil(text.length / 34) * 10))
-  }
-  if (nodeType === 'model') return 244
-  if (nodeType === 'viewpoint') return 210
-  if (nodeType === 'color') return 228
-  if (nodeType === 'edit') return node.mode === 'face-swap' ? 188 : 220
-  if (nodeType === 'fusion') return 206
-  if (nodeType === 'enhance') return 172
-  if (nodeType === 'wear') return 224
-  return 156
+  const hasPreviewImage = !!resolveNodePreview(nodeType, node)
+  return hasPreviewImage ? 108 : 88
 }
 
 function resolveBounds(frames: readonly BoardPreviewFrame[]): BoardPreviewBounds | null {
@@ -263,20 +253,6 @@ function resolveBounds(frames: readonly BoardPreviewFrame[]): BoardPreviewBounds
     width: Math.max(1, maxX - minX),
     height: Math.max(1, maxY - minY),
   }
-}
-
-function chunkText(text: string, maxCharsPerLine: number, maxLines: number): string[] {
-  const normalized = text.trim().replace(/\s+/g, ' ')
-  if (!normalized) return []
-  const result: string[] = []
-  let cursor = 0
-  while (cursor < normalized.length && result.length < maxLines) {
-    const nextCursor = Math.min(normalized.length, cursor + maxCharsPerLine)
-    const suffix = nextCursor < normalized.length && result.length === maxLines - 1 ? '...' : ''
-    result.push(normalized.slice(cursor, nextCursor) + suffix)
-    cursor = nextCursor
-  }
-  return result
 }
 
 function scaleBounds(bounds: BoardPreviewBounds) {
@@ -366,9 +342,9 @@ function collectBoardPreviewConnections(
 }
 
 function resolveConnectionStroke(tone: CanvasConnectionTone): string {
-  if (tone === 'mask') return '#63d1bc'
-  if (tone === 'prompt') return '#e8c276'
-  return '#7aa3ff'
+  if (tone === 'mask') return '#34c38f'
+  if (tone === 'prompt') return '#f59e0b'
+  return '#5b8def'
 }
 
 function createPreviewCanvas(): HTMLCanvasElement | null {
@@ -562,50 +538,6 @@ function drawPreviewPlaceholder(
   ctx.fillText(label, x + width / 2, y + height / 2)
 }
 
-function drawLabelChip(
-  ctx: CanvasRenderingContext2D,
-  label: string,
-  x: number,
-  y: number,
-  accent: string,
-  scale: number,
-) {
-  const fontSize = Math.max(10, Math.min(14, Math.round(10 * clamp(scale, 0.95, 1.25))))
-  ctx.font = `700 ${fontSize}px system-ui`
-  const textWidth = ctx.measureText(label).width
-  const chipHeight = fontSize + 10
-  const chipWidth = textWidth + 16
-  ctx.fillStyle = withAlpha(accent, 0.12)
-  roundedRectPath(ctx, x, y, chipWidth, chipHeight, chipHeight / 2)
-  ctx.fill()
-  ctx.strokeStyle = withAlpha(accent, 0.16)
-  ctx.lineWidth = 1
-  roundedRectPath(ctx, x, y, chipWidth, chipHeight, chipHeight / 2)
-  ctx.stroke()
-  ctx.fillStyle = withAlpha(accent, 0.95)
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(label, x + 8, y + chipHeight / 2 + 0.5)
-}
-
-function drawTextLines(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  scale: number,
-  text: string,
-) {
-  const lines = chunkText(text, Math.max(12, Math.floor(width / 18)), 4)
-  ctx.fillStyle = '#7a849c'
-  ctx.font = `${Math.max(11, Math.round(11 * scale))}px system-ui`
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'top'
-  lines.forEach((line, index) => {
-    ctx.fillText(line, x, y + index * 16 * scale)
-  })
-}
-
 function drawConnection(
   ctx: CanvasRenderingContext2D,
   connection: BoardPreviewConnection,
@@ -622,19 +554,17 @@ function drawConnection(
   ctx.beginPath()
   ctx.moveTo(startX, startY)
   ctx.bezierCurveTo(startX + curve, startY, endX - curve, endY, endX, endY)
-  ctx.strokeStyle = withAlpha(stroke, 0.88)
-  ctx.lineWidth = connection.tone === 'prompt' ? 2.2 : 2.6
+  ctx.strokeStyle = withAlpha(stroke, 0.78)
+  ctx.lineWidth = connection.tone === 'prompt' ? 1.3 : 1.55
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.globalAlpha = 0.92
   ctx.stroke()
-  ctx.globalAlpha = 1
   ctx.fillStyle = withAlpha(stroke, 0.72)
   ctx.beginPath()
-  ctx.arc(startX, startY, 2.2, 0, Math.PI * 2)
+  ctx.arc(startX, startY, 1.45, 0, Math.PI * 2)
   ctx.fill()
   ctx.beginPath()
-  ctx.arc(endX, endY, 2.2, 0, Math.PI * 2)
+  ctx.arc(endX, endY, 1.45, 0, Math.PI * 2)
   ctx.fill()
 }
 
@@ -677,48 +607,100 @@ function drawFrame(
   } else {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(x, y, width, height)
-    const insetX = Math.max(10, width * 0.05)
-    const insetY = Math.max(10, height * 0.06)
-    const chipY = y + insetY
-    const chipX = x + insetX
-    drawLabelChip(ctx, frame.label || 'Node', chipX, chipY, accent, scale)
 
-    const bodyX = x + insetX
-    const bodyY = chipY + Math.max(24, 24 * clamp(scale, 0.9, 1.15))
-    const bodyWidth = Math.max(12, width - insetX * 2)
-    const bodyHeight = Math.max(12, height - (bodyY - y) - insetY)
-    const bodyRadius = Math.max(9, radius - 5)
+    const inset = Math.max(8, Math.min(14, height * 0.13))
+    const headerHeight = Math.max(19, Math.min(26, height * 0.26))
+    const headerBottomY = y + headerHeight
+    const hasThumb = !!image
 
-    ctx.fillStyle = withAlpha(accent, image ? 0.08 : 0.06)
-    roundedRectPath(ctx, bodyX, bodyY, bodyWidth, bodyHeight, bodyRadius)
-    ctx.fill()
-    ctx.strokeStyle = withAlpha(accent, 0.14)
-    ctx.lineWidth = 1
-    roundedRectPath(ctx, bodyX, bodyY, bodyWidth, bodyHeight, bodyRadius)
+    ctx.fillStyle = withAlpha(accent, 0.065)
+    ctx.fillRect(x, y, width, headerHeight)
+    ctx.strokeStyle = withAlpha(accent, 0.12)
+    ctx.lineWidth = 0.8
+    ctx.beginPath()
+    ctx.moveTo(x, headerBottomY)
+    ctx.lineTo(x + width, headerBottomY)
     ctx.stroke()
 
-    if (image) {
+    const label = frame.label || 'Node'
+    const dotRadius = Math.max(2.4, Math.min(3.6, headerHeight * 0.16))
+    const dotX = x + inset + dotRadius
+    const headerCenterY = y + headerHeight / 2
+    ctx.fillStyle = withAlpha(accent, 0.76)
+    ctx.beginPath()
+    ctx.arc(dotX, headerCenterY, dotRadius, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.fillStyle = '#6f7a91'
+    ctx.font = `700 ${Math.max(8, Math.min(12, headerHeight * 0.42))}px system-ui`
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, dotX + dotRadius + 6, headerCenterY + 0.2)
+
+    const bodyTop = headerBottomY + Math.max(6, inset * 0.5)
+    const bodyBottom = y + height - inset
+    const bodyHeight = Math.max(12, bodyBottom - bodyTop)
+    const bodyCenterY = bodyTop + bodyHeight / 2
+    let contentStartX = x + inset
+
+    if (hasThumb) {
+      const thumbSize = Math.max(30, Math.min(52, bodyHeight))
+      const thumbY = bodyCenterY - thumbSize / 2
+      const thumbX = x + inset
+      const thumbRadius = Math.max(6, thumbSize * 0.22)
+      contentStartX = thumbX + thumbSize + 9
+
+      ctx.fillStyle = '#f8faff'
+      roundedRectPath(ctx, thumbX, thumbY, thumbSize, thumbSize, thumbRadius)
+      ctx.fill()
+      ctx.strokeStyle = withAlpha(accent, 0.16)
+      ctx.lineWidth = 0.8
+      roundedRectPath(ctx, thumbX, thumbY, thumbSize, thumbSize, thumbRadius)
+      ctx.stroke()
+
       ctx.save()
-      roundedRectPath(ctx, bodyX, bodyY, bodyWidth, bodyHeight, bodyRadius)
+      roundedRectPath(ctx, thumbX + 1, thumbY + 1, Math.max(0, thumbSize - 2), Math.max(0, thumbSize - 2), Math.max(4, thumbRadius - 1))
       ctx.clip()
-      ctx.fillStyle = '#f6f9ff'
-      ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight)
-      drawImageContain(ctx, image, bodyX + 6, bodyY + 6, Math.max(0, bodyWidth - 12), Math.max(0, bodyHeight - 12))
+      drawImageContain(ctx, image, thumbX + 2, thumbY + 2, Math.max(0, thumbSize - 4), Math.max(0, thumbSize - 4))
       ctx.restore()
-      if (frame.text) {
-        drawTextLines(ctx, bodyX + 10, Math.max(bodyY + bodyHeight - 22, bodyY + 10), bodyWidth - 20, scale, frame.text)
-      }
-    } else if (frame.text) {
-      drawTextLines(ctx, bodyX + 10, bodyY + 10, bodyWidth - 20, scale, frame.text)
-    } else {
-      drawPreviewPlaceholder(ctx, bodyX, bodyY, bodyWidth, bodyHeight, frame.label || 'Node', accent)
+    }
+
+    const contentEndX = x + width - inset
+    const lineWidth = Math.max(18, contentEndX - contentStartX)
+    const primaryY = bodyCenterY - 6
+    const secondaryY = bodyCenterY + 7
+
+    ctx.strokeStyle = withAlpha(accent, 0.42)
+    ctx.lineWidth = 1.6
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(contentStartX, primaryY)
+    ctx.lineTo(contentStartX + lineWidth * 0.62, primaryY)
+    ctx.stroke()
+
+    ctx.strokeStyle = frame.text
+      ? withAlpha(accent, 0.28)
+      : withAlpha('#6f7c96', 0.22)
+    ctx.lineWidth = 1.25
+    ctx.beginPath()
+    ctx.moveTo(contentStartX, secondaryY)
+    ctx.lineTo(contentStartX + lineWidth * (frame.text ? 0.84 : 0.44), secondaryY)
+    ctx.stroke()
+
+    if (!hasThumb && !frame.text) {
+      ctx.strokeStyle = withAlpha(accent, 0.24)
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(contentStartX + lineWidth * 0.48, bodyCenterY)
+      ctx.lineTo(contentStartX + lineWidth * 0.95, bodyCenterY)
+      ctx.stroke()
     }
   }
 
   ctx.restore()
 
-  ctx.strokeStyle = '#dce3f3'
-  ctx.lineWidth = Math.max(1.3, scale)
+  ctx.strokeStyle = frame.kind === 'node' ? withAlpha(accent, 0.2) : '#dce3f3'
+  ctx.lineWidth = frame.kind === 'node' ? 0.95 : Math.max(1.1, scale * 0.9)
   roundedRectPath(ctx, x, y, width, height, radius)
   ctx.stroke()
 }
@@ -746,7 +728,7 @@ export async function renderBoardPreviewDataUrl(state: CanvasBoardSnapshot | nul
   frames.forEach(frame => drawFrame(ctx, frame, scale, offsetX, offsetY, imageAssets.images))
 
   try {
-    const quality = frames.length > 12 ? 0.72 : 0.78
+    const quality = frames.length > 12 ? 0.52 : 0.58
     return canvas.toDataURL('image/jpeg', quality)
   } finally {
     imageAssets.revoke()
