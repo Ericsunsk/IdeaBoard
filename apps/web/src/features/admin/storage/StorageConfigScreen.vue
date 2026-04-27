@@ -77,9 +77,6 @@
             >
                 <span class="add-mark">+</span>
                 <span class="add-title">添加存储</span>
-                <span class="add-desc"
-                    >先选供应商，再创建新的存储卡片。保存后可直接切换为当前上传链路。</span
-                >
             </button>
         </div>
     </div>
@@ -464,12 +461,6 @@ const {
     color: var(--admin-text-1);
     font-size: 18px;
     font-weight: 600;
-}
-
-.add-desc {
-    color: var(--admin-text-2);
-    font-size: 13px;
-    line-height: 1.6;
 }
 
 .editor-provider {

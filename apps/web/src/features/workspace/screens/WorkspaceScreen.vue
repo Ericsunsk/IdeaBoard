@@ -566,6 +566,31 @@ function encodeWorkspacePathSegment(segment: string): string {
   )
 }
 
+function pathSegmentMatches(segment: string, expected: string): boolean {
+  const encodedExpected = encodeWorkspacePathSegment(expected)
+  if (segment === expected || segment === encodedExpected) return true
+  try {
+    return decodeURIComponent(segment) === expected
+  } catch {
+    return false
+  }
+}
+
+function isWorkspaceUploadPath(path: string, boardIdOverride?: string): boolean {
+  const boardId = `${boardIdOverride ?? currentBoardId.value ?? ''}`.trim()
+  if (!boardId) return false
+  const storageUid = `${userStore.user?.uid ?? ''}`.trim()
+  const segments = path.split('/').filter(Boolean)
+  for (let i = 0; i + 4 < segments.length; i += 1) {
+    if (segments[i] !== 'uploads' || segments[i + 1] !== 'workspace') continue
+    if (storageUid && !pathSegmentMatches(segments[i + 2], storageUid)) continue
+    if (!pathSegmentMatches(segments[i + 3], boardId)) continue
+    if (segments[i + 4] !== 'content') continue
+    return true
+  }
+  return false
+}
+
 function uploadWorkspaceImage(file: File) {
   const boardId = `${currentBoardId.value ?? ''}`.trim()
   if (!boardId) {
@@ -593,10 +618,11 @@ function isStableWorkspaceUploadUrl(rawUrl: string): boolean {
   if (typeof window === 'undefined') return true
   const normalized = rawUrl.trim()
   if (!normalized) return true
-  if (normalized.startsWith('/uploads/')) return true
+  const path = parseCanvasImagePath(normalized)
+  if (path && isWorkspaceUploadPath(path)) return true
   const parsed = resolveAbsoluteCanvasUrl(normalized)
   if (!parsed) return false
-  return parsed.origin === window.location.origin && parsed.pathname.startsWith('/uploads/')
+  return isWorkspaceUploadPath(parsed.pathname)
 }
 
 function getProxyTargetUrl(rawUrl: string): string | null {
@@ -771,19 +797,7 @@ let pendingSaveRecycleEntriesBuffer: PendingRecycleUploadEntry[] = []
 function resolveCanvasWorkspaceUploadMeta(url: string): CanvasImageItem['uploadMeta'] | undefined {
   const path = parseCanvasImagePath(url)
   if (!path) return undefined
-  const boardId = `${currentBoardId.value ?? ''}`.trim()
-  if (!boardId) return undefined
-  const encodedBoardId = encodeWorkspacePathSegment(boardId)
-  const segments = path.split('/').filter(Boolean)
-  if (segments.length < 6) return undefined
-  let matched = false
-  for (let i = 0; i + 4 < segments.length; i += 1) {
-    if (segments[i] !== 'uploads' || segments[i + 1] !== 'workspace') continue
-    if (segments[i + 3] !== encodedBoardId || segments[i + 4] !== 'content') continue
-    matched = true
-    break
-  }
-  if (!matched) return undefined
+  if (!isWorkspaceUploadPath(path)) return undefined
   return {
     kind: 'workspace-local-drop-upload',
     userId: Number(userStore.user?.id),
@@ -800,16 +814,7 @@ function resolvePendingRecycleEntryForUrl(
   const boardId = `${boardIdOverride ?? currentBoardId.value ?? ''}`.trim()
   if (!Number.isFinite(currentUserID) || currentUserID <= 0 || !boardId) return null
   const path = parseCanvasImagePath(normalizedUrl)
-  const encodedBoardId = encodeWorkspacePathSegment(boardId)
-  const segments = path?.split('/').filter(Boolean) ?? []
-  let matched = false
-  for (let i = 0; i + 4 < segments.length; i += 1) {
-    if (segments[i] !== 'uploads' || segments[i + 1] !== 'workspace') continue
-    if (segments[i + 3] !== encodedBoardId || segments[i + 4] !== 'content') continue
-    matched = true
-    break
-  }
-  if (!matched) return null
+  if (!path || !isWorkspaceUploadPath(path, boardId)) return null
   return {
     url: normalizedUrl,
     userId: currentUserID,

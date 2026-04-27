@@ -46,15 +46,15 @@ const chipClasses = computed(() => ({
 }
 
 .admin-chip.is-current {
-  color: var(--admin-text-1);
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.admin-chip.is-enabled {
   color: var(--admin-success);
   background: rgba(74, 222, 128, 0.12);
   border-color: rgba(74, 222, 128, 0.24);
+}
+
+.admin-chip.is-enabled {
+  color: var(--admin-text-2);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .admin-chip.is-empty {
