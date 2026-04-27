@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
 	"time"
 
 	"api/internal/accounts"
@@ -88,16 +89,25 @@ func (o *taskExecutionOrchestrator) execute(task *redis.GlobalQueueTask, account
 		log.Printf("[Consumer] 上游调用失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 		elapsed := time.Since(startTime).Seconds()
 		reason := userFacingProviderError(err)
+		if !shouldFailoverProviderError(err) {
+			o.completeFailedTask(task, accountID, reason, elapsed)
+			return
+		}
 		if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
 			log.Printf("[Consumer] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 		}
-		if requeueErr := o.taskRuntime.RequeueTaskForFailover(task.TaskID, accountID, reason); requeueErr != nil {
+		requeued, requeueErr := o.taskRuntime.RequeueTaskForFailover(task.TaskID, accountID, reason)
+		if requeueErr != nil {
 			if errors.Is(requeueErr, accounts.ErrTaskNotFound) || errors.Is(requeueErr, accounts.ErrTaskTerminal) || errors.Is(requeueErr, accounts.ErrTaskStateConflict) {
 				o.dropTask(task, 0, "任务状态已收敛，丢弃脏队列任务")
 				return
 			}
 			log.Printf("[Consumer] 重置任务为待重试失败: task=%s err=%v", task.TaskID, requeueErr)
 			o.completeFailedTask(task, 0, reason, elapsed)
+			return
+		}
+		if !requeued {
+			log.Printf("[Consumer] 任务达到重试上限，停止 failover: task=%s", task.TaskID)
 			return
 		}
 		disabled, failCount, statErr := o.taskRuntime.RecordAccountFailure(accountID)
@@ -215,6 +225,20 @@ func (o *taskExecutionOrchestrator) dropTask(task *redis.GlobalQueueTask, accoun
 func userFacingProviderError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "上游图像服务响应超时"
+	}
+	if status, ok := providerHTTPStatus(err); ok {
+		switch status {
+		case http.StatusBadRequest, http.StatusUnprocessableEntity:
+			return "请求参数不合法，请检查输入后重试"
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return "上游服务鉴权失败，请联系管理员"
+		case http.StatusPaymentRequired:
+			return "上游服务额度不足或未开通，请联系管理员"
+		case http.StatusNotFound:
+			return "上游服务接口或模型不可用，请联系管理员"
+		case http.StatusTooManyRequests:
+			return "上游服务请求过于频繁，请稍后重试"
+		}
 	}
 	return "上游图像服务调用失败"
 }

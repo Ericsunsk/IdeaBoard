@@ -164,17 +164,12 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
   }
 
   async function handleSketchToDesignGenerate(source: CanvasImageItem) {
-    const desc = resolveDirectPromptText(options.userPrompt.value)
-    if (!desc) {
-      options.message.warning('请输入提示词后再执行 Sketch to Design')
-      return
-    }
     options.generating.value = true
     const imageSize = await options.loadImageSizeFromUrl(source.url)
     let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
-        prompt: `${EXECUTION_DIRECT_ACTION_META.sketchToDesign.promptPrefix} ${desc}`,
+        prompt: '',
         feature: EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature,
         imageUrls: [source.url],
         params: buildExecutionSizeParams(imageSize),
@@ -200,18 +195,13 @@ export function useCanvasDirectActions(options: UseCanvasDirectActionsOptions) {
   }
 
   async function handleStyleInnovateGenerate(source: CanvasImageItem) {
-    const desc = resolveDirectPromptText(options.userPrompt.value)
-    if (!desc) {
-      options.message.warning('请输入提示词后再执行 Style Innovate')
-      return
-    }
     options.generating.value = true
     const strength = options.styleInnovateStrength.value
     const imageSize = await options.loadImageSizeFromUrl(source.url)
     let pendingItems: CanvasImageItem[] = []
     await options.submitTaskAndPoll({
       request: buildExecutionTaskRequest({
-        prompt: `${EXECUTION_DIRECT_ACTION_META.styleInnovate.promptPrefix} 创新强度：${strength}%，${desc}`,
+        prompt: '',
         feature: EXECUTION_DIRECT_ACTION_META.styleInnovate.feature,
         imageUrls: [source.url],
         params: {

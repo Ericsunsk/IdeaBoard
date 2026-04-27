@@ -1189,6 +1189,7 @@ const {
   selectedIds,
   imageNodes,
   activeImageNodeId,
+  preferImageOutputNode: false,
   message,
   loadImageRatioFromUrl,
   createCanvasImageAt: createCanvasImageItemAt,

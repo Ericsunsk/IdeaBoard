@@ -225,37 +225,73 @@ func (s *TaskRuntimeService) MarkTaskFailedWithRetry(taskID string, accountID ui
 	return s.taskRepo.Update(task)
 }
 
-func (s *TaskRuntimeService) RequeueTaskForFailover(taskID string, accountID uint64, errMsg string) error {
+func (s *TaskRuntimeService) RequeueTaskForFailover(taskID string, accountID uint64, errMsg string) (bool, error) {
 	if accountID == 0 {
-		return ErrTaskStateConflict
+		return false, ErrTaskStateConflict
 	}
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
-		"status":      tasks.StatusPending,
-		"account_id":  0,
-		"error_msg":   errMsg,
-		"retry_count": gorm.Expr("retry_count + 1"),
-	})
-	if err != nil {
-		return err
-	}
-	if rows > 0 {
-		return nil
-	}
-
 	task, err := s.taskRepo.GetByTaskID(taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrTaskNotFound
+			return false, ErrTaskNotFound
 		}
-		return err
+		return false, err
 	}
 	if isTaskTerminalStatus(task.Status) {
-		return ErrTaskTerminal
+		return false, ErrTaskTerminal
 	}
-	if task.Status == tasks.StatusPending {
-		return nil
+	if task.Status != tasks.StatusRunning {
+		if task.Status == tasks.StatusPending {
+			return true, nil
+		}
+		return false, ErrTaskStateConflict
 	}
-	return ErrTaskStateConflict
+
+	if task.RetryCount < defaultTaskRetryLimit-1 {
+		rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+			"status":      tasks.StatusPending,
+			"account_id":  0,
+			"error_msg":   errMsg,
+			"retry_count": gorm.Expr("retry_count + 1"),
+		})
+		if err != nil {
+			return false, err
+		}
+		if rows > 0 {
+			return true, nil
+		}
+		return false, ErrTaskStateConflict
+	}
+
+	now := time.Now()
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+		"status":       tasks.StatusFailed,
+		"account_id":   0,
+		"error_msg":    errMsg,
+		"result":       formatTaskFailureResult(taskID, errMsg),
+		"retry_count":  gorm.Expr("retry_count + 1"),
+		"completed_at": now,
+	})
+	if err != nil {
+		return false, err
+	}
+	if rows > 0 {
+		return false, nil
+	}
+
+	latest, err := s.taskRepo.GetByTaskID(taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, ErrTaskNotFound
+		}
+		return false, err
+	}
+	if latest.Status == tasks.StatusPending {
+		return true, nil
+	}
+	if isTaskTerminalStatus(latest.Status) {
+		return false, ErrTaskTerminal
+	}
+	return false, ErrTaskStateConflict
 }
 
 func (s *TaskRuntimeService) RecordAccountFailure(accountID uint64) (disabled bool, failCount int, err error) {

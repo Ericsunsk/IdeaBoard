@@ -654,7 +654,7 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	}
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("API 返回 %d: %s", resp.StatusCode, truncateErrorBody(string(respBody)))
+		return "", newUpstreamHTTPError(resp.StatusCode, truncateErrorBody(string(respBody)))
 	}
 
 	return extractOpenAIImageResponse(respBody, params)
@@ -1280,7 +1280,7 @@ func (c *Consumer) callStabilityAI(ctx context.Context, account *accounts.ApiAcc
 	}
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("API 返回 %d: %s", resp.StatusCode, truncateErrorBody(string(respBody)))
+		return "", newUpstreamHTTPError(resp.StatusCode, truncateErrorBody(string(respBody)))
 	}
 
 	var respData struct {

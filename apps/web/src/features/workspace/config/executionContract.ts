@@ -64,13 +64,9 @@ export const EXECUTION_DIRECT_ACTION_META = {
   },
   sketchToDesign: {
     feature: EXECUTION_FEATURE.sketchToDesign,
-    promptPrefix: '[sketch-to-design]',
-    fallbackPrompt: 'Sketch to design',
   },
   styleInnovate: {
     feature: EXECUTION_FEATURE.styleInnovate,
-    promptPrefix: '[style-innovate]',
-    fallbackPrompt: '保持原图主体身份、服装品类、版型轮廓、构图与光影关系不变，只在此基础上按强度做可控款式创新与细节变化',
   },
   removeBg: {
     feature: EXECUTION_FEATURE.removeBg,

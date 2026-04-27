@@ -48,6 +48,7 @@ interface UseGenerationPipelineOptions<TSubmitPayload extends object> {
   selectedIds: Ref<number[]>
   imageNodes: Ref<ImageNodeItem[]>
   activeImageNodeId: Ref<number | null>
+  preferImageOutputNode?: boolean
   message: MessageApiLike
   loadImageRatioFromUrl: (url: string) => Promise<number | null>
   createCanvasImageAt: (point: CanvasPoint, url: string, ratio?: number) => CanvasImageItem
@@ -124,10 +125,12 @@ export function useGenerationPipeline<TSubmitPayload extends object>(
   }
 
   function resolvePreferredImageOutputNode(providedNodeId?: number | null): ImageNodeItem | null {
+    const preferImageOutputNode = options.preferImageOutputNode ?? true
     if (providedNodeId !== null && providedNodeId !== undefined) {
       const provided = options.imageNodes.value.find(node => node.id === providedNodeId)
       if (provided) return provided
     }
+    if (!preferImageOutputNode) return null
     if (options.activeImageNodeId.value !== null) {
       const active = options.imageNodes.value.find(node => node.id === options.activeImageNodeId.value)
       if (active) return active
