@@ -323,7 +323,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { taskApi, uploadApi, vectorizeApi } from '../../../shared/api/index'
 import { useUserStore } from '../../../app/stores/user'
-import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import {
   collectCanvasBoardImageUrls,
   getCanvasBoardState,
@@ -341,10 +340,14 @@ import { useCanvasNodeUiState } from '../composables/useCanvasNodeUiState'
 import { useCanvasDirectActions } from '../composables/useCanvasDirectActions'
 import { useGenerationPipeline } from '../composables/useGenerationPipeline'
 import { useImageNode } from '../composables/useImageNode'
-import { clampMaskRefineAmount, useMaskNode } from '../composables/useMaskNode'
+import { useMaskNode } from '../composables/useMaskNode'
 import { useModelNode } from '../composables/useModelNode'
 import { useNodeExecutors } from '../composables/useNodeExecutors'
 import { useViewpointNode } from '../composables/useViewpointNode'
+import { useWorkspaceNodeLifecycle } from '../composables/useWorkspaceNodeLifecycle'
+import { useWorkspaceBoardSnapshot } from '../composables/useWorkspaceBoardSnapshot'
+import { useWorkspaceNodeUpdateHandlers } from '../composables/useWorkspaceNodeUpdateHandlers'
+import { useWorkspaceUploadLifecycle } from '../composables/useWorkspaceUploadLifecycle'
 import HomeCanvasConnectionLayer from '../components/home/HomeCanvasConnectionLayer.vue'
 import HomeCanvasImageItem from '../components/home/HomeCanvasImageItem.vue'
 import HomeBottomGenerateBar from '../components/home/HomeBottomGenerateBar.vue'
@@ -385,22 +388,9 @@ import {
   createViewpointNodeAt,
 } from '../utils/canvasNodeFactory'
 import {
-  DEFAULT_COLOR_STRENGTH,
-  ENHANCE_EXTEND_PERCENT_DEFAULT,
-  ENHANCE_EXTEND_PERCENT_MAX,
-  ENHANCE_EXTEND_PERCENT_MIN,
-  clampWearOpacity,
-  clampWearRotation,
-  clampWearScale,
-  clampModelPoseStrength,
-  clampModelReferenceStrength,
   isCanvasExecutionOutputNodeType,
   isCanvasImagePending,
-  isColorNodePlaceholderState,
   MAX_COLOR_NODE_SWATCHES,
-  normalizeWearTileMode,
-  normalizeColorNodeColors,
-  resolveWorkflowNodeOutputStatus,
 } from '../types/canvasNodes'
 import type {
   CanvasBoardSnapshot,
@@ -482,462 +472,84 @@ const enhanceNodes = ref<EnhanceNodeItem[]>([])
 const editNodes = ref<EditNodeItem[]>([])
 const fusionNodes = ref<FusionNodeItem[]>([])
 const wearNodes = ref<WearNodeItem[]>([])
-const RECENT_HISTORY_RECYCLE_GUARD_STEPS = 10
-const PENDING_RECYCLE_STORAGE_KEY_PREFIX = 'ideaboard.canvas.pendingUploadRecycle.v1'
-
-interface PendingRecycleUploadEntry {
-  url: string
-  userId: number
-  boardId: string
-}
-
-const pendingRecycleEntries = ref<PendingRecycleUploadEntry[]>(readPendingRecycleEntries())
-let pendingRecycleScanInFlight = false
-let pendingRecycleScanQueued = false
-let pendingRecycleScanTimer: number | null = null
-
-function getPendingRecycleStorageKey(): string | null {
-  const scope = getAuthStorageUserScope()
-  return scope ? `${PENDING_RECYCLE_STORAGE_KEY_PREFIX}.${scope}` : null
-}
-
-function normalizePendingRecycleEntry(entry: unknown): PendingRecycleUploadEntry | null {
-  if (!entry || typeof entry !== 'object') return null
-  const rawUrl = typeof (entry as { url?: unknown }).url === 'string' ? (entry as { url: string }).url.trim() : ''
-  const rawBoardId = typeof (entry as { boardId?: unknown }).boardId === 'string' ? (entry as { boardId: string }).boardId.trim() : ''
-  const rawUserId = Number((entry as { userId?: unknown }).userId)
-  if (!rawUrl || !rawBoardId || !Number.isFinite(rawUserId) || rawUserId <= 0) return null
-  return {
-    url: rawUrl,
-    userId: Math.floor(rawUserId),
-    boardId: rawBoardId,
-  }
-}
-
-function dedupePendingRecycleEntries(entries: PendingRecycleUploadEntry[]): PendingRecycleUploadEntry[] {
-  const entryMap = new Map<string, PendingRecycleUploadEntry>()
-  entries.forEach((entry) => {
-    const normalized = normalizePendingRecycleEntry(entry)
-    if (!normalized) return
-    entryMap.set(normalized.url, normalized)
-  })
-  return Array.from(entryMap.values())
-}
-
-function readPendingRecycleEntries(): PendingRecycleUploadEntry[] {
-  if (typeof window === 'undefined') return []
-  const storageKey = getPendingRecycleStorageKey()
-  if (!storageKey) return []
-  const raw = localStorage.getItem(storageKey)
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed)
-      ? dedupePendingRecycleEntries(parsed as PendingRecycleUploadEntry[])
-      : []
-  } catch {
-    return []
-  }
-}
-
-function writePendingRecycleEntries(entries: PendingRecycleUploadEntry[]) {
-  if (typeof window === 'undefined') return
-  const storageKey = getPendingRecycleStorageKey()
-  if (!storageKey) return
-  if (!entries.length) {
-    localStorage.removeItem(storageKey)
-    return
-  }
-  localStorage.setItem(storageKey, JSON.stringify(entries))
-}
-
-function setPendingRecycleEntries(entries: PendingRecycleUploadEntry[]) {
-  const nextEntries = dedupePendingRecycleEntries(entries)
-  pendingRecycleEntries.value = nextEntries
-  writePendingRecycleEntries(nextEntries)
-}
-
-function clearPendingRecycleScanTimer() {
-  if (pendingRecycleScanTimer === null) return
-  window.clearTimeout(pendingRecycleScanTimer)
-  pendingRecycleScanTimer = null
-}
-
-function parseCanvasImagePath(url: string): string | null {
-  const raw = url.trim()
-  if (!raw) return null
-  if (raw.startsWith('/')) return raw
-  try {
-    const parsed = new URL(raw, window.location.origin)
-    return parsed.pathname || null
-  } catch {
-    return null
-  }
-}
-
-function encodeWorkspacePathSegment(segment: string): string {
-  return encodeURIComponent(segment).replace(
-    /[!'()*]/g,
-    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
-  )
-}
-
-function pathSegmentMatches(segment: string, expected: string): boolean {
-  const encodedExpected = encodeWorkspacePathSegment(expected)
-  if (segment === expected || segment === encodedExpected) return true
-  try {
-    return decodeURIComponent(segment) === expected
-  } catch {
-    return false
-  }
-}
-
-function isWorkspaceUploadPath(path: string, boardIdOverride?: string): boolean {
-  const boardId = `${boardIdOverride ?? currentBoardId.value ?? ''}`.trim()
-  if (!boardId) return false
-  const storageUid = `${userStore.user?.uid ?? ''}`.trim()
-  const segments = path.split('/').filter(Boolean)
-  for (let i = 0; i + 4 < segments.length; i += 1) {
-    if (segments[i] !== 'uploads' || segments[i + 1] !== 'workspace') continue
-    if (storageUid && !pathSegmentMatches(segments[i + 2], storageUid)) continue
-    if (!pathSegmentMatches(segments[i + 3], boardId)) continue
-    if (segments[i + 4] !== 'content') continue
-    return true
-  }
-  return false
-}
-
-function uploadWorkspaceImage(file: File) {
-  const boardId = `${currentBoardId.value ?? ''}`.trim()
-  if (!boardId) {
-    throw new Error('缺少画布ID')
-  }
-  return uploadApi.upload(file, boardId)
-}
-
-interface PersistedImageUrlReference {
-  path: string
-  getUrl: () => string
-  setUrl: (url: string) => void
-}
-
-function resolveAbsoluteCanvasUrl(rawUrl: string): URL | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return new URL(rawUrl, window.location.origin)
-  } catch {
-    return null
-  }
-}
-
-function isStableWorkspaceUploadUrl(rawUrl: string): boolean {
-  if (typeof window === 'undefined') return true
-  const normalized = rawUrl.trim()
-  if (!normalized) return true
-  const path = parseCanvasImagePath(normalized)
-  if (path && isWorkspaceUploadPath(path)) return true
-  const parsed = resolveAbsoluteCanvasUrl(normalized)
-  if (!parsed) return false
-  return isWorkspaceUploadPath(parsed.pathname)
-}
-
-function getProxyTargetUrl(rawUrl: string): string | null {
-  const parsed = resolveAbsoluteCanvasUrl(rawUrl.trim())
-  if (!parsed) return null
-  if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith(USER_DOWNLOAD_ENDPOINT)) {
-    return null
-  }
-  const target = parsed.searchParams.get('url')
-  return target?.trim() || null
-}
-
-function resolveImageFetchRequestUrl(rawUrl: string): string {
-  const normalized = rawUrl.trim()
-  const proxyTarget = getProxyTargetUrl(normalized)
-  if (proxyTarget) {
-    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(proxyTarget)}`
-  }
-  const parsed = resolveAbsoluteCanvasUrl(normalized)
-  if (parsed && (parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
-    if (parsed.origin !== window.location.origin) {
-      return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(parsed.href)}`
-    }
-    return parsed.href
-  }
-  return normalized
-}
-
-function inferFileExtensionFromMimeType(mimeType: string): string {
-  const normalized = mimeType.toLowerCase()
-  if (normalized.includes('png')) return 'png'
-  if (normalized.includes('webp')) return 'webp'
-  if (normalized.includes('gif')) return 'gif'
-  if (normalized.includes('bmp')) return 'bmp'
-  if (normalized.includes('jpeg') || normalized.includes('jpg')) return 'jpg'
-  if (normalized.includes('svg')) return 'svg'
-  return 'jpg'
-}
-
-function toUploadFilename(rawUrl: string, mimeType: string): string {
-  const parsed = resolveAbsoluteCanvasUrl(rawUrl.trim())
-  const pathname = parsed?.pathname || rawUrl
-  const leaf = pathname.split('/').filter(Boolean).pop() || ''
-  const safeLeaf = leaf.replace(/[^A-Za-z0-9._-]/g, '')
-  const hasExtension = /\.[A-Za-z0-9]{2,8}$/.test(safeLeaf)
-  if (hasExtension) return safeLeaf
-  return `workspace-image-${Date.now()}.${inferFileExtensionFromMimeType(mimeType)}`
-}
-
-async function fetchAndUploadStableWorkspaceUrl(rawUrl: string): Promise<string> {
-  const requestUrl = resolveImageFetchRequestUrl(rawUrl)
-  let response: Response
-  try {
-    response = await fetch(requestUrl, { credentials: 'include' })
-  } catch (error) {
-    throw new Error(`下载图片失败：${error instanceof Error ? error.message : '网络异常'}`)
-  }
-  if (!response.ok) {
-    throw new Error(`下载图片失败：HTTP ${response.status}`)
-  }
-  const blob = await response.blob()
-  if (!blob.size) {
-    throw new Error('下载图片失败：响应为空')
-  }
-  const uploadFile = new File([blob], toUploadFilename(rawUrl, blob.type || 'image/jpeg'), {
-    type: blob.type || 'image/jpeg',
-  })
-  let uploadResult: Awaited<ReturnType<typeof uploadWorkspaceImage>>
-  try {
-    uploadResult = await uploadWorkspaceImage(uploadFile)
-  } catch (error) {
-    throw new Error(`上传图片失败：${error instanceof Error ? error.message : '未知错误'}`)
-  }
-  const stableUrl = `${uploadResult?.data?.url ?? ''}`.trim()
-  if (!stableUrl) {
-    throw new Error('上传图片失败：服务端未返回可用链接')
-  }
-  if (!isStableWorkspaceUploadUrl(stableUrl)) {
-    throw new Error('上传图片失败：返回链接不是 workspace uploads 地址')
-  }
-  return stableUrl
-}
-
-function appendOutputImageReferences(
-  target: PersistedImageUrlReference[],
-  prefix: string,
-  nodes: Array<{ outputImages: Array<{ url: string }> }>,
-) {
-  nodes.forEach((node, nodeIndex) => {
-    node.outputImages.forEach((output, outputIndex) => {
-      target.push({
-        path: `${prefix}[${nodeIndex}].outputImages[${outputIndex}].url`,
-        getUrl: () => output.url,
-        setUrl: (url) => {
-          output.url = url
-        },
-      })
-    })
-  })
-}
-
-function collectPersistedImageUrlReferences(): PersistedImageUrlReference[] {
-  const references: PersistedImageUrlReference[] = []
-  messages.value.forEach((item, index) => {
-    references.push({
-      path: `messages[${index}].url`,
-      getUrl: () => item.url,
-      setUrl: (url) => {
-        item.url = url
-      },
-    })
-  })
-  imageNodes.value.forEach((node, index) => {
-    references.push({
-      path: `imageNodes[${index}].sourceImageUrl`,
-      getUrl: () => node.sourceImageUrl,
-      setUrl: (url) => {
-        node.sourceImageUrl = url
-      },
-    })
-  })
-  maskNodes.value.forEach((node, index) => {
-    references.push({
-      path: `maskNodes[${index}].sourceImageUrl`,
-      getUrl: () => node.sourceImageUrl,
-      setUrl: (url) => {
-        node.sourceImageUrl = url
-      },
-    })
-  })
-  appendOutputImageReferences(references, 'imageNodes', imageNodes.value)
-  appendOutputImageReferences(references, 'modelNodes', modelNodes.value)
-  appendOutputImageReferences(references, 'viewpointNodes', viewpointNodes.value)
-  appendOutputImageReferences(references, 'colorNodes', colorNodes.value)
-  appendOutputImageReferences(references, 'enhanceNodes', enhanceNodes.value)
-  appendOutputImageReferences(references, 'editNodes', editNodes.value)
-  appendOutputImageReferences(references, 'fusionNodes', fusionNodes.value)
-  appendOutputImageReferences(references, 'wearNodes', wearNodes.value)
-  return references
-}
-
-async function stabilizePersistedImageUrlsBeforeSave() {
-  const normalizeAndUploadTasks = new Map<string, Promise<string>>()
-  const references = collectPersistedImageUrlReferences()
-  for (const reference of references) {
-    const original = reference.getUrl()
-    const normalized = original.trim()
-    if (!normalized) continue
-    if (normalized !== original) {
-      reference.setUrl(normalized)
-    }
-    if (isStableWorkspaceUploadUrl(normalized)) {
-      continue
-    }
-    let uploadTask = normalizeAndUploadTasks.get(normalized)
-    if (!uploadTask) {
-      uploadTask = fetchAndUploadStableWorkspaceUrl(normalized)
-      normalizeAndUploadTasks.set(normalized, uploadTask)
-    }
-    try {
-      const stableUrl = await uploadTask
-      reference.setUrl(stableUrl)
-    } catch (error) {
-      const reason = error instanceof Error && error.message ? error.message : '未知错误'
-      throw new Error(`保存失败：${reference.path} 使用了不稳定图片链接，${reason}`)
-    }
-  }
-}
-
-let pendingSaveRecycleEntriesBuffer: PendingRecycleUploadEntry[] = []
-
-function resolveCanvasWorkspaceUploadMeta(url: string): CanvasImageItem['uploadMeta'] | undefined {
-  const path = parseCanvasImagePath(url)
-  if (!path) return undefined
-  if (!isWorkspaceUploadPath(path)) return undefined
-  return {
-    kind: 'workspace-local-drop-upload',
-    userId: Number(userStore.user?.id),
-  }
-}
-
-function resolvePendingRecycleEntryForUrl(
-  url: string,
-  boardIdOverride?: string,
-): PendingRecycleUploadEntry | null {
-  const normalizedUrl = url.trim()
-  if (!normalizedUrl || !isStableWorkspaceUploadUrl(normalizedUrl)) return null
-  const currentUserID = Number(userStore.user?.id)
-  const boardId = `${boardIdOverride ?? currentBoardId.value ?? ''}`.trim()
-  if (!Number.isFinite(currentUserID) || currentUserID <= 0 || !boardId) return null
-  const path = parseCanvasImagePath(normalizedUrl)
-  if (!path || !isWorkspaceUploadPath(path, boardId)) return null
-  return {
-    url: normalizedUrl,
-    userId: currentUserID,
-    boardId,
-  }
-}
-
-function queueWorkspaceUploadUrlsForRecycle(
-  urls: Iterable<string>,
-  boardIdOverride?: string,
-) {
-  const nextEntryMap = new Map(
-    pendingRecycleEntries.value.map(entry => [entry.url, entry] as const),
-  )
-  for (const url of urls) {
-    const entry = resolvePendingRecycleEntryForUrl(url, boardIdOverride)
-    if (!entry) continue
-    nextEntryMap.set(entry.url, entry)
-  }
-  setPendingRecycleEntries(Array.from(nextEntryMap.values()))
-}
-
-function queueDeletedCanvasUploadsForRecycle(deletedItems: CanvasImageItem[]) {
-  if (!deletedItems.length) return
-  queueWorkspaceUploadUrlsForRecycle(
-    deletedItems.map(item => item.url),
-  )
-}
-
-async function flushPendingRecycleUploads() {
-  if (pendingRecycleScanInFlight) {
-    pendingRecycleScanQueued = true
-    return
-  }
-  clearPendingRecycleScanTimer()
-  if (pendingRecycleEntries.value.length === 0) return
-  pendingRecycleScanInFlight = true
-  try {
-    const activeBoardId = currentBoardId.value?.trim() || ''
-    const activeSnapshotUrls = collectCanvasBoardImageUrls(createBoardSnapshotBase())
-    const recycleTargets: PendingRecycleUploadEntry[] = []
-    const retainedEntries: PendingRecycleUploadEntry[] = []
-
-    pendingRecycleEntries.value.forEach((entry) => {
-      const normalized = normalizePendingRecycleEntry(entry)
-      if (!normalized) return
-      const { url } = normalized
-
-      if (activeSnapshotUrls.has(url.trim())) {
-        return
-      }
-
-      if (hasHistoryImageUrlReference(url, {
-        recentUndoSteps: RECENT_HISTORY_RECYCLE_GUARD_STEPS,
-        includeRedo: true,
-        includeCurrent: false,
-      })) {
-        retainedEntries.push(normalized)
-        return
-      }
-
-      const excludeBoardId = normalized.boardId === activeBoardId ? activeBoardId : undefined
-      if (isImageUrlReferencedInOtherCanvasBoardStates(url, excludeBoardId)) {
-        retainedEntries.push(normalized)
-        return
-      }
-
-      recycleTargets.push(normalized)
-    })
-
-    setPendingRecycleEntries(retainedEntries)
-    if (!recycleTargets.length) return
-
-    const results = await Promise.allSettled(recycleTargets.map(entry => uploadApi.recycle(entry.url, entry.boardId)))
-    const failedCount = results.filter(result => result.status === 'rejected').length
-    if (failedCount > 0) {
-      message.warning(`有 ${failedCount} 张图片回收失败，已保留文件`)
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          retainedEntries.push(recycleTargets[index])
-        }
-      })
-      setPendingRecycleEntries(retainedEntries)
-    }
-  } finally {
-    pendingRecycleScanInFlight = false
-    if (pendingRecycleScanQueued) {
-      pendingRecycleScanQueued = false
-      if (pendingRecycleEntries.value.length > 0) {
-        void flushPendingRecycleUploads()
-      }
-    }
-  }
-}
-
-async function schedulePendingRecycleScan() {
-  if (pendingRecycleEntries.value.length === 0) return
-  if (pendingRecycleScanTimer !== null) return
-  pendingRecycleScanTimer = window.setTimeout(() => {
-    pendingRecycleScanTimer = null
-    void flushPendingRecycleUploads()
-  }, 120)
-}
+const processedMaskPreviewUrls = ref<Record<number, string>>({})
+let suspendWorkflowCacheReactions = false
+let resetHistoryBaseline: ((snapshot?: CanvasBoardSnapshot | null) => void) | null = null
 const runningExecutionNodeKeys = ref<Set<string>>(new Set())
 const executionNodeLastRunFailedMap = ref<Record<string, boolean>>({})
 const connections = ref<CanvasConnection[]>([])
-const processedMaskPreviewUrls = ref<Record<number, string>>({})
+const {
+  createBoardSnapshotBase,
+  applyBoardSnapshot: applyBoardSnapshotCore,
+} = useWorkspaceBoardSnapshot({
+  messages,
+  imageNodes,
+  promptNodes,
+  modelNodes,
+  viewpointNodes,
+  maskNodes,
+  colorNodes,
+  enhanceNodes,
+  editNodes,
+  fusionNodes,
+  wearNodes,
+  connections,
+  runningExecutionNodeKeys,
+  executionNodeLastRunFailedMap,
+  processedMaskPreviewUrls,
+  resetEditorState: () => resetEditorState(),
+  clearAllNodeConnectionErrors: () => clearAllNodeConnectionErrors(),
+  resetEditorUiState: () => resetEditorUiState(),
+  clearSelectedConnection: () => clearSelectedConnection(),
+  clearConnectionDraft: () => clearConnectionDraft(),
+  setViewport: (viewport) => setViewport(viewport),
+  createViewportSnapshot: () => createViewportSnapshot(),
+  renderMaskNodeMask: (node) => renderMaskNodeMask(node),
+  refreshProcessedMaskPreview: (node) => refreshProcessedMaskPreview(node),
+  clearProcessedMaskPreview: (id) => clearProcessedMaskPreview(id),
+  scheduleRenderedConnectionsRefresh: () => scheduleRenderedConnectionsRefresh(),
+  resetHistoryBaseline: (snapshot) => resetHistoryBaseline?.(snapshot),
+  setSuspendWorkflowCacheReactions: (next) => {
+    suspendWorkflowCacheReactions = next
+  },
+})
+const RECENT_HISTORY_RECYCLE_GUARD_STEPS = 10
+const {
+  uploadWorkspaceImage,
+  resolveCanvasWorkspaceUploadMeta,
+  queueWorkspaceUploadUrlsForRecycle,
+  queueDeletedCanvasUploadsForRecycle,
+  prepareBoardSnapshotBeforePersist,
+  handleBoardPersisted,
+  schedulePendingRecycleScan,
+  clearPendingRecycleScanTimer,
+  flushPendingRecycleUploads,
+  reloadPendingRecycleEntries,
+} = useWorkspaceUploadLifecycle({
+  getCurrentBoardId: () => currentBoardId.value,
+  getUserId: () => Number(userStore.user?.id),
+  getUserUid: () => `${userStore.user?.uid ?? ''}`,
+  messages,
+  imageNodes,
+  maskNodes,
+  modelNodes,
+  viewpointNodes,
+  colorNodes,
+  enhanceNodes,
+  editNodes,
+  fusionNodes,
+  wearNodes,
+  createBoardSnapshot: createBoardSnapshotBase,
+  collectCanvasBoardImageUrls,
+  getCanvasBoardState,
+  isImageUrlReferencedInOtherCanvasBoardStates,
+  hasHistoryImageUrlReference: (url, options) => hasHistoryImageUrlReference(url, options),
+  uploadImageApi: (file, boardId) => uploadApi.upload(file, boardId),
+  recycleImageApi: (url, boardId) => uploadApi.recycle(url, boardId),
+  warning: (text) => message.warning(text),
+  historyRecycleGuardSteps: RECENT_HISTORY_RECYCLE_GUARD_STEPS,
+  userDownloadEndpoint: USER_DOWNLOAD_ENDPOINT,
+})
 const styleInnovateDefaultStrength = 50
 const styleInnovateStrength = ref(styleInnovateDefaultStrength)
 const styleStrengthTrackRef = ref<HTMLElement | HTMLElement[] | null>(null)
@@ -957,7 +569,6 @@ const tools = [
 
 const canvasNodeMenuItems = CANVAS_NODE_MENU_ITEMS
 
-const processedMaskPreviewSignatures = new Map<number, string>()
 const {
   selectedConnectionId,
   renderedConnections,
@@ -1143,7 +754,6 @@ const {
   dataUrlToFile,
   buildFullMaskDataUrl,
   refineExecutionMaskDataUrl,
-  buildPreviewMaskDataUrlFromExecutionMask,
   openMaskNodeFilePicker,
   clearMaskNodeImage,
   clearMaskNodeMask,
@@ -1151,8 +761,13 @@ const {
   importCanvasImageToMaskNodeAtPoint,
   removeMaskRuntimeFor,
   resetMaskRuntime,
+  clearProcessedMaskPreview,
+  getMaskExecutionDataUrl,
+  refreshProcessedMaskPreview,
+  getMaskNodeProcessedOutputUrl,
 } = useMaskNode({
   maskNodes,
+  processedMaskPreviewUrls,
   activeImageActionId,
   showStyleStrengthControl,
   message,
@@ -1189,7 +804,6 @@ const {
 const {
   updateModelAngleYaw,
   updateModelAngleFraming,
-  clampModelAngleYaw,
 } = useModelNode()
 
 const {
@@ -1258,25 +872,6 @@ function setWorkflowNodeOutputStatus(
   status?: WorkflowNodeOutputStatus,
 ) {
   node.outputStatus = status ?? (node.outputImages.length > 0 ? 'ready' : 'idle')
-}
-
-function cloneNodeOutputImages(outputs: { url: string; ratio: number }[]) {
-  return outputs.map(output => ({ ...output }))
-}
-
-function cloneModelAngleSpec(angleSpec: ModelAngleSpec) {
-  return { ...angleSpec }
-}
-
-function toNormalizedColorNode(node: ColorNodeItem): ColorNodeItem {
-  const colors = normalizeColorNodeColors(node.colors.map(color => normalizeHexColor(color)))
-  return {
-    ...node,
-    outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-    colors,
-    strength: Math.max(0, Math.min(100, Math.round(node.strength ?? DEFAULT_COLOR_STRENGTH))),
-    outputImages: cloneNodeOutputImages(node.outputImages),
-  }
 }
 
 function markExecutionNodeDirty(
@@ -1488,14 +1083,10 @@ function resetEditorState() {
   runningExecutionNodeKeys.value = new Set()
   executionNodeLastRunFailedMap.value = {}
   connections.value = []
-  processedMaskPreviewUrls.value = {}
-  processedMaskPreviewSignatures.clear()
   clearConnectionDraft()
   userPrompt.value = ''
   resetViewport()
 }
-
-let suspendWorkflowCacheReactions = false
 
 const canvasMutationVersions = {
   content: ref(0),
@@ -1517,144 +1108,9 @@ function getCanvasMutationVersionTotal() {
   return Object.values(canvasMutationVersions).reduce((sum, version) => sum + version.value, 0)
 }
 
-let resetHistoryBaseline: ((snapshot?: CanvasBoardSnapshot | null) => void) | null = null
-
 async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
-  suspendWorkflowCacheReactions = true
   bumpCanvasMutationVersion('system')
-  try {
-    if (!state) {
-      resetEditorState()
-      await nextTick()
-      resetHistoryBaseline?.(createBoardSnapshotBase())
-      return
-    }
-
-    messages.value = state.messages.map(item => ({ ...item }))
-    resetEditorUiState()
-    clearAllNodeConnectionErrors()
-    runningExecutionNodeKeys.value = new Set()
-    executionNodeLastRunFailedMap.value = {}
-
-    imageNodes.value = state.imageNodes.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-
-    promptNodes.value = state.promptNodes.map(node => ({ ...node }))
-
-    modelNodes.value = state.modelNodes.map(node => ({
-      ...node,
-      modelStrength: clampModelReferenceStrength(node.modelStrength),
-      poseStrength: clampModelPoseStrength(node.poseStrength),
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      angleSpec: cloneModelAngleSpec(node.angleSpec),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-    viewpointNodes.value = state.viewpointNodes.map(node => ({
-      ...node,
-      selectedViewpoint: normalizeViewpointSelectionByCategory(node.activeCategory, node.selectedViewpoint),
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-    maskNodes.value = state.maskNodes.map(node => ({
-      ...node,
-      refineAmount: clampMaskRefineAmount(node.refineAmount ?? 0),
-      invertMask: !!node.invertMask,
-    }))
-    enhanceNodes.value = state.enhanceNodes.map(node => ({
-      ...node,
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      outputQuality: Math.max(30, Math.min(100, Math.round(node.outputQuality ?? 95))),
-      extendTop: clampEnhanceExtendPercent(node.extendTop ?? ENHANCE_EXTEND_PERCENT_DEFAULT),
-      extendRight: clampEnhanceExtendPercent(node.extendRight ?? ENHANCE_EXTEND_PERCENT_DEFAULT),
-      extendBottom: clampEnhanceExtendPercent(node.extendBottom ?? ENHANCE_EXTEND_PERCENT_DEFAULT),
-      extendLeft: clampEnhanceExtendPercent(node.extendLeft ?? ENHANCE_EXTEND_PERCENT_DEFAULT),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-    editNodes.value = state.editNodes.map(node => ({
-      ...node,
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-    fusionNodes.value = state.fusionNodes.map(node => ({
-      ...node,
-      blendRatio: Math.max(0, Math.min(100, Math.round(node.blendRatio ?? 50))),
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-    wearNodes.value = state.wearNodes.map(node => ({
-      ...node,
-      tileMode: normalizeWearTileMode(node.tileMode),
-      outputStatus: resolveWorkflowNodeOutputStatus(node.outputStatus, node.outputImages),
-      rotation: clampWearRotation(node.rotation),
-      scale: clampWearScale(node.scale),
-      opacity: clampWearOpacity(node.opacity),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    }))
-    colorNodes.value = state.colorNodes.map(toNormalizedColorNode)
-    connections.value = state.connections.map(connection => ({ ...connection }))
-    clearSelectedConnection()
-    clearConnectionDraft()
-    setViewport(state.viewport)
-
-    await nextTick()
-    const nextMaskNodeIds = new Set(maskNodes.value.map(node => node.id))
-    Object.keys(processedMaskPreviewUrls.value).forEach((rawId) => {
-      const id = Number(rawId)
-      if (!nextMaskNodeIds.has(id)) {
-        clearProcessedMaskPreview(id)
-      }
-    })
-    maskNodes.value.forEach(node => renderMaskNodeMask(node))
-    maskNodes.value.forEach((node) => {
-      void refreshProcessedMaskPreview(node)
-    })
-    scheduleRenderedConnectionsRefresh()
-    resetHistoryBaseline?.(createBoardSnapshotBase())
-  } finally {
-    suspendWorkflowCacheReactions = false
-  }
-}
-
-function createBoardSnapshotBase(): CanvasBoardSnapshot {
-  return {
-    messages: messages.value.map(item => ({ ...item })),
-    imageNodes: imageNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    promptNodes: promptNodes.value.map(node => ({ ...node })),
-    modelNodes: modelNodes.value.map(node => ({
-      ...node,
-      angleSpec: cloneModelAngleSpec(node.angleSpec),
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    viewpointNodes: viewpointNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    maskNodes: maskNodes.value.map(node => ({ ...node })),
-    colorNodes: colorNodes.value.map(toNormalizedColorNode),
-    enhanceNodes: enhanceNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    editNodes: editNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    fusionNodes: fusionNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    wearNodes: wearNodes.value.map(node => ({
-      ...node,
-      outputImages: cloneNodeOutputImages(node.outputImages),
-    })),
-    connections: connections.value.map(connection => ({ ...connection })),
-    viewport: createViewportSnapshot(),
-  }
+  await applyBoardSnapshotCore(state)
 }
 
 function compactCanvasMutationGuardValue(value: unknown): unknown {
@@ -1698,46 +1154,6 @@ function installCanvasMutationDevGuard() {
     },
     { flush: 'post' },
   )
-}
-
-function collectRemovedWorkspaceUploadEntries(
-  previousSnapshot: CanvasBoardSnapshot | null | undefined,
-  nextSnapshot: CanvasBoardSnapshot | null | undefined,
-  boardId: string,
-): PendingRecycleUploadEntry[] {
-  const previousUrls = collectCanvasBoardImageUrls(previousSnapshot)
-  const nextUrls = collectCanvasBoardImageUrls(nextSnapshot)
-  const removedEntries: PendingRecycleUploadEntry[] = []
-
-  previousUrls.forEach((url) => {
-    if (nextUrls.has(url)) return
-    const entry = resolvePendingRecycleEntryForUrl(url, boardId)
-    if (entry) {
-      removedEntries.push(entry)
-    }
-  })
-
-  return removedEntries
-}
-
-async function prepareBoardSnapshotBeforePersist() {
-  const boardId = `${currentBoardId.value ?? ''}`.trim()
-  const previousSnapshot = boardId ? getCanvasBoardState(boardId) : null
-  await stabilizePersistedImageUrlsBeforeSave()
-  pendingSaveRecycleEntriesBuffer = boardId
-    ? collectRemovedWorkspaceUploadEntries(previousSnapshot, createBoardSnapshotBase(), boardId)
-    : []
-}
-
-async function handleBoardPersisted() {
-  if (pendingSaveRecycleEntriesBuffer.length > 0) {
-    setPendingRecycleEntries([
-      ...pendingRecycleEntries.value,
-      ...pendingSaveRecycleEntriesBuffer,
-    ])
-    pendingSaveRecycleEntriesBuffer = []
-  }
-  await schedulePendingRecycleScan()
 }
 
 const {
@@ -1954,12 +1370,21 @@ function applyConnectionMutationEffects(
 watch(
   () => userStore.user?.id,
   () => {
-    setPendingRecycleEntries(readPendingRecycleEntries())
+    reloadPendingRecycleEntries()
   },
   { immediate: true },
 )
 
 installCanvasMutationDevGuard()
+
+const { deleteNodeFromCollection } = useWorkspaceNodeLifecycle({
+  queueWorkspaceUploadUrlsForRecycle,
+  clearNodeConnectionError,
+  setExecutionNodeLastRunFailed,
+  removeConnectionsForNode,
+  removeSelectedNodeKey,
+  markCanvasLayoutChanged,
+})
 
 function deletePromptNode(id: number) {
   deleteNodeFromCollection(promptNodes, 'prompt', id, () => {
@@ -2058,46 +1483,6 @@ function createNodeFromContextMenu<T extends { id: number }>(
     afterCreate?.(newNode)
   }, { layout: true })
   closeNodeContextMenu()
-}
-
-function collectWorkspaceUploadUrlsFromNodeLike(
-  node: { sourceImageUrl?: string; outputImages?: Array<{ url: string }> },
-): string[] {
-  const urls = new Set<string>()
-  const sourceImageUrl = `${node.sourceImageUrl ?? ''}`.trim()
-  if (sourceImageUrl) {
-    urls.add(sourceImageUrl)
-  }
-  node.outputImages?.forEach((output) => {
-    const outputUrl = `${output.url ?? ''}`.trim()
-    if (outputUrl) {
-      urls.add(outputUrl)
-    }
-  })
-  return Array.from(urls)
-}
-
-function deleteNodeFromCollection<T extends { id: number }>(
-  collection: Ref<T[]>,
-  nodeType: CanvasConnectionNodeType,
-  id: number,
-  afterDelete?: () => void,
-) {
-  const removedNode = collection.value.find(node => node.id === id) as
-    | (T & { sourceImageUrl?: string; outputImages?: Array<{ url: string }> })
-    | undefined
-  if (removedNode) {
-    queueWorkspaceUploadUrlsForRecycle(collectWorkspaceUploadUrlsFromNodeLike(removedNode))
-  }
-  collection.value = collection.value.filter(node => node.id !== id)
-  clearNodeConnectionError(nodeType, id)
-  if (isCanvasExecutionOutputNodeType(nodeType)) {
-    setExecutionNodeLastRunFailed(nodeType, id, false)
-  }
-  removeConnectionsForNode(nodeType, id)
-  removeSelectedNodeKey(nodeType, id)
-  afterDelete?.()
-  markCanvasLayoutChanged()
 }
 
 function buildNodeCreateHandler<T extends { id: number }>(
@@ -2331,66 +1716,6 @@ function getImageNodeConnectionOutput(node: ImageNodeItem | null): { url: string
   return getImageNodePreferredImage(node)
 }
 
-function clearProcessedMaskPreview(id: number) {
-  if (!(id in processedMaskPreviewUrls.value)) {
-    processedMaskPreviewSignatures.delete(id)
-    return
-  }
-  const next = { ...processedMaskPreviewUrls.value }
-  delete next[id]
-  processedMaskPreviewUrls.value = next
-  processedMaskPreviewSignatures.delete(id)
-}
-
-function getMaskPreviewSignature(node: MaskNodeItem): string {
-  return `${getMaskExecutionDataUrl(node)}|${clampMaskRefineAmount(node.refineAmount ?? 0)}|${node.invertMask ? 1 : 0}`
-}
-
-function getMaskExecutionDataUrl(node: MaskNodeItem): string {
-  return node.executionMaskDataUrl || node.maskDataUrl || ''
-}
-
-async function refreshProcessedMaskPreview(node: MaskNodeItem) {
-  const baseExecutionMaskDataUrl = getMaskExecutionDataUrl(node)
-  if (!baseExecutionMaskDataUrl) {
-    clearProcessedMaskPreview(node.id)
-    return
-  }
-
-  const refineAmount = clampMaskRefineAmount(node.refineAmount ?? 0)
-  const signature = getMaskPreviewSignature(node)
-  processedMaskPreviewSignatures.set(node.id, signature)
-
-  if (refineAmount === 0 && !node.invertMask) {
-    const previewMaskDataUrl = await buildPreviewMaskDataUrlFromExecutionMask(baseExecutionMaskDataUrl)
-    if (processedMaskPreviewSignatures.get(node.id) !== signature) return
-    processedMaskPreviewUrls.value = {
-      ...processedMaskPreviewUrls.value,
-      [node.id]: previewMaskDataUrl || node.maskDataUrl || baseExecutionMaskDataUrl,
-    }
-    return
-  }
-
-  const refinedExecutionMaskDataUrl = await refineExecutionMaskDataUrl(
-    baseExecutionMaskDataUrl,
-    refineAmount,
-    !!node.invertMask,
-  )
-  if (processedMaskPreviewSignatures.get(node.id) !== signature) return
-  const refinedPreviewMaskDataUrl = await buildPreviewMaskDataUrlFromExecutionMask(refinedExecutionMaskDataUrl)
-  if (processedMaskPreviewSignatures.get(node.id) !== signature) return
-  processedMaskPreviewUrls.value = {
-    ...processedMaskPreviewUrls.value,
-    [node.id]: refinedPreviewMaskDataUrl || node.maskDataUrl || baseExecutionMaskDataUrl,
-  }
-}
-
-function getMaskNodeProcessedOutputUrl(node: MaskNodeItem): string {
-  const baseExecutionMaskDataUrl = getMaskExecutionDataUrl(node)
-  if (!baseExecutionMaskDataUrl) return ''
-  return processedMaskPreviewUrls.value[node.id] || node.maskDataUrl || baseExecutionMaskDataUrl
-}
-
 function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: number; mode: 'mask' | 'linked-output' | 'node-output' } | null {
   const connection = findIncomingConnection('image', node.id, 'image')
   if (!connection) return null
@@ -2589,10 +1914,6 @@ function setEditNodeMode(node: EditNodeItem, mode: EditNodeItem['mode']) {
     removeIncomingConnectionsForPort('edit', node.id, 'imageB')
   }
   markExecutionInputContentChanged('edit', node.id)
-}
-
-function clampEnhanceExtendPercent(value: number): number {
-  return Math.max(ENHANCE_EXTEND_PERCENT_MIN, Math.min(ENHANCE_EXTEND_PERCENT_MAX, Math.round(value)))
 }
 
 function getMaskNodeStageHeight(node: MaskNodeItem): number {
@@ -2867,187 +2188,47 @@ const onWearNodePortMouseDown = (event: MouseEvent, nodeId: number, port: Canvas
 const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
   handleConnectionPortMouseDown(event, 'color', nodeId, port)
 
-function onPromptNodeTextUpdate(node: PromptNodeItem, value: string) {
-  if (node.text === value) return
-  node.text = value
-  markWorkflowInputChanged('prompt', node.id)
-  markCanvasContentChanged()
-}
-
-function onModelNodeSelectBackground(node: ModelNodeItem, key: string) {
-  if (node.background === key) return
-  node.background = key
-  markExecutionInputContentChanged('model', node.id)
-}
-
-function onModelNodeUpdateAngleYaw(node: ModelNodeItem, value: number) {
-  const previousYaw = node.angleSpec.yaw
-  updateModelAngleYaw(node, clampModelAngleYaw(value))
-  if (node.angleSpec.yaw === previousYaw) return
-  markExecutionInputContentChanged('model', node.id)
-}
-
-function onModelNodeUpdateAngleFraming(node: ModelNodeItem, value: ModelAngleFraming) {
-  const previousFraming = node.angleSpec.framing
-  updateModelAngleFraming(node, value)
-  if (node.angleSpec.framing === previousFraming) return
-  markExecutionInputContentChanged('model', node.id)
-}
-
-function onModelNodeUpdateModelStrength(node: ModelNodeItem, value: number) {
-  const nextValue = clampModelReferenceStrength(value)
-  if (node.modelStrength === nextValue) return
-  node.modelStrength = nextValue
-  markExecutionInputContentChanged('model', node.id)
-}
-
-function onModelNodeUpdatePoseStrength(node: ModelNodeItem, value: number) {
-  const nextValue = clampModelPoseStrength(value)
-  if (node.poseStrength === nextValue) return
-  node.poseStrength = nextValue
-  markExecutionInputContentChanged('model', node.id)
-}
-
-function onViewpointNodeUpdateLighting(node: ViewpointNodeItem, value: ViewpointNodeItem['lighting']) {
-  if (node.lighting === value) return
-  node.lighting = value
-  markExecutionInputContentChanged('viewpoint', node.id)
-}
-
-function onMaskNodeCanvasMouseDownBridge(event: MouseEvent, node: MaskNodeItem) {
-  onMaskCanvasMouseDown(event, node)
-}
-
-function onMaskNodeSetDrawMode(node: MaskNodeItem, value: 'paint' | 'erase') {
-  node.drawMode = value
-}
-
-function onMaskNodeUpdateBrushSize(node: MaskNodeItem, value: number) {
-  node.brushSize = value
-}
-
-function onMaskNodeUpdateRefineAmount(node: MaskNodeItem, value: number) {
-  const nextValue = clampMaskRefineAmount(value)
-  if (node.refineAmount === nextValue) return
-  node.refineAmount = nextValue
-  markMaskNodeChanged(node)
-}
-
-function onMaskNodeToggleInvert(node: MaskNodeItem) {
-  node.invertMask = !node.invertMask
-  markMaskNodeChanged(node)
-}
-
-function onEditNodeUpdateMode(node: EditNodeItem, value: EditNodeItem['mode']) {
-  setEditNodeMode(node, value)
-}
-
-function onFusionNodeUpdateBlendRatio(node: FusionNodeItem, value: number) {
-  const nextValue = Math.max(0, Math.min(100, Math.round(value)))
-  if (node.blendRatio === nextValue) return
-  node.blendRatio = nextValue
-  markExecutionInputContentChanged('fusion', node.id)
-}
-
-function onEnhanceNodeUpdateMode(node: EnhanceNodeItem, value: EnhanceNodeItem['mode']) {
-  setEnhanceNodeMode(node, value)
-}
-
-function onEnhanceNodeUpdateUpscaleMode(node: EnhanceNodeItem, value: EnhanceNodeItem['upscaleMode']) {
-  if (node.upscaleMode === value) return
-  node.upscaleMode = value
-  markExecutionInputContentChanged('enhance', node.id)
-}
-
-function onEnhanceNodeUpdateUpscaleFactor(node: EnhanceNodeItem, value: EnhanceNodeItem['upscaleFactor']) {
-  if (node.upscaleFactor === value) return
-  node.upscaleFactor = value
-  markExecutionInputContentChanged('enhance', node.id)
-}
-
-function onEnhanceNodeUpdateOutputFormat(node: EnhanceNodeItem, value: EnhanceNodeItem['outputFormat']) {
-  if (node.outputFormat === value) return
-  node.outputFormat = value
-  markExecutionInputContentChanged('enhance', node.id)
-}
-
-function onEnhanceNodeUpdateOutputQuality(node: EnhanceNodeItem, value: number) {
-  const nextValue = Math.max(30, Math.min(100, Math.round(value)))
-  if (node.outputQuality === nextValue) return
-  node.outputQuality = nextValue
-  markExecutionInputContentChanged('enhance', node.id)
-}
-
-function onEnhanceNodeUpdateExtendTop(node: EnhanceNodeItem, value: number) {
-  const nextValue = clampEnhanceExtendPercent(value)
-  if (node.extendTop === nextValue) return
-  node.extendTop = nextValue
-  markExecutionInputContentChanged('enhance', node.id)
-}
-
-function onEnhanceNodeUpdateExtendRight(node: EnhanceNodeItem, value: number) {
-  const nextValue = clampEnhanceExtendPercent(value)
-  if (node.extendRight === nextValue) return
-  node.extendRight = nextValue
-  markExecutionInputContentChanged('enhance', node.id)
-}
-
-function onEnhanceNodeUpdateExtendBottom(node: EnhanceNodeItem, value: number) {
-  const nextValue = clampEnhanceExtendPercent(value)
-  if (node.extendBottom === nextValue) return
-  node.extendBottom = nextValue
-  markExecutionInputContentChanged('enhance', node.id)
-}
-
-function onEnhanceNodeUpdateExtendLeft(node: EnhanceNodeItem, value: number) {
-  const nextValue = clampEnhanceExtendPercent(value)
-  if (node.extendLeft === nextValue) return
-  node.extendLeft = nextValue
-  markExecutionInputContentChanged('enhance', node.id)
-}
-
-function onWearNodeUpdateTileMode(node: WearNodeItem, value: WearNodeItem['tileMode']) {
-  const nextValue = normalizeWearTileMode(value)
-  if (node.tileMode === nextValue) return
-  node.tileMode = nextValue
-  markExecutionInputContentChanged('wear', node.id)
-}
-
-function onWearNodeUpdateRotation(node: WearNodeItem, value: number) {
-  const nextValue = clampWearRotation(value)
-  if (node.rotation === nextValue) return
-  node.rotation = nextValue
-  markExecutionInputContentChanged('wear', node.id)
-}
-
-function onWearNodeUpdateScale(node: WearNodeItem, value: number) {
-  const nextValue = clampWearScale(value)
-  if (node.scale === nextValue) return
-  node.scale = nextValue
-  markExecutionInputContentChanged('wear', node.id)
-}
-
-function onWearNodeUpdateOpacity(node: WearNodeItem, value: number) {
-  const nextValue = clampWearOpacity(value)
-  if (node.opacity === nextValue) return
-  node.opacity = nextValue
-  markExecutionInputContentChanged('wear', node.id)
-}
-
-function onColorNodeApplyPreset(node: ColorNodeItem, value: string[]) {
-  const baseColors = isColorNodePlaceholderState(node) ? [] : node.colors
-  const nextColors = normalizeColorNodeColors([...baseColors, ...value])
-  if (nextColors.join(',') === node.colors.join(',')) return
-  node.colors = nextColors
-  markExecutionInputContentChanged('color', node.id)
-}
-
-function onColorNodeStrengthInput(node: ColorNodeItem, value: number) {
-  const nextValue = Math.max(0, Math.min(100, Math.round(value)))
-  if (node.strength === nextValue) return
-  node.strength = nextValue
-  markExecutionInputContentChanged('color', node.id)
-}
+const {
+  onPromptNodeTextUpdate,
+  onModelNodeSelectBackground,
+  onModelNodeUpdateAngleYaw,
+  onModelNodeUpdateAngleFraming,
+  onModelNodeUpdateModelStrength,
+  onModelNodeUpdatePoseStrength,
+  onViewpointNodeUpdateLighting,
+  onMaskNodeCanvasMouseDownBridge,
+  onMaskNodeSetDrawMode,
+  onMaskNodeUpdateBrushSize,
+  onMaskNodeUpdateRefineAmount,
+  onMaskNodeToggleInvert,
+  onEditNodeUpdateMode,
+  onFusionNodeUpdateBlendRatio,
+  onEnhanceNodeUpdateMode,
+  onEnhanceNodeUpdateUpscaleMode,
+  onEnhanceNodeUpdateUpscaleFactor,
+  onEnhanceNodeUpdateOutputFormat,
+  onEnhanceNodeUpdateOutputQuality,
+  onEnhanceNodeUpdateExtendTop,
+  onEnhanceNodeUpdateExtendRight,
+  onEnhanceNodeUpdateExtendBottom,
+  onEnhanceNodeUpdateExtendLeft,
+  onWearNodeUpdateTileMode,
+  onWearNodeUpdateRotation,
+  onWearNodeUpdateScale,
+  onWearNodeUpdateOpacity,
+  onColorNodeApplyPreset,
+  onColorNodeStrengthInput,
+} = useWorkspaceNodeUpdateHandlers({
+  markWorkflowInputChanged,
+  markCanvasContentChanged,
+  markExecutionInputContentChanged,
+  markMaskNodeChanged,
+  setEditNodeMode,
+  setEnhanceNodeMode,
+  onMaskCanvasMouseDown,
+  updateModelAngleYaw,
+  updateModelAngleFraming,
+})
 
 const {
   handleModelNodeGenerate,
@@ -3137,17 +2318,7 @@ function getImageDisplayHeight(item: CanvasImageItem): number {
   return Math.max(72, Math.round(width * ratio))
 }
 
-onMounted(async () => {
-  if (!userStore.isLoggedIn) {
-    addGlobalConnectionListeners()
-    nextTick(() => {
-      scheduleRenderedConnectionsRefresh()
-      maskNodes.value.forEach((node) => {
-        void refreshProcessedMaskPreview(node)
-      })
-    })
-    return
-  }
+onMounted(() => {
   addGlobalConnectionListeners()
   nextTick(() => {
     scheduleRenderedConnectionsRefresh()
@@ -3155,7 +2326,9 @@ onMounted(async () => {
       void refreshProcessedMaskPreview(node)
     })
   })
-  void schedulePendingRecycleScan()
+  if (userStore.isLoggedIn) {
+    schedulePendingRecycleScan()
+  }
 })
 
 onUnmounted(() => {

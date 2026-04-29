@@ -23,6 +23,7 @@ interface DragPayload {
 
 interface UseMaskNodeOptions {
   maskNodes: Ref<MaskNodeItem[]>
+  processedMaskPreviewUrls: Ref<Record<number, string>>
   activeImageActionId: Ref<number | null>
   showStyleStrengthControl: Ref<boolean>
   message: MaskNodeMessageApi
@@ -51,6 +52,8 @@ export function clampMaskRefineAmount(value: number): number {
 export function useMaskNode(options: UseMaskNodeOptions) {
   const maskCanvasRefs = new Map<number, HTMLCanvasElement>()
   const maskRasterCache = new Map<number, HTMLImageElement>()
+  const processedMaskPreviewUrls = options.processedMaskPreviewUrls
+  const processedMaskPreviewSignatures = new Map<number, string>()
 
   let paintingMaskNode: MaskNodeItem | null = null
   let paintingMaskCanvas: HTMLCanvasElement | null = null
@@ -195,6 +198,10 @@ export function useMaskNode(options: UseMaskNodeOptions) {
 
   function getMaskPreviewDataUrl(node: MaskNodeItem): string {
     return node.maskDataUrl || node.executionMaskDataUrl || ''
+  }
+
+  function getMaskExecutionDataUrl(node: MaskNodeItem): string {
+    return node.executionMaskDataUrl || node.maskDataUrl || ''
   }
 
   function drawMaskRasterPreviewToCanvas(raster: CanvasImageSource, targetCanvas: HTMLCanvasElement) {
@@ -559,6 +566,62 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     }
   }
 
+  function clearProcessedMaskPreview(id: number) {
+    if (!(id in processedMaskPreviewUrls.value)) {
+      processedMaskPreviewSignatures.delete(id)
+      return
+    }
+    const next = { ...processedMaskPreviewUrls.value }
+    delete next[id]
+    processedMaskPreviewUrls.value = next
+    processedMaskPreviewSignatures.delete(id)
+  }
+
+  function getMaskPreviewSignature(node: MaskNodeItem): string {
+    return `${getMaskExecutionDataUrl(node)}|${clampMaskRefineAmount(node.refineAmount ?? 0)}|${node.invertMask ? 1 : 0}`
+  }
+
+  async function refreshProcessedMaskPreview(node: MaskNodeItem) {
+    const baseExecutionMaskDataUrl = getMaskExecutionDataUrl(node)
+    if (!baseExecutionMaskDataUrl) {
+      clearProcessedMaskPreview(node.id)
+      return
+    }
+
+    const refineAmount = clampMaskRefineAmount(node.refineAmount ?? 0)
+    const signature = getMaskPreviewSignature(node)
+    processedMaskPreviewSignatures.set(node.id, signature)
+
+    if (refineAmount === 0 && !node.invertMask) {
+      const previewMaskDataUrl = await buildPreviewMaskDataUrlFromExecutionMask(baseExecutionMaskDataUrl)
+      if (processedMaskPreviewSignatures.get(node.id) !== signature) return
+      processedMaskPreviewUrls.value = {
+        ...processedMaskPreviewUrls.value,
+        [node.id]: previewMaskDataUrl || node.maskDataUrl || baseExecutionMaskDataUrl,
+      }
+      return
+    }
+
+    const refinedExecutionMaskDataUrl = await refineExecutionMaskDataUrl(
+      baseExecutionMaskDataUrl,
+      refineAmount,
+      !!node.invertMask,
+    )
+    if (processedMaskPreviewSignatures.get(node.id) !== signature) return
+    const refinedPreviewMaskDataUrl = await buildPreviewMaskDataUrlFromExecutionMask(refinedExecutionMaskDataUrl)
+    if (processedMaskPreviewSignatures.get(node.id) !== signature) return
+    processedMaskPreviewUrls.value = {
+      ...processedMaskPreviewUrls.value,
+      [node.id]: refinedPreviewMaskDataUrl || node.maskDataUrl || baseExecutionMaskDataUrl,
+    }
+  }
+
+  function getMaskNodeProcessedOutputUrl(node: MaskNodeItem): string {
+    const baseExecutionMaskDataUrl = getMaskExecutionDataUrl(node)
+    if (!baseExecutionMaskDataUrl) return ''
+    return processedMaskPreviewUrls.value[node.id] || node.maskDataUrl || baseExecutionMaskDataUrl
+  }
+
   async function uploadMaskNodeFile(node: MaskNodeItem, file: File) {
     if (!file.type.startsWith('image/')) {
       options.message.warning('请上传图片文件')
@@ -657,6 +720,8 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     stopMaskPainting(false)
     maskCanvasRefs.clear()
     maskRasterCache.clear()
+    processedMaskPreviewUrls.value = {}
+    processedMaskPreviewSignatures.clear()
   }
 
   onUnmounted(() => {
@@ -673,7 +738,10 @@ export function useMaskNode(options: UseMaskNodeOptions) {
     dataUrlToFile,
     buildFullMaskDataUrl,
     refineExecutionMaskDataUrl,
-    buildPreviewMaskDataUrlFromExecutionMask,
+    clearProcessedMaskPreview,
+    getMaskExecutionDataUrl,
+    refreshProcessedMaskPreview,
+    getMaskNodeProcessedOutputUrl,
     openMaskNodeFilePicker,
     clearMaskNodeImage,
     clearMaskNodeMask,

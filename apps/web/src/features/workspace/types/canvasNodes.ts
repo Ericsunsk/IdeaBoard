@@ -103,6 +103,12 @@ export function clampModelAngleYaw(value: unknown): number {
     : MODEL_ANGLE_YAW_DEFAULT
 }
 
+export function clampEnhanceExtendPercent(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(ENHANCE_EXTEND_PERCENT_MIN, Math.min(ENHANCE_EXTEND_PERCENT_MAX, Math.round(value)))
+    : ENHANCE_EXTEND_PERCENT_DEFAULT
+}
+
 export function createDefaultModelAngleSpec(): ModelAngleSpec {
   return {
     yaw: MODEL_ANGLE_YAW_DEFAULT,
