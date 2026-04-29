@@ -62,7 +62,8 @@ function cloneBoardSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot 
 }
 
 function serializeSnapshot(snapshot: CanvasBoardSnapshot): string {
-  return JSON.stringify(snapshot)
+  const { viewport: _viewport, ...snapshotWithoutViewport } = snapshot
+  return JSON.stringify(snapshotWithoutViewport)
 }
 
 function snapshotHasImageUrlReference(snapshot: CanvasBoardSnapshot, url: string): boolean {
@@ -139,6 +140,7 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
       maskDataUrl: detokenizeMaskDataUrl(node.maskDataUrl || ''),
       executionMaskDataUrl: detokenizeMaskDataUrl(node.executionMaskDataUrl || ''),
     }))
+    nextSnapshot.viewport = { ...options.createSnapshot().viewport }
     return nextSnapshot
   }
 
@@ -263,13 +265,7 @@ export function useCanvasHistory(options: UseCanvasHistoryOptions) {
       return
     }
 
-    const shouldCommit = hasPendingBatchChange
     hasPendingBatchChange = false
-    if (shouldCommit) {
-      commitCurrentSnapshot()
-      return
-    }
-
     commitCurrentSnapshot()
   }
 

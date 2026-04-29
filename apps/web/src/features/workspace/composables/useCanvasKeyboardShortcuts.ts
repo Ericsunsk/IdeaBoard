@@ -21,11 +21,17 @@ interface UseCanvasKeyboardShortcutsOptions {
   deleteSelectedCanvasImages: () => void
   isSpacePressed: Ref<boolean>
   isDuplicateModifierPressed: Ref<boolean>
+  canvasX: Ref<number>
+  canvasY: Ref<number>
+  onCanvasViewportChanged?: () => void
   undo: () => Promise<boolean> | boolean
   redo: () => Promise<boolean> | boolean
   saveBoard: () => Promise<boolean> | boolean
   onBoardSaved: () => void
 }
+
+const KEYBOARD_PAN_STEP = 48
+const KEYBOARD_PAN_FAST_STEP = 120
 
 function isInputLike(target: EventTarget | null): target is HTMLInputElement | HTMLTextAreaElement {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
@@ -35,6 +41,21 @@ function isEditableTarget(target: EventTarget | null): boolean {
   if (isInputLike(target)) return true
   if (!(target instanceof HTMLElement)) return false
   return !!target.closest('input, textarea, [contenteditable="true"]')
+}
+
+function getKeyboardPanDelta(key: string, step: number): { x: number; y: number } | null {
+  switch (key) {
+    case 'ArrowLeft':
+      return { x: -step, y: 0 }
+    case 'ArrowRight':
+      return { x: step, y: 0 }
+    case 'ArrowUp':
+      return { x: 0, y: -step }
+    case 'ArrowDown':
+      return { x: 0, y: step }
+    default:
+      return null
+  }
 }
 
 export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOptions) {
@@ -115,6 +136,18 @@ export function useCanvasKeyboardShortcuts(options: UseCanvasKeyboardShortcutsOp
       e.preventDefault()
       void options.undo()
       return
+    }
+
+    if (e.type === 'keydown' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const delta = getKeyboardPanDelta(e.key, e.shiftKey ? KEYBOARD_PAN_FAST_STEP : KEYBOARD_PAN_STEP)
+      if (delta) {
+        if (isEditableTarget(e.target)) return
+        e.preventDefault()
+        options.canvasX.value += delta.x
+        options.canvasY.value += delta.y
+        options.onCanvasViewportChanged?.()
+        return
+      }
     }
 
     if (e.code === 'Space') {

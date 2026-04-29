@@ -14,8 +14,6 @@ export interface BoardPreviewFrame {
   y: number
   width: number
   height: number
-  label?: string
-  text?: string
   imageUrl?: string
   nodeType?: CanvasConnectionNodeType
   nodeId?: number
@@ -40,8 +38,6 @@ interface NodeLike {
   x?: unknown
   y?: unknown
   width?: unknown
-  text?: unknown
-  mode?: unknown
   outputImages?: unknown
   sourceImageUrl?: unknown
   sourceImageRatio?: unknown
@@ -74,6 +70,8 @@ const BOARD_NODE_COLLECTIONS = [
 const PREVIEW_VIEWPORT_WIDTH = 760
 const PREVIEW_VIEWPORT_HEIGHT = 490
 const PREVIEW_PADDING = 36
+const PREVIEW_HIGH_DETAIL_QUALITY = 0.78
+const PREVIEW_DENSE_DETAIL_QUALITY = 0.72
 const PREVIEW_BACKGROUND = '#eef3fb'
 const PREVIEW_DOT_COLOR = 'rgba(201, 209, 225, 0.68)'
 const PREVIEW_STAGE_GLOW_PRIMARY = 'rgba(180, 199, 255, 0.28)'
@@ -184,33 +182,6 @@ function resolveNodePreview(nodeType: CanvasConnectionNodeType, node: NodeLike):
   return getLatestOutputPreview(node) ?? getSourcePreview(node)
 }
 
-function resolveNodeLabel(nodeType: CanvasConnectionNodeType): string {
-  if (nodeType === 'image') return 'Image'
-  if (nodeType === 'prompt') return 'Prompt'
-  if (nodeType === 'model') return 'Model'
-  if (nodeType === 'viewpoint') return 'Viewpoint'
-  if (nodeType === 'mask') return 'Mask'
-  if (nodeType === 'color') return 'Color'
-  if (nodeType === 'edit') return 'Edit'
-  if (nodeType === 'fusion') return 'Fusion'
-  if (nodeType === 'enhance') return 'Enhance'
-  if (nodeType === 'wear') return 'Wear'
-  return 'Node'
-}
-
-function resolveNodeText(nodeType: CanvasConnectionNodeType, node: NodeLike): string {
-  if (nodeType === 'prompt') {
-    return typeof node.text === 'string' ? node.text.trim() : ''
-  }
-  if (nodeType === 'enhance' && typeof node.mode === 'string') {
-    return node.mode
-  }
-  if (nodeType === 'edit' && typeof node.mode === 'string') {
-    return node.mode
-  }
-  return ''
-}
-
 function getImageNodeHeight(width: number, ratio: number): number {
   const stageWidth = Math.max(120, width - 24)
   return 46 + Math.max(96, Math.round(stageWidth * ratio))
@@ -285,8 +256,6 @@ function collectNodeFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
         y: node.y,
         width,
         height: resolveNodeHeight(nodeType, width, node),
-        label: resolveNodeLabel(nodeType),
-        text: resolveNodeText(nodeType, node),
         imageUrl: preview?.url,
         nodeType,
         nodeId: node.id,
@@ -353,6 +322,18 @@ function createPreviewCanvas(): HTMLCanvasElement | null {
   canvas.width = PREVIEW_VIEWPORT_WIDTH
   canvas.height = PREVIEW_VIEWPORT_HEIGHT
   return canvas
+}
+
+function encodePreviewCanvas(canvas: HTMLCanvasElement, dense: boolean): string {
+  const quality = dense ? PREVIEW_DENSE_DETAIL_QUALITY : PREVIEW_HIGH_DETAIL_QUALITY
+  const candidates = ['image/avif', 'image/webp', 'image/jpeg'] as const
+
+  for (const mimeType of candidates) {
+    const dataUrl = canvas.toDataURL(mimeType, quality)
+    if (dataUrl.startsWith(`data:${mimeType}`)) return dataUrl
+  }
+
+  return canvas.toDataURL('image/jpeg', quality)
 }
 
 function roundedRectPath(
@@ -495,24 +476,6 @@ function drawImageCover(
   ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight)
 }
 
-function drawImageContain(
-  ctx: CanvasRenderingContext2D,
-  image: CanvasImageSource,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-) {
-  const imageWidth = (image as HTMLImageElement).naturalWidth || (image as HTMLImageElement).width || width
-  const imageHeight = (image as HTMLImageElement).naturalHeight || (image as HTMLImageElement).height || height
-  const scale = Math.min(width / imageWidth, height / imageHeight)
-  const drawWidth = imageWidth * scale
-  const drawHeight = imageHeight * scale
-  const drawX = x + (width - drawWidth) / 2
-  const drawY = y + (height - drawHeight) / 2
-  ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight)
-}
-
 function drawPreviewPlaceholder(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -536,6 +499,39 @@ function drawPreviewPlaceholder(
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(label, x + width / 2, y + height / 2)
+}
+
+function drawNodeImageStage(
+  ctx: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  accent: string,
+) {
+  const stageRadius = Math.max(6, Math.min(10, Math.min(width, height) * 0.12))
+  const stageBarHeight = Math.max(8, Math.min(12, height * 0.18))
+
+  ctx.fillStyle = '#f7f9ff'
+  roundedRectPath(ctx, x, y, width, height, stageRadius)
+  ctx.fill()
+  ctx.strokeStyle = withAlpha(accent, 0.22)
+  ctx.lineWidth = 0.9
+  roundedRectPath(ctx, x, y, width, height, stageRadius)
+  ctx.stroke()
+
+  ctx.fillStyle = withAlpha(accent, 0.08)
+  roundedRectPath(ctx, x + 1, y + 1, Math.max(0, width - 2), Math.max(0, stageBarHeight), Math.max(4, stageRadius - 2))
+  ctx.fill()
+
+  const imageY = y + stageBarHeight + 2
+  const imageHeight = Math.max(6, height - stageBarHeight - 3)
+  ctx.save()
+  roundedRectPath(ctx, x + 2, imageY, Math.max(0, width - 4), imageHeight, Math.max(4, stageRadius - 3))
+  ctx.clip()
+  drawImageCover(ctx, image, x + 2, imageY, Math.max(0, width - 4), imageHeight)
+  ctx.restore()
 }
 
 function drawConnection(
@@ -608,12 +604,41 @@ function drawFrame(
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(x, y, width, height)
 
-    const inset = Math.max(8, Math.min(14, height * 0.13))
-    const headerHeight = Math.max(19, Math.min(26, height * 0.26))
+    const inset = Math.max(7, Math.min(13, height * 0.13))
+    const headerHeight = Math.max(18, Math.min(24, height * 0.24))
     const headerBottomY = y + headerHeight
     const hasThumb = !!image
 
-    ctx.fillStyle = withAlpha(accent, 0.065)
+    const leftPortX = x + 1.2
+    const rightPortX = x + width - 1.2
+    const portY = y + height / 2
+    const portOuterRadius = Math.max(1.9, Math.min(2.9, width * 0.012))
+    const portInnerRadius = Math.max(0.8, portOuterRadius - 1.2)
+
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(leftPortX, portY, portOuterRadius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(rightPortX, portY, portOuterRadius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = withAlpha(accent, 0.65)
+    ctx.lineWidth = 0.9
+    ctx.beginPath()
+    ctx.arc(leftPortX, portY, portOuterRadius, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(rightPortX, portY, portOuterRadius, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.fillStyle = withAlpha(accent, 0.85)
+    ctx.beginPath()
+    ctx.arc(leftPortX, portY, portInnerRadius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(rightPortX, portY, portInnerRadius, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.fillStyle = withAlpha(accent, 0.075)
     ctx.fillRect(x, y, width, headerHeight)
     ctx.strokeStyle = withAlpha(accent, 0.12)
     ctx.lineWidth = 0.8
@@ -622,78 +647,27 @@ function drawFrame(
     ctx.lineTo(x + width, headerBottomY)
     ctx.stroke()
 
-    const label = frame.label || 'Node'
-    const dotRadius = Math.max(2.4, Math.min(3.6, headerHeight * 0.16))
+    const dotRadius = Math.max(2, Math.min(3.2, headerHeight * 0.14))
+    const dotGap = Math.max(8, dotRadius * 3.6)
     const dotX = x + inset + dotRadius
     const headerCenterY = y + headerHeight / 2
-    ctx.fillStyle = withAlpha(accent, 0.76)
-    ctx.beginPath()
-    ctx.arc(dotX, headerCenterY, dotRadius, 0, Math.PI * 2)
-    ctx.fill()
-
-    ctx.fillStyle = '#6f7a91'
-    ctx.font = `700 ${Math.max(8, Math.min(12, headerHeight * 0.42))}px system-ui`
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(label, dotX + dotRadius + 6, headerCenterY + 0.2)
-
-    const bodyTop = headerBottomY + Math.max(6, inset * 0.5)
-    const bodyBottom = y + height - inset
-    const bodyHeight = Math.max(12, bodyBottom - bodyTop)
-    const bodyCenterY = bodyTop + bodyHeight / 2
-    let contentStartX = x + inset
-
-    if (hasThumb) {
-      const thumbSize = Math.max(30, Math.min(52, bodyHeight))
-      const thumbY = bodyCenterY - thumbSize / 2
-      const thumbX = x + inset
-      const thumbRadius = Math.max(6, thumbSize * 0.22)
-      contentStartX = thumbX + thumbSize + 9
-
-      ctx.fillStyle = '#f8faff'
-      roundedRectPath(ctx, thumbX, thumbY, thumbSize, thumbSize, thumbRadius)
+    ctx.fillStyle = withAlpha(accent, 0.9)
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath()
+      ctx.arc(dotX + i * dotGap, headerCenterY, dotRadius, 0, Math.PI * 2)
       ctx.fill()
-      ctx.strokeStyle = withAlpha(accent, 0.16)
-      ctx.lineWidth = 0.8
-      roundedRectPath(ctx, thumbX, thumbY, thumbSize, thumbSize, thumbRadius)
-      ctx.stroke()
-
-      ctx.save()
-      roundedRectPath(ctx, thumbX + 1, thumbY + 1, Math.max(0, thumbSize - 2), Math.max(0, thumbSize - 2), Math.max(4, thumbRadius - 1))
-      ctx.clip()
-      drawImageContain(ctx, image, thumbX + 2, thumbY + 2, Math.max(0, thumbSize - 4), Math.max(0, thumbSize - 4))
-      ctx.restore()
     }
 
-    const contentEndX = x + width - inset
-    const lineWidth = Math.max(18, contentEndX - contentStartX)
-    const primaryY = bodyCenterY - 6
-    const secondaryY = bodyCenterY + 7
+    const bodyTop = headerBottomY + Math.max(4, inset * 0.45)
+    const bodyBottom = y + height - inset
+    const bodyHeight = Math.max(12, bodyBottom - bodyTop)
+    const contentX = x + inset
+    const contentY = bodyTop
+    const contentWidth = Math.max(18, width - inset * 2)
+    const contentHeight = Math.max(14, bodyHeight)
 
-    ctx.strokeStyle = withAlpha(accent, 0.42)
-    ctx.lineWidth = 1.6
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(contentStartX, primaryY)
-    ctx.lineTo(contentStartX + lineWidth * 0.62, primaryY)
-    ctx.stroke()
-
-    ctx.strokeStyle = frame.text
-      ? withAlpha(accent, 0.28)
-      : withAlpha('#6f7c96', 0.22)
-    ctx.lineWidth = 1.25
-    ctx.beginPath()
-    ctx.moveTo(contentStartX, secondaryY)
-    ctx.lineTo(contentStartX + lineWidth * (frame.text ? 0.84 : 0.44), secondaryY)
-    ctx.stroke()
-
-    if (!hasThumb && !frame.text) {
-      ctx.strokeStyle = withAlpha(accent, 0.24)
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(contentStartX + lineWidth * 0.48, bodyCenterY)
-      ctx.lineTo(contentStartX + lineWidth * 0.95, bodyCenterY)
-      ctx.stroke()
+    if (hasThumb) {
+      drawNodeImageStage(ctx, image, contentX, contentY, contentWidth, contentHeight, accent)
     }
   }
 
@@ -728,8 +702,7 @@ export async function renderBoardPreviewDataUrl(state: CanvasBoardSnapshot | nul
   frames.forEach(frame => drawFrame(ctx, frame, scale, offsetX, offsetY, imageAssets.images))
 
   try {
-    const quality = frames.length > 12 ? 0.52 : 0.58
-    return canvas.toDataURL('image/jpeg', quality)
+    return encodePreviewCanvas(canvas, frames.length > 12)
   } finally {
     imageAssets.revoke()
   }
