@@ -1,12 +1,5 @@
 <template>
   <div class="admin-page channels-page">
-    <div class="summary-grid">
-      <AdminSummaryCard label="总渠道" :value="channels.length" />
-      <AdminSummaryCard label="Banana" :value="bananaCount" />
-      <AdminSummaryCard label="模型总数" :value="totalModelCount" />
-      <AdminSummaryCard label="空模型配置" :value="emptyModelCount" />
-    </div>
-
     <div class="toolbar">
       <div class="toolbar-left">
         <n-input
@@ -17,60 +10,193 @@
         >
           <template #prefix><n-icon><SearchOutline /></n-icon></template>
         </n-input>
-        <n-button secondary class="icon-btn" @click="loadChannels">
+        <n-button secondary class="admin-icon-btn" @click="loadData">
           <template #icon><n-icon><RefreshOutline /></n-icon></template>
         </n-button>
       </div>
       <div class="toolbar-spacer" />
       <div class="toolbar-right">
-        <n-button type="primary" @click="openAddModal">
+        <n-button type="primary" @click="openAddChannelModal">
           <template #icon><n-icon><AddOutline /></n-icon></template>
           新增渠道商
         </n-button>
       </div>
     </div>
 
-    <div class="table-card admin-table-card">
-      <div class="admin-card-header">
-        <div class="admin-card-title-wrapper">
-          <n-icon size="18" class="admin-card-title-icon"><ListOutline /></n-icon>
-          <div>
-            <h3 class="admin-card-title">渠道商列表</h3>
-          </div>
-        </div>
-      </div>
-      <n-data-table
-        :columns="columns"
-        :data="filteredChannels"
-        :loading="loading"
-        :pagination="false"
-        :bordered="false"
-        :row-key="(row: Channel) => row.id"
-        size="small"
-        class="admin-table-dense"
-      />
+    <div v-if="loading && channels.length === 0" class="loading-state">
+      <n-spin size="large" />
     </div>
 
-    <n-modal v-model:show="showModal" preset="card" :title="isEdit ? '编辑渠道商' : '新增渠道商'" style="width: 480px">
-      <n-form :model="formData" :rules="formRules" ref="formRef" label-placement="top">
-        <n-form-item label="渠道类型" path="type">
-          <n-select v-model:value="formData.type" :options="channelTypeOptions" placeholder="选择渠道类型" />
-        </n-form-item>
+    <div v-else class="channel-grid">
+      <article
+        v-for="channel in filteredChannels"
+        :key="channel.id"
+        class="channel-card panel-card admin-card-interactive"
+      >
+        <AdminCardHeader
+          :title="channel.name"
+          :subtitle="channel.api_url"
+          size="small"
+        >
+          <template #prefix>
+            <div class="provider-badge">
+              {{ (channel.name || 'CH').substring(0, 2).toUpperCase() }}
+            </div>
+          </template>
+          <template #extra>
+            <AdminChip :label="getChannelStatus(channel)" :variant="getChannelStatusVariant(channel)" />
+          </template>
+        </AdminCardHeader>
+
+        <div class="models-shelf">
+          <div class="shelf-label">当前生效模型</div>
+          <div class="shelf-content" v-if="getChannelActiveModels(channel.id).length > 0">
+            <span
+              v-for="model in getChannelActiveModels(channel.id)"
+              :key="model"
+              class="model-pill"
+              :class="getModelCategoryClass(model)"
+            >
+              {{ model }}
+            </span>
+          </div>
+          <div v-else class="empty-shelf">未配置生效模型</div>
+        </div>
+
+          <div class="accounts-grid">
+            <div class="grid-header">
+              <span class="grid-title">关联 APIKey ({{ getChannelAccounts(channel.id).length }})</span>
+              <n-button size="tiny" quaternary circle @click="openAddAccountModal(channel)">
+                <template #icon><n-icon><AddOutline /></n-icon></template>
+              </n-button>
+            </div>
+
+          <div class="accounts-scroller" v-if="getChannelAccounts(channel.id).length > 0">
+            <div
+              class="account-row"
+              v-for="account in getChannelAccounts(channel.id)"
+              :key="account.id"
+            >
+              <div class="row-main">
+                <div class="row-left">
+                  <div class="status-indicator" :class="getAccStatusClass(account)"></div>
+                  <span class="acc-name">{{ account.model_set || '未分配' }}</span>
+                </div>
+                <div class="row-right">
+                  <span class="acc-stat-val">{{ account.current_concurrent || 0 }}/{{ account.max_concurrent }}</span>
+                </div>
+              </div>
+              <n-progress
+                type="line"
+                :percentage="((account.current_concurrent || 0) / (account.max_concurrent || 1)) * 100"
+                :show-indicator="false"
+                :height="3"
+                :color="account.status === 1 ? 'var(--admin-success)' : 'var(--admin-text-3)'"
+                class="acc-progress"
+              />
+              <div class="row-actions">
+                <n-button size="tiny" quaternary @click="openEditAccountModal(account)">编辑</n-button>
+                <n-button
+                  size="tiny"
+                  quaternary
+                  :type="account.status === 1 ? 'warning' : 'success'"
+                  @click="toggleAccountStatus(account)"
+                >
+                  {{ account.status === 1 ? '停止' : '启动' }}
+                </n-button>
+                <n-button size="tiny" quaternary type="error" @click="handleDeleteAccount(account)">删除</n-button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-accounts">
+            点击上方按钮添加 APIKey
+          </div>
+        </div>
+        <div class="channel-card-footer">
+          <n-button size="small" color="#ffffff" text-color="#000000" @click="openEditChannelModal(channel)">配置详情</n-button>
+          <n-button size="small" tertiary type="error" @click="handleDeleteChannel(channel)">删除</n-button>
+        </div>
+      </article>
+
+      <button
+        class="admin-add-card"
+        type="button"
+        @click="openAddChannelModal"
+      >
+        <span class="add-mark">+</span>
+        <span class="add-title">添加渠道商</span>
+      </button>
+
+      <!-- Empty state -->
+      <div v-if="filteredChannels.length === 0" class="empty-state">
+        无匹配的渠道商
+      </div>
+    </div>
+
+    <!-- 渠道商表单弹窗 -->
+    <n-modal v-model:show="showChannelModal" preset="card" :title="isEditChannel ? '编辑渠道商' : '新增渠道商'" style="width: 480px">
+      <n-form :model="channelForm" :rules="channelRules" ref="channelFormRef" label-placement="top">
         <n-form-item label="渠道商名称" path="name">
-          <n-input v-model:value="formData.name" placeholder="例如：Nano Banana 官方" />
+          <n-input v-model:value="channelForm.name" placeholder="例如：Nano Banana 官方" />
         </n-form-item>
-        <n-form-item label="API 地址" path="api_url">
-          <n-input v-model:value="formData.api_url" placeholder="例如：https://api.example.com/v1" />
+        <n-form-item label="Base URL地址" path="api_url">
+          <n-input v-model:value="channelForm.api_url" placeholder="例如：https://api.example.com/v1" />
         </n-form-item>
-        <n-form-item label="可用模型" path="models">
-          <n-dynamic-tags v-model:value="modelTags" />
-          <div class="admin-helper-text" style="margin-top: 4px">输入模型名后按回车添加，如 dall-e-3、gpt-image-1</div>
+        <n-form-item label="渠道可用模型">
+          <n-dynamic-tags v-model:value="channelModelTags" :max="100" />
         </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
-          <n-button @click="showModal = false">取消</n-button>
-          <n-button type="primary" :loading="saveLoading" @click="handleSave">确定</n-button>
+          <n-button @click="showChannelModal = false">取消</n-button>
+          <n-button type="primary" :loading="channelSaveLoading" @click="handleSaveChannel">确定</n-button>
+        </n-space>
+      </template>
+    </n-modal>
+
+    <!-- APIKey 配置弹窗 -->
+    <n-modal v-model:show="showAccountModal" preset="card" :title="isEditAccount ? '编辑 APIKey' : '新增 APIKey'" style="width: 500px">
+      <n-form :model="accountForm" :rules="accountRules" ref="accountFormRef" label-placement="top">
+        <div v-if="selectedChannelForAccount" class="channel-url-hint">
+          <span>所属渠道：</span>
+          <code>{{ selectedChannelForAccount.name }}</code>
+        </div>
+
+        <n-form-item :label="isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)'" path="api_key">
+          <n-input v-model:value="accountForm.api_key" type="password" show-password-on="click" :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此渠道商的 API Key'" />
+        </n-form-item>
+
+        <n-form-item label="分配模型" path="model_values">
+          <n-select
+            v-model:value="accountForm.model_values"
+            multiple
+            filterable
+            tag
+            :loading="detectModelsLoading"
+            :options="accountModelOptions"
+            placeholder="选择或输入分配给该 APIKey 的模型"
+            class="model-select-rounded"
+            @update:show="handleAccountModelSelectShow"
+          />
+        </n-form-item>
+
+        <n-grid :cols="2" :x-gap="16">
+          <n-gi>
+            <n-form-item label="最大并发数" path="max_concurrent">
+              <n-input-number v-model:value="accountForm.max_concurrent" :min="1" :max="50" style="width: 100%" />
+            </n-form-item>
+          </n-gi>
+          <n-gi>
+            <n-form-item label="超时时间(秒)" path="timeout">
+              <n-input-number v-model:value="accountForm.timeout" :min="10" :max="600" style="width: 100%" />
+            </n-form-item>
+          </n-gi>
+        </n-grid>
+      </n-form>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="showAccountModal = false">取消</n-button>
+          <n-button type="primary" :loading="accountSaveLoading" @click="handleSaveAccount">确定</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -78,171 +204,402 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import channelApi from '../../../shared/api/channel'
 import type { Channel } from '../../../shared/api/channel'
-import { NButton, NDataTable, NModal, NForm, NFormItem, NInput, NIcon, NSpace, NTag, NSelect, NDynamicTags, useMessage, useDialog } from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
-import { AddOutline, RefreshOutline, ListOutline, SearchOutline } from '@vicons/ionicons5'
-import { extractApiErrorMessage, splitCommaValues } from '../shared/assetLibraryShared'
-import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
+import { NButton, NModal, NForm, NFormItem, NInput, NIcon, NSpace, NSelect, NGrid, NGi, NInputNumber, NSpin, NProgress, NDynamicTags, useMessage, useDialog } from 'naive-ui'
+import { AddOutline, RefreshOutline, SearchOutline } from '@vicons/ionicons5'
+import { extractApiErrorMessage, splitCommaValues, getModelCategoryClass } from '../shared/assetLibraryShared'
+import AdminCardHeader from '../shared/components/AdminCardHeader.vue'
+import AdminChip from '../shared/components/AdminChip.vue'
+import { useChannelAccounts } from './useChannelAccounts'
 
 const message = useMessage()
 const dialog = useDialog()
+
+// State
 const loading = ref(false)
 const channels = ref<Channel[]>([])
 const searchKeyword = ref('')
+
 const filteredChannels = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
   if (!keyword) return channels.value
   return channels.value.filter((item) => (item.name || '').toLowerCase().includes(keyword))
 })
-const bananaCount = computed(() => channels.value.filter(item => item.type === 'banana').length)
-const emptyModelCount = computed(() => channels.value.filter(item => !item.models || !item.models.trim()).length)
-const totalModelCount = computed(() => {
-  return channels.value.reduce((sum, item) => {
-    return sum + splitCommaValues(item.models).length
-  }, 0)
-})
 
-const showModal = ref(false)
-const isEdit = ref(false)
-const formRef = ref()
-const saveLoading = ref(false)
-const currentId = ref(0)
-
-const channelTypeOptions = [
-  { label: 'Banana', value: 'banana' },
-]
-
-const formData = ref({ type: 'banana', name: '', api_url: '', models: '' })
-const modelTags = ref<string[]>([])
-
-const formRules = {
-  type: [{ required: true, message: '请选择渠道类型', trigger: 'change' }],
-  name: [{ required: true, message: '请输入渠道商名称', trigger: 'blur' }],
-  api_url: [{ required: true, message: '请输入 API 地址', trigger: 'blur' }],
-  models: [{ required: true, message: '请添加至少一个可用模型', validator: () => modelTags.value.length > 0 ? true : new Error('请添加至少一个可用模型') }],
-}
-
-const getTypeLabel = (type: string) => {
-  const opt = channelTypeOptions.find(o => o.value === type)
-  return opt?.label || type
-}
-
-const columns: DataTableColumns<Channel> = [
-  { title: 'ID', key: 'id', width: 70 },
-  {
-    title: '渠道类型', key: 'channel_type', width: 120,
-    render: (row) => h(NTag, { size: 'small', bordered: false }, () => getTypeLabel(row.type))
-  },
-  { title: '渠道商名称', key: 'name', width: 200 },
-  {
-    title: '可用模型', key: 'models', width: 200,
-    render: (row) => {
-      const models = splitCommaValues(row.models)
-      return models.length
-        ? h(NSpace, { size: 'small', wrap: true }, () => models.map(m => h(NTag, { size: 'small', bordered: false }, () => m)))
-        : h('span', { style: { color: 'var(--admin-text-3)' } }, '未设置')
-    }
-  },
-  {
-    title: 'API 地址',
-    key: 'api_url',
-    ellipsis: { tooltip: true },
-    render: (row) => h('span', { style: { fontFamily: 'monospace', fontSize: '12px' } }, row.api_url),
-  },
-  { title: '创建时间', key: 'created_at', width: 170 },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 160,
-    render: (row) => h(NSpace, { size: 'small' }, () => [
-      h(NButton, { size: 'small', onClick: () => openEditModal(row) }, () => '编辑'),
-      h(NButton, { size: 'small', type: 'error', onClick: () => handleDelete(row) }, () => '删除'),
-    ]),
-  },
-]
-
-async function loadChannels() {
+// Data Loading
+async function loadData() {
   loading.value = true
   try {
-    const res = await channelApi.list()
-    if (res.code === 0) {
-      channels.value = res.data?.list || []
-    }
+    const chRes = await channelApi.list()
+
+    if (chRes.code === 0) channels.value = chRes.data?.list || []
+    await loadAccounts()
   } catch (error) {
-    message.error(extractApiErrorMessage(error, '加载渠道商列表失败'))
+    message.error(extractApiErrorMessage(error, '加载数据失败'))
   } finally {
     loading.value = false
   }
 }
 
-function openAddModal() {
-  isEdit.value = false
-  formData.value = { type: 'banana', name: '', api_url: '', models: '' }
-  modelTags.value = []
-  showModal.value = true
+// Model category class handled by shared utility getModelCategoryClass
+
+// Helpers
+function getChannelStatus(channel: Channel) {
+  const accs = getChannelAccounts(channel.id)
+  if (accs.length === 0) return '无账号'
+  const active = accs.filter(a => a.status === 1).length
+  return `${active} / ${accs.length} 运行中`
 }
 
-function openEditModal(row: Channel) {
-  isEdit.value = true
-  currentId.value = row.id
-  formData.value = { type: row.type, name: row.name, api_url: row.api_url, models: row.models || '' }
-  modelTags.value = splitCommaValues(row.models)
-  showModal.value = true
+function getChannelStatusVariant(channel: Channel) {
+  const accs = getChannelAccounts(channel.id)
+  if (accs.length === 0) return 'empty'
+  const active = accs.filter(a => a.status === 1 && a.fail_count < 5).length
+  if (active === 0) return 'neutral'
+  if (active < accs.length) return 'current'
+  return 'enabled'
 }
 
-async function handleSave() {
+// --- Channel Form ---
+const showChannelModal = ref(false)
+const isEditChannel = ref(false)
+const channelFormRef = ref()
+const channelSaveLoading = ref(false)
+const currentChannelId = ref(0)
+const channelForm = ref({ type: 'banana', name: '', api_url: '', models: '' })
+const channelModelTags = ref<string[]>([])
+
+const channelRules = {
+  name: [{ required: true, message: '请输入渠道商名称', trigger: 'blur' }],
+  api_url: [{ required: true, message: '请输入 Base URL地址', trigger: 'blur' }],
+}
+
+function openAddChannelModal() {
+  isEditChannel.value = false
+  channelForm.value = { type: 'banana', name: '', api_url: '', models: '' }
+  channelModelTags.value = []
+  showChannelModal.value = true
+}
+
+function openEditChannelModal(row: Channel) {
+  isEditChannel.value = true
+  currentChannelId.value = row.id
+  channelForm.value = { type: row.type, name: row.name, api_url: row.api_url, models: row.models || '' }
+  channelModelTags.value = splitCommaValues(row.models)
+  showChannelModal.value = true
+}
+
+async function handleSaveChannel() {
   try {
-    await formRef.value?.validate()
-    saveLoading.value = true
+    await channelFormRef.value?.validate()
+    channelSaveLoading.value = true
+    const submitData = { ...channelForm.value, models: channelModelTags.value.join(',') }
 
-    const submitData = { ...formData.value, models: modelTags.value.join(',') }
-    if (isEdit.value) {
-      await channelApi.update(currentId.value, submitData)
-      message.success('更新成功')
+    if (isEditChannel.value) {
+      await channelApi.update(currentChannelId.value, submitData)
+      message.success('渠道商已更新')
     } else {
       await channelApi.create(submitData)
-      message.success('创建成功')
+      message.success('渠道商已创建')
     }
-    showModal.value = false
-    await loadChannels()
+    showChannelModal.value = false
+    loadData()
   } catch (error) {
-    message.error(extractApiErrorMessage(error, '操作失败'))
+    message.error(extractApiErrorMessage(error, '保存渠道商失败'))
   } finally {
-    saveLoading.value = false
+    channelSaveLoading.value = false
   }
 }
 
-async function handleDelete(row: Channel) {
+function handleDeleteChannel(row: Channel) {
   dialog.warning({
     title: '确认删除',
-    content: `确定删除渠道商「${row.name}」吗？`,
+    content: `确定删除渠道商「${row.name}」吗？此操作不可恢复。`,
     positiveText: '确定',
     negativeText: '取消',
     onPositiveClick: async () => {
-      await channelApi.delete(row.id)
-      message.success('删除成功')
-      loadChannels()
+      try {
+        await channelApi.delete(row.id)
+        message.success('删除成功')
+        await loadData()
+      } catch (error) {
+        message.error(extractApiErrorMessage(error, '删除渠道商失败'))
+      }
     },
   })
 }
 
+const {
+  showAccountModal,
+  isEditAccount,
+  accountFormRef,
+  accountSaveLoading,
+  selectedChannelForAccount,
+  accountForm,
+  detectModelsLoading,
+  accountModelOptions,
+  accountRules,
+  loadAccounts,
+  getChannelAccounts,
+  getChannelActiveModels,
+  getAccStatusClass,
+  openAddAccountModal,
+  openEditAccountModal,
+  handleDetectModelsOnSelectOpen,
+  handleSaveAccount,
+  toggleAccountStatus,
+  handleDeleteAccount,
+} = useChannelAccounts({
+  channels,
+  message,
+  dialog,
+  onAfterMutation: loadData,
+})
+
+function handleAccountModelSelectShow(show: boolean) {
+  if (!show) return
+  void handleDetectModelsOnSelectOpen()
+}
+
 onMounted(() => {
-  loadChannels()
+  loadData()
 })
 </script>
 
 <style scoped>
 @import '../shared/adminCommon.css';
+
 .channels-page {
-  gap: 14px;
+  gap: 16px;
+  padding-bottom: 24px;
 }
 
-@media (max-width: 720px) {
-  .channels-page .toolbar {
-    justify-content: flex-start;
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.loading-state,
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 0;
+  color: var(--admin-text-3);
+  font-size: 14px;
+}
+
+.channel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  min-height: 260px;
+}
+
+.channel-card:hover {
+  border-color: #2e3034;
+  background: #141416;
+}
+
+/* Card header styles now handled by AdminCardHeader */
+.provider-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #17181a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--admin-text-1);
+  border: 1px solid var(--admin-border);
+  flex-shrink: 0;
+}
+
+.models-shelf {
+  background: #17181a;
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid var(--admin-border);
+}
+
+.shelf-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--admin-text-3);
+  margin-bottom: 8px;
+}
+
+.shelf-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.model-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #1c1d20;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-2);
+  font-size: 11px;
+}
+
+.model-pill.is-indigo { border-color: var(--admin-model-indigo); color: var(--admin-model-indigo); background: rgba(129, 140, 248, 0.05); }
+.model-pill.is-purple { border-color: var(--admin-model-purple); color: var(--admin-model-purple); background: rgba(192, 132, 252, 0.05); }
+.model-pill.is-cyan { border-color: var(--admin-model-cyan); color: var(--admin-model-cyan); background: rgba(34, 211, 238, 0.05); }
+
+.accounts-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grid-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.grid-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--admin-text-1);
+}
+
+.accounts-scroller {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.account-row {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  padding: 8px 10px;
+}
+
+.row-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-indicator.acc-success { background: var(--admin-success); }
+.status-indicator.acc-warning { background: var(--admin-warning); }
+.status-indicator.acc-error { background: var(--admin-danger); }
+
+.acc-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--admin-text-1);
+}
+
+.acc-stat-val {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--admin-text-3);
+  font-family: ui-monospace, monospace;
+}
+
+.acc-progress {
+  margin-bottom: 8px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.channel-card-footer {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.channel-card-footer :deep(.n-button) {
+  flex: none;
+}
+
+
+.model-select-rounded :deep(.n-base-selection-tag-wrapper) {
+  gap: 4px;
+}
+
+.model-select-rounded :deep(.n-tag) {
+  border-radius: 999px !important;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.model-select-rounded :deep(.n-tag__close) {
+  margin-left: 4px;
+}
+
+/* Add card styles now global */
+
+.accounts-scroller::-webkit-scrollbar {
+  width: 4px;
+}
+
+.accounts-scroller::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.channel-url-hint {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid #2b2c2f;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--admin-text-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.channel-url-hint code {
+  color: var(--admin-text-1);
+  font-weight: 600;
+}
+
+@media (max-width: 980px) {
+  .channel-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

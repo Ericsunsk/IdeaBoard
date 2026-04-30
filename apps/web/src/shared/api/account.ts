@@ -77,6 +77,33 @@ export interface MonitorResponse {
   }
 }
 
+export interface AdminStatisticsResponse {
+  summary: {
+    total_calls: number
+    today_calls: number
+    today_success: number
+    today_failed: number
+    yesterday_calls: number
+    yesterday_success: number
+    yesterday_failed: number
+    this_month_calls: number
+    pending: number
+    running: number
+    completed: number
+    failed: number
+  }
+  trend: Array<{
+    date: string
+    label: string
+    total: number
+    segments: Array<{ label: string; value: number }>
+  }>
+  model_ranking: Array<{ name: string; value: number; percent: number }>
+  user_rank: Array<{ name: string; value: number }>
+  latency: Array<{ name: string; avg_seconds: number }>
+  health_cells: Array<{ status: number; success: number; fail: number; total: number }>
+}
+
 // User task APIs - backend uses /api/user/drawing/...
 export const submitTask = (data: SubmitTaskRequest): Promise<ApiResponse<{ task_id: string }>> =>
   api.post('/user/drawing/submit', data) as any
@@ -94,7 +121,7 @@ export const submitAdminTask = (data: SubmitTaskRequest): Promise<ApiResponse<{ 
 export const getAdminTask = (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
   api.get('/admin/tasks/' + task_id) as any
 
-export const listAdminTasks = (params?: { page?: number; page_size?: number; status?: string }): Promise<ApiResponse<TaskListResponse>> =>
+export const listAdminTasks = (params?: { page?: number; page_size?: number; status?: string; user_id?: number; keyword?: string }): Promise<ApiResponse<TaskListResponse>> =>
   api.get('/admin/tasks', { params }) as any
 
 // Account management APIs
@@ -119,6 +146,9 @@ export const stopAccount = (id: number): Promise<ApiResponse<null>> =>
 export const getMonitor = (): Promise<ApiResponse<MonitorResponse>> =>
   api.get('/admin/monitor') as any
 
+export const getAdminStatistics = (range: '7d' | '30d' | '1y'): Promise<ApiResponse<AdminStatisticsResponse>> =>
+  api.get('/admin/statistics', { params: { range } }) as any
+
 export const accountApi = {
   submitTask,
   getTask,
@@ -133,6 +163,7 @@ export const accountApi = {
   startAccount,
   stopAccount,
   getMonitor,
+  getAdminStatistics,
 }
 
 export default accountApi

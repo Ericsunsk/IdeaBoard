@@ -1,19 +1,38 @@
 package channels
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
+	"time"
 
 	"api/internal/platform/response"
+	"api/internal/platform/safehttp"
 
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	detectModelsTimeout   = 5 * time.Second
+	maxDetectResponseSize = 1 << 20 // 1MB
+	maxDetectedModels     = 100
+)
+
 type ChannelHandler struct {
 	channelRepo *ChannelRepository
+	appEnv      string
 }
 
-func NewChannelHandler(channelRepo *ChannelRepository) *ChannelHandler {
-	return &ChannelHandler{channelRepo: channelRepo}
+func NewChannelHandler(channelRepo *ChannelRepository, appEnv ...string) *ChannelHandler {
+	env := ""
+	if len(appEnv) > 0 {
+		env = strings.TrimSpace(appEnv[0])
+	}
+	return &ChannelHandler{channelRepo: channelRepo, appEnv: env}
 }
 
 func (h *ChannelHandler) List(c *gin.Context) {
@@ -93,4 +112,169 @@ func (h *ChannelHandler) Delete(c *gin.Context) {
 	}
 
 	response.Success(c, nil)
+}
+
+func (h *ChannelHandler) DetectModels(c *gin.Context) {
+	var req DetectModelsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+
+	baseURL := strings.TrimSpace(req.BaseURL)
+	apiKey := strings.TrimSpace(req.APIKey)
+	if baseURL == "" || apiKey == "" {
+		response.Error(c, 400, "base_url 与 api_key 不能为空")
+		return
+	}
+
+	modelsURL, err := buildModelsURL(baseURL)
+	if err != nil {
+		response.Error(c, 400, "Base URL 无效")
+		return
+	}
+
+	resp, err := safehttp.DoWithAllowHosts(c.Request.Context(), http.MethodGet, modelsURL, func(r *http.Request) {
+		r.Header.Set("Authorization", "Bearer "+apiKey)
+		r.Header.Set("Accept", "application/json")
+	}, detectModelsTimeout, h.detectModelsAllowHosts()...)
+	if err != nil {
+		response.Error(c, 400, "模型检测失败，请检查 Base URL 或网络")
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		response.Error(c, 400, "模型检测失败，请检查 API Key 或渠道配置")
+		return
+	}
+
+	limited := &io.LimitedReader{R: resp.Body, N: maxDetectResponseSize + 1}
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		response.Error(c, 400, "模型检测失败，响应读取异常")
+		return
+	}
+	if int64(len(body)) > maxDetectResponseSize {
+		response.Error(c, 400, "模型检测失败，响应过大")
+		return
+	}
+
+	models, err := parseModelIDs(body)
+	if err != nil {
+		response.Error(c, 400, "模型检测失败，返回格式不支持")
+		return
+	}
+
+	response.Success(c, gin.H{"models": models})
+}
+
+func (h *ChannelHandler) detectModelsAllowHosts() []string {
+	if !h.isDevLikeEnvironment() {
+		return nil
+	}
+	return []string{"localhost", "127.0.0.1", "::1"}
+}
+
+func (h *ChannelHandler) isDevLikeEnvironment() bool {
+	env := strings.ToLower(strings.TrimSpace(h.appEnv))
+	switch env {
+	case "prod", "production", "release":
+		return false
+	case "dev", "development", "local":
+		return true
+	}
+
+	mode := strings.ToLower(strings.TrimSpace(gin.Mode()))
+	if mode == gin.DebugMode || mode == "development" {
+		return true
+	}
+	return false
+}
+
+func buildModelsURL(rawBaseURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawBaseURL))
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme == "" || parsed.Hostname() == "" {
+		return "", fmt.Errorf("invalid base url")
+	}
+	basePath := strings.TrimRight(parsed.Path, "/")
+	parsed.Path = basePath + "/models"
+	parsed.RawPath = ""
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func parseModelIDs(body []byte) ([]string, error) {
+	var payload any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+
+	var rawItems []any
+	switch v := payload.(type) {
+	case map[string]any:
+		if data, ok := v["data"]; ok {
+			rawItems = normalizeToSlice(data)
+		}
+		if len(rawItems) == 0 {
+			if models, ok := v["models"]; ok {
+				rawItems = normalizeToSlice(models)
+			}
+		}
+	case []any:
+		rawItems = v
+	}
+
+	if len(rawItems) == 0 {
+		return nil, fmt.Errorf("no models found")
+	}
+
+	seen := make(map[string]struct{}, len(rawItems))
+	models := make([]string, 0, len(rawItems))
+	for _, item := range rawItems {
+		modelID := extractModelID(item)
+		if modelID == "" {
+			continue
+		}
+		if _, ok := seen[modelID]; ok {
+			continue
+		}
+		seen[modelID] = struct{}{}
+		models = append(models, modelID)
+		if len(models) >= maxDetectedModels {
+			break
+		}
+	}
+
+	if len(models) == 0 {
+		return nil, fmt.Errorf("no valid model ids")
+	}
+	return models, nil
+}
+
+func normalizeToSlice(v any) []any {
+	switch item := v.(type) {
+	case []any:
+		return item
+	default:
+		return nil
+	}
+}
+
+func extractModelID(v any) string {
+	switch item := v.(type) {
+	case string:
+		return strings.TrimSpace(item)
+	case map[string]any:
+		if rawID, ok := item["id"]; ok {
+			if id, ok := rawID.(string); ok {
+				return strings.TrimSpace(id)
+			}
+		}
+	}
+	return ""
 }

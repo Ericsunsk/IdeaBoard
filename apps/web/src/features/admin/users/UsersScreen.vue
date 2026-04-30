@@ -22,7 +22,7 @@
             </template>
           </n-input>
         </div>
-        <n-button secondary class="icon-btn" @click="loadUsers">
+        <n-button secondary class="admin-icon-btn" @click="loadUsers">
           <template #icon><n-icon><RefreshOutline /></n-icon></template>
         </n-button>
       </div>
@@ -40,7 +40,7 @@
 
         <n-popover trigger="click" placement="bottom-end" :show-arrow="false" class="admin-popover-panel">
           <template #trigger>
-            <n-button secondary class="icon-btn">
+            <n-button secondary class="admin-icon-btn">
               <template #icon><n-icon><SettingsOutline /></n-icon></template>
             </n-button>
           </template>
@@ -72,12 +72,15 @@
     </div>
 
     <div class="table-card users-table-card">
-      <div class="admin-card-header">
-        <div class="admin-card-title-wrapper">
+      <AdminCardHeader
+        title="用户目录"
+        subtitle="管理平台所有注册用户的权限、状态及会话"
+        status="全部用户"
+      >
+        <template #prefix>
           <n-icon size="18" class="admin-card-title-icon"><PeopleOutline /></n-icon>
-          <h3 class="admin-card-title">用户目录</h3>
-        </div>
-        <div class="admin-card-actions">
+        </template>
+        <template #extra>
           <n-popover placement="bottom-end" trigger="click" :show-arrow="false" class="admin-popover-panel">
             <template #trigger>
               <n-button quaternary size="small" class="sort-btn">
@@ -96,8 +99,8 @@
               </n-checkbox-group>
             </div>
           </n-popover>
-        </div>
-      </div>
+        </template>
+      </AdminCardHeader>
       <div class="table-container">
         <n-data-table
           :columns="columns"
@@ -210,17 +213,17 @@ const columns: DataTableColumns<User> = [
     key: 'user',
     render: (row) => {
       return h('div', { class: 'user-profile-cell' }, [
-        h(NAvatar, {
-          round: true,
-          size: 26,
-          src: row.avatar || undefined,
-          fallbackSrc: 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'
-        }),
+        h('div', { class: 'avatar-wrapper' }, [
+          h(NAvatar, {
+            round: true,
+            size: 26,
+            src: row.avatar || undefined,
+            fallbackSrc: 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg'
+          }),
+          h('div', { class: ['admin-status-dot', row.status === 1 ? 'is-normal' : 'is-banned'] })
+        ]),
         h('div', { style: 'display: flex; flex-direction: column; gap: 0px;' }, [
-          h('div', { style: 'display: flex; align-items: center; gap: 8px;' }, [
-            h('span', { class: 'user-name' }, row.username),
-            h('div', { class: ['status-dot', row.status === 1 ? 'is-normal' : 'is-banned'] })
-          ]),
+          h('span', { class: 'user-name' }, row.username),
           h('span', { class: 'user-id' }, `ID: ${row.uid}`)
         ])
       ])
@@ -557,6 +560,12 @@ onMounted(() => {
   gap: 12px;
 }
 
+.admin-compact-table :deep(.avatar-wrapper) {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+}
+
 .admin-compact-table :deep(.user-name) {
   font-weight: 600;
   color: var(--admin-text-1);
@@ -577,22 +586,6 @@ onMounted(() => {
   background-color: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--admin-border);
   border-radius: 999px;
-}
-
-.admin-compact-table :deep(.status-dot) {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
-.admin-compact-table :deep(.status-dot.is-normal) {
-  background-color: #10b981;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
-}
-
-.admin-compact-table :deep(.status-dot.is-banned) {
-  background-color: #ef4444;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
 }
 
 .admin-compact-table :deep(.status-text) {

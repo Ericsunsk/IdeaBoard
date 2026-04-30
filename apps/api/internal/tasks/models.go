@@ -63,8 +63,10 @@ type SubmitTaskRequest struct {
 }
 
 type TaskListRequest struct {
+	UserID    uint64 `form:"user_id"`
 	AccountID uint64 `form:"account_id"`
 	Status    string `form:"status"`
+	Keyword   string `form:"keyword"`
 	Page      int    `form:"page,default=1"`
 	PageSize  int    `form:"page_size,default=20"`
 }

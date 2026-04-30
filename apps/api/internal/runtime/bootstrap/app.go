@@ -90,7 +90,7 @@ func Run(args []string) {
 
 	authHandler := auth.NewAuthHandler(userService)
 	adminHandler := users.NewAdminHandler(userService, systemConfigRepo, authServiceClient)
-	channelHandler := channels.NewChannelHandler(channelRepo)
+	channelHandler := channels.NewChannelHandler(channelRepo, cfg.App.Env)
 	storageHandler := storage.NewStorageHandler(storageService)
 	lineDraftHandler := assets.NewLineDraftHandler(lineDraftModeRepo)
 	accountHandler := accounts.NewAccountHandler(accountService)
@@ -314,6 +314,9 @@ func migrateModels(db *gorm.DB) error {
 		&users.UsedUID{},
 		&accounts.ApiAccount{},
 		&tasks.Task{},
+		&accounts.TaskDailyStat{},
+		&accounts.TaskStatEvent{},
+		&accounts.TaskDailyStatBackfill{},
 		&channels.Channel{},
 		&settings.SystemConfig{},
 		&assets.LineDraftMode{},

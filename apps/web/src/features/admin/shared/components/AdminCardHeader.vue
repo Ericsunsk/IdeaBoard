@@ -1,12 +1,18 @@
 <template>
-  <div class="admin-card-header">
-    <div class="admin-card-copy">
-      <div class="admin-card-title-row">
-        <AdminChip :label="provider" tone="strong" />
-        <AdminChip :label="status" :variant="statusVariant" />
+  <div class="admin-card-header" :class="{ 'is-small': size === 'small' }">
+    <div class="admin-card-header-main">
+      <slot name="prefix" />
+      <div class="admin-card-copy">
+        <div class="admin-card-title-row" v-if="status || provider">
+          <AdminChip v-if="provider" :label="provider" tone="strong" />
+          <AdminChip v-if="status" :label="status" :variant="statusVariant" />
+        </div>
+        <h3 class="admin-card-title">{{ title }}</h3>
+        <p class="admin-card-subtitle" :title="subtitle">{{ subtitle }}</p>
       </div>
-      <h3 class="admin-card-title">{{ title }}</h3>
-      <p class="admin-card-subtitle">{{ subtitle }}</p>
+    </div>
+    <div class="admin-card-header-side" v-if="$slots.extra">
+      <slot name="extra" />
     </div>
   </div>
 </template>
@@ -16,14 +22,16 @@ import AdminChip from './AdminChip.vue'
 
 withDefaults(
   defineProps<{
-    provider: string
-    status: string
+    provider?: string
+    status?: string
     statusVariant?: 'neutral' | 'current' | 'enabled' | 'empty'
     title: string
     subtitle: string
+    size?: 'default' | 'small'
   }>(),
   {
     statusVariant: 'neutral',
+    size: 'default'
   }
 )
 </script>
@@ -32,11 +40,21 @@ withDefaults(
 .admin-card-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
+}
+
+.admin-card-header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .admin-card-copy {
   min-width: 0;
+  flex: 1;
 }
 
 .admin-card-title-row {
@@ -44,17 +62,29 @@ withDefaults(
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-bottom: 4px;
 }
 
 .admin-card-title {
-  margin: 8px 0 0;
-  font-size: 20px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--admin-text-1);
+  line-height: 1.2;
+}
+
+.admin-card-header.is-small .admin-card-title {
+  font-size: 15px;
+  margin-top: 2px;
 }
 
 .admin-card-subtitle {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--admin-text-2);
-  font-size: 13px;
+  font-size: 12px;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

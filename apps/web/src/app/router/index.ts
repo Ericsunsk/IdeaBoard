@@ -78,21 +78,9 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true }
       },
       {
-        path: 'accounts',
-        name: 'AdminAccounts',
-        component: () => import('../../pages/admin/AdminAccountsPage.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: 'monitor',
-        name: 'AdminMonitor',
-        component: () => import('../../pages/admin/AdminMonitorPage.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: 'drawing-records',
-        name: 'AdminDrawingRecords',
-        component: () => import('../../pages/admin/AdminDrawingRecordsPage.vue'),
+        path: 'statistics',
+        name: 'AdminStatistics',
+        component: () => import('../../pages/admin/AdminUsageStatisticsPage.vue'),
         meta: { requiresAuth: true }
       },
       {

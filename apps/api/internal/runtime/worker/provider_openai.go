@@ -24,15 +24,15 @@ import (
 )
 
 // callOpenAI 调用 OpenAI DALL-E 风格接口（也兼容其他 OpenAI 兼容平台）
-func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}) (string, error) {
+func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
 	baseURL := "https://api.openai.com"
 	if account.ProxyURL != "" {
 		baseURL = strings.TrimRight(account.ProxyURL, "/")
 	}
 
 	model := "dall-e-3"
-	if account.ModelSet != "" {
-		model = account.ModelSet
+	if strings.TrimSpace(resolvedModel) != "" {
+		model = strings.TrimSpace(resolvedModel)
 	}
 
 	size := fmt.Sprintf("%dx%d", width, height)
@@ -72,18 +72,18 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	if useEditEndpoint {
 		body, contentType, buildErr := buildOpenAIEditMultipartRequestBody(ctx, reqBody, timeout)
 		if buildErr != nil {
-			return "", buildErr
+			return providerCallResult{}, buildErr
 		}
 		req, err = http.NewRequestWithContext(ctx, "POST", endpoint, body)
 		if err != nil {
-			return "", err
+			return providerCallResult{}, err
 		}
 		req.Header.Set("Content-Type", contentType)
 	} else {
 		bodyJSON, _ := json.Marshal(reqBody)
 		req, err = http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
 		if err != nil {
-			return "", err
+			return providerCallResult{}, err
 		}
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -102,25 +102,32 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			return "", err
+			return providerCallResult{}, err
 		}
-		return "", fmt.Errorf("HTTP 请求失败: %w", err)
+		return providerCallResult{}, fmt.Errorf("HTTP 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := readLimitedBody(resp.Body)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			return "", err
+			return providerCallResult{}, err
 		}
-		return "", fmt.Errorf("读取 API 响应失败: %w", err)
+		return providerCallResult{}, fmt.Errorf("读取 API 响应失败: %w", err)
 	}
 
 	if resp.StatusCode != 200 {
-		return "", newUpstreamHTTPError(resp.StatusCode, truncateErrorBody(string(respBody)))
+		return providerCallResult{}, newUpstreamHTTPError(resp.StatusCode, truncateErrorBody(string(respBody)))
 	}
 
-	return extractOpenAIImageResponse(respBody, params)
+	imageURL, err := extractOpenAIImageResponse(respBody, params)
+	if err != nil {
+		return providerCallResult{}, err
+	}
+	return providerCallResult{
+		ImageURL: imageURL,
+		Model:    model,
+	}, nil
 }
 
 func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody map[string]interface{}, timeout time.Duration) (*bytes.Buffer, string, error) {

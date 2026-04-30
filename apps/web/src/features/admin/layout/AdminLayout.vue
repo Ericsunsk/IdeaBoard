@@ -123,6 +123,7 @@ import {
     DocumentTextOutline,
     ChatbubbleEllipsesOutline,
     CloudOutline,
+    SpeedometerOutline,
 } from "@vicons/ionicons5";
 
 const router = useRouter();
@@ -256,22 +257,10 @@ const adminMenuItems: AdminMenuItem[] = [
         icon: LinkOutline,
     },
     {
-        key: "accounts",
-        label: "模型账号池",
-        title: "模型账号池",
-        icon: KeyOutline,
-    },
-    {
-        key: "monitor",
-        label: "任务监控",
-        title: "任务监控",
-        icon: PulseOutline,
-    },
-    {
-        key: "drawing-records",
-        label: "绘图记录",
-        title: "绘图记录",
-        icon: DocumentTextOutline,
+        key: "statistics",
+        label: "数据仪表盘",
+        title: "数据仪表盘",
+        icon: SpeedometerOutline,
     },
     {
         key: "feature-prompts",

@@ -17,6 +17,26 @@ export function splitCommaValues(input: string | null | undefined): string[] {
   return input.split(',').map(item => item.trim()).filter(Boolean)
 }
 
+/**
+ * Get the CSS class/variant for a model based on its family (GPT, MJ, SD, etc.)
+ */
+export function getModelCategoryClass(model: string): string {
+  const m = model.toLowerCase()
+  if (m.includes('dalle') || m.includes('gpt')) return 'is-indigo'
+  if (m.includes('mj') || m.includes('midjourney')) return 'is-purple'
+  if (m.includes('sd') || m.includes('stable')) return 'is-cyan'
+  return ''
+}
+
+/**
+ * Model meta for charts and dashboards
+ */
+export const ADMIN_MODEL_META = [
+  { label: 'DALLE', color: 'var(--admin-model-indigo)', key: 'indigo' },
+  { label: 'MJ', color: 'var(--admin-model-purple)', key: 'purple' },
+  { label: 'SD', color: 'var(--admin-model-cyan)', key: 'cyan' }
+]
+
 export function getChannelModelOptions(
   channels: Array<{ id: number; models?: string | null }>,
   channelId: number | null | undefined,

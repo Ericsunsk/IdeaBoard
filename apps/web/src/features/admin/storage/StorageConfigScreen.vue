@@ -4,7 +4,7 @@
             <article
                 v-for="storage in storages"
                 :key="storage.id"
-                class="storage-card"
+                class="storage-card panel-card admin-card-interactive"
                 :class="{ current: storage.isCurrent }"
             >
                 <AdminCardHeader
@@ -70,13 +70,13 @@
             </article>
 
             <button
-                class="storage-add-card"
+                class="admin-add-card"
                 type="button"
                 :disabled="creatableProviders.length === 0"
                 @click="openCreate"
             >
                 <span class="add-mark">+</span>
-                <span class="add-title">添加存储</span>
+                <span class="add-title">添加存储供应商</span>
             </button>
         </div>
     </div>
@@ -357,16 +357,12 @@ const {
     gap: 16px;
 }
 
-.storage-card,
-.storage-add-card {
-    min-height: 252px;
+.storage-card {
+    min-height: 180px;
     border-radius: 16px;
     border: 1px solid var(--admin-border-soft);
     background: var(--admin-card-strong);
     padding: 16px;
-}
-
-.storage-card {
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -376,9 +372,8 @@ const {
         transform 0.18s ease;
 }
 
-.storage-card:hover,
-.storage-add-card:hover {
-    border-color: #2e3034;
+.storage-card:hover {
+    border-color: var(--admin-text-3);
     background: #141416;
 }
 
@@ -424,44 +419,7 @@ const {
     gap: 8px;
 }
 
-.storage-add-card {
-    appearance: none;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
-    gap: 10px;
-    text-align: left;
-    transition:
-        border-color 0.18s ease,
-        background 0.18s ease;
-}
-
-.storage-add-card:disabled {
-    cursor: not-allowed;
-    opacity: 0.65;
-}
-
-.add-mark {
-    width: 42px;
-    height: 42px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 12px;
-    background: #17181a;
-    border: 1px solid var(--admin-border);
-    color: var(--admin-text-1);
-    font-size: 24px;
-    line-height: 1;
-}
-
-.add-title {
-    color: var(--admin-text-1);
-    font-size: 18px;
-    font-weight: 600;
-}
+/* Add card styles now global */
 
 .editor-provider {
     display: inline-flex;
@@ -770,8 +728,7 @@ const {
 }
 
 @media (max-width: 720px) {
-    .storage-card,
-    .storage-add-card {
+    .storage-card {
         min-height: unset;
     }
 

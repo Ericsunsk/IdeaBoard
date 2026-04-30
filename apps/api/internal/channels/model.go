@@ -27,3 +27,8 @@ type UpdateChannelRequest struct {
 	ApiURL string `json:"api_url" binding:"required"`
 	Models string `json:"models"`
 }
+
+type DetectModelsRequest struct {
+	BaseURL string `json:"base_url" binding:"required"`
+	APIKey  string `json:"api_key" binding:"required"`
+}

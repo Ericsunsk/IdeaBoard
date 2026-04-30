@@ -357,6 +357,8 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 	adminApi.GET("/tasks/:task_id", h.AccountHandler.GetTask)
 	adminApi.GET("/tasks", h.AccountHandler.ListTasks)
 	adminApi.GET("/monitor", h.AccountHandler.GetMonitor)
+	adminApi.GET("/statistics", h.AccountHandler.GetStatistics)
+	adminApi.POST("/statistics/backfill", h.AccountHandler.BackfillStatistics)
 
 	adminApi.POST("/upload", func(c *gin.Context) {
 		file, err := c.FormFile("file")
@@ -401,6 +403,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 	adminApi.POST("/channels", h.ChannelHandler.Create)
 	adminApi.PUT("/channels/:id", h.ChannelHandler.Update)
 	adminApi.DELETE("/channels/:id", h.ChannelHandler.Delete)
+	adminApi.POST("/channels/detect-models", h.ChannelHandler.DetectModels)
 
 	adminApi.GET("/line-draft-modes", h.LineDraftHandler.List)
 	adminApi.POST("/line-draft-modes", h.LineDraftHandler.Create)

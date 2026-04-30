@@ -59,6 +59,11 @@ type Consumer struct {
 	mu      sync.Mutex
 }
 
+type providerCallResult struct {
+	ImageURL string
+	Model    string
+}
+
 func NewConsumer(
 	accountRepo *accounts.AccountRepository,
 	channelRepo *channels.ChannelRepository,
@@ -202,7 +207,6 @@ func (c *Consumer) failTask(task *redis.GlobalQueueTask, accountID uint64, reaso
 	log.Printf("[Consumer] 任务 %s 失败, 原因: %s", task.TaskID, reason)
 }
 
-
 func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *redis.GlobalQueueTask) (string, error) {
 	log.Printf("[Consumer] 调用 API, 账号: %s, ChannelID: %d, ApiKey长度: %d",
 		account.Name, account.ChannelID, len(account.ApiKey))
@@ -248,16 +252,17 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 	// 根据 ratio 或自定义尺寸计算输出尺寸；local redraw 会先改写为 ROI 尺寸。
 	width, height := parseSizeFromParams(params)
 
-	var imageURL string
+	var callResult providerCallResult
 	var err error
 
 	platform := strings.ToLower(strings.TrimSpace(account.Platform))
+	resolvedModel := resolveRequestedModel(account.ModelSet, params)
 	switch {
 	case workflow.IsStabilityTextToImagePlatform(platform):
-		imageURL, err = c.callStabilityAI(ctx, account, task.Prompt, width, height, timeout)
+		callResult, err = c.callStabilityAI(ctx, account, task.Prompt, width, height, timeout, resolvedModel)
 	default:
 		// nano banana / openai / gemini 等 OpenAI 兼容平台（官方原生格式）
-		imageURL, err = c.callOpenAI(ctx, account, task.Prompt, width, height, timeout, params)
+		callResult, err = c.callOpenAI(ctx, account, task.Prompt, width, height, timeout, params, resolvedModel)
 	}
 
 	if err != nil {
@@ -266,6 +271,7 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		}
 		return "", fmt.Errorf("调用 API 失败 (渠道: %s): %w", channelName, err)
 	}
+	imageURL := callResult.ImageURL
 
 	if localRedrawCtx != nil {
 		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, localRedrawCtx, imageURL, timeout)
@@ -303,13 +309,49 @@ func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAcco
 		"channel_name": channelName,
 		"platform":     account.Platform,
 		"api_type":     account.ApiType,
-		"model_set":    account.ModelSet,
 		"status":       tasks.ResultStatusSuccess,
 		"image_url":    imageURL,
+	}
+	if strings.TrimSpace(account.ModelSet) != "" && !strings.Contains(account.ModelSet, ",") {
+		result["model_set"] = strings.TrimSpace(account.ModelSet)
+	}
+	if strings.TrimSpace(callResult.Model) != "" {
+		result["model"] = strings.TrimSpace(callResult.Model)
 	}
 
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
+}
+
+func resolveRequestedModel(accountModelSet string, params map[string]interface{}) string {
+	candidates := splitModelSet(accountModelSet)
+	if len(candidates) == 0 {
+		return ""
+	}
+	if modelFromParams, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
+		modelFromParams = strings.TrimSpace(modelFromParams)
+		if modelFromParams != "" {
+			for _, candidate := range candidates {
+				if strings.EqualFold(candidate, modelFromParams) {
+					return candidate
+				}
+			}
+		}
+	}
+	return candidates[0]
+}
+
+func splitModelSet(modelSet string) []string {
+	items := strings.Split(modelSet, ",")
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		model := strings.TrimSpace(item)
+		if model == "" {
+			continue
+		}
+		result = append(result, model)
+	}
+	return result
 }
 
 func resolveAccountTimeout(account *accounts.ApiAccount) time.Duration {

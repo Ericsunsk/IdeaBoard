@@ -76,6 +76,17 @@ func Get(ctx context.Context, rawURL string, timeout time.Duration) (*http.Respo
 }
 
 func GetWithAllowHosts(ctx context.Context, rawURL string, timeout time.Duration, allowHosts ...string) (*http.Response, error) {
+	return DoWithAllowHosts(ctx, http.MethodGet, rawURL, nil, timeout, allowHosts...)
+}
+
+func DoWithAllowHosts(
+	ctx context.Context,
+	method string,
+	rawURL string,
+	buildRequest func(*http.Request),
+	timeout time.Duration,
+	allowHosts ...string,
+) (*http.Response, error) {
 	policy, err := resolvePolicy(rawURL, allowHosts...)
 	if err != nil {
 		return nil, err
@@ -96,9 +107,12 @@ func GetWithAllowHosts(ctx context.Context, rawURL string, timeout time.Duration
 		},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, policy.parsed.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, policy.parsed.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("创建请求失败")
+	}
+	if buildRequest != nil {
+		buildRequest(req)
 	}
 
 	return client.Do(req)

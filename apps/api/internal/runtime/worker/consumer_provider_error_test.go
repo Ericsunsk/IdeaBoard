@@ -26,7 +26,7 @@ func TestCallOpenAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
 	}
 	params := map[string]interface{}{"feature": "pattern-gen"}
 
-	_, err := c.callOpenAI(context.Background(), account, "prompt", 1024, 1024, time.Second, params)
+	_, err := c.callOpenAI(context.Background(), account, "prompt", 1024, 1024, time.Second, params, "gpt-image-1")
 	if err == nil {
 		t.Fatalf("expected callOpenAI error")
 	}
@@ -54,7 +54,7 @@ func TestCallStabilityAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
 		ModelSet: "sdxl",
 	}
 
-	_, err := c.callStabilityAI(context.Background(), account, "prompt", 1024, 1024, time.Second)
+	_, err := c.callStabilityAI(context.Background(), account, "prompt", 1024, 1024, time.Second, "sdxl")
 	if err == nil {
 		t.Fatalf("expected callStabilityAI error")
 	}

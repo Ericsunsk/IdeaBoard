@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"api/internal/platform/redis"
@@ -153,6 +154,13 @@ func (s *TaskRuntimeService) MarkTaskCompleted(taskID string, result string) err
 		return err
 	}
 	if rows > 0 {
+		if task, getErr := s.taskRepo.GetByTaskID(taskID); getErr == nil {
+			if statErr := s.taskRepo.UpsertDailyStatByTask(task); statErr != nil {
+				log.Printf("[TaskRuntime] upsert daily stat failed after complete, task_id=%s err=%v", taskID, statErr)
+			}
+		} else {
+			log.Printf("[TaskRuntime] load task for daily stat failed after complete, task_id=%s err=%v", taskID, getErr)
+		}
 		return nil
 	}
 
@@ -181,6 +189,13 @@ func (s *TaskRuntimeService) MarkTaskFailed(taskID string, reason string) error 
 		return err
 	}
 	if rows > 0 {
+		if task, getErr := s.taskRepo.GetByTaskID(taskID); getErr == nil {
+			if statErr := s.taskRepo.UpsertDailyStatByTask(task); statErr != nil {
+				log.Printf("[TaskRuntime] upsert daily stat failed after fail, task_id=%s err=%v", taskID, statErr)
+			}
+		} else {
+			log.Printf("[TaskRuntime] load task for daily stat failed after fail, task_id=%s err=%v", taskID, getErr)
+		}
 		return nil
 	}
 
@@ -222,7 +237,15 @@ func (s *TaskRuntimeService) MarkTaskFailedWithRetry(taskID string, accountID ui
 		}
 	}
 
-	return s.taskRepo.Update(task)
+	if err := s.taskRepo.Update(task); err != nil {
+		return err
+	}
+	if task.Status == tasks.StatusFailed {
+		if statErr := s.taskRepo.UpsertDailyStatByTask(task); statErr != nil {
+			log.Printf("[TaskRuntime] upsert daily stat failed after fail-with-retry, task_id=%s err=%v", taskID, statErr)
+		}
+	}
+	return nil
 }
 
 func (s *TaskRuntimeService) RequeueTaskForFailover(taskID string, accountID uint64, errMsg string) (bool, error) {
@@ -275,6 +298,13 @@ func (s *TaskRuntimeService) RequeueTaskForFailover(taskID string, accountID uin
 		return false, err
 	}
 	if rows > 0 {
+		if task, getErr := s.taskRepo.GetByTaskID(taskID); getErr == nil {
+			if statErr := s.taskRepo.UpsertDailyStatByTask(task); statErr != nil {
+				log.Printf("[TaskRuntime] upsert daily stat failed after failover-final-fail, task_id=%s err=%v", taskID, statErr)
+			}
+		} else {
+			log.Printf("[TaskRuntime] load task for daily stat failed after failover-final-fail, task_id=%s err=%v", taskID, getErr)
+		}
 		return false, nil
 	}
 
