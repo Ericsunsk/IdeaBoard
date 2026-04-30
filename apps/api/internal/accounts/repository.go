@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"api/internal/tasks"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -295,7 +296,7 @@ func (r *TaskRepository) FailRunningByAccountID(accountID uint64, errMsg string)
 				CompletedAt: completedAt,
 			}
 			if err := r.upsertDailyStatByTaskWithFallbackModelTx(tx, task, fallbackModelSet); err != nil {
-				log.Printf("[TaskRepository] upsert daily stat failed after FailRunningByAccountID, task_id=%s err=%v", c.TaskID, err)
+				return fmt.Errorf("upsert daily stat for task %s: %w", c.TaskID, err)
 			}
 		}
 		return nil
@@ -340,7 +341,7 @@ func (r *TaskRepository) UpsertDailyStatByTask(task *tasks.Task) error {
 }
 
 func (r *TaskRepository) UpsertDailyStatByTaskWithFallbackModel(task *tasks.Task, fallbackModelSet string) error {
-	if strings.TrimSpace(fallbackModelSet) == "" && task != nil {
+	if task != nil && strings.TrimSpace(fallbackModelSet) == "" && !resultContainsModel(task.Result) {
 		fallbackModelSet = r.resolveAccountSingleModelSet(task.AccountID)
 	}
 	return r.db.Transaction(func(tx *gorm.DB) error {

@@ -315,8 +315,8 @@ func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStatistics after backfill failed: %v", err)
 	}
-	if after.Backfill.MissingDays >= before.Backfill.MissingDays {
-		t.Fatalf("expected missing_days to decrease after backfill, before=%+v after=%+v", before.Backfill, after.Backfill)
+	if after.Backfill.MissingDays != 0 {
+		t.Fatalf("expected missing_days=0 after backfill status check, got after=%+v", after.Backfill)
 	}
 }
 

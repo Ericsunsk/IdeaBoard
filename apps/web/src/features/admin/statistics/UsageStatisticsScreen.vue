@@ -7,6 +7,21 @@
       <AdminSummaryCard label="累计总调用" :value="totalCalls" :foot="totalCallsFoot" />
     </div>
 
+    <div v-if="needsBackfill" class="backfill-banner">
+      <div class="backfill-banner-content">
+        <n-icon size="18" class="backfill-banner-icon"><WarningOutline /></n-icon>
+        <span>缺失 <strong>{{ backfillStatus?.missing_days }}</strong> 天统计数据，部分历史数据不完整</span>
+      </div>
+      <n-button
+        size="small"
+        type="warning"
+        :loading="backfillLoading"
+        @click="handleBackfill"
+      >
+        立即补录
+      </n-button>
+    </div>
+
     <div class="charts-grid">
       <!-- 调用量趋势 -->
       <div class="chart-card">
@@ -35,40 +50,50 @@
           </div>
         </div>
         <div class="chart-body area-chart-container" @mousemove="handleChartHover" @mouseleave="activeDayIndex = null">
-          <div class="area-chart-wrapper">
-            <svg viewBox="0 0 700 200" preserveAspectRatio="none" class="area-svg">
-              <defs>
-                <linearGradient v-for="(m, idx) in areaSeriesMeta" :key="'grad-' + idx" :id="'grad-' + idx" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" :stop-color="m.color" stop-opacity="0.15" />
-                  <stop offset="100%" :stop-color="m.color" stop-opacity="0" />
-                </linearGradient>
-              </defs>
-              <path v-for="(path, index) in areaPaths" :key="'path-' + index" :d="path.d" :fill="`url(#grad-${index})`" class="area-path" />
-              <path v-for="(path, index) in areaPaths" :key="'line-' + index" :d="path.lineD" :stroke="path.color" stroke-width="1.5" fill="none" stroke-linecap="round" class="area-line" />
-              <line v-if="activeDayIndex !== null" :x1="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" y1="0" :x2="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" y2="200" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="4,4" />
-              <template v-if="activeDayIndex !== null">
-                <circle v-for="(pt, idx) in activeDayPoints" :key="'pt-' + idx" :cx="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" :cy="pt.y" r="3" :fill="pt.color" stroke="#141416" stroke-width="1.5" />
-              </template>
-            </svg>
-            <div v-if="activeDayIndex !== null" class="chart-float-tooltip" :style="{ left: (activeDayIndex * (100 / Math.max(1, trendData.length - 1))) + '%' }">
-              <div class="tooltip-header">{{ trendData[activeDayIndex].date }}</div>
-              <div class="tooltip-list">
-                <div v-for="seg in trendData[activeDayIndex].segments" :key="seg.label" class="tooltip-item">
-                  <span class="dot" :style="{ background: seg.color }"></span>
-                  <span class="label">{{ seg.label }}</span>
-                  <span class="val">{{ seg.value }}</span>
+          <div class="area-chart-clipped">
+            <div class="area-chart-wrapper">
+              <svg viewBox="0 0 700 200" preserveAspectRatio="none" class="area-svg">
+                <defs>
+                  <linearGradient v-for="(m, idx) in areaSeriesMeta" :key="'grad-' + idx" :id="'grad-' + idx" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" :stop-color="m.color" stop-opacity="0.15" />
+                    <stop offset="100%" :stop-color="m.color" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <path v-for="(path, index) in areaPaths" :key="'path-' + index" :d="path.d" :fill="`url(#grad-${index})`" class="area-path" />
+                <path v-for="(path, index) in areaPaths" :key="'line-' + index" :d="path.lineD" :stroke="path.color" stroke-width="1.5" fill="none" stroke-linecap="round" class="area-line" />
+                <line v-if="activeDayIndex !== null" :x1="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" y1="0" :x2="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" y2="200" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="4,4" />
+                <template v-if="activeDayIndex !== null">
+                  <circle v-for="(pt, idx) in activeDayPoints" :key="'pt-' + idx" :cx="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" :cy="pt.y" r="3" :fill="pt.color" stroke="#141416" stroke-width="1.5" />
+                </template>
+              </svg>
+            </div>
+            <div class="chart-x-axis-refined-fixed">
+              <template v-for="(day, i) in trendData" :key="day.date">
+                <div v-if="shouldShowLabel(i)" class="axis-item-absolute" :style="{ left: (i * (100 / Math.max(1, trendData.length - 1))) + '%' }">
+                  <span class="axis-date">{{ day.date }}</span>
                 </div>
-                <div class="tooltip-divider"></div>
-                <div class="tooltip-total"><span>总计</span><span>{{ trendData[activeDayIndex].total }}</span></div>
-              </div>
+              </template>
             </div>
           </div>
-          <div class="chart-x-axis-refined-fixed">
-            <template v-for="(day, i) in trendData" :key="day.date">
-              <div v-if="shouldShowLabel(i)" class="axis-item-absolute" :style="{ left: (i * (100 / Math.max(1, trendData.length - 1))) + '%' }">
-                <span class="axis-date">{{ day.date }}</span>
+          <div
+            v-if="activeDayIndex !== null"
+            class="chart-float-tooltip"
+            :class="{
+              'is-left-edge': activeDayIndex <= 1,
+              'is-right-edge': activeDayIndex >= Math.max(0, trendData.length - 2),
+            }"
+            :style="{ left: (activeDayIndex * (100 / Math.max(1, trendData.length - 1))) + '%' }"
+          >
+            <div class="tooltip-header">{{ trendData[activeDayIndex].date }}</div>
+            <div class="tooltip-list">
+              <div v-for="seg in trendData[activeDayIndex].segments" :key="seg.label" class="tooltip-item">
+                <span class="dot" :style="{ background: seg.color }"></span>
+                <span class="label">{{ seg.label }}</span>
+                <span class="val">{{ seg.value }}</span>
               </div>
-            </template>
+              <div class="tooltip-divider"></div>
+              <div class="tooltip-total"><span>总计</span><span>{{ trendData[activeDayIndex].total }}</span></div>
+            </div>
           </div>
         </div>
       </div>
@@ -510,6 +535,10 @@ const {
   timeRange,
   rangeOptions,
   loadStatistics,
+  backfillStatus,
+  needsBackfill,
+  backfillLoading,
+  triggerBackfill,
 } = useUsageStatisticsData()
 
 const {
@@ -554,6 +583,15 @@ const {
   timeRange,
   monitorData,
 })
+
+async function handleBackfill() {
+  const result = await triggerBackfill()
+  if (result.ok) {
+    message.success('统计补录完成')
+  } else {
+    message.error(result.message || '统计补录失败')
+  }
+}
 
 watch(filterStatus, () => {
   page.value = 1

@@ -308,7 +308,12 @@ export function useUsageStatisticsCharts(options: {
     const count = trendData.value.length
     if (count <= 7) return true
     if (options.timeRange.value === '30d') return index === 0 || index === count - 1 || index % 6 === 0
-    if (options.timeRange.value === '1y') return index === 0 || index === count - 1 || index % 2 === 0
+    if (options.timeRange.value === '1y') {
+      if (index === 0 || index === count - 1) return true
+      const day = trendData.value[index]
+      if (!day) return false
+      return isMonthStartLabel(day.date)
+    }
     return true
   }
 
@@ -365,6 +370,16 @@ function colorForModel(name: string, palette: string[]) {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i)
   return palette[Math.abs(hash) % palette.length]
+}
+
+function isMonthStartLabel(label: string): boolean {
+  const value = (label || '').trim()
+  if (!value) return false
+  const mmdd = /^(\d{2})\/(\d{2})$/.exec(value)
+  if (mmdd) return mmdd[2] === '01'
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (ymd) return ymd[3] === '01'
+  return false
 }
 
 function buildDeltaFoot(current: number, previous: number, label: string) {

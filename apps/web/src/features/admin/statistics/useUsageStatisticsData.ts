@@ -1,21 +1,33 @@
-import { ref, type Ref } from 'vue'
+import { ref, computed, type Ref } from 'vue'
 import accountApi from '../../../shared/api/account'
-import type { AdminStatisticsResponse } from '../../../shared/api/account'
+import type { AdminStatisticsResponse, AdminStatisticsBackfillState } from '../../../shared/api/account'
 import channelApi, { type Channel } from '../../../shared/api/channel'
+import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
 export type ConfiguredAccountLite = { model_set: string; platform: string; channel_id: number }
+type BackfillTriggerResult = { ok: boolean; message?: string }
 
 export function useUsageStatisticsData() {
   const adminStatistics = ref<AdminStatisticsResponse | null>(null)
   const configuredAccounts = ref<ConfiguredAccountLite[]>([])
   const configuredChannels = ref<Channel[]>([])
   const timeRange = ref('7d')
+  const backfillLoading = ref(false)
   const rangeOptions = [
     { label: '周', key: '7d' },
     { label: '月', key: '30d' },
     { label: '年', key: '1y' },
   ]
   const ACCOUNT_PAGE_SIZE = 100
+
+  const backfillStatus = computed<AdminStatisticsBackfillState | null>(() => {
+    return adminStatistics.value?.backfill_status ?? null
+  })
+
+  const needsBackfill = computed(() => {
+    const s = backfillStatus.value
+    return !!s && s.missing_days > 0
+  })
 
   async function loadAllAccounts() {
     const all: ConfiguredAccountLite[] = []
@@ -61,6 +73,22 @@ export function useUsageStatisticsData() {
     }
   }
 
+  async function triggerBackfill(): Promise<BackfillTriggerResult> {
+    backfillLoading.value = true
+    try {
+      const res = await accountApi.backfillStatistics(timeRange.value as '7d' | '30d' | '1y')
+      if (res.code === 0) {
+        await loadStatistics()
+        return { ok: true as const }
+      }
+      return { ok: false as const, message: res.msg || '补录失败' }
+    } catch (error: unknown) {
+      return { ok: false as const, message: extractSafeApiErrorMessage(error, '补录失败') }
+    } finally {
+      backfillLoading.value = false
+    }
+  }
+
   return {
     adminStatistics,
     configuredAccounts,
@@ -68,5 +96,9 @@ export function useUsageStatisticsData() {
     timeRange,
     rangeOptions,
     loadStatistics,
+    backfillStatus,
+    needsBackfill,
+    backfillLoading,
+    triggerBackfill,
   }
 }

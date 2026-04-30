@@ -5,6 +5,35 @@
   padding-bottom: 24px;
 }
 
+.backfill-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 10px;
+  gap: 12px;
+}
+
+.backfill-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--admin-text-2);
+}
+
+.backfill-banner-content strong {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.backfill-banner-icon {
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
 .charts-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -588,10 +617,19 @@
   flex-direction: column;
 }
 
+.area-chart-clipped {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
 .area-chart-wrapper {
   flex: 1;
   position: relative;
   cursor: crosshair;
+  min-height: 0;
 }
 
 .area-svg {
@@ -622,6 +660,14 @@
   pointer-events: none;
   z-index: 100;
   transition: left 0.1s linear;
+}
+
+.chart-float-tooltip.is-left-edge {
+  transform: translateX(0);
+}
+
+.chart-float-tooltip.is-right-edge {
+  transform: translateX(-100%);
 }
 
 .tooltip-header {

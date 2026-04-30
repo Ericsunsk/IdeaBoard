@@ -480,21 +480,32 @@ func (s *AccountService) GetStatistics(rawRange string) (*AdminStatisticsRespons
 	if err != nil {
 		return nil, err
 	}
-	missingDays := buildMissingStatisticsDaysByMarker(rangeStart, todayStart, days, backfilledDates)
+	missingDaysForStatus := buildMissingStatisticsDaysByMarkerForStatus(rangeStart, todayStart, days, backfilledDates)
 
-	rangeDailyRows, err := s.taskRepo.ListDailyStatsByDateRange(rangeStartDate, rangeEndDate)
+	// Single query covering the wider of month-start vs range-start through today,
+	// then split in memory to avoid 3 DB round-trips.
+	queryStart := monthStart
+	if rangeStart.Before(monthStart) {
+		queryStart = rangeStart
+	}
+	allDailyRows, err := s.taskRepo.ListDailyStatsByDateRange(queryStart.Format("2006-01-02"), rangeEndDate)
 	if err != nil {
 		return nil, err
 	}
 
 	yesterdayDate := yesterdayStart.Format("2006-01-02")
-	yesterdayRows, err := s.taskRepo.ListDailyStatsByDateRange(yesterdayDate, yesterdayDate)
-	if err != nil {
-		return nil, err
-	}
-	monthRows, err := s.taskRepo.ListDailyStatsByDateRange(monthStart.Format("2006-01-02"), rangeEndDate)
-	if err != nil {
-		return nil, err
+	monthStartDate := monthStart.Format("2006-01-02")
+	var rangeDailyRows, yesterdayRows, monthRows []DailyStatAggregate
+	for _, row := range allDailyRows {
+		if row.StatDate >= rangeStartDate && row.StatDate <= rangeEndDate {
+			rangeDailyRows = append(rangeDailyRows, row)
+		}
+		if row.StatDate == yesterdayDate {
+			yesterdayRows = append(yesterdayRows, row)
+		}
+		if row.StatDate >= monthStartDate {
+			monthRows = append(monthRows, row)
+		}
 	}
 
 	type trendBucket struct {
@@ -691,7 +702,7 @@ func (s *AccountService) GetStatistics(rawRange string) (*AdminStatisticsRespons
 		Backfill: AdminStatisticsBackfillState{
 			RangeStart:     rangeStartDate,
 			RangeEnd:       rangeEndDate,
-			MissingDays:    len(missingDays),
+			MissingDays:    len(missingDaysForStatus),
 			BackfilledDays: len(backfilledDates),
 		},
 	}, nil
@@ -734,6 +745,14 @@ func sumDailyTotal(rows []DailyStatAggregate) int64 {
 }
 
 func buildMissingStatisticsDaysByMarker(rangeStart, todayStart time.Time, days int, markerDates []string) []time.Time {
+	return buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart, days, markerDates, true)
+}
+
+func buildMissingStatisticsDaysByMarkerForStatus(rangeStart, todayStart time.Time, days int, markerDates []string) []time.Time {
+	return buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart, days, markerDates, false)
+}
+
+func buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart time.Time, days int, markerDates []string, includeToday bool) []time.Time {
 	markers := make(map[string]struct{}, len(markerDates))
 	for _, date := range markerDates {
 		markers[date] = struct{}{}
@@ -743,8 +762,10 @@ func buildMissingStatisticsDaysByMarker(rangeStart, todayStart time.Time, days i
 		dayStart := rangeStart.AddDate(0, 0, i)
 		dayKey := dayStart.Format("2006-01-02")
 		if dayKey == todayStart.Format("2006-01-02") {
-			// 今天始终允许回填，覆盖部署前同一天历史终态任务；事件幂等保证不会重复计数。
-			missing = append(missing, dayStart)
+			if includeToday {
+				// 今天始终允许回填，覆盖部署前同一天历史终态任务；事件幂等保证不会重复计数。
+				missing = append(missing, dayStart)
+			}
 			continue
 		}
 		if _, ok := markers[dayKey]; ok {
@@ -815,6 +836,20 @@ func parseResultMap(raw string) map[string]interface{} {
 		return nil
 	}
 	return result
+}
+
+func resultContainsModel(rawResult string) bool {
+	result := parseResultMap(rawResult)
+	if result == nil {
+		return false
+	}
+	if readResultString(result, "model") != "" {
+		return true
+	}
+	if readResultString(result, "model_set") != "" {
+		return true
+	}
+	return false
 }
 
 func extractTaskModel(rawResult string) string {

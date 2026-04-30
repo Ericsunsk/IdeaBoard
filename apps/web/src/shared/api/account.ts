@@ -77,6 +77,21 @@ export interface MonitorResponse {
   }
 }
 
+export interface AdminStatisticsBackfillState {
+  range_start: string
+  range_end: string
+  missing_days: number
+  backfilled_days: number
+}
+
+export interface AdminStatisticsBackfillResult {
+  range: string
+  range_start: string
+  range_end: string
+  scanned_days: number
+  backfilled_days: number
+}
+
 export interface AdminStatisticsResponse {
   summary: {
     total_calls: number
@@ -102,6 +117,7 @@ export interface AdminStatisticsResponse {
   user_rank: Array<{ name: string; value: number }>
   latency: Array<{ name: string; avg_seconds: number }>
   health_cells: Array<{ status: number; success: number; fail: number; total: number }>
+  backfill_status?: AdminStatisticsBackfillState
 }
 
 // User task APIs - backend uses /api/user/drawing/...
@@ -149,6 +165,9 @@ export const getMonitor = (): Promise<ApiResponse<MonitorResponse>> =>
 export const getAdminStatistics = (range: '7d' | '30d' | '1y'): Promise<ApiResponse<AdminStatisticsResponse>> =>
   api.get('/admin/statistics', { params: { range } }) as any
 
+export const backfillStatistics = (range: '7d' | '30d' | '1y'): Promise<ApiResponse<AdminStatisticsBackfillResult>> =>
+  api.post('/admin/statistics/backfill', { range }) as any
+
 export const accountApi = {
   submitTask,
   getTask,
@@ -164,6 +183,7 @@ export const accountApi = {
   stopAccount,
   getMonitor,
   getAdminStatistics,
+  backfillStatistics,
 }
 
 export default accountApi
