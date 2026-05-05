@@ -26,8 +26,8 @@ export const auth = betterAuth({
     maxPasswordLength: 50,
   },
   session: {
-    expiresIn: 60 * 60 * 24 * 7,
-    updateAge: 60 * 60 * 24,
+    expiresIn: 60 * 60 * 24,      // 24 hours — balances security with usability
+    updateAge: 60 * 60,           // refresh cookie every hour of active use
   },
   plugins: [
     username(),

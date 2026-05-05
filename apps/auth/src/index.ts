@@ -28,6 +28,10 @@ type AuthGuardSettingsCache = {
 }
 
 const app = express()
+// Trust loopback proxy (Nginx) so req.ip correctly reflects the real client IP
+// from X-Forwarded-For. Without this, Express always sees 127.0.0.1 as the IP
+// and rate-limiting becomes per-server instead of per-client.
+app.set('trust proxy', 'loopback')
 const authRateLimitStore = new Map<string, MemoryRateLimitEntry>()
 let authRateLimitCheckCounter = 0
 const AUTH_GUARD_SETTINGS_TTL_MS = 10_000

@@ -46,6 +46,9 @@ func NewMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
 			sqlDB, dbErr := db.DB()
 			if dbErr == nil {
 				if pingErr := sqlDB.Ping(); pingErr == nil {
+					sqlDB.SetMaxOpenConns(25)
+					sqlDB.SetMaxIdleConns(10)
+					sqlDB.SetConnMaxLifetime(5 * time.Minute)
 					return db, nil
 				} else {
 					err = pingErr

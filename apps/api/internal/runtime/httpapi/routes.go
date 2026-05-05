@@ -6,6 +6,7 @@ import (
 	"io"
 	iofs "io/fs"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path"
@@ -44,12 +45,43 @@ type Dependencies struct {
 	StorageService       *storage.StorageService
 	UserRepo             *users.UserRepository
 	AuthServiceClient    *auth.ServiceClient
+	// CORSMiddleware is a gin middleware for CORS. In production this should be
+	// a no-op since Nginx handles the headers; in development it should allow
+	// the Vite dev server origin.
+	CORSMiddleware gin.HandlerFunc
 }
 
 const globalRequestBodyLimitBytes int64 = 64 * 1024 * 1024
 
+// validateUploadFileHeader centralises the three-step upload validation:
+// 1. File size limit.
+// 2. Extension allow-list (lowercase, with leading dot).
+// 3. Magic bytes content check (prevents content-type spoofing).
+// On failure it writes an error response to c and returns ("", false).
+func validateUploadFileHeader(c *gin.Context, fh *multipart.FileHeader, maxBytes int64, allowedExts map[string]bool) (ext string, ok bool) {
+	if fh.Size > maxBytes {
+		response.Error(c, 400, fmt.Sprintf("文件大小不能超过 %dMB", maxBytes/1024/1024))
+		return "", false
+	}
+	ext = strings.ToLower(filepath.Ext(fh.Filename))
+	if !allowedExts[ext] {
+		allowed := make([]string, 0, len(allowedExts))
+		for e := range allowedExts {
+			allowed = append(allowed, strings.TrimPrefix(e, "."))
+		}
+		response.Error(c, 400, "仅支持 "+strings.Join(allowed, "/")+" 格式")
+		return "", false
+	}
+	if err := media.ValidateImageContent(fh, ext); err != nil {
+		response.Error(c, 400, err.Error())
+		return "", false
+	}
+	return ext, true
+}
+
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
 	r.Use(requestBodyLimitMiddleware(globalRequestBodyLimitBytes))
+	r.Use(deps.CORSMiddleware)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		response.Success(c, gin.H{"status": "ok"})
@@ -165,18 +197,7 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		if file.Size > 30*1024*1024 {
-			response.Error(c, 400, "文件大小不能超过 30MB")
-			return
-		}
-		ext := strings.ToLower(filepath.Ext(file.Filename))
-		allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true}
-		if !allowed[ext] {
-			response.Error(c, 400, "仅支持 JPG 和 PNG 格式")
-			return
-		}
-		if err := media.ValidateImageContent(file, ext); err != nil {
-			response.Error(c, 400, err.Error())
+		if _, ok := validateUploadFileHeader(c, file, 30*1024*1024, map[string]bool{".jpg": true, ".jpeg": true, ".png": true}); !ok {
 			return
 		}
 		userID := c.GetUint64("user_id")
@@ -320,6 +341,28 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			return
 		}
 
+		// Derive extension from Content-Type for magic bytes validation.
+		ctToExt := map[string]string{
+			"image/jpeg": ".jpg",
+			"image/png":  ".png",
+			"image/gif":  ".gif",
+			"image/webp": ".webp",
+		}
+		magicExt, knownType := ctToExt[strings.ToLower(contentType)]
+		if knownType {
+			header := make([]byte, 16)
+			if n, readErr := tmpFile.Read(header); readErr == nil && n > 0 {
+				if validateErr := media.ValidateImageBytes(header[:n], magicExt); validateErr != nil {
+					response.Error(c, 400, "文件内容与类型不匹配")
+					return
+				}
+			}
+			if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+				response.Error(c, 500, "读取临时文件失败")
+				return
+			}
+		}
+
 		c.Header("Content-Disposition", "attachment; filename=image.png")
 		c.Header("Content-Type", contentType)
 		c.Header("Content-Length", strconv.FormatInt(written, 10))
@@ -366,19 +409,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		if file.Size > 50*1024*1024 {
-			response.Error(c, 400, "文件大小不能超过 50MB")
-			return
-		}
-
-		ext := strings.ToLower(filepath.Ext(file.Filename))
-		allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
-		if !allowed[ext] {
-			response.Error(c, 400, "仅支持 jpg/png/gif/webp 格式")
-			return
-		}
-		if err := media.ValidateImageContent(file, ext); err != nil {
-			response.Error(c, 400, err.Error())
+		if _, ok := validateUploadFileHeader(c, file, 50*1024*1024, map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}); !ok {
 			return
 		}
 

@@ -208,8 +208,8 @@ func (c *Consumer) failTask(task *redis.GlobalQueueTask, accountID uint64, reaso
 }
 
 func (c *Consumer) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *redis.GlobalQueueTask) (string, error) {
-	log.Printf("[Consumer] 调用 API, 账号: %s, ChannelID: %d, ApiKey长度: %d",
-		account.Name, account.ChannelID, len(account.ApiKey))
+	log.Printf("[Consumer] 调用 API, 账号: %s, ChannelID: %d",
+		account.Name, account.ChannelID)
 
 	if account.ApiKey == "" {
 		return "", fmt.Errorf("账号 %s 的 API Key 为空", account.Name)

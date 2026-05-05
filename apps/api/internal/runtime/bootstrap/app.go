@@ -43,7 +43,7 @@ func Run(args []string) {
 		return
 	}
 
-	logFile, _ := os.OpenFile("server.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	logFile, _ := os.OpenFile("server.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if logFile != nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, logFile))
 	}
@@ -70,6 +70,9 @@ func Run(args []string) {
 	}
 
 	rdb := redis.NewRedis(cfg.Redis)
+	if err := rdb.Ping(context.Background()); err != nil {
+		log.Fatalf("[Main] Failed to connect to Redis: %v", err)
+	}
 	redisMgr := redis.NewRedisManager(rdb.GetClient())
 
 	userRepo := users.NewUserRepository(db)
@@ -119,6 +122,7 @@ func Run(args []string) {
 		StorageService:       storageService,
 		UserRepo:             userRepo,
 		AuthServiceClient:    authServiceClient,
+		CORSMiddleware:       buildCORSMiddleware(cfg.App.Env),
 	}, frontendFS)
 
 	consumer := worker.NewConsumer(accountRepo, channelRepo, taskRepo, redisMgr, storageService)
@@ -403,4 +407,30 @@ func isIgnorableDuplicateIndexError(err error) bool {
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
 	return strings.Contains(msg, "duplicate key name") ||
 		strings.Contains(msg, "error 1061")
+}
+
+// buildCORSMiddleware returns a Gin middleware for CORS handling.
+// In production, Nginx sets the required CORS headers so we return a no-op.
+// In non-production environments (local dev with Vite), the middleware sets
+// permissive CORS headers so the Vite dev server can call the API directly.
+func buildCORSMiddleware(appEnv string) gin.HandlerFunc {
+	if isProductionRuntime(appEnv) {
+		return func(c *gin.Context) { c.Next() }
+	}
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if origin == "" {
+			c.Next()
+			return
+		}
+		c.Header("Access-Control-Allow-Origin", origin)
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	}
 }

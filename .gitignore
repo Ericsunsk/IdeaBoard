@@ -47,4 +47,5 @@ release-temp/
 
 # ===== Temp Files =====
 other review.md
+apps/api/init_admin.sql
 
