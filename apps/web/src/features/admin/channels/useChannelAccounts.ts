@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import type { FormRules } from 'naive-ui'
 import accountApi, { type ApiAccount } from '../../../shared/api/account'
 import channelApi, { type Channel } from '../../../shared/api/channel'
 import { extractApiErrorMessage, splitCommaValues } from '../shared/assetLibraryShared'
@@ -89,15 +90,16 @@ export function useChannelAccounts(options: {
     return Array.from(allModels).map((m) => ({ label: m, value: m }))
   })
 
-  const accountRules = {
-    model_values: [{
-      required: true,
-      validator: (_rule: unknown, value: string[]) => {
-        return value && value.length > 0
+  const accountRules: FormRules = {
+    model_values: [
+      {
+        required: true,
+        type: 'array',
+        min: 1,
+        message: '请至少选择一个模型',
+        trigger: ['change', 'blur'],
       },
-      message: '请选择分配模型',
-      trigger: ['change', 'blur'],
-    }],
+    ],
   }
 
   function openAddAccountModal(channel: Channel) {

@@ -55,7 +55,6 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 		Type:   req.Type,
 		Name:   req.Name,
 		ApiURL: req.ApiURL,
-		Models: req.Models,
 		Status: 1,
 	}
 
@@ -89,7 +88,6 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 	channel.Type = req.Type
 	channel.Name = req.Name
 	channel.ApiURL = req.ApiURL
-	channel.Models = req.Models
 
 	if err := h.channelRepo.Update(channel); err != nil {
 		response.InternalError(c, 500, "更新渠道商失败", err)

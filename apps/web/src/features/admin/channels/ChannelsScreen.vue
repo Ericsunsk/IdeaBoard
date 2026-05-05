@@ -142,9 +142,6 @@
         <n-form-item label="Base URL地址" path="api_url">
           <n-input v-model:value="channelForm.api_url" placeholder="例如：https://api.example.com/v1" />
         </n-form-item>
-        <n-form-item label="渠道可用模型">
-          <n-dynamic-tags v-model:value="channelModelTags" :max="100" />
-        </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
@@ -207,9 +204,9 @@
 import { ref, onMounted, computed } from 'vue'
 import channelApi from '../../../shared/api/channel'
 import type { Channel } from '../../../shared/api/channel'
-import { NButton, NModal, NForm, NFormItem, NInput, NIcon, NSpace, NSelect, NGrid, NGi, NInputNumber, NSpin, NProgress, NDynamicTags, useMessage, useDialog } from 'naive-ui'
+import { NButton, NModal, NForm, NFormItem, NInput, NIcon, NSpace, NSelect, NGrid, NGi, NInputNumber, NSpin, NProgress, useMessage, useDialog } from 'naive-ui'
 import { AddOutline, RefreshOutline, SearchOutline } from '@vicons/ionicons5'
-import { extractApiErrorMessage, splitCommaValues, getModelCategoryClass } from '../shared/assetLibraryShared'
+import { extractApiErrorMessage, getModelCategoryClass } from '../shared/assetLibraryShared'
 import AdminCardHeader from '../shared/components/AdminCardHeader.vue'
 import AdminChip from '../shared/components/AdminChip.vue'
 import { useChannelAccounts } from './useChannelAccounts'
@@ -243,8 +240,6 @@ async function loadData() {
   }
 }
 
-// Model category class handled by shared utility getModelCategoryClass
-
 // Helpers
 function getChannelStatus(channel: Channel) {
   const accs = getChannelAccounts(channel.id)
@@ -268,8 +263,7 @@ const isEditChannel = ref(false)
 const channelFormRef = ref()
 const channelSaveLoading = ref(false)
 const currentChannelId = ref(0)
-const channelForm = ref({ type: 'banana', name: '', api_url: '', models: '' })
-const channelModelTags = ref<string[]>([])
+const channelForm = ref({ type: 'banana', name: '', api_url: '' })
 
 const channelRules = {
   name: [{ required: true, message: '请输入渠道商名称', trigger: 'blur' }],
@@ -278,16 +272,14 @@ const channelRules = {
 
 function openAddChannelModal() {
   isEditChannel.value = false
-  channelForm.value = { type: 'banana', name: '', api_url: '', models: '' }
-  channelModelTags.value = []
+  channelForm.value = { type: 'banana', name: '', api_url: '' }
   showChannelModal.value = true
 }
 
 function openEditChannelModal(row: Channel) {
   isEditChannel.value = true
   currentChannelId.value = row.id
-  channelForm.value = { type: row.type, name: row.name, api_url: row.api_url, models: row.models || '' }
-  channelModelTags.value = splitCommaValues(row.models)
+  channelForm.value = { type: row.type, name: row.name, api_url: row.api_url }
   showChannelModal.value = true
 }
 
@@ -295,7 +287,7 @@ async function handleSaveChannel() {
   try {
     await channelFormRef.value?.validate()
     channelSaveLoading.value = true
-    const submitData = { ...channelForm.value, models: channelModelTags.value.join(',') }
+    const submitData = { ...channelForm.value }
 
     if (isEditChannel.value) {
       await channelApi.update(currentChannelId.value, submitData)

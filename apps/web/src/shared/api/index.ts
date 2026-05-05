@@ -185,7 +185,6 @@ export interface Channel {
   type: string
   name: string
   api_url: string
-  models: string
   status: number
   created_at: string
   updated_at: string
@@ -195,7 +194,6 @@ export interface ChannelFormData {
   type: string
   name: string
   api_url: string
-  models: string
 }
 
 export const vectorizeApi = {

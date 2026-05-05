@@ -27,21 +27,3 @@ export function getModelCategoryClass(model: string): string {
   if (m.includes('sd') || m.includes('stable')) return 'is-cyan'
   return ''
 }
-
-/**
- * Model meta for charts and dashboards
- */
-export const ADMIN_MODEL_META = [
-  { label: 'DALLE', color: 'var(--admin-model-indigo)', key: 'indigo' },
-  { label: 'MJ', color: 'var(--admin-model-purple)', key: 'purple' },
-  { label: 'SD', color: 'var(--admin-model-cyan)', key: 'cyan' }
-]
-
-export function getChannelModelOptions(
-  channels: Array<{ id: number; models?: string | null }>,
-  channelId: number | null | undefined,
-) {
-  if (!channelId) return []
-  const channel = channels.find(item => item.id === channelId)
-  return splitCommaValues(channel?.models).map(model => ({ label: model, value: model }))
-}

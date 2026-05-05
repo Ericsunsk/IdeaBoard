@@ -31,7 +31,7 @@ type MonitorLike = {
   account_loads: Record<number, { current_concurrent: number; max_concurrent: number }>
 }
 
-type ChannelLike = { id: number; name: string; models: string }
+type ChannelLike = { id: number; name: string }
 type ConfiguredAccountLike = { model_set: string; platform: string; channel_id: number }
 
 export function useUsageStatisticsCharts(options: {
@@ -66,13 +66,6 @@ export function useUsageStatisticsCharts(options: {
         map.set(key, channelName)
       })
     })
-    options.configuredChannels.value.forEach((channel) => {
-      splitCommaValues(channel.models).forEach((model) => {
-        const key = normalizeModelName(model)
-        if (!key || map.has(key)) return
-        map.set(key, channel.name || '未配置渠道')
-      })
-    })
     return map
   })
 
@@ -81,14 +74,6 @@ export function useUsageStatisticsCharts(options: {
     const seen = new Set<string>()
     options.configuredAccounts.value.forEach((account) => {
       splitCommaValues(account.model_set).forEach((model) => {
-        const key = normalizeModelName(model)
-        if (!key || seen.has(key)) return
-        seen.add(key)
-        names.push(model)
-      })
-    })
-    options.configuredChannels.value.forEach((channel) => {
-      splitCommaValues(channel.models).forEach((model) => {
         const key = normalizeModelName(model)
         if (!key || seen.has(key)) return
         seen.add(key)

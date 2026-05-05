@@ -534,7 +534,7 @@ h3 {
   grid-column: 1 / -1;
 }
 
-.admin-page .n-data-table {
+.admin-route .n-data-table {
   --n-td-color: transparent;
   --n-th-color: #151618;
   --n-merged-td-color: transparent;
@@ -545,77 +545,86 @@ h3 {
   --n-th-color-modal: transparent;
 }
 
-.admin-page .n-data-table .n-data-table-th {
+.admin-route .n-data-table .n-data-table-th {
   font-weight: 600;
   font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.admin-page .n-data-table .n-data-table-tr:hover .n-data-table-td {
+.admin-route .n-data-table .n-data-table-tr:hover .n-data-table-td {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.admin-page .n-input,
-.admin-page .n-base-selection,
-.admin-page .n-input-number {
-  --n-color: #151618;
-  --n-color-focus: #151618;
-  --n-border: 1px solid #2b2c2f;
-  --n-border-hover: 1px solid #3a3b40;
-  --n-border-focus: 1px solid #3a3b40;
-  --n-box-shadow-focus: none;
-  --n-box-shadow-active: none;
-  --n-text-color: #f4f4f5;
-  --n-placeholder-color: #6b6b71;
-  border-radius: 12px;
+.admin-route .n-input,
+.admin-route .n-base-selection,
+.admin-route .n-input-number {
+  --n-color: #151618 !important;
+  --n-color-focus: #151618 !important;
+  --n-border: 1px solid #2b2c2f !important;
+  --n-border-hover: 1px solid #3a3b40 !important;
+  --n-border-focus: 1px solid #3a3b40 !important;
+  --n-border-active: 1px solid #3a3b40 !important;
+  --n-box-shadow-focus: none !important;
+  --n-box-shadow-active: none !important;
+  --n-box-shadow-hover: none !important;
+  --n-text-color: #f4f4f5 !important;
+  --n-placeholder-color: #6b6b71 !important;
+  border-radius: 12px !important;
 }
 
-.admin-page .n-input textarea,
-.admin-page .n-input input {
+.admin-route .n-base-selection .n-base-selection__state-border,
+.admin-route .n-input .n-input__state-border,
+.admin-route .n-input-number .n-input__state-border {
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.admin-route .n-input textarea,
+.admin-route .n-input input {
   color: #f4f4f5 !important;
 }
 
-.admin-page .n-input:hover,
-.admin-page .n-base-selection:hover,
-.admin-page .n-input-number:hover {
+.admin-route .n-input:hover,
+.admin-route .n-base-selection:hover,
+.admin-route .n-input-number:hover {
   box-shadow: none;
 }
 
-.admin-page .n-input.n-input--focus,
-.admin-page .n-base-selection.n-base-selection--focus,
-.admin-page .n-base-selection.n-base-selection--active,
-.admin-page .n-input-number.n-input-number--focus,
-.admin-page .n-input:focus,
-.admin-page .n-input:focus-visible,
-.admin-page .n-base-selection:focus,
-.admin-page .n-base-selection:focus-visible,
-.admin-page .n-input-number:focus,
-.admin-page .n-input-number:focus-visible {
+.admin-route .n-input.n-input--focus,
+.admin-route .n-base-selection.n-base-selection--focus,
+.admin-route .n-base-selection.n-base-selection--active,
+.admin-route .n-input-number.n-input-number--focus,
+.admin-route .n-input:focus,
+.admin-route .n-input:focus-visible,
+.admin-route .n-base-selection:focus,
+.admin-route .n-base-selection:focus-visible,
+.admin-route .n-input-number:focus,
+.admin-route .n-input-number:focus-visible {
   box-shadow: none !important;
   outline: none !important;
 }
 
-.admin-page .n-input .n-input-wrapper,
-.admin-page .n-base-selection .n-base-selection-label,
-.admin-page .n-input-number .n-input-wrapper {
+.admin-route .n-input .n-input-wrapper,
+.admin-route .n-base-selection .n-base-selection-label,
+.admin-route .n-input-number .n-input-wrapper {
   box-shadow: none !important;
 }
 
-.admin-page .n-button {
+.admin-route .n-button {
   --n-text-color: #e4e4e7;
   border-radius: 12px;
   transition: border-color 0.18s ease, background 0.18s ease;
 }
 
-.admin-page .n-button--default-type {
+.admin-route .n-button--default-type {
   --n-color: #17181a;
   --n-color-hover: #1b1c1f;
   --n-color-pressed: #151618;
   --n-border: 1px solid #2b2c2f;
 }
 
-.admin-page .n-button--primary-type {
+.admin-route .n-button--primary-type {
   --n-color: #f4f4f5;
   --n-color-hover: #ffffff;
   --n-color-pressed: #d4d4d8;
@@ -623,7 +632,7 @@ h3 {
   --n-text-color: #111111;
 }
 
-.admin-page .n-button--secondary-type:not(.n-button--warning-type):not(.n-button--error-type) {
+.admin-route .n-button--secondary-type:not(.n-button--warning-type):not(.n-button--error-type) {
   --n-color: rgba(255, 255, 255, 0.04);
   --n-color-hover: rgba(255, 255, 255, 0.08);
   --n-color-pressed: rgba(255, 255, 255, 0.12);
@@ -643,8 +652,8 @@ h3 {
 }
 
 /* Admin buttons should stay grayscale even when Naive UI inherits global primary purple tokens. */
-.admin-page .n-button--tertiary-type:not(.n-button--warning-type):not(.n-button--error-type),
-.admin-page .n-button--quaternary-type:not(.n-button--warning-type):not(.n-button--error-type) {
+.admin-route .n-button--tertiary-type:not(.n-button--warning-type):not(.n-button--error-type),
+.admin-route .n-button--quaternary-type:not(.n-button--warning-type):not(.n-button--error-type) {
   --n-color: rgba(255, 255, 255, 0.02);
   --n-color-hover: rgba(255, 255, 255, 0.06);
   --n-color-pressed: rgba(255, 255, 255, 0.1);
@@ -663,7 +672,7 @@ h3 {
   --n-text-color-disabled: #6b6b71;
 }
 
-.admin-page .n-button--text-type:not(.n-button--warning-type):not(.n-button--error-type) {
+.admin-route .n-button--text-type:not(.n-button--warning-type):not(.n-button--error-type) {
   --n-color: transparent;
   --n-color-hover: transparent;
   --n-color-pressed: transparent;
@@ -682,99 +691,99 @@ h3 {
   --n-text-color-disabled: #6b6b71;
 }
 
-.admin-page .n-button--warning-type {
+.admin-route .n-button--warning-type {
   --n-color: #f59e0b;
   --n-color-hover: #fbbf24;
   --n-color-pressed: #d97706;
   --n-text-color: #111111;
 }
 
-.admin-page .n-button--error-type {
+.admin-route .n-button--error-type {
   --n-color: #f43f5e;
   --n-color-hover: #fb7185;
   --n-color-pressed: #e11d48;
   --n-text-color: #ffffff;
 }
 
-.admin-page .n-switch {
+.admin-route .n-switch {
   --n-rail-color: #3f3f46;
   --n-rail-color-active: #f4f4f5;
   --n-box-shadow-focus: none;
   --n-box-shadow: none;
 }
 
-.admin-page .n-switch:focus,
-.admin-page .n-switch:focus-visible,
-.admin-page .n-switch.n-switch--focus,
-.admin-page .n-switch .n-switch__rail,
-.admin-page .n-switch .n-switch__button,
-.admin-page .n-button:focus,
-.admin-page .n-button:focus-visible,
-.admin-page .n-button.n-button--focus,
-.admin-page .n-checkbox:focus,
-.admin-page .n-checkbox:focus-visible,
-.admin-page .n-radio:focus,
-.admin-page .n-radio:focus-visible {
+.admin-route .n-switch:focus,
+.admin-route .n-switch:focus-visible,
+.admin-route .n-switch.n-switch--focus,
+.admin-route .n-switch .n-switch__rail,
+.admin-route .n-switch .n-switch__button,
+.admin-route .n-button:focus,
+.admin-route .n-button:focus-visible,
+.admin-route .n-button.n-button--focus,
+.admin-route .n-checkbox:focus,
+.admin-route .n-checkbox:focus-visible,
+.admin-route .n-radio:focus,
+.admin-route .n-radio:focus-visible {
   box-shadow: none !important;
   outline: none !important;
 }
 
-.admin-page .n-input .n-input__state-border,
-.admin-page .n-base-selection .n-base-selection__state-border,
-.admin-page .n-input-number .n-input__state-border,
-.admin-page .n-button .n-button__state-border,
-.admin-page .n-checkbox .n-checkbox-box,
-.admin-page .n-radio .n-radio__dot,
-.admin-page .n-radio-button .n-radio-button__state-border {
+.admin-route .n-input .n-input__state-border,
+.admin-route .n-base-selection .n-base-selection__state-border,
+.admin-route .n-input-number .n-input__state-border,
+.admin-route .n-button .n-button__state-border,
+.admin-route .n-checkbox .n-checkbox-box,
+.admin-route .n-radio .n-radio__dot,
+.admin-route .n-radio-button .n-radio-button__state-border {
   box-shadow: none !important;
 }
 
-.admin-page .n-button {
+.admin-route .n-button {
   --n-ripple-color: transparent;
 }
 
-.admin-page .n-menu-item-content:focus,
-.admin-page .n-menu-item-content:focus-visible,
-.admin-page .n-base-selection-menu .n-base-select-option:focus,
-.admin-page .n-base-selection-menu .n-base-select-option:focus-visible {
+.admin-route .n-menu-item-content:focus,
+.admin-route .n-menu-item-content:focus-visible,
+.admin-route .n-base-selection-menu .n-base-select-option:focus,
+.admin-route .n-base-selection-menu .n-base-select-option:focus-visible {
   box-shadow: none !important;
   outline: none !important;
 }
 
-.admin-page .n-tag {
+.admin-route .n-tag {
   --n-border-radius: 999px;
 }
 
-.admin-page .n-tag--info-type {
+.admin-route .n-tag--info-type {
   --n-color: rgba(255, 255, 255, 0.05);
   --n-border: 1px solid #2b2c2f;
   --n-text-color: #d4d4d8;
 }
 
-.admin-page .n-pagination .n-pagination-item,
-.admin-page .n-pagination .n-pagination-item--button {
+.admin-route .n-pagination .n-pagination-item,
+.admin-route .n-pagination .n-pagination-item--button {
   background: #17181a;
   border: 1px solid #2b2c2f;
   color: #d4d4d8;
 }
 
-.admin-page .n-pagination .n-pagination-item:not(.n-pagination-item--disabled):hover,
-.admin-page .n-pagination .n-pagination-item--button:not(.n-pagination-item--disabled):hover {
+.admin-route .n-pagination .n-pagination-item:not(.n-pagination-item--disabled):hover,
+.admin-route .n-pagination .n-pagination-item--button:not(.n-pagination-item--disabled):hover {
   border-color: #3a3b40;
   color: #f4f4f5;
 }
 
-.admin-page .n-card,
-.admin-page .n-modal {
+.admin-route .n-card,
+.admin-route .n-modal {
   --n-color: #141416;
   --n-border-color: #232326;
 }
 
-.admin-page .n-form-item-label__text {
+.admin-route .n-form-item-label__text {
   color: #d4d4d8;
 }
 
-.admin-page .n-pagination .n-pagination-item--active {
+.admin-route .n-pagination .n-pagination-item--active {
   background: #f4f4f5;
   border-color: #f4f4f5;
   color: #111111;
