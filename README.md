@@ -76,17 +76,17 @@ flowchart TB
     Worker --> Queue["Redis Queue"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / Kodo / S3"]
     Static --> Storage
 
-    style Browser fill:#f9f,stroke:#333,stroke-width:2px
-    style Nginx fill:#fff,stroke:#333,stroke-width:2px
-    style Auth fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style GoAPI fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style Static fill:#fff,stroke:#333,stroke-width:2px
-    style MySQL fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style Redis fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style Worker fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    style Queue fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    style AI fill:#f5f5f5,stroke:#616161,stroke-width:2px
-    style Storage fill:#f5f5f5,stroke:#616161,stroke-width:2px
+    style Browser fill:#f9f,stroke:#333,stroke-width:1px
+    style Nginx fill:#fff,stroke:#333,stroke-width:1px
+    style Auth fill:#e1f5fe,stroke:#01579b,stroke-width:1px
+    style GoAPI fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px
+    style Static fill:#fff,stroke:#333,stroke-width:1px
+    style MySQL fill:#fff3e0,stroke:#e65100,stroke-width:1px
+    style Redis fill:#ffebee,stroke:#c62828,stroke-width:1px
+    style Worker fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    style Queue fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    style AI fill:#f5f5f5,stroke:#616161,stroke-width:1px
+    style Storage fill:#f5f5f5,stroke:#616161,stroke-width:1px
 ```
 
 生产环境由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`，Go API 与 Better Auth Node Service 双服务拓扑运行。
