@@ -25,8 +25,6 @@
   <a href="#docs">相关文档</a>
 </p>
 
----
-
 <p align="center">
   <img src="https://img.shields.io/badge/web-Vue_3-42b883?style=flat-square&logo=vuedotjs&logoColor=white" alt="Web: Vue 3" />
   <img src="https://img.shields.io/badge/language-TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="Language: TypeScript" />
@@ -41,8 +39,6 @@
   <img src="https://img.shields.io/badge/cache-Redis_8.6-dc382d?style=flat-square&logo=redis&logoColor=white" alt="Cache: Redis 8.6" />
 </p>
 
----
-
 <a id="product-preview"></a>
 ## 产品预览
 
@@ -53,8 +49,6 @@
 <p align="center">
   <sub>统一画布工作流：输入、编辑、模型控制与输出回写在同一界面完成。</sub>
 </p>
-
----
 
 <a id="overview"></a>
 ## 项目概览
@@ -91,8 +85,6 @@ graph LR
 
 生产环境由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`，Go API 与 Better Auth Node Service 双服务拓扑运行。
 
----
-
 <a id="highlights"></a>
 ## 核心亮点
 
@@ -118,8 +110,6 @@ graph LR
     </td>
   </tr>
 </table>
-
----
 
 <a id="capabilities"></a>
 ## 能力范围
@@ -172,8 +162,6 @@ graph LR
 </table>
 
 更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。如需按 feature 配置管理后台系统提示词，可参考 [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)。
-
----
 
 <a id="quick-start"></a>
 ## 快速开始
@@ -295,8 +283,6 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 | `http://localhost:6000/api/health` | 后端健康检查 |
 | `http://localhost:6001/api/health` | Better Auth 健康检查 |
 
----
-
 ## 仓库结构
 
 ```text
@@ -313,8 +299,6 @@ IdeaBoard/
 └── *.md                      # README、DEVELOPMENT、DEPLOYMENT、CHANGELOG
 ```
 
----
-
 <a id="deployment"></a>
 ## 部署说明
 
@@ -330,8 +314,6 @@ IdeaBoard/
 
 运行拓扑见上方"系统架构"图。
 
----
-
 <a id="docs"></a>
 ## 相关文档
 
@@ -345,8 +327,6 @@ IdeaBoard/
 | [docker/README.md](./docker/README.md) | 本地依赖说明 |
 | [CHANGELOG.md](./CHANGELOG.md) | 发布记录 |
 
----
-
 ## 验证建议
 
 上线前建议至少确认：
@@ -357,8 +337,6 @@ IdeaBoard/
 4. 管理员可登录后台。
 5. 图片上传与结果回写正常。
 6. 任务提交后能看到完整状态流转。
-
----
 
 <p align="center">
   <sub>本项目为闭源私有项目，未经授权不得复制、分发或使用。保留所有权利。</sub>
