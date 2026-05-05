@@ -1,36 +1,28 @@
 # ===== Frontend =====
-frontend/node_modules/
-frontend/dist/
-frontend/.vscode/
 apps/web/node_modules/
 apps/web/dist/
 apps/web/.vscode/
 apps/auth/node_modules/
 apps/auth/dist/
 
-# ===== Backend =====
-backend/*.exe
-backend/*.exe~
-backend/feng-server
-backend/feng-server~
-backend/feng-server-linux
-backend/uploads/
-backend/*.log
-backend/test_upload.png
-backend/bin/
-backend/web/dist/*
-!backend/web/dist/.placeholder
+# ===== Backend (Go API) =====
 apps/api/*.exe
 apps/api/*.exe~
-apps/api/feng-server
-apps/api/feng-server~
-apps/api/feng-server-linux
-apps/api/uploads/
+apps/api/ideaboard-server
+apps/api/ideaboard-server~
+apps/api/ideaboard-server-linux
+apps/api/uploads/*
+!apps/api/uploads/.placeholder
 apps/api/*.log
 apps/api/test_upload.png
 apps/api/bin/
 apps/api/web/dist/*
 !apps/api/web/dist/.placeholder
+
+# ===== Go Specific =====
+apps/api/coverage.out
+apps/api/debug
+apps/api/debug.test
 
 # ===== OS / IDE =====
 .DS_Store
@@ -45,7 +37,6 @@ Thumbs.db
 # ===== Env / Secrets =====
 .env
 .env.*
-!backend/.env.example
 !apps/api/.env.example
 !apps/auth/.env.example
 
@@ -53,3 +44,7 @@ Thumbs.db
 release/
 release-temp/
 .cache/
+
+# ===== Temp Files =====
+other review.md
+
