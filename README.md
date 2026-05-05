@@ -66,21 +66,46 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 ### 系统架构
 
 ```mermaid
-graph LR
-  Browser[浏览器] --> Nginx[Nginx 反向代理]
-  Nginx -->|/api/auth/*| Auth[Better Auth Service<br/>Node.js :6001]
-  Nginx -->|/api/*| GoAPI[Go API<br/>Gin :6000]
-  Nginx -->|/uploads/*| Static[静态文件]
+graph TB
+  subgraph 客户端
+    Browser([浏览器])
+  end
 
-  GoAPI --> MySQL[(MySQL 8)]
-  GoAPI --> Redis[(Redis 8.6)]
+  subgraph 边缘层
+    Nginx[Nginx 反向代理<br/>:80 / :443]
+  end
+
+  subgraph 应用层
+    Auth[Better Auth Service<br/>Node.js :6001]
+    GoAPI[Go API<br/>Gin :6000]
+  end
+
+  subgraph 数据层
+    MySQL[(MySQL 8)]
+    Redis[(Redis 8.6)]
+  end
+
+  subgraph 执行层
+    Worker[Worker 消费者]
+  end
+
+  subgraph 外部依赖
+    Channel[上游 AI 渠道]
+    Storage[对象存储<br/>Local / Kodo / S3]
+  end
+
+  Browser --> Nginx
+  Nginx -->|/api/auth/*| Auth
+  Nginx -->|/api/*| GoAPI
+  Nginx -->|/uploads/*| Storage
+
   Auth --> MySQL
   Auth --> Redis
-
-  GoAPI --> Worker[Worker 消费者]
-  Worker --> Queue[Redis Queue]
-  Worker --> Channel[上游 AI 渠道]
-  Worker --> Storage[对象存储<br/>Local / Kodo / S3]
+  GoAPI --> MySQL
+  GoAPI --> Redis
+  GoAPI --> Worker
+  Worker --> Channel
+  Worker --> Storage
 ```
 
 生产环境由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`，Go API 与 Better Auth Node Service 双服务拓扑运行。
