@@ -64,6 +64,8 @@
 | Auth 入口文件 | `apps/auth/dist/index.js` |
 
 <a id="release-artifact"></a>
+---
+
 ## 发布产物
 
 标准发布包由以下脚本生成：
@@ -107,6 +109,8 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 └── DEPLOYMENT.md
 ```
 
+---
+
 ## 前置条件
 
 服务器建议满足：
@@ -128,6 +132,8 @@ sudo apt install -y potrace
 > 如果发行版仓库里的 Node.js 版本低于 20，请通过 NodeSource、nvm 或你的标准运维镜像安装 Node.js 20+。
 
 <a id="install-flow"></a>
+---
+
 ## 安装流程
 
 ### 1. 下载并校验发布包
@@ -215,6 +221,8 @@ sudo systemctl status redis-server --no-pager
 如果你的系统服务名是 `redis`，请替换为对应名称。
 
 <a id="runtime-config"></a>
+---
+
 ## 运行配置
 
 ### 1. 配置后端环境变量
@@ -337,6 +345,8 @@ server_name _;
 
 替换为真实域名。
 
+---
+
 ## 验证清单
 
 后端健康检查：
@@ -368,6 +378,8 @@ curl http://127.0.0.1/api/health
 6. `/uploads/*` 可以访问。
 7. 任务提交后能看到状态流转与结果落地。
 
+---
+
 ## 运维命令
 
 重启后端与认证服务：
@@ -397,6 +409,8 @@ nginx -t && systemctl reload nginx
 ```
 
 <a id="upgrade-and-rollback"></a>
+---
+
 ## 升级与回滚
 
 ### 升级

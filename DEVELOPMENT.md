@@ -38,7 +38,7 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 |------|----------|
 | 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
 | 后端 | `Go` + `Gin` + `GORM` + `Better Auth (Node.js/TypeScript)` |
-| 基础设施 | `MySQL 8.0+`、`Redis 7+` |
+| 基础设施 | `MySQL 8.0+`、`Redis 8.6+` |
 | 本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
 | 当前主链 | 画布节点编排 -> 任务提交 -> Worker 执行 -> 结果回写 |
 | 技术标识 | `ideaboard-*` |
@@ -92,6 +92,8 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - Worker 异步执行与结果持久化
 - 每日统计聚合（事件源去重 + 回填）与运营仪表盘 API
 
+---
+
 <a id="workflow-contract"></a>
 ## 工作流契约
 
@@ -136,6 +138,8 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 
 它们不进入 `feature_prompt:<slug>` 模板链，也不属于 workflow feature contract 的 active slug 集合。审计 prompt 系统或 admin 配置页时，不要把这类直连工具误当成 workflow feature 漏斗的一部分。
 
+---
+
 <a id="task-lifecycle"></a>
 ## 任务生命周期
 
@@ -176,6 +180,8 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - [engine.go](./apps/api/internal/prompts/engine.go)
 - [consumer.go](./apps/api/internal/runtime/worker/consumer.go)
 
+---
+
 ## 提示词系统
 
 系统提示词由后台配置项 `feature_prompt:<slug>` 驱动，支持 `{{变量}}` 模板语法。
@@ -207,6 +213,8 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - 管理页：[FeaturePromptConfigScreen.vue](./apps/web/src/features/admin/prompt-config/FeaturePromptConfigScreen.vue)
 - 后端装配：[engine.go](./apps/api/internal/prompts/engine.go)
 
+---
+
 ## 鉴权与会话
 
 系统采用 `Better Auth session + Go 业务授权模型`：
@@ -230,6 +238,8 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - [client.ts](./apps/web/src/shared/auth/client.ts)
 - [user.ts](./apps/web/src/app/stores/user.ts)
 
+---
+
 <a id="local-dev-fast-path"></a>
 ## 本地开发快速路径
 
@@ -240,7 +250,7 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 | Node.js | `20+` |
 | Go | `1.25+` |
 | MySQL | `8.0+` |
-| Redis | `7+` |
+| Redis | `8.6+` |
 
 ### 启动步骤
 
@@ -309,6 +319,8 @@ go run ./cmd init-admin
 >
 > `init-admin` 会调用 auth service 确保 Better Auth 存在 `admin` 账号，并绑定/创建本地 admin profile；执行该命令前请先启动 `apps/auth`。
 
+---
+
 ## 验证矩阵
 
 ### 前端
@@ -337,6 +349,8 @@ go build ./...
 - 提示词模板
 - 管理后台配置
 
+---
+
 ## 环境变量
 
 | 变量名 | 默认值 | 说明 |
@@ -356,6 +370,8 @@ go build ./...
 | `AUTH_SERVICE_TIMEOUT_SECONDS` | `5` | Go 调用 auth service 的超时秒数 |
 | `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |
 | `DB_LOG_MODE` | `warn` | GORM 日志等级，可选 `silent/error/warn/info` |
+
+---
 
 <a id="repo-map"></a>
 ## 仓库目录图
@@ -379,8 +395,10 @@ apps/api/
 ├── internal/platform/         # config、database、redis、response、safehttp
 ├── internal/runtime/          # bootstrap、http 路由、worker
 ├── internal/auth/             # 鉴权中间件与 auth service client
+├── internal/autherrors/       # 错误码定义
 ├── internal/users/            # 用户管理
 ├── internal/accounts/         # 账号池与任务调度
+├── internal/boards/           # 画板管理
 ├── internal/channels/         # 渠道管理
 ├── internal/tasks/            # 任务模型与状态
 ├── internal/workflow/         # feature contract
@@ -394,6 +412,8 @@ apps/auth/
 ├── src/index.ts               # /api/auth/* 与 /internal/* 路由
 └── .env.example               # auth 服务环境变量模板
 ```
+
+---
 
 ## 维护规则
 

@@ -2,7 +2,9 @@
 
 `docker/` 目录用于本地开发时快速启动 `MySQL + Redis`。生产环境请使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的部署方式。
 
-## 1. 快速启动
+---
+
+## 快速启动
 
 ```bash
 cd docker
@@ -22,7 +24,9 @@ docker compose logs -f mysql
 docker compose logs -f redis
 ```
 
-## 2. 服务说明
+---
+
+## 服务说明
 
 ### MySQL
 
@@ -36,10 +40,11 @@ docker compose logs -f redis
 | 默认业务用户 | `${MYSQL_USER:-ideaboard}` |
 | 默认业务密码 | `${MYSQL_PASSWORD:-ideaboard123}` |
 
-补充：
+> [!NOTE]
+> compose 已显式固定 `platform: linux/amd64`，便于 Apple Silicon 环境直接运行。
 
-- compose 已显式固定 `platform: linux/amd64`，便于 Apple Silicon 环境直接运行。
-- compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
+> [!TIP]
+> compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
 
 ### Redis
 
@@ -51,7 +56,9 @@ docker compose logs -f redis
 | 持久化 | `appendonly yes` |
 | 默认密码 | `${REDIS_PASSWORD:-无}` |
 
-## 3. 连接信息
+---
+
+## 连接信息
 
 ### MySQL
 
@@ -82,35 +89,27 @@ GUI 客户端：
 - Port：`6379`
 - Password：若设置了 `REDIS_PASSWORD`，客户端也必须同步填写；后端请同步配置 `REDIS_AUTH`
 
-## 4. 常用操作
+---
 
-启动：
+## 常用操作
 
 ```bash
+# 启动
 docker compose up -d
-```
 
-停止：
-
-```bash
+# 停止
 docker compose down
-```
 
-重启：
-
-```bash
+# 重启
 docker compose restart
 ```
 
-删除容器和卷：
+> [!CAUTION]
+> `docker compose down -v` 会删除容器和数据卷，清空本地开发数据。仅在明确要重置环境时使用。
 
-```bash
-docker compose down -v
-```
+---
 
-该命令会清空本地开发数据，仅在你明确要重置环境时使用。
-
-## 5. 常见问题
+## 常见问题
 
 ### `docker-compose: command not found`
 

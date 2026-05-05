@@ -25,17 +25,23 @@
   <a href="#docs">相关文档</a>
 </p>
 
+---
+
 <p align="center">
   <img src="https://img.shields.io/badge/web-Vue_3-42b883?style=flat-square&logo=vuedotjs&logoColor=white" alt="Web: Vue 3" />
   <img src="https://img.shields.io/badge/language-TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="Language: TypeScript" />
   <img src="https://img.shields.io/badge/ui-Naive_UI-18a058?style=flat-square" alt="UI: Naive UI" />
   <img src="https://img.shields.io/badge/state-Pinia-ffd859?style=flat-square&logo=pinia&logoColor=1f2937" alt="State: Pinia" />
+  <br/>
   <img src="https://img.shields.io/badge/api-Go-00add8?style=flat-square&logo=go&logoColor=white" alt="API: Go" />
   <img src="https://img.shields.io/badge/framework-Gin-008ecf?style=flat-square" alt="Framework: Gin" />
   <img src="https://img.shields.io/badge/orm-GORM-1f6feb?style=flat-square" alt="ORM: GORM" />
+  <br/>
   <img src="https://img.shields.io/badge/database-MySQL_8-4479a1?style=flat-square&logo=mysql&logoColor=white" alt="Database: MySQL 8" />
   <img src="https://img.shields.io/badge/cache-Redis_8.6-dc382d?style=flat-square&logo=redis&logoColor=white" alt="Cache: Redis 8.6" />
 </p>
+
+---
 
 <a id="product-preview"></a>
 ## 产品预览
@@ -59,68 +65,127 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 
 | 维度 | 当前配置 |
 |------|----------|
-| 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
-| 后端 | `Go` + `Gin` + `GORM` + `Better Auth (Node.js/TypeScript)` |
-| 基础设施 | `MySQL 8.0+`、`Redis 7+` |
 | 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
 | 运行方式 | 本地开发、标准 Linux 部署（Nginx + systemd + 双服务） |
 | 核心界面 | 用户画布工作台、画板管理、管理后台 |
 
-### 运行链路
+### 系统架构
 
-```text
-画布界面
-  -> API / Auth / Upload
-  -> 任务提交
-  -> Redis Queue
-  -> Worker 调度
-  -> 上游 AI 渠道
-  -> 结果持久化
+```mermaid
+graph LR
+  Browser[浏览器] --> Nginx[Nginx 反向代理]
+  Nginx -->|/api/auth/*| Auth[Better Auth Service<br/>Node.js :6001]
+  Nginx -->|/api/*| GoAPI[Go API<br/>Gin :6000]
+  Nginx -->|/uploads/*| Static[静态文件]
+
+  GoAPI --> MySQL[(MySQL 8)]
+  GoAPI --> Redis[(Redis 8.6)]
+  Auth --> MySQL
+  Auth --> Redis
+
+  GoAPI --> Worker[Worker 消费者]
+  Worker --> Queue[Redis Queue]
+  Worker --> Channel[上游 AI 渠道]
+  Worker --> Storage[对象存储<br/>Local / Kodo / S3]
 ```
+
+生产环境由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`，Go API 与 Better Auth Node Service 双服务拓扑运行。
+
+---
 
 <a id="highlights"></a>
 ## 核心亮点
 
 <table>
   <tr>
-    <td valign="top" width="25%">
+    <td valign="top" width="50%">
       <strong>画布工作流</strong><br/>
       以节点编排为中心，统一管理输入、连接、执行与结果回写。
     </td>
-    <td valign="top" width="25%">
+    <td valign="top" width="50%">
       <strong>任务运行时</strong><br/>
       任务异步执行，支持队列调度、账号池分发与状态轮询。
     </td>
-    <td valign="top" width="25%">
+  </tr>
+  <tr>
+    <td valign="top">
       <strong>提示词系统</strong><br/>
       支持按 feature 维度配置系统提示词与模板变量。
     </td>
-    <td valign="top" width="25%">
+    <td valign="top">
       <strong>管理控制台</strong><br/>
       管理用户、账号、渠道、统计仪表盘、线稿模式、提示词与配置项。
     </td>
   </tr>
 </table>
 
+---
+
 <a id="capabilities"></a>
 ## 能力范围
 
 当前产品主链路覆盖以下能力：
 
-| 能力类别 | 示例能力 |
-|----------|----------|
-| 设计生成 | 线稿成款、款式创新、图案生成 |
-| 编辑调整 | 局部改款、换背景、换脸、双图融合 |
-| 色彩与材质 | 多色配色、定向换色、上身贴合 |
-| 展示与视角 | 单视角展示、商品展示 |
-| 后处理 | 高清增强、画布延伸 |
-| 运营统计 | 每日调用聚合、模型消耗占比、用户排行、健康热力图、历史回填 |
-| 存储接入 | 本地存储、Kodo、S3-compatible 对象存储 |
+<table>
+  <tr>
+    <td valign="top" width="33%">
+      <strong>设计生成</strong><br/>
+      线稿成款、款式创新、图案生成
+    </td>
+    <td valign="top" width="33%">
+      <strong>编辑调整</strong><br/>
+      局部改款、换背景、换脸、双图融合
+    </td>
+    <td valign="top" width="33%">
+      <strong>色彩与材质</strong><br/>
+      多色配色、定向换色、上身贴合
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <strong>展示与视角</strong><br/>
+      单视角展示、商品展示
+    </td>
+    <td valign="top">
+      <strong>后处理</strong><br/>
+      高清增强、画布延伸
+    </td>
+    <td valign="top">
+      <strong>运营统计</strong><br/>
+      调用聚合、模型占比、健康热力图
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <strong>存储接入</strong><br/>
+      本地存储、Kodo、S3-compatible
+    </td>
+    <td valign="top">
+      <strong>身份认证</strong><br/>
+      登录、注册、会话、角色、封禁
+    </td>
+    <td valign="top">
+      <strong>任务调度</strong><br/>
+      队列、账号池、失败重试、模型解析
+    </td>
+  </tr>
+</table>
 
 更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。如需按 feature 配置管理后台系统提示词，可参考 [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)。
 
+---
+
 <a id="quick-start"></a>
 ## 快速开始
+
+### 环境要求
+
+| 组件 | 版本 |
+|------|------|
+| Node.js | `20+` |
+| Go | `1.25+` |
+| MySQL | `8.0+` |
+| Redis | `8.6+` |
 
 ### 1. 启动本地依赖
 
@@ -129,7 +194,8 @@ cd docker
 docker compose up -d
 ```
 
-默认本地依赖：
+<details>
+<summary>默认本地依赖配置</summary>
 
 | 项目 | 默认值 |
 |------|--------|
@@ -139,10 +205,10 @@ docker compose up -d
 | 业务密码 | `ideaboard123` |
 | Redis | `127.0.0.1:6379` |
 
-说明：
+</details>
 
-- `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 MySQL / Redis 直接暴露到外网。
-- 若你需要 Redis 密码，可在 `docker/.env` 中设置 `REDIS_PASSWORD`，并在 `apps/api/.env` 中同步设置 `REDIS_AUTH`。
+> [!NOTE]
+> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 MySQL / Redis 直接暴露到外网。若你需要 Redis 密码，可在 `docker/.env` 中设置 `REDIS_PASSWORD`，并在 `apps/api/.env` 中同步设置 `REDIS_AUTH`。
 
 ### 2. 配置后端环境
 
@@ -151,7 +217,8 @@ cd apps/api
 cp .env.example .env
 ```
 
-至少确认数据库、Redis、端口以及 `AUTH_SERVICE_BASE_URL / AUTH_SERVICE_INTERNAL_KEY` 配置正确；`.env.example` 里的敏感字段是占位值，不应直接用于部署。
+> [!TIP]
+> 至少确认数据库、Redis、端口以及 `AUTH_SERVICE_BASE_URL` / `AUTH_SERVICE_INTERNAL_KEY` 配置正确。`.env.example` 里的敏感字段是占位值，不应直接用于部署。
 
 如果后端放在 Nginx / 宝塔等反向代理后面，建议额外设置：
 
@@ -171,13 +238,17 @@ npm run migrate
 npm run dev
 ```
 
+> [!IMPORTANT]
 > 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（生产环境执行 `npm --prefix apps/auth run migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。
 
-Auth 服务建议额外确认：
+<details>
+<summary>Auth 服务能力说明</summary>
 
 - 身份侧高级管理入口：后台 `用户管理` 页。
 - 当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销、开放注册开关、防刷限流设置。
 - 仍不开放：后台改密；彻底注销必须经由 Go Admin API 编排，不允许前端直连 Better Auth 删除身份数据。
+
+</details>
 
 ### 4. 启动后端（Go API）
 
@@ -194,10 +265,13 @@ npm install
 npm run dev
 ```
 
-开发环境代理说明：
+<details>
+<summary>开发环境代理说明</summary>
 
 - `apps/web/vite.config.ts` 已将 `/api/auth` 代理到 `http://localhost:6001`
 - 其余 `/api/*` 与 `/uploads/*` 仍代理到 `http://localhost:6000`
+
+</details>
 
 ### 6. 初始化管理员账号
 
@@ -206,10 +280,11 @@ cd apps/api
 INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 ```
 
-管理员初始化：
-
 - 用户名：`admin`
 - 密码：由 `INIT_ADMIN_PASSWORD` 指定
+
+> [!IMPORTANT]
+> `init-admin` 会调用 auth service 确保 Better Auth 存在 `admin` 账号，并绑定/创建本地 admin profile。执行该命令前请先启动 `apps/auth`。
 
 ### 本地访问地址
 
@@ -220,22 +295,25 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 | `http://localhost:6000/api/health` | 后端健康检查 |
 | `http://localhost:6001/api/health` | Better Auth 健康检查 |
 
+---
+
 ## 仓库结构
 
 ```text
 IdeaBoard/
 ├── apps/
 │   ├── web/                  # Vue 3 前端与管理后台
+│   │   └── src/features/     # 业务模块（workspace、admin、profile 等）
 │   ├── auth/                 # Better Auth 服务（登录/注册/session）
 │   └── api/                  # Go API、任务、Worker、服务逻辑
+│       └── internal/         # 领域包（accounts、channels、users、workflow 等）
 ├── docs/                     # 架构约束与补充文档
 ├── docker/                   # 本地 MySQL / Redis 依赖
 ├── scripts/                  # 打包与部署脚本
-├── README.md                 # 项目首页
-├── DEVELOPMENT.md            # 开发手册
-├── DEPLOYMENT.md             # 标准 Linux 部署
-└── CHANGELOG.md              # 发布记录
+└── *.md                      # README、DEVELOPMENT、DEPLOYMENT、CHANGELOG
 ```
+
+---
 
 <a id="deployment"></a>
 ## 部署说明
@@ -250,16 +328,15 @@ IdeaBoard/
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
-### 运行拓扑
+运行拓扑见上方"系统架构"图。
 
-生产环境采用 Go API 与 Better Auth Node Service 双服务拓扑，并由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`。
+---
 
 <a id="docs"></a>
 ## 相关文档
 
 | 文档 | 用途 |
 |------|------|
-| [README.md](./README.md) | 项目首页与快速启动 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 架构、contract、本地开发与目录边界 |
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) | Feature System Prompt 配置手册与推荐模板 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | 标准 Linux 部署、升级与回滚 |
@@ -267,6 +344,8 @@ IdeaBoard/
 | [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 目录边界与命名约束 |
 | [docker/README.md](./docker/README.md) | 本地依赖说明 |
 | [CHANGELOG.md](./CHANGELOG.md) | 发布记录 |
+
+---
 
 ## 验证建议
 
@@ -279,8 +358,8 @@ IdeaBoard/
 5. 图片上传与结果回写正常。
 6. 任务提交后能看到完整状态流转。
 
-## 权利声明
+---
 
-本项目为闭源私有项目，未经授权不得复制、分发或使用。
-
-`保留所有权利。`
+<p align="center">
+  <sub>本项目为闭源私有项目，未经授权不得复制、分发或使用。保留所有权利。</sub>
+</p>
