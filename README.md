@@ -66,46 +66,30 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 ### 系统架构
 
 ```mermaid
-graph TB
-  subgraph 客户端
-    Browser([浏览器])
-  end
+graph LR
+  Browser([浏览器]) --> Nginx[Nginx 反向代理]
+  Nginx -->|/api/auth/*| Auth[Better Auth<br/>:6001]
+  Nginx -->|/api/*| API[Go API<br/>:6000]
+  Nginx -->|/uploads/*| OSS[对象存储]
 
-  subgraph 边缘层
-    Nginx[Nginx 反向代理<br/>:80 / :443]
-  end
+  API --> DB[(MySQL)]
+  API --> Cache[(Redis)]
+  API --> Worker[Worker]
+  Auth --> DB
+  Auth --> Cache
 
-  subgraph 应用层
-    Auth[Better Auth Service<br/>Node.js :6001]
-    GoAPI[Go API<br/>Gin :6000]
-  end
+  Worker --> AI[上游 AI 渠道]
+  Worker --> OSS
 
-  subgraph 数据层
-    MySQL[(MySQL 8)]
-    Redis[(Redis 8.6)]
-  end
-
-  subgraph 执行层
-    Worker[Worker 消费者]
-  end
-
-  subgraph 外部依赖
-    Channel[上游 AI 渠道]
-    Storage[对象存储<br/>Local / Kodo / S3]
-  end
-
-  Browser --> Nginx
-  Nginx -->|/api/auth/*| Auth
-  Nginx -->|/api/*| GoAPI
-  Nginx -->|/uploads/*| Storage
-
-  Auth --> MySQL
-  Auth --> Redis
-  GoAPI --> MySQL
-  GoAPI --> Redis
-  GoAPI --> Worker
-  Worker --> Channel
-  Worker --> Storage
+  style Browser fill:#3b82f6,stroke:#2563eb,color:#fff
+  style Nginx fill:#8b5cf6,stroke:#7c3aed,color:#fff
+  style Auth fill:#10b981,stroke:#059669,color:#fff
+  style API fill:#10b981,stroke:#059669,color:#fff
+  style DB fill:#f59e0b,stroke:#d97706,color:#fff
+  style Cache fill:#ef4444,stroke:#dc2626,color:#fff
+  style Worker fill:#6366f1,stroke:#4f46e5,color:#fff
+  style AI fill:#64748b,stroke:#475569,color:#fff
+  style OSS fill:#64748b,stroke:#475569,color:#fff
 ```
 
 生产环境由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`，Go API 与 Better Auth Node Service 双服务拓扑运行。
