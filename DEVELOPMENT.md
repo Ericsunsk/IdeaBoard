@@ -78,6 +78,7 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 | `/user/boards` | 画板列表 |
 | `/user/center` | 用户中心 |
 | `/admin/*` | 管理后台 |
+| `/admin/statistics` | 运营统计仪表盘（调用趋势、模型占比、健康热力图） |
 
 ### 后端职责
 
@@ -89,6 +90,7 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - 系统提示词模板读取与变量替换
 - 分割、超分、向量化、上传与对象存储
 - Worker 异步执行与结果持久化
+- 每日统计聚合（事件源去重 + 回填）与运营仪表盘 API
 
 <a id="workflow-contract"></a>
 ## 工作流契约
@@ -363,6 +365,12 @@ apps/web/src/
 ├── app/                       # 入口、router、store 装配
 ├── pages/                     # 路由级容器
 ├── features/                  # 领域模块
+│   └── admin/
+│       ├── statistics/        # 统计仪表盘（composables + CSS + 主屏）
+│       ├── channels/          # 渠道商卡片 + useChannelAccounts
+│       ├── users/             # 用户管理
+│       ├── shared/            # admin 公共 CSS、组件、monitorShared
+│       └── ...
 ├── shared/                    # 共享 API、UI、types、utils、assets
 └── config/                    # 仅保留跨 feature 运行配置
 

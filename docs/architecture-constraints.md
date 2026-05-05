@@ -35,3 +35,11 @@
 - 前端：`cd apps/web && npm run build`
 - 后端：`cd apps/api && go test ./... && go build ./...`
 - 跨层改动默认同时验证前后端。
+
+## 统计数据模型
+
+- `TaskStatEvent` 按 `task_id` 去重，保证同一任务只计数一次。
+- `TaskDailyStat` 按 `(stat_date, model_name, user_key)` upsert 聚合。
+- `TaskDailyStatBackfill` 标记某日期已完成历史扫描，避免重复回填。
+- 回填逻辑：首次查询缺失日期时扫描 tasks 表终态记录，逐条 upsert。
+- 前端统计 API 返回 `backfill_status`，由前端决定是否触发补录。

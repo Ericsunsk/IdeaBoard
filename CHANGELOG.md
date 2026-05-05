@@ -2,6 +2,50 @@
 
 本文档记录 IdeaBoard 的正式发布变更。
 
+## v0.2.0 - 2026-05-05
+
+管理后台统计系统、渠道商重构与后端性能优化。
+
+### 统计仪表盘
+
+- 新增运营统计页面（`/admin/statistics`），支持 7 天 / 30 天 / 1 年维度切换。
+- 每日统计聚合：按 (日期, 模型, 用户) 维度汇总调用量、成功/失败数、延迟。
+- 事件源去重：`TaskStatEvent` 按 `task_id` 幂等，`TaskDailyStat` 按唯一键 upsert。
+- 历史回填：部署前任务通过 `TaskDailyStatBackfill` 标记按天扫描补录。
+- 统计 API 支持回填状态返回 + 独立回填触发端点。
+- 健康热力图按天分桶，模型消耗占比环形图，用户排行。
+
+### 渠道商与账号重构
+
+- 渠道商页面从表格重构为卡片式布局，账号管理内嵌到渠道商卡片。
+- 提取 `useChannelAccounts` composable，账号 CRUD、表单、模型检测逻辑独立。
+- 移除渠道级 `models` 字段，模型完全归属 API Key 账号。
+- 模型检测改为后端代理（`POST /admin/channels/detect-models`），含 SSRF 防护。
+- 账号模型必选校验恢复（`min: 1`）。
+
+### 后端优化
+
+- Provider-agnostic 模型解析：多模型账号自动选择匹配模型。
+- `FailRunningByAccountID` 整体事务化，upsert 失败回滚。
+- `UpsertDailyStatByTask` 懒 fallback：result 含 model 时跳过 DB 查询。
+- `GetStatistics` 3 次 daily stats 查询合并为 1 次。
+- 关键词长度截断（200 字符）防止查询退化。
+
+### 前端优化
+
+- Admin CSS 选择器从 `:deep()` 迁移到 `.admin-route` body 级 class。
+- 统一 `--admin-danger` token，移除重复 `--admin-error`。
+- 调用量趋势图表溢出裁剪（`area-chart-clipped`）。
+- 年线 x-axis 仅显示月首标签（~12 个）。
+- Tooltip 边缘自适应（`is-left-edge` / `is-right-edge`）。
+
+### 移除
+
+- `AccountsScreen.vue`、`MonitorScreen.vue`、`monitorMeta.ts` 及对应页面 wrapper。
+- 渠道级 `models` 字段（Channel 模型、请求类型、前端表单、统计 fallback）。
+
+---
+
 ## v0.1.0 - 2026-04-26
 
 首个发布版基线，提供完整的 AI 画布工作流、后台运营配置、身份认证与标准 Linux 部署能力。

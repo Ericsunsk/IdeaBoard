@@ -97,7 +97,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
     </td>
     <td valign="top" width="25%">
       <strong>管理控制台</strong><br/>
-      管理用户、账号、渠道、线稿模式、提示词与配置项。
+      管理用户、账号、渠道、统计仪表盘、线稿模式、提示词与配置项。
     </td>
   </tr>
 </table>
@@ -114,6 +114,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 | 色彩与材质 | 多色配色、定向换色、上身贴合 |
 | 展示与视角 | 单视角展示、商品展示 |
 | 后处理 | 高清增强、画布延伸 |
+| 运营统计 | 每日调用聚合、模型消耗占比、用户排行、健康热力图、历史回填 |
 | 存储接入 | 本地存储、Kodo、S3-compatible 对象存储 |
 
 更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。如需按 feature 配置管理后台系统提示词，可参考 [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)。
