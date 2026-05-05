@@ -66,60 +66,27 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 ### 系统架构
 
 ```mermaid
-graph TD
-  %% Client Layer
-  subgraph Client [客户端]
-    Browser([浏览器 / Web App])
-  end
+flowchart TB
+    Browser(["浏览器 / Web App"]) --> Nginx["Nginx 反向代理"]
+    Nginx -- /api/auth/* --> Auth["Better Auth Service<br>Node.js :6001"]
+    Nginx -- /api/* --> GoAPI["Go API<br>Gin :6000"]
+    Nginx -- /uploads/* --> Static["静态资源服务<br>/uploads/*"]
+    Auth --> MySQL[("MySQL 8.0")] & Redis[("Redis 8.6")]
+    GoAPI --> MySQL & Redis & Worker["Worker 消费者"]
+    Worker --> Queue["Redis Queue"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / Kodo / S3"]
+    Static --> Storage
 
-  %% Gateway Layer
-  subgraph Gateway [流量入口]
-    Nginx[Nginx 反向代理]
-  end
-
-  %% Logic Layer
-  subgraph Services [核心服务]
-    Auth[Better Auth Service<br/>Node.js :6001]
-    GoAPI[Go API<br/>Gin :6000]
-    Static[静态资源服务<br/>/uploads/*]
-  end
-
-  %% Persistence Layer
-  subgraph Persistence [持久化与缓存]
-    MySQL[(MySQL 8.0)]
-    Redis[(Redis 8.6)]
-  end
-
-  %% Async Layer
-  subgraph Execution [任务执行]
-    Worker[Worker 消费者]
-    Queue[Redis Queue]
-  end
-
-  %% Cloud/Storage Layer
-  subgraph External [外部资源 / 存储]
-    AI[上游 AI 渠道]
-    Storage[对象存储<br/>Local / Kodo / S3]
-  end
-
-  %% Traffic Flow
-  Browser --> Nginx
-  Nginx -->|/api/auth/*| Auth
-  Nginx -->|/api/*| GoAPI
-  Nginx -->|/uploads/*| Static
-
-  %% Data Flow
-  Auth --> MySQL
-  Auth --> Redis
-  GoAPI --> MySQL
-  GoAPI --> Redis
-
-  %% Task Flow
-  GoAPI --> Worker
-  Worker --> Queue
-  Worker --> AI
-  Worker --> Storage
-  Static --> Storage
+    style Browser fill:#f9f,stroke:#333,stroke-width:2px
+    style Nginx fill:#fff,stroke:#333,stroke-width:2px
+    style Auth fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style GoAPI fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Static fill:#fff,stroke:#333,stroke-width:2px
+    style MySQL fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Redis fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style Worker fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style Queue fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style AI fill:#f5f5f5,stroke:#616161,stroke-width:2px
+    style Storage fill:#f5f5f5,stroke:#616161,stroke-width:2px
 ```
 
 生产环境由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`，Go API 与 Better Auth Node Service 双服务拓扑运行。
