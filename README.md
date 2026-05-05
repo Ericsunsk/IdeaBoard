@@ -120,19 +120,6 @@ graph TD
   Worker --> AI
   Worker --> Storage
   Static --> Storage
-
-  %% Styling
-  style Browser fill:#f9f,stroke:#333,stroke-width:2px
-  style Nginx fill:#fff,stroke:#333,stroke-width:2px
-  style Auth fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-  style GoAPI fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-  style MySQL fill:#fff3e0,stroke:#e65100,stroke-width:2px
-  style Redis fill:#ffebee,stroke:#c62828,stroke-width:2px
-  style Worker fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-  style Queue fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-  style Static fill:#fff,stroke:#333,stroke-width:2px
-  style AI fill:#f5f5f5,stroke:#616161,stroke-width:2px
-  style Storage fill:#f5f5f5,stroke:#616161,stroke-width:2px
 ```
 
 生产环境由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`，Go API 与 Better Auth Node Service 双服务拓扑运行。
