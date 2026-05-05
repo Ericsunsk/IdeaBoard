@@ -44,17 +44,21 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 
 ### 架构形态
 
-```text
-浏览器
-  -> Vite / 前端 SPA
-  -> Better Auth Service (apps/auth)
-  -> Gin API
-  -> MySQL (users / tasks / configs / accounts)
-  -> Redis (task queue)
-  -> Worker 消费者
-  -> 上游 AI 渠道
-  -> Kodo / 本地上传目录
+```mermaid
+graph LR
+    Browser["浏览器 (SPA)"] --> Vite["Vite / 前端"]
+    Browser --> Auth["Better Auth (apps/auth)"]
+    Browser --> Gin["Gin API (Go)"]
+    
+    Gin --> MySQL[("MySQL")]
+    Gin --> Redis[("Redis Queue")]
+    Auth --> MySQL
+    
+    Redis --> Worker["Worker 消费者"]
+    Worker --> AI["上游 AI 渠道"]
+    Worker --> Storage["Kodo / 本地 OSS"]
 ```
+
 
 ## 职责边界
 
@@ -163,13 +167,31 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 
 ### 后端流程
 
-1. 标准化 `feature` 与关键参数。
-2. 基于系统提示词模板生成最终 prompt。
-3. 写入任务表并推入 Redis 队列。
-4. Worker 从队列消费任务并调度可用账号。
-5. 调用上游渠道商接口。
-6. 将结果持久化到对象存储或本地上传目录。
-7. 更新任务状态并返回给前端轮询。
+```mermaid
+sequenceDiagram
+    participant FE as 前端
+    participant API as Go API
+    participant DB as MySQL/Redis
+    participant WK as Worker
+    participant AI as AI 渠道
+
+    FE->>API: 提交任务 (feature + prompt)
+    API->>API: 标准化参数 & 模板装配
+    API->>DB: 写入任务表 & 推入队列
+    API-->>FE: 返回任务 ID (开始轮询)
+    
+    DB->>WK: 消费任务
+    WK->>WK: 调度可用账号
+    WK->>AI: 调用接口
+    AI-->>WK: 返回结果
+    WK->>WK: 持久化存储 (OSS/Local)
+    WK->>DB: 更新状态为 Success/Failed
+    
+    FE->>API: 轮询状态
+    API->>DB: 查询
+    DB-->>FE: 返回最终结果
+```
+
 
 关键代码：
 

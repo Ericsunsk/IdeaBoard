@@ -35,19 +35,35 @@
 
 ### 目标拓扑
 
-```text
-互联网
-  -> Nginx :80
-    -> apps/web/dist
-    -> /api/auth proxy
-      -> ideaboard-auth :6001
-        -> MySQL
-    -> /api /uploads proxy
-      -> ideaboard-server :6000
-        -> MySQL
-        -> Redis
-        -> OSS / 上游 AI 渠道
+```mermaid
+graph TD
+    User((互联网)) --> Nginx["Nginx (:80)"]
+    
+    subgraph "前端静态资源"
+        Nginx --> Web["apps/web/dist"]
+    end
+    
+    subgraph "后端服务 (systemd)"
+        Nginx -- "/api/auth" --> Auth["ideaboard-auth (:6001)"]
+        Nginx -- "/api /uploads" --> Server["ideaboard-server (:6000)"]
+    end
+    
+    subgraph "基础设施"
+        Auth --> MySQL[(MySQL)]
+        Server --> MySQL
+        Server --> Redis[(Redis)]
+        Server --> OSS["OSS / 上游 AI 渠道"]
+    end
+
+    style User fill:#f9f,stroke:#333
+    style Nginx fill:#fff,stroke:#333
+    style Web fill:#e1f5fe,stroke:#01579b
+    style Auth fill:#e8f5e9,stroke:#2e7d32
+    style Server fill:#e8f5e9,stroke:#2e7d32
+    style MySQL fill:#fff3e0,stroke:#e65100
+    style Redis fill:#ffebee,stroke:#c62828
 ```
+
 
 ### 当前约定
 
