@@ -22,7 +22,6 @@
   <a href="#repo-map">目录边界</a>
 </p>
 
----
 
 > [!IMPORTANT]
 > 本文档仅供 IdeaBoard 授权成员内部使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
@@ -92,7 +91,6 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - Worker 异步执行与结果持久化
 - 每日统计聚合（事件源去重 + 回填）与运营仪表盘 API
 
----
 
 <a id="workflow-contract"></a>
 ## 工作流契约
@@ -138,7 +136,6 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 
 它们不进入 `feature_prompt:<slug>` 模板链，也不属于 workflow feature contract 的 active slug 集合。审计 prompt 系统或 admin 配置页时，不要把这类直连工具误当成 workflow feature 漏斗的一部分。
 
----
 
 <a id="task-lifecycle"></a>
 ## 任务生命周期
@@ -180,7 +177,6 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - [engine.go](./apps/api/internal/prompts/engine.go)
 - [consumer.go](./apps/api/internal/runtime/worker/consumer.go)
 
----
 
 ## 提示词系统
 
@@ -213,7 +209,6 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - 管理页：[FeaturePromptConfigScreen.vue](./apps/web/src/features/admin/prompt-config/FeaturePromptConfigScreen.vue)
 - 后端装配：[engine.go](./apps/api/internal/prompts/engine.go)
 
----
 
 ## 鉴权与会话
 
@@ -238,7 +233,6 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 - [client.ts](./apps/web/src/shared/auth/client.ts)
 - [user.ts](./apps/web/src/app/stores/user.ts)
 
----
 
 <a id="local-dev-fast-path"></a>
 ## 本地开发快速路径
@@ -319,7 +313,6 @@ go run ./cmd init-admin
 >
 > `init-admin` 会调用 auth service 确保 Better Auth 存在 `admin` 账号，并绑定/创建本地 admin profile；执行该命令前请先启动 `apps/auth`。
 
----
 
 ## 验证矩阵
 
@@ -349,7 +342,6 @@ go build ./...
 - 提示词模板
 - 管理后台配置
 
----
 
 ## 环境变量
 
@@ -371,7 +363,6 @@ go build ./...
 | `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |
 | `DB_LOG_MODE` | `warn` | GORM 日志等级，可选 `silent/error/warn/info` |
 
----
 
 <a id="repo-map"></a>
 ## 仓库目录图
@@ -413,7 +404,6 @@ apps/auth/
 └── .env.example               # auth 服务环境变量模板
 ```
 
----
 
 ## 维护规则
 

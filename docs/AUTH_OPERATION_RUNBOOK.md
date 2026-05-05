@@ -2,7 +2,6 @@
 
 本文档定义 `Go/Vue 管理后台` 与 `Better Auth Admin plugin` 的职责边界，避免在账号与安全操作上出现重复实现和误操作。
 
----
 
 ## 目标
 
@@ -10,7 +9,6 @@
 - 身份与安全侧动作优先走 Better Auth 生态能力；高风险跨库动作由 Go Admin API 编排，避免前端直连删除身份数据。
 - 出现异常时有一致的处理路径和审计口径。
 
----
 
 ## 职责分工
 
@@ -38,7 +36,6 @@
 > [!NOTE]
 > 暂不在内嵌 UI 暴露：后台改密。未开放的高风险动作应走受控身份运维流程，并在明确审计要求后再扩展 UI。
 
----
 
 ## 操作准则
 
@@ -53,7 +50,6 @@
 
 4. **高风险动作保留审计记录。** 建议记录操作人、时间、原因、影响用户与回滚策略。
 
----
 
 ## 推荐流程
 
@@ -84,7 +80,6 @@
 3. Go Admin API 会先调用 Auth Service `/internal/users/:id` 删除身份记录、会话与凭据；Auth 删除失败时不会继续删除业务侧数据。
 4. 若业务侧清理失败，按接口错误与服务日志进行补偿处理，避免重复手工删除造成二次漂移。
 
----
 
 ## 上线与安全基线
 
@@ -96,7 +91,6 @@
 - 定期检查后台"防刷限流设置"与 `system_configs`（`auth_rate_limit_window`、`auth_rate_limit_max_requests`）是否符合流量规模。
 - 启用 Admin plugin 后先执行迁移：开发环境 `npm --prefix apps/auth run migrate`，生产环境 `npm --prefix apps/auth run migrate:dist`。
 
----
 
 ## 关联文档
 

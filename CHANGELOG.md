@@ -44,7 +44,6 @@
 - `AccountsScreen.vue`、`MonitorScreen.vue`、`monitorMeta.ts` 及对应页面 wrapper。
 - 渠道级 `models` 字段（Channel 模型、请求类型、前端表单、统计 fallback）。
 
----
 
 ## v0.1.0 - 2026-04-26
 

@@ -22,7 +22,6 @@
   <a href="#upgrade-and-rollback">升级回滚</a>
 </p>
 
----
 
 > [!IMPORTANT]
 > 本文档仅供 IdeaBoard 授权成员在内部部署与运维场景下使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
@@ -64,7 +63,6 @@
 | Auth 入口文件 | `apps/auth/dist/index.js` |
 
 <a id="release-artifact"></a>
----
 
 ## 发布产物
 
@@ -109,7 +107,6 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 └── DEPLOYMENT.md
 ```
 
----
 
 ## 前置条件
 
@@ -132,7 +129,6 @@ sudo apt install -y potrace
 > 如果发行版仓库里的 Node.js 版本低于 20，请通过 NodeSource、nvm 或你的标准运维镜像安装 Node.js 20+。
 
 <a id="install-flow"></a>
----
 
 ## 安装流程
 
@@ -221,7 +217,6 @@ sudo systemctl status redis-server --no-pager
 如果你的系统服务名是 `redis`，请替换为对应名称。
 
 <a id="runtime-config"></a>
----
 
 ## 运行配置
 
@@ -345,7 +340,6 @@ server_name _;
 
 替换为真实域名。
 
----
 
 ## 验证清单
 
@@ -378,7 +372,6 @@ curl http://127.0.0.1/api/health
 6. `/uploads/*` 可以访问。
 7. 任务提交后能看到状态流转与结果落地。
 
----
 
 ## 运维命令
 
@@ -409,7 +402,6 @@ nginx -t && systemctl reload nginx
 ```
 
 <a id="upgrade-and-rollback"></a>
----
 
 ## 升级与回滚
 

@@ -2,7 +2,6 @@
 
 `docker/` 目录用于本地开发时快速启动 `MySQL + Redis`。生产环境请使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的部署方式。
 
----
 
 ## 快速启动
 
@@ -24,7 +23,6 @@ docker compose logs -f mysql
 docker compose logs -f redis
 ```
 
----
 
 ## 服务说明
 
@@ -56,7 +54,6 @@ docker compose logs -f redis
 | 持久化 | `appendonly yes` |
 | 默认密码 | `${REDIS_PASSWORD:-无}` |
 
----
 
 ## 连接信息
 
@@ -89,7 +86,6 @@ GUI 客户端：
 - Port：`6379`
 - Password：若设置了 `REDIS_PASSWORD`，客户端也必须同步填写；后端请同步配置 `REDIS_AUTH`
 
----
 
 ## 常用操作
 
@@ -107,7 +103,6 @@ docker compose restart
 > [!CAUTION]
 > `docker compose down -v` 会删除容器和数据卷，清空本地开发数据。仅在明确要重置环境时使用。
 
----
 
 ## 常见问题
 
