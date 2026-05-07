@@ -1149,29 +1149,6 @@ async function onCanvasDrop(event: DragEvent) {
   }
 }
 
-function appendMessageFlowNode(item: CanvasImageItem) {
-  const historyBefore = flowHistory.capture()
-  const data: FlowNodeData = {
-    kind: 'message',
-    title: `Message #${item.id}`,
-    summary: 'Canvas message image',
-    inputPorts: [],
-    outputPorts: [],
-    snapshotNode: item,
-  }
-  const nextNode: FlowAdapterNode = {
-    id: `message-${item.id}`,
-    type: 'canvas',
-    dragHandle: resolveFlowNodeDragHandle('message'),
-    position: { x: item.x, y: item.y },
-    data,
-  }
-  ;(nodes.value as unknown as FlowAdapterNode[]).push(nextNode)
-  flowHistory.push(historyBefore)
-  markDirty()
-  refreshSnapshot()
-}
-
 function onFlowMessageContextMenu(nodeId: string, event: MouseEvent) {
   applyFlowNodeSelection(nodeId, event)
   activeMessageActionNodeId.value = nodeId
@@ -1265,6 +1242,7 @@ function onFlowMessageDirectAction(
 const {
   onFlowImageAppendToCanvas,
   onFlowImageDisplayDragStart,
+  appendMessageFlowNode,
   onFlowMessageImageDragStart,
   onFlowMessageResizeMouseDown,
 } = useFlowMessageImageInteractions({

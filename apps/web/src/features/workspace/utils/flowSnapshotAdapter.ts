@@ -97,7 +97,7 @@ function parseFlowNodeId(nodeId: string): { nodeType: CanvasConnectionNodeType |
   if (dashIndex <= 0) return null
   const prefix = nodeId.slice(0, dashIndex)
   const idPart = nodeId.slice(dashIndex + 1)
-  if (!/^\d+$/.test(idPart)) return null
+  if (!/^\d+(?:\.\d+)?$/.test(idPart)) return null
   const parsedId = Number(idPart)
   if (!Number.isFinite(parsedId)) return null
   return { nodeType: prefix as CanvasConnectionNodeType | 'message', id: parsedId }
