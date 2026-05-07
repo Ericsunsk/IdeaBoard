@@ -63,9 +63,12 @@ func (r *BoardRepository) ListAccessibleByUserID(userID uint64) ([]BoardWithRole
 
 func (r *BoardRepository) GetByBoardID(boardID string) (*UserBoard, error) {
 	var board UserBoard
-	err := r.db.Where("board_id = ?", boardID).First(&board).Error
-	if err != nil {
-		return nil, err
+	tx := r.db.Where("board_id = ?", boardID).Limit(1).Find(&board)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	if tx.RowsAffected == 0 {
+		return nil, gorm.ErrRecordNotFound
 	}
 	return &board, nil
 }

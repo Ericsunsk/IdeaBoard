@@ -574,9 +574,17 @@ export function collectCanvasBoardImageUrls(snapshot: CanvasBoardSnapshot | null
   })
 
   snapshot.maskNodes.forEach((node) => {
-    const normalized = `${node.sourceImageUrl ?? ''}`.trim()
-    if (normalized) {
-      urls.add(normalized)
+    const sourceImageUrl = `${node.sourceImageUrl ?? ''}`.trim()
+    if (sourceImageUrl) {
+      urls.add(sourceImageUrl)
+    }
+    const executionMaskDataUrl = `${node.executionMaskDataUrl ?? ''}`.trim()
+    if (executionMaskDataUrl) {
+      urls.add(executionMaskDataUrl)
+    }
+    const maskDataUrl = `${node.maskDataUrl ?? ''}`.trim()
+    if (maskDataUrl) {
+      urls.add(maskDataUrl)
     }
   })
 

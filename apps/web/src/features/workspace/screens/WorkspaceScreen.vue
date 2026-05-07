@@ -1,22 +1,7 @@
 <template>
-  <div 
-    class="canvas-layout" 
-    :class="{
-      'copy-mode': isDuplicateModifierPressed && activeTool === 'select',
-      'interaction-lite': isCanvasInteractionActive,
-    }"
-    ref="canvasLayoutRef"
-    :style="canvasStyle" 
-    @mousedown="onCanvasMouseDown"
-    @contextmenu="onCanvasContextMenu"
-    @dragover.prevent="isDraggingFile = true"
-    @dragleave="isDraggingFile = false"
-    @drop="handleDrop"
-  >
-    <!-- ① 无限画布背景层 -->
-    <div class="canvas-grid" :class="{ 'grid-dragging': isDraggingFile }"></div>
+  <div class="canvas-layout" :class="`tool-${activeTool}`" @mousedown.self="closeBoardHeaderEditing">
+    <div class="canvas-grid" :style="canvasGridStyle"></div>
 
-    <!-- ② 顶部悬浮栏 -->
     <HomeCanvasHeader
       :current-board-name="currentBoardName"
       :board-options="boardOptions"
@@ -25,85 +10,145 @@
       :is-renaming-board="isRenamingBoard"
       :board-name-draft="boardNameDraft"
       :set-board-name-input-ref="setBoardNameInputRef"
-      :export-disabled="selectedIds.length === 0"
+      :export-disabled="!hasSelectedFlowNodes"
       :avatar-url="userStore.user?.avatar"
       @update:board-name-draft="boardNameDraft = $event"
       @toggle-board-menu="toggleBoardMenu"
       @start-board-rename="startBoardRename"
       @cancel-board-rename="cancelBoardRename"
-      @confirm-board-rename="confirmBoardRename"
-      @select-board="handleBoardSelect"
-      @export="handleExport"
-      @open-center="navigateAway('/user/center')"
+      @confirm-board-rename="onConfirmBoardRename"
+      @select-board="onSelectBoard"
+      @export="onExportSelectedImages"
+      @open-center="onNavigateRequest('/user/center')"
     />
 
-    <!-- 框选视觉矩形 -->
-    <div 
-      v-if="isSelecting" 
-      class="selection-marquee"
-      :style="{
-        left: Math.min(selectionRect.x1, selectionRect.x2) + 'px',
-        top: Math.min(selectionRect.y1, selectionRect.y2) + 'px',
-        width: Math.abs(selectionRect.x2 - selectionRect.x1) + 'px',
-        height: Math.abs(selectionRect.y2 - selectionRect.y1) + 'px'
-      }"
-    ></div>
-
-    <!-- ③ 左侧工具栏 -->
     <aside class="floating-toolbar">
-      <div class="tool-item" :class="{ active: activeTool === 'select' }" title="Select (V)" @click="activeTool = 'select'">
+      <div class="tool-item" :class="{ active: activeTool === 'select' }" title="Select (V)" @click="setActiveTool('select')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
       </div>
-      <div class="tool-item" :class="{ active: activeTool === 'hand' }" title="Hand (H)" @click="activeTool = 'hand'">
+      <div class="tool-item" :class="{ active: activeTool === 'hand' }" title="Hand (H)" @click="setActiveTool('hand')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v10"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
       </div>
-      <div class="tool-item" :class="{ active: activeTool === 'text' }" title="Text (T)" @click="activeTool = 'text'">
+      <div class="tool-item" :class="{ active: activeTool === 'text' }" title="Text (T)" @click="setActiveTool('text')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
       </div>
       <div class="toolbar-divider"></div>
-      <!-- 业务入口 -->
-      <div 
-        class="tool-item" 
-        v-for="t in tools" 
-        :key="t.title" 
-        :class="{ active: route.path === t.path }" 
-        :title="t.title" 
-        @click="navigateAway(t.path)"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" v-html="t.icon"></svg>
-      </div>
+      <button v-if="isDev" type="button" class="tool-item debug-toggle" title="Debug" @click="debugPanelOpen = !debugPanelOpen">D</button>
     </aside>
 
-    <!-- ④ 底部指令栏 -->
+    <div
+      ref="canvasWrapRef"
+      class="workspace-flow-canvas-wrap"
+      @dragover.prevent="onCanvasDragOver"
+      @drop.prevent="onCanvasDrop"
+    >
+      <VueFlow
+        v-model:nodes="nodes"
+        v-model:edges="edges"
+        fit-view-on-init
+        :pan-on-drag="activeTool === 'hand'"
+        :nodes-draggable="activeTool !== 'hand'"
+        :nodes-connectable="activeTool !== 'hand'"
+        :elements-selectable="activeTool !== 'hand'"
+        :select-nodes-on-drag="activeTool === 'select'"
+        :selection-key-code="activeTool === 'select' ? 'Shift' : false"
+        :multi-selection-key-code="activeTool === 'select' ? 'Shift' : null"
+        :default-edge-options="{ animated: false }"
+        :is-valid-connection="isValidConnection"
+        @connect="onConnect"
+        @move-start="closeBoardHeaderEditing"
+        @move="onFlowMove"
+        @node-click="onFlowNodeClick"
+        @node-drag-start="onNodeDragStart"
+        @node-drag-stop="onNodeDragStop"
+        @nodes-initialized="onFlowNodesInitialized"
+        @pane-click="onPaneClick"
+        @pane-context-menu="onPaneContextMenu"
+      >
+        <template #node-canvas="nodeProps">
+          <FlowCanvasNode
+            :data="nodeProps.data"
+            :selected="!!nodeProps.selected"
+            :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
+            :mask-source-image-url="getFlowMaskEffectiveSourceCached(nodeProps.id).url"
+            :mask-source-image-ratio="getFlowMaskEffectiveSourceCached(nodeProps.id).ratio"
+            :mask-has-connected-image-input="getFlowMaskEffectiveSourceCached(nodeProps.id).hasConnectedImageInput"
+            :message-action-visible="activeMessageActionNodeId === nodeProps.id"
+            :message-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
+            :show-style-strength-control="flowShowStyleStrengthControl && activeMessageActionNodeId === nodeProps.id"
+            :style-innovate-strength-pct="flowStyleInnovateStrength"
+            :set-style-strength-track-ref="setFlowStyleStrengthTrackRef"
+            @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
+            @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
+            @color-apply-preset="(value) => onFlowColorApplyPreset(nodeProps.id, value)"
+            @color-remove="(index) => onFlowColorRemove(nodeProps.id, index)"
+            @color-add="(value) => onFlowColorAdd(nodeProps.id, value)"
+            @mask-toggle-invert="() => onFlowMaskToggleInvert(nodeProps.id)"
+            @delete-node="() => onFlowDeleteNode(nodeProps.id)"
+            @generate-edit="() => onFlowEditGenerate(nodeProps.id)"
+            @generate-enhance="() => onFlowEnhanceGenerate(nodeProps.id)"
+            @generate-color="() => onFlowColorGenerate(nodeProps.id)"
+            @generate-fusion="() => onFlowFusionGenerate(nodeProps.id)"
+            @generate-wear="() => onFlowWearGenerate(nodeProps.id)"
+            @generate-model="() => onFlowModelGenerate(nodeProps.id)"
+            @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
+            @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
+            @image-open-file="() => onFlowImageOpenFile(nodeProps.id)"
+            @image-append-to-canvas="() => onFlowImageAppendToCanvas(nodeProps.id)"
+            @image-display-dragstart="(event) => onFlowImageDisplayDragStart(nodeProps.id, event)"
+            @image-reset="() => onFlowImageReset(nodeProps.id)"
+            @message-image-dragstart="(event) => onFlowMessageImageDragStart(nodeProps.id, event)"
+            @message-resize-mousedown="(payload) => onFlowMessageResizeMouseDown(nodeProps.id, payload)"
+            @mask-open-file="() => onFlowMaskOpenFile(nodeProps.id)"
+            @mask-clear-image="() => onFlowMaskClearImage(nodeProps.id)"
+            @mask-stage-drop="(event) => onFlowMaskStageDrop(nodeProps.id, event)"
+            @mask-canvas-mousedown="(event) => onFlowMaskCanvasMouseDown(nodeProps.id, event)"
+            @mask-clear-mask="() => onFlowMaskClearMask(nodeProps.id)"
+            @mask-set-canvas-ref="(element) => onFlowMaskSetCanvasRef(nodeProps.id, element)"
+            @node-mousedown="(event) => onFlowNodeMouseDown(nodeProps.id, event)"
+            @message-contextmenu="(event) => onFlowMessageContextMenu(nodeProps.id, event)"
+            @message-action="(action) => onFlowMessageDirectAction(nodeProps.id, action)"
+            @style-innovate-mousedown="onFlowStyleInnovateMouseDown"
+            @style-strength-track-mousedown="onFlowStyleStrengthTrackMouseDown"
+            @request-internals-update="() => scheduleFlowNodeInternalsRefresh([nodeProps.id])"
+          />
+        </template>
+      </VueFlow>
+      <WorkspaceNodeContextMenu
+        :visible="nodeContextMenu.visible"
+        :x="nodeContextMenu.x"
+        :y="nodeContextMenu.y"
+        :items="canvasNodeMenuItems"
+        @create="handleNodeContextMenuCreate"
+      />
+    </div>
+
     <HomeBottomGenerateBar
-      :show-settings="showSettings"
-      :ratio-options="patternGenerateRatioOptions"
-      :quality-options="patternGenerateQualityOptions"
-      :selected-ratio="selectedRatio"
-      :selected-quality="selectedQuality"
-      :selected-preview-items="selectedPreviewItems"
-      :user-prompt="userPrompt"
-      :prompt-placeholder="promptPlaceholder"
-      :has-direct-prompt="hasDirectPrompt"
-      :direct-generating="directGenerating"
-      @toggle-settings="showSettings = !showSettings"
-      @select-ratio="selectedRatio = $event"
-      @select-quality="selectedQuality = $event"
-      @clear-selected="clearSelectedIds"
-      @focus-selected="focusSelectedItem"
-      @remove-selected="removeSelectedId"
-      @update:user-prompt="userPrompt = $event"
-      @generate="handleGenerate"
+      class="workspace-flow-bottom-bar"
+      :show-settings="flowPromptShowSettings"
+      :ratio-options="flowPromptRatioOptions"
+      :quality-options="flowPromptQualityOptions"
+      :selected-ratio="flowPromptRatio"
+      :selected-quality="flowPromptQuality"
+      :selected-preview-items="[]"
+      :user-prompt="flowPromptText"
+      :prompt-placeholder="flowPromptPlaceholder"
+      :has-direct-prompt="false"
+      :direct-generating="false"
+      :disabled="true"
+      @toggle-settings="flowPromptShowSettings = !flowPromptShowSettings"
+      @select-ratio="flowPromptRatio = $event"
+      @select-quality="flowPromptQuality = $event"
+      @update:user-prompt="flowPromptText = $event"
     />
 
-    <!-- ⑤ 右下角控件 -->
     <div class="floating-status">
       <div class="zoom-controls">
-        <button class="zoom-btn" @click="updateCanvasZoom(-10)">−</button>
+        <button class="zoom-btn" @click="onZoomOut">−</button>
         <span class="zoom-level">{{ zoomLevel }}%</span>
-        <button class="zoom-btn" @click="updateCanvasZoom(10)">+</button>
+        <button class="zoom-btn" @click="onZoomIn">+</button>
       </div>
-      <button class="logo-btn" title="返回画布列表" @click="navigateAway('/user/boards')">
+      <button class="logo-btn" title="返回画布列表" @click="onNavigateRequest('/user/boards')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="16" y1="12" x2="6" y2="12" />
           <polyline points="10 8 6 12 10 16" />
@@ -128,2297 +173,1419 @@
       </div>
     </div>
 
-    <div
-      v-if="nodeContextMenu.visible"
-      class="node-context-menu"
-      :style="{ left: `${nodeContextMenu.x}px`, top: `${nodeContextMenu.y}px` }"
-      @mousedown.stop
-      @click.stop
-    >
-      <button
-        v-for="item in canvasNodeMenuItems"
-        :key="item.key"
-        type="button"
-        class="node-context-item"
-        @click="handleNodeMenuAction(item.actionKey)"
-      >
-        {{ item.label }}
-      </button>
-    </div>
-
-    <HomeCanvasConnectionLayer
-      :rendered-connections="renderedConnections"
-      :selected-connection-id="selectedConnectionId"
-      :hidden-connection-id="reconnectingConnectionId"
-      :draft-connection-path="draftConnectionPath"
-      :draft-connection-kind="draftConnectionKind"
-      :draft-connection-tone="draftConnectionTone"
-      @path-mousedown="onConnectionPathMouseDown"
-    />
-
-    <!-- ⑥ 内容展示区 -->
-    <div class="canvas-content">
-      <HomeCanvasNodesBasic
-        :image-nodes="visibleImageNodes"
-        :prompt-nodes="visiblePromptNodes"
-        :copy-mode="nodeCopyMode"
-        :is-node-selected="isNodeSelected"
-        :is-node-dragging="isNodeDragging"
-        :get-image-node-ui-state="getImageNodeUiState"
-        :get-prompt-node-ui-state="getPromptNodeUiState"
-        :get-image-node-stage-height="getImageNodeStageHeight"
-        :get-resolved-image-node-display="getResolvedImageNodeDisplay"
-        @image-node-mousedown="(event, node) => onImageNodeMouseDown(event, node)"
-        @image-port-mousedown="onImageNodePortMouseDown"
-        @image-delete="deleteImageNode"
-        @image-stage-drop="(event, node) => onImageNodeStageDrop(event, node)"
-        @image-open-file="openImageNodeFilePicker"
-        @image-append-to-canvas="appendImageNodeDisplayToCanvas"
-        @image-reset="resetImageNode"
-        @image-display-dragstart="(event, node) => onImageNodeDisplayDragStart(event, node)"
-        @prompt-node-mousedown="(event, node) => onPromptNodeMouseDown(event, node)"
-        @prompt-port-mousedown="onPromptNodePortMouseDown"
-        @prompt-delete="deletePromptNode"
-        @prompt-focus="activatePromptNode"
-        @prompt-update-text="onPromptNodeTextUpdate"
-      />
-
-      <HomeCanvasNodesStructured
-        :model-nodes="visibleModelNodes"
-        :viewpoint-nodes="visibleViewpointNodes"
-        :mask-nodes="visibleMaskNodes"
-        :copy-mode="nodeCopyMode"
-        :is-node-selected="isNodeSelected"
-        :is-node-dragging="isNodeDragging"
-        :get-model-node-ui-state="getModelNodeUiState"
-        :get-viewpoint-node-ui-state="getViewpointNodeUiState"
-        :get-mask-node-ui-state="getMaskNodeUiState"
-        :get-node-connection-error-ports="getNodeConnectionErrorPorts"
-        :get-mask-node-stage-height="getMaskNodeStageHeight"
-        :get-mask-canvas-width="getMaskCanvasWidth"
-        :get-mask-node-effective-source="getMaskNodeEffectiveSource"
-        :model-background-options="modelBackgroundOptions"
-        @model-node-mousedown="(event, node) => onModelNodeMouseDown(event, node)"
-        @model-port-mousedown="onModelNodePortMouseDown"
-        @model-delete="deleteModelNode"
-        @model-update-angle-yaw="onModelNodeUpdateAngleYaw"
-        @model-update-angle-framing="onModelNodeUpdateAngleFraming"
-        @model-update-model-strength="onModelNodeUpdateModelStrength"
-        @model-update-pose-strength="onModelNodeUpdatePoseStrength"
-        @model-select-background="onModelNodeSelectBackground"
-        @model-generate="handleModelNodeGenerate"
-        @viewpoint-node-mousedown="(event, node) => onViewpointNodeMouseDown(event, node)"
-        @viewpoint-port-mousedown="onViewpointNodePortMouseDown"
-        @viewpoint-delete="deleteViewpointNode"
-        @viewpoint-update-category="(node, category) => setViewpointNodeCategory(node, category)"
-        @viewpoint-select="(node, key) => setViewpointSelection(node, key)"
-        @viewpoint-update-lighting="onViewpointNodeUpdateLighting"
-        @viewpoint-generate="handleViewpointNodeGenerate"
-        @mask-node-mousedown="(event, node) => onMaskNodeMouseDown(event, node)"
-        @mask-port-mousedown="onMaskNodePortMouseDown"
-        @mask-delete="deleteMaskNode"
-        @mask-open-file-picker="openMaskNodeFilePicker"
-        @mask-clear-image="clearMaskNodeImage"
-        @mask-stage-drop="(event, node) => onMaskStageDrop(event, node)"
-        @mask-canvas-mousedown="onMaskNodeCanvasMouseDownBridge"
-        @mask-set-draw-mode="onMaskNodeSetDrawMode"
-        @mask-update-brush-size="onMaskNodeUpdateBrushSize"
-        @mask-update-refine-amount="onMaskNodeUpdateRefineAmount"
-        @mask-toggle-invert="onMaskNodeToggleInvert"
-        @mask-clear-mask="clearMaskNodeMask"
-        @mask-set-canvas-ref="setMaskCanvasRef"
-      />
-
-      <HomeCanvasNodesExecution
-        :edit-nodes="visibleEditNodes"
-        :fusion-nodes="visibleFusionNodes"
-        :enhance-nodes="visibleEnhanceNodes"
-        :wear-nodes="visibleWearNodes"
-        :color-nodes="visibleColorNodes"
-        :copy-mode="nodeCopyMode"
-        :is-node-selected="isNodeSelected"
-        :is-node-dragging="isNodeDragging"
-        :get-edit-node-ui-state="getEditNodeUiState"
-        :get-fusion-node-ui-state="getFusionNodeUiState"
-        :get-enhance-node-ui-state="getEnhanceNodeUiState"
-        :get-wear-node-ui-state="getWearNodeUiState"
-        :get-color-node-ui-state="getColorNodeUiState"
-        :get-node-connection-error-ports="getNodeConnectionErrorPorts"
-        @edit-node-mousedown="(event, node) => onEditNodeMouseDown(event, node)"
-        @edit-delete="deleteEditNode"
-        @edit-update-mode="onEditNodeUpdateMode"
-        @edit-generate="handleEditNodeGenerate"
-        @edit-port-mousedown="onEditNodePortMouseDown"
-        @fusion-node-mousedown="(event, node) => onFusionNodeMouseDown(event, node)"
-        @fusion-delete="deleteFusionNode"
-        @fusion-update-blend-ratio="onFusionNodeUpdateBlendRatio"
-        @fusion-generate="handleFusionNodeGenerate"
-        @fusion-port-mousedown="onFusionNodePortMouseDown"
-        @enhance-node-mousedown="(event, node) => onEnhanceNodeMouseDown(event, node)"
-        @enhance-delete="deleteEnhanceNode"
-        @enhance-update-mode="onEnhanceNodeUpdateMode"
-        @enhance-update-upscale-mode="onEnhanceNodeUpdateUpscaleMode"
-        @enhance-update-upscale-factor="onEnhanceNodeUpdateUpscaleFactor"
-        @enhance-update-output-format="onEnhanceNodeUpdateOutputFormat"
-        @enhance-update-output-quality="onEnhanceNodeUpdateOutputQuality"
-        @enhance-update-extend-top="onEnhanceNodeUpdateExtendTop"
-        @enhance-update-extend-right="onEnhanceNodeUpdateExtendRight"
-        @enhance-update-extend-bottom="onEnhanceNodeUpdateExtendBottom"
-        @enhance-update-extend-left="onEnhanceNodeUpdateExtendLeft"
-        @enhance-generate="handleEnhanceNodeGenerate"
-        @enhance-port-mousedown="onEnhanceNodePortMouseDown"
-        @wear-node-mousedown="(event, node) => onWearNodeMouseDown(event, node)"
-        @wear-delete="deleteWearNode"
-        @wear-update-tile-mode="onWearNodeUpdateTileMode"
-        @wear-update-rotation="onWearNodeUpdateRotation"
-        @wear-update-scale="onWearNodeUpdateScale"
-        @wear-update-opacity="onWearNodeUpdateOpacity"
-        @wear-generate="handleWearNodeGenerate"
-        @wear-port-mousedown="onWearNodePortMouseDown"
-        @color-node-mousedown="(event, node) => onColorNodeMouseDown(event, node)"
-        @color-delete="deleteColorNode"
-        @color-apply-preset="onColorNodeApplyPreset"
-        @color-remove-color="(node, index) => removeColorNodeColor(node, index)"
-        @color-add-color="(node, value) => addColorNodeColor(node, value)"
-        @color-strength-input="onColorNodeStrengthInput"
-        @color-generate="handleColorNodeGenerate"
-        @color-port-mousedown="onColorNodePortMouseDown"
-      />
-
-      <HomeCanvasImageItem
-        v-for="msg in visibleMessages"
-        :key="msg.id"
-        :item="msg"
-        :is-active="selectedIds.includes(msg.id)"
-        :is-pending="isCanvasImagePending(msg)"
-        :show-action-menu="activeImageActionId === msg.id && !isCanvasImagePending(msg)"
-        :show-style-strength-control="showStyleStrengthControl"
-        :style-strength-menu-style="showStyleStrengthControl ? getStyleStrengthMenuStyle(msg) : undefined"
-        :direct-generating="directGenerating"
-        :display-height="getImageDisplayHeight(msg)"
-        :style-innovate-strength-pct="styleInnovateStrengthPct"
-        :show-resize-handles="selectedIds.length === 1 && selectedIds[0] === msg.id && !isCanvasImagePending(msg)"
-        :set-image-ref="(el) => setCanvasImageRef(msg.id, el)"
-        :set-style-strength-track-ref="setStyleStrengthTrackRef"
-        @item-mousedown="onItemMouseDown($event, msg)"
-        @item-contextmenu="onItemContextMenu($event, msg)"
-        @image-load="onImageLoad(msg, $event)"
-        @style-innovate-mousedown="onStyleInnovateMouseDown"
-        @style-innovate-click="onStyleInnovateClick(msg)"
-        @action-remove-bg="runCanvasAction('remove-bg', msg)"
-        @action-to-vector="runCanvasAction('to-vector', msg)"
-        @action-sketch-to-design="runCanvasAction('sketch-to-design', msg)"
-        @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
-        @resize-mousedown="onResizeMouseDown($event.event, msg, $event.direction)"
-      />
-    </div>
-
+    <n-collapse-transition :show="isDev && debugPanelOpen">
+      <n-card class="workspace-flow-json" size="small" title="Flow Debug">
+        <div class="workspace-flow-debug-toolbar">
+          <span class="workspace-flow-save-state" :class="`is-${saveStateTag}`">{{ saveStateText }}</span>
+          <n-button size="tiny" :loading="isSavingBoard" :disabled="!canSaveBoard" @click="saveCurrentBoardSnapshot">保存</n-button>
+          <n-select v-model:value="createNodeKind" size="small" class="workspace-flow-node-kind" :options="createNodeOptions" />
+          <n-button size="tiny" @click="onAddNode">添加节点</n-button>
+          <n-button size="tiny" @click="importEmptyBoardSnapshot">导入空白</n-button>
+          <n-button size="tiny" :loading="isLoadingBoardSnapshot" @click="importBoardSnapshot">导入画布快照</n-button>
+          <n-button size="tiny" :type="snapshotView === 'flow' ? 'primary' : 'default'" @click="setSnapshotView('flow')">Flow JSON</n-button>
+          <n-button size="tiny" :type="snapshotView === 'board' ? 'primary' : 'default'" @click="setSnapshotView('board')">Board JSON</n-button>
+          <n-button size="tiny" @click="refreshSnapshot">刷新</n-button>
+          <n-button size="tiny" @click="copyJson">复制</n-button>
+        </div>
+        <pre>{{ snapshotText }}</pre>
+      </n-card>
+    </n-collapse-transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import type { ComponentPublicInstance, Ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useMessage } from 'naive-ui'
-import { taskApi, uploadApi, vectorizeApi } from '../../../shared/api/index'
+import { computed, nextTick, onMounted, ref, watch, type Ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { NButton, NCard, NCollapseTransition, NSelect, useMessage } from 'naive-ui'
+import type { SelectMixedOption } from 'naive-ui/es/select/src/interface'
 import { useUserStore } from '../../../app/stores/user'
-import {
-  collectCanvasBoardImageUrls,
-  getCanvasBoardState,
-  isImageUrlReferencedInOtherCanvasBoardStates,
-} from '../../boards/lib/canvasBoardState'
-import { CANVAS_NODE_MENU_ITEMS, type CanvasNodeCreateActionKey } from '../config/canvasNodeMenu'
-import { useCanvasConnections } from '../composables/useCanvasConnections'
-import { useCanvasViewport } from '../composables/useCanvasViewport'
-import { useCanvasViewportCulling } from '../composables/useCanvasViewportCulling'
-import { useCanvasBoard } from '../composables/useCanvasBoard'
-import { useCanvasEditor } from '../composables/useCanvasEditor'
-import { useCanvasHistory } from '../composables/useCanvasHistory'
-import { useCanvasNodeConnections } from '../composables/useCanvasNodeConnections'
-import { useCanvasNodeUiState } from '../composables/useCanvasNodeUiState'
-import { useCanvasDirectActions } from '../composables/useCanvasDirectActions'
-import { useGenerationPipeline } from '../composables/useGenerationPipeline'
-import { useImageNode } from '../composables/useImageNode'
-import { useMaskNode } from '../composables/useMaskNode'
-import { useModelNode } from '../composables/useModelNode'
-import { useNodeExecutors } from '../composables/useNodeExecutors'
-import { useViewpointNode } from '../composables/useViewpointNode'
-import { useWorkspaceNodeLifecycle } from '../composables/useWorkspaceNodeLifecycle'
-import { useWorkspaceBoardSnapshot } from '../composables/useWorkspaceBoardSnapshot'
-import { useWorkspaceNodeUpdateHandlers } from '../composables/useWorkspaceNodeUpdateHandlers'
-import { useWorkspaceUploadLifecycle } from '../composables/useWorkspaceUploadLifecycle'
-import HomeCanvasConnectionLayer from '../components/home/HomeCanvasConnectionLayer.vue'
-import HomeCanvasImageItem from '../components/home/HomeCanvasImageItem.vue'
-import HomeBottomGenerateBar from '../components/home/HomeBottomGenerateBar.vue'
-import HomeCanvasHeader from '../components/home/HomeCanvasHeader.vue'
-import HomeCanvasNodesBasic from '../components/home/HomeCanvasNodesBasic.vue'
-import HomeCanvasNodesExecution from '../components/home/HomeCanvasNodesExecution.vue'
-import HomeCanvasNodesStructured from '../components/home/HomeCanvasNodesStructured.vue'
-import {
-  describeViewpointOption,
-  GENERATE_QUALITY_OPTIONS,
-  PATTERN_GENERATE_RATIO_OPTIONS,
-  MODEL_BACKGROUND_OPTIONS,
-  VIEWPOINT_LIGHTING_LABELS,
-  type GenerateQualityOption,
-  type PatternGenerateRatioOption,
-  normalizeViewpointSelectionByCategory,
-  VIEWPOINT_OPTIONS_BY_CATEGORY,
-} from '../components/nodes/nodeOptionConfig'
-import { normalizeHexColor } from '../components/nodes/colorPopoverUtils'
-import {
-  enhanceModeSupportsPrompt,
-  enhanceModeSupportsMask,
-  editModeSupportsPrompt,
-  editModeSupportsSourceImage,
-} from '../config/canvasNodeConnectionContract'
-import { isCanvasConnectionAllowed } from '../config/canvasConnections'
-import {
-  createCanvasImageItemAt,
-  createEnhanceNodeAt,
-  createEditNodeAt,
-  createFusionNodeAt,
-  createImageNodeAt,
-  createMaskNodeAt,
-  createModelNodeAt,
-  createColorNodeAt,
-  createPromptNodeAt,
-  createWearNodeAt,
-  createViewpointNodeAt,
-} from '../utils/canvasNodeFactory'
-import {
-  isCanvasExecutionOutputNodeType,
-  isCanvasImagePending,
-  MAX_COLOR_NODE_SWATCHES,
-} from '../types/canvasNodes'
+import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { uploadApi } from '../../../shared/api'
+import type { Edge, Node, NodeMouseEvent } from '@vue-flow/core'
+import { useVueFlow, VueFlow } from '@vue-flow/core'
+import '@vue-flow/core/dist/style.css'
+import '@vue-flow/core/dist/theme-default.css'
+import FlowCanvasNode from '../components/FlowCanvasNode.vue'
+import WorkspaceNodeContextMenu from '../components/WorkspaceNodeContextMenu.vue'
+import { useFlowHistory } from '../composables/useFlowHistory'
+import { useFlowBoardPersistence } from '../composables/useFlowBoardPersistence'
+import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
+import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
+import { useFlowMaskDrawing } from '../composables/useFlowMaskDrawing'
+import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
+import { useFlowNodeMutations, type FlowCreatableNodeKind } from '../composables/useFlowNodeMutations'
+import { loadImageSizeFromUrl, useFlowGenerationHandlers } from '../composables/useFlowGenerationHandlers'
+import { useFlowMessageDirectActions } from '../composables/useFlowMessageDirectActions'
+import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovateControl'
+import { useFlowMessageImageInteractions } from '../composables/useFlowMessageImageInteractions'
+import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
+import { parseHandlePort, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
+import type { FlowNodeData } from '../types/flowTypes'
+import { createEmptyCanvasBoardSnapshot, type FlowAdapterEdge, type FlowAdapterNode, flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
+import { buildFlowEdgeClassName, resolveFlowEdgeToneFromHandles } from '../utils/flowEdgeVisual'
+import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
+import { createCanvasImageItemAt } from '../../workspace/utils/canvasNodeFactory'
 import type {
   CanvasBoardSnapshot,
-  CanvasConnection,
-  CanvasExecutionOutputNodeType,
-  CanvasExecutionOutputNodeItem,
-  CanvasConnectionNodeType,
-  CanvasConnectionPort,
   CanvasImageItem,
-  CanvasNodeItem,
-  ColorNodeItem,
-  EnhanceNodeItem,
-  EditNodeItem,
-  FusionNodeItem,
+  CanvasConnectionNodeType,
   ImageNodeItem,
   MaskNodeItem,
-  ModelAngleFraming,
-  ModelAngleSpec,
-  ModelNodeItem,
-  PromptNodeItem,
-  WearNodeItem,
-  ViewpointNodeItem,
-  WorkflowNodeOutputStatus,
-} from '../types/canvasNodes'
+} from '../../workspace/types/canvasNodes'
+import HomeCanvasHeader from '../../workspace/components/home/HomeCanvasHeader.vue'
+import HomeBottomGenerateBar from '../../workspace/components/home/HomeBottomGenerateBar.vue'
+import { useRouter } from 'vue-router'
+import {
+  isCanvasBoardNameTaken,
+  listCanvasBoards,
+  normalizeCanvasBoardName,
+  renameCanvasBoard,
+} from '../../boards/lib/canvasBoards'
+import {
+  GENERATE_QUALITY_OPTIONS,
+  PATTERN_GENERATE_RATIO_OPTIONS,
+  type GenerateQualityOption,
+  type PatternGenerateRatioOption,
+} from '../../workspace/components/nodes/nodeOptionConfig'
 
-const router = useRouter()
-const route = useRoute()
 const message = useMessage()
+const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
-const defaultCanvasName = 'Untitled'
-const USER_DOWNLOAD_ENDPOINT = '/api/user/download'
+const { screenToFlowCoordinate, updateNodeInternals, zoomIn, zoomOut, getViewport, setViewport } = useVueFlow()
+const isDev = import.meta.env.DEV
 
-const patternGenerateRatioOptions = PATTERN_GENERATE_RATIO_OPTIONS
-const patternGenerateQualityOptions = GENERATE_QUALITY_OPTIONS
-const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
-const viewpointLightingLabels = VIEWPOINT_LIGHTING_LABELS
+const nodes = ref<Node[]>([])
+const edges = ref<Edge[]>([])
+const canvasWrapRef = ref<HTMLElement | null>(null)
+const snapshotText = ref('')
+const snapshotView = ref<'flow' | 'board'>('flow')
+const boardBaseSnapshot = ref<CanvasBoardSnapshot>(createEmptyCanvasBoardSnapshot())
+const debugPanelOpen = ref(false)
+const isLoadingBoardSnapshot = ref(false)
+const isSavingBoard = ref(false)
+const isDirty = ref(false)
+const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
+const leaveConfirmVisible = ref(false)
+const activeTool = ref<'select' | 'hand' | 'text'>('select')
+const isBoardMenuOpen = ref(false)
+const isRenamingBoard = ref(false)
+const boardNameDraft = ref('')
+const boardNameInputRef = ref<HTMLInputElement | null>(null)
+const boardMetas = ref(listCanvasBoards())
+const flowPromptShowSettings = ref(false)
+const flowPromptText = ref('')
+const flowPromptRatio = ref<PatternGenerateRatioOption>('1:1')
+const flowPromptQuality = ref<GenerateQualityOption>('1k')
+const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
+const FLOW_NODE_KIND_DRAG_MIME = 'application/x-ideaboard-flow-node-kind'
+const FLOW_NODE_IMAGE_DRAG_MIME = 'application/x-canvas-node-image'
+let pendingNodeInternalsRefresh = false
+let queuedNodeInternalsIds: Set<string> | null = null
+let leaveConfirmResolver: ((choice: 'save' | 'discard' | 'cancel') => void) | null = null
+let leaveConfirmPromise: Promise<'save' | 'discard' | 'cancel'> | null = null
+let skipNextLeaveConfirm = false
+let lastManualNodeSelection:
+  | {
+    nodeId: string
+    timestamp: number
+  }
+  | null = null
+const zoomLevel = ref(100)
+const viewportOffsetX = ref(0)
+const viewportOffsetY = ref(0)
+const nodeContextMenu = ref({ visible: false, x: 0, y: 0, flowX: 0, flowY: 0 })
+const activeMessageActionNodeId = ref<string | null>(null)
 
-const nodeImageDragMime = 'application/x-ideaboard-image-url'
+const canvasNodeMenuItems = [
+  { key: 'prompt', label: 'Prompt' },
+  { key: 'image', label: 'Image' },
+  { key: 'edit', label: 'Edit' },
+  { key: 'enhance', label: 'Enhance' },
+  { key: 'color', label: 'Color' },
+  { key: 'fusion', label: 'Fusion' },
+  { key: 'wear', label: 'Wear' },
+  { key: 'mask', label: 'Mask' },
+  { key: 'model', label: 'Model' },
+  { key: 'viewpoint', label: 'Viewpoint' },
+] as const
 
-// 状态
-const userPrompt = ref('')
-const nodeGenerating = ref(false)
-const directGenerating = ref(false)
-const messages = ref<CanvasImageItem[]>([])
-const {
-  zoomLevel,
-  canvasX,
-  canvasY,
-  canvasLayoutRef,
-  canvasStyle,
-  updateZoom,
-  getCanvasPointFromClient,
-  setViewport,
-  resetViewport,
-  createViewportSnapshot,
-} = useCanvasViewport()
-const cullingBuffer = computed(() => {
-  const zoomScale = Math.max(0.1, zoomLevel.value / 100)
-  return Math.max(800, Math.min(1400, Math.round(1000 / Math.max(zoomScale, 0.7))))
-})
-const { isNodeRectVisible, filterVisible } = useCanvasViewportCulling({
-  canvasLayoutRef,
-  canvasX,
-  canvasY,
-  zoomLevel,
-  buffer: cullingBuffer,
-  onViewportRectChanged: () => markCanvasViewportChanged(),
-})
-const activeTool = ref('select')
-const isDraggingFile = ref(false)
-const showSettings = ref(false)
-const imageNodes = ref<ImageNodeItem[]>([])
-const promptNodes = ref<PromptNodeItem[]>([])
-const modelNodes = ref<ModelNodeItem[]>([])
-const viewpointNodes = ref<ViewpointNodeItem[]>([])
-const maskNodes = ref<MaskNodeItem[]>([])
-const colorNodes = ref<ColorNodeItem[]>([])
-const enhanceNodes = ref<EnhanceNodeItem[]>([])
-const editNodes = ref<EditNodeItem[]>([])
-const fusionNodes = ref<FusionNodeItem[]>([])
-const wearNodes = ref<WearNodeItem[]>([])
-const processedMaskPreviewUrls = ref<Record<number, string>>({})
-let suspendWorkflowCacheReactions = false
-let resetHistoryBaseline: ((snapshot?: CanvasBoardSnapshot | null) => void) | null = null
-const runningExecutionNodeKeys = ref<Set<string>>(new Set())
-const executionNodeLastRunFailedMap = ref<Record<string, boolean>>({})
-const connections = ref<CanvasConnection[]>([])
-const {
-  createBoardSnapshotBase,
-  applyBoardSnapshot: applyBoardSnapshotCore,
-} = useWorkspaceBoardSnapshot({
-  messages,
-  imageNodes,
-  promptNodes,
-  modelNodes,
-  viewpointNodes,
-  maskNodes,
-  colorNodes,
-  enhanceNodes,
-  editNodes,
-  fusionNodes,
-  wearNodes,
-  connections,
-  runningExecutionNodeKeys,
-  executionNodeLastRunFailedMap,
-  processedMaskPreviewUrls,
-  resetEditorState: () => resetEditorState(),
-  clearAllNodeConnectionErrors: () => clearAllNodeConnectionErrors(),
-  resetEditorUiState: () => resetEditorUiState(),
-  clearSelectedConnection: () => clearSelectedConnection(),
-  clearConnectionDraft: () => clearConnectionDraft(),
-  setViewport: (viewport) => setViewport(viewport),
-  createViewportSnapshot: () => createViewportSnapshot(),
-  renderMaskNodeMask: (node) => renderMaskNodeMask(node),
-  refreshProcessedMaskPreview: (node) => refreshProcessedMaskPreview(node),
-  clearProcessedMaskPreview: (id) => clearProcessedMaskPreview(id),
-  scheduleRenderedConnectionsRefresh: () => scheduleRenderedConnectionsRefresh(),
-  resetHistoryBaseline: (snapshot) => resetHistoryBaseline?.(snapshot),
-  setSuspendWorkflowCacheReactions: (next) => {
-    suspendWorkflowCacheReactions = next
-  },
-})
-const RECENT_HISTORY_RECYCLE_GUARD_STEPS = 10
-const {
-  uploadWorkspaceImage,
-  resolveCanvasWorkspaceUploadMeta,
-  queueWorkspaceUploadUrlsForRecycle,
-  queueDeletedCanvasUploadsForRecycle,
-  prepareBoardSnapshotBeforePersist,
-  handleBoardPersisted,
-  schedulePendingRecycleScan,
-  clearPendingRecycleScanTimer,
-  flushPendingRecycleUploads,
-  reloadPendingRecycleEntries,
-} = useWorkspaceUploadLifecycle({
-  getCurrentBoardId: () => currentBoardId.value,
-  getUserId: () => Number(userStore.user?.id),
-  getUserUid: () => `${userStore.user?.uid ?? ''}`,
-  messages,
-  imageNodes,
-  maskNodes,
-  modelNodes,
-  viewpointNodes,
-  colorNodes,
-  enhanceNodes,
-  editNodes,
-  fusionNodes,
-  wearNodes,
-  createBoardSnapshot: createBoardSnapshotBase,
-  collectCanvasBoardImageUrls,
-  getCanvasBoardState,
-  isImageUrlReferencedInOtherCanvasBoardStates,
-  hasHistoryImageUrlReference: (url, options) => hasHistoryImageUrlReference(url, options),
-  uploadImageApi: (file, boardId) => uploadApi.upload(file, boardId),
-  recycleImageApi: (url, boardId) => uploadApi.recycle(url, boardId),
-  warning: (text) => message.warning(text),
-  historyRecycleGuardSteps: RECENT_HISTORY_RECYCLE_GUARD_STEPS,
-  userDownloadEndpoint: USER_DOWNLOAD_ENDPOINT,
-})
-const styleInnovateDefaultStrength = 50
-const styleInnovateStrength = ref(styleInnovateDefaultStrength)
-const styleStrengthTrackRef = ref<HTMLElement | HTMLElement[] | null>(null)
-const showStyleStrengthControl = ref(false)
-const styleInnovateStrengthPct = computed(() => styleInnovateStrength.value)
-const suppressStyleInnovateClick = ref(false)
-const canvasImageRefs = new Map<number, HTMLImageElement>()
-const styleStrengthMenuGap = 16
-let styleStrengthLongPressTimer: number | null = null
-let styleStrengthHideTimer: number | null = null
-let styleStrengthDragging = false
-let styleStrengthPointerY = 0
-
-const tools = [
-  { title: '图・文生图', path: '/user/picture', icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 14l4-4 5 5 5-5 4 4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M19 3l-1 2-2 1 2 1 1 2 1-2 2-1-2-1-1-2z" fill="currentColor" stroke="none"/>' }
-]
-
-const canvasNodeMenuItems = CANVAS_NODE_MENU_ITEMS
-
-const {
-  selectedConnectionId,
-  renderedConnections,
-  draftConnectionPath,
-  draftConnectionTone,
-  draftConnectionKind,
-  reconnectingConnectionId,
-  hasSelectedConnection,
-  clearSelectedConnection,
-  selectConnection,
-  deleteSelectedConnection,
-  findIncomingConnection,
-  getIncomingConnections,
-  hasIncomingPortConnection,
-  getOutgoingConnections,
-  hasOutgoingPortConnection,
-  removeConnectionsForNode,
-  removeIncomingConnectionsForPort,
-  clearNodeConnectionError,
-  clearAllNodeConnectionErrors,
-  getNodeConnectionErrorPorts,
-  triggerNodeConnectionError,
-  clearConnectionDraft,
-  beginConnectionReconnect,
-  scheduleRenderedConnectionsRefresh,
-  startConnectionDrag,
-  addGlobalConnectionListeners,
-  removeGlobalConnectionListeners,
-  disposeConnectionRuntime,
-} = useCanvasConnections({
-  connections,
-  canvasLayoutRef,
-  canvasX,
-  canvasY,
-  zoomLevel,
-  isConnectionRenderable: (connection) => {
-    if (connection.id === selectedConnectionId.value || connection.id === reconnectingConnectionId.value) {
-      return true
-    }
-    return isConnectionRetainedByNodes(connection, retainedNodeKeys.value)
-  },
-  lookupNodeByType: getCanvasConnectionNodeByType,
-  isConnectionAllowed: (from, to) => isCanvasConnectionAllowed(from, to, getCanvasConnectionNodeByType),
-  onConnectionsChanged: applyConnectionMutationEffects,
-  onConnectionNotAllowed: () => {
-    message.warning('当前这两个端口不能连接')
-  },
-  onInvalidDirection: () => {
-    message.warning('连线只能从输出口接到输入口')
-  },
-})
-
-const {
-  selectedIds,
-  activeImageActionId,
-  isDuplicateModifierPressed,
-  activeImageNodeId,
-  activePromptNodeId,
-  activeModelNodeId,
-  activeViewpointNodeId,
-  activeMaskNodeId,
-  activeColorNodeId,
-  activeEditNodeId,
-  activeFusionNodeId,
-  activeEnhanceNodeId,
-  activeWearNodeId,
-  nodeContextMenu,
-  isPanning,
-  isSelecting,
-  isDraggingItem,
-  isResizingItem,
-  selectionRect,
-  activateImageNode,
-  activatePromptNode,
-  activateModelNode,
-  activateViewpointNode,
-  activateMaskNode,
-  activateColorNode,
-  activateEditNode,
-  activateFusionNode,
-  activateEnhanceNode,
-  activateWearNode,
-  isNodeSelected,
-  isNodeDragging,
-  closeNodeContextMenu,
-  resetEditorUiState,
-  onCanvasContextMenu,
-  onCanvasMouseDown,
-  onItemMouseDown,
-  onItemContextMenu,
-  onImageNodeMouseDown,
-  onPromptNodeMouseDown,
-  onModelNodeMouseDown,
-  onViewpointNodeMouseDown,
-  onMaskNodeMouseDown,
-  onEditNodeMouseDown,
-  onFusionNodeMouseDown,
-  onEnhanceNodeMouseDown,
-  onWearNodeMouseDown,
-  onColorNodeMouseDown,
-  onResizeMouseDown,
-  readNodeImageDropPayload,
-  handleDrop: handleCanvasDropCore,
-  clearSelectedIds,
-  removeSelectedNodeKey,
-  removeSelectedId,
-  focusSelectedItem,
-} = useCanvasEditor({
-  messages,
-  imageNodes,
-  promptNodes,
-  modelNodes,
-  viewpointNodes,
-  maskNodes,
-  colorNodes,
-  enhanceNodes,
-  editNodes,
-  fusionNodes,
-  wearNodes,
-  activeTool,
-  showStyleStrengthControl,
-  canvasX,
-  canvasY,
-  zoomLevel,
-  canvasLayoutRef,
-  isBoardMenuOpen: () => isBoardMenuOpen.value,
-  setBoardMenuOpen: (visible) => {
-    isBoardMenuOpen.value = visible
-  },
-  isBoardRenaming: () => isRenamingBoard.value,
-  isLeaveConfirmVisible: () => leaveConfirmVisible.value,
-  confirmBoardRename: () => confirmBoardRename(),
-  saveBoard: () => persistBoardStateNow(),
-  resolveLeaveConfirm: (decision) => resolveLeaveConfirm(decision),
-  updateZoom: updateCanvasZoom,
-  getCanvasPointFromClient,
-  createCanvasImageAt: createCanvasImageItemAt,
-  uploadImage: uploadWorkspaceImage,
-  resolveCanvasImageUploadMeta: (url) => resolveCanvasWorkspaceUploadMeta(url),
-  importCanvasImageToImageNodeAtPoint: (clientX, clientY, item) => importCanvasImageToImageNodeAtPoint(clientX, clientY, item),
-  importCanvasImageToMaskNodeAtPoint: (clientX, clientY, item) => importCanvasImageToMaskNodeAtPoint(clientX, clientY, item),
-  deleteImageNode,
-  deletePromptNode,
-  deleteModelNode,
-  deleteViewpointNode,
-  deleteMaskNode,
-  deleteColorNode,
-  deleteEnhanceNode,
-  deleteEditNode,
-  deleteFusionNode,
-  deleteWearNode,
-  onDeleteCanvasImages: (deletedItems) => {
-    queueDeletedCanvasUploadsForRecycle(deletedItems)
-  },
-  hasSelectedConnection,
-  clearSelectedConnection,
-  deleteSelectedConnection,
-  beginHistoryBatch: () => beginCanvasHistoryBatch(),
-  endHistoryBatch: (commit) => endCanvasHistoryBatch(commit),
-  onCanvasViewportChanged: markCanvasViewportChanged,
-  onCanvasLayoutFrameChanged: markCanvasLayoutFrameChanged,
-  onCanvasLayoutMutationCommitted: markCanvasLayoutChanged,
-  onCanvasContentChanged: markCanvasContentChanged,
-  undo: () => undoCanvasSnapshot(),
-  redo: () => redoCanvasSnapshot(),
-  message,
-  nodeImageDragMime,
-})
-
-const isCanvasInteractionActive = computed(() =>
-  isSelecting.value ||
-  isPanning.value ||
-  isDraggingItem.value ||
-  isResizingItem.value,
-)
-
-const {
-  getMaskCanvasWidth,
-  getMaskStageHeight,
-  setMaskCanvasRef,
-  renderMaskNodeMask,
-  onMaskCanvasMouseDown,
-  dataUrlToFile,
-  buildFullMaskDataUrl,
-  refineExecutionMaskDataUrl,
-  openMaskNodeFilePicker,
-  clearMaskNodeImage,
-  clearMaskNodeMask,
-  onMaskStageDrop: handleMaskStageDrop,
-  importCanvasImageToMaskNodeAtPoint,
-  removeMaskRuntimeFor,
-  resetMaskRuntime,
-  clearProcessedMaskPreview,
-  getMaskExecutionDataUrl,
-  refreshProcessedMaskPreview,
-  getMaskNodeProcessedOutputUrl,
-} = useMaskNode({
-  maskNodes,
-  processedMaskPreviewUrls,
-  activeImageActionId,
-  showStyleStrengthControl,
-  message,
-  uploadImage: uploadWorkspaceImage,
-  loadImageRatioFromFile,
-  loadImageRatioFromUrl,
-  loadImageSizeFromUrl,
-  activateMaskNode,
-  closeNodeContextMenu,
-  readNodeImageDropPayload,
-  onMaskNodeContentChanged: markMaskNodeChanged,
-})
-
-const {
-  getImageNodePreferredImage,
-  openImageNodeFilePicker,
-  resetImageNode,
-  onImageNodeStageDrop: handleImageNodeStageDrop,
-  importCanvasImageToImageNodeAtPoint,
-} = useImageNode({
-  imageNodes,
-  message,
-  uploadImage: uploadWorkspaceImage,
-  loadImageRatioFromFile,
-  loadImageRatioFromUrl,
-  readNodeImageDropPayload,
-  hasIncomingImageConnection: (nodeId) => hasIncomingPortConnection('image', nodeId, 'image'),
-  onImageNodeInputChanged: (node) => {
-    markWorkflowInputChanged('image', node.id)
-    markCanvasLayoutChanged()
-  },
-})
-
-const {
-  updateModelAngleYaw,
-  updateModelAngleFraming,
-} = useModelNode()
-
-const {
-  setViewpointSelection,
-} = useViewpointNode()
-
-const {
-  stopTaskPolling: stopNodeTaskPolling,
-  resolvePreferredImageOutputNode,
-  appendGeneratedImages,
-  submitTaskAndPoll,
-} = useGenerationPipeline({
-  generating: nodeGenerating,
-  messages,
-  selectedIds,
-  imageNodes,
-  activeImageNodeId,
-  message,
-  loadImageRatioFromUrl,
-  createCanvasImageAt: createCanvasImageItemAt,
-  submitTask: taskApi.submit,
-  getTask: taskApi.get,
-  onCanvasImagesChanged: markCanvasContentChanged,
-  onImageNodeOutputsChanged: (node) => {
-    markWorkflowInputChanged('image', node.id)
-    markCanvasLayoutChanged()
-  },
-})
-
-const {
-  stopTaskPolling: stopDirectTaskPolling,
-  submitTaskAndPoll: submitDirectTaskAndPoll,
-  createPendingGeneratedImages,
-  replacePendingGeneratedImages,
-  removePendingGeneratedImages,
-} = useGenerationPipeline({
-  generating: directGenerating,
-  messages,
-  selectedIds,
-  imageNodes,
-  activeImageNodeId,
-  preferImageOutputNode: false,
-  message,
-  loadImageRatioFromUrl,
-  createCanvasImageAt: createCanvasImageItemAt,
-  submitTask: taskApi.submit,
-  getTask: taskApi.get,
-  onCanvasImagesChanged: markCanvasContentChanged,
-  onImageNodeOutputsChanged: (node) => {
-    markWorkflowInputChanged('image', node.id)
-    markCanvasLayoutChanged()
-  },
-})
-
-function getExecutionOutputNodeByType(
-  nodeType: CanvasExecutionOutputNodeType,
-  nodeId: number,
-) {
-  const node = getCanvasConnectionNodeByType(nodeType, nodeId)
-  if (!node || !('outputStatus' in node)) return null
-  return node as CanvasExecutionOutputNodeItem
-}
-
-function setWorkflowNodeOutputStatus(
-  node: { outputImages: { url: string }[]; outputStatus?: WorkflowNodeOutputStatus },
-  status?: WorkflowNodeOutputStatus,
-) {
-  node.outputStatus = status ?? (node.outputImages.length > 0 ? 'ready' : 'idle')
-}
-
-function markExecutionNodeDirty(
-  nodeType: CanvasExecutionOutputNodeType,
-  nodeId: number,
-  visited = new Set<string>(),
-) {
-  const visitKey = `${nodeType}:${nodeId}`
-  if (visited.has(visitKey)) return
-  visited.add(visitKey)
-
-  const node = getExecutionOutputNodeByType(nodeType, nodeId)
-  if (!node) return
-  setWorkflowNodeOutputStatus(node, node.outputImages.length > 0 ? 'stale' : 'idle')
-  setExecutionNodeLastRunFailed(nodeType, nodeId, false)
-
-  getOutgoingConnections(nodeType, nodeId, 'image').forEach((connection) => {
-    if (isCanvasExecutionOutputNodeType(connection.toNodeType)) {
-      markExecutionNodeDirty(connection.toNodeType, connection.toNodeId, visited)
+function scheduleFlowNodeInternalsRefresh(nodeIds?: string[]) {
+  const hasCanvasNodes = (nodes.value as Array<{ type?: string }>).some(node => node.type === 'canvas')
+  if (!hasCanvasNodes) return
+  if (nodeIds && nodeIds.length > 0) {
+    if (!queuedNodeInternalsIds) queuedNodeInternalsIds = new Set()
+    nodeIds.forEach(id => queuedNodeInternalsIds?.add(id))
+  }
+  if (pendingNodeInternalsRefresh) return
+  pendingNodeInternalsRefresh = true
+  void nextTick(() => {
+    const ids = (queuedNodeInternalsIds && queuedNodeInternalsIds.size > 0)
+      ? Array.from(queuedNodeInternalsIds)
+      : nodes.value.map(node => node.id)
+    queuedNodeInternalsIds = null
+    if (ids.length === 0) {
+      pendingNodeInternalsRefresh = false
       return
     }
-    if (connection.toNodeType === 'mask') {
-      markConnectedExecutionTargetsDirty('mask', connection.toNodeId, visited)
-    }
-  })
-}
-
-function markConnectedExecutionTargetsDirty(
-  fromNodeType: CanvasConnectionNodeType,
-  fromNodeId: number,
-  visited = new Set<string>(),
-) {
-  const outgoingPort =
-    fromNodeType === 'prompt'
-      ? 'prompt'
-      : fromNodeType === 'mask'
-        ? 'mask'
-        : 'image'
-  getOutgoingConnections(fromNodeType, fromNodeId, outgoingPort).forEach((connection) => {
-    if (isCanvasExecutionOutputNodeType(connection.toNodeType)) {
-      markExecutionNodeDirty(connection.toNodeType, connection.toNodeId, visited)
-      return
-    }
-    if (connection.toNodeType === 'mask') {
-      markConnectedExecutionTargetsDirty('mask', connection.toNodeId, visited)
-    }
-  })
-}
-
-function appendWorkflowNodeOutputs(
-  nodeType: CanvasExecutionOutputNodeType,
-  nodeId: number,
-  urls: string[],
-) {
-  if (urls.length === 0) return
-  const node = getExecutionOutputNodeByType(nodeType, nodeId)
-  if (!node) return
-  setWorkflowNodeOutputStatus(node, 'ready')
-  const startIndex = node.outputImages.length
-  urls.forEach((url) => {
-    node.outputImages.push({ url, ratio: 1 })
-  })
-  urls.forEach((url, offset) => {
-    const outputIndex = startIndex + offset
-    void loadImageRatioFromUrl(url).then((ratio) => {
-      if (!ratio) return
-      const targetNode = getExecutionOutputNodeByType(nodeType, nodeId)
-      if (!targetNode) return
-      const output = targetNode.outputImages[outputIndex]
-      if (!output || output.url !== url) return
-      output.ratio = ratio
-      markExecutionOutputChanged(nodeType, nodeId)
-      markCanvasLayoutChanged()
+    requestAnimationFrame(() => {
+      updateNodeInternals(ids)
+      requestAnimationFrame(() => {
+        updateNodeInternals(ids)
+        pendingNodeInternalsRefresh = false
+      })
     })
   })
-  setExecutionNodeLastRunFailed(nodeType, nodeId, false)
-  markExecutionOutputChanged(nodeType, nodeId)
-  markCanvasContentChanged()
 }
 
-function getExecutionNodeStateKey(nodeType: CanvasExecutionOutputNodeType, nodeId: number): string {
-  return `${nodeType}:${nodeId}`
+function onFlowNodesInitialized() {
+  scheduleFlowNodeInternalsRefresh()
 }
 
-function setExecutionNodeRunning(
-  nodeType: CanvasExecutionOutputNodeType,
-  nodeId: number,
-  running: boolean,
-) {
-  const key = getExecutionNodeStateKey(nodeType, nodeId)
-  if (running) {
-    if (runningExecutionNodeKeys.value.has(key)) return
-    const nextKeys = new Set(runningExecutionNodeKeys.value)
-    nextKeys.add(key)
-    runningExecutionNodeKeys.value = nextKeys
-    return
-  }
-  if (!runningExecutionNodeKeys.value.has(key)) return
-  const nextKeys = new Set(runningExecutionNodeKeys.value)
-  nextKeys.delete(key)
-  runningExecutionNodeKeys.value = nextKeys
-}
-
-function isExecutionNodeRunning(
-  nodeType: CanvasExecutionOutputNodeType,
-  nodeId: number,
-): boolean {
-  return runningExecutionNodeKeys.value.has(getExecutionNodeStateKey(nodeType, nodeId))
-}
-
-function setExecutionNodeLastRunFailed(
-  nodeType: CanvasExecutionOutputNodeType,
-  nodeId: number,
-  failed: boolean,
-) {
-  const key = getExecutionNodeStateKey(nodeType, nodeId)
-  if (!failed) {
-    if (executionNodeLastRunFailedMap.value[key] == null) return
-    const nextMap = { ...executionNodeLastRunFailedMap.value }
-    delete nextMap[key]
-    executionNodeLastRunFailedMap.value = nextMap
-    return
-  }
-  executionNodeLastRunFailedMap.value = {
-    ...executionNodeLastRunFailedMap.value,
-    [key]: true,
-  }
-}
-
-function isExecutionNodeLastRunFailed(
-  nodeType: CanvasExecutionOutputNodeType,
-  nodeId: number,
-): boolean {
-  return !!executionNodeLastRunFailedMap.value[getExecutionNodeStateKey(nodeType, nodeId)]
-}
-
-function getViewpointLabel(key: string): string {
-  return describeViewpointOption(key)
-}
-
-function getViewpointLightingLabel(key: ViewpointNodeItem['lighting']): string {
-  return viewpointLightingLabels[key] || key
-}
-
-function loadImageRatioFromUrl(url: string): Promise<number | null> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      if (!img.naturalWidth || !img.naturalHeight) {
-        resolve(null)
-        return
-      }
-      resolve(img.naturalHeight / img.naturalWidth)
-    }
-    img.onerror = () => resolve(null)
-    img.src = url
-  })
-}
-
-function loadImageSizeFromUrl(url: string): Promise<{ width: number; height: number } | null> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      if (!img.naturalWidth || !img.naturalHeight) {
-        resolve(null)
-        return
-      }
-      resolve({ width: img.naturalWidth, height: img.naturalHeight })
-    }
-    img.onerror = () => resolve(null)
-    img.src = url
-  })
-}
-
-function loadImageRatioFromFile(file: File): Promise<number | null> {
-  return new Promise((resolve) => {
-    const localUrl = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => {
-      const ratio = img.naturalWidth && img.naturalHeight
-        ? img.naturalHeight / img.naturalWidth
-        : null
-      URL.revokeObjectURL(localUrl)
-      resolve(ratio)
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(localUrl)
-      resolve(null)
-    }
-    img.src = localUrl
-  })
-}
-
-function resetEditorState() {
-  messages.value = []
-  resetEditorUiState()
-  clearAllNodeConnectionErrors()
-  resetMaskRuntime()
-  imageNodes.value = []
-  promptNodes.value = []
-  modelNodes.value = []
-  viewpointNodes.value = []
-  maskNodes.value = []
-  colorNodes.value = []
-  enhanceNodes.value = []
-  editNodes.value = []
-  fusionNodes.value = []
-  wearNodes.value = []
-  runningExecutionNodeKeys.value = new Set()
-  executionNodeLastRunFailedMap.value = {}
-  connections.value = []
-  clearConnectionDraft()
-  userPrompt.value = ''
-  resetViewport()
-}
-
-const canvasMutationVersions = {
-  content: ref(0),
-  layout: ref(0),
-  layoutFrame: ref(0),
-  viewport: ref(0),
-  workflowInput: ref(0),
-  executionInput: ref(0),
-  executionOutput: ref(0),
-  preview: ref(0),
-  system: ref(0),
-}
-
-function bumpCanvasMutationVersion(scope: keyof typeof canvasMutationVersions) {
-  canvasMutationVersions[scope].value += 1
-}
-
-function getCanvasMutationVersionTotal() {
-  return Object.values(canvasMutationVersions).reduce((sum, version) => sum + version.value, 0)
-}
-
-async function applyBoardSnapshot(state: CanvasBoardSnapshot | null) {
-  bumpCanvasMutationVersion('system')
-  await applyBoardSnapshotCore(state)
-}
-
-function compactCanvasMutationGuardValue(value: unknown): unknown {
-  if (typeof value === 'string') {
-    if (value.length <= 256) return value
-    return `${value.slice(0, 32)}:${value.length}:${value.slice(-16)}`
-  }
-  if (Array.isArray(value)) {
-    return value.map(item => compactCanvasMutationGuardValue(item))
-  }
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-        key,
-        compactCanvasMutationGuardValue(item),
-      ]),
-    )
-  }
-  return value
-}
-
-function createCanvasMutationGuardSnapshot(): string {
-  return JSON.stringify(compactCanvasMutationGuardValue(createBoardSnapshotBase()))
-}
-
-function installCanvasMutationDevGuard() {
-  if (!import.meta.env.DEV) return
-  let lastVersionTotal = getCanvasMutationVersionTotal()
-  watch(
-    createCanvasMutationGuardSnapshot,
-    () => {
-      const nextVersionTotal = getCanvasMutationVersionTotal()
-      if (!suspendWorkflowCacheReactions && nextVersionTotal === lastVersionTotal) {
-        console.warn(
-          '[canvas] Canvas state changed without an explicit mutation side effect. ' +
-          'Route the update through markCanvasContentChanged, markCanvasLayoutChanged, ' +
-          'markWorkflowInputChanged, markExecutionInputChanged, or markExecutionOutputChanged.',
-        )
-      }
-      lastVersionTotal = nextVersionTotal
-    },
-    { flush: 'post' },
-  )
-}
-
-const {
-  notifySnapshotChanged,
-  beginBatch: beginCanvasHistoryBatch,
-  endBatch: endCanvasHistoryBatch,
-  resetHistoryBaseline: syncCanvasHistoryBaseline,
-  undo: undoCanvasSnapshot,
-  redo: redoCanvasSnapshot,
-  hasImageUrlReference: hasHistoryImageUrlReference,
-} = useCanvasHistory({
-  createSnapshot: createBoardSnapshotBase,
-  applySnapshot: applyBoardSnapshot,
-  maxEntries: RECENT_HISTORY_RECYCLE_GUARD_STEPS,
-  debounceMs: 280,
+const flowPromptRatioOptions = PATTERN_GENERATE_RATIO_OPTIONS
+const flowPromptQualityOptions = GENERATE_QUALITY_OPTIONS
+const currentBoardName = computed(() => {
+  const boardId = `${currentBoardId.value ?? ''}`.trim()
+  if (!boardId) return 'Untitled Canvas'
+  return boardMetas.value.find(board => board.id === boardId)?.name ?? boardId
 })
-
-resetHistoryBaseline = syncCanvasHistoryBaseline
-
-const {
-  currentBoardId,
-  currentBoardName,
-  boardOptions,
-  isBoardMenuOpen,
-  isRenamingBoard,
-  boardNameDraft,
-  boardNameInputRef,
-  isBoardDirty,
-  leaveConfirmVisible,
-  toggleBoardMenu,
-  startBoardRename,
-  cancelBoardRename,
-  confirmBoardRename,
-  handleBoardSelect,
-  resolveLeaveConfirm,
-  confirmSaveBeforeLeave,
-  persistBoardStateNow,
-  markBoardDirty,
-} = useCanvasBoard({
-  defaultBoardName: defaultCanvasName,
-  message,
-  createSnapshot: createBoardSnapshotBase,
-  applySnapshot: applyBoardSnapshot,
-  prepareSnapshotBeforePersist: prepareBoardSnapshotBeforePersist,
-  onPersisted: handleBoardPersisted,
-})
-
-function setBoardNameInputRef(element: HTMLInputElement | null) {
-  boardNameInputRef.value = element
-}
-
-function updateCanvasZoom(delta: number, anchor?: { clientX: number; clientY: number }) {
-  updateZoom(delta, anchor)
-  markCanvasViewportChanged()
-}
-
-async function navigateAway(path: string) {
-  if (path === route.path) return
-  const canLeave = await confirmSaveBeforeLeave()
-  if (!canLeave) return
-  void router.push(path)
-}
-
-let boardDirtySnapshotRafId: number | null = null
-
-function flushBoardDirtySnapshotSchedule() {
-  boardDirtySnapshotRafId = null
-  markBoardDirty()
-  notifySnapshotChanged()
-}
-
-function scheduleBoardDirtySnapshot() {
-  if (boardDirtySnapshotRafId !== null) return
-  boardDirtySnapshotRafId = window.requestAnimationFrame(flushBoardDirtySnapshotSchedule)
-}
-
-function cancelBoardDirtySnapshotSchedule() {
-  if (boardDirtySnapshotRafId === null) return
-  window.cancelAnimationFrame(boardDirtySnapshotRafId)
-  boardDirtySnapshotRafId = null
-}
-
-interface CanvasMutationOptions {
-  content?: boolean
-  layout?: boolean
-  layoutFrame?: boolean
-  viewport?: boolean
-}
-
-function applyCanvasMutationEffects(options: CanvasMutationOptions | undefined) {
-  if (options?.viewport) {
-    bumpCanvasMutationVersion('viewport')
-    scheduleRenderedConnectionsRefresh()
-  }
-  if (suspendWorkflowCacheReactions) return
-  if (options?.layoutFrame) {
-    bumpCanvasMutationVersion('layoutFrame')
-    scheduleRenderedConnectionsRefresh()
-  }
-  if (options?.layout) {
-    bumpCanvasMutationVersion('layout')
-    bumpCanvasMutationVersion('content')
-    scheduleRenderedConnectionsRefresh()
-    scheduleBoardDirtySnapshot()
-    return
-  }
-  if (options?.content) {
-    bumpCanvasMutationVersion('content')
-    scheduleBoardDirtySnapshot()
-  }
-}
-
-function commitCanvasMutation<T>(mutator: () => T, options?: CanvasMutationOptions): T {
-  const result = mutator()
-  applyCanvasMutationEffects(options)
-  return result
-}
-
-function runCanvasMutation(mutator: () => void, options?: CanvasMutationOptions) {
-  commitCanvasMutation(mutator, options)
-}
-
-function markCanvasContentChanged() {
-  applyCanvasMutationEffects({ content: true })
-}
-
-function markCanvasLayoutFrameChanged() {
-  applyCanvasMutationEffects({ layoutFrame: true })
-}
-
-function markCanvasLayoutChanged() {
-  applyCanvasMutationEffects({ layout: true })
-}
-
-function markCanvasViewportChanged() {
-  applyCanvasMutationEffects({ viewport: true })
-}
-
-function markWorkflowInputChanged(fromNodeType: 'prompt' | 'image' | 'mask', fromNodeId: number) {
-  if (suspendWorkflowCacheReactions) return
-  bumpCanvasMutationVersion('workflowInput')
-  markConnectedExecutionTargetsDirty(fromNodeType, fromNodeId)
-}
-
-function markExecutionInputChanged(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
-  if (suspendWorkflowCacheReactions) return
-  bumpCanvasMutationVersion('executionInput')
-  markExecutionNodeDirty(nodeType, nodeId)
-}
-
-function markExecutionInputContentChanged(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
-  markExecutionInputChanged(nodeType, nodeId)
-  markCanvasContentChanged()
-}
-
-function markExecutionOutputChanged(nodeType: CanvasExecutionOutputNodeType, nodeId: number) {
-  if (suspendWorkflowCacheReactions) return
-  const node = getExecutionOutputNodeByType(nodeType, nodeId)
-  if (!node) return
-  bumpCanvasMutationVersion('executionOutput')
-  bumpCanvasMutationVersion('preview')
-  setWorkflowNodeOutputStatus(node)
-  markConnectedExecutionTargetsDirty(nodeType, nodeId)
-}
-
-function markMaskNodeChanged(node: MaskNodeItem) {
-  markWorkflowInputChanged('mask', node.id)
-  bumpCanvasMutationVersion('preview')
-  markCanvasLayoutChanged()
-  void refreshProcessedMaskPreview(node)
-}
-
-function buildConnectionTargetSignatureMapFromConnections(
-  sourceConnections: CanvasConnection[],
-): Record<string, string> {
-  const grouped: Record<string, string[]> = {}
-  sourceConnections.forEach((connection) => {
-    const targetKey = `${connection.toNodeType}:${connection.toNodeId}`
-    if (!grouped[targetKey]) {
-      grouped[targetKey] = []
-    }
-    grouped[targetKey].push(`${connection.fromNodeType}:${connection.fromNodeId}:${connection.fromPort}->${connection.toPort}`)
-  })
-  return Object.entries(grouped).reduce<Record<string, string>>((acc, [key, values]) => {
-    acc[key] = values.sort().join('|')
-    return acc
-  }, {})
-}
-
-function applyConnectionMutationEffects(
-  previousConnections: CanvasConnection[],
-  nextConnections: CanvasConnection[],
-) {
-  if (suspendWorkflowCacheReactions) return
-  markCanvasLayoutChanged()
-  const previousMap = buildConnectionTargetSignatureMapFromConnections(previousConnections)
-  const nextMap = buildConnectionTargetSignatureMapFromConnections(nextConnections)
-  const keys = new Set([...Object.keys(previousMap), ...Object.keys(nextMap)])
-  keys.forEach((key) => {
-    if (previousMap[key] === nextMap[key]) return
-    const [nodeType, rawNodeId] = key.split(':')
-    const nodeId = Number(rawNodeId)
-    if (!Number.isFinite(nodeId)) return
-    if (isCanvasExecutionOutputNodeType(nodeType)) {
-      markExecutionInputChanged(nodeType, nodeId)
-      return
-    }
-    if (nodeType === 'mask') {
-      markWorkflowInputChanged('mask', nodeId)
-    }
-  })
-}
-
-watch(
-  () => userStore.user?.id,
-  () => {
-    reloadPendingRecycleEntries()
-  },
-  { immediate: true },
+const boardOptions = computed(() =>
+  boardMetas.value.map(board => ({ id: board.id, name: board.name })),
 )
-
-installCanvasMutationDevGuard()
-
-const { deleteNodeFromCollection } = useWorkspaceNodeLifecycle({
-  queueWorkspaceUploadUrlsForRecycle,
-  clearNodeConnectionError,
-  setExecutionNodeLastRunFailed,
-  removeConnectionsForNode,
-  removeSelectedNodeKey,
-  markCanvasLayoutChanged,
+const flowPromptPlaceholder = computed(() => {
+  return activeTool.value === 'text'
+    ? '文本工具稍后接入，请在节点内执行生成'
+    : '请在节点内执行生成'
 })
+const canvasGridStyle = computed(() => ({
+  '--zoom': `${Math.max(0.5, zoomLevel.value / 100)}`,
+  '--offset-x': `${viewportOffsetX.value}px`,
+  '--offset-y': `${viewportOffsetY.value}px`,
+}))
 
-function deletePromptNode(id: number) {
-  deleteNodeFromCollection(promptNodes, 'prompt', id, () => {
-    if (activePromptNodeId.value === id) {
-      activePromptNodeId.value = null
-    }
+function setBoardNameInputRef(el: HTMLInputElement | null) {
+  boardNameInputRef.value = el
+}
+
+function refreshBoardMetas() {
+  boardMetas.value = listCanvasBoards()
+}
+
+function toggleBoardMenu() {
+  if (!isBoardMenuOpen.value) refreshBoardMetas()
+  isBoardMenuOpen.value = !isBoardMenuOpen.value
+}
+
+function startBoardRename() {
+  if (!currentBoardId.value) return
+  isRenamingBoard.value = true
+  isBoardMenuOpen.value = false
+  boardNameDraft.value = currentBoardName.value
+  void nextTick(() => {
+    boardNameInputRef.value?.focus()
+    boardNameInputRef.value?.select()
   })
 }
 
-function deleteModelNode(id: number) {
-  deleteNodeFromCollection(modelNodes, 'model', id, () => {
-    if (activeModelNodeId.value === id) {
-      activeModelNodeId.value = null
+function cancelBoardRename() {
+  isRenamingBoard.value = false
+  boardNameDraft.value = ''
+}
+
+function closeBoardHeaderEditing() {
+  isBoardMenuOpen.value = false
+  cancelBoardRename()
+}
+
+function clearFlowSelection(): boolean {
+  let hasSelection = false
+  const nextNodes = (nodes.value as Array<Node & { selected?: boolean }>).map((node) => {
+    if (node.selected) {
+      hasSelection = true
+      return { ...node, selected: false }
     }
+    return node
   })
-}
-
-function deleteViewpointNode(id: number) {
-  deleteNodeFromCollection(viewpointNodes, 'viewpoint', id, () => {
-    if (activeViewpointNodeId.value === id) {
-      activeViewpointNodeId.value = null
+  const nextEdges = (edges.value as Array<Edge & { selected?: boolean }>).map((edge) => {
+    if (edge.selected) {
+      hasSelection = true
+      return { ...edge, selected: false }
     }
+    return edge
   })
-}
-
-function deleteMaskNode(id: number) {
-  deleteNodeFromCollection(maskNodes, 'mask', id, () => {
-    removeMaskRuntimeFor(id)
-    clearProcessedMaskPreview(id)
-    if (activeMaskNodeId.value === id) {
-      activeMaskNodeId.value = null
-    }
-  })
-}
-
-function deleteImageNode(id: number) {
-  deleteNodeFromCollection(imageNodes, 'image', id, () => {
-    if (activeImageNodeId.value === id) {
-      activeImageNodeId.value = null
-    }
-  })
-}
-
-function deleteColorNode(id: number) {
-  deleteNodeFromCollection(colorNodes, 'color', id, () => {
-    if (activeColorNodeId.value === id) {
-      activeColorNodeId.value = null
-    }
-  })
-}
-
-function deleteEnhanceNode(id: number) {
-  deleteNodeFromCollection(enhanceNodes, 'enhance', id, () => {
-    if (activeEnhanceNodeId.value === id) {
-      activeEnhanceNodeId.value = null
-    }
-  })
-}
-
-function deleteEditNode(id: number) {
-  deleteNodeFromCollection(editNodes, 'edit', id, () => {
-    if (activeEditNodeId.value === id) {
-      activeEditNodeId.value = null
-    }
-  })
-}
-
-function deleteFusionNode(id: number) {
-  deleteNodeFromCollection(fusionNodes, 'fusion', id, () => {
-    if (activeFusionNodeId.value === id) {
-      activeFusionNodeId.value = null
-    }
-  })
-}
-
-function deleteWearNode(id: number) {
-  deleteNodeFromCollection(wearNodes, 'wear', id, () => {
-    if (activeWearNodeId.value === id) {
-      activeWearNodeId.value = null
-    }
-  })
-}
-
-function createNodeFromContextMenu<T extends { id: number }>(
-  createAt: (point: { x: number; y: number }) => T,
-  append: (node: T) => void,
-  activate: (id: number) => void,
-  afterCreate?: (node: T) => void,
-) {
-  const { clientX, clientY } = nodeContextMenu.value
-  const point = getCanvasPointFromClient(clientX, clientY)
-  runCanvasMutation(() => {
-    const newNode = createAt(point)
-    append(newNode)
-    activate(newNode.id)
-    afterCreate?.(newNode)
-  }, { layout: true })
-  closeNodeContextMenu()
-}
-
-function buildNodeCreateHandler<T extends { id: number }>(
-  createAt: (point: { x: number; y: number }) => T,
-  collection: Ref<T[]>,
-  activate: (id: number) => void,
-  afterCreate?: (node: T) => void,
-) {
-  return () => createNodeFromContextMenu(
-    createAt,
-    (newNode) => collection.value.push(newNode),
-    activate,
-    afterCreate,
-  )
-}
-
-const nodeContextMenuHandlers: Record<CanvasNodeCreateActionKey, () => void> = {
-  createImageNode: buildNodeCreateHandler(createImageNodeAt, imageNodes, activateImageNode),
-  createPromptNode: buildNodeCreateHandler(createPromptNodeAt, promptNodes, activatePromptNode),
-  createModelNode: buildNodeCreateHandler(createModelNodeAt, modelNodes, activateModelNode),
-  createViewpointNode: buildNodeCreateHandler(createViewpointNodeAt, viewpointNodes, activateViewpointNode),
-  createMaskNode: buildNodeCreateHandler(createMaskNodeAt, maskNodes, activateMaskNode),
-  createEditNode: buildNodeCreateHandler(createEditNodeAt, editNodes, activateEditNode),
-  createFusionNode: buildNodeCreateHandler(createFusionNodeAt, fusionNodes, activateFusionNode),
-  createEnhanceNode: buildNodeCreateHandler(createEnhanceNodeAt, enhanceNodes, activateEnhanceNode),
-  createWearNode: buildNodeCreateHandler(createWearNodeAt, wearNodes, activateWearNode),
-  createColorNode: buildNodeCreateHandler(createColorNodeAt, colorNodes, activateColorNode),
-}
-
-function handleNodeMenuAction(actionKey: CanvasNodeCreateActionKey) {
-  nodeContextMenuHandlers[actionKey]?.()
-}
-
-function handleConnectionPortMouseDown(
-  event: MouseEvent,
-  nodeType: CanvasConnectionNodeType,
-  nodeId: number,
-  port: CanvasConnectionPort,
-) {
-  clearSelectedIds()
-  clearSelectedConnection()
-  closeNodeContextMenu()
-  const target = event.currentTarget as HTMLElement | null
-  const direction = target?.dataset.portDirection
-  if (direction === 'input') {
-    const existingConnection = findIncomingConnection(nodeType, nodeId, port)
-    if (!existingConnection) return
-    beginConnectionReconnect(existingConnection.id)
-    return
-  }
-  startConnectionDrag(event, nodeType, nodeId, port)
-}
-
-function onConnectionPathMouseDown(event: MouseEvent, connectionId: number) {
-  event.preventDefault()
-  event.stopPropagation()
-  clearSelectedIds()
-  closeNodeContextMenu()
-  clearSelectedConnection()
-  selectConnection(connectionId)
-}
-
-function onMaskStageDrop(e: DragEvent, node: MaskNodeItem) {
-  isDraggingFile.value = false
-  handleMaskStageDrop(e, node)
-}
-
-function onImageNodeStageDrop(e: DragEvent, node: ImageNodeItem) {
-  isDraggingFile.value = false
-  handleImageNodeStageDrop(e, node)
-}
-
-async function handleDrop(e: DragEvent) {
-  isDraggingFile.value = false
-  await handleCanvasDropCore(e)
-}
-
-function clearStyleStrengthLongPressTimer() {
-  if (!styleStrengthLongPressTimer) return
-  clearTimeout(styleStrengthLongPressTimer)
-  styleStrengthLongPressTimer = null
-}
-
-function clearStyleStrengthHideTimer() {
-  if (!styleStrengthHideTimer) return
-  clearTimeout(styleStrengthHideTimer)
-  styleStrengthHideTimer = null
-}
-
-function removeStyleStrengthGlobalListeners() {
-  window.removeEventListener('mousemove', onStyleInnovateMouseMove, true)
-  window.removeEventListener('mouseup', onStyleInnovateMouseUp, true)
-}
-
-function addStyleStrengthGlobalListeners() {
-  window.addEventListener('mousemove', onStyleInnovateMouseMove, true)
-  window.addEventListener('mouseup', onStyleInnovateMouseUp, true)
-}
-
-function getStyleStrengthTrackEl(): HTMLElement | null {
-  if (Array.isArray(styleStrengthTrackRef.value)) {
-    return styleStrengthTrackRef.value[0] ?? null
-  }
-  return styleStrengthTrackRef.value
-}
-
-function setStyleStrengthTrackRef(el: Element | ComponentPublicInstance | null) {
-  const targetEl =
-    el instanceof HTMLElement
-      ? el
-      : el && '$el' in el && (el as ComponentPublicInstance).$el instanceof HTMLElement
-        ? (el as ComponentPublicInstance).$el
-        : null
-  styleStrengthTrackRef.value = targetEl
-}
-
-function setCanvasImageRef(id: number, el: Element | ComponentPublicInstance | null) {
-  const imageEl =
-    el instanceof HTMLImageElement
-      ? el
-      : el && '$el' in el && (el as ComponentPublicInstance).$el instanceof HTMLImageElement
-        ? (el as ComponentPublicInstance).$el
-        : null
-
-  if (imageEl) {
-    canvasImageRefs.set(id, imageEl)
-    return
-  }
-  canvasImageRefs.delete(id)
-}
-
-function getStyleStrengthMenuStyle(item: CanvasImageItem): { top: string; left: string } {
-  const imageEl = canvasImageRefs.get(item.id)
-  if (!imageEl) {
-    return { top: '8px', left: `calc(100% + ${styleStrengthMenuGap}px)` }
-  }
-  const top = Math.max(0, imageEl.offsetTop)
-  const left = Math.max(0, imageEl.offsetLeft + imageEl.clientWidth + styleStrengthMenuGap)
-  return {
-    top: `${top}px`,
-    left: `${left}px`,
-  }
-}
-
-function getActiveCanvasImageItem(): CanvasImageItem | null {
-  const id = activeImageActionId.value ?? selectedIds.value[0] ?? null
-  if (id === null) return null
-  return messages.value.find(item => item.id === id) ?? null
-}
-
-function updateStyleStrengthFromClientY(clientY: number) {
-  const track = getStyleStrengthTrackEl()
-  if (!track) return
-  const rect = track.getBoundingClientRect()
-  if (rect.height <= 0) return
-  const ratio = 1 - (clientY - rect.top) / rect.height
-  const clamped = Math.max(0, Math.min(1, ratio))
-  styleInnovateStrength.value = Math.max(0, Math.min(100, Math.round(clamped * 100)))
-}
-
-function beginStyleStrengthDragging(clientY: number) {
-  showStyleStrengthControl.value = true
-  styleStrengthDragging = true
-  styleStrengthPointerY = clientY
-  addStyleStrengthGlobalListeners()
-  void nextTick(() => updateStyleStrengthFromClientY(styleStrengthPointerY))
-}
-
-function onStyleInnovateMouseDown(e: MouseEvent) {
-  if (directGenerating.value) return
-  clearStyleStrengthHideTimer()
-  clearStyleStrengthLongPressTimer()
-  suppressStyleInnovateClick.value = false
-  styleStrengthDragging = false
-  styleStrengthPointerY = e.clientY
-
-  styleStrengthLongPressTimer = window.setTimeout(() => {
-    suppressStyleInnovateClick.value = true
-    beginStyleStrengthDragging(styleStrengthPointerY)
-  }, 260)
-
-  addStyleStrengthGlobalListeners()
-}
-
-function onStyleInnovateMouseMove(e: MouseEvent) {
-  styleStrengthPointerY = e.clientY
-  if (!styleStrengthDragging || !showStyleStrengthControl.value) return
-  updateStyleStrengthFromClientY(e.clientY)
-}
-
-function onStyleInnovateMouseUp() {
-  clearStyleStrengthLongPressTimer()
-  removeStyleStrengthGlobalListeners()
-  if (!styleStrengthDragging) return
-  styleStrengthDragging = false
-  clearStyleStrengthHideTimer()
-  showStyleStrengthControl.value = false
-
-  const target = getActiveCanvasImageItem()
-  if (!target) return
-  void runCanvasAction('style-innovate', target)
-}
-
-function onStyleStrengthTrackMouseDown(e: MouseEvent) {
-  clearStyleStrengthHideTimer()
-  beginStyleStrengthDragging(e.clientY)
-}
-
-function onStyleInnovateClick(item: CanvasImageItem) {
-  if (suppressStyleInnovateClick.value) {
-    suppressStyleInnovateClick.value = false
-    return
-  }
-  void runCanvasAction('style-innovate', item)
-}
-
-const selectedPreviewItems = computed(() => {
-  const messageMap = new Map(messages.value.map(item => [item.id, item]))
-  return selectedIds.value
-    .map(id => messageMap.get(id))
-    .filter((item): item is CanvasImageItem => !!item && item.type === 'image' && !!item.url)
-    .map(item => ({ id: item.id, url: item.url }))
-})
-const promptPlaceholder = computed(() => 'Pattern generation prompt')
-const hasDirectPrompt = computed(() => !!userPrompt.value.trim())
-const selectedRatio = ref<PatternGenerateRatioOption>('3:4')
-const selectedQuality = ref<GenerateQualityOption>('1k')
-
-function getImageNodeConnectionOutput(node: ImageNodeItem | null): { url: string; ratio: number } | null {
-  if (!node) return null
-  return getImageNodePreferredImage(node)
-}
-
-function getImageNodeConnectedInput(node: ImageNodeItem): { url: string; ratio: number; mode: 'mask' | 'linked-output' | 'node-output' } | null {
-  const connection = findIncomingConnection('image', node.id, 'image')
-  if (!connection) return null
-  if (connection.fromNodeType === 'mask') {
-    const sourceNode = maskNodes.value.find(item => item.id === connection.fromNodeId) ?? null
-    if (!sourceNode || !getMaskExecutionDataUrl(sourceNode)) return null
-    const source = getMaskNodeEffectiveSource(sourceNode)
-    return {
-      url: getMaskNodeProcessedOutputUrl(sourceNode),
-      ratio: source.ratio,
-      mode: 'mask',
-    }
-  }
-  const resolvedImage = getConnectedImageInput('image', node.id, 'image')
-  if (!resolvedImage) return null
-  return {
-    ...resolvedImage,
-    mode: connection.fromNodeType === 'image' ? 'linked-output' : 'node-output',
-  }
-}
-
-function getResolvedImageNodeDisplay(node: ImageNodeItem): { image: { url: string; ratio: number } | null; mode: 'source' | 'node-output' | 'linked-output' | 'mask' | 'pending' } {
-  if (hasIncomingPortConnection('image', node.id, 'image')) {
-    const connectedInput = getImageNodeConnectedInput(node)
-    if (!connectedInput) {
-      return {
-        image: null,
-        mode: 'pending',
-      }
-    }
-    return {
-      image: {
-        url: connectedInput.url,
-        ratio: connectedInput.ratio,
-      },
-      mode: connectedInput.mode,
-    }
-  }
-
-  const preferredImage = getImageNodePreferredImage(node)
-  if (node.outputImages.length > 0 && preferredImage) {
-    return {
-      image: preferredImage,
-      mode: 'node-output',
-    }
-  }
-
-  return {
-    image: preferredImage,
-    mode: 'source',
-  }
-}
-
-function getImageNodeStageHeight(node: ImageNodeItem): number {
-  const displayImage = getResolvedImageNodeDisplay(node).image
-  if (!displayImage) return 160
-  const stageWidth = Math.max(120, node.width - 24)
-  const ratio = Number.isFinite(displayImage.ratio) && displayImage.ratio > 0
-    ? displayImage.ratio
-    : 1
-  const dynamicHeight = Math.round(stageWidth * ratio)
-  return Math.max(110, dynamicHeight)
-}
-
-function appendImageNodeDisplayToCanvas(node: ImageNodeItem) {
-  const display = getResolvedImageNodeDisplay(node).image
-  if (!display) return
-  runCanvasMutation(() => {
-    const item = createCanvasImageItemAt(
-      { x: node.x - 360, y: node.y + 18 },
-      display.url,
-      display.ratio,
-    )
-    messages.value.push(item)
-    selectedIds.value = [item.id]
-  }, { layout: true })
-}
-
-function onImageNodeDisplayDragStart(event: DragEvent, node: ImageNodeItem) {
-  const display = getResolvedImageNodeDisplay(node).image
-  if (!display || !event.dataTransfer) return
-  event.dataTransfer.effectAllowed = 'copy'
-  event.dataTransfer.setData(nodeImageDragMime, display.url)
-  event.dataTransfer.setData(`${nodeImageDragMime}-ratio`, String(display.ratio || 1))
-}
-
-function getMaskNodeConnectedImageInput(node: MaskNodeItem): { url: string; ratio: number } | null {
-  return getConnectedImageInput('mask', node.id, 'image')
-}
-
-function getMaskNodeEffectiveSource(node: MaskNodeItem): { url: string; ratio: number; connected: boolean } {
-  const connectedImage = getMaskNodeConnectedImageInput(node)
-  if (connectedImage) {
-    return {
-      url: connectedImage.url,
-      ratio: connectedImage.ratio,
-      connected: true,
-    }
-  }
-  return {
-    url: node.sourceImageUrl,
-    ratio: node.sourceImageRatio,
-    connected: false,
-  }
-}
-
-function setViewpointNodeCategory(node: ViewpointNodeItem, category: ViewpointNodeItem['activeCategory']) {
-  runCanvasMutation(() => {
-    node.activeCategory = category
-    node.selectedViewpoint = normalizeViewpointSelectionByCategory(category, node.selectedViewpoint)
-  }, { content: true })
-  markExecutionInputChanged('viewpoint', node.id)
-}
-
-function getCanvasConnectionNodeByType(
-  nodeType: CanvasConnectionNodeType,
-  nodeId: number,
-): CanvasNodeItem | null {
-  switch (nodeType) {
-    case 'prompt':
-      return promptNodes.value.find(item => item.id === nodeId) ?? null
-    case 'image':
-      return imageNodes.value.find(item => item.id === nodeId) ?? null
-    case 'mask':
-      return maskNodes.value.find(item => item.id === nodeId) ?? null
-    case 'color':
-      return colorNodes.value.find(item => item.id === nodeId) ?? null
-    case 'model':
-      return modelNodes.value.find(item => item.id === nodeId) ?? null
-    case 'viewpoint':
-      return viewpointNodes.value.find(item => item.id === nodeId) ?? null
-    case 'edit':
-      return editNodes.value.find(item => item.id === nodeId) ?? null
-    case 'fusion':
-      return fusionNodes.value.find(item => item.id === nodeId) ?? null
-    case 'enhance':
-      return enhanceNodes.value.find(item => item.id === nodeId) ?? null
-    case 'wear':
-      return wearNodes.value.find(item => item.id === nodeId) ?? null
-    default:
-      return null
-  }
-}
-
-function resolvePreferredOutputNodeId(connectedOutputNodeId: number | null): number | null {
-  return connectedOutputNodeId ?? resolvePreferredImageOutputNode()?.id ?? null
-}
-
-function buildPlacementSource(url: string, x: number, y: number): CanvasImageItem {
-  return {
-    id: -Date.now(),
-    type: 'image',
-    url,
-    x,
-    y,
-    width: 300,
-  }
-}
-
-function warnMissingNodeInputs(
-  nodeType: CanvasConnectionNodeType,
-  nodeId: number,
-  missingPorts: string[],
-  formatMessage: (state: { disconnectedPorts: string[]; pendingPorts: string[] }) => string,
-): boolean {
-  if (missingPorts.length === 0) return false
-  const { disconnectedPorts, pendingPorts } = getNodeRequiredPortIssues(nodeType, nodeId, missingPorts)
-  const unresolvedPorts = missingPorts.filter(
-    port => !disconnectedPorts.includes(port) && !pendingPorts.includes(port),
-  )
-  const mergedDisconnectedPorts = disconnectedPorts.concat(unresolvedPorts)
-  triggerNodeConnectionError(nodeType, nodeId, missingPorts)
-  message.warning(formatMessage({ disconnectedPorts: mergedDisconnectedPorts, pendingPorts }))
+  if (!hasSelection) return false
+  nodes.value = nextNodes
+  edges.value = nextEdges
   return true
 }
 
-function setEnhanceNodeMode(node: EnhanceNodeItem, mode: EnhanceNodeItem['mode']) {
-  if (node.mode === mode) return
-  node.mode = mode
-  if (!enhanceModeSupportsPrompt(mode)) {
-    removeIncomingConnectionsForPort('enhance', node.id, 'prompt')
-  }
-  if (!enhanceModeSupportsMask(mode)) {
-    removeIncomingConnectionsForPort('enhance', node.id, 'mask')
-  }
-  markExecutionInputContentChanged('enhance', node.id)
+function onPaneClick() {
+  closeBoardHeaderEditing()
+  closeNodeContextMenu()
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  clearFlowSelection()
 }
 
-function setEditNodeMode(node: EditNodeItem, mode: EditNodeItem['mode']) {
-  if (node.mode === mode) return
-  node.mode = mode
-  if (!editModeSupportsPrompt(mode)) {
-    removeIncomingConnectionsForPort('edit', node.id, 'prompt')
-  }
-  if (!editModeSupportsSourceImage(mode)) {
-    removeIncomingConnectionsForPort('edit', node.id, 'imageB')
-  }
-  markExecutionInputContentChanged('edit', node.id)
+function closeNodeContextMenu() {
+  nodeContextMenu.value.visible = false
 }
 
-function getMaskNodeStageHeight(node: MaskNodeItem): number {
-  const source = getMaskNodeEffectiveSource(node)
-  return getMaskStageHeight({
-    ...node,
-    sourceImageUrl: source.url,
-    sourceImageRatio: source.ratio,
-  })
+function onPaneContextMenu(event: MouseEvent) {
+  event.preventDefault()
+  closeBoardHeaderEditing()
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  clearFlowSelection()
+  const flowPoint = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
+  const rect = canvasWrapRef.value?.getBoundingClientRect()
+  const x = rect ? event.clientX - rect.left : event.clientX
+  const y = rect ? event.clientY - rect.top : event.clientY
+  nodeContextMenu.value = { visible: true, x, y, flowX: flowPoint.x, flowY: flowPoint.y }
 }
 
-function removeColorNodeColor(node: ColorNodeItem, index: number) {
-  if (index < 0 || index >= node.colors.length) return
-  node.colors.splice(index, 1)
-  markExecutionInputContentChanged('color', node.id)
+function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
+  createNodeAtPosition(kind, nodeContextMenu.value.flowX, nodeContextMenu.value.flowY)
+  closeNodeContextMenu()
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
 }
 
-function addColorNodeColor(node: ColorNodeItem, rawColor: string) {
-  if (node.colors.length >= MAX_COLOR_NODE_SWATCHES) {
-    message.warning('最多保留 8 种颜色')
+function onFlowNodeClick(payload: NodeMouseEvent) {
+  if (activeTool.value === 'hand') return
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  const targetNodeId = payload.node.id
+  const event = payload.event
+  if (shouldSkipNodeClickAfterManualSelection(targetNodeId)) return
+  applyFlowNodeSelection(targetNodeId, event instanceof MouseEvent ? event : null)
+}
+
+function applyFlowNodeSelection(targetNodeId: string, event: MouseEvent | null) {
+  if (activeTool.value === 'hand') return
+  const isShiftToggle = !!event?.shiftKey
+  const flowNodes = nodes.value as Array<{ id: string; selected?: boolean } & Record<string, unknown>>
+  const flowEdges = edges.value as Array<{ selected?: boolean } & Record<string, unknown>>
+  if (isShiftToggle) {
+    nodes.value = flowNodes.map((node) => (
+      node.id === targetNodeId
+        ? { ...node, selected: !node.selected }
+        : node
+    )) as unknown as Node[]
     return
   }
-  const nextColor = normalizeHexColor(rawColor)
-  if (node.colors.includes(nextColor)) return
-  node.colors.push(nextColor)
-  markExecutionInputContentChanged('color', node.id)
+  nodes.value = flowNodes.map((node) => (
+    node.id === targetNodeId
+      ? (node.selected ? node : { ...node, selected: true })
+      : (node.selected ? { ...node, selected: false } : node)
+  )) as unknown as Node[]
+  edges.value = flowEdges.map((edge) => (
+    edge.selected ? { ...edge, selected: false } : edge
+  )) as unknown as Edge[]
 }
 
-const {
-  getNodeConnectionStatus,
-  getConnectedImageInput,
-  getConnectedPromptInput,
-  getConnectedOutputImageTarget,
-  resolveConnectedPlacedImageInput,
-  resolveConnectedPlacedMaskInput,
-  getMissingRequiredNodeInputs,
-} = useCanvasNodeConnections({
-  imageNodes,
-  promptNodes,
-  maskNodes,
-  getIncomingConnections,
-  hasIncomingPortConnection,
-  hasOutgoingPortConnection,
-  findIncomingConnection,
-  getOutgoingConnections,
-  getImageNodePreferredImage,
-  lookupNodeByType: getCanvasConnectionNodeByType,
-  refineExecutionMaskDataUrl,
-})
-
-const {
-  getNodeRequiredPortIssues,
-  getNodeUiState,
-} = useCanvasNodeUiState({
-  getNodeConnectionStatus,
-  lookupNodeByType: getCanvasConnectionNodeByType,
-  isExecutionNodeRunning,
-  isNodeLastRunFailed: isExecutionNodeLastRunFailed,
-})
-
-function resolveWorkflowPromptText(
-  nodeType: CanvasConnectionNodeType,
-  nodeId: number,
-  fallback = '',
-): string {
-  return getConnectedPromptInput(nodeType, nodeId, 'prompt') || fallback
-}
-
-const nodeCopyMode = computed(() => isDuplicateModifierPressed.value && activeTool.value === 'select')
-
-interface CanvasRectLike {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-function toNodeRenderKey(nodeType: CanvasConnectionNodeType, nodeId: number): string {
-  return `${nodeType}:${nodeId}`
-}
-
-function isNodeKeyRetained(nodeType: CanvasConnectionNodeType, nodeId: number, retainedKeys: Set<string>): boolean {
-  return retainedKeys.has(toNodeRenderKey(nodeType, nodeId))
-}
-
-function filterRetainedNodes<T extends { id: number }>(nodeType: CanvasConnectionNodeType, nodes: T[]): T[] {
-  return nodes.filter(node => isNodeKeyRetained(nodeType, node.id, retainedNodeKeys.value))
-}
-
-function isConnectionRetainedByNodes(connection: CanvasConnection, retainedKeys: Set<string>): boolean {
-  return (
-    retainedKeys.has(toNodeRenderKey(connection.fromNodeType, connection.fromNodeId)) &&
-    retainedKeys.has(toNodeRenderKey(connection.toNodeType, connection.toNodeId))
-  )
-}
-
-function estimateNodeRect(
-  node: { x: number; y: number; width: number },
-  estimatedHeight: number,
-): CanvasRectLike {
-  return {
-    x: node.x,
-    y: node.y,
-    width: Math.max(120, node.width || 0),
-    height: Math.max(96, estimatedHeight),
+function onFlowNodeMouseDown(nodeId: string, event: MouseEvent) {
+  if (event.button === 0) {
+    activeMessageActionNodeId.value = null
+    hideFlowStyleStrengthControl()
+  }
+  applyFlowNodeSelection(nodeId, event)
+  lastManualNodeSelection = {
+    nodeId,
+    timestamp: Date.now(),
   }
 }
 
-function estimateMessageRect(item: CanvasImageItem): CanvasRectLike {
-  const width = Math.max(120, item.width || 300)
-  const ratio = Number.isFinite(item.height_ratio) && (item.height_ratio ?? 0) > 0
-    ? Number(item.height_ratio)
-    : 1
-  const displayHeight = Math.max(72, Math.round(width * ratio))
-  return {
-    x: item.x,
-    y: item.y,
-    width,
-    height: displayHeight + 12,
+function shouldSkipNodeClickAfterManualSelection(nodeId: string): boolean {
+  if (!lastManualNodeSelection) return false
+  const isSameNode = lastManualNodeSelection.nodeId === nodeId
+  const isRecent = Date.now() - lastManualNodeSelection.timestamp < 400
+  if (!isSameNode || !isRecent) {
+    lastManualNodeSelection = null
+    return false
   }
+  lastManualNodeSelection = null
+  return true
 }
 
-function estimateImageNodeHeight(node: ImageNodeItem): number {
-  return getImageNodeStageHeight(node) + 220
-}
-
-function estimateMaskNodeHeight(node: MaskNodeItem): number {
-  return getMaskNodeStageHeight(node) + 240
-}
-
-function collectForcedNodeKeys(): Set<string> {
-  const forcedKeys = new Set<string>()
-  const collect = <T extends { id: number }>(
-    nodeType: CanvasConnectionNodeType,
-    source: T[],
-  ) => {
-    source.forEach((node) => {
-      if (isNodeSelected(nodeType, node.id) || isNodeDragging(nodeType, node.id)) {
-        forcedKeys.add(toNodeRenderKey(nodeType, node.id))
-      }
-    })
-  }
-  collect('image', imageNodes.value)
-  collect('prompt', promptNodes.value)
-  collect('model', modelNodes.value)
-  collect('viewpoint', viewpointNodes.value)
-  collect('mask', maskNodes.value)
-  collect('color', colorNodes.value)
-  collect('edit', editNodes.value)
-  collect('fusion', fusionNodes.value)
-  collect('enhance', enhanceNodes.value)
-  collect('wear', wearNodes.value)
-  return forcedKeys
-}
-
-const baseVisibleNodeKeys = computed(() => {
-  const forcedKeys = collectForcedNodeKeys()
-  const visibleKeys = new Set(forcedKeys)
-
-  const collectVisible = <T extends { id: number }>(
-    nodeType: CanvasConnectionNodeType,
-    source: T[],
-    resolveRect: (node: T) => CanvasRectLike,
-  ) => {
-    source.forEach((node) => {
-      if (isNodeRectVisible(resolveRect(node))) {
-        visibleKeys.add(toNodeRenderKey(nodeType, node.id))
-      }
-    })
-  }
-
-  collectVisible('image', imageNodes.value, node => estimateNodeRect(node, estimateImageNodeHeight(node)))
-  collectVisible('prompt', promptNodes.value, node => estimateNodeRect(node, 240))
-  collectVisible('model', modelNodes.value, node => estimateNodeRect(node, 420))
-  collectVisible('viewpoint', viewpointNodes.value, node => estimateNodeRect(node, 430))
-  collectVisible('mask', maskNodes.value, node => estimateNodeRect(node, estimateMaskNodeHeight(node)))
-  collectVisible('color', colorNodes.value, node => estimateNodeRect(node, 360))
-  collectVisible('edit', editNodes.value, node => estimateNodeRect(node, 320))
-  collectVisible('fusion', fusionNodes.value, node => estimateNodeRect(node, 320))
-  collectVisible('enhance', enhanceNodes.value, node => estimateNodeRect(node, 420))
-  collectVisible('wear', wearNodes.value, node => estimateNodeRect(node, 360))
-
-  return visibleKeys
-})
-
-const prioritizedConnectionIds = computed(() => {
-  const ids = new Set<number>()
-  if (selectedConnectionId.value !== null) {
-    ids.add(selectedConnectionId.value)
-  }
-  if (reconnectingConnectionId.value !== null) {
-    ids.add(reconnectingConnectionId.value)
-  }
-  return ids
-})
-
-const retainedNodeKeys = computed(() => {
-  const seedKeys = baseVisibleNodeKeys.value
-  const retainedKeys = new Set(seedKeys)
-
-  if (seedKeys.size > 0) {
-    connections.value.forEach((connection) => {
-      const fromKey = toNodeRenderKey(connection.fromNodeType, connection.fromNodeId)
-      const toKey = toNodeRenderKey(connection.toNodeType, connection.toNodeId)
-      if (!seedKeys.has(fromKey) && !seedKeys.has(toKey)) return
-      retainedKeys.add(fromKey)
-      retainedKeys.add(toKey)
-    })
-  }
-
-  const priorityIds = prioritizedConnectionIds.value
-  if (priorityIds.size > 0) {
-    connections.value.forEach((connection) => {
-      if (!priorityIds.has(connection.id)) return
-      retainedKeys.add(toNodeRenderKey(connection.fromNodeType, connection.fromNodeId))
-      retainedKeys.add(toNodeRenderKey(connection.toNodeType, connection.toNodeId))
-    })
-  }
-
-  return retainedKeys
-})
-
-const visibleMessages = computed(() => {
-  const forcedMessageIds = new Set<number>(selectedIds.value)
-  if (activeImageActionId.value !== null) {
-    forcedMessageIds.add(activeImageActionId.value)
-  }
-  const visibleMessageIds = new Set(filterVisible(messages.value, estimateMessageRect).map(item => item.id))
-  return messages.value.filter(item => forcedMessageIds.has(item.id) || visibleMessageIds.has(item.id))
-})
-
-const visibleImageNodes = computed(() => filterRetainedNodes('image', imageNodes.value))
-const visiblePromptNodes = computed(() => filterRetainedNodes('prompt', promptNodes.value))
-const visibleModelNodes = computed(() => filterRetainedNodes('model', modelNodes.value))
-const visibleViewpointNodes = computed(() => filterRetainedNodes('viewpoint', viewpointNodes.value))
-const visibleMaskNodes = computed(() => filterRetainedNodes('mask', maskNodes.value))
-const visibleColorNodes = computed(() => filterRetainedNodes('color', colorNodes.value))
-const visibleEditNodes = computed(() => filterRetainedNodes('edit', editNodes.value))
-const visibleFusionNodes = computed(() => filterRetainedNodes('fusion', fusionNodes.value))
-const visibleEnhanceNodes = computed(() => filterRetainedNodes('enhance', enhanceNodes.value))
-const visibleWearNodes = computed(() => filterRetainedNodes('wear', wearNodes.value))
-
-const getImageNodeUiState = (node: ImageNodeItem) => getNodeUiState('image', node)
-const getPromptNodeUiState = (node: PromptNodeItem) => getNodeUiState('prompt', node)
-const getModelNodeUiState = (node: ModelNodeItem) => getNodeUiState('model', node)
-const getViewpointNodeUiState = (node: ViewpointNodeItem) => getNodeUiState('viewpoint', node)
-const getMaskNodeUiState = (node: MaskNodeItem) => getNodeUiState('mask', node)
-const getEditNodeUiState = (node: EditNodeItem) => getNodeUiState('edit', node)
-const getFusionNodeUiState = (node: FusionNodeItem) => getNodeUiState('fusion', node)
-const getEnhanceNodeUiState = (node: EnhanceNodeItem) => getNodeUiState('enhance', node)
-const getWearNodeUiState = (node: WearNodeItem) => getNodeUiState('wear', node)
-const getColorNodeUiState = (node: ColorNodeItem) => getNodeUiState('color', node)
-
-const onImageNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'image', nodeId, port)
-const onPromptNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'prompt', nodeId, port)
-const onModelNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'model', nodeId, port)
-const onViewpointNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'viewpoint', nodeId, port)
-const onMaskNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'mask', nodeId, port)
-const onEditNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'edit', nodeId, port)
-const onFusionNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'fusion', nodeId, port)
-const onEnhanceNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'enhance', nodeId, port)
-const onWearNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'wear', nodeId, port)
-const onColorNodePortMouseDown = (event: MouseEvent, nodeId: number, port: CanvasConnectionPort) =>
-  handleConnectionPortMouseDown(event, 'color', nodeId, port)
-
-const {
-  onPromptNodeTextUpdate,
-  onModelNodeSelectBackground,
-  onModelNodeUpdateAngleYaw,
-  onModelNodeUpdateAngleFraming,
-  onModelNodeUpdateModelStrength,
-  onModelNodeUpdatePoseStrength,
-  onViewpointNodeUpdateLighting,
-  onMaskNodeCanvasMouseDownBridge,
-  onMaskNodeSetDrawMode,
-  onMaskNodeUpdateBrushSize,
-  onMaskNodeUpdateRefineAmount,
-  onMaskNodeToggleInvert,
-  onEditNodeUpdateMode,
-  onFusionNodeUpdateBlendRatio,
-  onEnhanceNodeUpdateMode,
-  onEnhanceNodeUpdateUpscaleMode,
-  onEnhanceNodeUpdateUpscaleFactor,
-  onEnhanceNodeUpdateOutputFormat,
-  onEnhanceNodeUpdateOutputQuality,
-  onEnhanceNodeUpdateExtendTop,
-  onEnhanceNodeUpdateExtendRight,
-  onEnhanceNodeUpdateExtendBottom,
-  onEnhanceNodeUpdateExtendLeft,
-  onWearNodeUpdateTileMode,
-  onWearNodeUpdateRotation,
-  onWearNodeUpdateScale,
-  onWearNodeUpdateOpacity,
-  onColorNodeApplyPreset,
-  onColorNodeStrengthInput,
-} = useWorkspaceNodeUpdateHandlers({
-  markWorkflowInputChanged,
-  markCanvasContentChanged,
-  markExecutionInputContentChanged,
-  markMaskNodeChanged,
-  setEditNodeMode,
-  setEnhanceNodeMode,
-  onMaskCanvasMouseDown,
-  updateModelAngleYaw,
-  updateModelAngleFraming,
-})
-
-const {
-  handleModelNodeGenerate,
-  handleViewpointNodeGenerate,
-  handleEditNodeGenerate,
-  handleFusionNodeGenerate,
-  handleEnhanceNodeGenerate,
-  handleWearNodeGenerate,
-  handleColorNodeGenerate,
-} = useNodeExecutors({
-  message,
-  messages,
-  selectedIds,
-  imageNodes,
-  maskNodes,
-  activeImageNodeId,
-  activeMaskNodeId,
-  getViewpointLabel,
-  getViewpointLightingLabel,
-  getNodeConnectionStatus,
-  triggerNodeConnectionError,
-  resolveNodePromptText: resolveWorkflowPromptText,
-  getConnectedOutputImageTarget,
-  resolvePreferredOutputNodeId,
-  buildPlacementSource,
-  getMissingRequiredNodeInputs,
-  warnMissingNodeInputs,
-  submitTaskAndPoll,
-  appendGeneratedImages,
-  appendWorkflowNodeOutputs,
-  normalizeHexColor,
-  getImageNodePreferredImage,
-  resolveConnectedPlacedImageInput,
-  resolveConnectedPlacedMaskInput,
-  buildFullMaskDataUrl,
-  refineExecutionMaskDataUrl,
-  dataUrlToFile,
-  uploadImage: uploadWorkspaceImage,
-  loadImageSizeFromUrl,
-  setExecutionNodeRunning,
-  setExecutionNodeLastRunFailed,
-  isExecutionNodeRunning,
-})
-
-const {
-  runCanvasAction,
-  handleGenerate,
-  handleExport,
-} = useCanvasDirectActions({
-  generating: directGenerating,
-  selectedIds,
-  activeImageActionId,
-  showStyleStrengthControl,
-  hasDirectPrompt,
-  showSettings,
-  selectedRatio,
-  selectedQuality,
-  userPrompt,
-  messages,
-  styleInnovateStrength,
-  loadImageSizeFromUrl,
-  message,
-  submitTaskAndPoll: submitDirectTaskAndPoll,
-  appendGeneratedImages,
-  createPendingGeneratedImages,
-  replacePendingGeneratedImages,
-  removePendingGeneratedImages,
-  vectorizeImage: vectorizeApi.vectorize,
-})
-
-function onImageLoad(msg: any, event: Event) {
-  const target = event.target as HTMLImageElement | null
-  if (!target || !target.naturalWidth || !target.naturalHeight) return
-  const nextRatio = target.naturalHeight / target.naturalWidth
-  if (msg.height_ratio === nextRatio) return
-  msg.height_ratio = nextRatio
-  markCanvasContentChanged()
-}
-
-function getImageDisplayHeight(item: CanvasImageItem): number {
-  const imageEl = canvasImageRefs.get(item.id)
-  if (imageEl && imageEl.clientHeight > 0) {
-    return Math.round(imageEl.clientHeight)
-  }
-  const width = item.width || 300
-  const ratio = item.height_ratio || 1
-  return Math.max(72, Math.round(width * ratio))
-}
-
-onMounted(() => {
-  addGlobalConnectionListeners()
-  nextTick(() => {
-    scheduleRenderedConnectionsRefresh()
-    maskNodes.value.forEach((node) => {
-      void refreshProcessedMaskPreview(node)
-    })
+function requestLeaveConfirm(): Promise<'save' | 'discard' | 'cancel'> {
+  if (leaveConfirmPromise) return leaveConfirmPromise
+  leaveConfirmVisible.value = true
+  leaveConfirmPromise = new Promise((resolve) => {
+    leaveConfirmResolver = resolve
   })
-  if (userStore.isLoggedIn) {
-    schedulePendingRecycleScan()
+  return leaveConfirmPromise
+}
+
+function resolveLeaveConfirm(choice: 'save' | 'discard' | 'cancel') {
+  if (!leaveConfirmPromise) return
+  leaveConfirmVisible.value = false
+  const resolver = leaveConfirmResolver
+  leaveConfirmResolver = null
+  leaveConfirmPromise = null
+  resolver?.(choice)
+}
+
+async function confirmFlowLeave(): Promise<boolean> {
+  if (skipNextLeaveConfirm) {
+    skipNextLeaveConfirm = false
+    return true
   }
+  if (!isDirty.value || isSavingBoard.value) return true
+  const choice = await requestLeaveConfirm()
+  if (choice === 'discard') return true
+  if (choice === 'cancel') return false
+  return !!(await saveCurrentBoardSnapshot())
+}
+
+function onConfirmBoardRename() {
+  const boardId = `${currentBoardId.value ?? ''}`.trim()
+  if (!boardId) return
+  const normalized = normalizeCanvasBoardName(boardNameDraft.value)
+  isRenamingBoard.value = false
+  boardNameDraft.value = ''
+  if (!normalized) {
+    message.warning('请输入画布名称')
+    return
+  }
+  if (isCanvasBoardNameTaken(boardId, normalized)) {
+    message.warning('名称已存在')
+    return
+  }
+  if (!renameCanvasBoard(boardId, normalized)) {
+    message.warning('重命名失败')
+    return
+  }
+  refreshBoardMetas()
+  message.success('已重命名画布')
+}
+
+function onSelectBoard(boardId: string) {
+  if (!boardId) return
+  refreshBoardMetas()
+  isBoardMenuOpen.value = false
+  if (boardId === currentBoardId.value) return
+  void navigateToBoard(boardId)
+}
+
+async function navigateToBoard(boardId: string) {
+  if (isDirty.value && !(await confirmFlowLeave())) return
+  skipNextLeaveConfirm = true
+  await router.push({ path: '/user/workspace', query: { ...route.query, boardId } })
+}
+
+function setActiveTool(tool: 'select' | 'hand' | 'text') {
+  closeBoardHeaderEditing()
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  activeTool.value = tool
+  if (tool === 'text') {
+    message.info('文本工具稍后接入')
+  }
+}
+
+function onEscapeShortcut() {
+  if (isBoardMenuOpen.value || isRenamingBoard.value) {
+    closeBoardHeaderEditing()
+    return true
+  }
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  return clearFlowSelection()
+}
+
+function onPanViewport(delta: { x: number; y: number }) {
+  const viewport = getViewport()
+  setViewport({
+    x: viewport.x + delta.x,
+    y: viewport.y + delta.y,
+    zoom: viewport.zoom,
+  })
+}
+
+async function onNavigateRequest(path: string) {
+  if (isDirty.value && !(await confirmFlowLeave())) return
+  skipNextLeaveConfirm = true
+  await router.push(path)
+}
+
+function onZoomIn() {
+  zoomIn()
+}
+
+function onZoomOut() {
+  zoomOut()
+}
+
+function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
+  closeBoardHeaderEditing()
+  const transform = payload.flowTransform
+  if (!transform) return
+  if (Number.isFinite(transform.zoom)) {
+    zoomLevel.value = Math.max(10, Math.round((transform.zoom as number) * 100))
+  }
+  if (Number.isFinite(transform.x)) {
+    viewportOffsetX.value = transform.x as number
+  }
+  if (Number.isFinite(transform.y)) {
+    viewportOffsetY.value = transform.y as number
+  }
+}
+
+function buildFlowEdgeClass(edge: { selected?: boolean; sourceHandle?: string | null; targetHandle?: string | null }): string {
+  const tone = resolveFlowEdgeToneFromHandles(edge.sourceHandle, edge.targetHandle)
+  return buildFlowEdgeClassName(tone, !!edge.selected)
+}
+
+function ensureFlowEdgeVisuals() {
+  const source = edges.value as Array<Edge & { data?: { tone?: string } }>
+  const withVisuals = source.map((edge): Edge => {
+    const nextClass = buildFlowEdgeClass(edge)
+    const tone = resolveFlowEdgeToneFromHandles(edge.sourceHandle, edge.targetHandle)
+    return {
+      ...edge,
+      animated: false,
+      class: nextClass,
+      data: {
+        ...(edge.data ?? {}),
+        tone,
+      },
+    }
+  })
+  const same = source
+    .map(edge => `${edge.id}|${edge.class ?? ''}|${edge.animated ? 1 : 0}|${edge.data?.tone ?? ''}`)
+    .join(';')
+    === withVisuals
+      .map(edge => `${edge.id}|${edge.class ?? ''}|${edge.animated ? 1 : 0}|${edge.data?.tone ?? ''}`)
+      .join(';')
+  if (!same) {
+    edges.value = withVisuals
+  }
+}
+
+const flowMaskEffectiveSourceCache = computed(() => {
+  const cache: Record<string, { url: string; ratio: number; hasConnectedImageInput: boolean }> = {}
+  const flowNodes = nodes.value as Array<{ id: string; data?: { kind?: string } }>
+  for (const node of flowNodes) {
+    if (node.data?.kind !== 'mask') continue
+    cache[node.id] = getFlowMaskEffectiveSource(node.id)
+  }
+  return cache
 })
 
-onUnmounted(() => {
-  cancelBoardDirtySnapshotSchedule()
-  clearPendingRecycleScanTimer()
-  void flushPendingRecycleUploads()
-  stopNodeTaskPolling()
-  stopDirectTaskPolling()
-  clearStyleStrengthLongPressTimer()
-  clearStyleStrengthHideTimer()
-  removeStyleStrengthGlobalListeners()
-  removeGlobalConnectionListeners()
-  disposeConnectionRuntime()
+const createNodeOptions: SelectMixedOption[] = [
+  { label: 'Prompt', value: 'prompt' },
+  { label: 'Image', value: 'image' },
+  { label: 'Edit', value: 'edit' },
+  { label: 'Enhance', value: 'enhance' },
+  { label: 'Color', value: 'color' },
+  { label: 'Fusion', value: 'fusion' },
+  { label: 'Wear', value: 'wear' },
+  { label: 'Mask', value: 'mask' },
+  { label: 'Model', value: 'model' },
+  { label: 'Viewpoint', value: 'viewpoint' },
+]
+
+function canCreateNodeKind(kind: string): kind is FlowCreatableNodeKind {
+  return createNodeOptions.some(item => item.value === kind)
+}
+
+function markDirty() {
+  if (canSaveBoard.value) {
+    isDirty.value = true
+    if (saveStatus.value !== 'failed') saveStatus.value = 'idle'
+  }
+}
+
+const flowHistory = useFlowHistory({
+  nodes,
+  edges,
+  maxSteps: 10,
+  onRestore: () => {
+    markDirty()
+  },
+})
+
+type FlowHistorySnapshot = ReturnType<typeof flowHistory.capture>
+
+function refreshSnapshot() {
+  if (snapshotView.value === 'flow') {
+    snapshotText.value = JSON.stringify(
+      {
+        nodes: nodes.value,
+        edges: edges.value,
+      },
+      null,
+      2,
+    )
+    return
+  }
+  const boardSnapshot = flowToCanvasBoardSnapshot({
+    nodes: nodes.value as unknown as FlowAdapterNode[],
+    edges: edges.value as unknown as FlowAdapterEdge[],
+  }, boardBaseSnapshot.value)
+  snapshotText.value = JSON.stringify(boardSnapshot, null, 2)
+}
+
+const boardPersistence = useFlowBoardPersistence({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  boardBaseSnapshot,
+  isDirty,
+  saveStatus,
+  isLoadingBoardSnapshot,
+  isSavingBoard,
+  getBoardIdQuery: () => route.query.boardId,
+  onWarning: (msg) => {
+    message.warning(msg)
+  },
+  onSuccess: (msg) => {
+    message.success(msg)
+  },
+  onError: (msg) => {
+    message.error(msg)
+  },
+  refreshSnapshot,
+  clearFlowHistoryBaseline: flowHistory.clearBaseline,
+  getUserIdentity: () => ({
+    userId: Number(userStore.user?.id),
+    userUid: `${userStore.user?.uid ?? ''}`.trim(),
+  }),
+})
+
+const currentBoardId = boardPersistence.currentBoardId
+const canSaveBoard = boardPersistence.canSaveBoard
+const loadInitialOrRouteBoard = boardPersistence.loadInitialOrRouteBoard
+const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
+const importEmptyBoardSnapshot = boardPersistence.importEmptyBoardSnapshot
+const importBoardSnapshot = boardPersistence.importBoardSnapshot
+
+const saveStateTag = computed<'dirty' | 'saved' | 'failed'>(() => {
+  if (!canSaveBoard.value) return 'failed'
+  if (saveStatus.value === 'saved') return 'saved'
+  if (saveStatus.value === 'failed') return 'failed'
+  return isDirty.value ? 'dirty' : 'saved'
+})
+
+const saveStateText = computed(() => {
+  if (!canSaveBoard.value) {
+    return isLoadingBoardSnapshot.value ? '未启用保存（加载中）' : '未启用保存'
+  }
+  if (saveStatus.value === 'saved' && !isDirty.value) return '已保存'
+  if (saveStatus.value === 'failed') return '保存失败'
+  return '未保存修改'
+})
+
+function copyJson() {
+  void navigator.clipboard.writeText(snapshotText.value || '')
+  message.success('已复制 JSON')
+}
+
+function onAddNode() {
+  const viewport = getViewport()
+  const x = 320 - viewport.x / (viewport.zoom || 1)
+  const y = 180 - viewport.y / (viewport.zoom || 1)
+  createNodeAtPosition(createNodeKind.value, x, y)
+}
+
+const flowNodeMutations = useFlowNodeMutations({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  createNodeKind,
+  boardBaseSnapshot,
+  captureHistory: flowHistory.capture,
+  pushHistory: flowHistory.push,
+  markDirty,
+  refreshSnapshot,
+  appendFlowNodes: (nextNodes) => {
+    nodes.value = [...nodes.value, ...nextNodes]
+    scheduleFlowNodeInternalsRefresh(nextNodes.map(node => node.id))
+  },
+  onWarning: (text) => {
+    message.warning(text)
+  },
+})
+
+const isValidConnection = flowNodeMutations.isValidConnection
+const onConnect = flowNodeMutations.onConnect
+const onEdgeUpdate = flowNodeMutations.onEdgeUpdate
+const createNodeAtPosition = flowNodeMutations.createNodeAtPosition
+const onFlowDeleteNode = flowNodeMutations.onFlowDeleteNode
+const updateSnapshotNodeBase = flowNodeMutations.updateSnapshotNode
+const deleteSelectedFlowElements = flowNodeMutations.deleteSelectedFlowElements
+const onFlowPromptTextUpdate = flowNodeMutations.onFlowPromptTextUpdate
+const onFlowNodeParamUpdate = flowNodeMutations.onFlowNodeParamUpdate
+const onFlowColorApplyPreset = flowNodeMutations.onFlowColorApplyPreset
+const onFlowColorRemove = flowNodeMutations.onFlowColorRemove
+const onFlowColorAdd = flowNodeMutations.onFlowColorAdd
+const onFlowMaskToggleInvert = flowNodeMutations.onFlowMaskToggleInvert
+
+function updateSnapshotNode(
+  nodeId: string,
+  mutate: (snapshotNode: Record<string, unknown>) => Record<string, unknown>,
+  options?: { history?: boolean },
+) {
+  updateSnapshotNodeBase(nodeId, mutate, options)
+  scheduleFlowNodeInternalsRefresh([nodeId])
+}
+
+const selectionExport = useFlowSelectionExport({ nodes, message })
+const hasSelectedFlowNodes = computed(() => selectionExport.hasSelectedNodes())
+
+function onExportSelectedImages() {
+  selectionExport.exportSelectedImages()
+}
+
+function onNodeDragStart() {
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  flowHistory.onNodeDragStart()
+}
+
+function onNodeDragStop() {
+  flowHistory.onNodeDragStop(() => {
+    markDirty()
+  })
+  ensureFlowEdgeVisuals()
+}
+
+function getImageNodeSnapshot(nodeId: string): ImageNodeItem | null {
+  const node = (nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>).find(item => item.id === nodeId)
+  if (!node || node.data?.kind !== 'image' || !node.data.snapshotNode || typeof node.data.snapshotNode !== 'object') return null
+  return node.data.snapshotNode as ImageNodeItem
+}
+
+function getImageNodeDisplayPayload(nodeId: string): { url: string; ratio: number } | null {
+  const snapshot = getImageNodeSnapshot(nodeId)
+  if (!snapshot) return null
+  const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
+  const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
+  const url = `${latestOutput?.url || snapshot.sourceImageUrl || ''}`.trim()
+  if (!url) return null
+  const outputRatio = Number(latestOutput?.ratio)
+  const sourceRatio = Number(snapshot.sourceImageRatio)
+  return {
+    url,
+    ratio: Number.isFinite(outputRatio) && outputRatio > 0
+      ? outputRatio
+      : (Number.isFinite(sourceRatio) && sourceRatio > 0 ? sourceRatio : 1),
+  }
+}
+
+function getMaskNodeSnapshot(nodeId: string): MaskNodeItem | null {
+  const node = (nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>).find(item => item.id === nodeId)
+  if (!node || node.data?.kind !== 'mask' || !node.data.snapshotNode || typeof node.data.snapshotNode !== 'object') return null
+  return node.data.snapshotNode as MaskNodeItem
+}
+
+function resolveFlowImageInputForNode(
+  targetNodeId: string,
+  port: 'image' | 'mask' | 'prompt',
+): { sourceKind: CanvasConnectionNodeType; snapshotNode: Record<string, unknown> } | null {
+  const incomingEdge = (edges.value as Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>)
+    .find(edge => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === port)
+  if (!incomingEdge) return null
+  const sourceNode = (nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>)
+    .find(node => node.id === incomingEdge.source)
+  if (!sourceNode || !sourceNode.data?.snapshotNode || typeof sourceNode.data.snapshotNode !== 'object') return null
+  const sourceKind = sourceNode.data.kind
+  if (
+    sourceKind !== 'image' && sourceKind !== 'edit' && sourceKind !== 'enhance'
+    && sourceKind !== 'color' && sourceKind !== 'fusion' && sourceKind !== 'wear'
+    && sourceKind !== 'model' && sourceKind !== 'viewpoint'
+  ) return null
+  const sourceType = sourceKind as CanvasConnectionNodeType
+  return {
+    sourceKind: sourceType,
+    snapshotNode: sourceNode.data.snapshotNode as Record<string, unknown>,
+  }
+}
+
+function resolveFlowSourceImageRatio(sourceKind: CanvasConnectionNodeType, snapshotNode: Record<string, unknown>): number {
+  if (sourceKind === 'image') {
+    const sourceImageRatio = Number(snapshotNode.sourceImageRatio)
+    if (Number.isFinite(sourceImageRatio) && sourceImageRatio > 0) return sourceImageRatio
+  }
+  const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages as Array<{ ratio?: unknown }> : []
+  const latestOutput = outputImages.length > 0 ? outputImages[outputImages.length - 1] : null
+  const outputRatio = Number(latestOutput?.ratio)
+  if (Number.isFinite(outputRatio) && outputRatio > 0) return outputRatio
+  return 1
+}
+
+function getFlowMaskEffectiveSource(nodeId: string): { url: string; ratio: number; hasConnectedImageInput: boolean } {
+  const maskNode = getMaskNodeSnapshot(nodeId)
+  if (!maskNode) return { url: '', ratio: 1, hasConnectedImageInput: false }
+  const imageInput = resolveFlowImageInputForNode(nodeId, 'image')
+  if (imageInput) {
+    const url = resolveSourceImageFromNode(imageInput.sourceKind, imageInput.snapshotNode).trim()
+    if (url) {
+      return {
+        url,
+        ratio: resolveFlowSourceImageRatio(imageInput.sourceKind, imageInput.snapshotNode),
+        hasConnectedImageInput: true,
+      }
+    }
+  }
+  return {
+    url: (maskNode.sourceImageUrl || '').trim(),
+    ratio: maskNode.sourceImageRatio > 0 ? maskNode.sourceImageRatio : 1,
+    hasConnectedImageInput: false,
+  }
+}
+
+function getFlowMaskEffectiveSourceCached(nodeId: string): { url: string; ratio: number; hasConnectedImageInput: boolean } {
+  return flowMaskEffectiveSourceCache.value[nodeId] || { url: '', ratio: 1, hasConnectedImageInput: false }
+}
+
+function readNodeImageDropPayload(event: DragEvent): { url: string; ratio: number } | null {
+  const rawUrl = event.dataTransfer?.getData(FLOW_NODE_IMAGE_DRAG_MIME)
+  if (!rawUrl) return null
+  const url = rawUrl.trim()
+  if (!url) return null
+  const ratioRaw = event.dataTransfer?.getData(`${FLOW_NODE_IMAGE_DRAG_MIME}-ratio`) || ''
+  const ratio = Number(ratioRaw)
+  return {
+    url,
+    ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
+  }
+}
+
+async function loadImageRatioFromFile(file: File): Promise<number | null> {
+  const localUrl = URL.createObjectURL(file)
+  try {
+    const size = await loadImageSizeFromUrl(localUrl)
+    if (!size || !size.width || !size.height) return null
+    return size.height / size.width
+  } finally {
+    URL.revokeObjectURL(localUrl)
+  }
+}
+
+async function uploadImageToBoard(file: File): Promise<{ url: string; ratio: number }> {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('请上传图片文件')
+  }
+  const boardId = `${currentBoardId.value ?? ''}`.trim()
+  if (!boardId) {
+    throw new Error('缺少 boardId，无法上传图片')
+  }
+  const ratio = await loadImageRatioFromFile(file)
+  const uploadRes = await uploadApi.upload(file, boardId)
+  if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+    throw new Error(sanitizeApiErrorMessage(uploadRes.msg, '上传失败'))
+  }
+  return {
+    url: uploadRes.data.url,
+    ratio: ratio && ratio > 0 ? ratio : 1,
+  }
+}
+
+async function applyImageFileToImageNode(nodeId: string, file: File): Promise<void> {
+  const snapshotNode = getImageNodeSnapshot(nodeId)
+  if (!snapshotNode) {
+    message.warning('Image 节点不存在')
+    return
+  }
+  try {
+    const uploaded = await uploadImageToBoard(file)
+    updateSnapshotNode(nodeId, prev => ({
+      ...prev,
+      sourceImageUrl: uploaded.url,
+      sourceImageRatio: uploaded.ratio,
+      outputImages: [],
+    }))
+    message.success('Image 节点输入已更新')
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : '上传失败'
+    message.warning(msg)
+  }
+}
+
+async function loadImageRatioFromUrl(url: string): Promise<number | null> {
+  const size = await loadImageSizeFromUrl(url)
+  if (!size || !size.width || !size.height) return null
+  return size.height / size.width
+}
+
+function onFlowImageOpenFile(nodeId: string) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    void applyImageFileToImageNode(nodeId, file)
+  }
+  input.click()
+}
+
+function onFlowImageReset(nodeId: string) {
+  updateSnapshotNode(nodeId, prev => ({
+    ...prev,
+    sourceImageUrl: '',
+    sourceImageRatio: 1,
+    outputImages: [],
+  }))
+}
+
+function onFlowImageStageDrop(nodeId: string, event: DragEvent) {
+  event.preventDefault()
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+  void applyImageFileToImageNode(nodeId, file)
+}
+
+function onFlowMaskOpenFile(nodeId: string) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    void applyImageFileToMaskNode(nodeId, file)
+  }
+  input.click()
+}
+
+async function applyImageFileToMaskNode(nodeId: string, file: File): Promise<void> {
+  const snapshotNode = getMaskNodeSnapshot(nodeId)
+  if (!snapshotNode) {
+    message.warning('Mask 节点不存在')
+    return
+  }
+  try {
+    const uploaded = await uploadImageToBoard(file)
+    updateSnapshotNode(nodeId, prev => ({
+      ...prev,
+      sourceImageUrl: uploaded.url,
+      sourceImageRatio: uploaded.ratio,
+      executionMaskDataUrl: '',
+      maskDataUrl: '',
+    }))
+    void nextTick(() => renderMaskNodeMask(nodeId))
+    message.success('Mask 节点输入已更新')
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : '上传失败'
+    message.warning(msg)
+  }
+}
+
+function onFlowMaskClearImage(nodeId: string) {
+  updateSnapshotNode(nodeId, prev => ({
+    ...prev,
+    sourceImageUrl: '',
+    sourceImageRatio: 1,
+    executionMaskDataUrl: '',
+    maskDataUrl: '',
+  }))
+  clearMaskCanvas(nodeId)
+}
+
+function onFlowMaskClearMask(nodeId: string) {
+  updateSnapshotNode(nodeId, prev => ({
+    ...prev,
+    executionMaskDataUrl: '',
+    maskDataUrl: '',
+  }))
+  clearMaskCanvas(nodeId)
+}
+
+async function applyMaskSourceByUrl(nodeId: string, url: string, ratio?: number) {
+  const nextRatio = Number.isFinite(ratio) && Number(ratio) > 0
+    ? Number(ratio)
+    : (await loadImageRatioFromUrl(url)) || 1
+  updateSnapshotNode(nodeId, prev => ({
+    ...prev,
+    sourceImageUrl: url,
+    sourceImageRatio: nextRatio,
+    executionMaskDataUrl: '',
+    maskDataUrl: '',
+  }))
+  void nextTick(() => renderMaskNodeMask(nodeId))
+}
+
+function onFlowMaskStageDrop(nodeId: string, event: DragEvent) {
+  event.preventDefault()
+  const payload = readNodeImageDropPayload(event)
+  if (payload) {
+    void applyMaskSourceByUrl(nodeId, payload.url, payload.ratio)
+    return
+  }
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+  void applyImageFileToMaskNode(nodeId, file)
+}
+
+function onCanvasDragOver(event: DragEvent) {
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  if (!event.dataTransfer) return
+  event.dataTransfer.dropEffect = 'copy'
+}
+
+async function onCanvasDrop(event: DragEvent) {
+  const point = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
+  const nodeKindRaw = event.dataTransfer?.getData(FLOW_NODE_KIND_DRAG_MIME) || ''
+  const nodeKind = nodeKindRaw.trim() as FlowCreatableNodeKind
+  if (nodeKind && createNodeOptions.some(item => item.value === nodeKind)) {
+    createNodeAtPosition(nodeKind, point.x, point.y)
+    return
+  }
+
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    message.warning('请上传图片文件')
+    return
+  }
+  try {
+    const uploaded = await uploadImageToBoard(file)
+    const messageNode = createCanvasImageItemAt({ x: point.x, y: point.y }, uploaded.url, uploaded.ratio)
+    appendMessageFlowNode(messageNode)
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : '上传失败'
+    message.warning(msg)
+  }
+}
+
+function appendMessageFlowNode(item: CanvasImageItem) {
+  const historyBefore = flowHistory.capture()
+  const data: FlowNodeData = {
+    kind: 'message',
+    title: `Message #${item.id}`,
+    summary: 'Canvas message image',
+    inputPorts: [],
+    outputPorts: [],
+    snapshotNode: item,
+  }
+  const nextNode: FlowAdapterNode = {
+    id: `message-${item.id}`,
+    type: 'canvas',
+    dragHandle: resolveFlowNodeDragHandle('message'),
+    position: { x: item.x, y: item.y },
+    data,
+  }
+  ;(nodes.value as unknown as FlowAdapterNode[]).push(nextNode)
+  flowHistory.push(historyBefore)
+  markDirty()
+  refreshSnapshot()
+}
+
+function onFlowMessageContextMenu(nodeId: string, event: MouseEvent) {
+  applyFlowNodeSelection(nodeId, event)
+  activeMessageActionNodeId.value = nodeId
+}
+
+const {
+  onFlowMaskSetCanvasRef,
+  renderMaskNodeMask,
+  onFlowMaskCanvasMouseDown,
+  stopMaskPainting,
+  clearMaskCanvas,
+} = useFlowMaskDrawing({
+  getMaskNodeSnapshot,
+  updateSnapshotNode,
+})
+
+const {
+  onFlowEnhanceGenerate,
+  onFlowEditGenerate,
+  onFlowColorGenerate,
+  onFlowFusionGenerate,
+  onFlowWearGenerate,
+  onFlowModelGenerate,
+  onFlowViewpointGenerate,
+  isFlowExecutionNodeRunning,
+} = useFlowGenerationHandlers({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  currentBoardId,
+  updateSnapshotNode,
+  captureHistory: flowHistory.capture as () => FlowHistorySnapshot,
+  onWarning: (text) => {
+    message.warning(text)
+  },
+  onSuccess: (text) => {
+    message.success(text)
+  },
+  onError: (text) => {
+    message.error(text)
+  },
+})
+
+const {
+  isDirectGenerating,
+  isNodeDirectActionRunning,
+  runPatternGenerate,
+  runMessageDirectAction,
+} = useFlowMessageDirectActions({
+  nodes: nodes as Ref<Node[]>,
+  captureHistory: flowHistory.capture as () => FlowHistorySnapshot,
+  pushHistory: flowHistory.push,
+  markDirty,
+  refreshSnapshot,
+  onSuccess: (text) => {
+    message.success(text)
+  },
+  onWarning: (text) => {
+    message.warning(text)
+  },
+})
+
+const {
+  flowStyleInnovateStrength,
+  flowShowStyleStrengthControl,
+  flowSuppressStyleInnovateClick,
+  setFlowStyleStrengthTrackRef,
+  hideFlowStyleStrengthControl,
+  onFlowStyleInnovateMouseDown,
+  onFlowStyleStrengthTrackMouseDown,
+} = useFlowStyleInnovateControl({
+  onCommit: (strength) => {
+    const targetNodeId = activeMessageActionNodeId.value
+    if (!targetNodeId) return
+    activeMessageActionNodeId.value = null
+    void runMessageDirectAction(targetNodeId, 'style-innovate', { strength })
+  },
+})
+
+function onFlowMessageDirectAction(
+  nodeId: string,
+  action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design',
+) {
+  if (action === 'style-innovate' && flowSuppressStyleInnovateClick.value) {
+    return
+  }
+  activeMessageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  void runMessageDirectAction(nodeId, action, action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined)
+}
+
+const {
+  onFlowImageAppendToCanvas,
+  onFlowImageDisplayDragStart,
+  onFlowMessageImageDragStart,
+  onFlowMessageResizeMouseDown,
+} = useFlowMessageImageInteractions({
+  nodes: nodes as Ref<Node[]>,
+  FLOW_NODE_IMAGE_DRAG_MIME,
+  MIN_MESSAGE_IMAGE_WIDTH: 120,
+  MIN_MESSAGE_IMAGE_HEIGHT: 72,
+  getImageNodeDisplayPayload,
+  getImageNodeSnapshot: (nodeId) => {
+    const snapshot = getImageNodeSnapshot(nodeId)
+    if (!snapshot) return null
+    return {
+      x: Number(snapshot.x ?? 0),
+      y: Number(snapshot.y ?? 0),
+      width: Number(snapshot.width ?? 300),
+    }
+  },
+  getViewport,
+  updateSnapshotNode,
+  captureFlowHistorySnapshot: flowHistory.capture as () => FlowHistorySnapshot,
+  pushFlowHistorySnapshot: flowHistory.push,
+  markDirty,
+  refreshSnapshot,
+  appendFlowNodes: (nextNodes) => {
+    nodes.value = [...nodes.value, ...nextNodes]
+    scheduleFlowNodeInternalsRefresh(nextNodes.map(node => node.id))
+  },
+  startCanvasInteraction: () => undefined,
+  stopCanvasInteraction: () => undefined,
+})
+
+const { getFlowNodeUiStateCached } = useFlowNodeUiState({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  isFlowExecutionNodeRunning,
+})
+
+function setSnapshotView(view: 'flow' | 'board') {
+  snapshotView.value = view
+  refreshSnapshot()
+}
+
+watch(
+  () => (edges.value as Array<Edge & { selected?: boolean }>).map(edge => `${edge.id}:${edge.selected ? 1 : 0}:${edge.sourceHandle ?? ''}:${edge.targetHandle ?? ''}`).join('|'),
+  () => {
+    ensureFlowEdgeVisuals()
+  },
+)
+
+watch(
+  () => {
+    const ids = (nodes.value as Array<{ id: string }>).map(node => node.id)
+    return ids.join(',')
+  },
+  () => {
+    scheduleFlowNodeInternalsRefresh()
+  },
+)
+
+watch(
+  () => route.query.boardId,
+  async () => {
+    await loadInitialOrRouteBoard()
+    refreshBoardMetas()
+  },
+)
+
+useFlowKeyboardShortcuts({
+  onSave: () => {
+    void saveCurrentBoardSnapshot()
+  },
+  onUndo: flowHistory.undo,
+  onRedo: flowHistory.redo,
+  onDeleteSelected: deleteSelectedFlowElements,
+  isLeaveConfirmVisible: () => leaveConfirmVisible.value,
+  onCancelLeaveConfirm: () => {
+    resolveLeaveConfirm('cancel')
+  },
+  onEscape: onEscapeShortcut,
+  onPanViewport,
+  onToolSelect: () => {
+    setActiveTool('select')
+  },
+  onToolHand: () => {
+    setActiveTool('hand')
+  },
+  onToolText: () => {
+    setActiveTool('text')
+  },
+})
+
+useFlowLeaveGuard({
+  isDirty,
+  isSaving: isSavingBoard,
+  confirmLeave: confirmFlowLeave,
+})
+
+onMounted(async () => {
+  await loadInitialOrRouteBoard()
+  ensureFlowEdgeVisuals()
+  refreshBoardMetas()
+  refreshSnapshot()
 })
 </script>
 
 <style scoped>
-.canvas-layout { width: 100%; height: 100%; background: #ffffff; position: relative; overflow: hidden; }
-.canvas-layout.copy-mode .canvas-item {
-  cursor: copy;
-}
-.canvas-layout.copy-mode :deep(.workflow-node.copy-mode .workflow-node-header) {
-  cursor: copy !important;
-}
-.canvas-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, #e2e4e8 calc(1.5px * var(--zoom, 1)), transparent calc(1.5px * var(--zoom, 1))); background-size: calc(24px * var(--zoom, 1)) calc(24px * var(--zoom, 1)); background-position: calc(50% + var(--offset-x, 0px)) calc(50% + var(--offset-y, 0px)); z-index: 0; opacity: var(--grid-opacity, 1); }
-.canvas-grid.grid-dragging { background: rgba(146, 120, 230, 0.05); }
+.canvas-layout { width: 100%; height: 100vh; background: #ffffff; position: relative; overflow: hidden; }
+.canvas-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, #e2e4e8 calc(1.5px * var(--zoom, 1)), transparent calc(1.5px * var(--zoom, 1))); background-size: calc(24px * var(--zoom, 1)) calc(24px * var(--zoom, 1)); background-position: calc(50% + var(--offset-x, 0px)) calc(50% + var(--offset-y, 0px)); z-index: 0; opacity: 1; }
 
-.selection-marquee {
-  position: absolute;
-  background: rgba(146, 120, 230, 0.1);
-  border: 1.5px solid #9278e6;
-  border-radius: 4px;
-  z-index: 1000;
-  pointer-events: none;
+.floating-toolbar { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: #fff; padding: 8px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #e2e4e8; z-index: 100; }
+.tool-item { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #5f6368; cursor: pointer; border: none; background: transparent; }
+.tool-item.active { background: #f1f3f9; color: #9278e6; }
+.toolbar-divider { width: 24px; height: 1px; background: #f1f3f9; margin: 4px auto; }
+.debug-toggle { cursor: pointer; font-size: 13px; font-weight: 700; }
+
+.workspace-flow-node-kind {
+  width: 132px;
 }
+
+.workspace-flow-save-state {
+  border-radius: 999px;
+  padding: 2px 10px;
+  border: 1px solid #d4dbe7;
+  background: #f6f8fc;
+  font-size: 12px;
+  color: #516074;
+}
+
+.workspace-flow-save-state.is-dirty {
+  border-color: #f2c97d;
+  background: #fff7e8;
+  color: #9f6a00;
+}
+
+.workspace-flow-save-state.is-saved {
+  border-color: #9fddb4;
+  background: #ecfbf1;
+  color: #15753a;
+}
+
+.workspace-flow-save-state.is-failed {
+  border-color: #efb0b0;
+  background: #fff1f1;
+  color: #b12828;
+}
+
+.workspace-flow-canvas-wrap { position: absolute; inset: 0; z-index: 2; }
+
+.workspace-flow-canvas-wrap :deep(.vue-flow) {
+  background: transparent;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__node) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  cursor: default;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__node:hover),
+.workspace-flow-canvas-wrap :deep(.vue-flow__node.selected),
+.workspace-flow-canvas-wrap :deep(.vue-flow__node:focus),
+.workspace-flow-canvas-wrap :deep(.vue-flow__node:focus-visible) {
+  box-shadow: none !important;
+  border: 0 !important;
+  outline: none !important;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__selectionpane) {
+  cursor: default;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__pane) {
+  cursor: default;
+}
+
+.canvas-layout.tool-hand .workspace-flow-canvas-wrap :deep(.vue-flow__pane) {
+  cursor: grab;
+}
+
+.canvas-layout.tool-hand .workspace-flow-canvas-wrap :deep(.vue-flow__pane.dragging) {
+  cursor: grabbing;
+}
+
+.canvas-layout.tool-text .workspace-flow-canvas-wrap :deep(.vue-flow__pane) {
+  cursor: text;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__handle) {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent !important;
+  box-shadow: none;
+  opacity: 0;
+  cursor: crosshair;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__handle.connecting),
+.workspace-flow-canvas-wrap :deep(.vue-flow__handle.connectionindicator) {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge.tone-image .vue-flow__edge-path) {
+  stroke: #5b8def;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge.tone-mask .vue-flow__edge-path) {
+  stroke: #34c38f;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge.tone-prompt .vue-flow__edge-path) {
+  stroke: #f59e0b;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge .vue-flow__edge-path) {
+  stroke-width: 1.8;
+  opacity: 0.78;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge.selected .vue-flow__edge-path) {
+  opacity: 0.98;
+  stroke-width: 2.2;
+}
+
+.workspace-flow-canvas-wrap :deep(.workspace-flow-edge) {
+  pointer-events: visibleStroke;
+}
+
+.workspace-flow-canvas-wrap :deep(.workspace-flow-edge .vue-flow__edge-path) {
+  transition: opacity 0.18s ease, stroke-width 0.18s ease;
+}
+
+.workspace-flow-canvas-wrap :deep(.workspace-flow-edge.is-selected .vue-flow__edge-path) {
+  opacity: 0.98;
+  stroke-width: 2.2;
+}
+
+.workspace-flow-canvas-wrap :deep(.workspace-connection-line path) {
+  stroke-width: 2;
+  opacity: 0.9;
+}
+
+.workspace-flow-bottom-bar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 24px;
+  z-index: 100;
+}
+
+.floating-status { position: absolute; right: 24px; bottom: 24px; z-index: 100; display: flex; gap: 10px; align-items: center; }
+.zoom-controls { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border: 1px solid #e8eaed; border-radius: 999px; padding: 6px 10px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+.zoom-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #eef1f6; background: #fff; cursor: pointer; color: #5f6368; font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.zoom-level { font-size: 13px; font-weight: 600; color: #5f6368; min-width: 40px; text-align: center; }
+.logo-btn { width: 40px; height: 40px; border-radius: 999px; border: 1px solid #e8eaed; background: rgba(255,255,255,.95); color: #5f6368; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.08); }
 
 .leave-confirm-mask {
   position: absolute;
   inset: 0;
-  z-index: 220;
-  background: rgba(17, 24, 39, 0.24);
+  z-index: 500;
+  background: rgba(15, 23, 42, 0.16);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .leave-confirm-card {
-  width: min(420px, calc(100% - 28px));
-  border-radius: 12px;
-  border: 1px solid #d9deea;
+  width: min(90vw, 340px);
   background: #fff;
-  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  padding: 18px 18px 14px;
 }
 
 .leave-confirm-title {
-  font-size: 15px;
-  line-height: 1.3;
-  font-weight: 600;
-  color: #2a3142;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .leave-confirm-desc {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 13px;
-  line-height: 1.45;
-  color: #6b7488;
+  color: #475569;
 }
 
 .leave-confirm-actions {
-  margin-top: 14px;
+  margin-top: 16px;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
 .leave-btn {
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid #d5dbe8;
-  background: #fff;
-  color: #4f576a;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  padding: 7px 12px;
   font-size: 13px;
-  font-weight: 500;
-  padding: 0 12px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  background: #fff;
+  color: #334155;
 }
 
-.leave-btn:hover {
-  border-color: #c2cae0;
+.leave-btn.ghost {
+  background: #fff;
+}
+
+.leave-btn.danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fff5f5;
 }
 
 .leave-btn.primary {
@@ -2427,168 +1594,35 @@ onUnmounted(() => {
   color: #fff;
 }
 
-.leave-btn.primary:hover {
-  background: #8166df;
-  border-color: #8166df;
-}
-
-.leave-btn.danger {
-  border-color: #e7ced4;
-  color: #bf5a74;
-  background: #fff;
-}
-
-.leave-btn.danger:hover {
-  border-color: #ddb3bf;
-  background: #fff6f8;
-}
-
-.node-context-menu {
+.workspace-flow-json {
   position: absolute;
-  z-index: 160;
-  width: 160px;
-  min-width: 160px;
-  max-width: 160px;
-  padding: 6px;
-  border-radius: 10px;
-  border: 1px solid #d8ddea;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
+  left: 72px;
+  top: 24px;
+  z-index: 200;
+  width: min(720px, calc(100vw - 96px));
 }
 
-.node-context-item {
-  width: 100%;
-  height: 34px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  text-align: left;
-  padding: 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #4b5565;
-  cursor: pointer;
-}
-
-.node-context-item:hover {
-  background: rgba(146, 120, 230, 0.12);
-  color: #6757c8;
-}
-
-.floating-toolbar { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: #fff; padding: 8px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #e2e4e8; z-index: 100; }
-.tool-item { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #5f6368; cursor: pointer; }
-.tool-item.active { background: #f1f3f9; color: #9278e6; }
-.toolbar-divider { width: 24px; height: 1px; background: #f1f3f9; margin: 4px auto; }
-
-.floating-status { position: absolute; bottom: 24px; right: 24px; display: flex; gap: 16px; z-index: 100; }
-.zoom-controls { background: #f1f3f9; padding: 4px; border-radius: 12px; display: flex; align-items: center; gap: 8px; }
-.zoom-btn { 
-  width: 28px; 
-  height: 28px; 
-  border: none; 
-  background: transparent; 
-  cursor: pointer; 
-  color: #5f6368;
-  font-size: 18px;
+.workspace-flow-debug-toolbar {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
   align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-.zoom-btn:hover { background: #fff; color: #202124; }
-.zoom-level { 
-  font-size: 13px; 
-  font-weight: 600;
-  color: #5f6368;
-  min-width: 40px; 
-  text-align: center; 
-}
-.logo-btn { 
-  width: 40px; 
-  height: 40px; 
-  border-radius: 50%; 
-  background: #fff; 
-  border: 1px solid #e2e4e8; 
-  cursor: pointer; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  transition: all 0.3s ease;
-  color: #5f6368;
 }
 
-.logo-btn:hover {
-  background: #f8fafc;
-  border-color: #9278e6;
-  color: #9278e6;
+.workspace-flow-json pre {
+  margin: 0;
+  max-height: 280px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
-.logo-btn:active {
-  transform: scale(0.9);
+@media (max-width: 900px) {
+  .workspace-flow-json {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
 }
-
-.logo-btn svg {
-  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.logo-btn:hover svg {
-  transform: rotate(360deg);
-}
-
-.canvas-content {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  transform: translate3d(var(--offset-x, 0px), var(--offset-y, 0px), 0) scale(var(--zoom, 1));
-  transform-origin: center center;
-  will-change: transform;
-  backface-visibility: hidden;
-}
-
-.canvas-layout.interaction-lite .canvas-content {
-  will-change: transform;
-}
-
-.canvas-layout.interaction-lite :deep(.workflow-node) {
-  transition: none !important;
-}
-
-.canvas-layout.interaction-lite :deep(.canvas-connection-path) {
-  transition: none !important;
-}
-
-.canvas-layout.interaction-lite :deep(.canvas-connection-path.selected) {
-  filter: none !important;
-}
-
-.canvas-layout.interaction-lite :deep(.canvas-connection-endpoint) {
-  filter: none !important;
-}
-:deep(.workflow-node) {
-  position: absolute;
-  z-index: 12;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
-  background: #ffffff;
-  overflow: visible;
-  transition: border-color 0.2s ease;
-  will-change: transform;
-  pointer-events: auto;
-}
-
-:deep(.workflow-node .workflow-node-header) {
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-}
-
-:deep(.workflow-node.active) {
-  border-color: #9278e6;
-}
-
-:deep(.workflow-node.dragging) {
-  transition: none;
-}
-
 </style>

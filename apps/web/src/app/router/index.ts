@@ -38,12 +38,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../../pages/user/UserHomePage.vue'),
       },
       {
-        path: 'picture',
-        name: 'UserPicture',
-        component: () => import('../../pages/user/UserPicturePage.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
         path: 'boards',
         name: 'UserBoards',
         component: () => import('../../pages/user/UserBoardsPage.vue'),
@@ -56,6 +50,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true }
       }
     ]
+  },
+  {
+    path: '/user/workspace',
+    name: 'UserWorkspace',
+    component: () => import('../../pages/user/UserWorkspacePage.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin',

@@ -34,7 +34,7 @@
         :style="{ height: `${stageHeight}px` }"
         @dragover.stop="onStageDragOver"
         @drop.stop="onStageDrop"
-        @mousedown.stop="onStageMouseDown"
+        @mousedown="onStageMouseDown"
         @contextmenu.prevent.stop
       >
         <template v-if="displayImage">
@@ -47,7 +47,7 @@
           <img
             :src="stageDisplayUrl"
             class="image-node-stage-image"
-            draggable="true"
+            draggable="false"
             @dragstart="emit('display-dragstart', $event)"
             @dblclick="emit('append-to-canvas')"
           />
@@ -193,6 +193,7 @@ function closePreviewPopup() {
 function onStageMouseDown(event: MouseEvent) {
   if (event.button !== 2 || !props.displayImage) return
   event.preventDefault()
+  event.stopPropagation()
   previewPopupOpen.value = true
 }
 

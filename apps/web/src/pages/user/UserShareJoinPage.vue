@@ -55,7 +55,7 @@ async function joinSharedBoard() {
 
   await hydrateCanvasBoardsFromServer()
   await router.replace({
-    path: '/user/picture',
+    path: '/user/workspace',
     query: {
       boardId,
       board_id: boardId,
@@ -122,4 +122,3 @@ onMounted(async () => {
   background: #162039;
 }
 </style>
-

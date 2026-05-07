@@ -236,7 +236,7 @@ async function createAndOpenBoard() {
     console.warn('[boards] failed to sync new board', error)
   }
   reloadBoards()
-  router.push({ path: '/user/picture', query: { boardId: board.id } })
+  router.push({ path: '/user/workspace', query: { boardId: board.id } })
 }
 
 function openBoard(board: CanvasBoardMeta) {
@@ -247,7 +247,20 @@ function openBoard(board: CanvasBoardMeta) {
     }
     console.warn('[boards] failed to sync board open touch', error)
   })
-  router.push({ path: '/user/picture', query: { boardId: board.id } })
+  router.push({ path: '/user/workspace', query: { boardId: board.id } })
+}
+
+function isNotFoundError(error: unknown): boolean {
+  if (typeof error !== 'object' || !error) return false
+  const status = 'status' in error ? (error as { status?: unknown }).status : undefined
+  if (status === 404) return true
+  const code = 'code' in error ? (error as { code?: unknown }).code : undefined
+  if (code === 404) return true
+  const msg = 'msg' in error ? (error as { msg?: unknown }).msg : undefined
+  if (typeof msg === 'string' && (msg.includes('画布不存在') || msg.toLowerCase().includes('not found'))) {
+    return true
+  }
+  return false
 }
 
 function onBoardCardClick(board: CanvasBoardMeta) {
@@ -344,21 +357,23 @@ async function handleDuplicateAction(board: CanvasBoardMeta) {
 async function handleDeleteAction(board: CanvasBoardMeta) {
   activeMenuBoardId.value = null
   if (!window.confirm(`确认删除画布「${board.name}」？`)) return
+  try {
+    await syncDeleteCanvasBoardToServer(board.id)
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      // remote already deleted, continue cleaning local state
+    } else {
+      message.error('删除失败，请稍后重试')
+      console.warn('[boards] failed to sync deleted board', error)
+      return
+    }
+  }
   const ok = deleteCanvasBoard(board.id)
   if (!ok) {
     message.error('删除失败')
     return
   }
   deleteCanvasBoardState(board.id)
-  try {
-    await syncDeleteCanvasBoardToServer(board.id)
-  } catch (error) {
-    if (isBoardNameConflictError(error)) {
-      message.error('操作冲突，请刷新后重试')
-      return
-    }
-    console.warn('[boards] failed to sync deleted board', error)
-  }
   if (renamingBoardId.value === board.id) {
     cancelRename()
   }
