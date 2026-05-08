@@ -225,10 +225,18 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     stopMaskPainting(true)
   }
 
+  function onMaskPaintLostPointerCapture(event: PointerEvent) {
+    if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
+    stopMaskPainting(true)
+  }
+
   function stopMaskPainting(commit = true) {
     window.removeEventListener('pointermove', onMaskPaintPointerMove, true)
     window.removeEventListener('pointerup', onMaskPaintPointerUp, true)
     window.removeEventListener('pointercancel', onMaskPaintPointerCancel, true)
+    if (paintingMaskCanvas) {
+      paintingMaskCanvas.removeEventListener('lostpointercapture', onMaskPaintLostPointerCapture)
+    }
     if (paintingMaskCanvas && paintingPointerId != null && paintingMaskCanvas.hasPointerCapture(paintingPointerId)) {
       paintingMaskCanvas.releasePointerCapture(paintingPointerId)
     }
@@ -266,6 +274,7 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     window.addEventListener('pointermove', onMaskPaintPointerMove, true)
     window.addEventListener('pointerup', onMaskPaintPointerUp, true)
     window.addEventListener('pointercancel', onMaskPaintPointerCancel, true)
+    canvas.addEventListener('lostpointercapture', onMaskPaintLostPointerCapture)
   }
 
   function onFlowMaskSetCanvasRef(nodeId: string, element: Element | null) {
