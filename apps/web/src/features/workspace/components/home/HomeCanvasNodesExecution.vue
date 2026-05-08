@@ -11,7 +11,7 @@
       @delete="emit('edit-delete', node.id)"
       @update:mode="emit('edit-update-mode', node, $event)"
       @generate="emit('edit-generate', node)"
-      @port-mousedown="(event, port) => emit('edit-port-mousedown', event, node.id, port)"
+
     />
   </template>
 
@@ -27,7 +27,6 @@
       @delete="emit('fusion-delete', node.id)"
       @update:blend-ratio="emit('fusion-update-blend-ratio', node, $event)"
       @generate="emit('fusion-generate', node)"
-      @port-mousedown="(event, port) => emit('fusion-port-mousedown', event, node.id, port)"
     />
   </template>
 
@@ -51,7 +50,6 @@
       @update:extend-bottom="emit('enhance-update-extend-bottom', node, $event)"
       @update:extend-left="emit('enhance-update-extend-left', node, $event)"
       @generate="emit('enhance-generate', node)"
-      @port-mousedown="(event, port) => emit('enhance-port-mousedown', event, node.id, port)"
     />
   </template>
 
@@ -70,7 +68,6 @@
       @update:scale="emit('wear-update-scale', node, $event)"
       @update:opacity="emit('wear-update-opacity', node, $event)"
       @generate="emit('wear-generate', node)"
-      @port-mousedown="(event, port) => emit('wear-port-mousedown', event, node.id, port)"
     />
   </template>
 
@@ -89,7 +86,6 @@
       @add-color="emit('color-add-color', node, $event)"
       @strength-input="emit('color-strength-input', node, $event)"
       @generate="emit('color-generate', node)"
-      @port-mousedown="(event, port) => emit('color-port-mousedown', event, node.id, port)"
     />
   </template>
 

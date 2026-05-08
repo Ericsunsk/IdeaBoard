@@ -26,22 +26,14 @@
       @mousedown.stop
       @contextmenu.stop
     />
-    <NodePorts
-      node-kind="prompt"
-      :node-id="node.id"
-      :ports="ports"
-      @port-mousedown="onPortMouseDown"
-    />
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import type { PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeHeader from './NodeHeader.vue'
-import NodePorts from './NodePorts.vue'
-import { buildNodeIoFromSlots, PROMPT_NODE_IO_SLOTS } from './nodeIoConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -57,34 +49,15 @@ const emit = defineEmits<{
   (e: 'delete'): void
   (e: 'focus'): void
   (e: 'update:text', value: string): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'prompt'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-const resolvedUiState = computed<PromptNodeUiState>(() => ({
-  connection: {
-    hasAnyConnection: props.uiState?.connection?.hasAnyConnection ?? false,
-    connected: {
-      output: props.uiState?.connection?.connected?.output ?? false,
-    },
-    pending: props.uiState?.connection?.pending,
-  },
-}))
-
-const ports = computed(() =>
-  buildNodeIoFromSlots(PROMPT_NODE_IO_SLOTS, null, {
-    connected: resolvedUiState.value.connection.connected,
-    pending: resolvedUiState.value.connection.pending,
-  }).ports,
-)
 
 function onInput(event: Event) {
   emit('update:text', (event.target as HTMLTextAreaElement).value)
 }
 
-function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'prompt')
-}
+
 </script>
 
 <style scoped src="./node-shared.css"></style>

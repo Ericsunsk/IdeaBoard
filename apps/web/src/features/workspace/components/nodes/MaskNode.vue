@@ -138,12 +138,7 @@
         </div>
       </div>
     </div>
-    <NodePorts
-      node-kind="mask"
-      :node-id="node.id"
-      :ports="ports"
-      @port-mousedown="onPortMouseDown"
-    />
+
   </div>
 </template>
 
@@ -155,8 +150,8 @@ import type { NodeUiState } from '../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodeIconButton from './NodeIconButton.vue'
-import NodePorts from './NodePorts.vue'
-import { buildNodeIoFromSlots, MASK_NODE_IO_SLOTS } from './nodeIoConfig'
+
+
 import { toNumber } from './numberUtils'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
@@ -185,22 +180,10 @@ const emit = defineEmits<{
   (e: 'toggle-invert'): void
   (e: 'clear-mask'): void
   (e: 'set-canvas-ref', value: Element | null): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'mask'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 const effectiveSourceImageUrl = computed(() => props.sourceImageUrl ?? props.node.sourceImageUrl)
-const ports = computed(() =>
-  buildNodeIoFromSlots(MASK_NODE_IO_SLOTS, null, {
-    connected: {
-      image: props.uiState?.connection?.connected?.image,
-      output: props.uiState?.connection?.connected?.output,
-    },
-    pending: {
-      image: props.uiState?.connection?.pending?.image,
-    },
-  }).ports,
-)
 
 const popupRef = ref<HTMLElement | null>(null)
 const paintPopupOpen = ref(false)
@@ -249,9 +232,6 @@ function clampBrushSize(value: number): number {
   return Math.max(BRUSH_SIZE_MIN, Math.min(BRUSH_SIZE_MAX, Math.round(value)))
 }
 
-function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'mask')
-}
 
 function updateBrushSize(value: number) {
   emit('update:brush-size', clampBrushSize(value))

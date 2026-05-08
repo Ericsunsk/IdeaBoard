@@ -12,7 +12,6 @@
         @node-mousedown="noopMouse"
         @delete="onDeleteRequest"
         @focus="noop"
-        @port-mousedown="noopPortMouse"
       />
     </template>
     <template v-else-if="isImageNode && imageSnapshot">
@@ -33,7 +32,6 @@
           @append-to-canvas="onImageAppendToCanvas"
           @reset="onImageReset"
           @display-dragstart="onImageDisplayDragStart"
-          @port-mousedown="noopPortMouse"
         />
       </div>
     </template>
@@ -96,7 +94,7 @@
         @delete="onDeleteRequest"
         @update:mode="emitNodeParam('mode', $event)"
         @generate="onEditGenerate"
-        @port-mousedown="noopPortMouse"
+
       />
     </template>
     <template v-else-if="isEnhanceNode && enhanceSnapshot">
@@ -119,7 +117,7 @@
         @update:extend-bottom="emitNodeParam('extendBottom', $event)"
         @update:extend-left="emitNodeParam('extendLeft', $event)"
         @generate="onEnhanceGenerate"
-        @port-mousedown="noopPortMouse"
+
       />
     </template>
     <template v-else-if="isColorNode && colorSnapshot">
@@ -137,7 +135,7 @@
         @add-color="onColorAdd"
         @strength-input="emitNodeParam('strength', $event)"
         @generate="onColorGenerate"
-        @port-mousedown="noopPortMouse"
+
       />
     </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
@@ -152,7 +150,7 @@
         @delete="onDeleteRequest"
         @update:blend-ratio="emitNodeParam('blendRatio', $event)"
         @generate="onFusionGenerate"
-        @port-mousedown="noopPortMouse"
+
       />
     </template>
     <template v-else-if="isWearNode && wearSnapshot">
@@ -170,7 +168,7 @@
         @update:scale="emitNodeParam('scale', $event)"
         @update:opacity="emitNodeParam('opacity', $event)"
         @generate="onWearGenerate"
-        @port-mousedown="noopPortMouse"
+
       />
     </template>
     <template v-else-if="isMaskNode && maskSnapshot">
@@ -196,7 +194,7 @@
         @toggle-invert="onMaskToggleInvert"
         @clear-mask="onMaskClearMask"
         @set-canvas-ref="onMaskSetCanvasRef"
-        @port-mousedown="noopPortMouse"
+
       />
     </template>
     <template v-else-if="isModelNode && modelSnapshot">
@@ -216,7 +214,7 @@
         @update-pose-strength="emitNodeParam('poseStrength', $event)"
         @select-background="emitNodeParam('background', $event)"
         @generate="onModelGenerate"
-        @port-mousedown="noopPortMouse"
+
       />
     </template>
     <template v-else-if="isViewpointNode && viewpointSnapshot">
@@ -233,7 +231,7 @@
         @select:viewpoint="emitNodeParam('selectedViewpoint', $event)"
         @update:lighting="emitNodeParam('lighting', $event)"
         @generate="onViewpointGenerate"
-        @port-mousedown="noopPortMouse"
+
       />
     </template>
     <template v-else>
@@ -714,7 +712,7 @@ function resolveHandleStyle(port: CanvasConnectionPort, direction: 'input' | 'ou
   if (!kind) return undefined
   const topMap = getNodeIoTopMap(kind)
   const top = topMap[port]
-  // Keep horizontal offset visually aligned with legacy .node-port (left/right: -5.5px).
+  // Keep horizontal offset visually aligned with current node edge styling (left/right: -5.5px).
   const side = direction === 'input' ? { left: '-5.5px' } : { right: '-5.5px' }
   if (typeof top === 'number' && Number.isFinite(top)) {
     return {
@@ -749,7 +747,6 @@ function isHandlePending(port: CanvasConnectionPort): boolean {
 
 function noop() {}
 function noopMouse() {}
-function noopPortMouse() {}
 </script>
 
 <style scoped>
@@ -997,12 +994,6 @@ function noopPortMouse() {}
 .flow-canvas-node :deep(.flow-canvas-node__handle.vue-flow__handle-left),
 .flow-canvas-node :deep(.flow-canvas-node__handle.vue-flow__handle-right) {
   transform: translateY(-50%) !important;
-}
-
-.flow-canvas-node :deep(.node-port) {
-  opacity: 0;
-  pointer-events: none !important;
-  z-index: 21;
 }
 
 .flow-canvas-node.is-message :deep(.vue-flow__handle) {

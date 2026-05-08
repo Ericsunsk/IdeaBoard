@@ -1,3 +1,20 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// MAINTENANCE CONSTRAINT: The `top` field on every IO slot template is the
+// SOLE Y-coordinate source for Vue Flow <Handle> positioning.
+//
+// FlowCanvasNode.resolveHandleStyle() reads these tops via getNodeIoTopMap()
+// and applies them directly as CSS `top` values on Handles.  Do NOT re-
+// introduce DOM-rect-based measurement (getBoundingClientRect) as a primary
+// positioning source — it bakes the viewport transform into node-local
+// coordinates and causes port drift at non-default zoom levels.
+//
+// When adding a new node type or editing an existing one:
+//   - Set `top` on every slot that has a `direction` + `portName`.
+//   - Match the `top` value to the port's visual center in the node body.
+//   - If a port is conditional (e.g. Edit mask port shifts when imageB
+//     is visible), use a resolver function.
+// ═══════════════════════════════════════════════════════════════════════════
+
 import type { EditNodeItem } from '../../types/canvasNodes'
 import {
   editModeRequiresMask,
@@ -56,17 +73,17 @@ function resolveValue<T, V>(value: Resolvable<T, V>, context: T): V {
 }
 
 export const PROMPT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'output', kind: 'prompt', direction: 'output', portName: 'prompt', portKey: 'prompt-output' },
+  { key: 'output', kind: 'prompt', direction: 'output', portName: 'prompt', portKey: 'prompt-output', top: 92 },
 ]
 
 export const IMAGE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'image', kind: 'image', direction: 'input', portName: 'image', portKey: 'image-input' },
-  { key: 'output', kind: 'image', direction: 'output', portName: 'image', portKey: 'image-output' },
+  { key: 'image', kind: 'image', direction: 'input', portName: 'image', portKey: 'image-input', top: 92 },
+  { key: 'output', kind: 'image', direction: 'output', portName: 'image', portKey: 'image-output', top: 92 },
 ]
 
 export const MASK_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
-  { key: 'image', kind: 'image', direction: 'input', portName: 'image', portKey: 'mask-image-input' },
-  { key: 'output', kind: 'mask', direction: 'output', portName: 'mask', portKey: 'mask-output' },
+  { key: 'image', kind: 'image', direction: 'input', portName: 'image', portKey: 'mask-image-input', top: 92 },
+  { key: 'output', kind: 'mask', direction: 'output', portName: 'mask', portKey: 'mask-output', top: 92 },
 ]
 
 export const COLOR_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [

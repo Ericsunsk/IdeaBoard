@@ -11,7 +11,7 @@
       :input-locked="entry.inputLocked"
       :ui-state="entry.uiState"
       @node-mousedown="emit('image-node-mousedown', $event, entry.node)"
-      @port-mousedown="(event, port) => emit('image-port-mousedown', event, entry.node.id, port)"
+
       @delete="emit('image-delete', entry.node.id)"
       @stage-drop="emit('image-stage-drop', $event, entry.node)"
       @open-file="emit('image-open-file', entry.node)"
@@ -29,7 +29,6 @@
       :copy-mode="copyMode"
       :ui-state="getPromptNodeUiState(node)"
       @node-mousedown="emit('prompt-node-mousedown', $event, node)"
-      @port-mousedown="(event, port) => emit('prompt-port-mousedown', event, node.id, port)"
       @delete="emit('prompt-delete', node.id)"
       @focus="emit('prompt-focus', node.id)"
       @update:text="emit('prompt-update-text', node, $event)"

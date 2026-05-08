@@ -84,12 +84,7 @@
       />
     </div>
 
-    <NodePorts
-      node-kind="wear"
-      :node-id="node.id"
-      :ports="ports"
-      @port-mousedown="onPortMouseDown"
-    />
+
   </div>
 </template>
 
@@ -100,7 +95,7 @@ import type { NodeUiState } from '../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeExecutionFooter from './NodeExecutionFooter.vue'
 import NodeHeader from './NodeHeader.vue'
-import NodePorts from './NodePorts.vue'
+
 import { buildNodeIoFromSlots, WEAR_NODE_IO_SLOTS } from './nodeIoConfig'
 import { WEAR_TILE_MODE_OPTIONS } from './nodeOptionConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
@@ -122,7 +117,6 @@ const emit = defineEmits<{
   (e: 'update:scale', value: number): void
   (e: 'update:opacity', value: number): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'imageA' | 'imageB' | 'mask'): void
 }>()
 
 const wearTileModeOptions = WEAR_TILE_MODE_OPTIONS
@@ -146,13 +140,8 @@ const io = computed(() =>
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
-const ports = computed(() => io.value.ports)
 
-function onPortMouseDown(event: MouseEvent, port: string) {
-  if (port === 'image' || port === 'imageA' || port === 'imageB' || port === 'mask') {
-    emit('port-mousedown', event, port)
-  }
-}
+
 </script>
 
 <style scoped src="./node-shared.css"></style>

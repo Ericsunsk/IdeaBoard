@@ -133,12 +133,7 @@
       />
     </div>
 
-    <NodePorts
-      node-kind="color"
-      :node-id="node.id"
-      :ports="ports"
-      @port-mousedown="onPortMouseDown"
-    />
+
   </div>
 </template>
 
@@ -154,7 +149,7 @@ import NodeColorSwatch from './NodeColorSwatch.vue'
 import NodeExecutionFooter from './NodeExecutionFooter.vue'
 import NodeHeader from './NodeHeader.vue'
 import NodeIconButton from './NodeIconButton.vue'
-import NodePorts from './NodePorts.vue'
+
 import { buildNodeIoFromSlots, COLOR_NODE_IO_SLOTS } from './nodeIoConfig'
 import { DEFAULT_COLOR_HEX, normalizeHexColor } from './colorPopoverUtils'
 import { toNumber } from './numberUtils'
@@ -178,7 +173,6 @@ const emit = defineEmits<{
   (e: 'add-color', value: string): void
   (e: 'strength-input', value: number): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'mask' | 'prompt'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -211,7 +205,6 @@ const io = computed(() =>
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
-const ports = computed(() => io.value.ports)
 const picker = useColorPickerState({
   initialHex: customColor.value,
   syncHsvOnHexInput: true,
@@ -254,9 +247,6 @@ function setColorHex(value: string) {
   applyCommittedColor(value)
 }
 
-function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image' | 'mask' | 'prompt')
-}
 
 function togglePopover() {
   if (isPopoverOpen.value) {

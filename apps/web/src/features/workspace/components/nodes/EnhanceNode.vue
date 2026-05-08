@@ -147,12 +147,7 @@
       />
     </div>
 
-    <NodePorts
-      node-kind="enhance"
-      :node-id="node.id"
-      :ports="ports"
-      @port-mousedown="onPortMouseDown"
-    />
+
   </div>
 </template>
 
@@ -167,7 +162,7 @@ import type { NodeUiState } from '../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeExecutionFooter from './NodeExecutionFooter.vue'
 import NodeHeader from './NodeHeader.vue'
-import NodePorts from './NodePorts.vue'
+
 import { buildNodeIoFromSlots, ENHANCE_NODE_IO_SLOTS } from './nodeIoConfig'
 import {
   ENHANCE_MODE_OPTIONS,
@@ -199,7 +194,6 @@ const emit = defineEmits<{
   (e: 'update:extend-bottom', value: number): void
   (e: 'update:extend-left', value: number): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'mask' | 'prompt'): void
 }>()
 
 const enhanceModeOptions = ENHANCE_MODE_OPTIONS
@@ -230,15 +224,12 @@ const io = computed(() =>
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
-const ports = computed(() => io.value.ports)
 
 function toExtendSliderPct(value: number): number {
   return ((value - extendMin) / (extendMax - extendMin)) * 100
 }
 
-function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image' | 'mask' | 'prompt')
-}
+
 </script>
 
 <style scoped src="./node-shared.css"></style>

@@ -107,12 +107,7 @@
         @generate="emit('generate')"
       />
     </div>
-    <NodePorts
-      node-kind="model"
-      :node-id="node.id"
-      :ports="ports"
-      @port-mousedown="onPortMouseDown"
-    />
+
   </div>
 </template>
 
@@ -124,7 +119,7 @@ import type { NodeUiState } from '../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeExecutionFooter from './NodeExecutionFooter.vue'
 import NodeHeader from './NodeHeader.vue'
-import NodePorts from './NodePorts.vue'
+
 import { buildNodeIoFromSlots, MODEL_NODE_IO_SLOTS } from './nodeIoConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
@@ -147,7 +142,6 @@ const emit = defineEmits<{
   (e: 'update-pose-strength', value: number): void
   (e: 'select-background', key: string): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'imageA' | 'imageB' | 'prompt'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -169,14 +163,11 @@ const io = computed(() =>
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
-const ports = computed(() => io.value.ports)
 const showModelStrength = computed(() => !!(props.uiState?.connection?.connected?.imageA || props.uiState?.connection?.pending?.imageA))
 const showPoseStrength = computed(() => !!(props.uiState?.connection?.connected?.imageB || props.uiState?.connection?.pending?.imageB))
 const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
 
-function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image' | 'imageA' | 'imageB' | 'prompt')
-}
+
 </script>
 
 <style scoped src="./node-shared.css"></style>

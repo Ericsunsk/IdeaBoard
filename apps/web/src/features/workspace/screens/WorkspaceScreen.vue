@@ -56,6 +56,7 @@
         :selection-key-code="activeTool === 'select' ? 'Shift' : false"
         :multi-selection-key-code="activeTool === 'select' ? 'Shift' : null"
         :default-edge-options="{ animated: false, updatable: true }"
+        :only-render-visible-elements="FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING"
         :is-valid-connection="isValidConnection"
         :connection-line-style="flowConnectionLineStyle"
         @connect="onConnect"
@@ -232,6 +233,7 @@ import { useFlowMessageDirectActions } from '../composables/useFlowMessageDirect
 import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovateControl'
 import { useFlowMessageImageInteractions } from '../composables/useFlowMessageImageInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
+import { useFlowBoardViewport } from '../composables/useFlowBoardViewport'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import { parseHandlePort, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -267,8 +269,20 @@ const message = useMessage()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { screenToFlowCoordinate, updateNodeInternals, setNodes, setEdges, zoomIn, zoomOut, getViewport, setViewport } = useVueFlow()
+const { screenToFlowCoordinate, updateNodeInternals, setNodes, setEdges } = useVueFlow()
 const isDev = import.meta.env.DEV
+
+const {
+  zoomLevel,
+  viewportOffsetX,
+  viewportOffsetY,
+  canvasGridStyle,
+  onZoomIn,
+  onZoomOut,
+  getViewport,
+  setViewport,
+  applyFlowTransform,
+} = useFlowBoardViewport()
 
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
@@ -330,6 +344,11 @@ function onFlowEdgeUpdateEnd() {
 
 const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 
+// Feature flag: enable Vue Flow built-in visible-elements culling.
+// Must be validated with 100+ node canvases before enabling in production.
+// Disabled by default — dynamic node/edge sync must work first.
+const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING = false
+
 const FLOW_NODE_KIND_DRAG_MIME = 'application/x-ideaboard-flow-node-kind'
 const FLOW_NODE_IMAGE_DRAG_MIME = 'application/x-canvas-node-image'
 let pendingNodeInternalsRefresh = false
@@ -343,9 +362,6 @@ let lastManualNodeSelection:
     timestamp: number
   }
   | null = null
-const zoomLevel = ref(100)
-const viewportOffsetX = ref(0)
-const viewportOffsetY = ref(0)
 const nodeContextMenu = ref({ visible: false, x: 0, y: 0, flowX: 0, flowY: 0 })
 const activeMessageActionNodeId = ref<string | null>(null)
 
@@ -401,12 +417,6 @@ const flowPromptPlaceholder = computed(() => {
     ? '文本工具稍后接入，请在节点内执行生成'
     : '请在节点内执行生成'
 })
-const canvasGridStyle = computed(() => ({
-  '--zoom': `${Math.max(0.5, zoomLevel.value / 100)}`,
-  '--offset-x': `${viewportOffsetX.value}px`,
-  '--offset-y': `${viewportOffsetY.value}px`,
-}))
-
 function setBoardNameInputRef(el: HTMLInputElement | null) {
   boardNameInputRef.value = el
 }
@@ -661,36 +671,13 @@ async function onNavigateRequest(path: string) {
   await router.push(path)
 }
 
-function onZoomIn() {
-  zoomIn()
-}
-
-function onZoomOut() {
-  zoomOut()
-}
-
-let lastFlowZoom: number | null = null
-
 function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
   closeBoardHeaderEditing()
   const transform = payload.flowTransform
   if (!transform) return
-  if (Number.isFinite(transform.zoom)) {
-    const nextZoom = Math.max(10, Math.round((transform.zoom as number) * 100))
-    const zoomChanged = lastFlowZoom !== null && lastFlowZoom !== nextZoom
-    zoomLevel.value = nextZoom
-    if (zoomChanged) {
-      lastFlowZoom = nextZoom
-      scheduleFlowNodeInternalsRefresh()
-    } else if (lastFlowZoom === null) {
-      lastFlowZoom = nextZoom
-    }
-  }
-  if (Number.isFinite(transform.x)) {
-    viewportOffsetX.value = transform.x as number
-  }
-  if (Number.isFinite(transform.y)) {
-    viewportOffsetY.value = transform.y as number
+  const zoomChanged = applyFlowTransform(transform)
+  if (zoomChanged) {
+    scheduleFlowNodeInternalsRefresh()
   }
 }
 

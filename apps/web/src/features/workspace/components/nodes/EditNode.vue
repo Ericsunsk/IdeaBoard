@@ -54,12 +54,7 @@
       />
     </div>
 
-    <NodePorts
-      node-kind="edit"
-      :node-id="node.id"
-      :ports="ports"
-      @port-mousedown="onPortMouseDown"
-    />
+
   </div>
 </template>
 
@@ -70,7 +65,7 @@ import type { NodeUiState } from '../../types/canvasNodeUi'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeExecutionFooter from './NodeExecutionFooter.vue'
 import NodeHeader from './NodeHeader.vue'
-import NodePorts from './NodePorts.vue'
+
 import { buildEditNodeIoContext, buildNodeIoFromSlots, EDIT_NODE_IO_SLOTS } from './nodeIoConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
@@ -88,7 +83,6 @@ const emit = defineEmits<{
   (e: 'delete'): void
   (e: 'update:mode', value: 'partial-edit' | 'bg-swap' | 'face-swap'): void
   (e: 'generate'): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image' | 'imageB' | 'mask' | 'prompt'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -110,11 +104,8 @@ const io = computed(() =>
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
-const ports = computed(() => io.value.ports)
 
-function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image' | 'imageB' | 'mask' | 'prompt')
-}
+
 </script>
 
 <style scoped src="./node-shared.css"></style>

@@ -6,12 +6,6 @@
     :class="{ active, dragging, 'copy-mode': copyMode }"
     :style="nodeStyle"
   >
-    <NodePorts
-      node-kind="image"
-      :node-id="node.id"
-      :ports="ports"
-      @port-mousedown="onPortMouseDown"
-    />
     <NodeHeader
       title="Image"
       rounded
@@ -113,8 +107,6 @@ import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeHeader from './NodeHeader.vue'
-import NodePorts from './NodePorts.vue'
-import { buildNodeIoFromSlots, IMAGE_NODE_IO_SLOTS } from './nodeIoConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -137,7 +129,6 @@ const emit = defineEmits<{
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'display-dragstart', event: DragEvent): void
-  (e: 'port-mousedown', event: MouseEvent, port: 'image'): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -163,17 +154,6 @@ const emptyStateLabel = computed(() => {
   if (props.displayMode === 'pending' || props.inputLocked) return 'Waiting...'
   return '上传或拖拽图片作为输入'
 })
-const ports = computed(() =>
-  buildNodeIoFromSlots(IMAGE_NODE_IO_SLOTS, null, {
-    connected: {
-      image: props.uiState?.connection?.connected?.image,
-      output: props.uiState?.connection?.connected?.output,
-    },
-    pending: {
-      image: props.uiState?.connection?.pending?.image,
-    },
-  }).ports,
-)
 
 const popupStageHeight = computed(() =>
   Math.max(280, Math.min(560, Math.round(props.stageHeight * 2))),
@@ -218,10 +198,6 @@ function onGlobalMouseUp(event: MouseEvent) {
 
 function onWindowBlur() {
   closePreviewPopup()
-}
-
-function onPortMouseDown(event: MouseEvent, port: string) {
-  emit('port-mousedown', event, port as 'image')
 }
 
 window.addEventListener('mouseup', onGlobalMouseUp, true)
