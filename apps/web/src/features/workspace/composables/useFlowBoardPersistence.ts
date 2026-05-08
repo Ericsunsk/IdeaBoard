@@ -28,6 +28,8 @@ export type UseFlowBoardPersistenceOptions = {
   isLoadingBoardSnapshot: ValueRef<boolean>
   isSavingBoard: ValueRef<boolean>
   getBoardIdQuery: () => unknown
+  getViewport: () => { x: number; y: number; zoom: number }
+  setViewport: (viewport: { x: number; y: number; zoom: number }) => void
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
   onError: (text: string) => void
@@ -61,6 +63,16 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     options.nodes.value = flow.nodes as unknown[]
     options.edges.value = flow.edges as unknown[]
     options.boardBaseSnapshot.value = snapshot
+    const vp = snapshot.viewport
+    if (vp && typeof vp.canvasX === 'number' && typeof vp.canvasY === 'number' && typeof vp.zoomLevel === 'number') {
+      void Promise.resolve().then(() => {
+        options.setViewport({
+          x: vp.canvasX,
+          y: vp.canvasY,
+          zoom: Math.max(0.1, vp.zoomLevel / 100),
+        })
+      })
+    }
     clearDirtyAfterImport()
     options.clearFlowHistoryBaseline()
     options.refreshSnapshot()
@@ -102,13 +114,20 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
   }
 
   function buildCurrentBoardSnapshot(): CanvasBoardSnapshot {
-    return flowToCanvasBoardSnapshot(
+    const snapshot = flowToCanvasBoardSnapshot(
       {
         nodes: options.nodes.value as unknown as FlowAdapterNode[],
         edges: options.edges.value as unknown as FlowAdapterEdge[],
       },
       options.boardBaseSnapshot.value,
     )
+    const vp = options.getViewport()
+    snapshot.viewport = {
+      canvasX: vp.x,
+      canvasY: vp.y,
+      zoomLevel: Math.round(vp.zoom * 100),
+    }
+    return snapshot
   }
 
   async function refreshBoardPreviewAfterSave(boardId: string, stabilizedSnapshot: CanvasBoardSnapshot) {

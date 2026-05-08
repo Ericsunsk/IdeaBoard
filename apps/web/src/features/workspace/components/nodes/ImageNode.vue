@@ -5,7 +5,6 @@
     :data-node-id="node.id"
     :class="{ active, dragging, 'copy-mode': copyMode }"
     :style="nodeStyle"
-    @mousedown.stop
   >
     <NodePorts
       node-kind="image"
@@ -27,7 +26,7 @@
         </svg>
       </template>
     </NodeHeader>
-    <div class="image-node-body" @mousedown.stop @contextmenu.stop>
+    <div class="image-node-body" @contextmenu.stop>
       <div
         class="image-node-stage"
         :data-image-node-id="node.id"
@@ -46,8 +45,8 @@
           </div>
           <img
             :src="stageDisplayUrl"
-            class="image-node-stage-image"
-            draggable="false"
+            class="image-node-stage-image nodrag"
+            draggable="true"
             @dragstart="emit('display-dragstart', $event)"
             @dblclick="emit('append-to-canvas')"
           />

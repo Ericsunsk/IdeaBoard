@@ -256,6 +256,13 @@ export function flowToCanvasBoardSnapshot(
         ? restoredId
         : nextConnectionId()
     usedConnectionIds.add(connectionId)
+    // Remove any existing connection targeting the same input port (last-write wins)
+    const dupIndex = snapshot.connections.findIndex(
+      c => c.toNodeType === toRef.nodeType && c.toNodeId === toRef.id && c.toPort === toPort,
+    )
+    if (dupIndex >= 0) {
+      snapshot.connections.splice(dupIndex, 1)
+    }
     snapshot.connections.push({
       id: connectionId,
       fromNodeType: fromRef.nodeType,

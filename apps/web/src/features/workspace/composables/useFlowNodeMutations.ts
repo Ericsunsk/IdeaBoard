@@ -61,6 +61,8 @@ type UseFlowNodeMutationsOptions = {
   markDirty: () => void
   refreshSnapshot: () => void
   appendFlowNodes: (nextNodes: Node[]) => void
+  commitNodes: (nextNodes: Node[]) => void
+  commitEdges: (nextEdges: Edge[]) => void
   onWarning: (message: string) => void
   onNodeDeleted?: (nodeId: string, kind: string) => void
 }
@@ -133,10 +135,22 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       data: { tone },
     } as Edge
     const before = options.captureHistory()
-    options.edges.value = [...(options.edges.value as unknown as Edge[]), nextEdge]
+    const existingEdges = options.edges.value as unknown as Edge[]
+    const filteredEdges = existingEdges.filter(edge => {
+      if (edge.target === connection.target && edge.targetHandle === connection.targetHandle) return false
+      if (
+        edge.source === connection.source
+        && edge.target === connection.target
+        && edge.sourceHandle === connection.sourceHandle
+        && edge.targetHandle === connection.targetHandle
+      ) return false
+      return true
+    })
+    options.commitEdges([...filteredEdges, nextEdge])
     options.pushHistory(before)
     options.markDirty()
     options.refreshSnapshot()
+    markFlowExecutionNodeDirty(connection.target, { includeSelf: true })
   }
 
   function onEdgeUpdate(event: EdgeUpdateEvent) {
@@ -148,22 +162,32 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     if (!connection.source || !connection.target) return
     const before = options.captureHistory()
     const tone = resolveFlowEdgeToneFromHandles(connection.sourceHandle, connection.targetHandle)
-    const nextEdges = options.edges.value as unknown as Edge[]
-    for (const item of nextEdges) {
-      if (item.id === edge.id) {
-        item.source = connection.source
-        item.target = connection.target
-        item.sourceHandle = connection.sourceHandle ?? null
-        item.targetHandle = connection.targetHandle ?? null
-        item.class = `tone-${tone}`
-        if (!item.data) item.data = {}
-        ;(item.data as { tone?: string }).tone = tone
-        break
-      }
-    }
+    const nextEdges = (options.edges.value as unknown as Edge[])
+      .filter(item => (
+        item.id === edge.id
+        || !(
+          item.target === connection.target
+          && (item.targetHandle ?? null) === (connection.targetHandle ?? null)
+        )
+      ))
+      .map((item) => {
+        if (item.id !== edge.id) return item
+        const nextData = { ...((item.data ?? {}) as Record<string, unknown>), tone }
+        return {
+          ...item,
+          source: connection.source!,
+          target: connection.target!,
+          sourceHandle: connection.sourceHandle ?? null,
+          targetHandle: connection.targetHandle ?? null,
+          class: `tone-${tone}`,
+          data: nextData,
+        } as Edge
+      })
+    options.commitEdges(nextEdges)
     options.pushHistory(before)
     options.markDirty()
     options.refreshSnapshot()
+    markFlowExecutionNodeDirty(connection.target, { includeSelf: true })
   }
 
   function onAddNode() {
@@ -211,8 +235,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     if (!targetKind || targetKind === 'message') return
     options.onNodeDeleted?.(nodeId, targetKind)
     const before = options.captureHistory()
-    options.nodes.value = (options.nodes.value as Node[]).filter(node => node.id !== nodeId)
-    options.edges.value = (options.edges.value as Edge[]).filter(edge => edge.source !== nodeId && edge.target !== nodeId)
+    const nextNodes = (options.nodes.value as Node[]).filter(node => node.id !== nodeId)
+    const nextEdges = (options.edges.value as Edge[]).filter(edge => edge.source !== nodeId && edge.target !== nodeId)
+    options.commitNodes(nextNodes)
+    options.commitEdges(nextEdges)
     options.pushHistory(before)
     options.markDirty()
     options.refreshSnapshot()
@@ -261,12 +287,14 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       options.onNodeDeleted?.(nodeId, kind)
     })
     const before = options.captureHistory()
-    options.nodes.value = flowNodes.filter(node => !selectedNodeIds.has(node.id)) as Node[]
-    options.edges.value = flowEdges.filter(edge => (
+    const nextNodes = flowNodes.filter(node => !selectedNodeIds.has(node.id)) as Node[]
+    const nextEdges = flowEdges.filter(edge => (
       !selectedEdgeIds.has(edge.id)
       && !selectedNodeIds.has(edge.source)
       && !selectedNodeIds.has(edge.target)
     )) as Edge[]
+    options.commitNodes(nextNodes)
+    options.commitEdges(nextEdges)
     options.pushHistory(before)
     options.markDirty()
     options.refreshSnapshot()
@@ -497,6 +525,47 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     })
   }
 
+  const EXECUTION_NODE_KINDS = new Set(['edit', 'enhance', 'color', 'fusion', 'wear', 'model', 'viewpoint'])
+
+  function markFlowExecutionNodeDirty(nodeId: string, { includeSelf = false }: { includeSelf?: boolean } = {}) {
+    const visited = new Set<string>()
+    const queue: string[] = []
+    if (includeSelf) {
+      const selfData = lookupData(nodeId)
+      if (selfData && EXECUTION_NODE_KINDS.has(selfData.kind)) {
+        updateSnapshotNode(nodeId, (snapshotNode) => {
+          if (snapshotNode.outputStatus === 'ready') return { ...snapshotNode, outputStatus: 'stale' }
+          return snapshotNode
+        }, { history: false })
+      }
+    }
+    visited.add(nodeId)
+    for (const edge of (options.edges.value as unknown as Edge[])) {
+      if (edge.source === nodeId) {
+        if (!visited.has(edge.target)) {
+          queue.push(edge.target)
+          visited.add(edge.target)
+        }
+      }
+    }
+    while (queue.length > 0) {
+      const currentId = queue.shift()!
+      const data = lookupData(currentId)
+      if (data && EXECUTION_NODE_KINDS.has(data.kind)) {
+        updateSnapshotNode(currentId, (snapshotNode) => {
+          if (snapshotNode.outputStatus === 'ready') return { ...snapshotNode, outputStatus: 'stale' }
+          return snapshotNode
+        }, { history: false })
+      }
+      for (const edge of (options.edges.value as unknown as Edge[])) {
+        if (edge.source === currentId && !visited.has(edge.target)) {
+          queue.push(edge.target)
+          visited.add(edge.target)
+        }
+      }
+    }
+  }
+
   return {
     isValidConnection,
     resolveNodePosition,
@@ -514,5 +583,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     onFlowColorRemove,
     onFlowColorAdd,
     onFlowMaskToggleInvert,
+    markFlowExecutionNodeDirty,
   }
 }

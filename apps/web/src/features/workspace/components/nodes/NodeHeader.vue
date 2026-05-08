@@ -2,7 +2,7 @@
   <div
     class="workflow-node-header"
     :class="{ 'workflow-node-header--rounded': rounded }"
-    @mousedown.stop="emit('node-mousedown', $event)"
+    @mousedown="emit('node-mousedown', $event)"
   >
     <div class="node-header-title">
       <span v-if="$slots.icon" class="node-header-icon">

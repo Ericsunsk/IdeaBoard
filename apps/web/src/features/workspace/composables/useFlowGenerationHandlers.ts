@@ -98,6 +98,36 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     options.updateSnapshotNode(nodeId, prev => ({ ...prev, outputStatus: 'stale' }), { history: false })
   }
 
+  function buildOutputImagesWithRatio(nodeId: string, urls: string[]): Array<{ url: string; ratio: number }> {
+    const initial = urls.map(url => ({ url, ratio: 1 }))
+    Promise.all(urls.map(async (url) => {
+      const size = await loadImageSizeFromUrl(url)
+      if (size && size.width > 0 && size.height > 0) {
+        return size.height / size.width
+      }
+      return 1
+    })).then((ratios) => {
+      const nextImages = urls.map((url, i) => ({ url, ratio: ratios[i] ?? 1 }))
+      options.updateSnapshotNode(nodeId, (prev) => {
+        const currentOutputImages = Array.isArray(prev.outputImages)
+          ? prev.outputImages as Array<{ url?: unknown }>
+          : []
+        const currentUrls = currentOutputImages.map(item => String(item?.url ?? ''))
+        if (
+          currentUrls.length !== urls.length
+          || currentUrls.some((url, index) => url !== urls[index])
+        ) {
+          return prev
+        }
+        return {
+          ...prev,
+          outputImages: nextImages,
+        }
+      }, { history: false, dirty: true })
+    }).catch(() => {})
+    return initial
+  }
+
   function commitNodeOutputWithHistory(
     nodeId: string,
     patcher: (snapshotNode: SnapshotNodeRecord) => SnapshotNodeRecord,
@@ -147,9 +177,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     try {
       setNodeOutputStaleSilently(nodeId)
       const { urls } = await executeFlowEnhanceNode(enhanceContext, enhanceOptions)
+      const outputImages = buildOutputImagesWithRatio(nodeId, urls)
       commitNodeOutputWithHistory(nodeId, prev => ({
         ...prev,
-        outputImages: urls.map(url => ({ url, ratio: 1 })),
+        outputImages,
         outputStatus: 'ready',
       }), beforeGenerate)
       options.onSuccess('Enhance 生成完成')
@@ -201,7 +232,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       const { urls } = await executeFlowEditNode(editContext, editOptions)
       commitNodeOutputWithHistory(nodeId, prev => ({
         ...prev,
-        outputImages: urls.map(url => ({ url, ratio: 1 })),
+        outputImages: buildOutputImagesWithRatio(nodeId, urls),
         outputStatus: 'ready',
       }), beforeGenerate)
       options.onSuccess('Edit 生成完成')
@@ -253,7 +284,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       const { urls } = await executeFlowColorNode(colorContext, colorOptions)
       commitNodeOutputWithHistory(nodeId, prev => ({
         ...prev,
-        outputImages: urls.map(url => ({ url, ratio: 1 })),
+        outputImages: buildOutputImagesWithRatio(nodeId, urls),
         outputStatus: 'ready',
       }), beforeGenerate)
       options.onSuccess('Color 生成完成')
@@ -304,7 +335,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       const { urls } = await executeFlowFusionNode(fusionContext, fusionOptions)
       commitNodeOutputWithHistory(nodeId, prev => ({
         ...prev,
-        outputImages: urls.map(url => ({ url, ratio: 1 })),
+        outputImages: buildOutputImagesWithRatio(nodeId, urls),
         outputStatus: 'ready',
       }), beforeGenerate)
       options.onSuccess('Fusion 生成完成')
@@ -359,7 +390,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       const { urls } = await executeFlowWearNode(wearContext, wearOptions)
       commitNodeOutputWithHistory(nodeId, prev => ({
         ...prev,
-        outputImages: urls.map(url => ({ url, ratio: 1 })),
+        outputImages: buildOutputImagesWithRatio(nodeId, urls),
         outputStatus: 'ready',
       }), beforeGenerate)
       options.onSuccess('Wear 生成完成')
@@ -414,7 +445,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       const { urls } = await executeFlowModelNode(modelContext, modelOptions)
       commitNodeOutputWithHistory(nodeId, prev => ({
         ...prev,
-        outputImages: urls.map(url => ({ url, ratio: 1 })),
+        outputImages: buildOutputImagesWithRatio(nodeId, urls),
         outputStatus: 'ready',
       }), beforeGenerate)
       options.onSuccess('Model 生成完成')
@@ -469,7 +500,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       const { urls } = await executeFlowViewpointNode(viewpointContext, viewpointOptions)
       commitNodeOutputWithHistory(nodeId, prev => ({
         ...prev,
-        outputImages: urls.map(url => ({ url, ratio: 1 })),
+        outputImages: buildOutputImagesWithRatio(nodeId, urls),
         outputStatus: 'ready',
       }), beforeGenerate)
       options.onSuccess('Viewpoint 生成完成')

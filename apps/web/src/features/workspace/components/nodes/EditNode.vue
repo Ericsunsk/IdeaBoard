@@ -5,7 +5,6 @@
     :data-node-id="node.id"
     :class="{ active, dragging, 'copy-mode': copyMode, running: uiState?.isRunning }"
     :style="nodeStyle"
-    @mousedown.stop
   >
     <NodeHeader
       title="Edit"
@@ -20,7 +19,7 @@
       </template>
     </NodeHeader>
 
-    <div class="edit-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
+    <div class="edit-node-body node-execution-body" @contextmenu.stop>
       <div class="edit-mode-card node-mode-card">
         <div class="edit-mode-row node-option-row">
           <NodeActionButton

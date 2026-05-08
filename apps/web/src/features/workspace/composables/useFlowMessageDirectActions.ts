@@ -26,6 +26,8 @@ type UseFlowMessageDirectActionsOptions = {
   pushHistory: (snapshot: FlowHistorySnapshot) => void
   markDirty: () => void
   refreshSnapshot: () => void
+  commitNodes: (nextNodes: Node[]) => void
+  updateSnapshotNodeSilently: (nodeId: string, patcher: (snapshotNode: Record<string, unknown>) => Record<string, unknown>) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
 }
@@ -58,7 +60,8 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
 
   function commitNodeMutation(mutator: (items: Node[]) => Node[]) {
     const historyBefore = options.captureHistory()
-    options.nodes.value = mutator(options.nodes.value)
+    const nextNodes = mutator(options.nodes.value)
+    options.commitNodes(nextNodes)
     options.pushHistory(historyBefore)
     options.markDirty()
     options.refreshSnapshot()
@@ -154,6 +157,16 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
         },
       }
     }))
+    // Backfill real image ratio asynchronously without creating extra history
+    loadImageSizeFromUrl(url).then((size) => {
+      if (size && size.width > 0 && size.height > 0) {
+        const ratio = size.height / size.width
+        options.updateSnapshotNodeSilently(nodeId, prev => ({
+          ...prev,
+          height_ratio: ratio,
+        }))
+      }
+    }).catch(() => {})
   }
 
   async function runSubmitAndWait(

@@ -5,7 +5,6 @@
     :data-node-id="node.id"
     :class="{ active, dragging, 'copy-mode': copyMode }"
     :style="nodeStyle"
-    @mousedown.stop
   >
     <NodeHeader
       title="Prompt"

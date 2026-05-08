@@ -48,9 +48,9 @@
         <div class="flow-canvas-node__drag-zone flow-canvas-node__drag-zone--message" />
         <img
           :src="messageSnapshot.url"
-          class="flow-canvas-node__message-image flow-canvas-node__drag-surface"
+          class="flow-canvas-node__message-image flow-canvas-node__drag-surface nodrag"
           :ref="setMessageImageRef"
-          draggable="false"
+          draggable="true"
           @load="onMessageImageLoad"
           @dragstart="onMessageImageDragStart"
         />
@@ -246,7 +246,15 @@
       :key="`canvas-in:${port}`"
       type="target"
       :position="Position.Left"
-      class="flow-canvas-node__handle flow-canvas-node__handle--input"
+      :class="[
+        'flow-canvas-node__handle',
+        'flow-canvas-node__handle--input',
+        {
+          'is-connected': isHandleConnected(port, 'input'),
+          'is-pending': isHandlePending(port),
+        },
+      ]"
+      :data-port-kind="resolvePortVisualKind(port)"
       :style="resolveHandleStyle(port, 'input')"
     />
     <Handle
@@ -255,7 +263,15 @@
       :key="`canvas-out:${port}`"
       type="source"
       :position="Position.Right"
-      class="flow-canvas-node__handle flow-canvas-node__handle--output"
+      :class="[
+        'flow-canvas-node__handle',
+        'flow-canvas-node__handle--output',
+        {
+          'is-connected': isHandleConnected(port, 'output'),
+          'is-pending': isHandlePending(port),
+        },
+      ]"
+      :data-port-kind="resolvePortVisualKind(port)"
       :style="resolveHandleStyle(port, 'output')"
     />
   </div>
@@ -486,96 +502,6 @@ const stageHeight = computed(() => {
 
 const handleInputPorts = computed(() => getCanvasNodeVisiblePortsForKind('input'))
 const handleOutputPorts = computed(() => getCanvasNodeVisiblePortsForKind('output'))
-const flowCanvasNodeRef = ref<HTMLElement | null>(null)
-const measuredPortTopMap = ref<Record<string, number>>({})
-let nodeResizeObserver: ResizeObserver | null = null
-let portResizeObserver: ResizeObserver | null = null
-let nodeMutationObserver: MutationObserver | null = null
-let measureQueued = false
-
-function schedulePortMeasurement() {
-  if (measureQueued) return
-  measureQueued = true
-  void nextTick(() => {
-    measureQueued = false
-    measurePortTopsFromLegacyDom()
-    reconnectPortResizeObserver()
-    emit('request-internals-update')
-  })
-}
-
-function measurePortTopsFromLegacyDom() {
-  const root = flowCanvasNodeRef.value
-  if (!root) {
-    measuredPortTopMap.value = {}
-    return
-  }
-  const rootRect = root.getBoundingClientRect()
-  const portElements = root.querySelectorAll<HTMLElement>('.node-port[data-port-direction][data-port-name]')
-  const nextMap: Record<string, number> = {}
-  for (const portElement of portElements) {
-    const direction = portElement.dataset.portDirection
-    const portName = portElement.dataset.portName as CanvasConnectionPort | undefined
-    if (!portName) continue
-    if (direction !== 'input' && direction !== 'output') continue
-    const rect = portElement.getBoundingClientRect()
-    const centerY = rect.top + rect.height / 2 - rootRect.top
-    if (!Number.isFinite(centerY)) continue
-    nextMap[getMeasuredPortKey(portName, direction)] = centerY
-  }
-  measuredPortTopMap.value = nextMap
-}
-
-function getMeasuredPortKey(port: CanvasConnectionPort, direction: 'input' | 'output'): string {
-  return `${direction}:${port}`
-}
-
-function reconnectPortResizeObserver() {
-  portResizeObserver?.disconnect()
-  const root = flowCanvasNodeRef.value
-  if (!root || typeof ResizeObserver === 'undefined') return
-  portResizeObserver = new ResizeObserver(() => {
-    schedulePortMeasurement()
-  })
-  const portElements = root.querySelectorAll<HTMLElement>('.node-port[data-port-direction][data-port-name]')
-  for (const portElement of portElements) {
-    portResizeObserver.observe(portElement)
-  }
-}
-
-function setupObservers() {
-  const root = flowCanvasNodeRef.value
-  nodeResizeObserver?.disconnect()
-  nodeMutationObserver?.disconnect()
-  if (!root) return
-  if (typeof ResizeObserver !== 'undefined') {
-    nodeResizeObserver = new ResizeObserver(() => {
-      schedulePortMeasurement()
-    })
-    nodeResizeObserver.observe(root)
-  }
-  if (typeof MutationObserver !== 'undefined') {
-    nodeMutationObserver = new MutationObserver(() => {
-      schedulePortMeasurement()
-    })
-    nodeMutationObserver.observe(root, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: ['style', 'class', 'data-port-direction', 'data-port-name'],
-    })
-  }
-}
-
-watch(
-  flowCanvasNodeRef,
-  () => {
-    setupObservers()
-    schedulePortMeasurement()
-  },
-  { flush: 'post' },
-)
 
 watch(
   () => [
@@ -585,19 +511,10 @@ watch(
     handleOutputPorts.value.join('|'),
   ],
   () => {
-    schedulePortMeasurement()
+    emit('request-internals-update')
   },
   { deep: true, flush: 'post' },
 )
-
-onBeforeUnmount(() => {
-  nodeResizeObserver?.disconnect()
-  nodeResizeObserver = null
-  portResizeObserver?.disconnect()
-  portResizeObserver = null
-  nodeMutationObserver?.disconnect()
-  nodeMutationObserver = null
-})
 
 function onPromptTextUpdate(value: string) {
   emit('update-prompt-text', value)
@@ -718,10 +635,6 @@ function onMessageContextMenu(event: MouseEvent) {
 }
 
 function onMessageImageDragStart(event: DragEvent) {
-  if (!event.altKey) {
-    event.preventDefault()
-    return
-  }
   emit('message-image-dragstart', event)
 }
 
@@ -800,10 +713,9 @@ function resolveHandleStyle(port: CanvasConnectionPort, direction: 'input' | 'ou
   const kind = getCanvasNodeType()
   if (!kind) return undefined
   const topMap = getNodeIoTopMap(kind)
-  const measuredTop = measuredPortTopMap.value[getMeasuredPortKey(port, direction)]
-  const top = typeof measuredTop === 'number' && Number.isFinite(measuredTop) ? measuredTop : topMap[port]
-  // Keep handle center aligned to legacy .node-port center after expanding hit area to 18px.
-  const side = direction === 'input' ? { left: '-10px' } : { right: '-10px' }
+  const top = topMap[port]
+  // Keep horizontal offset visually aligned with legacy .node-port (left/right: -5.5px).
+  const side = direction === 'input' ? { left: '-5.5px' } : { right: '-5.5px' }
   if (typeof top === 'number' && Number.isFinite(top)) {
     return {
       top: `${top}px`,
@@ -816,6 +728,25 @@ function resolveHandleStyle(port: CanvasConnectionPort, direction: 'input' | 'ou
   }
 }
 
+function resolvePortVisualKind(port: string): 'image' | 'mask' | 'prompt' | null {
+  if (port === 'image' || port === 'imageA' || port === 'imageB' || port === 'output') return 'image'
+  if (port === 'mask') return 'mask'
+  if (port === 'prompt') return 'prompt'
+  return null
+}
+
+function isHandleConnected(port: CanvasConnectionPort, direction: 'input' | 'output'): boolean {
+  const connected = props.uiState?.connection?.connected as Partial<Record<string, boolean | undefined>> | undefined
+  if (!connected) return false
+  if (direction === 'output') return !!connected.output
+  return !!connected[port]
+}
+
+function isHandlePending(port: CanvasConnectionPort): boolean {
+  const pending = props.uiState?.connection?.pending as Partial<Record<string, boolean | undefined>> | undefined
+  return !!pending?.[port]
+}
+
 function noop() {}
 function noopMouse() {}
 function noopPortMouse() {}
@@ -825,6 +756,8 @@ function noopPortMouse() {}
 .flow-canvas-node {
   position: relative;
   isolation: isolate;
+  min-width: 100px;
+  min-height: 40px;
 }
 
 .flow-canvas-node__drag-zone {
@@ -1015,16 +948,50 @@ function noopPortMouse() {}
 }
 
 .flow-canvas-node__handle {
-  width: 18px;
-  height: 18px;
-  border: 0;
-  opacity: 0;
+  --port-color: #9278e6;
+  --port-glow: rgba(146, 120, 230, 0.24);
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid #fff;
+  border-radius: 999px;
+  opacity: 1;
   z-index: 24;
   transform: translateY(-50%);
-  box-shadow: none;
-  background: transparent !important;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.16);
+  background: var(--port-color) !important;
   cursor: crosshair;
   pointer-events: all;
+  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.flow-canvas-node__handle[data-port-kind='image'] {
+  --port-color: #5b8def;
+  --port-glow: rgba(91, 141, 239, 0.24);
+}
+
+.flow-canvas-node__handle[data-port-kind='mask'] {
+  --port-color: #34c38f;
+  --port-glow: rgba(52, 195, 143, 0.24);
+}
+
+.flow-canvas-node__handle[data-port-kind='prompt'] {
+  --port-color: #f59e0b;
+  --port-glow: rgba(245, 158, 11, 0.24);
+}
+
+.flow-canvas-node__handle:hover {
+  transform: translateY(-50%) scale(1.08);
+  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.18));
+}
+
+.flow-canvas-node__handle.is-connected {
+  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.2));
+}
+
+.flow-canvas-node__handle.is-pending {
+  background: #fff !important;
+  border-color: var(--port-color, #9278e6);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--port-color, #9278e6) 18%, transparent);
 }
 
 .flow-canvas-node :deep(.flow-canvas-node__handle.vue-flow__handle-left),
@@ -1033,6 +1000,7 @@ function noopPortMouse() {}
 }
 
 .flow-canvas-node :deep(.node-port) {
+  opacity: 0;
   pointer-events: none !important;
   z-index: 21;
 }
