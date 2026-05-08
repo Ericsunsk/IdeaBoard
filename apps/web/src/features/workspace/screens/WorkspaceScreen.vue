@@ -1,5 +1,5 @@
 <template>
-  <div class="canvas-layout" :class="`tool-${activeTool}`" @mousedown.self="closeBoardHeaderEditing">
+  <div class="canvas-layout" :class="[`tool-${activeTool}`, { 'interaction-lite': isFlowInteractionActive }]" @mousedown.self="closeBoardHeaderEditing">
     <div class="canvas-grid" :style="canvasGridStyle"></div>
 
     <HomeCanvasHeader
@@ -33,6 +33,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
       </div>
       <div class="toolbar-divider"></div>
+      <div class="tool-item" title="图·文生图" @click="onNavigateRequest('/user/picture')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M3 14l4-4 5 5 5-5 4 4"/></svg>
+      </div>
       <button v-if="isDev" type="button" class="tool-item debug-toggle" title="Debug" @click="debugPanelOpen = !debugPanelOpen">D</button>
     </aside>
 
@@ -52,10 +55,15 @@
         :select-nodes-on-drag="activeTool === 'select'"
         :selection-key-code="activeTool === 'select' ? 'Shift' : false"
         :multi-selection-key-code="activeTool === 'select' ? 'Shift' : null"
-        :default-edge-options="{ animated: false }"
+        :default-edge-options="{ animated: false, updatable: true }"
         :is-valid-connection="isValidConnection"
+        :connection-line-style="flowConnectionLineStyle"
         @connect="onConnect"
+        @connect-start="onFlowConnectStart"
+        @connect-end="onFlowConnectEnd"
         @edge-update="onEdgeUpdate"
+        @edge-update-start="onFlowEdgeUpdateStart"
+        @edge-update-end="onFlowEdgeUpdateEnd"
         @move-start="closeBoardHeaderEditing"
         @move="onFlowMove"
         @node-click="onFlowNodeClick"
@@ -223,6 +231,7 @@ import { loadImageSizeFromUrl, useFlowGenerationHandlers } from '../composables/
 import { useFlowMessageDirectActions } from '../composables/useFlowMessageDirectActions'
 import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovateControl'
 import { useFlowMessageImageInteractions } from '../composables/useFlowMessageImageInteractions'
+import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import { parseHandlePort, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -252,6 +261,7 @@ import {
   type GenerateQualityOption,
   type PatternGenerateRatioOption,
 } from '../../workspace/components/nodes/nodeOptionConfig'
+import { CANVAS_NODE_MENU_ITEMS } from '../../workspace/config/canvasNodeMenu'
 
 const message = useMessage()
 const route = useRoute()
@@ -282,6 +292,42 @@ const flowPromptShowSettings = ref(false)
 const flowPromptText = ref('')
 const flowPromptRatio = ref<PatternGenerateRatioOption>('1:1')
 const flowPromptQuality = ref<GenerateQualityOption>('1k')
+const connectingSourceHandle = ref<string | null>(null)
+
+const TONE_COLOR_MAP: Record<string, string> = {
+  image: '#5b8def',
+  mask: '#34c38f',
+  prompt: '#f59e0b',
+}
+
+const flowConnectionLineStyle = computed(() => {
+  const tone = resolveFlowEdgeToneFromHandles(connectingSourceHandle.value, null)
+  return {
+    stroke: TONE_COLOR_MAP[tone] || '#9278e6',
+    strokeWidth: '2',
+    opacity: '0.9',
+  }
+})
+
+function onFlowConnectStart(event: { handleId?: string | null }) {
+  connectingSourceHandle.value = event.handleId ?? null
+  startFlowInteraction('connect')
+}
+
+function onFlowConnectEnd() {
+  connectingSourceHandle.value = null
+  stopFlowInteraction('connect')
+}
+
+function onFlowEdgeUpdateStart() {
+  startFlowInteraction('edge-update')
+}
+
+function onFlowEdgeUpdateEnd() {
+  connectingSourceHandle.value = null
+  stopFlowInteraction('edge-update')
+}
+
 const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 
 const FLOW_NODE_KIND_DRAG_MIME = 'application/x-ideaboard-flow-node-kind'
@@ -303,18 +349,10 @@ const viewportOffsetY = ref(0)
 const nodeContextMenu = ref({ visible: false, x: 0, y: 0, flowX: 0, flowY: 0 })
 const activeMessageActionNodeId = ref<string | null>(null)
 
-const canvasNodeMenuItems = [
-  { key: 'prompt', label: 'Prompt' },
-  { key: 'image', label: 'Image' },
-  { key: 'edit', label: 'Edit' },
-  { key: 'enhance', label: 'Enhance' },
-  { key: 'color', label: 'Color' },
-  { key: 'fusion', label: 'Fusion' },
-  { key: 'wear', label: 'Wear' },
-  { key: 'mask', label: 'Mask' },
-  { key: 'model', label: 'Model' },
-  { key: 'viewpoint', label: 'Viewpoint' },
-] as const
+const canvasNodeMenuItems = CANVAS_NODE_MENU_ITEMS.map(item => ({
+  key: item.key as FlowCreatableNodeKind,
+  label: item.label.replace('+ ', '').replace(' 节点', ''),
+}))
 
 function scheduleFlowNodeInternalsRefresh(nodeIds?: string[]) {
   const hasCanvasNodes = (nodes.value as Array<{ type?: string }>).some(node => node.type === 'canvas')
@@ -986,6 +1024,12 @@ function onExportSelectedImages() {
 const isAltPressed = ref(false)
 const isDraggingNode = ref(false)
 
+const {
+  isCanvasInteractionActive: isFlowInteractionActive,
+  startCanvasInteraction: startFlowInteraction,
+  stopCanvasInteraction: stopFlowInteraction,
+} = useFlowCanvasInteractionState()
+
 function onWindowKeyDown(event: KeyboardEvent) {
   if (event.key === 'Alt') {
     isAltPressed.value = true
@@ -1000,6 +1044,7 @@ function onWindowKeyUp(event: KeyboardEvent) {
 
 function onNodeDragStart() {
   isDraggingNode.value = true
+  startFlowInteraction('node-drag')
   activeMessageActionNodeId.value = null
   hideFlowStyleStrengthControl()
   flowHistory.onNodeDragStart()
@@ -1008,6 +1053,7 @@ function onNodeDragStart() {
 
 function onNodeDragStop() {
   isDraggingNode.value = false
+  stopFlowInteraction('node-drag')
   finishFlowNodeDragDuplicateTracking(isAltPressed.value)
   flowHistory.onNodeDragStop(() => {
     markDirty()
@@ -1128,7 +1174,15 @@ async function loadImageRatioFromFile(file: File): Promise<number | null> {
   }
 }
 
-async function uploadImageToBoard(file: File): Promise<{ url: string; ratio: number }> {
+type UploadImageResult = { url: string; ratio: number }
+
+const uploadCache = new Map<string, Promise<UploadImageResult>>()
+
+function buildUploadCacheKey(boardId: string, file: File): string {
+  return `${boardId}::${file.name}::${file.size}::${file.lastModified}`
+}
+
+async function uploadImageToBoard(file: File): Promise<UploadImageResult> {
   if (!file.type.startsWith('image/')) {
     throw new Error('请上传图片文件')
   }
@@ -1136,14 +1190,28 @@ async function uploadImageToBoard(file: File): Promise<{ url: string; ratio: num
   if (!boardId) {
     throw new Error('缺少 boardId，无法上传图片')
   }
-  const ratio = await loadImageRatioFromFile(file)
-  const uploadRes = await uploadApi.upload(file, boardId)
-  if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-    throw new Error(sanitizeApiErrorMessage(uploadRes.msg, '上传失败'))
-  }
-  return {
-    url: uploadRes.data.url,
-    ratio: ratio && ratio > 0 ? ratio : 1,
+  const cacheKey = buildUploadCacheKey(boardId, file)
+  const cached = uploadCache.get(cacheKey)
+  if (cached) return cached
+  const uploadTask = (async (): Promise<UploadImageResult> => {
+    const ratio = await loadImageRatioFromFile(file)
+    const uploadRes = await uploadApi.upload(file, boardId)
+    if (uploadRes.code !== 0 || !uploadRes.data?.url) {
+      throw new Error(sanitizeApiErrorMessage(uploadRes.msg, '上传失败'))
+    }
+    return {
+      url: uploadRes.data.url,
+      ratio: ratio && ratio > 0 ? ratio : 1,
+    }
+  })()
+  uploadCache.set(cacheKey, uploadTask)
+  try {
+    return await uploadTask
+  } catch (error) {
+    if (uploadCache.get(cacheKey) === uploadTask) {
+      uploadCache.delete(cacheKey)
+    }
+    throw error
   }
 }
 
@@ -1354,6 +1422,8 @@ const {
 } = useFlowMaskDrawing({
   getMaskNodeSnapshot,
   updateSnapshotNode,
+  startCanvasInteraction: startFlowInteraction,
+  stopCanvasInteraction: stopFlowInteraction,
 })
 
 const {
@@ -1471,8 +1541,8 @@ const {
   appendFlowNodes: (nextNodes) => {
     commitFlowNodesAppend(nextNodes)
   },
-  startCanvasInteraction: () => undefined,
-  stopCanvasInteraction: () => undefined,
+  startCanvasInteraction: startFlowInteraction,
+  stopCanvasInteraction: stopFlowInteraction,
 })
 
 const { getFlowNodeUiStateCached } = useFlowNodeUiState({
@@ -1558,6 +1628,23 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .canvas-layout { width: 100%; height: 100vh; background: #ffffff; position: relative; overflow: hidden; }
+
+.canvas-layout.interaction-lite :deep(.workflow-node),
+.canvas-layout.interaction-lite :deep(.flow-canvas-node__message),
+.canvas-layout.interaction-lite :deep(.vue-flow__edge-path),
+.canvas-layout.interaction-lite :deep(.workspace-connection-line path) {
+  transition: none !important;
+}
+
+.canvas-layout.interaction-lite :deep(.workflow-node *),
+.canvas-layout.interaction-lite :deep(.flow-canvas-node__message *) {
+  transition-duration: 0s !important;
+}
+
+.canvas-layout.interaction-lite :deep(.vue-flow__edge.selected .vue-flow__edge-path),
+.canvas-layout.interaction-lite :deep(.workspace-flow-edge.is-selected .vue-flow__edge-path) {
+  filter: none !important;
+}
 .canvas-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, #e2e4e8 calc(1.5px * var(--zoom, 1)), transparent calc(1.5px * var(--zoom, 1))); background-size: calc(24px * var(--zoom, 1)) calc(24px * var(--zoom, 1)); background-position: calc(50% + var(--offset-x, 0px)) calc(50% + var(--offset-y, 0px)); z-index: 0; opacity: 1; }
 
 .floating-toolbar { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: #fff; padding: 8px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #e2e4e8; z-index: 100; }
