@@ -1,6 +1,6 @@
 <template>
   <div class="canvas-layout" :class="[`tool-${activeTool}`, { 'interaction-lite': isFlowInteractionActive }]" @mousedown.self="closeBoardHeaderEditing">
-    <div class="canvas-grid" :style="canvasGridStyle"></div>
+
 
     <HomeCanvasHeader
       :current-board-name="currentBoardName"
@@ -228,7 +228,7 @@ import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowMaskDrawing } from '../composables/useFlowMaskDrawing'
 import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
 import { useFlowNodeMutations, type FlowCreatableNodeKind } from '../composables/useFlowNodeMutations'
-import { loadImageSizeFromUrl, useFlowGenerationHandlers } from '../composables/useFlowGenerationHandlers'
+import { useFlowGenerationHandlers } from '../composables/useFlowGenerationHandlers'
 import { useFlowMessageDirectActions } from '../composables/useFlowMessageDirectActions'
 import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovateControl'
 import { useFlowMessageImageInteractions } from '../composables/useFlowMessageImageInteractions'
@@ -240,10 +240,8 @@ import type { FlowNodeData } from '../types/flowTypes'
 import { createEmptyCanvasBoardSnapshot, type FlowAdapterEdge, type FlowAdapterNode, flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 import { buildFlowEdgeClassName, resolveFlowEdgeToneFromHandles } from '../utils/flowEdgeVisual'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
-import { createCanvasImageItemAt } from '../../workspace/utils/canvasNodeFactory'
 import type {
   CanvasBoardSnapshot,
-  CanvasImageItem,
   CanvasConnectionNodeType,
   ImageNodeItem,
   MaskNodeItem,
@@ -252,18 +250,15 @@ import HomeCanvasHeader from '../../workspace/components/home/HomeCanvasHeader.v
 import HomeBottomGenerateBar from '../../workspace/components/home/HomeBottomGenerateBar.vue'
 import { useRouter } from 'vue-router'
 import {
-  isCanvasBoardNameTaken,
-  listCanvasBoards,
-  normalizeCanvasBoardName,
-  renameCanvasBoard,
-} from '../../boards/lib/canvasBoards'
-import {
   GENERATE_QUALITY_OPTIONS,
   PATTERN_GENERATE_RATIO_OPTIONS,
   type GenerateQualityOption,
   type PatternGenerateRatioOption,
 } from '../../workspace/components/nodes/nodeOptionConfig'
-import { CANVAS_NODE_MENU_ITEMS } from '../../workspace/config/canvasNodeMenu'
+import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
+import { useFlowSelectionPreviewBar } from '../composables/useFlowSelectionPreviewBar'
+import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
+import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActions'
 
 const message = useMessage()
 const route = useRoute()
@@ -274,9 +269,6 @@ const isDev = import.meta.env.DEV
 
 const {
   zoomLevel,
-  viewportOffsetX,
-  viewportOffsetY,
-  canvasGridStyle,
   onZoomIn,
   onZoomOut,
   getViewport,
@@ -297,11 +289,6 @@ const isDirty = ref(false)
 const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
 const leaveConfirmVisible = ref(false)
 const activeTool = ref<'select' | 'hand' | 'text'>('select')
-const isBoardMenuOpen = ref(false)
-const isRenamingBoard = ref(false)
-const boardNameDraft = ref('')
-const boardNameInputRef = ref<HTMLInputElement | null>(null)
-const boardMetas = ref(listCanvasBoards())
 const flowPromptShowSettings = ref(false)
 const flowPromptText = ref('')
 const flowPromptRatio = ref<PatternGenerateRatioOption>('1:1')
@@ -344,12 +331,8 @@ function onFlowEdgeUpdateEnd() {
 
 const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 
-// Feature flag: enable Vue Flow built-in visible-elements culling.
-// Must be validated with 100+ node canvases before enabling in production.
-// Disabled by default — dynamic node/edge sync must work first.
-const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING = false
+const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING = import.meta.env.VITE_WORKSPACE_FLOW_ENABLE_CULLING === 'true'
 
-const FLOW_NODE_KIND_DRAG_MIME = 'application/x-ideaboard-flow-node-kind'
 const FLOW_NODE_IMAGE_DRAG_MIME = 'application/x-canvas-node-image'
 let pendingNodeInternalsRefresh = false
 let queuedNodeInternalsIds: Set<string> | null = null
@@ -362,13 +345,7 @@ let lastManualNodeSelection:
     timestamp: number
   }
   | null = null
-const nodeContextMenu = ref({ visible: false, x: 0, y: 0, flowX: 0, flowY: 0 })
 const activeMessageActionNodeId = ref<string | null>(null)
-
-const canvasNodeMenuItems = CANVAS_NODE_MENU_ITEMS.map(item => ({
-  key: item.key as FlowCreatableNodeKind,
-  label: item.label.replace('+ ', '').replace(' 节点', ''),
-}))
 
 function scheduleFlowNodeInternalsRefresh(nodeIds?: string[]) {
   const hasCanvasNodes = (nodes.value as Array<{ type?: string }>).some(node => node.type === 'canvas')
@@ -404,53 +381,11 @@ function onFlowNodesInitialized() {
 
 const flowPromptRatioOptions = PATTERN_GENERATE_RATIO_OPTIONS
 const flowPromptQualityOptions = GENERATE_QUALITY_OPTIONS
-const currentBoardName = computed(() => {
-  const boardId = `${currentBoardId.value ?? ''}`.trim()
-  if (!boardId) return 'Untitled Canvas'
-  return boardMetas.value.find(board => board.id === boardId)?.name ?? boardId
-})
-const boardOptions = computed(() =>
-  boardMetas.value.map(board => ({ id: board.id, name: board.name })),
-)
 const flowPromptPlaceholder = computed(() => {
   return activeTool.value === 'text'
     ? '文本工具稍后接入，请在节点内执行生成'
     : '请在节点内执行生成'
 })
-function setBoardNameInputRef(el: HTMLInputElement | null) {
-  boardNameInputRef.value = el
-}
-
-function refreshBoardMetas() {
-  boardMetas.value = listCanvasBoards()
-}
-
-function toggleBoardMenu() {
-  if (!isBoardMenuOpen.value) refreshBoardMetas()
-  isBoardMenuOpen.value = !isBoardMenuOpen.value
-}
-
-function startBoardRename() {
-  if (!currentBoardId.value) return
-  isRenamingBoard.value = true
-  isBoardMenuOpen.value = false
-  boardNameDraft.value = currentBoardName.value
-  void nextTick(() => {
-    boardNameInputRef.value?.focus()
-    boardNameInputRef.value?.select()
-  })
-}
-
-function cancelBoardRename() {
-  isRenamingBoard.value = false
-  boardNameDraft.value = ''
-}
-
-function closeBoardHeaderEditing() {
-  isBoardMenuOpen.value = false
-  cancelBoardRename()
-}
-
 function clearFlowSelection(): boolean {
   let hasSelection = false
   const nextNodes = (nodes.value as Array<Node & { selected?: boolean }>).map((node) => {
@@ -481,10 +416,6 @@ function onPaneClick() {
   clearFlowSelection()
 }
 
-function closeNodeContextMenu() {
-  nodeContextMenu.value.visible = false
-}
-
 function onPaneContextMenu(event: MouseEvent) {
   event.preventDefault()
   closeBoardHeaderEditing()
@@ -495,7 +426,7 @@ function onPaneContextMenu(event: MouseEvent) {
   const rect = canvasWrapRef.value?.getBoundingClientRect()
   const x = rect ? event.clientX - rect.left : event.clientX
   const y = rect ? event.clientY - rect.top : event.clientY
-  nodeContextMenu.value = { visible: true, x, y, flowX: flowPoint.x, flowY: flowPoint.y }
+  openNodeContextMenu(x, y, flowPoint.x, flowPoint.y)
 }
 
 function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
@@ -598,42 +529,6 @@ async function confirmFlowLeave(): Promise<boolean> {
   if (choice === 'discard') return true
   if (choice === 'cancel') return false
   return !!(await saveCurrentBoardSnapshot())
-}
-
-function onConfirmBoardRename() {
-  const boardId = `${currentBoardId.value ?? ''}`.trim()
-  if (!boardId) return
-  const normalized = normalizeCanvasBoardName(boardNameDraft.value)
-  isRenamingBoard.value = false
-  boardNameDraft.value = ''
-  if (!normalized) {
-    message.warning('请输入画布名称')
-    return
-  }
-  if (isCanvasBoardNameTaken(boardId, normalized)) {
-    message.warning('名称已存在')
-    return
-  }
-  if (!renameCanvasBoard(boardId, normalized)) {
-    message.warning('重命名失败')
-    return
-  }
-  refreshBoardMetas()
-  message.success('已重命名画布')
-}
-
-function onSelectBoard(boardId: string) {
-  if (!boardId) return
-  refreshBoardMetas()
-  isBoardMenuOpen.value = false
-  if (boardId === currentBoardId.value) return
-  void navigateToBoard(boardId)
-}
-
-async function navigateToBoard(boardId: string) {
-  if (isDirty.value && !(await confirmFlowLeave())) return
-  skipNextLeaveConfirm = true
-  await router.push({ path: '/user/workspace', query: { ...route.query, boardId } })
 }
 
 function setActiveTool(tool: 'select' | 'hand' | 'text') {
@@ -811,6 +706,33 @@ const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
 const importEmptyBoardSnapshot = boardPersistence.importEmptyBoardSnapshot
 const importBoardSnapshot = boardPersistence.importBoardSnapshot
 
+const {
+  isBoardMenuOpen,
+  isRenamingBoard,
+  boardNameDraft,
+  boardNameInputRef,
+  boardMetas,
+  currentBoardName,
+  boardOptions,
+  setBoardNameInputRef,
+  refreshBoardMetas,
+  toggleBoardMenu,
+  startBoardRename,
+  cancelBoardRename,
+  closeBoardHeaderEditing,
+  onConfirmBoardRename,
+  onSelectBoard,
+  navigateToBoard,
+} = useFlowBoardHeaderActions({
+  currentBoardId,
+  message: { warning: (msg: string) => message.warning(msg), success: (msg: string) => message.success(msg) },
+  router,
+  route,
+  isDirty,
+  confirmFlowLeave,
+  skipNextLeaveConfirm: { get value() { return skipNextLeaveConfirm }, set value(v: boolean) { skipNextLeaveConfirm = v } },
+})
+
 const saveStateTag = computed<'dirty' | 'saved' | 'failed'>(() => {
   if (!canSaveBoard.value) return 'failed'
   if (saveStatus.value === 'saved') return 'saved'
@@ -964,46 +886,6 @@ function updateSnapshotNode(
 const selectionExport = useFlowSelectionExport({ nodes, message })
 const hasSelectedFlowNodes = computed(() => selectionExport.hasSelectedNodes())
 
-const selectedPreviewItems = computed(() => {
-  return (nodes.value as Array<{ id: string; selected?: boolean; data?: { kind?: string; snapshotNode?: unknown } }>)
-    .filter(node => node.selected && node.data?.kind === 'message' && node.data.snapshotNode && typeof node.data.snapshotNode === 'object')
-    .map(node => {
-      const snapshot = node.data!.snapshotNode as { id?: number; url?: string }
-      return { id: Number(snapshot.id ?? 0), url: String(snapshot.url ?? '') }
-    })
-    .filter(item => item.id > 0 && item.url.length > 0)
-})
-
-function onClearSelected() {
-  clearFlowSelection()
-}
-
-function onRemoveSelectedPreviewItem(id: number) {
-  const nodeId = `message-${id}`
-  nodes.value = (nodes.value as Array<Node & { selected?: boolean }>).map((node) => {
-    if (node.id !== nodeId || !node.selected) return node
-    return { ...node, selected: false }
-  }) as Node[]
-}
-
-function onFocusSelectedPreviewItem(id: number) {
-  const nodeId = `message-${id}`
-  const node = (nodes.value as Array<{ id: string; position: { x: number; y: number } }>).find(n => n.id === nodeId)
-  if (!node) return
-  const viewport = getViewport()
-  setViewport({
-    x: node.position.x - 300,
-    y: node.position.y - 200,
-    zoom: viewport.zoom,
-  })
-}
-
-function onFlowGenerate() {
-  const prompt = flowPromptText.value.trim()
-  if (!prompt) return
-  void runPatternGenerate(prompt, flowPromptRatio.value, flowPromptQuality.value)
-}
-
 function onExportSelectedImages() {
   selectionExport.exportSelectedImages()
 }
@@ -1016,6 +898,30 @@ const {
   startCanvasInteraction: startFlowInteraction,
   stopCanvasInteraction: stopFlowInteraction,
 } = useFlowCanvasInteractionState()
+
+const {
+  nodeContextMenu,
+  canvasNodeMenuItems,
+  closeNodeContextMenu,
+  openNodeContextMenu,
+} = useFlowNodeContextMenu()
+
+const {
+  selectedPreviewItems,
+  onClearSelected,
+  onRemoveSelectedPreviewItem,
+  onFocusSelectedPreviewItem,
+  onFlowGenerate,
+} = useFlowSelectionPreviewBar({
+  nodes: nodes as Ref<Node[]>,
+  flowPromptText,
+  flowPromptRatio,
+  flowPromptQuality,
+  clearFlowSelection,
+  getViewport,
+  setViewport,
+  get runPatternGenerate() { return runPatternGenerate },
+})
 
 function onWindowKeyDown(event: KeyboardEvent) {
   if (event.key === 'Alt') {
@@ -1138,96 +1044,11 @@ function getFlowMaskEffectiveSourceCached(nodeId: string): { url: string; ratio:
 }
 
 function readNodeImageDropPayload(event: DragEvent): { url: string; ratio: number } | null {
-  const rawUrl = event.dataTransfer?.getData(FLOW_NODE_IMAGE_DRAG_MIME)
-  if (!rawUrl) return null
-  const url = rawUrl.trim()
-  if (!url) return null
-  const ratioRaw = event.dataTransfer?.getData(`${FLOW_NODE_IMAGE_DRAG_MIME}-ratio`) || ''
-  const ratio = Number(ratioRaw)
-  return {
-    url,
-    ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
-  }
-}
-
-async function loadImageRatioFromFile(file: File): Promise<number | null> {
-  const localUrl = URL.createObjectURL(file)
-  try {
-    const size = await loadImageSizeFromUrl(localUrl)
-    if (!size || !size.width || !size.height) return null
-    return size.height / size.width
-  } finally {
-    URL.revokeObjectURL(localUrl)
-  }
-}
-
-type UploadImageResult = { url: string; ratio: number }
-
-const uploadCache = new Map<string, Promise<UploadImageResult>>()
-
-function buildUploadCacheKey(boardId: string, file: File): string {
-  return `${boardId}::${file.name}::${file.size}::${file.lastModified}`
-}
-
-async function uploadImageToBoard(file: File): Promise<UploadImageResult> {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('请上传图片文件')
-  }
-  const boardId = `${currentBoardId.value ?? ''}`.trim()
-  if (!boardId) {
-    throw new Error('缺少 boardId，无法上传图片')
-  }
-  const cacheKey = buildUploadCacheKey(boardId, file)
-  const cached = uploadCache.get(cacheKey)
-  if (cached) return cached
-  const uploadTask = (async (): Promise<UploadImageResult> => {
-    const ratio = await loadImageRatioFromFile(file)
-    const uploadRes = await uploadApi.upload(file, boardId)
-    if (uploadRes.code !== 0 || !uploadRes.data?.url) {
-      throw new Error(sanitizeApiErrorMessage(uploadRes.msg, '上传失败'))
-    }
-    return {
-      url: uploadRes.data.url,
-      ratio: ratio && ratio > 0 ? ratio : 1,
-    }
-  })()
-  uploadCache.set(cacheKey, uploadTask)
-  try {
-    return await uploadTask
-  } catch (error) {
-    if (uploadCache.get(cacheKey) === uploadTask) {
-      uploadCache.delete(cacheKey)
-    }
-    throw error
-  }
+  return canvasDrop.readNodeImageDropPayload(event)
 }
 
 async function applyImageFileToImageNode(nodeId: string, file: File): Promise<void> {
-  const snapshotNode = getImageNodeSnapshot(nodeId)
-  if (!snapshotNode) {
-    message.warning('Image 节点不存在')
-    return
-  }
-  try {
-    const uploaded = await uploadImageToBoard(file)
-    updateSnapshotNode(nodeId, prev => ({
-      ...prev,
-      sourceImageUrl: uploaded.url,
-      sourceImageRatio: uploaded.ratio,
-      outputImages: [],
-    }))
-    markFlowExecutionNodeDirty(nodeId)
-    message.success('Image 节点输入已更新')
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : '上传失败'
-    message.warning(msg)
-  }
-}
-
-async function loadImageRatioFromUrl(url: string): Promise<number | null> {
-  const size = await loadImageSizeFromUrl(url)
-  if (!size || !size.width || !size.height) return null
-  return size.height / size.width
+  await canvasDrop.applyImageFileToImageNode(nodeId, file)
 }
 
 function onFlowImageOpenFile(nodeId: string) {
@@ -1283,27 +1104,7 @@ function onFlowMaskOpenFile(nodeId: string) {
 }
 
 async function applyImageFileToMaskNode(nodeId: string, file: File): Promise<void> {
-  const snapshotNode = getMaskNodeSnapshot(nodeId)
-  if (!snapshotNode) {
-    message.warning('Mask 节点不存在')
-    return
-  }
-  try {
-    const uploaded = await uploadImageToBoard(file)
-    updateSnapshotNode(nodeId, prev => ({
-      ...prev,
-      sourceImageUrl: uploaded.url,
-      sourceImageRatio: uploaded.ratio,
-      executionMaskDataUrl: '',
-      maskDataUrl: '',
-    }))
-    markFlowExecutionNodeDirty(nodeId)
-    void nextTick(() => renderMaskNodeMask(nodeId))
-    message.success('Mask 节点输入已更新')
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : '上传失败'
-    message.warning(msg)
-  }
+  await canvasDrop.applyImageFileToMaskNode(nodeId, file)
 }
 
 function onFlowMaskClearImage(nodeId: string) {
@@ -1329,20 +1130,8 @@ function onFlowMaskClearMask(nodeId: string) {
 }
 
 async function applyMaskSourceByUrl(nodeId: string, url: string, ratio?: number) {
-  const nextRatio = Number.isFinite(ratio) && Number(ratio) > 0
-    ? Number(ratio)
-    : (await loadImageRatioFromUrl(url)) || 1
-  updateSnapshotNode(nodeId, prev => ({
-    ...prev,
-    sourceImageUrl: url,
-    sourceImageRatio: nextRatio,
-    executionMaskDataUrl: '',
-    maskDataUrl: '',
-  }))
-  markFlowExecutionNodeDirty(nodeId)
-  void nextTick(() => renderMaskNodeMask(nodeId))
+  await canvasDrop.applyMaskSourceByUrl(nodeId, url, ratio)
 }
-
 function onFlowMaskStageDrop(nodeId: string, event: DragEvent) {
   event.preventDefault()
   const payload = readNodeImageDropPayload(event)
@@ -1358,40 +1147,11 @@ function onFlowMaskStageDrop(nodeId: string, event: DragEvent) {
 function onCanvasDragOver(event: DragEvent) {
   activeMessageActionNodeId.value = null
   hideFlowStyleStrengthControl()
-  if (!event.dataTransfer) return
-  event.dataTransfer.dropEffect = 'copy'
+  canvasDrop.onCanvasDragOver(event)
 }
 
 async function onCanvasDrop(event: DragEvent) {
-  const point = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
-  const nodeKindRaw = event.dataTransfer?.getData(FLOW_NODE_KIND_DRAG_MIME) || ''
-  const nodeKind = nodeKindRaw.trim() as FlowCreatableNodeKind
-  if (nodeKind && createNodeOptions.some(item => item.value === nodeKind)) {
-    createNodeAtPosition(nodeKind, point.x, point.y)
-    return
-  }
-
-  const payload = readNodeImageDropPayload(event)
-  if (payload) {
-    const messageNode = createCanvasImageItemAt({ x: point.x, y: point.y }, payload.url, payload.ratio)
-    appendMessageFlowNode(messageNode)
-    return
-  }
-
-  const file = event.dataTransfer?.files?.[0]
-  if (!file) return
-  if (!file.type.startsWith('image/')) {
-    message.warning('请上传图片文件')
-    return
-  }
-  try {
-    const uploaded = await uploadImageToBoard(file)
-    const messageNode = createCanvasImageItemAt({ x: point.x, y: point.y }, uploaded.url, uploaded.ratio)
-    appendMessageFlowNode(messageNode)
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : '上传失败'
-    message.warning(msg)
-  }
+  await canvasDrop.onCanvasDrop(event)
 }
 
 function onFlowMessageContextMenu(nodeId: string, event: MouseEvent) {
@@ -1532,6 +1292,24 @@ const {
   stopCanvasInteraction: stopFlowInteraction,
 })
 
+const canvasDrop = useFlowCanvasDrop({
+  currentBoardId,
+  screenToFlowCoordinate,
+  createNodeAtPosition,
+  appendMessageFlowNode,
+  updateSnapshotNode,
+  getImageNodeSnapshot,
+  getMaskNodeSnapshot,
+  uploadApi,
+  sanitizeApiErrorMessage,
+  renderMaskNodeMask,
+  clearMaskCanvas,
+  onWarning: (msg) => message.warning(msg),
+  onSuccess: (msg) => message.success(msg),
+  onNodeMutated: (nodeId) => markFlowExecutionNodeDirty(nodeId),
+  createNodeOptions: createNodeOptions as unknown as ReadonlyArray<{ value?: unknown }>,
+})
+
 const { getFlowNodeUiStateCached } = useFlowNodeUiState({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
@@ -1632,7 +1410,11 @@ onBeforeUnmount(() => {
 .canvas-layout.interaction-lite :deep(.workspace-flow-edge.is-selected .vue-flow__edge-path) {
   filter: none !important;
 }
-.canvas-grid { position: absolute; inset: 0; background-image: radial-gradient(circle, #e2e4e8 calc(1.5px * var(--zoom, 1)), transparent calc(1.5px * var(--zoom, 1))); background-size: calc(24px * var(--zoom, 1)) calc(24px * var(--zoom, 1)); background-position: calc(50% + var(--offset-x, 0px)) calc(50% + var(--offset-y, 0px)); z-index: 0; opacity: 1; }
+.workspace-flow-canvas-wrap :deep(.vue-flow__viewport) {
+  background-image: radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  background-position: 0 0;
+}
 
 .floating-toolbar { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: #fff; padding: 8px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #e2e4e8; z-index: 100; }
 .tool-item { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #5f6368; cursor: pointer; border: none; background: transparent; }
