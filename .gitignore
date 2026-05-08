@@ -49,3 +49,4 @@ release-temp/
 other review.md
 apps/api/init_admin.sql
 
+.worktrees/
