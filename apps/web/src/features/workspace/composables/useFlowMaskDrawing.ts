@@ -1,5 +1,6 @@
 import { nextTick, onUnmounted } from 'vue'
 import type { MaskNodeItem } from '../types/canvasNodes'
+import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 
 const MASK_PAINT_COLOR = 'rgba(122, 107, 213, 1)'
 const MASK_PAINT_ALPHA = 0.5
@@ -7,6 +8,8 @@ const MASK_PAINT_ALPHA = 0.5
 type UseFlowMaskDrawingOptions = {
   getMaskNodeSnapshot: (nodeId: string) => MaskNodeItem | null
   updateSnapshotNode: (nodeId: string, patcher: (snapshotNode: Record<string, any>) => Record<string, any>) => void
+  startCanvasInteraction?: (key: CanvasInteractionKey) => void
+  stopCanvasInteraction?: (key: CanvasInteractionKey) => void
 }
 
 function getMaskPreviewDataUrl(node: Pick<MaskNodeItem, 'maskDataUrl' | 'executionMaskDataUrl'>): string {
@@ -21,6 +24,19 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
   let paintingPointerId: number | null = null
   let paintingLastX = 0
   let paintingLastY = 0
+  let maskPaintingInteractionActive = false
+
+  function startMaskPaintingInteraction() {
+    if (maskPaintingInteractionActive) return
+    maskPaintingInteractionActive = true
+    options.startCanvasInteraction?.('mask-painting')
+  }
+
+  function stopMaskPaintingInteraction() {
+    if (!maskPaintingInteractionActive) return
+    maskPaintingInteractionActive = false
+    options.stopCanvasInteraction?.('mask-painting')
+  }
 
   function clearMaskCanvas(nodeId: string) {
     const canvas = maskCanvasRefs.get(nodeId)
@@ -216,12 +232,16 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     if (paintingMaskCanvas && paintingPointerId != null && paintingMaskCanvas.hasPointerCapture(paintingPointerId)) {
       paintingMaskCanvas.releasePointerCapture(paintingPointerId)
     }
-    if (commit && paintingMaskNodeId) {
-      commitMaskNodeMask(paintingMaskNodeId)
+    try {
+      if (commit && paintingMaskNodeId) {
+        commitMaskNodeMask(paintingMaskNodeId)
+      }
+    } finally {
+      stopMaskPaintingInteraction()
+      paintingPointerId = null
+      paintingMaskNodeId = null
+      paintingMaskCanvas = null
     }
-    paintingPointerId = null
-    paintingMaskNodeId = null
-    paintingMaskCanvas = null
   }
 
   function onFlowMaskCanvasMouseDown(nodeId: string, event: PointerEvent) {
@@ -236,6 +256,7 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     paintingMaskNodeId = nodeId
     paintingMaskCanvas = canvas
     paintingPointerId = event.pointerId
+    startMaskPaintingInteraction()
     if (!canvas.hasPointerCapture(event.pointerId)) {
       canvas.setPointerCapture(event.pointerId)
     }

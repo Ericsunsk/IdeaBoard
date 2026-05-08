@@ -9,6 +9,7 @@ export type CanvasInteractionKey =
   | 'selection-drag'
   | 'connect'
   | 'edge-update'
+  | 'mask-painting'
   | 'message-resize'
 
 export function useFlowCanvasInteractionState() {
