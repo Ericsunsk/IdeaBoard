@@ -47,6 +47,11 @@ release-temp/
 
 # ===== Temp Files =====
 other review.md
+AGENTS.md
+plan.md
+canvas_migration_audit.md
+优化方向.md
+vue flow迁移路线.md
 apps/api/init_admin.sql
 
 .worktrees/
