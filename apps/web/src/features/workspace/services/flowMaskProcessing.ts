@@ -1,7 +1,7 @@
 import type { MaskNodeItem } from '../types/canvasNodes'
 import { uploadApi } from '../../../shared/api'
 import { ensureFlowMaskImageUrl } from './flowMediaUpload'
-import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
+import { isDataUrl, resolveFetchUrl } from './flowMediaIO'
 
 interface ResolveFlowExecutionMaskUrlOptions {
   boardId?: string
@@ -17,37 +17,8 @@ export function clampMaskRefineAmount(value: number): number {
   return Math.max(-100, Math.min(100, Math.round(value)))
 }
 
-function isDataUrl(value: string): boolean {
-  return /^data:/i.test(value.trim())
-}
 
-function toAbsoluteUrl(raw: string): URL | null {
-  try {
-    return new URL(raw, window.location.origin)
-  } catch {
-    return null
-  }
-}
 
-function resolveFetchUrl(raw: string): string {
-  const trimmed = raw.trim()
-  if (!trimmed) return ''
-  if (isDataUrl(trimmed)) return trimmed
-  const parsed = toAbsoluteUrl(trimmed)
-  if (!parsed) return trimmed
-  if (parsed.origin === window.location.origin && parsed.pathname.startsWith(USER_DOWNLOAD_ENDPOINT)) {
-    const target = parsed.searchParams.get('url')?.trim()
-    if (target) return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(target)}`
-    return parsed.href
-  }
-  if (parsed.origin === window.location.origin && parsed.pathname.startsWith('/uploads')) {
-    return parsed.href
-  }
-  if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(parsed.href)}`
-  }
-  return parsed.href
-}
 
 async function decodeMaskBitmap(rawUrl: string): Promise<ImageBitmap> {
   const resolvedUrl = resolveFetchUrl(rawUrl)

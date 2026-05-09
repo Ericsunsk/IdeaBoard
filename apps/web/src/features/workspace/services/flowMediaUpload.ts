@@ -1,12 +1,10 @@
 import { uploadApi } from '../../../shared/api'
+import { isDataUrl } from './flowMediaIO'
 
 interface EnsureFlowMaskImageUrlOptions {
   boardId?: string
 }
 
-function isDataUrl(value: string): boolean {
-  return /^data:/i.test(value)
-}
 
 export async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
   const response = await fetch(dataUrl)

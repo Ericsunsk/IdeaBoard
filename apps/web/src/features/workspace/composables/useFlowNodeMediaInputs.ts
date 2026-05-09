@@ -1,6 +1,6 @@
 import { computed, nextTick, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { parseHandlePort, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
+import { resolveConnectedExecutionInput, resolveFlowSourceImageRatio, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
 import type { CanvasConnectionNodeType, ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
 
 type UseFlowNodeMediaInputsOptions = {
@@ -51,35 +51,18 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
     targetNodeId: string,
     port: 'image' | 'mask' | 'prompt',
   ): { sourceKind: CanvasConnectionNodeType; snapshotNode: Record<string, unknown> } | null {
-    const incomingEdge = (options.edges.value as Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>)
-      .find(edge => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === port)
-    if (!incomingEdge) return null
-    const sourceNode = (options.nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>)
-      .find(node => node.id === incomingEdge.source)
-    if (!sourceNode || !sourceNode.data?.snapshotNode || typeof sourceNode.data.snapshotNode !== 'object') return null
-    const sourceKind = sourceNode.data.kind
-    if (
-      sourceKind !== 'image' && sourceKind !== 'edit' && sourceKind !== 'enhance'
-      && sourceKind !== 'color' && sourceKind !== 'fusion' && sourceKind !== 'wear'
-      && sourceKind !== 'model' && sourceKind !== 'viewpoint'
-    ) return null
-    return {
-      sourceKind: sourceKind as CanvasConnectionNodeType,
-      snapshotNode: sourceNode.data.snapshotNode as Record<string, unknown>,
-    }
+    const connected = resolveConnectedExecutionInput(
+      {
+        nodes: options.nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>,
+        edges: options.edges.value as Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>,
+      },
+      targetNodeId,
+      port,
+    )
+    if (!connected) return null
+    return { sourceKind: connected.sourceType, snapshotNode: connected.snapshotNode }
   }
 
-  function resolveFlowSourceImageRatio(sourceKind: CanvasConnectionNodeType, snapshotNode: Record<string, unknown>): number {
-    if (sourceKind === 'image') {
-      const sourceImageRatio = Number(snapshotNode.sourceImageRatio)
-      if (Number.isFinite(sourceImageRatio) && sourceImageRatio > 0) return sourceImageRatio
-    }
-    const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages as Array<{ ratio?: unknown }> : []
-    const latestOutput = outputImages.length > 0 ? outputImages[outputImages.length - 1] : null
-    const outputRatio = Number(latestOutput?.ratio)
-    if (Number.isFinite(outputRatio) && outputRatio > 0) return outputRatio
-    return 1
-  }
 
   function getFlowMaskEffectiveSource(nodeId: string): { url: string; ratio: number; hasConnectedImageInput: boolean } {
     const maskNode = getMaskNodeSnapshot(nodeId)

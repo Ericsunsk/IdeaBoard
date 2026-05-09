@@ -1,7 +1,7 @@
 import { collectCanvasBoardImageUrls, getCanvasBoardState, isImageUrlReferencedInOtherCanvasBoardStates } from '../../boards/lib/canvasBoardState'
 import { uploadApi } from '../../../shared/api'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
-import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
+import { filenameFromImageUrl, isDataUrl, resolveFetchUrl, toAbsoluteUrl } from './flowMediaIO'
 
 interface StableRef {
   path: string
@@ -53,55 +53,10 @@ function isBoardWorkspaceUploadPath(path: string, userUid: string, boardId: stri
   return false
 }
 
-function toAbsoluteUrl(raw: string): URL | null {
-  try {
-    return new URL(raw, window.location.origin)
-  } catch {
-    return null
-  }
-}
 
-function resolveFetchUrl(raw: string): string {
-  const trimmed = raw.trim()
-  const parsed = toAbsoluteUrl(trimmed)
-  if (!parsed) return trimmed
-  const isProxyUrl = parsed.origin === window.location.origin && parsed.pathname.startsWith(USER_DOWNLOAD_ENDPOINT)
-  if (isProxyUrl) {
-    const target = parsed.searchParams.get('url')?.trim()
-    if (target) return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(target)}`
-  }
-  if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.origin !== window.location.origin) {
-    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(parsed.href)}`
-  }
-  return parsed.href
-}
 
-function isDataUrl(raw: string): boolean {
-  return /^data:/i.test(raw.trim())
-}
 
-function inferExt(mime: string): string {
-  const value = mime.toLowerCase()
-  if (value.includes('png')) return 'png'
-  if (value.includes('webp')) return 'webp'
-  if (value.includes('gif')) return 'gif'
-  if (value.includes('bmp')) return 'bmp'
-  if (value.includes('jpeg') || value.includes('jpg')) return 'jpg'
-  if (value.includes('svg')) return 'svg'
-  return 'jpg'
-}
 
-function filenameFromUrl(raw: string, mime: string): string {
-  const randomSuffix = Math.random().toString(36).slice(2, 10)
-  if (isDataUrl(raw)) {
-    return `flow-mask-${Date.now()}-${randomSuffix}.${inferExt(mime)}`
-  }
-  const pathname = toAbsoluteUrl(raw)?.pathname || raw
-  const leaf = pathname.split('/').filter(Boolean).pop() || ''
-  const safeLeaf = leaf.replace(/[^A-Za-z0-9._-]/g, '')
-  if (/\.[A-Za-z0-9]{2,8}$/.test(safeLeaf)) return safeLeaf
-  return `flow-stable-${Date.now()}-${randomSuffix}.${inferExt(mime)}`
-}
 
 function appendOutputImageRefs(
   refs: StableRef[],
@@ -187,7 +142,7 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
     if (!blob.size) {
       throw new Error('下载图片失败：响应为空')
     }
-    const file = new File([blob], filenameFromUrl(raw, blob.type || 'image/jpeg'), { type: blob.type || 'image/jpeg' })
+    const file = new File([blob], filenameFromImageUrl(raw, blob.type || 'image/jpeg'), { type: blob.type || 'image/jpeg' })
     const uploadRes = await uploadApi.upload(file, normalizedBoardId)
     if (uploadRes.code !== 0 || !uploadRes.data?.url) {
       throw new Error(uploadRes.msg || '上传图片失败')

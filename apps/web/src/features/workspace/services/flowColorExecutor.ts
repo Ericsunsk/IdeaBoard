@@ -13,7 +13,7 @@ import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api'
 import { cleanupFlowExecutionMaskAsset, resolveFlowExecutionMaskAsset } from './flowMaskProcessing'
 import { cleanupFlowLocalInpaintAssets, composeFlowLocalInpaint, prepareFlowLocalInpaint } from './flowLocalInpaint'
-import { parseHandlePort, resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
+import { parseHandlePort, resolveConnectedExecutionInput, resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
 
 interface FlowColorNodeContext {
   nodeId: string
@@ -50,26 +50,7 @@ function resolveConnectedMaskImageSource(
   options: FlowColorExecutorOptions,
   maskNodeId: string,
 ): { sourceType: CanvasConnectionNodeType; snapshotNode: Record<string, unknown> } | null {
-  const incoming = options.edges.find(
-    edge => edge.target === maskNodeId && parseHandlePort(edge.targetHandle) === 'image',
-  )
-  if (!incoming) return null
-  const sourceNode = options.nodes.find(node => node.id === incoming.source)
-  if (!sourceNode || !sourceNode.data?.kind || !sourceNode.data.snapshotNode || typeof sourceNode.data.snapshotNode !== 'object') {
-    return null
-  }
-  const sourceType = sourceNode.data.kind
-  if (
-    sourceType !== 'image' && sourceType !== 'edit' && sourceType !== 'enhance'
-    && sourceType !== 'color' && sourceType !== 'fusion' && sourceType !== 'wear'
-    && sourceType !== 'model' && sourceType !== 'viewpoint'
-  ) {
-    return null
-  }
-  return {
-    sourceType,
-    snapshotNode: sourceNode.data.snapshotNode as Record<string, unknown>,
-  }
+  return resolveConnectedExecutionInput(options, maskNodeId, 'image')
 }
 
 function resolveEffectiveMaskSourceImageUrl(options: FlowColorExecutorOptions, maskNodeId: string, maskNode: MaskNodeItem): string {

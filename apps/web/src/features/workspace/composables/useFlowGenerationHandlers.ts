@@ -90,6 +90,72 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     }
   }
 
+  type GenerationNodeConfig<TContext, TOptions> = {
+    nodeType: string
+    runningSet: { value: Set<string> }
+    runningMessage: string
+    missingNodeMessage: string
+    successMessage: string
+    failureMessage: string
+    errorMessage: string
+    buildContext: (target: { data: { snapshotNode: unknown } }, nodeId: string) => TContext
+    buildOptions: () => TOptions
+    validate: (context: TContext, opts: TOptions) => string | null
+    execute: (context: TContext, opts: TOptions) => Promise<{ urls: string[] }>
+    preserveOutputImagesOnFailure?: boolean
+  }
+
+  async function runFlowGenerationNode<TContext, TOptions>(
+    nodeId: string,
+    config: GenerationNodeConfig<TContext, TOptions>,
+  ) {
+    if (config.runningSet.value.has(nodeId)) {
+      options.onWarning(config.runningMessage)
+      return
+    }
+    const target = options.nodes.value.find(item => item.id === nodeId)
+    if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
+      options.onWarning(config.missingNodeMessage)
+      return
+    }
+
+    const snapshot = target.data.snapshotNode as Record<string, unknown>
+    const prevOutputStatus = (snapshot.outputStatus as string | undefined) ?? 'idle'
+    const prevOutputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages as Array<{ url: string }> : []
+    const context = config.buildContext(target as { data: { snapshotNode: unknown } }, nodeId)
+    const opts = config.buildOptions()
+    const validationError = config.validate(context, opts)
+    if (validationError) {
+      options.onWarning(validationError)
+      return
+    }
+
+    config.runningSet.value.add(nodeId)
+    const beforeGenerate = captureGenerateHistoryBefore()
+    try {
+      setNodeOutputStaleSilently(nodeId)
+      const { urls } = await config.execute(context, opts)
+      const outputImages = buildOutputImagesWithRatio(nodeId, urls)
+      commitNodeOutputWithHistory(nodeId, prev => ({
+        ...prev,
+        outputImages,
+        outputStatus: 'ready',
+      }), beforeGenerate)
+      options.onSuccess(config.successMessage)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : config.failureMessage
+      options.onWarning(msg)
+      rollbackNodeOutputSilently(nodeId, prev => ({
+        ...prev,
+        outputStatus: prevOutputStatus ?? (Array.isArray(prev.outputImages) && prev.outputImages.length > 0 ? 'ready' : 'idle'),
+        outputImages: config.preserveOutputImagesOnFailure && prevOutputImages.length > 0 ? prevOutputImages : (Array.isArray(prev.outputImages) ? prev.outputImages : []),
+      }))
+      options.onError(config.errorMessage)
+    } finally {
+      config.runningSet.value.delete(nodeId)
+    }
+  }
+
   function captureGenerateHistoryBefore(): FlowHistorySnapshot {
     return options.captureHistory()
   }
@@ -144,378 +210,161 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     options.updateSnapshotNode(nodeId, patcher, { history: false })
   }
 
+
   async function onFlowEnhanceGenerate(nodeId: string) {
-    if (runningEnhanceNodeIds.value.has(nodeId)) {
-      options.onWarning('Enhance 任务正在执行中')
-      return
-    }
-    const target = options.nodes.value.find(item => item.id === nodeId)
-    if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
-      options.onWarning('Enhance 节点不存在')
-      return
-    }
-
-    const prevOutputStatus = (target.data.snapshotNode as EnhanceNodeItem).outputStatus
-    const enhanceContext = {
-      nodeId,
-      snapshotNode: target.data.snapshotNode as EnhanceNodeItem,
-    }
-    const enhanceOptions = {
-      nodes: options.nodes.value as FlowRuntimeNode[],
-      edges: options.edges.value as FlowRuntimeEdge[],
-      loadImageSizeFromUrl,
-      boardId: options.currentBoardId.value || undefined,
-    }
-    const validationError = validateFlowEnhanceNodeInputs(enhanceContext, enhanceOptions)
-    if (validationError) {
-      options.onWarning(validationError)
-      return
-    }
-
-    runningEnhanceNodeIds.value.add(nodeId)
-    const beforeGenerate = captureGenerateHistoryBefore()
-    try {
-      setNodeOutputStaleSilently(nodeId)
-      const { urls } = await executeFlowEnhanceNode(enhanceContext, enhanceOptions)
-      const outputImages = buildOutputImagesWithRatio(nodeId, urls)
-      commitNodeOutputWithHistory(nodeId, prev => ({
-        ...prev,
-        outputImages,
-        outputStatus: 'ready',
-      }), beforeGenerate)
-      options.onSuccess('Enhance 生成完成')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Enhance 生成失败'
-      options.onWarning(msg)
-      rollbackNodeOutputSilently(nodeId, prev => ({
-        ...prev,
-        outputStatus: prevOutputStatus ?? (Array.isArray(prev.outputImages) && prev.outputImages.length > 0 ? 'ready' : 'idle'),
-      }))
-      options.onError('Enhance 生成失败')
-    } finally {
-      runningEnhanceNodeIds.value.delete(nodeId)
-    }
+    await runFlowGenerationNode(nodeId, {
+      nodeType: 'enhance',
+      runningSet: runningEnhanceNodeIds,
+      runningMessage: 'Enhance 任务正在执行中',
+      missingNodeMessage: 'Enhance 节点不存在',
+      successMessage: 'Enhance 生成完成',
+      failureMessage: 'Enhance 生成失败',
+      errorMessage: 'Enhance 生成失败',
+      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as EnhanceNodeItem }),
+      buildOptions: () => ({
+        nodes: options.nodes.value as FlowRuntimeNode[],
+        edges: options.edges.value as FlowRuntimeEdge[],
+        loadImageSizeFromUrl,
+        boardId: options.currentBoardId.value || undefined,
+      }),
+      validate: (ctx, opts) => validateFlowEnhanceNodeInputs(ctx, opts),
+      execute: (ctx, opts) => executeFlowEnhanceNode(ctx, opts),
+    })
   }
+
 
   async function onFlowEditGenerate(nodeId: string) {
-    if (runningEditNodeIds.value.has(nodeId)) {
-      options.onWarning('Edit 任务正在执行中')
-      return
-    }
-    const target = options.nodes.value.find(item => item.id === nodeId)
-    if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
-      options.onWarning('Edit 节点不存在')
-      return
-    }
-
-    const prevOutputStatus = (target.data.snapshotNode as EditNodeItem).outputStatus
-    const editContext = {
-      nodeId,
-      snapshotNode: target.data.snapshotNode as EditNodeItem,
-    }
-    const editOptions = {
-      nodes: options.nodes.value as FlowRuntimeNode[],
-      edges: options.edges.value as FlowRuntimeEdge[],
-      loadImageSizeFromUrl,
-      boardId: options.currentBoardId.value || undefined,
-    }
-    const validationError = validateFlowEditNodeInputs(editContext, editOptions)
-    if (validationError) {
-      options.onWarning(validationError)
-      return
-    }
-
-    runningEditNodeIds.value.add(nodeId)
-    const beforeGenerate = captureGenerateHistoryBefore()
-    try {
-      setNodeOutputStaleSilently(nodeId)
-      const { urls } = await executeFlowEditNode(editContext, editOptions)
-      commitNodeOutputWithHistory(nodeId, prev => ({
-        ...prev,
-        outputImages: buildOutputImagesWithRatio(nodeId, urls),
-        outputStatus: 'ready',
-      }), beforeGenerate)
-      options.onSuccess('Edit 生成完成')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Edit 生成失败'
-      options.onWarning(msg)
-      rollbackNodeOutputSilently(nodeId, prev => ({
-        ...prev,
-        outputStatus: prevOutputStatus ?? (Array.isArray(prev.outputImages) && prev.outputImages.length > 0 ? 'ready' : 'idle'),
-      }))
-      options.onError('Edit 生成失败')
-    } finally {
-      runningEditNodeIds.value.delete(nodeId)
-    }
+    await runFlowGenerationNode(nodeId, {
+      nodeType: 'edit',
+      runningSet: runningEditNodeIds,
+      runningMessage: 'Edit 任务正在执行中',
+      missingNodeMessage: 'Edit 节点不存在',
+      successMessage: 'Edit 生成完成',
+      failureMessage: 'Edit 生成失败',
+      errorMessage: 'Edit 生成失败',
+      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as EditNodeItem }),
+      buildOptions: () => ({
+        nodes: options.nodes.value as FlowRuntimeNode[],
+        edges: options.edges.value as FlowRuntimeEdge[],
+        loadImageSizeFromUrl,
+        boardId: options.currentBoardId.value || undefined,
+      }),
+      validate: (ctx, opts) => validateFlowEditNodeInputs(ctx, opts),
+      execute: (ctx, opts) => executeFlowEditNode(ctx, opts),
+    })
   }
+
 
   async function onFlowColorGenerate(nodeId: string) {
-    if (runningColorNodeIds.value.has(nodeId)) {
-      options.onWarning('Color 任务正在执行中')
-      return
-    }
-    const target = options.nodes.value.find(item => item.id === nodeId)
-    if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
-      options.onWarning('Color 节点不存在')
-      return
-    }
-
-    const prevOutputStatus = (target.data.snapshotNode as ColorNodeItem).outputStatus
-    const colorContext = {
-      nodeId,
-      snapshotNode: target.data.snapshotNode as ColorNodeItem,
-    }
-    const colorOptions = {
-      nodes: options.nodes.value as FlowRuntimeNode[],
-      edges: options.edges.value as FlowRuntimeEdge[],
-      loadImageSizeFromUrl,
-      boardId: options.currentBoardId.value || undefined,
-    }
-    const validationError = validateFlowColorNodeInputs(colorContext, colorOptions)
-    if (validationError) {
-      options.onWarning(validationError)
-      return
-    }
-
-    runningColorNodeIds.value.add(nodeId)
-    const beforeGenerate = captureGenerateHistoryBefore()
-    try {
-      setNodeOutputStaleSilently(nodeId)
-      const { urls } = await executeFlowColorNode(colorContext, colorOptions)
-      commitNodeOutputWithHistory(nodeId, prev => ({
-        ...prev,
-        outputImages: buildOutputImagesWithRatio(nodeId, urls),
-        outputStatus: 'ready',
-      }), beforeGenerate)
-      options.onSuccess('Color 生成完成')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Color 生成失败'
-      options.onWarning(msg)
-      rollbackNodeOutputSilently(nodeId, prev => ({
-        ...prev,
-        outputStatus: prevOutputStatus ?? (Array.isArray(prev.outputImages) && prev.outputImages.length > 0 ? 'ready' : 'idle'),
-      }))
-      options.onError('Color 生成失败')
-    } finally {
-      runningColorNodeIds.value.delete(nodeId)
-    }
+    await runFlowGenerationNode(nodeId, {
+      nodeType: 'color',
+      runningSet: runningColorNodeIds,
+      runningMessage: 'Color 任务正在执行中',
+      missingNodeMessage: 'Color 节点不存在',
+      successMessage: 'Color 生成完成',
+      failureMessage: 'Color 生成失败',
+      errorMessage: 'Color 生成失败',
+      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as ColorNodeItem }),
+      buildOptions: () => ({
+        nodes: options.nodes.value as FlowRuntimeNode[],
+        edges: options.edges.value as FlowRuntimeEdge[],
+        loadImageSizeFromUrl,
+        boardId: options.currentBoardId.value || undefined,
+      }),
+      validate: (ctx, opts) => validateFlowColorNodeInputs(ctx, opts),
+      execute: (ctx, opts) => executeFlowColorNode(ctx, opts),
+    })
   }
+
 
   async function onFlowFusionGenerate(nodeId: string) {
-    if (runningFusionNodeIds.value.has(nodeId)) {
-      options.onWarning('Fusion 任务正在执行中')
-      return
-    }
-    const target = options.nodes.value.find(item => item.id === nodeId)
-    if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
-      options.onWarning('Fusion 节点不存在')
-      return
-    }
-
-    const prevOutputStatus = (target.data.snapshotNode as FusionNodeItem).outputStatus
-    const fusionContext = {
-      nodeId,
-      snapshotNode: target.data.snapshotNode as FusionNodeItem,
-    }
-    const fusionOptions = {
-      nodes: options.nodes.value as FlowRuntimeNode[],
-      edges: options.edges.value as FlowRuntimeEdge[],
-      loadImageSizeFromUrl,
-    }
-    const validationError = validateFlowFusionNodeInputs(fusionContext, fusionOptions)
-    if (validationError) {
-      options.onWarning(validationError)
-      return
-    }
-
-    runningFusionNodeIds.value.add(nodeId)
-    const beforeGenerate = captureGenerateHistoryBefore()
-    try {
-      setNodeOutputStaleSilently(nodeId)
-      const { urls } = await executeFlowFusionNode(fusionContext, fusionOptions)
-      commitNodeOutputWithHistory(nodeId, prev => ({
-        ...prev,
-        outputImages: buildOutputImagesWithRatio(nodeId, urls),
-        outputStatus: 'ready',
-      }), beforeGenerate)
-      options.onSuccess('Fusion 生成完成')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Fusion 生成失败'
-      options.onWarning(msg)
-      rollbackNodeOutputSilently(nodeId, prev => ({
-        ...prev,
-        outputStatus: prevOutputStatus ?? (Array.isArray(prev.outputImages) && prev.outputImages.length > 0 ? 'ready' : 'idle'),
-      }))
-      options.onError('Fusion 生成失败')
-    } finally {
-      runningFusionNodeIds.value.delete(nodeId)
-    }
+    await runFlowGenerationNode(nodeId, {
+      nodeType: 'fusion',
+      runningSet: runningFusionNodeIds,
+      runningMessage: 'Fusion 任务正在执行中',
+      missingNodeMessage: 'Fusion 节点不存在',
+      successMessage: 'Fusion 生成完成',
+      failureMessage: 'Fusion 生成失败',
+      errorMessage: 'Fusion 生成失败',
+      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as FusionNodeItem }),
+      buildOptions: () => ({
+        nodes: options.nodes.value as FlowRuntimeNode[],
+        edges: options.edges.value as FlowRuntimeEdge[],
+        loadImageSizeFromUrl,
+        boardId: options.currentBoardId.value || undefined,
+      }),
+      validate: (ctx, opts) => validateFlowFusionNodeInputs(ctx, opts),
+      execute: (ctx, opts) => executeFlowFusionNode(ctx, opts),
+    })
   }
+
 
   async function onFlowWearGenerate(nodeId: string) {
-    if (runningWearNodeIds.value.has(nodeId)) {
-      options.onWarning('Wear 任务正在执行中')
-      return
-    }
-    const target = options.nodes.value.find(item => item.id === nodeId)
-    if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
-      options.onWarning('Wear 节点不存在')
-      return
-    }
-
-    const prevOutputStatus = (target.data.snapshotNode as WearNodeItem).outputStatus
-    const prevOutputImages = Array.isArray((target.data.snapshotNode as WearNodeItem).outputImages)
-      ? [...(target.data.snapshotNode as WearNodeItem).outputImages]
-      : []
-    const wearContext = {
-      nodeId,
-      snapshotNode: target.data.snapshotNode as WearNodeItem,
-    }
-    const wearOptions = {
-      nodes: options.nodes.value as FlowRuntimeNode[],
-      edges: options.edges.value as FlowRuntimeEdge[],
-      loadImageSizeFromUrl,
-      boardId: options.currentBoardId.value || undefined,
-    }
-    const validationError = validateFlowWearNodeInputs(wearContext, wearOptions)
-    if (validationError) {
-      options.onWarning(validationError)
-      return
-    }
-
-    runningWearNodeIds.value.add(nodeId)
-    const beforeGenerate = captureGenerateHistoryBefore()
-    try {
-      setNodeOutputStaleSilently(nodeId)
-      const { urls } = await executeFlowWearNode(wearContext, wearOptions)
-      commitNodeOutputWithHistory(nodeId, prev => ({
-        ...prev,
-        outputImages: buildOutputImagesWithRatio(nodeId, urls),
-        outputStatus: 'ready',
-      }), beforeGenerate)
-      options.onSuccess('Wear 生成完成')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Wear 生成失败'
-      options.onWarning(msg)
-      rollbackNodeOutputSilently(nodeId, prev => ({
-        ...prev,
-        outputImages: prevOutputImages,
-        outputStatus: prevOutputStatus ?? (prevOutputImages.length > 0 ? 'ready' : 'idle'),
-      }))
-      options.onError('Wear 生成失败')
-    } finally {
-      runningWearNodeIds.value.delete(nodeId)
-    }
+    await runFlowGenerationNode(nodeId, {
+      nodeType: 'wear',
+      runningSet: runningWearNodeIds,
+      runningMessage: 'Wear 任务正在执行中',
+      missingNodeMessage: 'Wear 节点不存在',
+      successMessage: 'Wear 生成完成',
+      failureMessage: 'Wear 生成失败',
+      errorMessage: 'Wear 生成失败',
+      preserveOutputImagesOnFailure: true,
+      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as WearNodeItem }),
+      buildOptions: () => ({
+        nodes: options.nodes.value as FlowRuntimeNode[],
+        edges: options.edges.value as FlowRuntimeEdge[],
+        loadImageSizeFromUrl,
+        boardId: options.currentBoardId.value || undefined,
+      }),
+      validate: (ctx, opts) => validateFlowWearNodeInputs(ctx, opts),
+      execute: (ctx, opts) => executeFlowWearNode(ctx, opts),
+    })
   }
+
 
   async function onFlowModelGenerate(nodeId: string) {
-    if (runningModelNodeIds.value.has(nodeId)) {
-      options.onWarning('Model 任务正在执行中')
-      return
-    }
-    const target = options.nodes.value.find(item => item.id === nodeId)
-    if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
-      options.onWarning('Model 节点不存在')
-      return
-    }
-
-    const prevOutputStatus = (target.data.snapshotNode as ModelNodeItem).outputStatus
-    const prevOutputImages = Array.isArray((target.data.snapshotNode as ModelNodeItem).outputImages)
-      ? [...(target.data.snapshotNode as ModelNodeItem).outputImages]
-      : []
-    const modelContext = {
-      nodeId,
-      snapshotNode: target.data.snapshotNode as ModelNodeItem,
-    }
-    const modelOptions = {
-      nodes: options.nodes.value as FlowRuntimeNode[],
-      edges: options.edges.value as FlowRuntimeEdge[],
-      loadImageSizeFromUrl,
-    }
-    const validationError = validateFlowModelNodeInputs(modelContext, modelOptions)
-    if (validationError) {
-      options.onWarning(validationError)
-      return
-    }
-
-    runningModelNodeIds.value.add(nodeId)
-    const beforeGenerate = captureGenerateHistoryBefore()
-    try {
-      setNodeOutputStaleSilently(nodeId)
-      const { urls } = await executeFlowModelNode(modelContext, modelOptions)
-      commitNodeOutputWithHistory(nodeId, prev => ({
-        ...prev,
-        outputImages: buildOutputImagesWithRatio(nodeId, urls),
-        outputStatus: 'ready',
-      }), beforeGenerate)
-      options.onSuccess('Model 生成完成')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Model 生成失败'
-      options.onWarning(msg)
-      rollbackNodeOutputSilently(nodeId, prev => ({
-        ...prev,
-        outputImages: prevOutputImages,
-        outputStatus: prevOutputStatus ?? (prevOutputImages.length > 0 ? 'ready' : 'idle'),
-      }))
-      options.onError('Model 生成失败')
-    } finally {
-      runningModelNodeIds.value.delete(nodeId)
-    }
+    await runFlowGenerationNode(nodeId, {
+      nodeType: 'model',
+      runningSet: runningModelNodeIds,
+      runningMessage: 'Model 任务正在执行中',
+      missingNodeMessage: 'Model 节点不存在',
+      successMessage: 'Model 生成完成',
+      failureMessage: 'Model 生成失败',
+      errorMessage: 'Model 生成失败',
+      preserveOutputImagesOnFailure: true,
+      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as ModelNodeItem }),
+      buildOptions: () => ({
+        nodes: options.nodes.value as FlowRuntimeNode[],
+        edges: options.edges.value as FlowRuntimeEdge[],
+        loadImageSizeFromUrl,
+        boardId: options.currentBoardId.value || undefined,
+      }),
+      validate: (ctx, opts) => validateFlowModelNodeInputs(ctx, opts),
+      execute: (ctx, opts) => executeFlowModelNode(ctx, opts),
+    })
   }
 
+
   async function onFlowViewpointGenerate(nodeId: string) {
-    if (runningViewpointNodeIds.value.has(nodeId)) {
-      options.onWarning('Viewpoint 任务正在执行中')
-      return
-    }
-    const target = options.nodes.value.find(item => item.id === nodeId)
-    if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
-      options.onWarning('Viewpoint 节点不存在')
-      return
-    }
-
-    const prevOutputStatus = (target.data.snapshotNode as ViewpointNodeItem).outputStatus
-    const prevOutputImages = Array.isArray((target.data.snapshotNode as ViewpointNodeItem).outputImages)
-      ? [...(target.data.snapshotNode as ViewpointNodeItem).outputImages]
-      : []
-    const viewpointContext = {
-      nodeId,
-      snapshotNode: target.data.snapshotNode as ViewpointNodeItem,
-    }
-    const viewpointOptions = {
-      nodes: options.nodes.value as FlowRuntimeNode[],
-      edges: options.edges.value as FlowRuntimeEdge[],
-      loadImageSizeFromUrl,
-    }
-    const validationError = validateFlowViewpointNodeInputs(viewpointContext, viewpointOptions)
-    if (validationError) {
-      options.onWarning(validationError)
-      return
-    }
-
-    runningViewpointNodeIds.value.add(nodeId)
-    const beforeGenerate = captureGenerateHistoryBefore()
-    try {
-      setNodeOutputStaleSilently(nodeId)
-      const { urls } = await executeFlowViewpointNode(viewpointContext, viewpointOptions)
-      commitNodeOutputWithHistory(nodeId, prev => ({
-        ...prev,
-        outputImages: buildOutputImagesWithRatio(nodeId, urls),
-        outputStatus: 'ready',
-      }), beforeGenerate)
-      options.onSuccess('Viewpoint 生成完成')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Viewpoint 生成失败'
-      options.onWarning(msg)
-      rollbackNodeOutputSilently(nodeId, prev => ({
-        ...prev,
-        outputImages: prevOutputImages,
-        outputStatus: prevOutputStatus ?? (prevOutputImages.length > 0 ? 'ready' : 'idle'),
-      }))
-      options.onError('Viewpoint 生成失败')
-    } finally {
-      runningViewpointNodeIds.value.delete(nodeId)
-    }
+    await runFlowGenerationNode(nodeId, {
+      nodeType: 'viewpoint',
+      runningSet: runningViewpointNodeIds,
+      runningMessage: 'Viewpoint 任务正在执行中',
+      missingNodeMessage: 'Viewpoint 节点不存在',
+      successMessage: 'Viewpoint 生成完成',
+      failureMessage: 'Viewpoint 生成失败',
+      errorMessage: 'Viewpoint 生成失败',
+      preserveOutputImagesOnFailure: true,
+      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as ViewpointNodeItem }),
+      buildOptions: () => ({
+        nodes: options.nodes.value as FlowRuntimeNode[],
+        edges: options.edges.value as FlowRuntimeEdge[],
+        loadImageSizeFromUrl,
+        boardId: options.currentBoardId.value || undefined,
+      }),
+      validate: (ctx, opts) => validateFlowViewpointNodeInputs(ctx, opts),
+      execute: (ctx, opts) => executeFlowViewpointNode(ctx, opts),
+    })
   }
 
   return {

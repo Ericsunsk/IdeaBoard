@@ -63,6 +63,23 @@ export function resolveConnectedInput(
   }
 }
 
+export function resolveConnectedExecutionInput(
+  options: FlowTaskExecutorGraphOptions,
+  targetNodeId: string,
+  targetPort: 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB',
+): FlowConnectedInput | null {
+  const incoming = options.edges.find(edge => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === targetPort)
+  if (!incoming) return null
+  const sourceNode = options.nodes.find(node => node.id === incoming.source)
+  if (!sourceNode || !sourceNode.data?.snapshotNode || typeof sourceNode.data.snapshotNode !== 'object') return null
+  const sourceKind = sourceNode.data.kind
+  if (!sourceKind || !isFlowExecutionSourceKind(sourceKind)) return null
+  return {
+    sourceType: sourceKind as CanvasConnectionNodeType,
+    snapshotNode: sourceNode.data.snapshotNode as Record<string, unknown>,
+  }
+}
+
 export function extractImageUrlsFromTaskResult(result: string | null | undefined): string[] {
   if (!result) return []
   try {
@@ -93,4 +110,25 @@ export async function waitTaskResult(taskId: string): Promise<string[]> {
     await new Promise(resolve => window.setTimeout(resolve, 2000))
   }
   throw new Error('任务轮询超时，请稍后查看结果')
+}
+
+/** All node kinds that can produce image output usable as downstream source. */
+export const FLOW_EXECUTION_SOURCE_KINDS = new Set<CanvasConnectionNodeType>([
+  'image', 'edit', 'enhance', 'color', 'fusion', 'wear', 'model', 'viewpoint',
+])
+
+export function isFlowExecutionSourceKind(kind: string): kind is CanvasConnectionNodeType {
+  return FLOW_EXECUTION_SOURCE_KINDS.has(kind as CanvasConnectionNodeType)
+}
+
+export function resolveFlowSourceImageRatio(sourceKind: CanvasConnectionNodeType, snapshotNode: Record<string, unknown>): number {
+  if (sourceKind === 'image') {
+    const sourceImageRatio = Number(snapshotNode.sourceImageRatio)
+    if (Number.isFinite(sourceImageRatio) && sourceImageRatio > 0) return sourceImageRatio
+  }
+  const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages as Array<{ ratio?: unknown }> : []
+  const latestOutput = outputImages.length > 0 ? outputImages[outputImages.length - 1] : null
+  const outputRatio = Number(latestOutput?.ratio)
+  if (Number.isFinite(outputRatio) && outputRatio > 0) return outputRatio
+  return 1
 }

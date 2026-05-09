@@ -1,5 +1,5 @@
 import { uploadApi } from '../../../shared/api'
-import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
+import { canvasToBlob, resolveFetchUrl, uploadWorkspaceBlob } from './flowMediaIO'
 
 export const FLOW_LOCAL_INPAINT_PADDING = 128
 
@@ -33,37 +33,8 @@ interface ComposeFlowLocalInpaintOptions {
   boardId?: string
 }
 
-function isDataUrl(value: string): boolean {
-  return /^data:/i.test(value.trim())
-}
 
-function toAbsoluteUrl(raw: string): URL | null {
-  try {
-    return new URL(raw, window.location.origin)
-  } catch {
-    return null
-  }
-}
 
-function resolveFetchUrl(raw: string): string {
-  const trimmed = raw.trim()
-  if (!trimmed) return ''
-  if (isDataUrl(trimmed)) return trimmed
-  const parsed = toAbsoluteUrl(trimmed)
-  if (!parsed) return trimmed
-  if (parsed.origin === window.location.origin && parsed.pathname.startsWith(USER_DOWNLOAD_ENDPOINT)) {
-    const target = parsed.searchParams.get('url')?.trim()
-    if (target) return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(target)}`
-    return parsed.href
-  }
-  if (parsed.origin === window.location.origin && parsed.pathname.startsWith('/uploads')) {
-    return parsed.href
-  }
-  if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-    return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(parsed.href)}`
-  }
-  return parsed.href
-}
 
 async function fetchBlob(rawUrl: string): Promise<Blob> {
   const url = resolveFetchUrl(rawUrl)
@@ -78,28 +49,6 @@ async function fetchBlob(rawUrl: string): Promise<Blob> {
 async function decodeImageBitmap(rawUrl: string): Promise<ImageBitmap> {
   const blob = await fetchBlob(rawUrl)
   return await createImageBitmap(blob)
-}
-
-function uploadBlobFile(blob: Blob, name: string, boardId?: string): Promise<string> {
-  const file = new File([blob], name, { type: blob.type || 'image/png' })
-  return uploadApi.upload(file, boardId).then((res) => {
-    if (res.code !== 0 || !res.data?.url) {
-      throw new Error(res.msg || '上传图片失败')
-    }
-    return res.data.url
-  })
-}
-
-function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/png', quality?: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('图片编码失败'))
-        return
-      }
-      resolve(blob)
-    }, type, quality)
-  })
 }
 
 function computeMaskBbox(maskData: ImageData): FlowLocalInpaintBBox | null {
@@ -218,8 +167,8 @@ export async function prepareFlowLocalInpaint(options: PrepareFlowLocalInpaintOp
       canvasToBlob(maskCropCanvas, 'image/png'),
     ])
     const [croppedImageUrl, croppedMaskUrl] = await Promise.all([
-      uploadBlobFile(imageBlob, `flow-local-inpaint-image-${Date.now()}.png`, options.boardId),
-      uploadBlobFile(maskBlob, `flow-local-inpaint-mask-${Date.now()}.png`, options.boardId),
+      uploadWorkspaceBlob(imageBlob, `flow-local-inpaint-image-${Date.now()}.png`, options.boardId),
+      uploadWorkspaceBlob(maskBlob, `flow-local-inpaint-mask-${Date.now()}.png`, options.boardId),
     ])
 
     return {
@@ -276,7 +225,7 @@ export async function composeFlowLocalInpaint(options: ComposeFlowLocalInpaintOp
     )
 
     const finalBlob = await canvasToBlob(outputCanvas, 'image/png')
-    return await uploadBlobFile(finalBlob, `flow-local-inpaint-final-${Date.now()}.png`, options.boardId)
+    return await uploadWorkspaceBlob(finalBlob, `flow-local-inpaint-final-${Date.now()}.png`, options.boardId)
   } finally {
     originalBitmap?.close()
     resultBitmap?.close()

@@ -2,7 +2,7 @@
 // MAINTENANCE CONSTRAINT: The `top` field on every IO slot template is the
 // SOLE Y-coordinate source for Vue Flow <Handle> positioning.
 //
-// FlowCanvasNode.resolveHandleStyle() reads these tops via getNodeIoTopMap()
+// FlowNodeHandles.vue reads these tops via getNodeIoTopMap() for Handle positioning
 // and applies them directly as CSS `top` values on Handles.  Do NOT re-
 // introduce DOM-rect-based measurement (getBoundingClientRect) as a primary
 // positioning source — it bakes the viewport transform into node-local

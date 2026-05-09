@@ -389,7 +389,6 @@ const stageHeight = computed(() => {
 })
 
 
-
 function onPromptTextUpdate(value: string) {
   emit('update-prompt-text', value)
 }
@@ -445,7 +444,6 @@ function onModelGenerate() {
 function onViewpointGenerate() {
   emit('generate-viewpoint')
 }
-
 
 
 function onImageStageDrop(event: DragEvent) {
@@ -520,10 +518,6 @@ function onStyleStrengthTrackMouseDown(event: MouseEvent) {
 }
 
 
-
-
-
-
 function noop() {}
 function noopMouse() {}
 </script>
@@ -571,18 +565,6 @@ function noopMouse() {}
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 .flow-canvas-node__unsupported {
   padding: 8px 10px;
   border: 1px dashed #d0d7de;
@@ -623,5 +605,4 @@ function noopMouse() {}
   left: calc(100% + 12px);
   z-index: 30;
 }
-
 </style>
