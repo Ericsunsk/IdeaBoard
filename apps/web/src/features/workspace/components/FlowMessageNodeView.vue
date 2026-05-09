@@ -49,7 +49,7 @@
 <script setup lang="ts">
 import { computed, type ComponentPublicInstance } from 'vue'
 import type { CanvasImageItem } from '../types/canvasNodes'
-import { useFlowMessageNode, MESSAGE_RESIZE_DIRECTIONS } from '../composables/useFlowMessageNode'
+import { useFlowMessageNode, MESSAGE_RESIZE_DIRECTIONS, type MessageAction, type ResizeDirection } from '../composables/useFlowMessageNode'
 import HomeCanvasImageActionMenu from './home/HomeCanvasImageActionMenu.vue'
 
 const props = defineProps<{
@@ -62,18 +62,18 @@ const props = defineProps<{
   setStyleStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'image-dragstart', event: DragEvent): void
-  (e: 'resize-mousedown', payload: { event: MouseEvent; direction: string }): void
-  (e: 'message-action', action: string): void
+  (e: 'resize-mousedown', payload: { event: MouseEvent; direction: ResizeDirection }): void
+  (e: 'message-action', action: MessageAction): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
   (e: 'request-internals-update'): void
 }>()
 
-const messageSnapshot = computed(() => props.node)
+const messageSnapshot = computed<CanvasImageItem | null>(() => props.node)
 
 const {
   messageDisplayWidth,
@@ -82,15 +82,28 @@ const {
   isMessagePending,
   setMessageImageRef,
   onMessageImageLoad: _onMessageImageLoad,
-} = useFlowMessageNode(messageSnapshot as any)
+} = useFlowMessageNode(messageSnapshot)
 
 const showMessageActionMenu = computed(() => !!props.messageActionVisible && !!props.node)
 
 function onMessageImageLoad() {
   _onMessageImageLoad()
+  emit('request-internals-update')
 }
 </script>
 <style scoped>
+.flow-canvas-node__drag-zone {
+  position: absolute;
+  z-index: 20;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.flow-canvas-node__drag-zone:active {
+  cursor: grabbing;
+}
+
 .flow-canvas-node__drag-zone--message {
   top: 0;
   left: 0;
@@ -98,6 +111,7 @@ function onMessageImageLoad() {
   bottom: 0;
   z-index: 1;
 }
+
 .flow-canvas-node__message {
   position: relative;
   background: #fff;
@@ -122,6 +136,14 @@ function onMessageImageLoad() {
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
+}
+
+.flow-canvas-node__drag-surface {
+  cursor: grab;
+}
+
+.flow-canvas-node__drag-surface:active {
+  cursor: grabbing;
 }
 
 .flow-canvas-node__message-pending {
@@ -201,8 +223,5 @@ function onMessageImageLoad() {
   right: -7px;
   bottom: -7px;
   cursor: nwse-resize;
-}
-.flow-canvas-node.is-message :deep(.vue-flow__handle) {
-  display: none;
 }
 </style>

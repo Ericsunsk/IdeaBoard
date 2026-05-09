@@ -2,6 +2,7 @@ import { computed, ref, type ComponentPublicInstance, type Ref } from 'vue'
 import type { CanvasImageItem } from '../types/canvasNodes'
 
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se'
+export type MessageAction = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
 
 export const MESSAGE_RESIZE_DIRECTIONS: ResizeDirection[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se']
 

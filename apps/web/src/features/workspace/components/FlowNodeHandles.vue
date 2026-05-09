@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import { getCanvasNodeVisibleInputPorts, getCanvasNodeVisibleOutputPorts } from '../config/canvasNodeConnectionContract'
 import {
@@ -68,6 +68,10 @@ const props = defineProps<{
   kind: FlowNodeData['kind']
   snapshotNode: unknown
   uiState?: NodeUiState | PromptNodeUiState
+}>()
+
+const emit = defineEmits<{
+  (e: 'request-internals-update'): void
 }>()
 
 function getCanvasNodeType(): CanvasConnectionNodeType | null {
@@ -147,6 +151,7 @@ function resolvePortVisualKind(port: string): 'image' | 'mask' | 'prompt' | null
 function isHandleConnected(port: CanvasConnectionPort, direction: 'input' | 'output'): boolean {
   const connected = props.uiState?.connection?.connected as Partial<Record<string, boolean | undefined>> | undefined
   if (!connected) return false
+  if (direction === 'output') return !!connected.output
   return !!connected[port]
 }
 
@@ -158,4 +163,70 @@ function isHandlePending(port: CanvasConnectionPort): boolean {
 
 const handleInputPorts = computed(() => getCanvasNodeVisiblePortsForKind('input'))
 const handleOutputPorts = computed(() => getCanvasNodeVisiblePortsForKind('output'))
+
+watch(
+  () => [
+    props.kind,
+    props.snapshotNode,
+    handleInputPorts.value.join('|'),
+    handleOutputPorts.value.join('|'),
+  ],
+  () => {
+    emit('request-internals-update')
+  },
+  { deep: true, flush: 'post' },
+)
 </script>
+<style scoped>
+.flow-canvas-node__handle {
+  --port-color: #9278e6;
+  --port-glow: rgba(146, 120, 230, 0.24);
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid #fff;
+  border-radius: 999px;
+  opacity: 1;
+  z-index: 24;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.16);
+  background: var(--port-color) !important;
+  cursor: crosshair;
+  pointer-events: all;
+  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.flow-canvas-node__handle[data-port-kind='image'] {
+  --port-color: #5b8def;
+  --port-glow: rgba(91, 141, 239, 0.24);
+}
+
+.flow-canvas-node__handle[data-port-kind='mask'] {
+  --port-color: #34c38f;
+  --port-glow: rgba(52, 195, 143, 0.24);
+}
+
+.flow-canvas-node__handle[data-port-kind='prompt'] {
+  --port-color: #f59e0b;
+  --port-glow: rgba(245, 158, 11, 0.24);
+}
+
+.flow-canvas-node__handle:hover {
+  transform: translateY(-50%) scale(1.08);
+  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.18));
+}
+
+.flow-canvas-node__handle.is-connected {
+  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.2));
+}
+
+.flow-canvas-node__handle.is-pending {
+  background: #fff !important;
+  border-color: var(--port-color, #9278e6);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--port-color, #9278e6) 18%, transparent);
+}
+
+:deep(.flow-canvas-node__handle.vue-flow__handle-left),
+:deep(.flow-canvas-node__handle.vue-flow__handle-right) {
+  transform: translateY(-50%) !important;
+}
+</style>

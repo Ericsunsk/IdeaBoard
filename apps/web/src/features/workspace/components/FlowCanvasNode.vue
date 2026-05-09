@@ -36,51 +36,23 @@
       </div>
     </template>
     <template v-else-if="isMessageNode && messageSnapshot">
-      <div
-        class="flow-canvas-node__message"
-        :class="{ 'is-pending': isMessagePending }"
-        :style="{ width: `${messageDisplayWidth}px` }"
-        @mousedown="onMessageMouseDown"
-        @contextmenu.stop.prevent="onMessageContextMenu"
-      >
-        <div class="flow-canvas-node__drag-zone flow-canvas-node__drag-zone--message" />
-        <img
-          :src="messageSnapshot.url"
-          class="flow-canvas-node__message-image flow-canvas-node__drag-surface nodrag"
-          :ref="setMessageImageRef"
-          draggable="true"
-          @load="onMessageImageLoad"
-          @dragstart="onMessageImageDragStart"
-        />
-        <button
-          v-for="direction in MESSAGE_RESIZE_DIRECTIONS"
-          v-if="selected && !isMessagePending"
-          :key="`message-resize-${direction}`"
-          class="flow-canvas-node__message-resize-handle"
-          :class="`is-${direction}`"
-          type="button"
-          :aria-label="`Resize message image ${direction}`"
-          @mousedown.stop.prevent="onMessageResizeMouseDown($event, direction)"
-        />
-        <div v-if="isMessagePending" class="flow-canvas-node__message-pending" aria-hidden="true">
-          处理中
-        </div>
-        <HomeCanvasImageActionMenu
-          v-if="showMessageActionMenu"
-          :show-style-strength-control="props.showStyleStrengthControl"
-          :style-strength-menu-style="props.showStyleStrengthControl ? messageStyleStrengthMenuStyle : undefined"
-          :direct-generating="messageDirectGenerating"
-          :display-height="messageDisplayHeight"
-          :style-innovate-strength-pct="props.styleInnovateStrengthPct"
-          :set-style-strength-track-ref="props.setStyleStrengthTrackRef"
-          @action-remove-bg="onMessageAction('remove-bg')"
-          @style-innovate-mousedown="onStyleInnovateMouseDown"
-          @style-innovate-click="onMessageAction('style-innovate')"
-          @action-to-vector="onMessageAction('to-vector')"
-          @action-sketch-to-design="onMessageAction('sketch-to-design')"
-          @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
-        />
-      </div>
+      <FlowMessageNodeView
+        :node="messageSnapshot"
+        :selected="!!selected"
+        :message-action-visible="!!props.messageActionVisible"
+        :message-direct-generating="!!messageDirectGenerating"
+        :show-style-strength-control="!!props.showStyleStrengthControl"
+        :style-innovate-strength-pct="props.styleInnovateStrengthPct ?? 50"
+        :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
+        @node-mousedown="onMessageMouseDown"
+        @contextmenu="onMessageContextMenu"
+        @image-dragstart="onMessageImageDragStart"
+        @resize-mousedown="onMessageResizeMouseDown($event.event, $event.direction)"
+        @message-action="onMessageAction"
+        @style-innovate-mousedown="onStyleInnovateMouseDown"
+        @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
+        @request-internals-update="emit('request-internals-update')"
+      />
     </template>
     <template v-else-if="isEditNode && editSnapshot">
       <EditNode
@@ -238,67 +210,21 @@
       <div class="flow-canvas-node__unsupported">Unsupported node</div>
     </template>
 
-    <Handle
-      v-for="port in handleInputPorts"
-      :id="`in:${port}`"
-      :key="`canvas-in:${port}`"
-      type="target"
-      :position="Position.Left"
-      :class="[
-        'flow-canvas-node__handle',
-        'flow-canvas-node__handle--input',
-        {
-          'is-connected': isHandleConnected(port, 'input'),
-          'is-pending': isHandlePending(port),
-        },
-      ]"
-      :data-port-kind="resolvePortVisualKind(port)"
-      :style="resolveHandleStyle(port, 'input')"
-    />
-    <Handle
-      v-for="port in handleOutputPorts"
-      :id="`out:${port}`"
-      :key="`canvas-out:${port}`"
-      type="source"
-      :position="Position.Right"
-      :class="[
-        'flow-canvas-node__handle',
-        'flow-canvas-node__handle--output',
-        {
-          'is-connected': isHandleConnected(port, 'output'),
-          'is-pending': isHandlePending(port),
-        },
-      ]"
-      :data-port-kind="resolvePortVisualKind(port)"
-      :style="resolveHandleStyle(port, 'output')"
+    <FlowNodeHandles
+      :kind="data.kind"
+      :snapshot-node="data.snapshotNode"
+      :ui-state="props.uiState"
+      @request-internals-update="emit('request-internals-update')"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
-import { Handle, Position } from '@vue-flow/core'
-import { getCanvasNodeVisibleInputPorts, getCanvasNodeVisibleOutputPorts } from '../config/canvasNodeConnectionContract'
-import {
-  buildEditNodeIoContext,
-  buildNodeIoFromSlots,
-  COLOR_NODE_IO_SLOTS,
-  EDIT_NODE_IO_SLOTS,
-  ENHANCE_NODE_IO_SLOTS,
-  FUSION_NODE_IO_SLOTS,
-  IMAGE_NODE_IO_SLOTS,
-  MASK_NODE_IO_SLOTS,
-  MODEL_NODE_IO_SLOTS,
-  PROMPT_NODE_IO_SLOTS,
-  VIEWPOINT_NODE_IO_SLOTS,
-  WEAR_NODE_IO_SLOTS,
-} from '../components/nodes/nodeIoConfig'
+import { computed, type ComponentPublicInstance } from 'vue'
 import {
   MODEL_BACKGROUND_OPTIONS,
 } from '../components/nodes/nodeOptionConfig'
 import type {
-  CanvasConnectionNodeType,
-  CanvasConnectionPort,
   CanvasImageItem,
   ColorNodeItem,
   EditNodeItem,
@@ -321,10 +247,11 @@ import ModelNode from '../components/nodes/ModelNode.vue'
 import PromptNode from '../components/nodes/PromptNode.vue'
 import ViewpointNode from '../components/nodes/ViewpointNode.vue'
 import WearNode from '../components/nodes/WearNode.vue'
-import HomeCanvasImageActionMenu from '../components/home/HomeCanvasImageActionMenu.vue'
+import FlowMessageNodeView from './FlowMessageNodeView.vue'
+import FlowNodeHandles from './FlowNodeHandles.vue'
+import type { MessageAction, ResizeDirection } from '../composables/useFlowMessageNode'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
-type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se'
 
 const props = withDefaults(defineProps<{
   data: FlowNodeData
@@ -403,8 +330,6 @@ const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const isMessageNode = computed(() => props.data.kind === 'message')
 const showDefaultDragZone = computed(() => !isMessageNode.value)
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
-const MESSAGE_RESIZE_DIRECTIONS: ResizeDirection[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se']
-
 function resolveSnapshotNode<T>() {
   return props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
     ? ({ ...(props.data.snapshotNode as T), x: 0, y: 0 } as T)
@@ -429,41 +354,6 @@ const maskSnapshot = computed<MaskNodeItem | null>(() => (isMaskNode.value ? res
 const modelSnapshot = computed<ModelNodeItem | null>(() => (isModelNode.value ? resolveSnapshotNode<ModelNodeItem>() : null))
 const viewpointSnapshot = computed<ViewpointNodeItem | null>(() => (isViewpointNode.value ? resolveSnapshotNode<ViewpointNodeItem>() : null))
 const messageSnapshot = computed<CanvasImageItem | null>(() => (isMessageNode.value ? resolveSnapshotNode<CanvasImageItem>() : null))
-const STYLE_STRENGTH_MENU_GAP = 16
-const messageImageElement = ref<HTMLImageElement | null>(null)
-const messageImageLayoutVersion = ref(0)
-const messageDisplayWidth = computed(() => {
-  const width = Number(messageSnapshot.value?.width)
-  return Number.isFinite(width) && width > 0 ? width : 300
-})
-const messageStyleStrengthMenuStyle = computed(() => {
-  messageImageLayoutVersion.value
-  const imageEl = messageImageElement.value
-  if (!imageEl) {
-    return { top: '8px', left: 'calc(100% + 16px)' }
-  }
-  return {
-    top: `${Math.max(0, imageEl.offsetTop)}px`,
-    left: `${Math.max(0, imageEl.offsetLeft + imageEl.clientWidth + STYLE_STRENGTH_MENU_GAP)}px`,
-  }
-})
-const messageDisplayHeight = computed(() => {
-  const width = messageDisplayWidth.value
-  const directRatio = Number(messageSnapshot.value?.height_ratio)
-  if (Number.isFinite(directRatio) && directRatio > 0) {
-    return Math.max(72, Math.round(width * directRatio))
-  }
-
-  const snapshot = messageSnapshot.value as (CanvasImageItem & { height?: unknown; width?: unknown }) | null
-  const sourceHeight = Number(snapshot?.height)
-  const sourceWidth = Number(snapshot?.width)
-  const fallbackRatio = Number.isFinite(sourceHeight) && sourceHeight > 0 && Number.isFinite(sourceWidth) && sourceWidth > 0
-    ? sourceHeight / sourceWidth
-    : 1
-  return Math.max(72, Math.round(width * fallbackRatio))
-})
-const isMessagePending = computed(() => messageSnapshot.value?.renderState === 'pending')
-const showMessageActionMenu = computed(() => isMessageNode.value && !!props.messageActionVisible && !!messageSnapshot.value)
 
 const displayImage = computed<{ url: string } | null>(() => {
   if (!imageSnapshot.value) return null
@@ -498,21 +388,7 @@ const stageHeight = computed(() => {
   return Math.max(120, Math.min(360, Math.round(stageWidth * ratio)))
 })
 
-const handleInputPorts = computed(() => getCanvasNodeVisiblePortsForKind('input'))
-const handleOutputPorts = computed(() => getCanvasNodeVisiblePortsForKind('output'))
 
-watch(
-  () => [
-    props.data.kind,
-    props.data.snapshotNode,
-    handleInputPorts.value.join('|'),
-    handleOutputPorts.value.join('|'),
-  ],
-  () => {
-    emit('request-internals-update')
-  },
-  { deep: true, flush: 'post' },
-)
 
 function onPromptTextUpdate(value: string) {
   emit('update-prompt-text', value)
@@ -570,15 +446,7 @@ function onViewpointGenerate() {
   emit('generate-viewpoint')
 }
 
-function setMessageImageRef(element: Element | ComponentPublicInstance | null) {
-  messageImageElement.value = element instanceof HTMLImageElement ? element : null
-  messageImageLayoutVersion.value += 1
-}
 
-function onMessageImageLoad() {
-  messageImageLayoutVersion.value += 1
-  emit('request-internals-update')
-}
 
 function onImageStageDrop(event: DragEvent) {
   emit('image-stage-drop', event)
@@ -640,7 +508,7 @@ function onMessageResizeMouseDown(event: MouseEvent, direction: ResizeDirection)
   emit('message-resize-mousedown', { event, direction })
 }
 
-function onMessageAction(action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design') {
+function onMessageAction(action: MessageAction) {
   emit('message-action', action)
 }
 function onStyleInnovateMouseDown(event: MouseEvent) {
@@ -651,99 +519,10 @@ function onStyleStrengthTrackMouseDown(event: MouseEvent) {
   emit('style-strength-track-mousedown', event)
 }
 
-function getCanvasNodeType(): CanvasConnectionNodeType | null {
-  const kind = props.data.kind
-  return kind === 'message' ? null : kind
-}
 
-function getNodePortsByKind(kind: CanvasConnectionNodeType, direction: 'input' | 'output'): CanvasConnectionPort[] {
-  const node = props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
-    ? props.data.snapshotNode as Record<string, unknown>
-    : { id: 0 }
-  const list = direction === 'input'
-    ? getCanvasNodeVisibleInputPorts(kind, node as never)
-    : getCanvasNodeVisibleOutputPorts(kind, node as never)
-  return list.map(port => port.port)
-}
 
-function getNodeIoTopMap(kind: CanvasConnectionNodeType): Partial<Record<CanvasConnectionPort, number>> {
-  if (!props.data.snapshotNode || typeof props.data.snapshotNode !== 'object') return {}
-  const snapshotNode = props.data.snapshotNode as Record<string, unknown>
-  const state = {}
-  if (kind === 'prompt') return portTopMapFromSlots(PROMPT_NODE_IO_SLOTS, null, state)
-  if (kind === 'image') return portTopMapFromSlots(IMAGE_NODE_IO_SLOTS, null, state)
-  if (kind === 'mask') return portTopMapFromSlots(MASK_NODE_IO_SLOTS, null, state)
-  if (kind === 'color') return portTopMapFromSlots(COLOR_NODE_IO_SLOTS, null, state)
-  if (kind === 'model') return portTopMapFromSlots(MODEL_NODE_IO_SLOTS, null, state)
-  if (kind === 'viewpoint') return portTopMapFromSlots(VIEWPOINT_NODE_IO_SLOTS, null, state)
-  if (kind === 'fusion') return portTopMapFromSlots(FUSION_NODE_IO_SLOTS, null, state)
-  if (kind === 'wear') return portTopMapFromSlots(WEAR_NODE_IO_SLOTS, null, state)
-  if (kind === 'edit') return portTopMapFromSlots(EDIT_NODE_IO_SLOTS, buildEditNodeIoContext(snapshotNode as unknown as EditNodeItem), state)
-  if (kind === 'enhance') return portTopMapFromSlots(ENHANCE_NODE_IO_SLOTS, {
-    supportsPrompt: (snapshotNode as unknown as EnhanceNodeItem).mode === 'canvas-extend',
-    supportsMask: (snapshotNode as unknown as EnhanceNodeItem).mode === 'hd-upscale',
-  }, state)
-  return {}
-}
 
-function portTopMapFromSlots<T>(
-  slots: readonly unknown[],
-  context: T,
-  state: { connected?: Record<string, boolean>; pending?: Record<string, boolean> },
-): Partial<Record<CanvasConnectionPort, number>> {
-  const built = buildNodeIoFromSlots(slots as never, context, state)
-  const map: Partial<Record<CanvasConnectionPort, number>> = {}
-  for (const port of built.ports) {
-    if (port.visible === false) continue
-    if (port.top == null) continue
-    map[port.name as CanvasConnectionPort] = port.top
-  }
-  return map
-}
 
-function getCanvasNodeVisiblePortsForKind(direction: 'input' | 'output'): CanvasConnectionPort[] {
-  const kind = getCanvasNodeType()
-  if (!kind) return []
-  return getNodePortsByKind(kind, direction)
-}
-
-function resolveHandleStyle(port: CanvasConnectionPort, direction: 'input' | 'output') {
-  const kind = getCanvasNodeType()
-  if (!kind) return undefined
-  const topMap = getNodeIoTopMap(kind)
-  const top = topMap[port]
-  // Keep horizontal offset visually aligned with current node edge styling (left/right: -5.5px).
-  const side = direction === 'input' ? { left: '-5.5px' } : { right: '-5.5px' }
-  if (typeof top === 'number' && Number.isFinite(top)) {
-    return {
-      top: `${top}px`,
-      transform: 'translateY(-50%)',
-      ...side,
-    }
-  }
-  return {
-    ...side,
-  }
-}
-
-function resolvePortVisualKind(port: string): 'image' | 'mask' | 'prompt' | null {
-  if (port === 'image' || port === 'imageA' || port === 'imageB' || port === 'output') return 'image'
-  if (port === 'mask') return 'mask'
-  if (port === 'prompt') return 'prompt'
-  return null
-}
-
-function isHandleConnected(port: CanvasConnectionPort, direction: 'input' | 'output'): boolean {
-  const connected = props.uiState?.connection?.connected as Partial<Record<string, boolean | undefined>> | undefined
-  if (!connected) return false
-  if (direction === 'output') return !!connected.output
-  return !!connected[port]
-}
-
-function isHandlePending(port: CanvasConnectionPort): boolean {
-  const pending = props.uiState?.connection?.pending as Partial<Record<string, boolean | undefined>> | undefined
-  return !!pending?.[port]
-}
 
 function noop() {}
 function noopMouse() {}
@@ -777,13 +556,6 @@ function noopMouse() {}
   min-width: 96px;
 }
 
-.flow-canvas-node__drag-zone--message {
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-}
 
 .flow-canvas-node__image-wrap {
   position: relative;
@@ -798,110 +570,18 @@ function noopMouse() {}
   cursor: grabbing;
 }
 
-.flow-canvas-node__message {
-  position: relative;
-  background: #fff;
-  border: 1.5px solid #e2e4e8;
-  border-radius: 12px;
-  padding: 4px;
-  box-sizing: border-box;
-  overflow: visible;
-}
 
-.flow-canvas-node.is-selected .flow-canvas-node__message {
-  border-color: #9278e6;
-}
 
-.flow-canvas-node__message-image {
-  display: block;
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-  border-radius: 8px;
-  aspect-ratio: auto;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-user-drag: none;
-}
 
-.flow-canvas-node__message-pending {
-  position: absolute;
-  inset: 4px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.12);
-  color: #334155;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-  user-select: none;
-  z-index: 3;
-}
 
-.flow-canvas-node__message-resize-handle {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  z-index: 14;
-}
 
-.flow-canvas-node__message-resize-handle.is-n {
-  top: -7px;
-  left: 50%;
-  transform: translateX(-50%);
-  cursor: ns-resize;
-}
 
-.flow-canvas-node__message-resize-handle.is-s {
-  bottom: -7px;
-  left: 50%;
-  transform: translateX(-50%);
-  cursor: ns-resize;
-}
 
-.flow-canvas-node__message-resize-handle.is-e {
-  right: -7px;
-  top: 50%;
-  transform: translateY(-50%);
-  cursor: ew-resize;
-}
 
-.flow-canvas-node__message-resize-handle.is-w {
-  left: -7px;
-  top: 50%;
-  transform: translateY(-50%);
-  cursor: ew-resize;
-}
 
-.flow-canvas-node__message-resize-handle.is-nw {
-  left: -7px;
-  top: -7px;
-  cursor: nwse-resize;
-}
 
-.flow-canvas-node__message-resize-handle.is-ne {
-  right: -7px;
-  top: -7px;
-  cursor: nesw-resize;
-}
 
-.flow-canvas-node__message-resize-handle.is-sw {
-  left: -7px;
-  bottom: -7px;
-  cursor: nesw-resize;
-}
 
-.flow-canvas-node__message-resize-handle.is-se {
-  right: -7px;
-  bottom: -7px;
-  cursor: nwse-resize;
-}
 
 .flow-canvas-node__unsupported {
   padding: 8px 10px;
@@ -944,59 +624,4 @@ function noopMouse() {}
   z-index: 30;
 }
 
-.flow-canvas-node__handle {
-  --port-color: #9278e6;
-  --port-glow: rgba(146, 120, 230, 0.24);
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid #fff;
-  border-radius: 999px;
-  opacity: 1;
-  z-index: 24;
-  transform: translateY(-50%);
-  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.16);
-  background: var(--port-color) !important;
-  cursor: crosshair;
-  pointer-events: all;
-  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
-}
-
-.flow-canvas-node__handle[data-port-kind='image'] {
-  --port-color: #5b8def;
-  --port-glow: rgba(91, 141, 239, 0.24);
-}
-
-.flow-canvas-node__handle[data-port-kind='mask'] {
-  --port-color: #34c38f;
-  --port-glow: rgba(52, 195, 143, 0.24);
-}
-
-.flow-canvas-node__handle[data-port-kind='prompt'] {
-  --port-color: #f59e0b;
-  --port-glow: rgba(245, 158, 11, 0.24);
-}
-
-.flow-canvas-node__handle:hover {
-  transform: translateY(-50%) scale(1.08);
-  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.18));
-}
-
-.flow-canvas-node__handle.is-connected {
-  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.2));
-}
-
-.flow-canvas-node__handle.is-pending {
-  background: #fff !important;
-  border-color: var(--port-color, #9278e6);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--port-color, #9278e6) 18%, transparent);
-}
-
-.flow-canvas-node :deep(.flow-canvas-node__handle.vue-flow__handle-left),
-.flow-canvas-node :deep(.flow-canvas-node__handle.vue-flow__handle-right) {
-  transform: translateY(-50%) !important;
-}
-
-.flow-canvas-node.is-message :deep(.vue-flow__handle) {
-  display: none;
-}
 </style>
