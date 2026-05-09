@@ -1,6 +1,5 @@
 import type { CanvasConnectionNodeType, ImageNodeOutputItem } from '../types/canvasNodes'
 import { waitTaskResultWithQueryClient } from '../../../shared/query/taskQueries'
-import { extractImageUrlsFromTaskResult } from '../../../shared/query/taskResult'
 
 export interface FlowTaskExecutorGraphOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>

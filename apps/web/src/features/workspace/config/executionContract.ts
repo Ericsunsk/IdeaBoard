@@ -1,4 +1,4 @@
-import type { SubmitTaskData } from '../../../shared/api/index'
+import type { SubmitTaskData } from '../../../shared/api/task'
 
 export const EXECUTION_FEATURE = {
   partialEdit: 'partial-edit',

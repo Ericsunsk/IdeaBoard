@@ -89,7 +89,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { NInput, NButton, useMessage } from 'naive-ui'
-import { featurePromptApi } from '../../../shared/api'
+import { featurePromptApi } from '../../../shared/api/featurePrompt'
 import AdminEditorModal from '../shared/components/AdminEditorModal.vue'
 import {
   featureMap,

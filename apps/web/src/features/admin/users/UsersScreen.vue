@@ -145,7 +145,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, h, computed } from 'vue'
-import { adminApi } from '../../../shared/api'
+import { adminApi } from '../../../shared/api/admin'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
 import {
   NInput,

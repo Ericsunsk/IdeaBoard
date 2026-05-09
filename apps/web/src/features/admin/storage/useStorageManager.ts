@@ -1,7 +1,7 @@
 import { computed, h, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
-import { storageApi } from '../../../shared/api/index'
-import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../../shared/api/index'
+import { storageApi } from '../../../shared/api/storage'
+import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../../shared/api/storage'
 import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { buildVendorPresets, type VendorPresetOption } from './storageMeta'
 import {

@@ -1,4 +1,3 @@
-import type { AxiosInstance } from 'axios'
 import type { ApiResponse } from '../types'
 
 export type StorageProvider = 'local' | 'kodo' | 's3-compatible' | string
@@ -43,23 +42,30 @@ export interface StorageProfilePayload {
   config: Record<string, unknown>
 }
 
-export function createStorageApi(api: AxiosInstance) {
+type StorageRequestClient = {
+  get: <T>(url: string, config?: Record<string, unknown>) => Promise<ApiResponse<T>>
+  post: <T, D = unknown>(url: string, data?: D, config?: Record<string, unknown>) => Promise<ApiResponse<T>>
+  put: <T, D = unknown>(url: string, data?: D, config?: Record<string, unknown>) => Promise<ApiResponse<T>>
+  delete: <T>(url: string, config?: Record<string, unknown>) => Promise<ApiResponse<T>>
+}
+
+export function createStorageApi(client: StorageRequestClient) {
   return {
     getProviders: (): Promise<ApiResponse<{ providers: StorageProviderMeta[] }>> =>
-      api.get('/admin/storage/providers') as unknown as Promise<ApiResponse<{ providers: StorageProviderMeta[] }>>,
+      client.get<{ providers: StorageProviderMeta[] }>('/admin/storage/providers'),
     getProfiles: (): Promise<ApiResponse<{ profiles: StorageProfile[] }>> =>
-      api.get('/admin/storage/profiles') as unknown as Promise<ApiResponse<{ profiles: StorageProfile[] }>>,
+      client.get<{ profiles: StorageProfile[] }>('/admin/storage/profiles'),
     createProfile: (data: StorageProfilePayload): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-      api.post('/admin/storage/profiles', data) as unknown as Promise<ApiResponse<{ profile: StorageProfile; message: string }>>,
+      client.post<{ profile: StorageProfile; message: string }, StorageProfilePayload>('/admin/storage/profiles', data),
     updateProfile: (id: string, data: StorageProfilePayload): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-      api.put('/admin/storage/profiles/' + id, data) as unknown as Promise<ApiResponse<{ profile: StorageProfile; message: string }>>,
+      client.put<{ profile: StorageProfile; message: string }, StorageProfilePayload>('/admin/storage/profiles/' + id, data),
     deleteProfile: (id: string): Promise<ApiResponse<{ message: string }>> =>
-      api.delete('/admin/storage/profiles/' + id) as unknown as Promise<ApiResponse<{ message: string }>>,
+      client.delete<{ message: string }>('/admin/storage/profiles/' + id),
     applyProfile: (id: string): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-      api.post('/admin/storage/profiles/' + id + '/apply') as unknown as Promise<ApiResponse<{ profile: StorageProfile; message: string }>>,
+      client.post<{ profile: StorageProfile; message: string }>('/admin/storage/profiles/' + id + '/apply'),
     testProfile: (id: string): Promise<ApiResponse<{ message: string }>> =>
-      api.post('/admin/storage/profiles/' + id + '/test') as unknown as Promise<ApiResponse<{ message: string }>>,
+      client.post<{ message: string }>('/admin/storage/profiles/' + id + '/test'),
     getBucketInfo: (id: string): Promise<ApiResponse<{ info: { domains?: string[] } }>> =>
-      api.get('/admin/storage/profiles/' + id + '/bucket-info') as unknown as Promise<ApiResponse<{ info: { domains?: string[] } }>>,
+      client.get<{ info: { domains?: string[] } }>('/admin/storage/profiles/' + id + '/bucket-info'),
   }
 }
