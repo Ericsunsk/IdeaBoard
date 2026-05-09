@@ -1,17 +1,5 @@
-import api from './client'
-import type { Task as BaseTask, SubmitTaskData } from './task'
+import { apiGet, apiPost, apiPut, apiDelete } from './client'
 import type { ApiResponse } from './types'
-import { taskApi } from './task'
-import { adminTaskApi } from './adminTask'
-import { monitorApi } from './monitor'
-
-export type Task = BaseTask
-export type SubmitTaskRequest = SubmitTaskData
-
-export interface TaskListResponse {
-  list: Task[]
-  total: number
-}
 
 export interface ApiAccount {
   id: number
@@ -65,128 +53,31 @@ export interface AccountListResponse {
   total: number
 }
 
-export interface MonitorResponse {
-  monitor: {
-    global_queue_len: number
-    wait_queue_len: number
-    running_tasks: number
-    account_loads: Record<number, { current_concurrent: number; max_concurrent: number }>
-  }
-  stats: {
-    pending: number
-    running: number
-    completed: number
-    failed: number
-  }
-}
-
-export interface AdminStatisticsBackfillState {
-  range_start: string
-  range_end: string
-  missing_days: number
-  backfilled_days: number
-}
-
-export interface AdminStatisticsBackfillResult {
-  range: string
-  range_start: string
-  range_end: string
-  scanned_days: number
-  backfilled_days: number
-}
-
-export interface AdminStatisticsResponse {
-  summary: {
-    total_calls: number
-    today_calls: number
-    today_success: number
-    today_failed: number
-    yesterday_calls: number
-    yesterday_success: number
-    yesterday_failed: number
-    this_month_calls: number
-    pending: number
-    running: number
-    completed: number
-    failed: number
-  }
-  trend: Array<{
-    date: string
-    label: string
-    total: number
-    segments: Array<{ label: string; value: number }>
-  }>
-  model_ranking: Array<{ name: string; value: number; percent: number }>
-  user_rank: Array<{ name: string; value: number }>
-  latency: Array<{ name: string; avg_seconds: number }>
-  health_cells: Array<{ status: number; success: number; fail: number; total: number }>
-  backfill_status?: AdminStatisticsBackfillState
-}
-
-// User task APIs - backend uses /api/user/drawing/...
-export const submitTask = (data: SubmitTaskRequest): Promise<ApiResponse<{ task_id: string }>> =>
-  taskApi.submit(data)
-
-export const getTask = (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
-  taskApi.get(task_id)
-
-export const listTasks = (params?: { page?: number; page_size?: number }): Promise<ApiResponse<TaskListResponse>> =>
-  taskApi.list(params) as Promise<ApiResponse<TaskListResponse>>
-
-// Admin task APIs - backend uses /api/admin/tasks/...
-export const submitAdminTask = (data: SubmitTaskRequest): Promise<ApiResponse<{ task_id: string }>> =>
-  adminTaskApi.submit(data)
-
-export const getAdminTask = (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
-  adminTaskApi.get(task_id)
-
-export const listAdminTasks = (params?: { page?: number; page_size?: number; status?: string; user_id?: number; keyword?: string }): Promise<ApiResponse<TaskListResponse>> =>
-  adminTaskApi.list(params) as Promise<ApiResponse<TaskListResponse>>
-
-// Account management APIs
 export const createAccount = (data: CreateAccountRequest): Promise<ApiResponse<{ account: ApiAccount }>> =>
-  api.post('/admin/accounts', data) as any
+  apiPost<{ account: ApiAccount }>('/admin/accounts', data)
 
 export const updateAccount = (id: number, data: UpdateAccountRequest): Promise<ApiResponse<null>> =>
-  api.put('/admin/accounts/' + id, data) as any
+  apiPut<null>('/admin/accounts/' + id, data)
 
 export const deleteAccount = (id: number): Promise<ApiResponse<null>> =>
-  api.delete('/admin/accounts/' + id) as any
+  apiDelete<null>('/admin/accounts/' + id)
 
 export const listAccounts = (params?: { keyword?: string; platform?: string; page?: number; page_size?: number }): Promise<ApiResponse<AccountListResponse>> =>
-  api.get('/admin/accounts', { params }) as any
+  apiGet<AccountListResponse>('/admin/accounts', { params })
 
 export const startAccount = (id: number): Promise<ApiResponse<null>> =>
-  api.post('/admin/accounts/' + id + '/start') as any
+  apiPost<null>('/admin/accounts/' + id + '/start')
 
 export const stopAccount = (id: number): Promise<ApiResponse<null>> =>
-  api.post('/admin/accounts/' + id + '/stop') as any
-
-export const getMonitor = (): Promise<ApiResponse<MonitorResponse>> =>
-  monitorApi.get() as Promise<ApiResponse<MonitorResponse>>
-
-export const getAdminStatistics = (range: '7d' | '30d' | '1y'): Promise<ApiResponse<AdminStatisticsResponse>> =>
-  api.get('/admin/statistics', { params: { range } }) as any
-
-export const backfillStatistics = (range: '7d' | '30d' | '1y'): Promise<ApiResponse<AdminStatisticsBackfillResult>> =>
-  api.post('/admin/statistics/backfill', { range }) as any
+  apiPost<null>('/admin/accounts/' + id + '/stop')
 
 export const accountApi = {
-  submitTask,
-  getTask,
-  listTasks,
-  submitAdminTask,
-  getAdminTask,
-  listAdminTasks,
   createAccount,
   updateAccount,
   deleteAccount,
   listAccounts,
   startAccount,
   stopAccount,
-  getMonitor,
-  getAdminStatistics,
-  backfillStatistics,
 }
 
 export default accountApi

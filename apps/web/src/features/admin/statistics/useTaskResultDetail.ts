@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { sanitizeTaskErrorMessage, sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
-import type { Task } from '../../../shared/api/account'
+import type { Task } from '../../../shared/api/task'
 
 const RESULT_MAX_STRING_LENGTH = 300
 const RESULT_DEBUG_MAX_DEPTH = 4

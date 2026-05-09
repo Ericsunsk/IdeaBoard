@@ -107,8 +107,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
-import accountApi from '../../../shared/api/account'
-import type { Task } from '../../../shared/api/account'
+
+import type { Task } from '../../../shared/api/task'
+import { adminTaskApi } from '../../../shared/api/adminTask'
+import { monitorApi } from '../../../shared/api/monitor'
 import {
   NIcon, NTag, NButton, NSelect, NDataTable, NPagination,
   NDrawer, NDrawerContent, NDescriptions, NDescriptionsItem, NImage,
@@ -405,7 +407,7 @@ const columns: DataTableColumns<Task> = [
 async function loadRecords() {
   loading.value = true
   try {
-    const res = await accountApi.listAdminTasks({
+    const res = await adminTaskApi.list({
       status: filterStatus.value || undefined,
       page: page.value,
       page_size: pageSize,
@@ -423,7 +425,7 @@ async function loadRecords() {
 
 async function loadStats() {
   try {
-    const res = await accountApi.getMonitor()
+    const res = await monitorApi.get()
     if (res.code === 0) {
       const s = (res.data as any)?.stats || {}
       statsSuccess.value = s.completed || 0

@@ -1,4 +1,4 @@
-import api from './client'
+import { apiDelete, apiPost } from './client'
 import type { ApiResponse } from './types'
 
 export const uploadApi = {
@@ -9,10 +9,8 @@ export const uploadApi = {
     if (normalizedBoardId) {
       form.append('board_id', normalizedBoardId)
     }
-    return api.post('/user/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } }) as any
+    return apiPost<{ url: string }, FormData>('/user/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
   recycle: (url: string, boardId: string): Promise<ApiResponse<{ deleted: boolean }>> =>
-    api.delete('/user/upload', {
-      data: { url, board_id: boardId.trim() },
-    }) as any,
+    apiDelete<{ deleted: boolean }>('/user/upload', { data: { url, board_id: boardId.trim() } }),
 }

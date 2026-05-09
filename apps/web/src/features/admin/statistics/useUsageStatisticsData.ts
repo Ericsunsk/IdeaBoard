@@ -1,6 +1,7 @@
 import { ref, computed, type Ref } from 'vue'
 import accountApi from '../../../shared/api/account'
-import type { AdminStatisticsResponse, AdminStatisticsBackfillState } from '../../../shared/api/account'
+import { adminStatisticsApi, type AdminStatisticsBackfillState } from '../../../shared/api/adminStatistics'
+import type { AdminStatisticsResponse } from '../../../shared/api/adminStatistics'
 import channelApi, { type Channel } from '../../../shared/api/channel'
 import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
@@ -51,7 +52,7 @@ export function useUsageStatisticsData() {
     const activeRange = typeof targetRange === 'string' ? targetRange : (targetRange?.value || timeRange.value)
     try {
       const [statsRes, channelsRes, firstAccountsRes] = await Promise.all([
-        accountApi.getAdminStatistics(activeRange as '7d' | '30d' | '1y'),
+        adminStatisticsApi.get(activeRange as '7d' | '30d' | '1y'),
         channelApi.list(),
         accountApi.listAccounts({ page: 1, page_size: ACCOUNT_PAGE_SIZE }),
       ])
@@ -76,7 +77,7 @@ export function useUsageStatisticsData() {
   async function triggerBackfill(): Promise<BackfillTriggerResult> {
     backfillLoading.value = true
     try {
-      const res = await accountApi.backfillStatistics(timeRange.value as '7d' | '30d' | '1y')
+      const res = await adminStatisticsApi.backfill(timeRange.value as '7d' | '30d' | '1y')
       if (res.code === 0) {
         await loadStatistics()
         return { ok: true as const }

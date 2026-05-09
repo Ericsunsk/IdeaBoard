@@ -2,7 +2,7 @@ import { h } from 'vue'
 import { NTag, NImage, NPopover, NButton, NIcon } from 'naive-ui'
 import { EyeOutline } from '@vicons/ionicons5'
 import type { DataTableColumns } from 'naive-ui'
-import type { Task } from '../../../shared/api/account'
+import type { Task } from '../../../shared/api/task'
 import { sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
 
 export interface AccountLoad {

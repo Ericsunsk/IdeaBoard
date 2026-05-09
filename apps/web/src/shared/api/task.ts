@@ -1,4 +1,4 @@
-import api from './client'
+import { apiDelete, apiGet, apiPost } from './client'
 import type { ApiResponse } from './types'
 
 export interface Task {
@@ -27,11 +27,11 @@ export interface SubmitTaskData {
 
 export const taskApi = {
   submit: (data: SubmitTaskData): Promise<ApiResponse<{ task_id: string }>> =>
-    api.post('/user/drawing/submit', data) as any,
+    apiPost<{ task_id: string }, SubmitTaskData>('/user/drawing/submit', data),
   get: (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
-    api.get('/user/drawing/' + task_id) as any,
+    apiGet<{ task: Task }>('/user/drawing/' + task_id),
   list: (params?: { page?: number; page_size?: number }): Promise<ApiResponse<{ list: Task[]; total: number }>> =>
-    api.get('/user/drawing', { params }) as any,
+    apiGet<{ list: Task[]; total: number }>('/user/drawing', { params }),
   delete: (task_id: string): Promise<ApiResponse<{ message: string }>> =>
-    api.delete('/user/drawing/' + task_id) as any,
+    apiDelete<{ message: string }>('/user/drawing/' + task_id),
 }

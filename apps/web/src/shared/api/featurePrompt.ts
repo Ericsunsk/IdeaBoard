@@ -1,11 +1,11 @@
-import api from './client'
+import { apiGet, apiPut } from './client'
 import type { ApiResponse } from './types'
 
 export const featurePromptApi = {
   adminList: (): Promise<ApiResponse<{ prompts: Record<string, string> }>> =>
-    api.get('/admin/feature-prompts') as any,
+    apiGet<{ prompts: Record<string, string> }>('/admin/feature-prompts'),
   adminGet: (slug: string): Promise<ApiResponse<{ slug: string; prompt: string }>> =>
-    api.get('/admin/feature-prompts/' + slug) as any,
+    apiGet<{ slug: string; prompt: string }>('/admin/feature-prompts/' + slug),
   adminSet: (slug: string, prompt: string): Promise<ApiResponse<{ slug: string; prompt: string }>> =>
-    api.put('/admin/feature-prompts/' + slug, { prompt }) as any,
+    apiPut<{ slug: string; prompt: string }, { prompt: string }>('/admin/feature-prompts/' + slug, { prompt }),
 }

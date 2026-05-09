@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import type { DataTableColumns } from 'naive-ui'
-import type { Task } from '../../../shared/api/account'
+import type { Task } from '../../../shared/api/task'
 import { fetchAdminTasks, fetchAdminMonitor } from '../../../shared/query/taskQueries'
 import { queryKeys } from '../../../shared/query/keys'
 import { createMonitorTaskColumns } from '../shared/monitorShared'

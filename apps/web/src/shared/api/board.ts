@@ -1,4 +1,4 @@
-import api from './client'
+import { apiDelete, apiGet, apiPost, apiPut } from './client'
 import type { ApiResponse } from './types'
 
 export interface UserBoardPayload {
@@ -20,13 +20,13 @@ export interface UserBoardItem {
 
 export const boardApi = {
   list: (): Promise<ApiResponse<{ list: UserBoardItem[] }>> =>
-    api.get('/user/boards') as any,
+    apiGet<{ list: UserBoardItem[] }>('/user/boards'),
   upsert: (boardId: string, payload: Omit<UserBoardPayload, 'board_id'>): Promise<ApiResponse<{ board: UserBoardItem }>> =>
-    api.put('/user/boards/' + encodeURIComponent(boardId), payload) as any,
+    apiPut<{ board: UserBoardItem }, Omit<UserBoardPayload, 'board_id'>>('/user/boards/' + encodeURIComponent(boardId), payload),
   remove: (boardId: string): Promise<ApiResponse<{ deleted: boolean }>> =>
-    api.delete('/user/boards/' + encodeURIComponent(boardId)) as any,
+    apiDelete<{ deleted: boolean }>('/user/boards/' + encodeURIComponent(boardId)),
   joinByShareToken: (token: string): Promise<ApiResponse<{ board: UserBoardItem }>> =>
-    api.post('/user/boards/share-tokens/join', { token }) as any,
+    apiPost<{ board: UserBoardItem }, { token: string }>('/user/boards/share-tokens/join', { token }),
 }
 
 export default boardApi

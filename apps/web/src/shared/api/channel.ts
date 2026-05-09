@@ -1,4 +1,4 @@
-import api from './client'
+import { apiDelete, apiGet, apiPost, apiPut } from './client'
 import type { ApiResponse } from './types'
 
 export interface Channel {
@@ -28,15 +28,15 @@ export type DetectModelsResponse = {
 
 export const channelApi = {
   list: (): Promise<ApiResponse<{ list: Channel[] }>> =>
-    api.get('/admin/channels') as any,
+    apiGet<{ list: Channel[] }>('/admin/channels'),
   create: (data: ChannelFormData): Promise<ApiResponse<{ channel: Channel }>> =>
-    api.post('/admin/channels', data) as any,
+    apiPost<{ channel: Channel }, ChannelFormData>('/admin/channels', data),
   update: (id: number, data: ChannelFormData): Promise<ApiResponse<{ channel: Channel }>> =>
-    api.put('/admin/channels/' + id, data) as any,
+    apiPut<{ channel: Channel }, ChannelFormData>('/admin/channels/' + id, data),
   delete: (id: number): Promise<ApiResponse<null>> =>
-    api.delete('/admin/channels/' + id) as any,
+    apiDelete<null>('/admin/channels/' + id),
   detectModels: (data: DetectModelsRequest): Promise<ApiResponse<DetectModelsResponse>> =>
-    api.post('/admin/channels/detect-models', data) as any,
+    apiPost<DetectModelsResponse, DetectModelsRequest>('/admin/channels/detect-models', data),
 }
 
 export default channelApi
