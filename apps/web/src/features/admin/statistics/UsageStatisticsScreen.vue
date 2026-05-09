@@ -593,10 +593,6 @@ async function handleBackfill() {
   }
 }
 
-watch(filterStatus, () => {
-  page.value = 1
-  void loadTasks()
-})
 watch(timeRange, () => {
   void loadStatistics()
 })

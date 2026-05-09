@@ -1,5 +1,5 @@
 import type { AxiosInstance } from 'axios'
-import type { ApiResponse } from '../../types'
+import type { ApiResponse } from '../types'
 
 export type StorageProvider = 'local' | 'kodo' | 's3-compatible' | string
 export type StorageFieldType = 'text' | 'password' | 'switch' | string
