@@ -144,8 +144,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h, computed } from 'vue'
-import { adminApi } from '../../../shared/api/admin'
+import { ref, h, computed, watch } from 'vue'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
 import {
   NInput,
@@ -170,6 +170,22 @@ import {
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import type { User } from '../../../shared/types'
+import { formatDateOnly } from '../../../shared/utils/dateTime'
+import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { queryKeys } from '../../../shared/query/keys'
+import {
+  deleteAdminUser,
+  fetchAdminUsers,
+  fetchRateLimitSettings,
+  fetchRegistrationSetting,
+  invalidateAdminUsers,
+  invalidateRateLimitSettings,
+  invalidateRegistrationSetting,
+  updateAdminUserRole,
+  updateAdminUserStatus,
+  updateRateLimitSettings,
+  updateRegistrationSetting,
+} from '../../../shared/query/adminQueries'
 import {
   SearchOutline,
   RefreshOutline,
@@ -182,9 +198,56 @@ import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 
 const message = useMessage()
 const dialog = useDialog()
-const users = ref<User[]>([])
-const loading = ref(false)
+const userListParams = { page: 1, page_size: 100 } as const
 const searchKeyword = ref('')
+const appliedSearchKeyword = ref('')
+const userQueryParams = computed(() => ({
+  ...userListParams,
+  keyword: appliedSearchKeyword.value || undefined,
+}))
+const usersQuery = useQuery({
+  queryKey: computed(() => queryKeys.admin.users(userQueryParams.value)),
+  queryFn: () => fetchAdminUsers(userQueryParams.value),
+})
+const registrationSettingQuery = useQuery({
+  queryKey: queryKeys.admin.registrationSetting(),
+  queryFn: fetchRegistrationSetting,
+})
+const rateLimitSettingsQuery = useQuery({
+  queryKey: queryKeys.admin.rateLimitSettings(),
+  queryFn: fetchRateLimitSettings,
+})
+
+const updateUserStatusMutation = useMutation({
+  mutationFn: updateAdminUserStatus,
+  onSuccess: () => invalidateAdminUsers(),
+})
+const updateUserRoleMutation = useMutation({
+  mutationFn: updateAdminUserRole,
+  onSuccess: () => invalidateAdminUsers(),
+})
+const deleteUserMutation = useMutation({
+  mutationFn: deleteAdminUser,
+  onSuccess: () => invalidateAdminUsers(),
+})
+const saveRateLimitMutation = useMutation({
+  mutationFn: updateRateLimitSettings,
+  onSuccess: async (settings) => {
+    rateLimitForm.value.window_seconds = settings.window_seconds
+    rateLimitForm.value.max_requests = settings.max_requests
+    await invalidateRateLimitSettings()
+  },
+})
+const updateRegistrationSettingMutation = useMutation({
+  mutationFn: updateRegistrationSetting,
+  onSuccess: async (setting) => {
+    registrationEnabled.value = setting.enabled
+    await invalidateRegistrationSetting()
+  },
+})
+
+const users = computed(() => usersQuery.data.value?.list ?? [])
+const loading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
 const currentSorts = ref<string[]>(['role', 'status', 'newest'])
 
 // 后端限流配置状态
@@ -192,11 +255,15 @@ const rateLimitForm = ref({
   window_seconds: 60,
   max_requests: 100
 })
-const rateLimitSaving = ref(false)
+const rateLimitSaving = computed(() => saveRateLimitMutation.isPending.value)
 
 // 注册限制状态
 const registrationEnabled = ref(true)
-const registrationSettingLoading = ref(false)
+const registrationSettingLoading = computed(() =>
+  registrationSettingQuery.isLoading.value ||
+  registrationSettingQuery.isFetching.value ||
+  updateRegistrationSettingMutation.isPending.value,
+)
 
 // 封禁弹窗状态
 const showBanModal = ref(false)
@@ -206,6 +273,43 @@ const banForm = ref({
   expiresInDays: 0,
   reason: ''
 })
+
+function safeErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : extractSafeApiErrorMessage(error, fallback)
+}
+
+watch(
+  () => usersQuery.error.value,
+  (error) => {
+    if (error) message.error(safeErrorMessage(error, '加载用户失败'))
+  },
+)
+
+watch(
+  () => registrationSettingQuery.error.value || rateLimitSettingsQuery.error.value,
+  (error) => {
+    if (error) message.error(safeErrorMessage(error, '加载后台配置失败'))
+  },
+)
+
+watch(
+  () => rateLimitSettingsQuery.data.value,
+  (settings) => {
+    if (!settings || saveRateLimitMutation.isPending.value) return
+    rateLimitForm.value.window_seconds = settings.window_seconds
+    rateLimitForm.value.max_requests = settings.max_requests
+  },
+  { immediate: true },
+)
+
+watch(
+  () => registrationSettingQuery.data.value,
+  (setting) => {
+    if (!setting || updateRegistrationSettingMutation.isPending.value) return
+    registrationEnabled.value = setting.enabled
+  },
+  { immediate: true },
+)
 
 const columns: DataTableColumns<User> = [
   {
@@ -251,7 +355,7 @@ const columns: DataTableColumns<User> = [
     key: 'created_at',
     width: 160,
     render: (row) => {
-      return h('span', { style: 'color: var(--admin-text-3); font-size: 13px;' }, row.created_at ? row.created_at.split(' ')[0].split('T')[0] : '-')
+      return h('span', { style: 'color: var(--admin-text-3); font-size: 13px;' }, row.created_at ? formatDateOnly(row.created_at) : '-')
     }
   },
   {
@@ -318,71 +422,35 @@ const sortedUsers = computed(() => {
   return withSort
 })
 
-async function loadUsers() {
-  loading.value = true
-  try {
-    const res = await adminApi.getUsers({ keyword: searchKeyword.value, page: 1, page_size: 100 })
-    if (res.code === 0 && res.data) {
-      users.value = res.data.list
-    }
-  } catch (error) {
-    message.error('加载用户失败')
-  } finally {
-    loading.value = false
+function loadUsers() {
+  const nextKeyword = searchKeyword.value.trim()
+  if (appliedSearchKeyword.value !== nextKeyword) {
+    appliedSearchKeyword.value = nextKeyword
+    return
   }
-}
-
-async function loadSettings() {
-  try {
-    const [resRate, resReg] = await Promise.all([
-      adminApi.getRateLimitSettings(),
-      adminApi.getRegistrationSetting()
-    ])
-    if (resRate.code === 0 && resRate.data) {
-      rateLimitForm.value.window_seconds = resRate.data.window_seconds
-      rateLimitForm.value.max_requests = resRate.data.max_requests
-    }
-    if (resReg.code === 0 && resReg.data) {
-      registrationEnabled.value = resReg.data.enabled
-    }
-  } catch (err) {
-    console.error('Failed to load settings')
-  }
+  void usersQuery.refetch()
 }
 
 async function handleSaveRateLimit() {
-  rateLimitSaving.value = true
   try {
-    const res = await adminApi.updateRateLimitSettings({
+    await saveRateLimitMutation.mutateAsync({
       window_seconds: rateLimitForm.value.window_seconds,
       max_requests: rateLimitForm.value.max_requests
     })
-    if (res.code === 0) {
-      message.success('限流配置已保存')
-    } else {
-      message.error(res.msg || '保存失败')
-    }
-  } catch (err) {
-    message.error('保存失败')
-  } finally {
-    rateLimitSaving.value = false
+    message.success('限流配置已保存')
+  } catch (error) {
+    message.error(safeErrorMessage(error, '保存失败'))
   }
 }
 
 async function handleToggleRegistration(newValue: boolean) {
-  registrationSettingLoading.value = true
+  const fallbackEnabled = registrationSettingQuery.data.value?.enabled ?? !newValue
   try {
-    const res = await adminApi.updateRegistrationSetting(newValue)
-    if (res.code === 0) {
-      message.success(newValue ? '已开放注册' : '已关闭注册')
-    } else {
-      throw new Error(res.msg)
-    }
-  } catch (error: any) {
-    registrationEnabled.value = !newValue
-    message.error(error.message || '更新注册状态失败')
-  } finally {
-    registrationSettingLoading.value = false
+    await updateRegistrationSettingMutation.mutateAsync(newValue)
+    message.success(newValue ? '已开放注册' : '已关闭注册')
+  } catch (error) {
+    registrationEnabled.value = fallbackEnabled
+    message.error(safeErrorMessage(error, '更新注册状态失败'))
   }
 }
 
@@ -418,9 +486,8 @@ function handleToggleStatus(row: User) {
             const { error } = await authClient.admin.unbanUser({ userId: row.auth_user_id })
             if (error) throw error
           }
-          await adminApi.updateUserStatus(row.id, 1)
+          await updateUserStatusMutation.mutateAsync({ id: row.id, status: 1 })
           message.success('已解除封禁')
-          loadUsers()
         } catch (err: any) {
           message.error(extractBetterAuthErrorMessage(err, '解封失败'))
         }
@@ -434,7 +501,7 @@ const confirmBanUser = async () => {
   const row = banUserContext.value
   banFormLoading.value = true
   try {
-    await adminApi.updateUserStatus(row.id, 0)
+    await updateUserStatusMutation.mutateAsync({ id: row.id, status: 0 })
     if (row.auth_user_id) {
       let expiresIn: number | undefined = undefined
       if (banForm.value.expiresInDays > 0) {
@@ -449,16 +516,15 @@ const confirmBanUser = async () => {
         if (error) throw error
       } catch (authError: any) {
         showBanModal.value = false
-        loadUsers()
+        void invalidateAdminUsers()
         message.warning(extractBetterAuthErrorMessage(authError, '已完成业务封禁，但身份侧封禁失败，请稍后重试身份侧操作'))
         return
       }
     }
     message.success(`已高级封禁用户 ${row.username}`)
     showBanModal.value = false
-    loadUsers()
   } catch (err: any) {
-    message.error(err?.msg || extractBetterAuthErrorMessage(err, '封禁失败'))
+    message.error(err?.message || safeErrorMessage(err, extractBetterAuthErrorMessage(err, '封禁失败')))
   } finally {
     banFormLoading.value = false
   }
@@ -506,11 +572,10 @@ function handleDeleteUser(row: User) {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        await adminApi.deleteUser(row.id)
+        await deleteUserMutation.mutateAsync(row.id)
         message.success('用户已受控彻底注销')
-        loadUsers()
       } catch (err: any) {
-        message.error(err?.msg || err?.message || '注销失败')
+        message.error(safeErrorMessage(err, '注销失败'))
       }
     }
   })
@@ -527,11 +592,10 @@ function handleToggleRole(row: User) {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        await adminApi.updateUserRole(row.id, nextRole)
+        await updateUserRoleMutation.mutateAsync({ id: row.id, role: nextRole })
         message.success(nextRole === 'admin' ? '已设为管理员' : '已取消管理员')
-        loadUsers()
       } catch (err: any) {
-        message.error(err?.msg || err?.message || '角色更新失败')
+        message.error(safeErrorMessage(err, '角色更新失败'))
       }
     }
   })
@@ -541,10 +605,6 @@ const activeUserCount = computed(() => users.value.filter(u => u.status === 1).l
 const bannedUserCount = computed(() => users.value.filter(u => u.status === 0).length)
 const reservedUserCount = computed(() => users.value.filter(u => u.role === 'admin').length)
 
-onMounted(() => {
-  loadUsers()
-  loadSettings()
-})
 </script>
 
 <style scoped>
