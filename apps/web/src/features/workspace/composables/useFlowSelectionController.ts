@@ -10,7 +10,6 @@ type UseFlowSelectionControllerOptions = {
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
   _deleteSelectedFlowElements: () => void
-  removeMaskRuntimeForNode?: (nodeId: string, kind: string) => void
 }
 
 export function useFlowSelectionController(options: UseFlowSelectionControllerOptions) {
@@ -61,18 +60,15 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     const isShiftToggle = !!event?.shiftKey
 
     if (!isShiftToggle) {
-      let changed = false
       for (const node of (options.nodes.value as Array<{ id: string; selected?: boolean }>)) {
         const shouldBeSelected = node.id === targetNodeId
         if (node.selected !== shouldBeSelected) {
           node.selected = shouldBeSelected
-          changed = true
         }
       }
       for (const edge of (options.edges.value as Array<{ selected?: boolean }>)) {
         if (edge.selected) {
           edge.selected = false
-          changed = true
         }
       }
     } else {

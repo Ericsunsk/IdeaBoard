@@ -5,6 +5,7 @@ import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 
 type UseFlowConnectionVisualsOptions = {
   edges: Ref<Edge[]>
+  commitEdges?: (nextEdges: Edge[]) => void
   startFlowInteraction: (key: CanvasInteractionKey) => void
   stopFlowInteraction: (key: CanvasInteractionKey) => void
 }
@@ -70,7 +71,11 @@ export function useFlowConnectionVisuals(options: UseFlowConnectionVisualsOption
         .map(edge => `${edge.id}|${edge.class ?? ''}|${edge.animated ? 1 : 0}|${edge.data?.tone ?? ''}`)
         .join(';')
     if (!same) {
-      options.edges.value = withVisuals
+      if (options.commitEdges) {
+        options.commitEdges(withVisuals)
+      } else {
+        options.edges.value = withVisuals
+      }
     }
   }
 
@@ -83,6 +88,7 @@ export function useFlowConnectionVisuals(options: UseFlowConnectionVisualsOption
   )
 
   return {
+    connectingSourceHandle,
     flowConnectionLineStyle,
     onFlowConnectStart,
     onFlowConnectEnd,

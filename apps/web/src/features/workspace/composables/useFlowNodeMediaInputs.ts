@@ -14,7 +14,6 @@ type UseFlowNodeMediaInputsOptions = {
   }
   updateSnapshotNode: (nodeId: string, patcher: (prev: Record<string, unknown>) => Record<string, unknown>) => void
   markFlowExecutionNodeDirty: (nodeId: string) => void
-  renderMaskNodeMask: (nodeId: string) => void
   clearMaskCanvas: (nodeId: string) => void
 }
 
@@ -146,6 +145,17 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
 
   function onFlowImageStageDrop(nodeId: string, event: DragEvent) {
     event.preventDefault()
+    const payload = readNodeImageDropPayload(event)
+    if (payload) {
+      options.updateSnapshotNode(nodeId, prev => ({
+        ...prev,
+        sourceImageUrl: payload.url,
+        sourceImageRatio: payload.ratio,
+        outputImages: [],
+      }))
+      options.markFlowExecutionNodeDirty(nodeId)
+      return
+    }
     const file = event.dataTransfer?.files?.[0]
     if (!file) return
     void options.canvasDrop.applyImageFileToImageNode(nodeId, file)

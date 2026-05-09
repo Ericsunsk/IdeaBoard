@@ -190,13 +190,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api'
-import type { Edge, Node, NodeMouseEvent } from '@vue-flow/core'
+import type { Edge, Node } from '@vue-flow/core'
 import { useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -216,17 +216,9 @@ import { useFlowMessageImageInteractions } from '../composables/useFlowMessageIm
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowBoardViewport } from '../composables/useFlowBoardViewport'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
-import { parseHandlePort, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
 import type { FlowNodeData } from '../types/flowTypes'
-import { createEmptyCanvasBoardSnapshot, type FlowAdapterEdge, type FlowAdapterNode, flowToCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
-import { buildFlowEdgeClassName, resolveFlowEdgeToneFromHandles } from '../utils/flowEdgeVisual'
-import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
-import type {
-  CanvasBoardSnapshot,
-  CanvasConnectionNodeType,
-  ImageNodeItem,
-  MaskNodeItem,
-} from '../../workspace/types/canvasNodes'
+import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
+import type { CanvasBoardSnapshot } from '../../workspace/types/canvasNodes'
 import HomeCanvasHeader from '../../workspace/components/home/HomeCanvasHeader.vue'
 import HomeBottomGenerateBar from '../../workspace/components/home/HomeBottomGenerateBar.vue'
 import { useRouter } from 'vue-router'
@@ -240,14 +232,16 @@ import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
 import { useFlowSelectionPreviewBar } from '../composables/useFlowSelectionPreviewBar'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActions'
+import { useFlowConnectionVisuals } from '../composables/useFlowConnectionVisuals'
+import { useFlowSelectionController } from '../composables/useFlowSelectionController'
+import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
+import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 
 const message = useMessage()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const { screenToFlowCoordinate, updateNodeInternals, setNodes, setEdges } = useVueFlow()
-const isDev = import.meta.env.DEV
-
 const {
   zoomLevel,
   onZoomIn,
@@ -284,41 +278,6 @@ const flowPromptShowSettings = ref(false)
 const flowPromptText = ref('')
 const flowPromptRatio = ref<PatternGenerateRatioOption>('1:1')
 const flowPromptQuality = ref<GenerateQualityOption>('1k')
-const connectingSourceHandle = ref<string | null>(null)
-
-const TONE_COLOR_MAP: Record<string, string> = {
-  image: '#5b8def',
-  mask: '#34c38f',
-  prompt: '#f59e0b',
-}
-
-const flowConnectionLineStyle = computed(() => {
-  const tone = resolveFlowEdgeToneFromHandles(connectingSourceHandle.value, null)
-  return {
-    stroke: TONE_COLOR_MAP[tone] || '#9278e6',
-    strokeWidth: '2',
-    opacity: '0.9',
-  }
-})
-
-function onFlowConnectStart(event: { handleId?: string | null }) {
-  connectingSourceHandle.value = event.handleId ?? null
-  startFlowInteraction('connect')
-}
-
-function onFlowConnectEnd() {
-  connectingSourceHandle.value = null
-  stopFlowInteraction('connect')
-}
-
-function onFlowEdgeUpdateStart() {
-  startFlowInteraction('edge-update')
-}
-
-function onFlowEdgeUpdateEnd() {
-  connectingSourceHandle.value = null
-  stopFlowInteraction('edge-update')
-}
 
 const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 
@@ -330,12 +289,6 @@ let queuedNodeInternalsIds: Set<string> | null = null
 let leaveConfirmResolver: ((choice: 'save' | 'discard' | 'cancel') => void) | null = null
 let leaveConfirmPromise: Promise<'save' | 'discard' | 'cancel'> | null = null
 let skipNextLeaveConfirm = false
-let lastManualNodeSelection:
-  | {
-    nodeId: string
-    timestamp: number
-  }
-  | null = null
 const activeMessageActionNodeId = ref<string | null>(null)
 
 function scheduleFlowNodeInternalsRefresh(nodeIds?: string[]) {
@@ -377,36 +330,6 @@ const flowPromptPlaceholder = computed(() => {
     ? '文本工具稍后接入，请在节点内执行生成'
     : '请在节点内执行生成'
 })
-function clearFlowSelection(): boolean {
-  let hasSelection = false
-  const nextNodes = (nodes.value as Array<Node & { selected?: boolean }>).map((node) => {
-    if (node.selected) {
-      hasSelection = true
-      return { ...node, selected: false }
-    }
-    return node
-  })
-  const nextEdges = (edges.value as Array<Edge & { selected?: boolean }>).map((edge) => {
-    if (edge.selected) {
-      hasSelection = true
-      return { ...edge, selected: false }
-    }
-    return edge
-  })
-  if (!hasSelection) return false
-  nodes.value = nextNodes
-  edges.value = nextEdges
-  return true
-}
-
-function onPaneClick() {
-  closeBoardHeaderEditing()
-  closeNodeContextMenu()
-  activeMessageActionNodeId.value = null
-  hideFlowStyleStrengthControl()
-  clearFlowSelection()
-}
-
 function onPaneContextMenu(event: MouseEvent) {
   event.preventDefault()
   closeBoardHeaderEditing()
@@ -425,71 +348,6 @@ function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
   closeNodeContextMenu()
   activeMessageActionNodeId.value = null
   hideFlowStyleStrengthControl()
-}
-
-function onFlowNodeClick(payload: NodeMouseEvent) {
-  if (activeTool.value === 'hand') return
-  activeMessageActionNodeId.value = null
-  hideFlowStyleStrengthControl()
-  const targetNodeId = payload.node.id
-  const event = payload.event
-  if (shouldSkipNodeClickAfterManualSelection(targetNodeId)) return
-  applyFlowNodeSelection(targetNodeId, event instanceof MouseEvent ? event : null)
-}
-
-function applyFlowNodeSelection(targetNodeId: string, event: MouseEvent | null) {
-  if (activeTool.value === 'hand') return
-  const isShiftToggle = !!event?.shiftKey
-
-  if (!isShiftToggle) {
-    // Single selection: unselect others, select target
-    let changed = false
-    for (const node of (nodes.value as Array<{ id: string; selected?: boolean }>)) {
-      const shouldBeSelected = node.id === targetNodeId
-      if (node.selected !== shouldBeSelected) {
-        node.selected = shouldBeSelected
-        changed = true
-      }
-    }
-    for (const edge of (edges.value as Array<{ selected?: boolean }>)) {
-      if (edge.selected) {
-        edge.selected = false
-        changed = true
-      }
-    }
-  } else {
-    // Multi selection toggle
-    for (const node of (nodes.value as Array<{ id: string; selected?: boolean }>)) {
-      if (node.id === targetNodeId) {
-        node.selected = !node.selected
-        break
-      }
-    }
-  }
-}
-
-function onFlowNodeMouseDown(nodeId: string, event: MouseEvent) {
-  if (event.button === 0) {
-    activeMessageActionNodeId.value = null
-    hideFlowStyleStrengthControl()
-  }
-  applyFlowNodeSelection(nodeId, event)
-  lastManualNodeSelection = {
-    nodeId,
-    timestamp: Date.now(),
-  }
-}
-
-function shouldSkipNodeClickAfterManualSelection(nodeId: string): boolean {
-  if (!lastManualNodeSelection) return false
-  const isSameNode = lastManualNodeSelection.nodeId === nodeId
-  const isRecent = Date.now() - lastManualNodeSelection.timestamp < 400
-  if (!isSameNode || !isRecent) {
-    lastManualNodeSelection = null
-    return false
-  }
-  lastManualNodeSelection = null
-  return true
 }
 
 function requestLeaveConfirm(): Promise<'save' | 'discard' | 'cancel'> {
@@ -567,52 +425,6 @@ function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: 
   }
 }
 
-function buildFlowEdgeClass(edge: { selected?: boolean; sourceHandle?: string | null; targetHandle?: string | null }): string {
-  const tone = resolveFlowEdgeToneFromHandles(edge.sourceHandle, edge.targetHandle)
-  return buildFlowEdgeClassName(tone, !!edge.selected)
-}
-
-function ensureFlowEdgeVisuals() {
-  const source = edges.value as Array<Edge & { data?: { tone?: string } }>
-  const withVisuals = source.map((edge): Edge => {
-    const nextClass = buildFlowEdgeClass(edge)
-    const tone = resolveFlowEdgeToneFromHandles(edge.sourceHandle, edge.targetHandle)
-    return {
-      ...edge,
-      animated: false,
-      class: nextClass,
-      data: {
-        ...(edge.data ?? {}),
-        tone,
-      },
-    }
-  })
-  const same = source
-    .map(edge => `${edge.id}|${edge.class ?? ''}|${edge.animated ? 1 : 0}|${edge.data?.tone ?? ''}`)
-    .join(';')
-    === withVisuals
-      .map(edge => `${edge.id}|${edge.class ?? ''}|${edge.animated ? 1 : 0}|${edge.data?.tone ?? ''}`)
-      .join(';')
-  if (!same) {
-    edges.value = withVisuals
-  }
-}
-
-const flowMaskEffectiveSourceCache = computed(() => {
-  const cache: Record<string, { url: string; ratio: number; hasConnectedImageInput: boolean }> = {}
-  const flowNodes = nodes.value as Array<{ id: string; data?: { kind?: string } }>
-  for (const node of flowNodes) {
-    if (node.data?.kind !== 'mask') continue
-    cache[node.id] = getFlowMaskEffectiveSource(node.id)
-  }
-  return cache
-})
-
-
-function canCreateNodeKind(kind: string): kind is FlowCreatableNodeKind {
-  return createNodeOptions.some(item => item.value === kind)
-}
-
 function markDirty() {
   if (canSaveBoard.value) {
     isDirty.value = true
@@ -632,7 +444,7 @@ const flowHistory = useFlowHistory({
 type FlowHistorySnapshot = ReturnType<typeof flowHistory.capture>
 
 function refreshSnapshot() {
-  // No-op: debug panel removed
+  // Snapshot preview UI has been removed; callers keep this hook for flow parity.
 }
 
 const boardPersistence = useFlowBoardPersistence({
@@ -667,15 +479,11 @@ const currentBoardId = boardPersistence.currentBoardId
 const canSaveBoard = boardPersistence.canSaveBoard
 const loadInitialOrRouteBoard = boardPersistence.loadInitialOrRouteBoard
 const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
-const importEmptyBoardSnapshot = boardPersistence.importEmptyBoardSnapshot
-const importBoardSnapshot = boardPersistence.importBoardSnapshot
 
 const {
   isBoardMenuOpen,
   isRenamingBoard,
   boardNameDraft,
-  boardNameInputRef,
-  boardMetas,
   currentBoardName,
   boardOptions,
   setBoardNameInputRef,
@@ -686,7 +494,6 @@ const {
   closeBoardHeaderEditing,
   onConfirmBoardRename,
   onSelectBoard,
-  navigateToBoard,
 } = useFlowBoardHeaderActions({
   currentBoardId,
   message: { warning: (msg: string) => message.warning(msg), success: (msg: string) => message.success(msg) },
@@ -696,13 +503,6 @@ const {
   confirmFlowLeave,
   skipNextLeaveConfirm: { get value() { return skipNextLeaveConfirm }, set value(v: boolean) { skipNextLeaveConfirm = v } },
 })
-
-function onAddNode() {
-  const viewport = getViewport()
-  const x = 320 - viewport.x / (viewport.zoom || 1)
-  const y = 180 - viewport.y / (viewport.zoom || 1)
-  createNodeAtPosition(createNodeKind.value, x, y)
-}
 
 function commitFlowNodes(nextNodes: Node[]) {
   nodes.value = nextNodes
@@ -772,15 +572,6 @@ function onFlowDeleteNode(nodeId: string) {
 }
 const updateSnapshotNodeBase = flowNodeMutations.updateSnapshotNode
 const _deleteSelectedFlowElements = flowNodeMutations.deleteSelectedFlowElements
-function deleteSelectedFlowElements() {
-  activeMessageActionNodeId.value = null
-  hideFlowStyleStrengthControl()
-  closeNodeContextMenu()
-  _deleteSelectedFlowElements()
-  void nextTick(() => {
-    ensureFlowEdgeVisuals()
-  })
-}
 const _onFlowPromptTextUpdate = flowNodeMutations.onFlowPromptTextUpdate
 const _onFlowNodeParamUpdate = flowNodeMutations.onFlowNodeParamUpdate
 function onFlowPromptTextUpdate(nodeId: string, value: string) {
@@ -833,9 +624,6 @@ function onExportSelectedImages() {
   selectionExport.exportSelectedImages()
 }
 
-const isAltPressed = ref(false)
-const isDraggingNode = ref(false)
-
 const {
   isCanvasInteractionActive: isFlowInteractionActive,
   startCanvasInteraction: startFlowInteraction,
@@ -850,242 +638,60 @@ const {
 } = useFlowNodeContextMenu()
 
 const {
-  selectedPreviewItems,
-  onClearSelected,
-  onRemoveSelectedPreviewItem,
-  onFocusSelectedPreviewItem,
-  onFlowGenerate,
-} = useFlowSelectionPreviewBar({
-  nodes: nodes as Ref<Node[]>,
-  flowPromptText,
-  flowPromptRatio,
-  flowPromptQuality,
-  clearFlowSelection,
-  getViewport,
-  setViewport,
-  get runPatternGenerate() { return runPatternGenerate },
+  flowConnectionLineStyle,
+  onFlowConnectStart,
+  onFlowConnectEnd,
+  onFlowEdgeUpdateStart,
+  onFlowEdgeUpdateEnd,
+  ensureFlowEdgeVisuals,
+} = useFlowConnectionVisuals({
+  edges: edges as Ref<Edge[]>,
+  commitEdges: (nextEdges) => {
+    commitFlowEdges(nextEdges)
+  },
+  startFlowInteraction: startFlowInteraction,
+  stopFlowInteraction: stopFlowInteraction,
 })
 
-function onWindowKeyDown(event: KeyboardEvent) {
-  if (event.key === 'Alt') {
-    isAltPressed.value = true
-  }
-}
+let canvasDropRef: ReturnType<typeof useFlowCanvasDrop> | null = null
+let clearMaskCanvasRef: ((nodeId: string) => void) = () => {}
 
-function onWindowKeyUp(event: KeyboardEvent) {
-  if (event.key === 'Alt') {
-    isAltPressed.value = false
-  }
-}
-
-function onNodeDragStart() {
-  isDraggingNode.value = true
-  startFlowInteraction('node-drag')
-  activeMessageActionNodeId.value = null
-  hideFlowStyleStrengthControl()
-  flowHistory.onNodeDragStart()
-  beginFlowNodeDragDuplicateTracking(isAltPressed.value)
-}
-
-function onNodeDragStop() {
-  isDraggingNode.value = false
-  stopFlowInteraction('node-drag')
-  finishFlowNodeDragDuplicateTracking(isAltPressed.value)
-  flowHistory.onNodeDragStop(() => {
-    markDirty()
-  })
-  ensureFlowEdgeVisuals()
-}
-
-function getImageNodeSnapshot(nodeId: string): ImageNodeItem | null {
-  const node = (nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>).find(item => item.id === nodeId)
-  if (!node || node.data?.kind !== 'image' || !node.data.snapshotNode || typeof node.data.snapshotNode !== 'object') return null
-  return node.data.snapshotNode as ImageNodeItem
-}
-
-function getImageNodeDisplayPayload(nodeId: string): { url: string; ratio: number } | null {
-  const snapshot = getImageNodeSnapshot(nodeId)
-  if (!snapshot) return null
-  const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-  const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
-  const url = `${latestOutput?.url || snapshot.sourceImageUrl || ''}`.trim()
-  if (!url) return null
-  const outputRatio = Number(latestOutput?.ratio)
-  const sourceRatio = Number(snapshot.sourceImageRatio)
-  return {
-    url,
-    ratio: Number.isFinite(outputRatio) && outputRatio > 0
-      ? outputRatio
-      : (Number.isFinite(sourceRatio) && sourceRatio > 0 ? sourceRatio : 1),
-  }
-}
-
-function getMaskNodeSnapshot(nodeId: string): MaskNodeItem | null {
-  const node = (nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>).find(item => item.id === nodeId)
-  if (!node || node.data?.kind !== 'mask' || !node.data.snapshotNode || typeof node.data.snapshotNode !== 'object') return null
-  return node.data.snapshotNode as MaskNodeItem
-}
-
-function resolveFlowImageInputForNode(
-  targetNodeId: string,
-  port: 'image' | 'mask' | 'prompt',
-): { sourceKind: CanvasConnectionNodeType; snapshotNode: Record<string, unknown> } | null {
-  const incomingEdge = (edges.value as Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>)
-    .find(edge => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === port)
-  if (!incomingEdge) return null
-  const sourceNode = (nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>)
-    .find(node => node.id === incomingEdge.source)
-  if (!sourceNode || !sourceNode.data?.snapshotNode || typeof sourceNode.data.snapshotNode !== 'object') return null
-  const sourceKind = sourceNode.data.kind
-  if (
-    sourceKind !== 'image' && sourceKind !== 'edit' && sourceKind !== 'enhance'
-    && sourceKind !== 'color' && sourceKind !== 'fusion' && sourceKind !== 'wear'
-    && sourceKind !== 'model' && sourceKind !== 'viewpoint'
-  ) return null
-  const sourceType = sourceKind as CanvasConnectionNodeType
-  return {
-    sourceKind: sourceType,
-    snapshotNode: sourceNode.data.snapshotNode as Record<string, unknown>,
-  }
-}
-
-function resolveFlowSourceImageRatio(sourceKind: CanvasConnectionNodeType, snapshotNode: Record<string, unknown>): number {
-  if (sourceKind === 'image') {
-    const sourceImageRatio = Number(snapshotNode.sourceImageRatio)
-    if (Number.isFinite(sourceImageRatio) && sourceImageRatio > 0) return sourceImageRatio
-  }
-  const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages as Array<{ ratio?: unknown }> : []
-  const latestOutput = outputImages.length > 0 ? outputImages[outputImages.length - 1] : null
-  const outputRatio = Number(latestOutput?.ratio)
-  if (Number.isFinite(outputRatio) && outputRatio > 0) return outputRatio
-  return 1
-}
-
-function getFlowMaskEffectiveSource(nodeId: string): { url: string; ratio: number; hasConnectedImageInput: boolean } {
-  const maskNode = getMaskNodeSnapshot(nodeId)
-  if (!maskNode) return { url: '', ratio: 1, hasConnectedImageInput: false }
-  const imageInput = resolveFlowImageInputForNode(nodeId, 'image')
-  if (imageInput) {
-    const url = resolveSourceImageFromNode(imageInput.sourceKind, imageInput.snapshotNode).trim()
-    if (url) {
-      return {
-        url,
-        ratio: resolveFlowSourceImageRatio(imageInput.sourceKind, imageInput.snapshotNode),
-        hasConnectedImageInput: true,
-      }
-    }
-  }
-  return {
-    url: (maskNode.sourceImageUrl || '').trim(),
-    ratio: maskNode.sourceImageRatio > 0 ? maskNode.sourceImageRatio : 1,
-    hasConnectedImageInput: false,
-  }
-}
-
-function getFlowMaskEffectiveSourceCached(nodeId: string): { url: string; ratio: number; hasConnectedImageInput: boolean } {
-  return flowMaskEffectiveSourceCache.value[nodeId] || { url: '', ratio: 1, hasConnectedImageInput: false }
-}
-
-function readNodeImageDropPayload(event: DragEvent): { url: string; ratio: number } | null {
-  return canvasDrop.readNodeImageDropPayload(event)
-}
-
-async function applyImageFileToImageNode(nodeId: string, file: File): Promise<void> {
-  await canvasDrop.applyImageFileToImageNode(nodeId, file)
-}
-
-function onFlowImageOpenFile(nodeId: string) {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'image/*'
-  input.onchange = () => {
-    const file = input.files?.[0]
-    if (!file) return
-    void applyImageFileToImageNode(nodeId, file)
-  }
-  input.click()
-}
-
-function onFlowImageReset(nodeId: string) {
-  updateSnapshotNode(nodeId, prev => ({
-    ...prev,
-    sourceImageUrl: '',
-    sourceImageRatio: 1,
-    outputImages: [],
-  }))
-  markFlowExecutionNodeDirty(nodeId)
-}
-
-function onFlowImageStageDrop(nodeId: string, event: DragEvent) {
-  event.preventDefault()
-  const payload = readNodeImageDropPayload(event)
-  if (payload) {
-    updateSnapshotNode(nodeId, prev => ({
-      ...prev,
-      sourceImageUrl: payload.url,
-      sourceImageRatio: payload.ratio,
-      outputImages: [],
-    }))
-    markFlowExecutionNodeDirty(nodeId)
-    return
-  }
-  const file = event.dataTransfer?.files?.[0]
-  if (!file) return
-  void applyImageFileToImageNode(nodeId, file)
-}
-
-function onFlowMaskOpenFile(nodeId: string) {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'image/*'
-  input.onchange = () => {
-    const file = input.files?.[0]
-    if (!file) return
-    void applyImageFileToMaskNode(nodeId, file)
-  }
-  input.click()
-}
-
-async function applyImageFileToMaskNode(nodeId: string, file: File): Promise<void> {
-  await canvasDrop.applyImageFileToMaskNode(nodeId, file)
-}
-
-function onFlowMaskClearImage(nodeId: string) {
-  updateSnapshotNode(nodeId, prev => ({
-    ...prev,
-    sourceImageUrl: '',
-    sourceImageRatio: 1,
-    executionMaskDataUrl: '',
-    maskDataUrl: '',
-  }))
-  markFlowExecutionNodeDirty(nodeId)
-  clearMaskCanvas(nodeId)
-}
-
-function onFlowMaskClearMask(nodeId: string) {
-  updateSnapshotNode(nodeId, prev => ({
-    ...prev,
-    executionMaskDataUrl: '',
-    maskDataUrl: '',
-  }))
-  markFlowExecutionNodeDirty(nodeId)
-  clearMaskCanvas(nodeId)
-}
-
-async function applyMaskSourceByUrl(nodeId: string, url: string, ratio?: number) {
-  await canvasDrop.applyMaskSourceByUrl(nodeId, url, ratio)
-}
-function onFlowMaskStageDrop(nodeId: string, event: DragEvent) {
-  event.preventDefault()
-  const payload = readNodeImageDropPayload(event)
-  if (payload) {
-    void applyMaskSourceByUrl(nodeId, payload.url, payload.ratio)
-    return
-  }
-  const file = event.dataTransfer?.files?.[0]
-  if (!file) return
-  void applyImageFileToMaskNode(nodeId, file)
-}
+const {
+  getImageNodeSnapshot,
+  getImageNodeDisplayPayload,
+  getMaskNodeSnapshot,
+  getFlowMaskEffectiveSourceCached,
+  onFlowImageOpenFile,
+  onFlowImageReset,
+  onFlowImageStageDrop,
+  onFlowMaskOpenFile,
+  onFlowMaskClearImage,
+  onFlowMaskClearMask,
+  onFlowMaskStageDrop,
+} = useFlowNodeMediaInputs({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  canvasDrop: {
+    readNodeImageDropPayload: (event) => canvasDropRef?.readNodeImageDropPayload(event) ?? null,
+    applyImageFileToImageNode: async (nodeId, file) => {
+      if (!canvasDropRef) return
+      await canvasDropRef.applyImageFileToImageNode(nodeId, file)
+    },
+    applyImageFileToMaskNode: async (nodeId, file) => {
+      if (!canvasDropRef) return
+      await canvasDropRef.applyImageFileToMaskNode(nodeId, file)
+    },
+    applyMaskSourceByUrl: async (nodeId, url, ratio) => {
+      if (!canvasDropRef) return
+      await canvasDropRef.applyMaskSourceByUrl(nodeId, url, ratio)
+    },
+  },
+  updateSnapshotNode,
+  markFlowExecutionNodeDirty,
+  clearMaskCanvas: (nodeId) => {
+    clearMaskCanvasRef(nodeId)
+  },
+})
 
 function onCanvasDragOver(event: DragEvent) {
   activeMessageActionNodeId.value = null
@@ -1115,6 +721,7 @@ const {
   startCanvasInteraction: startFlowInteraction,
   stopCanvasInteraction: stopFlowInteraction,
 })
+clearMaskCanvasRef = clearMaskCanvas
 
 const {
   onFlowEnhanceGenerate,
@@ -1199,6 +806,39 @@ function onFlowMessageDirectAction(
   void runMessageDirectAction(nodeId, action, action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined)
 }
 
+const { clearFlowSelection, onPaneClick, onFlowNodeClick, onFlowNodeMouseDown, applyFlowNodeSelection, deleteSelectedFlowElements } = useFlowSelectionController({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  activeTool: activeTool as Ref<string>,
+  activeMessageActionNodeId,
+  hideFlowStyleStrengthControl,
+  closeBoardHeaderEditing,
+  closeNodeContextMenu,
+  _deleteSelectedFlowElements: () => {
+    _deleteSelectedFlowElements()
+    void nextTick(() => {
+      ensureFlowEdgeVisuals()
+    })
+  },
+})
+
+const {
+  selectedPreviewItems,
+  onClearSelected,
+  onRemoveSelectedPreviewItem,
+  onFocusSelectedPreviewItem,
+  onFlowGenerate,
+} = useFlowSelectionPreviewBar({
+  nodes: nodes as Ref<Node[]>,
+  flowPromptText,
+  flowPromptRatio,
+  flowPromptQuality,
+  clearFlowSelection,
+  getViewport,
+  setViewport,
+  get runPatternGenerate() { return runPatternGenerate },
+})
+
 const {
   onFlowImageAppendToCanvas,
   onFlowImageDisplayDragStart,
@@ -1235,6 +875,21 @@ const {
   stopCanvasInteraction: stopFlowInteraction,
 })
 
+const { isAltPressed, isDraggingNode, onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
+  flowHistory: {
+    onNodeDragStart: flowHistory.onNodeDragStart,
+    onNodeDragStop: flowHistory.onNodeDragStop,
+  },
+  startFlowInteraction,
+  stopFlowInteraction,
+  beginFlowNodeDragDuplicateTracking,
+  finishFlowNodeDragDuplicateTracking,
+  ensureFlowEdgeVisuals,
+  markDirty,
+  activeMessageActionNodeId,
+  hideFlowStyleStrengthControl,
+})
+
 const canvasDrop = useFlowCanvasDrop({
   currentBoardId,
   screenToFlowCoordinate,
@@ -1252,19 +907,13 @@ const canvasDrop = useFlowCanvasDrop({
   onNodeMutated: (nodeId) => markFlowExecutionNodeDirty(nodeId),
   createNodeOptions: createNodeOptions as unknown as ReadonlyArray<{ value?: unknown }>,
 })
+canvasDropRef = canvasDrop
 
 const { getFlowNodeUiStateCached } = useFlowNodeUiState({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
   isFlowExecutionNodeRunning,
 })
-
-watch(
-  () => (edges.value as Array<Edge & { selected?: boolean }>).map(edge => `${edge.id}:${edge.selected ? 1 : 0}:${edge.sourceHandle ?? ''}:${edge.targetHandle ?? ''}`).join('|'),
-  () => {
-    ensureFlowEdgeVisuals()
-  },
-)
 
 watch(
   () => {
@@ -1315,17 +964,10 @@ useFlowLeaveGuard({
 })
 
 onMounted(async () => {
-  window.addEventListener('keydown', onWindowKeyDown)
-  window.addEventListener('keyup', onWindowKeyUp)
   await loadInitialOrRouteBoard()
   ensureFlowEdgeVisuals()
   refreshBoardMetas()
   refreshSnapshot()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onWindowKeyDown)
-  window.removeEventListener('keyup', onWindowKeyUp)
 })
 </script>
 
@@ -1358,38 +1000,6 @@ onBeforeUnmount(() => {
 .tool-item { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #5f6368; cursor: pointer; border: none; background: transparent; }
 .tool-item.active { background: #f1f3f9; color: #9278e6; }
 .toolbar-divider { width: 24px; height: 1px; background: #f1f3f9; margin: 4px auto; }
-.debug-toggle { cursor: pointer; font-size: 13px; font-weight: 700; }
-
-.workspace-flow-node-kind {
-  width: 132px;
-}
-
-.workspace-flow-save-state {
-  border-radius: 999px;
-  padding: 2px 10px;
-  border: 1px solid #d4dbe7;
-  background: #f6f8fc;
-  font-size: 12px;
-  color: #516074;
-}
-
-.workspace-flow-save-state.is-dirty {
-  border-color: #f2c97d;
-  background: #fff7e8;
-  color: #9f6a00;
-}
-
-.workspace-flow-save-state.is-saved {
-  border-color: #9fddb4;
-  background: #ecfbf1;
-  color: #15753a;
-}
-
-.workspace-flow-save-state.is-failed {
-  border-color: #efb0b0;
-  background: #fff1f1;
-  color: #b12828;
-}
 
 .workspace-flow-canvas-wrap { position: absolute; inset: 0; z-index: 2; }
 
