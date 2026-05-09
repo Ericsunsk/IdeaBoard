@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/vue-query": "^5.100.9",
     "@vicons/ionicons5": "^0.13.0",
     "@vue-flow/core": "^1.48.2",
     "axios": "^1.15.2",

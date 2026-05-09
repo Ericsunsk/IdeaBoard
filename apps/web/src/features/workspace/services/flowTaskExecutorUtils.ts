@@ -1,6 +1,6 @@
 import type { CanvasConnectionNodeType, ImageNodeOutputItem } from '../types/canvasNodes'
-import { sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
-import { taskApi } from '../../../shared/api'
+import { waitTaskResultWithQueryClient } from '../../../shared/query/taskQueries'
+import { extractImageUrlsFromTaskResult } from '../../../shared/query/taskResult'
 
 export interface FlowTaskExecutorGraphOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
@@ -80,36 +80,8 @@ export function resolveConnectedExecutionInput(
   }
 }
 
-export function extractImageUrlsFromTaskResult(result: string | null | undefined): string[] {
-  if (!result) return []
-  try {
-    const parsed = JSON.parse(result)
-    if (Array.isArray(parsed?.image_urls)) {
-      return parsed.image_urls.filter((url: unknown): url is string => typeof url === 'string' && url.trim().length > 0)
-    }
-    if (typeof parsed?.image_url === 'string' && parsed.image_url.trim()) return [parsed.image_url.trim()]
-    return []
-  } catch {
-    return []
-  }
-}
-
 export async function waitTaskResult(taskId: string): Promise<string[]> {
-  const maxRetries = 180
-  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
-    const taskRes = await taskApi.get(taskId)
-    if (taskRes.code === 0 && taskRes.data?.task) {
-      const task = taskRes.data.task
-      if (task.status === 'completed') {
-        return extractImageUrlsFromTaskResult(task.result)
-      }
-      if (task.status === 'failed') {
-        throw new Error(sanitizeTaskErrorMessage(task.error_msg, '生成失败'))
-      }
-    }
-    await new Promise(resolve => window.setTimeout(resolve, 2000))
-  }
-  throw new Error('任务轮询超时，请稍后查看结果')
+  return waitTaskResultWithQueryClient(taskId)
 }
 
 /** All node kinds that can produce image output usable as downstream source. */

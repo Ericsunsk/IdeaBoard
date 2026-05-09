@@ -144,10 +144,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, h } from 'vue'
+import { ref, computed, onMounted, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../../app/stores/user'
-import { taskApi } from '../../../shared/api/index'
+import { useQuery } from '@tanstack/vue-query'
+import { fetchUserTasks } from '../../../shared/query/taskQueries'
+import { queryKeys } from '../../../shared/query/keys'
 import { NButton, NTag, NForm, NFormItem, NInput, NDataTable, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 
@@ -162,17 +164,26 @@ const navItems = [
   { key: 'security', label: '账号安全', icon: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>' },
 ]
 
-const tasks = ref<any[]>([])
-const taskLoading = ref(false)
-const taskPagination = ref({
-  page: 1,
-  pageSize: 8,
-  total: 0,
-  onChange: (page: number) => {
-    taskPagination.value.page = page
-    loadTasks()
-  }
+const taskPage = ref(1)
+const taskPageSize = 8
+
+const tasksQuery = useQuery({
+  queryKey: computed(() => queryKeys.tasks.list({ page: taskPage.value, page_size: taskPageSize })),
+  queryFn: () => fetchUserTasks({ page: taskPage.value, page_size: taskPageSize }),
+  placeholderData: (prev) => prev,
 })
+
+const tasks = computed(() => tasksQuery.data.value?.data?.list || [])
+const taskLoading = computed(() => tasksQuery.isLoading.value)
+
+const taskPagination = computed(() => ({
+  page: taskPage.value,
+  pageSize: taskPageSize,
+  total: tasksQuery.data.value?.data?.total || 0,
+  onChange: (page: number) => {
+    taskPage.value = page
+  },
+}))
 
 const getStatusConfig = (status: string) => {
   switch (status) {
@@ -196,22 +207,8 @@ const taskColumns: DataTableColumns<any> = [
     render: (row) => h('span', { style: { color: '#86868b', fontSize: '13px' } }, row.created_at) },
 ]
 
-async function loadTasks() {
-  taskLoading.value = true
-  try {
-    const res: any = await taskApi.list({
-      page: taskPagination.value.page,
-      page_size: taskPagination.value.pageSize,
-    })
-    if (res.code === 0) {
-      tasks.value = res.data?.list || []
-      taskPagination.value.total = res.data?.total || 0
-    }
-  } catch {
-    message.error('加载记录失败')
-  } finally {
-    taskLoading.value = false
-  }
+function loadTasks() {
+  tasksQuery.refetch()
 }
 
 const pwdFormRef = ref()
@@ -250,7 +247,6 @@ async function handleLogout() {
 
 onMounted(() => {
   userStore.fetchUserInfo()
-  loadTasks()
 })
 </script>
 
