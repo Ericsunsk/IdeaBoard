@@ -10,7 +10,7 @@ import {
   normalizeColorNodeColors,
   normalizeWearTileMode,
 } from '../types/canvasNodes'
-import { clampMaskRefineAmount } from './useMaskNode'
+import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
 import type {
   ColorNodeItem,
   EditNodeItem,

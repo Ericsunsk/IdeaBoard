@@ -1,28 +1,51 @@
-# Canvas → Vue Flow 迁移审计（收尾版）
+# Canvas -> Vue Flow 迁移审计报告（收尾版）
 
-最后更新：2026-05-07
-目标：标记已完成项，保留真实残余，避免后续重复追旧问题。
+更新日期：2026-05-08
 
-## 已完成（本轮可关闭）
+## 当前状态（代码已落地）
 
-1. 旧路由/POC 关键引用清理：`picture-flow`、`workspace-flow`、`POC/poc`、`canvasInteractionCounter`、`disabled="true"`、`selected-preview-items="[]"` 在 `apps/web/src` 下已无命中。
-2. message 图片 resize 历史语义修正：改为一次交互只在 `mouseup` 且确有变化时入历史；不再逐帧入历史，也不会“无变化却标脏”。
-3. 未引用旧实现清理：旧 `useMaskNode.ts` 已移除；`clampMaskRefineAmount` 已迁移到 flow 服务侧实现并复用。
+- `WorkspaceScreen.vue` 已接入 `VITE_WORKSPACE_FLOW_ENABLE_CULLING`，默认 `false`。
+- 网格背景已从外层 `.canvas-grid` / CSS variables 方案迁移为 `.vue-flow__viewport` 背景方案。
+- 已拆分 composables：
+  - `useFlowNodeContextMenu`
+  - `useFlowSelectionPreviewBar`
+  - `useFlowCanvasDrop`
+  - `useFlowBoardHeaderActions`
+- 旧 canvas 相关文件已进入 staged 删除集合（按当前工作树状态收口）。
 
-## 当前状态（已迁移但保留关注）
+## 真实残余项
 
-1. Workspace 已以 Vue Flow 为主路径运行，旧 workspace 核心 composables/组件保持删除状态。
-2. 节点 UI 基础组件（`Node*`、`useCanvasNodeStyle` 等）仍被新节点层复用，属于“保留资产”，不在清理范围。
-3. message 图片 resize 仍保留 8 向与 north/west 锚点计算逻辑；本轮仅修正历史与脏标记行为，不改交互几何算法。
+### P1：用户浏览器验收（必须）
 
-## 残余风险（真实保留）
+1. 网格视觉一致性
+- 在快速缩放、平移、拖拽节点时，确认网格与节点运动感知一致，无漂移/抖动。
 
-1. Pointer 输入模型尚未彻底统一：当前仍以鼠标事件为主，触屏/PointerEvent 路径需要后续统一抽象与回归。
-2. `WorkspaceScreen.vue` 仍承担较多编排职责，后续仍建议继续拆分（交互、上传生命周期、执行编排等）。
-3. 迁移后的手工回归风险仍存在：需持续做关键链路回归（节点编辑、连线、history、board 持久化、生成链路）。
+2. 大画布交互稳定性
+- 在 100+ 节点画布下，确认连线、拖拽、框选、删除、缩放行为稳定。
 
-## 后续建议（短清单）
+3. Culling 开关专项
+- 默认关闭（`false`）路径下确认行为稳定。
+- 如需评估性能，手动开启 `VITE_WORKSPACE_FLOW_ENABLE_CULLING=true` 做对比回归。
 
-1. 以 pointer 统一为切入点，梳理 resize/drag/select/mask 的输入事件层。
-2. 继续拆分 `WorkspaceScreen`，优先抽离高耦合副作用逻辑。
-3. 建立最小回归清单并固化到 CI 前检查（至少覆盖 history 与路由入口稳定性）。
+### P1：运行时风险
+
+- `onlyRenderVisibleElements` 启用后仍存在潜在端口/连线边界错位风险，需要专项回归后再决定是否默认开启。
+
+### P2：后续可执行项（非阻断）
+
+- 继续把 `WorkspaceScreen.vue` 做小步拆分（仅结构拆分，不改行为）。
+- 按批次清理旧 canvas 残余代码（每批先用 `rg` 证明无引用，再删除）。
+
+## 本轮不再列为待修的问题
+
+以下事项已在当前代码中完成，不应再作为“未修复”重复派工：
+
+- Phase A：culling feature flag 接入并默认关闭。
+- Phase C：首批 composables 拆分完成（四个已落地）。
+- Phase D：旧 canvas 关键文件已进入 staged 删除流程。
+
+## 验证基线
+
+- `git diff --check`
+- `git diff --cached --check`（存在 staged diff 时）
+- `cd apps/web && npm run build`

@@ -1,7 +1,7 @@
 import { nextTick, type Ref } from 'vue'
 import { normalizeHexColor } from '../components/nodes/colorPopoverUtils'
 import { normalizeViewpointSelectionByCategory } from '../components/nodes/nodeOptionConfig'
-import { clampMaskRefineAmount } from './useMaskNode'
+import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
 import {
   DEFAULT_COLOR_STRENGTH,
   ENHANCE_EXTEND_PERCENT_DEFAULT,
