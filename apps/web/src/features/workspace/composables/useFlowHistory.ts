@@ -12,6 +12,8 @@ type UseFlowHistoryOptions = {
   edges: ArrayRef<unknown>
   maxSteps?: number
   onRestore?: () => void
+  commitNodes?: (nodes: unknown[]) => void
+  commitEdges?: (edges: unknown[]) => void
 }
 
 function cloneJson<T>(value: T): T {
@@ -149,8 +151,16 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
   function restore(snapshot: FlowHistorySnapshot) {
     const restored = cloneFlowHistorySnapshot(snapshot)
     decodeHistoryBlobsInPlace(restored.nodes)
-    options.nodes.value = restored.nodes
-    options.edges.value = restored.edges
+    if (options.commitNodes) {
+      options.commitNodes(restored.nodes)
+    } else {
+      options.nodes.value = restored.nodes
+    }
+    if (options.commitEdges) {
+      options.commitEdges(restored.edges)
+    } else {
+      options.edges.value = restored.edges
+    }
     options.onRestore?.()
   }
 

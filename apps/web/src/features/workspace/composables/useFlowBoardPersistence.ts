@@ -36,6 +36,9 @@ export type UseFlowBoardPersistenceOptions = {
   refreshSnapshot: () => void
   clearFlowHistoryBaseline: () => void
   getUserIdentity: () => { userId: number; userUid: string }
+  commitNodes: (nodes: unknown[]) => void
+  commitEdges: (edges: unknown[]) => void
+  onGraphCommitted: () => void
 }
 
 export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions) {
@@ -60,8 +63,8 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
 
   function applyBoardSnapshot(snapshot: CanvasBoardSnapshot) {
     const flow = canvasBoardSnapshotToFlow(snapshot)
-    options.nodes.value = flow.nodes as unknown[]
-    options.edges.value = flow.edges as unknown[]
+    options.commitNodes(flow.nodes as unknown[])
+    options.commitEdges(flow.edges as unknown[])
     options.boardBaseSnapshot.value = snapshot
     const vp = snapshot.viewport
     if (vp && typeof vp.canvasX === 'number' && typeof vp.canvasY === 'number' && typeof vp.zoomLevel === 'number') {
@@ -76,6 +79,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     clearDirtyAfterImport()
     options.clearFlowHistoryBaseline()
     options.refreshSnapshot()
+    options.onGraphCommitted()
   }
 
   function importEmptyBoardSnapshot() {
@@ -166,8 +170,8 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       await saveBoardSnapshotFromFlow(boardId, stabilizedSnapshot)
       options.boardBaseSnapshot.value = stabilizedSnapshot
       const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
-      options.nodes.value = nextFlow.nodes as unknown[]
-      options.edges.value = nextFlow.edges as unknown[]
+      options.commitNodes(nextFlow.nodes as unknown[])
+      options.commitEdges(nextFlow.edges as unknown[])
       options.clearFlowHistoryBaseline()
       options.isDirty.value = false
       options.saveStatus.value = 'saved'
@@ -177,6 +181,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       })
       await uploadLifecycle.recycleRemovedUploadsAfterSave(previousSnapshot, stabilizedSnapshot)
       options.refreshSnapshot()
+      options.onGraphCommitted()
       return true
     } catch (error) {
       options.saveStatus.value = 'failed'

@@ -48,14 +48,20 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
     options.ensureFlowEdgeVisuals()
   }
 
+  function onWindowBlur() {
+    isAltPressed.value = false
+  }
+
   onMounted(() => {
     window.addEventListener('keydown', onWindowKeyDown)
     window.addEventListener('keyup', onWindowKeyUp)
+    window.addEventListener('blur', onWindowBlur)
   })
 
   onBeforeUnmount(() => {
     window.removeEventListener('keydown', onWindowKeyDown)
     window.removeEventListener('keyup', onWindowKeyUp)
+    window.removeEventListener('blur', onWindowBlur)
   })
 
   return {

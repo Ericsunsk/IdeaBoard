@@ -438,7 +438,10 @@ const flowHistory = useFlowHistory({
   maxSteps: 10,
   onRestore: () => {
     markDirty()
+    syncFlowAfterGraphRestore()
   },
+  commitNodes: (nodes) => commitFlowNodes(nodes as Node[]),
+  commitEdges: (edges) => commitFlowEdges(edges as Edge[]),
 })
 
 type FlowHistorySnapshot = ReturnType<typeof flowHistory.capture>
@@ -473,6 +476,9 @@ const boardPersistence = useFlowBoardPersistence({
   }),
   getViewport,
   setViewport,
+  commitNodes: (nodes) => commitFlowNodes(nodes as Node[]),
+  commitEdges: (edges) => commitFlowEdges(edges as Edge[]),
+  onGraphCommitted: syncFlowAfterGraphRestore,
 })
 
 const currentBoardId = boardPersistence.currentBoardId
@@ -525,6 +531,13 @@ function commitFlowNodesAppend(nextNodes: Node[]) {
         updateNodeInternals(nextNodes.map(n => n.id))
       })
     })
+  })
+}
+
+function syncFlowAfterGraphRestore() {
+  scheduleFlowNodeInternalsRefresh()
+  void nextTick(() => {
+    ensureFlowEdgeVisuals()
   })
 }
 
