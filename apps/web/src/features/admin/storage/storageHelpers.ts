@@ -14,7 +14,7 @@ export interface StorageCard {
   isCurrent: boolean
   builtin: boolean
   secretConfigured: boolean
-  config: Record<string, any>
+  config: Record<string, unknown>
 }
 
 export type ProviderMetaMap = Partial<Record<StorageProvider, StorageProviderMeta>>
@@ -37,11 +37,11 @@ export function providerSupportsTest(provider: StorageProvider, providerMap: Pro
 
 export function normalizeConfig(
   provider: StorageProvider,
-  config: Record<string, any> | undefined,
+  config: Record<string, unknown> | undefined,
   providerMap: ProviderMetaMap
 ) {
   const fields = providerMap[provider]?.fields || []
-  const next: Record<string, any> = {}
+  const next: Record<string, unknown> = {}
 
   for (const field of fields) {
     const raw = config?.[field.key]
@@ -109,7 +109,8 @@ function requiredFieldsFor(storage: StorageCard, providerMap: ProviderMetaMap) {
 
 function fieldSatisfied(storage: StorageCard, field: StorageProviderField) {
   if (field.type === 'switch') return true
-  const value = typeof storage.config[field.key] === 'string' ? storage.config[field.key].trim() : storage.config[field.key]
+  const raw = storage.config[field.key]
+  const value = typeof raw === 'string' ? raw.trim() : raw
   if (field.secret) {
     return Boolean(value || storage.secretConfigured)
   }
@@ -199,7 +200,7 @@ export function storageFeatureChips(storage: StorageCard) {
 
 export function buildPayload(profile: StorageCard, providerMap: ProviderMetaMap): StorageProfilePayload {
   const fields = providerMap[profile.provider]?.fields || []
-  const config: Record<string, any> = {}
+  const config: Record<string, unknown> = {}
 
   for (const field of fields) {
     const value = profile.config[field.key]

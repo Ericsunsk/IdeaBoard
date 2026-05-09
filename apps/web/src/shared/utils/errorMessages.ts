@@ -29,3 +29,9 @@ export function extractSafeApiErrorMessage(error: unknown, fallback: string): st
 export function sanitizeTaskErrorMessage(message: string | null | undefined, fallback = '上游图像服务调用失败'): string {
   return sanitizeApiErrorMessage(message, fallback)
 }
+
+/** Unified display helper: prefers Error.message first, then falls back to API-safe extraction. */
+export function formatDisplayErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) return sanitizeApiErrorMessage(error.message, fallback)
+  return extractSafeApiErrorMessage(error, fallback)
+}

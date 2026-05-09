@@ -2,7 +2,7 @@ import { computed, h, ref, watch } from 'vue'
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import { useMessage } from 'naive-ui'
 import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../../shared/api/storage'
-import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import { queryKeys } from '../../../shared/query/keys'
 import {
   applyStorageProfile,
@@ -44,9 +44,6 @@ function vendorAccessLabel(vendor: VendorPresetOption) {
   return vendor.provider === 'kodo' ? '原生接入' : 'S3-compatible'
 }
 
-function safeErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : extractSafeApiErrorMessage(error, fallback)
-}
 
 export function useStorageManager() {
   const message = useMessage()
@@ -78,12 +75,6 @@ export function useStorageManager() {
     mutationFn: fetchStorageBucketDomains,
   })
 
-  const loading = computed(() =>
-    providersQuery.isLoading.value ||
-    providersQuery.isFetching.value ||
-    profilesQuery.isLoading.value ||
-    profilesQuery.isFetching.value,
-  )
   const saving = ref(false)
   const savingAndApplying = ref(false)
   const fetching = ref(false)
@@ -117,7 +108,7 @@ export function useStorageManager() {
   watch(
     () => providersQuery.error.value || profilesQuery.error.value,
     (error) => {
-      if (error) message.error(safeErrorMessage(error, '加载存储配置失败'))
+      if (error) message.error(formatDisplayErrorMessage(error, '加载存储配置失败'))
     },
   )
 
@@ -321,7 +312,7 @@ export function useStorageManager() {
       if (!saved) return
       closeEditor()
     } catch (error) {
-      message.error(safeErrorMessage(error, '保存失败'))
+      message.error(formatDisplayErrorMessage(error, '保存失败'))
     } finally {
       saving.value = false
     }
@@ -337,7 +328,7 @@ export function useStorageManager() {
       message.success(response.message || '已设为当前存储')
       closeEditor()
     } catch (error) {
-      message.error(safeErrorMessage(error, '设为当前失败'))
+      message.error(formatDisplayErrorMessage(error, '设为当前失败'))
     } finally {
       savingAndApplying.value = false
     }
@@ -349,7 +340,7 @@ export function useStorageManager() {
       const response = await applyProfileMutation.mutateAsync(id)
       message.success(response.message || '已设为当前存储')
     } catch (error) {
-      message.error(safeErrorMessage(error, '设为当前失败'))
+      message.error(formatDisplayErrorMessage(error, '设为当前失败'))
     } finally {
       applyingId.value = null
     }
@@ -361,7 +352,7 @@ export function useStorageManager() {
       const response = await testProfileMutation.mutateAsync(storage.id)
       message.success(response.message || '连接成功')
     } catch (error) {
-      message.error(safeErrorMessage(error, '连接失败'))
+      message.error(formatDisplayErrorMessage(error, '连接失败'))
     } finally {
       testingId.value = null
     }
@@ -383,7 +374,7 @@ export function useStorageManager() {
         message.warning('未检测到绑定域名')
       }
     } catch (error) {
-      message.error(safeErrorMessage(error, '获取失败'))
+      message.error(formatDisplayErrorMessage(error, '获取失败'))
     } finally {
       fetching.value = false
     }
@@ -395,12 +386,11 @@ export function useStorageManager() {
       message.success(response.message || '删除成功')
       if (editingId.value === id) closeEditor()
     } catch (error) {
-      message.error(safeErrorMessage(error, '删除失败'))
+      message.error(formatDisplayErrorMessage(error, '删除失败'))
     }
   }
 
   return {
-    loading,
     saving,
     savingAndApplying,
     fetching,
@@ -408,7 +398,6 @@ export function useStorageManager() {
     testingId,
     editorOpen,
     editorMode,
-    editingId,
     selectedVendorKey,
     storages,
     bucketDomains,

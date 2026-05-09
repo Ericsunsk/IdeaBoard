@@ -171,7 +171,7 @@ import {
 import type { DataTableColumns } from 'naive-ui'
 import type { User } from '../../../shared/types'
 import { formatDateOnly } from '../../../shared/utils/dateTime'
-import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import { queryKeys } from '../../../shared/query/keys'
 import {
   deleteAdminUser,
@@ -274,21 +274,18 @@ const banForm = ref({
   reason: ''
 })
 
-function safeErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : extractSafeApiErrorMessage(error, fallback)
-}
 
 watch(
   () => usersQuery.error.value,
   (error) => {
-    if (error) message.error(safeErrorMessage(error, '加载用户失败'))
+    if (error) message.error(formatDisplayErrorMessage(error, '加载用户失败'))
   },
 )
 
 watch(
   () => registrationSettingQuery.error.value || rateLimitSettingsQuery.error.value,
   (error) => {
-    if (error) message.error(safeErrorMessage(error, '加载后台配置失败'))
+    if (error) message.error(formatDisplayErrorMessage(error, '加载后台配置失败'))
   },
 )
 
@@ -439,7 +436,7 @@ async function handleSaveRateLimit() {
     })
     message.success('限流配置已保存')
   } catch (error) {
-    message.error(safeErrorMessage(error, '保存失败'))
+    message.error(formatDisplayErrorMessage(error, '保存失败'))
   }
 }
 
@@ -450,7 +447,7 @@ async function handleToggleRegistration(newValue: boolean) {
     message.success(newValue ? '已开放注册' : '已关闭注册')
   } catch (error) {
     registrationEnabled.value = fallbackEnabled
-    message.error(safeErrorMessage(error, '更新注册状态失败'))
+    message.error(formatDisplayErrorMessage(error, '更新注册状态失败'))
   }
 }
 
@@ -524,7 +521,7 @@ const confirmBanUser = async () => {
     message.success(`已高级封禁用户 ${row.username}`)
     showBanModal.value = false
   } catch (err: any) {
-    message.error(err?.message || safeErrorMessage(err, extractBetterAuthErrorMessage(err, '封禁失败')))
+    message.error(err?.message || formatDisplayErrorMessage(err, extractBetterAuthErrorMessage(err, '封禁失败')))
   } finally {
     banFormLoading.value = false
   }
@@ -575,7 +572,7 @@ function handleDeleteUser(row: User) {
         await deleteUserMutation.mutateAsync(row.id)
         message.success('用户已受控彻底注销')
       } catch (err: any) {
-        message.error(safeErrorMessage(err, '注销失败'))
+        message.error(formatDisplayErrorMessage(err, '注销失败'))
       }
     }
   })
@@ -595,7 +592,7 @@ function handleToggleRole(row: User) {
         await updateUserRoleMutation.mutateAsync({ id: row.id, role: nextRole })
         message.success(nextRole === 'admin' ? '已设为管理员' : '已取消管理员')
       } catch (err: any) {
-        message.error(safeErrorMessage(err, '角色更新失败'))
+        message.error(formatDisplayErrorMessage(err, '角色更新失败'))
       }
     }
   })

@@ -300,7 +300,6 @@ const {
     testingId,
     editorOpen,
     editorMode,
-    editingId,
     selectedVendorKey,
     storages,
     bucketDomains,

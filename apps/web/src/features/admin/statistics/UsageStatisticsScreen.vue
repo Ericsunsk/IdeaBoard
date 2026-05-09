@@ -475,7 +475,6 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
 import { 
   NDataTable, NProgress, NTooltip, NButton, NIcon, NPopover, NInputNumber, 
   NForm, NFormItem, NModal, NSelect, NPagination, NImage, NInput, 
@@ -534,7 +533,6 @@ const {
   configuredChannels,
   timeRange,
   rangeOptions,
-  loadStatistics,
   backfillStatus,
   needsBackfill,
   backfillLoading,
@@ -592,14 +590,5 @@ async function handleBackfill() {
     message.error(result.message || '统计补录失败')
   }
 }
-
-watch(timeRange, () => {
-  void loadStatistics()
-})
-
-onMounted(() => {
-  void loadTasks()
-  void loadStatistics()
-})
 
 </script>

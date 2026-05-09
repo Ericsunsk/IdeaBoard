@@ -67,7 +67,7 @@
         </div>
 
         <n-input
-          :ref="(el: any) => { if (el) textareaRefs[item.slug] = el }"
+          :ref="(el) => bindTextareaRef(item.slug, el)"
           v-model:value="promptMap[item.slug]"
           type="textarea"
           :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
@@ -88,6 +88,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
+import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import { NInput, NButton, useMessage } from 'naive-ui'
 import AdminEditorModal from '../shared/components/AdminEditorModal.vue'
@@ -112,7 +113,8 @@ import {
 const message = useMessage()
 
 // textarea 引用 + 插入逻辑
-const textareaRefs = reactive<Record<string, any>>({})
+type TextareaRefLike = { textareaElRef?: HTMLTextAreaElement; $el?: Element }
+const textareaRefs = reactive<Record<string, TextareaRefLike>>({})
 const activeGroupKey = ref<string | null>(null)
 const activeGroup = computed<FeatureGroup | null>(() => {
   return groupedFeatureGroups.find((group) => group.key === activeGroupKey.value) || null
@@ -152,6 +154,10 @@ function insertVar(slug: FeatureSlug, varKey: string) {
   promptMap[slug] = current.slice(0, pos) + varKey + current.slice(pos)
 }
 
+function bindTextareaRef(slug: FeatureSlug, el: unknown) {
+  if (el) textareaRefs[slug] = el as TextareaRefLike
+}
+
 const promptMap = reactive<Record<string, string>>({})
 const savedPromptMap = reactive<Record<string, string>>({})
 const saving = reactive<Record<string, boolean>>({})
@@ -170,7 +176,7 @@ const savePromptMutation = useMutation({
 watch(
   () => promptsQuery.error.value,
   (error) => {
-    if (error) message.error(error instanceof Error ? error.message : '加载提示词失败')
+    if (error) message.error(formatDisplayErrorMessage(error, '加载提示词失败'))
   },
 )
 
@@ -204,7 +210,7 @@ async function savePrompt(slug: FeatureSlug) {
     await savePromptMutation.mutateAsync({ slug, prompt: promptMap[slug] || '' })
     message.success(`「${featureMap[slug].title}」提示词已保存`)
   } catch (error) {
-    message.error(error instanceof Error ? error.message : '保存失败')
+    message.error(formatDisplayErrorMessage(error, '保存失败'))
   } finally {
     saving[slug] = false
   }
