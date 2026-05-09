@@ -3,7 +3,7 @@ import { buildExecutionTaskRequest, EXECUTION_WEAR_META } from '../config/execut
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import type { MaskNodeItem, WearNodeItem } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
-import { taskApi } from '../../../shared/api'
+import { taskApi } from '../../../shared/api/task'
 import { cleanupFlowExecutionMaskAsset, resolveFlowExecutionMaskAsset } from './flowMaskProcessing'
 import { parseHandlePort, resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
 

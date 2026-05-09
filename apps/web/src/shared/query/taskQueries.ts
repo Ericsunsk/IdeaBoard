@@ -1,7 +1,8 @@
 import { queryClient } from './queryClient'
 import { queryKeys } from './keys'
-import { taskApi } from '../api'
-import { accountApi } from '../api/account'
+import { taskApi } from '../api/task'
+import { adminTaskApi } from '../api/adminTask'
+import { monitorApi } from '../api/monitor'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { extractImageUrlsFromTaskResult } from './taskResult'
 
@@ -32,11 +33,11 @@ export async function fetchUserTasks(params: { page?: number; page_size?: number
 export async function fetchAdminTasks(params: {
   page?: number; page_size?: number; status?: string; user_id?: number; keyword?: string
 }) {
-  return accountApi.listAdminTasks(params)
+  return adminTaskApi.list(params)
 }
 
 export async function fetchAdminMonitor() {
-  return accountApi.getMonitor()
+  return monitorApi.get()
 }
 
 /**

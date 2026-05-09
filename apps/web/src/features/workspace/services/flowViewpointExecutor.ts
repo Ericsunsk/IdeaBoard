@@ -2,7 +2,7 @@ import { buildExecutionTaskRequest, EXECUTION_VIEWPOINT_META } from '../config/e
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import type { PromptNodeItem, ViewpointNodeItem } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
-import { taskApi } from '../../../shared/api'
+import { taskApi } from '../../../shared/api/task'
 import { resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
 
 interface FlowViewpointNodeContext {

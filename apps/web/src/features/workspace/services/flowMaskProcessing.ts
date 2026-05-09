@@ -1,5 +1,5 @@
 import type { MaskNodeItem } from '../types/canvasNodes'
-import { uploadApi } from '../../../shared/api'
+import { uploadApi } from '../../../shared/api/upload'
 import { ensureFlowMaskImageUrl } from './flowMediaUpload'
 import { isDataUrl, resolveFetchUrl } from './flowMediaIO'
 

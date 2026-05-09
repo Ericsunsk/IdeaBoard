@@ -1,8 +1,21 @@
-import api from './index'
-import type { ApiResponse } from '../types'
-import type { Channel, ChannelFormData } from './index'
+import api from './client'
+import type { ApiResponse } from './types'
 
-export type { Channel }
+export interface Channel {
+  id: number
+  type: string
+  name: string
+  api_url: string
+  status: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ChannelFormData {
+  type: string
+  name: string
+  api_url: string
+}
 
 export type DetectModelsRequest = {
   base_url: string

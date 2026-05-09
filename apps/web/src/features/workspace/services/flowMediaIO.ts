@@ -1,6 +1,6 @@
 /** Shared media URL/Blob/Canvas utilities used across workspace services. */
 import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
-import { uploadApi } from '../../../shared/api'
+import { uploadApi } from '../../../shared/api/upload'
 
 /**
  * Returns true if the value is a data: URL.

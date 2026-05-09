@@ -1,4 +1,4 @@
-import { uploadApi } from '../../../shared/api'
+import { uploadApi } from '../../../shared/api/upload'
 import { canvasToBlob, resolveFetchUrl, uploadWorkspaceBlob } from './flowMediaIO'
 
 export const FLOW_LOCAL_INPAINT_PADDING = 128

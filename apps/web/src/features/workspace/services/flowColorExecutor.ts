@@ -10,7 +10,7 @@ import {
   type PromptNodeItem,
 } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
-import { taskApi } from '../../../shared/api'
+import { taskApi } from '../../../shared/api/task'
 import { cleanupFlowExecutionMaskAsset, resolveFlowExecutionMaskAsset } from './flowMaskProcessing'
 import { cleanupFlowLocalInpaintAssets, composeFlowLocalInpaint, prepareFlowLocalInpaint } from './flowLocalInpaint'
 import { parseHandlePort, resolveConnectedExecutionInput, resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'

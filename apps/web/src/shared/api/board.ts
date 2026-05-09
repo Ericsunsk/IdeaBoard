@@ -1,5 +1,5 @@
-import api from './index'
-import type { ApiResponse } from '../types'
+import api from './client'
+import type { ApiResponse } from './types'
 
 export interface UserBoardPayload {
   board_id: string

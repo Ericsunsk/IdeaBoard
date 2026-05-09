@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import { taskApi, vectorizeApi } from '../../../shared/api'
+import { taskApi } from '../../../shared/api/task'
+import { vectorizeApi } from '../../../shared/api/vectorize'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   buildExecutionTaskRequest,

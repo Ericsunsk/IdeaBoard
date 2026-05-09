@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User } from '../../shared/types'
-import { userApi } from '../../shared/api'
+import { userApi } from '../../shared/api/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../shared/auth/client'
 import {
   getStoredUser,

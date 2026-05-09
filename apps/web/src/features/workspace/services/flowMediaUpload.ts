@@ -1,4 +1,4 @@
-import { uploadApi } from '../../../shared/api'
+import { uploadApi } from '../../../shared/api/upload'
 import { isDataUrl } from './flowMediaIO'
 
 interface EnsureFlowMaskImageUrlOptions {

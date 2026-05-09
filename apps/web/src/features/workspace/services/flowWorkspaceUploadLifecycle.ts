@@ -1,5 +1,5 @@
 import { collectCanvasBoardImageUrls, getCanvasBoardState, isImageUrlReferencedInOtherCanvasBoardStates } from '../../boards/lib/canvasBoardState'
-import { uploadApi } from '../../../shared/api'
+import { uploadApi } from '../../../shared/api/upload'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl, toAbsoluteUrl } from './flowMediaIO'
 

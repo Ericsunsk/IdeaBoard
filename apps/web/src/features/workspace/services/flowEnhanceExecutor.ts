@@ -3,7 +3,7 @@ import { enhanceModeSupportsMask, enhanceModeSupportsPrompt } from '../config/ca
 import { buildExecutionSizeParams, extendExecutionImageSize, scaleExecutionImageSize } from '../utils/executionSizeParams'
 import type { EnhanceNodeItem, MaskNodeItem, PromptNodeItem } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
-import { taskApi } from '../../../shared/api'
+import { taskApi } from '../../../shared/api/task'
 import { cleanupFlowExecutionMaskAsset, resolveFlowExecutionMaskAsset } from './flowMaskProcessing'
 import { resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
 

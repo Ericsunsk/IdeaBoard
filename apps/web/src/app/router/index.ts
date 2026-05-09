@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import { userApi } from '../../shared/api'
+import { userApi } from '../../shared/api/user'
 import { getStoredUser, clearStoredAuth, setStoredAuth } from '../../shared/utils/auth'
 
 const routes: RouteRecordRaw[] = [

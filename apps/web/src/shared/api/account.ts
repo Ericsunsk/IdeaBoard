@@ -1,6 +1,9 @@
-import api from './index'
-import type { Task as BaseTask, SubmitTaskData } from './index'
-import type { ApiResponse } from '../types'
+import api from './client'
+import type { Task as BaseTask, SubmitTaskData } from './task'
+import type { ApiResponse } from './types'
+import { taskApi } from './task'
+import { adminTaskApi } from './adminTask'
+import { monitorApi } from './monitor'
 
 export type Task = BaseTask
 export type SubmitTaskRequest = SubmitTaskData
@@ -122,23 +125,23 @@ export interface AdminStatisticsResponse {
 
 // User task APIs - backend uses /api/user/drawing/...
 export const submitTask = (data: SubmitTaskRequest): Promise<ApiResponse<{ task_id: string }>> =>
-  api.post('/user/drawing/submit', data) as any
+  taskApi.submit(data)
 
 export const getTask = (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
-  api.get('/user/drawing/' + task_id) as any
+  taskApi.get(task_id)
 
 export const listTasks = (params?: { page?: number; page_size?: number }): Promise<ApiResponse<TaskListResponse>> =>
-  api.get('/user/drawing', { params }) as any
+  taskApi.list(params) as Promise<ApiResponse<TaskListResponse>>
 
 // Admin task APIs - backend uses /api/admin/tasks/...
 export const submitAdminTask = (data: SubmitTaskRequest): Promise<ApiResponse<{ task_id: string }>> =>
-  api.post('/admin/tasks/submit', data) as any
+  adminTaskApi.submit(data)
 
 export const getAdminTask = (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
-  api.get('/admin/tasks/' + task_id) as any
+  adminTaskApi.get(task_id)
 
 export const listAdminTasks = (params?: { page?: number; page_size?: number; status?: string; user_id?: number; keyword?: string }): Promise<ApiResponse<TaskListResponse>> =>
-  api.get('/admin/tasks', { params }) as any
+  adminTaskApi.list(params) as Promise<ApiResponse<TaskListResponse>>
 
 // Account management APIs
 export const createAccount = (data: CreateAccountRequest): Promise<ApiResponse<{ account: ApiAccount }>> =>
@@ -160,7 +163,7 @@ export const stopAccount = (id: number): Promise<ApiResponse<null>> =>
   api.post('/admin/accounts/' + id + '/stop') as any
 
 export const getMonitor = (): Promise<ApiResponse<MonitorResponse>> =>
-  api.get('/admin/monitor') as any
+  monitorApi.get() as Promise<ApiResponse<MonitorResponse>>
 
 export const getAdminStatistics = (range: '7d' | '30d' | '1y'): Promise<ApiResponse<AdminStatisticsResponse>> =>
   api.get('/admin/statistics', { params: { range } }) as any
