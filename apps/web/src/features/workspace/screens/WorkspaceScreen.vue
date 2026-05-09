@@ -36,7 +36,6 @@
       <div class="tool-item" title="图·文生图" @click="onNavigateRequest('/user/picture')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M3 14l4-4 5 5 5-5 4 4"/></svg>
       </div>
-      <button v-if="isDev" type="button" class="tool-item debug-toggle" title="Debug" @click="debugPanelOpen = !debugPanelOpen">D</button>
     </aside>
 
     <div
@@ -187,31 +186,13 @@
       </div>
     </div>
 
-    <n-collapse-transition :show="isDev && debugPanelOpen">
-      <n-card class="workspace-flow-json" size="small" title="Flow Debug">
-        <div class="workspace-flow-debug-toolbar">
-          <span class="workspace-flow-save-state" :class="`is-${saveStateTag}`">{{ saveStateText }}</span>
-          <n-button size="tiny" :loading="isSavingBoard" :disabled="!canSaveBoard" @click="saveCurrentBoardSnapshot">保存</n-button>
-          <n-select v-model:value="createNodeKind" size="small" class="workspace-flow-node-kind" :options="createNodeOptions" />
-          <n-button size="tiny" @click="onAddNode">添加节点</n-button>
-          <n-button size="tiny" @click="importEmptyBoardSnapshot">导入空白</n-button>
-          <n-button size="tiny" :loading="isLoadingBoardSnapshot" @click="importBoardSnapshot">导入画布快照</n-button>
-          <n-button size="tiny" :type="snapshotView === 'flow' ? 'primary' : 'default'" @click="setSnapshotView('flow')">Flow JSON</n-button>
-          <n-button size="tiny" :type="snapshotView === 'board' ? 'primary' : 'default'" @click="setSnapshotView('board')">Board JSON</n-button>
-          <n-button size="tiny" @click="refreshSnapshot">刷新</n-button>
-          <n-button size="tiny" @click="copyJson">复制</n-button>
-        </div>
-        <pre>{{ snapshotText }}</pre>
-      </n-card>
-    </n-collapse-transition>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { NButton, NCard, NCollapseTransition, NSelect, useMessage } from 'naive-ui'
-import type { SelectMixedOption } from 'naive-ui/es/select/src/interface'
+import { useMessage } from 'naive-ui'
 import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api'
@@ -279,10 +260,20 @@ const {
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 const canvasWrapRef = ref<HTMLElement | null>(null)
-const snapshotText = ref('')
-const snapshotView = ref<'flow' | 'board'>('flow')
 const boardBaseSnapshot = ref<CanvasBoardSnapshot>(createEmptyCanvasBoardSnapshot())
-const debugPanelOpen = ref(false)
+
+const createNodeOptions: readonly { key: string; label: string; value: FlowCreatableNodeKind }[] = [
+  { key: 'prompt', label: 'Prompt', value: 'prompt' },
+  { key: 'image', label: 'Image', value: 'image' },
+  { key: 'edit', label: 'Edit', value: 'edit' },
+  { key: 'enhance', label: 'Enhance', value: 'enhance' },
+  { key: 'color', label: 'Color', value: 'color' },
+  { key: 'fusion', label: 'Fusion', value: 'fusion' },
+  { key: 'wear', label: 'Wear', value: 'wear' },
+  { key: 'mask', label: 'Mask', value: 'mask' },
+  { key: 'model', label: 'Model', value: 'model' },
+  { key: 'viewpoint', label: 'Viewpoint', value: 'viewpoint' },
+]
 const isLoadingBoardSnapshot = ref(false)
 const isSavingBoard = ref(false)
 const isDirty = ref(false)
@@ -617,18 +608,6 @@ const flowMaskEffectiveSourceCache = computed(() => {
   return cache
 })
 
-const createNodeOptions: SelectMixedOption[] = [
-  { label: 'Prompt', value: 'prompt' },
-  { label: 'Image', value: 'image' },
-  { label: 'Edit', value: 'edit' },
-  { label: 'Enhance', value: 'enhance' },
-  { label: 'Color', value: 'color' },
-  { label: 'Fusion', value: 'fusion' },
-  { label: 'Wear', value: 'wear' },
-  { label: 'Mask', value: 'mask' },
-  { label: 'Model', value: 'model' },
-  { label: 'Viewpoint', value: 'viewpoint' },
-]
 
 function canCreateNodeKind(kind: string): kind is FlowCreatableNodeKind {
   return createNodeOptions.some(item => item.value === kind)
@@ -653,22 +632,7 @@ const flowHistory = useFlowHistory({
 type FlowHistorySnapshot = ReturnType<typeof flowHistory.capture>
 
 function refreshSnapshot() {
-  if (snapshotView.value === 'flow') {
-    snapshotText.value = JSON.stringify(
-      {
-        nodes: nodes.value,
-        edges: edges.value,
-      },
-      null,
-      2,
-    )
-    return
-  }
-  const boardSnapshot = flowToCanvasBoardSnapshot({
-    nodes: nodes.value as unknown as FlowAdapterNode[],
-    edges: edges.value as unknown as FlowAdapterEdge[],
-  }, boardBaseSnapshot.value)
-  snapshotText.value = JSON.stringify(boardSnapshot, null, 2)
+  // No-op: debug panel removed
 }
 
 const boardPersistence = useFlowBoardPersistence({
@@ -732,27 +696,6 @@ const {
   confirmFlowLeave,
   skipNextLeaveConfirm: { get value() { return skipNextLeaveConfirm }, set value(v: boolean) { skipNextLeaveConfirm = v } },
 })
-
-const saveStateTag = computed<'dirty' | 'saved' | 'failed'>(() => {
-  if (!canSaveBoard.value) return 'failed'
-  if (saveStatus.value === 'saved') return 'saved'
-  if (saveStatus.value === 'failed') return 'failed'
-  return isDirty.value ? 'dirty' : 'saved'
-})
-
-const saveStateText = computed(() => {
-  if (!canSaveBoard.value) {
-    return isLoadingBoardSnapshot.value ? '未启用保存（加载中）' : '未启用保存'
-  }
-  if (saveStatus.value === 'saved' && !isDirty.value) return '已保存'
-  if (saveStatus.value === 'failed') return '保存失败'
-  return '未保存修改'
-})
-
-function copyJson() {
-  void navigator.clipboard.writeText(snapshotText.value || '')
-  message.success('已复制 JSON')
-}
 
 function onAddNode() {
   const viewport = getViewport()
@@ -1316,11 +1259,6 @@ const { getFlowNodeUiStateCached } = useFlowNodeUiState({
   isFlowExecutionNodeRunning,
 })
 
-function setSnapshotView(view: 'flow' | 'board') {
-  snapshotView.value = view
-  refreshSnapshot()
-}
-
 watch(
   () => (edges.value as Array<Edge & { selected?: boolean }>).map(edge => `${edge.id}:${edge.selected ? 1 : 0}:${edge.sourceHandle ?? ''}:${edge.targetHandle ?? ''}`).join('|'),
   () => {
@@ -1632,35 +1570,4 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.workspace-flow-json {
-  position: absolute;
-  left: 72px;
-  top: 24px;
-  z-index: 200;
-  width: min(720px, calc(100vw - 96px));
-}
-
-.workspace-flow-debug-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-  align-items: center;
-}
-
-.workspace-flow-json pre {
-  margin: 0;
-  max-height: 280px;
-  overflow: auto;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-@media (max-width: 900px) {
-  .workspace-flow-json {
-    left: 12px;
-    right: 12px;
-    width: auto;
-  }
-}
 </style>
