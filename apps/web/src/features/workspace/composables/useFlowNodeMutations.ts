@@ -1,12 +1,6 @@
 import type { Ref } from 'vue'
-import type { Connection, Edge, EdgeUpdateEvent, Node } from '@vue-flow/core'
+import type { Connection, Edge, Node } from '@vue-flow/core'
 import { normalizeHexColor } from '../components/nodes/colorPopoverUtils'
-import {
-  normalizeViewpointSelectionByCategory,
-  VIEWPOINT_LIGHTING_OPTIONS,
-  ENHANCE_UPSCALE_FACTOR_OPTIONS,
-} from '../components/nodes/nodeOptionConfig'
-import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
 import {
   createColorNodeAt,
   createEditNodeAt,
@@ -21,21 +15,14 @@ import {
 } from '../utils/canvasNodeFactory'
 import { getCanvasNodeVisibleInputPorts, getCanvasNodeVisibleOutputPorts } from '../config/canvasNodeConnectionContract'
 import { isFlowConnectionAllowed } from '../utils/flowConnectionAdapter'
-import { resolveFlowEdgeToneFromHandles } from '../utils/flowEdgeVisual'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
-import type { CanvasBoardSnapshot, EnhanceNodeItem, ViewpointNodeItem } from '../types/canvasNodes'
+import { patchFlowSnapshotParam } from '../utils/flowSnapshotParamMutations'
+import { useFlowConnectionMutations } from './useFlowConnectionMutations'
+import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 import {
   MAX_COLOR_NODE_SWATCHES,
-  clampEnhanceExtendPercent,
-  clampModelAngleYaw,
-  clampModelPoseStrength,
-  clampModelReferenceStrength,
-  clampWearOpacity,
-  clampWearRotation,
-  clampWearScale,
   isColorNodePlaceholderState,
   normalizeColorNodeColors,
-  normalizeWearTileMode,
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 
@@ -118,77 +105,17 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return isFlowConnectionAllowed(connection, lookupData)
   }
 
-  function onConnect(connection: Connection) {
-    if (!isValidConnection(connection)) {
-      options.onWarning('该连线不符合当前连接语义')
-      return
-    }
-    if (!connection.source || !connection.target) return
-    const tone = resolveFlowEdgeToneFromHandles(connection.sourceHandle, connection.targetHandle)
-    const nextEdge = {
-      ...connection,
-      id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      source: connection.source,
-      target: connection.target,
-      animated: false,
-      class: `tone-${tone}`,
-      data: { tone },
-    } as Edge
-    const before = options.captureHistory()
-    const existingEdges = options.edges.value as unknown as Edge[]
-    const filteredEdges = existingEdges.filter(edge => {
-      if (edge.target === connection.target && edge.targetHandle === connection.targetHandle) return false
-      if (
-        edge.source === connection.source
-        && edge.target === connection.target
-        && edge.sourceHandle === connection.sourceHandle
-        && edge.targetHandle === connection.targetHandle
-      ) return false
-      return true
-    })
-    options.commitEdges([...filteredEdges, nextEdge])
-    options.pushHistory(before)
-    options.markDirty()
-    options.refreshSnapshot()
-    markFlowExecutionNodeDirty(connection.target, { includeSelf: true })
-  }
-
-  function onEdgeUpdate(event: EdgeUpdateEvent) {
-    const { edge, connection } = event
-    if (!isValidConnection(connection)) {
-      options.onWarning('该连线不符合当前连接语义')
-      return
-    }
-    if (!connection.source || !connection.target) return
-    const before = options.captureHistory()
-    const tone = resolveFlowEdgeToneFromHandles(connection.sourceHandle, connection.targetHandle)
-    const nextEdges = (options.edges.value as unknown as Edge[])
-      .filter(item => (
-        item.id === edge.id
-        || !(
-          item.target === connection.target
-          && (item.targetHandle ?? null) === (connection.targetHandle ?? null)
-        )
-      ))
-      .map((item) => {
-        if (item.id !== edge.id) return item
-        const nextData = { ...((item.data ?? {}) as Record<string, unknown>), tone }
-        return {
-          ...item,
-          source: connection.source!,
-          target: connection.target!,
-          sourceHandle: connection.sourceHandle ?? null,
-          targetHandle: connection.targetHandle ?? null,
-          class: `tone-${tone}`,
-          data: nextData,
-        } as Edge
-      })
-    options.commitEdges(nextEdges)
-    options.pushHistory(before)
-    options.markDirty()
-    options.refreshSnapshot()
-    markFlowExecutionNodeDirty(connection.target, { includeSelf: true })
-  }
+  const connectionMutations = useFlowConnectionMutations({
+    edges: options.edges,
+    isValidConnection,
+    captureHistory: options.captureHistory,
+    pushHistory: options.pushHistory,
+    commitEdges: options.commitEdges,
+    markDirty: options.markDirty,
+    refreshSnapshot: options.refreshSnapshot,
+    onWarning: options.onWarning,
+    markFlowExecutionNodeDirty,
+  })
 
   function onAddNode() {
     const kind = options.createNodeKind.value
@@ -308,163 +235,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   }
 
   function onFlowNodeParamUpdate(nodeId: string, payload: { key: string; value: unknown }) {
-    const { key, value } = payload
-    updateSnapshotNode(nodeId, (snapshotNode) => {
-      switch (key) {
-        case 'mode':
-          if (snapshotNode.mode === value) return snapshotNode
-          return { ...snapshotNode, mode: value }
-        case 'upscaleMode':
-          if (snapshotNode.upscaleMode === value) return snapshotNode
-          return { ...snapshotNode, upscaleMode: value }
-        case 'upscaleFactor':
-          if (ENHANCE_UPSCALE_FACTOR_OPTIONS.includes(value as EnhanceNodeItem['upscaleFactor'])) {
-            if (snapshotNode.upscaleFactor === value) return snapshotNode
-            return { ...snapshotNode, upscaleFactor: value }
-          }
-          return snapshotNode
-        case 'outputFormat':
-          if (snapshotNode.outputFormat === value) return snapshotNode
-          return { ...snapshotNode, outputFormat: value }
-        case 'outputQuality':
-          {
-            const nextOutputQuality = Math.max(30, Math.min(100, Math.round(Number(value) || 0)))
-            if (snapshotNode.outputQuality === nextOutputQuality) return snapshotNode
-            return { ...snapshotNode, outputQuality: nextOutputQuality }
-          }
-        case 'extendTop':
-          {
-            const nextExtendTop = clampEnhanceExtendPercent(value)
-            if (snapshotNode.extendTop === nextExtendTop) return snapshotNode
-            return { ...snapshotNode, extendTop: nextExtendTop }
-          }
-        case 'extendRight':
-          {
-            const nextExtendRight = clampEnhanceExtendPercent(value)
-            if (snapshotNode.extendRight === nextExtendRight) return snapshotNode
-            return { ...snapshotNode, extendRight: nextExtendRight }
-          }
-        case 'extendBottom':
-          {
-            const nextExtendBottom = clampEnhanceExtendPercent(value)
-            if (snapshotNode.extendBottom === nextExtendBottom) return snapshotNode
-            return { ...snapshotNode, extendBottom: nextExtendBottom }
-          }
-        case 'extendLeft':
-          {
-            const nextExtendLeft = clampEnhanceExtendPercent(value)
-            if (snapshotNode.extendLeft === nextExtendLeft) return snapshotNode
-            return { ...snapshotNode, extendLeft: nextExtendLeft }
-          }
-        case 'strength':
-          {
-            const nextStrength = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
-            if (snapshotNode.strength === nextStrength) return snapshotNode
-            return { ...snapshotNode, strength: nextStrength }
-          }
-        case 'blendRatio':
-          {
-            const nextBlendRatio = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
-            if (snapshotNode.blendRatio === nextBlendRatio) return snapshotNode
-            return { ...snapshotNode, blendRatio: nextBlendRatio }
-          }
-        case 'tileMode':
-          {
-            const nextTileMode = normalizeWearTileMode(value)
-            if (snapshotNode.tileMode === nextTileMode) return snapshotNode
-            return { ...snapshotNode, tileMode: nextTileMode }
-          }
-        case 'rotation':
-          {
-            const nextRotation = clampWearRotation(value)
-            if (snapshotNode.rotation === nextRotation) return snapshotNode
-            return { ...snapshotNode, rotation: nextRotation }
-          }
-        case 'scale':
-          {
-            const nextScale = clampWearScale(value)
-            if (snapshotNode.scale === nextScale) return snapshotNode
-            return { ...snapshotNode, scale: nextScale }
-          }
-        case 'opacity':
-          {
-            const nextOpacity = clampWearOpacity(value)
-            if (snapshotNode.opacity === nextOpacity) return snapshotNode
-            return { ...snapshotNode, opacity: nextOpacity }
-          }
-        case 'angleSpec.yaw':
-          {
-            const nextYaw = clampModelAngleYaw(value)
-            const nextAngleSpec = { ...(snapshotNode.angleSpec ?? {}), yaw: nextYaw }
-            const prevAngleSpec = snapshotNode.angleSpec ?? {}
-            if (prevAngleSpec.yaw === nextYaw) return snapshotNode
-            return { ...snapshotNode, angleSpec: nextAngleSpec }
-          }
-        case 'angleSpec.framing':
-          {
-            const prevAngleSpec = snapshotNode.angleSpec ?? {}
-            if (prevAngleSpec.framing === value) return snapshotNode
-            return { ...snapshotNode, angleSpec: { ...prevAngleSpec, framing: value } }
-          }
-        case 'modelStrength':
-          {
-            const nextModelStrength = clampModelReferenceStrength(value)
-            if (snapshotNode.modelStrength === nextModelStrength) return snapshotNode
-            return { ...snapshotNode, modelStrength: nextModelStrength }
-          }
-        case 'poseStrength':
-          {
-            const nextPoseStrength = clampModelPoseStrength(value)
-            if (snapshotNode.poseStrength === nextPoseStrength) return snapshotNode
-            return { ...snapshotNode, poseStrength: nextPoseStrength }
-          }
-        case 'background':
-          if (snapshotNode.background === value) return snapshotNode
-          return { ...snapshotNode, background: value }
-        case 'activeCategory': {
-          const category = value as ViewpointNodeItem['activeCategory']
-          const nextSelectedViewpoint = normalizeViewpointSelectionByCategory(category, String(snapshotNode.selectedViewpoint ?? ''))
-          if (snapshotNode.activeCategory === category && snapshotNode.selectedViewpoint === nextSelectedViewpoint) {
-            return snapshotNode
-          }
-          return { ...snapshotNode, activeCategory: category, selectedViewpoint: nextSelectedViewpoint }
-        }
-        case 'selectedViewpoint':
-          {
-            const nextSelectedViewpoint = String(value ?? '')
-            if (snapshotNode.selectedViewpoint === nextSelectedViewpoint) return snapshotNode
-            return { ...snapshotNode, selectedViewpoint: nextSelectedViewpoint }
-          }
-        case 'lighting': {
-          const allowed = VIEWPOINT_LIGHTING_OPTIONS.some((option: { value: string }) => option.value === value)
-          if (allowed) {
-            if (snapshotNode.lighting === value) return snapshotNode
-            return { ...snapshotNode, lighting: value }
-          }
-          return snapshotNode
-        }
-        case 'drawMode':
-          if (value === 'paint' || value === 'erase') {
-            if (snapshotNode.drawMode === value) return snapshotNode
-            return { ...snapshotNode, drawMode: value }
-          }
-          return snapshotNode
-        case 'brushSize':
-          {
-            const nextBrushSize = Math.max(4, Math.min(48, Math.round(Number(value) || 0)))
-            if (snapshotNode.brushSize === nextBrushSize) return snapshotNode
-            return { ...snapshotNode, brushSize: nextBrushSize }
-          }
-        case 'refineAmount':
-          {
-            const nextRefineAmount = clampMaskRefineAmount(Number(value) || 0)
-            if (snapshotNode.refineAmount === nextRefineAmount) return snapshotNode
-            return { ...snapshotNode, refineAmount: nextRefineAmount }
-          }
-        default:
-          return snapshotNode
-      }
-    })
+    updateSnapshotNode(nodeId, snapshotNode => patchFlowSnapshotParam(snapshotNode, payload))
   }
 
   function onFlowColorApplyPreset(nodeId: string, value: string[]) {
@@ -570,8 +341,8 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     isValidConnection,
     resolveNodePosition,
     createSnapshotNodeForKind,
-    onConnect,
-    onEdgeUpdate,
+    onConnect: connectionMutations.onConnect,
+    onEdgeUpdate: connectionMutations.onEdgeUpdate,
     onAddNode,
     createNodeAtPosition,
     onFlowDeleteNode,
