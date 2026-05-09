@@ -1,25 +1,62 @@
-import { ref, computed, type Ref } from 'vue'
-import accountApi from '../../../shared/api/account'
-import { adminStatisticsApi, type AdminStatisticsBackfillState } from '../../../shared/api/adminStatistics'
-import type { AdminStatisticsResponse } from '../../../shared/api/adminStatistics'
-import channelApi, { type Channel } from '../../../shared/api/channel'
+import { computed, nextTick, ref, type Ref } from 'vue'
+import { useMutation, useQuery } from '@tanstack/vue-query'
+import type { AdminStatisticsBackfillState, AdminStatisticsResponse } from '../../../shared/api/adminStatistics'
+import type { Channel } from '../../../shared/api/channel'
 import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { queryKeys } from '../../../shared/query/keys'
+import {
+  fetchAdminStatistics,
+  fetchAllAccounts,
+  fetchChannels,
+  invalidateAdminStatistics,
+  triggerAdminStatisticsBackfill,
+  type AdminStatisticsRange,
+} from '../../../shared/query/adminQueries'
 
 export type ConfiguredAccountLite = { model_set: string; platform: string; channel_id: number }
 type BackfillTriggerResult = { ok: boolean; message?: string }
 
+type RangeOption = { label: string; key: AdminStatisticsRange }
+
+function normalizeRange(range: string): AdminStatisticsRange {
+  return range === '30d' || range === '1y' ? range : '7d'
+}
+
 export function useUsageStatisticsData() {
-  const adminStatistics = ref<AdminStatisticsResponse | null>(null)
-  const configuredAccounts = ref<ConfiguredAccountLite[]>([])
-  const configuredChannels = ref<Channel[]>([])
-  const timeRange = ref('7d')
-  const backfillLoading = ref(false)
-  const rangeOptions = [
+  const timeRange = ref<AdminStatisticsRange>('7d')
+  const rangeOptions: RangeOption[] = [
     { label: '周', key: '7d' },
     { label: '月', key: '30d' },
     { label: '年', key: '1y' },
   ]
-  const ACCOUNT_PAGE_SIZE = 100
+
+  const statisticsQuery = useQuery({
+    queryKey: computed(() => queryKeys.admin.statistics(timeRange.value)),
+    queryFn: () => fetchAdminStatistics(timeRange.value),
+    placeholderData: (previous) => previous,
+  })
+
+  const channelsQuery = useQuery({
+    queryKey: queryKeys.admin.channels(),
+    queryFn: fetchChannels,
+  })
+
+  const accountsQuery = useQuery({
+    queryKey: queryKeys.admin.accounts({ page: 1, page_size: 100 }),
+    queryFn: () => fetchAllAccounts({ page: 1, page_size: 100 }),
+  })
+
+  const backfillMutation = useMutation({
+    mutationFn: () => triggerAdminStatisticsBackfill(timeRange.value),
+    onSuccess: async () => {
+      await invalidateAdminStatistics(timeRange.value)
+    },
+  })
+
+  const adminStatistics = computed<AdminStatisticsResponse | null>(() => statisticsQuery.data.value ?? null)
+  const configuredAccounts = computed<ConfiguredAccountLite[]>(() => accountsQuery.data.value?.accounts ?? [])
+  const configuredChannels = computed<Channel[]>(() => channelsQuery.data.value ?? [])
+  const backfillLoading = computed(() => backfillMutation.isPending.value)
 
   const backfillStatus = computed<AdminStatisticsBackfillState | null>(() => {
     return adminStatistics.value?.backfill_status ?? null
@@ -30,63 +67,27 @@ export function useUsageStatisticsData() {
     return !!s && s.missing_days > 0
   })
 
-  async function loadAllAccounts() {
-    const all: ConfiguredAccountLite[] = []
-    let page = 1
-    let total = Number.POSITIVE_INFINITY
-
-    while (true) {
-      const res = await accountApi.listAccounts({ page, page_size: ACCOUNT_PAGE_SIZE })
-      if (res.code !== 0) break
-      const list = (res.data?.list || []) as ConfiguredAccountLite[]
-      total = res.data?.total ?? total
-      all.push(...list)
-      if (all.length >= total || list.length === 0) break
-      page += 1
-    }
-
-    return all
-  }
-
   async function loadStatistics(targetRange?: Ref<string> | string) {
-    const activeRange = typeof targetRange === 'string' ? targetRange : (targetRange?.value || timeRange.value)
-    try {
-      const [statsRes, channelsRes, firstAccountsRes] = await Promise.all([
-        adminStatisticsApi.get(activeRange as '7d' | '30d' | '1y'),
-        channelApi.list(),
-        accountApi.listAccounts({ page: 1, page_size: ACCOUNT_PAGE_SIZE }),
-      ])
-      adminStatistics.value = statsRes.code === 0 ? (statsRes.data || null) : null
-      configuredChannels.value = channelsRes.code === 0 ? (channelsRes.data?.list || []) : []
-      configuredAccounts.value = firstAccountsRes.code === 0 ? ((firstAccountsRes.data?.list || []) as ConfiguredAccountLite[]) : []
-
-      if (firstAccountsRes.code === 0) {
-        const firstPage = (firstAccountsRes.data?.list || []) as ConfiguredAccountLite[]
-        const total = firstAccountsRes.data?.total || firstPage.length
-        if (firstPage.length < total) {
-          configuredAccounts.value = await loadAllAccounts()
-        }
-      }
-    } catch {
-      adminStatistics.value = null
-      configuredAccounts.value = []
-      configuredChannels.value = []
+    const nextRange = typeof targetRange === 'string' ? targetRange : targetRange?.value
+    if (nextRange) {
+      timeRange.value = normalizeRange(nextRange)
+      await nextTick()
     }
+    await Promise.all([
+      statisticsQuery.refetch(),
+      channelsQuery.refetch(),
+      accountsQuery.refetch(),
+    ])
   }
 
   async function triggerBackfill(): Promise<BackfillTriggerResult> {
-    backfillLoading.value = true
     try {
-      const res = await adminStatisticsApi.backfill(timeRange.value as '7d' | '30d' | '1y')
-      if (res.code === 0) {
-        await loadStatistics()
-        return { ok: true as const }
-      }
-      return { ok: false as const, message: res.msg || '补录失败' }
+      await backfillMutation.mutateAsync()
+      await statisticsQuery.refetch()
+      return { ok: true as const }
     } catch (error: unknown) {
-      return { ok: false as const, message: extractSafeApiErrorMessage(error, '补录失败') }
-    } finally {
-      backfillLoading.value = false
+      const fallback = error instanceof Error ? error.message : '补录失败'
+      return { ok: false as const, message: extractSafeApiErrorMessage(error, fallback) }
     }
   }
 

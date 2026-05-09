@@ -122,6 +122,7 @@ import {
   ListOutline,
 } from '@vicons/ionicons5'
 import { sanitizeApiErrorMessage, sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
+import { formatDurationSeconds } from '../../../shared/utils/dateTime'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 
 const records = ref<Task[]>([])
@@ -300,11 +301,7 @@ function getErrorReason(row: Task): string {
 
 function calcDuration(row: Task): string {
   if (!row.completed_at || !row.created_at) return '-'
-  const start = new Date(row.created_at).getTime()
-  const end = new Date(row.completed_at).getTime()
-  if (isNaN(start) || isNaN(end)) return '-'
-  const sec = Math.round((end - start) / 1000)
-  return sec >= 0 ? `${sec}s` : '-'
+  return formatDurationSeconds(row.created_at, row.completed_at)
 }
 
 const columns: DataTableColumns<Task> = [

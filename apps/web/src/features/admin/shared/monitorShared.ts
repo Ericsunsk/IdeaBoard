@@ -4,6 +4,7 @@ import { EyeOutline } from '@vicons/ionicons5'
 import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../shared/api/task'
 import { sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
+import { calcDurationSeconds, formatAdminDateTime } from '../../../shared/utils/dateTime'
 
 export interface AccountLoad {
   current_concurrent: number
@@ -106,11 +107,7 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
       key: 'created_at',
       width: 130,
       render: (row) => {
-        const d = new Date(row.created_at)
-        if (isNaN(d.getTime())) return row.created_at
-        const date = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`
-        const time = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-        return h('span', { style: { fontSize: '12px', color: 'var(--admin-text-1)', fontWeight: '500' } }, `${date}-${time}`)
+        return h('span', { style: { fontSize: '12px', color: 'var(--admin-text-1)', fontWeight: '500' } }, formatAdminDateTime(row.created_at, row.created_at))
       }
     },
     {
@@ -214,10 +211,8 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
       align: 'center',
       render: (row) => {
         if (!row.completed_at || !row.created_at) return h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
-        const start = new Date(row.created_at).getTime()
-        const end = new Date(row.completed_at).getTime()
-        if (isNaN(start) || isNaN(end)) return '-'
-        const sec = Math.round((end - start) / 1000)
+        const sec = calcDurationSeconds(row.created_at, row.completed_at)
+        if (sec == null) return '-'
         const color = sec > 60 ? 'var(--admin-danger)' : (sec > 30 ? 'var(--admin-warning)' : 'var(--admin-success)')
         return h('span', { style: { fontSize: '12px', color, fontWeight: '500' } }, `${sec}s`)
       }

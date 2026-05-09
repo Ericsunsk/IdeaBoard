@@ -87,10 +87,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import { NInput, NButton, useMessage } from 'naive-ui'
-import { featurePromptApi } from '../../../shared/api/featurePrompt'
 import AdminEditorModal from '../shared/components/AdminEditorModal.vue'
+import { queryKeys } from '../../../shared/query/keys'
+import {
+  fetchFeaturePrompts,
+  invalidateFeaturePrompts,
+  saveFeaturePrompt,
+} from '../../../shared/query/adminQueries'
 import {
   featureMap,
   groupedFeatureGroups,
@@ -149,7 +155,24 @@ function insertVar(slug: FeatureSlug, varKey: string) {
 const promptMap = reactive<Record<string, string>>({})
 const savedPromptMap = reactive<Record<string, string>>({})
 const saving = reactive<Record<string, boolean>>({})
-const loading = ref(false)
+const promptsQuery = useQuery({
+  queryKey: queryKeys.admin.featurePrompts(),
+  queryFn: fetchFeaturePrompts,
+})
+const savePromptMutation = useMutation({
+  mutationFn: saveFeaturePrompt,
+  onSuccess: async ({ slug, prompt }) => {
+    savedPromptMap[slug] = prompt
+    promptMap[slug] = prompt
+    await invalidateFeaturePrompts()
+  },
+})
+watch(
+  () => promptsQuery.error.value,
+  (error) => {
+    if (error) message.error(error instanceof Error ? error.message : '加载提示词失败')
+  },
+)
 
 function resetGroupDraftFromSaved(group: FeatureGroup) {
   for (const item of group.items) {
@@ -157,41 +180,35 @@ function resetGroupDraftFromSaved(group: FeatureGroup) {
   }
 }
 
-async function loadPrompts() {
-  loading.value = true
-  try {
-    const res: any = await featurePromptApi.adminList()
-    if (res.code === 0 && res.data?.prompts) {
-      for (const [slug, prompt] of Object.entries(res.data.prompts)) {
-        const val = (prompt as string) || ''
-        savedPromptMap[slug] = val
+watch(
+  () => promptsQuery.data.value,
+  (prompts) => {
+    if (!prompts) return
+    for (const [slug, prompt] of Object.entries(prompts)) {
+      const val = prompt || ''
+      const hadDraft = Object.prototype.hasOwnProperty.call(promptMap, slug)
+      const currentDraft = promptMap[slug] || ''
+      const previousSaved = savedPromptMap[slug] || ''
+      savedPromptMap[slug] = val
+      if (!hadDraft || currentDraft === previousSaved) {
         promptMap[slug] = val
       }
     }
-  } catch (error) {
-    console.error('[FeaturePromptConfig] Failed to load prompts', error)
-    message.error('加载提示词失败')
-  }
-  loading.value = false
-}
+  },
+  { immediate: true },
+)
 
 async function savePrompt(slug: FeatureSlug) {
   saving[slug] = true
   try {
-    const res: any = await featurePromptApi.adminSet(slug, promptMap[slug] || '')
-    if (res.code === 0) {
-      savedPromptMap[slug] = promptMap[slug] || ''
-      message.success(`「${featureMap[slug].title}」提示词已保存`)
-    } else {
-      message.error(res.msg || '保存失败')
-    }
-  } catch {
-    message.error('保存失败')
+    await savePromptMutation.mutateAsync({ slug, prompt: promptMap[slug] || '' })
+    message.success(`「${featureMap[slug].title}」提示词已保存`)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '保存失败')
+  } finally {
+    saving[slug] = false
   }
-  saving[slug] = false
 }
-
-onMounted(loadPrompts)
 </script>
 
 <style scoped>

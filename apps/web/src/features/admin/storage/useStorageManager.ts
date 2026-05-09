@@ -1,8 +1,19 @@
-import { computed, h, onMounted, ref } from 'vue'
+import { computed, h, ref, watch } from 'vue'
+import { useMutation, useQuery } from '@tanstack/vue-query'
 import { useMessage } from 'naive-ui'
-import { storageApi } from '../../../shared/api/storage'
 import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../../shared/api/storage'
 import { extractSafeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { queryKeys } from '../../../shared/query/keys'
+import {
+  applyStorageProfile,
+  deleteStorageProfile,
+  fetchStorageBucketDomains,
+  fetchStorageProfiles,
+  fetchStorageProviders,
+  invalidateStorageProfiles,
+  saveStorageProfile,
+  testStorageProfile,
+} from '../../../shared/query/adminQueries'
 import { buildVendorPresets, type VendorPresetOption } from './storageMeta'
 import {
   buildPayload,
@@ -33,10 +44,46 @@ function vendorAccessLabel(vendor: VendorPresetOption) {
   return vendor.provider === 'kodo' ? '原生接入' : 'S3-compatible'
 }
 
+function safeErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : extractSafeApiErrorMessage(error, fallback)
+}
+
 export function useStorageManager() {
   const message = useMessage()
 
-  const loading = ref(false)
+  const providersQuery = useQuery({
+    queryKey: queryKeys.admin.storage.providers(),
+    queryFn: fetchStorageProviders,
+  })
+  const profilesQuery = useQuery({
+    queryKey: queryKeys.admin.storage.profiles(),
+    queryFn: fetchStorageProfiles,
+  })
+  const saveProfileMutation = useMutation({
+    mutationFn: saveStorageProfile,
+    onSuccess: () => invalidateStorageProfiles(),
+  })
+  const applyProfileMutation = useMutation({
+    mutationFn: applyStorageProfile,
+    onSuccess: () => invalidateStorageProfiles(),
+  })
+  const testProfileMutation = useMutation({
+    mutationFn: testStorageProfile,
+  })
+  const deleteProfileMutation = useMutation({
+    mutationFn: deleteStorageProfile,
+    onSuccess: () => invalidateStorageProfiles(),
+  })
+  const bucketDomainsMutation = useMutation({
+    mutationFn: fetchStorageBucketDomains,
+  })
+
+  const loading = computed(() =>
+    providersQuery.isLoading.value ||
+    providersQuery.isFetching.value ||
+    profilesQuery.isLoading.value ||
+    profilesQuery.isFetching.value,
+  )
   const saving = ref(false)
   const savingAndApplying = ref(false)
   const fetching = ref(false)
@@ -47,12 +94,12 @@ export function useStorageManager() {
   const editingId = ref<string | null>(null)
   const selectedVendorKey = ref('kodo')
 
-  const providers = ref<StorageProviderMeta[]>([])
-  const storages = ref<StorageCard[]>([])
+  const providers = computed<StorageProviderMeta[]>(() => providersQuery.data.value ?? [])
   const bucketDomains = ref<string[]>([])
   const providerMap = computed(() => toProviderMetaMap(providers.value))
   const creatableProviders = computed(() => providers.value.filter((provider) => provider.create_allowed))
   const vendorPresets = computed(() => buildVendorPresets(providerMap.value, creatableProviders.value))
+  const storages = computed<StorageCard[]>(() => (profilesQuery.data.value ?? []).map(normalizeProfile))
   const form = ref<StorageCard>(createEmptyStorageProfile('kodo', providerMap.value))
   const selectedProviderMeta = computed(() => providerMap.value[form.value.provider])
   const textFields = computed(() => (selectedProviderMeta.value?.fields || []).filter((field) => field.type !== 'switch'))
@@ -65,6 +112,13 @@ export function useStorageManager() {
       disabled: !vendor.supported,
       vendor,
     }))
+  )
+
+  watch(
+    () => providersQuery.error.value || profilesQuery.error.value,
+    (error) => {
+      if (error) message.error(safeErrorMessage(error, '加载存储配置失败'))
+    },
   )
 
   function toChipVariant(status: string): 'neutral' | 'current' | 'enabled' | 'empty' {
@@ -237,66 +291,25 @@ export function useStorageManager() {
     bucketDomains.value = []
   }
 
-  async function loadStorageData() {
-    loading.value = true
-    try {
-      const [providersRes, profilesRes] = await Promise.all([
-        storageApi.getProviders(),
-        storageApi.getProfiles(),
-      ])
-
-      if (providersRes.code === 0 && providersRes.data?.providers) {
-        providers.value = providersRes.data.providers
-      }
-
-      if (profilesRes.code === 0 && profilesRes.data?.profiles) {
-        storages.value = profilesRes.data.profiles.map(normalizeProfile)
-      }
-    } catch (error) {
-      console.error('Failed to load storage profiles', error)
-      message.error('加载存储配置失败')
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function reloadProfiles() {
-    const response = await storageApi.getProfiles()
-    if (response.code === 0 && response.data?.profiles) {
-      storages.value = response.data.profiles.map(normalizeProfile)
-    }
-  }
-
   async function persistForm(showSuccess = true) {
     const payload = buildPayload(form.value, providerMap.value)
-    let response
-    if (editorMode.value === 'create') {
-      response = await storageApi.createProfile(payload)
-    } else {
-      const editId = editingId.value
-      if (!editId) {
-        message.error('未找到可编辑的存储配置')
-        return null
-      }
-      response = await storageApi.updateProfile(editId, payload)
-    }
-
-    if (response.code !== 0 || !response.data?.profile) {
-      message.error(response.msg || '保存失败')
+    const editId = editorMode.value === 'edit' ? editingId.value : undefined
+    if (editorMode.value === 'edit' && !editId) {
+      message.error('未找到可编辑的存储配置')
       return null
     }
 
-    const saved = normalizeProfile(response.data.profile)
+    const response = await saveProfileMutation.mutateAsync({ id: editId || undefined, payload })
+    const saved = normalizeProfile(response.profile)
     editorMode.value = 'edit'
     editingId.value = saved.id
     form.value = {
       ...saved,
       config: { ...saved.config },
     }
-    await reloadProfiles()
 
     if (showSuccess) {
-      message.success(response.data?.message || '保存成功')
+      message.success(response.message || '保存成功')
     }
     return saved
   }
@@ -308,7 +321,7 @@ export function useStorageManager() {
       if (!saved) return
       closeEditor()
     } catch (error) {
-      message.error(extractSafeApiErrorMessage(error, '保存失败'))
+      message.error(safeErrorMessage(error, '保存失败'))
     } finally {
       saving.value = false
     }
@@ -320,17 +333,11 @@ export function useStorageManager() {
       const saved = await persistForm(false)
       if (!saved) return
 
-      const response = await storageApi.applyProfile(saved.id)
-      if (response.code !== 0) {
-        message.error(response.msg || '设为当前失败')
-        return
-      }
-
-      await reloadProfiles()
-      message.success(response.data?.message || '已设为当前存储')
+      const response = await applyProfileMutation.mutateAsync(saved.id)
+      message.success(response.message || '已设为当前存储')
       closeEditor()
     } catch (error) {
-      message.error(extractSafeApiErrorMessage(error, '设为当前失败'))
+      message.error(safeErrorMessage(error, '设为当前失败'))
     } finally {
       savingAndApplying.value = false
     }
@@ -339,15 +346,10 @@ export function useStorageManager() {
   async function applyStorage(id: string) {
     applyingId.value = id
     try {
-      const response = await storageApi.applyProfile(id)
-      if (response.code === 0) {
-        await reloadProfiles()
-        message.success(response.data?.message || '已设为当前存储')
-      } else {
-        message.error(response.msg || '设为当前失败')
-      }
+      const response = await applyProfileMutation.mutateAsync(id)
+      message.success(response.message || '已设为当前存储')
     } catch (error) {
-      message.error(extractSafeApiErrorMessage(error, '设为当前失败'))
+      message.error(safeErrorMessage(error, '设为当前失败'))
     } finally {
       applyingId.value = null
     }
@@ -356,14 +358,10 @@ export function useStorageManager() {
   async function handleTest(storage: StorageCard) {
     testingId.value = storage.id
     try {
-      const response = await storageApi.testProfile(storage.id)
-      if (response.code === 0) {
-        message.success(response.data?.message || '连接成功')
-      } else {
-        message.error(response.msg || '连接失败')
-      }
+      const response = await testProfileMutation.mutateAsync(storage.id)
+      message.success(response.message || '连接成功')
     } catch (error) {
-      message.error(extractSafeApiErrorMessage(error, '连接失败'))
+      message.error(safeErrorMessage(error, '连接失败'))
     } finally {
       testingId.value = null
     }
@@ -377,15 +375,15 @@ export function useStorageManager() {
       const saved = await persistForm(false)
       if (!saved) return
 
-      const response = await storageApi.getBucketInfo(saved.id)
-      if (response.code === 0 && response.data?.info?.domains?.length) {
-        bucketDomains.value = response.data.info.domains
+      const domains = await bucketDomainsMutation.mutateAsync(saved.id)
+      if (domains.length > 0) {
+        bucketDomains.value = domains
         message.success(`检测到 ${bucketDomains.value.length} 个域名`)
       } else {
-        message.warning(response.msg || '未检测到绑定域名')
+        message.warning('未检测到绑定域名')
       }
     } catch (error) {
-      message.error(extractSafeApiErrorMessage(error, '获取失败'))
+      message.error(safeErrorMessage(error, '获取失败'))
     } finally {
       fetching.value = false
     }
@@ -393,20 +391,13 @@ export function useStorageManager() {
 
   async function removeProfile(id: string) {
     try {
-      const response = await storageApi.deleteProfile(id)
-      if (response.code === 0) {
-        storages.value = storages.value.filter((item) => item.id !== id)
-        message.success(response.data?.message || '删除成功')
-        if (editingId.value === id) closeEditor()
-      } else {
-        message.error(response.msg || '删除失败')
-      }
+      const response = await deleteProfileMutation.mutateAsync(id)
+      message.success(response.message || '删除成功')
+      if (editingId.value === id) closeEditor()
     } catch (error) {
-      message.error(extractSafeApiErrorMessage(error, '删除失败'))
+      message.error(safeErrorMessage(error, '删除失败'))
     }
   }
-
-  onMounted(loadStorageData)
 
   return {
     loading,

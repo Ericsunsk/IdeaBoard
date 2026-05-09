@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { sanitizeTaskErrorMessage, sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { formatAdminDateTime, formatDurationSeconds } from '../../../shared/utils/dateTime'
 import type { Task } from '../../../shared/api/task'
 
 const RESULT_MAX_STRING_LENGTH = 300
@@ -69,11 +70,7 @@ export function useTaskResultDetail(options: {
 
   function formatDateTime(timeStr: string | null | undefined): string {
     if (!timeStr) return '-'
-    const d = new Date(timeStr)
-    if (isNaN(d.getTime())) return timeStr
-    const datePart = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`
-    const timePart = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-    return `${datePart}-${timePart}`
+    return formatAdminDateTime(timeStr, timeStr)
   }
 
   function showDetail(row: Task) {
@@ -97,11 +94,7 @@ export function useTaskResultDetail(options: {
 
   function calcDuration(row: Task): string {
     if (!row.completed_at || !row.created_at) return '-'
-    const start = new Date(row.created_at).getTime()
-    const end = new Date(row.completed_at).getTime()
-    if (isNaN(start) || isNaN(end)) return '-'
-    const sec = Math.round((end - start) / 1000)
-    return sec >= 0 ? `${sec}s` : '-'
+    return formatDurationSeconds(row.created_at, row.completed_at)
   }
 
   return {
@@ -160,4 +153,3 @@ function sanitizeValue(value: unknown, depth: number, keyCountState = { count: 0
   }
   return String(value)
 }
-
