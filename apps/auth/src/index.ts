@@ -315,13 +315,6 @@ function buildRateLimitKey(req: Request, path: string): string {
 }
 
 function getRequestIP(req: Request): string {
-  const forwardedFor = String(req.headers['x-forwarded-for'] || '').trim()
-  if (forwardedFor) {
-    const candidate = forwardedFor.split(',')[0]?.trim()
-    if (candidate) return candidate
-  }
-  const realIP = String(req.headers['x-real-ip'] || '').trim()
-  if (realIP) return realIP
   const expressIP = String(req.ip || '').trim()
   if (expressIP) return expressIP
   const remoteIP = String(req.socket?.remoteAddress || '').trim()

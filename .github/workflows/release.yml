@@ -68,6 +68,18 @@ jobs:
         working-directory: apps/auth
         run: npm ci
 
+      - name: Audit web production dependencies
+        working-directory: apps/web
+        run: npm audit --omit=dev
+
+      - name: Audit auth production dependencies
+        working-directory: apps/auth
+        run: npm audit --omit=dev
+
+      - name: Test Go API
+        working-directory: apps/api
+        run: go test ./...
+
       - name: Build web archive
         shell: bash
         run: |
@@ -177,7 +189,7 @@ jobs:
               add_header X-XSS-Protection "1; mode=block" always;
               add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-              client_max_body_size 30m;
+              client_max_body_size 50m;
 
               root /opt/ideaboard/apps/web/dist;
               index index.html;

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -149,7 +150,7 @@ func Run(args []string) {
 		StorageService:       storageService,
 		UserRepo:             userRepo,
 		AuthServiceClient:    authServiceClient,
-		CORSMiddleware:       buildCORSMiddleware(cfg.App.Env),
+		CORSMiddleware:       buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 	}, frontendFS)
 
 	asynqHandler := worker.NewAsynqTaskHandler(
@@ -326,14 +327,37 @@ func requireAuthInternalKeyForProduction(cfg *config.Config) {
 	if !isProductionRuntime(cfg.App.Env) {
 		return
 	}
-	if strings.TrimSpace(cfg.Auth.InternalAPIKey) == "" {
+	internalKey := strings.TrimSpace(cfg.Auth.InternalAPIKey)
+	if internalKey == "" {
 		log.Fatal("[Config] AUTH_SERVICE_INTERNAL_KEY must be set when APP_ENV=production")
+	}
+	if isUnsafeProductionSecret(internalKey) {
+		log.Fatal("[Config] AUTH_SERVICE_INTERNAL_KEY must not use placeholder or development values in production")
 	}
 }
 
 func isProductionRuntime(env string) bool {
 	switch strings.ToLower(strings.TrimSpace(env)) {
 	case "prod", "production", "release":
+		return true
+	default:
+		return false
+	}
+}
+
+func isUnsafeProductionSecret(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return true
+	}
+	if strings.HasPrefix(normalized, "replace-with") {
+		return true
+	}
+	if strings.Contains(normalized, "change-before-production") {
+		return true
+	}
+	switch normalized {
+	case "changeme", "change-me", "password", "secret":
 		return true
 	default:
 		return false
@@ -456,16 +480,24 @@ func isIgnorableDuplicateIndexError(err error) bool {
 }
 
 // buildCORSMiddleware returns a Gin middleware for CORS handling.
-// In production, Nginx sets the required CORS headers so we return a no-op.
-// In non-production environments (local dev with Vite), the middleware sets
-// permissive CORS headers so the Vite dev server can call the API directly.
-func buildCORSMiddleware(appEnv string) gin.HandlerFunc {
-	if isProductionRuntime(appEnv) {
+// In production with no explicit allowlist, Nginx handles CORS so this is a no-op.
+// If origins are configured, enforce the same allowlist in every environment.
+func buildCORSMiddleware(appEnv string, allowedOrigins []string) gin.HandlerFunc {
+	allowed := buildAllowedOriginSet(allowedOrigins)
+	if len(allowedOrigins) == 0 && isProductionRuntime(appEnv) {
 		return func(c *gin.Context) { c.Next() }
 	}
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 		if origin == "" {
+			c.Next()
+			return
+		}
+		if !allowed[normalizeCORSOrigin(origin)] {
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
 			c.Next()
 			return
 		}
@@ -479,4 +511,32 @@ func buildCORSMiddleware(appEnv string) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+func buildAllowedOriginSet(origins []string) map[string]bool {
+	allowed := make(map[string]bool, len(origins))
+	for _, origin := range origins {
+		normalized := normalizeCORSOrigin(origin)
+		if normalized == "" {
+			continue
+		}
+		allowed[normalized] = true
+	}
+	return allowed
+}
+
+func normalizeCORSOrigin(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return ""
+	}
+	return scheme + "://" + strings.ToLower(parsed.Host)
 }

@@ -31,6 +31,9 @@ var ErrShareTokenExpired = errors.New("share token expired")
 var ErrShareTokenRevoked = errors.New("share token revoked")
 
 const maxBoardNameLen = 60
+const maxBoardIDLen = 100
+const maxBoardStateBytes = 8 * 1024 * 1024
+const maxBoardStateDepth = 32
 
 type BoardService struct {
 	repo             *BoardRepository
@@ -453,7 +456,17 @@ func ResolvePublicBaseURL(requestScheme, requestHost string) string {
 }
 
 func normalizeBoardID(boardID string) string {
-	return strings.TrimSpace(boardID)
+	normalized := strings.TrimSpace(boardID)
+	if normalized == "" || len([]byte(normalized)) > maxBoardIDLen {
+		return ""
+	}
+	for _, r := range normalized {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			continue
+		}
+		return ""
+	}
+	return normalized
 }
 
 func normalizeBoardName(name string) string {
@@ -501,11 +514,40 @@ func marshalState(state interface{}) (string, error) {
 	if state == nil {
 		return "null", nil
 	}
+	if boardJSONValueDepth(state) > maxBoardStateDepth {
+		return "", ErrInvalidBoardInput
+	}
 	payload, err := json.Marshal(state)
 	if err != nil {
 		return "", err
 	}
+	if len(payload) > maxBoardStateBytes {
+		return "", ErrInvalidBoardInput
+	}
 	return string(payload), nil
+}
+
+func boardJSONValueDepth(value interface{}) int {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		maxDepth := 1
+		for _, child := range v {
+			if depth := 1 + boardJSONValueDepth(child); depth > maxDepth {
+				maxDepth = depth
+			}
+		}
+		return maxDepth
+	case []interface{}:
+		maxDepth := 1
+		for _, child := range v {
+			if depth := 1 + boardJSONValueDepth(child); depth > maxDepth {
+				maxDepth = depth
+			}
+		}
+		return maxDepth
+	default:
+		return 1
+	}
 }
 
 func resolveClientTime(raw *int64, fallback time.Time) time.Time {

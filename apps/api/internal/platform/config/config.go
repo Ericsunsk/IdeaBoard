@@ -34,10 +34,11 @@ type RedisConfig struct {
 }
 
 type AppConfig struct {
-	Port    string
-	Host    string
-	Env     string
-	GinMode string
+	Port               string
+	Host               string
+	Env                string
+	GinMode            string
+	CORSAllowedOrigins []string
 }
 
 type QueueConfig struct {
@@ -86,10 +87,11 @@ func Load() *Config {
 			AsynqMaxRetry:           getEnvInt("ASYNQ_MAX_RETRY", 25),
 		},
 		App: AppConfig{
-			Port:    getEnv("APP_PORT", "6000"),
-			Host:    getFirstEnv("APP_HOST", "APP_BIND_HOST"),
-			Env:     appEnv,
-			GinMode: ginMode,
+			Port:               getEnv("APP_PORT", "6000"),
+			Host:               getFirstEnv("APP_HOST", "APP_BIND_HOST"),
+			Env:                appEnv,
+			GinMode:            ginMode,
+			CORSAllowedOrigins: detectCORSAllowedOrigins(appEnv),
 		},
 		Auth: AuthServiceConfig{
 			BaseURL:        getEnv("AUTH_SERVICE_BASE_URL", "http://127.0.0.1:6001"),
@@ -127,6 +129,17 @@ func detectGinMode() string {
 	}
 }
 
+func detectCORSAllowedOrigins(appEnv string) []string {
+	origins := splitCSVEnv(getEnv("APP_CORS_ALLOWED_ORIGINS", ""))
+	if len(origins) > 0 || isProductionAppEnv(appEnv) {
+		return origins
+	}
+	return []string{
+		"http://localhost:5173",
+		"http://127.0.0.1:5173",
+	}
+}
+
 func isProductionAppEnv(env string) bool {
 	switch strings.ToLower(strings.TrimSpace(env)) {
 	case "prod", "production", "release":
@@ -134,6 +147,24 @@ func isProductionAppEnv(env string) bool {
 	default:
 		return false
 	}
+}
+
+func splitCSVEnv(raw string) []string {
+	parts := strings.Split(raw, ",")
+	result := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 func loadEnvFile() {

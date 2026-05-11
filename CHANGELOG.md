@@ -2,6 +2,19 @@
 
 本文档记录 IdeaBoard 的正式发布变更。
 
+## Unreleased
+
+### 安全与部署
+
+- Better Auth 生产环境强制配置 `BETTER_AUTH_SECRET` 与 `BETTER_AUTH_URL`。
+- 生产环境拒绝 Auth internal key 与 Better Auth secret 使用占位值。
+- Auth 登录/注册限流改为依赖可信代理解析后的客户端 IP，避免直接信任请求头。
+- Go API CORS 改为 allowlist；生产配置 `APP_CORS_ALLOWED_ORIGINS` 时同样生效。
+- 任务提交与画布保存增加大小、数量和嵌套层级限制。
+- 任务参数字段调整为 `MEDIUMTEXT`，与 2MB 参数校验上限保持一致。
+- 发布流程增加 Web/Auth 生产依赖审计与 Go API 测试。
+- Nginx 上传上限调整为 `50m`，与后台上传接口保持一致。
+
 ## v0.2.0 - 2026-05-05
 
 管理后台统计系统、渠道商重构与后端性能优化。

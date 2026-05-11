@@ -236,15 +236,16 @@ nano /opt/ideaboard/apps/api/.env
 - `APP_ENV=production`（生产环境必须显式设置）
 - `APP_PORT=6000`
 - `APP_HOST=127.0.0.1`（建议反向代理场景启用）
+- `APP_CORS_ALLOWED_ORIGINS`（如需跨源直连 API，填写正式浏览器源；生产经 Nginx 同源访问可留空）
 - `AUTH_SERVICE_BASE_URL=http://127.0.0.1:6001`
-- `AUTH_SERVICE_INTERNAL_KEY`（必须与认证服务的 `AUTH_INTERNAL_KEY` 完全一致）
+- `AUTH_SERVICE_INTERNAL_KEY`（必须与认证服务的 `AUTH_INTERNAL_KEY` 完全一致，且不能使用 `replace-with-*` 占位值）
 
 建议：
 
 - 不要在生产环境继续使用本地开发默认账号
 - 若 Redis 开启密码，必须同步配置 `REDIS_AUTH`
 - 若前面有 Nginx / 其他反向代理，建议设置 `APP_HOST=127.0.0.1`
-- 生产环境请固定设置 `APP_ENV=production`，不要依赖默认值
+- 生产环境请固定设置 `APP_ENV=production`，不要依赖默认值；发布包 systemd 已设置该值，不要在 `.env` 中写回 `development`
 - `AUTH_SERVICE_INTERNAL_KEY` 建议使用足够长的随机字符串，并只在 API 与 Auth Service 两侧共享
 
 完整字段说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
@@ -267,8 +268,10 @@ npm prune --omit=dev
 
 - `AUTH_HOST=127.0.0.1`
 - `AUTH_PORT=6001`
-- `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的 `AUTH_SERVICE_INTERNAL_KEY` 一致
+- `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的 `AUTH_SERVICE_INTERNAL_KEY` 一致，且不能使用 `replace-with-*` 占位值
 - `AUTH_TRUSTED_ORIGINS` 包含你的正式访问源，例如 `https://example.com`
+- `BETTER_AUTH_SECRET` 至少 32 字符高熵随机值，例如 `openssl rand -base64 32`；不能使用 `replace-with-*` 或本地开发 fallback
+- `BETTER_AUTH_URL` 设置为正式访问地址，例如 `https://example.com`
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
 
 > [!IMPORTANT]
@@ -341,6 +344,8 @@ server_name _;
 ```
 
 替换为真实域名。
+
+发布包内置 Nginx 配置已将 `client_max_body_size` 设为 `50m`，与后台上传接口上限保持一致；若你手写 Nginx 配置，请同步该值。
 
 SSE 任务进度接口需要关闭 Nginx 缓冲并放宽读取超时，确认 `ideaboard.conf` 包含以下 location（放在 `location /api/` 之前）：
 

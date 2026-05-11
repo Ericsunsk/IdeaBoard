@@ -276,3 +276,42 @@ func TestValidateExecutablePromptReturnsExplicitErrorWhenFinalPromptEmpty(t *tes
 		t.Fatalf("got %q, want %q", err.Error(), want)
 	}
 }
+
+func TestSubmitTaskInputLimits(t *testing.T) {
+	t.Run("prompt byte limit", func(t *testing.T) {
+		err := validateSubmitTaskPrompt(strings.Repeat("a", maxSubmitTaskPromptBytes+1), maxSubmitTaskPromptBytes, "提示词")
+		if err == nil {
+			t.Fatalf("expected prompt limit error")
+		}
+	})
+
+	t.Run("image url count limit", func(t *testing.T) {
+		urls := make([]string, maxSubmitTaskImageURLs+1)
+		for i := range urls {
+			urls[i] = "https://example.com/image.png"
+		}
+		if err := validateSubmitTaskImageURLs(urls); err == nil {
+			t.Fatalf("expected image url count error")
+		}
+	})
+
+	t.Run("params byte limit", func(t *testing.T) {
+		_, err := marshalSubmitTaskParams(map[string]interface{}{
+			"payload": strings.Repeat("x", maxSubmitTaskParamsBytes+1),
+		})
+		if err == nil {
+			t.Fatalf("expected params size error")
+		}
+	})
+
+	t.Run("params depth limit", func(t *testing.T) {
+		var current interface{} = "leaf"
+		for i := 0; i < maxSubmitTaskParamsDepth+1; i++ {
+			current = map[string]interface{}{"next": current}
+		}
+		_, err := marshalSubmitTaskParams(map[string]interface{}{"root": current})
+		if err == nil {
+			t.Fatalf("expected params depth error")
+		}
+	})
+}

@@ -71,3 +71,43 @@ func TestLoadQueueDefaults(t *testing.T) {
 		t.Fatalf("expected AsynqMaxRetry=25, got %d", cfg.Queue.AsynqMaxRetry)
 	}
 }
+
+func TestDetectCORSAllowedOrigins(t *testing.T) {
+	t.Run("development default is local vite origins", func(t *testing.T) {
+		t.Setenv("APP_CORS_ALLOWED_ORIGINS", "")
+
+		got := detectCORSAllowedOrigins("development")
+		want := []string{"http://localhost:5173", "http://127.0.0.1:5173"}
+		if len(got) != len(want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("got %v, want %v", got, want)
+			}
+		}
+	})
+
+	t.Run("production default is closed", func(t *testing.T) {
+		t.Setenv("APP_CORS_ALLOWED_ORIGINS", "")
+
+		if got := detectCORSAllowedOrigins("production"); len(got) != 0 {
+			t.Fatalf("got %v, want empty", got)
+		}
+	})
+
+	t.Run("explicit env wins", func(t *testing.T) {
+		t.Setenv("APP_CORS_ALLOWED_ORIGINS", "https://example.com, https://admin.example.com,https://example.com")
+
+		got := detectCORSAllowedOrigins("development")
+		want := []string{"https://example.com", "https://admin.example.com"}
+		if len(got) != len(want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("got %v, want %v", got, want)
+			}
+		}
+	})
+}

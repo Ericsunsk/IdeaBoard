@@ -241,7 +241,7 @@ sequenceDiagram
 - Go 仅维护本地业务用户档案（`id/username/auth_user_id/storage_uid/role/status`）与权限判定。
 - 可在管理后台通过“开放注册”开关实时控制注册入口，状态持久化在 `system_configs` 表中。
 - 可在管理后台通过“防刷限流设置”调整登录/注册入口限流参数，配置落在 `system_configs`（`auth_rate_limit_window`、`auth_rate_limit_max_requests`）。
-- `apps/auth` 对 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 启用基于来源 IP 的内存限流；反向代理场景优先读取 `x-forwarded-for` 的首个 IP。
+- `apps/auth` 对 `/api/auth/sign-in/*` 与 `/api/auth/sign-up/*` 启用基于来源 IP 的内存限流；反向代理场景依赖 Express `req.ip` 与 loopback `trust proxy` 解析客户端 IP。
 - `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销；不开放后台改密。
 - 角色升降级必须经由 Go Admin API：前端不直连 `authClient.admin.setRole`，由 Go 校验后同步 Auth Service 与业务侧 `users.role`。
 - 彻底注销必须经由 Go Admin API：先校验目标不是当前管理员/管理员账号，再调用 Auth Service internal endpoint 删除身份、会话与凭据，最后清理业务侧用户数据；前端不得直接调用 `authClient.admin.removeUser`。
@@ -379,11 +379,25 @@ go build ./...
 | `REDIS_AUTH` | 空 | Redis 密码 |
 | `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
 | `APP_PORT` | `6000` | 后端监听端口 |
+| `APP_HOST` / `APP_BIND_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
+| `APP_GIN_MODE` / `GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
+| `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS allowlist，多个 origin 用逗号分隔；生产同源访问通常留空，跨源直连 API 时必须显式配置 |
 | `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
 | `AUTH_SERVICE_INTERNAL_KEY` | 空 | Go 调用 auth service 的 internal key |
 | `AUTH_SERVICE_TIMEOUT_SECONDS` | `5` | Go 调用 auth service 的超时秒数 |
 | `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |
 | `DB_LOG_MODE` | `warn` | GORM 日志等级，可选 `silent/error/warn/info` |
+
+Auth 服务关键变量：
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `AUTH_HOST` | `127.0.0.1` | Auth 服务监听地址；生产建议仅监听回环地址 |
+| `AUTH_PORT` | `6001` | Auth 服务监听端口 |
+| `AUTH_INTERNAL_KEY` | 空 | Auth internal endpoint 保护密钥；生产必须设置为非占位随机值，并与 Go 的 `AUTH_SERVICE_INTERNAL_KEY` 一致 |
+| `AUTH_TRUSTED_ORIGINS` | 空 | Better Auth 可信浏览器源 |
+| `BETTER_AUTH_SECRET` | 本地开发 fallback | Better Auth 签名密钥；生产必须设置为非占位随机值，至少 32 字符高熵随机值 |
+| `BETTER_AUTH_URL` | `http://localhost:5173`（本地开发） | Better Auth 对外基准 URL；生产必须设置为正式访问地址 |
 
 
 <a id="repo-map"></a>

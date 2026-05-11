@@ -42,6 +42,12 @@ const defaultAccountMaxConcurrent = 3
 const taskCancelTTL = 24 * time.Hour
 const defaultAccountTimeoutSeconds = 120
 const maxTaskKeywordLength = 200
+const maxSubmitTaskPromptBytes = 8 * 1024
+const maxSubmitTaskFinalPromptBytes = 32 * 1024
+const maxSubmitTaskImageURLs = 16
+const maxSubmitTaskImageURLBytes = 4096
+const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
+const maxSubmitTaskParamsDepth = 24
 
 func NewAccountServiceWithQueue(
 	accountRepo *AccountRepository,
@@ -299,6 +305,16 @@ func (s *AccountService) GetAccountQueueInfo(id uint64) (concurrent int, maxConc
 // ============ 任务管理 ============
 
 func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest) (string, error) {
+	if req == nil {
+		return "", fmt.Errorf("请求参数错误")
+	}
+	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
+		return "", err
+	}
+	if err := validateSubmitTaskImageURLs(req.ImageURLs); err != nil {
+		return "", err
+	}
+
 	// 获取所有可用的账号
 	accounts, err := s.accountRepo.GetAllEnabled()
 	if err != nil {
@@ -350,12 +366,14 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	if err := validateExecutablePrompt(fullPrompt); err != nil {
 		return "", err
 	}
+	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
+		return "", err
+	}
 
 	// 序列化参数
-	paramsJSON := ""
-	if req.Params != nil {
-		b, _ := json.Marshal(req.Params)
-		paramsJSON = string(b)
+	paramsJSON, err := marshalSubmitTaskParams(req.Params)
+	if err != nil {
+		return "", err
 	}
 
 	// 创建任务记录
@@ -403,6 +421,69 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	}
 
 	return taskID, nil
+}
+
+func validateSubmitTaskPrompt(prompt string, maxBytes int, label string) error {
+	if len([]byte(prompt)) > maxBytes {
+		return fmt.Errorf("%s长度不能超过 %dKB", label, maxBytes/1024)
+	}
+	return nil
+}
+
+func validateSubmitTaskImageURLs(imageURLs []string) error {
+	if len(imageURLs) > maxSubmitTaskImageURLs {
+		return fmt.Errorf("图片数量不能超过 %d 张", maxSubmitTaskImageURLs)
+	}
+	for _, raw := range imageURLs {
+		url := strings.TrimSpace(raw)
+		if url == "" {
+			return fmt.Errorf("图片地址不能为空")
+		}
+		if len([]byte(url)) > maxSubmitTaskImageURLBytes {
+			return fmt.Errorf("图片地址长度不能超过 %d 字符", maxSubmitTaskImageURLBytes)
+		}
+	}
+	return nil
+}
+
+func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {
+	if params == nil {
+		return "", nil
+	}
+	if jsonValueDepth(params) > maxSubmitTaskParamsDepth {
+		return "", fmt.Errorf("任务参数层级过深")
+	}
+	payload, err := json.Marshal(params)
+	if err != nil {
+		return "", fmt.Errorf("任务参数格式错误")
+	}
+	if len(payload) > maxSubmitTaskParamsBytes {
+		return "", fmt.Errorf("任务参数不能超过 %dMB", maxSubmitTaskParamsBytes/1024/1024)
+	}
+	return string(payload), nil
+}
+
+func jsonValueDepth(value interface{}) int {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		maxDepth := 1
+		for _, child := range v {
+			if depth := 1 + jsonValueDepth(child); depth > maxDepth {
+				maxDepth = depth
+			}
+		}
+		return maxDepth
+	case []interface{}:
+		maxDepth := 1
+		for _, child := range v {
+			if depth := 1 + jsonValueDepth(child); depth > maxDepth {
+				maxDepth = depth
+			}
+		}
+		return maxDepth
+	default:
+		return 1
+	}
 }
 
 func (s *AccountService) GetTask(taskID string) (*tasks.Task, error) {

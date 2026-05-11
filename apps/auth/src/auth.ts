@@ -18,6 +18,8 @@ export const auth = betterAuth({
   database: authDB,
   basePath: '/api/auth',
   appName: 'IdeaBoard',
+  ...(env.auth.secret ? { secret: env.auth.secret } : {}),
+  ...(env.auth.baseURL ? { baseURL: env.auth.baseURL } : {}),
   trustedOrigins: env.auth.trustedOrigins,
   emailAndPassword: {
     enabled: true,

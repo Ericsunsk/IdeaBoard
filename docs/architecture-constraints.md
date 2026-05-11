@@ -42,7 +42,9 @@
 
 - 前端：`cd apps/web && npm run build`
 - 后端：`cd apps/api && go test ./... && go build ./...`
-- 跨层改动默认同时验证前后端。
+- Auth 服务：`cd apps/auth && npm run build`
+- 生产、安全或发布相关改动：对 `apps/web` 和 `apps/auth` 运行 `npm audit --omit=dev`。
+- 跨层改动默认同时验证前后端与 Auth 服务。
 
 
 ## 统计数据模型

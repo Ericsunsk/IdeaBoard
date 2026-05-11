@@ -13,7 +13,7 @@ type Task struct {
 	AccountID   uint64     `gorm:"index" json:"account_id"`
 	Prompt      string     `gorm:"type:text" json:"prompt"`
 	UserPrompt  string     `gorm:"type:text" json:"user_prompt"`
-	Params      string     `gorm:"type:text" json:"params"`
+	Params      string     `gorm:"type:mediumtext" json:"params"`
 	Status      string     `gorm:"type:varchar(20);default:'pending';index" json:"status"`
 	RetryCount  int        `gorm:"type:int;default:0" json:"retry_count"`
 	ErrorMsg    string     `gorm:"type:text" json:"error_msg"`
