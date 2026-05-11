@@ -1,4 +1,3 @@
-import { computed, ref, watch } from 'vue'
 import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../shared/api/task'
 import { createMonitorTaskColumns } from '../shared/monitorShared'

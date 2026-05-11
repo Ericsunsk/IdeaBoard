@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref, watch, type MaybeRefOrGetter, toValue } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
 
 interface PreviewOptions {
   maxSide?: number

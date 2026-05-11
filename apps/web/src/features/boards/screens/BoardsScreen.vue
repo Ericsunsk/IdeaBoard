@@ -67,10 +67,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useMessage } from 'naive-ui'
-import BoardCard from '../components/BoardCard.vue'
 import {
   createCanvasBoard,
   deleteCanvasBoard,

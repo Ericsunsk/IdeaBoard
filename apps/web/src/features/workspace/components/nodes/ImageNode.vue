@@ -101,12 +101,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
 import type { ImageNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
-import NodeActionButton from './NodeActionButton.vue'
-import NodeHeader from './NodeHeader.vue'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{

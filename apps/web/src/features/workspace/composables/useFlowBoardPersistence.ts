@@ -1,4 +1,3 @@
-import { computed } from 'vue'
 import { renderBoardPreviewDataUrl } from '../../boards/lib/boardPreviewSerializer'
 import { setCanvasBoardPreviewSnapshot } from '../../boards/lib/canvasBoardState'
 import { syncCanvasBoardToServer } from '../../boards/lib/boardSync'

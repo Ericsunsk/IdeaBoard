@@ -67,7 +67,7 @@
         </div>
 
         <n-input
-          :ref="(el) => bindTextareaRef(item.slug, el)"
+          :ref="(el: unknown) => bindTextareaRef(item.slug, el)"
           v-model:value="promptMap[item.slug]"
           type="textarea"
           :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
@@ -87,11 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { NInput, NButton, useMessage } from 'naive-ui'
-import AdminEditorModal from '../shared/components/AdminEditorModal.vue'
 import { saveFeaturePrompt } from '../../../shared/query/adminQueries'
 import {
   getListAdminFeaturePromptsQueryKey,

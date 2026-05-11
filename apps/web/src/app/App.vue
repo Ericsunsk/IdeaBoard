@@ -15,17 +15,7 @@
 
 <script setup lang="ts">
 import { darkTheme, zhCN } from 'naive-ui'
-import {
-  NConfigProvider,
-  NMessageProvider,
-  NDialogProvider,
-  NNotificationProvider,
-  // 全局注册 breadcrumb 组件
-  NBreadcrumb,
-  NBreadcrumbItem,
-} from 'naive-ui'
-import { computed, defineComponent, h } from 'vue'
-import { useRoute } from 'vue-router'
+import { defineComponent } from 'vue'
 
 const naiveLocale = zhCN
 const route = useRoute()

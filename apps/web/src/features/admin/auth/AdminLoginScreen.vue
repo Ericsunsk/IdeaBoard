@@ -38,10 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../../app/stores/user'
-import { NForm, NFormItem, NInput, NButton, useMessage } from 'naive-ui'
 
 const router = useRouter()
 const route = useRoute()

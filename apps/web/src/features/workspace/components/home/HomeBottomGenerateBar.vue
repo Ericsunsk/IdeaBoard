@@ -80,8 +80,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { NSpin } from 'naive-ui'
 import type { GenerateQualityOption, PatternGenerateRatioOption } from '../nodes/nodeOptionConfig'
 
 type SelectedPreviewItem = {

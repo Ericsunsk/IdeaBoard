@@ -1,5 +1,3 @@
-import { computed, ref } from 'vue'
-
 export type CanvasInteractionKey =
   | 'mask-painting'
   | 'message-resize'

@@ -144,11 +144,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
-import { useRouter } from 'vue-router'
 import { useUserStore } from '../../../app/stores/user'
 import { useListUserTasks } from '../../../shared/api/generated-query/tasks/tasks'
-import { NButton, NTag, NForm, NFormItem, NInput, NDataTable, useMessage } from 'naive-ui'
+import { NTag } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 
 const router = useRouter()

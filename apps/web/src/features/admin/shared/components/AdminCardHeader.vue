@@ -18,8 +18,6 @@
 </template>
 
 <script setup lang="ts">
-import AdminChip from './AdminChip.vue'
-
 withDefaults(
   defineProps<{
     provider?: string

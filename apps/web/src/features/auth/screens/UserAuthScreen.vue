@@ -22,10 +22,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import LoginModal from '../components/LoginModal.vue'
-import RegisterModal from '../components/RegisterModal.vue'
 
 const props = defineProps<{
   mode: 'login' | 'register'

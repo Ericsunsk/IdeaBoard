@@ -44,9 +44,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { NButton, NIcon, NMenu, useMessage } from 'naive-ui'
 import type { MenuOption } from 'naive-ui'
 import { CloseOutline, ShieldHalfOutline } from '@vicons/ionicons5'
 import { useUserStore } from '../../../app/stores/user'

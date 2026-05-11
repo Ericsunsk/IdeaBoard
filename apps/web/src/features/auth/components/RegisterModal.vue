@@ -98,9 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
 import { useUserStore } from "../../../app/stores/user";
-import { NForm, NFormItem, NInput, NButton, useMessage } from "naive-ui";
 import type { FormInst } from "naive-ui";
 
 const props = defineProps<{

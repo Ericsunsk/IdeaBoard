@@ -1,4 +1,3 @@
-import { computed, ref } from 'vue'
 import { resolveFlowEdgeToneFromHandles } from '../utils/flowEdgeVisual'
 
 const TONE_COLOR_MAP: Record<string, string> = {

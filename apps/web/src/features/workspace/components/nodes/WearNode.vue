@@ -89,12 +89,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import type { WearNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
-import NodeActionButton from './NodeActionButton.vue'
-import NodeExecutionFooter from './NodeExecutionFooter.vue'
-import NodeHeader from './NodeHeader.vue'
 
 import { buildNodeIoFromSlots, WEAR_NODE_IO_SLOTS } from './nodeIoConfig'
 import { WEAR_TILE_MODE_OPTIONS } from './nodeOptionConfig'

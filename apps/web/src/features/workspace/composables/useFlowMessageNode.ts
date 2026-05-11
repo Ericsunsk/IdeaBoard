@@ -1,4 +1,4 @@
-import { computed, ref, type ComponentPublicInstance, type Ref } from 'vue'
+import type { ComponentPublicInstance, Ref } from 'vue'
 import type { CanvasImageItem } from '../types/canvasNodes'
 
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se'

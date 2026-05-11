@@ -220,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type ComponentPublicInstance } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import {
   MODEL_BACKGROUND_OPTIONS,
 } from '../components/nodes/nodeOptionConfig'
@@ -237,18 +237,6 @@ import type {
   ViewpointNodeItem,
   WearNodeItem,
 } from '../types/canvasNodes'
-import ColorNode from '../components/nodes/ColorNode.vue'
-import EditNode from '../components/nodes/EditNode.vue'
-import EnhanceNode from '../components/nodes/EnhanceNode.vue'
-import FusionNode from '../components/nodes/FusionNode.vue'
-import ImageNode from '../components/nodes/ImageNode.vue'
-import MaskNode from '../components/nodes/MaskNode.vue'
-import ModelNode from '../components/nodes/ModelNode.vue'
-import PromptNode from '../components/nodes/PromptNode.vue'
-import ViewpointNode from '../components/nodes/ViewpointNode.vue'
-import WearNode from '../components/nodes/WearNode.vue'
-import FlowMessageNodeView from './FlowMessageNodeView.vue'
-import FlowNodeHandles from './FlowNodeHandles.vue'
 import type { MessageAction, ResizeDirection } from '../composables/useFlowMessageNode'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'

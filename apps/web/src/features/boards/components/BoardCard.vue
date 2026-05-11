@@ -57,7 +57,6 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
 import type { CanvasBoardMeta } from '../lib/canvasBoards'
 
 const props = defineProps<{

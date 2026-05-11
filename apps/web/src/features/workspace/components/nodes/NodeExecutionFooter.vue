@@ -8,8 +8,6 @@
 </template>
 
 <script setup lang="ts">
-import NodeActionButton from './NodeActionButton.vue'
-import NodeConnectionChips from './NodeConnectionChips.vue'
 
 type ConnectionChipItem = {
   key: string

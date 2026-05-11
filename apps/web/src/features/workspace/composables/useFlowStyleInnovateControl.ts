@@ -1,4 +1,4 @@
-import { nextTick, onBeforeUnmount, ref, type ComponentPublicInstance } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 
 export function useFlowStyleInnovateControl(options: {
   onCommit: (strength: number) => void

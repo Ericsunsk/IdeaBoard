@@ -22,7 +22,6 @@
 </template>
 
 <script setup lang="ts">
-import NodeColorSwatch from './NodeColorSwatch.vue'
 
 withDefaults(defineProps<{
   value: string

@@ -38,7 +38,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import { getCanvasNodeVisibleInputPorts, getCanvasNodeVisibleOutputPorts } from '../config/canvasNodeConnectionContract'
 import {

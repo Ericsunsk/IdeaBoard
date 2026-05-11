@@ -106,8 +106,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
-
 import type { Task } from '../../../shared/api/task'
 import { adminTaskApi } from '../../../shared/api/adminTask'
 import { monitorApi } from '../../../shared/api/monitor'
@@ -123,7 +121,6 @@ import {
 } from '@vicons/ionicons5'
 import { sanitizeApiErrorMessage, sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
 import { formatDurationSeconds } from '../../../shared/utils/dateTime'
-import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 
 const records = ref<Task[]>([])
 const loading = ref(false)

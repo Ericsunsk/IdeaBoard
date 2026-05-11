@@ -1,4 +1,3 @@
-import { nextTick } from 'vue'
 import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
 import type { CanvasImageItem, ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
 import { createCanvasImageItemAt } from '../utils/canvasNodeFactory'

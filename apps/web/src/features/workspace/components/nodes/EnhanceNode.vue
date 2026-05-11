@@ -152,16 +152,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import {
   ENHANCE_EXTEND_PERCENT_MAX,
   ENHANCE_EXTEND_PERCENT_MIN,
   type EnhanceNodeItem,
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
-import NodeActionButton from './NodeActionButton.vue'
-import NodeExecutionFooter from './NodeExecutionFooter.vue'
-import NodeHeader from './NodeHeader.vue'
 
 import { buildNodeIoFromSlots, ENHANCE_NODE_IO_SLOTS } from './nodeIoConfig'
 import {

@@ -1,4 +1,3 @@
-import { computed, nextTick, ref } from 'vue'
 import { listCanvasBoards } from '../../boards/lib/canvasBoards'
 
 type BoardMeta = ReturnType<typeof listCanvasBoards>[number]

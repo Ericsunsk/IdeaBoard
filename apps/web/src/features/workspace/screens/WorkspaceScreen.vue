@@ -188,9 +188,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch, type Ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { useMessage } from 'naive-ui'
+import type { Ref } from 'vue'
 import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
@@ -198,8 +196,6 @@ import type { Edge, Node } from '@vue-flow/core'
 import { useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
-import FlowCanvasNode from '../components/FlowCanvasNode.vue'
-import WorkspaceNodeContextMenu from '../components/WorkspaceNodeContextMenu.vue'
 import { useFlowHistory } from '../composables/useFlowHistory'
 import { useFlowBoardPersistence } from '../composables/useFlowBoardPersistence'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
@@ -216,9 +212,6 @@ import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import type { FlowNodeData } from '../types/flowTypes'
 import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 import type { CanvasBoardSnapshot } from '../../workspace/types/canvasNodes'
-import HomeCanvasHeader from '../../workspace/components/home/HomeCanvasHeader.vue'
-import HomeBottomGenerateBar from '../../workspace/components/home/HomeBottomGenerateBar.vue'
-import { useRouter } from 'vue-router'
 import {
   GENERATE_QUALITY_OPTIONS,
   PATTERN_GENERATE_RATIO_OPTIONS,

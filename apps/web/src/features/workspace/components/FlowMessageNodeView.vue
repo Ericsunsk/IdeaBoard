@@ -47,10 +47,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type ComponentPublicInstance } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import type { CanvasImageItem } from '../types/canvasNodes'
 import { useFlowMessageNode, MESSAGE_RESIZE_DIRECTIONS, type MessageAction, type ResizeDirection } from '../composables/useFlowMessageNode'
-import HomeCanvasImageActionMenu from './home/HomeCanvasImageActionMenu.vue'
 
 const props = defineProps<{
   node: CanvasImageItem

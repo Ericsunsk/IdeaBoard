@@ -1,4 +1,3 @@
-import { computed, ref } from 'vue'
 import type { FormRules } from 'naive-ui'
 import accountApi, { type ApiAccount } from '../../../shared/api/account'
 import channelApi, { type Channel } from '../../../shared/api/channel'

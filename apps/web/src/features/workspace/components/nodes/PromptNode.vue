@@ -33,7 +33,6 @@
 <script setup lang="ts">
 import type { PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
-import NodeHeader from './NodeHeader.vue'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
 
 const props = defineProps<{

@@ -1,4 +1,4 @@
-import { computed, nextTick, ref, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { Router } from 'vue-router'
 import {
   isCanvasBoardNameTaken,

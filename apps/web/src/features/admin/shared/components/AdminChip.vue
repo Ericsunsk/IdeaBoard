@@ -3,8 +3,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-
 type ChipVariant = 'neutral' | 'current' | 'enabled' | 'empty'
 type ChipTone = 'default' | 'strong'
 

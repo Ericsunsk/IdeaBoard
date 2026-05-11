@@ -1,4 +1,3 @@
-import { computed, onUnmounted, ref } from 'vue'
 import {
   clampColorValue,
   DEFAULT_COLOR_HEX,

@@ -138,17 +138,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MAX_COLOR_NODE_SWATCHES } from '../../types/canvasNodes'
 import type { ColorNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useColorPickerState } from '../../composables/useColorPickerState'
-import NodeColorField from './NodeColorField.vue'
-import NodeColorPopover from './NodeColorPopover.vue'
-import NodeColorSwatch from './NodeColorSwatch.vue'
-import NodeExecutionFooter from './NodeExecutionFooter.vue'
-import NodeHeader from './NodeHeader.vue'
-import NodeIconButton from './NodeIconButton.vue'
 
 import { buildNodeIoFromSlots, COLOR_NODE_IO_SLOTS } from './nodeIoConfig'
 import { DEFAULT_COLOR_HEX, normalizeHexColor } from './colorPopoverUtils'

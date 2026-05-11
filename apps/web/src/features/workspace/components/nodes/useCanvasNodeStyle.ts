@@ -1,5 +1,3 @@
-import { computed } from 'vue'
-
 interface PositionedNodeLike {
   x: number
   y: number

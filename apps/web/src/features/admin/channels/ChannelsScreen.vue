@@ -201,14 +201,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
 import channelApi from '../../../shared/api/channel'
 import type { Channel } from '../../../shared/api/channel'
-import { NButton, NModal, NForm, NFormItem, NInput, NIcon, NSpace, NSelect, NGrid, NGi, NInputNumber, NSpin, NProgress, useMessage, useDialog } from 'naive-ui'
+import { NButton, NIcon } from 'naive-ui'
 import { AddOutline, RefreshOutline, SearchOutline } from '@vicons/ionicons5'
 import { extractApiErrorMessage, getModelCategoryClass } from '../shared/assetLibraryShared'
-import AdminCardHeader from '../shared/components/AdminCardHeader.vue'
-import AdminChip from '../shared/components/AdminChip.vue'
 import { useChannelAccounts } from './useChannelAccounts'
 
 const message = useMessage()

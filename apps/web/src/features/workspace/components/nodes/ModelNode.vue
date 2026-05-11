@@ -112,13 +112,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { MODEL_ANGLE_FRAMING_OPTIONS, describeModelAngleSpec } from './nodeOptionConfig'
 import type { ModelAngleFraming, ModelNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
-import NodeActionButton from './NodeActionButton.vue'
-import NodeExecutionFooter from './NodeExecutionFooter.vue'
-import NodeHeader from './NodeHeader.vue'
 
 import { buildNodeIoFromSlots, MODEL_NODE_IO_SLOTS } from './nodeIoConfig'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'

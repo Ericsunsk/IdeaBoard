@@ -286,10 +286,6 @@
 </template>
 
 <script setup lang="ts">
-import { NButton, NInput, NSelect, NSwitch } from "naive-ui";
-import AdminEditorModal from "../shared/components/AdminEditorModal.vue";
-import AdminCardHeader from "../shared/components/AdminCardHeader.vue";
-import AdminChip from "../shared/components/AdminChip.vue";
 import { useStorageManager } from "./useStorageManager";
 
 const {

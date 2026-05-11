@@ -101,8 +101,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, watch, onMounted, onUnmounted } from "vue";
-import { useRouter, useRoute } from "vue-router";
 import { useUserStore } from "../../../app/stores/user";
 import {
     NConfigProvider,

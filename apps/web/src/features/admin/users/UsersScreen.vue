@@ -144,8 +144,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h, computed, watch } from 'vue'
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
 import {
   NInput,
@@ -197,7 +195,6 @@ import {
   PeopleOutline,
   FilterOutline
 } from '@vicons/ionicons5'
-import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 
 const message = useMessage()
 const dialog = useDialog()

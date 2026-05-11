@@ -143,13 +143,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import type { MaskNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
-import NodeActionButton from './NodeActionButton.vue'
-import NodeHeader from './NodeHeader.vue'
-import NodeIconButton from './NodeIconButton.vue'
 
 
 import { toNumber } from './numberUtils'
