@@ -62,14 +62,12 @@
         @connect-start="onFlowConnectStart"
         @connect-end="onFlowConnectEnd"
         @edge-update="onEdgeUpdate"
-        @edge-update-start="onFlowEdgeUpdateStart"
         @edge-update-end="onFlowEdgeUpdateEnd"
         @move-start="closeBoardHeaderEditing"
         @move="onFlowMove"
         @node-click="onFlowNodeClick"
         @node-drag-start="onNodeDragStart"
         @node-drag-stop="onNodeDragStop"
-        @nodes-initialized="onFlowNodesInitialized"
         @pane-click="onPaneClick"
         @pane-context-menu="onPaneContextMenu"
       >
@@ -78,7 +76,7 @@
             :data="nodeProps.data"
             :selected="!!nodeProps.selected"
             :dragging="!!nodeProps.dragging"
-            :copy-mode="isAltPressed"
+            :copy-mode="duplicateModifierPressed"
             :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
             :mask-source-image-url="getFlowMaskEffectiveSourceCached(nodeProps.id).url"
             :mask-source-image-ratio="getFlowMaskEffectiveSourceCached(nodeProps.id).ratio"
@@ -240,7 +238,18 @@ const message = useMessage()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { screenToFlowCoordinate, updateNodeInternals, zoomIn, zoomOut, getViewport, setViewport, setNodes, setEdges } = useVueFlow()
+const {
+  screenToFlowCoordinate,
+  updateNodeInternals,
+  zoomIn,
+  zoomOut,
+  getViewport,
+  setViewport,
+  setNodes,
+  setEdges,
+  removeSelectedElements,
+  addSelectedNodes,
+} = useVueFlow()
 
 const zoomLevel = ref(100)
 let lastFlowZoom = 100
@@ -298,34 +307,42 @@ let leaveConfirmResolver: ((choice: 'save' | 'discard' | 'cancel') => void) | nu
 let leaveConfirmPromise: Promise<'save' | 'discard' | 'cancel'> | null = null
 let skipNextLeaveConfirm = false
 const activeMessageActionNodeId = ref<string | null>(null)
+const duplicateModifierPressed = ref(false)
 
-function scheduleFlowNodeInternalsRefresh(nodeIds?: string[]) {
-  const hasCanvasNodes = (nodes.value as Array<{ type?: string }>).some(node => node.type === 'canvas')
-  if (!hasCanvasNodes) return
-  if (nodeIds && nodeIds.length > 0) {
-    if (!queuedNodeInternalsIds) queuedNodeInternalsIds = new Set()
-    nodeIds.forEach(id => queuedNodeInternalsIds?.add(id))
-  }
+function scheduleFlowNodeInternalsRefresh(nodeIds: string[]) {
+  const nextIds = nodeIds.filter(id => typeof id === 'string' && id.length > 0)
+  if (nextIds.length === 0) return
+  if (!queuedNodeInternalsIds) queuedNodeInternalsIds = new Set()
+  nextIds.forEach(id => queuedNodeInternalsIds?.add(id))
   if (pendingNodeInternalsRefresh) return
   pendingNodeInternalsRefresh = true
   void nextTick(() => {
-    const ids = (queuedNodeInternalsIds && queuedNodeInternalsIds.size > 0)
-      ? Array.from(queuedNodeInternalsIds)
-      : nodes.value.map(node => node.id)
-    queuedNodeInternalsIds = null
-    if (ids.length === 0) {
-      pendingNodeInternalsRefresh = false
-      return
-    }
     requestAnimationFrame(() => {
-      updateNodeInternals(ids)
+      const ids = readQueuedNodeInternalsRefreshIds()
+      if (ids.length > 0) {
+        updateNodeInternals(ids)
+      }
+      const pendingIds = readQueuedNodeInternalsRefreshIds()
       pendingNodeInternalsRefresh = false
+      if (pendingIds.length > 0) {
+        scheduleFlowNodeInternalsRefresh(pendingIds)
+      }
     })
   })
 }
 
-function onFlowNodesInitialized() {
-  scheduleFlowNodeInternalsRefresh()
+function readQueuedNodeInternalsRefreshIds(): string[] {
+  const ids = queuedNodeInternalsIds ? Array.from(queuedNodeInternalsIds) : []
+  queuedNodeInternalsIds = null
+  return ids
+}
+
+function clearSelectedFlowElements(elements?: Parameters<typeof removeSelectedElements>[0]) {
+  removeSelectedElements(elements)
+}
+
+function selectFlowNodes(nextNodes: Node[]) {
+  addSelectedNodes(nextNodes as Parameters<typeof addSelectedNodes>[0])
 }
 
 const flowPromptRatioOptions = PATTERN_GENERATE_RATIO_OPTIONS
@@ -440,7 +457,6 @@ const flowHistory = useFlowHistory({
   maxSteps: 10,
   onRestore: () => {
     markDirty()
-    syncFlowAfterGraphRestore()
   },
   commitNodes: (nodes) => commitFlowNodes(nodes as Node[]),
   commitEdges: (edges) => commitFlowEdges(edges as Edge[]),
@@ -480,7 +496,6 @@ const boardPersistence = useFlowBoardPersistence({
   setViewport,
   commitNodes: (nodes) => commitFlowNodes(nodes as Node[]),
   commitEdges: (edges) => commitFlowEdges(edges as Edge[]),
-  onGraphCommitted: syncFlowAfterGraphRestore,
 })
 
 const currentBoardId = boardPersistence.currentBoardId
@@ -521,13 +536,8 @@ function commitFlowEdges(nextEdges: Edge[]) {
 }
 
 function commitFlowNodesAppend(nextNodes: Node[]) {
-  const combined = [...(nodes.value as Node[]), ...nextNodes]
-  setNodes(combined)
+  setNodes(currentNodes => [...(currentNodes as Node[]), ...nextNodes])
   scheduleFlowNodeInternalsRefresh(nextNodes.map(node => node.id))
-}
-
-function syncFlowAfterGraphRestore() {
-  scheduleFlowNodeInternalsRefresh()
 }
 
 const flowNodeMutations = useFlowNodeMutations({
@@ -639,7 +649,6 @@ const {
   flowConnectionLineStyle,
   onFlowConnectStart,
   onFlowConnectEnd,
-  onFlowEdgeUpdateStart,
   onFlowEdgeUpdateEnd,
 } = useFlowConnectionVisuals()
 
@@ -695,7 +704,7 @@ async function onCanvasDrop(event: DragEvent) {
 
 function onFlowMessageContextMenu(nodeId: string, event: MouseEvent) {
   event.preventDefault()
-  selectSingleFlowNode(nodeId)
+  selectFlowNodeForContextMenu(nodeId)
   activeMessageActionNodeId.value = nodeId
 }
 
@@ -797,7 +806,7 @@ function onFlowMessageDirectAction(
   void runMessageDirectAction(nodeId, action, action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined)
 }
 
-const { clearFlowSelection, selectSingleFlowNode, onPaneClick, onFlowNodeClick, onFlowNodeMouseDown, deleteSelectedFlowElements } = useFlowSelectionController({
+const { clearFlowSelection, selectFlowNodeForContextMenu, onPaneClick, onFlowNodeClick, onFlowNodeMouseDown, deleteSelectedFlowElements } = useFlowSelectionController({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
   activeTool: activeTool as Ref<string>,
@@ -808,8 +817,8 @@ const { clearFlowSelection, selectSingleFlowNode, onPaneClick, onFlowNodeClick, 
   _deleteSelectedFlowElements: () => {
     flowNodeMutations.deleteSelectedFlowElements()
   },
-  commitNodes: (nextNodes) => commitFlowNodes(nextNodes),
-  commitEdges: (nextEdges) => commitFlowEdges(nextEdges),
+  clearSelectedElements: clearSelectedFlowElements,
+  selectFlowNodes,
 })
 
 const {
@@ -827,7 +836,6 @@ const {
   getViewport,
   setViewport,
   get runPatternGenerate() { return runPatternGenerate },
-  commitNodes: (nextNodes) => commitFlowNodes(nextNodes),
 })
 
 const {
@@ -866,11 +874,12 @@ const {
   stopCanvasInteraction: stopFlowInteraction,
 })
 
-const { isAltPressed, onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
+const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
   flowHistory: {
     onNodeDragStart: flowHistory.onNodeDragStart,
     onNodeDragStop: flowHistory.onNodeDragStop,
   },
+  duplicateModifierPressed,
   beginFlowNodeDragDuplicateTracking,
   finishFlowNodeDragDuplicateTracking,
   markDirty,
@@ -932,6 +941,9 @@ useFlowKeyboardShortcuts({
   },
   onToolText: () => {
     setActiveTool('text')
+  },
+  onDuplicateModifierChange: (pressed) => {
+    duplicateModifierPressed.value = pressed
   },
 })
 

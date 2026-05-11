@@ -1,13 +1,12 @@
 import { computed, type Ref } from 'vue'
-import type { Node } from '@vue-flow/core'
+import type { Elements, Node } from '@vue-flow/core'
 
 type UseFlowSelectionPreviewBarOptions = {
   nodes: Ref<Node[]>
   flowPromptText: Ref<string>
   flowPromptRatio: Ref<string>
   flowPromptQuality: Ref<string>
-  clearFlowSelection: () => boolean
-  commitNodes: (nodes: Node[]) => void
+  clearFlowSelection: (elements?: Elements) => boolean
   getViewport: () => { x: number; y: number; zoom: number }
   setViewport: (vp: { x: number; y: number; zoom: number }) => void
   runPatternGenerate: (prompt: string, ratio: string, quality: string) => Promise<void>
@@ -30,12 +29,10 @@ export function useFlowSelectionPreviewBar(options: UseFlowSelectionPreviewBarOp
 
   function onRemoveSelectedPreviewItem(id: number) {
     const nodeId = `message-${id}`
-    // Deselect the node instead of deleting — matches original canvas behavior
-    const nextNodes = (options.nodes.value as Array<{ id: string; selected?: boolean }>).map((node) => {
-      if (node.id !== nodeId || !node.selected) return node
-      return { ...node, selected: false }
-    })
-    options.commitNodes(nextNodes as Node[])
+    const node = (options.nodes.value as Array<Node & { selected?: boolean }>).find(node => node.id === nodeId)
+    if (!node?.selected) return
+    // Deselect the node instead of deleting; Vue Flow owns selected state.
+    options.clearFlowSelection([node])
   }
 
   function onFocusSelectedPreviewItem(id: number) {

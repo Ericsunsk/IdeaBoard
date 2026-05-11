@@ -27,10 +27,6 @@ export function useFlowConnectionVisuals() {
     connectingSourceHandle.value = null
   }
 
-  function onFlowEdgeUpdateStart() {
-    // Keep the current source-handle tone on edge-update interactions.
-  }
-
   function onFlowEdgeUpdateEnd() {
     connectingSourceHandle.value = null
   }
@@ -40,7 +36,6 @@ export function useFlowConnectionVisuals() {
     flowConnectionLineStyle,
     onFlowConnectStart,
     onFlowConnectEnd,
-    onFlowEdgeUpdateStart,
     onFlowEdgeUpdateEnd,
   }
 }

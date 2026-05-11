@@ -1,5 +1,5 @@
 import { type Ref } from 'vue'
-import type { Edge, Node, NodeMouseEvent } from '@vue-flow/core'
+import type { Edge, Elements, Node, NodeMouseEvent } from '@vue-flow/core'
 
 type UseFlowSelectionControllerOptions = {
   nodes: Ref<Node[]>
@@ -10,50 +10,35 @@ type UseFlowSelectionControllerOptions = {
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
   _deleteSelectedFlowElements: () => void
-  commitNodes: (nodes: Node[]) => void
-  commitEdges: (edges: Edge[]) => void
+  clearSelectedElements: (elements?: Elements) => void
+  selectFlowNodes: (nodes: Node[]) => void
 }
 
 export function useFlowSelectionController(options: UseFlowSelectionControllerOptions) {
-  function clearFlowSelection(): boolean {
-    let hasSelection = false
-    const nextNodes = (options.nodes.value as Array<Node & { selected?: boolean }>).map((node) => {
-      if (node.selected) {
-        hasSelection = true
-        return { ...node, selected: false }
-      }
-      return node
-    })
-    const nextEdges = (options.edges.value as Array<Edge & { selected?: boolean }>).map((edge) => {
-      if (edge.selected) {
-        hasSelection = true
-        return { ...edge, selected: false }
-      }
-      return edge
-    })
-    if (!hasSelection) return false
-    options.commitNodes(nextNodes)
-    options.commitEdges(nextEdges)
+  function getSelectedElements(): Elements {
+    return [
+      ...(options.nodes.value as Array<Node & { selected?: boolean }>).filter(node => !!node.selected),
+      ...(options.edges.value as Array<Edge & { selected?: boolean }>).filter(edge => !!edge.selected),
+    ]
+  }
+
+  function clearFlowSelection(elements?: Elements): boolean {
+    const targetElements = elements ?? getSelectedElements()
+    if (targetElements.length === 0) return false
+    options.clearSelectedElements(targetElements)
     return true
   }
 
-  function selectSingleFlowNode(nodeId: string): boolean {
-    let hasChanged = false
-    const nextNodes = (options.nodes.value as Array<Node & { selected?: boolean }>).map((node) => {
-      const shouldBeSelected = node.id === nodeId
-      const isSelected = !!node.selected
-      if (isSelected === shouldBeSelected) return node
-      hasChanged = true
-      return { ...node, selected: shouldBeSelected }
-    })
-    const nextEdges = (options.edges.value as Array<Edge & { selected?: boolean }>).map((edge) => {
-      if (!edge.selected) return edge
-      hasChanged = true
-      return { ...edge, selected: false }
-    })
+  function selectFlowNodeForContextMenu(nodeId: string): boolean {
+    const targetNode = options.nodes.value.find(node => node.id === nodeId)
+    if (!targetNode) return false
+    const selectedElements = getSelectedElements()
+    const hasChanged = selectedElements.length !== 1 || selectedElements[0]?.id !== nodeId
     if (!hasChanged) return false
-    options.commitNodes(nextNodes)
-    options.commitEdges(nextEdges)
+    if (selectedElements.length > 0) {
+      options.clearSelectedElements(selectedElements)
+    }
+    options.selectFlowNodes([targetNode])
     return true
   }
 
@@ -62,7 +47,6 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     options.closeNodeContextMenu()
     options.activeMessageActionNodeId.value = null
     options.hideFlowStyleStrengthControl()
-    clearFlowSelection()
   }
 
   function onFlowNodeClick(_payload: NodeMouseEvent) {
@@ -87,7 +71,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
 
   return {
     clearFlowSelection,
-    selectSingleFlowNode,
+    selectFlowNodeForContextMenu,
     onPaneClick,
     onFlowNodeClick,
     onFlowNodeMouseDown,

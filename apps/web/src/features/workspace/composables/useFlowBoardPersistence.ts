@@ -38,7 +38,7 @@ export type UseFlowBoardPersistenceOptions = {
   getUserIdentity: () => { userId: number; userUid: string }
   commitNodes: (nodes: unknown[]) => void
   commitEdges: (edges: unknown[]) => void
-  onGraphCommitted: () => void
+  onGraphCommitted?: () => void
 }
 
 export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions) {
@@ -79,7 +79,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     clearDirtyAfterImport()
     options.clearFlowHistoryBaseline()
     options.refreshSnapshot()
-    options.onGraphCommitted()
+    options.onGraphCommitted?.()
   }
 
   function importEmptyBoardSnapshot() {
@@ -181,7 +181,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       })
       await uploadLifecycle.recycleRemovedUploadsAfterSave(previousSnapshot, stabilizedSnapshot)
       options.refreshSnapshot()
-      options.onGraphCommitted()
+      options.onGraphCommitted?.()
       return true
     } catch (error) {
       options.saveStatus.value = 'failed'
