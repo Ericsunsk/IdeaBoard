@@ -70,8 +70,10 @@ func NewConsumer(
 	taskRepo *accounts.TaskRepository,
 	redisMgr *redis.RedisManager,
 	storageService *storage.StorageService,
+	taskEventHub *accounts.TaskEventHub,
 ) *Consumer {
 	taskRuntime := accounts.NewTaskRuntimeService(accountRepo, taskRepo, redisMgr)
+	taskRuntime.SetEventHub(taskEventHub)
 	consumer := &Consumer{
 		accountRepo:    accountRepo,
 		channelRepo:    channelRepo,

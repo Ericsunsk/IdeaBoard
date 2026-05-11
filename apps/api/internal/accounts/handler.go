@@ -1,9 +1,12 @@
 package accounts
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
+	"time"
 
 	"api/internal/platform/response"
 	"api/internal/tasks"
@@ -209,6 +212,93 @@ func (h *AccountHandler) GetUserTask(c *gin.Context) {
 		return
 	}
 	response.Success(c, gin.H{"task": task.ToUserView()})
+}
+
+// StreamUserTask streams user-safe task updates over Server-Sent Events.
+func (h *AccountHandler) StreamUserTask(c *gin.Context) {
+	userID := c.GetUint64("user_id")
+	taskID := c.Param("task_id")
+	if userID == 0 {
+		response.Error(c, http.StatusUnauthorized, "未登录")
+		return
+	}
+	task, err := h.accountService.GetUserTask(taskID, userID)
+	if err != nil {
+		response.Error(c, http.StatusNotFound, "任务不存在")
+		return
+	}
+	hub := h.accountService.TaskEventHub()
+	if hub == nil {
+		response.Error(c, http.StatusServiceUnavailable, "任务事件服务未配置")
+		return
+	}
+
+	header := c.Writer.Header()
+	header.Set("Content-Type", "text/event-stream")
+	header.Set("Cache-Control", "no-cache")
+	header.Set("Connection", "keep-alive")
+	header.Set("X-Accel-Buffering", "no")
+	c.Status(http.StatusOK)
+	_ = http.NewResponseController(c.Writer).SetWriteDeadline(time.Time{})
+
+	if isTaskTerminalStatus(task.Status) {
+		writeTaskSSEvent(c, task)
+		return
+	}
+
+	events, unsubscribe := hub.Subscribe(taskID)
+	defer unsubscribe()
+
+	// Re-read after subscribing to close the race between initial load and status publish.
+	task, err = h.accountService.GetUserTask(taskID, userID)
+	if err != nil {
+		return
+	}
+	writeTaskSSEvent(c, task)
+	if isTaskTerminalStatus(task.Status) {
+		return
+	}
+
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case <-heartbeat.C:
+			if !writeSSEvent(c, "ping", gin.H{"ts": time.Now().Unix()}) {
+				return
+			}
+		case <-events:
+			latest, err := h.accountService.GetUserTask(taskID, userID)
+			if err != nil {
+				return
+			}
+			if !writeTaskSSEvent(c, latest) {
+				return
+			}
+			if isTaskTerminalStatus(latest.Status) {
+				return
+			}
+		}
+	}
+}
+
+func writeTaskSSEvent(c *gin.Context, task *tasks.Task) bool {
+	return writeSSEvent(c, "task", task.ToUserView())
+}
+
+func writeSSEvent(c *gin.Context, event string, data interface{}) bool {
+	payload, err := json.Marshal(data)
+	if err != nil {
+		return false
+	}
+	if _, err := fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", event, payload); err != nil {
+		return false
+	}
+	c.Writer.Flush()
+	return true
 }
 
 // DeleteUserTask 用户删除自己的任务

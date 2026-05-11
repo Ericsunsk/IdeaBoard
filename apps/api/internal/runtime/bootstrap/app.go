@@ -88,7 +88,9 @@ func Run(args []string) {
 
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
+	taskEventHub := accounts.NewTaskEventHub()
 	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, systemConfigRepo, storageService)
+	accountService.SetTaskEventHub(taskEventHub)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
 	authHandler := auth.NewAuthHandler(userService)
@@ -125,7 +127,7 @@ func Run(args []string) {
 		CORSMiddleware:       buildCORSMiddleware(cfg.App.Env),
 	}, frontendFS)
 
-	consumer := worker.NewConsumer(accountRepo, channelRepo, taskRepo, redisMgr, storageService)
+	consumer := worker.NewConsumer(accountRepo, channelRepo, taskRepo, redisMgr, storageService, taskEventHub)
 	go consumer.Start(5)
 
 	port := os.Getenv("PORT")

@@ -174,6 +174,7 @@ func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 	userApi.GET("/info", h.AuthHandler.GetCurrentUser)
 	userApi.POST("/drawing/submit", h.AccountHandler.SubmitTask)
+	userApi.GET("/drawing/:task_id/events", h.AccountHandler.StreamUserTask)
 	userApi.GET("/drawing/:task_id", h.AccountHandler.GetUserTask)
 	userApi.DELETE("/drawing/:task_id", h.AccountHandler.DeleteUserTask)
 	userApi.GET("/drawing", h.AccountHandler.GetUserTasks)

@@ -73,6 +73,39 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 	}
 }
 
+func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewTaskRuntimeService(nil, taskRepo, nil)
+	hub := NewTaskEventHub()
+	service.SetEventHub(hub)
+	events, unsubscribe := hub.Subscribe("task-publish")
+	defer unsubscribe()
+
+	task := &tasks.Task{
+		TaskID:    "task-publish",
+		UserID:    1,
+		ChannelID: 1,
+		Status:    tasks.StatusPending,
+	}
+	if err := taskRepo.Create(task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if err := service.MarkTaskRunning(task.TaskID, 42); err != nil {
+		t.Fatalf("MarkTaskRunning returned error: %v", err)
+	}
+
+	select {
+	case event := <-events:
+		if event.TaskID != task.TaskID || event.Status != tasks.StatusRunning {
+			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, task.TaskID, tasks.StatusRunning)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for running event")
+	}
+}
+
 func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := NewTaskRepository(db)
