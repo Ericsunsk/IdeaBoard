@@ -209,7 +209,6 @@ import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovate
 import { useFlowMessageImageInteractions } from '../composables/useFlowMessageImageInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
-import type { FlowNodeData } from '../types/flowTypes'
 import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 import type { CanvasBoardSnapshot } from '../../workspace/types/canvasNodes'
 import {
@@ -705,7 +704,6 @@ const {
   onFlowMaskSetCanvasRef,
   renderMaskNodeMask,
   onFlowMaskCanvasMouseDown,
-  stopMaskPainting,
   clearMaskCanvas,
   removeMaskRuntimeForNode,
 } = useFlowMaskDrawing({

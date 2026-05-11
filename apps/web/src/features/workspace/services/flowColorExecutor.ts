@@ -199,7 +199,7 @@ export async function executeFlowColorNode(
     return { urls: [composedUrl] }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Color 任务执行失败'
-    throw new Error(sanitizeApiErrorMessage(msg, 'Color 任务执行失败'))
+    throw new Error(sanitizeApiErrorMessage(msg, 'Color 任务执行失败'), { cause: error })
   } finally {
     await cleanupFlowExecutionMaskAsset(executionMaskAsset, options.boardId)
     await cleanupFlowLocalInpaintAssets(localInpaint, options.boardId)

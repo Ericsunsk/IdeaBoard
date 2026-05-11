@@ -129,7 +129,7 @@ export async function executeFlowEnhanceNode(
     return { urls }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Enhance 任务执行失败'
-    throw new Error(sanitizeApiErrorMessage(msg, 'Enhance 任务执行失败'))
+    throw new Error(sanitizeApiErrorMessage(msg, 'Enhance 任务执行失败'), { cause: error })
   } finally {
     await cleanupFlowExecutionMaskAsset(executionMaskAsset, options.boardId)
   }

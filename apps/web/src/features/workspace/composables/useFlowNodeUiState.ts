@@ -15,7 +15,6 @@ import {
   type CanvasExecutionOutputNodeType,
   type CanvasNodeItem,
   type ColorNodeItem,
-  type EditNodeItem,
   type ViewpointNodeItem,
 } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'

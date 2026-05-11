@@ -363,7 +363,9 @@ const columns: DataTableColumns<Task> = [
             r.model_set ? h('span', { style: { marginLeft: '4px', color: 'var(--admin-text-3)', fontSize: '11px' } }, r.model_set) : null,
           ])
         }
-      } catch {}
+      } catch {
+        return h('span', { style: { color: 'var(--admin-text-2)', fontSize: '12px' } }, '有结果')
+      }
       return h('span', { style: { color: 'var(--admin-text-2)', fontSize: '12px' } }, '有结果')
     },
   },
@@ -427,7 +429,9 @@ async function loadStats() {
       statsPending.value = (s.pending || 0) + (s.running || 0)
       statsTotal.value = statsSuccess.value + statsFailed.value + statsPending.value
     }
-  } catch {}
+  } catch (error) {
+    console.error('加载监控统计失败', error)
+  }
 }
 
 onMounted(() => {

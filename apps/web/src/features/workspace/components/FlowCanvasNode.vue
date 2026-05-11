@@ -7,7 +7,7 @@
         :active="selected"
         :dragging="props.dragging"
         :copy-mode="props.copyMode"
-        :ui-state="props.uiState as PromptNodeUiState | undefined"
+        :ui-state="promptUiState"
         @update:text="onPromptTextUpdate"
         @node-mousedown="noopMouse"
         @delete="onDeleteRequest"
@@ -259,6 +259,7 @@ const props = withDefaults(defineProps<{
   selected: false,
   dragging: false,
   copyMode: false,
+  uiState: undefined,
   maskSourceImageUrl: '',
   maskSourceImageRatio: 1,
   maskHasConnectedImageInput: false,
@@ -318,6 +319,7 @@ const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const isMessageNode = computed(() => props.data.kind === 'message')
 const showDefaultDragZone = computed(() => !isMessageNode.value)
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
+const promptUiState = computed<PromptNodeUiState | undefined>(() => props.uiState as PromptNodeUiState | undefined)
 function resolveSnapshotNode<T>() {
   return props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
     ? ({ ...(props.data.snapshotNode as T), x: 0, y: 0 } as T)

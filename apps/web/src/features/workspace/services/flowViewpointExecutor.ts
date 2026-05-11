@@ -71,6 +71,6 @@ export async function executeFlowViewpointNode(
     return { urls }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Viewpoint 任务执行失败'
-    throw new Error(sanitizeApiErrorMessage(msg, 'Viewpoint 任务执行失败'))
+    throw new Error(sanitizeApiErrorMessage(msg, 'Viewpoint 任务执行失败'), { cause: error })
   }
 }

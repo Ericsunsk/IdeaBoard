@@ -83,6 +83,6 @@ export async function executeFlowFusionNode(
     return { urls }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Fusion 任务执行失败'
-    throw new Error(sanitizeApiErrorMessage(msg, 'Fusion 任务执行失败'))
+    throw new Error(sanitizeApiErrorMessage(msg, 'Fusion 任务执行失败'), { cause: error })
   }
 }

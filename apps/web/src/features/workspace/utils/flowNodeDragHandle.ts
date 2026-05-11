@@ -6,5 +6,6 @@ export const FLOW_NODE_DRAG_HANDLE = [
 ].join(', ')
 
 export function resolveFlowNodeDragHandle(_kind: FlowNodeKind): string {
+  void _kind
   return FLOW_NODE_DRAG_HANDLE
 }

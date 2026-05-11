@@ -33,7 +33,7 @@ export function useFlowMessageNode(messageSnapshot: Ref<CanvasImageItem | null>)
   })
 
   const messageStyleStrengthMenuStyle = computed(() => {
-    messageImageLayoutVersion.value
+    void messageImageLayoutVersion.value
     const imageEl = messageImageElement.value
     if (!imageEl) {
       return { top: '8px', left: 'calc(100% + 16px)' }

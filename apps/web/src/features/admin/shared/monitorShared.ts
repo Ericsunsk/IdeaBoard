@@ -80,7 +80,9 @@ function getTaskResultImageUrl(result: string): string {
         return imageUrls[0]
       }
     }
-  } catch {}
+  } catch {
+    return ''
+  }
   return ''
 }
 
@@ -191,7 +193,9 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
               r.model_set ? h('span', { style: { marginLeft: '4px', color: 'var(--admin-text-3)', fontSize: '10px' } }, r.model_set) : null,
             ])
           }
-        } catch {}
+        } catch {
+          return h('span', { style: { color: 'var(--admin-text-3)', fontSize: '12px' } }, '-')
+        }
         return h('span', { style: { color: 'var(--admin-text-3)', fontSize: '12px' } }, '-')
       }
     },

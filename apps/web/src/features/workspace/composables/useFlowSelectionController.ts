@@ -1,5 +1,5 @@
 import { type Ref } from 'vue'
-import type { Edge, Elements, Node, NodeMouseEvent } from '@vue-flow/core'
+import type { Edge, Elements, Node } from '@vue-flow/core'
 
 type UseFlowSelectionControllerOptions = {
   nodes: Ref<Node[]>
@@ -49,13 +49,14 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     options.hideFlowStyleStrengthControl()
   }
 
-  function onFlowNodeClick(_payload: NodeMouseEvent) {
+  function onFlowNodeClick() {
     if (options.activeTool.value === 'hand') return
     options.activeMessageActionNodeId.value = null
     options.hideFlowStyleStrengthControl()
   }
 
-  function onFlowNodeMouseDown(_nodeId: string, event: MouseEvent) {
+  function onFlowNodeMouseDown(...args: [string, MouseEvent]) {
+    const event = args[1]
     if (event.button === 0) {
       options.activeMessageActionNodeId.value = null
       options.hideFlowStyleStrengthControl()

@@ -1,7 +1,7 @@
 import { collectCanvasBoardImageUrls, getCanvasBoardState, isImageUrlReferencedInOtherCanvasBoardStates } from '../../boards/lib/canvasBoardState'
 import { uploadApi } from '../../../shared/api/upload'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
-import { filenameFromImageUrl, isDataUrl, resolveFetchUrl, toAbsoluteUrl } from './flowMediaIO'
+import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from './flowMediaIO'
 
 interface StableRef {
   path: string
@@ -163,14 +163,14 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
         }
         return await dataUrlResponse.blob()
       } catch (error) {
-        throw new Error(`读取 mask 失败：${error instanceof Error ? error.message : '未知错误'}`)
+        throw new Error(`读取 mask 失败：${error instanceof Error ? error.message : '未知错误'}`, { cause: error })
       }
     }
     let response: Response
     try {
       response = await fetch(resolveFetchUrl(raw), { credentials: 'include' })
     } catch (error) {
-      throw new Error(`下载图片失败：${error instanceof Error ? error.message : '网络异常'}`)
+      throw new Error(`下载图片失败：${error instanceof Error ? error.message : '网络异常'}`, { cause: error })
     }
     if (!response.ok) {
       throw new Error(`下载图片失败：HTTP ${response.status}`)
@@ -251,7 +251,7 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
         ref.set(await task)
       } catch (error) {
         const reason = error instanceof Error ? error.message : '未知错误'
-        throw new Error(`保存失败：${ref.path} 使用了不稳定图片链接，${reason}`)
+        throw new Error(`保存失败：${ref.path} 使用了不稳定图片链接，${reason}`, { cause: error })
       }
     }
     return next

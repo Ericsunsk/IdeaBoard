@@ -76,7 +76,7 @@ export const useUserStore = defineStore('user', () => {
       if (result?.error) {
         logoutSuccess = false
       }
-    } catch (e) {
+    } catch {
       logoutSuccess = false
     }
     resetAuth()

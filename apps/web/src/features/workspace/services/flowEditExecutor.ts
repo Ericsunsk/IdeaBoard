@@ -245,6 +245,6 @@ export async function executeFlowEditNode(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Edit 任务执行失败'
-    throw new Error(sanitizeApiErrorMessage(msg, 'Edit 任务执行失败'))
+    throw new Error(sanitizeApiErrorMessage(msg, 'Edit 任务执行失败'), { cause: error })
   }
 }

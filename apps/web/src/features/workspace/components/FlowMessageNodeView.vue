@@ -15,16 +15,17 @@
       @load="onMessageImageLoad"
       @dragstart="$emit('image-dragstart', $event)"
     />
-    <button
-      v-for="direction in MESSAGE_RESIZE_DIRECTIONS"
-      v-if="selected && !isMessagePending"
-      :key="`message-resize-${direction}`"
-      class="flow-canvas-node__message-resize-handle"
-      :class="`is-${direction}`"
-      type="button"
-      :aria-label="`Resize message image ${direction}`"
-      @mousedown.stop.prevent="$emit('resize-mousedown', { event: $event, direction })"
-    />
+    <template v-if="showResizeHandles">
+      <button
+        v-for="direction in MESSAGE_RESIZE_DIRECTIONS"
+        :key="`message-resize-${direction}`"
+        class="flow-canvas-node__message-resize-handle"
+        :class="`is-${direction}`"
+        type="button"
+        :aria-label="`Resize message image ${direction}`"
+        @mousedown.stop.prevent="$emit('resize-mousedown', { event: $event, direction })"
+      />
+    </template>
     <div v-if="isMessagePending" class="flow-canvas-node__message-pending" aria-hidden="true">
       处理中
     </div>
@@ -84,6 +85,7 @@ const {
 } = useFlowMessageNode(messageSnapshot)
 
 const showMessageActionMenu = computed(() => !!props.messageActionVisible && !!props.node)
+const showResizeHandles = computed(() => props.selected && !isMessagePending.value)
 
 function onMessageImageLoad() {
   _onMessageImageLoad()

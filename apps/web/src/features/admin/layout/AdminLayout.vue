@@ -116,9 +116,6 @@ import {
 import {
     PeopleOutline,
     LinkOutline,
-    KeyOutline,
-    PulseOutline,
-    DocumentTextOutline,
     ChatbubbleEllipsesOutline,
     CloudOutline,
     SpeedometerOutline,

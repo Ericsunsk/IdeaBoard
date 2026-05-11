@@ -101,12 +101,13 @@ export function filenameFromImageUrl(raw: string, mime: string, fallbackPrefix =
   if (!url) return `flow-stable-${stamp}.${ext}`
   const segments = url.pathname.split('/').filter(Boolean)
   const last = segments[segments.length - 1] || fallbackPrefix
-  let decodedLast = last
-  try {
-    decodedLast = decodeURIComponent(last)
-  } catch {
-    decodedLast = last
-  }
+  const decodedLast = (() => {
+    try {
+      return decodeURIComponent(last)
+    } catch {
+      return last
+    }
+  })()
   const safeLast = decodedLast.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '')
   const hasExt = /\.[A-Za-z0-9]{1,10}$/.test(safeLast)
   if (!safeLast || !hasExt) return `flow-stable-${stamp}.${ext}`

@@ -160,9 +160,12 @@ async function refreshBoardPreviewInBackground(boardId: string) {
   const startState = getCanvasBoardState(boardId)
   if (!startState || !isBoardPreviewStale(boardId)) return
   const baseUpdatedAt = startState.updatedAt
-  let snapshotDataUrl = ''
+  let snapshotDataUrl: string | undefined
+  let snapshotUpdatedAt: number | undefined
   try {
-    snapshotDataUrl = await renderBoardPreviewDataUrl(startState)
+    const renderedDataUrl = await renderBoardPreviewDataUrl(startState)
+    snapshotDataUrl = renderedDataUrl || undefined
+    snapshotUpdatedAt = renderedDataUrl ? Date.now() : undefined
   } catch (error) {
     console.warn('[boards] failed to render board preview', boardId, error)
     return
@@ -175,8 +178,8 @@ async function refreshBoardPreviewInBackground(boardId: string) {
   }
   const updatedState = setCanvasBoardPreviewSnapshot(
     boardId,
-    snapshotDataUrl || undefined,
-    snapshotDataUrl ? Date.now() : undefined,
+    snapshotDataUrl,
+    snapshotUpdatedAt,
   )
   if (!updatedState) return
   boardPreviewMap.value = {

@@ -1,4 +1,4 @@
-import { computed, nextTick, type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { resolveConnectedExecutionInput, resolveFlowSourceImageRatio, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
 import type { CanvasConnectionNodeType, ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'

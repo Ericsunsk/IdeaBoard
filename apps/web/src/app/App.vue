@@ -15,7 +15,6 @@
 
 <script setup lang="ts">
 import { darkTheme, zhCN } from 'naive-ui'
-import { defineComponent } from 'vue'
 
 const naiveLocale = zhCN
 const route = useRoute()

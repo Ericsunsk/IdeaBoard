@@ -183,7 +183,7 @@ export async function resolveFlowExecutionMaskAsset(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : '未知错误'
-    throw new Error(`处理 Mask 失败：${msg}`)
+    throw new Error(`处理 Mask 失败：${msg}`, { cause: error })
   }
 }
 

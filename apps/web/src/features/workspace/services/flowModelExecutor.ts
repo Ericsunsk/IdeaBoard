@@ -103,6 +103,6 @@ export async function executeFlowModelNode(
     return { urls }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Model 任务执行失败'
-    throw new Error(sanitizeApiErrorMessage(msg, 'Model 任务执行失败'))
+    throw new Error(sanitizeApiErrorMessage(msg, 'Model 任务执行失败'), { cause: error })
   }
 }

@@ -28,6 +28,8 @@ withDefaults(
     size?: 'default' | 'small'
   }>(),
   {
+    provider: '',
+    status: '',
     statusVariant: 'neutral',
     size: 'default'
   }
