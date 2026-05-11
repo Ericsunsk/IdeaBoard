@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -239,10 +240,14 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 	header.Set("Connection", "keep-alive")
 	header.Set("X-Accel-Buffering", "no")
 	c.Status(http.StatusOK)
-	_ = http.NewResponseController(c.Writer).SetWriteDeadline(time.Time{})
+	if err := http.NewResponseController(c.Writer).SetWriteDeadline(time.Time{}); err != nil {
+		log.Printf("[SSE] clear write deadline failed task_id=%s err=%v", taskID, err)
+	}
 
 	if isTaskTerminalStatus(task.Status) {
-		writeTaskSSEvent(c, task)
+		if !writeTaskSSEvent(c, task) {
+			return
+		}
 		return
 	}
 
@@ -254,7 +259,9 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	writeTaskSSEvent(c, task)
+	if !writeTaskSSEvent(c, task) {
+		return
+	}
 	if isTaskTerminalStatus(task.Status) {
 		return
 	}

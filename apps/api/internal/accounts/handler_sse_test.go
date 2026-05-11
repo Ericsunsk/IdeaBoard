@@ -1,10 +1,14 @@
 package accounts
 
 import (
+	"bufio"
+	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"api/internal/tasks"
 
@@ -58,5 +62,99 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	}
 	if strings.Contains(body, "internal prompt") || strings.Contains(body, "account_id") || strings.Contains(body, "channel_id") {
 		t.Fatalf("body leaked internal task fields: %s", body)
+	}
+}
+
+func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewAccountService(nil, taskRepo, nil, nil, nil)
+	hub := NewTaskEventHub()
+	service.SetTaskEventHub(hub)
+
+	task := &tasks.Task{
+		TaskID:     "task-sse-live",
+		UserID:     8,
+		ChannelID:  99,
+		AccountID:  21,
+		Prompt:     "internal prompt",
+		UserPrompt: "user prompt",
+		Status:     tasks.StatusPending,
+	}
+	if err := taskRepo.Create(task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	handler := NewAccountHandler(service)
+	router := gin.New()
+	router.GET("/events/:task_id", func(c *gin.Context) {
+		c.Set("user_id", uint64(8))
+		handler.StreamUserTask(c)
+	})
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/events/"+task.TaskID, nil)
+	if err != nil {
+		t.Fatalf("create request failed: %v", err)
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("do request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		time.Sleep(80 * time.Millisecond)
+		now := time.Now()
+		rows, updateErr := taskRepo.UpdateByTaskIDAndStatuses(task.TaskID, []string{tasks.StatusPending}, map[string]interface{}{
+			"status":       tasks.StatusCompleted,
+			"result":       `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`,
+			"completed_at": now,
+		})
+		if updateErr != nil {
+			done <- updateErr
+			return
+		}
+		if rows != 1 {
+			done <- fmt.Errorf("unexpected updated rows: %d", rows)
+			return
+		}
+		hub.Publish(task.TaskID, TaskEvent{TaskID: task.TaskID, Status: tasks.StatusCompleted})
+		done <- nil
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	reader := bufio.NewReader(resp.Body)
+	var payload strings.Builder
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("timeout waiting sse payload: %s", payload.String())
+		default:
+		}
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			t.Fatalf("read stream failed: %v, payload=%s", readErr, payload.String())
+		}
+		payload.WriteString(line)
+		body := payload.String()
+		if strings.Contains(body, `"status":"pending"`) && strings.Contains(body, `"status":"completed"`) {
+			if strings.Contains(body, "internal prompt") || strings.Contains(body, "account_id") || strings.Contains(body, "channel_id") {
+				t.Fatalf("stream leaked internal task fields: %s", body)
+			}
+			if err := <-done; err != nil {
+				t.Fatalf("update/publish failed: %v", err)
+			}
+			return
+		}
 	}
 }

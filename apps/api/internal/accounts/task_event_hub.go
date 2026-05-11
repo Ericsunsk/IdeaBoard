@@ -1,16 +1,12 @@
 package accounts
 
-import (
-	"sync"
-
-	"api/internal/tasks"
-)
+import "sync"
 
 // TaskEvent is emitted when a task's status changes.
+// It carries minimal data; consumers should call GetUserTask for the full safe view.
 type TaskEvent struct {
 	TaskID string
 	Status string
-	Task   *tasks.Task
 }
 
 // taskSubscription represents a single subscriber to a task's events.
@@ -34,8 +30,8 @@ func NewTaskEventHub() *TaskEventHub {
 }
 
 // Subscribe returns a channel that receives TaskEvents for the given taskID,
-// and an unsubscribe function. The channel is buffered to avoid blocking
-// publishers on slow consumers.
+// and an unsubscribe function. Unsubscribe removes the subscriber from the hub
+// but does not close the channel.
 func (h *TaskEventHub) Subscribe(taskID string) (<-chan TaskEvent, func()) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -73,7 +69,8 @@ func (h *TaskEventHub) Subscribe(taskID string) (<-chan TaskEvent, func()) {
 }
 
 // Publish sends an event to all subscribers of the given taskID.
-// It is non-blocking; slow consumers keep the newest status.
+// It is non-blocking; for slow consumers older buffered events may be dropped
+// to keep delivery moving and preserve the latest status when possible.
 func (h *TaskEventHub) Publish(taskID string, event TaskEvent) {
 	h.mu.RLock()
 	subs := h.subs[taskID]

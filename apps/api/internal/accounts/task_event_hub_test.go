@@ -3,8 +3,6 @@ package accounts
 import (
 	"testing"
 	"time"
-
-	"api/internal/tasks"
 )
 
 func TestTaskEventHub_SubscribeAndPublish(t *testing.T) {
@@ -13,7 +11,7 @@ func TestTaskEventHub_SubscribeAndPublish(t *testing.T) {
 	ch, unsub := hub.Subscribe("task-1")
 	defer unsub()
 
-	event := TaskEvent{TaskID: "task-1", Status: "running", Task: &tasks.Task{TaskID: "task-1", Status: "running"}}
+	event := TaskEvent{TaskID: "task-1", Status: "running"}
 	hub.Publish("task-1", event)
 
 	select {
@@ -32,17 +30,12 @@ func TestTaskEventHub_Unsubscribe(t *testing.T) {
 	ch, unsub := hub.Subscribe("task-1")
 	unsub()
 
-	// Verify channel is closed after unsubscribe
+	// Unsubscribe removes subscription and should not receive further events.
+	hub.Publish("task-1", TaskEvent{TaskID: "task-1", Status: "completed"})
 	select {
-	case _, ok := <-ch:
-		if ok {
-			t.Error("channel should be closed after unsubscribe but it isn't")
-			// drain
-			for range ch {
-			}
-		}
+	case event := <-ch:
+		t.Fatalf("unexpected event after unsubscribe: %+v", event)
 	case <-time.After(100 * time.Millisecond):
-		// Channel might still be open but subscriber removed
 	}
 
 	if hub.SubscriberCount("task-1") != 0 {

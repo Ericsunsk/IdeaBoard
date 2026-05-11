@@ -341,7 +341,6 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 
 	if err := s.redisMgr.PushGlobalQueue(context.Background(), queueTask); err != nil {
 		_ = s.taskRepo.MarkQueueFailed(taskID, "任务入队失败: "+err.Error())
-		s.taskRuntime.publishTaskEvent(taskID)
 		if failedTask, loadErr := s.taskRepo.GetByTaskID(taskID); loadErr == nil {
 			if statErr := s.taskRepo.UpsertDailyStatByTask(failedTask); statErr != nil {
 				log.Printf("[AccountService] upsert daily stat failed after queue fail, task_id=%s err=%v", taskID, statErr)
@@ -352,7 +351,6 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
-	s.taskRuntime.publishTaskEvent(taskID)
 	return taskID, nil
 }
 
