@@ -513,18 +513,16 @@ const {
 })
 
 function commitFlowNodes(nextNodes: Node[]) {
-  nodes.value = nextNodes
   setNodes(nextNodes)
 }
 
 function commitFlowEdges(nextEdges: Edge[]) {
-  edges.value = nextEdges
   setEdges(nextEdges)
 }
 
 function commitFlowNodesAppend(nextNodes: Node[]) {
   const combined = [...(nodes.value as Node[]), ...nextNodes]
-  commitFlowNodes(combined)
+  setNodes(combined)
   scheduleFlowNodeInternalsRefresh(nextNodes.map(node => node.id))
 }
 
