@@ -25,6 +25,7 @@ type TaskRuntimeService struct {
 	accountRepo *AccountRepository
 	taskRepo    *TaskRepository
 	redisMgr    *redis.RedisManager
+	hub         *TaskEventHub
 }
 
 func NewTaskRuntimeService(
@@ -37,6 +38,11 @@ func NewTaskRuntimeService(
 		taskRepo:    taskRepo,
 		redisMgr:    redisMgr,
 	}
+}
+
+// SetEventHub injects the event hub for SSE task event streaming.
+func (s *TaskRuntimeService) SetEventHub(hub *TaskEventHub) {
+	s.hub = hub
 }
 
 func (s *TaskRuntimeService) RefreshTaskAccounts(task *redis.GlobalQueueTask) error {
@@ -111,6 +117,17 @@ func (s *TaskRuntimeService) WatchTaskCancellation(parent context.Context, taskI
 	return ctx, cancel
 }
 
+func (s *TaskRuntimeService) publishTaskEvent(taskID string) {
+	if s.hub == nil {
+		return
+	}
+	task, err := s.taskRepo.GetByTaskID(taskID)
+	if err != nil {
+		return
+	}
+	s.hub.Publish(taskID, TaskEvent{TaskID: taskID, Status: task.Status, Task: task})
+}
+
 func (s *TaskRuntimeService) MarkTaskRunning(taskID string, accountID uint64) error {
 	if accountID == 0 {
 		return ErrTaskStateConflict
@@ -123,6 +140,7 @@ func (s *TaskRuntimeService) MarkTaskRunning(taskID string, accountID uint64) er
 		return err
 	}
 	if rows > 0 {
+		s.publishTaskEvent(taskID)
 		return nil
 	}
 
@@ -161,6 +179,7 @@ func (s *TaskRuntimeService) MarkTaskCompleted(taskID string, result string) err
 		} else {
 			log.Printf("[TaskRuntime] load task for daily stat failed after complete, task_id=%s err=%v", taskID, getErr)
 		}
+		s.publishTaskEvent(taskID)
 		return nil
 	}
 
@@ -196,6 +215,7 @@ func (s *TaskRuntimeService) MarkTaskFailed(taskID string, reason string) error 
 		} else {
 			log.Printf("[TaskRuntime] load task for daily stat failed after fail, task_id=%s err=%v", taskID, getErr)
 		}
+		s.publishTaskEvent(taskID)
 		return nil
 	}
 
@@ -245,6 +265,7 @@ func (s *TaskRuntimeService) MarkTaskFailedWithRetry(taskID string, accountID ui
 			log.Printf("[TaskRuntime] upsert daily stat failed after fail-with-retry, task_id=%s err=%v", taskID, statErr)
 		}
 	}
+	s.publishTaskEvent(taskID)
 	return nil
 }
 
@@ -280,6 +301,7 @@ func (s *TaskRuntimeService) RequeueTaskForFailover(taskID string, accountID uin
 			return false, err
 		}
 		if rows > 0 {
+			s.publishTaskEvent(taskID)
 			return true, nil
 		}
 		return false, ErrTaskStateConflict
@@ -305,6 +327,7 @@ func (s *TaskRuntimeService) RequeueTaskForFailover(taskID string, accountID uin
 		} else {
 			log.Printf("[TaskRuntime] load task for daily stat failed after failover-final-fail, task_id=%s err=%v", taskID, getErr)
 		}
+		s.publishTaskEvent(taskID)
 		return false, nil
 	}
 

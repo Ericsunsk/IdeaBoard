@@ -1,5 +1,5 @@
 import type { CanvasConnectionNodeType, ImageNodeOutputItem } from '../types/canvasNodes'
-import { waitTaskResultWithQueryClient } from '../../../shared/query/taskQueries'
+import { waitTaskResultWithSse } from '../../../shared/api/taskEvents'
 
 export interface FlowTaskExecutorGraphOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
@@ -80,7 +80,7 @@ export function resolveConnectedExecutionInput(
 }
 
 export async function waitTaskResult(taskId: string): Promise<string[]> {
-  return waitTaskResultWithQueryClient(taskId)
+  return waitTaskResultWithSse(taskId)
 }
 
 /** All node kinds that can produce image output usable as downstream source. */
