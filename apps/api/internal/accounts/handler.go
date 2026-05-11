@@ -322,7 +322,11 @@ func (h *AccountHandler) DeleteUserTask(c *gin.Context) {
 // ============ 监控 API ============
 
 func (h *AccountHandler) GetMonitor(c *gin.Context) {
-	info, _ := h.accountService.GetMonitorInfo()
+	info, err := h.accountService.GetMonitorInfo()
+	if err != nil {
+		response.InternalError(c, 500, "获取监控数据失败", err)
+		return
+	}
 	stats, _ := h.accountService.GetTaskStats()
 	response.Success(c, gin.H{"monitor": info, "stats": stats})
 }

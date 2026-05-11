@@ -21,7 +21,7 @@ func resolvePublicAssetBaseURL() *url.URL {
 		}
 		parsed, err := url.Parse(raw)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-			log.Printf("[Consumer] 忽略无效的公网基址配置: %s=%q", key, raw)
+			log.Printf("[Worker] 忽略无效的公网基址配置: %s=%q", key, raw)
 			continue
 		}
 		return parsed
@@ -107,7 +107,7 @@ func absolutizeAssetURL(base *url.URL, raw string) (string, bool, bool) {
 	return base.ResolveReference(rel).String(), true, false
 }
 
-func (c *Consumer) normalizeUpstreamMediaParams(params map[string]interface{}) {
+func (c *ProviderExecutor) normalizeUpstreamMediaParams(params map[string]interface{}) {
 	if len(params) == 0 {
 		return
 	}
@@ -136,7 +136,7 @@ func (c *Consumer) normalizeUpstreamMediaParams(params map[string]interface{}) {
 		if unresolved {
 			if inlinedValue, handled, err := inlineLocalAssetDataURL(value); handled {
 				if err != nil {
-					log.Printf("[Consumer] 本地媒体内联失败: feature=%s key=%s err=%v", featureSlug, key, err)
+					log.Printf("[Worker] 本地媒体内联失败: feature=%s key=%s err=%v", featureSlug, key, err)
 				} else {
 					params[key] = inlinedValue
 					inlined++
@@ -168,7 +168,7 @@ func (c *Consumer) normalizeUpstreamMediaParams(params map[string]interface{}) {
 				if unresolved {
 					if inlinedValue, handled, err := inlineLocalAssetDataURL(item); handled {
 						if err != nil {
-							log.Printf("[Consumer] 本地媒体内联失败: feature=%s key=%s index=%d err=%v", featureSlug, key, index, err)
+							log.Printf("[Worker] 本地媒体内联失败: feature=%s key=%s index=%d err=%v", featureSlug, key, index, err)
 						} else {
 							values[index] = inlinedValue
 							updated = true
@@ -201,7 +201,7 @@ func (c *Consumer) normalizeUpstreamMediaParams(params map[string]interface{}) {
 				if unresolved {
 					if inlinedValue, handled, err := inlineLocalAssetDataURL(text); handled {
 						if err != nil {
-							log.Printf("[Consumer] 本地媒体内联失败: feature=%s key=%s index=%d err=%v", featureSlug, key, index, err)
+							log.Printf("[Worker] 本地媒体内联失败: feature=%s key=%s index=%d err=%v", featureSlug, key, index, err)
 						} else {
 							values[index] = inlinedValue
 							updated = true
@@ -228,16 +228,16 @@ func (c *Consumer) normalizeUpstreamMediaParams(params map[string]interface{}) {
 	}
 
 	if converted > 0 {
-		log.Printf("[Consumer] 已补全上游媒体地址: feature=%s converted=%d", featureSlug, converted)
+		log.Printf("[Worker] 已补全上游媒体地址: feature=%s converted=%d", featureSlug, converted)
 	}
 	if inlined > 0 {
-		log.Printf("[Consumer] 已内联本地媒体到上游请求: feature=%s inlined=%d", featureSlug, inlined)
+		log.Printf("[Worker] 已内联本地媒体到上游请求: feature=%s inlined=%d", featureSlug, inlined)
 	}
 	if len(unresolvedKeys) > 0 {
 		keys := make([]string, 0, len(unresolvedKeys))
 		for key := range unresolvedKeys {
 			keys = append(keys, key)
 		}
-		log.Printf("[Consumer] 上游媒体地址仍为相对路径，请配置 APP_PUBLIC_BASE_URL: feature=%s keys=%s", featureSlug, strings.Join(keys, ","))
+		log.Printf("[Worker] 上游媒体地址仍为相对路径，请配置 APP_PUBLIC_BASE_URL: feature=%s keys=%s", featureSlug, strings.Join(keys, ","))
 	}
 }

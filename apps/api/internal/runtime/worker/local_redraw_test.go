@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"api/internal/runtime/queuetypes"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -14,7 +15,6 @@ import (
 	"testing"
 
 	"api/internal/accounts"
-	"api/internal/platform/redis"
 )
 
 func mustEncodePNGDataURL(t *testing.T, img image.Image) string {
@@ -159,13 +159,13 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		t.Fatalf("marshal params: %v", err)
 	}
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
 		ModelSet: "gpt-image-1",
 	}
-	task := &redis.GlobalQueueTask{
+	task := &queuetypes.TaskPayload{
 		TaskID: "task-local-redraw",
 		Prompt: "test prompt",
 		Params: string(paramsJSON),

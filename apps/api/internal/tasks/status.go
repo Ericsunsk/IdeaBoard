@@ -7,9 +7,4 @@ const (
 	StatusFailed    = "failed"
 )
 
-const (
-	QueueAssignStatusQueueFull = "queue_full"
-	QueueAssignStatusWaitQueue = "wait_queue"
-)
-
 const ResultStatusSuccess = "success"

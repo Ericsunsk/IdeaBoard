@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"api/internal/runtime/queuetypes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -11,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/platform/redis"
 	"api/internal/platform/settings"
 	"api/internal/prompts"
 	"api/internal/runtime/taskqueue"
@@ -22,7 +22,8 @@ import (
 type AccountService struct {
 	accountRepo      *AccountRepository
 	taskRepo         *TaskRepository
-	queue            taskqueue.TaskQueue
+	queue            taskqueue.TaskEnqueuer
+	queueStats       taskqueue.QueueStatsStore
 	concurrencyStore taskqueue.AccountConcurrencyStore
 	cancelStore      taskqueue.TaskCancellationStore
 	monitorStore     taskqueue.TaskMonitorStore
@@ -42,22 +43,11 @@ const taskCancelTTL = 24 * time.Hour
 const defaultAccountTimeoutSeconds = 120
 const maxTaskKeywordLength = 200
 
-func NewAccountService(
-	accountRepo *AccountRepository,
-	taskRepo *TaskRepository,
-	redisMgr *redis.RedisManager,
-	systemConfigRepo *settings.SystemConfigRepository,
-	previewResolver previewURLResolver,
-) *AccountService {
-	// Compatibility wrapper for default Redis wiring.
-	redisQueue := taskqueue.NewRedisQueue(redisMgr)
-	return NewAccountServiceWithQueue(accountRepo, taskRepo, redisQueue, redisQueue, redisQueue, redisQueue, redisQueue, systemConfigRepo, previewResolver)
-}
-
 func NewAccountServiceWithQueue(
 	accountRepo *AccountRepository,
 	taskRepo *TaskRepository,
-	queue taskqueue.TaskQueue,
+	queue taskqueue.TaskEnqueuer,
+	queueStats taskqueue.QueueStatsStore,
 	assigner taskqueue.TaskAssigner,
 	concurrencyStore taskqueue.AccountConcurrencyStore,
 	cancelStore taskqueue.TaskCancellationStore,
@@ -69,6 +59,7 @@ func NewAccountServiceWithQueue(
 		accountRepo:      accountRepo,
 		taskRepo:         taskRepo,
 		queue:            queue,
+		queueStats:       queueStats,
 		assigner:         assigner,
 		concurrencyStore: concurrencyStore,
 		cancelStore:      cancelStore,
@@ -148,7 +139,7 @@ func (s *AccountService) ListAccounts(req *AccountListRequest) ([]*AccountWithLo
 	for i := range accounts {
 		accountIDs[i] = accounts[i].ID
 	}
-	loadInfo := map[uint64]*redis.AccountLoad{}
+	loadInfo := map[uint64]*queuetypes.AccountLoad{}
 	if s.assigner != nil {
 		loads, loadErr := s.assigner.GetAccountLoadInfo(ctx, accountIDs)
 		if loadErr != nil {
@@ -158,8 +149,8 @@ func (s *AccountService) ListAccounts(req *AccountListRequest) ([]*AccountWithLo
 		}
 	}
 	waitQueueCount := 0
-	if s.queue != nil {
-		_, wait, waitErr := s.queue.QueueLengths(ctx)
+	if s.queueStats != nil {
+		_, wait, waitErr := s.queueStats.QueueLengths(ctx)
 		if waitErr != nil {
 			log.Printf("[AccountService] 查询等待队列长度失败: %v", waitErr)
 		} else {
@@ -389,7 +380,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	}
 
 	// 推送到全局队列
-	queueTask := &redis.GlobalQueueTask{
+	queueTask := &queuetypes.TaskPayload{
 		TaskID:     taskID,
 		UserID:     userID,
 		Prompt:     fullPrompt,
@@ -478,9 +469,15 @@ func (s *AccountService) GetUserTasks(userID uint64, page, pageSize int) ([]*tas
 
 // ============ 监控 ============
 
-func (s *AccountService) GetMonitorInfo() (*redis.MonitorInfo, error) {
+func (s *AccountService) GetMonitorInfo() (*queuetypes.MonitorInfo, error) {
 	ctx := context.Background()
-	accounts, _ := s.accountRepo.GetAllEnabled()
+	if s.monitorStore == nil {
+		return nil, fmt.Errorf("monitor store not configured")
+	}
+	accounts, err := s.accountRepo.GetAllEnabled()
+	if err != nil {
+		return nil, err
+	}
 	accountIDs := make([]uint64, len(accounts))
 	for i, acc := range accounts {
 		accountIDs[i] = acc.ID
@@ -986,18 +983,6 @@ func extractTaskUser(rawResult string, fallbackUserID uint64) string {
 		return "unknown"
 	}
 	return fmt.Sprintf("%d", fallbackUserID)
-}
-
-func (s *AccountService) MarkTaskRunning(taskID string, accountID uint64) error {
-	return s.taskRuntime.MarkTaskRunning(taskID, accountID)
-}
-
-func (s *AccountService) MarkTaskCompleted(taskID string, result string) error {
-	return s.taskRuntime.MarkTaskCompleted(taskID, result)
-}
-
-func (s *AccountService) MarkTaskFailed(taskID string, accountID uint64, errMsg string) error {
-	return s.taskRuntime.MarkTaskFailedWithRetry(taskID, accountID, errMsg)
 }
 
 // generateSecureTaskID produces a non-guessable task identifier using crypto/rand.

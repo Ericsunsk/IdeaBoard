@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"api/internal/runtime/queuetypes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,7 +9,6 @@ import (
 	"log"
 	"time"
 
-	"api/internal/platform/redis"
 	"api/internal/runtime/taskqueue"
 	"api/internal/tasks"
 	"gorm.io/gorm"
@@ -30,15 +30,6 @@ type TaskRuntimeService struct {
 	hub         *TaskEventHub
 }
 
-func NewTaskRuntimeService(
-	accountRepo *AccountRepository,
-	taskRepo *TaskRepository,
-	redisMgr *redis.RedisManager,
-) *TaskRuntimeService {
-	redisQueue := taskqueue.NewRedisQueue(redisMgr)
-	return NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, redisQueue, redisQueue)
-}
-
 func NewTaskRuntimeServiceWithQueue(
 	accountRepo *AccountRepository,
 	taskRepo *TaskRepository,
@@ -58,7 +49,7 @@ func (s *TaskRuntimeService) SetEventHub(hub *TaskEventHub) {
 	s.hub = hub
 }
 
-func (s *TaskRuntimeService) RefreshTaskAccounts(task *redis.GlobalQueueTask) error {
+func (s *TaskRuntimeService) RefreshTaskAccounts(task *queuetypes.TaskPayload) error {
 	accounts, err := s.accountRepo.GetAllEnabled()
 	if err != nil {
 		return err
@@ -244,38 +235,42 @@ func (s *TaskRuntimeService) MarkTaskFailed(taskID string, reason string) error 
 	return ErrTaskStateConflict
 }
 
-func (s *TaskRuntimeService) MarkTaskFailedWithRetry(taskID string, accountID uint64, errMsg string) error {
-	task, err := s.taskRepo.GetByTaskID(taskID)
+func (s *TaskRuntimeService) ResetTaskRunningToPending(taskID string, accountID uint64, reason string) error {
+	if accountID == 0 {
+		return ErrTaskStateConflict
+	}
+
+	updates := map[string]interface{}{
+		"status":     tasks.StatusPending,
+		"account_id": 0,
+	}
+	if reason != "" {
+		updates["error_msg"] = reason
+	}
+
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, updates)
 	if err != nil {
 		return err
 	}
-
-	task.RetryCount++
-	task.ErrorMsg = errMsg
-	if task.RetryCount >= defaultTaskRetryLimit {
-		task.Status = tasks.StatusFailed
-		now := time.Now()
-		task.CompletedAt = &now
-	} else {
-		task.Status = tasks.StatusPending
+	if rows > 0 {
+		s.publishTaskStatusEvent(taskID, tasks.StatusPending)
+		return nil
 	}
 
-	if accountID > 0 {
-		if _, _, err := s.RecordAccountFailure(accountID); err != nil {
-			return err
+	task, err := s.taskRepo.GetByTaskID(taskID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTaskNotFound
 		}
-	}
-
-	if err := s.taskRepo.Update(task); err != nil {
 		return err
 	}
-	if task.Status == tasks.StatusFailed {
-		if statErr := s.taskRepo.UpsertDailyStatByTask(task); statErr != nil {
-			log.Printf("[TaskRuntime] upsert daily stat failed after fail-with-retry, task_id=%s err=%v", taskID, statErr)
-		}
+	if task.Status == tasks.StatusPending {
+		return nil
 	}
-	s.publishTaskStatusEvent(taskID, task.Status)
-	return nil
+	if isTaskTerminalStatus(task.Status) {
+		return ErrTaskTerminal
+	}
+	return ErrTaskStateConflict
 }
 
 func (s *TaskRuntimeService) RequeueTaskForFailover(taskID string, accountID uint64, errMsg string) (bool, error) {

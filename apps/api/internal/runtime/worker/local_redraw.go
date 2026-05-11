@@ -66,7 +66,7 @@ func (s maskCoverageSampler) coverageAt(x, y int) uint8 {
 	return uint8(luminance >> 8)
 }
 
-func (c *Consumer) prepareLocalRedrawPipeline(ctx context.Context, account *accounts.ApiAccount, params map[string]interface{}, timeout time.Duration) (*localRedrawContext, error) {
+func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, account *accounts.ApiAccount, params map[string]interface{}, timeout time.Duration) (*localRedrawContext, error) {
 	if !shouldUseLocalRedrawPipeline(params) {
 		return nil, nil
 	}
@@ -123,7 +123,7 @@ func (c *Consumer) prepareLocalRedrawPipeline(ctx context.Context, account *acco
 	}, nil
 }
 
-func (c *Consumer) finalizeLocalRedrawResult(ctx context.Context, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, bool, error) {
+func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, bool, error) {
 	if redraw == nil {
 		return upstreamImageRef, false, nil
 	}

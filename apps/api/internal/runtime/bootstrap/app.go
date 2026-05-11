@@ -75,7 +75,19 @@ func Run(args []string) {
 		log.Fatalf("[Main] Failed to connect to Redis: %v", err)
 	}
 	redisMgr := redis.NewRedisManager(rdb.GetClient())
-	redisQueue := taskqueue.NewRedisQueue(redisMgr)
+	redisAsynqAssigner := taskqueue.NewRedisAsynqAssigner(redisMgr)
+	asynqConnOpt := worker.BuildAsynqRedisConnOpt(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Auth)
+	asynqQueue := taskqueue.NewAsynqQueue(
+		asynqConnOpt,
+		redisMgr,
+		time.Duration(cfg.Queue.AsynqTaskTimeoutSeconds)*time.Second,
+		cfg.Queue.AsynqMaxRetry,
+	)
+	defer func() {
+		if err := asynqQueue.Close(); err != nil {
+			log.Printf("[Main] Failed to close asynq queue resources: %v", err)
+		}
+	}()
 
 	userRepo := users.NewUserRepository(db)
 	if err := userRepo.EnsureStorageUIDs(); err != nil {
@@ -91,7 +103,18 @@ func Run(args []string) {
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
 	taskEventHub := accounts.NewTaskEventHub()
-	accountService := accounts.NewAccountServiceWithQueue(accountRepo, taskRepo, redisQueue, redisQueue, redisQueue, redisQueue, redisQueue, systemConfigRepo, storageService)
+	accountService := accounts.NewAccountServiceWithQueue(
+		accountRepo,
+		taskRepo,
+		asynqQueue,
+		asynqQueue,
+		redisAsynqAssigner,
+		redisAsynqAssigner,
+		redisAsynqAssigner,
+		asynqQueue,
+		systemConfigRepo,
+		storageService,
+	)
 	accountService.SetTaskEventHub(taskEventHub)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
@@ -129,8 +152,27 @@ func Run(args []string) {
 		CORSMiddleware:       buildCORSMiddleware(cfg.App.Env),
 	}, frontendFS)
 
-	consumer := worker.NewConsumerWithQueue(accountRepo, channelRepo, taskRepo, redisQueue, redisQueue, redisQueue, storageService, taskEventHub)
-	go consumer.Start(5)
+	asynqHandler := worker.NewAsynqTaskHandler(
+		accountRepo,
+		channelRepo,
+		taskRepo,
+		asynqQueue,
+		redisAsynqAssigner,
+		redisAsynqAssigner,
+		storageService,
+		taskEventHub,
+	)
+	asynqServer, asynqMux := worker.NewAsynqServer(asynqConnOpt, worker.AsynqServerOptions{
+		QueueName:            taskqueue.AsynqQueueDefault,
+		Concurrency:          cfg.Queue.WorkerConcurrency,
+		NoCapacityRetryDelay: time.Duration(cfg.Queue.AsynqNoCapacityDelaySec) * time.Second,
+	}, asynqHandler)
+	go func() {
+		log.Printf("[Main] Asynq worker starting: queue=%s concurrency=%d", taskqueue.AsynqQueueDefault, cfg.Queue.WorkerConcurrency)
+		if err := asynqServer.Run(asynqMux); err != nil {
+			log.Fatalf("[Main] Failed to start asynq worker: %v", err)
+		}
+	}()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -158,7 +200,7 @@ func Run(args []string) {
 	<-quit
 
 	log.Println("[Main] Shutting down server...")
-	consumer.Stop()
+	asynqServer.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

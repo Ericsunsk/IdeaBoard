@@ -14,6 +14,7 @@ import (
 type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
+	Queue    QueueConfig
 	App      AppConfig
 	Auth     AuthServiceConfig
 }
@@ -37,6 +38,13 @@ type AppConfig struct {
 	Host    string
 	Env     string
 	GinMode string
+}
+
+type QueueConfig struct {
+	WorkerConcurrency       int
+	AsynqTaskTimeoutSeconds int
+	AsynqNoCapacityDelaySec int
+	AsynqMaxRetry           int
 }
 
 type AuthServiceConfig struct {
@@ -70,6 +78,12 @@ func Load() *Config {
 			Host: getEnv("REDIS_HOST", "localhost"),
 			Port: getEnv("REDIS_PORT", "6379"),
 			Auth: getEnv("REDIS_AUTH", ""),
+		},
+		Queue: QueueConfig{
+			WorkerConcurrency:       getEnvInt("TASK_QUEUE_WORKER_CONCURRENCY", 5),
+			AsynqTaskTimeoutSeconds: getEnvInt("ASYNQ_TASK_TIMEOUT_SECONDS", 180),
+			AsynqNoCapacityDelaySec: getEnvInt("ASYNQ_NO_CAPACITY_RETRY_SECONDS", 5),
+			AsynqMaxRetry:           getEnvInt("ASYNQ_MAX_RETRY", 25),
 		},
 		App: AppConfig{
 			Port:    getEnv("APP_PORT", "6000"),

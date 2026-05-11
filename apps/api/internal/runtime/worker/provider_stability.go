@@ -14,7 +14,7 @@ import (
 	"api/internal/accounts"
 )
 
-func (c *Consumer) callStabilityAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, resolvedModel string) (providerCallResult, error) {
+func (c *ProviderExecutor) callStabilityAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, resolvedModel string) (providerCallResult, error) {
 	baseURL := "https://api.stability.ai"
 	if account.ProxyURL != "" {
 		baseURL = account.ProxyURL
@@ -45,7 +45,7 @@ func (c *Consumer) callStabilityAI(ctx context.Context, account *accounts.ApiAcc
 	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
 	req.Header.Set("Accept", "application/json")
 
-	log.Printf("[Consumer] StabilityAI 请求: engine=%s, %dx%d", engine, width, height)
+	log.Printf("[Worker] StabilityAI 请求: engine=%s, %dx%d", engine, width, height)
 
 	resp, err := client.Do(req)
 	if err != nil {

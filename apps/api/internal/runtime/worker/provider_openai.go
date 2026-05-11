@@ -24,7 +24,7 @@ import (
 )
 
 // callOpenAI 调用 OpenAI DALL-E 风格接口（也兼容其他 OpenAI 兼容平台）
-func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
+func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
 	baseURL := "https://api.openai.com"
 	if account.ProxyURL != "" {
 		baseURL = strings.TrimRight(account.ProxyURL, "/")
@@ -90,7 +90,7 @@ func (c *Consumer) callOpenAI(ctx context.Context, account *accounts.ApiAccount,
 	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
 
 	log.Printf(
-		"[Consumer] OpenAI 请求: feature=%s endpoint=%s model=%s size=%s edit=%t images=%d",
+		"[Worker] OpenAI 请求: feature=%s endpoint=%s model=%s size=%s edit=%t images=%d",
 		featureSlug,
 		endpoint,
 		model,

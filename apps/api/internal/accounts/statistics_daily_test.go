@@ -22,7 +22,7 @@ func newStatisticsTestService(t *testing.T) (*AccountService, *TaskRepository, *
 		t.Fatalf("auto migrate failed: %v", err)
 	}
 	taskRepo := NewTaskRepository(db)
-	svc := NewAccountService(nil, taskRepo, nil, nil, nil)
+	svc := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil, nil)
 	return svc, taskRepo, db
 }
 

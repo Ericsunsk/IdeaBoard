@@ -18,7 +18,7 @@ func TestCallOpenAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -47,7 +47,7 @@ func TestCallStabilityAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",

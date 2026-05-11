@@ -6,25 +6,25 @@ import (
 	"fmt"
 	"time"
 
+	"api/internal/runtime/queuetypes"
+
 	"github.com/redis/go-redis/v9"
 )
 
 const (
 	KeyAccountConcurrent = "drawing:api:concurrent"
-	KeyGlobalQueue       = "drawing:task:global_queue"
-	KeyWaitQueue         = "drawing:task:wait_queue"
 	KeyRunningTasks      = "drawing:task:running"
 	KeyTaskCancelPrefix  = "drawing:task:cancelled"
-	MaxGlobalQueueLen    = 10000
-	MaxWaitQueueLen      = 100
+
+	AssignTaskStatusAssigned   = "assigned"
+	AssignTaskStatusNoCapacity = "no_capacity"
 )
 
-// Lua 脚本：原子分配任务
-const luaAssignTask = `
+// Lua 脚本：原子分配任务（无等待队列副作用）
+const luaTryAssignTask = `
 local account_ids = cjson.decode(ARGV[1])
 local max_concurrent_key = ARGV[2]
 
--- 找最小负载的账号
 local best_account = -1
 local best_load = 999999
 
@@ -32,7 +32,7 @@ for _, aid in ipairs(account_ids) do
     local concurrent_key = max_concurrent_key .. ":" .. aid
     local current = tonumber(redis.call("HGET", concurrent_key, "count")) or 0
     local max = tonumber(redis.call("HGET", concurrent_key, "max")) or 3
-    
+
     if current < max then
         local load = current / max
         if load < best_load then
@@ -43,21 +43,12 @@ for _, aid in ipairs(account_ids) do
 end
 
 if best_account == -1 then
-    -- 所有账号都繁忙，检查等待队列
-    local wait_len = redis.call("LLEN", "drawing:task:wait_queue")
-    if wait_len >= 100 then
-        return "-2"  -- 等待队列满
-    end
-    -- 加入等待队列
-    redis.call("RPUSH", "drawing:task:wait_queue", ARGV[3])
-    return "-1"  -- 进入等待队列
+    return "-1"
 end
 
--- 分配给最佳账号，原子增加并发计数
 local concurrent_key = max_concurrent_key .. ":" .. best_account
 redis.call("HINCRBY", concurrent_key, "count", 1)
-redis.call("SADD", "drawing:task:running", ARGV[4])
-
+redis.call("SADD", "drawing:task:running", ARGV[3])
 return tostring(best_account)
 `
 
@@ -87,16 +78,6 @@ func NewRedisManager(rdb *redis.Client) *RedisManager {
 
 func (r *RedisManager) GetClient() *redis.Client {
 	return r.rdb
-}
-
-// InitAccountConcurrent 初始化账号并发计数
-func (r *RedisManager) InitAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {
-	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
-	pipe := r.rdb.Pipeline()
-	pipe.HSet(ctx, key, "count", 0)
-	pipe.HSet(ctx, key, "max", maxConcurrent)
-	_, err := pipe.Exec(ctx)
-	return err
 }
 
 // EnsureAccountConcurrent 确保账号并发配置存在；不会重置已有 count。
@@ -135,91 +116,21 @@ func (r *RedisManager) GetAccountMaxConcurrent(ctx context.Context, accountID ui
 	return max, err
 }
 
-// PushGlobalQueue 推送任务到全局队列
-func (r *RedisManager) PushGlobalQueue(ctx context.Context, task *GlobalQueueTask) error {
-	data, err := json.Marshal(task)
-	if err != nil {
-		return err
-	}
-
-	length, err := r.rdb.LLen(ctx, KeyGlobalQueue).Result()
-	if err != nil {
-		return err
-	}
-	if length >= MaxGlobalQueueLen {
-		return fmt.Errorf("队列已满，请稍后再试")
-	}
-
-	return r.rdb.RPush(ctx, KeyGlobalQueue, string(data)).Err()
-}
-
-func (r *RedisManager) PushGlobalQueueFront(ctx context.Context, task *GlobalQueueTask) error {
-	data, err := json.Marshal(task)
-	if err != nil {
-		return err
-	}
-	return r.rdb.LPush(ctx, KeyGlobalQueue, string(data)).Err()
-}
-
-// PopGlobalQueue 弹出全局队列任务
-func (r *RedisManager) PopGlobalQueue(ctx context.Context) (*GlobalQueueTask, error) {
-	data, err := r.rdb.LPop(ctx, KeyGlobalQueue).Result()
-	if err == redis.Nil {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var task GlobalQueueTask
-	if err := json.Unmarshal([]byte(data), &task); err != nil {
-		return nil, err
-	}
-	return &task, nil
-}
-
-func (r *RedisManager) PopWaitQueue(ctx context.Context) (*GlobalQueueTask, error) {
-	data, err := r.rdb.LPop(ctx, KeyWaitQueue).Result()
-	if err == redis.Nil {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var task GlobalQueueTask
-	if err := json.Unmarshal([]byte(data), &task); err != nil {
-		return nil, err
-	}
-	return &task, nil
-}
-
-// GetGlobalQueueLength 获取全局队列长度
-func (r *RedisManager) GetGlobalQueueLength(ctx context.Context) (int64, error) {
-	return r.rdb.LLen(ctx, KeyGlobalQueue).Result()
-}
-
-// GetWaitQueueLength 获取等待队列长度
-func (r *RedisManager) GetWaitQueueLength(ctx context.Context) (int64, error) {
-	return r.rdb.LLen(ctx, KeyWaitQueue).Result()
-}
-
-// AssignTask 分配任务给账号（Lua脚本原子操作）
-func (r *RedisManager) AssignTask(ctx context.Context, accountIDs []uint64, task *GlobalQueueTask) (uint64, string, error) {
+// TryAssignTask 分配任务给账号（Lua脚本原子操作，无等待队列副作用）
+func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, taskID string) (uint64, string, error) {
 	if len(accountIDs) == 0 {
 		return 0, "", fmt.Errorf("没有可用的账号")
 	}
+	if taskID == "" {
+		return 0, "", fmt.Errorf("task id is empty")
+	}
 
 	idsJSON, _ := json.Marshal(accountIDs)
-	taskJSON, _ := json.Marshal(task)
-
-	result, err := r.rdb.Eval(ctx, luaAssignTask, []string{},
+	result, err := r.rdb.Eval(ctx, luaTryAssignTask, []string{},
 		string(idsJSON),
 		KeyAccountConcurrent,
-		string(taskJSON),
-		task.TaskID,
+		taskID,
 	).Result()
-
 	if err != nil {
 		return 0, "", err
 	}
@@ -228,17 +139,13 @@ func (r *RedisManager) AssignTask(ctx context.Context, accountIDs []uint64, task
 	if !ok {
 		return 0, "", fmt.Errorf("Lua脚本返回类型错误")
 	}
-
-	switch resultStr {
-	case "-1":
-		return 0, "wait_queue", nil
-	case "-2":
-		return 0, "queue_full", nil
-	default:
-		var accountID uint64
-		fmt.Sscanf(resultStr, "%d", &accountID)
-		return accountID, "assigned", nil
+	if resultStr == "-1" {
+		return 0, AssignTaskStatusNoCapacity, nil
 	}
+
+	var accountID uint64
+	fmt.Sscanf(resultStr, "%d", &accountID)
+	return accountID, AssignTaskStatusAssigned, nil
 }
 
 // ReleaseTask 释放任务
@@ -253,8 +160,8 @@ func (r *RedisManager) ReleaseTask(ctx context.Context, accountID uint64, taskID
 }
 
 // GetAccountLoadInfo 获取所有账号的负载信息
-func (r *RedisManager) GetAccountLoadInfo(ctx context.Context, accountIDs []uint64) (map[uint64]*AccountLoad, error) {
-	result := make(map[uint64]*AccountLoad)
+func (r *RedisManager) GetAccountLoadInfo(ctx context.Context, accountIDs []uint64) (map[uint64]*queuetypes.AccountLoad, error) {
+	result := make(map[uint64]*queuetypes.AccountLoad)
 
 	for _, id := range accountIDs {
 		key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, id)
@@ -263,7 +170,7 @@ func (r *RedisManager) GetAccountLoadInfo(ctx context.Context, accountIDs []uint
 		if max == 0 {
 			max = 3
 		}
-		result[id] = &AccountLoad{
+		result[id] = &queuetypes.AccountLoad{
 			CurrentConcurrent: count,
 			MaxConcurrent:     max,
 		}
@@ -276,11 +183,6 @@ func (r *RedisManager) GetAccountLoadInfo(ctx context.Context, accountIDs []uint
 func (r *RedisManager) DeleteAccountConcurrent(ctx context.Context, accountID uint64) error {
 	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
 	return r.rdb.Del(ctx, key).Err()
-}
-
-// GetAllRunningTasks 获取所有运行中的任务ID
-func (r *RedisManager) GetAllRunningTasks(ctx context.Context) ([]string, error) {
-	return r.rdb.SMembers(ctx, KeyRunningTasks).Result()
 }
 
 func (r *RedisManager) MarkTaskCancelled(ctx context.Context, taskID string, ttl time.Duration) error {
@@ -297,47 +199,6 @@ func (r *RedisManager) IsTaskCancelled(ctx context.Context, taskID string) (bool
 
 func (r *RedisManager) ClearTaskCancelled(ctx context.Context, taskID string) error {
 	return r.rdb.Del(ctx, taskCancelKey(taskID)).Err()
-}
-
-// 全局队列任务结构
-type GlobalQueueTask struct {
-	TaskID     string   `json:"task_id"`
-	UserID     uint64   `json:"user_id"`
-	Prompt     string   `json:"prompt"`
-	Params     string   `json:"params"`
-	AccountIDs []uint64 `json:"account_ids"`
-	RetryCount int      `json:"retry_count"`
-	CreatedAt  int64    `json:"created_at"`
-}
-
-// 账号负载信息
-type AccountLoad struct {
-	CurrentConcurrent int `json:"current_concurrent"`
-	MaxConcurrent     int `json:"max_concurrent"`
-}
-
-// 监控信息
-type MonitorInfo struct {
-	GlobalQueueLen int64                   `json:"global_queue_len"`
-	WaitQueueLen   int64                   `json:"wait_queue_len"`
-	RunningTasks   int64                   `json:"running_tasks"`
-	AccountLoads   map[uint64]*AccountLoad `json:"account_loads"`
-}
-
-// GetMonitorInfo 获取监控信息
-func (r *RedisManager) GetMonitorInfo(ctx context.Context, accountIDs []uint64) (*MonitorInfo, error) {
-	info := &MonitorInfo{
-		AccountLoads: make(map[uint64]*AccountLoad),
-	}
-
-	info.GlobalQueueLen, _ = r.GetGlobalQueueLength(ctx)
-	info.WaitQueueLen, _ = r.GetWaitQueueLength(ctx)
-	info.RunningTasks, _ = r.rdb.SCard(ctx, KeyRunningTasks).Result()
-
-	loads, _ := r.GetAccountLoadInfo(ctx, accountIDs)
-	info.AccountLoads = loads
-
-	return info, nil
 }
 
 func taskCancelKey(taskID string) string {

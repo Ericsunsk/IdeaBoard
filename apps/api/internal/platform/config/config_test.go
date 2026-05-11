@@ -50,3 +50,24 @@ func TestDetectGinMode(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadQueueDefaults(t *testing.T) {
+	t.Setenv("TASK_QUEUE_WORKER_CONCURRENCY", "")
+	t.Setenv("ASYNQ_TASK_TIMEOUT_SECONDS", "")
+	t.Setenv("ASYNQ_NO_CAPACITY_RETRY_SECONDS", "")
+	t.Setenv("ASYNQ_MAX_RETRY", "")
+
+	cfg := Load()
+	if cfg.Queue.WorkerConcurrency != 5 {
+		t.Fatalf("expected WorkerConcurrency=5, got %d", cfg.Queue.WorkerConcurrency)
+	}
+	if cfg.Queue.AsynqTaskTimeoutSeconds != 180 {
+		t.Fatalf("expected AsynqTaskTimeoutSeconds=180, got %d", cfg.Queue.AsynqTaskTimeoutSeconds)
+	}
+	if cfg.Queue.AsynqNoCapacityDelaySec != 5 {
+		t.Fatalf("expected AsynqNoCapacityDelaySec=5, got %d", cfg.Queue.AsynqNoCapacityDelaySec)
+	}
+	if cfg.Queue.AsynqMaxRetry != 25 {
+		t.Fatalf("expected AsynqMaxRetry=25, got %d", cfg.Queue.AsynqMaxRetry)
+	}
+}

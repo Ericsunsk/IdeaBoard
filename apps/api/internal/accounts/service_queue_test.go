@@ -1,11 +1,11 @@
 package accounts
 
 import (
+	"api/internal/runtime/queuetypes"
 	"context"
 	"testing"
 	"time"
 
-	"api/internal/platform/redis"
 	"api/internal/tasks"
 
 	"gorm.io/driver/sqlite"
@@ -16,23 +16,16 @@ type fakeQueueForService struct {
 	waitLen int64
 }
 
-func (f *fakeQueueForService) Enqueue(context.Context, *redis.GlobalQueueTask) error      { return nil }
-func (f *fakeQueueForService) EnqueueFront(context.Context, *redis.GlobalQueueTask) error { return nil }
-func (f *fakeQueueForService) Dequeue(context.Context) (*redis.GlobalQueueTask, error) {
-	return nil, nil
-}
-func (f *fakeQueueForService) DequeueWait(context.Context) (*redis.GlobalQueueTask, error) {
-	return nil, nil
-}
+func (f *fakeQueueForService) Enqueue(context.Context, *queuetypes.TaskPayload) error { return nil }
 func (f *fakeQueueForService) QueueLengths(context.Context) (int64, int64, error) {
 	return 0, f.waitLen, nil
 }
 
 type fakeAssignerForService struct {
-	loadInfo map[uint64]*redis.AccountLoad
+	loadInfo map[uint64]*queuetypes.AccountLoad
 }
 
-func (f *fakeAssignerForService) Assign(context.Context, []uint64, *redis.GlobalQueueTask) (uint64, string, error) {
+func (f *fakeAssignerForService) Assign(context.Context, []uint64, *queuetypes.TaskPayload) (uint64, string, error) {
 	return 0, "", nil
 }
 func (f *fakeAssignerForService) Release(context.Context, uint64, string) error { return nil }
@@ -42,7 +35,7 @@ func (f *fakeAssignerForService) EnsureAccountConcurrent(context.Context, uint64
 func (f *fakeAssignerForService) SetAccountMaxConcurrent(context.Context, uint64, int) error {
 	return nil
 }
-func (f *fakeAssignerForService) GetAccountLoadInfo(context.Context, []uint64) (map[uint64]*redis.AccountLoad, error) {
+func (f *fakeAssignerForService) GetAccountLoadInfo(context.Context, []uint64) (map[uint64]*queuetypes.AccountLoad, error) {
 	return f.loadInfo, nil
 }
 
@@ -76,8 +69,8 @@ func (f *fakeCancelStore) ClearCancelled(context.Context, string) error      { r
 
 type fakeMonitorStore struct{}
 
-func (f *fakeMonitorStore) MonitorInfo(context.Context, []uint64) (*redis.MonitorInfo, error) {
-	return &redis.MonitorInfo{}, nil
+func (f *fakeMonitorStore) MonitorInfo(context.Context, []uint64) (*queuetypes.MonitorInfo, error) {
+	return &queuetypes.MonitorInfo{}, nil
 }
 
 func newQueueServiceTestDB(t *testing.T) *gorm.DB {
@@ -123,8 +116,9 @@ func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 		accountRepo,
 		taskRepo,
 		&fakeQueueForService{waitLen: 7},
+		&fakeQueueForService{waitLen: 7},
 		&fakeAssignerForService{
-			loadInfo: map[uint64]*redis.AccountLoad{
+			loadInfo: map[uint64]*queuetypes.AccountLoad{
 				acc.ID: {CurrentConcurrent: 2, MaxConcurrent: 3},
 			},
 		},
@@ -159,7 +153,7 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 		concurrent: map[uint64]int{acc.ID: 1},
 		max:        map[uint64]int{acc.ID: 4},
 	}
-	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, &fakeCancelStore{}, &fakeMonitorStore{}, nil, nil)
+	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, &fakeCancelStore{}, &fakeMonitorStore{}, nil, nil)
 
 	current, max, err := svc.GetAccountQueueInfo(acc.ID)
 	if err != nil {
@@ -176,7 +170,7 @@ func TestDeleteAccountCallsDeleteAccountConcurrent(t *testing.T) {
 	taskRepo := NewTaskRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 	concurrency := &fakeConcurrencyStore{}
-	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, &fakeCancelStore{}, &fakeMonitorStore{}, nil, nil)
+	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, &fakeCancelStore{}, &fakeMonitorStore{}, nil, nil)
 
 	if err := svc.DeleteAccount(acc.ID); err != nil {
 		t.Fatalf("DeleteAccount failed: %v", err)
@@ -203,7 +197,7 @@ func TestStopAccountMarksCancelAndDeleteConcurrent(t *testing.T) {
 
 	concurrency := &fakeConcurrencyStore{}
 	cancelStore := &fakeCancelStore{}
-	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, cancelStore, &fakeMonitorStore{}, nil, nil)
+	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, cancelStore, &fakeMonitorStore{}, nil, nil)
 
 	if err := svc.StopAccount(acc.ID); err != nil {
 		t.Fatalf("StopAccount failed: %v", err)

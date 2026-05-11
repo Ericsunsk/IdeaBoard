@@ -1,13 +1,12 @@
 package taskqueue
 
 import (
+	"api/internal/runtime/queuetypes"
 	"testing"
-
-	"api/internal/platform/redis"
 )
 
 func TestAsynqPayloadEncodeDecodeRoundTrip(t *testing.T) {
-	task := &redis.GlobalQueueTask{
+	task := &queuetypes.TaskPayload{
 		TaskID:     "task-1",
 		UserID:     9,
 		Prompt:     "draw",

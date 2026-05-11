@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"api/internal/runtime/queuetypes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"api/internal/accounts"
-	"api/internal/platform/redis"
 )
 
 type multipartFilePart struct {
@@ -105,7 +105,7 @@ func TestCallOpenAIUsesEditEndpointForCanvasExtend(t *testing.T) {
 	defer server.Close()
 	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -170,7 +170,7 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 	defer server.Close()
 	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -214,7 +214,7 @@ func TestCallOpenAIGenerationMapsImageURLsToStringImageField(t *testing.T) {
 	defer server.Close()
 	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -276,7 +276,7 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	defer server.Close()
 	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -303,7 +303,7 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 }
 
 func TestCallDrawingAPIRejectsStabilityForReferenceImageFeatures(t *testing.T) {
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		Platform: "Stability AI",
 		ApiKey:   "test-key",
@@ -328,7 +328,7 @@ func TestCallDrawingAPIRejectsStabilityForReferenceImageFeatures(t *testing.T) {
 			if err != nil {
 				t.Fatalf("marshal params: %v", err)
 			}
-			task := &redis.GlobalQueueTask{
+			task := &queuetypes.TaskPayload{
 				TaskID: "task_test",
 				Prompt: "test prompt",
 				Params: string(paramsJSON),
@@ -370,7 +370,7 @@ func TestCallOpenAIFaceSwapUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	defer server.Close()
 	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -426,7 +426,7 @@ func TestCallOpenAIMultiAngleUsesEditEndpointAndIncludesSourceModelPose(t *testi
 	defer server.Close()
 	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -472,7 +472,7 @@ func TestCallOpenAIStyleInnovateDataURLDropsRedundantImageCopies(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -513,7 +513,7 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -562,7 +562,7 @@ func TestCallOpenAIUsesFirstModelWhenAccountHasMultiModelSet(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -586,7 +586,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ID:       1,
 		Name:     "test",
@@ -596,7 +596,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		ApiKey:   "test-key",
 		ModelSet: "gpt-image-1",
 	}
-	task := &redis.GlobalQueueTask{
+	task := &queuetypes.TaskPayload{
 		TaskID: "task-model-field",
 		Prompt: "prompt",
 		Params: `{"feature":"pattern-gen"}`,
@@ -626,7 +626,7 @@ func TestCallOpenAIHDUpscaleMaskedUsesMultipartFiles(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -673,7 +673,7 @@ func TestCallOpenAIDirectedRecolorUsesEditEndpointAndMaskMultipartFile(t *testin
 	}))
 	defer server.Close()
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -738,7 +738,7 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesRelativeUploadPaths(t *testing.T
 		"variation_strength": 5,
 	}
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	c.normalizeUpstreamMediaParams(params)
 
 	imageURLs, ok := params["image_urls"].([]interface{})
@@ -790,7 +790,7 @@ func TestNormalizeUpstreamMediaParamsInlinesRelativeUploadPathsWithoutPublicBase
 		"original_image_url": "/uploads/2026/04/23/source.png",
 	}
 
-	c := &Consumer{}
+	c := &ProviderExecutor{}
 	c.normalizeUpstreamMediaParams(params)
 
 	imageURLs, ok := params["image_urls"].([]interface{})

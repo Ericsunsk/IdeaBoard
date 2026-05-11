@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -9,6 +10,71 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+func TestResetTaskRunningToPendingResetsState(t *testing.T) {
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+
+	task := &tasks.Task{
+		TaskID:    "task-reset-pending",
+		UserID:    1,
+		ChannelID: 1,
+		AccountID: 77,
+		Status:    tasks.StatusRunning,
+	}
+	if err := taskRepo.Create(task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if err := service.ResetTaskRunningToPending(task.TaskID, task.AccountID, "worker context interrupted"); err != nil {
+		t.Fatalf("ResetTaskRunningToPending returned error: %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	}
+	if updated.AccountID != 0 {
+		t.Fatalf("account_id = %d, want 0", updated.AccountID)
+	}
+	if updated.ErrorMsg != "worker context interrupted" {
+		t.Fatalf("error_msg = %q, want %q", updated.ErrorMsg, "worker context interrupted")
+	}
+	if updated.CompletedAt != nil {
+		t.Fatalf("completed_at should remain nil, got %v", updated.CompletedAt)
+	}
+}
+
+func TestResetTaskRunningToPendingRejectsTerminalTask(t *testing.T) {
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+
+	task := &tasks.Task{
+		TaskID:      "task-reset-terminal",
+		UserID:      1,
+		ChannelID:   1,
+		AccountID:   77,
+		Status:      tasks.StatusCompleted,
+		CompletedAt: ptrTime(time.Now()),
+	}
+	if err := taskRepo.Create(task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	err := service.ResetTaskRunningToPending(task.TaskID, task.AccountID, "worker context interrupted")
+	if !errors.Is(err, ErrTaskTerminal) {
+		t.Fatalf("expected ErrTaskTerminal, got %v", err)
+	}
+}
+
+func ptrTime(t time.Time) *time.Time {
+	return &t
+}
 
 func newTaskRuntimeServiceTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -33,7 +99,7 @@ func newTaskRuntimeServiceTestDB(t *testing.T) *gorm.DB {
 func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeService(nil, taskRepo, nil)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:     "task-requeue",
@@ -73,66 +139,10 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 	}
 }
 
-func TestMarkTaskFailedWithRetryPublishesPendingOrFailed(t *testing.T) {
-	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeService(nil, taskRepo, nil)
-	hub := NewTaskEventHub()
-	service.SetEventHub(hub)
-
-	pendingTask := &tasks.Task{
-		TaskID:     "task-fail-retry-pending",
-		UserID:     1,
-		ChannelID:  1,
-		Status:     tasks.StatusRunning,
-		RetryCount: 0,
-	}
-	if err := taskRepo.Create(pendingTask); err != nil {
-		t.Fatalf("seed pending task failed: %v", err)
-	}
-	pendingEvents, unsubPending := hub.Subscribe(pendingTask.TaskID)
-	defer unsubPending()
-	if err := service.MarkTaskFailedWithRetry(pendingTask.TaskID, 0, "retryable"); err != nil {
-		t.Fatalf("MarkTaskFailedWithRetry pending returned error: %v", err)
-	}
-	select {
-	case event := <-pendingEvents:
-		if event.Status != tasks.StatusPending {
-			t.Fatalf("pending event status=%s, want %s", event.Status, tasks.StatusPending)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting pending retry event")
-	}
-
-	finalTask := &tasks.Task{
-		TaskID:     "task-fail-retry-final",
-		UserID:     1,
-		ChannelID:  1,
-		Status:     tasks.StatusRunning,
-		RetryCount: defaultTaskRetryLimit - 1,
-	}
-	if err := taskRepo.Create(finalTask); err != nil {
-		t.Fatalf("seed final task failed: %v", err)
-	}
-	finalEvents, unsubFinal := hub.Subscribe(finalTask.TaskID)
-	defer unsubFinal()
-	if err := service.MarkTaskFailedWithRetry(finalTask.TaskID, 0, "final fail"); err != nil {
-		t.Fatalf("MarkTaskFailedWithRetry final returned error: %v", err)
-	}
-	select {
-	case event := <-finalEvents:
-		if event.Status != tasks.StatusFailed {
-			t.Fatalf("final event status=%s, want %s", event.Status, tasks.StatusFailed)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting final failed event")
-	}
-}
-
 func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeService(nil, taskRepo, nil)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
 	hub := NewTaskEventHub()
 	service.SetEventHub(hub)
 	events, unsubscribe := hub.Subscribe("task-publish")
@@ -165,7 +175,7 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeService(nil, taskRepo, nil)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:     "task-retry-limit",
@@ -222,7 +232,7 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeService(nil, taskRepo, nil)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
 	hub := NewTaskEventHub()
 	service.SetEventHub(hub)
 
@@ -288,7 +298,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeService(nil, taskRepo, nil)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:    "task-completed-daily",
