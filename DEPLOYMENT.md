@@ -342,6 +342,22 @@ server_name _;
 
 替换为真实域名。
 
+SSE 任务进度接口需要关闭 Nginx 缓冲并放宽读取超时，确认 `ideaboard.conf` 包含以下 location（放在 `location /api/` 之前）：
+
+```nginx
+location /api/user/drawing/ {
+    proxy_pass http://127.0.0.1:6000;
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 10m;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
 
 ## 验证清单
 

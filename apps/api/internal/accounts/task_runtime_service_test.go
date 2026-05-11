@@ -73,6 +73,62 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 	}
 }
 
+func TestMarkTaskFailedWithRetryPublishesPendingOrFailed(t *testing.T) {
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewTaskRuntimeService(nil, taskRepo, nil)
+	hub := NewTaskEventHub()
+	service.SetEventHub(hub)
+
+	pendingTask := &tasks.Task{
+		TaskID:     "task-fail-retry-pending",
+		UserID:     1,
+		ChannelID:  1,
+		Status:     tasks.StatusRunning,
+		RetryCount: 0,
+	}
+	if err := taskRepo.Create(pendingTask); err != nil {
+		t.Fatalf("seed pending task failed: %v", err)
+	}
+	pendingEvents, unsubPending := hub.Subscribe(pendingTask.TaskID)
+	defer unsubPending()
+	if err := service.MarkTaskFailedWithRetry(pendingTask.TaskID, 0, "retryable"); err != nil {
+		t.Fatalf("MarkTaskFailedWithRetry pending returned error: %v", err)
+	}
+	select {
+	case event := <-pendingEvents:
+		if event.Status != tasks.StatusPending {
+			t.Fatalf("pending event status=%s, want %s", event.Status, tasks.StatusPending)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting pending retry event")
+	}
+
+	finalTask := &tasks.Task{
+		TaskID:     "task-fail-retry-final",
+		UserID:     1,
+		ChannelID:  1,
+		Status:     tasks.StatusRunning,
+		RetryCount: defaultTaskRetryLimit - 1,
+	}
+	if err := taskRepo.Create(finalTask); err != nil {
+		t.Fatalf("seed final task failed: %v", err)
+	}
+	finalEvents, unsubFinal := hub.Subscribe(finalTask.TaskID)
+	defer unsubFinal()
+	if err := service.MarkTaskFailedWithRetry(finalTask.TaskID, 0, "final fail"); err != nil {
+		t.Fatalf("MarkTaskFailedWithRetry final returned error: %v", err)
+	}
+	select {
+	case event := <-finalEvents:
+		if event.Status != tasks.StatusFailed {
+			t.Fatalf("final event status=%s, want %s", event.Status, tasks.StatusFailed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting final failed event")
+	}
+}
+
 func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := NewTaskRepository(db)
@@ -160,6 +216,72 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 	}
 	if rows[0].Failed != 1 || rows[0].Total != 1 {
 		t.Fatalf("daily stat failed=%d total=%d, want 1/1", rows[0].Failed, rows[0].Total)
+	}
+}
+
+func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewTaskRuntimeService(nil, taskRepo, nil)
+	hub := NewTaskEventHub()
+	service.SetEventHub(hub)
+
+	requeueTask := &tasks.Task{
+		TaskID:     "task-requeue-publish-pending",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  13,
+		Status:     tasks.StatusRunning,
+		RetryCount: 0,
+	}
+	if err := taskRepo.Create(requeueTask); err != nil {
+		t.Fatalf("seed requeue task failed: %v", err)
+	}
+	pendingEvents, unsubPending := hub.Subscribe(requeueTask.TaskID)
+	defer unsubPending()
+	requeued, err := service.RequeueTaskForFailover(requeueTask.TaskID, requeueTask.AccountID, "retry")
+	if err != nil {
+		t.Fatalf("RequeueTaskForFailover pending returned error: %v", err)
+	}
+	if !requeued {
+		t.Fatalf("expected requeued=true")
+	}
+	select {
+	case event := <-pendingEvents:
+		if event.Status != tasks.StatusPending {
+			t.Fatalf("requeue event status=%s, want %s", event.Status, tasks.StatusPending)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting requeue pending event")
+	}
+
+	finalTask := &tasks.Task{
+		TaskID:     "task-requeue-publish-failed",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  14,
+		Status:     tasks.StatusRunning,
+		RetryCount: defaultTaskRetryLimit - 1,
+	}
+	if err := taskRepo.Create(finalTask); err != nil {
+		t.Fatalf("seed final requeue task failed: %v", err)
+	}
+	failedEvents, unsubFailed := hub.Subscribe(finalTask.TaskID)
+	defer unsubFailed()
+	requeued, err = service.RequeueTaskForFailover(finalTask.TaskID, finalTask.AccountID, "stop retry")
+	if err != nil {
+		t.Fatalf("RequeueTaskForFailover failed returned error: %v", err)
+	}
+	if requeued {
+		t.Fatalf("expected requeued=false when final fail")
+	}
+	select {
+	case event := <-failedEvents:
+		if event.Status != tasks.StatusFailed {
+			t.Fatalf("final fail event status=%s, want %s", event.Status, tasks.StatusFailed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting final failed event")
 	}
 }
 
