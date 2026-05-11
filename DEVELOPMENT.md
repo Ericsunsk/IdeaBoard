@@ -404,40 +404,44 @@ Auth 服务关键变量：
 ## 仓库目录图
 
 ```text
+.github/workflows/           # CI / release workflow
+docker/                      # 本地数据库与开发环境
+docs/                        # 设计、运行与约束文档
+scripts/                     # 打包、部署与发布脚本
+
 apps/web/src/
-├── app/                       # 入口、router、store 装配
-├── pages/                     # 路由级容器
-├── features/                  # 领域模块
-│   └── admin/
-│       ├── statistics/        # 统计仪表盘（composables + CSS + 主屏）
-│       ├── channels/          # 渠道商卡片 + useChannelAccounts
-│       ├── users/             # 用户管理
-│       ├── shared/            # admin 公共 CSS、组件、monitorShared
-│       └── ...
-├── shared/                    # 共享 API、UI、types、utils、assets
-└── config/                    # 仅保留跨 feature 运行配置
+├── app/                      # 入口、router、store 装配
+├── pages/                    # 路由级容器
+├── features/                 # 领域模块
+│   ├── workspace/            # 画布、节点与执行链路
+│   ├── boards/               # 画板列表、预览与同步
+│   ├── admin/                # 管理后台
+│   ├── auth/                 # 登录、注册与会话相关
+│   └── profile/              # 用户中心
+├── shared/                   # 共享 API、UI、auth、types、utils、assets
+└── config/                   # 仅保留跨 feature 运行配置
 
 apps/api/
-├── cmd/                       # 服务入口
-├── internal/platform/         # config、database、redis、response、safehttp
-├── internal/runtime/          # bootstrap、http 路由、worker
-├── internal/auth/             # 鉴权中间件与 auth service client
-├── internal/autherrors/       # 错误码定义
-├── internal/users/            # 用户管理
-├── internal/accounts/         # 账号池与任务调度
-├── internal/boards/           # 画板管理
-├── internal/channels/         # 渠道管理
-├── internal/tasks/            # 任务模型与状态
-├── internal/workflow/         # feature contract
-├── internal/prompts/          # 提示词模板与装配
-├── internal/storage/          # 对象存储配置与实现
-├── internal/assets/           # 线稿模式等业务模板
-└── internal/imageproc/        # 分割、线稿、向量化等图片处理
+├── cmd/                      # 服务入口
+├── internal/platform/        # 基础设施：config、database、redis、response、safehttp
+├── internal/runtime/         # 启动、HTTP 路由、队列与 worker
+├── internal/auth/            # 鉴权中间件与 auth service client
+├── internal/users/           # 用户管理
+├── internal/accounts/        # 账号池与任务调度
+├── internal/boards/          # 画板管理
+├── internal/channels/        # 渠道管理
+├── internal/tasks/           # 任务模型与状态
+├── internal/workflow/        # feature contract
+├── internal/prompts/         # 提示词模板与装配
+├── internal/storage/         # 对象存储配置与实现
+├── internal/assets/          # 线稿模式等业务模板
+└── internal/imageproc/       # 分割、线稿、向量化等图片处理
 
 apps/auth/
-├── src/auth.ts                # Better Auth 配置
-├── src/index.ts               # /api/auth/* 与 /internal/* 路由
-└── .env.example               # auth 服务环境变量模板
+├── src/auth.ts               # Better Auth 配置
+├── src/env.ts                # 环境变量与生产校验
+├── src/index.ts              # /api/auth/* 与 /internal/* 路由
+└── .env.example              # auth 服务环境变量模板
 ```
 
 
