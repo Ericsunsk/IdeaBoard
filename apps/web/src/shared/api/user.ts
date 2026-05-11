@@ -1,8 +1,7 @@
-import { apiGet } from './client'
-import type { User } from '../types'
-import type { ApiResponse } from './types'
+import { getUser } from './generated/user/user'
+import type { GetUserInfoResult } from './generated/user/user'
 
 export const userApi = {
-  getInfo: (): Promise<ApiResponse<{ user: User }>> =>
-    apiGet<{ user: User }>('/user/info'),
+  getInfo: (): Promise<GetUserInfoResult> =>
+    getUser().getUserInfo(),
 }

@@ -1,75 +1,41 @@
-import { apiGet, apiPost, apiPut, apiDelete } from './client'
+import { getAdminAccounts } from './generated/admin-accounts/admin-accounts'
+import type {
+  AdminAccount as GeneratedAdminAccount,
+  AdminAccountCreateRequest as GeneratedAdminAccountCreateRequest,
+  AdminAccountUpdateRequest as GeneratedAdminAccountUpdateRequest,
+} from './generated/model'
 import type { ApiResponse } from './types'
 
-export interface ApiAccount {
-  id: number
-  name: string
-  channel_id: number
-  platform: string
-  api_type: string
-  api_key: string
-  proxy_url: string
-  model_set: string
-  max_concurrent: number
-  current_concurrent: number
-  fail_count: number
-  weight: number
-  timeout: number
-  extra_config: string
-  status: number
-  created_at: string
-  updated_at: string
-}
+export type ApiAccount = GeneratedAdminAccount
 
-export interface CreateAccountRequest {
-  name: string
-  platform: string
-  api_type: string
-  api_key: string
-  model_set?: string
-  proxy_url?: string
-  max_concurrent?: number
-  timeout?: number
-  weight?: number
-  extra_config?: string
-}
+export type CreateAccountRequest = GeneratedAdminAccountCreateRequest
 
-export interface UpdateAccountRequest {
-  name?: string
-  platform?: string
-  api_type?: string
-  api_key?: string
-  model_set?: string
-  proxy_url?: string
-  max_concurrent?: number
-  timeout?: number
-  weight?: number
-  extra_config?: string
-  status?: number
-}
+export type UpdateAccountRequest = GeneratedAdminAccountUpdateRequest
 
 export interface AccountListResponse {
   list: ApiAccount[]
   total: number
 }
 
+const adminAccountsApi = getAdminAccounts()
+
 export const createAccount = (data: CreateAccountRequest): Promise<ApiResponse<{ account: ApiAccount }>> =>
-  apiPost<{ account: ApiAccount }>('/admin/accounts', data)
+  adminAccountsApi.createAdminAccount(data)
 
 export const updateAccount = (id: number, data: UpdateAccountRequest): Promise<ApiResponse<null>> =>
-  apiPut<null>('/admin/accounts/' + id, data)
+  adminAccountsApi.updateAdminAccount(id, data)
 
 export const deleteAccount = (id: number): Promise<ApiResponse<null>> =>
-  apiDelete<null>('/admin/accounts/' + id)
+  adminAccountsApi.deleteAdminAccount(id)
 
 export const listAccounts = (params?: { keyword?: string; platform?: string; page?: number; page_size?: number }): Promise<ApiResponse<AccountListResponse>> =>
-  apiGet<AccountListResponse>('/admin/accounts', { params })
+  adminAccountsApi.listAdminAccounts(params)
 
 export const startAccount = (id: number): Promise<ApiResponse<null>> =>
-  apiPost<null>('/admin/accounts/' + id + '/start')
+  adminAccountsApi.startAdminAccount(id)
 
 export const stopAccount = (id: number): Promise<ApiResponse<null>> =>
-  apiPost<null>('/admin/accounts/' + id + '/stop')
+  adminAccountsApi.stopAdminAccount(id)
 
 export const accountApi = {
   createAccount,

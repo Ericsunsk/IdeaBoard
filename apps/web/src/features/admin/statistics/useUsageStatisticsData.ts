@@ -1,24 +1,54 @@
 import { computed, ref } from 'vue'
-import { useMutation, useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { AdminStatisticsBackfillState, AdminStatisticsResponse } from '../../../shared/api/adminStatistics'
 import type { Channel } from '../../../shared/api/channel'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
-import { queryKeys } from '../../../shared/query/keys'
 import {
-  fetchAdminStatistics,
-  fetchAllAccounts,
-  fetchChannels,
-  invalidateAdminStatistics,
+  getGetAdminStatisticsQueryKey,
+  useGetAdminStatistics,
+} from '../../../shared/api/generated-query/admin-statistics/admin-statistics'
+import { useListAdminChannels } from '../../../shared/api/generated-query/admin-channels/admin-channels'
+import {
+  getListAdminAccountsQueryKey,
+  listAdminAccounts,
+} from '../../../shared/api/generated-query/admin-accounts/admin-accounts'
+import type { ListAdminAccountsParams } from '../../../shared/api/generated-query/model'
+import {
   triggerAdminStatisticsBackfill,
   type AdminStatisticsRange,
 } from '../../../shared/query/adminQueries'
 
 export type ConfiguredAccountLite = { model_set: string; platform: string; channel_id: number }
+type ConfiguredAccountsResult = { accounts: ConfiguredAccountLite[]; total: number }
 type BackfillTriggerResult = { ok: boolean; message?: string }
 
 type RangeOption = { label: string; key: AdminStatisticsRange }
+const accountListParams = { page: 1, page_size: 100 } as const
+
+function requireAccountListData(response: Awaited<ReturnType<typeof listAdminAccounts>>) {
+  if (!response.data) throw new Error('获取账号列表失败')
+  return response.data
+}
+
+async function listAllAdminAccounts(params: ListAdminAccountsParams): Promise<ConfiguredAccountsResult> {
+  const pageSize = params.page_size ?? 100
+  const firstPage = requireAccountListData(await listAdminAccounts({ ...params, page: 1, page_size: pageSize }))
+  const accounts: ConfiguredAccountLite[] = [...firstPage.list]
+  const total = firstPage.total
+  let page = 2
+
+  while (accounts.length < total) {
+    const data = requireAccountListData(await listAdminAccounts({ ...params, page, page_size: pageSize }))
+    if (data.list.length === 0) break
+    accounts.push(...data.list)
+    page += 1
+  }
+
+  return { accounts, total }
+}
 
 export function useUsageStatisticsData() {
+  const queryClient = useQueryClient()
   const timeRange = ref<AdminStatisticsRange>('7d')
   const rangeOptions: RangeOption[] = [
     { label: '周', key: '7d' },
@@ -26,32 +56,30 @@ export function useUsageStatisticsData() {
     { label: '年', key: '1y' },
   ]
 
-  const statisticsQuery = useQuery({
-    queryKey: computed(() => queryKeys.admin.statistics(timeRange.value)),
-    queryFn: () => fetchAdminStatistics(timeRange.value),
-    placeholderData: (previous) => previous,
+  const statisticsParams = computed(() => ({ range: timeRange.value }))
+  const statisticsQuery = useGetAdminStatistics(statisticsParams, {
+    query: {
+      placeholderData: (previous) => previous,
+    },
   })
 
-  const channelsQuery = useQuery({
-    queryKey: queryKeys.admin.channels(),
-    queryFn: fetchChannels,
-  })
+  const channelsQuery = useListAdminChannels()
 
   const accountsQuery = useQuery({
-    queryKey: queryKeys.admin.accounts({ page: 1, page_size: 100 }),
-    queryFn: () => fetchAllAccounts({ page: 1, page_size: 100 }),
+    queryKey: [...getListAdminAccountsQueryKey(accountListParams), 'all-pages'] as const,
+    queryFn: () => listAllAdminAccounts(accountListParams),
   })
 
   const backfillMutation = useMutation({
     mutationFn: () => triggerAdminStatisticsBackfill(timeRange.value),
     onSuccess: async () => {
-      await invalidateAdminStatistics(timeRange.value)
+      await queryClient.invalidateQueries({ queryKey: getGetAdminStatisticsQueryKey(statisticsParams.value) })
     },
   })
 
-  const adminStatistics = computed<AdminStatisticsResponse | null>(() => statisticsQuery.data.value ?? null)
+  const adminStatistics = computed<AdminStatisticsResponse | null>(() => statisticsQuery.data.value?.data ?? null)
   const configuredAccounts = computed<ConfiguredAccountLite[]>(() => accountsQuery.data.value?.accounts ?? [])
-  const configuredChannels = computed<Channel[]>(() => channelsQuery.data.value ?? [])
+  const configuredChannels = computed<Channel[]>(() => channelsQuery.data.value?.data?.list ?? [])
   const backfillLoading = computed(() => backfillMutation.isPending.value)
 
   const backfillStatus = computed<AdminStatisticsBackfillState | null>(() => {

@@ -1,16 +1,17 @@
 import { computed, h, ref, watch } from 'vue'
-import { useMutation, useQuery } from '@tanstack/vue-query'
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { useMessage } from 'naive-ui'
 import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../../shared/api/storage'
+import {
+  getListAdminStorageProfilesQueryKey,
+  useListAdminStorageProfiles,
+  useListAdminStorageProviders,
+} from '../../../shared/api/generated-query/admin-storage/admin-storage'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
-import { queryKeys } from '../../../shared/query/keys'
 import {
   applyStorageProfile,
   deleteStorageProfile,
   fetchStorageBucketDomains,
-  fetchStorageProfiles,
-  fetchStorageProviders,
-  invalidateStorageProfiles,
   saveStorageProfile,
   testStorageProfile,
 } from '../../../shared/query/adminQueries'
@@ -47,29 +48,24 @@ function vendorAccessLabel(vendor: VendorPresetOption) {
 
 export function useStorageManager() {
   const message = useMessage()
+  const queryClient = useQueryClient()
 
-  const providersQuery = useQuery({
-    queryKey: queryKeys.admin.storage.providers(),
-    queryFn: fetchStorageProviders,
-  })
-  const profilesQuery = useQuery({
-    queryKey: queryKeys.admin.storage.profiles(),
-    queryFn: fetchStorageProfiles,
-  })
+  const providersQuery = useListAdminStorageProviders()
+  const profilesQuery = useListAdminStorageProfiles()
   const saveProfileMutation = useMutation({
     mutationFn: saveStorageProfile,
-    onSuccess: () => invalidateStorageProfiles(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
   })
   const applyProfileMutation = useMutation({
     mutationFn: applyStorageProfile,
-    onSuccess: () => invalidateStorageProfiles(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
   })
   const testProfileMutation = useMutation({
     mutationFn: testStorageProfile,
   })
   const deleteProfileMutation = useMutation({
     mutationFn: deleteStorageProfile,
-    onSuccess: () => invalidateStorageProfiles(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
   })
   const bucketDomainsMutation = useMutation({
     mutationFn: fetchStorageBucketDomains,
@@ -85,12 +81,12 @@ export function useStorageManager() {
   const editingId = ref<string | null>(null)
   const selectedVendorKey = ref('kodo')
 
-  const providers = computed<StorageProviderMeta[]>(() => providersQuery.data.value ?? [])
+  const providers = computed<StorageProviderMeta[]>(() => providersQuery.data.value?.data?.providers ?? [])
   const bucketDomains = ref<string[]>([])
   const providerMap = computed(() => toProviderMetaMap(providers.value))
   const creatableProviders = computed(() => providers.value.filter((provider) => provider.create_allowed))
   const vendorPresets = computed(() => buildVendorPresets(providerMap.value, creatableProviders.value))
-  const storages = computed<StorageCard[]>(() => (profilesQuery.data.value ?? []).map(normalizeProfile))
+  const storages = computed<StorageCard[]>(() => (profilesQuery.data.value?.data?.profiles ?? []).map(normalizeProfile))
   const form = ref<StorageCard>(createEmptyStorageProfile('kodo', providerMap.value))
   const selectedProviderMeta = computed(() => providerMap.value[form.value.provider])
   const textFields = computed(() => (selectedProviderMeta.value?.fields || []).filter((field) => field.type !== 'switch'))

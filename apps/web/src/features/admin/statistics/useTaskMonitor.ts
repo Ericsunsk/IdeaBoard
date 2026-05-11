@@ -1,10 +1,9 @@
 import { computed, ref, watch } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
 import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../shared/api/task'
-import { fetchAdminTasks, fetchAdminMonitor } from '../../../shared/query/taskQueries'
-import { queryKeys } from '../../../shared/query/keys'
 import { createMonitorTaskColumns } from '../shared/monitorShared'
+import { useGetAdminMonitor } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
+import { useListAdminTasks } from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
 
 export function useTaskMonitor(options: {
   onShowDetail: (row: Task) => void
@@ -32,16 +31,16 @@ export function useTaskMonitor(options: {
     return params
   }
 
-  const tasksQuery = useQuery({
-    queryKey: computed(() => queryKeys.admin.tasks(resolveParams())),
-    queryFn: () => fetchAdminTasks(resolveParams()),
-    placeholderData: (prev) => prev,
+  const tasksQuery = useListAdminTasks(computed(resolveParams), {
+    query: {
+      placeholderData: (prev) => prev,
+    },
   })
 
-  const monitorQuery = useQuery({
-    queryKey: queryKeys.admin.monitor(),
-    queryFn: fetchAdminMonitor,
-    refetchInterval: 10_000,
+  const monitorQuery = useGetAdminMonitor({
+    query: {
+      refetchInterval: 10_000,
+    },
   })
 
   const tasks = computed(() => tasksQuery.data.value?.data?.list || [])

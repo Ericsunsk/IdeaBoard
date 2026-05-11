@@ -1,5 +1,6 @@
 import { queryClient } from '../query/queryClient'
-import { queryKeys } from '../query/keys'
+import { getGetUserTaskQueryKey } from './generated-query/tasks/tasks'
+import type { ApiResponseTask } from './generated-query/model'
 import { extractImageUrlsFromTaskResult } from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import type { Task } from './task'
@@ -53,7 +54,16 @@ function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[
         return
       }
 
-      queryClient.setQueryData(queryKeys.tasks.detail(taskId), (old: Task | undefined) => ({ ...old, ...task }))
+      queryClient.setQueryData(getGetUserTaskQueryKey(taskId), (old: ApiResponseTask | undefined) => {
+        if (!old?.data?.task) return old
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            task: { ...old.data.task, ...task },
+          },
+        }
+      })
 
       if (task.status === 'completed') {
         settleResolve(extractImageUrlsFromTaskResult(task.result))

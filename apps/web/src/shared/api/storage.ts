@@ -1,12 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from './client'
-import { createStorageApi } from './admin/storage'
-
-export const storageApi = createStorageApi({
-  get: apiGet,
-  post: apiPost,
-  put: apiPut,
-  delete: apiDelete,
-})
+export { storageApi } from './admin/storage'
 
 export type {
   StorageFieldType,

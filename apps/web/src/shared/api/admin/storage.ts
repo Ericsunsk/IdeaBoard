@@ -1,71 +1,34 @@
+import { getAdminStorage } from '../generated/admin-storage/admin-storage'
 import type { ApiResponse } from '../types'
+import type {
+  StorageProfile as GeneratedStorageProfile,
+  StorageProfilePayload as GeneratedStorageProfilePayload,
+  StorageProviderField as GeneratedStorageProviderField,
+  StorageProviderMeta as GeneratedStorageProviderMeta,
+} from '../generated/model'
 
-export type StorageProvider = 'local' | 'kodo' | 's3-compatible' | string
-export type StorageFieldType = 'text' | 'password' | 'switch' | string
+const adminStorageApi = getAdminStorage()
 
-export interface StorageProviderField {
-  key: string
-  label: string
-  type: StorageFieldType
-  placeholder?: string
-  hint?: string
-  required?: boolean
-  secret?: boolean
-}
-
-export interface StorageProviderMeta {
+export type StorageProvider = string
+export type StorageFieldType = string
+export type StorageProviderField = Omit<GeneratedStorageProviderField, 'type'> & { type: StorageFieldType }
+export type StorageProviderMeta = Omit<GeneratedStorageProviderMeta, 'provider' | 'fields'> & {
   provider: StorageProvider
-  label: string
-  description: string
-  builtin: boolean
-  create_allowed: boolean
-  supports_test: boolean
-  supports_bucket_info: boolean
   fields: StorageProviderField[]
 }
+export type StorageProfile = Omit<GeneratedStorageProfile, 'provider'> & { provider: StorageProvider }
+export type StorageProfilePayload = Omit<GeneratedStorageProfilePayload, 'provider'> & { provider: StorageProvider }
 
-export interface StorageProfile {
-  id: string
-  name: string
-  provider: StorageProvider
-  enabled: boolean
-  is_current: boolean
-  builtin: boolean
-  secret_configured: boolean
-  config: Record<string, unknown>
-}
-
-export interface StorageProfilePayload {
-  name: string
-  provider: StorageProvider
-  enabled: boolean
-  config: Record<string, unknown>
-}
-
-type StorageRequestClient = {
-  get: <T>(url: string, config?: Record<string, unknown>) => Promise<ApiResponse<T>>
-  post: <T, D = unknown>(url: string, data?: D, config?: Record<string, unknown>) => Promise<ApiResponse<T>>
-  put: <T, D = unknown>(url: string, data?: D, config?: Record<string, unknown>) => Promise<ApiResponse<T>>
-  delete: <T>(url: string, config?: Record<string, unknown>) => Promise<ApiResponse<T>>
-}
-
-export function createStorageApi(client: StorageRequestClient) {
-  return {
-    getProviders: (): Promise<ApiResponse<{ providers: StorageProviderMeta[] }>> =>
-      client.get<{ providers: StorageProviderMeta[] }>('/admin/storage/providers'),
-    getProfiles: (): Promise<ApiResponse<{ profiles: StorageProfile[] }>> =>
-      client.get<{ profiles: StorageProfile[] }>('/admin/storage/profiles'),
-    createProfile: (data: StorageProfilePayload): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-      client.post<{ profile: StorageProfile; message: string }, StorageProfilePayload>('/admin/storage/profiles', data),
-    updateProfile: (id: string, data: StorageProfilePayload): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-      client.put<{ profile: StorageProfile; message: string }, StorageProfilePayload>('/admin/storage/profiles/' + id, data),
-    deleteProfile: (id: string): Promise<ApiResponse<{ message: string }>> =>
-      client.delete<{ message: string }>('/admin/storage/profiles/' + id),
-    applyProfile: (id: string): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-      client.post<{ profile: StorageProfile; message: string }>('/admin/storage/profiles/' + id + '/apply'),
-    testProfile: (id: string): Promise<ApiResponse<{ message: string }>> =>
-      client.post<{ message: string }>('/admin/storage/profiles/' + id + '/test'),
-    getBucketInfo: (id: string): Promise<ApiResponse<{ info: { domains?: string[] } }>> =>
-      client.get<{ info: { domains?: string[] } }>('/admin/storage/profiles/' + id + '/bucket-info'),
-  }
+export const storageApi = {
+  getProviders: (): Promise<ApiResponse<{ providers: StorageProviderMeta[] }>> => adminStorageApi.listAdminStorageProviders(),
+  getProfiles: (): Promise<ApiResponse<{ profiles: StorageProfile[] }>> => adminStorageApi.listAdminStorageProfiles(),
+  createProfile: (data: StorageProfilePayload): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
+    adminStorageApi.createAdminStorageProfile(data),
+  updateProfile: (id: string, data: StorageProfilePayload): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
+    adminStorageApi.updateAdminStorageProfile(id, data),
+  deleteProfile: (id: string): Promise<ApiResponse<{ message: string }>> => adminStorageApi.deleteAdminStorageProfile(id),
+  applyProfile: (id: string): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
+    adminStorageApi.applyAdminStorageProfile(id),
+  testProfile: (id: string): Promise<ApiResponse<{ message: string }>> => adminStorageApi.testAdminStorageProfile(id),
+  getBucketInfo: (id: string): Promise<ApiResponse<{ info: { domains?: string[] } }>> => adminStorageApi.getAdminStorageBucketInfo(id),
 }

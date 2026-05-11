@@ -1,21 +1,10 @@
-import { apiDelete, apiGet, apiPost, apiPut } from './client'
+import { apiPost } from './client'
+import { getAdminChannels } from './generated/admin-channels/admin-channels'
+import type { Channel as GeneratedChannel, ChannelFormData as GeneratedChannelFormData } from './generated/model'
 import type { ApiResponse } from './types'
 
-export interface Channel {
-  id: number
-  type: string
-  name: string
-  api_url: string
-  status: number
-  created_at: string
-  updated_at: string
-}
-
-export interface ChannelFormData {
-  type: string
-  name: string
-  api_url: string
-}
+export type Channel = GeneratedChannel
+export type ChannelFormData = GeneratedChannelFormData
 
 export type DetectModelsRequest = {
   base_url: string
@@ -26,15 +15,17 @@ export type DetectModelsResponse = {
   models: string[]
 }
 
+const adminChannelsApi = getAdminChannels()
+
 export const channelApi = {
   list: (): Promise<ApiResponse<{ list: Channel[] }>> =>
-    apiGet<{ list: Channel[] }>('/admin/channels'),
+    adminChannelsApi.listAdminChannels(),
   create: (data: ChannelFormData): Promise<ApiResponse<{ channel: Channel }>> =>
-    apiPost<{ channel: Channel }, ChannelFormData>('/admin/channels', data),
+    adminChannelsApi.createAdminChannel(data),
   update: (id: number, data: ChannelFormData): Promise<ApiResponse<{ channel: Channel }>> =>
-    apiPut<{ channel: Channel }, ChannelFormData>('/admin/channels/' + id, data),
+    adminChannelsApi.updateAdminChannel(id, data),
   delete: (id: number): Promise<ApiResponse<null>> =>
-    apiDelete<null>('/admin/channels/' + id),
+    adminChannelsApi.deleteAdminChannel(id),
   detectModels: (data: DetectModelsRequest): Promise<ApiResponse<DetectModelsResponse>> =>
     apiPost<DetectModelsResponse, DetectModelsRequest>('/admin/channels/detect-models', data),
 }

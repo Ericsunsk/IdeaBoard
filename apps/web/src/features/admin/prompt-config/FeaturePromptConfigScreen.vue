@@ -89,15 +89,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
-import { useMutation, useQuery } from '@tanstack/vue-query'
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { NInput, NButton, useMessage } from 'naive-ui'
 import AdminEditorModal from '../shared/components/AdminEditorModal.vue'
-import { queryKeys } from '../../../shared/query/keys'
+import { saveFeaturePrompt } from '../../../shared/query/adminQueries'
 import {
-  fetchFeaturePrompts,
-  invalidateFeaturePrompts,
-  saveFeaturePrompt,
-} from '../../../shared/query/adminQueries'
+  getListAdminFeaturePromptsQueryKey,
+  useListAdminFeaturePrompts,
+} from '../../../shared/api/generated-query/admin-feature-prompts/admin-feature-prompts'
 import {
   featureMap,
   groupedFeatureGroups,
@@ -111,6 +110,7 @@ import {
 } from './featurePromptMeta'
 
 const message = useMessage()
+const queryClient = useQueryClient()
 
 // textarea 引用 + 插入逻辑
 type TextareaRefLike = { textareaElRef?: HTMLTextAreaElement; $el?: Element }
@@ -161,16 +161,13 @@ function bindTextareaRef(slug: FeatureSlug, el: unknown) {
 const promptMap = reactive<Record<string, string>>({})
 const savedPromptMap = reactive<Record<string, string>>({})
 const saving = reactive<Record<string, boolean>>({})
-const promptsQuery = useQuery({
-  queryKey: queryKeys.admin.featurePrompts(),
-  queryFn: fetchFeaturePrompts,
-})
+const promptsQuery = useListAdminFeaturePrompts()
 const savePromptMutation = useMutation({
   mutationFn: saveFeaturePrompt,
   onSuccess: async ({ slug, prompt }) => {
     savedPromptMap[slug] = prompt
     promptMap[slug] = prompt
-    await invalidateFeaturePrompts()
+    await queryClient.invalidateQueries({ queryKey: getListAdminFeaturePromptsQueryKey() })
   },
 })
 watch(
@@ -188,7 +185,8 @@ function resetGroupDraftFromSaved(group: FeatureGroup) {
 
 watch(
   () => promptsQuery.data.value,
-  (prompts) => {
+  (response) => {
+    const prompts = response?.data?.prompts
     if (!prompts) return
     for (const [slug, prompt] of Object.entries(prompts)) {
       const val = prompt || ''

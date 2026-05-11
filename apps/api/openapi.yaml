@@ -1,0 +1,1346 @@
+openapi: 3.0.3
+info:
+  title: Feng-AI API
+  version: 0.1.0
+servers:
+  - url: /api
+tags:
+  - name: User
+  - name: Boards
+  - name: Tasks
+  - name: AdminSettings
+  - name: AdminUsers
+  - name: AdminAccounts
+  - name: AdminTasks
+  - name: AdminMonitor
+  - name: AdminStatistics
+  - name: AdminChannels
+  - name: AdminStorage
+  - name: AdminFeaturePrompts
+paths:
+  /user/info:
+    get:
+      tags: [User]
+      operationId: getUserInfo
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserInfo'
+  /user/boards:
+    get:
+      tags: [Boards]
+      operationId: listUserBoards
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserBoardList'
+  /user/boards/{board_id}:
+    put:
+      tags: [Boards]
+      operationId: upsertUserBoard
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserBoardUpsertRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserBoard'
+    delete:
+      tags: [Boards]
+      operationId: deleteUserBoard
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDeleted'
+  /user/boards/share-tokens/join:
+    post:
+      tags: [Boards]
+      operationId: joinBoardByShareToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserBoard'
+  /user/drawing/submit:
+    post:
+      tags: [Tasks]
+      operationId: submitUserTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTaskRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTaskId'
+  /user/drawing:
+    get:
+      tags: [Tasks]
+      operationId: listUserTasks
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTaskList'
+  /user/drawing/{task_id}:
+    get:
+      tags: [Tasks]
+      operationId: getUserTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTask'
+    delete:
+      tags: [Tasks]
+      operationId: deleteUserTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMessage'
+
+  /admin/settings/registration:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminRegistrationSetting
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseRegistrationSetting'
+    put:
+      tags: [AdminSettings]
+      operationId: updateAdminRegistrationSetting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseRegistrationSetting'
+  /admin/settings/rate-limit:
+    get:
+      tags: [AdminSettings]
+      operationId: getAdminRateLimitSettings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseRateLimitSetting'
+    put:
+      tags: [AdminSettings]
+      operationId: updateAdminRateLimitSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RateLimitSetting'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseRateLimitSetting'
+
+  /admin/users:
+    get:
+      tags: [AdminUsers]
+      operationId: listAdminUsers
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserList'
+  /admin/users/{id}/status:
+    put:
+      tags: [AdminUsers]
+      operationId: updateAdminUserStatus
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/users/{id}/role:
+    put:
+      tags: [AdminUsers]
+      operationId: updateAdminUserRole
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [admin, user]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/users/{id}:
+    delete:
+      tags: [AdminUsers]
+      operationId: deleteAdminUser
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+
+  /admin/accounts:
+    get:
+      tags: [AdminAccounts]
+      operationId: listAdminAccounts
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - name: platform
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAccountList'
+    post:
+      tags: [AdminAccounts]
+      operationId: createAdminAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAccountCreateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAdminAccount'
+  /admin/accounts/{id}:
+    put:
+      tags: [AdminAccounts]
+      operationId: updateAdminAccount
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAccountUpdateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+    delete:
+      tags: [AdminAccounts]
+      operationId: deleteAdminAccount
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/accounts/{id}/start:
+    post:
+      tags: [AdminAccounts]
+      operationId: startAdminAccount
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/accounts/{id}/stop:
+    post:
+      tags: [AdminAccounts]
+      operationId: stopAdminAccount
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+
+  /admin/tasks:
+    get:
+      tags: [AdminTasks]
+      operationId: listAdminTasks
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: user_id
+          in: query
+          schema: { type: integer }
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTaskList'
+  /admin/tasks/submit:
+    post:
+      tags: [AdminTasks]
+      operationId: submitAdminTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTaskRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTaskId'
+  /admin/tasks/{task_id}:
+    get:
+      tags: [AdminTasks]
+      operationId: getAdminTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTask'
+
+  /admin/monitor:
+    get:
+      tags: [AdminMonitor]
+      operationId: getAdminMonitor
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMonitor'
+
+  /admin/statistics:
+    get:
+      tags: [AdminStatistics]
+      operationId: getAdminStatistics
+      parameters:
+        - name: range
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [7d, 30d, 1y]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAdminStatistics'
+
+  /admin/channels:
+    get:
+      tags: [AdminChannels]
+      operationId: listAdminChannels
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseChannelList'
+    post:
+      tags: [AdminChannels]
+      operationId: createAdminChannel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelFormData'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseChannel'
+  /admin/channels/{id}:
+    put:
+      tags: [AdminChannels]
+      operationId: updateAdminChannel
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelFormData'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseChannel'
+    delete:
+      tags: [AdminChannels]
+      operationId: deleteAdminChannel
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+
+  /admin/storage/providers:
+    get:
+      tags: [AdminStorage]
+      operationId: listAdminStorageProviders
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStorageProviderList'
+  /admin/storage/profiles:
+    get:
+      tags: [AdminStorage]
+      operationId: listAdminStorageProfiles
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStorageProfileList'
+    post:
+      tags: [AdminStorage]
+      operationId: createAdminStorageProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorageProfilePayload'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStorageProfileWithMessage'
+  /admin/storage/profiles/{id}:
+    put:
+      tags: [AdminStorage]
+      operationId: updateAdminStorageProfile
+      parameters:
+        - $ref: '#/components/parameters/StorageProfileId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StorageProfilePayload'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStorageProfileWithMessage'
+    delete:
+      tags: [AdminStorage]
+      operationId: deleteAdminStorageProfile
+      parameters:
+        - $ref: '#/components/parameters/StorageProfileId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMessage'
+  /admin/storage/profiles/{id}/apply:
+    post:
+      tags: [AdminStorage]
+      operationId: applyAdminStorageProfile
+      parameters:
+        - $ref: '#/components/parameters/StorageProfileId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStorageProfileWithMessage'
+  /admin/storage/profiles/{id}/test:
+    post:
+      tags: [AdminStorage]
+      operationId: testAdminStorageProfile
+      parameters:
+        - $ref: '#/components/parameters/StorageProfileId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMessage'
+  /admin/storage/profiles/{id}/bucket-info:
+    get:
+      tags: [AdminStorage]
+      operationId: getAdminStorageBucketInfo
+      parameters:
+        - $ref: '#/components/parameters/StorageProfileId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStorageBucketInfo'
+
+  /admin/feature-prompts:
+    get:
+      tags: [AdminFeaturePrompts]
+      operationId: listAdminFeaturePrompts
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseFeaturePromptMap'
+  /admin/feature-prompts/{slug}:
+    get:
+      tags: [AdminFeaturePrompts]
+      operationId: getAdminFeaturePrompt
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseFeaturePrompt'
+    put:
+      tags: [AdminFeaturePrompts]
+      operationId: setAdminFeaturePrompt
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseFeaturePrompt'
+
+components:
+  parameters:
+    BoardId:
+      name: board_id
+      in: path
+      required: true
+      schema: { type: string }
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      schema: { type: string }
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    StorageProfileId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer }
+
+  schemas:
+    ApiResponseBase:
+      type: object
+      required: [code, msg]
+      properties:
+        code: { type: integer }
+        msg: { type: string }
+
+    User:
+      type: object
+      required: [id, uid, username, role, status, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        uid: { type: string }
+        username: { type: string }
+        auth_user_id: { type: string }
+        avatar: { type: string }
+        role: { type: string }
+        status: { type: integer }
+        created_at: { type: string }
+        updated_at: { type: string }
+
+    UserBoardItem:
+      type: object
+      required: [board_id, name, state, created_at, updated_at]
+      properties:
+        board_id: { type: string }
+        name: { type: string }
+        state:
+          type: object
+          nullable: true
+          additionalProperties: true
+        access_role:
+          type: string
+          enum: [owner, editor, viewer]
+        created_at: { type: number }
+        updated_at: { type: number }
+
+    UserBoardUpsertRequest:
+      type: object
+      required: [name, state]
+      properties:
+        name: { type: string }
+        state:
+          type: object
+          nullable: true
+          additionalProperties: true
+        created_at: { type: number }
+        updated_at: { type: number }
+
+    Task:
+      type: object
+      required: [id, task_id, user_id, prompt, status, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        task_id: { type: string }
+        user_id: { type: integer }
+        channel_id: { type: integer }
+        account_id: { type: integer }
+        prompt: { type: string }
+        params: { type: string }
+        status: { type: string }
+        retry_count: { type: integer }
+        error_msg: { type: string }
+        result: { type: string }
+        created_at: { type: string }
+        updated_at: { type: string }
+        completed_at:
+          type: string
+          nullable: true
+
+    SubmitTaskRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt: { type: string }
+        feature: { type: string }
+        image_urls:
+          type: array
+          items: { type: string }
+        params:
+          type: object
+          additionalProperties: true
+
+    RateLimitSetting:
+      type: object
+      required: [window_seconds, max_requests]
+      properties:
+        window_seconds: { type: integer }
+        max_requests: { type: integer }
+
+    AdminAccount:
+      type: object
+      required: [id, name, channel_id, platform, api_type, api_key, proxy_url, model_set, max_concurrent, current_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        channel_id: { type: integer }
+        platform: { type: string }
+        api_type: { type: string }
+        api_key: { type: string }
+        proxy_url: { type: string }
+        model_set: { type: string }
+        max_concurrent: { type: integer }
+        current_concurrent: { type: integer }
+        fail_count: { type: integer }
+        weight: { type: integer }
+        timeout: { type: integer }
+        extra_config: { type: string }
+        status: { type: integer }
+        created_at: { type: string }
+        updated_at: { type: string }
+
+    AdminAccountCreateRequest:
+      type: object
+      required: [name, platform, api_type, api_key]
+      properties:
+        name: { type: string }
+        platform: { type: string }
+        api_type: { type: string }
+        api_key: { type: string }
+        model_set: { type: string }
+        proxy_url: { type: string }
+        max_concurrent: { type: integer }
+        timeout: { type: integer }
+        weight: { type: integer }
+        extra_config: { type: string }
+
+    AdminAccountUpdateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        platform: { type: string }
+        api_type: { type: string }
+        api_key: { type: string }
+        model_set: { type: string }
+        proxy_url: { type: string }
+        max_concurrent: { type: integer }
+        timeout: { type: integer }
+        weight: { type: integer }
+        extra_config: { type: string }
+        status: { type: integer }
+
+    MonitorAccountLoad:
+      type: object
+      required: [current_concurrent, max_concurrent]
+      properties:
+        current_concurrent: { type: integer }
+        max_concurrent: { type: integer }
+
+    MonitorData:
+      type: object
+      required: [global_queue_len, wait_queue_len, running_tasks, account_loads]
+      properties:
+        global_queue_len: { type: integer }
+        wait_queue_len: { type: integer }
+        running_tasks: { type: integer }
+        account_loads:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/MonitorAccountLoad'
+
+    MonitorStats:
+      type: object
+      required: [pending, running, completed, failed]
+      properties:
+        pending: { type: integer }
+        running: { type: integer }
+        completed: { type: integer }
+        failed: { type: integer }
+
+    MonitorResponse:
+      type: object
+      required: [monitor, stats]
+      properties:
+        monitor:
+          $ref: '#/components/schemas/MonitorData'
+        stats:
+          $ref: '#/components/schemas/MonitorStats'
+
+    AdminStatistics:
+      type: object
+      required: [summary, trend, model_ranking, user_rank, latency, health_cells, backfill_status]
+      properties:
+        summary:
+          type: object
+          required: [total_calls, today_calls, today_success, today_failed, yesterday_calls, yesterday_success, yesterday_failed, this_month_calls, pending, running, completed, failed]
+          properties:
+            total_calls: { type: integer }
+            today_calls: { type: integer }
+            today_success: { type: integer }
+            today_failed: { type: integer }
+            yesterday_calls: { type: integer }
+            yesterday_success: { type: integer }
+            yesterday_failed: { type: integer }
+            this_month_calls: { type: integer }
+            pending: { type: integer }
+            running: { type: integer }
+            completed: { type: integer }
+            failed: { type: integer }
+        trend:
+          type: array
+          items:
+            type: object
+            required: [date, label, total, segments]
+            properties:
+              date: { type: string }
+              label: { type: string }
+              total: { type: integer }
+              segments:
+                type: array
+                items:
+                  type: object
+                  required: [label, value]
+                  properties:
+                    label: { type: string }
+                    value: { type: integer }
+        model_ranking:
+          type: array
+          items:
+            type: object
+            required: [name, value, percent]
+            properties:
+              name: { type: string }
+              value: { type: integer }
+              percent: { type: number }
+        user_rank:
+          type: array
+          items:
+            type: object
+            required: [name, value]
+            properties:
+              name: { type: string }
+              value: { type: integer }
+        latency:
+          type: array
+          items:
+            type: object
+            required: [name, avg_seconds]
+            properties:
+              name: { type: string }
+              avg_seconds: { type: number }
+        health_cells:
+          type: array
+          items:
+            type: object
+            required: [status, success, fail, total]
+            properties:
+              status: { type: integer }
+              success: { type: integer }
+              fail: { type: integer }
+              total: { type: integer }
+        backfill_status:
+          type: object
+          required: [range_start, range_end, missing_days, backfilled_days]
+          properties:
+            range_start: { type: string }
+            range_end: { type: string }
+            missing_days: { type: integer }
+            backfilled_days: { type: integer }
+
+    Channel:
+      type: object
+      required: [id, type, name, api_url, status, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        type: { type: string }
+        name: { type: string }
+        api_url: { type: string }
+        status: { type: integer }
+        created_at: { type: string }
+        updated_at: { type: string }
+
+    ChannelFormData:
+      type: object
+      required: [type, name, api_url]
+      properties:
+        type: { type: string }
+        name: { type: string }
+        api_url: { type: string }
+
+    StorageProviderField:
+      type: object
+      required: [key, label, type]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        type: { type: string }
+        placeholder: { type: string }
+        hint: { type: string }
+        required: { type: boolean }
+        secret: { type: boolean }
+
+    StorageProviderMeta:
+      type: object
+      required: [provider, label, description, builtin, create_allowed, supports_test, supports_bucket_info, fields]
+      properties:
+        provider: { type: string }
+        label: { type: string }
+        description: { type: string }
+        builtin: { type: boolean }
+        create_allowed: { type: boolean }
+        supports_test: { type: boolean }
+        supports_bucket_info: { type: boolean }
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/StorageProviderField'
+
+    StorageProfile:
+      type: object
+      required: [id, name, provider, enabled, is_current, builtin, secret_configured, config]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        provider: { type: string }
+        enabled: { type: boolean }
+        is_current: { type: boolean }
+        builtin: { type: boolean }
+        secret_configured: { type: boolean }
+        config:
+          type: object
+          additionalProperties: true
+
+    StorageProfilePayload:
+      type: object
+      required: [name, provider, enabled, config]
+      properties:
+        name: { type: string }
+        provider: { type: string }
+        enabled: { type: boolean }
+        config:
+          type: object
+          additionalProperties: true
+
+    FeaturePrompt:
+      type: object
+      required: [slug, prompt]
+      properties:
+        slug: { type: string }
+        prompt: { type: string }
+
+    ApiResponseUserInfo:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [user]
+              properties:
+                user:
+                  $ref: '#/components/schemas/User'
+
+    ApiResponseUserBoardList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/UserBoardItem'
+
+    ApiResponseUserBoard:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [board]
+              properties:
+                board:
+                  $ref: '#/components/schemas/UserBoardItem'
+
+    ApiResponseDeleted:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [deleted]
+              properties:
+                deleted:
+                  type: boolean
+
+    ApiResponseTaskId:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [task_id]
+              properties:
+                task_id: { type: string }
+
+    ApiResponseTaskList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list, total]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Task'
+                total: { type: integer }
+
+    ApiResponseTask:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [task]
+              properties:
+                task:
+                  $ref: '#/components/schemas/Task'
+
+    ApiResponseMessage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string }
+
+    ApiResponseRegistrationSetting:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+
+    ApiResponseRateLimitSetting:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/RateLimitSetting'
+
+    ApiResponseUserList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [total, list]
+              properties:
+                total: { type: integer }
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/User'
+
+    ApiResponseEmpty:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+
+    ApiResponseAccountList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list, total]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AdminAccount'
+                total: { type: integer }
+
+    ApiResponseAdminAccount:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [account]
+              properties:
+                account:
+                  $ref: '#/components/schemas/AdminAccount'
+
+    ApiResponseMonitor:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/MonitorResponse'
+
+    ApiResponseAdminStatistics:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AdminStatistics'
+
+    ApiResponseChannelList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Channel'
+
+    ApiResponseChannel:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [channel]
+              properties:
+                channel:
+                  $ref: '#/components/schemas/Channel'
+
+    ApiResponseStorageProviderList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [providers]
+              properties:
+                providers:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/StorageProviderMeta'
+
+    ApiResponseStorageProfileList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [profiles]
+              properties:
+                profiles:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/StorageProfile'
+
+    ApiResponseStorageProfileWithMessage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [profile, message]
+              properties:
+                profile:
+                  $ref: '#/components/schemas/StorageProfile'
+                message:
+                  type: string
+
+    ApiResponseStorageBucketInfo:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [info]
+              properties:
+                info:
+                  type: object
+                  properties:
+                    domains:
+                      type: array
+                      items: { type: string }
+
+    ApiResponseFeaturePromptMap:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [prompts]
+              properties:
+                prompts:
+                  type: object
+                  additionalProperties:
+                    type: string
+
+    ApiResponseFeaturePrompt:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/FeaturePrompt'

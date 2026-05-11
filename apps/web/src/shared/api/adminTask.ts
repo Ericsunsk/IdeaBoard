@@ -1,12 +1,20 @@
-import { apiGet, apiPost } from './client'
+import { getAdminTasks } from './generated/admin-tasks/admin-tasks'
+import type {
+  ApiResponseTaskData,
+  ApiResponseTaskIdData,
+  ApiResponseTaskListData,
+  ListAdminTasksParams,
+} from './generated/model'
 import type { ApiResponse } from './types'
-import type { Task, SubmitTaskData } from './task'
+import type { SubmitTaskData } from './task'
+
+const adminTasksClient = getAdminTasks()
 
 export const adminTaskApi = {
-  submit: (data: SubmitTaskData): Promise<ApiResponse<{ task_id: string }>> =>
-    apiPost<{ task_id: string }, SubmitTaskData>('/admin/tasks/submit', data),
-  get: (task_id: string): Promise<ApiResponse<{ task: Task }>> =>
-    apiGet<{ task: Task }>('/admin/tasks/' + task_id),
-  list: (params?: { status?: string; page?: number; page_size?: number; user_id?: number; keyword?: string }): Promise<ApiResponse<{ list: Task[]; total: number }>> =>
-    apiGet<{ list: Task[]; total: number }>('/admin/tasks', { params }),
+  submit: (data: SubmitTaskData): Promise<ApiResponse<ApiResponseTaskIdData>> =>
+    adminTasksClient.submitAdminTask(data),
+  get: (task_id: string): Promise<ApiResponse<ApiResponseTaskData>> =>
+    adminTasksClient.getAdminTask(task_id),
+  list: (params?: ListAdminTasksParams): Promise<ApiResponse<ApiResponseTaskListData>> =>
+    adminTasksClient.listAdminTasks(params),
 }

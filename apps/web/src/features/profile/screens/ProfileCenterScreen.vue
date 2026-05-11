@@ -147,9 +147,7 @@
 import { ref, computed, onMounted, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../../app/stores/user'
-import { useQuery } from '@tanstack/vue-query'
-import { fetchUserTasks } from '../../../shared/query/taskQueries'
-import { queryKeys } from '../../../shared/query/keys'
+import { useListUserTasks } from '../../../shared/api/generated-query/tasks/tasks'
 import { NButton, NTag, NForm, NFormItem, NInput, NDataTable, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 
@@ -167,10 +165,13 @@ const navItems = [
 const taskPage = ref(1)
 const taskPageSize = 8
 
-const tasksQuery = useQuery({
-  queryKey: computed(() => queryKeys.tasks.list({ page: taskPage.value, page_size: taskPageSize })),
-  queryFn: () => fetchUserTasks({ page: taskPage.value, page_size: taskPageSize }),
-  placeholderData: (prev) => prev,
+const tasksQuery = useListUserTasks(computed(() => ({
+  page: taskPage.value,
+  page_size: taskPageSize,
+})), {
+  query: {
+    placeholderData: (prev) => prev,
+  },
 })
 
 const tasks = computed(() => tasksQuery.data.value?.data?.list || [])

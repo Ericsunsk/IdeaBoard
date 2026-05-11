@@ -1,11 +1,15 @@
-import { apiGet, apiPut } from './client'
-import type { ApiResponse } from './types'
+import { getAdminFeaturePrompts } from './generated/admin-feature-prompts/admin-feature-prompts'
+import type {
+  GetAdminFeaturePromptResult,
+  ListAdminFeaturePromptsResult,
+  SetAdminFeaturePromptResult,
+} from './generated/admin-feature-prompts/admin-feature-prompts'
 
 export const featurePromptApi = {
-  adminList: (): Promise<ApiResponse<{ prompts: Record<string, string> }>> =>
-    apiGet<{ prompts: Record<string, string> }>('/admin/feature-prompts'),
-  adminGet: (slug: string): Promise<ApiResponse<{ slug: string; prompt: string }>> =>
-    apiGet<{ slug: string; prompt: string }>('/admin/feature-prompts/' + slug),
-  adminSet: (slug: string, prompt: string): Promise<ApiResponse<{ slug: string; prompt: string }>> =>
-    apiPut<{ slug: string; prompt: string }, { prompt: string }>('/admin/feature-prompts/' + slug, { prompt }),
+  adminList: (): Promise<ListAdminFeaturePromptsResult> =>
+    getAdminFeaturePrompts().listAdminFeaturePrompts(),
+  adminGet: (slug: string): Promise<GetAdminFeaturePromptResult> =>
+    getAdminFeaturePrompts().getAdminFeaturePrompt(slug),
+  adminSet: (slug: string, prompt: string): Promise<SetAdminFeaturePromptResult> =>
+    getAdminFeaturePrompts().setAdminFeaturePrompt(slug, { prompt }),
 }

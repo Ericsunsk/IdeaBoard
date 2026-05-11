@@ -72,4 +72,5 @@ export function apiDelete<T>(url: string, config?: AxiosConfig): Promise<ApiResp
   return api.delete<unknown, ApiResponse<T>>(url, config)
 }
 
+export { api }
 export default api

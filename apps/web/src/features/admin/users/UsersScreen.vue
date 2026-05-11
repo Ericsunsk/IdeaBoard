@@ -145,7 +145,7 @@
 
 <script setup lang="ts">
 import { ref, h, computed, watch } from 'vue'
-import { useMutation, useQuery } from '@tanstack/vue-query'
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
 import {
   NInput,
@@ -172,15 +172,18 @@ import type { DataTableColumns } from 'naive-ui'
 import type { User } from '../../../shared/types'
 import { formatDateOnly } from '../../../shared/utils/dateTime'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
-import { queryKeys } from '../../../shared/query/keys'
+import {
+  getListAdminUsersQueryKey,
+  useListAdminUsers,
+} from '../../../shared/api/generated-query/admin-users/admin-users'
+import {
+  getGetAdminRateLimitSettingsQueryKey,
+  getGetAdminRegistrationSettingQueryKey,
+  useGetAdminRateLimitSettings,
+  useGetAdminRegistrationSetting,
+} from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import {
   deleteAdminUser,
-  fetchAdminUsers,
-  fetchRateLimitSettings,
-  fetchRegistrationSetting,
-  invalidateAdminUsers,
-  invalidateRateLimitSettings,
-  invalidateRegistrationSetting,
   updateAdminUserRole,
   updateAdminUserStatus,
   updateRateLimitSettings,
@@ -198,6 +201,7 @@ import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 
 const message = useMessage()
 const dialog = useDialog()
+const queryClient = useQueryClient()
 const userListParams = { page: 1, page_size: 100 } as const
 const searchKeyword = ref('')
 const appliedSearchKeyword = ref('')
@@ -205,48 +209,51 @@ const userQueryParams = computed(() => ({
   ...userListParams,
   keyword: appliedSearchKeyword.value || undefined,
 }))
-const usersQuery = useQuery({
-  queryKey: computed(() => queryKeys.admin.users(userQueryParams.value)),
-  queryFn: () => fetchAdminUsers(userQueryParams.value),
-})
-const registrationSettingQuery = useQuery({
-  queryKey: queryKeys.admin.registrationSetting(),
-  queryFn: fetchRegistrationSetting,
-})
-const rateLimitSettingsQuery = useQuery({
-  queryKey: queryKeys.admin.rateLimitSettings(),
-  queryFn: fetchRateLimitSettings,
-})
+const usersQuery = useListAdminUsers(userQueryParams)
+const registrationSettingQuery = useGetAdminRegistrationSetting()
+const rateLimitSettingsQuery = useGetAdminRateLimitSettings()
+
+function invalidateAdminUsersQuery() {
+  return queryClient.invalidateQueries({ queryKey: getListAdminUsersQueryKey() })
+}
+
+function invalidateRegistrationSettingQuery() {
+  return queryClient.invalidateQueries({ queryKey: getGetAdminRegistrationSettingQueryKey() })
+}
+
+function invalidateRateLimitSettingsQuery() {
+  return queryClient.invalidateQueries({ queryKey: getGetAdminRateLimitSettingsQueryKey() })
+}
 
 const updateUserStatusMutation = useMutation({
   mutationFn: updateAdminUserStatus,
-  onSuccess: () => invalidateAdminUsers(),
+  onSuccess: () => invalidateAdminUsersQuery(),
 })
 const updateUserRoleMutation = useMutation({
   mutationFn: updateAdminUserRole,
-  onSuccess: () => invalidateAdminUsers(),
+  onSuccess: () => invalidateAdminUsersQuery(),
 })
 const deleteUserMutation = useMutation({
   mutationFn: deleteAdminUser,
-  onSuccess: () => invalidateAdminUsers(),
+  onSuccess: () => invalidateAdminUsersQuery(),
 })
 const saveRateLimitMutation = useMutation({
   mutationFn: updateRateLimitSettings,
   onSuccess: async (settings) => {
     rateLimitForm.value.window_seconds = settings.window_seconds
     rateLimitForm.value.max_requests = settings.max_requests
-    await invalidateRateLimitSettings()
+    await invalidateRateLimitSettingsQuery()
   },
 })
 const updateRegistrationSettingMutation = useMutation({
   mutationFn: updateRegistrationSetting,
   onSuccess: async (setting) => {
     registrationEnabled.value = setting.enabled
-    await invalidateRegistrationSetting()
+    await invalidateRegistrationSettingQuery()
   },
 })
 
-const users = computed(() => usersQuery.data.value?.list ?? [])
+const users = computed<User[]>(() => usersQuery.data.value?.data?.list ?? [])
 const loading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
 const currentSorts = ref<string[]>(['role', 'status', 'newest'])
 
@@ -291,7 +298,8 @@ watch(
 
 watch(
   () => rateLimitSettingsQuery.data.value,
-  (settings) => {
+  (response) => {
+    const settings = response?.data
     if (!settings || saveRateLimitMutation.isPending.value) return
     rateLimitForm.value.window_seconds = settings.window_seconds
     rateLimitForm.value.max_requests = settings.max_requests
@@ -301,7 +309,8 @@ watch(
 
 watch(
   () => registrationSettingQuery.data.value,
-  (setting) => {
+  (response) => {
+    const setting = response?.data
     if (!setting || updateRegistrationSettingMutation.isPending.value) return
     registrationEnabled.value = setting.enabled
   },
@@ -441,7 +450,7 @@ async function handleSaveRateLimit() {
 }
 
 async function handleToggleRegistration(newValue: boolean) {
-  const fallbackEnabled = registrationSettingQuery.data.value?.enabled ?? !newValue
+  const fallbackEnabled = registrationSettingQuery.data.value?.data?.enabled ?? !newValue
   try {
     await updateRegistrationSettingMutation.mutateAsync(newValue)
     message.success(newValue ? '已开放注册' : '已关闭注册')
@@ -513,7 +522,7 @@ const confirmBanUser = async () => {
         if (error) throw error
       } catch (authError: any) {
         showBanModal.value = false
-        void invalidateAdminUsers()
+        void invalidateAdminUsersQuery()
         message.warning(extractBetterAuthErrorMessage(authError, '已完成业务封禁，但身份侧封禁失败，请稍后重试身份侧操作'))
         return
       }
