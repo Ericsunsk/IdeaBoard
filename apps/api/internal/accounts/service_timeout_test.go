@@ -25,7 +25,6 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 	repo := NewAccountRepository(db)
 	service := &AccountService{
 		accountRepo: repo,
-		redisMgr:    nil,
 	}
 
 	account := &ApiAccount{

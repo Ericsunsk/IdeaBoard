@@ -9,26 +9,27 @@ import (
 
 	"api/internal/accounts"
 	"api/internal/platform/redis"
+	"api/internal/runtime/taskqueue"
 )
 
 type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *redis.GlobalQueueTask) (string, error)
 
 type taskExecutionOrchestrator struct {
 	accountRepo  *accounts.AccountRepository
-	redisMgr     *redis.RedisManager
+	queue        taskqueue.TaskQueue
 	taskRuntime  *accounts.TaskRuntimeService
 	providerCall providerCallFunc
 }
 
 func newTaskExecutionOrchestrator(
 	accountRepo *accounts.AccountRepository,
-	redisMgr *redis.RedisManager,
+	queue taskqueue.TaskQueue,
 	taskRuntime *accounts.TaskRuntimeService,
 	providerCall providerCallFunc,
 ) *taskExecutionOrchestrator {
 	return &taskExecutionOrchestrator{
 		accountRepo:  accountRepo,
-		redisMgr:     redisMgr,
+		queue:        queue,
 		taskRuntime:  taskRuntime,
 		providerCall: providerCall,
 	}
@@ -165,7 +166,7 @@ func (o *taskExecutionOrchestrator) requeueTask(task *redis.GlobalQueueTask, acc
 		o.failTask(task, reason)
 		return
 	}
-	if err := o.redisMgr.PushGlobalQueueFront(ctx, task); err != nil {
+	if err := o.queue.EnqueueFront(ctx, task); err != nil {
 		o.failTask(task, reason)
 	}
 }

@@ -26,6 +26,7 @@ import (
 	"api/internal/platform/settings"
 	"api/internal/prompts"
 	"api/internal/runtime/httpapi"
+	"api/internal/runtime/taskqueue"
 	"api/internal/runtime/worker"
 	"api/internal/storage"
 	"api/internal/tasks"
@@ -74,6 +75,7 @@ func Run(args []string) {
 		log.Fatalf("[Main] Failed to connect to Redis: %v", err)
 	}
 	redisMgr := redis.NewRedisManager(rdb.GetClient())
+	redisQueue := taskqueue.NewRedisQueue(redisMgr)
 
 	userRepo := users.NewUserRepository(db)
 	if err := userRepo.EnsureStorageUIDs(); err != nil {
@@ -89,7 +91,7 @@ func Run(args []string) {
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
 	taskEventHub := accounts.NewTaskEventHub()
-	accountService := accounts.NewAccountService(accountRepo, taskRepo, redisMgr, systemConfigRepo, storageService)
+	accountService := accounts.NewAccountServiceWithQueue(accountRepo, taskRepo, redisQueue, redisQueue, redisQueue, redisQueue, redisQueue, systemConfigRepo, storageService)
 	accountService.SetTaskEventHub(taskEventHub)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
@@ -127,7 +129,7 @@ func Run(args []string) {
 		CORSMiddleware:       buildCORSMiddleware(cfg.App.Env),
 	}, frontendFS)
 
-	consumer := worker.NewConsumer(accountRepo, channelRepo, taskRepo, redisMgr, storageService, taskEventHub)
+	consumer := worker.NewConsumerWithQueue(accountRepo, channelRepo, taskRepo, redisQueue, redisQueue, redisQueue, storageService, taskEventHub)
 	go consumer.Start(5)
 
 	port := os.Getenv("PORT")

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"api/internal/platform/redis"
+	"api/internal/runtime/taskqueue"
 	"api/internal/tasks"
 	"gorm.io/gorm"
 )
@@ -24,7 +25,8 @@ var (
 type TaskRuntimeService struct {
 	accountRepo *AccountRepository
 	taskRepo    *TaskRepository
-	redisMgr    *redis.RedisManager
+	queue       taskqueue.TaskAssigner
+	cancelStore taskqueue.TaskCancellationStore
 	hub         *TaskEventHub
 }
 
@@ -33,10 +35,21 @@ func NewTaskRuntimeService(
 	taskRepo *TaskRepository,
 	redisMgr *redis.RedisManager,
 ) *TaskRuntimeService {
+	redisQueue := taskqueue.NewRedisQueue(redisMgr)
+	return NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, redisQueue, redisQueue)
+}
+
+func NewTaskRuntimeServiceWithQueue(
+	accountRepo *AccountRepository,
+	taskRepo *TaskRepository,
+	assigner taskqueue.TaskAssigner,
+	cancelStore taskqueue.TaskCancellationStore,
+) *TaskRuntimeService {
 	return &TaskRuntimeService{
 		accountRepo: accountRepo,
 		taskRepo:    taskRepo,
-		redisMgr:    redisMgr,
+		queue:       assigner,
+		cancelStore: cancelStore,
 	}
 }
 
@@ -68,7 +81,7 @@ func (s *TaskRuntimeService) RefreshTaskAccounts(task *redis.GlobalQueueTask) er
 			}
 		}
 		maxConcurrent := normalizeMaxConcurrent(account.MaxConcurrent)
-		if err := s.redisMgr.EnsureAccountConcurrent(ctx, account.ID, maxConcurrent); err != nil {
+		if err := s.queue.EnsureAccountConcurrent(ctx, account.ID, maxConcurrent); err != nil {
 			return err
 		}
 		next = append(next, account.ID)
@@ -81,15 +94,15 @@ func (s *TaskRuntimeService) ReleaseTask(accountID uint64, taskID string) error 
 	if accountID == 0 {
 		return nil
 	}
-	return s.redisMgr.ReleaseTask(context.Background(), accountID, taskID)
+	return s.queue.Release(context.Background(), accountID, taskID)
 }
 
 func (s *TaskRuntimeService) IsTaskCancelled(taskID string) (bool, error) {
-	return s.redisMgr.IsTaskCancelled(context.Background(), taskID)
+	return s.cancelStore.IsCancelled(context.Background(), taskID)
 }
 
 func (s *TaskRuntimeService) ClearTaskCancelled(taskID string) error {
-	return s.redisMgr.ClearTaskCancelled(context.Background(), taskID)
+	return s.cancelStore.ClearCancelled(context.Background(), taskID)
 }
 
 func (s *TaskRuntimeService) WatchTaskCancellation(parent context.Context, taskID string) (context.Context, context.CancelFunc) {

@@ -14,6 +14,7 @@ import (
 	"api/internal/accounts"
 	"api/internal/channels"
 	"api/internal/platform/redis"
+	"api/internal/runtime/taskqueue"
 	"api/internal/storage"
 	"api/internal/tasks"
 	"api/internal/workflow"
@@ -48,15 +49,23 @@ type Consumer struct {
 	accountRepo    *accounts.AccountRepository
 	channelRepo    *channels.ChannelRepository
 	taskRepo       *accounts.TaskRepository
-	redisMgr       *redis.RedisManager
+	queue          taskqueue.TaskQueue
+	assigner       taskqueue.TaskAssigner
 	storageService *storage.StorageService
-	taskRuntime    *accounts.TaskRuntimeService
+	taskRuntime    consumerTaskRuntime
 	orchestrator   *taskExecutionOrchestrator
+	executeTask    func(task *redis.GlobalQueueTask, accountID uint64)
 
 	wg      sync.WaitGroup
 	stopCh  chan struct{}
 	running bool
 	mu      sync.Mutex
+}
+
+type consumerTaskRuntime interface {
+	RefreshTaskAccounts(task *redis.GlobalQueueTask) error
+	ReleaseTask(accountID uint64, taskID string) error
+	MarkTaskFailed(taskID string, reason string) error
 }
 
 type providerCallResult struct {
@@ -72,18 +81,35 @@ func NewConsumer(
 	storageService *storage.StorageService,
 	taskEventHub *accounts.TaskEventHub,
 ) *Consumer {
-	taskRuntime := accounts.NewTaskRuntimeService(accountRepo, taskRepo, redisMgr)
+	// Compatibility wrapper for default Redis wiring.
+	redisQueue := taskqueue.NewRedisQueue(redisMgr)
+	return NewConsumerWithQueue(accountRepo, channelRepo, taskRepo, redisQueue, redisQueue, redisQueue, storageService, taskEventHub)
+}
+
+func NewConsumerWithQueue(
+	accountRepo *accounts.AccountRepository,
+	channelRepo *channels.ChannelRepository,
+	taskRepo *accounts.TaskRepository,
+	queue taskqueue.TaskQueue,
+	assigner taskqueue.TaskAssigner,
+	cancelStore taskqueue.TaskCancellationStore,
+	storageService *storage.StorageService,
+	taskEventHub *accounts.TaskEventHub,
+) *Consumer {
+	taskRuntime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore)
 	taskRuntime.SetEventHub(taskEventHub)
 	consumer := &Consumer{
 		accountRepo:    accountRepo,
 		channelRepo:    channelRepo,
 		taskRepo:       taskRepo,
-		redisMgr:       redisMgr,
+		queue:          queue,
+		assigner:       assigner,
 		storageService: storageService,
 		taskRuntime:    taskRuntime,
 		stopCh:         make(chan struct{}),
 	}
-	consumer.orchestrator = newTaskExecutionOrchestrator(accountRepo, redisMgr, taskRuntime, consumer.callDrawingAPI)
+	consumer.orchestrator = newTaskExecutionOrchestrator(accountRepo, queue, taskRuntime, consumer.callDrawingAPI)
+	consumer.executeTask = consumer.orchestrator.execute
 	return consumer
 }
 
@@ -141,7 +167,7 @@ func (c *Consumer) processQueue() {
 	ctx := context.Background()
 	c.promoteWaitQueue(ctx)
 
-	task, err := c.redisMgr.PopGlobalQueue(ctx)
+	task, err := c.queue.Dequeue(ctx)
 	if err != nil {
 		log.Printf("[Consumer] 拉取任务失败: %v", err)
 		return
@@ -164,29 +190,31 @@ func (c *Consumer) processQueue() {
 		return
 	}
 
-	accountID, status, err := c.redisMgr.AssignTask(ctx, task.AccountIDs, task)
+	accountID, status, err := c.assigner.Assign(ctx, task.AccountIDs, task)
 	if err != nil {
 		log.Printf("[Consumer] 分配任务失败: %v", err)
 		c.failTask(task, 0, "分配失败: "+err.Error())
 		return
 	}
 
-	if status == tasks.QueueAssignStatusQueueFull {
+	if status == taskqueue.AssignStatusQueueFull {
 		log.Printf("[Consumer] 等待队列满，将任务放回: %s", task.TaskID)
-		c.redisMgr.PushGlobalQueueFront(ctx, task)
+		if pushErr := c.queue.EnqueueFront(ctx, task); pushErr != nil {
+			log.Printf("[Consumer] 任务回流失败: %v", pushErr)
+		}
 		return
 	}
 
-	if status == tasks.QueueAssignStatusWaitQueue {
+	if status == taskqueue.AssignStatusWaitQueue {
 		log.Printf("[Consumer] 任务进入等待队列: %s", task.TaskID)
 		return
 	}
 
-	go c.orchestrator.execute(task, accountID)
+	go c.executeTask(task, accountID)
 }
 
 func (c *Consumer) promoteWaitQueue(ctx context.Context) {
-	task, err := c.redisMgr.PopWaitQueue(ctx)
+	task, err := c.queue.DequeueWait(ctx)
 	if err != nil {
 		log.Printf("[Consumer] 拉取等待队列失败: %v", err)
 		return
@@ -194,7 +222,7 @@ func (c *Consumer) promoteWaitQueue(ctx context.Context) {
 	if task == nil {
 		return
 	}
-	if err := c.redisMgr.PushGlobalQueueFront(ctx, task); err != nil {
+	if err := c.queue.EnqueueFront(ctx, task); err != nil {
 		log.Printf("[Consumer] 回流等待队列失败: %v", err)
 	}
 }

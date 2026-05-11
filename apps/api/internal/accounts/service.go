@@ -14,6 +14,7 @@ import (
 	"api/internal/platform/redis"
 	"api/internal/platform/settings"
 	"api/internal/prompts"
+	"api/internal/runtime/taskqueue"
 	"api/internal/tasks"
 	"api/internal/workflow"
 )
@@ -21,7 +22,11 @@ import (
 type AccountService struct {
 	accountRepo      *AccountRepository
 	taskRepo         *TaskRepository
-	redisMgr         *redis.RedisManager
+	queue            taskqueue.TaskQueue
+	concurrencyStore taskqueue.AccountConcurrencyStore
+	cancelStore      taskqueue.TaskCancellationStore
+	monitorStore     taskqueue.TaskMonitorStore
+	assigner         taskqueue.TaskAssigner
 	taskRuntime      *TaskRuntimeService
 	taskEventHub     *TaskEventHub
 	systemConfigRepo *settings.SystemConfigRepository
@@ -44,11 +49,31 @@ func NewAccountService(
 	systemConfigRepo *settings.SystemConfigRepository,
 	previewResolver previewURLResolver,
 ) *AccountService {
+	// Compatibility wrapper for default Redis wiring.
+	redisQueue := taskqueue.NewRedisQueue(redisMgr)
+	return NewAccountServiceWithQueue(accountRepo, taskRepo, redisQueue, redisQueue, redisQueue, redisQueue, redisQueue, systemConfigRepo, previewResolver)
+}
+
+func NewAccountServiceWithQueue(
+	accountRepo *AccountRepository,
+	taskRepo *TaskRepository,
+	queue taskqueue.TaskQueue,
+	assigner taskqueue.TaskAssigner,
+	concurrencyStore taskqueue.AccountConcurrencyStore,
+	cancelStore taskqueue.TaskCancellationStore,
+	monitorStore taskqueue.TaskMonitorStore,
+	systemConfigRepo *settings.SystemConfigRepository,
+	previewResolver previewURLResolver,
+) *AccountService {
 	return &AccountService{
 		accountRepo:      accountRepo,
 		taskRepo:         taskRepo,
-		redisMgr:         redisMgr,
-		taskRuntime:      NewTaskRuntimeService(accountRepo, taskRepo, redisMgr),
+		queue:            queue,
+		assigner:         assigner,
+		concurrencyStore: concurrencyStore,
+		cancelStore:      cancelStore,
+		monitorStore:     monitorStore,
+		taskRuntime:      NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore),
 		systemConfigRepo: systemConfigRepo,
 		previewResolver:  previewResolver,
 	}
@@ -93,9 +118,9 @@ func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, 
 		return nil, err
 	}
 
-	if s.redisMgr != nil {
+	if s.assigner != nil {
 		ctx := context.Background()
-		s.redisMgr.InitAccountConcurrent(ctx, account.ID, account.MaxConcurrent)
+		s.assigner.EnsureAccountConcurrent(ctx, account.ID, account.MaxConcurrent)
 	}
 
 	return account, nil
@@ -119,11 +144,35 @@ func (s *AccountService) ListAccounts(req *AccountListRequest) ([]*AccountWithLo
 	}
 
 	ctx := context.Background()
+	accountIDs := make([]uint64, len(accounts))
+	for i := range accounts {
+		accountIDs[i] = accounts[i].ID
+	}
+	loadInfo := map[uint64]*redis.AccountLoad{}
+	if s.assigner != nil {
+		loads, loadErr := s.assigner.GetAccountLoadInfo(ctx, accountIDs)
+		if loadErr != nil {
+			log.Printf("[AccountService] 查询账号并发信息失败: %v", loadErr)
+		} else {
+			loadInfo = loads
+		}
+	}
+	waitQueueCount := 0
+	if s.queue != nil {
+		_, wait, waitErr := s.queue.QueueLengths(ctx)
+		if waitErr != nil {
+			log.Printf("[AccountService] 查询等待队列长度失败: %v", waitErr)
+		} else {
+			waitQueueCount = int(wait)
+		}
+	}
 	result := make([]*AccountWithLoad, len(accounts))
 
 	for i, acc := range accounts {
-		concurrent, _ := s.redisMgr.GetAccountConcurrent(ctx, acc.ID)
-		waitQueue, _ := s.redisMgr.GetWaitQueueLength(ctx)
+		concurrent := 0
+		if load, ok := loadInfo[acc.ID]; ok && load != nil {
+			concurrent = load.CurrentConcurrent
+		}
 
 		status := "运行中"
 		if acc.Status == 0 {
@@ -135,7 +184,7 @@ func (s *AccountService) ListAccounts(req *AccountListRequest) ([]*AccountWithLo
 		result[i] = &AccountWithLoad{
 			ApiAccount:        *acc,
 			CurrentConcurrent: concurrent,
-			WaitQueueCount:    int(waitQueue),
+			WaitQueueCount:    waitQueueCount,
 			RunningStatus:     status,
 		}
 	}
@@ -171,9 +220,9 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 		return err
 	}
 
-	if s.redisMgr != nil {
+	if s.assigner != nil {
 		ctx := context.Background()
-		s.redisMgr.SetAccountMaxConcurrent(ctx, account.ID, account.MaxConcurrent)
+		s.assigner.SetAccountMaxConcurrent(ctx, account.ID, account.MaxConcurrent)
 	}
 
 	return nil
@@ -181,7 +230,11 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 
 func (s *AccountService) DeleteAccount(id uint64) error {
 	ctx := context.Background()
-	s.redisMgr.DeleteAccountConcurrent(ctx, id)
+	if s.concurrencyStore != nil {
+		if err := s.concurrencyStore.DeleteAccountConcurrent(ctx, id); err != nil {
+			log.Printf("[DeleteAccount] 删除账号并发计数失败: account=%d err=%v", id, err)
+		}
+	}
 	return s.accountRepo.Delete(id)
 }
 
@@ -197,7 +250,7 @@ func (s *AccountService) StartAccount(id uint64) error {
 	}
 
 	ctx := context.Background()
-	return s.redisMgr.EnsureAccountConcurrent(ctx, id, account.MaxConcurrent)
+	return s.assigner.EnsureAccountConcurrent(ctx, id, account.MaxConcurrent)
 }
 
 func (s *AccountService) StopAccount(id uint64) error {
@@ -208,7 +261,7 @@ func (s *AccountService) StopAccount(id uint64) error {
 		log.Printf("[StopAccount] 查询账号 %d 进行中任务失败: %v", id, err)
 	} else {
 		for _, taskID := range taskIDs {
-			if cancelErr := s.redisMgr.MarkTaskCancelled(ctx, taskID, taskCancelTTL); cancelErr != nil {
+			if cancelErr := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); cancelErr != nil {
 				log.Printf("[StopAccount] 标记任务取消失败: account=%d task=%s err=%v", id, taskID, cancelErr)
 			}
 		}
@@ -226,19 +279,26 @@ func (s *AccountService) StopAccount(id uint64) error {
 	}
 
 	// 2. 清除 Redis 中该账号的并发计数（释放占位）
-	s.redisMgr.DeleteAccountConcurrent(ctx, id)
+	if s.concurrencyStore != nil {
+		if err := s.concurrencyStore.DeleteAccountConcurrent(ctx, id); err != nil {
+			log.Printf("[StopAccount] 删除账号并发计数失败: account=%d err=%v", id, err)
+		}
+	}
 
 	// 3. 停用账号
 	return s.accountRepo.UpdateStatus(id, 0)
 }
 
 func (s *AccountService) GetAccountQueueInfo(id uint64) (concurrent int, maxConcurrent int, err error) {
+	if s.concurrencyStore == nil {
+		return 0, 0, fmt.Errorf("account concurrency store not configured")
+	}
 	ctx := context.Background()
-	concurrent, err = s.redisMgr.GetAccountConcurrent(ctx, id)
+	concurrent, err = s.concurrencyStore.GetAccountConcurrent(ctx, id)
 	if err != nil {
 		return 0, 0, err
 	}
-	maxConcurrent, err = s.redisMgr.GetAccountMaxConcurrent(ctx, id)
+	maxConcurrent, err = s.concurrencyStore.GetAccountMaxConcurrent(ctx, id)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -339,7 +399,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		CreatedAt:  time.Now().Unix(),
 	}
 
-	if err := s.redisMgr.PushGlobalQueue(context.Background(), queueTask); err != nil {
+	if err := s.queue.Enqueue(context.Background(), queueTask); err != nil {
 		_ = s.taskRepo.MarkQueueFailed(taskID, "任务入队失败: "+err.Error())
 		if failedTask, loadErr := s.taskRepo.GetByTaskID(taskID); loadErr == nil {
 			if statErr := s.taskRepo.UpsertDailyStatByTask(failedTask); statErr != nil {
@@ -395,7 +455,7 @@ func (s *AccountService) DeleteUserTask(taskID string, userID uint64) error {
 	if _, err := s.taskRepo.GetByTaskIDAndUserID(taskID, userID); err != nil {
 		return err
 	}
-	if err := s.redisMgr.MarkTaskCancelled(context.Background(), taskID, taskCancelTTL); err != nil {
+	if err := s.cancelStore.MarkCancelled(context.Background(), taskID, taskCancelTTL); err != nil {
 		return err
 	}
 	return s.taskRepo.DeleteByTaskIDAndUserID(taskID, userID)
@@ -425,7 +485,7 @@ func (s *AccountService) GetMonitorInfo() (*redis.MonitorInfo, error) {
 	for i, acc := range accounts {
 		accountIDs[i] = acc.ID
 	}
-	return s.redisMgr.GetMonitorInfo(ctx, accountIDs)
+	return s.monitorStore.MonitorInfo(ctx, accountIDs)
 }
 
 func normalizeMaxConcurrent(value int) int {
@@ -926,22 +986,6 @@ func extractTaskUser(rawResult string, fallbackUserID uint64) string {
 		return "unknown"
 	}
 	return fmt.Sprintf("%d", fallbackUserID)
-}
-
-// ============ 消费服务调用 ============
-
-func (s *AccountService) GetNextTaskFromQueue() (*redis.GlobalQueueTask, error) {
-	ctx := context.Background()
-	return s.redisMgr.PopGlobalQueue(ctx)
-}
-
-func (s *AccountService) AssignTaskToAccount(task *redis.GlobalQueueTask) (uint64, string, error) {
-	ctx := context.Background()
-	return s.redisMgr.AssignTask(ctx, task.AccountIDs, task)
-}
-
-func (s *AccountService) ReleaseTask(accountID uint64, taskID string) error {
-	return s.redisMgr.ReleaseTask(context.Background(), accountID, taskID)
 }
 
 func (s *AccountService) MarkTaskRunning(taskID string, accountID uint64) error {
