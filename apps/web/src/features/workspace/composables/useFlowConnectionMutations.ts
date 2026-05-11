@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, EdgeUpdateEvent } from '@vue-flow/core'
-import { resolveFlowEdgeToneFromHandles } from '../utils/flowEdgeVisual'
+import { buildFlowEdgeClassName, resolveFlowEdgeToneFromHandles } from '../utils/flowEdgeVisual'
 
 type UseFlowConnectionMutationsOptions = {
   edges: Ref<Array<Record<string, any>>>
@@ -28,7 +28,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       source: connection.source,
       target: connection.target,
       animated: false,
-      class: `tone-${tone}`,
+      class: buildFlowEdgeClassName(tone, false),
       data: { tone },
     } as Edge
     const before = options.captureHistory()
@@ -76,7 +76,7 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
           target: connection.target!,
           sourceHandle: connection.sourceHandle ?? null,
           targetHandle: connection.targetHandle ?? null,
-          class: `tone-${tone}`,
+          class: buildFlowEdgeClassName(tone, false),
           data: nextData,
         } as Edge
       })

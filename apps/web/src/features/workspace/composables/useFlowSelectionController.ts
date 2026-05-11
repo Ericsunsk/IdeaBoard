@@ -10,11 +10,11 @@ type UseFlowSelectionControllerOptions = {
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
   _deleteSelectedFlowElements: () => void
+  commitNodes: (nodes: Node[]) => void
+  commitEdges: (edges: Edge[]) => void
 }
 
 export function useFlowSelectionController(options: UseFlowSelectionControllerOptions) {
-  let lastManualNodeSelection: { nodeId: string; timestamp: number } | null = null
-
   function clearFlowSelection(): boolean {
     let hasSelection = false
     const nextNodes = (options.nodes.value as Array<Node & { selected?: boolean }>).map((node) => {
@@ -32,8 +32,28 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
       return edge
     })
     if (!hasSelection) return false
-    options.nodes.value = nextNodes
-    options.edges.value = nextEdges
+    options.commitNodes(nextNodes)
+    options.commitEdges(nextEdges)
+    return true
+  }
+
+  function selectSingleFlowNode(nodeId: string): boolean {
+    let hasChanged = false
+    const nextNodes = (options.nodes.value as Array<Node & { selected?: boolean }>).map((node) => {
+      const shouldBeSelected = node.id === nodeId
+      const isSelected = !!node.selected
+      if (isSelected === shouldBeSelected) return node
+      hasChanged = true
+      return { ...node, selected: shouldBeSelected }
+    })
+    const nextEdges = (options.edges.value as Array<Edge & { selected?: boolean }>).map((edge) => {
+      if (!edge.selected) return edge
+      hasChanged = true
+      return { ...edge, selected: false }
+    })
+    if (!hasChanged) return false
+    options.commitNodes(nextNodes)
+    options.commitEdges(nextEdges)
     return true
   }
 
@@ -45,61 +65,17 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     clearFlowSelection()
   }
 
-  function onFlowNodeClick(payload: NodeMouseEvent) {
+  function onFlowNodeClick(_payload: NodeMouseEvent) {
     if (options.activeTool.value === 'hand') return
     options.activeMessageActionNodeId.value = null
     options.hideFlowStyleStrengthControl()
-    const targetNodeId = payload.node.id
-    const event = payload.event
-    if (shouldSkipNodeClickAfterManualSelection(targetNodeId)) return
-    applyFlowNodeSelection(targetNodeId, event instanceof MouseEvent ? event : null)
   }
 
-  function applyFlowNodeSelection(targetNodeId: string, event: MouseEvent | null) {
-    if (options.activeTool.value === 'hand') return
-    const isShiftToggle = !!event?.shiftKey
-
-    if (!isShiftToggle) {
-      for (const node of (options.nodes.value as Array<{ id: string; selected?: boolean }>)) {
-        const shouldBeSelected = node.id === targetNodeId
-        if (node.selected !== shouldBeSelected) {
-          node.selected = shouldBeSelected
-        }
-      }
-      for (const edge of (options.edges.value as Array<{ selected?: boolean }>)) {
-        if (edge.selected) {
-          edge.selected = false
-        }
-      }
-    } else {
-      for (const node of (options.nodes.value as Array<{ id: string; selected?: boolean }>)) {
-        if (node.id === targetNodeId) {
-          node.selected = !node.selected
-          break
-        }
-      }
-    }
-  }
-
-  function onFlowNodeMouseDown(nodeId: string, event: MouseEvent) {
+  function onFlowNodeMouseDown(_nodeId: string, event: MouseEvent) {
     if (event.button === 0) {
       options.activeMessageActionNodeId.value = null
       options.hideFlowStyleStrengthControl()
     }
-    applyFlowNodeSelection(nodeId, event)
-    lastManualNodeSelection = { nodeId, timestamp: Date.now() }
-  }
-
-  function shouldSkipNodeClickAfterManualSelection(nodeId: string): boolean {
-    if (!lastManualNodeSelection) return false
-    const isSameNode = lastManualNodeSelection.nodeId === nodeId
-    const isRecent = Date.now() - lastManualNodeSelection.timestamp < 400
-    if (!isSameNode || !isRecent) {
-      lastManualNodeSelection = null
-      return false
-    }
-    lastManualNodeSelection = null
-    return true
   }
 
   function deleteSelectedFlowElements() {
@@ -111,11 +87,10 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
 
   return {
     clearFlowSelection,
+    selectSingleFlowNode,
     onPaneClick,
     onFlowNodeClick,
     onFlowNodeMouseDown,
-    applyFlowNodeSelection,
-    shouldSkipNodeClickAfterManualSelection,
     deleteSelectedFlowElements,
   }
 }

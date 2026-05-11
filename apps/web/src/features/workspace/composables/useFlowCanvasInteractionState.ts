@@ -1,30 +1,28 @@
 import { computed, ref } from 'vue'
 
 export type CanvasInteractionKey =
-  | 'move'
-  | 'node-drag'
-  | 'selection'
-  | 'selection-drag'
-  | 'connect'
-  | 'edge-update'
   | 'mask-painting'
   | 'message-resize'
 
 export function useFlowCanvasInteractionState() {
-  const activeCanvasInteractions = ref<Set<CanvasInteractionKey>>(new Set())
-  const isCanvasInteractionActive = computed(() => activeCanvasInteractions.value.size > 0)
+  const isMaskPainting = ref(false)
+  const isMessageResizing = ref(false)
+  const isCanvasInteractionActive = computed(() => isMaskPainting.value || isMessageResizing.value)
 
   function startCanvasInteraction(key: CanvasInteractionKey) {
-    const next = new Set(activeCanvasInteractions.value)
-    next.add(key)
-    activeCanvasInteractions.value = next
+    if (key === 'mask-painting') {
+      isMaskPainting.value = true
+      return
+    }
+    isMessageResizing.value = true
   }
 
   function stopCanvasInteraction(key: CanvasInteractionKey) {
-    if (!activeCanvasInteractions.value.has(key)) return
-    const next = new Set(activeCanvasInteractions.value)
-    next.delete(key)
-    activeCanvasInteractions.value = next
+    if (key === 'mask-painting') {
+      isMaskPainting.value = false
+      return
+    }
+    isMessageResizing.value = false
   }
 
   return {

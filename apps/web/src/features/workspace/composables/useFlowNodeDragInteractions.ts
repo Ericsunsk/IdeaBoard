@@ -1,13 +1,9 @@
 import { onMounted, onBeforeUnmount, ref } from 'vue'
-import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 
 type UseFlowNodeDragInteractionsOptions = {
   flowHistory: { onNodeDragStart: () => void; onNodeDragStop: (onCommit: () => void) => void }
-  startFlowInteraction: (key: CanvasInteractionKey) => void
-  stopFlowInteraction: (key: CanvasInteractionKey) => void
   beginFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   finishFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
-  ensureFlowEdgeVisuals: () => void
   markDirty: () => void
   activeMessageActionNodeId: { value: string | null }
   hideFlowStyleStrengthControl: () => void
@@ -15,7 +11,6 @@ type UseFlowNodeDragInteractionsOptions = {
 
 export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractionsOptions) {
   const isAltPressed = ref(false)
-  const isDraggingNode = ref(false)
 
   function onWindowKeyDown(event: KeyboardEvent) {
     if (event.key === 'Alt') {
@@ -30,8 +25,6 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   }
 
   function onNodeDragStart() {
-    isDraggingNode.value = true
-    options.startFlowInteraction('node-drag')
     options.activeMessageActionNodeId.value = null
     options.hideFlowStyleStrengthControl()
     options.flowHistory.onNodeDragStart()
@@ -39,13 +32,10 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   }
 
   function onNodeDragStop() {
-    isDraggingNode.value = false
-    options.stopFlowInteraction('node-drag')
     options.finishFlowNodeDragDuplicateTracking(isAltPressed.value)
     options.flowHistory.onNodeDragStop(() => {
       options.markDirty()
     })
-    options.ensureFlowEdgeVisuals()
   }
 
   function onWindowBlur() {
@@ -66,7 +56,6 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
 
   return {
     isAltPressed,
-    isDraggingNode,
     onNodeDragStart,
     onNodeDragStop,
   }

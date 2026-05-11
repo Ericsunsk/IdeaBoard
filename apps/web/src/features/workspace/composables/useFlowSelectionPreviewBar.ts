@@ -7,6 +7,7 @@ type UseFlowSelectionPreviewBarOptions = {
   flowPromptRatio: Ref<string>
   flowPromptQuality: Ref<string>
   clearFlowSelection: () => boolean
+  commitNodes: (nodes: Node[]) => void
   getViewport: () => { x: number; y: number; zoom: number }
   setViewport: (vp: { x: number; y: number; zoom: number }) => void
   runPatternGenerate: (prompt: string, ratio: string, quality: string) => Promise<void>
@@ -34,7 +35,7 @@ export function useFlowSelectionPreviewBar(options: UseFlowSelectionPreviewBarOp
       if (node.id !== nodeId || !node.selected) return node
       return { ...node, selected: false }
     })
-    options.nodes.value = nextNodes as Node[]
+    options.commitNodes(nextNodes as Node[])
   }
 
   function onFocusSelectedPreviewItem(id: number) {

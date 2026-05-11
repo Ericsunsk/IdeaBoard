@@ -77,7 +77,7 @@
           <FlowCanvasNode
             :data="nodeProps.data"
             :selected="!!nodeProps.selected"
-            :dragging="isDraggingNode && !!nodeProps.dragging"
+            :dragging="!!nodeProps.dragging"
             :copy-mode="isAltPressed"
             :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
             :mask-source-image-url="getFlowMaskEffectiveSourceCached(nodeProps.id).url"
@@ -214,7 +214,6 @@ import { useFlowMessageDirectActions } from '../composables/useFlowMessageDirect
 import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovateControl'
 import { useFlowMessageImageInteractions } from '../composables/useFlowMessageImageInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
-import { useFlowBoardViewport } from '../composables/useFlowBoardViewport'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import type { FlowNodeData } from '../types/flowTypes'
 import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
@@ -241,15 +240,24 @@ const message = useMessage()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { screenToFlowCoordinate, updateNodeInternals, setNodes, setEdges } = useVueFlow()
-const {
-  zoomLevel,
-  onZoomIn,
-  onZoomOut,
-  getViewport,
-  setViewport,
-  applyFlowTransform,
-} = useFlowBoardViewport()
+const { screenToFlowCoordinate, updateNodeInternals, zoomIn, zoomOut, getViewport, setViewport, setNodes, setEdges } = useVueFlow()
+
+const zoomLevel = ref(100)
+let lastFlowZoom = 100
+
+function applyFlowTransform(transform: { x?: number; y?: number; zoom?: number }): boolean {
+  let zoomChanged = false
+  if (Number.isFinite(transform.zoom)) {
+    const nextZoom = Math.max(10, Math.round((transform.zoom as number) * 100))
+    if (lastFlowZoom !== nextZoom) zoomChanged = true
+    zoomLevel.value = nextZoom
+    lastFlowZoom = nextZoom
+  }
+  return zoomChanged
+}
+
+function onZoomIn() { zoomIn() }
+function onZoomOut() { zoomOut() }
 
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
@@ -311,10 +319,7 @@ function scheduleFlowNodeInternalsRefresh(nodeIds?: string[]) {
     }
     requestAnimationFrame(() => {
       updateNodeInternals(ids)
-      requestAnimationFrame(() => {
-        updateNodeInternals(ids)
-        pendingNodeInternalsRefresh = false
-      })
+      pendingNodeInternalsRefresh = false
     })
   })
 }
@@ -419,10 +424,7 @@ function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: 
   closeBoardHeaderEditing()
   const transform = payload.flowTransform
   if (!transform) return
-  const zoomChanged = applyFlowTransform(transform)
-  if (zoomChanged) {
-    scheduleFlowNodeInternalsRefresh()
-  }
+  applyFlowTransform(transform)
 }
 
 function markDirty() {
@@ -522,23 +524,12 @@ function commitFlowEdges(nextEdges: Edge[]) {
 
 function commitFlowNodesAppend(nextNodes: Node[]) {
   const combined = [...(nodes.value as Node[]), ...nextNodes]
-  nodes.value = combined
-  setNodes(combined)
-  void nextTick(() => {
-    requestAnimationFrame(() => {
-      updateNodeInternals(nextNodes.map(n => n.id))
-      requestAnimationFrame(() => {
-        updateNodeInternals(nextNodes.map(n => n.id))
-      })
-    })
-  })
+  commitFlowNodes(combined)
+  scheduleFlowNodeInternalsRefresh(nextNodes.map(node => node.id))
 }
 
 function syncFlowAfterGraphRestore() {
   scheduleFlowNodeInternalsRefresh()
-  void nextTick(() => {
-    ensureFlowEdgeVisuals()
-  })
 }
 
 const flowNodeMutations = useFlowNodeMutations({
@@ -579,12 +570,8 @@ function onFlowDeleteNode(nodeId: string) {
   hideFlowStyleStrengthControl()
   closeNodeContextMenu()
   _onFlowDeleteNode(nodeId)
-  void nextTick(() => {
-    ensureFlowEdgeVisuals()
-  })
 }
 const updateSnapshotNodeBase = flowNodeMutations.updateSnapshotNode
-const _deleteSelectedFlowElements = flowNodeMutations.deleteSelectedFlowElements
 const _onFlowPromptTextUpdate = flowNodeMutations.onFlowPromptTextUpdate
 const _onFlowNodeParamUpdate = flowNodeMutations.onFlowNodeParamUpdate
 function onFlowPromptTextUpdate(nodeId: string, value: string) {
@@ -656,15 +643,7 @@ const {
   onFlowConnectEnd,
   onFlowEdgeUpdateStart,
   onFlowEdgeUpdateEnd,
-  ensureFlowEdgeVisuals,
-} = useFlowConnectionVisuals({
-  edges: edges as Ref<Edge[]>,
-  commitEdges: (nextEdges) => {
-    commitFlowEdges(nextEdges)
-  },
-  startFlowInteraction: startFlowInteraction,
-  stopFlowInteraction: stopFlowInteraction,
-})
+} = useFlowConnectionVisuals()
 
 let canvasDropRef: ReturnType<typeof useFlowCanvasDrop> | null = null
 let clearMaskCanvasRef: ((nodeId: string) => void) = () => {}
@@ -717,7 +696,8 @@ async function onCanvasDrop(event: DragEvent) {
 }
 
 function onFlowMessageContextMenu(nodeId: string, event: MouseEvent) {
-  applyFlowNodeSelection(nodeId, event)
+  event.preventDefault()
+  selectSingleFlowNode(nodeId)
   activeMessageActionNodeId.value = nodeId
 }
 
@@ -819,7 +799,7 @@ function onFlowMessageDirectAction(
   void runMessageDirectAction(nodeId, action, action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined)
 }
 
-const { clearFlowSelection, onPaneClick, onFlowNodeClick, onFlowNodeMouseDown, applyFlowNodeSelection, deleteSelectedFlowElements } = useFlowSelectionController({
+const { clearFlowSelection, selectSingleFlowNode, onPaneClick, onFlowNodeClick, onFlowNodeMouseDown, deleteSelectedFlowElements } = useFlowSelectionController({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
   activeTool: activeTool as Ref<string>,
@@ -828,11 +808,10 @@ const { clearFlowSelection, onPaneClick, onFlowNodeClick, onFlowNodeMouseDown, a
   closeBoardHeaderEditing,
   closeNodeContextMenu,
   _deleteSelectedFlowElements: () => {
-    _deleteSelectedFlowElements()
-    void nextTick(() => {
-      ensureFlowEdgeVisuals()
-    })
+    flowNodeMutations.deleteSelectedFlowElements()
   },
+  commitNodes: (nextNodes) => commitFlowNodes(nextNodes),
+  commitEdges: (nextEdges) => commitFlowEdges(nextEdges),
 })
 
 const {
@@ -850,6 +829,7 @@ const {
   getViewport,
   setViewport,
   get runPatternGenerate() { return runPatternGenerate },
+  commitNodes: (nextNodes) => commitFlowNodes(nextNodes),
 })
 
 const {
@@ -888,16 +868,13 @@ const {
   stopCanvasInteraction: stopFlowInteraction,
 })
 
-const { isAltPressed, isDraggingNode, onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
+const { isAltPressed, onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
   flowHistory: {
     onNodeDragStart: flowHistory.onNodeDragStart,
     onNodeDragStop: flowHistory.onNodeDragStop,
   },
-  startFlowInteraction,
-  stopFlowInteraction,
   beginFlowNodeDragDuplicateTracking,
   finishFlowNodeDragDuplicateTracking,
-  ensureFlowEdgeVisuals,
   markDirty,
   activeMessageActionNodeId,
   hideFlowStyleStrengthControl,
@@ -927,16 +904,6 @@ const { getFlowNodeUiStateCached } = useFlowNodeUiState({
   edges: edges as Ref<Edge[]>,
   isFlowExecutionNodeRunning,
 })
-
-watch(
-  () => {
-    const ids = (nodes.value as Array<{ id: string }>).map(node => node.id)
-    return ids.join(',')
-  },
-  () => {
-    scheduleFlowNodeInternalsRefresh()
-  },
-)
 
 watch(
   () => route.query.boardId,
@@ -978,7 +945,6 @@ useFlowLeaveGuard({
 
 onMounted(async () => {
   await loadInitialOrRouteBoard()
-  ensureFlowEdgeVisuals()
   refreshBoardMetas()
   refreshSnapshot()
 })
