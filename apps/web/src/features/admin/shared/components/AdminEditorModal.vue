@@ -4,7 +4,14 @@
       <div v-if="show" class="admin-editor-overlay" @click.self="$emit('close')">
         <div class="admin-editor-modal" :style="modalStyle">
           <button class="admin-editor-close" type="button" @click="$emit('close')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
@@ -142,7 +149,9 @@ const modalStyle = computed(() => {
   background: rgba(255, 255, 255, 0.06);
   color: #f4f4f5;
   cursor: pointer;
-  transition: background 0.18s ease, transform 0.18s ease;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 
 .admin-editor-close:hover {

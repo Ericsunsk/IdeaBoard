@@ -11,16 +11,21 @@
 </template>
 
 <script setup lang="ts">
-const props = withDefaults(defineProps<{
-  title: string
-  description?: string
-  variant?: 'panel' | 'section'
-}>(), {
-  description: '',
-  variant: 'panel',
-})
+const props = withDefaults(
+  defineProps<{
+    title: string
+    description?: string
+    variant?: 'panel' | 'section'
+  }>(),
+  {
+    description: '',
+    variant: 'panel',
+  },
+)
 
-const headerClass = computed(() => props.variant === 'section' ? 'section-header' : 'panel-header')
+const headerClass = computed(() =>
+  props.variant === 'section' ? 'section-header' : 'panel-header',
+)
 </script>
 
 <style scoped>

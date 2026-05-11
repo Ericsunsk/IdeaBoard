@@ -3,9 +3,7 @@
     <div class="share-card">
       <h1>正在加入共享画布</h1>
       <p>{{ statusText }}</p>
-      <button v-if="failed" type="button" class="share-btn" @click="goBoards">
-        返回画布列表
-      </button>
+      <button v-if="failed" type="button" class="share-btn" @click="goBoards">返回画布列表</button>
     </div>
   </div>
 </template>

@@ -1,8 +1,6 @@
 import type { ComponentPublicInstance } from 'vue'
 
-export function useFlowStyleInnovateControl(options: {
-  onCommit: (strength: number) => void
-}) {
+export function useFlowStyleInnovateControl(options: { onCommit: (strength: number) => void }) {
   const { onCommit } = options
   const flowStyleInnovateStrength = ref(50)
   const flowShowStyleStrengthControl = ref(false)

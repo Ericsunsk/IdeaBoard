@@ -13,7 +13,14 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.1"
+        >
           <path d="M4.5 7.5h7l2 2.4h6V17a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2z" />
           <path d="M10 12.2h4" />
           <path d="M12 10.2v4" />
@@ -74,8 +81,6 @@
         @generate="emit('generate')"
       />
     </div>
-
-
   </div>
 </template>
 
@@ -112,7 +117,9 @@ const emit = defineEmits<{
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 const categoryOptions = VIEWPOINT_CATEGORY_OPTIONS
 const lightingOptions = VIEWPOINT_LIGHTING_OPTIONS
-const currentViewOptions = computed(() => VIEWPOINT_OPTIONS_BY_CATEGORY[props.node.activeCategory] ?? [])
+const currentViewOptions = computed(
+  () => VIEWPOINT_OPTIONS_BY_CATEGORY[props.node.activeCategory] ?? [],
+)
 const io = computed(() =>
   buildNodeIoFromSlots(VIEWPOINT_NODE_IO_SLOTS, null, {
     connected: {
@@ -127,8 +134,6 @@ const io = computed(() =>
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
-
-
 </script>
 
 <style scoped src="./node-shared.css"></style>
@@ -140,5 +145,4 @@ const connectionChips = computed(() => io.value.connectionChips)
 .viewpoint-lighting-head {
   margin-top: 2px;
 }
-
 </style>

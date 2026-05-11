@@ -5,7 +5,9 @@ export type NodePrimaryActionState = {
   disabled: boolean
 }
 
-export type NodeConnectionMap<TPort extends string = string> = Partial<Record<TPort, boolean | undefined>>
+export type NodeConnectionMap<TPort extends string = string> = Partial<
+  Record<TPort, boolean | undefined>
+>
 
 export type NodeConnectionState<TPort extends string = string> = {
   hasAnyConnection?: boolean

@@ -25,7 +25,14 @@
           </n-form-item>
         </n-form>
 
-        <n-button type="primary" block size="large" :loading="loading" :disabled="loading" @click="handleLogin">
+        <n-button
+          type="primary"
+          block
+          size="large"
+          :loading="loading"
+          :disabled="loading"
+          @click="handleLogin"
+        >
           {{ loading ? '登录中...' : '进入管理员后台' }}
         </n-button>
 
@@ -49,16 +56,18 @@ const formRef = ref()
 const loading = ref(false)
 const formValue = ref({
   username: '',
-  password: ''
+  password: '',
 })
 
 const rules = {
   username: { required: true, message: '请输入账号', trigger: 'blur' },
-  password: { required: true, message: '请输入密码', trigger: 'blur' }
+  password: { required: true, message: '请输入密码', trigger: 'blur' },
 }
 
 function resolveAdminRedirectPath() {
-  const redirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
+  const redirect = Array.isArray(route.query.redirect)
+    ? route.query.redirect[0]
+    : route.query.redirect
   if (!redirect || typeof redirect !== 'string') {
     return '/admin/users'
   }

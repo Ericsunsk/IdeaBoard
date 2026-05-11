@@ -16,7 +16,12 @@ type StatisticsLike = {
     completed?: number
     failed?: number
   }
-  trend?: Array<{ date: string; label: string; total: number; segments: Array<{ label: string; value: number }> }>
+  trend?: Array<{
+    date: string
+    label: string
+    total: number
+    segments: Array<{ label: string; value: number }>
+  }>
   model_ranking?: Array<{ name: string; value: number; percent: number }>
   user_rank?: Array<{ name: string; value: number }>
   latency?: Array<{ name: string; avg_seconds: number }>
@@ -59,7 +64,8 @@ export function useUsageStatisticsCharts(options: {
       channelNameByID.set(channel.id, channel.name || '')
     })
     options.configuredAccounts.value.forEach((account) => {
-      const channelName = channelNameByID.get(account.channel_id) || account.platform || '未配置渠道'
+      const channelName =
+        channelNameByID.get(account.channel_id) || account.platform || '未配置渠道'
       splitCommaValues(account.model_set).forEach((model) => {
         const key = normalizeModelName(model)
         if (!key || map.has(key)) return
@@ -105,7 +111,11 @@ export function useUsageStatisticsCharts(options: {
     return fallback.map((day) => {
       const segments = day.segments.map((seg, idx) => {
         const match = getModelMetaByName(seg.label)
-        return { label: seg.label, value: seg.value, color: match?.color || defaultModelColors[idx % defaultModelColors.length] }
+        return {
+          label: seg.label,
+          value: seg.value,
+          color: match?.color || defaultModelColors[idx % defaultModelColors.length],
+        }
       })
       if (segments.length === 0) segments.push({ label: '无数据', value: 0, color: '#3f3f46' })
       return { date: day.label || day.date, total: day.total, segments }
@@ -113,10 +123,17 @@ export function useUsageStatisticsCharts(options: {
   })
 
   const totalCallsInRange = computed(() => trendData.value.reduce((sum, d) => sum + d.total, 0))
-  const trendMaxY = computed(() => Math.max(1, ...trendData.value.map((day) => day.segments.reduce((sum, seg) => sum + seg.value, 0))))
+  const trendMaxY = computed(() =>
+    Math.max(
+      1,
+      ...trendData.value.map((day) => day.segments.reduce((sum, seg) => sum + seg.value, 0)),
+    ),
+  )
   const areaSeriesMeta = computed(() => {
     const maxSegments = Math.max(1, ...trendData.value.map((day) => day.segments.length))
-    return Array.from({ length: maxSegments }, (_, idx) => ({ color: defaultModelColors[idx % defaultModelColors.length] }))
+    return Array.from({ length: maxSegments }, (_, idx) => ({
+      color: defaultModelColors[idx % defaultModelColors.length],
+    }))
   })
 
   const activeDayIndex = ref<number | null>(null)
@@ -142,11 +159,15 @@ export function useUsageStatisticsCharts(options: {
         let currentStackY = 0
         for (let j = 0; j <= mIdx; j++) currentStackY += day.segments[j]?.value || 0
         const prevStackY = currentStackY - (day.segments[mIdx]?.value || 0)
-        points.push({ x: i * step, y: height - (currentStackY / maxY * height) })
-        bottomPoints.unshift({ x: i * step, y: height - (prevStackY / maxY * height) })
+        points.push({ x: i * step, y: height - (currentStackY / maxY) * height })
+        bottomPoints.unshift({ x: i * step, y: height - (prevStackY / maxY) * height })
       })
       const lineD = getSmoothPath(points)
-      const d = lineD + ` L ${bottomPoints[0].x} ${bottomPoints[0].y} ` + getSmoothPath(bottomPoints, true) + ' Z'
+      const d =
+        lineD +
+        ` L ${bottomPoints[0].x} ${bottomPoints[0].y} ` +
+        getSmoothPath(bottomPoints, true) +
+        ' Z'
       return { color: meta.color, d, lineD }
     })
   })
@@ -159,7 +180,7 @@ export function useUsageStatisticsCharts(options: {
     let currentStackY = 0
     return day.segments.map((seg) => {
       currentStackY += seg.value
-      return { y: height - (currentStackY / maxY * height), color: seg.color }
+      return { y: height - (currentStackY / maxY) * height, color: seg.color }
     })
   })
 
@@ -167,14 +188,30 @@ export function useUsageStatisticsCharts(options: {
   const todaySuccess = computed(() => options.adminStatistics.value?.summary?.today_success || 0)
   const todayFailed = computed(() => options.adminStatistics.value?.summary?.today_failed || 0)
   const totalCalls = computed(() => options.adminStatistics.value?.summary?.total_calls || 0)
-  const yesterdayCalls = computed(() => options.adminStatistics.value?.summary?.yesterday_calls || 0)
-  const yesterdaySuccess = computed(() => options.adminStatistics.value?.summary?.yesterday_success || 0)
-  const yesterdayFailed = computed(() => options.adminStatistics.value?.summary?.yesterday_failed || 0)
+  const yesterdayCalls = computed(
+    () => options.adminStatistics.value?.summary?.yesterday_calls || 0,
+  )
+  const yesterdaySuccess = computed(
+    () => options.adminStatistics.value?.summary?.yesterday_success || 0,
+  )
+  const yesterdayFailed = computed(
+    () => options.adminStatistics.value?.summary?.yesterday_failed || 0,
+  )
 
-  const todayCallsFoot = computed(() => buildDeltaFoot(todayCalls.value, yesterdayCalls.value, '昨日'))
-  const todaySuccessFoot = computed(() => buildDeltaFoot(todaySuccess.value, yesterdaySuccess.value, '昨日'))
-  const todayFailedFoot = computed(() => buildDeltaFoot(todayFailed.value, yesterdayFailed.value, '昨日'))
-  const totalCallsFoot = computed(() => (options.adminStatistics.value ? `本月 ${options.adminStatistics.value.summary?.this_month_calls || 0}` : '无数据'))
+  const todayCallsFoot = computed(() =>
+    buildDeltaFoot(todayCalls.value, yesterdayCalls.value, '昨日'),
+  )
+  const todaySuccessFoot = computed(() =>
+    buildDeltaFoot(todaySuccess.value, yesterdaySuccess.value, '昨日'),
+  )
+  const todayFailedFoot = computed(() =>
+    buildDeltaFoot(todayFailed.value, yesterdayFailed.value, '昨日'),
+  )
+  const totalCallsFoot = computed(() =>
+    options.adminStatistics.value
+      ? `本月 ${options.adminStatistics.value.summary?.this_month_calls || 0}`
+      : '无数据',
+  )
 
   const modelRanking = computed(() => {
     const data = options.adminStatistics.value?.model_ranking || []
@@ -224,7 +261,14 @@ export function useUsageStatisticsCharts(options: {
     const totalCells = HEALTH_COLS * HEALTH_ROWS
     const rows = options.adminStatistics.value?.health_cells || []
     if (rows.length >= totalCells) return rows.slice(0, totalCells)
-    return rows.concat(Array.from({ length: totalCells - rows.length }, () => ({ status: 0, success: 0, fail: 0, total: 0 })))
+    return rows.concat(
+      Array.from({ length: totalCells - rows.length }, () => ({
+        status: 0,
+        success: 0,
+        fail: 0,
+        total: 0,
+      })),
+    )
   })
 
   const userRank = computed(() => (options.adminStatistics.value?.user_rank || []).slice(0, 6))
@@ -232,7 +276,15 @@ export function useUsageStatisticsCharts(options: {
     const rows = (options.adminStatistics.value?.latency || [])
       .map((item, idx) => {
         const match = getModelMetaByName(item.name)
-        return { name: item.name, val: item.avg_seconds, idx, color: match?.color || defaultModelColors[idx % defaultModelColors.length] || 'var(--admin-warning)' }
+        return {
+          name: item.name,
+          val: item.avg_seconds,
+          idx,
+          color:
+            match?.color ||
+            defaultModelColors[idx % defaultModelColors.length] ||
+            'var(--admin-warning)',
+        }
       })
       .slice(0, 5)
     const maxVal = Math.max(1, ...rows.map((r) => r.val))
@@ -249,20 +301,66 @@ export function useUsageStatisticsCharts(options: {
     if (!s) return 0
     return (s.pending || 0) + (s.running || 0) + (s.completed || 0) + (s.failed || 0)
   })
-  const completedSampleTotal = computed(() => options.adminStatistics.value?.summary?.completed || 0)
+  const completedSampleTotal = computed(
+    () => options.adminStatistics.value?.summary?.completed || 0,
+  )
   const failedSampleTotal = computed(() => options.adminStatistics.value?.summary?.failed || 0)
   const runningSampleTotal = computed(() => options.adminStatistics.value?.summary?.running || 0)
-  const healthRate = computed(() => (taskSampleTotal.value === 0 ? '0.0%' : `${((completedSampleTotal.value / taskSampleTotal.value) * 100).toFixed(1)}%`))
-  const failureRate = computed(() => (taskSampleTotal.value === 0 ? '0%' : `${Math.round((failedSampleTotal.value / taskSampleTotal.value) * 100)}%`))
-  const runningRate = computed(() => (taskSampleTotal.value === 0 ? '0%' : `${Math.round((runningSampleTotal.value / taskSampleTotal.value) * 100)}%`))
-  const successRate = computed(() => (taskSampleTotal.value === 0 ? '0%' : `${Math.round((completedSampleTotal.value / taskSampleTotal.value) * 100)}%`))
+  const healthRate = computed(() =>
+    taskSampleTotal.value === 0
+      ? '0.0%'
+      : `${((completedSampleTotal.value / taskSampleTotal.value) * 100).toFixed(1)}%`,
+  )
+  const failureRate = computed(() =>
+    taskSampleTotal.value === 0
+      ? '0%'
+      : `${Math.round((failedSampleTotal.value / taskSampleTotal.value) * 100)}%`,
+  )
+  const runningRate = computed(() =>
+    taskSampleTotal.value === 0
+      ? '0%'
+      : `${Math.round((runningSampleTotal.value / taskSampleTotal.value) * 100)}%`,
+  )
+  const successRate = computed(() =>
+    taskSampleTotal.value === 0
+      ? '0%'
+      : `${Math.round((completedSampleTotal.value / taskSampleTotal.value) * 100)}%`,
+  )
 
-  const monitorQueueTotal = computed(() => (options.monitorData.value?.global_queue_len || 0) + (options.monitorData.value?.wait_queue_len || 0))
+  const monitorQueueTotal = computed(
+    () =>
+      (options.monitorData.value?.global_queue_len || 0) +
+      (options.monitorData.value?.wait_queue_len || 0),
+  )
   const monitorRunningTotal = computed(() => options.monitorData.value?.running_tasks || 0)
-  const monitorQueueText = computed(() => `${options.monitorData.value?.global_queue_len || 0}/${Math.max(1, monitorQueueTotal.value)}`)
-  const monitorRunningText = computed(() => `${monitorRunningTotal.value}/${Math.max(1, monitorQueueTotal.value + monitorRunningTotal.value)}`)
-  const monitorQueuePercent = computed(() => Math.min(100, Math.round(((options.monitorData.value?.global_queue_len || 0) / Math.max(1, monitorQueueTotal.value)) * 100)))
-  const monitorRunningPercent = computed(() => Math.min(100, Math.round((monitorRunningTotal.value / Math.max(1, monitorQueueTotal.value + monitorRunningTotal.value)) * 100)))
+  const monitorQueueText = computed(
+    () =>
+      `${options.monitorData.value?.global_queue_len || 0}/${Math.max(1, monitorQueueTotal.value)}`,
+  )
+  const monitorRunningText = computed(
+    () =>
+      `${monitorRunningTotal.value}/${Math.max(1, monitorQueueTotal.value + monitorRunningTotal.value)}`,
+  )
+  const monitorQueuePercent = computed(() =>
+    Math.min(
+      100,
+      Math.round(
+        ((options.monitorData.value?.global_queue_len || 0) /
+          Math.max(1, monitorQueueTotal.value)) *
+          100,
+      ),
+    ),
+  )
+  const monitorRunningPercent = computed(() =>
+    Math.min(
+      100,
+      Math.round(
+        (monitorRunningTotal.value /
+          Math.max(1, monitorQueueTotal.value + monitorRunningTotal.value)) *
+          100,
+      ),
+    ),
+  )
 
   const accountLoadRows = computed(() => {
     const loads = options.monitorData.value?.account_loads || {}
@@ -271,13 +369,20 @@ export function useUsageStatisticsCharts(options: {
         const current = val.current_concurrent || 0
         const max = Math.max(1, val.max_concurrent || 0)
         const percent = Math.min(100, Math.round((current / max) * 100))
-        const color = percent >= 90 ? 'var(--admin-danger)' : percent >= 70 ? 'var(--admin-warning)' : 'var(--admin-success)'
+        const color =
+          percent >= 90
+            ? 'var(--admin-danger)'
+            : percent >= 70
+              ? 'var(--admin-warning)'
+              : 'var(--admin-success)'
         return { id, current, max, percent, color }
       })
       .sort((a, b) => b.percent - a.percent)
       .slice(0, 3)
   })
-  const saturatedAccountCount = computed(() => accountLoadRows.value.filter((item) => item.percent >= 90).length)
+  const saturatedAccountCount = computed(
+    () => accountLoadRows.value.filter((item) => item.percent >= 90).length,
+  )
 
   function calculatePercent(cell: HealthCellLike) {
     if (cell.total === 0) return '0.0'
@@ -285,14 +390,20 @@ export function useUsageStatisticsCharts(options: {
   }
 
   function getCellTimeRange(index: number) {
-    const rangeLabel = options.timeRange.value === '7d' ? '最近7天' : options.timeRange.value === '30d' ? '最近30天' : '最近1年'
+    const rangeLabel =
+      options.timeRange.value === '7d'
+        ? '最近7天'
+        : options.timeRange.value === '30d'
+          ? '最近30天'
+          : '最近1年'
     return `${rangeLabel} 样本区间 #${index + 1}`
   }
 
   function shouldShowLabel(index: number) {
     const count = trendData.value.length
     if (count <= 7) return true
-    if (options.timeRange.value === '30d') return index === 0 || index === count - 1 || index % 6 === 0
+    if (options.timeRange.value === '30d')
+      return index === 0 || index === count - 1 || index % 6 === 0
     if (options.timeRange.value === '1y') {
       if (index === 0 || index === count - 1) return true
       const day = trendData.value[index]
@@ -353,7 +464,7 @@ function normalizeModelName(name: string | null | undefined): string {
 
 function colorForModel(name: string, palette: string[]) {
   let hash = 0
-  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i)
+  for (let i = 0; i < name.length; i++) hash = (hash << 5) - hash + name.charCodeAt(i)
   return palette[Math.abs(hash) % palette.length]
 }
 

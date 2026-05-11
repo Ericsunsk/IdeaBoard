@@ -11,14 +11,17 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
-  label: string
-  value?: string | number
-  foot?: string
-}>(), {
-  value: '',
-  foot: '',
-})
+withDefaults(
+  defineProps<{
+    label: string
+    value?: string | number
+    foot?: string
+  }>(),
+  {
+    value: '',
+    foot: '',
+  },
+)
 </script>
 
 <style scoped>

@@ -82,21 +82,29 @@ export function useFlowMessageImageInteractions(options: UseFlowMessageImageInte
   }
 
   function onFlowMessageImageDragStart(nodeId: string, event: DragEvent) {
-    const target = (options.nodes.value as Array<{ id: string; data?: FlowNodeData }>).find(node => node.id === nodeId)
+    const target = (options.nodes.value as Array<{ id: string; data?: FlowNodeData }>).find(
+      (node) => node.id === nodeId,
+    )
     const snapshot = target?.data?.snapshotNode as CanvasImageItem | undefined
     const url = `${snapshot?.url ?? ''}`.trim()
     if (!url || !event.dataTransfer) return
-    const ratio = Number.isFinite(snapshot?.height_ratio) && Number(snapshot?.height_ratio) > 0
-      ? Number(snapshot?.height_ratio)
-      : 1
+    const ratio =
+      Number.isFinite(snapshot?.height_ratio) && Number(snapshot?.height_ratio) > 0
+        ? Number(snapshot?.height_ratio)
+        : 1
     event.dataTransfer.effectAllowed = 'copy'
     event.dataTransfer.setData(options.FLOW_NODE_IMAGE_DRAG_MIME, url)
     event.dataTransfer.setData(`${options.FLOW_NODE_IMAGE_DRAG_MIME}-ratio`, String(ratio))
   }
 
-  function onFlowMessageResizeMouseDown(nodeId: string, payload: { event: MouseEvent; direction: ResizeDirection }) {
+  function onFlowMessageResizeMouseDown(
+    nodeId: string,
+    payload: { event: MouseEvent; direction: ResizeDirection },
+  ) {
     const { event, direction } = payload
-    const target = (options.nodes.value as Array<{ id: string; data?: FlowNodeData }>).find(node => node.id === nodeId)
+    const target = (options.nodes.value as Array<{ id: string; data?: FlowNodeData }>).find(
+      (node) => node.id === nodeId,
+    )
     const snapshot = target?.data?.snapshotNode as CanvasImageItem | undefined
     const flowNode = target as { position?: { x?: number; y?: number } } | undefined
     if (!snapshot) return
@@ -179,23 +187,28 @@ export function useFlowMessageImageInteractions(options: UseFlowMessageImageInte
       }
 
       nextWidth = Math.round(nextWidth)
-      options.updateSnapshotNode(nodeId, (prev) => {
-        const prevWidth = Number(prev.width)
-        const prevRatio = Number(prev.height_ratio)
-        const prevX = Number(prev.x)
-        const prevY = Number(prev.y)
-        if (prevWidth === nextWidth && prevRatio === ratio && prevX === nextX && prevY === nextY) return prev
-        hasResized = true
-        return {
-          ...prev,
-          width: nextWidth,
-          height_ratio: ratio,
-          x: nextX,
-          y: nextY,
-        }
-      }, { history: false, dirty: false })
+      options.updateSnapshotNode(
+        nodeId,
+        (prev) => {
+          const prevWidth = Number(prev.width)
+          const prevRatio = Number(prev.height_ratio)
+          const prevX = Number(prev.x)
+          const prevY = Number(prev.y)
+          if (prevWidth === nextWidth && prevRatio === ratio && prevX === nextX && prevY === nextY)
+            return prev
+          hasResized = true
+          return {
+            ...prev,
+            width: nextWidth,
+            height_ratio: ratio,
+            x: nextX,
+            y: nextY,
+          }
+        },
+        { history: false, dirty: false },
+      )
       const flowNodes = options.nodes.value as Array<Node & { position?: { x: number; y: number } }>
-      const node = flowNodes.find(n => n.id === nodeId)
+      const node = flowNodes.find((n) => n.id === nodeId)
       if (node) {
         const currentX = Number(node.position?.x ?? 0)
         const currentY = Number(node.position?.y ?? 0)
@@ -227,17 +240,18 @@ export function useFlowMessageImageInteractions(options: UseFlowMessageImageInte
     }
     const selectedNodeIds = new Set(
       (options.nodes.value as Array<{ id: string; selected?: boolean }>)
-        .filter(node => !!node.selected)
-        .map(node => node.id),
+        .filter((node) => !!node.selected)
+        .map((node) => node.id),
     )
-    const draggingSelectedIds = selectedNodeIds.size > 0
-      ? selectedNodeIds
-      : new Set<string>()
+    const draggingSelectedIds = selectedNodeIds.size > 0 ? selectedNodeIds : new Set<string>()
     flowAltDragDuplicateState.value = {
       initialPositions: new Map(
         (options.nodes.value as Array<{ id: string; position?: { x?: number; y?: number } }>)
-          .filter(node => draggingSelectedIds.size === 0 || draggingSelectedIds.has(node.id))
-          .map(node => [node.id, { x: Number(node.position?.x ?? 0), y: Number(node.position?.y ?? 0) }]),
+          .filter((node) => draggingSelectedIds.size === 0 || draggingSelectedIds.has(node.id))
+          .map((node) => [
+            node.id,
+            { x: Number(node.position?.x ?? 0), y: Number(node.position?.y ?? 0) },
+          ]),
       ),
     }
   }
@@ -246,8 +260,12 @@ export function useFlowMessageImageInteractions(options: UseFlowMessageImageInte
     const altState = flowAltDragDuplicateState.value
     flowAltDragDuplicateState.value = null
     if (!altState || !isDuplicateMode || altState.initialPositions.size === 0) return
-    const flowNodes = options.nodes.value as Array<{ id: string; data?: FlowNodeData; position: { x: number; y: number } }>
-    const idToNode = new Map(flowNodes.map(node => [node.id, node]))
+    const flowNodes = options.nodes.value as Array<{
+      id: string
+      data?: FlowNodeData
+      position: { x: number; y: number }
+    }>
+    const idToNode = new Map(flowNodes.map((node) => [node.id, node]))
     const deltaByNode = new Map<string, { x: number; y: number }>()
     altState.initialPositions.forEach((startPos, nodeId) => {
       const current = idToNode.get(nodeId)

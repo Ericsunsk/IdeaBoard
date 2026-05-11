@@ -119,8 +119,14 @@ export function patchFlowSnapshotParam(
       return { ...snapshotNode, background: value }
     case 'activeCategory': {
       const category = value as ViewpointNodeItem['activeCategory']
-      const nextSelectedViewpoint = normalizeViewpointSelectionByCategory(category, String(snapshotNode.selectedViewpoint ?? ''))
-      if (snapshotNode.activeCategory === category && snapshotNode.selectedViewpoint === nextSelectedViewpoint) {
+      const nextSelectedViewpoint = normalizeViewpointSelectionByCategory(
+        category,
+        String(snapshotNode.selectedViewpoint ?? ''),
+      )
+      if (
+        snapshotNode.activeCategory === category &&
+        snapshotNode.selectedViewpoint === nextSelectedViewpoint
+      ) {
         return snapshotNode
       }
       return { ...snapshotNode, activeCategory: category, selectedViewpoint: nextSelectedViewpoint }
@@ -131,7 +137,9 @@ export function patchFlowSnapshotParam(
       return { ...snapshotNode, selectedViewpoint: nextSelectedViewpoint }
     }
     case 'lighting': {
-      const allowed = VIEWPOINT_LIGHTING_OPTIONS.some((option: { value: string }) => option.value === value)
+      const allowed = VIEWPOINT_LIGHTING_OPTIONS.some(
+        (option: { value: string }) => option.value === value,
+      )
       if (allowed) {
         if (snapshotNode.lighting === value) return snapshotNode
         return { ...snapshotNode, lighting: value }

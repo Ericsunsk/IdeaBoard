@@ -3,7 +3,9 @@ export interface ExecutionImageSize {
   height: number
 }
 
-function normalizeExecutionImageSize(size: ExecutionImageSize | null | undefined): ExecutionImageSize | null {
+function normalizeExecutionImageSize(
+  size: ExecutionImageSize | null | undefined,
+): ExecutionImageSize | null {
   if (!size) return null
   const width = Math.max(1, Math.round(size.width))
   const height = Math.max(1, Math.round(size.height))

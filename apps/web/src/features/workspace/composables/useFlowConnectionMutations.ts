@@ -33,14 +33,16 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     } as Edge
     const before = options.captureHistory()
     const existingEdges = options.edges.value as unknown as Edge[]
-    const filteredEdges = existingEdges.filter(edge => {
-      if (edge.target === connection.target && edge.targetHandle === connection.targetHandle) return false
+    const filteredEdges = existingEdges.filter((edge) => {
+      if (edge.target === connection.target && edge.targetHandle === connection.targetHandle)
+        return false
       if (
-        edge.source === connection.source
-        && edge.target === connection.target
-        && edge.sourceHandle === connection.sourceHandle
-        && edge.targetHandle === connection.targetHandle
-      ) return false
+        edge.source === connection.source &&
+        edge.target === connection.target &&
+        edge.sourceHandle === connection.sourceHandle &&
+        edge.targetHandle === connection.targetHandle
+      )
+        return false
       return true
     })
     options.commitEdges([...filteredEdges, nextEdge])
@@ -60,13 +62,14 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     const before = options.captureHistory()
     const tone = resolveFlowEdgeToneFromHandles(connection.sourceHandle, connection.targetHandle)
     const nextEdges = (options.edges.value as unknown as Edge[])
-      .filter(item => (
-        item.id === edge.id
-        || !(
-          item.target === connection.target
-          && (item.targetHandle ?? null) === (connection.targetHandle ?? null)
-        )
-      ))
+      .filter(
+        (item) =>
+          item.id === edge.id ||
+          !(
+            item.target === connection.target &&
+            (item.targetHandle ?? null) === (connection.targetHandle ?? null)
+          ),
+      )
       .map((item) => {
         if (item.id !== edge.id) return item
         const nextData = { ...((item.data ?? {}) as Record<string, unknown>), tone }

@@ -1,7 +1,4 @@
-import {
-  ADMIN_UPLOAD_ENDPOINT,
-  UPLOAD_FAILED_MESSAGE,
-} from '../../../shared/constants/media'
+import { ADMIN_UPLOAD_ENDPOINT, UPLOAD_FAILED_MESSAGE } from '../../../shared/constants/media'
 import { handleAuthFailure } from '../../../shared/utils/auth'
 
 type UploadResponse = {

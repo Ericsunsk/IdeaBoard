@@ -92,7 +92,7 @@ export function getCanvasBoardById(boardId: string): CanvasBoardMeta | null {
   const id = boardId.trim()
   if (!id) return null
   const boards = readRawBoards()
-  return boards.find(board => board.id === id) || null
+  return boards.find((board) => board.id === id) || null
 }
 
 export function isCanvasBoardNameTaken(name: string, excludeBoardId?: string): boolean {
@@ -151,7 +151,7 @@ export function renameCanvasBoard(boardId: string, nextName: string): CanvasBoar
   if (!id || !name) return null
   if (isCanvasBoardNameTaken(name, id)) return null
   const boards = readRawBoards()
-  const target = boards.find(board => board.id === id)
+  const target = boards.find((board) => board.id === id)
   if (!target) return null
   target.name = name
   target.updatedAt = Date.now()
@@ -163,7 +163,7 @@ export function touchCanvasBoard(boardId: string): CanvasBoardMeta | null {
   const id = boardId.trim()
   if (!id) return null
   const boards = readRawBoards()
-  const target = boards.find(board => board.id === id)
+  const target = boards.find((board) => board.id === id)
   if (!target) return null
   target.updatedAt = Date.now()
   writeRawBoards(boards)
@@ -174,7 +174,7 @@ export function deleteCanvasBoard(boardId: string): boolean {
   const id = boardId.trim()
   if (!id) return false
   const boards = readRawBoards()
-  const nextBoards = boards.filter(board => board.id !== id)
+  const nextBoards = boards.filter((board) => board.id !== id)
   if (nextBoards.length === boards.length) return false
   writeRawBoards(nextBoards)
   return true
@@ -184,7 +184,7 @@ export function duplicateCanvasBoard(boardId: string): CanvasBoardMeta | null {
   const id = boardId.trim()
   if (!id) return null
   const boards = readRawBoards()
-  const source = boards.find(board => board.id === id)
+  const source = boards.find((board) => board.id === id)
   if (!source) return null
   const now = Date.now()
   const copy: CanvasBoardMeta = {

@@ -29,11 +29,11 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
   const currentBoardName = computed(() => {
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) return 'Untitled Canvas'
-    return boardMetas.value.find(board => board.id === boardId)?.name ?? boardId
+    return boardMetas.value.find((board) => board.id === boardId)?.name ?? boardId
   })
 
   const boardOptions = computed(() =>
-    boardMetas.value.map(board => ({ id: board.id, name: board.name })),
+    boardMetas.value.map((board) => ({ id: board.id, name: board.name })),
   )
 
   function setBoardNameInputRef(el: HTMLInputElement | null) {
@@ -103,7 +103,10 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
   async function navigateToBoard(boardId: string) {
     if (options.isDirty.value && !(await options.confirmFlowLeave())) return
     options.skipNextLeaveConfirm.value = true
-    await options.router.push({ path: '/user/workspace', query: { ...options.route.query, boardId } })
+    await options.router.push({
+      path: '/user/workspace',
+      query: { ...options.route.query, boardId },
+    })
   }
 
   return {

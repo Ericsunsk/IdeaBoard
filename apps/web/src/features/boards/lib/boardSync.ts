@@ -31,7 +31,10 @@ function toLocalState(board: UserBoardItem): CanvasBoardState | null {
   const state = board.state as Record<string, unknown>
   return {
     ...state,
-    updatedAt: typeof state.updatedAt === 'number' ? state.updatedAt : Number(board.updated_at) || Date.now(),
+    updatedAt:
+      typeof state.updatedAt === 'number'
+        ? state.updatedAt
+        : Number(board.updated_at) || Date.now(),
   } as CanvasBoardState
 }
 
@@ -62,11 +65,13 @@ export async function hydrateCanvasBoardsFromServer() {
   const task = (async () => {
     const remoteBoards = await listRemoteBoards()
     applyRemoteBoardsToLocal(remoteBoards)
-  })().catch((error) => {
-    console.warn('[boards] hydrate from server failed', error)
-  }).finally(() => {
-    hydrateInFlight.delete(scope)
-  })
+  })()
+    .catch((error) => {
+      console.warn('[boards] hydrate from server failed', error)
+    })
+    .finally(() => {
+      hydrateInFlight.delete(scope)
+    })
   hydrateInFlight.set(scope, task)
   return task
 }

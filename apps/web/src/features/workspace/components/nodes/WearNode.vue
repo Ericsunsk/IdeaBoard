@@ -13,7 +13,14 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.1"
+        >
           <path d="M7 4h10l2 4-2.2 2.2-1.8-1.4V20H9V8.8L7.2 10.2 5 8l2-4z" />
         </svg>
       </template>
@@ -83,8 +90,6 @@
         @generate="emit('generate')"
       />
     </div>
-
-
   </div>
 </template>
 
@@ -136,8 +141,6 @@ const io = computed(() =>
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
-
-
 </script>
 
 <style scoped src="./node-shared.css"></style>
@@ -171,5 +174,4 @@ const connectionChips = computed(() => io.value.connectionChips)
   flex: 1;
   min-width: 0;
 }
-
 </style>

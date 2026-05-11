@@ -1,4 +1,7 @@
-import { getCanvasNodeVisibleInputPorts, getCanvasNodeVisibleOutputPorts } from '../config/canvasNodeConnectionContract'
+import {
+  getCanvasNodeVisibleInputPorts,
+  getCanvasNodeVisibleOutputPorts,
+} from '../config/canvasNodeConnectionContract'
 import type {
   CanvasBoardSnapshot,
   CanvasConnection,
@@ -92,7 +95,9 @@ function toFlowNodeId(nodeType: CanvasConnectionNodeType | 'message', id: number
   return `${nodeType}-${id}`
 }
 
-function parseFlowNodeId(nodeId: string): { nodeType: CanvasConnectionNodeType | 'message'; id: number } | null {
+function parseFlowNodeId(
+  nodeId: string,
+): { nodeType: CanvasConnectionNodeType | 'message'; id: number } | null {
   const dashIndex = nodeId.indexOf('-')
   if (dashIndex <= 0) return null
   const prefix = nodeId.slice(0, dashIndex)
@@ -103,27 +108,39 @@ function parseFlowNodeId(nodeId: string): { nodeType: CanvasConnectionNodeType |
   return { nodeType: prefix as CanvasConnectionNodeType | 'message', id: parsedId }
 }
 
-function parsePortFromHandle(handle: string | null | undefined, direction: 'in' | 'out'): CanvasConnectionPort | null {
+function parsePortFromHandle(
+  handle: string | null | undefined,
+  direction: 'in' | 'out',
+): CanvasConnectionPort | null {
   if (!handle) return null
   const [handleDirection, port] = handle.split(':')
   if (handleDirection !== direction || !port) return null
   return port as CanvasConnectionPort
 }
 
-function resolveNodeTitle(nodeType: CanvasConnectionNodeType | 'message', node: { id: number }): string {
+function resolveNodeTitle(
+  nodeType: CanvasConnectionNodeType | 'message',
+  node: { id: number },
+): string {
   if (nodeType === 'message') return `Message #${node.id}`
   return `${nodeType[0].toUpperCase()}${nodeType.slice(1)} #${node.id}`
 }
 
-function toFlowDataFromCanvasNode(nodeType: CanvasConnectionNodeType, node: CanvasNodeItem): FlowNodeData {
-  const inputPorts = getCanvasNodeVisibleInputPorts(nodeType, node).map(port => port.port)
-  const outputPorts = getCanvasNodeVisibleOutputPorts(nodeType, node).map(port => port.port)
+function toFlowDataFromCanvasNode(
+  nodeType: CanvasConnectionNodeType,
+  node: CanvasNodeItem,
+): FlowNodeData {
+  const inputPorts = getCanvasNodeVisibleInputPorts(nodeType, node).map((port) => port.port)
+  const outputPorts = getCanvasNodeVisibleOutputPorts(nodeType, node).map((port) => port.port)
   return {
     kind: nodeType,
     nodeType,
     title: resolveNodeTitle(nodeType, node),
     summary: `Canvas ${nodeType} node`,
-    mode: (nodeType === 'edit' || nodeType === 'enhance') ? (node as { mode?: FlowNodeData['mode'] }).mode : undefined,
+    mode:
+      nodeType === 'edit' || nodeType === 'enhance'
+        ? (node as { mode?: FlowNodeData['mode'] }).mode
+        : undefined,
     inputPorts,
     outputPorts,
     snapshotNode: clone(node),
@@ -141,7 +158,10 @@ function toFlowDataFromMessageNode(node: CanvasImageItem): FlowNodeData {
   }
 }
 
-export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): { nodes: FlowAdapterNode[]; edges: FlowAdapterEdge[] } {
+export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
+  nodes: FlowAdapterNode[]
+  edges: FlowAdapterEdge[]
+} {
   const nodes: FlowAdapterNode[] = []
   const edges: FlowAdapterEdge[] = []
 
@@ -186,18 +206,30 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): { node
   return { nodes, edges }
 }
 
-function resolveCollectionKeyByNodeType(nodeType: CanvasConnectionNodeType): SnapshotNodeCollectionKey {
+function resolveCollectionKeyByNodeType(
+  nodeType: CanvasConnectionNodeType,
+): SnapshotNodeCollectionKey {
   switch (nodeType) {
-    case 'image': return 'imageNodes'
-    case 'prompt': return 'promptNodes'
-    case 'model': return 'modelNodes'
-    case 'viewpoint': return 'viewpointNodes'
-    case 'mask': return 'maskNodes'
-    case 'color': return 'colorNodes'
-    case 'edit': return 'editNodes'
-    case 'fusion': return 'fusionNodes'
-    case 'enhance': return 'enhanceNodes'
-    case 'wear': return 'wearNodes'
+    case 'image':
+      return 'imageNodes'
+    case 'prompt':
+      return 'promptNodes'
+    case 'model':
+      return 'modelNodes'
+    case 'viewpoint':
+      return 'viewpointNodes'
+    case 'mask':
+      return 'maskNodes'
+    case 'color':
+      return 'colorNodes'
+    case 'edit':
+      return 'editNodes'
+    case 'fusion':
+      return 'fusionNodes'
+    case 'enhance':
+      return 'enhanceNodes'
+    case 'wear':
+      return 'wearNodes'
   }
 }
 
@@ -215,7 +247,7 @@ export function flowToCanvasBoardSnapshot(
   const usedConnectionIds = new Set<number>()
 
   const nextConnectionId = () => {
-    const existingIds = snapshot.connections.map(connection => connection.id)
+    const existingIds = snapshot.connections.map((connection) => connection.id)
     const maxId = existingIds.length ? Math.max(...existingIds) : 0
     return maxId + 1
   }
@@ -224,7 +256,7 @@ export function flowToCanvasBoardSnapshot(
     const ref = parseFlowNodeId(node.id)
     if (!ref) return
     const data = (node.data ?? {}) as FlowNodeData
-    const snapshotNode = data.snapshotNode as (CanvasNodeItem | CanvasImageItem | undefined)
+    const snapshotNode = data.snapshotNode as CanvasNodeItem | CanvasImageItem | undefined
     if (!snapshotNode || typeof snapshotNode !== 'object') return
     const positionedNode = {
       ...snapshotNode,
@@ -249,16 +281,19 @@ export function flowToCanvasBoardSnapshot(
     const toPort = parsePortFromHandle(edge.targetHandle ?? null, 'in')
     if (!fromPort || !toPort) return
 
-    const existingConnection = (edge.data as { connectionSnapshot?: CanvasConnection } | undefined)?.connectionSnapshot
+    const existingConnection = (edge.data as { connectionSnapshot?: CanvasConnection } | undefined)
+      ?.connectionSnapshot
     const restoredId = existingConnection?.id
     const connectionId =
-      typeof restoredId === 'number' && Number.isFinite(restoredId) && !usedConnectionIds.has(restoredId)
+      typeof restoredId === 'number' &&
+      Number.isFinite(restoredId) &&
+      !usedConnectionIds.has(restoredId)
         ? restoredId
         : nextConnectionId()
     usedConnectionIds.add(connectionId)
     // Remove any existing connection targeting the same input port (last-write wins)
     const dupIndex = snapshot.connections.findIndex(
-      c => c.toNodeType === toRef.nodeType && c.toNodeId === toRef.id && c.toPort === toPort,
+      (c) => c.toNodeType === toRef.nodeType && c.toNodeId === toRef.id && c.toPort === toPort,
     )
     if (dupIndex >= 0) {
       snapshot.connections.splice(dupIndex, 1)

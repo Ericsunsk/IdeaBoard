@@ -1,4 +1,7 @@
-import { sanitizeTaskErrorMessage, sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import {
+  sanitizeTaskErrorMessage,
+  sanitizeApiErrorMessage,
+} from '../../../shared/utils/errorMessages'
 import { formatAdminDateTime, formatDurationSeconds } from '../../../shared/utils/dateTime'
 import type { Task } from '../../../shared/api/task'
 
@@ -6,7 +9,8 @@ const RESULT_MAX_STRING_LENGTH = 300
 const RESULT_DEBUG_MAX_DEPTH = 4
 const RESULT_DEBUG_MAX_KEYS = 40
 const RESULT_ARRAY_PREVIEW_LENGTH = 5
-const SENSITIVE_KEY_PATTERN = /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
+const SENSITIVE_KEY_PATTERN =
+  /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
 
 export function useTaskResultDetail(options: {
   message: { success: (content: string) => void; error: (content: string) => void }
@@ -30,13 +34,29 @@ export function useTaskResultDetail(options: {
     const parsed = parseResultSafely(detailTask.value.result)
     if (parsed == null) return sanitizeApiErrorMessage(detailTask.value.result, '[REDACTED]')
     if (Array.isArray(parsed)) {
-      return JSON.stringify({ type: 'array', length: parsed.length, preview: sanitizeValue(parsed, 1) }, null, 2)
+      return JSON.stringify(
+        { type: 'array', length: parsed.length, preview: sanitizeValue(parsed, 1) },
+        null,
+        2,
+      )
     }
     if (typeof parsed !== 'object') return truncateString(String(parsed))
 
     const summary: Record<string, unknown> = {}
     const source = parsed as Record<string, unknown>
-    const preferredKeys = ['status', 'platform', 'model_set', 'model', 'request_id', 'task_id', 'code', 'message', 'error', 'duration', 'image_url']
+    const preferredKeys = [
+      'status',
+      'platform',
+      'model_set',
+      'model',
+      'request_id',
+      'task_id',
+      'code',
+      'message',
+      'error',
+      'duration',
+      'image_url',
+    ]
     preferredKeys.forEach((key) => {
       if (key in source) summary[key] = sanitizeValue(source[key], 0)
     })
@@ -62,9 +82,12 @@ export function useTaskResultDetail(options: {
 
   function copyToClipboard(text: string) {
     if (!text) return
-    navigator.clipboard.writeText(text).then(() => options.message.success('已复制到剪贴板')).catch(() => {
-      options.message.error('复制失败')
-    })
+    navigator.clipboard
+      .writeText(text)
+      .then(() => options.message.success('已复制到剪贴板'))
+      .catch(() => {
+        options.message.error('复制失败')
+      })
   }
 
   function formatDateTime(timeStr: string | null | undefined): string {
@@ -113,7 +136,11 @@ export function useTaskResultDetail(options: {
 }
 
 function parseResultSafely(str: string): unknown | null {
-  try { return JSON.parse(str) } catch { return null }
+  try {
+    return JSON.parse(str)
+  } catch {
+    return null
+  }
 }
 
 function truncateString(value: string, maxLength = RESULT_MAX_STRING_LENGTH): string {
@@ -130,8 +157,11 @@ function sanitizeValue(value: unknown, depth: number, keyCountState = { count: 0
   if (typeof value === 'number' || typeof value === 'boolean') return value
   if (Array.isArray(value)) {
     if (depth >= RESULT_DEBUG_MAX_DEPTH) return `[array:${value.length}]`
-    const preview = value.slice(0, RESULT_ARRAY_PREVIEW_LENGTH).map((item) => sanitizeValue(item, depth + 1, keyCountState))
-    if (value.length > RESULT_ARRAY_PREVIEW_LENGTH) preview.push(`...(+${value.length - RESULT_ARRAY_PREVIEW_LENGTH} items)`)
+    const preview = value
+      .slice(0, RESULT_ARRAY_PREVIEW_LENGTH)
+      .map((item) => sanitizeValue(item, depth + 1, keyCountState))
+    if (value.length > RESULT_ARRAY_PREVIEW_LENGTH)
+      preview.push(`...(+${value.length - RESULT_ARRAY_PREVIEW_LENGTH} items)`)
     return preview
   }
   if (typeof value === 'object') {

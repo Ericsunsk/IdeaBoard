@@ -1,4 +1,7 @@
-import { buildExecutionTaskRequest, EXECUTION_DIRECTED_RECOLOR_META } from '../config/executionContract'
+import {
+  buildExecutionTaskRequest,
+  EXECUTION_DIRECTED_RECOLOR_META,
+} from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import {
   DEFAULT_COLOR_STRENGTH,
@@ -12,8 +15,18 @@ import {
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api/task'
 import { cleanupFlowExecutionMaskAsset, resolveFlowExecutionMaskAsset } from './flowMaskProcessing'
-import { cleanupFlowLocalInpaintAssets, composeFlowLocalInpaint, prepareFlowLocalInpaint } from './flowLocalInpaint'
-import { parseHandlePort, resolveConnectedExecutionInput, resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
+import {
+  cleanupFlowLocalInpaintAssets,
+  composeFlowLocalInpaint,
+  prepareFlowLocalInpaint,
+} from './flowLocalInpaint'
+import {
+  parseHandlePort,
+  resolveConnectedExecutionInput,
+  resolveConnectedInput,
+  resolveSourceImageFromNode,
+  waitTaskResult,
+} from './flowTaskExecutorUtils'
 
 interface FlowColorNodeContext {
   nodeId: string
@@ -22,7 +35,12 @@ interface FlowColorNodeContext {
 
 interface FlowColorExecutorOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
-  edges: Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>
+  edges: Array<{
+    source: string
+    sourceHandle?: string | null
+    target: string
+    targetHandle?: string | null
+  }>
   loadImageSizeFromUrl: (url: string) => Promise<{ width: number; height: number } | null>
   boardId?: string
 }
@@ -53,7 +71,11 @@ function resolveConnectedMaskImageSource(
   return resolveConnectedExecutionInput(options, maskNodeId, 'image')
 }
 
-function resolveEffectiveMaskSourceImageUrl(options: FlowColorExecutorOptions, maskNodeId: string, maskNode: MaskNodeItem): string {
+function resolveEffectiveMaskSourceImageUrl(
+  options: FlowColorExecutorOptions,
+  maskNodeId: string,
+  maskNode: MaskNodeItem,
+): string {
   const connected = resolveConnectedMaskImageSource(options, maskNodeId)
   if (connected) {
     const url = resolveSourceImageFromNode(connected.sourceType, connected.snapshotNode).trim()
@@ -62,9 +84,12 @@ function resolveEffectiveMaskSourceImageUrl(options: FlowColorExecutorOptions, m
   return resolveMaskSourceImageUrl(maskNode)
 }
 
-function resolveConnectedMaskNodeId(options: FlowColorExecutorOptions, colorNodeId: string): string {
+function resolveConnectedMaskNodeId(
+  options: FlowColorExecutorOptions,
+  colorNodeId: string,
+): string {
   const maskEdge = options.edges.find(
-    edge => edge.target === colorNodeId && parseHandlePort(edge.targetHandle) === 'mask',
+    (edge) => edge.target === colorNodeId && parseHandlePort(edge.targetHandle) === 'mask',
   )
   return maskEdge?.source || ''
 }
@@ -84,7 +109,7 @@ export function validateFlowColorNodeInputs(
   }
 
   const hasMaskConnection = options.edges.some(
-    edge => edge.target === context.nodeId && parseHandlePort(edge.targetHandle) === 'mask',
+    (edge) => edge.target === context.nodeId && parseHandlePort(edge.targetHandle) === 'mask',
   )
   if (hasMaskConnection) {
     const maskInput = resolveConnectedInput(options, context.nodeId, 'mask')
@@ -123,9 +148,10 @@ export async function executeFlowColorNode(
   const imageInput = resolveConnectedInput(options, context.nodeId, 'image')!
   const imageUrl = resolveSourceImageFromNode(imageInput.sourceType, imageInput.snapshotNode)
   const promptInput = resolveConnectedInput(options, context.nodeId, 'prompt')
-  const promptText = promptInput?.sourceType === 'prompt'
-    ? (((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim())
-    : ''
+  const promptText =
+    promptInput?.sourceType === 'prompt'
+      ? ((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim()
+      : ''
 
   const targetColor = resolveFlowColorTargetColor(node)
   const strength = resolveFlowColorStrength(node)
@@ -147,7 +173,9 @@ export async function executeFlowColorNode(
       }
       const rawMaskImageUrl = (maskNode.executionMaskDataUrl || maskNode.maskDataUrl || '').trim()
       if (rawMaskImageUrl) {
-        executionMaskAsset = await resolveFlowExecutionMaskAsset(maskNode, { boardId: options.boardId })
+        executionMaskAsset = await resolveFlowExecutionMaskAsset(maskNode, {
+          boardId: options.boardId,
+        })
         maskImageUrl = executionMaskAsset.url
         localInpaint = await prepareFlowLocalInpaint({
           originalImageUrl: imageUrl,

@@ -14,7 +14,14 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+        >
           <path d="M4 7a3 3 0 0 1 3-3h6l7 7v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" />
           <path d="M13 4v6h6" />
         </svg>
@@ -45,11 +52,20 @@
             @mouseleave="hideMaskCursor"
           />
           <div v-if="node.sourceImageUrl && !hasConnectedImageInput" class="mask-stage-actions">
-            <NodeActionButton variant="stage-ghost" @click="emit('clear-image')">清空</NodeActionButton>
+            <NodeActionButton variant="stage-ghost" @click="emit('clear-image')"
+              >清空</NodeActionButton
+            >
           </div>
         </template>
         <div v-else class="mask-stage-empty" @click="emit('open-file-picker')">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
@@ -64,9 +80,18 @@
           title="Brush"
           @click="emit('set-draw-mode', 'paint')"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
-            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.9"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 19l7-7 3 3-7 7-3-3z" />
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
           </svg>
         </NodeIconButton>
         <NodeIconButton
@@ -74,9 +99,20 @@
           title="Eraser"
           @click="emit('set-draw-mode', 'erase')"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/>
-            <path d="M22 21H7"/>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.9"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"
+            />
+            <path d="M22 21H7" />
           </svg>
         </NodeIconButton>
         <input
@@ -86,7 +122,12 @@
           type="range"
           min="4"
           max="48"
-          @input="emit('update:brush-size', toNumber(($event.target as HTMLInputElement).value, node.brushSize))"
+          @input="
+            emit(
+              'update:brush-size',
+              toNumber(($event.target as HTMLInputElement).value, node.brushSize),
+            )
+          "
         />
       </div>
 
@@ -99,16 +140,19 @@
           type="range"
           min="-100"
           max="100"
-          @input="emit('update:refine-amount', toNumber(($event.target as HTMLInputElement).value, node.refineAmount))"
+          @input="
+            emit(
+              'update:refine-amount',
+              toNumber(($event.target as HTMLInputElement).value, node.refineAmount),
+            )
+          "
         />
-        <NodeActionButton
-          variant="tool"
-          :active="node.invertMask"
-          @click="emit('toggle-invert')"
-        >
+        <NodeActionButton variant="tool" :active="node.invertMask" @click="emit('toggle-invert')">
           Invert
         </NodeActionButton>
-        <NodeActionButton variant="tool" push-right @click="emit('clear-mask')">Clear</NodeActionButton>
+        <NodeActionButton variant="tool" push-right @click="emit('clear-mask')"
+          >Clear</NodeActionButton
+        >
       </div>
 
       <div
@@ -138,7 +182,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -146,7 +189,6 @@
 import type { ComponentPublicInstance } from 'vue'
 import type { MaskNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
-
 
 import { toNumber } from './numberUtils'
 import { useCanvasNodeStyle } from './useCanvasNodeStyle'
@@ -228,7 +270,6 @@ function clampBrushSize(value: number): number {
   return Math.max(BRUSH_SIZE_MIN, Math.min(BRUSH_SIZE_MAX, Math.round(value)))
 }
 
-
 function updateBrushSize(value: number) {
   emit('update:brush-size', clampBrushSize(value))
 }
@@ -244,9 +285,7 @@ function onCanvasRef(el: Element | ComponentPublicInstance | null) {
 }
 
 function syncMaskCursor(event: MouseEvent) {
-  const canvas = event.currentTarget instanceof HTMLCanvasElement
-    ? event.currentTarget
-    : null
+  const canvas = event.currentTarget instanceof HTMLCanvasElement ? event.currentTarget : null
 
   if (!canvas) return
 
@@ -304,15 +343,9 @@ function onGlobalKeyDown(event: KeyboardEvent) {
   if (!paintPopupOpen.value && !maskCursor.visible) return
   if (isTextEditableTarget(event.target)) return
 
-  const isBrushShortcut =
-    event.key === 'b' ||
-    event.key === 'B' ||
-    event.code === 'KeyB'
+  const isBrushShortcut = event.key === 'b' || event.key === 'B' || event.code === 'KeyB'
 
-  const isEraserShortcut =
-    event.key === 'e' ||
-    event.key === 'E' ||
-    event.code === 'KeyE'
+  const isEraserShortcut = event.key === 'e' || event.key === 'E' || event.code === 'KeyE'
 
   if (isBrushShortcut || isEraserShortcut) {
     event.preventDefault()
@@ -320,15 +353,9 @@ function onGlobalKeyDown(event: KeyboardEvent) {
     return
   }
 
-  const isDecrease =
-    event.key === '[' ||
-    event.key === '【' ||
-    event.code === 'BracketLeft'
+  const isDecrease = event.key === '[' || event.key === '【' || event.code === 'BracketLeft'
 
-  const isIncrease =
-    event.key === ']' ||
-    event.key === '】' ||
-    event.code === 'BracketRight'
+  const isIncrease = event.key === ']' || event.key === '】' || event.code === 'BracketRight'
 
   if (!isDecrease && !isIncrease) return
 
@@ -416,5 +443,4 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 80px;
 }
-
 </style>

@@ -14,7 +14,10 @@ export function getApiList<T>(response: ListResponse<T> | null | undefined): T[]
 
 export function splitCommaValues(input: string | null | undefined): string[] {
   if (!input) return []
-  return input.split(',').map(item => item.trim()).filter(Boolean)
+  return input
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 /**

@@ -1,7 +1,12 @@
 <template>
   <article class="board-card board-item" @click="emit('click-board')">
     <div class="board-preview">
-      <img v-if="previewSnapshotDataUrl" :src="previewSnapshotDataUrl" class="board-preview-image" alt="" />
+      <img
+        v-if="previewSnapshotDataUrl"
+        :src="previewSnapshotDataUrl"
+        class="board-preview-image"
+        alt=""
+      />
       <div v-else class="preview-avatar">{{ board.name.slice(0, 1).toUpperCase() }}</div>
       <div class="board-preview-fade"></div>
     </div>
@@ -37,11 +42,7 @@
           <circle cx="12" cy="19" r="1.8" fill="currentColor" />
         </svg>
       </button>
-      <div
-        v-if="isMenuOpen"
-        class="board-action-menu"
-        @click.stop
-      >
+      <div v-if="isMenuOpen" class="board-action-menu" @click.stop>
         <button type="button" class="board-action-item" @click.stop="emit('rename-action')">
           Rename
         </button>

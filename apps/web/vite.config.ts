@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
@@ -7,6 +8,7 @@ import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     vue(),
     AutoImport({
       imports: [
@@ -37,16 +39,16 @@ export default defineConfig({
     proxy: {
       '/api/auth': {
         target: 'http://localhost:6001',
-        changeOrigin: true
+        changeOrigin: true,
       },
       '/api': {
         target: 'http://localhost:6000',
-        changeOrigin: true
+        changeOrigin: true,
       },
       '/uploads': {
         target: 'http://localhost:6000',
-        changeOrigin: true
-      }
-    }
-  }
+        changeOrigin: true,
+      },
+    },
+  },
 })

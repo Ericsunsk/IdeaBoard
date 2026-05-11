@@ -1,4 +1,8 @@
-import { collectCanvasBoardImageUrls, getCanvasBoardState, isImageUrlReferencedInOtherCanvasBoardStates } from '../../boards/lib/canvasBoardState'
+import {
+  collectCanvasBoardImageUrls,
+  getCanvasBoardState,
+  isImageUrlReferencedInOtherCanvasBoardStates,
+} from '../../boards/lib/canvasBoardState'
 import { uploadApi } from '../../../shared/api/upload'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from './flowMediaIO'
@@ -28,7 +32,10 @@ function parsePathname(raw: string): string | null {
 }
 
 function encodePathSegment(segment: string): string {
-  return encodeURIComponent(segment).replace(/[!'()*]/g, ch => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`)
+  return encodeURIComponent(segment).replace(
+    /[!'()*]/g,
+    (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
 }
 
 function pathSegmentMatches(segment: string, expected: string): boolean {
@@ -52,11 +59,6 @@ function isBoardWorkspaceUploadPath(path: string, userUid: string, boardId: stri
   }
   return false
 }
-
-
-
-
-
 
 function appendOutputImageRefs(
   refs: StableRef[],
@@ -142,7 +144,9 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
     if (!blob.size) {
       throw new Error('下载图片失败：响应为空')
     }
-    const file = new File([blob], filenameFromImageUrl(raw, blob.type || 'image/jpeg'), { type: blob.type || 'image/jpeg' })
+    const file = new File([blob], filenameFromImageUrl(raw, blob.type || 'image/jpeg'), {
+      type: blob.type || 'image/jpeg',
+    })
     const uploadRes = await uploadApi.upload(file, normalizedBoardId)
     if (uploadRes.code !== 0 || !uploadRes.data?.url) {
       throw new Error(uploadRes.msg || '上传图片失败')
@@ -163,14 +167,18 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
         }
         return await dataUrlResponse.blob()
       } catch (error) {
-        throw new Error(`读取 mask 失败：${error instanceof Error ? error.message : '未知错误'}`, { cause: error })
+        throw new Error(`读取 mask 失败：${error instanceof Error ? error.message : '未知错误'}`, {
+          cause: error,
+        })
       }
     }
     let response: Response
     try {
       response = await fetch(resolveFetchUrl(raw), { credentials: 'include' })
     } catch (error) {
-      throw new Error(`下载图片失败：${error instanceof Error ? error.message : '网络异常'}`, { cause: error })
+      throw new Error(`下载图片失败：${error instanceof Error ? error.message : '网络异常'}`, {
+        cause: error,
+      })
     }
     if (!response.ok) {
       throw new Error(`下载图片失败：HTTP ${response.status}`)
@@ -219,7 +227,9 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
     }
   }
 
-  async function stabilizeSnapshotForSave(snapshot: CanvasBoardSnapshot): Promise<CanvasBoardSnapshot> {
+  async function stabilizeSnapshotForSave(
+    snapshot: CanvasBoardSnapshot,
+  ): Promise<CanvasBoardSnapshot> {
     const next = JSON.parse(JSON.stringify(snapshot)) as CanvasBoardSnapshot
     for (const node of next.maskNodes) {
       const executionMaskDataUrl = `${node.executionMaskDataUrl ?? ''}`.trim()
@@ -282,7 +292,9 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
       recycleTargets.push(recyclable)
     })
     if (!recycleTargets.length) return
-    const results = await Promise.allSettled(recycleTargets.map(url => uploadApi.recycle(url, normalizedBoardId)))
+    const results = await Promise.allSettled(
+      recycleTargets.map((url) => uploadApi.recycle(url, normalizedBoardId)),
+    )
     const failed = results.filter((item) => {
       if (item.status === 'rejected') return true
       const code = item.value?.code

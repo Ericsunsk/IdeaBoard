@@ -77,7 +77,7 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
   function getSpectrumElement() {
     const raw = spectrumRef.value
     if (!raw) return null
-    return Array.isArray(raw) ? (raw[0] || null) : raw
+    return Array.isArray(raw) ? raw[0] || null : raw
   }
 
   function updateColorFromSpectrumClient(clientX: number, clientY: number) {
@@ -144,8 +144,7 @@ export function useColorPickerState(options: UseColorPickerStateOptions = {}) {
   }
 
   const spectrumStyle = computed(() => ({
-    background:
-      `linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, hsl(${hue.value}, 100%, 50%))`,
+    background: `linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, hsl(${hue.value}, 100%, 50%))`,
   }))
 
   const cursorStyle = computed(() => ({

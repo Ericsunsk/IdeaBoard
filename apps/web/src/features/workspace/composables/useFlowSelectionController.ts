@@ -17,8 +17,12 @@ type UseFlowSelectionControllerOptions = {
 export function useFlowSelectionController(options: UseFlowSelectionControllerOptions) {
   function getSelectedElements(): Elements {
     return [
-      ...(options.nodes.value as Array<Node & { selected?: boolean }>).filter(node => !!node.selected),
-      ...(options.edges.value as Array<Edge & { selected?: boolean }>).filter(edge => !!edge.selected),
+      ...(options.nodes.value as Array<Node & { selected?: boolean }>).filter(
+        (node) => !!node.selected,
+      ),
+      ...(options.edges.value as Array<Edge & { selected?: boolean }>).filter(
+        (edge) => !!edge.selected,
+      ),
     ]
   }
 
@@ -30,7 +34,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
   }
 
   function selectFlowNodeForContextMenu(nodeId: string): boolean {
-    const targetNode = options.nodes.value.find(node => node.id === nodeId)
+    const targetNode = options.nodes.value.find((node) => node.id === nodeId)
     if (!targetNode) return false
     const selectedElements = getSelectedElements()
     const hasChanged = selectedElements.length !== 1 || selectedElements[0]?.id !== nodeId

@@ -1,6 +1,4 @@
-export type CanvasInteractionKey =
-  | 'mask-painting'
-  | 'message-resize'
+export type CanvasInteractionKey = 'mask-painting' | 'message-resize'
 
 export function useFlowCanvasInteractionState() {
   const isMaskPainting = ref(false)

@@ -26,7 +26,14 @@
     </div>
 
     <!-- ========== 顶部导航 ========== -->
-    <header v-if="!['/user/home', '/user/boards', '/user/picture', '/user', '/user/center'].includes(route.path)" class="top-header">
+    <header
+      v-if="
+        !['/user/home', '/user/boards', '/user/picture', '/user', '/user/center'].includes(
+          route.path,
+        )
+      "
+      class="top-header"
+    >
       <n-menu
         v-model:value="activeKey"
         mode="horizontal"
@@ -57,7 +64,9 @@ const userStore = useUserStore()
 const activeKey = ref<string>('free')
 const stopImpersonatingLoading = ref(false)
 const authSession = authClient.useSession()
-const isImpersonating = computed(() => Boolean((authSession.value?.data as any)?.session?.impersonatedBy))
+const isImpersonating = computed(() =>
+  Boolean((authSession.value?.data as any)?.session?.impersonatedBy),
+)
 
 const menuOptions: MenuOption[] = [
   {
@@ -74,14 +83,12 @@ const menuOptions: MenuOption[] = [
     children: [
       { label: '局部改款', key: 'partial-edit' },
       { label: '定向换色', key: 'directed-recolor' },
-    ]
+    ],
   },
   {
     label: '图案工作室',
     key: 'pattern-studio',
-    children: [
-      { label: '图案生成', key: 'pattern-gen' },
-    ]
+    children: [{ label: '图案生成', key: 'pattern-gen' }],
   },
   {
     label: 'AI 工具箱',
@@ -89,14 +96,12 @@ const menuOptions: MenuOption[] = [
     children: [
       { label: '高清放大', key: 'hd-upscale' },
       { label: '画布延伸', key: 'canvas-extend' },
-    ]
+    ],
   },
   {
     label: '我的',
     key: 'mine',
-    children: [
-      { label: '我的作品', key: 'my-works' },
-    ]
+    children: [{ label: '我的作品', key: 'my-works' }],
   },
 ]
 
@@ -152,7 +157,7 @@ watch(
       if (match) activeKey.value = match[1]
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 </script>
 
@@ -175,7 +180,10 @@ watch(
   flex-shrink: 0;
   position: relative;
   z-index: 50;
-  transition: background-color 0.3s, border-color 0.3s, transform 0.3s ease;
+  transition:
+    background-color 0.3s,
+    border-color 0.3s,
+    transform 0.3s ease;
 }
 
 .impersonation-banner {

@@ -108,7 +108,7 @@ export const vendorPresetCatalog: VendorPreset[] = [
 
 export function buildVendorPresets(
   _providerMap: ProviderMetaMap,
-  creatableProviders: StorageProviderMeta[]
+  creatableProviders: StorageProviderMeta[],
 ): VendorPresetOption[] {
   return vendorPresetCatalog.map((vendor) => {
     const supported = creatableProviders.some((provider) => provider.provider === vendor.provider)

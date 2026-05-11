@@ -16,8 +16,8 @@ export const GENERATE_COUNT_OPTIONS = [1, 2, 4] as const
 export const GENERATE_QUALITY_OPTIONS = ['1k', '2k', '4k'] as const
 export const PATTERN_GENERATE_RATIO_OPTIONS = ['1:1', '3:4', '4:3', '9:16', '16:9'] as const
 
-export type GenerateQualityOption = typeof GENERATE_QUALITY_OPTIONS[number]
-export type PatternGenerateRatioOption = typeof PATTERN_GENERATE_RATIO_OPTIONS[number]
+export type GenerateQualityOption = (typeof GENERATE_QUALITY_OPTIONS)[number]
+export type PatternGenerateRatioOption = (typeof PATTERN_GENERATE_RATIO_OPTIONS)[number]
 
 export const ENHANCE_MODE_OPTIONS: OptionItem<EnhanceNodeItem['mode']>[] = [
   { label: 'HD', value: 'hd-upscale' },
@@ -74,7 +74,8 @@ export function describeModelAngleYaw(yaw: number): string {
 }
 
 export function describeModelAngleSpec(spec: Pick<ModelAngleSpec, 'yaw' | 'framing'>): string {
-  const framingLabel = MODEL_ANGLE_FRAMING_OPTIONS.find(option => option.key === spec.framing)?.label || spec.framing
+  const framingLabel =
+    MODEL_ANGLE_FRAMING_OPTIONS.find((option) => option.key === spec.framing)?.label || spec.framing
   return `${describeModelAngleYaw(spec.yaw)} · ${framingLabel}`
 }
 
@@ -105,7 +106,9 @@ export const VIEWPOINT_OPTIONS_BY_CATEGORY: Record<ViewpointCategory, ViewpointO
   ],
 }
 
-const VIEWPOINT_LABEL_MAP = Object.values(VIEWPOINT_OPTIONS_BY_CATEGORY).reduce<Record<string, string>>((acc, options) => {
+const VIEWPOINT_LABEL_MAP = Object.values(VIEWPOINT_OPTIONS_BY_CATEGORY).reduce<
+  Record<string, string>
+>((acc, options) => {
   options.forEach((option) => {
     acc[option.key] = option.label
   })
@@ -121,7 +124,7 @@ export function normalizeViewpointSelectionByCategory(
   selectedViewpoint: string,
 ): string {
   const options = VIEWPOINT_OPTIONS_BY_CATEGORY[category] ?? []
-  return options.some(option => option.key === selectedViewpoint) ? selectedViewpoint : ''
+  return options.some((option) => option.key === selectedViewpoint) ? selectedViewpoint : ''
 }
 
 export const VIEWPOINT_LIGHTING_OPTIONS: OptionItem<ViewpointNodeItem['lighting']>[] = [

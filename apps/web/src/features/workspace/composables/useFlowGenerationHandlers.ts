@@ -1,12 +1,18 @@
 import { ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { executeFlowEnhanceNode, validateFlowEnhanceNodeInputs } from '../services/flowEnhanceExecutor'
+import {
+  executeFlowEnhanceNode,
+  validateFlowEnhanceNodeInputs,
+} from '../services/flowEnhanceExecutor'
 import { executeFlowColorNode, validateFlowColorNodeInputs } from '../services/flowColorExecutor'
 import { executeFlowEditNode, validateFlowEditNodeInputs } from '../services/flowEditExecutor'
 import { executeFlowFusionNode, validateFlowFusionNodeInputs } from '../services/flowFusionExecutor'
 import { executeFlowWearNode, validateFlowWearNodeInputs } from '../services/flowWearExecutor'
 import { executeFlowModelNode, validateFlowModelNodeInputs } from '../services/flowModelExecutor'
-import { executeFlowViewpointNode, validateFlowViewpointNodeInputs } from '../services/flowViewpointExecutor'
+import {
+  executeFlowViewpointNode,
+  validateFlowViewpointNodeInputs,
+} from '../services/flowViewpointExecutor'
 import type {
   CanvasExecutionOutputNodeType,
   ColorNodeItem,
@@ -19,7 +25,12 @@ import type {
 } from '../types/canvasNodes'
 
 type FlowRuntimeNode = { id: string; data?: { kind?: string; snapshotNode?: unknown } }
-type FlowRuntimeEdge = { source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }
+type FlowRuntimeEdge = {
+  source: string
+  sourceHandle?: string | null
+  target: string
+  targetHandle?: string | null
+}
 type FlowHistorySnapshot = { nodes: unknown[]; edges: unknown[] }
 type SnapshotNodeRecord = Record<string, unknown>
 type UpdateSnapshotNodeOptions = {
@@ -45,7 +56,9 @@ type UseFlowGenerationHandlersOptions = {
   onOutputCommitted?: (nodeId: string) => void
 }
 
-export function loadImageSizeFromUrl(url: string): Promise<{ width: number; height: number } | null> {
+export function loadImageSizeFromUrl(
+  url: string,
+): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
@@ -69,7 +82,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
   const runningModelNodeIds = ref(new Set<string>())
   const runningViewpointNodeIds = ref(new Set<string>())
 
-  function isFlowExecutionNodeRunning(nodeType: CanvasExecutionOutputNodeType, nodeId: string): boolean {
+  function isFlowExecutionNodeRunning(
+    nodeType: CanvasExecutionOutputNodeType,
+    nodeId: string,
+  ): boolean {
     switch (nodeType) {
       case 'enhance':
         return runningEnhanceNodeIds.value.has(nodeId)
@@ -113,7 +129,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       options.onWarning(config.runningMessage)
       return
     }
-    const target = options.nodes.value.find(item => item.id === nodeId)
+    const target = options.nodes.value.find((item) => item.id === nodeId)
     if (!target?.data?.snapshotNode || typeof target.data.snapshotNode !== 'object') {
       options.onWarning(config.missingNodeMessage)
       return
@@ -121,7 +137,9 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
 
     const snapshot = target.data.snapshotNode as Record<string, unknown>
     const prevOutputStatus = (snapshot.outputStatus as string | undefined) ?? 'idle'
-    const prevOutputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages as Array<{ url: string }> : []
+    const prevOutputImages = Array.isArray(snapshot.outputImages)
+      ? (snapshot.outputImages as Array<{ url: string }>)
+      : []
     const context = config.buildContext(target as { data: { snapshotNode: unknown } }, nodeId)
     const opts = config.buildOptions()
     const validationError = config.validate(context, opts)
@@ -136,19 +154,30 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       setNodeOutputStaleSilently(nodeId)
       const { urls } = await config.execute(context, opts)
       const outputImages = buildOutputImagesWithRatio(nodeId, urls)
-      commitNodeOutputWithHistory(nodeId, prev => ({
-        ...prev,
-        outputImages,
-        outputStatus: 'ready',
-      }), beforeGenerate)
+      commitNodeOutputWithHistory(
+        nodeId,
+        (prev) => ({
+          ...prev,
+          outputImages,
+          outputStatus: 'ready',
+        }),
+        beforeGenerate,
+      )
       options.onSuccess(config.successMessage)
     } catch (error) {
       const msg = error instanceof Error ? error.message : config.failureMessage
       options.onWarning(msg)
-      rollbackNodeOutputSilently(nodeId, prev => ({
+      rollbackNodeOutputSilently(nodeId, (prev) => ({
         ...prev,
-        outputStatus: prevOutputStatus ?? (Array.isArray(prev.outputImages) && prev.outputImages.length > 0 ? 'ready' : 'idle'),
-        outputImages: config.preserveOutputImagesOnFailure && prevOutputImages.length > 0 ? prevOutputImages : (Array.isArray(prev.outputImages) ? prev.outputImages : []),
+        outputStatus:
+          prevOutputStatus ??
+          (Array.isArray(prev.outputImages) && prev.outputImages.length > 0 ? 'ready' : 'idle'),
+        outputImages:
+          config.preserveOutputImagesOnFailure && prevOutputImages.length > 0
+            ? prevOutputImages
+            : Array.isArray(prev.outputImages)
+              ? prev.outputImages
+              : [],
       }))
       options.onError(config.errorMessage)
     } finally {
@@ -161,36 +190,49 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
   }
 
   function setNodeOutputStaleSilently(nodeId: string) {
-    options.updateSnapshotNode(nodeId, prev => ({ ...prev, outputStatus: 'stale' }), { history: false })
+    options.updateSnapshotNode(nodeId, (prev) => ({ ...prev, outputStatus: 'stale' }), {
+      history: false,
+    })
   }
 
-  function buildOutputImagesWithRatio(nodeId: string, urls: string[]): Array<{ url: string; ratio: number }> {
-    const initial = urls.map(url => ({ url, ratio: 1 }))
-    Promise.all(urls.map(async (url) => {
-      const size = await loadImageSizeFromUrl(url)
-      if (size && size.width > 0 && size.height > 0) {
-        return size.height / size.width
-      }
-      return 1
-    })).then((ratios) => {
-      const nextImages = urls.map((url, i) => ({ url, ratio: ratios[i] ?? 1 }))
-      options.updateSnapshotNode(nodeId, (prev) => {
-        const currentOutputImages = Array.isArray(prev.outputImages)
-          ? prev.outputImages as Array<{ url?: unknown }>
-          : []
-        const currentUrls = currentOutputImages.map(item => String(item?.url ?? ''))
-        if (
-          currentUrls.length !== urls.length
-          || currentUrls.some((url, index) => url !== urls[index])
-        ) {
-          return prev
+  function buildOutputImagesWithRatio(
+    nodeId: string,
+    urls: string[],
+  ): Array<{ url: string; ratio: number }> {
+    const initial = urls.map((url) => ({ url, ratio: 1 }))
+    Promise.all(
+      urls.map(async (url) => {
+        const size = await loadImageSizeFromUrl(url)
+        if (size && size.width > 0 && size.height > 0) {
+          return size.height / size.width
         }
-        return {
-          ...prev,
-          outputImages: nextImages,
-        }
-      }, { history: false, dirty: true })
-    }).catch(() => {})
+        return 1
+      }),
+    )
+      .then((ratios) => {
+        const nextImages = urls.map((url, i) => ({ url, ratio: ratios[i] ?? 1 }))
+        options.updateSnapshotNode(
+          nodeId,
+          (prev) => {
+            const currentOutputImages = Array.isArray(prev.outputImages)
+              ? (prev.outputImages as Array<{ url?: unknown }>)
+              : []
+            const currentUrls = currentOutputImages.map((item) => String(item?.url ?? ''))
+            if (
+              currentUrls.length !== urls.length ||
+              currentUrls.some((url, index) => url !== urls[index])
+            ) {
+              return prev
+            }
+            return {
+              ...prev,
+              outputImages: nextImages,
+            }
+          },
+          { history: false, dirty: true },
+        )
+      })
+      .catch(() => {})
     return initial
   }
 
@@ -210,7 +252,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     options.updateSnapshotNode(nodeId, patcher, { history: false })
   }
 
-
   async function onFlowEnhanceGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'enhance',
@@ -220,7 +261,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       successMessage: 'Enhance 生成完成',
       failureMessage: 'Enhance 生成失败',
       errorMessage: 'Enhance 生成失败',
-      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as EnhanceNodeItem }),
+      buildContext: (target, nodeId) => ({
+        nodeId,
+        snapshotNode: target.data.snapshotNode as EnhanceNodeItem,
+      }),
       buildOptions: () => ({
         nodes: options.nodes.value as FlowRuntimeNode[],
         edges: options.edges.value as FlowRuntimeEdge[],
@@ -232,7 +276,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-
   async function onFlowEditGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'edit',
@@ -242,7 +285,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       successMessage: 'Edit 生成完成',
       failureMessage: 'Edit 生成失败',
       errorMessage: 'Edit 生成失败',
-      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as EditNodeItem }),
+      buildContext: (target, nodeId) => ({
+        nodeId,
+        snapshotNode: target.data.snapshotNode as EditNodeItem,
+      }),
       buildOptions: () => ({
         nodes: options.nodes.value as FlowRuntimeNode[],
         edges: options.edges.value as FlowRuntimeEdge[],
@@ -254,7 +300,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-
   async function onFlowColorGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'color',
@@ -264,7 +309,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       successMessage: 'Color 生成完成',
       failureMessage: 'Color 生成失败',
       errorMessage: 'Color 生成失败',
-      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as ColorNodeItem }),
+      buildContext: (target, nodeId) => ({
+        nodeId,
+        snapshotNode: target.data.snapshotNode as ColorNodeItem,
+      }),
       buildOptions: () => ({
         nodes: options.nodes.value as FlowRuntimeNode[],
         edges: options.edges.value as FlowRuntimeEdge[],
@@ -276,7 +324,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-
   async function onFlowFusionGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'fusion',
@@ -286,7 +333,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       successMessage: 'Fusion 生成完成',
       failureMessage: 'Fusion 生成失败',
       errorMessage: 'Fusion 生成失败',
-      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as FusionNodeItem }),
+      buildContext: (target, nodeId) => ({
+        nodeId,
+        snapshotNode: target.data.snapshotNode as FusionNodeItem,
+      }),
       buildOptions: () => ({
         nodes: options.nodes.value as FlowRuntimeNode[],
         edges: options.edges.value as FlowRuntimeEdge[],
@@ -298,7 +348,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-
   async function onFlowWearGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'wear',
@@ -309,7 +358,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       failureMessage: 'Wear 生成失败',
       errorMessage: 'Wear 生成失败',
       preserveOutputImagesOnFailure: true,
-      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as WearNodeItem }),
+      buildContext: (target, nodeId) => ({
+        nodeId,
+        snapshotNode: target.data.snapshotNode as WearNodeItem,
+      }),
       buildOptions: () => ({
         nodes: options.nodes.value as FlowRuntimeNode[],
         edges: options.edges.value as FlowRuntimeEdge[],
@@ -321,7 +373,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-
   async function onFlowModelGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'model',
@@ -332,7 +383,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       failureMessage: 'Model 生成失败',
       errorMessage: 'Model 生成失败',
       preserveOutputImagesOnFailure: true,
-      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as ModelNodeItem }),
+      buildContext: (target, nodeId) => ({
+        nodeId,
+        snapshotNode: target.data.snapshotNode as ModelNodeItem,
+      }),
       buildOptions: () => ({
         nodes: options.nodes.value as FlowRuntimeNode[],
         edges: options.edges.value as FlowRuntimeEdge[],
@@ -344,7 +398,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-
   async function onFlowViewpointGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'viewpoint',
@@ -355,7 +408,10 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       failureMessage: 'Viewpoint 生成失败',
       errorMessage: 'Viewpoint 生成失败',
       preserveOutputImagesOnFailure: true,
-      buildContext: (target, nodeId) => ({ nodeId, snapshotNode: target.data.snapshotNode as ViewpointNodeItem }),
+      buildContext: (target, nodeId) => ({
+        nodeId,
+        snapshotNode: target.data.snapshotNode as ViewpointNodeItem,
+      }),
       buildOptions: () => ({
         nodes: options.nodes.value as FlowRuntimeNode[],
         edges: options.edges.value as FlowRuntimeEdge[],

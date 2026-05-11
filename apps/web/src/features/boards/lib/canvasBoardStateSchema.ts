@@ -75,7 +75,9 @@ const modelNodeItemSchema = z.object({
     yaw: finiteNumberSchema.min(MODEL_ANGLE_YAW_MIN).max(MODEL_ANGLE_YAW_MAX),
     framing: z.enum(['full', 'half', 'portrait']),
   }),
-  modelStrength: finiteNumberSchema.min(MODEL_REFERENCE_STRENGTH_MIN).max(MODEL_REFERENCE_STRENGTH_MAX),
+  modelStrength: finiteNumberSchema
+    .min(MODEL_REFERENCE_STRENGTH_MIN)
+    .max(MODEL_REFERENCE_STRENGTH_MAX),
   poseStrength: finiteNumberSchema.min(MODEL_POSE_STRENGTH_MIN).max(MODEL_POSE_STRENGTH_MAX),
   background: z.string(),
   outputStatus: workflowNodeOutputStatusSchema,

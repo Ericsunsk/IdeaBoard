@@ -17,8 +17,10 @@ export function extractBetterAuthErrorMessage(error: any, fallback: string) {
   if (!error) return fallback
   if (typeof error.message === 'string' && error.message.trim()) return error.message
   if (typeof error.statusText === 'string' && error.statusText.trim()) return error.statusText
-  if (typeof error.error?.message === 'string' && error.error.message.trim()) return error.error.message
-  if (typeof error.data?.message === 'string' && error.data.message.trim()) return error.data.message
+  if (typeof error.error?.message === 'string' && error.error.message.trim())
+    return error.error.message
+  if (typeof error.data?.message === 'string' && error.data.message.trim())
+    return error.data.message
   if (typeof error.data?.msg === 'string' && error.data.msg.trim()) return error.data.msg
   return fallback
 }

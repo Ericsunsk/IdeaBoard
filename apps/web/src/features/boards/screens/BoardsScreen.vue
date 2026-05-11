@@ -14,9 +14,17 @@
       <p class="page-subtitle">Explore, expand, and refine your ideas</p>
 
       <section class="boards-toolbar">
-        <button class="create-btn" type="button" @click="createAndOpenBoard">+ Create New Project</button>
+        <button class="create-btn" type="button" @click="createAndOpenBoard">
+          + Create New Project
+        </button>
         <label class="search-wrap">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            class="search-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="11" cy="11" r="7"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
@@ -59,9 +67,7 @@
         />
       </section>
 
-      <p v-if="visibleBoards.length === 0 && searchKeyword" class="empty-tip">
-        No matching canvas
-      </p>
+      <p v-if="visibleBoards.length === 0 && searchKeyword" class="empty-tip">No matching canvas</p>
     </main>
   </div>
 </template>
@@ -176,11 +182,7 @@ async function refreshBoardPreviewInBackground(boardId: string) {
     enqueueBoardPreviewRefresh(boardId)
     return
   }
-  const updatedState = setCanvasBoardPreviewSnapshot(
-    boardId,
-    snapshotDataUrl,
-    snapshotUpdatedAt,
-  )
+  const updatedState = setCanvasBoardPreviewSnapshot(boardId, snapshotDataUrl, snapshotUpdatedAt)
   if (!updatedState) return
   boardPreviewMap.value = {
     ...boardPreviewMap.value,
@@ -256,7 +258,10 @@ function isNotFoundError(error: unknown): boolean {
   const code = 'code' in error ? (error as { code?: unknown }).code : undefined
   if (code === 404) return true
   const msg = 'msg' in error ? (error as { msg?: unknown }).msg : undefined
-  if (typeof msg === 'string' && (msg.includes('画布不存在') || msg.toLowerCase().includes('not found'))) {
+  if (
+    typeof msg === 'string' &&
+    (msg.includes('画布不存在') || msg.toLowerCase().includes('not found'))
+  ) {
     return true
   }
   return false
@@ -446,8 +451,12 @@ onUnmounted(() => {
   background:
     radial-gradient(55% 35% at 45% 45%, rgba(150, 120, 230, 0.24) 0%, rgba(150, 120, 230, 0) 100%),
     radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size: 100% 100%, 24px 24px;
-  background-position: center center, center center;
+  background-size:
+    100% 100%,
+    24px 24px;
+  background-position:
+    center center,
+    center center;
 }
 
 .boards-header {
@@ -590,10 +599,10 @@ onUnmounted(() => {
 
 .create-preview {
   height: 186px;
-  background:
-    radial-gradient(circle, #dfe4ef 1px, transparent 1px),
-    #fbfcff;
-  background-size: 10px 10px, cover;
+  background: radial-gradient(circle, #dfe4ef 1px, transparent 1px), #fbfcff;
+  background-size:
+    10px 10px,
+    cover;
   border-bottom: 1px solid #e7ebf3;
   display: flex;
   align-items: center;

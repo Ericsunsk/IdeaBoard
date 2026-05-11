@@ -93,7 +93,7 @@ async function createPreviewObjectUrl(sourceUrl: string, maxSide: number): Promi
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
 
-  const previewBlob = await new Promise<Blob | null>(resolve => {
+  const previewBlob = await new Promise<Blob | null>((resolve) => {
     canvas.toBlob(resolve, 'image/webp', 0.82)
   })
 
@@ -110,7 +110,7 @@ async function getOrCreatePreviewUrl(sourceUrl: string, maxSide: number): Promis
   if (inFlight) return inFlight
 
   const task = enqueuePreviewTask(() => createPreviewObjectUrl(sourceUrl, maxSide))
-    .then(previewUrl => {
+    .then((previewUrl) => {
       if (previewUrl) touchCache(cacheKey, previewUrl)
       return previewUrl
     })
@@ -133,7 +133,7 @@ export function useDisplayImagePreview(
 
   watch(
     () => toValue(sourceUrl),
-    currentSource => {
+    (currentSource) => {
       requestToken += 1
       const token = requestToken
       previewUrl.value = null
@@ -147,7 +147,7 @@ export function useDisplayImagePreview(
         return
       }
 
-      void getOrCreatePreviewUrl(currentSource, maxSide).then(generatedPreviewUrl => {
+      void getOrCreatePreviewUrl(currentSource, maxSide).then((generatedPreviewUrl) => {
         if (token !== requestToken) return
         previewUrl.value = generatedPreviewUrl
       })

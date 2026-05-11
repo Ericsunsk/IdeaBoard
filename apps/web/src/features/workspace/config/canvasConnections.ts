@@ -45,8 +45,12 @@ export function isCanvasConnectionAllowed(
   const toNode = lookupNode(to.nodeType, to.nodeId)
   if (!fromNode || !toNode) return false
 
-  const fromPort = getCanvasNodeVisibleOutputPorts(from.nodeType, fromNode).find(port => port.port === from.port)
-  const toPort = getCanvasNodeVisibleInputPorts(to.nodeType, toNode).find(port => port.port === to.port)
+  const fromPort = getCanvasNodeVisibleOutputPorts(from.nodeType, fromNode).find(
+    (port) => port.port === from.port,
+  )
+  const toPort = getCanvasNodeVisibleInputPorts(to.nodeType, toNode).find(
+    (port) => port.port === to.port,
+  )
   if (!fromPort || !toPort) return false
 
   if (from.nodeType === 'prompt') {
@@ -55,10 +59,7 @@ export function isCanvasConnectionAllowed(
 
   if (from.nodeType === 'mask') {
     if (fromPort.kind !== 'mask') return false
-    return (
-      toPort.kind === 'mask' ||
-      (to.nodeType === 'image' && to.port === 'image')
-    )
+    return toPort.kind === 'mask' || (to.nodeType === 'image' && to.port === 'image')
   }
 
   if (from.nodeType === 'image') {

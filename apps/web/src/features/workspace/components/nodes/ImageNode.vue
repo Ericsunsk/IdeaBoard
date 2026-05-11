@@ -13,7 +13,14 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+        >
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <circle cx="8.5" cy="8.5" r="1.5" />
           <path d="M3 14l4-4 5 5 5-5 4 4" />
@@ -31,10 +38,7 @@
         @contextmenu.prevent.stop
       >
         <template v-if="displayImage">
-          <div
-            class="image-node-stage-badge"
-            :class="displayModeClass"
-          >
+          <div class="image-node-stage-badge" :class="displayModeClass">
             {{ displayModeLabel }}
           </div>
           <img
@@ -69,7 +73,15 @@
             <circle cx="12" cy="12" r="8" />
             <path d="M12 8v4l2.5 2.5" />
           </svg>
-          <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <svg
+            v-else
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
@@ -89,11 +101,7 @@
           class="image-preview-popup-stage"
           :style="{ width: `${popupStageWidth}px`, height: `${popupStageHeight}px` }"
         >
-          <img
-            :src="displayImage.url"
-            class="image-node-stage-image preview"
-            draggable="false"
-          />
+          <img :src="displayImage.url" class="image-node-stage-image preview" draggable="false" />
         </div>
       </div>
     </div>
@@ -286,5 +294,4 @@ onBeforeUnmount(() => {
 .image-preview-popup {
   z-index: 28;
 }
-
 </style>

@@ -5,7 +5,12 @@ import type { MaskNodeItem, WearNodeItem } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api/task'
 import { cleanupFlowExecutionMaskAsset, resolveFlowExecutionMaskAsset } from './flowMaskProcessing'
-import { parseHandlePort, resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
+import {
+  parseHandlePort,
+  resolveConnectedInput,
+  resolveSourceImageFromNode,
+  waitTaskResult,
+} from './flowTaskExecutorUtils'
 
 interface FlowWearNodeContext {
   nodeId: string
@@ -14,7 +19,12 @@ interface FlowWearNodeContext {
 
 interface FlowWearExecutorOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
-  edges: Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>
+  edges: Array<{
+    source: string
+    sourceHandle?: string | null
+    target: string
+    targetHandle?: string | null
+  }>
   loadImageSizeFromUrl: (url: string) => Promise<{ width: number; height: number } | null>
   boardId?: string
 }
@@ -44,7 +54,7 @@ export function validateFlowWearNodeInputs(
   if (!imageBUrl) return 'Wear 节点等待上游 Texture 输出'
 
   const hasMaskConnection = options.edges.some(
-    edge => edge.target === context.nodeId && parseHandlePort(edge.targetHandle) === 'mask',
+    (edge) => edge.target === context.nodeId && parseHandlePort(edge.targetHandle) === 'mask',
   )
   if (!hasMaskConnection) return null
 

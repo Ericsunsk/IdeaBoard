@@ -13,7 +13,14 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+        >
           <circle cx="12" cy="6" r="2.5" />
           <path d="M12 9.5v5M8.5 13.5h7M10 20l2-5 2 5" />
         </svg>
@@ -36,7 +43,12 @@
             min="-180"
             max="180"
             step="1"
-            @input="emit('update-angle-yaw', Number(($event.target as HTMLInputElement).value || node.angleSpec.yaw))"
+            @input="
+              emit(
+                'update-angle-yaw',
+                Number(($event.target as HTMLInputElement).value || node.angleSpec.yaw),
+              )
+            "
           />
           <span class="model-angle-anchor">R</span>
         </div>
@@ -79,7 +91,12 @@
           min="0"
           max="100"
           step="1"
-          @input="emit('update-model-strength', Number(($event.target as HTMLInputElement).value || node.modelStrength))"
+          @input="
+            emit(
+              'update-model-strength',
+              Number(($event.target as HTMLInputElement).value || node.modelStrength),
+            )
+          "
         />
       </div>
 
@@ -96,7 +113,12 @@
           min="0"
           max="100"
           step="1"
-          @input="emit('update-pose-strength', Number(($event.target as HTMLInputElement).value || node.poseStrength))"
+          @input="
+            emit(
+              'update-pose-strength',
+              Number(($event.target as HTMLInputElement).value || node.poseStrength),
+            )
+          "
         />
       </div>
 
@@ -107,7 +129,6 @@
         @generate="emit('generate')"
       />
     </div>
-
   </div>
 </template>
 
@@ -159,16 +180,19 @@ const io = computed(() =>
   }),
 )
 const connectionChips = computed(() => io.value.connectionChips)
-const showModelStrength = computed(() => !!(props.uiState?.connection?.connected?.imageA || props.uiState?.connection?.pending?.imageA))
-const showPoseStrength = computed(() => !!(props.uiState?.connection?.connected?.imageB || props.uiState?.connection?.pending?.imageB))
+const showModelStrength = computed(
+  () =>
+    !!(props.uiState?.connection?.connected?.imageA || props.uiState?.connection?.pending?.imageA),
+)
+const showPoseStrength = computed(
+  () =>
+    !!(props.uiState?.connection?.connected?.imageB || props.uiState?.connection?.pending?.imageB),
+)
 const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
-
-
 </script>
 
 <style scoped src="./node-shared.css"></style>
 <style scoped>
-
 .model-node-body {
   gap: 8px;
 }
@@ -217,5 +241,4 @@ const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
 .model-strength-range {
   width: 100%;
 }
-
 </style>

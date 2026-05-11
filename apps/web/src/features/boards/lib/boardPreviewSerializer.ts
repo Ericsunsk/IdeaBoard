@@ -65,7 +65,10 @@ const BOARD_NODE_COLLECTIONS = [
   { key: 'fusionNodes', nodeType: 'fusion' },
   { key: 'enhanceNodes', nodeType: 'enhance' },
   { key: 'wearNodes', nodeType: 'wear' },
-] as const satisfies ReadonlyArray<{ key: keyof CanvasBoardSnapshot; nodeType: CanvasConnectionNodeType }>
+] as const satisfies ReadonlyArray<{
+  key: keyof CanvasBoardSnapshot
+  nodeType: CanvasConnectionNodeType
+}>
 
 const PREVIEW_VIEWPORT_WIDTH = 760
 const PREVIEW_VIEWPORT_HEIGHT = 490
@@ -157,7 +160,10 @@ function getSourcePreview(node: NodeLike): NodeImagePreview | null {
   if (typeof node.sourceImageUrl !== 'string' || !node.sourceImageUrl) return null
   return {
     url: node.sourceImageUrl,
-    ratio: isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0 ? node.sourceImageRatio : 1,
+    ratio:
+      isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0
+        ? node.sourceImageRatio
+        : 1,
   }
 }
 
@@ -165,19 +171,28 @@ function getMaskPreview(node: NodeLike): NodeImagePreview | null {
   if (typeof node.executionMaskDataUrl === 'string' && node.executionMaskDataUrl) {
     return {
       url: node.executionMaskDataUrl,
-      ratio: isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0 ? node.sourceImageRatio : 1,
+      ratio:
+        isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0
+          ? node.sourceImageRatio
+          : 1,
     }
   }
   if (typeof node.maskDataUrl === 'string' && node.maskDataUrl) {
     return {
       url: node.maskDataUrl,
-      ratio: isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0 ? node.sourceImageRatio : 1,
+      ratio:
+        isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0
+          ? node.sourceImageRatio
+          : 1,
     }
   }
   return getSourcePreview(node)
 }
 
-function resolveNodePreview(nodeType: CanvasConnectionNodeType, node: NodeLike): NodeImagePreview | null {
+function resolveNodePreview(
+  nodeType: CanvasConnectionNodeType,
+  node: NodeLike,
+): NodeImagePreview | null {
   if (nodeType === 'mask') return getMaskPreview(node)
   return getLatestOutputPreview(node) ?? getSourcePreview(node)
 }
@@ -189,13 +204,15 @@ function getImageNodeHeight(width: number, ratio: number): number {
 
 function getMaskNodeHeight(width: number, ratio: number, hasSource: boolean): number {
   const stageWidth = Math.max(120, width - 24)
-  const stageHeight = hasSource
-    ? Math.max(112, Math.min(360, Math.round(stageWidth * ratio)))
-    : 172
+  const stageHeight = hasSource ? Math.max(112, Math.min(360, Math.round(stageWidth * ratio))) : 172
   return 46 + stageHeight
 }
 
-function resolveNodeHeight(nodeType: CanvasConnectionNodeType, width: number, node: NodeLike): number {
+function resolveNodeHeight(
+  nodeType: CanvasConnectionNodeType,
+  width: number,
+  node: NodeLike,
+): number {
   if (nodeType === 'image') {
     return getImageNodeHeight(width, resolveNodePreview(nodeType, node)?.ratio ?? 1)
   }
@@ -209,11 +226,16 @@ function resolveNodeHeight(nodeType: CanvasConnectionNodeType, width: number, no
 
 function resolveBounds(frames: readonly BoardPreviewFrame[]): BoardPreviewBounds | null {
   if (!frames.length) return null
-  const minX = Math.min(...frames.map(frame => frame.x))
-  const minY = Math.min(...frames.map(frame => frame.y))
-  const maxX = Math.max(...frames.map(frame => frame.x + frame.width))
-  const maxY = Math.max(...frames.map(frame => frame.y + frame.height))
-  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+  const minX = Math.min(...frames.map((frame) => frame.x))
+  const minY = Math.min(...frames.map((frame) => frame.y))
+  const maxX = Math.max(...frames.map((frame) => frame.x + frame.width))
+  const maxY = Math.max(...frames.map((frame) => frame.y + frame.height))
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(maxX) ||
+    !Number.isFinite(maxY)
+  ) {
     return null
   }
   return {
@@ -229,7 +251,11 @@ function resolveBounds(frames: readonly BoardPreviewFrame[]): BoardPreviewBounds
 function scaleBounds(bounds: BoardPreviewBounds) {
   const availableWidth = PREVIEW_VIEWPORT_WIDTH - PREVIEW_PADDING * 2
   const availableHeight = PREVIEW_VIEWPORT_HEIGHT - PREVIEW_PADDING * 2
-  const scale = clamp(Math.min(availableWidth / bounds.width, availableHeight / bounds.height), 0.08, 2.4)
+  const scale = clamp(
+    Math.min(availableWidth / bounds.width, availableHeight / bounds.height),
+    0.08,
+    2.4,
+  )
   const scaledWidth = bounds.width * scale
   const scaledHeight = bounds.height * scale
   return {
@@ -267,7 +293,7 @@ function collectNodeFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
 
 export function collectBoardPreviewFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
   const imageFrames: BoardPreviewFrame[] = state.messages
-    .filter(item => item.type === 'image' && !!item.url)
+    .filter((item) => item.type === 'image' && !!item.url)
     .map((item) => {
       const width = item.width && item.width > 0 ? item.width : 300
       const ratio = item.height_ratio && item.height_ratio > 0 ? item.height_ratio : 1
@@ -299,14 +325,16 @@ function collectBoardPreviewConnections(
     const fromFrame = frameMap.get(`${connection.fromNodeType}:${connection.fromNodeId}`)
     const toFrame = frameMap.get(`${connection.toNodeType}:${connection.toNodeId}`)
     if (!fromFrame || !toFrame) return []
-    return [{
-      key: `connection-${connection.id}-${index}`,
-      tone: resolveCanvasConnectionTone(connection.fromPort),
-      startX: fromFrame.x + fromFrame.width,
-      startY: fromFrame.y + fromFrame.height / 2,
-      endX: toFrame.x,
-      endY: toFrame.y + toFrame.height / 2,
-    }]
+    return [
+      {
+        key: `connection-${connection.id}-${index}`,
+        tone: resolveCanvasConnectionTone(connection.fromPort),
+        startX: fromFrame.x + fromFrame.width,
+        startY: fromFrame.y + fromFrame.height / 2,
+        endX: toFrame.x,
+        endY: toFrame.y + toFrame.height / 2,
+      },
+    ]
   })
 }
 
@@ -374,8 +402,20 @@ function drawDotBackground(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = PREVIEW_BACKGROUND
   ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
 
-  drawBackdropGlow(ctx, PREVIEW_VIEWPORT_WIDTH * 0.18, PREVIEW_VIEWPORT_HEIGHT * 0.2, 260, PREVIEW_STAGE_GLOW_PRIMARY)
-  drawBackdropGlow(ctx, PREVIEW_VIEWPORT_WIDTH * 0.84, PREVIEW_VIEWPORT_HEIGHT * 0.82, 300, PREVIEW_STAGE_GLOW_SECONDARY)
+  drawBackdropGlow(
+    ctx,
+    PREVIEW_VIEWPORT_WIDTH * 0.18,
+    PREVIEW_VIEWPORT_HEIGHT * 0.2,
+    260,
+    PREVIEW_STAGE_GLOW_PRIMARY,
+  )
+  drawBackdropGlow(
+    ctx,
+    PREVIEW_VIEWPORT_WIDTH * 0.84,
+    PREVIEW_VIEWPORT_HEIGHT * 0.82,
+    300,
+    PREVIEW_STAGE_GLOW_SECONDARY,
+  )
 
   const gradient = ctx.createLinearGradient(0, 0, 0, PREVIEW_VIEWPORT_HEIGHT)
   gradient.addColorStop(0, '#fcfdff')
@@ -393,7 +433,9 @@ function drawDotBackground(ctx: CanvasRenderingContext2D) {
   }
 }
 
-async function loadPreviewImage(url: string): Promise<{ image: HTMLImageElement; revokeUrl?: string } | null> {
+async function loadPreviewImage(
+  url: string,
+): Promise<{ image: HTMLImageElement; revokeUrl?: string } | null> {
   const resolvedUrl = toAbsolutePreviewUrl(url)
   if (!resolvedUrl || typeof Image === 'undefined') return null
   let imageSrc = resolvedUrl
@@ -401,9 +443,12 @@ async function loadPreviewImage(url: string): Promise<{ image: HTMLImageElement;
 
   if (shouldProxyPreviewUrl(resolvedUrl)) {
     try {
-      const response = await fetch(`${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(resolvedUrl)}`, {
-        credentials: 'include',
-      })
+      const response = await fetch(
+        `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(resolvedUrl)}`,
+        {
+          credentials: 'include',
+        },
+      )
       if (!response.ok) return null
       const blob = await response.blob()
       revokeUrl = URL.createObjectURL(blob)
@@ -430,11 +475,7 @@ async function buildPreviewImageMap(frames: readonly BoardPreviewFrame[]): Promi
   revoke: () => void
 }> {
   const uniqueUrls = Array.from(
-    new Set(
-      frames
-        .map(frame => frame.imageUrl?.trim() || '')
-        .filter(Boolean),
-    ),
+    new Set(frames.map((frame) => frame.imageUrl?.trim() || '').filter(Boolean)),
   )
   const revokeUrls: string[] = []
   const imageEntries = await Promise.all(
@@ -453,7 +494,7 @@ async function buildPreviewImageMap(frames: readonly BoardPreviewFrame[]): Promi
   return {
     images: result,
     revoke: () => {
-      revokeUrls.forEach(url => URL.revokeObjectURL(url))
+      revokeUrls.forEach((url) => URL.revokeObjectURL(url))
     },
   }
 }
@@ -466,8 +507,10 @@ function drawImageCover(
   width: number,
   height: number,
 ) {
-  const imageWidth = (image as HTMLImageElement).naturalWidth || (image as HTMLImageElement).width || width
-  const imageHeight = (image as HTMLImageElement).naturalHeight || (image as HTMLImageElement).height || height
+  const imageWidth =
+    (image as HTMLImageElement).naturalWidth || (image as HTMLImageElement).width || width
+  const imageHeight =
+    (image as HTMLImageElement).naturalHeight || (image as HTMLImageElement).height || height
   const scale = Math.max(width / imageWidth, height / imageHeight)
   const drawWidth = imageWidth * scale
   const drawHeight = imageHeight * scale
@@ -522,13 +565,27 @@ function drawNodeImageStage(
   ctx.stroke()
 
   ctx.fillStyle = withAlpha(accent, 0.08)
-  roundedRectPath(ctx, x + 1, y + 1, Math.max(0, width - 2), Math.max(0, stageBarHeight), Math.max(4, stageRadius - 2))
+  roundedRectPath(
+    ctx,
+    x + 1,
+    y + 1,
+    Math.max(0, width - 2),
+    Math.max(0, stageBarHeight),
+    Math.max(4, stageRadius - 2),
+  )
   ctx.fill()
 
   const imageY = y + stageBarHeight + 2
   const imageHeight = Math.max(6, height - stageBarHeight - 3)
   ctx.save()
-  roundedRectPath(ctx, x + 2, imageY, Math.max(0, width - 4), imageHeight, Math.max(4, stageRadius - 3))
+  roundedRectPath(
+    ctx,
+    x + 2,
+    imageY,
+    Math.max(0, width - 4),
+    imageHeight,
+    Math.max(4, stageRadius - 3),
+  )
   ctx.clip()
   drawImageCover(ctx, image, x + 2, imageY, Math.max(0, width - 4), imageHeight)
   ctx.restore()
@@ -577,7 +634,7 @@ function drawFrame(
   const width = frame.width * scale
   const height = frame.height * scale
   const radius = Math.min(22, Math.max(12, width * 0.05))
-  const image = frame.imageUrl ? imageMap.get(frame.imageUrl) ?? null : null
+  const image = frame.imageUrl ? (imageMap.get(frame.imageUrl) ?? null) : null
   const accent = frame.nodeType ? NODE_ACCENT_COLORS[frame.nodeType] : '#7a90bf'
 
   ctx.save()
@@ -598,7 +655,15 @@ function drawFrame(
       ctx.clip()
       drawImageCover(ctx, image, x + inset, y + inset, width - inset * 2, height - inset * 2)
     } else {
-      drawPreviewPlaceholder(ctx, x + inset, y + inset, width - inset * 2, height - inset * 2, 'IMAGE', accent)
+      drawPreviewPlaceholder(
+        ctx,
+        x + inset,
+        y + inset,
+        width - inset * 2,
+        height - inset * 2,
+        'IMAGE',
+        accent,
+      )
     }
   } else {
     ctx.fillStyle = '#ffffff'
@@ -679,7 +744,9 @@ function drawFrame(
   ctx.stroke()
 }
 
-export async function renderBoardPreviewDataUrl(state: CanvasBoardSnapshot | null): Promise<string> {
+export async function renderBoardPreviewDataUrl(
+  state: CanvasBoardSnapshot | null,
+): Promise<string> {
   if (!state) return ''
   const canvas = createPreviewCanvas()
   if (!canvas) return ''
@@ -698,8 +765,8 @@ export async function renderBoardPreviewDataUrl(state: CanvasBoardSnapshot | nul
   const imageAssets = await buildPreviewImageMap(frames)
 
   drawDotBackground(ctx)
-  connections.forEach(connection => drawConnection(ctx, connection, scale, offsetX, offsetY))
-  frames.forEach(frame => drawFrame(ctx, frame, scale, offsetX, offsetY, imageAssets.images))
+  connections.forEach((connection) => drawConnection(ctx, connection, scale, offsetX, offsetY))
+  frames.forEach((frame) => drawFrame(ctx, frame, scale, offsetX, offsetY, imageAssets.images))
 
   try {
     return encodePreviewCanvas(canvas, frames.length > 12)

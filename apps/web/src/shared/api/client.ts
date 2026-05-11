@@ -23,7 +23,10 @@ function toObject(value: unknown): Record<string, unknown> | null {
 
 export function createApiError(payload?: unknown, status?: number): ApiClientError {
   const data = toObject(payload)
-  const message = (typeof data?.msg === 'string' && data.msg) || (typeof data?.message === 'string' && data.message) || '请求失败'
+  const message =
+    (typeof data?.msg === 'string' && data.msg) ||
+    (typeof data?.message === 'string' && data.message) ||
+    '请求失败'
   const error = new Error(message) as ApiClientError
   error.code = (typeof data?.code === 'number' ? data.code : undefined) ?? status
   error.msg = (typeof data?.msg === 'string' && data.msg) || message
@@ -60,11 +63,19 @@ export function apiGet<T>(url: string, config?: AxiosConfig): Promise<ApiRespons
   return api.get<unknown, ApiResponse<T>>(url, config)
 }
 
-export function apiPost<T, D = unknown>(url: string, data?: D, config?: AxiosConfig<D>): Promise<ApiResponse<T>> {
+export function apiPost<T, D = unknown>(
+  url: string,
+  data?: D,
+  config?: AxiosConfig<D>,
+): Promise<ApiResponse<T>> {
   return api.post<unknown, ApiResponse<T>, D>(url, data, config)
 }
 
-export function apiPut<T, D = unknown>(url: string, data?: D, config?: AxiosConfig<D>): Promise<ApiResponse<T>> {
+export function apiPut<T, D = unknown>(
+  url: string,
+  data?: D,
+  config?: AxiosConfig<D>,
+): Promise<ApiResponse<T>> {
   return api.put<unknown, ApiResponse<T>, D>(url, data, config)
 }
 

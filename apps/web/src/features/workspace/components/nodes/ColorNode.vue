@@ -13,9 +13,18 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.1"
+        >
           <circle cx="12" cy="12" r="3.2" />
-          <path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 2.1-.8 2.1-1.8 0-.5-.2-.9-.2-1.4 0-1 .8-1.8 1.8-1.8h.8a3.8 3.8 0 0 0 0-7.6z" />
+          <path
+            d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 2.1-.8 2.1-1.8 0-.5-.2-.9-.2-1.4 0-1 .8-1.8 1.8-1.8h.8a3.8 3.8 0 0 0 0-7.6z"
+          />
         </svg>
       </template>
     </NodeHeader>
@@ -30,7 +39,12 @@
             type="range"
             min="0"
             max="100"
-            @input="emit('strength-input', toNumber(($event.target as HTMLInputElement).value, node.strength))"
+            @input="
+              emit(
+                'strength-input',
+                toNumber(($event.target as HTMLInputElement).value, node.strength),
+              )
+            "
           />
         </div>
 
@@ -89,7 +103,15 @@
               @mousedown.prevent
               @click="addCustomColor"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              >
                 <path d="M12 5v14" />
                 <path d="M5 12h14" />
               </svg>
@@ -101,10 +123,41 @@
               title="吸管取色"
               @click="onEyedropperClick"
             >
-              <svg class="color-eyedropper-icon" viewBox="0 0 242.63 240.1" fill="none" aria-hidden="true">
-                <rect x="94.33" y="57.68" width="124.37" height="55.2" transform="translate(205.65 256.62) rotate(-134.59)" fill="currentColor" />
-                <rect x="67.51" y="38.09" width="55.26" height="215.36" rx="27.63" ry="27.63" transform="translate(58.11 315.87) rotate(-134.59)" stroke="currentColor" stroke-width="21" />
-                <rect x="162.01" y="-10.5" width="55.53" height="125.99" rx="27.77" ry="27.77" transform="translate(285.61 224.51) rotate(-134.59)" fill="currentColor" />
+              <svg
+                class="color-eyedropper-icon"
+                viewBox="0 0 242.63 240.1"
+                fill="none"
+                aria-hidden="true"
+              >
+                <rect
+                  x="94.33"
+                  y="57.68"
+                  width="124.37"
+                  height="55.2"
+                  transform="translate(205.65 256.62) rotate(-134.59)"
+                  fill="currentColor"
+                />
+                <rect
+                  x="67.51"
+                  y="38.09"
+                  width="55.26"
+                  height="215.36"
+                  rx="27.63"
+                  ry="27.63"
+                  transform="translate(58.11 315.87) rotate(-134.59)"
+                  stroke="currentColor"
+                  stroke-width="21"
+                />
+                <rect
+                  x="162.01"
+                  y="-10.5"
+                  width="55.53"
+                  height="125.99"
+                  rx="27.77"
+                  ry="27.77"
+                  transform="translate(285.61 224.51) rotate(-134.59)"
+                  fill="currentColor"
+                />
               </svg>
             </NodeIconButton>
           </div>
@@ -132,8 +185,6 @@
         @generate="emit('generate')"
       />
     </div>
-
-
   </div>
 </template>
 
@@ -239,7 +290,6 @@ async function onEyedropperClick() {
 function setColorHex(value: string) {
   applyCommittedColor(value)
 }
-
 
 function togglePopover() {
   if (isPopoverOpen.value) {

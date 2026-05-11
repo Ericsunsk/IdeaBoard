@@ -8,16 +8,22 @@
           clearable
           class="admin-search-input"
         >
-          <template #prefix><n-icon><SearchOutline /></n-icon></template>
+          <template #prefix
+            ><n-icon><SearchOutline /></n-icon
+          ></template>
         </n-input>
         <n-button secondary class="admin-icon-btn" @click="loadData">
-          <template #icon><n-icon><RefreshOutline /></n-icon></template>
+          <template #icon
+            ><n-icon><RefreshOutline /></n-icon
+          ></template>
         </n-button>
       </div>
       <div class="toolbar-spacer" />
       <div class="toolbar-right">
         <n-button type="primary" @click="openAddChannelModal">
-          <template #icon><n-icon><AddOutline /></n-icon></template>
+          <template #icon
+            ><n-icon><AddOutline /></n-icon
+          ></template>
           新增渠道商
         </n-button>
       </div>
@@ -33,24 +39,23 @@
         :key="channel.id"
         class="channel-card panel-card admin-card-interactive"
       >
-        <AdminCardHeader
-          :title="channel.name"
-          :subtitle="channel.api_url"
-          size="small"
-        >
+        <AdminCardHeader :title="channel.name" :subtitle="channel.api_url" size="small">
           <template #prefix>
             <div class="provider-badge">
               {{ (channel.name || 'CH').substring(0, 2).toUpperCase() }}
             </div>
           </template>
           <template #extra>
-            <AdminChip :label="getChannelStatus(channel)" :variant="getChannelStatusVariant(channel)" />
+            <AdminChip
+              :label="getChannelStatus(channel)"
+              :variant="getChannelStatusVariant(channel)"
+            />
           </template>
         </AdminCardHeader>
 
         <div class="models-shelf">
           <div class="shelf-label">当前生效模型</div>
-          <div class="shelf-content" v-if="getChannelActiveModels(channel.id).length > 0">
+          <div v-if="getChannelActiveModels(channel.id).length > 0" class="shelf-content">
             <span
               v-for="model in getChannelActiveModels(channel.id)"
               :key="model"
@@ -63,19 +68,23 @@
           <div v-else class="empty-shelf">未配置生效模型</div>
         </div>
 
-          <div class="accounts-grid">
-            <div class="grid-header">
-              <span class="grid-title">关联 APIKey ({{ getChannelAccounts(channel.id).length }})</span>
-              <n-button size="tiny" quaternary circle @click="openAddAccountModal(channel)">
-                <template #icon><n-icon><AddOutline /></n-icon></template>
-              </n-button>
-            </div>
+        <div class="accounts-grid">
+          <div class="grid-header">
+            <span class="grid-title"
+              >关联 APIKey ({{ getChannelAccounts(channel.id).length }})</span
+            >
+            <n-button size="tiny" quaternary circle @click="openAddAccountModal(channel)">
+              <template #icon
+                ><n-icon><AddOutline /></n-icon
+              ></template>
+            </n-button>
+          </div>
 
-          <div class="accounts-scroller" v-if="getChannelAccounts(channel.id).length > 0">
+          <div v-if="getChannelAccounts(channel.id).length > 0" class="accounts-scroller">
             <div
-              class="account-row"
               v-for="account in getChannelAccounts(channel.id)"
               :key="account.id"
+              class="account-row"
             >
               <div class="row-main">
                 <div class="row-left">
@@ -83,19 +92,25 @@
                   <span class="acc-name">{{ account.model_set || '未分配' }}</span>
                 </div>
                 <div class="row-right">
-                  <span class="acc-stat-val">{{ account.current_concurrent || 0 }}/{{ account.max_concurrent }}</span>
+                  <span class="acc-stat-val"
+                    >{{ account.current_concurrent || 0 }}/{{ account.max_concurrent }}</span
+                  >
                 </div>
               </div>
               <n-progress
                 type="line"
-                :percentage="((account.current_concurrent || 0) / (account.max_concurrent || 1)) * 100"
+                :percentage="
+                  ((account.current_concurrent || 0) / (account.max_concurrent || 1)) * 100
+                "
                 :show-indicator="false"
                 :height="3"
                 :color="account.status === 1 ? 'var(--admin-success)' : 'var(--admin-text-3)'"
                 class="acc-progress"
               />
               <div class="row-actions">
-                <n-button size="tiny" quaternary @click="openEditAccountModal(account)">编辑</n-button>
+                <n-button size="tiny" quaternary @click="openEditAccountModal(account)"
+                  >编辑</n-button
+                >
                 <n-button
                   size="tiny"
                   quaternary
@@ -104,63 +119,88 @@
                 >
                   {{ account.status === 1 ? '停止' : '启动' }}
                 </n-button>
-                <n-button size="tiny" quaternary type="error" @click="handleDeleteAccount(account)">删除</n-button>
+                <n-button size="tiny" quaternary type="error" @click="handleDeleteAccount(account)"
+                  >删除</n-button
+                >
               </div>
             </div>
           </div>
-          <div v-else class="empty-accounts">
-            点击上方按钮添加 APIKey
-          </div>
+          <div v-else class="empty-accounts">点击上方按钮添加 APIKey</div>
         </div>
         <div class="channel-card-footer">
-          <n-button size="small" color="#ffffff" text-color="#000000" @click="openEditChannelModal(channel)">配置详情</n-button>
-          <n-button size="small" tertiary type="error" @click="handleDeleteChannel(channel)">删除</n-button>
+          <n-button
+            size="small"
+            color="#ffffff"
+            text-color="#000000"
+            @click="openEditChannelModal(channel)"
+            >配置详情</n-button
+          >
+          <n-button size="small" tertiary type="error" @click="handleDeleteChannel(channel)"
+            >删除</n-button
+          >
         </div>
       </article>
 
-      <button
-        class="admin-add-card"
-        type="button"
-        @click="openAddChannelModal"
-      >
+      <button class="admin-add-card" type="button" @click="openAddChannelModal">
         <span class="add-mark">+</span>
         <span class="add-title">添加渠道商</span>
       </button>
 
       <!-- Empty state -->
-      <div v-if="filteredChannels.length === 0" class="empty-state">
-        无匹配的渠道商
-      </div>
+      <div v-if="filteredChannels.length === 0" class="empty-state">无匹配的渠道商</div>
     </div>
 
     <!-- 渠道商表单弹窗 -->
-    <n-modal v-model:show="showChannelModal" preset="card" :title="isEditChannel ? '编辑渠道商' : '新增渠道商'" style="width: 480px">
-      <n-form :model="channelForm" :rules="channelRules" ref="channelFormRef" label-placement="top">
+    <n-modal
+      v-model:show="showChannelModal"
+      preset="card"
+      :title="isEditChannel ? '编辑渠道商' : '新增渠道商'"
+      style="width: 480px"
+    >
+      <n-form ref="channelFormRef" :model="channelForm" :rules="channelRules" label-placement="top">
         <n-form-item label="渠道商名称" path="name">
           <n-input v-model:value="channelForm.name" placeholder="例如：Nano Banana 官方" />
         </n-form-item>
         <n-form-item label="Base URL地址" path="api_url">
-          <n-input v-model:value="channelForm.api_url" placeholder="例如：https://api.example.com/v1" />
+          <n-input
+            v-model:value="channelForm.api_url"
+            placeholder="例如：https://api.example.com/v1"
+          />
         </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
           <n-button @click="showChannelModal = false">取消</n-button>
-          <n-button type="primary" :loading="channelSaveLoading" @click="handleSaveChannel">确定</n-button>
+          <n-button type="primary" :loading="channelSaveLoading" @click="handleSaveChannel"
+            >确定</n-button
+          >
         </n-space>
       </template>
     </n-modal>
 
     <!-- APIKey 配置弹窗 -->
-    <n-modal v-model:show="showAccountModal" preset="card" :title="isEditAccount ? '编辑 APIKey' : '新增 APIKey'" style="width: 500px">
-      <n-form :model="accountForm" :rules="accountRules" ref="accountFormRef" label-placement="top">
+    <n-modal
+      v-model:show="showAccountModal"
+      preset="card"
+      :title="isEditAccount ? '编辑 APIKey' : '新增 APIKey'"
+      style="width: 500px"
+    >
+      <n-form ref="accountFormRef" :model="accountForm" :rules="accountRules" label-placement="top">
         <div v-if="selectedChannelForAccount" class="channel-url-hint">
           <span>所属渠道：</span>
           <code>{{ selectedChannelForAccount.name }}</code>
         </div>
 
-        <n-form-item :label="isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)'" path="api_key">
-          <n-input v-model:value="accountForm.api_key" type="password" show-password-on="click" :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此渠道商的 API Key'" />
+        <n-form-item
+          :label="isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)'"
+          path="api_key"
+        >
+          <n-input
+            v-model:value="accountForm.api_key"
+            type="password"
+            show-password-on="click"
+            :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此渠道商的 API Key'"
+          />
         </n-form-item>
 
         <n-form-item label="分配模型" path="model_values">
@@ -180,12 +220,22 @@
         <n-grid :cols="2" :x-gap="16">
           <n-gi>
             <n-form-item label="最大并发数" path="max_concurrent">
-              <n-input-number v-model:value="accountForm.max_concurrent" :min="1" :max="50" style="width: 100%" />
+              <n-input-number
+                v-model:value="accountForm.max_concurrent"
+                :min="1"
+                :max="50"
+                style="width: 100%"
+              />
             </n-form-item>
           </n-gi>
           <n-gi>
             <n-form-item label="超时时间(秒)" path="timeout">
-              <n-input-number v-model:value="accountForm.timeout" :min="10" :max="600" style="width: 100%" />
+              <n-input-number
+                v-model:value="accountForm.timeout"
+                :min="10"
+                :max="600"
+                style="width: 100%"
+              />
             </n-form-item>
           </n-gi>
         </n-grid>
@@ -193,7 +243,9 @@
       <template #footer>
         <n-space justify="end">
           <n-button @click="showAccountModal = false">取消</n-button>
-          <n-button type="primary" :loading="accountSaveLoading" @click="handleSaveAccount">确定</n-button>
+          <n-button type="primary" :loading="accountSaveLoading" @click="handleSaveAccount"
+            >确定</n-button
+          >
         </n-space>
       </template>
     </n-modal>
@@ -241,14 +293,14 @@ async function loadData() {
 function getChannelStatus(channel: Channel) {
   const accs = getChannelAccounts(channel.id)
   if (accs.length === 0) return '无账号'
-  const active = accs.filter(a => a.status === 1).length
+  const active = accs.filter((a) => a.status === 1).length
   return `${active} / ${accs.length} 运行中`
 }
 
 function getChannelStatusVariant(channel: Channel) {
   const accs = getChannelAccounts(channel.id)
   if (accs.length === 0) return 'empty'
-  const active = accs.filter(a => a.status === 1 && a.fail_count < 5).length
+  const active = accs.filter((a) => a.status === 1 && a.fail_count < 5).length
   if (active === 0) return 'neutral'
   if (active < accs.length) return 'current'
   return 'enabled'
@@ -443,9 +495,21 @@ onMounted(() => {
   font-size: 11px;
 }
 
-.model-pill.is-indigo { border-color: var(--admin-model-indigo); color: var(--admin-model-indigo); background: rgba(129, 140, 248, 0.05); }
-.model-pill.is-purple { border-color: var(--admin-model-purple); color: var(--admin-model-purple); background: rgba(192, 132, 252, 0.05); }
-.model-pill.is-cyan { border-color: var(--admin-model-cyan); color: var(--admin-model-cyan); background: rgba(34, 211, 238, 0.05); }
+.model-pill.is-indigo {
+  border-color: var(--admin-model-indigo);
+  color: var(--admin-model-indigo);
+  background: rgba(129, 140, 248, 0.05);
+}
+.model-pill.is-purple {
+  border-color: var(--admin-model-purple);
+  color: var(--admin-model-purple);
+  background: rgba(192, 132, 252, 0.05);
+}
+.model-pill.is-cyan {
+  border-color: var(--admin-model-cyan);
+  color: var(--admin-model-cyan);
+  background: rgba(34, 211, 238, 0.05);
+}
 
 .accounts-grid {
   flex: 1;
@@ -501,9 +565,15 @@ onMounted(() => {
   border-radius: 50%;
 }
 
-.status-indicator.acc-success { background: var(--admin-success); }
-.status-indicator.acc-warning { background: var(--admin-warning); }
-.status-indicator.acc-error { background: var(--admin-danger); }
+.status-indicator.acc-success {
+  background: var(--admin-success);
+}
+.status-indicator.acc-warning {
+  background: var(--admin-warning);
+}
+.status-indicator.acc-error {
+  background: var(--admin-danger);
+}
 
 .acc-name {
   font-size: 12px;
@@ -540,7 +610,6 @@ onMounted(() => {
 .channel-card-footer :deep(.n-button) {
   flex: none;
 }
-
 
 .model-select-rounded :deep(.n-base-selection-tag-wrapper) {
   gap: 4px;

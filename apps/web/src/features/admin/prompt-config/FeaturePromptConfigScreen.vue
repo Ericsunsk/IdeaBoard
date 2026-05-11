@@ -13,11 +13,15 @@
 
         <div class="node-card-meta">
           <span class="meta-chip">{{ getGroupVariableCount(group) }} 个变量</span>
-          <span class="meta-chip">{{ getGroupFilledCount(group) }}/{{ group.items.length }} 已配置</span>
+          <span class="meta-chip"
+            >{{ getGroupFilledCount(group) }}/{{ group.items.length }} 已配置</span
+          >
         </div>
 
         <div class="node-feature-preview">
-          <span v-for="item in group.items" :key="item.slug" class="feature-pill">{{ item.title }}</span>
+          <span v-for="item in group.items" :key="item.slug" class="feature-pill">{{
+            item.title
+          }}</span>
         </div>
 
         <div class="node-card-actions">
@@ -77,7 +81,12 @@
 
         <div class="feature-actions">
           <span class="feature-count">{{ (promptMap[item.slug] || '').length }} 字</span>
-          <n-button size="small" type="primary" :loading="saving[item.slug]" @click="savePrompt(item.slug)">
+          <n-button
+            size="small"
+            type="primary"
+            :loading="saving[item.slug]"
+            @click="savePrompt(item.slug)"
+          >
             保存
           </n-button>
         </div>
@@ -229,7 +238,9 @@ async function savePrompt(slug: FeatureSlug) {
   flex-direction: column;
   gap: 14px;
   min-height: 244px;
-  transition: border-color 0.18s ease, background 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
 }
 
 .node-card:hover {

@@ -43,7 +43,9 @@
     <div v-if="selectedPreviewItems.length > 0" class="selected-preview-bar" @mousedown.stop>
       <div class="selected-preview-header">
         <span class="selected-preview-count">{{ selectedPreviewItems.length }} selected</span>
-        <button class="clear-selected-btn" type="button" @click="emit('clear-selected')">Clear</button>
+        <button class="clear-selected-btn" type="button" @click="emit('clear-selected')">
+          Clear
+        </button>
       </div>
       <div class="selected-preview-list">
         <button
@@ -54,15 +56,34 @@
           @click="emit('focus-selected', item.id)"
         >
           <img :src="item.url" class="selected-preview-image" />
-          <span class="selected-preview-remove" @click.stop="emit('remove-selected', item.id)">×</span>
+          <span class="selected-preview-remove" @click.stop="emit('remove-selected', item.id)"
+            >×</span
+          >
         </button>
-        <div v-if="previewOverflowCount > 0" class="selected-preview-overflow">+{{ previewOverflowCount }}</div>
+        <div v-if="previewOverflowCount > 0" class="selected-preview-overflow">
+          +{{ previewOverflowCount }}
+        </div>
       </div>
     </div>
 
     <div class="prompt-container" @mousedown.stop>
-      <button type="button" class="add-btn" :class="{ active: showSettings }" @click="emit('toggle-settings')">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <button
+        type="button"
+        class="add-btn"
+        :class="{ active: showSettings }"
+        @click="emit('toggle-settings')"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
       </button>
       <input
         :value="userPrompt"
@@ -72,7 +93,18 @@
         @keyup.enter="emit('generate')"
       />
       <button type="button" class="send-btn" :disabled="directGenerating" @click="emit('generate')">
-        <svg v-if="!directGenerating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        <svg
+          v-if="!directGenerating"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+        >
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
         <n-spin v-else size="small" />
       </button>
     </div>
@@ -112,7 +144,9 @@ const emit = defineEmits<{
 }>()
 
 const visiblePreviewItems = computed(() => props.selectedPreviewItems.slice(0, 6))
-const previewOverflowCount = computed(() => Math.max(0, props.selectedPreviewItems.length - visiblePreviewItems.value.length))
+const previewOverflowCount = computed(() =>
+  Math.max(0, props.selectedPreviewItems.length - visiblePreviewItems.value.length),
+)
 
 function onPromptInput(event: Event) {
   emit('update:user-prompt', (event.target as HTMLInputElement).value)

@@ -8,8 +8,20 @@ const MAX_DETECTED_MODELS = 100
 
 export function useChannelAccounts(options: {
   channels: Readonly<{ value: Channel[] }>
-  message: { success: (content: string) => void; error: (content: string) => void; warning: (content: string) => void }
-  dialog: { warning: (options: { title: string; content: string; positiveText: string; negativeText: string; onPositiveClick: () => void | Promise<void> }) => void }
+  message: {
+    success: (content: string) => void
+    error: (content: string) => void
+    warning: (content: string) => void
+  }
+  dialog: {
+    warning: (options: {
+      title: string
+      content: string
+      positiveText: string
+      negativeText: string
+      onPositiveClick: () => void | Promise<void>
+    }) => void
+  }
   onAfterMutation: () => Promise<void> | void
 }) {
   const accounts = ref<ApiAccount[]>([])
@@ -166,7 +178,6 @@ export function useChannelAccounts(options: {
         const merged = new Set([...detectedModelValues.value, ...models])
         detectedModelValues.value = Array.from(merged).slice(0, MAX_DETECTED_MODELS)
       }
-
     } catch (error) {
       options.message.warning(extractApiErrorMessage(error, '自动检测模型失败'))
     } finally {

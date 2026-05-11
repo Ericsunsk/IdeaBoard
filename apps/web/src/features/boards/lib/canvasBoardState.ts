@@ -113,7 +113,9 @@ function appendOutputNodeImageUrls(
   })
 }
 
-export function collectCanvasBoardImageUrls(snapshot: CanvasBoardSnapshot | null | undefined): Set<string> {
+export function collectCanvasBoardImageUrls(
+  snapshot: CanvasBoardSnapshot | null | undefined,
+): Set<string> {
   const urls = new Set<string>()
   if (!snapshot) return urls
 
@@ -234,7 +236,10 @@ export function duplicateCanvasBoardState(sourceBoardId: string, targetBoardId: 
   return true
 }
 
-export function isImageUrlReferencedInOtherCanvasBoardStates(url: string, excludeBoardId?: string): boolean {
+export function isImageUrlReferencedInOtherCanvasBoardStates(
+  url: string,
+  excludeBoardId?: string,
+): boolean {
   const targetURL = url.trim()
   if (!targetURL) return false
   const excluded = excludeBoardId?.trim() || ''

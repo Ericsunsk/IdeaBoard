@@ -25,7 +25,8 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
 }
 
 export function rgbToHex(r: number, g: number, b: number): string {
-  const toHex = (num: number) => clampColorValue(Math.round(num), 0, 255).toString(16).padStart(2, '0')
+  const toHex = (num: number) =>
+    clampColorValue(Math.round(num), 0, 255).toString(16).padStart(2, '0')
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase()
 }
 
@@ -64,7 +65,7 @@ export function rgbToHsv(r: number, g: number, b: number): { h: number; s: numbe
 }
 
 export function hsvToRgb(h: number, s: number, v: number): { r: number; g: number; b: number } {
-  const hn = ((h % 360) + 360) % 360 / 360
+  const hn = (((h % 360) + 360) % 360) / 360
   const sn = clampColorValue(s, 0, 100) / 100
   const vn = clampColorValue(v, 0, 100) / 100
   const scaledHue = hn * 6

@@ -12,8 +12,15 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+        >
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
       </template>
     </NodeHeader>
@@ -26,7 +33,6 @@
       @mousedown.stop
       @contextmenu.stop
     />
-
   </div>
 </template>
 
@@ -55,8 +61,6 @@ const nodeStyle = useCanvasNodeStyle(() => props.node)
 function onInput(event: Event) {
   emit('update:text', (event.target as HTMLTextAreaElement).value)
 }
-
-
 </script>
 
 <style scoped src="./node-shared.css"></style>

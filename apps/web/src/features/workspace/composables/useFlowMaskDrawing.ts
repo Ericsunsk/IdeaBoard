@@ -7,12 +7,17 @@ const MASK_PAINT_ALPHA = 0.5
 
 type UseFlowMaskDrawingOptions = {
   getMaskNodeSnapshot: (nodeId: string) => MaskNodeItem | null
-  updateSnapshotNode: (nodeId: string, patcher: (snapshotNode: Record<string, any>) => Record<string, any>) => void
+  updateSnapshotNode: (
+    nodeId: string,
+    patcher: (snapshotNode: Record<string, any>) => Record<string, any>,
+  ) => void
   startCanvasInteraction?: (key: CanvasInteractionKey) => void
   stopCanvasInteraction?: (key: CanvasInteractionKey) => void
 }
 
-function getMaskPreviewDataUrl(node: Pick<MaskNodeItem, 'maskDataUrl' | 'executionMaskDataUrl'>): string {
+function getMaskPreviewDataUrl(
+  node: Pick<MaskNodeItem, 'maskDataUrl' | 'executionMaskDataUrl'>,
+): string {
   return node.maskDataUrl || node.executionMaskDataUrl || ''
 }
 
@@ -46,7 +51,10 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     }
   }
 
-  function drawMaskRasterPreviewToCanvas(image: CanvasImageSource, targetCanvas: HTMLCanvasElement) {
+  function drawMaskRasterPreviewToCanvas(
+    image: CanvasImageSource,
+    targetCanvas: HTMLCanvasElement,
+  ) {
     const width = targetCanvas.width
     const height = targetCanvas.height
     if (!width || !height) return
@@ -94,7 +102,8 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     image.onload = () => {
       const latestCanvas = maskCanvasRefs.get(nodeId)
       const latestNode = options.getMaskNodeSnapshot(nodeId)
-      if (!latestCanvas || !latestNode || getMaskPreviewDataUrl(latestNode) !== previewMaskDataUrl) return
+      if (!latestCanvas || !latestNode || getMaskPreviewDataUrl(latestNode) !== previewMaskDataUrl)
+        return
       const latestCtx = latestCanvas.getContext('2d')
       if (!latestCtx) return
       latestCtx.clearRect(0, 0, latestCanvas.width, latestCanvas.height)
@@ -115,7 +124,14 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     }
   }
 
-  function drawMaskStrokeSegment(node: MaskNodeItem, canvas: HTMLCanvasElement, fromX: number, fromY: number, toX: number, toY: number) {
+  function drawMaskStrokeSegment(
+    node: MaskNodeItem,
+    canvas: HTMLCanvasElement,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+  ) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.save()
@@ -136,7 +152,11 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     ctx.restore()
   }
 
-  function extractMaskIntensity(data: Uint8ClampedArray, width: number, height: number): Float32Array {
+  function extractMaskIntensity(
+    data: Uint8ClampedArray,
+    width: number,
+    height: number,
+  ): Float32Array {
     const total = width * height
     const values = new Float32Array(total)
     for (let i = 0; i < total; i += 1) {
@@ -147,7 +167,12 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     return values
   }
 
-  function paintExecutionMaskValuesToCanvas(targetCanvas: HTMLCanvasElement, values: Float32Array, width: number, height: number) {
+  function paintExecutionMaskValuesToCanvas(
+    targetCanvas: HTMLCanvasElement,
+    values: Float32Array,
+    width: number,
+    height: number,
+  ) {
     const ctx = targetCanvas.getContext('2d')
     if (!ctx) return
     const imageData = ctx.createImageData(width, height)
@@ -163,7 +188,12 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     ctx.putImageData(imageData, 0, 0)
   }
 
-  function paintPreviewMaskValuesToCanvas(targetCanvas: HTMLCanvasElement, values: Float32Array, width: number, height: number) {
+  function paintPreviewMaskValuesToCanvas(
+    targetCanvas: HTMLCanvasElement,
+    values: Float32Array,
+    width: number,
+    height: number,
+  ) {
     const ctx = targetCanvas.getContext('2d')
     if (!ctx) return
     const imageData = ctx.createImageData(width, height)
@@ -197,7 +227,7 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     paintPreviewMaskValuesToCanvas(previewCanvas, values, canvas.width, canvas.height)
     const executionMaskDataUrl = executionCanvas.toDataURL('image/png')
     const maskDataUrl = previewCanvas.toDataURL('image/png')
-    options.updateSnapshotNode(nodeId, prev => ({
+    options.updateSnapshotNode(nodeId, (prev) => ({
       ...prev,
       executionMaskDataUrl,
       maskDataUrl,
@@ -237,7 +267,11 @@ export function useFlowMaskDrawing(options: UseFlowMaskDrawingOptions) {
     if (paintingMaskCanvas) {
       paintingMaskCanvas.removeEventListener('lostpointercapture', onMaskPaintLostPointerCapture)
     }
-    if (paintingMaskCanvas && paintingPointerId != null && paintingMaskCanvas.hasPointerCapture(paintingPointerId)) {
+    if (
+      paintingMaskCanvas &&
+      paintingPointerId != null &&
+      paintingMaskCanvas.hasPointerCapture(paintingPointerId)
+    ) {
       paintingMaskCanvas.releasePointerCapture(paintingPointerId)
     }
     try {

@@ -8,9 +8,9 @@
   >
     <div class="flow-canvas-node__drag-zone flow-canvas-node__drag-zone--message" />
     <img
+      :ref="setMessageImageRef"
       :src="node.url"
       class="flow-canvas-node__message-image flow-canvas-node__drag-surface nodrag"
-      :ref="setMessageImageRef"
       draggable="true"
       @load="onMessageImageLoad"
       @dragstart="$emit('image-dragstart', $event)"
@@ -32,7 +32,9 @@
     <HomeCanvasImageActionMenu
       v-if="showMessageActionMenu"
       :show-style-strength-control="showStyleStrengthControl"
-      :style-strength-menu-style="showStyleStrengthControl ? messageStyleStrengthMenuStyle : undefined"
+      :style-strength-menu-style="
+        showStyleStrengthControl ? messageStyleStrengthMenuStyle : undefined
+      "
       :direct-generating="messageDirectGenerating"
       :display-height="messageDisplayHeight"
       :style-innovate-strength-pct="styleInnovateStrengthPct"
@@ -50,7 +52,12 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
 import type { CanvasImageItem } from '../types/canvasNodes'
-import { useFlowMessageNode, MESSAGE_RESIZE_DIRECTIONS, type MessageAction, type ResizeDirection } from '../composables/useFlowMessageNode'
+import {
+  useFlowMessageNode,
+  MESSAGE_RESIZE_DIRECTIONS,
+  type MessageAction,
+  type ResizeDirection,
+} from '../composables/useFlowMessageNode'
 
 const props = defineProps<{
   node: CanvasImageItem

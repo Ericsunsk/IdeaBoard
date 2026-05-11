@@ -2,9 +2,7 @@ import { listCanvasBoards } from '../../boards/lib/canvasBoards'
 
 type BoardMeta = ReturnType<typeof listCanvasBoards>[number]
 
-export function useFlowBoardHeaderState(options: {
-  currentBoardId: { value: string | null }
-}) {
+export function useFlowBoardHeaderState(options: { currentBoardId: { value: string | null } }) {
   const { currentBoardId } = options
   const isBoardMenuOpen = ref(false)
   const isRenamingBoard = ref(false)
@@ -15,11 +13,11 @@ export function useFlowBoardHeaderState(options: {
   const currentBoardName = computed(() => {
     const boardId = `${currentBoardId.value ?? ''}`.trim()
     if (!boardId) return 'Untitled Canvas'
-    return boardMetas.value.find(board => board.id === boardId)?.name ?? boardId
+    return boardMetas.value.find((board) => board.id === boardId)?.name ?? boardId
   })
 
   const boardOptions = computed(() =>
-    boardMetas.value.map(board => ({ id: board.id, name: board.name })),
+    boardMetas.value.map((board) => ({ id: board.id, name: board.name })),
   )
 
   function setBoardNameInputRef(el: HTMLInputElement | null) {

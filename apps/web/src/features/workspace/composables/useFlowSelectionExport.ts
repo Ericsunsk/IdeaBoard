@@ -71,23 +71,32 @@ function readOutputImages(snapshotNode: Record<string, unknown>): ImageNodeOutpu
   return rawOutputs
     .map((item) => {
       if (!item || typeof item !== 'object') return null
-      const rawUrl = typeof (item as { url?: unknown }).url === 'string' ? (item as { url: string }).url.trim() : ''
+      const rawUrl =
+        typeof (item as { url?: unknown }).url === 'string'
+          ? (item as { url: string }).url.trim()
+          : ''
       if (!rawUrl) return null
       return { url: rawUrl, ratio: 1 }
     })
     .filter((item): item is ImageNodeOutputItem => !!item)
 }
 
-function resolveExportUrls(kind: ExportableNodeKind, snapshotNode: Record<string, unknown>): string[] {
+function resolveExportUrls(
+  kind: ExportableNodeKind,
+  snapshotNode: Record<string, unknown>,
+): string[] {
   if (kind === 'message') {
     const messageUrl = typeof snapshotNode.url === 'string' ? snapshotNode.url.trim() : ''
     return messageUrl ? [messageUrl] : []
   }
-  const outputUrls = readOutputImages(snapshotNode).map(item => item.url).filter(Boolean)
+  const outputUrls = readOutputImages(snapshotNode)
+    .map((item) => item.url)
+    .filter(Boolean)
   if (kind === 'image') {
     const latestOutputUrl = outputUrls.length > 0 ? outputUrls[outputUrls.length - 1] : ''
     if (latestOutputUrl) return [latestOutputUrl]
-    const sourceImageUrl = typeof snapshotNode.sourceImageUrl === 'string' ? snapshotNode.sourceImageUrl.trim() : ''
+    const sourceImageUrl =
+      typeof snapshotNode.sourceImageUrl === 'string' ? snapshotNode.sourceImageUrl.trim() : ''
     if (sourceImageUrl) return [sourceImageUrl]
   }
   return outputUrls
@@ -97,22 +106,22 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
   let exportLoading: MessageLoadingHandle | null = null
 
   function getSelectedExportUrls(): string[] {
-    const selectedNodes = options.nodes.value.filter(node => !!node.selected)
+    const selectedNodes = options.nodes.value.filter((node) => !!node.selected)
     const urls: string[] = []
     for (const node of selectedNodes) {
       const data = node.data
       if (!data) continue
       const kind = data.kind
       if (
-        kind !== 'message'
-        && kind !== 'image'
-        && kind !== 'edit'
-        && kind !== 'enhance'
-        && kind !== 'color'
-        && kind !== 'fusion'
-        && kind !== 'wear'
-        && kind !== 'model'
-        && kind !== 'viewpoint'
+        kind !== 'message' &&
+        kind !== 'image' &&
+        kind !== 'edit' &&
+        kind !== 'enhance' &&
+        kind !== 'color' &&
+        kind !== 'fusion' &&
+        kind !== 'wear' &&
+        kind !== 'model' &&
+        kind !== 'viewpoint'
       ) {
         continue
       }
@@ -120,7 +129,7 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       if (!snapshotNode || typeof snapshotNode !== 'object') continue
       urls.push(...resolveExportUrls(kind, snapshotNode as Record<string, unknown>))
     }
-    return Array.from(new Set(urls.map(url => url.trim()).filter(Boolean)))
+    return Array.from(new Set(urls.map((url) => url.trim()).filter(Boolean)))
   }
 
   async function exportSelectedImages() {
@@ -172,6 +181,6 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
 
   return {
     exportSelectedImages,
-    hasSelectedNodes: () => options.nodes.value.some(node => !!node.selected),
+    hasSelectedNodes: () => options.nodes.value.some((node) => !!node.selected),
   }
 }

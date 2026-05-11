@@ -13,10 +13,18 @@ type UseFlowCanvasDropOptions = {
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   createNodeAtPosition: (kind: FlowCreatableNodeKind, x: number, y: number) => string | null
   appendMessageFlowNode: (item: CanvasImageItem) => void
-  updateSnapshotNode: (nodeId: string, patcher: (prev: Record<string, unknown>) => Record<string, unknown>) => void
+  updateSnapshotNode: (
+    nodeId: string,
+    patcher: (prev: Record<string, unknown>) => Record<string, unknown>,
+  ) => void
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
   getMaskNodeSnapshot: (nodeId: string) => MaskNodeItem | null
-  uploadApi: { upload: (file: File, boardId: string) => Promise<{ code: number; msg?: string; data?: { url?: string } }> }
+  uploadApi: {
+    upload: (
+      file: File,
+      boardId: string,
+    ) => Promise<{ code: number; msg?: string; data?: { url?: string } }>
+  }
   sanitizeApiErrorMessage: (msg: string | null | undefined, fallback: string) => string
   renderMaskNodeMask: (nodeId: string) => void
   clearMaskCanvas: (nodeId: string) => void
@@ -96,7 +104,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     }
     try {
       const uploaded = await uploadImageToBoard(file)
-      options.updateSnapshotNode(nodeId, prev => ({
+      options.updateSnapshotNode(nodeId, (prev) => ({
         ...prev,
         sourceImageUrl: uploaded.url,
         sourceImageRatio: uploaded.ratio,
@@ -118,7 +126,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     }
     try {
       const uploaded = await uploadImageToBoard(file)
-      options.updateSnapshotNode(nodeId, prev => ({
+      options.updateSnapshotNode(nodeId, (prev) => ({
         ...prev,
         sourceImageUrl: uploaded.url,
         sourceImageRatio: uploaded.ratio,
@@ -135,10 +143,11 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
   }
 
   async function applyMaskSourceByUrl(nodeId: string, url: string, ratio?: number) {
-    const nextRatio = Number.isFinite(ratio) && Number(ratio) > 0
-      ? Number(ratio)
-      : (await loadImageRatioFromUrl(url)) || 1
-    options.updateSnapshotNode(nodeId, prev => ({
+    const nextRatio =
+      Number.isFinite(ratio) && Number(ratio) > 0
+        ? Number(ratio)
+        : (await loadImageRatioFromUrl(url)) || 1
+    options.updateSnapshotNode(nodeId, (prev) => ({
       ...prev,
       sourceImageUrl: url,
       sourceImageRatio: nextRatio,
@@ -158,14 +167,18 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     const point = options.screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
     const nodeKindRaw = event.dataTransfer?.getData(FLOW_NODE_KIND_DRAG_MIME) || ''
     const nodeKind = nodeKindRaw.trim() as FlowCreatableNodeKind
-    if (nodeKind && options.createNodeOptions.some(item => item.value === nodeKind)) {
+    if (nodeKind && options.createNodeOptions.some((item) => item.value === nodeKind)) {
       options.createNodeAtPosition(nodeKind, point.x, point.y)
       return
     }
 
     const payload = readNodeImageDropPayload(event)
     if (payload) {
-      const messageNode = createCanvasImageItemAt({ x: point.x, y: point.y }, payload.url, payload.ratio)
+      const messageNode = createCanvasImageItemAt(
+        { x: point.x, y: point.y },
+        payload.url,
+        payload.ratio,
+      )
       options.appendMessageFlowNode(messageNode)
       return
     }
@@ -178,7 +191,11 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     }
     try {
       const uploaded = await uploadImageToBoard(file)
-      const messageNode = createCanvasImageItemAt({ x: point.x, y: point.y }, uploaded.url, uploaded.ratio)
+      const messageNode = createCanvasImageItemAt(
+        { x: point.x, y: point.y },
+        uploaded.url,
+        uploaded.ratio,
+      )
       options.appendMessageFlowNode(messageNode)
     } catch (error) {
       const msg = error instanceof Error ? error.message : '上传失败'

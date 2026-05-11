@@ -92,7 +92,10 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
       return
     }
     if (!event.metaKey && !event.ctrlKey && !event.altKey) {
-      const delta = getKeyboardPanDelta(key, event.shiftKey ? KEYBOARD_PAN_FAST_STEP : KEYBOARD_PAN_STEP)
+      const delta = getKeyboardPanDelta(
+        key,
+        event.shiftKey ? KEYBOARD_PAN_FAST_STEP : KEYBOARD_PAN_STEP,
+      )
       if (delta) {
         event.preventDefault()
         options.onPanViewport?.(delta)

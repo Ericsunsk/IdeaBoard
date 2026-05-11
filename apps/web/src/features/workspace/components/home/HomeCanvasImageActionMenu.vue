@@ -15,7 +15,16 @@
         @click="emit('action-remove-bg')"
       >
         <span class="action-logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M4 5h10v10H4z" />
             <path d="M10 9h10v10H10z" />
           </svg>
@@ -31,8 +40,19 @@
         @click="emit('style-innovate-click')"
       >
         <span class="action-logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"
+            />
           </svg>
         </span>
         <span class="action-tooltip">款式创新</span>
@@ -45,7 +65,16 @@
         @click="emit('action-to-vector')"
       >
         <span class="action-logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <circle cx="5" cy="19" r="2" />
             <circle cx="19" cy="5" r="2" />
             <path d="M5 17C5 10 10 5 19 5" />
@@ -61,7 +90,16 @@
         @click="emit('action-sketch-to-design')"
       >
         <span class="action-logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M18 2l-6.3 6.3M12 14l-4 4" />
             <path d="M3 21l3.5-3.5" />
             <path d="M15 6l4 4" />
@@ -145,7 +183,12 @@ const emit = defineEmits<{
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.18s ease, color 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
   color: #6f61c6;
 }
 
@@ -188,7 +231,9 @@ const emit = defineEmits<{
   letter-spacing: 0.01em;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.16s ease, transform 0.16s ease;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
 }
 
 .image-action-icon-btn:hover:not(:disabled) .action-tooltip {

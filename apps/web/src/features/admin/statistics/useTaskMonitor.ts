@@ -4,9 +4,7 @@ import { createMonitorTaskColumns } from '../shared/monitorShared'
 import { useGetAdminMonitor } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import { useListAdminTasks } from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
 
-export function useTaskMonitor(options: {
-  onShowDetail: (row: Task) => void
-}) {
+export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
   const page = ref(1)
   const TASK_MONITOR_PAGE_SIZE = 12
   const filterStatus = ref<string | null>(null)
@@ -18,13 +16,20 @@ export function useTaskMonitor(options: {
   )
 
   function resolveParams() {
-    const params: { status?: string; page: number; page_size: number; user_id?: number; keyword?: string } = {
+    const params: {
+      status?: string
+      page: number
+      page_size: number
+      user_id?: number
+      keyword?: string
+    } = {
       status: filterStatus.value || undefined,
       page: page.value,
       page_size: TASK_MONITOR_PAGE_SIZE,
     }
     if (appliedSearchKeyword.value) {
-      if (/^\d+$/.test(appliedSearchKeyword.value)) params.user_id = parseInt(appliedSearchKeyword.value)
+      if (/^\d+$/.test(appliedSearchKeyword.value))
+        params.user_id = parseInt(appliedSearchKeyword.value)
       else params.keyword = appliedSearchKeyword.value
     }
     return params

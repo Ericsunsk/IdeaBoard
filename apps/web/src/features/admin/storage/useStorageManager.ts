@@ -1,4 +1,8 @@
-import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../../shared/api/storage'
+import type {
+  StorageProfile,
+  StorageProvider,
+  StorageProviderMeta,
+} from '../../../shared/api/storage'
 import {
   getListAdminStorageProfilesQueryKey,
   useListAdminStorageProfiles,
@@ -42,7 +46,6 @@ function vendorAccessLabel(vendor: VendorPresetOption) {
   return vendor.provider === 'kodo' ? '原生接入' : 'S3-compatible'
 }
 
-
 export function useStorageManager() {
   const message = useMessage()
   const queryClient = useQueryClient()
@@ -51,18 +54,21 @@ export function useStorageManager() {
   const profilesQuery = useListAdminStorageProfiles()
   const saveProfileMutation = useMutation({
     mutationFn: saveStorageProfile,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
   })
   const applyProfileMutation = useMutation({
     mutationFn: applyStorageProfile,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
   })
   const testProfileMutation = useMutation({
     mutationFn: testStorageProfile,
   })
   const deleteProfileMutation = useMutation({
     mutationFn: deleteStorageProfile,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: getListAdminStorageProfilesQueryKey() }),
   })
   const bucketDomainsMutation = useMutation({
     mutationFn: fetchStorageBucketDomains,
@@ -78,24 +84,40 @@ export function useStorageManager() {
   const editingId = ref<string | null>(null)
   const selectedVendorKey = ref('kodo')
 
-  const providers = computed<StorageProviderMeta[]>(() => providersQuery.data.value?.data?.providers ?? [])
+  const providers = computed<StorageProviderMeta[]>(
+    () => providersQuery.data.value?.data?.providers ?? [],
+  )
   const bucketDomains = ref<string[]>([])
   const providerMap = computed(() => toProviderMetaMap(providers.value))
-  const creatableProviders = computed(() => providers.value.filter((provider) => provider.create_allowed))
-  const vendorPresets = computed(() => buildVendorPresets(providerMap.value, creatableProviders.value))
-  const storages = computed<StorageCard[]>(() => (profilesQuery.data.value?.data?.profiles ?? []).map(normalizeProfile))
+  const creatableProviders = computed(() =>
+    providers.value.filter((provider) => provider.create_allowed),
+  )
+  const vendorPresets = computed(() =>
+    buildVendorPresets(providerMap.value, creatableProviders.value),
+  )
+  const storages = computed<StorageCard[]>(() =>
+    (profilesQuery.data.value?.data?.profiles ?? []).map(normalizeProfile),
+  )
   const form = ref<StorageCard>(createEmptyStorageProfile('kodo', providerMap.value))
   const selectedProviderMeta = computed(() => providerMap.value[form.value.provider])
-  const textFields = computed(() => (selectedProviderMeta.value?.fields || []).filter((field) => field.type !== 'switch'))
-  const switchFields = computed(() => (selectedProviderMeta.value?.fields || []).filter((field) => field.type === 'switch'))
-  const activeVendorPreset = computed(() => vendorPresets.value.find((vendor) => vendor.key === selectedVendorKey.value) || vendorPresets.value[0])
+  const textFields = computed(() =>
+    (selectedProviderMeta.value?.fields || []).filter((field) => field.type !== 'switch'),
+  )
+  const switchFields = computed(() =>
+    (selectedProviderMeta.value?.fields || []).filter((field) => field.type === 'switch'),
+  )
+  const activeVendorPreset = computed(
+    () =>
+      vendorPresets.value.find((vendor) => vendor.key === selectedVendorKey.value) ||
+      vendorPresets.value[0],
+  )
   const vendorSelectOptions = computed(() =>
     vendorPresets.value.map((vendor) => ({
       label: vendor.label,
       value: vendor.key,
       disabled: !vendor.supported,
       vendor,
-    }))
+    })),
   )
 
   watch(
@@ -121,7 +143,11 @@ export function useStorageManager() {
   function asVendorSelectOption(input: unknown): VendorSelectOption | null {
     if (!input || typeof input !== 'object') return null
     const candidate = input as Partial<VendorSelectOption>
-    if (typeof candidate.label !== 'string' || typeof candidate.value !== 'string' || !candidate.vendor) {
+    if (
+      typeof candidate.label !== 'string' ||
+      typeof candidate.value !== 'string' ||
+      !candidate.vendor
+    ) {
       return null
     }
     return candidate as VendorSelectOption

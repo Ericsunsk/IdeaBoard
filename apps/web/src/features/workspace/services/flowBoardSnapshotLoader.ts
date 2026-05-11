@@ -12,7 +12,9 @@ export function resolveBoardIdFromQueryValue(
   return boardId || null
 }
 
-export async function loadBoardSnapshotForFlow(boardId: string): Promise<CanvasBoardSnapshot | null> {
+export async function loadBoardSnapshotForFlow(
+  boardId: string,
+): Promise<CanvasBoardSnapshot | null> {
   const normalized = boardId.trim()
   if (!normalized) return null
   await hydrateCanvasBoardsFromServer()

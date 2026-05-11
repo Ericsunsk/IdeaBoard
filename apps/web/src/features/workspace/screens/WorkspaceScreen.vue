@@ -1,7 +1,9 @@
 <template>
-  <div class="canvas-layout" :class="[`tool-${activeTool}`, { 'interaction-lite': isFlowInteractionActive }]" @mousedown.self="closeBoardHeaderEditing">
-
-
+  <div
+    class="canvas-layout"
+    :class="[`tool-${activeTool}`, { 'interaction-lite': isFlowInteractionActive }]"
+    @mousedown.self="closeBoardHeaderEditing"
+  >
     <HomeCanvasHeader
       :current-board-name="currentBoardName"
       :board-options="boardOptions"
@@ -23,18 +25,79 @@
     />
 
     <aside class="floating-toolbar">
-      <div class="tool-item" :class="{ active: activeTool === 'select' }" title="Select (V)" @click="setActiveTool('select')">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+      <div
+        class="tool-item"
+        :class="{ active: activeTool === 'select' }"
+        title="Select (V)"
+        @click="setActiveTool('select')"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+          <path d="M13 13l6 6" />
+        </svg>
       </div>
-      <div class="tool-item" :class="{ active: activeTool === 'hand' }" title="Hand (H)" @click="setActiveTool('hand')">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v10"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+      <div
+        class="tool-item"
+        :class="{ active: activeTool === 'hand' }"
+        title="Hand (H)"
+        @click="setActiveTool('hand')"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+          <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v10" />
+          <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+          <path
+            d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
+          />
+        </svg>
       </div>
-      <div class="tool-item" :class="{ active: activeTool === 'text' }" title="Text (T)" @click="setActiveTool('text')">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+      <div
+        class="tool-item"
+        :class="{ active: activeTool === 'text' }"
+        title="Text (T)"
+        @click="setActiveTool('text')"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+        >
+          <polyline points="4 7 4 4 20 4 20 7" />
+          <line x1="9" y1="20" x2="15" y2="20" />
+          <line x1="12" y1="4" x2="12" y2="20" />
+        </svg>
       </div>
       <div class="toolbar-divider"></div>
       <div class="tool-item" title="图·文生图" @click="onNavigateRequest('/user/picture')">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M3 14l4-4 5 5 5-5 4 4"/></svg>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <path d="M3 14l4-4 5 5 5-5 4 4" />
+        </svg>
       </div>
     </aside>
 
@@ -80,10 +143,14 @@
             :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
             :mask-source-image-url="getFlowMaskEffectiveSourceCached(nodeProps.id).url"
             :mask-source-image-ratio="getFlowMaskEffectiveSourceCached(nodeProps.id).ratio"
-            :mask-has-connected-image-input="getFlowMaskEffectiveSourceCached(nodeProps.id).hasConnectedImageInput"
+            :mask-has-connected-image-input="
+              getFlowMaskEffectiveSourceCached(nodeProps.id).hasConnectedImageInput
+            "
             :message-action-visible="activeMessageActionNodeId === nodeProps.id"
             :message-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
-            :show-style-strength-control="flowShowStyleStrengthControl && activeMessageActionNodeId === nodeProps.id"
+            :show-style-strength-control="
+              flowShowStyleStrengthControl && activeMessageActionNodeId === nodeProps.id
+            "
             :style-innovate-strength-pct="flowStyleInnovateStrength"
             :set-style-strength-track-ref="setFlowStyleStrengthTrackRef"
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
@@ -106,7 +173,9 @@
             @image-display-dragstart="(event) => onFlowImageDisplayDragStart(nodeProps.id, event)"
             @image-reset="() => onFlowImageReset(nodeProps.id)"
             @message-image-dragstart="(event) => onFlowMessageImageDragStart(nodeProps.id, event)"
-            @message-resize-mousedown="(payload) => onFlowMessageResizeMouseDown(nodeProps.id, payload)"
+            @message-resize-mousedown="
+              (payload) => onFlowMessageResizeMouseDown(nodeProps.id, payload)
+            "
             @mask-open-file="() => onFlowMaskOpenFile(nodeProps.id)"
             @mask-clear-image="() => onFlowMaskClearImage(nodeProps.id)"
             @mask-stage-drop="(event) => onFlowMaskStageDrop(nodeProps.id, event)"
@@ -160,7 +229,16 @@
         <button class="zoom-btn" @click="onZoomIn">+</button>
       </div>
       <button class="logo-btn" title="返回画布列表" @click="onNavigateRequest('/user/boards')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <line x1="16" y1="12" x2="6" y2="12" />
           <polyline points="10 8 6 12 10 16" />
         </svg>
@@ -177,13 +255,18 @@
         <div class="leave-confirm-title">离开前是否保存？</div>
         <div class="leave-confirm-desc">当前画布有未保存更改。</div>
         <div class="leave-confirm-actions">
-          <button type="button" class="leave-btn ghost" @click="resolveLeaveConfirm('cancel')">继续编辑</button>
-          <button type="button" class="leave-btn danger" @click="resolveLeaveConfirm('discard')">不保存</button>
-          <button type="button" class="leave-btn primary" @click="resolveLeaveConfirm('save')">保存并离开</button>
+          <button type="button" class="leave-btn ghost" @click="resolveLeaveConfirm('cancel')">
+            继续编辑
+          </button>
+          <button type="button" class="leave-btn danger" @click="resolveLeaveConfirm('discard')">
+            不保存
+          </button>
+          <button type="button" class="leave-btn primary" @click="resolveLeaveConfirm('save')">
+            保存并离开
+          </button>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -202,7 +285,10 @@ import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcut
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowMaskDrawing } from '../composables/useFlowMaskDrawing'
 import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
-import { useFlowNodeMutations, type FlowCreatableNodeKind } from '../composables/useFlowNodeMutations'
+import {
+  useFlowNodeMutations,
+  type FlowCreatableNodeKind,
+} from '../composables/useFlowNodeMutations'
 import { useFlowGenerationHandlers } from '../composables/useFlowGenerationHandlers'
 import { useFlowMessageDirectActions } from '../composables/useFlowMessageDirectActions'
 import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovateControl'
@@ -257,8 +343,12 @@ function applyFlowTransform(transform: { x?: number; y?: number; zoom?: number }
   return zoomChanged
 }
 
-function onZoomIn() { zoomIn() }
-function onZoomOut() { zoomOut() }
+function onZoomIn() {
+  zoomIn()
+}
+function onZoomOut() {
+  zoomOut()
+}
 
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
@@ -290,7 +380,8 @@ const flowPromptQuality = ref<GenerateQualityOption>('1k')
 
 const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 
-const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING = import.meta.env.VITE_WORKSPACE_FLOW_ENABLE_CULLING === 'true'
+const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING =
+  import.meta.env.VITE_WORKSPACE_FLOW_ENABLE_CULLING === 'true'
 
 const FLOW_NODE_IMAGE_DRAG_MIME = 'application/x-canvas-node-image'
 let pendingNodeInternalsRefresh = false
@@ -302,10 +393,10 @@ const activeMessageActionNodeId = ref<string | null>(null)
 const duplicateModifierPressed = ref(false)
 
 function scheduleFlowNodeInternalsRefresh(nodeIds: string[]) {
-  const nextIds = nodeIds.filter(id => typeof id === 'string' && id.length > 0)
+  const nextIds = nodeIds.filter((id) => typeof id === 'string' && id.length > 0)
   if (nextIds.length === 0) return
   if (!queuedNodeInternalsIds) queuedNodeInternalsIds = new Set()
-  nextIds.forEach(id => queuedNodeInternalsIds?.add(id))
+  nextIds.forEach((id) => queuedNodeInternalsIds?.add(id))
   if (pendingNodeInternalsRefresh) return
   pendingNodeInternalsRefresh = true
   void nextTick(() => {
@@ -340,9 +431,7 @@ function selectFlowNodes(nextNodes: Node[]) {
 const flowPromptRatioOptions = PATTERN_GENERATE_RATIO_OPTIONS
 const flowPromptQualityOptions = GENERATE_QUALITY_OPTIONS
 const flowPromptPlaceholder = computed(() => {
-  return activeTool.value === 'text'
-    ? '文本工具稍后接入，请在节点内执行生成'
-    : '请在节点内执行生成'
+  return activeTool.value === 'text' ? '文本工具稍后接入，请在节点内执行生成' : '请在节点内执行生成'
 })
 function onPaneContextMenu(event: MouseEvent) {
   event.preventDefault()
@@ -511,12 +600,22 @@ const {
   onSelectBoard,
 } = useFlowBoardHeaderActions({
   currentBoardId,
-  message: { warning: (msg: string) => message.warning(msg), success: (msg: string) => message.success(msg) },
+  message: {
+    warning: (msg: string) => message.warning(msg),
+    success: (msg: string) => message.success(msg),
+  },
   router,
   route,
   isDirty,
   confirmFlowLeave,
-  skipNextLeaveConfirm: { get value() { return skipNextLeaveConfirm }, set value(v: boolean) { skipNextLeaveConfirm = v } },
+  skipNextLeaveConfirm: {
+    get value() {
+      return skipNextLeaveConfirm
+    },
+    set value(v: boolean) {
+      skipNextLeaveConfirm = v
+    },
+  },
 })
 
 function commitFlowNodes(nextNodes: Node[]) {
@@ -528,8 +627,8 @@ function commitFlowEdges(nextEdges: Edge[]) {
 }
 
 function commitFlowNodesAppend(nextNodes: Node[]) {
-  setNodes(currentNodes => [...(currentNodes as Node[]), ...nextNodes])
-  scheduleFlowNodeInternalsRefresh(nextNodes.map(node => node.id))
+  setNodes((currentNodes) => [...(currentNodes as Node[]), ...nextNodes])
+  scheduleFlowNodeInternalsRefresh(nextNodes.map((node) => node.id))
 }
 
 const flowNodeMutations = useFlowNodeMutations({
@@ -630,22 +729,14 @@ const {
   stopCanvasInteraction: stopFlowInteraction,
 } = useFlowCanvasInteractionState()
 
-const {
-  nodeContextMenu,
-  canvasNodeMenuItems,
-  closeNodeContextMenu,
-  openNodeContextMenu,
-} = useFlowNodeContextMenu()
+const { nodeContextMenu, canvasNodeMenuItems, closeNodeContextMenu, openNodeContextMenu } =
+  useFlowNodeContextMenu()
 
-const {
-  flowConnectionLineStyle,
-  onFlowConnectStart,
-  onFlowConnectEnd,
-  onFlowEdgeUpdateEnd,
-} = useFlowConnectionVisuals()
+const { flowConnectionLineStyle, onFlowConnectStart, onFlowConnectEnd, onFlowEdgeUpdateEnd } =
+  useFlowConnectionVisuals()
 
 let canvasDropRef: ReturnType<typeof useFlowCanvasDrop> | null = null
-let clearMaskCanvasRef: ((nodeId: string) => void) = () => {}
+let clearMaskCanvasRef: (nodeId: string) => void = () => {}
 
 const {
   getImageNodeSnapshot,
@@ -794,10 +885,21 @@ function onFlowMessageDirectAction(
   }
   activeMessageActionNodeId.value = null
   hideFlowStyleStrengthControl()
-  void runMessageDirectAction(nodeId, action, action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined)
+  void runMessageDirectAction(
+    nodeId,
+    action,
+    action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined,
+  )
 }
 
-const { clearFlowSelection, selectFlowNodeForContextMenu, onPaneClick, onFlowNodeClick, onFlowNodeMouseDown, deleteSelectedFlowElements } = useFlowSelectionController({
+const {
+  clearFlowSelection,
+  selectFlowNodeForContextMenu,
+  onPaneClick,
+  onFlowNodeClick,
+  onFlowNodeMouseDown,
+  deleteSelectedFlowElements,
+} = useFlowSelectionController({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
   activeTool: activeTool as Ref<string>,
@@ -826,7 +928,9 @@ const {
   clearFlowSelection,
   getViewport,
   setViewport,
-  get runPatternGenerate() { return runPatternGenerate },
+  get runPatternGenerate() {
+    return runPatternGenerate
+  },
 })
 
 const {
@@ -952,7 +1056,13 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.canvas-layout { width: 100%; height: 100vh; background: #ffffff; position: relative; overflow: hidden; }
+.canvas-layout {
+  width: 100%;
+  height: 100vh;
+  background: #ffffff;
+  position: relative;
+  overflow: hidden;
+}
 
 .canvas-layout.interaction-lite :deep(.workflow-node),
 .canvas-layout.interaction-lite :deep(.flow-canvas-node__message),
@@ -976,12 +1086,48 @@ onMounted(async () => {
   background-position: 0 0;
 }
 
-.floating-toolbar { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); background: #fff; padding: 8px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px; border: 1px solid #e2e4e8; z-index: 100; }
-.tool-item { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #5f6368; cursor: pointer; border: none; background: transparent; }
-.tool-item.active { background: #f1f3f9; color: #9278e6; }
-.toolbar-divider { width: 24px; height: 1px; background: #f1f3f9; margin: 4px auto; }
+.floating-toolbar {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #fff;
+  padding: 8px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #e2e4e8;
+  z-index: 100;
+}
+.tool-item {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5f6368;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+.tool-item.active {
+  background: #f1f3f9;
+  color: #9278e6;
+}
+.toolbar-divider {
+  width: 24px;
+  height: 1px;
+  background: #f1f3f9;
+  margin: 4px auto;
+}
 
-.workspace-flow-canvas-wrap { position: absolute; inset: 0; z-index: 2; }
+.workspace-flow-canvas-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
 
 .workspace-flow-canvas-wrap :deep(.vue-flow) {
   background: transparent;
@@ -1069,7 +1215,9 @@ onMounted(async () => {
 }
 
 .workspace-flow-canvas-wrap :deep(.workspace-flow-edge .vue-flow__edge-path) {
-  transition: opacity 0.18s ease, stroke-width 0.18s ease;
+  transition:
+    opacity 0.18s ease,
+    stroke-width 0.18s ease;
 }
 
 .workspace-flow-canvas-wrap :deep(.workspace-flow-edge.is-selected .vue-flow__edge-path) {
@@ -1090,11 +1238,60 @@ onMounted(async () => {
   z-index: 100;
 }
 
-.floating-status { position: absolute; right: 24px; bottom: 24px; z-index: 100; display: flex; gap: 10px; align-items: center; }
-.zoom-controls { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border: 1px solid #e8eaed; border-radius: 999px; padding: 6px 10px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
-.zoom-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid #eef1f6; background: #fff; cursor: pointer; color: #5f6368; font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; }
-.zoom-level { font-size: 13px; font-weight: 600; color: #5f6368; min-width: 40px; text-align: center; }
-.logo-btn { width: 40px; height: 40px; border-radius: 999px; border: 1px solid #e8eaed; background: rgba(255,255,255,.95); color: #5f6368; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+.floating-status {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid #e8eaed;
+  border-radius: 999px;
+  padding: 6px 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+.zoom-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #eef1f6;
+  background: #fff;
+  cursor: pointer;
+  color: #5f6368;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zoom-level {
+  font-size: 13px;
+  font-weight: 600;
+  color: #5f6368;
+  min-width: 40px;
+  text-align: center;
+}
+.logo-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid #e8eaed;
+  background: rgba(255, 255, 255, 0.95);
+  color: #5f6368;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
 
 .leave-confirm-mask {
   position: absolute;
@@ -1159,5 +1356,4 @@ onMounted(async () => {
   background: #9278e6;
   color: #fff;
 }
-
 </style>

@@ -22,7 +22,6 @@
 </template>
 
 <script setup lang="ts">
-
 const props = defineProps<{
   mode: 'login' | 'register'
 }>()
@@ -93,7 +92,9 @@ function onRegisterVisibleChange(visible: boolean) {
   background:
     radial-gradient(40% 30% at 50% 20%, rgba(146, 120, 230, 0.14) 0%, rgba(146, 120, 230, 0) 100%),
     radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size: 100% 100%, 24px 24px;
+  background-size:
+    100% 100%,
+    24px 24px;
   opacity: 1;
 }
 

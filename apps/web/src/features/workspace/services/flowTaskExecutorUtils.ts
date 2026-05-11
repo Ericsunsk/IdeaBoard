@@ -3,7 +3,12 @@ import { waitTaskResultWithSse } from '../../../shared/api/taskEvents'
 
 export interface FlowTaskExecutorGraphOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
-  edges: Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>
+  edges: Array<{
+    source: string
+    sourceHandle?: string | null
+    target: string
+    targetHandle?: string | null
+  }>
 }
 
 export interface FlowConnectedInput {
@@ -21,24 +26,39 @@ export function parseHandlePort(handle: string | null | undefined): string {
 export function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null {
   const [head] = nodeId.split('-')
   if (
-    head === 'prompt' || head === 'image' || head === 'mask'
-    || head === 'model' || head === 'viewpoint' || head === 'edit'
-    || head === 'fusion' || head === 'enhance' || head === 'wear' || head === 'color'
+    head === 'prompt' ||
+    head === 'image' ||
+    head === 'mask' ||
+    head === 'model' ||
+    head === 'viewpoint' ||
+    head === 'edit' ||
+    head === 'fusion' ||
+    head === 'enhance' ||
+    head === 'wear' ||
+    head === 'color'
   ) {
     return head
   }
   return null
 }
 
-export function readLatestOutputImage(snapshotNode: Record<string, unknown>): ImageNodeOutputItem | null {
-  const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages as ImageNodeOutputItem[] : []
+export function readLatestOutputImage(
+  snapshotNode: Record<string, unknown>,
+): ImageNodeOutputItem | null {
+  const outputImages = Array.isArray(snapshotNode.outputImages)
+    ? (snapshotNode.outputImages as ImageNodeOutputItem[])
+    : []
   return outputImages.length > 0 ? outputImages[outputImages.length - 1] : null
 }
 
-export function resolveSourceImageFromNode(nodeType: CanvasConnectionNodeType, snapshotNode: Record<string, unknown>): string {
+export function resolveSourceImageFromNode(
+  nodeType: CanvasConnectionNodeType,
+  snapshotNode: Record<string, unknown>,
+): string {
   if (nodeType === 'image') {
     const latestOutput = readLatestOutputImage(snapshotNode)
-    const sourceImageUrl = typeof snapshotNode.sourceImageUrl === 'string' ? snapshotNode.sourceImageUrl.trim() : ''
+    const sourceImageUrl =
+      typeof snapshotNode.sourceImageUrl === 'string' ? snapshotNode.sourceImageUrl.trim() : ''
     return (latestOutput?.url || sourceImageUrl || '').trim()
   }
   const latestOutput = readLatestOutputImage(snapshotNode)
@@ -50,10 +70,17 @@ export function resolveConnectedInput(
   targetNodeId: string,
   targetPort: 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB',
 ): FlowConnectedInput | null {
-  const incoming = options.edges.find(edge => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === targetPort)
+  const incoming = options.edges.find(
+    (edge) => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === targetPort,
+  )
   if (!incoming) return null
-  const sourceNode = options.nodes.find(node => node.id === incoming.source)
-  if (!sourceNode || !sourceNode.data?.snapshotNode || typeof sourceNode.data.snapshotNode !== 'object') return null
+  const sourceNode = options.nodes.find((node) => node.id === incoming.source)
+  if (
+    !sourceNode ||
+    !sourceNode.data?.snapshotNode ||
+    typeof sourceNode.data.snapshotNode !== 'object'
+  )
+    return null
   const sourceType = resolveNodeType(sourceNode.id)
   if (!sourceType) return null
   return {
@@ -67,10 +94,17 @@ export function resolveConnectedExecutionInput(
   targetNodeId: string,
   targetPort: 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB',
 ): FlowConnectedInput | null {
-  const incoming = options.edges.find(edge => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === targetPort)
+  const incoming = options.edges.find(
+    (edge) => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === targetPort,
+  )
   if (!incoming) return null
-  const sourceNode = options.nodes.find(node => node.id === incoming.source)
-  if (!sourceNode || !sourceNode.data?.snapshotNode || typeof sourceNode.data.snapshotNode !== 'object') return null
+  const sourceNode = options.nodes.find((node) => node.id === incoming.source)
+  if (
+    !sourceNode ||
+    !sourceNode.data?.snapshotNode ||
+    typeof sourceNode.data.snapshotNode !== 'object'
+  )
+    return null
   const sourceKind = sourceNode.data.kind
   if (!sourceKind || !isFlowExecutionSourceKind(sourceKind)) return null
   return {
@@ -85,19 +119,31 @@ export async function waitTaskResult(taskId: string): Promise<string[]> {
 
 /** All node kinds that can produce image output usable as downstream source. */
 export const FLOW_EXECUTION_SOURCE_KINDS = new Set<CanvasConnectionNodeType>([
-  'image', 'edit', 'enhance', 'color', 'fusion', 'wear', 'model', 'viewpoint',
+  'image',
+  'edit',
+  'enhance',
+  'color',
+  'fusion',
+  'wear',
+  'model',
+  'viewpoint',
 ])
 
 export function isFlowExecutionSourceKind(kind: string): kind is CanvasConnectionNodeType {
   return FLOW_EXECUTION_SOURCE_KINDS.has(kind as CanvasConnectionNodeType)
 }
 
-export function resolveFlowSourceImageRatio(sourceKind: CanvasConnectionNodeType, snapshotNode: Record<string, unknown>): number {
+export function resolveFlowSourceImageRatio(
+  sourceKind: CanvasConnectionNodeType,
+  snapshotNode: Record<string, unknown>,
+): number {
   if (sourceKind === 'image') {
     const sourceImageRatio = Number(snapshotNode.sourceImageRatio)
     if (Number.isFinite(sourceImageRatio) && sourceImageRatio > 0) return sourceImageRatio
   }
-  const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages as Array<{ ratio?: unknown }> : []
+  const outputImages = Array.isArray(snapshotNode.outputImages)
+    ? (snapshotNode.outputImages as Array<{ ratio?: unknown }>)
+    : []
   const latestOutput = outputImages.length > 0 ? outputImages[outputImages.length - 1] : null
   const outputRatio = Number(latestOutput?.ratio)
   if (Number.isFinite(outputRatio) && outputRatio > 0) return outputRatio

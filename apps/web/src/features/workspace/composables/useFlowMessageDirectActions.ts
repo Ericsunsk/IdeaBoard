@@ -28,7 +28,10 @@ type UseFlowMessageDirectActionsOptions = {
   markDirty: () => void
   refreshSnapshot: () => void
   commitNodes: (nextNodes: Node[]) => void
-  updateSnapshotNodeSilently: (nodeId: string, patcher: (snapshotNode: Record<string, unknown>) => Record<string, unknown>) => void
+  updateSnapshotNodeSilently: (
+    nodeId: string,
+    patcher: (snapshotNode: Record<string, unknown>) => Record<string, unknown>,
+  ) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
 }
@@ -36,7 +39,7 @@ type UseFlowMessageDirectActionsOptions = {
 const STYLE_INNOVATE_DEFAULT_STRENGTH = 50
 
 function parseAspectRatio(rawRatio: string): number {
-  const [width, height] = rawRatio.split(':').map(part => Number(part))
+  const [width, height] = rawRatio.split(':').map((part) => Number(part))
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return 1
   }
@@ -48,7 +51,7 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
   const isDirectGenerating = ref(false)
 
   function getMessageNodeById(nodeId: string): Node<FlowNodeData> | null {
-    const target = options.nodes.value.find(node => node.id === nodeId)
+    const target = options.nodes.value.find((node) => node.id === nodeId)
     if (!target || target.data?.kind !== 'message') return null
     return target as Node<FlowNodeData>
   }
@@ -94,12 +97,14 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
       },
     }
 
-    commitNodeMutation(items => [...items, nextNode as Node])
+    commitNodeMutation((items) => [...items, nextNode as Node])
     return nextNode.id
   }
 
   function appendPendingPatternMessageNode(heightRatio?: number): string {
-    const messageNodes = options.nodes.value.filter(node => node.data?.kind === 'message') as Array<Node<FlowNodeData>>
+    const messageNodes = options.nodes.value.filter(
+      (node) => node.data?.kind === 'message',
+    ) as Array<Node<FlowNodeData>>
     const lastMessageNode = messageNodes[messageNodes.length - 1]
     const lastSnapshot = lastMessageNode?.data?.snapshotNode as CanvasImageItem | undefined
     const baseX = Number(lastSnapshot?.x)
@@ -131,43 +136,47 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
         snapshotNode: pendingItem,
       },
     }
-    commitNodeMutation(items => [...items, nextNode as Node])
+    commitNodeMutation((items) => [...items, nextNode as Node])
     return nextNode.id
   }
 
   function removeMessageNode(nodeId: string) {
-    commitNodeMutation(items => items.filter(node => node.id !== nodeId))
+    commitNodeMutation((items) => items.filter((node) => node.id !== nodeId))
   }
 
   function replacePendingNodeResultUrl(nodeId: string, url: string) {
-    commitNodeMutation((items) => items.map((node) => {
-      if (node.id !== nodeId || node.data?.kind !== 'message') return node
-      const snapshotNode = node.data.snapshotNode
-      if (!snapshotNode || typeof snapshotNode !== 'object') return node
-      const prev = snapshotNode as CanvasImageItem
-      const nextSnapshot: CanvasImageItem = {
-        ...prev,
-        url,
-        renderState: 'ready',
-      }
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          snapshotNode: nextSnapshot,
-        },
-      }
-    }))
-    // Backfill real image ratio asynchronously without creating extra history
-    loadImageSizeFromUrl(url).then((size) => {
-      if (size && size.width > 0 && size.height > 0) {
-        const ratio = size.height / size.width
-        options.updateSnapshotNodeSilently(nodeId, prev => ({
+    commitNodeMutation((items) =>
+      items.map((node) => {
+        if (node.id !== nodeId || node.data?.kind !== 'message') return node
+        const snapshotNode = node.data.snapshotNode
+        if (!snapshotNode || typeof snapshotNode !== 'object') return node
+        const prev = snapshotNode as CanvasImageItem
+        const nextSnapshot: CanvasImageItem = {
           ...prev,
-          height_ratio: ratio,
-        }))
-      }
-    }).catch(() => {})
+          url,
+          renderState: 'ready',
+        }
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            snapshotNode: nextSnapshot,
+          },
+        }
+      }),
+    )
+    // Backfill real image ratio asynchronously without creating extra history
+    loadImageSizeFromUrl(url)
+      .then((size) => {
+        if (size && size.width > 0 && size.height > 0) {
+          const ratio = size.height / size.width
+          options.updateSnapshotNodeSilently(nodeId, (prev) => ({
+            ...prev,
+            height_ratio: ratio,
+          }))
+        }
+      })
+      .catch(() => {})
   }
 
   async function runSubmitAndWait(
@@ -179,26 +188,28 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
     const strength = Number.isFinite(strengthOverride)
       ? Math.max(0, Math.min(100, Math.round(strengthOverride as number)))
       : STYLE_INNOVATE_DEFAULT_STRENGTH
-    const request = action === 'style-innovate'
-      ? buildExecutionTaskRequest({
-        prompt: '',
-        feature: EXECUTION_DIRECT_ACTION_META.styleInnovate.feature,
-        imageUrls: [source.url],
-        params: {
-          original_image_url: source.url,
-          ...buildExecutionSizeParams(imageSize),
-          variation_strength: strength,
-          strength,
-        },
-      })
-      : buildExecutionTaskRequest({
-        prompt: '',
-        feature: action === 'remove-bg'
-          ? EXECUTION_DIRECT_ACTION_META.removeBg.feature
-          : EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature,
-        imageUrls: [source.url],
-        params: buildExecutionSizeParams(imageSize),
-      })
+    const request =
+      action === 'style-innovate'
+        ? buildExecutionTaskRequest({
+            prompt: '',
+            feature: EXECUTION_DIRECT_ACTION_META.styleInnovate.feature,
+            imageUrls: [source.url],
+            params: {
+              original_image_url: source.url,
+              ...buildExecutionSizeParams(imageSize),
+              variation_strength: strength,
+              strength,
+            },
+          })
+        : buildExecutionTaskRequest({
+            prompt: '',
+            feature:
+              action === 'remove-bg'
+                ? EXECUTION_DIRECT_ACTION_META.removeBg.feature
+                : EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature,
+            imageUrls: [source.url],
+            params: buildExecutionSizeParams(imageSize),
+          })
 
     const submitRes = await taskApi.submit(request)
     if (submitRes.code !== 0 || !submitRes.data?.task_id) {
@@ -263,10 +274,11 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
     runningNodeIds.value.add(nodeId)
     const pendingNodeId = appendPendingMessageNode(source)
     try {
-      const urls = action === 'to-vector'
-        ? await runToVector(source)
-        : await runSubmitAndWait(source, action, runOptions?.strength)
-      const firstUrl = urls.find(url => typeof url === 'string' && url.trim())
+      const urls =
+        action === 'to-vector'
+          ? await runToVector(source)
+          : await runSubmitAndWait(source, action, runOptions?.strength)
+      const firstUrl = urls.find((url) => typeof url === 'string' && url.trim())
       if (!firstUrl) throw new Error('任务完成但未返回图片')
       replacePendingNodeResultUrl(pendingNodeId, firstUrl)
       options.onSuccess('处理完成')
@@ -294,7 +306,7 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
       const urls = await submitPatternGenerateTask(prompt, ratio, quality, {
         onSubmitted: runOptions?.onSubmitted,
       })
-      const firstUrl = urls.find(url => typeof url === 'string' && url.trim())
+      const firstUrl = urls.find((url) => typeof url === 'string' && url.trim())
       if (!firstUrl) throw new Error('任务完成但未返回图片')
       replacePendingNodeResultUrl(pendingNodeId, firstUrl)
       options.onSuccess('生成完成')

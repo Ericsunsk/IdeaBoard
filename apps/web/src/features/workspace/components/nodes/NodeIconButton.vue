@@ -13,19 +13,22 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
-  tone?: 'tool' | 'accent'
-  active?: boolean
-  disabled?: boolean
-  size?: number
-  title?: string
-}>(), {
-  tone: 'tool',
-  active: false,
-  disabled: false,
-  size: 28,
-  title: '',
-})
+withDefaults(
+  defineProps<{
+    tone?: 'tool' | 'accent'
+    active?: boolean
+    disabled?: boolean
+    size?: number
+    title?: string
+  }>(),
+  {
+    tone: 'tool',
+    active: false,
+    disabled: false,
+    size: 28,
+    title: '',
+  },
+)
 
 const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void

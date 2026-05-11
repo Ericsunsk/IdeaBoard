@@ -13,7 +13,14 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.1"
+        >
           <path d="M12 3l2.7 5.3L20 11l-5.3 2.7L12 19l-2.7-5.3L4 11l5.3-2.7L12 3z" />
         </svg>
       </template>
@@ -75,7 +82,9 @@
               step="1"
               :value="node.outputQuality"
               :disabled="node.outputFormat === 'png'"
-              @input="emit('update:output-quality', Number(($event.target as HTMLInputElement).value))"
+              @input="
+                emit('update:output-quality', Number(($event.target as HTMLInputElement).value))
+              "
             />
           </div>
         </template>
@@ -104,7 +113,9 @@
               :max="extendMax"
               step="1"
               :value="node.extendRight"
-              @input="emit('update:extend-right', Number(($event.target as HTMLInputElement).value))"
+              @input="
+                emit('update:extend-right', Number(($event.target as HTMLInputElement).value))
+              "
             />
             <span class="enhance-extend-value">{{ node.extendRight }}%</span>
           </div>
@@ -118,7 +129,9 @@
               :max="extendMax"
               step="1"
               :value="node.extendBottom"
-              @input="emit('update:extend-bottom', Number(($event.target as HTMLInputElement).value))"
+              @input="
+                emit('update:extend-bottom', Number(($event.target as HTMLInputElement).value))
+              "
             />
             <span class="enhance-extend-value">{{ node.extendBottom }}%</span>
           </div>
@@ -146,8 +159,6 @@
         @generate="emit('generate')"
       />
     </div>
-
-
   </div>
 </template>
 
@@ -205,27 +216,29 @@ const isUpscaleMode = computed(() => props.node.mode === 'hd-upscale')
 const supportsPrompt = computed(() => props.node.mode === 'canvas-extend')
 const supportsMask = computed(() => props.node.mode === 'hd-upscale')
 const io = computed(() =>
-  buildNodeIoFromSlots(ENHANCE_NODE_IO_SLOTS, { supportsPrompt: supportsPrompt.value, supportsMask: supportsMask.value }, {
-    connected: {
-      image: props.uiState?.connection?.connected?.image,
-      mask: props.uiState?.connection?.connected?.mask,
-      prompt: props.uiState?.connection?.connected?.prompt,
-      output: props.uiState?.connection?.connected?.output,
+  buildNodeIoFromSlots(
+    ENHANCE_NODE_IO_SLOTS,
+    { supportsPrompt: supportsPrompt.value, supportsMask: supportsMask.value },
+    {
+      connected: {
+        image: props.uiState?.connection?.connected?.image,
+        mask: props.uiState?.connection?.connected?.mask,
+        prompt: props.uiState?.connection?.connected?.prompt,
+        output: props.uiState?.connection?.connected?.output,
+      },
+      pending: {
+        image: props.uiState?.connection?.pending?.image,
+        mask: props.uiState?.connection?.pending?.mask,
+      },
+      errorPortKeys: props.errorPortKeys,
     },
-    pending: {
-      image: props.uiState?.connection?.pending?.image,
-      mask: props.uiState?.connection?.pending?.mask,
-    },
-    errorPortKeys: props.errorPortKeys,
-  }),
+  ),
 )
 const connectionChips = computed(() => io.value.connectionChips)
 
 function toExtendSliderPct(value: number): number {
   return ((value - extendMin) / (extendMax - extendMin)) * 100
 }
-
-
 </script>
 
 <style scoped src="./node-shared.css"></style>
@@ -273,5 +286,4 @@ function toExtendSliderPct(value: number): number {
   color: #a1a1aa;
   text-align: right;
 }
-
 </style>

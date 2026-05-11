@@ -1,7 +1,4 @@
-import type {
-  CanvasConnectionNodeType,
-  CanvasConnectionPort,
-} from '../types/canvasNodes'
+import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 
 export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNodeType[] = [
   'image',

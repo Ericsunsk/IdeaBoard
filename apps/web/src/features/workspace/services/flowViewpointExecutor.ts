@@ -3,7 +3,11 @@ import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import type { PromptNodeItem, ViewpointNodeItem } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api/task'
-import { resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
+import {
+  resolveConnectedInput,
+  resolveSourceImageFromNode,
+  waitTaskResult,
+} from './flowTaskExecutorUtils'
 
 interface FlowViewpointNodeContext {
   nodeId: string
@@ -12,7 +16,12 @@ interface FlowViewpointNodeContext {
 
 interface FlowViewpointExecutorOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
-  edges: Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>
+  edges: Array<{
+    source: string
+    sourceHandle?: string | null
+    target: string
+    targetHandle?: string | null
+  }>
   loadImageSizeFromUrl: (url: string) => Promise<{ width: number; height: number } | null>
 }
 
@@ -43,9 +52,10 @@ export async function executeFlowViewpointNode(
   const imageInput = resolveConnectedInput(options, context.nodeId, 'image')!
   const imageUrl = resolveSourceImageFromNode(imageInput.sourceType, imageInput.snapshotNode)
   const promptInput = resolveConnectedInput(options, context.nodeId, 'prompt')
-  const promptText = promptInput?.sourceType === 'prompt'
-    ? (((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim())
-    : ''
+  const promptText =
+    promptInput?.sourceType === 'prompt'
+      ? ((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim()
+      : ''
   const imageSize = await options.loadImageSizeFromUrl(imageUrl)
 
   const request = buildExecutionTaskRequest({

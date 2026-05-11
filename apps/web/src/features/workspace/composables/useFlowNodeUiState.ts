@@ -20,7 +20,12 @@ import {
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import { parseHandlePort, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
 
-type FlowEdgeLike = { source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }
+type FlowEdgeLike = {
+  source: string
+  sourceHandle?: string | null
+  target: string
+  targetHandle?: string | null
+}
 type FlowNodeLike = { id: string; data?: { kind?: string; snapshotNode?: unknown } }
 
 type UseFlowNodeUiStateOptions = {
@@ -39,16 +44,18 @@ type FlowNodeConnectionStatus = {
 type ExecutionActionLabels = { ready: string; running: string }
 
 function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNodeType {
-  return value === 'image'
-    || value === 'prompt'
-    || value === 'mask'
-    || value === 'color'
-    || value === 'model'
-    || value === 'viewpoint'
-    || value === 'edit'
-    || value === 'fusion'
-    || value === 'enhance'
-    || value === 'wear'
+  return (
+    value === 'image' ||
+    value === 'prompt' ||
+    value === 'mask' ||
+    value === 'color' ||
+    value === 'model' ||
+    value === 'viewpoint' ||
+    value === 'edit' ||
+    value === 'fusion' ||
+    value === 'enhance' ||
+    value === 'wear'
+  )
 }
 
 function getNodeOutputPort(nodeType: CanvasConnectionNodeType): CanvasConnectionPort {
@@ -57,7 +64,9 @@ function getNodeOutputPort(nodeType: CanvasConnectionNodeType): CanvasConnection
   return 'image'
 }
 
-function resolveExecutionActionLabels(nodeType: CanvasExecutionOutputNodeType): ExecutionActionLabels {
+function resolveExecutionActionLabels(
+  nodeType: CanvasExecutionOutputNodeType,
+): ExecutionActionLabels {
   switch (nodeType) {
     case 'model':
     case 'viewpoint':
@@ -81,10 +90,10 @@ function formatNodePortLabel(
   node?: CanvasNodeItem | null,
 ): string {
   if (
-    nodeType === 'edit'
-    && node
-    && node.type === 'edit'
-    && (port === 'image' || port === 'imageB' || port === 'mask' || port === 'prompt')
+    nodeType === 'edit' &&
+    node &&
+    node.type === 'edit' &&
+    (port === 'image' || port === 'imageB' || port === 'mask' || port === 'prompt')
   ) {
     return getEditNodePortLabel(node.mode, port)
   }
@@ -106,7 +115,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
     const result: Record<string, NodeUiState | PromptNodeUiState> = {}
     const flowNodes = options.nodes.value as FlowNodeLike[]
     const flowEdges = options.edges.value as FlowEdgeLike[]
-    const nodeMap = new Map(flowNodes.map(node => [node.id, node]))
+    const nodeMap = new Map(flowNodes.map((node) => [node.id, node]))
 
     function getSnapshotNode(nodeId: string): CanvasNodeItem | null {
       const node = nodeMap.get(nodeId)
@@ -135,7 +144,10 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       return outputStatus === 'ready'
     }
 
-    function getNodeConnectionStatus(nodeType: CanvasConnectionNodeType, nodeId: string): FlowNodeConnectionStatus {
+    function getNodeConnectionStatus(
+      nodeType: CanvasConnectionNodeType,
+      nodeId: string,
+    ): FlowNodeConnectionStatus {
       const node = getSnapshotNode(nodeId)
       if (!node) return { hasAnyConnection: false, incoming: {}, pendingIncoming: {}, outgoing: {} }
       const incoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
@@ -143,14 +155,21 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       const outgoing: Partial<Record<CanvasConnectionPort, boolean>> = {}
 
       getCanvasNodeVisibleInputPorts(nodeType, node).forEach((portContract) => {
-        const matchedEdge = flowEdges.find(edge => edge.target === nodeId && parseHandlePort(edge.targetHandle) === portContract.port)
+        const matchedEdge = flowEdges.find(
+          (edge) =>
+            edge.target === nodeId && parseHandlePort(edge.targetHandle) === portContract.port,
+        )
         const connected = !!matchedEdge
         incoming[portContract.port] = connected
         if (!connected || !matchedEdge) {
           pendingIncoming[portContract.port] = false
           return
         }
-        if (portContract.port === 'image' || portContract.port === 'imageA' || portContract.port === 'imageB') {
+        if (
+          portContract.port === 'image' ||
+          portContract.port === 'imageA' ||
+          portContract.port === 'imageB'
+        ) {
           pendingIncoming[portContract.port] = !resolveConnectedImageReady(matchedEdge.source)
           return
         }
@@ -158,10 +177,14 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       })
 
       const outputPort = getNodeOutputPort(nodeType)
-      outgoing[outputPort] = flowEdges.some(edge => edge.source === nodeId && parseHandlePort(edge.sourceHandle) === outputPort)
+      outgoing[outputPort] = flowEdges.some(
+        (edge) => edge.source === nodeId && parseHandlePort(edge.sourceHandle) === outputPort,
+      )
 
       return {
-        hasAnyConnection: flowEdges.some(edge => edge.source === nodeId || edge.target === nodeId),
+        hasAnyConnection: flowEdges.some(
+          (edge) => edge.source === nodeId || edge.target === nodeId,
+        ),
         incoming,
         pendingIncoming,
         outgoing,
@@ -196,23 +219,35 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         }
       }
 
-      const requiredPorts = getCanvasNodeRequiredInputPorts(nodeType, executionNode).map(port => port.port as CanvasConnectionPort)
-      const disconnectedPorts = requiredPorts.filter(port => !status.incoming[port])
+      const requiredPorts = getCanvasNodeRequiredInputPorts(nodeType, executionNode).map(
+        (port) => port.port as CanvasConnectionPort,
+      )
+      const disconnectedPorts = requiredPorts.filter((port) => !status.incoming[port])
       if (disconnectedPorts.length > 0) {
-        const missingLabels = disconnectedPorts.map(port => formatNodePortLabel(nodeType, port, executionNode))
+        const missingLabels = disconnectedPorts.map((port) =>
+          formatNodePortLabel(nodeType, port, executionNode),
+        )
         return {
-          label: disconnectedPorts.length === 1 ? `连接 ${missingLabels[0]}` : `连接 ${disconnectedPorts.length} 个输入`,
+          label:
+            disconnectedPorts.length === 1
+              ? `连接 ${missingLabels[0]}`
+              : `连接 ${disconnectedPorts.length} 个输入`,
           disabled: true,
         }
       }
 
       const pendingPorts = getCanvasNodeVisibleInputPorts(nodeType, executionNode)
-        .map(port => port.port)
-        .filter(port => !!status.incoming[port] && !!status.pendingIncoming[port])
+        .map((port) => port.port)
+        .filter((port) => !!status.incoming[port] && !!status.pendingIncoming[port])
       if (pendingPorts.length > 0) {
-        const pendingLabels = pendingPorts.map(port => formatNodePortLabel(nodeType, port, executionNode))
+        const pendingLabels = pendingPorts.map((port) =>
+          formatNodePortLabel(nodeType, port, executionNode),
+        )
         return {
-          label: pendingPorts.length === 1 ? `等待 ${pendingLabels[0]}` : `等待 ${pendingPorts.length} 个输入`,
+          label:
+            pendingPorts.length === 1
+              ? `等待 ${pendingLabels[0]}`
+              : `等待 ${pendingPorts.length} 个输入`,
           disabled: true,
         }
       }
@@ -264,7 +299,10 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       result[node.id] = {
         connection,
         primaryAction: buildPrimaryAction(nodeType, node.id, executionNode, status),
-        cacheStatus: resolveWorkflowNodeOutputStatus(executionNode.outputStatus, executionNode.outputImages),
+        cacheStatus: resolveWorkflowNodeOutputStatus(
+          executionNode.outputStatus,
+          executionNode.outputImages,
+        ),
         isRunning: options.isFlowExecutionNodeRunning?.(nodeType, node.id) ?? false,
       }
     })
@@ -273,7 +311,11 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
   })
 
   function getFlowNodeUiStateCached(nodeId: string): NodeUiState | PromptNodeUiState {
-    return flowNodeUiStateCache.value[nodeId] || { connection: { hasAnyConnection: false, connected: {} } }
+    return (
+      flowNodeUiStateCache.value[nodeId] || {
+        connection: { hasAnyConnection: false, connected: {} },
+      }
+    )
   }
 
   return {

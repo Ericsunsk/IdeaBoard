@@ -13,7 +13,10 @@ import {
   createViewpointNodeAt,
   createWearNodeAt,
 } from '../utils/canvasNodeFactory'
-import { getCanvasNodeVisibleInputPorts, getCanvasNodeVisibleOutputPorts } from '../config/canvasNodeConnectionContract'
+import {
+  getCanvasNodeVisibleInputPorts,
+  getCanvasNodeVisibleOutputPorts,
+} from '../config/canvasNodeConnectionContract'
 import { isFlowConnectionAllowed } from '../utils/flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { patchFlowSnapshotParam } from '../utils/flowSnapshotParamMutations'
@@ -97,7 +100,9 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   }
 
   function lookupData(nodeId: string) {
-    const matched = (options.nodes.value as Array<{ id: string; data?: unknown }>).find(node => node.id === nodeId)
+    const matched = (options.nodes.value as Array<{ id: string; data?: unknown }>).find(
+      (node) => node.id === nodeId,
+    )
     return matched?.data as FlowNodeData | undefined
   }
 
@@ -138,8 +143,8 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         kind,
         nodeType: kind,
         title: `${kind[0].toUpperCase()}${kind.slice(1)} #${snapshotId}`,
-        inputPorts: getCanvasNodeVisibleInputPorts(kind, snapshotNode).map(port => port.port),
-        outputPorts: getCanvasNodeVisibleOutputPorts(kind, snapshotNode).map(port => port.port),
+        inputPorts: getCanvasNodeVisibleInputPorts(kind, snapshotNode).map((port) => port.port),
+        outputPorts: getCanvasNodeVisibleOutputPorts(kind, snapshotNode).map((port) => port.port),
         snapshotNode,
       } satisfies FlowNodeData,
     }
@@ -156,14 +161,16 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   function onFlowDeleteNode(nodeId: string) {
     const flowNodes = options.nodes.value as Array<{ id: string; data?: unknown }>
-    const target = flowNodes.find(node => node.id === nodeId)
+    const target = flowNodes.find((node) => node.id === nodeId)
     if (!target) return
     const targetKind = (target.data as { kind?: string } | undefined)?.kind
     if (!targetKind || targetKind === 'message') return
     options.onNodeDeleted?.(nodeId, targetKind)
     const before = options.captureHistory()
-    const nextNodes = (options.nodes.value as Node[]).filter(node => node.id !== nodeId)
-    const nextEdges = (options.edges.value as Edge[]).filter(edge => edge.source !== nodeId && edge.target !== nodeId)
+    const nextNodes = (options.nodes.value as Node[]).filter((node) => node.id !== nodeId)
+    const nextEdges = (options.edges.value as Edge[]).filter(
+      (edge) => edge.source !== nodeId && edge.target !== nodeId,
+    )
     options.commitNodes(nextNodes)
     options.commitEdges(nextEdges)
     options.pushHistory(before)
@@ -180,7 +187,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const shouldMarkDirty = mutationOptions.dirty ?? true
     const before = mutationOptions.historyBefore ?? options.captureHistory()
     const nextNodes = [...options.nodes.value] as Array<Record<string, any>>
-    const index = nextNodes.findIndex(node => node.id === nodeId)
+    const index = nextNodes.findIndex((node) => node.id === nodeId)
     if (index < 0) return
     const node = nextNodes[index]
     const data = (node.data ?? {}) as { snapshotNode?: unknown }
@@ -202,24 +209,34 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const flowNodes = options.nodes.value as Array<{ id: string; selected?: boolean }>
     const selectedNodeKinds = new Map(
       (options.nodes.value as Array<{ id: string; selected?: boolean; data?: { kind?: string } }>)
-        .filter(node => !!node.selected && typeof node.data?.kind === 'string')
-        .map(node => [node.id, node.data!.kind as string] as const),
+        .filter((node) => !!node.selected && typeof node.data?.kind === 'string')
+        .map((node) => [node.id, node.data!.kind as string] as const),
     )
-    const flowEdges = options.edges.value as Array<{ id: string; selected?: boolean; source: string; target: string }>
-    const selectedNodeIds = new Set(flowNodes.filter(node => !!node.selected).map(node => node.id))
-    const selectedEdgeIds = new Set(flowEdges.filter(edge => !!edge.selected).map(edge => edge.id))
+    const flowEdges = options.edges.value as Array<{
+      id: string
+      selected?: boolean
+      source: string
+      target: string
+    }>
+    const selectedNodeIds = new Set(
+      flowNodes.filter((node) => !!node.selected).map((node) => node.id),
+    )
+    const selectedEdgeIds = new Set(
+      flowEdges.filter((edge) => !!edge.selected).map((edge) => edge.id),
+    )
     if (selectedNodeIds.size === 0 && selectedEdgeIds.size === 0) return
     selectedNodeKinds.forEach((kind, nodeId) => {
       if (kind === 'message') return
       options.onNodeDeleted?.(nodeId, kind)
     })
     const before = options.captureHistory()
-    const nextNodes = flowNodes.filter(node => !selectedNodeIds.has(node.id)) as Node[]
-    const nextEdges = flowEdges.filter(edge => (
-      !selectedEdgeIds.has(edge.id)
-      && !selectedNodeIds.has(edge.source)
-      && !selectedNodeIds.has(edge.target)
-    )) as Edge[]
+    const nextNodes = flowNodes.filter((node) => !selectedNodeIds.has(node.id)) as Node[]
+    const nextEdges = flowEdges.filter(
+      (edge) =>
+        !selectedEdgeIds.has(edge.id) &&
+        !selectedNodeIds.has(edge.source) &&
+        !selectedNodeIds.has(edge.target),
+    ) as Edge[]
     options.commitNodes(nextNodes)
     options.commitEdges(nextEdges)
     options.pushHistory(before)
@@ -235,18 +252,22 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   }
 
   function onFlowNodeParamUpdate(nodeId: string, payload: { key: string; value: unknown }) {
-    updateSnapshotNode(nodeId, snapshotNode => patchFlowSnapshotParam(snapshotNode, payload))
+    updateSnapshotNode(nodeId, (snapshotNode) => patchFlowSnapshotParam(snapshotNode, payload))
   }
 
   function onFlowColorApplyPreset(nodeId: string, value: string[]) {
     updateSnapshotNode(nodeId, (snapshotNode) => {
-      const baseColors = isColorNodePlaceholderState(snapshotNode) ? [] : (Array.isArray(snapshotNode.colors) ? snapshotNode.colors : [])
-      const normalizedPreset = value.map(color => normalizeHexColor(color))
+      const baseColors = isColorNodePlaceholderState(snapshotNode)
+        ? []
+        : Array.isArray(snapshotNode.colors)
+          ? snapshotNode.colors
+          : []
+      const normalizedPreset = value.map((color) => normalizeHexColor(color))
       if (normalizedPreset.length === 0) return snapshotNode
       const nextColors = normalizeColorNodeColors([...baseColors, ...normalizedPreset])
       if (
-        nextColors.length === baseColors.length
-        && nextColors.every((color: string, index: number) => color === baseColors[index])
+        nextColors.length === baseColors.length &&
+        nextColors.every((color: string, index: number) => color === baseColors[index])
       ) {
         return snapshotNode
       }
@@ -269,12 +290,16 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   function onFlowColorAdd(nodeId: string, value: string) {
     updateSnapshotNode(nodeId, (snapshotNode) => {
-      const baseColors = isColorNodePlaceholderState(snapshotNode) ? [] : (Array.isArray(snapshotNode.colors) ? snapshotNode.colors : [])
+      const baseColors = isColorNodePlaceholderState(snapshotNode)
+        ? []
+        : Array.isArray(snapshotNode.colors)
+          ? snapshotNode.colors
+          : []
       if (baseColors.length >= MAX_COLOR_NODE_SWATCHES) return snapshotNode
       const nextColors = normalizeColorNodeColors([...baseColors, normalizeHexColor(value)])
       if (
-        nextColors.length === baseColors.length
-        && nextColors.every((color: string, index: number) => color === baseColors[index])
+        nextColors.length === baseColors.length &&
+        nextColors.every((color: string, index: number) => color === baseColors[index])
       ) {
         return snapshotNode
       }
@@ -296,22 +321,38 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     })
   }
 
-  const EXECUTION_NODE_KINDS = new Set(['edit', 'enhance', 'color', 'fusion', 'wear', 'model', 'viewpoint'])
+  const EXECUTION_NODE_KINDS = new Set([
+    'edit',
+    'enhance',
+    'color',
+    'fusion',
+    'wear',
+    'model',
+    'viewpoint',
+  ])
 
-  function markFlowExecutionNodeDirty(nodeId: string, { includeSelf = false }: { includeSelf?: boolean } = {}) {
+  function markFlowExecutionNodeDirty(
+    nodeId: string,
+    { includeSelf = false }: { includeSelf?: boolean } = {},
+  ) {
     const visited = new Set<string>()
     const queue: string[] = []
     if (includeSelf) {
       const selfData = lookupData(nodeId)
       if (selfData && EXECUTION_NODE_KINDS.has(selfData.kind)) {
-        updateSnapshotNode(nodeId, (snapshotNode) => {
-          if (snapshotNode.outputStatus === 'ready') return { ...snapshotNode, outputStatus: 'stale' }
-          return snapshotNode
-        }, { history: false })
+        updateSnapshotNode(
+          nodeId,
+          (snapshotNode) => {
+            if (snapshotNode.outputStatus === 'ready')
+              return { ...snapshotNode, outputStatus: 'stale' }
+            return snapshotNode
+          },
+          { history: false },
+        )
       }
     }
     visited.add(nodeId)
-    for (const edge of (options.edges.value as unknown as Edge[])) {
+    for (const edge of options.edges.value as unknown as Edge[]) {
       if (edge.source === nodeId) {
         if (!visited.has(edge.target)) {
           queue.push(edge.target)
@@ -323,12 +364,17 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       const currentId = queue.shift()!
       const data = lookupData(currentId)
       if (data && EXECUTION_NODE_KINDS.has(data.kind)) {
-        updateSnapshotNode(currentId, (snapshotNode) => {
-          if (snapshotNode.outputStatus === 'ready') return { ...snapshotNode, outputStatus: 'stale' }
-          return snapshotNode
-        }, { history: false })
+        updateSnapshotNode(
+          currentId,
+          (snapshotNode) => {
+            if (snapshotNode.outputStatus === 'ready')
+              return { ...snapshotNode, outputStatus: 'stale' }
+            return snapshotNode
+          },
+          { history: false },
+        )
       }
-      for (const edge of (options.edges.value as unknown as Edge[])) {
+      for (const edge of options.edges.value as unknown as Edge[]) {
         if (edge.source === currentId && !visited.has(edge.target)) {
           queue.push(edge.target)
           visited.add(edge.target)

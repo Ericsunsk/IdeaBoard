@@ -8,7 +8,6 @@
 </template>
 
 <script setup lang="ts">
-
 type ConnectionChipItem = {
   key: string
   label: string

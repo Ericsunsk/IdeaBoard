@@ -20,14 +20,19 @@ export interface StorageCard {
 export type ProviderMetaMap = Partial<Record<StorageProvider, StorageProviderMeta>>
 
 export function toProviderMetaMap(providers: StorageProviderMeta[]): ProviderMetaMap {
-  return Object.fromEntries(providers.map((provider) => [provider.provider, provider])) as ProviderMetaMap
+  return Object.fromEntries(
+    providers.map((provider) => [provider.provider, provider]),
+  ) as ProviderMetaMap
 }
 
 export function providerLabel(provider: StorageProvider, providerMap: ProviderMetaMap) {
   return providerMap[provider]?.label || provider
 }
 
-export function providerSupportsBucketInfo(provider: StorageProvider, providerMap: ProviderMetaMap) {
+export function providerSupportsBucketInfo(
+  provider: StorageProvider,
+  providerMap: ProviderMetaMap,
+) {
   return Boolean(providerMap[provider]?.supports_bucket_info)
 }
 
@@ -38,7 +43,7 @@ export function providerSupportsTest(provider: StorageProvider, providerMap: Pro
 export function normalizeConfig(
   provider: StorageProvider,
   config: Record<string, unknown> | undefined,
-  providerMap: ProviderMetaMap
+  providerMap: ProviderMetaMap,
 ) {
   const fields = providerMap[provider]?.fields || []
   const next: Record<string, unknown> = {}
@@ -61,7 +66,10 @@ export function normalizeConfig(
   return next
 }
 
-export function createEmptyProfile(provider: StorageProvider, providerMap: ProviderMetaMap): StorageCard {
+export function createEmptyProfile(
+  provider: StorageProvider,
+  providerMap: ProviderMetaMap,
+): StorageCard {
   return {
     id: '',
     name: `${providerLabel(provider, providerMap)} 存储`,
@@ -74,7 +82,10 @@ export function createEmptyProfile(provider: StorageProvider, providerMap: Provi
   }
 }
 
-export function normalizeProfile(profile: StorageProfile, providerMap: ProviderMetaMap): StorageCard {
+export function normalizeProfile(
+  profile: StorageProfile,
+  providerMap: ProviderMetaMap,
+): StorageCard {
   const config = normalizeConfig(profile.provider, profile.config, providerMap)
   const secretFields = (providerMap[profile.provider]?.fields || []).filter((field) => field.secret)
   for (const field of secretFields) {
@@ -128,7 +139,10 @@ export function canApply(storage: StorageCard, providerMap: ProviderMetaMap) {
 }
 
 export function canTest(storage: StorageCard, providerMap: ProviderMetaMap) {
-  return providerSupportsTest(storage.provider, providerMap) && hasConfiguredProfile(storage, providerMap)
+  return (
+    providerSupportsTest(storage.provider, providerMap) &&
+    hasConfiguredProfile(storage, providerMap)
+  )
 }
 
 export function statusText(storage: StorageCard, providerMap: ProviderMetaMap) {
@@ -176,10 +190,7 @@ export function storageMetaItems(storage: StorageCard) {
 
 export function storageFeatureChips(storage: StorageCard) {
   if (storage.provider === 'local') {
-    return [
-      `状态 ${storage.enabled ? '开启' : '关闭'}`,
-      '模式 本地目录',
-    ]
+    return [`状态 ${storage.enabled ? '开启' : '关闭'}`, '模式 本地目录']
   }
 
   if (storage.provider === 's3-compatible') {
@@ -198,19 +209,23 @@ export function storageFeatureChips(storage: StorageCard) {
   ]
 }
 
-export function buildPayload(profile: StorageCard, providerMap: ProviderMetaMap): StorageProfilePayload {
+export function buildPayload(
+  profile: StorageCard,
+  providerMap: ProviderMetaMap,
+): StorageProfilePayload {
   const fields = providerMap[profile.provider]?.fields || []
   const config: Record<string, unknown> = {}
 
   for (const field of fields) {
     const value = profile.config[field.key]
-    config[field.key] = field.type === 'switch'
-      ? Boolean(value)
-      : typeof value === 'string'
-        ? value.trim()
-        : value == null
-          ? ''
-          : String(value)
+    config[field.key] =
+      field.type === 'switch'
+        ? Boolean(value)
+        : typeof value === 'string'
+          ? value.trim()
+          : value == null
+            ? ''
+            : String(value)
   }
 
   return {

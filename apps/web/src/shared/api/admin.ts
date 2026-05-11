@@ -24,15 +24,20 @@ export const adminApi = {
 
   getRateLimitSettings: (): Promise<GetAdminRateLimitSettingsResult> =>
     adminSettingsApi.getAdminRateLimitSettings(),
-  updateRateLimitSettings: (data: { window_seconds: number; max_requests: number }): Promise<UpdateAdminRateLimitSettingsResult> =>
+  updateRateLimitSettings: (data: {
+    window_seconds: number
+    max_requests: number
+  }): Promise<UpdateAdminRateLimitSettingsResult> =>
     adminSettingsApi.updateAdminRateLimitSettings(data),
 
-  getUsers: (params: { keyword?: string; page?: number; page_size?: number }): Promise<ListAdminUsersResult> =>
-    adminUsersApi.listAdminUsers(params),
+  getUsers: (params: {
+    keyword?: string
+    page?: number
+    page_size?: number
+  }): Promise<ListAdminUsersResult> => adminUsersApi.listAdminUsers(params),
   updateUserStatus: (id: number, status: number): Promise<UpdateAdminUserStatusResult> =>
     adminUsersApi.updateAdminUserStatus(id, { status }),
   updateUserRole: (id: number, role: 'admin' | 'user'): Promise<UpdateAdminUserRoleResult> =>
     adminUsersApi.updateAdminUserRole(id, { role }),
-  deleteUser: (id: number): Promise<DeleteAdminUserResult> =>
-    adminUsersApi.deleteAdminUser(id),
+  deleteUser: (id: number): Promise<DeleteAdminUserResult> => adminUsersApi.deleteAdminUser(id),
 }

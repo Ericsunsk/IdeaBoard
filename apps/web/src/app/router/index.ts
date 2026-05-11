@@ -6,27 +6,27 @@ import { getStoredUser, clearStoredAuth, setStoredAuth } from '../../shared/util
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/user/home'
+    redirect: '/user/home',
   },
   {
     path: '/user/login',
     name: 'UserLogin',
     component: () => import('../../pages/user/UserAuthPage.vue'),
     props: { mode: 'login' },
-    meta: { guest: true }
+    meta: { guest: true },
   },
   {
     path: '/user/register',
     name: 'UserRegister',
     component: () => import('../../pages/user/UserAuthPage.vue'),
     props: { mode: 'register' },
-    meta: { guest: true }
+    meta: { guest: true },
   },
   {
     path: '/share',
     name: 'ShareJoin',
     component: () => import('../../pages/user/UserShareJoinPage.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
   },
   {
     path: '/user',
@@ -47,15 +47,15 @@ const routes: RouteRecordRaw[] = [
         path: 'center',
         name: 'UserCenter',
         component: () => import('../../pages/user/UserCenterPage.vue'),
-        meta: { requiresAuth: true }
-      }
-    ]
+        meta: { requiresAuth: true },
+      },
+    ],
   },
   {
     path: '/user/workspace',
     name: 'UserWorkspace',
     component: () => import('../../pages/user/UserWorkspacePage.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
   },
   {
     path: '/admin',
@@ -63,51 +63,51 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        redirect: '/admin/users'
+        redirect: '/admin/users',
       },
       {
         path: 'login',
         name: 'AdminLogin',
         component: () => import('../../pages/admin/AdminLoginPage.vue'),
-        meta: { guest: true }
+        meta: { guest: true },
       },
       {
         path: 'users',
         name: 'AdminUsers',
         component: () => import('../../pages/admin/AdminUsersPage.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true },
       },
       {
         path: 'statistics',
         name: 'AdminStatistics',
         component: () => import('../../pages/admin/AdminUsageStatisticsPage.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true },
       },
       {
         path: 'channels',
         name: 'AdminChannels',
         component: () => import('../../pages/admin/AdminChannelsPage.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true },
       },
       {
         path: 'oss-config',
         name: 'AdminOSSConfig',
         component: () => import('../../pages/admin/AdminStoragePage.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true },
       },
       {
         path: 'feature-prompts',
         name: 'AdminFeaturePrompts',
         component: () => import('../../pages/admin/AdminFeaturePromptsPage.vue'),
-        meta: { requiresAuth: true }
-      }
-    ]
-  }
+        meta: { requiresAuth: true },
+      },
+    ],
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
 })
 
 // Session cache: avoid hitting /api/user/info on every navigation.
@@ -125,7 +125,8 @@ router.beforeEach(async (to) => {
   if (shouldRefreshSession) {
     const now = Date.now()
     // Admin routes always bypass the cache to ensure fresh auth state.
-    const cacheValid = !isAdminRoute && sessionCacheUser !== null && (now - sessionCacheAt) < SESSION_CACHE_TTL_MS
+    const cacheValid =
+      !isAdminRoute && sessionCacheUser !== null && now - sessionCacheAt < SESSION_CACHE_TTL_MS
     if (cacheValid) {
       user = sessionCacheUser
     } else {

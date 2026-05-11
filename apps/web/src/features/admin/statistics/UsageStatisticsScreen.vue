@@ -10,14 +10,12 @@
     <div v-if="needsBackfill" class="backfill-banner">
       <div class="backfill-banner-content">
         <n-icon size="18" class="backfill-banner-icon"><WarningOutline /></n-icon>
-        <span>缺失 <strong>{{ backfillStatus?.missing_days }}</strong> 天统计数据，部分历史数据不完整</span>
+        <span
+          >缺失
+          <strong>{{ backfillStatus?.missing_days }}</strong> 天统计数据，部分历史数据不完整</span
+        >
       </div>
-      <n-button
-        size="small"
-        type="warning"
-        :loading="backfillLoading"
-        @click="handleBackfill"
-      >
+      <n-button size="small" type="warning" :loading="backfillLoading" @click="handleBackfill">
         立即补录
       </n-button>
     </div>
@@ -37,8 +35,8 @@
           </div>
           <div class="chart-controls">
             <div class="range-picker">
-              <button 
-                v-for="r in rangeOptions" 
+              <button
+                v-for="r in rangeOptions"
                 :key="r.key"
                 class="range-btn"
                 :class="{ active: timeRange === r.key }"
@@ -49,27 +47,76 @@
             </div>
           </div>
         </div>
-        <div class="chart-body area-chart-container" @mousemove="handleChartHover" @mouseleave="activeDayIndex = null">
+        <div
+          class="chart-body area-chart-container"
+          @mousemove="handleChartHover"
+          @mouseleave="activeDayIndex = null"
+        >
           <div class="area-chart-clipped">
             <div class="area-chart-wrapper">
               <svg viewBox="0 0 700 200" preserveAspectRatio="none" class="area-svg">
                 <defs>
-                  <linearGradient v-for="(m, idx) in areaSeriesMeta" :key="'grad-' + idx" :id="'grad-' + idx" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient
+                    v-for="(m, idx) in areaSeriesMeta"
+                    :id="'grad-' + idx"
+                    :key="'grad-' + idx"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
                     <stop offset="0%" :stop-color="m.color" stop-opacity="0.15" />
                     <stop offset="100%" :stop-color="m.color" stop-opacity="0" />
                   </linearGradient>
                 </defs>
-                <path v-for="(path, index) in areaPaths" :key="'path-' + index" :d="path.d" :fill="`url(#grad-${index})`" class="area-path" />
-                <path v-for="(path, index) in areaPaths" :key="'line-' + index" :d="path.lineD" :stroke="path.color" stroke-width="1.5" fill="none" stroke-linecap="round" class="area-line" />
-                <line v-if="activeDayIndex !== null" :x1="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" y1="0" :x2="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" y2="200" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="4,4" />
+                <path
+                  v-for="(path, index) in areaPaths"
+                  :key="'path-' + index"
+                  :d="path.d"
+                  :fill="`url(#grad-${index})`"
+                  class="area-path"
+                />
+                <path
+                  v-for="(path, index) in areaPaths"
+                  :key="'line-' + index"
+                  :d="path.lineD"
+                  :stroke="path.color"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linecap="round"
+                  class="area-line"
+                />
+                <line
+                  v-if="activeDayIndex !== null"
+                  :x1="activeDayIndex * (700 / Math.max(1, trendData.length - 1))"
+                  y1="0"
+                  :x2="activeDayIndex * (700 / Math.max(1, trendData.length - 1))"
+                  y2="200"
+                  stroke="rgba(255,255,255,0.1)"
+                  stroke-width="1"
+                  stroke-dasharray="4,4"
+                />
                 <template v-if="activeDayIndex !== null">
-                  <circle v-for="(pt, idx) in activeDayPoints" :key="'pt-' + idx" :cx="activeDayIndex * (700 / Math.max(1, trendData.length - 1))" :cy="pt.y" r="3" :fill="pt.color" stroke="#141416" stroke-width="1.5" />
+                  <circle
+                    v-for="(pt, idx) in activeDayPoints"
+                    :key="'pt-' + idx"
+                    :cx="activeDayIndex * (700 / Math.max(1, trendData.length - 1))"
+                    :cy="pt.y"
+                    r="3"
+                    :fill="pt.color"
+                    stroke="#141416"
+                    stroke-width="1.5"
+                  />
                 </template>
               </svg>
             </div>
             <div class="chart-x-axis-refined-fixed">
               <template v-for="(day, i) in trendData" :key="day.date">
-                <div v-if="shouldShowLabel(i)" class="axis-item-absolute" :style="{ left: (i * (100 / Math.max(1, trendData.length - 1))) + '%' }">
+                <div
+                  v-if="shouldShowLabel(i)"
+                  class="axis-item-absolute"
+                  :style="{ left: i * (100 / Math.max(1, trendData.length - 1)) + '%' }"
+                >
                   <span class="axis-date">{{ day.date }}</span>
                 </div>
               </template>
@@ -82,17 +129,23 @@
               'is-left-edge': activeDayIndex <= 1,
               'is-right-edge': activeDayIndex >= Math.max(0, trendData.length - 2),
             }"
-            :style="{ left: (activeDayIndex * (100 / Math.max(1, trendData.length - 1))) + '%' }"
+            :style="{ left: activeDayIndex * (100 / Math.max(1, trendData.length - 1)) + '%' }"
           >
             <div class="tooltip-header">{{ trendData[activeDayIndex].date }}</div>
             <div class="tooltip-list">
-              <div v-for="seg in trendData[activeDayIndex].segments" :key="seg.label" class="tooltip-item">
+              <div
+                v-for="seg in trendData[activeDayIndex].segments"
+                :key="seg.label"
+                class="tooltip-item"
+              >
                 <span class="dot" :style="{ background: seg.color }"></span>
                 <span class="label">{{ seg.label }}</span>
                 <span class="val">{{ seg.value }}</span>
               </div>
               <div class="tooltip-divider"></div>
-              <div class="tooltip-total"><span>总计</span><span>{{ trendData[activeDayIndex].total }}</span></div>
+              <div class="tooltip-total">
+                <span>总计</span><span>{{ trendData[activeDayIndex].total }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -102,17 +155,42 @@
       <div class="chart-card pie-chart-card">
         <div class="chart-header-row">
           <h3 class="chart-title">模型消耗占比</h3>
-          <n-popover trigger="click" placement="bottom-end" :show-arrow="false" raw class="admin-popover-panel">
+          <n-popover
+            trigger="click"
+            placement="bottom-end"
+            :show-arrow="false"
+            raw
+            class="admin-popover-panel"
+          >
             <template #trigger>
               <n-button quaternary circle size="small">
-                <template #icon><n-icon><SettingsOutline /></n-icon></template>
+                <template #icon
+                  ><n-icon><SettingsOutline /></n-icon
+                ></template>
               </n-button>
             </template>
             <div class="price-card-popover">
               <div class="popover-body">
-                <n-form size="small" :show-feedback="false" label-placement="left" label-width="150" label-align="left">
-                  <n-form-item v-for="m in modelSettingCandidates" :key="m.name" :label="m.name" class="modal-style-item">
-                    <n-input-number placeholder="0.00" :precision="4" :min="0" style="width: 100%" class="pill-input">
+                <n-form
+                  size="small"
+                  :show-feedback="false"
+                  label-placement="left"
+                  label-width="150"
+                  label-align="left"
+                >
+                  <n-form-item
+                    v-for="m in modelSettingCandidates"
+                    :key="m.name"
+                    :label="m.name"
+                    class="modal-style-item"
+                  >
+                    <n-input-number
+                      placeholder="0.00"
+                      :precision="4"
+                      :min="0"
+                      style="width: 100%"
+                      class="pill-input"
+                    >
                       <template #prefix>$</template>
                     </n-input-number>
                   </n-form-item>
@@ -125,18 +203,25 @@
           <div class="donut-section-large">
             <div class="donut-wrapper-large">
               <svg viewBox="0 0 100 100" class="donut-svg">
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.03)" stroke-width="8" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="transparent"
+                  stroke="rgba(255,255,255,0.03)"
+                  stroke-width="8"
+                />
                 <template v-for="(item, index) in chartSegments" :key="'ring-' + index">
-                  <circle 
-                    cx="50" 
-                    cy="50" 
-                    r="40" 
-                    fill="transparent" 
-                    :stroke="item.color" 
-                    stroke-width="8" 
-                    stroke-linecap="round" 
-                    :stroke-dasharray="item.dashArray" 
-                    :stroke-dashoffset="item.dashOffset" 
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="transparent"
+                    :stroke="item.color"
+                    stroke-width="8"
+                    stroke-linecap="round"
+                    :stroke-dasharray="item.dashArray"
+                    :stroke-dashoffset="item.dashOffset"
                     class="donut-segment-hardware"
                   />
                 </template>
@@ -147,7 +232,7 @@
               </div>
             </div>
           </div>
-          
+
           <!-- 新增渠道列表 legend -->
           <div class="consumption-legend">
             <div v-for="item in modelRanking" :key="item.name" class="legend-row">
@@ -172,26 +257,59 @@
           </div>
         </div>
         <div class="health-grid">
-          <n-tooltip v-for="(cell, i) in healthGridFlat" :key="i" trigger="hover" placement="top" :show-arrow="true" class="health-tooltip">
+          <n-tooltip
+            v-for="(cell, i) in healthGridFlat"
+            :key="i"
+            trigger="hover"
+            placement="top"
+            :show-arrow="true"
+            class="health-tooltip"
+          >
             <template #trigger>
-              <div class="health-cell" :class="{ 'is-error': cell.status === 1, 'is-warning': cell.status === 2, 'is-success': cell.status === 3, 'is-empty': cell.status === 0 }" :style="{ background: cell.status === 1 ? 'var(--admin-danger)' : cell.status === 2 ? 'var(--admin-warning)' : cell.status === 3 ? 'var(--admin-success)' : 'rgba(255, 255, 255, 0.05)' }"></div>
+              <div
+                class="health-cell"
+                :class="{
+                  'is-error': cell.status === 1,
+                  'is-warning': cell.status === 2,
+                  'is-success': cell.status === 3,
+                  'is-empty': cell.status === 0,
+                }"
+                :style="{
+                  background:
+                    cell.status === 1
+                      ? 'var(--admin-danger)'
+                      : cell.status === 2
+                        ? 'var(--admin-warning)'
+                        : cell.status === 3
+                          ? 'var(--admin-success)'
+                          : 'rgba(255, 255, 255, 0.05)',
+                }"
+              ></div>
             </template>
             <div class="tooltip-content">
               <div class="tooltip-time">{{ getCellTimeRange(i) }}</div>
               <div class="tooltip-stats">
                 <span class="stat-success"><span class="icon">✓</span> {{ cell.success }}</span>
-                <span class="stat-fail"><span class="icon Discovery-failed">×</span> {{ cell.fail }}</span>
+                <span class="stat-fail"
+                  ><span class="icon Discovery-failed">×</span> {{ cell.fail }}</span
+                >
                 <span class="stat-percent">({{ calculatePercent(cell) }}%)</span>
               </div>
             </div>
           </n-tooltip>
         </div>
         <div class="health-legend">
-          <div class="legend-item"><span class="legend-dot is-success"></span><span>正常</span></div>
-          <div class="legend-item"><span class="legend-dot is-warning"></span><span>波动</span></div>
+          <div class="legend-item">
+            <span class="legend-dot is-success"></span><span>正常</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-dot is-warning"></span><span>波动</span>
+          </div>
           <div class="legend-item"><span class="legend-dot is-error"></span><span>故障</span></div>
           <div class="legend-spacer"></div>
-          <div class="legend-item"><span class="legend-dot is-empty"></span><span>无数据</span></div>
+          <div class="legend-item">
+            <span class="legend-dot is-empty"></span><span>无数据</span>
+          </div>
         </div>
       </div>
       <!-- 第三行：延迟、错误分布与用户排行 -->
@@ -202,10 +320,13 @@
             <span class="metric-title">模型响应延迟 (TTFT)</span>
           </div>
           <div class="latency-list">
-            <div class="latency-item" v-for="item in latencyList" :key="item.name">
+            <div v-for="item in latencyList" :key="item.name" class="latency-item">
               <span class="model-tag">{{ item.name }}</span>
               <div class="latency-bar-wrapper">
-                <div class="latency-bar" :style="{ width: `${item.percent}%`, background: item.color }"></div>
+                <div
+                  class="latency-bar"
+                  :style="{ width: `${item.percent}%`, background: item.color }"
+                ></div>
               </div>
               <span class="latency-val">{{ item.val }}s</span>
             </div>
@@ -218,9 +339,18 @@
             <span class="metric-title">错误分布</span>
           </div>
           <div class="error-tags">
-            <div class="error-tag-item"><span class="tag-dot" style="background: #ef4444"></span><span>失败任务</span><span class="tag-val">{{ failureRate }}</span></div>
-            <div class="error-tag-item"><span class="tag-dot" style="background: #f59e0b"></span><span>运行中任务</span><span class="tag-val">{{ runningRate }}</span></div>
-            <div class="error-tag-item"><span class="tag-dot" style="background: #6366f1"></span><span>已完成任务</span><span class="tag-val">{{ successRate }}</span></div>
+            <div class="error-tag-item">
+              <span class="tag-dot" style="background: #ef4444"></span><span>失败任务</span
+              ><span class="tag-val">{{ failureRate }}</span>
+            </div>
+            <div class="error-tag-item">
+              <span class="tag-dot" style="background: #f59e0b"></span><span>运行中任务</span
+              ><span class="tag-val">{{ runningRate }}</span>
+            </div>
+            <div class="error-tag-item">
+              <span class="tag-dot" style="background: #6366f1"></span><span>已完成任务</span
+              ><span class="tag-val">{{ successRate }}</span>
+            </div>
           </div>
         </div>
 
@@ -235,14 +365,28 @@
                 <span>全局队列</span>
                 <span class="load-count">{{ monitorQueueText }}</span>
               </div>
-              <n-progress type="line" :percentage="monitorQueuePercent" :show-indicator="false" :height="6" :border-radius="3" color="var(--admin-primary)" />
+              <n-progress
+                type="line"
+                :percentage="monitorQueuePercent"
+                :show-indicator="false"
+                :height="6"
+                :border-radius="3"
+                color="var(--admin-primary)"
+              />
             </div>
             <div class="load-bar-item">
               <div class="load-bar-info">
                 <span>运行中任务</span>
                 <span class="load-count">{{ monitorRunningText }}</span>
               </div>
-              <n-progress type="line" :percentage="monitorRunningPercent" :show-indicator="false" :height="6" :border-radius="3" status="warning" />
+              <n-progress
+                type="line"
+                :percentage="monitorRunningPercent"
+                :show-indicator="false"
+                :height="6"
+                :border-radius="3"
+                status="warning"
+              />
             </div>
           </div>
         </div>
@@ -251,12 +395,20 @@
         <div class="chart-card metric-mini-card channel-load-card">
           <div class="metric-header">
             <span class="metric-title">渠道并发负载</span>
-            <span class="metric-value">{{ saturatedAccountCount }} <span class="unit">个饱和</span></span>
+            <span class="metric-value"
+              >{{ saturatedAccountCount }} <span class="unit">个饱和</span></span
+            >
           </div>
           <div class="load-items-mini">
-            <div class="load-item-row" v-for="item in accountLoadRows" :key="item.id">
+            <div v-for="item in accountLoadRows" :key="item.id" class="load-item-row">
               <span class="acc-id">#{{ item.id }}</span>
-              <n-progress type="line" :percentage="item.percent" :show-indicator="false" :height="4" :color="item.color" />
+              <n-progress
+                type="line"
+                :percentage="item.percent"
+                :show-indicator="false"
+                :height="4"
+                :color="item.color"
+              />
               <span class="acc-num">{{ item.current }}/{{ item.max }}</span>
             </div>
           </div>
@@ -276,7 +428,6 @@
           </div>
         </div>
       </div>
-
     </div>
     <!-- 底部：任务监控 (Migrated from MonitorScreen) -->
     <div class="chart-card admin-table-card tasks-audit-log">
@@ -298,9 +449,17 @@
               <n-icon><SearchOutline /></n-icon>
             </template>
           </n-input>
-          <n-select v-model:value="filterStatus" :options="taskStatusOptions" placeholder="所有状态" clearable style="width: 140px" />
+          <n-select
+            v-model:value="filterStatus"
+            :options="taskStatusOptions"
+            placeholder="所有状态"
+            clearable
+            style="width: 140px"
+          />
           <n-button secondary class="admin-icon-btn" @click="loadTasks">
-            <template #icon><n-icon><RefreshOutline /></n-icon></template>
+            <template #icon
+              ><n-icon><RefreshOutline /></n-icon
+            ></template>
           </n-button>
         </div>
       </div>
@@ -315,27 +474,27 @@
         :scroll-x="1000"
       />
       <div class="pagination-wrapper">
-        <n-pagination
-          v-model:page="page"
-          :page-count="pageCount"
-          @update:page="loadTasks"
-        />
+        <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadTasks" />
       </div>
     </div>
 
     <!-- 详情弹窗 (Redesigned: High Density & Premium Modal) -->
-    <n-modal 
-      v-model:show="detailModalVisible" 
+    <n-modal
+      v-model:show="detailModalVisible"
       class="premium-detail-modal"
       preset="card"
-      style="width: 640px; max-width: 95vw; border-radius: 20px;"
+      style="width: 640px; max-width: 95vw; border-radius: 20px"
       :bordered="false"
       :segmented="{ content: 'soft' }"
     >
       <template #header>
         <div class="premium-drawer-header">
           <div class="h-left">
-            <n-icon size="22" class="h-icon" :color="getTaskStatusConfig(detailTask?.status || '').color">
+            <n-icon
+              size="22"
+              class="h-icon"
+              :color="getTaskStatusConfig(detailTask?.status || '').color"
+            >
               <CheckmarkCircleOutline v-if="detailTask?.status === 'completed'" />
               <CloseCircleOutline v-else-if="detailTask?.status === 'failed'" />
               <TimeOutline v-else />
@@ -346,8 +505,15 @@
             </div>
           </div>
           <div class="h-actions">
-            <n-button quaternary size="small" circle @click="copyToClipboard(detailTask?.task_id || '')">
-              <template #icon><n-icon><CopyOutline /></n-icon></template>
+            <n-button
+              quaternary
+              size="small"
+              circle
+              @click="copyToClipboard(detailTask?.task_id || '')"
+            >
+              <template #icon
+                ><n-icon><CopyOutline /></n-icon
+              ></template>
             </n-button>
           </div>
         </div>
@@ -361,8 +527,8 @@
             <span class="status-value">{{ getTaskStatusConfig(detailTask.status).text }}</span>
           </div>
           <div v-if="detailTask.status === 'failed'" class="banner-error">
-             <n-icon class="err-icon"><WarningOutline /></n-icon>
-             <span>{{ getErrorReason(detailTask) || '处理过程中发生未知错误' }}</span>
+            <n-icon class="err-icon"><WarningOutline /></n-icon>
+            <span>{{ getErrorReason(detailTask) || '处理过程中发生未知错误' }}</span>
           </div>
           <div v-else class="banner-metrics">
             <div class="metric">
@@ -387,8 +553,15 @@
               <span class="label">用户 ID</span>
               <div class="val-group">
                 <span class="value">{{ detailTask.user_id }}</span>
-                <n-button quaternary circle size="tiny" @click="copyToClipboard(String(detailTask.user_id))">
-                  <template #icon><n-icon><CopyOutline /></n-icon></template>
+                <n-button
+                  quaternary
+                  circle
+                  size="tiny"
+                  @click="copyToClipboard(String(detailTask.user_id))"
+                >
+                  <template #icon
+                    ><n-icon><CopyOutline /></n-icon
+                  ></template>
                 </n-button>
               </div>
             </div>
@@ -412,7 +585,12 @@
           <div class="section-title">
             <n-icon><ChatbubbleEllipsesOutline /></n-icon>
             <span>任务指令 (Prompt)</span>
-            <n-button quaternary size="tiny" class="title-action" @click="copyToClipboard(detailTask.prompt || '')">
+            <n-button
+              quaternary
+              size="tiny"
+              class="title-action"
+              @click="copyToClipboard(detailTask.prompt || '')"
+            >
               复制全文
             </n-button>
           </div>
@@ -428,10 +606,15 @@
             <span>生成结果</span>
           </div>
           <div class="result-image-box">
-            <n-image :src="resultImageUrl" width="100%" object-fit="contain" class="standard-image" />
+            <n-image
+              :src="resultImageUrl"
+              width="100%"
+              object-fit="contain"
+              class="standard-image"
+            />
             <div class="image-overlay">
               <n-button tertiary size="small" @click="openResultImage(resultImageUrl)">
-                 在新窗口打开
+                在新窗口打开
               </n-button>
             </div>
           </div>
@@ -442,21 +625,26 @@
           <div class="section-title">
             <n-icon><CodeWorkingOutline /></n-icon>
             <span>API 响应摘要</span>
-            <n-button quaternary size="tiny" class="title-action" @click="copyToClipboard(resultSummaryText)">
+            <n-button
+              quaternary
+              size="tiny"
+              class="title-action"
+              @click="copyToClipboard(resultSummaryText)"
+            >
               复制 JSON
             </n-button>
           </div>
           <div class="json-card">
             <pre>{{ resultSummaryText }}</pre>
           </div>
-          
+
           <div v-if="resultDebugText" class="debug-wrapper">
             <div class="debug-header" @click="showDebugResult = !showDebugResult">
-               <div class="header-left">
-                 <n-icon><TerminalOutline /></n-icon>
-                 <span>原始调试详情 (脱敏)</span>
-               </div>
-               <n-button text size="tiny">{{ showDebugResult ? '隐藏' : '展开' }}</n-button>
+              <div class="header-left">
+                <n-icon><TerminalOutline /></n-icon>
+                <span>原始调试详情 (脱敏)</span>
+              </div>
+              <n-button text size="tiny">{{ showDebugResult ? '隐藏' : '展开' }}</n-button>
             </div>
             <n-collapse-transition :show="showDebugResult">
               <div class="json-card debug-mode">
@@ -466,32 +654,49 @@
           </div>
         </div>
 
-        <div class="premium-drawer-footer">
-           &copy; Feng-AI Operations Audit System
-        </div>
+        <div class="premium-drawer-footer">&copy; Feng-AI Operations Audit System</div>
       </div>
     </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { 
-  NDataTable, NProgress, NTooltip, NButton, NIcon, NPopover, NInputNumber, 
-  NForm, NFormItem, NModal, NSelect, NPagination, NImage, NInput, 
-  NCollapseTransition, useMessage 
+import {
+  NDataTable,
+  NProgress,
+  NTooltip,
+  NButton,
+  NIcon,
+  NPopover,
+  NInputNumber,
+  NForm,
+  NFormItem,
+  NModal,
+  NSelect,
+  NPagination,
+  NImage,
+  NInput,
+  NCollapseTransition,
+  useMessage,
 } from 'naive-ui'
-import { 
-  SettingsOutline, ListOutline, RefreshOutline, SearchOutline, 
-  ChatbubbleEllipsesOutline, ImageOutline, WarningOutline, TerminalOutline,
-  CopyOutline, CheckmarkCircleOutline, CloseCircleOutline, TimeOutline,
+import {
+  SettingsOutline,
+  ListOutline,
+  RefreshOutline,
+  SearchOutline,
+  ChatbubbleEllipsesOutline,
+  ImageOutline,
+  WarningOutline,
+  TerminalOutline,
+  CopyOutline,
+  CheckmarkCircleOutline,
+  CloseCircleOutline,
+  TimeOutline,
   FingerPrintOutline,
-  CodeWorkingOutline
+  CodeWorkingOutline,
 } from '@vicons/ionicons5'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
-import {
-  taskStatusOptions,
-  getTaskStatusConfig,
-} from '../shared/monitorShared'
+import { taskStatusOptions, getTaskStatusConfig } from '../shared/monitorShared'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { useTaskMonitor } from './useTaskMonitor'
 import { useUsageStatisticsData } from './useUsageStatisticsData'
@@ -590,5 +795,4 @@ async function handleBackfill() {
     message.error(result.message || '统计补录失败')
   }
 }
-
 </script>

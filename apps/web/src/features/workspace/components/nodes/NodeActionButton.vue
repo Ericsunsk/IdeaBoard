@@ -11,19 +11,22 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
-  variant?: 'stage' | 'stage-ghost' | 'tool' | 'chip' | 'primary'
-  active?: boolean
-  disabled?: boolean
-  full?: boolean
-  pushRight?: boolean
-}>(), {
-  variant: 'tool',
-  active: false,
-  disabled: false,
-  full: false,
-  pushRight: false,
-})
+withDefaults(
+  defineProps<{
+    variant?: 'stage' | 'stage-ghost' | 'tool' | 'chip' | 'primary'
+    active?: boolean
+    disabled?: boolean
+    full?: boolean
+    pushRight?: boolean
+  }>(),
+  {
+    variant: 'tool',
+    active: false,
+    disabled: false,
+    full: false,
+    pushRight: false,
+  },
+)
 
 const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void

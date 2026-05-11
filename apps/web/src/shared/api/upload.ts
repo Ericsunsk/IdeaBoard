@@ -9,7 +9,9 @@ export const uploadApi = {
     if (normalizedBoardId) {
       form.append('board_id', normalizedBoardId)
     }
-    return apiPost<{ url: string }, FormData>('/user/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return apiPost<{ url: string }, FormData>('/user/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
   },
   recycle: (url: string, boardId: string): Promise<ApiResponse<{ deleted: boolean }>> =>
     apiDelete<{ deleted: boolean }>('/user/upload', { data: { url, board_id: boardId.trim() } }),

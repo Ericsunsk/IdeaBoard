@@ -87,7 +87,9 @@ function getTaskResultImageUrl(result: string): string {
 }
 
 export function getTaskStatusConfig(status: string): TaskStatusConfig {
-  return taskStatusConfigMap[status] || { type: 'default', text: status, color: DEFAULT_STATUS_COLOR }
+  return (
+    taskStatusConfigMap[status] || { type: 'default', text: status, color: DEFAULT_STATUS_COLOR }
+  )
 }
 
 export function calculateCappedRate(value: number, threshold: number): number {
@@ -102,15 +104,21 @@ export function isAccountSaturated(load: AccountLoad): boolean {
   return load.current_concurrent >= load.max_concurrent
 }
 
-export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) => void }): DataTableColumns<Task> {
+export function createMonitorTaskColumns(options?: {
+  onShowDetail?: (row: Task) => void
+}): DataTableColumns<Task> {
   return [
     {
       title: '创建时间',
       key: 'created_at',
       width: 130,
       render: (row) => {
-        return h('span', { style: { fontSize: '12px', color: 'var(--admin-text-1)', fontWeight: '500' } }, formatAdminDateTime(row.created_at, row.created_at))
-      }
+        return h(
+          'span',
+          { style: { fontSize: '12px', color: 'var(--admin-text-1)', fontWeight: '500' } },
+          formatAdminDateTime(row.created_at, row.created_at),
+        )
+      },
     },
     {
       title: '结果',
@@ -128,32 +136,37 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
             style: { borderRadius: '4px', cursor: 'pointer', display: 'block' },
             objectFit: 'cover',
             previewDisabled: false,
-            lazy: true
+            lazy: true,
           })
         }
         return '-'
-      }
+      },
     },
     {
       title: '用户',
       key: 'user',
       width: 100,
       render: (row: any) => {
-        const identifier = row.username || row.email || (row.user?.username) || (row.user?.email) || row.user_id
+        const identifier =
+          row.username || row.email || row.user?.username || row.user?.email || row.user_id
         return h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
-          h('span', { 
-            style: { 
-              fontWeight: '600', 
-              color: 'var(--admin-text-1)', 
-              fontSize: '12px',
-              maxWidth: '90px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            } 
-          }, identifier)
+          h(
+            'span',
+            {
+              style: {
+                fontWeight: '600',
+                color: 'var(--admin-text-1)',
+                fontSize: '12px',
+                maxWidth: '90px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              },
+            },
+            identifier,
+          ),
         ])
-      }
+      },
     },
     {
       title: '提示词',
@@ -161,22 +174,31 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
       width: 120,
       render: (row) => {
         const text = row.prompt || '-'
-        return h(NPopover, { trigger: 'hover', placement: 'top', style: { maxWidth: '400px' } }, {
-          trigger: () => h('span', { 
-            style: { 
-              color: 'var(--admin-text-2)', 
-              fontSize: '12px', 
-              cursor: 'help',
-              display: '-webkit-box',
-              '-webkit-line-clamp': '1',
-              '-webkit-box-orient': 'vertical',
-              'overflow': 'hidden',
-              'word-break': 'break-all'
-            } 
-          }, text),
-          default: () => h('div', { style: { fontSize: '12px', lineHeight: '1.6' } }, text)
-        })
-      }
+        return h(
+          NPopover,
+          { trigger: 'hover', placement: 'top', style: { maxWidth: '400px' } },
+          {
+            trigger: () =>
+              h(
+                'span',
+                {
+                  style: {
+                    color: 'var(--admin-text-2)',
+                    fontSize: '12px',
+                    cursor: 'help',
+                    display: '-webkit-box',
+                    '-webkit-line-clamp': '1',
+                    '-webkit-box-orient': 'vertical',
+                    overflow: 'hidden',
+                    'word-break': 'break-all',
+                  },
+                },
+                text,
+              ),
+            default: () => h('div', { style: { fontSize: '12px', lineHeight: '1.6' } }, text),
+          },
+        )
+      },
     },
     { title: '账号', key: 'account_id', width: 50, align: 'center' },
     {
@@ -189,15 +211,27 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
           const r = JSON.parse(row.result)
           if (r.platform) {
             return h('span', { style: { fontSize: '12px' } }, [
-              h(NTag, { size: 'tiny', type: 'info', bordered: false, style: { borderRadius: '4px' } }, () => r.platform),
-              r.model_set ? h('span', { style: { marginLeft: '4px', color: 'var(--admin-text-3)', fontSize: '10px' } }, r.model_set) : null,
+              h(
+                NTag,
+                { size: 'tiny', type: 'info', bordered: false, style: { borderRadius: '4px' } },
+                () => r.platform,
+              ),
+              r.model_set
+                ? h(
+                    'span',
+                    {
+                      style: { marginLeft: '4px', color: 'var(--admin-text-3)', fontSize: '10px' },
+                    },
+                    r.model_set,
+                  )
+                : null,
             ])
           }
         } catch {
           return h('span', { style: { color: 'var(--admin-text-3)', fontSize: '12px' } }, '-')
         }
         return h('span', { style: { color: 'var(--admin-text-3)', fontSize: '12px' } }, '-')
-      }
+      },
     },
     {
       title: '状态',
@@ -205,7 +239,11 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
       width: 80,
       render: (row) => {
         const config = getTaskStatusConfig(row.status)
-        return h(NTag, { type: config.type, size: 'small', bordered: false, style: { borderRadius: '6px' } }, () => config.text)
+        return h(
+          NTag,
+          { type: config.type, size: 'small', bordered: false, style: { borderRadius: '6px' } },
+          () => config.text,
+        )
       },
     },
     {
@@ -214,12 +252,18 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
       width: 60,
       align: 'center',
       render: (row) => {
-        if (!row.completed_at || !row.created_at) return h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
+        if (!row.completed_at || !row.created_at)
+          return h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
         const sec = calcDurationSeconds(row.created_at, row.completed_at)
         if (sec == null) return '-'
-        const color = sec > 60 ? 'var(--admin-danger)' : (sec > 30 ? 'var(--admin-warning)' : 'var(--admin-success)')
+        const color =
+          sec > 60
+            ? 'var(--admin-danger)'
+            : sec > 30
+              ? 'var(--admin-warning)'
+              : 'var(--admin-success)'
         return h('span', { style: { fontSize: '12px', color, fontWeight: '500' } }, `${sec}s`)
-      }
+      },
     },
     {
       title: '错误诊断',
@@ -227,7 +271,11 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
       width: 140,
       render: (row) => {
         if (row.status === 'failed' && row.error_msg) {
-          return h('span', { style: { color: ERROR_TEXT_COLOR, fontSize: '12px' } }, sanitizeTaskErrorMessage(row.error_msg))
+          return h(
+            'span',
+            { style: { color: ERROR_TEXT_COLOR, fontSize: '12px' } },
+            sanitizeTaskErrorMessage(row.error_msg),
+          )
         }
         return h('span', { style: { color: 'var(--admin-text-3)', fontSize: '12px' } }, '-')
       },
@@ -238,14 +286,18 @@ export function createMonitorTaskColumns(options?: { onShowDetail?: (row: Task) 
       width: 70,
       align: 'center',
       render: (row) =>
-        h(NButton, {
-          size: 'tiny',
-          quaternary: true,
-          onClick: () => options?.onShowDetail?.(row)
-        }, {
-          icon: () => h(NIcon, null, () => h(EyeOutline)),
-          default: () => '详情',
-        }),
+        h(
+          NButton,
+          {
+            size: 'tiny',
+            quaternary: true,
+            onClick: () => options?.onShowDetail?.(row),
+          },
+          {
+            icon: () => h(NIcon, null, () => h(EyeOutline)),
+            default: () => '详情',
+          },
+        ),
     },
   ]
 }

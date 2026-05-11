@@ -97,7 +97,8 @@ export const EXECUTION_ENHANCE_META = {
   canvasExtend: {
     feature: EXECUTION_FEATURE.canvasExtend,
     promptPrefix: '[canvas-extend]',
-    fallbackPrompt: '保持原图主体、人物、服装、构图、光影与透视不变，仅按扩边方向在新增画布区域自然补全连续背景与缺失内容',
+    fallbackPrompt:
+      '保持原图主体、人物、服装、构图、光影与透视不变，仅按扩边方向在新增画布区域自然补全连续背景与缺失内容',
   },
 } as const
 
@@ -108,7 +109,9 @@ interface BuildExecutionTaskRequestOptions {
   params?: Record<string, unknown>
 }
 
-export function buildExecutionTaskRequest(options: BuildExecutionTaskRequestOptions): SubmitTaskData {
+export function buildExecutionTaskRequest(
+  options: BuildExecutionTaskRequestOptions,
+): SubmitTaskData {
   const request: SubmitTaskData = {
     prompt: options.prompt,
   }

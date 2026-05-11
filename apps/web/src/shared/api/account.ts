@@ -19,8 +19,9 @@ export interface AccountListResponse {
 
 const adminAccountsApi = getAdminAccounts()
 
-export const createAccount = (data: CreateAccountRequest): Promise<ApiResponse<{ account: ApiAccount }>> =>
-  adminAccountsApi.createAdminAccount(data)
+export const createAccount = (
+  data: CreateAccountRequest,
+): Promise<ApiResponse<{ account: ApiAccount }>> => adminAccountsApi.createAdminAccount(data)
 
 export const updateAccount = (id: number, data: UpdateAccountRequest): Promise<ApiResponse<null>> =>
   adminAccountsApi.updateAdminAccount(id, data)
@@ -28,8 +29,12 @@ export const updateAccount = (id: number, data: UpdateAccountRequest): Promise<A
 export const deleteAccount = (id: number): Promise<ApiResponse<null>> =>
   adminAccountsApi.deleteAdminAccount(id)
 
-export const listAccounts = (params?: { keyword?: string; platform?: string; page?: number; page_size?: number }): Promise<ApiResponse<AccountListResponse>> =>
-  adminAccountsApi.listAdminAccounts(params)
+export const listAccounts = (params?: {
+  keyword?: string
+  platform?: string
+  page?: number
+  page_size?: number
+}): Promise<ApiResponse<AccountListResponse>> => adminAccountsApi.listAdminAccounts(params)
 
 export const startAccount = (id: number): Promise<ApiResponse<null>> =>
   adminAccountsApi.startAdminAccount(id)

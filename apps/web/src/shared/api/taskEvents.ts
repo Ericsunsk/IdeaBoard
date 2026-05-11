@@ -22,7 +22,9 @@ export function waitTaskResultWithSse(
 
 function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    const es = new EventSource(`/api/user/drawing/${encodeURIComponent(taskId)}/events`, { withCredentials: true })
+    const es = new EventSource(`/api/user/drawing/${encodeURIComponent(taskId)}/events`, {
+      withCredentials: true,
+    })
     let settled = false
 
     const cleanup = () => {
@@ -54,16 +56,19 @@ function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[
         return
       }
 
-      queryClient.setQueryData(getGetUserTaskQueryKey(taskId), (old: ApiResponseTask | undefined) => {
-        if (!old?.data?.task) return old
-        return {
-          ...old,
-          data: {
-            ...old.data,
-            task: { ...old.data.task, ...task },
-          },
-        }
-      })
+      queryClient.setQueryData(
+        getGetUserTaskQueryKey(taskId),
+        (old: ApiResponseTask | undefined) => {
+          if (!old?.data?.task) return old
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              task: { ...old.data.task, ...task },
+            },
+          }
+        },
+      )
 
       if (task.status === 'completed') {
         settleResolve(extractImageUrlsFromTaskResult(task.result))

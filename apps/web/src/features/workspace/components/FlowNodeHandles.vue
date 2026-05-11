@@ -39,7 +39,10 @@
 
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core'
-import { getCanvasNodeVisibleInputPorts, getCanvasNodeVisibleOutputPorts } from '../config/canvasNodeConnectionContract'
+import {
+  getCanvasNodeVisibleInputPorts,
+  getCanvasNodeVisibleOutputPorts,
+} from '../config/canvasNodeConnectionContract'
 import {
   buildEditNodeIoContext,
   buildNodeIoFromSlots,
@@ -77,17 +80,24 @@ function getCanvasNodeType(): CanvasConnectionNodeType | null {
   return props.kind === 'message' ? null : props.kind
 }
 
-function getNodePortsByKind(kind: CanvasConnectionNodeType, direction: 'input' | 'output'): CanvasConnectionPort[] {
-  const node = props.snapshotNode && typeof props.snapshotNode === 'object'
-    ? props.snapshotNode as Record<string, unknown>
-    : { id: 0 }
-  const list = direction === 'input'
-    ? getCanvasNodeVisibleInputPorts(kind, node as never)
-    : getCanvasNodeVisibleOutputPorts(kind, node as never)
-  return list.map(port => port.port)
+function getNodePortsByKind(
+  kind: CanvasConnectionNodeType,
+  direction: 'input' | 'output',
+): CanvasConnectionPort[] {
+  const node =
+    props.snapshotNode && typeof props.snapshotNode === 'object'
+      ? (props.snapshotNode as Record<string, unknown>)
+      : { id: 0 }
+  const list =
+    direction === 'input'
+      ? getCanvasNodeVisibleInputPorts(kind, node as never)
+      : getCanvasNodeVisibleOutputPorts(kind, node as never)
+  return list.map((port) => port.port)
 }
 
-function getNodeIoTopMap(kind: CanvasConnectionNodeType): Partial<Record<CanvasConnectionPort, number>> {
+function getNodeIoTopMap(
+  kind: CanvasConnectionNodeType,
+): Partial<Record<CanvasConnectionPort, number>> {
   if (!props.snapshotNode || typeof props.snapshotNode !== 'object') return {}
   const snapshotNode = props.snapshotNode as Record<string, unknown>
   const state = {}
@@ -99,11 +109,21 @@ function getNodeIoTopMap(kind: CanvasConnectionNodeType): Partial<Record<CanvasC
   if (kind === 'viewpoint') return portTopMapFromSlots(VIEWPOINT_NODE_IO_SLOTS, null, state)
   if (kind === 'fusion') return portTopMapFromSlots(FUSION_NODE_IO_SLOTS, null, state)
   if (kind === 'wear') return portTopMapFromSlots(WEAR_NODE_IO_SLOTS, null, state)
-  if (kind === 'edit') return portTopMapFromSlots(EDIT_NODE_IO_SLOTS, buildEditNodeIoContext(snapshotNode as unknown as EditNodeItem), state)
-  if (kind === 'enhance') return portTopMapFromSlots(ENHANCE_NODE_IO_SLOTS, {
-    supportsPrompt: (snapshotNode as unknown as EnhanceNodeItem).mode === 'canvas-extend',
-    supportsMask: (snapshotNode as unknown as EnhanceNodeItem).mode === 'hd-upscale',
-  }, state)
+  if (kind === 'edit')
+    return portTopMapFromSlots(
+      EDIT_NODE_IO_SLOTS,
+      buildEditNodeIoContext(snapshotNode as unknown as EditNodeItem),
+      state,
+    )
+  if (kind === 'enhance')
+    return portTopMapFromSlots(
+      ENHANCE_NODE_IO_SLOTS,
+      {
+        supportsPrompt: (snapshotNode as unknown as EnhanceNodeItem).mode === 'canvas-extend',
+        supportsMask: (snapshotNode as unknown as EnhanceNodeItem).mode === 'hd-upscale',
+      },
+      state,
+    )
   return {}
 }
 
@@ -141,21 +161,26 @@ function resolveHandleStyle(port: CanvasConnectionPort, direction: 'input' | 'ou
 }
 
 function resolvePortVisualKind(port: string): 'image' | 'mask' | 'prompt' | null {
-  if (port === 'image' || port === 'imageA' || port === 'imageB' || port === 'output') return 'image'
+  if (port === 'image' || port === 'imageA' || port === 'imageB' || port === 'output')
+    return 'image'
   if (port === 'mask') return 'mask'
   if (port === 'prompt') return 'prompt'
   return null
 }
 
 function isHandleConnected(port: CanvasConnectionPort, direction: 'input' | 'output'): boolean {
-  const connected = props.uiState?.connection?.connected as Partial<Record<string, boolean | undefined>> | undefined
+  const connected = props.uiState?.connection?.connected as
+    | Partial<Record<string, boolean | undefined>>
+    | undefined
   if (!connected) return false
   if (direction === 'output') return !!connected.output
   return !!connected[port]
 }
 
 function isHandlePending(port: CanvasConnectionPort): boolean {
-  const pending = props.uiState?.connection?.pending as Partial<Record<string, boolean | undefined>> | undefined
+  const pending = props.uiState?.connection?.pending as
+    | Partial<Record<string, boolean | undefined>>
+    | undefined
   if (!pending) return false
   return !!pending[port]
 }
@@ -191,7 +216,11 @@ watch(
   background: var(--port-color) !important;
   cursor: crosshair;
   pointer-events: all;
-  transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .flow-canvas-node__handle[data-port-kind='image'] {

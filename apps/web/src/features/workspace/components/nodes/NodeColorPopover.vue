@@ -31,7 +31,9 @@
         type="range"
         min="0"
         max="100"
-        @input="emit('saturation-input', toNumber(($event.target as HTMLInputElement).value, saturation))"
+        @input="
+          emit('saturation-input', toNumber(($event.target as HTMLInputElement).value, saturation))
+        "
       />
     </label>
     <label class="node-color-popover-control">
@@ -42,7 +44,9 @@
         type="range"
         min="0"
         max="100"
-        @input="emit('brightness-input', toNumber(($event.target as HTMLInputElement).value, brightness))"
+        @input="
+          emit('brightness-input', toNumber(($event.target as HTMLInputElement).value, brightness))
+        "
       />
     </label>
     <div
@@ -92,9 +96,13 @@ const emit = defineEmits<{
 
 const spectrumRefEl = ref<HTMLElement | null>(null)
 
-watch(spectrumRefEl, (value) => {
-  emit('set-spectrum-ref', value ?? null)
-}, { immediate: true })
+watch(
+  spectrumRefEl,
+  (value) => {
+    emit('set-spectrum-ref', value ?? null)
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -139,7 +147,9 @@ watch(spectrumRefEl, (value) => {
   background: #f9fbff;
   color: #425067;
   font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   padding: 0 8px;
   outline: none;
   text-transform: uppercase;
@@ -182,7 +192,11 @@ watch(spectrumRefEl, (value) => {
 .node-color-popover-range::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--range-accent) 0%, color-mix(in srgb, var(--range-accent) 56%, #ffffff) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--range-accent) 0%,
+    color-mix(in srgb, var(--range-accent) 56%, #ffffff) 100%
+  );
 }
 
 .node-color-popover-range::-webkit-slider-thumb {
@@ -202,7 +216,11 @@ watch(spectrumRefEl, (value) => {
   height: 6px;
   border: none;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--range-accent) 0%, color-mix(in srgb, var(--range-accent) 56%, #ffffff) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--range-accent) 0%,
+    color-mix(in srgb, var(--range-accent) 56%, #ffffff) 100%
+  );
 }
 
 .node-color-popover-range::-moz-range-thumb {

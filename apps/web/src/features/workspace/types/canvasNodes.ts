@@ -22,7 +22,9 @@ export interface CanvasImageUploadMeta {
   userId: number
 }
 
-export function isCanvasImagePending(item: { renderState?: CanvasImageItem['renderState'] | null | undefined }) {
+export function isCanvasImagePending(item: {
+  renderState?: CanvasImageItem['renderState'] | null | undefined
+}) {
   return item.renderState === 'pending'
 }
 
@@ -53,10 +55,17 @@ export const WEAR_OPACITY_MAX = 100
 export const WEAR_OPACITY_DEFAULT = 82
 export const WEAR_TILE_MODE_DEFAULT = 'single'
 
-export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = ['idle', 'ready', 'stale']
+export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = [
+  'idle',
+  'ready',
+  'stale',
+]
 
 export function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {
-  return typeof value === 'string' && WORKFLOW_NODE_OUTPUT_STATUSES.includes(value as WorkflowNodeOutputStatus)
+  return (
+    typeof value === 'string' &&
+    WORKFLOW_NODE_OUTPUT_STATUSES.includes(value as WorkflowNodeOutputStatus)
+  )
 }
 
 export function resolveWorkflowNodeOutputStatus(
@@ -93,7 +102,10 @@ export function clampModelPoseStrength(value: unknown): number {
 
 export function clampModelReferenceStrength(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(MODEL_REFERENCE_STRENGTH_MIN, Math.min(MODEL_REFERENCE_STRENGTH_MAX, Math.round(value)))
+    ? Math.max(
+        MODEL_REFERENCE_STRENGTH_MIN,
+        Math.min(MODEL_REFERENCE_STRENGTH_MAX, Math.round(value)),
+      )
     : MODEL_REFERENCE_STRENGTH_DEFAULT
 }
 
@@ -265,12 +277,14 @@ export interface WearNodeItem {
 }
 
 export function normalizeColorNodeColors(colors: readonly string[] | null | undefined): string[] {
-  return Array.from(new Set(
-    (colors ?? [])
-      .map(color => color.trim().toUpperCase())
-      .filter(color => /^#?[0-9A-F]{6}$/.test(color))
-      .map(color => (color.startsWith('#') ? color : `#${color}`)),
-  )).slice(0, MAX_COLOR_NODE_SWATCHES)
+  return Array.from(
+    new Set(
+      (colors ?? [])
+        .map((color) => color.trim().toUpperCase())
+        .filter((color) => /^#?[0-9A-F]{6}$/.test(color))
+        .map((color) => (color.startsWith('#') ? color : `#${color}`)),
+    ),
+  ).slice(0, MAX_COLOR_NODE_SWATCHES)
 }
 
 export function hasColorNodeColors(node: { colors?: readonly string[] | null }) {
@@ -278,7 +292,10 @@ export function hasColorNodeColors(node: { colors?: readonly string[] | null }) 
 }
 
 export function isColorNodePlaceholderState(node: { colors?: readonly string[] | null }) {
-  return (node.colors?.length ?? 0) === 1 && normalizeColorNodeColors(node.colors)[0] === DEFAULT_COLOR_NODE_COLOR
+  return (
+    (node.colors?.length ?? 0) === 1 &&
+    normalizeColorNodeColors(node.colors)[0] === DEFAULT_COLOR_NODE_COLOR
+  )
 }
 
 export function isColorSingleColorMode(node: { colors?: readonly string[] | null }) {
@@ -304,8 +321,13 @@ export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType
   'wear',
 ]
 
-export function isCanvasExecutionOutputNodeType(value: unknown): value is CanvasExecutionOutputNodeType {
-  return typeof value === 'string' && EXECUTION_OUTPUT_NODE_TYPES.includes(value as CanvasExecutionOutputNodeType)
+export function isCanvasExecutionOutputNodeType(
+  value: unknown,
+): value is CanvasExecutionOutputNodeType {
+  return (
+    typeof value === 'string' &&
+    EXECUTION_OUTPUT_NODE_TYPES.includes(value as CanvasExecutionOutputNodeType)
+  )
 }
 
 export type CanvasExecutionOutputNodeItem =

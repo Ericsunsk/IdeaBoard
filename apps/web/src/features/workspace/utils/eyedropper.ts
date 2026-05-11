@@ -3,7 +3,8 @@ export type EyeDropperInstance = { open: () => Promise<EyeDropperResult> }
 export type EyeDropperConstructor = new () => EyeDropperInstance
 
 export function getEyeDropperConstructor(): EyeDropperConstructor | null {
-  const constructorCandidate = (window as unknown as { EyeDropper?: EyeDropperConstructor }).EyeDropper
+  const constructorCandidate = (window as unknown as { EyeDropper?: EyeDropperConstructor })
+    .EyeDropper
   return typeof constructorCandidate === 'function' ? constructorCandidate : null
 }
 

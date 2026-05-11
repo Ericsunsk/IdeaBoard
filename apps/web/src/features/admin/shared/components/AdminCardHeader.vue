@@ -3,7 +3,7 @@
     <div class="admin-card-header-main">
       <slot name="prefix" />
       <div class="admin-card-copy">
-        <div class="admin-card-title-row" v-if="status || provider">
+        <div v-if="status || provider" class="admin-card-title-row">
           <AdminChip v-if="provider" :label="provider" tone="strong" />
           <AdminChip v-if="status" :label="status" :variant="statusVariant" />
         </div>
@@ -11,7 +11,7 @@
         <p class="admin-card-subtitle" :title="subtitle">{{ subtitle }}</p>
       </div>
     </div>
-    <div class="admin-card-header-side" v-if="$slots.extra">
+    <div v-if="$slots.extra" class="admin-card-header-side">
       <slot name="extra" />
     </div>
   </div>
@@ -31,8 +31,8 @@ withDefaults(
     provider: '',
     status: '',
     statusVariant: 'neutral',
-    size: 'default'
-  }
+    size: 'default',
+  },
 )
 </script>
 

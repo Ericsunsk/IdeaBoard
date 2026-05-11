@@ -15,7 +15,7 @@ const props = withDefaults(
   {
     variant: 'neutral',
     tone: 'default',
-  }
+  },
 )
 
 const chipClasses = computed(() => ({

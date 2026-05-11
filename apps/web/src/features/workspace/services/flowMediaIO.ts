@@ -47,7 +47,11 @@ export function resolveFetchUrl(
     if (!target) return ''
     return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(target)}`
   }
-  if (isSameOrigin && (options?.allowSameOriginUploads ?? true) && url.pathname.startsWith('/uploads')) {
+  if (
+    isSameOrigin &&
+    (options?.allowSameOriginUploads ?? true) &&
+    url.pathname.startsWith('/uploads')
+  ) {
     return trimmed
   }
   if (isSameOrigin) return trimmed
@@ -59,17 +63,29 @@ export function resolveFetchUrl(
 }
 
 /** Convert a canvas to a Blob for upload. */
-export function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/png', quality?: number): Promise<Blob> {
+export function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type = 'image/png',
+  quality?: number,
+): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob)
-      else reject(new Error('Canvas toBlob returned null'))
-    }, type, quality)
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob)
+        else reject(new Error('Canvas toBlob returned null'))
+      },
+      type,
+      quality,
+    )
   })
 }
 
 /** Upload a generated image Blob to the workspace upload API. */
-export async function uploadWorkspaceBlob(blob: Blob, fileName: string, boardId?: string): Promise<string> {
+export async function uploadWorkspaceBlob(
+  blob: Blob,
+  fileName: string,
+  boardId?: string,
+): Promise<string> {
   const file = new File([blob], fileName, { type: blob.type || 'image/png' })
   const res = await uploadApi.upload(file, boardId)
   if (res.code !== 0 || !res.data?.url) {

@@ -102,16 +102,32 @@ export function getCanvasNodePortContracts(
     case 'mask':
       return [input('image', 'image', true), output('mask', 'mask')]
     case 'model':
-      return [input('image', 'image', true), input('imageA', 'image', true), input('imageB', 'image'), input('prompt', 'prompt'), output('image', 'image')]
+      return [
+        input('image', 'image', true),
+        input('imageA', 'image', true),
+        input('imageB', 'image'),
+        input('prompt', 'prompt'),
+        output('image', 'image'),
+      ]
     case 'viewpoint':
       return [input('image', 'image', true), input('prompt', 'prompt'), output('image', 'image')]
     case 'edit': {
       const editNode = node as EditNodeItem
       return [
         input('image', 'image', true),
-        input('imageB', 'image', editModeSupportsSourceImage(editNode.mode), editModeSupportsSourceImage(editNode.mode)),
+        input(
+          'imageB',
+          'image',
+          editModeSupportsSourceImage(editNode.mode),
+          editModeSupportsSourceImage(editNode.mode),
+        ),
         input('mask', 'mask', editModeRequiresMask(editNode.mode), true),
-        input('prompt', 'prompt', editModeSupportsPrompt(editNode.mode), editModeSupportsPrompt(editNode.mode)),
+        input(
+          'prompt',
+          'prompt',
+          editModeSupportsPrompt(editNode.mode),
+          editModeSupportsPrompt(editNode.mode),
+        ),
         output('image', 'image'),
       ]
     }
@@ -156,19 +172,23 @@ export function getCanvasNodeVisibleInputPorts(
   nodeType: CanvasConnectionNodeType,
   node: CanvasConnectionContractNode | { id: number },
 ): CanvasNodePortContract[] {
-  return getCanvasNodePortContracts(nodeType, node).filter(port => port.direction === 'input' && port.visible)
+  return getCanvasNodePortContracts(nodeType, node).filter(
+    (port) => port.direction === 'input' && port.visible,
+  )
 }
 
 export function getCanvasNodeVisibleOutputPorts(
   nodeType: CanvasConnectionNodeType,
   node: CanvasConnectionContractNode | { id: number },
 ): CanvasNodePortContract[] {
-  return getCanvasNodePortContracts(nodeType, node).filter(port => port.direction === 'output' && port.visible)
+  return getCanvasNodePortContracts(nodeType, node).filter(
+    (port) => port.direction === 'output' && port.visible,
+  )
 }
 
 export function getCanvasNodeRequiredInputPorts(
   nodeType: CanvasConnectionNodeType,
   node: CanvasConnectionContractNode | { id: number },
 ): CanvasNodePortContract[] {
-  return getCanvasNodeVisibleInputPorts(nodeType, node).filter(port => port.required)
+  return getCanvasNodeVisibleInputPorts(nodeType, node).filter((port) => port.required)
 }

@@ -2,7 +2,10 @@ import { renderBoardPreviewDataUrl } from '../../boards/lib/boardPreviewSerializ
 import { setCanvasBoardPreviewSnapshot } from '../../boards/lib/canvasBoardState'
 import { syncCanvasBoardToServer } from '../../boards/lib/boardSync'
 import { getCanvasBoardById } from '../../boards/lib/canvasBoards'
-import { loadBoardSnapshotForFlow, resolveBoardIdFromQueryValue } from '../services/flowBoardSnapshotLoader'
+import {
+  loadBoardSnapshotForFlow,
+  resolveBoardIdFromQueryValue,
+} from '../services/flowBoardSnapshotLoader'
 import { saveBoardSnapshotFromFlow } from '../services/flowBoardSnapshotSaver'
 import { createFlowWorkspaceUploadLifecycle } from '../services/flowWorkspaceUploadLifecycle'
 import {
@@ -42,18 +45,21 @@ export type UseFlowBoardPersistenceOptions = {
 
 export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions) {
   function readBoardIdFromQuery() {
-    return resolveBoardIdFromQueryValue(options.getBoardIdQuery() as string | string[] | null | undefined)
+    return resolveBoardIdFromQueryValue(
+      options.getBoardIdQuery() as string | string[] | null | undefined,
+    )
   }
 
-  const currentBoardId = computed(() =>
-    readBoardIdFromQuery(),
-  )
+  const currentBoardId = computed(() => readBoardIdFromQuery())
   const currentBoardExists = computed(() => {
     const boardId = currentBoardId.value
     if (!boardId) return false
     return !!getCanvasBoardById(boardId)
   })
-  const canSaveBoard = computed(() => !!currentBoardId.value && currentBoardExists.value && !options.isLoadingBoardSnapshot.value)
+  const canSaveBoard = computed(
+    () =>
+      !!currentBoardId.value && currentBoardExists.value && !options.isLoadingBoardSnapshot.value,
+  )
 
   function clearDirtyAfterImport() {
     options.isDirty.value = false
@@ -66,7 +72,12 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     options.commitEdges(flow.edges as unknown[])
     options.boardBaseSnapshot.value = snapshot
     const vp = snapshot.viewport
-    if (vp && typeof vp.canvasX === 'number' && typeof vp.canvasY === 'number' && typeof vp.zoomLevel === 'number') {
+    if (
+      vp &&
+      typeof vp.canvasX === 'number' &&
+      typeof vp.canvasY === 'number' &&
+      typeof vp.zoomLevel === 'number'
+    ) {
       void Promise.resolve().then(() => {
         options.setViewport({
           x: vp.canvasX,
@@ -133,7 +144,10 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
     return snapshot
   }
 
-  async function refreshBoardPreviewAfterSave(boardId: string, stabilizedSnapshot: CanvasBoardSnapshot) {
+  async function refreshBoardPreviewAfterSave(
+    boardId: string,
+    stabilizedSnapshot: CanvasBoardSnapshot,
+  ) {
     const snapshotDataUrl = await renderBoardPreviewDataUrl(stabilizedSnapshot)
     setCanvasBoardPreviewSnapshot(
       boardId,

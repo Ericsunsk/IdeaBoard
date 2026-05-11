@@ -33,9 +33,6 @@ interface ComposeFlowLocalInpaintOptions {
   boardId?: string
 }
 
-
-
-
 async function fetchBlob(rawUrl: string): Promise<Blob> {
   const url = resolveFetchUrl(rawUrl)
   if (!url) throw new Error('图片链接为空')
@@ -93,12 +90,16 @@ function expandBbox(
   }
 }
 
-export async function prepareFlowLocalInpaint(options: PrepareFlowLocalInpaintOptions): Promise<FlowLocalInpaintCropResult> {
-  const padding = Number.isFinite(options.padding) ? Math.max(0, Math.round(options.padding ?? FLOW_LOCAL_INPAINT_PADDING)) : FLOW_LOCAL_INPAINT_PADDING
+export async function prepareFlowLocalInpaint(
+  options: PrepareFlowLocalInpaintOptions,
+): Promise<FlowLocalInpaintCropResult> {
+  const padding = Number.isFinite(options.padding)
+    ? Math.max(0, Math.round(options.padding ?? FLOW_LOCAL_INPAINT_PADDING))
+    : FLOW_LOCAL_INPAINT_PADDING
   let originalBitmap: ImageBitmap | null = null
   let maskBitmap: ImageBitmap | null = null
   try {
-    [originalBitmap, maskBitmap] = await Promise.all([
+    ;[originalBitmap, maskBitmap] = await Promise.all([
       decodeImageBitmap(options.originalImageUrl),
       decodeImageBitmap(options.maskUrl),
     ])
@@ -184,12 +185,14 @@ export async function prepareFlowLocalInpaint(options: PrepareFlowLocalInpaintOp
   }
 }
 
-export async function composeFlowLocalInpaint(options: ComposeFlowLocalInpaintOptions): Promise<string> {
+export async function composeFlowLocalInpaint(
+  options: ComposeFlowLocalInpaintOptions,
+): Promise<string> {
   let originalBitmap: ImageBitmap | null = null
   let resultBitmap: ImageBitmap | null = null
   let maskBitmap: ImageBitmap | null = null
   try {
-    [originalBitmap, resultBitmap, maskBitmap] = await Promise.all([
+    ;[originalBitmap, resultBitmap, maskBitmap] = await Promise.all([
       decodeImageBitmap(options.originalImageUrl),
       decodeImageBitmap(options.croppedResultUrl),
       decodeImageBitmap(options.croppedMaskUrl),
@@ -225,7 +228,11 @@ export async function composeFlowLocalInpaint(options: ComposeFlowLocalInpaintOp
     )
 
     const finalBlob = await canvasToBlob(outputCanvas, 'image/png')
-    return await uploadWorkspaceBlob(finalBlob, `flow-local-inpaint-final-${Date.now()}.png`, options.boardId)
+    return await uploadWorkspaceBlob(
+      finalBlob,
+      `flow-local-inpaint-final-${Date.now()}.png`,
+      options.boardId,
+    )
   } finally {
     originalBitmap?.close()
     resultBitmap?.close()
@@ -240,8 +247,8 @@ export async function cleanupFlowLocalInpaintAssets(
   const normalizedBoardId = `${boardId ?? ''}`.trim()
   if (!localInpaint || !normalizedBoardId) return
   const recycleTargets = [localInpaint.croppedImageUrl, localInpaint.croppedMaskUrl]
-    .map(url => url.trim())
+    .map((url) => url.trim())
     .filter(Boolean)
   if (recycleTargets.length === 0) return
-  await Promise.allSettled(recycleTargets.map(url => uploadApi.recycle(url, normalizedBoardId)))
+  await Promise.allSettled(recycleTargets.map((url) => uploadApi.recycle(url, normalizedBoardId)))
 }

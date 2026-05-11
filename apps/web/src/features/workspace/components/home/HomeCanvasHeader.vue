@@ -2,8 +2,15 @@
   <header class="floating-header">
     <div class="header-left">
       <div class="file-name-chip" @mousedown.stop>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         </svg>
         <input
           v-if="isRenamingBoard"
@@ -32,8 +39,17 @@
           title="选择画布"
           @click.stop="emit('toggle-board-menu')"
         >
-          <svg class="chevron-down" :class="{ open: isBoardMenuOpen }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-            <polyline points="6 9 12 15 18 9"/>
+          <svg
+            class="chevron-down"
+            :class="{ open: isBoardMenuOpen }"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+          >
+            <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
         <div v-if="isBoardMenuOpen" class="board-switch-menu" @mousedown.stop @click.stop>
@@ -53,13 +69,27 @@
     </div>
     <div class="header-right">
       <button class="btn-ghost share-btn" @mousedown.stop>Share</button>
-      <button class="btn-primary export-btn" :disabled="exportDisabled" @mousedown.stop @click="emit('export')">Export</button>
+      <button
+        class="btn-primary export-btn"
+        :disabled="exportDisabled"
+        @mousedown.stop
+        @click="emit('export')"
+      >
+        Export
+      </button>
       <div class="user-avatar-wrap" title="个人中心" @click="emit('open-center')">
         <img v-if="avatarUrl" :src="avatarUrl" class="user-avatar" />
         <div v-else class="user-avatar-placeholder">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
           </svg>
         </div>
       </div>
@@ -99,8 +129,22 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 </script>
 
 <style scoped>
-.floating-header { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; z-index: 100; pointer-events: none; }
-.header-left, .header-right { display: flex; gap: 12px; pointer-events: auto; }
+.floating-header {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  z-index: 100;
+  pointer-events: none;
+}
+.header-left,
+.header-right {
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
 .file-name-chip {
   background: #f1f3f9;
   padding: 8px 16px;
@@ -115,7 +159,9 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   transition: background 0.2s;
   position: relative;
 }
-.file-name-chip:hover { background: #e8eaed; }
+.file-name-chip:hover {
+  background: #e8eaed;
+}
 .file-name-btn {
   border: none;
   background: transparent;
@@ -131,7 +177,9 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.file-name-btn:hover { color: #6757c8; }
+.file-name-btn:hover {
+  color: #6757c8;
+}
 .board-name-input {
   height: 24px;
   min-width: 140px;
@@ -144,7 +192,9 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   color: #202124;
   background: #fff;
 }
-.board-name-input:focus { border-color: #9278e6; }
+.board-name-input:focus {
+  border-color: #9278e6;
+}
 .board-switch-btn {
   width: 20px;
   height: 20px;
@@ -156,11 +206,20 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
-.board-switch-btn:hover { background: #fff; color: #6757c8; }
-.chevron-down { transition: transform 0.2s ease; }
-.chevron-down.open { transform: rotate(180deg); }
+.board-switch-btn:hover {
+  background: #fff;
+  color: #6757c8;
+}
+.chevron-down {
+  transition: transform 0.2s ease;
+}
+.chevron-down.open {
+  transform: rotate(180deg);
+}
 .board-switch-menu {
   position: absolute;
   top: calc(100% + 8px);
@@ -192,8 +251,14 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.board-switch-item:hover { background: rgba(146, 120, 230, 0.12); color: #6757c8; }
-.board-switch-item.active { background: rgba(146, 120, 230, 0.16); color: #6757c8; }
+.board-switch-item:hover {
+  background: rgba(146, 120, 230, 0.12);
+  color: #6757c8;
+}
+.board-switch-item.active {
+  background: rgba(146, 120, 230, 0.16);
+  color: #6757c8;
+}
 .board-switch-empty {
   height: 34px;
   display: flex;
@@ -202,13 +267,37 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   font-size: 12px;
   color: #8a91a3;
 }
-.btn-ghost, .btn-primary { height: 40px; padding: 0 16px; border-radius: 10px; font-size: 14px; border: none; cursor: pointer; }
-.btn-ghost { background: #f1f3f9; }
-.btn-ghost:hover { background: #f1f3f9; }
-.share-btn { background: #f1f3f9 !important; }
-.share-btn:hover { background: #f1f3f9 !important; transform: none; }
-.btn-primary { background: #9278e6; color: white; }
-.btn-primary:disabled { background: #e2e4e8; color: #a8adb7; cursor: not-allowed; }
+.btn-ghost,
+.btn-primary {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+}
+.btn-ghost {
+  background: #f1f3f9;
+}
+.btn-ghost:hover {
+  background: #f1f3f9;
+}
+.share-btn {
+  background: #f1f3f9 !important;
+}
+.share-btn:hover {
+  background: #f1f3f9 !important;
+  transform: none;
+}
+.btn-primary {
+  background: #9278e6;
+  color: white;
+}
+.btn-primary:disabled {
+  background: #e2e4e8;
+  color: #a8adb7;
+  cursor: not-allowed;
+}
 .user-avatar-wrap {
   width: 40px;
   height: 40px;
@@ -220,7 +309,10 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   align-items: center;
   justify-content: center;
   background: #f1f3f9;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
   flex-shrink: 0;
   color: #5f6368;
 }

@@ -17,9 +17,6 @@ export function clampMaskRefineAmount(value: number): number {
   return Math.max(-100, Math.min(100, Math.round(value)))
 }
 
-
-
-
 async function decodeMaskBitmap(rawUrl: string): Promise<ImageBitmap> {
   const resolvedUrl = resolveFetchUrl(rawUrl)
   const response = await fetch(resolvedUrl, { credentials: 'include' })
@@ -30,7 +27,11 @@ async function decodeMaskBitmap(rawUrl: string): Promise<ImageBitmap> {
   return await createImageBitmap(blob)
 }
 
-function extractMaskIntensity(data: Uint8ClampedArray, width: number, height: number): Float32Array {
+function extractMaskIntensity(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Float32Array {
   const total = width * height
   const values = new Float32Array(total)
   for (let i = 0; i < total; i += 1) {
@@ -79,7 +80,12 @@ function runMaskMorphology(
   return input
 }
 
-function runMaskFeather(source: Float32Array, width: number, height: number, passes: number): Float32Array {
+function runMaskFeather(
+  source: Float32Array,
+  width: number,
+  height: number,
+  passes: number,
+): Float32Array {
   if (passes <= 0) return source
   let input = source
   for (let p = 0; p < passes; p += 1) {
@@ -106,7 +112,11 @@ function runMaskFeather(source: Float32Array, width: number, height: number, pas
   return input
 }
 
-async function buildRefinedExecutionMaskDataUrl(maskUrl: string, refineAmount: number, invertMask: boolean): Promise<string> {
+async function buildRefinedExecutionMaskDataUrl(
+  maskUrl: string,
+  refineAmount: number,
+  invertMask: boolean,
+): Promise<string> {
   let maskBitmap: ImageBitmap | null = null
   try {
     maskBitmap = await decodeMaskBitmap(maskUrl)
@@ -130,7 +140,13 @@ async function buildRefinedExecutionMaskDataUrl(maskUrl: string, refineAmount: n
     const amount = clampMaskRefineAmount(refineAmount)
     const rounds = Math.round(Math.abs(amount) / 12)
     if (rounds > 0) {
-      maskValues = runMaskMorphology(maskValues, width, height, amount > 0 ? 'dilate' : 'erode', rounds)
+      maskValues = runMaskMorphology(
+        maskValues,
+        width,
+        height,
+        amount > 0 ? 'dilate' : 'erode',
+        rounds,
+      )
     }
     if (amount !== 0) {
       maskValues = runMaskFeather(maskValues, width, height, 1)
@@ -176,7 +192,11 @@ export async function resolveFlowExecutionMaskAsset(
       }
       return { url: rawMaskUrl, temporary: false }
     }
-    const refinedDataUrl = await buildRefinedExecutionMaskDataUrl(rawMaskUrl, refineAmount, invertMask)
+    const refinedDataUrl = await buildRefinedExecutionMaskDataUrl(
+      rawMaskUrl,
+      refineAmount,
+      invertMask,
+    )
     return {
       url: await ensureFlowMaskImageUrl(refinedDataUrl, { boardId: options.boardId }),
       temporary: true,

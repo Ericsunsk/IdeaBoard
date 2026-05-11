@@ -4,12 +4,19 @@
       <div v-if="show" class="login-modal-overlay" @click.self="handleClose">
         <div class="login-modal-content">
           <button class="close-btn" :disabled="loading" @click="handleClose">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
-          
+
           <div class="modal-header">
             <h2 class="heading-text">欢迎回来</h2>
             <p>登录 IdeaBoard，继续你的创作</p>
@@ -17,7 +24,11 @@
 
           <n-form ref="formRef" :model="formValue" :rules="rules" size="large">
             <n-form-item path="username" label="账号">
-              <n-input v-model:value="formValue.username" placeholder="请输入账号" class="auth-input" />
+              <n-input
+                v-model:value="formValue.username"
+                placeholder="请输入账号"
+                class="auth-input"
+              />
             </n-form-item>
 
             <n-form-item path="password" label="密码">
@@ -31,13 +42,28 @@
             </n-form-item>
           </n-form>
 
-          <n-button type="primary" block size="large" :loading="loading" :disabled="loading" class="auth-primary-btn" @click="handleLogin">
+          <n-button
+            type="primary"
+            block
+            size="large"
+            :loading="loading"
+            :disabled="loading"
+            class="auth-primary-btn"
+            @click="handleLogin"
+          >
             {{ loading ? '登录中...' : '登录' }}
           </n-button>
 
           <div class="modal-footer">
             <span>还没有账号？</span>
-            <button type="button" class="signup-link" :disabled="loading" @click="handleSwitchToRegister">立即注册</button>
+            <button
+              type="button"
+              class="signup-link"
+              :disabled="loading"
+              @click="handleSwitchToRegister"
+            >
+              立即注册
+            </button>
           </div>
         </div>
       </div>
@@ -66,16 +92,12 @@ const formRef = ref<FormInst | null>(null)
 const loading = ref(false)
 const formValue = ref({
   username: '',
-  password: ''
+  password: '',
 })
 
 const rules = {
-  username: [
-    { required: true, message: '请输入账号', trigger: 'blur' },
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-  ]
+  username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 }
 
 function resetForm() {
@@ -102,7 +124,7 @@ watch(
     if (!visible) {
       resetForm()
     }
-  }
+  },
 )
 
 async function handleLogin() {
@@ -150,8 +172,14 @@ async function handleLogin() {
 }
 
 @keyframes modalIn {
-  from { opacity: 0; transform: scale(0.95) translateY(20px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .close-btn {
@@ -283,11 +311,13 @@ async function handleLogin() {
 }
 
 /* Transitions */
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.3s ease;
 }
 
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 </style>

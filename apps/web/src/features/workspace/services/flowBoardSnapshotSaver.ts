@@ -3,7 +3,10 @@ import { getCanvasBoardById, touchCanvasBoard } from '../../boards/lib/canvasBoa
 import { setCanvasBoardState } from '../../boards/lib/canvasBoardState'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 
-export async function saveBoardSnapshotFromFlow(boardId: string, snapshot: CanvasBoardSnapshot): Promise<void> {
+export async function saveBoardSnapshotFromFlow(
+  boardId: string,
+  snapshot: CanvasBoardSnapshot,
+): Promise<void> {
   const normalized = boardId.trim()
   if (!normalized) {
     throw new Error('MISSING_BOARD_ID')

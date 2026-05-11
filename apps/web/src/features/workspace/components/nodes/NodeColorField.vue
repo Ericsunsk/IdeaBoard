@@ -22,15 +22,17 @@
 </template>
 
 <script setup lang="ts">
-
-withDefaults(defineProps<{
-  value: string
-  placeholder?: string
-  swatchAriaLabel?: string
-}>(), {
-  placeholder: '#000000',
-  swatchAriaLabel: '选择颜色',
-})
+withDefaults(
+  defineProps<{
+    value: string
+    placeholder?: string
+    swatchAriaLabel?: string
+  }>(),
+  {
+    placeholder: '#000000',
+    swatchAriaLabel: '选择颜色',
+  },
+)
 
 const emit = defineEmits<{
   (e: 'swatch-click'): void
@@ -77,7 +79,9 @@ const emit = defineEmits<{
   background: #fff;
   color: #425067;
   font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   padding: 0 8px;
   outline: none;
   text-transform: uppercase;

@@ -15,10 +15,17 @@
           placeholder="状态筛选"
           clearable
           style="width: 130px"
-          @update:value="() => { page = 1; loadRecords() }"
+          @update:value="
+            () => {
+              page = 1
+              loadRecords()
+            }
+          "
         />
         <n-button secondary class="icon-btn" @click="loadRecords">
-          <template #icon><n-icon><RefreshOutline /></n-icon></template>
+          <template #icon
+            ><n-icon><RefreshOutline /></n-icon
+          ></template>
         </n-button>
       </div>
     </div>
@@ -58,18 +65,26 @@
       <n-drawer-content :title="'任务详情 - ' + (detailTask?.task_id || '')">
         <div v-if="detailTask" class="detail-content">
           <n-descriptions :column="2" label-placement="left" bordered size="small">
-            <n-descriptions-item label="用户ID" :span="1">{{ detailTask.user_id }}</n-descriptions-item>
-            <n-descriptions-item label="账号ID" :span="1">{{ detailTask.account_id || '未分配' }}</n-descriptions-item>
+            <n-descriptions-item label="用户ID" :span="1">{{
+              detailTask.user_id
+            }}</n-descriptions-item>
+            <n-descriptions-item label="账号ID" :span="1">{{
+              detailTask.account_id || '未分配'
+            }}</n-descriptions-item>
             <n-descriptions-item label="状态" :span="1">
               <n-tag :type="getStatusConfig(detailTask.status).type" size="small">
                 {{ getStatusConfig(detailTask.status).text }}
               </n-tag>
             </n-descriptions-item>
             <n-descriptions-item label="耗时" :span="1">
-              <span v-if="detailTask.completed_at" class="detail-duration is-completed">{{ calcDuration(detailTask) }}</span>
+              <span v-if="detailTask.completed_at" class="detail-duration is-completed">{{
+                calcDuration(detailTask)
+              }}</span>
               <span v-else class="detail-duration is-empty">-</span>
             </n-descriptions-item>
-            <n-descriptions-item label="创建时间" :span="2">{{ detailTask.created_at }}</n-descriptions-item>
+            <n-descriptions-item label="创建时间" :span="2">{{
+              detailTask.created_at
+            }}</n-descriptions-item>
           </n-descriptions>
 
           <h4 class="detail-subtitle">提示词</h4>
@@ -110,16 +125,24 @@ import type { Task } from '../../../shared/api/task'
 import { adminTaskApi } from '../../../shared/api/adminTask'
 import { monitorApi } from '../../../shared/api/monitor'
 import {
-  NIcon, NTag, NButton, NSelect, NDataTable, NPagination,
-  NDrawer, NDrawerContent, NDescriptions, NDescriptionsItem, NImage,
+  NIcon,
+  NTag,
+  NButton,
+  NSelect,
+  NDataTable,
+  NPagination,
+  NDrawer,
+  NDrawerContent,
+  NDescriptions,
+  NDescriptionsItem,
+  NImage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
+import { RefreshOutline, EyeOutline, ListOutline } from '@vicons/ionicons5'
 import {
-  RefreshOutline,
-  EyeOutline,
-  ListOutline,
-} from '@vicons/ionicons5'
-import { sanitizeApiErrorMessage, sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
+  sanitizeApiErrorMessage,
+  sanitizeTaskErrorMessage,
+} from '../../../shared/utils/errorMessages'
 import { formatDurationSeconds } from '../../../shared/utils/dateTime'
 
 const records = ref<Task[]>([])
@@ -142,7 +165,8 @@ const RESULT_MAX_STRING_LENGTH = 300
 const RESULT_DEBUG_MAX_DEPTH = 4
 const RESULT_DEBUG_MAX_KEYS = 40
 const RESULT_ARRAY_PREVIEW_LENGTH = 5
-const SENSITIVE_KEY_PATTERN = /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
+const SENSITIVE_KEY_PATTERN =
+  /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
 
 const resultImageUrl = computed(() => {
   if (!detailTask.value?.result) return ''
@@ -159,7 +183,11 @@ const resultSummaryText = computed(() => {
   const parsed = parseResultSafely(detailTask.value.result)
   if (parsed == null) return sanitizeApiErrorMessage(detailTask.value.result, '[REDACTED]')
   if (Array.isArray(parsed)) {
-    return JSON.stringify({ type: 'array', length: parsed.length, preview: sanitizeValue(parsed, 1) }, null, 2)
+    return JSON.stringify(
+      { type: 'array', length: parsed.length, preview: sanitizeValue(parsed, 1) },
+      null,
+      2,
+    )
   }
   if (typeof parsed !== 'object') {
     return truncateString(String(parsed))
@@ -214,11 +242,16 @@ const statusOptions = [
 
 const getStatusConfig = (status: string) => {
   switch (status) {
-    case 'pending': return { type: 'default' as const, text: '等待中' }
-    case 'running': return { type: 'warning' as const, text: '执行中' }
-    case 'completed': return { type: 'success' as const, text: '已完成' }
-    case 'failed': return { type: 'error' as const, text: '失败' }
-    default: return { type: 'default' as const, text: status }
+    case 'pending':
+      return { type: 'default' as const, text: '等待中' }
+    case 'running':
+      return { type: 'warning' as const, text: '执行中' }
+    case 'completed':
+      return { type: 'success' as const, text: '已完成' }
+    case 'failed':
+      return { type: 'error' as const, text: '失败' }
+    default:
+      return { type: 'default' as const, text: status }
   }
 }
 
@@ -249,8 +282,11 @@ function sanitizeValue(value: unknown, depth: number, keyCountState = { count: 0
 
   if (Array.isArray(value)) {
     if (depth >= RESULT_DEBUG_MAX_DEPTH) return `[array:${value.length}]`
-    const preview = value.slice(0, RESULT_ARRAY_PREVIEW_LENGTH).map((item) => sanitizeValue(item, depth + 1, keyCountState))
-    if (value.length > RESULT_ARRAY_PREVIEW_LENGTH) preview.push(`...(+${value.length - RESULT_ARRAY_PREVIEW_LENGTH} items)`)
+    const preview = value
+      .slice(0, RESULT_ARRAY_PREVIEW_LENGTH)
+      .map((item) => sanitizeValue(item, depth + 1, keyCountState))
+    if (value.length > RESULT_ARRAY_PREVIEW_LENGTH)
+      preview.push(`...(+${value.length - RESULT_ARRAY_PREVIEW_LENGTH} items)`)
     return preview
   }
 
@@ -307,20 +343,30 @@ const columns: DataTableColumns<Task> = [
     key: 'task_id',
     width: 180,
     ellipsis: { tooltip: true },
-    render: (row) => h('span', { style: { fontFamily: 'monospace', fontSize: '12px' } }, row.task_id),
+    render: (row) =>
+      h('span', { style: { fontFamily: 'monospace', fontSize: '12px' } }, row.task_id),
   },
   {
     title: '用户/账号',
     key: 'user_account',
     width: 100,
     align: 'center',
-    render: (row) => h('span', { style: { fontSize: '12px', lineHeight: '1.6' } }, [
-      h('span', { style: { color: 'var(--admin-text-3)' } }, 'U:'),
-      h('span', { style: { color: 'var(--admin-text-1)', fontWeight: '500' } }, String(row.user_id)),
-      h('span', { style: { color: 'var(--admin-text-3)', margin: '0 4px' } }, '/'),
-      h('span', { style: { color: 'var(--admin-text-3)' } }, 'A:'),
-      h('span', { style: { color: 'var(--admin-text-1)', fontWeight: '500' } }, row.account_id ? String(row.account_id) : '-'),
-    ]),
+    render: (row) =>
+      h('span', { style: { fontSize: '12px', lineHeight: '1.6' } }, [
+        h('span', { style: { color: 'var(--admin-text-3)' } }, 'U:'),
+        h(
+          'span',
+          { style: { color: 'var(--admin-text-1)', fontWeight: '500' } },
+          String(row.user_id),
+        ),
+        h('span', { style: { color: 'var(--admin-text-3)', margin: '0 4px' } }, '/'),
+        h('span', { style: { color: 'var(--admin-text-3)' } }, 'A:'),
+        h(
+          'span',
+          { style: { color: 'var(--admin-text-1)', fontWeight: '500' } },
+          row.account_id ? String(row.account_id) : '-',
+        ),
+      ]),
   },
   {
     title: '提示词',
@@ -346,7 +392,11 @@ const columns: DataTableColumns<Task> = [
     render: (row) => {
       const dur = calcDuration(row)
       if (dur === '-') return h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
-      return h('span', { style: { fontSize: '12px', color: 'var(--admin-success)', fontWeight: '500' } }, dur)
+      return h(
+        'span',
+        { style: { fontSize: '12px', color: 'var(--admin-success)', fontWeight: '500' } },
+        dur,
+      )
     },
   },
   {
@@ -360,7 +410,13 @@ const columns: DataTableColumns<Task> = [
         if (r.platform) {
           return h('span', { style: { fontSize: '12px' } }, [
             h(NTag, { size: 'tiny', type: 'info', bordered: false }, () => r.platform),
-            r.model_set ? h('span', { style: { marginLeft: '4px', color: 'var(--admin-text-3)', fontSize: '11px' } }, r.model_set) : null,
+            r.model_set
+              ? h(
+                  'span',
+                  { style: { marginLeft: '4px', color: 'var(--admin-text-3)', fontSize: '11px' } },
+                  r.model_set,
+                )
+              : null,
           ])
         }
       } catch {
@@ -393,10 +449,14 @@ const columns: DataTableColumns<Task> = [
     width: 70,
     align: 'center',
     render: (row) =>
-      h(NButton, { size: 'tiny', quaternary: true, onClick: () => showDetail(row) }, {
-        icon: () => h(NIcon, null, () => h(EyeOutline)),
-        default: () => '详情',
-      }),
+      h(
+        NButton,
+        { size: 'tiny', quaternary: true, onClick: () => showDetail(row) },
+        {
+          icon: () => h(NIcon, null, () => h(EyeOutline)),
+          default: () => '详情',
+        },
+      ),
   },
 ]
 
@@ -507,5 +567,9 @@ onMounted(() => {
   border: 1px solid rgba(251, 113, 133, 0.28);
 }
 
-.detail-image { display: flex; flex-direction: column; gap: 8px; }
+.detail-image {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 </style>

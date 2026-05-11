@@ -10,8 +10,17 @@ import { taskApi } from '../../../shared/api/task'
 import { uploadApi } from '../../../shared/api/upload'
 import { ensureFlowMaskImageUrl } from './flowMediaUpload'
 import { cleanupFlowExecutionMaskAsset, resolveFlowExecutionMaskAsset } from './flowMaskProcessing'
-import { cleanupFlowLocalInpaintAssets, composeFlowLocalInpaint, prepareFlowLocalInpaint } from './flowLocalInpaint'
-import { parseHandlePort, resolveConnectedInput, resolveSourceImageFromNode, waitTaskResult } from './flowTaskExecutorUtils'
+import {
+  cleanupFlowLocalInpaintAssets,
+  composeFlowLocalInpaint,
+  prepareFlowLocalInpaint,
+} from './flowLocalInpaint'
+import {
+  parseHandlePort,
+  resolveConnectedInput,
+  resolveSourceImageFromNode,
+  waitTaskResult,
+} from './flowTaskExecutorUtils'
 
 interface FlowEditNodeContext {
   nodeId: string
@@ -20,7 +29,12 @@ interface FlowEditNodeContext {
 
 interface FlowEditExecutorOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
-  edges: Array<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>
+  edges: Array<{
+    source: string
+    sourceHandle?: string | null
+    target: string
+    targetHandle?: string | null
+  }>
   loadImageSizeFromUrl: (url: string) => Promise<{ width: number; height: number } | null>
   boardId?: string
 }
@@ -29,7 +43,10 @@ interface FlowEditResult {
   urls: string[]
 }
 
-async function buildMaskedImageDataUrl(imageUrl: string, maskDataUrl: string): Promise<string | null> {
+async function buildMaskedImageDataUrl(
+  imageUrl: string,
+  maskDataUrl: string,
+): Promise<string | null> {
   let imageBitmap: ImageBitmap | null = null
   let maskBitmap: ImageBitmap | null = null
   try {
@@ -90,7 +107,7 @@ export function validateFlowEditNodeInputs(
   if (!imageUrl) return 'Edit 节点等待上游 Image 输出'
 
   const hasMaskConnection = options.edges.some(
-    edge => edge.target === context.nodeId && parseHandlePort(edge.targetHandle) === 'mask',
+    (edge) => edge.target === context.nodeId && parseHandlePort(edge.targetHandle) === 'mask',
   )
   const maskInput = resolveConnectedInput(options, context.nodeId, 'mask')
   if (hasMaskConnection) {
@@ -112,7 +129,7 @@ export function validateFlowEditNodeInputs(
   if (!promptInput || promptInput.sourceType !== 'prompt') {
     return 'Edit 节点缺少 Prompt 连线'
   }
-  const promptText = (((promptInput.snapshotNode as unknown as PromptNodeItem).text) || '').trim()
+  const promptText = ((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim()
   if (!promptText) {
     return 'Edit 节点缺少 Prompt 内容（请填写 Prompt 节点）'
   }
@@ -136,14 +153,17 @@ export async function executeFlowEditNode(
       const imageBInput = resolveConnectedInput(options, context.nodeId, 'imageB')!
       const imageBUrl = resolveSourceImageFromNode(imageBInput.sourceType, imageBInput.snapshotNode)
       const maskInput = resolveConnectedInput(options, context.nodeId, 'mask')
-      let executionMaskAsset: Awaited<ReturnType<typeof resolveFlowExecutionMaskAsset>> | null = null
+      let executionMaskAsset: Awaited<ReturnType<typeof resolveFlowExecutionMaskAsset>> | null =
+        null
       let temporaryFaceSourceUrl = ''
 
       let faceSourceUrl = imageBUrl
       try {
         if (maskInput?.sourceType === 'mask') {
           const maskNode = maskInput.snapshotNode as unknown as MaskNodeItem
-          executionMaskAsset = await resolveFlowExecutionMaskAsset(maskNode, { boardId: options.boardId })
+          executionMaskAsset = await resolveFlowExecutionMaskAsset(maskNode, {
+            boardId: options.boardId,
+          })
           if (!executionMaskAsset.url) {
             throw new Error('Edit 节点等待上游 Mask 输出')
           }
@@ -151,7 +171,9 @@ export async function executeFlowEditNode(
           if (!maskedFaceDataUrl) {
             throw new Error('无法生成分割人脸，请重试')
           }
-          faceSourceUrl = await ensureFlowMaskImageUrl(maskedFaceDataUrl, { boardId: options.boardId })
+          faceSourceUrl = await ensureFlowMaskImageUrl(maskedFaceDataUrl, {
+            boardId: options.boardId,
+          })
           temporaryFaceSourceUrl = faceSourceUrl
         }
 
@@ -179,7 +201,7 @@ export async function executeFlowEditNode(
     }
 
     const promptInput = resolveConnectedInput(options, context.nodeId, 'prompt')!
-    const promptText = (((promptInput.snapshotNode as unknown as PromptNodeItem).text) || '').trim()
+    const promptText = ((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim()
     if (!promptText) {
       throw new Error('Edit 节点缺少 Prompt 内容（请填写 Prompt 节点）')
     }
@@ -191,7 +213,9 @@ export async function executeFlowEditNode(
       let maskImageUrl = ''
       if (maskInput?.sourceType === 'mask') {
         const maskNode = maskInput.snapshotNode as unknown as MaskNodeItem
-        executionMaskAsset = await resolveFlowExecutionMaskAsset(maskNode, { boardId: options.boardId })
+        executionMaskAsset = await resolveFlowExecutionMaskAsset(maskNode, {
+          boardId: options.boardId,
+        })
         maskImageUrl = executionMaskAsset.url
         if (!maskImageUrl) {
           throw new Error('Edit 节点等待上游 Mask 输出')

@@ -43,7 +43,10 @@ export async function updateAdminUserStatus(input: { id: number; status: number 
   requireApiOk(res, input.status === 1 ? '解封失败' : '封禁失败')
 }
 
-export async function updateAdminUserRole(input: { id: number; role: 'admin' | 'user' }): Promise<void> {
+export async function updateAdminUserRole(input: {
+  id: number
+  role: 'admin' | 'user'
+}): Promise<void> {
   const res = await adminApi.updateUserRole(input.id, input.role)
   requireApiOk(res, '角色更新失败')
 }
@@ -53,24 +56,32 @@ export async function deleteAdminUser(id: number): Promise<void> {
   requireApiOk(res, '注销失败')
 }
 
-export async function saveFeaturePrompt(input: SaveFeaturePromptInput): Promise<{ slug: string; prompt: string }> {
+export async function saveFeaturePrompt(
+  input: SaveFeaturePromptInput,
+): Promise<{ slug: string; prompt: string }> {
   const res = await featurePromptApi.adminSet(input.slug, input.prompt)
   return requireApiData(res, '保存提示词失败')
 }
 
-export async function triggerAdminStatisticsBackfill(range: AdminStatisticsRange): Promise<AdminStatisticsBackfillResult> {
+export async function triggerAdminStatisticsBackfill(
+  range: AdminStatisticsRange,
+): Promise<AdminStatisticsBackfillResult> {
   const res = await adminStatisticsApi.backfill(range)
   return requireApiData(res, '补录失败')
 }
 
-export async function saveStorageProfile(input: SaveStorageProfileInput): Promise<{ profile: StorageProfile; message: string }> {
+export async function saveStorageProfile(
+  input: SaveStorageProfileInput,
+): Promise<{ profile: StorageProfile; message: string }> {
   const res = input.id
     ? await storageApi.updateProfile(input.id, input.payload)
     : await storageApi.createProfile(input.payload)
   return requireApiData(res, '保存存储配置失败')
 }
 
-export async function applyStorageProfile(id: string): Promise<{ profile: StorageProfile; message: string }> {
+export async function applyStorageProfile(
+  id: string,
+): Promise<{ profile: StorageProfile; message: string }> {
   const res = await storageApi.applyProfile(id)
   return requireApiData(res, '设为当前失败')
 }

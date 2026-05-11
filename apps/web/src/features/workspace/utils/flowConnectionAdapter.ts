@@ -14,7 +14,10 @@ interface ParsedHandleRef {
   port: CanvasConnectionPort
 }
 
-function parseNodeRef(nodeId: string | null | undefined, fallbackType?: CanvasConnectionNodeType): ParsedNodeRef | null {
+function parseNodeRef(
+  nodeId: string | null | undefined,
+  fallbackType?: CanvasConnectionNodeType,
+): ParsedNodeRef | null {
   if (!nodeId) return null
   const [prefix, idPart] = nodeId.split('-')
   const parsedId = Number(idPart)
@@ -24,16 +27,18 @@ function parseNodeRef(nodeId: string | null | undefined, fallbackType?: CanvasCo
 }
 
 function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNodeType {
-  return value === 'image'
-    || value === 'prompt'
-    || value === 'mask'
-    || value === 'color'
-    || value === 'model'
-    || value === 'viewpoint'
-    || value === 'edit'
-    || value === 'fusion'
-    || value === 'enhance'
-    || value === 'wear'
+  return (
+    value === 'image' ||
+    value === 'prompt' ||
+    value === 'mask' ||
+    value === 'color' ||
+    value === 'model' ||
+    value === 'viewpoint' ||
+    value === 'edit' ||
+    value === 'fusion' ||
+    value === 'enhance' ||
+    value === 'wear'
+  )
 }
 
 function parseHandleRef(handleId: string | null | undefined): ParsedHandleRef | null {
@@ -50,8 +55,12 @@ export function isFlowConnectionAllowed(
 ): boolean {
   const sourceNodeData = connection.source ? lookupData(connection.source) : undefined
   const targetNodeData = connection.target ? lookupData(connection.target) : undefined
-  const sourceNodeType = isCanvasConnectionNodeType(sourceNodeData?.nodeType) ? sourceNodeData?.nodeType : undefined
-  const targetNodeType = isCanvasConnectionNodeType(targetNodeData?.nodeType) ? targetNodeData?.nodeType : undefined
+  const sourceNodeType = isCanvasConnectionNodeType(sourceNodeData?.nodeType)
+    ? sourceNodeData?.nodeType
+    : undefined
+  const targetNodeType = isCanvasConnectionNodeType(targetNodeData?.nodeType)
+    ? targetNodeData?.nodeType
+    : undefined
   const sourceNodeRef = parseNodeRef(connection.source, sourceNodeType)
   const targetNodeRef = parseNodeRef(connection.target, targetNodeType)
   const sourceHandle = parseHandleRef(connection.sourceHandle)
@@ -63,7 +72,10 @@ export function isFlowConnectionAllowed(
   const from = { ...sourceNodeRef, port: sourceHandle.port }
   const to = { ...targetNodeRef, port: targetHandle.port }
 
-  const lookupNode = (nodeType: CanvasConnectionNodeType, nodeId: number): CanvasConnectionContractNode | null => {
+  const lookupNode = (
+    nodeType: CanvasConnectionNodeType,
+    nodeId: number,
+  ): CanvasConnectionContractNode | null => {
     const key = `${nodeType}-${nodeId}`
     const data = lookupData(key)
     if (!data) return null

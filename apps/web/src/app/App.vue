@@ -19,7 +19,9 @@ import { darkTheme, zhCN } from 'naive-ui'
 const naiveLocale = zhCN
 const route = useRoute()
 const isUserRoute = computed(() => route.path.startsWith('/user'))
-const messageContainerClass = computed(() => (isUserRoute.value ? 'user-message-container' : undefined))
+const messageContainerClass = computed(() =>
+  isUserRoute.value ? 'user-message-container' : undefined,
+)
 
 const userMessageThemeOverrides = {
   borderRadius: '14px',
@@ -28,7 +30,9 @@ const userMessageThemeOverrides = {
   closeIconSize: '16px',
   fontSize: '13px',
 }
-const messageThemeOverrides = computed(() => (isUserRoute.value ? userMessageThemeOverrides : undefined))
+const messageThemeOverrides = computed(() =>
+  isUserRoute.value ? userMessageThemeOverrides : undefined,
+)
 
 const themeOverrides = {
   common: {
@@ -43,7 +47,7 @@ const themeOverrides = {
   },
   Table: {
     borderRadius: '12px',
-  }
+  },
 }
 </script>
 
@@ -54,7 +58,8 @@ const themeOverrides = {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   background: #18181b;
   color: #e4e4e7;

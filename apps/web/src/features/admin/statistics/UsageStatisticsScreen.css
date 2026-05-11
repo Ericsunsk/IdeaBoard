@@ -137,9 +137,15 @@
   background: var(--admin-text-3);
 }
 
-.status-banner.completed::before { background: var(--admin-success); }
-.status-banner.failed::before { background: var(--admin-danger); }
-.status-banner.running::before { background: var(--admin-warning); }
+.status-banner.completed::before {
+  background: var(--admin-success);
+}
+.status-banner.failed::before {
+  background: var(--admin-danger);
+}
+.status-banner.running::before {
+  background: var(--admin-warning);
+}
 
 .banner-main {
   display: flex;
@@ -868,7 +874,9 @@
 .donut-segment-hardware {
   cursor: pointer;
   will-change: stroke-width, stroke-opacity;
-  transition: stroke-width 0.15s cubic-bezier(0.2, 0, 0, 1), stroke-opacity 0.15s ease;
+  transition:
+    stroke-width 0.15s cubic-bezier(0.2, 0, 0, 1),
+    stroke-opacity 0.15s ease;
   stroke-opacity: 1;
 }
 
@@ -1001,10 +1009,18 @@
   border-radius: 1px;
 }
 
-.legend-dot.is-success { background: var(--admin-success); }
-.legend-dot.is-warning { background: var(--admin-warning); }
-.legend-dot.is-error { background: var(--admin-danger); }
-.legend-dot.is-empty { background: rgba(255, 255, 255, 0.1); }
+.legend-dot.is-success {
+  background: var(--admin-success);
+}
+.legend-dot.is-warning {
+  background: var(--admin-warning);
+}
+.legend-dot.is-error {
+  background: var(--admin-danger);
+}
+.legend-dot.is-empty {
+  background: rgba(255, 255, 255, 0.1);
+}
 
 .legend-spacer {
   flex: 1;

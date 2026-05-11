@@ -421,7 +421,6 @@ h3 {
   color: var(--admin-danger);
 }
 
-
 .config-card {
   background: var(--admin-card-strong);
   border: 1px solid var(--admin-border-soft);
@@ -614,7 +613,9 @@ h3 {
 .admin-route .n-button {
   --n-text-color: #e4e4e7;
   border-radius: 12px;
-  transition: border-color 0.18s ease, background 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
 }
 
 .admin-route .n-button--default-type {
@@ -912,7 +913,10 @@ h3 {
 
 /* Standardized Interactive Cards */
 .admin-card-interactive {
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 
 .admin-card-interactive:hover {

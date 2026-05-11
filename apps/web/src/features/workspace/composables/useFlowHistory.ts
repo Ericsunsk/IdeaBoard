@@ -83,7 +83,7 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
 
   function collectHistoryBlobTokens(value: unknown, tokens: Set<string>): void {
     if (Array.isArray(value)) {
-      value.forEach(item => collectHistoryBlobTokens(item, tokens))
+      value.forEach((item) => collectHistoryBlobTokens(item, tokens))
       return
     }
     if (typeof value === 'string') {
@@ -91,13 +91,14 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
       return
     }
     if (!isRecord(value)) return
-    Object.values(value).forEach(field => collectHistoryBlobTokens(field, tokens))
+    Object.values(value).forEach((field) => collectHistoryBlobTokens(field, tokens))
   }
 
   function pruneBlobStore() {
     const retainedTokens = new Set<string>()
     for (const snapshot of flowHistoryPast.value) collectHistoryBlobTokens(snapshot, retainedTokens)
-    for (const snapshot of flowHistoryFuture.value) collectHistoryBlobTokens(snapshot, retainedTokens)
+    for (const snapshot of flowHistoryFuture.value)
+      collectHistoryBlobTokens(snapshot, retainedTokens)
     if (dragBeforeSnapshot.value) collectHistoryBlobTokens(dragBeforeSnapshot.value, retainedTokens)
     for (const [token, value] of blobStore.entries()) {
       if (retainedTokens.has(token)) continue
@@ -109,10 +110,10 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
   function cloneFlowNodesForHistory(nodes: unknown[]): unknown[] {
     const serialized = JSON.stringify(nodes, (key, value) => {
       if (
-        typeof value === 'string'
-        && HISTORY_BLOB_DATA_KEYS.has(key)
-        && value.startsWith('data:')
-        && value.length >= HISTORY_BLOB_MIN_LENGTH
+        typeof value === 'string' &&
+        HISTORY_BLOB_DATA_KEYS.has(key) &&
+        value.startsWith('data:') &&
+        value.length >= HISTORY_BLOB_MIN_LENGTH
       ) {
         return encodeHistoryBlob(value)
       }

@@ -22,7 +22,6 @@
 </template>
 
 <script setup lang="ts">
-
 type ChipKind = 'image' | 'mask' | 'prompt'
 
 type ConnectionChipItem = {

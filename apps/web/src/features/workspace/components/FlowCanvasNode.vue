@@ -1,6 +1,13 @@
 <template>
-  <div ref="flowCanvasNodeRef" class="flow-canvas-node" :class="[`is-${data.kind}`, { 'is-selected': selected }]">
-    <div v-if="showDefaultDragZone" class="flow-canvas-node__drag-zone flow-canvas-node__drag-zone--default" />
+  <div
+    ref="flowCanvasNodeRef"
+    class="flow-canvas-node"
+    :class="[`is-${data.kind}`, { 'is-selected': selected }]"
+  >
+    <div
+      v-if="showDefaultDragZone"
+      class="flow-canvas-node__drag-zone flow-canvas-node__drag-zone--default"
+    />
     <template v-if="isPromptNode && promptSnapshot">
       <PromptNode
         :node="promptSnapshot"
@@ -15,7 +22,11 @@
       />
     </template>
     <template v-else-if="isImageNode && imageSnapshot">
-      <div class="flow-canvas-node__image-wrap flow-canvas-node__drag-surface" @click.stop @contextmenu.stop>
+      <div
+        class="flow-canvas-node__image-wrap flow-canvas-node__drag-surface"
+        @click.stop
+        @contextmenu.stop
+      >
         <ImageNode
           :node="imageSnapshot"
           :active="selected"
@@ -66,7 +77,6 @@
         @delete="onDeleteRequest"
         @update:mode="emitNodeParam('mode', $event)"
         @generate="onEditGenerate"
-
       />
     </template>
     <template v-else-if="isEnhanceNode && enhanceSnapshot">
@@ -89,7 +99,6 @@
         @update:extend-bottom="emitNodeParam('extendBottom', $event)"
         @update:extend-left="emitNodeParam('extendLeft', $event)"
         @generate="onEnhanceGenerate"
-
       />
     </template>
     <template v-else-if="isColorNode && colorSnapshot">
@@ -107,7 +116,6 @@
         @add-color="onColorAdd"
         @strength-input="emitNodeParam('strength', $event)"
         @generate="onColorGenerate"
-
       />
     </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
@@ -122,7 +130,6 @@
         @delete="onDeleteRequest"
         @update:blend-ratio="emitNodeParam('blendRatio', $event)"
         @generate="onFusionGenerate"
-
       />
     </template>
     <template v-else-if="isWearNode && wearSnapshot">
@@ -140,7 +147,6 @@
         @update:scale="emitNodeParam('scale', $event)"
         @update:opacity="emitNodeParam('opacity', $event)"
         @generate="onWearGenerate"
-
       />
     </template>
     <template v-else-if="isMaskNode && maskSnapshot">
@@ -166,7 +172,6 @@
         @toggle-invert="onMaskToggleInvert"
         @clear-mask="onMaskClearMask"
         @set-canvas-ref="onMaskSetCanvasRef"
-
       />
     </template>
     <template v-else-if="isModelNode && modelSnapshot">
@@ -186,7 +191,6 @@
         @update-pose-strength="emitNodeParam('poseStrength', $event)"
         @select-background="emitNodeParam('background', $event)"
         @generate="onModelGenerate"
-
       />
     </template>
     <template v-else-if="isViewpointNode && viewpointSnapshot">
@@ -203,7 +207,6 @@
         @select:viewpoint="emitNodeParam('selectedViewpoint', $event)"
         @update:lighting="emitNodeParam('lighting', $event)"
         @generate="onViewpointGenerate"
-
       />
     </template>
     <template v-else>
@@ -221,9 +224,7 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import {
-  MODEL_BACKGROUND_OPTIONS,
-} from '../components/nodes/nodeOptionConfig'
+import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/nodeOptionConfig'
 import type {
   CanvasImageItem,
   ColorNodeItem,
@@ -241,34 +242,37 @@ import type { MessageAction, ResizeDirection } from '../composables/useFlowMessa
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 
-const props = withDefaults(defineProps<{
-  data: FlowNodeData
-  selected?: boolean
-  dragging?: boolean
-  copyMode?: boolean
-  uiState?: NodeUiState | PromptNodeUiState
-  maskSourceImageUrl?: string
-  maskSourceImageRatio?: number
-  maskHasConnectedImageInput?: boolean
-  messageActionVisible?: boolean
-  messageDirectGenerating?: boolean
-  showStyleStrengthControl?: boolean
-  styleInnovateStrengthPct?: number
-  setStyleStrengthTrackRef?: (el: Element | ComponentPublicInstance | null) => void
-}>(), {
-  selected: false,
-  dragging: false,
-  copyMode: false,
-  uiState: undefined,
-  maskSourceImageUrl: '',
-  maskSourceImageRatio: 1,
-  maskHasConnectedImageInput: false,
-  messageActionVisible: false,
-  messageDirectGenerating: false,
-  showStyleStrengthControl: false,
-  styleInnovateStrengthPct: 50,
-  setStyleStrengthTrackRef: () => undefined,
-})
+const props = withDefaults(
+  defineProps<{
+    data: FlowNodeData
+    selected?: boolean
+    dragging?: boolean
+    copyMode?: boolean
+    uiState?: NodeUiState | PromptNodeUiState
+    maskSourceImageUrl?: string
+    maskSourceImageRatio?: number
+    maskHasConnectedImageInput?: boolean
+    messageActionVisible?: boolean
+    messageDirectGenerating?: boolean
+    showStyleStrengthControl?: boolean
+    styleInnovateStrengthPct?: number
+    setStyleStrengthTrackRef?: (el: Element | ComponentPublicInstance | null) => void
+  }>(),
+  {
+    selected: false,
+    dragging: false,
+    copyMode: false,
+    uiState: undefined,
+    maskSourceImageUrl: '',
+    maskSourceImageRatio: 1,
+    maskHasConnectedImageInput: false,
+    messageActionVisible: false,
+    messageDirectGenerating: false,
+    showStyleStrengthControl: false,
+    styleInnovateStrengthPct: 50,
+    setStyleStrengthTrackRef: () => undefined,
+  },
+)
 
 const emit = defineEmits<{
   (e: 'update-prompt-text', value: string): void
@@ -300,7 +304,10 @@ const emit = defineEmits<{
   (e: 'message-contextmenu', event: MouseEvent): void
   (e: 'message-image-dragstart', event: DragEvent): void
   (e: 'message-resize-mousedown', payload: { event: MouseEvent; direction: ResizeDirection }): void
-  (e: 'message-action', action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'): void
+  (
+    e: 'message-action',
+    action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design',
+  ): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
   (e: 'request-internals-update'): void
@@ -319,7 +326,9 @@ const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const isMessageNode = computed(() => props.data.kind === 'message')
 const showDefaultDragZone = computed(() => !isMessageNode.value)
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
-const promptUiState = computed<PromptNodeUiState | undefined>(() => props.uiState as PromptNodeUiState | undefined)
+const promptUiState = computed<PromptNodeUiState | undefined>(
+  () => props.uiState as PromptNodeUiState | undefined,
+)
 function resolveSnapshotNode<T>() {
   return props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
     ? ({ ...(props.data.snapshotNode as T), x: 0, y: 0 } as T)
@@ -335,19 +344,39 @@ const imageSnapshot = computed<ImageNodeItem | null>(() => {
   if (!isImageNode.value) return null
   return resolveSnapshotNode<ImageNodeItem>()
 })
-const editSnapshot = computed<EditNodeItem | null>(() => (isEditNode.value ? resolveSnapshotNode<EditNodeItem>() : null))
-const enhanceSnapshot = computed<EnhanceNodeItem | null>(() => (isEnhanceNode.value ? resolveSnapshotNode<EnhanceNodeItem>() : null))
-const colorSnapshot = computed<ColorNodeItem | null>(() => (isColorNode.value ? resolveSnapshotNode<ColorNodeItem>() : null))
-const fusionSnapshot = computed<FusionNodeItem | null>(() => (isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null))
-const wearSnapshot = computed<WearNodeItem | null>(() => (isWearNode.value ? resolveSnapshotNode<WearNodeItem>() : null))
-const maskSnapshot = computed<MaskNodeItem | null>(() => (isMaskNode.value ? resolveSnapshotNode<MaskNodeItem>() : null))
-const modelSnapshot = computed<ModelNodeItem | null>(() => (isModelNode.value ? resolveSnapshotNode<ModelNodeItem>() : null))
-const viewpointSnapshot = computed<ViewpointNodeItem | null>(() => (isViewpointNode.value ? resolveSnapshotNode<ViewpointNodeItem>() : null))
-const messageSnapshot = computed<CanvasImageItem | null>(() => (isMessageNode.value ? resolveSnapshotNode<CanvasImageItem>() : null))
+const editSnapshot = computed<EditNodeItem | null>(() =>
+  isEditNode.value ? resolveSnapshotNode<EditNodeItem>() : null,
+)
+const enhanceSnapshot = computed<EnhanceNodeItem | null>(() =>
+  isEnhanceNode.value ? resolveSnapshotNode<EnhanceNodeItem>() : null,
+)
+const colorSnapshot = computed<ColorNodeItem | null>(() =>
+  isColorNode.value ? resolveSnapshotNode<ColorNodeItem>() : null,
+)
+const fusionSnapshot = computed<FusionNodeItem | null>(() =>
+  isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null,
+)
+const wearSnapshot = computed<WearNodeItem | null>(() =>
+  isWearNode.value ? resolveSnapshotNode<WearNodeItem>() : null,
+)
+const maskSnapshot = computed<MaskNodeItem | null>(() =>
+  isMaskNode.value ? resolveSnapshotNode<MaskNodeItem>() : null,
+)
+const modelSnapshot = computed<ModelNodeItem | null>(() =>
+  isModelNode.value ? resolveSnapshotNode<ModelNodeItem>() : null,
+)
+const viewpointSnapshot = computed<ViewpointNodeItem | null>(() =>
+  isViewpointNode.value ? resolveSnapshotNode<ViewpointNodeItem>() : null,
+)
+const messageSnapshot = computed<CanvasImageItem | null>(() =>
+  isMessageNode.value ? resolveSnapshotNode<CanvasImageItem>() : null,
+)
 
 const displayImage = computed<{ url: string } | null>(() => {
   if (!imageSnapshot.value) return null
-  const outputs = Array.isArray(imageSnapshot.value.outputImages) ? imageSnapshot.value.outputImages : []
+  const outputs = Array.isArray(imageSnapshot.value.outputImages)
+    ? imageSnapshot.value.outputImages
+    : []
   const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
   const url = latestOutput?.url || imageSnapshot.value.sourceImageUrl || ''
   return url ? { url } : null
@@ -360,9 +389,12 @@ const maskCanvasWidth = computed(() => {
 
 const maskStageHeight = computed(() => {
   if (!maskSnapshot.value) return 180
-  const ratio = props.maskSourceImageRatio > 0
-    ? props.maskSourceImageRatio
-    : (maskSnapshot.value.sourceImageRatio > 0 ? maskSnapshot.value.sourceImageRatio : 1)
+  const ratio =
+    props.maskSourceImageRatio > 0
+      ? props.maskSourceImageRatio
+      : maskSnapshot.value.sourceImageRatio > 0
+        ? maskSnapshot.value.sourceImageRatio
+        : 1
   return Math.max(120, Math.min(360, Math.round(maskCanvasWidth.value * ratio)))
 })
 
@@ -377,7 +409,6 @@ const stageHeight = computed(() => {
   const ratio = imageSnapshot.value.sourceImageRatio > 0 ? imageSnapshot.value.sourceImageRatio : 1
   return Math.max(120, Math.min(360, Math.round(stageWidth * ratio)))
 })
-
 
 function onPromptTextUpdate(value: string) {
   emit('update-prompt-text', value)
@@ -434,7 +465,6 @@ function onModelGenerate() {
 function onViewpointGenerate() {
   emit('generate-viewpoint')
 }
-
 
 function onImageStageDrop(event: DragEvent) {
   emit('image-stage-drop', event)
@@ -507,7 +537,6 @@ function onStyleStrengthTrackMouseDown(event: MouseEvent) {
   emit('style-strength-track-mousedown', event)
 }
 
-
 function noop() {}
 function noopMouse() {}
 </script>
@@ -540,7 +569,6 @@ function noopMouse() {}
   min-width: 96px;
 }
 
-
 .flow-canvas-node__image-wrap {
   position: relative;
   overflow: visible;
@@ -553,7 +581,6 @@ function noopMouse() {}
 .flow-canvas-node__drag-surface:active {
   cursor: grabbing;
 }
-
 
 .flow-canvas-node__unsupported {
   padding: 8px 10px;

@@ -5,7 +5,6 @@ interface EnsureFlowMaskImageUrlOptions {
   boardId?: string
 }
 
-
 export async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
   const response = await fetch(dataUrl)
   const blob = await response.blob()

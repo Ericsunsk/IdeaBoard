@@ -13,8 +13,17 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
-          <path d="M8 6.5h4l4 4v7a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 7 17.5v-9A2 2 0 0 1 8 6.5z" />
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.1"
+        >
+          <path
+            d="M8 6.5h4l4 4v7a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 7 17.5v-9A2 2 0 0 1 8 6.5z"
+          />
           <path d="M12 6.5v4h4" />
           <path d="M9 14c1.5-1.4 4.5-1.4 6 0" />
         </svg>
@@ -33,7 +42,12 @@
             max="100"
             step="1"
             :value="imageAWeight"
-            @input="emit('update:blend-ratio', toNumber(($event.target as HTMLInputElement).value, imageAWeight))"
+            @input="
+              emit(
+                'update:blend-ratio',
+                toNumber(($event.target as HTMLInputElement).value, imageAWeight),
+              )
+            "
           />
           <span class="fusion-slider-value">{{ imageAWeight }}%</span>
         </div>
@@ -47,7 +61,12 @@
             max="100"
             step="1"
             :value="imageBWeight"
-            @input="emit('update:blend-ratio', 100 - toNumber(($event.target as HTMLInputElement).value, imageBWeight))"
+            @input="
+              emit(
+                'update:blend-ratio',
+                100 - toNumber(($event.target as HTMLInputElement).value, imageBWeight),
+              )
+            "
           />
           <span class="fusion-slider-value">{{ imageBWeight }}%</span>
         </div>
@@ -60,8 +79,6 @@
         @generate="emit('generate')"
       />
     </div>
-
-
   </div>
 </template>
 
@@ -108,8 +125,6 @@ const io = computed(() =>
 const connectionChips = computed(() => io.value.connectionChips)
 const imageAWeight = computed(() => props.node.blendRatio)
 const imageBWeight = computed(() => 100 - props.node.blendRatio)
-
-
 </script>
 
 <style scoped src="./node-shared.css"></style>
@@ -144,5 +159,4 @@ const imageBWeight = computed(() => 100 - props.node.blendRatio)
   font-weight: 700;
   color: #7b8798;
 }
-
 </style>
