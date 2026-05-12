@@ -1,49 +1,112 @@
 <template>
-  <div class="center-page">
-    <div class="mesh-bg">
-      <div class="mesh-blob blob-1"></div>
-      <div class="mesh-blob blob-2"></div>
-    </div>
+  <div
+    class="relative h-screen w-full overflow-hidden bg-[#f8f9fd] bg-[radial-gradient(circle,#e2e4e8_1.5px,transparent_1.5px)] bg-[length:24px_24px] [background-attachment:fixed] bg-center font-[-apple-system,BlinkMacSystemFont,'PingFang_SC','Segoe_UI',sans-serif] text-[#1f2430]"
+  >
+    <div
+      class="relative z-[1] mx-auto my-[5vh] flex h-[90vh] max-w-[1200px] overflow-hidden rounded-[24px] border border-[#d9dfec] bg-[rgba(255,255,255,0.88)] backdrop-blur-[16px]"
+    >
+      <aside
+        class="flex w-[260px] shrink-0 flex-col border-r border-[rgba(0,0,0,0.05)] px-[24px] py-[34px]"
+      >
+        <button
+          class="mb-[34px] w-fit border-0 bg-transparent p-0 text-left text-[22px] leading-none font-[800] text-[#7a6bd5]"
+          type="button"
+          @click="router.push('/user/home')"
+        >
+          IdeaBoard
+        </button>
 
-    <div class="center-container">
-      <aside class="center-sidebar">
-        <div class="sidebar-header">
-          <div class="logo-text" @click="router.push('/user/home')">IdeaBoard</div>
+        <div
+          class="mb-[30px] rounded-[22px] border border-[#e4e8f3] bg-[rgba(255,255,255,0.72)] p-[18px]"
+        >
+          <div class="flex items-center gap-[12px]">
+            <div
+              class="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#9278e6,#b087f4)] text-[22px] font-[800] text-[#ffffff]"
+            >
+              {{ userStore.user?.username?.[0]?.toUpperCase() }}
+            </div>
+            <div class="min-w-0">
+              <div class="truncate text-[15px] leading-[1.2] font-[800] text-[#1d2333]">
+                {{ userStore.user?.username || '-' }}
+              </div>
+              <div class="mt-[5px] text-[12px] leading-none font-[600] text-[#8a91a4]">
+                {{ userStore.user?.role === 'admin' ? '管理员账户' : '创作者账户' }}
+              </div>
+            </div>
+          </div>
+          <div class="mt-[16px] flex items-center justify-between text-[12px]">
+            <span class="font-[600] text-[#8a91a4]">会员编号</span>
+            <span class="font-[800] text-[#5d52c9]">{{ userStore.user?.uid || '-' }}</span>
+          </div>
         </div>
 
-        <nav class="sidebar-nav">
+        <nav class="flex flex-1 flex-col gap-[10px]">
           <div
             v-for="item in navItems"
             :key="item.key"
-            class="nav-item"
-            :class="{ active: activeTab === item.key }"
+            class="group flex h-[48px] cursor-pointer items-center gap-[12px] rounded-[16px] px-[14px] text-[14px] font-[700] transition-colors duration-200"
+            :class="
+              activeTab === item.key
+                ? 'bg-[#7a6bd5] text-[#ffffff]'
+                : 'text-[#86868b] hover:bg-[#eef1fa] hover:text-[#2c3448]'
+            "
             @click="activeTab = item.key"
           >
-            <div class="nav-icon">
+            <span
+              class="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[10px] transition-colors"
+              :class="
+                activeTab === item.key
+                  ? 'bg-[rgba(255,255,255,0.18)]'
+                  : 'bg-[#f1f3fa] text-[#7f86a0] group-hover:bg-[#e6eaf6]'
+              "
+            >
               <svg
-                width="20"
-                height="20"
+                v-if="item.key === 'profile'"
+                width="15"
+                height="15"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                stroke-width="2"
+                stroke-width="2.2"
               >
-                <component
-                  :is="shape.tag"
-                  v-for="(shape, shapeIndex) in item.shapes"
-                  :key="`${item.key}-${shapeIndex}`"
-                  v-bind="shape.attrs"
-                />
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 21a8 8 0 0 1 16 0" />
               </svg>
-            </div>
+              <svg
+                v-else-if="item.key === 'tasks'"
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+              >
+                <path d="M4 5a2 2 0 0 1 2-2h8l6 6v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+                <path d="M14 3v6h6" />
+                <path d="M8 14h8" />
+                <path d="M8 18h5" />
+              </svg>
+              <svg
+                v-else
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+              >
+                <rect x="4" y="11" width="16" height="9" rx="2" />
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+            </span>
             <span>{{ item.label }}</span>
           </div>
         </nav>
 
-        <div class="sidebar-footer">
+        <div class="mt-auto flex flex-col gap-[10px]">
           <button
             v-if="userStore.user?.role === 'admin'"
-            class="action-btn admin-btn"
+            class="flex h-[44px] w-full items-center gap-[10px] rounded-[14px] border-0 bg-[#7a6bd5] px-[15px] text-[14px] font-[700] text-[#ffffff] transition-colors hover:bg-[#6c54c4]"
             @click="router.push('/admin/users')"
           >
             <svg
@@ -59,7 +122,10 @@
             管理后台
           </button>
 
-          <button class="action-btn back-btn" @click="router.back()">
+          <button
+            class="flex h-[44px] w-full items-center gap-[10px] rounded-[14px] border-0 bg-[#f1f3f9] px-[15px] text-[14px] font-[700] text-[#4d556a] transition-colors hover:bg-[#e8ecf7]"
+            @click="router.back()"
+          >
             <svg
               width="18"
               height="18"
@@ -73,7 +139,10 @@
             返回上级
           </button>
 
-          <button class="action-btn logout-btn" @click="handleLogout">
+          <button
+            class="flex h-[44px] w-full items-center gap-[10px] rounded-[14px] border-0 bg-transparent px-[15px] text-[14px] font-[700] text-[#ff3b30] transition-colors hover:bg-[rgba(255,59,48,0.06)]"
+            @click="handleLogout"
+          >
             <svg
               width="18"
               height="18"
@@ -91,83 +160,180 @@
         </div>
       </aside>
 
-      <main class="center-main">
-        <div class="main-header">
-          <div class="user-brief">
-            <div class="avatar-big">
-              <img
-                v-if="userStore.user?.avatar"
-                class="h-full w-full object-cover"
-                :src="userStore.user.avatar"
-              />
+      <main
+        class="custom-scrollbar flex flex-1 flex-col gap-[22px] overflow-x-hidden overflow-y-auto px-[38px] py-[34px]"
+      >
+        <section
+          class="rounded-[24px] border border-[#e3e8f4] bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(247,248,255,0.84))] p-[26px]"
+        >
+          <div class="flex items-center justify-between gap-[24px]">
+            <div class="flex min-w-0 items-center gap-[18px]">
               <div
-                v-else
-                class="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#9278e6,#c084fc)] text-[32px] font-bold text-white"
+                class="flex h-[82px] w-[82px] shrink-0 items-center justify-center overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#9278e6,#b072f1)] text-[34px] font-[800] text-[#ffffff] shadow-[0_18px_34px_rgba(122,107,213,0.22)]"
               >
-                {{ userStore.user?.username?.[0]?.toUpperCase() }}
+                <img
+                  v-if="userStore.user?.avatar"
+                  class="h-full w-full object-cover"
+                  :src="userStore.user.avatar"
+                />
+                <span v-else>{{ userStore.user?.username?.[0]?.toUpperCase() }}</span>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-[10px]">
+                  <h1 class="m-0 truncate text-[30px] leading-[1.05] font-[800] text-[#111827]">
+                    {{ userStore.user?.username || '-' }}
+                  </h1>
+                  <span
+                    class="inline-flex h-[26px] shrink-0 items-center rounded-full border border-[#b7eadf] bg-[rgba(93,216,184,0.08)] px-[10px] text-[12px] font-[800] text-[#5fd2b2]"
+                  >
+                    {{ userStore.user?.status === 1 ? '正常使用中' : '已封禁' }}
+                  </span>
+                </div>
+                <p class="mt-[10px] text-[15px] leading-none font-[600] text-[#858b9c]">
+                  {{ userStore.user?.role === 'admin' ? '管理员' : '创作者' }} · UID
+                  {{ userStore.user?.uid || '-' }}
+                </p>
               </div>
             </div>
-            <div class="user-info-text">
-              <h1>{{ userStore.user?.username }}</h1>
-              <p>{{ userStore.user?.role === 'admin' ? '管理员' : '创作者' }}</p>
-            </div>
-          </div>
-          <div class="stats-row">
-            <div
-              class="flex min-w-[100px] flex-col rounded-2xl border border-white/80 bg-white/50 px-5 py-3"
-            >
-              <span class="text-xl font-bold text-[#1d1d1f]">{{ taskPagination.total }}</span>
-              <span class="text-[13px] text-[#86868b]">累计作品</span>
-            </div>
-            <div
-              class="flex min-w-[100px] flex-col rounded-2xl border border-white/80 bg-white/50 px-5 py-3"
-            >
-              <span class="text-xl font-bold text-[#1d1d1f]">{{ userStore.user?.uid || '-' }}</span>
-              <span class="text-[13px] text-[#86868b]">会员编号</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="main-body">
+            <div class="grid shrink-0 grid-cols-2 gap-[12px]">
+              <div
+                class="min-w-[112px] rounded-[18px] border border-[#e4e8f3] bg-[rgba(255,255,255,0.82)] px-[18px] py-[15px]"
+              >
+                <span class="block text-[24px] leading-none font-[800] text-[#1d1d1f]">
+                  {{ taskPagination.total }}
+                </span>
+                <span class="mt-[10px] block text-[12px] leading-none font-[700] text-[#8b92a4]">
+                  累计作品
+                </span>
+              </div>
+              <div
+                class="min-w-[112px] rounded-[18px] border border-[#e4e8f3] bg-[rgba(255,255,255,0.82)] px-[18px] py-[15px]"
+              >
+                <span class="block text-[24px] leading-none font-[800] text-[#1d1d1f]">
+                  {{ userStore.user?.uid || '-' }}
+                </span>
+                <span class="mt-[10px] block text-[12px] leading-none font-[700] text-[#8b92a4]">
+                  会员编号
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="flex-1">
           <Transition name="fade-slide" mode="out-in">
-            <div v-if="activeTab === 'profile'" key="profile" class="tab-content">
-              <div class="content-card">
-                <h2 class="section-title">个人基本资料</h2>
-                <div class="profile-grid">
-                  <div class="profile-field">
-                    <label>用户账号</label>
-                    <div class="field-value">{{ userStore.user?.username }}</div>
+            <div
+              v-if="activeTab === 'profile'"
+              key="profile"
+              class="grid grid-cols-[minmax(0,1fr)_260px] gap-[18px]"
+            >
+              <section class="rounded-[24px] border border-[#e2e7f3] bg-[#ffffff] p-[30px]">
+                <div class="mb-[30px] flex items-center justify-between">
+                  <div>
+                    <h2 class="m-0 text-[22px] leading-none font-[800] text-[#1d1d1f]">
+                      个人基本资料
+                    </h2>
+                    <p class="mt-[10px] text-[13px] leading-none font-[600] text-[#8a91a4]">
+                      账号身份与基础信息
+                    </p>
                   </div>
-                  <div class="profile-field">
-                    <label>账号状态</label>
-                    <div class="field-value">
-                      <n-tag
-                        :type="userStore.user?.status === 1 ? 'success' : 'warning'"
-                        size="small"
-                        round
-                        ghost
-                      >
-                        {{ userStore.user?.status === 1 ? '正常使用中' : '已封禁' }}
-                      </n-tag>
+                  <span
+                    class="rounded-full bg-[#f2efff] px-[12px] py-[7px] text-[12px] leading-none font-[800] text-[#6f5bd3]"
+                  >
+                    {{ userStore.user?.role === 'admin' ? 'Admin' : 'Creator' }}
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-[14px]">
+                  <div class="rounded-[18px] bg-[#f7f8fc] p-[18px]">
+                    <label class="block text-[12px] leading-none font-[800] text-[#8b92a4]">
+                      用户账号
+                    </label>
+                    <div
+                      class="mt-[14px] truncate text-[18px] leading-none font-[800] text-[#1d1d1f]"
+                    >
+                      {{ userStore.user?.username || '-' }}
                     </div>
                   </div>
-                  <div class="profile-field">
-                    <label>加入时间</label>
-                    <div class="field-value">
-                      {{ userStore.user?.created_at?.split(' ')?.[0] || '-' }}
+
+                  <div class="rounded-[18px] bg-[#f7f8fc] p-[18px]">
+                    <label class="block text-[12px] leading-none font-[800] text-[#8b92a4]">
+                      账号状态
+                    </label>
+                    <div class="mt-[12px]">
+                      <span
+                        class="inline-flex h-[30px] items-center rounded-full border border-[#a6ecdd] bg-[rgba(93,216,184,0.08)] px-[12px] text-[13px] font-[800] text-[#5fd2b2]"
+                      >
+                        {{ userStore.user?.status === 1 ? '正常使用中' : '已封禁' }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="col-span-2 rounded-[18px] bg-[#f7f8fc] p-[18px]">
+                    <label class="block text-[12px] leading-none font-[800] text-[#8b92a4]">
+                      加入时间
+                    </label>
+                    <div
+                      class="mt-[14px] text-[18px] leading-[1.25] font-[700] break-all text-[#1d1d1f]"
+                    >
+                      {{ userStore.user?.created_at || '-' }}
                     </div>
                   </div>
                 </div>
-              </div>
+              </section>
+
+              <aside class="flex flex-col gap-[14px]">
+                <div
+                  class="rounded-[24px] border border-[#e2e7f3] bg-[linear-gradient(180deg,#ffffff,#f8f7ff)] p-[22px]"
+                >
+                  <div class="text-[13px] leading-none font-[800] text-[#8b92a4]">身份权限</div>
+                  <div class="mt-[18px] text-[26px] leading-none font-[800] text-[#1d1d1f]">
+                    {{ userStore.user?.role === 'admin' ? 'Admin' : 'User' }}
+                  </div>
+                  <p class="mt-[14px] text-[13px] leading-[1.6] font-[600] text-[#7e8597]">
+                    {{
+                      userStore.user?.role === 'admin'
+                        ? '可进入后台管理与内容工作区。'
+                        : '可进入创作工作区。'
+                    }}
+                  </p>
+                </div>
+
+                <div class="rounded-[24px] border border-[#e2e7f3] bg-[#ffffff] p-[22px]">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[13px] font-[800] text-[#8b92a4]">作品统计</span>
+                    <span class="text-[22px] leading-none font-[800] text-[#7a6bd5]">
+                      {{ taskPagination.total }}
+                    </span>
+                  </div>
+                  <div class="mt-[18px] h-[8px] overflow-hidden rounded-full bg-[#eef1fa]">
+                    <div
+                      class="h-full w-[64%] rounded-full bg-[linear-gradient(90deg,#7a6bd5,#b087f4)]"
+                    ></div>
+                  </div>
+                </div>
+              </aside>
             </div>
 
-            <div v-else-if="activeTab === 'tasks'" key="tasks" class="tab-content">
-              <div class="content-card">
-                <div class="card-header">
-                  <h2 class="section-title">我的创作记录</h2>
-                  <button class="refresh-btn" :disabled="taskLoading" @click="loadTasks">
+            <div v-else-if="activeTab === 'tasks'" key="tasks">
+              <section class="rounded-[24px] border border-[#e2e7f3] bg-[#ffffff] p-[30px]">
+                <div class="mb-[24px] flex items-center justify-between">
+                  <div>
+                    <h2 class="m-0 text-[22px] leading-none font-[800] text-[#1d1d1f]">
+                      我的作品记录
+                    </h2>
+                    <p class="mt-[10px] text-[13px] leading-none font-[600] text-[#8a91a4]">
+                      最近生成与创作历史
+                    </p>
+                  </div>
+                  <button
+                    class="flex h-[36px] items-center gap-[7px] rounded-full border-0 bg-[#f2efff] px-[15px] text-[13px] font-[800] text-[#6f5bd3] transition-colors hover:bg-[#e9e3ff] disabled:cursor-not-allowed disabled:opacity-60"
+                    :disabled="taskLoading"
+                    @click="loadTasks"
+                  >
                     <svg
-                      :class="{ spinning: taskLoading }"
+                      :class="{ 'animate-spin': taskLoading }"
                       width="16"
                       height="16"
                       viewBox="0 0 24 24"
@@ -178,7 +344,7 @@
                       <path d="M23 4v6h-6" />
                       <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                     </svg>
-                    同步记录
+                    同步数据
                   </button>
                 </div>
                 <n-data-table
@@ -190,24 +356,31 @@
                   size="medium"
                   class="profile-table"
                 />
-              </div>
+              </section>
             </div>
 
-            <div v-else-if="activeTab === 'security'" key="security" class="tab-content">
-              <div class="content-card">
-                <h2 class="section-title">账号安全设置</h2>
+            <div v-else-if="activeTab === 'security'" key="security">
+              <section class="rounded-[24px] border border-[#e2e7f3] bg-[#ffffff] p-[30px]">
+                <div class="mb-[28px]">
+                  <h2 class="m-0 text-[22px] leading-none font-[800] text-[#1d1d1f]">
+                    修改登录密码
+                  </h2>
+                  <p class="mt-[10px] text-[13px] leading-none font-[600] text-[#8a91a4]">
+                    更新后需要重新登录
+                  </p>
+                </div>
                 <n-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-placement="top">
-                  <div class="security-grid">
+                  <div class="mb-[26px] flex flex-col gap-[16px]">
                     <n-form-item label="当前原密码" path="oldPassword">
                       <n-input
                         v-model:value="pwdForm.oldPassword"
                         type="password"
-                        placeholder="请输入当前使用的密码"
+                        placeholder="验证您的当前密码"
                         show-password-on="click"
                         class="profile-input"
                       />
                     </n-form-item>
-                    <div class="new-password-row">
+                    <div class="grid grid-cols-2 gap-[16px]">
                       <n-form-item label="设置新密码" path="newPassword">
                         <n-input
                           v-model:value="pwdForm.newPassword"
@@ -221,24 +394,23 @@
                         <n-input
                           v-model:value="pwdForm.confirmPassword"
                           type="password"
-                          placeholder="请再次输入新密码"
+                          placeholder="请再次确认新密码"
                           show-password-on="click"
                           class="profile-input"
                         />
                       </n-form-item>
                     </div>
                   </div>
-                  <n-button
-                    type="primary"
-                    block
-                    :loading="pwdLoading"
-                    class="profile-btn"
-                    @click="handleUpdatePassword"
+                  <button
+                    class="flex h-[50px] w-full items-center justify-center rounded-[16px] border-0 bg-[#7a6bd5] text-[15px] font-[800] text-[#ffffff] transition-colors hover:bg-[#6c54c4] disabled:cursor-not-allowed disabled:opacity-50"
+                    type="button"
+                    :disabled="pwdLoading"
+                    @click.prevent="handleUpdatePassword"
                   >
-                    确认更新密码
-                  </n-button>
+                    确认更新账户密码
+                  </button>
                 </n-form>
-              </div>
+              </section>
             </div>
           </Transition>
         </div>
@@ -259,50 +431,11 @@ const message = useMessage()
 
 const activeTab = ref('profile')
 
-type NavShape = {
-  tag: 'circle' | 'path' | 'polyline' | 'line' | 'rect'
-  attrs: Record<string, string | number>
-}
-
-type NavItem = {
-  key: 'profile' | 'tasks' | 'security'
-  label: string
-  shapes: NavShape[]
-}
-
 const navItems = [
-  {
-    key: 'profile',
-    label: '个人资料',
-    shapes: [
-      { tag: 'circle', attrs: { cx: 12, cy: 12, r: 10 } },
-      { tag: 'circle', attrs: { cx: 12, cy: 10, r: 3 } },
-      { tag: 'path', attrs: { d: 'M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662' } },
-    ],
-  },
-  {
-    key: 'tasks',
-    label: '我的作品',
-    shapes: [
-      {
-        tag: 'path',
-        attrs: { d: 'M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z' },
-      },
-      { tag: 'polyline', attrs: { points: '14 2 14 8 20 8' } },
-      { tag: 'line', attrs: { x1: 16, y1: 13, x2: 8, y2: 13 } },
-      { tag: 'line', attrs: { x1: 16, y1: 17, x2: 8, y2: 17 } },
-      { tag: 'line', attrs: { x1: 10, y1: 9, x2: 8, y2: 9 } },
-    ],
-  },
-  {
-    key: 'security',
-    label: '账号安全',
-    shapes: [
-      { tag: 'rect', attrs: { x: 3, y: 11, width: 18, height: 11, rx: 2, ry: 2 } },
-      { tag: 'path', attrs: { d: 'M7 11V7a5 5 0 0 1 10 0v4' } },
-    ],
-  },
-] satisfies NavItem[]
+  { key: 'profile', label: '个人资料' },
+  { key: 'tasks', label: '我的作品' },
+  { key: 'security', label: '账号安全' },
+]
 
 const taskPage = ref(1)
 const taskPageSize = 8
@@ -350,28 +483,28 @@ const taskColumns: DataTableColumns<any> = [
   {
     title: '状态',
     key: 'status',
-    width: 100,
+    width: 120,
     render: (row) => {
       const cfg = getStatusConfig(row.status)
       return h(NTag, { type: cfg.type, size: 'small', round: true, ghost: true }, () => cfg.text)
     },
   },
   {
-    title: '内容描述',
+    title: '作品描述',
     key: 'prompt',
     ellipsis: { tooltip: true },
     render: (row) =>
       h(
         'span',
-        { style: { color: '#1d1d1f', fontWeight: '500' } },
+        { style: { color: '#1d1d1f', fontWeight: '600' } },
         row.prompt?.replace(/^\[.*?\]\s*/, ''),
       ),
   },
   {
     title: '创作时间',
     key: 'created_at',
-    width: 180,
-    render: (row) => h('span', { style: { color: '#86868b', fontSize: '13px' } }, row.created_at),
+    width: 200,
+    render: (row) => h('span', { style: { color: '#86868b' } }, row.created_at),
   },
 ]
 
@@ -383,16 +516,16 @@ const pwdFormRef = ref()
 const pwdLoading = ref(false)
 const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const pwdRules = {
-  oldPassword: { required: true, message: '请输入当前原密码', trigger: 'blur' },
+  oldPassword: { required: true, message: '请输入当前密码', trigger: 'blur' },
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
     { min: 6, message: '密码至少6个字符', trigger: 'blur' },
   ],
   confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
     {
       validator: (_rule: any, value: string) => value === pwdForm.value.newPassword,
-      message: '两次输入密码不一致',
+      message: '两次密码不一致',
       trigger: 'blur',
     },
   ],
@@ -403,7 +536,7 @@ async function handleUpdatePassword() {
     await pwdFormRef.value?.validate()
     pwdLoading.value = true
     await userStore.updatePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
-    message.success('密码更新成功，请重新登录')
+    message.success('更新成功，请重新登录')
     pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
     await router.push('/user/login')
   } catch (error: any) {
@@ -423,380 +556,49 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.center-page {
-  width: 100%;
-  height: 100vh;
-  background: #f8f9fd;
-  color: #1f2430;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif;
-  overflow: hidden;
-  position: relative;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(122, 107, 213, 0.2);
+  border-radius: 10px;
 }
 
-.mesh-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-  background:
-    radial-gradient(50% 35% at 30% 18%, rgba(146, 120, 230, 0.14) 0%, rgba(146, 120, 230, 0) 100%),
-    radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size:
-    100% 100%,
-    24px 24px;
-}
-.mesh-blob {
-  display: none;
-}
-
-.center-container {
-  max-width: 1200px;
-  height: 90vh;
-  margin: 5vh auto;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(16px);
-  border-radius: 24px;
-  border: 1px solid #d9dfec;
-  display: flex;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-}
-
-/* Sidebar */
-.center-sidebar {
-  width: 260px;
-  border-right: 1px solid rgba(0, 0, 0, 0.05);
-  padding: 40px 24px;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-header {
-  margin-bottom: 48px;
-}
-.logo-text {
-  font-size: 22px;
-  font-weight: 700;
-  color: #2a3142;
-  cursor: pointer;
-  background: linear-gradient(135deg, #7f68d5, #9f8fe6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.sidebar-nav {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  cursor: pointer;
-  color: #86868b;
-  font-size: 15px;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.nav-item:hover {
-  background: #eef1fa;
-  color: #2c3448;
-}
-.nav-item.active {
-  background: #7a6bd5;
-  color: #fff;
-}
-.nav-icon {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.action-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border: none;
-  background: transparent;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 12px;
-  transition: all 0.2s;
-}
-
-.back-btn {
-  color: #4d556a;
-  background: #f1f3f9;
-}
-.back-btn:hover {
-  background: #e8ecf7;
-  color: #2a3142;
-}
-
-.admin-btn {
-  color: #fff;
-  background: linear-gradient(135deg, #7f68d5, #9f8fe6);
-}
-.admin-btn:hover {
-  background: linear-gradient(135deg, #6c54c4, #8b7ad6);
-}
-
-.logout-btn {
-  color: #ff3b30;
-}
-.logout-btn:hover {
-  background: rgba(255, 59, 48, 0.05);
-}
-
-/* Main Content */
-.center-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 44px 52px;
-}
-
-.center-main {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(146, 120, 230, 0.38) transparent;
-}
-
-.center-main::-webkit-scrollbar {
-  width: 8px;
-}
-
-.center-main::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.center-main::-webkit-scrollbar-thumb {
-  background: rgba(146, 120, 230, 0.34);
-  border-radius: 999px;
-}
-
-.center-main::-webkit-scrollbar-thumb:hover {
-  background: rgba(122, 107, 213, 0.5);
-}
-
-.main-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 40px;
-}
-
-.user-brief {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.avatar-big {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #fff;
-  border: 4px solid #fff;
-  overflow: hidden;
-}
-
-.user-info-text h1 {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-.user-info-text p {
-  color: #86868b;
-  margin: 4px 0 0;
-  font-size: 15px;
-}
-
-.stats-row {
-  display: flex;
-  gap: 24px;
-}
-
-.main-body {
-  flex: 1;
-}
-
-.content-card {
-  background: #ffffff;
-  padding: 34px;
-  border-radius: 18px;
-  border: 1px solid #e2e7f3;
-}
-
-.section-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 32px;
-  color: #1d1d1f;
-}
-
-/* Fields */
-.profile-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 32px;
-}
-.profile-field label {
-  display: block;
-  font-size: 13px;
-  color: #86868b;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-.field-value {
-  font-size: 16px;
-  color: #1d1d1f;
-  font-weight: 500;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-.card-header .section-title {
-  margin-bottom: 0;
-}
-
-.refresh-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #f5f5f7;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
-  color: #1d1d1f;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.refresh-btn:hover {
-  background: #e8e8ed;
-}
-.refresh-btn:disabled {
-  opacity: 0.6;
-}
-.spinning {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.security-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-.new-password-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-/* Custom Naive UI Styles */
-:deep(.n-input.profile-input) {
-  --n-border: 1px solid #d2d2d7 !important;
-  --n-border-hover: 1px solid #9278e6 !important;
-  --n-border-focus: 1px solid #9278e6 !important;
-  --n-color: #f5f5f7 !important;
-  --n-color-focus: #fff !important;
-  --n-text-color: #1d1d1f !important;
-  --n-placeholder-color: #86868b !important;
-  --n-caret-color: #9278e6 !important;
-  border-radius: 12px;
-  height: 48px;
-}
-
-:deep(.n-input.profile-input input) {
-  color: #1d1d1f !important;
-  height: 48px !important;
-}
-
-:deep(.n-form-item-label__text) {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1d1d1f !important;
-  margin-left: 4px;
-}
-
-.profile-btn {
-  background: #9278e6 !important;
-  color: #fff !important;
-  height: 48px !important;
-  border-radius: 14px !important;
-  font-weight: 600 !important;
-  font-size: 15px !important;
-  border: none !important;
+:deep(.profile-input.n-input) {
+  --n-border-radius: 12px;
+  --n-height: 48px;
+  --n-color: #f8fafc;
+  --n-border: 1px solid #e2e8f0;
 }
 
 .profile-table :deep(.n-data-table-th) {
-  background: transparent;
-  color: #86868b;
-  font-size: 13px;
-  font-weight: 500;
-  border-bottom: 1px solid #f5f5f7;
+  background-color: #f8fafc;
+  font-weight: 700;
+  color: #64748b;
+  border-bottom: none;
 }
 
 .profile-table :deep(.n-data-table-td) {
   padding: 16px 12px;
-  color: #1d1d1f !important;
-  border-bottom: 1px solid #f5f5f7;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.profile-table :deep(.n-pagination-item) {
-  color: #1d1d1f !important;
-}
 .profile-table :deep(.n-pagination-item--active) {
-  color: #fff !important;
-  background-color: #7a6bd5 !important;
-  border-color: #7a6bd5 !important;
+  background-color: #7a6bd5;
+  border-color: #7a6bd5;
+  color: white;
 }
 
-/* Transitions */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition: all 0.3s ease;
 }
 .fade-slide-enter-from {
   opacity: 0;
-  transform: translateX(20px);
+  transform: translateY(10px);
 }
 .fade-slide-leave-to {
   opacity: 0;
-  transform: translateX(-20px);
+  transform: translateY(-10px);
 }
 </style>
