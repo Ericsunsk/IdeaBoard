@@ -1,9 +1,14 @@
 import { apiPost } from './client'
-import { getAdminChannels } from './generated/admin-channels/admin-channels'
+import {
+  createAdminChannel,
+  deleteAdminChannel,
+  listAdminChannels,
+  updateAdminChannel,
+} from './generated-query/admin-channels/admin-channels'
 import type {
   Channel as GeneratedChannel,
   ChannelFormData as GeneratedChannelFormData,
-} from './generated/model'
+} from './generated-query/model'
 import type { ApiResponse } from './types'
 
 export type Channel = GeneratedChannel
@@ -18,15 +23,13 @@ export type DetectModelsResponse = {
   models: string[]
 }
 
-const adminChannelsApi = getAdminChannels()
-
 export const channelApi = {
-  list: (): Promise<ApiResponse<{ list: Channel[] }>> => adminChannelsApi.listAdminChannels(),
+  list: (): Promise<ApiResponse<{ list: Channel[] }>> => listAdminChannels(),
   create: (data: ChannelFormData): Promise<ApiResponse<{ channel: Channel }>> =>
-    adminChannelsApi.createAdminChannel(data),
+    createAdminChannel(data),
   update: (id: number, data: ChannelFormData): Promise<ApiResponse<{ channel: Channel }>> =>
-    adminChannelsApi.updateAdminChannel(id, data),
-  delete: (id: number): Promise<ApiResponse<null>> => adminChannelsApi.deleteAdminChannel(id),
+    updateAdminChannel(id, data),
+  delete: (id: number): Promise<ApiResponse<null>> => deleteAdminChannel(id),
   detectModels: (data: DetectModelsRequest): Promise<ApiResponse<DetectModelsResponse>> =>
     apiPost<DetectModelsResponse, DetectModelsRequest>('/admin/channels/detect-models', data),
 }

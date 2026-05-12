@@ -17,6 +17,12 @@ import {
   type CanvasBoardSnapshot,
 } from '../../workspace/types/canvasNodes'
 
+type PersistedCanvasBoardState = CanvasBoardSnapshot & {
+  previewSnapshotDataUrl?: string
+  previewSnapshotUpdatedAt?: number
+  updatedAt: number
+}
+
 const finiteNumberSchema = z.number().finite()
 
 const workflowNodeOutputStatusSchema = z.enum(['idle', 'ready', 'stale'])
@@ -207,7 +213,11 @@ const canvasViewportStateSchema = z.object({
   zoomLevel: finiteNumberSchema,
 })
 
-export const canvasBoardSnapshotSchema = z.object({
+// Board state parsing intentionally uses unknown-key strip mode.
+// Reason: remote/local legacy snapshots may contain stale fields; we keep known data
+// and discard unsupported fields instead of hard-failing workspace hydration.
+export const canvasBoardSnapshotSchema = z
+  .object({
   messages: z.array(canvasImageItemSchema),
   imageNodes: z.array(imageNodeItemSchema),
   promptNodes: z.array(promptNodeItemSchema),
@@ -221,10 +231,13 @@ export const canvasBoardSnapshotSchema = z.object({
   wearNodes: z.array(wearNodeItemSchema),
   connections: z.array(canvasConnectionSchema),
   viewport: canvasViewportStateSchema,
-}) satisfies z.ZodType<CanvasBoardSnapshot>
+  })
+  .strip() satisfies z.ZodType<CanvasBoardSnapshot>
 
-export const canvasBoardStateSchema = canvasBoardSnapshotSchema.extend({
-  previewSnapshotDataUrl: z.string().min(1).optional(),
-  previewSnapshotUpdatedAt: finiteNumberSchema.optional(),
-  updatedAt: finiteNumberSchema,
-})
+export const canvasBoardStateSchema = canvasBoardSnapshotSchema
+  .extend({
+    previewSnapshotDataUrl: z.string().min(1).optional(),
+    previewSnapshotUpdatedAt: finiteNumberSchema.optional(),
+    updatedAt: finiteNumberSchema,
+  })
+  .strip() satisfies z.ZodType<PersistedCanvasBoardState>

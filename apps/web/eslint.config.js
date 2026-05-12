@@ -11,7 +11,6 @@ export default tseslint.config(
       'node_modules/**',
       'src/auto-imports.d.ts',
       'src/components.d.ts',
-      'src/shared/api/generated/**',
       'src/shared/api/generated-query/**',
     ],
   },

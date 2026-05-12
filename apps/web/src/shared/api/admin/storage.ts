@@ -1,13 +1,20 @@
-import { getAdminStorage } from '../generated/admin-storage/admin-storage'
+import {
+  applyAdminStorageProfile,
+  createAdminStorageProfile,
+  deleteAdminStorageProfile,
+  getAdminStorageBucketInfo,
+  listAdminStorageProfiles,
+  listAdminStorageProviders,
+  testAdminStorageProfile,
+  updateAdminStorageProfile,
+} from '../generated-query/admin-storage/admin-storage'
 import type { ApiResponse } from '../types'
 import type {
   StorageProfile as GeneratedStorageProfile,
   StorageProfilePayload as GeneratedStorageProfilePayload,
   StorageProviderField as GeneratedStorageProviderField,
   StorageProviderMeta as GeneratedStorageProviderMeta,
-} from '../generated/model'
-
-const adminStorageApi = getAdminStorage()
+} from '../generated-query/model'
 
 export type StorageProvider = string
 export type StorageFieldType = string
@@ -27,24 +34,24 @@ export type StorageProfilePayload = Omit<GeneratedStorageProfilePayload, 'provid
 
 export const storageApi = {
   getProviders: (): Promise<ApiResponse<{ providers: StorageProviderMeta[] }>> =>
-    adminStorageApi.listAdminStorageProviders(),
+    listAdminStorageProviders(),
   getProfiles: (): Promise<ApiResponse<{ profiles: StorageProfile[] }>> =>
-    adminStorageApi.listAdminStorageProfiles(),
+    listAdminStorageProfiles(),
   createProfile: (
     data: StorageProfilePayload,
   ): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-    adminStorageApi.createAdminStorageProfile(data),
+    createAdminStorageProfile(data),
   updateProfile: (
     id: string,
     data: StorageProfilePayload,
   ): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-    adminStorageApi.updateAdminStorageProfile(id, data),
+    updateAdminStorageProfile(id, data),
   deleteProfile: (id: string): Promise<ApiResponse<{ message: string }>> =>
-    adminStorageApi.deleteAdminStorageProfile(id),
+    deleteAdminStorageProfile(id),
   applyProfile: (id: string): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> =>
-    adminStorageApi.applyAdminStorageProfile(id),
+    applyAdminStorageProfile(id),
   testProfile: (id: string): Promise<ApiResponse<{ message: string }>> =>
-    adminStorageApi.testAdminStorageProfile(id),
+    testAdminStorageProfile(id),
   getBucketInfo: (id: string): Promise<ApiResponse<{ info: { domains?: string[] } }>> =>
-    adminStorageApi.getAdminStorageBucketInfo(id),
+    getAdminStorageBucketInfo(id),
 }

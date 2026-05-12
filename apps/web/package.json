@@ -10,7 +10,8 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:schema": "tsx src/features/boards/lib/canvasBoardStateSchema.spec.ts"
   },
   "dependencies": {
     "@tanstack/vue-query": "^5.100.9",
@@ -38,6 +39,7 @@
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.20.6",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.59.3",
     "unplugin-auto-import": "^21.0.0",

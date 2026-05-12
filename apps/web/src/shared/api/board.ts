@@ -1,4 +1,10 @@
-import { apiDelete, apiGet, apiPost, apiPut } from './client'
+import {
+  deleteUserBoard,
+  joinBoardByShareToken,
+  listUserBoards,
+  upsertUserBoard,
+} from './generated-query/boards/boards'
+import type { UserBoardUpsertRequestState } from './generated-query/model'
 import type { ApiResponse } from './types'
 
 export interface UserBoardPayload {
@@ -20,21 +26,19 @@ export interface UserBoardItem {
 
 export const boardApi = {
   list: (): Promise<ApiResponse<{ list: UserBoardItem[] }>> =>
-    apiGet<{ list: UserBoardItem[] }>('/user/boards'),
+    listUserBoards(),
   upsert: (
     boardId: string,
     payload: Omit<UserBoardPayload, 'board_id'>,
   ): Promise<ApiResponse<{ board: UserBoardItem }>> =>
-    apiPut<{ board: UserBoardItem }, Omit<UserBoardPayload, 'board_id'>>(
-      '/user/boards/' + encodeURIComponent(boardId),
-      payload,
-    ),
-  remove: (boardId: string): Promise<ApiResponse<{ deleted: boolean }>> =>
-    apiDelete<{ deleted: boolean }>('/user/boards/' + encodeURIComponent(boardId)),
-  joinByShareToken: (token: string): Promise<ApiResponse<{ board: UserBoardItem }>> =>
-    apiPost<{ board: UserBoardItem }, { token: string }>('/user/boards/share-tokens/join', {
-      token,
+    upsertUserBoard(boardId, {
+      ...payload,
+      state: (payload.state ?? null) as UserBoardUpsertRequestState,
     }),
+  remove: (boardId: string): Promise<ApiResponse<{ deleted: boolean }>> =>
+    deleteUserBoard(boardId),
+  joinByShareToken: (token: string): Promise<ApiResponse<{ board: UserBoardItem }>> =>
+    joinBoardByShareToken({ token }),
 }
 
 export default boardApi

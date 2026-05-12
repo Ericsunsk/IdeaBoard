@@ -1,10 +1,10 @@
 import { apiPost } from './client'
-import { getAdminStatistics } from './generated/admin-statistics/admin-statistics'
+import { getAdminStatistics } from './generated-query/admin-statistics/admin-statistics'
 import type {
   AdminStatistics,
   AdminStatisticsBackfillStatus,
   GetAdminStatisticsRange,
-} from './generated/model'
+} from './generated-query/model'
 import type { ApiResponse } from './types'
 
 export type AdminStatisticsResponse = AdminStatistics
@@ -18,11 +18,9 @@ export interface AdminStatisticsBackfillResult {
   backfilled_days: number
 }
 
-const adminStatisticsGeneratedApi = getAdminStatistics()
-
 export const adminStatisticsApi = {
   get: (range: GetAdminStatisticsRange): Promise<ApiResponse<AdminStatisticsResponse>> =>
-    adminStatisticsGeneratedApi.getAdminStatistics({ range }),
+    getAdminStatistics({ range }),
   backfill: (range: GetAdminStatisticsRange): Promise<ApiResponse<AdminStatisticsBackfillResult>> =>
     apiPost<AdminStatisticsBackfillResult, { range: GetAdminStatisticsRange }>(
       '/admin/statistics/backfill',

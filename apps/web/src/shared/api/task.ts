@@ -1,4 +1,9 @@
-import { getTasks } from './generated/tasks/tasks'
+import {
+  deleteUserTask,
+  getUserTask,
+  listUserTasks,
+  submitUserTask,
+} from './generated-query/tasks/tasks'
 import type {
   ApiResponseMessageData,
   ApiResponseTaskData,
@@ -7,21 +12,19 @@ import type {
   ListUserTasksParams,
   SubmitTaskRequest,
   Task as GeneratedTask,
-} from './generated/model'
+} from './generated-query/model'
 import type { ApiResponse } from './types'
-
-const tasksClient = getTasks()
 
 export type Task = GeneratedTask
 export type SubmitTaskData = SubmitTaskRequest
 
 export const taskApi = {
   submit: (data: SubmitTaskData): Promise<ApiResponse<ApiResponseTaskIdData>> =>
-    tasksClient.submitUserTask(data),
+    submitUserTask(data),
   get: (task_id: string): Promise<ApiResponse<ApiResponseTaskData>> =>
-    tasksClient.getUserTask(task_id),
+    getUserTask(task_id),
   list: (params?: ListUserTasksParams): Promise<ApiResponse<ApiResponseTaskListData>> =>
-    tasksClient.listUserTasks(params),
+    listUserTasks(params),
   delete: (task_id: string): Promise<ApiResponse<ApiResponseMessageData>> =>
-    tasksClient.deleteUserTask(task_id),
+    deleteUserTask(task_id),
 }
