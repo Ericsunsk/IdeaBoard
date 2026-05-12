@@ -15,18 +15,20 @@
           :subtitle="storageSubtitle(storage)"
         />
 
-        <div class="storage-meta-grid">
+        <div class="grid grid-cols-2 gap-3 max-[980px]:grid-cols-1">
           <div
             v-for="item in storageMetaItems(storage)"
             :key="`${storage.id}-${item.label}`"
-            class="meta-item"
+            class="flex min-w-0 flex-col gap-[5px]"
           >
-            <span class="meta-label">{{ item.label }}</span>
-            <span class="meta-value">{{ item.value }}</span>
+            <span class="text-[11px] text-[var(--admin-text-3)]">{{ item.label }}</span>
+            <span class="text-[13px] leading-[1.5] break-all text-[var(--admin-text-1)]">
+              {{ item.value }}
+            </span>
           </div>
         </div>
 
-        <div class="feature-chips">
+        <div class="flex flex-wrap gap-2">
           <AdminChip
             v-for="chip in storageFeatureChips(storage)"
             :key="`${storage.id}-${chip}`"
@@ -34,7 +36,7 @@
           />
         </div>
 
-        <div class="storage-card-actions">
+        <div class="mt-auto flex flex-wrap gap-2 max-[720px]:flex-col max-[720px]:items-stretch">
           <n-button size="small" @click="openEdit(storage.id)">编辑</n-button>
           <n-button
             v-if="supportsTest(storage)"
@@ -186,13 +188,13 @@
             <span v-if="field.hint" class="field-hint">{{ field.hint }}</span>
             <div
               v-if="field.key === 'access_domain' && bucketDomains.length > 0"
-              class="domain-list"
+              class="mt-2 flex flex-wrap gap-2"
             >
-              <span class="domain-label">检测到的域名：</span>
+              <span class="text-[11px] text-[var(--admin-text-3)]">检测到的域名：</span>
               <span
                 v-for="domain in bucketDomains"
                 :key="domain"
-                class="domain-tag"
+                class="cursor-pointer rounded-full border border-[var(--admin-border)] bg-white/[0.06] px-2.5 py-1 text-xs text-[var(--admin-text-2)]"
                 @click="updateConfigValue(field.key, `https://${domain}`)"
               >
                 {{ domain }}
@@ -201,7 +203,12 @@
           </div>
         </div>
       </div>
-      <div v-else class="empty-config-note">当前存储类型无需额外密钥配置，保存后即可切换使用。</div>
+      <div
+        v-else
+        class="flex min-h-[84px] items-center justify-center rounded-[14px] border border-dashed border-[var(--admin-border)] bg-[#151618] px-4 text-center text-[13px] leading-[1.7] text-[var(--admin-text-2)]"
+      >
+        当前存储类型无需额外密钥配置，保存后即可切换使用。
+      </div>
     </div>
 
     <div v-if="switchFields.length > 0" class="editor-section">
@@ -329,44 +336,6 @@ const {
 
 .storage-card.current {
   border-color: rgba(244, 244, 245, 0.24);
-}
-
-.storage-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-}
-
-.meta-label {
-  color: var(--admin-text-3);
-  font-size: 11px;
-}
-
-.meta-value {
-  color: var(--admin-text-1);
-  font-size: 13px;
-  line-height: 1.5;
-  word-break: break-all;
-}
-
-.feature-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.storage-card-actions {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 /* Add card styles now global */
@@ -617,49 +586,11 @@ const {
   max-width: 220px;
 }
 
-.empty-config-note {
-  min-height: 84px;
-  border-radius: 14px;
-  border: 1px dashed var(--admin-border);
-  background: #151618;
-  color: var(--admin-text-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 16px;
-  text-align: center;
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.domain-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.domain-label {
-  font-size: 11px;
-  color: var(--admin-text-3);
-}
-
-.domain-tag {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--admin-border);
-  color: var(--admin-text-2);
-  cursor: pointer;
-}
-
 @media (max-width: 980px) {
   .storage-grid {
     grid-template-columns: 1fr;
   }
 
-  .storage-meta-grid,
   .toggle-grid {
     grid-template-columns: 1fr;
   }
@@ -680,11 +611,6 @@ const {
 @media (max-width: 720px) {
   .storage-card {
     min-height: unset;
-  }
-
-  .storage-card-actions {
-    flex-direction: column;
-    align-items: stretch;
   }
 }
 </style>

@@ -7,12 +7,16 @@
       <AdminSummaryCard label="累计总调用" :value="totalCalls" :foot="totalCallsFoot" />
     </div>
 
-    <div v-if="needsBackfill" class="backfill-banner">
-      <div class="backfill-banner-content">
-        <n-icon size="18" class="backfill-banner-icon"><WarningOutline /></n-icon>
+    <div
+      v-if="needsBackfill"
+      class="flex items-center justify-between gap-3 rounded-[10px] border border-[rgba(251,191,36,0.2)] bg-[rgba(251,191,36,0.08)] px-4 py-2.5"
+    >
+      <div class="flex items-center gap-2 text-[13px] text-[var(--admin-text-2)]">
+        <n-icon size="18" class="shrink-0 text-[#fbbf24]"><WarningOutline /></n-icon>
         <span
           >缺失
-          <strong>{{ backfillStatus?.missing_days }}</strong> 天统计数据，部分历史数据不完整</span
+          <strong class="font-semibold text-[#fbbf24]">{{ backfillStatus?.missing_days }}</strong>
+          天统计数据，部分历史数据不完整</span
         >
       </div>
       <n-button size="small" type="warning" :loading="backfillLoading" @click="handleBackfill">
@@ -543,16 +547,20 @@
         </div>
 
         <!-- 核心元数据卡片 -->
-        <div class="detail-section">
-          <div class="section-title">
-            <n-icon><FingerPrintOutline /></n-icon>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2 text-[13px] font-[650] text-[var(--admin-text-2)]">
+            <n-icon class="text-[var(--admin-text-3)]"><FingerPrintOutline /></n-icon>
             <span>身份与归属</span>
           </div>
-          <div class="metadata-grid">
-            <div class="meta-item">
-              <span class="label">用户 ID</span>
-              <div class="val-group">
-                <span class="value">{{ detailTask.user_id }}</span>
+          <div class="grid grid-cols-2 gap-3">
+            <div
+              class="flex flex-col gap-1 rounded-[10px] border border-[var(--admin-border)] bg-white/[0.02] px-3.5 py-2.5"
+            >
+              <span class="text-[11px] text-[var(--admin-text-3)]">用户 ID</span>
+              <div class="flex items-center justify-between">
+                <span class="text-[13px] font-semibold text-[var(--admin-text-1)]">{{
+                  detailTask.user_id
+                }}</span>
                 <n-button
                   quaternary
                   circle
@@ -565,54 +573,76 @@
                 </n-button>
               </div>
             </div>
-            <div class="meta-item">
-              <span class="label">账号 ID</span>
-              <span class="value">{{ detailTask.account_id || 'N/A' }}</span>
+            <div
+              class="flex flex-col gap-1 rounded-[10px] border border-[var(--admin-border)] bg-white/[0.02] px-3.5 py-2.5"
+            >
+              <span class="text-[11px] text-[var(--admin-text-3)]">账号 ID</span>
+              <span class="text-[13px] font-semibold text-[var(--admin-text-1)]">{{
+                detailTask.account_id || 'N/A'
+              }}</span>
             </div>
-            <div class="meta-item">
-              <span class="label">创建时间</span>
-              <span class="value">{{ formatDateTime(detailTask.created_at) }}</span>
+            <div
+              class="flex flex-col gap-1 rounded-[10px] border border-[var(--admin-border)] bg-white/[0.02] px-3.5 py-2.5"
+            >
+              <span class="text-[11px] text-[var(--admin-text-3)]">创建时间</span>
+              <span class="text-[13px] font-semibold text-[var(--admin-text-1)]">{{
+                formatDateTime(detailTask.created_at)
+              }}</span>
             </div>
-            <div class="meta-item">
-              <span class="label">完成时间</span>
-              <span class="value">{{ formatDateTime(detailTask.completed_at) }}</span>
+            <div
+              class="flex flex-col gap-1 rounded-[10px] border border-[var(--admin-border)] bg-white/[0.02] px-3.5 py-2.5"
+            >
+              <span class="text-[11px] text-[var(--admin-text-3)]">完成时间</span>
+              <span class="text-[13px] font-semibold text-[var(--admin-text-1)]">{{
+                formatDateTime(detailTask.completed_at)
+              }}</span>
             </div>
           </div>
         </div>
 
         <!-- 提示词与内容 -->
-        <div class="detail-section">
-          <div class="section-title">
-            <n-icon><ChatbubbleEllipsesOutline /></n-icon>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2 text-[13px] font-[650] text-[var(--admin-text-2)]">
+            <n-icon class="text-[var(--admin-text-3)]"><ChatbubbleEllipsesOutline /></n-icon>
             <span>任务指令 (Prompt)</span>
             <n-button
               quaternary
               size="tiny"
-              class="title-action"
+              class="!ml-auto !text-[11px] !text-[var(--admin-text-3)]"
               @click="copyToClipboard(detailTask.prompt || '')"
             >
               复制全文
             </n-button>
           </div>
-          <div class="prompt-card">
-            <div class="prompt-content">{{ detailTask.prompt || '无提示词' }}</div>
+          <div
+            class="max-h-[200px] overflow-y-auto rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card-strong)] px-4 py-3.5"
+          >
+            <div
+              class="text-[13px] leading-[1.7] break-all whitespace-pre-wrap text-[var(--admin-text-2)]"
+            >
+              {{ detailTask.prompt || '无提示词' }}
+            </div>
           </div>
         </div>
 
         <!-- 产出物预览 -->
-        <div v-if="resultImageUrl" class="detail-section">
-          <div class="section-title">
-            <n-icon><ImageOutline /></n-icon>
+        <div v-if="resultImageUrl" class="flex flex-col gap-3">
+          <div class="flex items-center gap-2 text-[13px] font-[650] text-[var(--admin-text-2)]">
+            <n-icon class="text-[var(--admin-text-3)]"><ImageOutline /></n-icon>
             <span>生成结果</span>
           </div>
-          <div class="result-image-box">
+          <div
+            class="group relative overflow-hidden rounded-[14px] border border-[var(--admin-border)] bg-black transition-colors hover:border-[var(--admin-text-3)]"
+          >
             <n-image
               :src="resultImageUrl"
               width="100%"
               object-fit="contain"
               class="standard-image"
             />
-            <div class="image-overlay">
+            <div
+              class="absolute right-3 bottom-3 opacity-0 transition-opacity group-hover:opacity-100"
+            >
               <n-button tertiary size="small" @click="openResultImage(resultImageUrl)">
                 在新窗口打开
               </n-button>
@@ -621,14 +651,14 @@
         </div>
 
         <!-- API 调用摘要 -->
-        <div class="detail-section">
-          <div class="section-title">
-            <n-icon><CodeWorkingOutline /></n-icon>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2 text-[13px] font-[650] text-[var(--admin-text-2)]">
+            <n-icon class="text-[var(--admin-text-3)]"><CodeWorkingOutline /></n-icon>
             <span>API 响应摘要</span>
             <n-button
               quaternary
               size="tiny"
-              class="title-action"
+              class="!ml-auto !text-[11px] !text-[var(--admin-text-3)]"
               @click="copyToClipboard(resultSummaryText)"
             >
               复制 JSON
@@ -654,7 +684,11 @@
           </div>
         </div>
 
-        <div class="premium-drawer-footer">&copy; Feng-AI Operations Audit System</div>
+        <div
+          class="mt-3 border-t border-[var(--admin-divider)] px-0 py-5 text-center text-[10px] tracking-[1px] text-[var(--admin-text-3)] uppercase"
+        >
+          &copy; Feng-AI Operations Audit System
+        </div>
       </div>
     </n-modal>
   </div>

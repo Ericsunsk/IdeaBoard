@@ -1,9 +1,11 @@
 <template>
-  <div class="auth-page">
+  <div class="relative min-h-screen w-full overflow-hidden bg-[#f8f9fd]">
     <div class="auth-bg"></div>
-    <div class="auth-brand">
-      <h1>IdeaBoard</h1>
-      <p>登录 IdeaBoard，继续你的创作流程。</p>
+    <div
+      class="pointer-events-none absolute top-[42px] left-1/2 z-[1] -translate-x-1/2 text-center"
+    >
+      <h1 class="text-[30px] leading-[1.1] font-bold text-[#222a3c]">IdeaBoard</h1>
+      <p class="mt-1.5 text-[13px] text-[#6f768a]">登录 IdeaBoard，继续你的创作流程。</p>
     </div>
 
     <LoginModal
@@ -78,14 +80,6 @@ function onRegisterVisibleChange(visible: boolean) {
 </script>
 
 <style scoped>
-.auth-page {
-  width: 100%;
-  min-height: 100vh;
-  position: relative;
-  overflow: hidden;
-  background: #f8f9fd;
-}
-
 .auth-bg {
   position: absolute;
   inset: 0;
@@ -96,28 +90,5 @@ function onRegisterVisibleChange(visible: boolean) {
     100% 100%,
     24px 24px;
   opacity: 1;
-}
-
-.auth-brand {
-  position: absolute;
-  top: 42px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1;
-  text-align: center;
-  pointer-events: none;
-}
-
-.auth-brand h1 {
-  font-size: 30px;
-  line-height: 1.1;
-  font-weight: 700;
-  color: #222a3c;
-}
-
-.auth-brand p {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #6f768a;
 }
 </style>

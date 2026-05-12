@@ -53,9 +53,9 @@
           </template>
         </AdminCardHeader>
 
-        <div class="models-shelf">
-          <div class="shelf-label">当前生效模型</div>
-          <div v-if="getChannelActiveModels(channel.id).length > 0" class="shelf-content">
+        <div class="rounded-xl border border-[var(--admin-border)] bg-[#17181a] p-2.5">
+          <div class="mb-2 text-[11px] font-bold text-[var(--admin-text-3)]">当前生效模型</div>
+          <div v-if="getChannelActiveModels(channel.id).length > 0" class="flex flex-wrap gap-1.5">
             <span
               v-for="model in getChannelActiveModels(channel.id)"
               :key="model"
@@ -68,9 +68,9 @@
           <div v-else class="empty-shelf">未配置生效模型</div>
         </div>
 
-        <div class="accounts-grid">
-          <div class="grid-header">
-            <span class="grid-title"
+        <div class="flex flex-1 flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-[var(--admin-text-1)]"
               >关联 APIKey ({{ getChannelAccounts(channel.id).length }})</span
             >
             <n-button size="tiny" quaternary circle @click="openAddAccountModal(channel)">
@@ -86,13 +86,15 @@
               :key="account.id"
               class="account-row"
             >
-              <div class="row-main">
-                <div class="row-left">
+              <div class="mb-1.5 flex items-center justify-between">
+                <div class="flex items-center gap-2">
                   <div class="status-indicator" :class="getAccStatusClass(account)"></div>
-                  <span class="acc-name">{{ account.model_set || '未分配' }}</span>
+                  <span class="text-xs font-semibold text-[var(--admin-text-1)]">{{
+                    account.model_set || '未分配'
+                  }}</span>
                 </div>
-                <div class="row-right">
-                  <span class="acc-stat-val"
+                <div>
+                  <span class="font-mono text-[11px] font-bold text-[var(--admin-text-3)]"
                     >{{ account.current_concurrent || 0 }}/{{ account.max_concurrent }}</span
                   >
                 </div>
@@ -107,7 +109,7 @@
                 :color="account.status === 1 ? 'var(--admin-success)' : 'var(--admin-text-3)'"
                 class="acc-progress"
               />
-              <div class="row-actions">
+              <div class="flex justify-end gap-1">
                 <n-button size="tiny" quaternary @click="openEditAccountModal(account)"
                   >编辑</n-button
                 >
@@ -127,7 +129,7 @@
           </div>
           <div v-else class="empty-accounts">点击上方按钮添加 APIKey</div>
         </div>
-        <div class="channel-card-footer">
+        <div class="mt-auto flex flex-wrap gap-2 border-t border-[var(--admin-border)] pt-3">
           <n-button
             size="small"
             color="#ffffff"
@@ -463,26 +465,6 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.models-shelf {
-  background: #17181a;
-  border-radius: 12px;
-  padding: 10px;
-  border: 1px solid var(--admin-border);
-}
-
-.shelf-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--admin-text-3);
-  margin-bottom: 8px;
-}
-
-.shelf-content {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
 .model-pill {
   display: inline-flex;
   align-items: center;
@@ -511,25 +493,6 @@ onMounted(() => {
   background: rgba(34, 211, 238, 0.05);
 }
 
-.accounts-grid {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.grid-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.grid-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--admin-text-1);
-}
-
 .accounts-scroller {
   display: flex;
   flex-direction: column;
@@ -544,19 +507,6 @@ onMounted(() => {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.03);
   padding: 8px 10px;
-}
-
-.row-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.row-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .status-indicator {
@@ -575,36 +525,8 @@ onMounted(() => {
   background: var(--admin-danger);
 }
 
-.acc-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--admin-text-1);
-}
-
-.acc-stat-val {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--admin-text-3);
-  font-family: ui-monospace, monospace;
-}
-
 .acc-progress {
   margin-bottom: 8px;
-}
-
-.row-actions {
-  display: flex;
-  gap: 4px;
-  justify-content: flex-end;
-}
-
-.channel-card-footer {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--admin-border);
 }
 
 .channel-card-footer :deep(.n-button) {

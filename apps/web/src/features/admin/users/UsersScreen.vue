@@ -53,27 +53,27 @@
               ></template>
             </n-button>
           </template>
-          <div class="rate-limit-panel">
-            <div class="panel-header">
-              <div class="panel-title">限流策略</div>
-              <div class="panel-desc">API 请求频率全局控制</div>
+          <div class="w-[280px] bg-[var(--admin-card)]">
+            <div class="border-b border-[var(--admin-border)] px-5 py-4">
+              <div class="text-sm font-semibold text-[var(--admin-text-1)]">限流策略</div>
+              <div class="mt-0.5 text-xs text-[var(--admin-text-3)]">API 请求频率全局控制</div>
             </div>
-            <div class="panel-body">
+            <div class="p-5">
               <n-form
                 :model="rateLimitForm"
                 label-placement="top"
                 size="small"
                 :show-feedback="false"
               >
-                <div class="form-row">
-                  <n-form-item label="最大请求 (次)" class="rate-limit-field">
+                <div class="flex gap-3">
+                  <n-form-item label="最大请求 (次)" class="flex-1">
                     <n-input-number
                       v-model:value="rateLimitForm.max_requests"
                       :min="1"
                       placeholder="100"
                     />
                   </n-form-item>
-                  <n-form-item label="窗口周期 (秒)" class="rate-limit-field">
+                  <n-form-item label="窗口周期 (秒)" class="flex-1">
                     <n-input-number
                       v-model:value="rateLimitForm.window_seconds"
                       :min="1"
@@ -81,7 +81,7 @@
                     />
                   </n-form-item>
                 </div>
-                <div class="panel-footer">
+                <div class="mt-4">
                   <n-button
                     type="primary"
                     block
@@ -99,8 +99,10 @@
     </div>
 
     <div class="table-card users-table-card">
-      <div class="users-card-header">
-        <h3 class="users-card-title">用户目录</h3>
+      <div class="flex items-center justify-between gap-3 border-b border-white/[0.04] px-6 py-3.5">
+        <h3 class="m-0 text-[15px] font-semibold tracking-[0.3px] text-[var(--admin-text-1)]">
+          用户目录
+        </h3>
         <n-popover
           placement="bottom-end"
           trigger="click"
@@ -173,9 +175,9 @@
       border: 1px solid var(--admin-border);
     "
   >
-    <div style="color: var(--admin-text-2); margin-bottom: 24px; font-size: 14px; line-height: 1.6">
+    <div class="mb-6 text-sm leading-[1.6] text-[var(--admin-text-2)]">
       您即将对用户
-      <strong style="color: var(--admin-text-1)">{{ banUserContext?.username }}</strong>
+      <strong class="text-[var(--admin-text-1)]">{{ banUserContext?.username }}</strong>
       实施强制访问限制。该用户将立即断开所有连接，并且在封禁期间无法重新登录。
     </div>
     <n-form :model="banForm" label-placement="top">
@@ -198,7 +200,7 @@
           :rows="3"
         />
       </n-form-item>
-      <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px">
+      <div class="mt-4 flex justify-end gap-3">
         <n-button quaternary @click="showBanModal = false">取消</n-button>
         <n-button
           type="error"
@@ -790,65 +792,9 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
   justify-content: space-between;
 }
 
-.rate-limit-panel {
-  width: 280px;
-  background: var(--admin-card);
-}
-
-.panel-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--admin-border);
-}
-
-.panel-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--admin-text-1);
-}
-
-.panel-desc {
-  font-size: 12px;
-  color: var(--admin-text-3);
-  margin-top: 2px;
-}
-
-.panel-body {
-  padding: 20px;
-}
-
-.form-row {
-  display: flex;
-  gap: 12px;
-}
-
-.rate-limit-field {
-  flex: 1;
-}
-
-.panel-footer {
-  margin-top: 16px;
-}
-
 .users-table-card {
   padding: 0;
   overflow: hidden;
-}
-
-.users-card-header {
-  padding: 14px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.users-card-title {
-  margin: 0;
-  color: var(--admin-text-1);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
 }
 
 .sort-btn {

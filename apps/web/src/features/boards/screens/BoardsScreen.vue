@@ -1,74 +1,129 @@
 <template>
-  <div class="boards-page">
-    <div class="boards-bg"></div>
+  <div
+    class="boards-page relative box-border h-full w-full [scrollbar-width:thin] [scrollbar-color:#c8d0e4_transparent] overflow-x-hidden overflow-y-auto bg-[#f8f9fd] bg-[radial-gradient(circle,#e2e4e8_1.5px,transparent_1.5px)] bg-[length:24px_24px] [background-attachment:fixed] bg-center px-[28px] pt-[30px] pb-[64px] text-[#1f2430] [-webkit-overflow-scrolling:touch] max-[860px]:px-[14px] max-[860px]:pt-[30px] max-[860px]:pb-[40px]"
+  >
+    <div
+      class="pointer-events-none fixed top-[28%] left-[23%] h-[44vh] w-[54vw] rounded-[9999px] bg-[rgba(150,120,230,0.24)] blur-[120px]"
+    ></div>
 
-    <header class="boards-header">
-      <div class="brand">
-        <span class="brand-name">IdeaBoard</span>
-      </div>
-      <button class="header-home-btn" type="button" @click="router.push('/user/home')">Home</button>
-    </header>
-
-    <main class="boards-main">
-      <h1 class="page-title">Welcome to IdeaBoard!</h1>
-      <p class="page-subtitle">Explore, expand, and refine your ideas</p>
-
-      <section class="boards-toolbar">
-        <button class="create-btn" type="button" @click="createAndOpenBoard">
-          + Create New Project
-        </button>
-        <label class="search-wrap">
-          <svg
-            class="search-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+    <div class="relative z-[1]">
+      <header class="flex translate-y-[-8px] items-center justify-between">
+        <div class="inline-flex items-center gap-[8px]">
+          <span class="text-[32px] [line-height:normal] font-[700] tracking-[-0.03em]"
+            >IdeaBoard</span
           >
-            <circle cx="11" cy="11" r="7"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input v-model.trim="searchKeyword" type="text" placeholder="Search projects..." />
-        </label>
-        <select v-model="sortMode" class="sort-select">
-          <option value="recent">Recent</option>
-          <option value="name">Name</option>
-        </select>
-      </section>
-
-      <section class="boards-grid">
-        <button class="board-card board-create-card" type="button" @click="createAndOpenBoard">
-          <div class="create-preview">
-            <div class="create-preview-icon">+</div>
-          </div>
-          <div class="board-meta board-create-meta">
-            <div class="board-title">Create New Canvas</div>
-            <div class="board-date">Start from an empty board</div>
-          </div>
+        </div>
+        <button
+          class="h-[34px] min-w-[78px] cursor-pointer rounded-[9999px] border border-[#d9dfec] bg-[rgba(255,255,255,0.9)] px-[0px] text-[13px] font-[600] text-[#3d4253]"
+          type="button"
+          @click="router.push('/user/home')"
+        >
+          Home
         </button>
+      </header>
 
-        <BoardCard
-          v-for="board in visibleBoards"
-          :key="board.id"
-          :board="board"
-          :preview-snapshot-data-url="boardPreviewMap[board.id] || ''"
-          :is-renaming="renamingBoardId === board.id"
-          :rename-draft="renameDraft"
-          :is-menu-open="activeMenuBoardId === board.id"
-          :display-date="formatDate(board.updatedAt)"
-          @click-board="onBoardCardClick(board)"
-          @toggle-menu="toggleBoardMenu(board.id)"
-          @rename-action="handleRenameAction(board)"
-          @duplicate-action="handleDuplicateAction(board)"
-          @delete-action="handleDeleteAction(board)"
-          @rename-input="onRenameInput"
-          @commit-rename="commitRename"
-          @cancel-rename="cancelRename"
-        />
-      </section>
+      <main class="mx-auto mt-[46px] max-w-[1080px]">
+        <h1
+          class="m-0 text-center text-[62px] leading-[1.05] font-[700] tracking-[-0.03em] max-[860px]:text-[40px]"
+        >
+          Welcome to IdeaBoard!
+        </h1>
+        <p
+          class="mt-[16px] mb-[34px] translate-y-px text-center text-[19px] tracking-[0.01em] text-[#6e7487] max-[860px]:text-[15px]"
+        >
+          Explore, expand, and refine your ideas
+        </p>
 
-      <p v-if="visibleBoards.length === 0 && searchKeyword" class="empty-tip">No matching canvas</p>
-    </main>
+        <section
+          class="mb-[24px] grid grid-cols-[auto_1fr_auto] items-center gap-[14px] max-[860px]:grid-cols-1"
+        >
+          <button
+            class="h-[42px] cursor-pointer rounded-[9999px] border-none bg-[#7a6bd5] px-[20px] text-[14px] font-[700] tracking-[0.01em] text-[#ffffff] hover:bg-[#6d5fd0] max-[860px]:w-full"
+            type="button"
+            @click="createAndOpenBoard"
+          >
+            + Create New Project
+          </button>
+          <label
+            class="flex h-[42px] items-center gap-[8px] rounded-[9999px] border border-[#d9dfec] bg-[rgba(255,255,255,0.9)] px-[12px]"
+          >
+            <svg
+              class="h-[14px] w-[14px] [flex-shrink:0] text-[#8a90a3]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input
+              v-model.trim="searchKeyword"
+              class="w-full border-none bg-transparent text-[13px] text-[#2f3446] outline-none"
+              type="text"
+              placeholder="Search projects..."
+            />
+          </label>
+          <div class="relative max-[860px]:w-full">
+            <select
+              v-model="sortMode"
+              class="h-[42px] min-w-[96px] appearance-none rounded-[9999px] border border-[#d9dfec] bg-[rgba(255,255,255,0.9)] px-[14px] text-center text-[13px] font-[600] text-[#3e4457] max-[860px]:w-full"
+            >
+              <option value="recent">Recent</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-[14px]">
+          <button
+            class="h-[244px] cursor-pointer overflow-hidden rounded-[12px] border border-[#d9dfec] bg-[rgba(255,255,255,0.92)] p-0 text-left"
+            type="button"
+            @click="createAndOpenBoard"
+          >
+            <div
+              class="flex h-[186px] items-center justify-center border-b border-[#e7ebf3] bg-[radial-gradient(circle,#dfe4ef_1px,transparent_1px),#fbfcff] bg-[length:10px_10px,cover]"
+            >
+              <div
+                class="flex h-[54px] w-[54px] items-center justify-center rounded-[14px] border border-[#cfd7ea] bg-[#ffffff] text-[28px] font-medium text-[#69708a]"
+              >
+                +
+              </div>
+            </div>
+            <div class="px-[12px] pt-[10px] pb-[12px]">
+              <div class="text-[14px] font-[700] text-[#394054]">Create New Canvas</div>
+              <div class="mt-[3px] text-[12px] text-[#7b8297]">Start from an empty board</div>
+            </div>
+          </button>
+
+          <BoardCard
+            v-for="board in visibleBoards"
+            :key="board.id"
+            :board="board"
+            :preview-snapshot-data-url="boardPreviewMap[board.id] || ''"
+            :is-renaming="renamingBoardId === board.id"
+            :rename-draft="renameDraft"
+            :is-menu-open="activeMenuBoardId === board.id"
+            :display-date="formatDate(board.updatedAt)"
+            @click-board="onBoardCardClick(board)"
+            @toggle-menu="toggleBoardMenu(board.id)"
+            @rename-action="handleRenameAction(board)"
+            @duplicate-action="handleDuplicateAction(board)"
+            @delete-action="handleDeleteAction(board)"
+            @rename-input="onRenameInput"
+            @commit-rename="commitRename"
+            @cancel-rename="cancelRename"
+          />
+        </section>
+
+        <p
+          v-if="visibleBoards.length === 0 && searchKeyword"
+          class="mt-[18px] text-[13px] text-[#7b8297]"
+        >
+          No matching canvas
+        </p>
+      </main>
+    </div>
   </div>
 </template>
 
@@ -405,21 +460,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.boards-page {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  padding: 16px 28px 64px;
-  box-sizing: border-box;
-  background: #f8f9fd;
-  color: #1f2430;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: #c8d0e4 transparent;
-}
-
 .boards-page::-webkit-scrollbar {
   width: 10px;
 }
@@ -442,233 +482,5 @@ onUnmounted(() => {
 
 .boards-page::-webkit-scrollbar-corner {
   background: transparent;
-}
-
-.boards-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(55% 35% at 45% 45%, rgba(150, 120, 230, 0.24) 0%, rgba(150, 120, 230, 0) 100%),
-    radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size:
-    100% 100%,
-    24px 24px;
-  background-position:
-    center center,
-    center center;
-}
-
-.boards-header {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.brand-name {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.header-home-btn {
-  border: 1px solid #d9dfec;
-  background: rgba(255, 255, 255, 0.9);
-  color: #3d4253;
-  height: 34px;
-  min-width: 78px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.boards-main {
-  position: relative;
-  z-index: 1;
-  max-width: 1080px;
-  margin: 46px auto 0;
-}
-
-.page-title {
-  margin: 0;
-  text-align: center;
-  font-size: 62px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-}
-
-.page-subtitle {
-  margin: 16px 0 34px;
-  text-align: center;
-  color: #6e7487;
-  font-size: 19px;
-  letter-spacing: 0.01em;
-}
-
-.boards-toolbar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 14px;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.create-btn {
-  height: 42px;
-  border: none;
-  border-radius: 999px;
-  padding: 0 20px;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  background: #7a6bd5;
-  color: #fff;
-  cursor: pointer;
-}
-
-.create-btn:hover {
-  background: #6d5fd0;
-}
-
-.search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 42px;
-  border-radius: 999px;
-  border: 1px solid #d9dfec;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0 12px;
-}
-
-.search-icon {
-  width: 14px;
-  height: 14px;
-  color: #8a90a3;
-}
-
-.search-wrap input {
-  width: 100%;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 13px;
-  color: #2f3446;
-}
-
-.sort-select {
-  height: 42px;
-  border-radius: 999px;
-  border: 1px solid #d9dfec;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #3e4457;
-}
-
-.boards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
-}
-
-.board-card {
-  border: 1px solid #d9dfec;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  overflow: hidden;
-  height: 244px;
-  text-align: left;
-}
-
-.board-create-card {
-  padding: 0;
-  cursor: pointer;
-}
-
-.create-preview {
-  height: 186px;
-  background: radial-gradient(circle, #dfe4ef 1px, transparent 1px), #fbfcff;
-  background-size:
-    10px 10px,
-    cover;
-  border-bottom: 1px solid #e7ebf3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.create-preview-icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
-  border: 1px solid #cfd7ea;
-  background: #ffffff;
-  color: #69708a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  font-weight: 500;
-}
-
-.board-create-meta .board-title {
-  color: #394054;
-}
-
-.board-meta {
-  padding: 10px 12px 12px;
-}
-
-.board-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #2b3142;
-}
-
-.board-date {
-  margin-top: 3px;
-  font-size: 12px;
-  color: #7b8297;
-}
-
-.empty-tip {
-  margin-top: 18px;
-  font-size: 13px;
-  color: #7b8297;
-}
-
-@media (max-width: 860px) {
-  .boards-page {
-    padding: 14px 14px 40px;
-  }
-
-  .page-title {
-    font-size: 40px;
-  }
-
-  .page-subtitle {
-    font-size: 15px;
-  }
-
-  .boards-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .create-btn,
-  .sort-select {
-    width: 100%;
-  }
 }
 </style>

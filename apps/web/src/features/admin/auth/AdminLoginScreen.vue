@@ -1,13 +1,19 @@
 <template>
-  <div class="login-page">
-    <div class="login-shell">
-      <section class="login-intro">
-        <h1>管理员控制台入口</h1>
-        <p>用于账户、渠道、资源与任务管理。</p>
+  <div class="flex min-h-screen items-center justify-center bg-[#0a0a0b] p-6 max-[480px]:p-4">
+    <div class="grid w-[min(900px,100%)] grid-cols-[1.02fr_1fr] gap-3 max-[900px]:grid-cols-1">
+      <section
+        class="rounded-[18px] border border-[#232326] bg-[#111214] p-[30px] max-[900px]:rounded-2xl max-[900px]:p-6"
+      >
+        <h1 class="m-0 text-[28px] text-[#f4f4f5] max-[480px]:text-2xl">管理员控制台入口</h1>
+        <p class="mt-3.5 mb-0 max-w-[440px] text-sm leading-[1.72] text-[#a1a1aa]">
+          用于账户、渠道、资源与任务管理。
+        </p>
       </section>
 
-      <section class="login-card">
-        <h2>管理员登录</h2>
+      <section
+        class="rounded-[18px] border border-[#232326] bg-[#101113] p-[30px] max-[900px]:rounded-2xl max-[900px]:p-6"
+      >
+        <h2 class="m-0 text-2xl text-[#f4f4f5]">管理员登录</h2>
 
         <n-form ref="formRef" :model="formValue" :rules="rules" size="large" label-placement="top">
           <n-form-item path="username" label="账号">
@@ -36,7 +42,7 @@
           {{ loading ? '登录中...' : '进入管理员后台' }}
         </n-button>
 
-        <div class="footer">
+        <div class="mt-[18px] text-center text-[13px]">
           <router-link to="/user/login">用户登录</router-link>
         </div>
       </section>
@@ -103,57 +109,6 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-.login-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: #0a0a0b;
-}
-
-.login-shell {
-  width: min(900px, 100%);
-  display: grid;
-  grid-template-columns: 1.02fr 1fr;
-  gap: 12px;
-}
-
-.login-intro,
-.login-card {
-  border: 1px solid #232326;
-  border-radius: 18px;
-  padding: 30px;
-}
-
-.login-intro {
-  background: #111214;
-}
-
-.login-intro h1 {
-  margin: 0;
-  font-size: 28px;
-  color: #f4f4f5;
-}
-
-.login-intro p {
-  margin: 14px 0 0;
-  color: #a1a1aa;
-  line-height: 1.72;
-  font-size: 14px;
-  max-width: 440px;
-}
-
-.login-card {
-  background: #101113;
-}
-
-.login-card h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #f4f4f5;
-}
-
 :deep(.n-form-item) {
   margin-bottom: 18px;
 }
@@ -201,35 +156,7 @@ async function handleLogin() {
   outline: none !important;
 }
 
-.footer {
-  margin-top: 18px;
-  text-align: center;
-  font-size: 13px;
-}
-
-.footer a {
+a {
   color: #f4f4f5;
-}
-
-@media (max-width: 900px) {
-  .login-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .login-intro,
-  .login-card {
-    padding: 24px;
-    border-radius: 16px;
-  }
-}
-
-@media (max-width: 480px) {
-  .login-page {
-    padding: 16px;
-  }
-
-  .login-intro h1 {
-    font-size: 24px;
-  }
 }
 </style>

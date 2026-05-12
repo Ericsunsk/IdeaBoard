@@ -11,6 +11,7 @@
     "format:check": "prettier . --check",
     "lint": "eslint .",
     "preview": "vite preview",
+    "css:audit": "tsx scripts/audit-css-migration.ts",
     "test:schema": "tsx src/features/boards/lib/canvasBoardStateSchema.spec.ts"
   },
   "dependencies": {

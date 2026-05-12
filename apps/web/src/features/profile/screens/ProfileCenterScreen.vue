@@ -95,8 +95,15 @@
         <div class="main-header">
           <div class="user-brief">
             <div class="avatar-big">
-              <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" />
-              <div v-else class="avatar-placeholder">
+              <img
+                v-if="userStore.user?.avatar"
+                class="h-full w-full object-cover"
+                :src="userStore.user.avatar"
+              />
+              <div
+                v-else
+                class="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#9278e6,#c084fc)] text-[32px] font-bold text-white"
+              >
                 {{ userStore.user?.username?.[0]?.toUpperCase() }}
               </div>
             </div>
@@ -106,13 +113,17 @@
             </div>
           </div>
           <div class="stats-row">
-            <div class="stat-card">
-              <span class="stat-value">{{ taskPagination.total }}</span>
-              <span class="stat-label">累计作品</span>
+            <div
+              class="flex min-w-[100px] flex-col rounded-2xl border border-white/80 bg-white/50 px-5 py-3"
+            >
+              <span class="text-xl font-bold text-[#1d1d1f]">{{ taskPagination.total }}</span>
+              <span class="text-[13px] text-[#86868b]">累计作品</span>
             </div>
-            <div class="stat-card">
-              <span class="stat-value">{{ userStore.user?.uid || '-' }}</span>
-              <span class="stat-label">会员编号</span>
+            <div
+              class="flex min-w-[100px] flex-col rounded-2xl border border-white/80 bg-white/50 px-5 py-3"
+            >
+              <span class="text-xl font-bold text-[#1d1d1f]">{{ userStore.user?.uid || '-' }}</span>
+              <span class="text-[13px] text-[#86868b]">会员编号</span>
             </div>
           </div>
         </div>
@@ -607,22 +618,6 @@ onMounted(() => {
   border: 4px solid #fff;
   overflow: hidden;
 }
-.avatar-big img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #9278e6, #c084fc);
-  color: #fff;
-  font-size: 32px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
 .user-info-text h1 {
   font-size: 28px;
@@ -639,24 +634,6 @@ onMounted(() => {
 .stats-row {
   display: flex;
   gap: 24px;
-}
-.stat-card {
-  background: rgba(255, 255, 255, 0.5);
-  padding: 12px 20px;
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-  min-width: 100px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-}
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1d1d1f;
-}
-.stat-label {
-  font-size: 13px;
-  color: #86868b;
 }
 
 .main-body {
