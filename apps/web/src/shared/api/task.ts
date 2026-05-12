@@ -21,8 +21,7 @@ export type SubmitTaskData = SubmitTaskRequest
 export const taskApi = {
   submit: (data: SubmitTaskData): Promise<ApiResponse<ApiResponseTaskIdData>> =>
     submitUserTask(data),
-  get: (task_id: string): Promise<ApiResponse<ApiResponseTaskData>> =>
-    getUserTask(task_id),
+  get: (task_id: string): Promise<ApiResponse<ApiResponseTaskData>> => getUserTask(task_id),
   list: (params?: ListUserTasksParams): Promise<ApiResponse<ApiResponseTaskListData>> =>
     listUserTasks(params),
   delete: (task_id: string): Promise<ApiResponse<ApiResponseMessageData>> =>

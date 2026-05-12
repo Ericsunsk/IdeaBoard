@@ -1,6 +1,6 @@
 <template>
   <div
-    class="workflow-node image-node"
+    class="workflow-node image-node overflow-visible"
     data-node-kind="image"
     :data-node-id="node.id"
     :class="{ active, dragging, 'copy-mode': copyMode }"
@@ -27,7 +27,7 @@
         </svg>
       </template>
     </NodeHeader>
-    <div class="image-node-body" @contextmenu.stop>
+    <div class="relative flex flex-col gap-2 px-3 pt-2.5 pb-3" @contextmenu.stop>
       <div
         class="image-node-stage"
         :data-image-node-id="node.id"
@@ -38,12 +38,15 @@
         @contextmenu.prevent.stop
       >
         <template v-if="displayImage">
-          <div class="image-node-stage-badge" :class="displayModeClass">
+          <div
+            class="absolute top-2 left-2 z-[2] rounded-full px-2 py-1 text-[11px] leading-none font-bold tracking-[0.02em] backdrop-blur"
+            :class="displayModeClass"
+          >
             {{ displayModeLabel }}
           </div>
           <img
             :src="stageDisplayUrl"
-            class="image-node-stage-image nodrag"
+            class="nodrag h-full w-full bg-white object-contain"
             draggable="true"
             @dragstart="emit('display-dragstart', $event)"
             @dblclick="emit('append-to-canvas')"
@@ -56,8 +59,8 @@
           v-else
           class="image-node-stage-empty"
           :class="{
-            'is-pending': isPendingDisplayMode,
-            'is-readonly': props.inputLocked,
+            'text-[#8f789b]': isPendingDisplayMode,
+            'cursor-default': props.inputLocked,
           }"
           @click="onEmptyStateClick"
         >
@@ -92,7 +95,7 @@
 
       <div
         v-if="previewPopupOpen && displayImage"
-        class="image-preview-popup"
+        class="image-preview-popup z-28"
         @mousedown.stop
         @click.stop
         @contextmenu.prevent.stop
@@ -101,7 +104,11 @@
           class="image-preview-popup-stage"
           :style="{ width: `${popupStageWidth}px`, height: `${popupStageHeight}px` }"
         >
-          <img :src="displayImage.url" class="image-node-stage-image preview" draggable="false" />
+          <img
+            :src="displayImage.url"
+            class="pointer-events-none h-full w-full bg-white object-contain"
+            draggable="false"
+          />
         </div>
       </div>
     </div>
@@ -148,11 +155,19 @@ const displayModeLabel = computed(() => {
   return 'Source'
 })
 const displayModeClass = computed(() => {
-  if (props.displayMode === 'pending') return 'is-pending'
-  if (props.displayMode === 'linked-output') return 'is-linked-output'
-  if (props.displayMode === 'node-output') return 'is-output'
-  if (props.displayMode === 'mask') return 'is-mask'
-  return 'is-source'
+  if (props.displayMode === 'pending') {
+    return 'border border-[rgba(243,187,64,0.18)] bg-[rgba(255,250,239,0.94)] text-[#bb7b00]'
+  }
+  if (props.displayMode === 'linked-output') {
+    return 'border border-[rgba(76,118,229,0.18)] bg-[rgba(244,247,255,0.92)] text-[#496ad5]'
+  }
+  if (props.displayMode === 'node-output') {
+    return 'border border-[rgba(53,171,123,0.18)] bg-[rgba(240,255,248,0.92)] text-[#1d8b61]'
+  }
+  if (props.displayMode === 'mask') {
+    return 'border border-[rgba(146,120,230,0.2)] bg-[rgba(247,243,255,0.94)] text-[#7b67d1]'
+  }
+  return 'border border-[rgba(146,120,230,0.2)] bg-[rgba(255,255,255,0.9)] text-[#7b67d1]'
 })
 const isPendingDisplayMode = computed(() => props.displayMode === 'pending')
 const emptyStateLabel = computed(() => {
@@ -215,83 +230,3 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped src="./node-shared.css"></style>
-<style scoped>
-.workflow-node.image-node {
-  overflow: visible;
-}
-
-.image-node-body {
-  position: relative;
-  padding: 10px 12px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.image-node-stage-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #fff;
-}
-
-.image-node-stage-image.preview {
-  pointer-events: none;
-}
-
-.image-node-stage-badge {
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  z-index: 2;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  backdrop-filter: blur(8px);
-}
-
-.image-node-stage-badge.is-source {
-  border: 1px solid rgba(146, 120, 230, 0.2);
-  background: rgba(255, 255, 255, 0.9);
-  color: #7b67d1;
-}
-
-.image-node-stage-badge.is-output {
-  border: 1px solid rgba(53, 171, 123, 0.18);
-  background: rgba(240, 255, 248, 0.92);
-  color: #1d8b61;
-}
-
-.image-node-stage-badge.is-linked-output {
-  border: 1px solid rgba(76, 118, 229, 0.18);
-  background: rgba(244, 247, 255, 0.92);
-  color: #496ad5;
-}
-
-.image-node-stage-badge.is-mask {
-  border: 1px solid rgba(146, 120, 230, 0.2);
-  background: rgba(247, 243, 255, 0.94);
-  color: #7b67d1;
-}
-
-.image-node-stage-badge.is-pending {
-  border: 1px solid rgba(243, 187, 64, 0.18);
-  background: rgba(255, 250, 239, 0.94);
-  color: #bb7b00;
-}
-
-.image-node-stage-empty.is-readonly {
-  cursor: default;
-}
-
-.image-node-stage-empty.is-pending {
-  color: #8f789b;
-}
-
-.image-preview-popup {
-  z-index: 28;
-}
-</style>

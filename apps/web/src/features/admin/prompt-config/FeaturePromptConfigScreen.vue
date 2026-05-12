@@ -96,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import { NButton, NInput, useMessage } from 'naive-ui'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import { saveFeaturePrompt } from '../../../shared/query/adminQueries'
 import {
@@ -150,9 +151,9 @@ function getGroupFilledCount(group: FeatureGroup) {
 
 function insertVar(slug: FeatureSlug, varKey: string) {
   const current = promptMap[slug] || ''
-  const ref = textareaRefs[slug]
+  const textareaRef = textareaRefs[slug]
   let pos = current.length
-  const textareaEl = ref?.textareaElRef ?? ref?.$el?.querySelector?.('textarea')
+  const textareaEl = textareaRef?.textareaElRef ?? textareaRef?.$el?.querySelector?.('textarea')
   if (textareaEl instanceof HTMLTextAreaElement) {
     pos = textareaEl.selectionStart ?? current.length
   }

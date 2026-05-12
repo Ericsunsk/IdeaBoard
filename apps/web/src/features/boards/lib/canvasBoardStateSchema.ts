@@ -218,19 +218,19 @@ const canvasViewportStateSchema = z.object({
 // and discard unsupported fields instead of hard-failing workspace hydration.
 export const canvasBoardSnapshotSchema = z
   .object({
-  messages: z.array(canvasImageItemSchema),
-  imageNodes: z.array(imageNodeItemSchema),
-  promptNodes: z.array(promptNodeItemSchema),
-  modelNodes: z.array(modelNodeItemSchema),
-  viewpointNodes: z.array(viewpointNodeItemSchema),
-  maskNodes: z.array(maskNodeItemSchema),
-  colorNodes: z.array(colorNodeItemSchema),
-  editNodes: z.array(editNodeItemSchema),
-  fusionNodes: z.array(fusionNodeItemSchema),
-  enhanceNodes: z.array(enhanceNodeItemSchema),
-  wearNodes: z.array(wearNodeItemSchema),
-  connections: z.array(canvasConnectionSchema),
-  viewport: canvasViewportStateSchema,
+    messages: z.array(canvasImageItemSchema),
+    imageNodes: z.array(imageNodeItemSchema),
+    promptNodes: z.array(promptNodeItemSchema),
+    modelNodes: z.array(modelNodeItemSchema),
+    viewpointNodes: z.array(viewpointNodeItemSchema),
+    maskNodes: z.array(maskNodeItemSchema),
+    colorNodes: z.array(colorNodeItemSchema),
+    editNodes: z.array(editNodeItemSchema),
+    fusionNodes: z.array(fusionNodeItemSchema),
+    enhanceNodes: z.array(enhanceNodeItemSchema),
+    wearNodes: z.array(wearNodeItemSchema),
+    connections: z.array(canvasConnectionSchema),
+    viewport: canvasViewportStateSchema,
   })
   .strip() satisfies z.ZodType<CanvasBoardSnapshot>
 

@@ -25,8 +25,7 @@ export interface UserBoardItem {
 }
 
 export const boardApi = {
-  list: (): Promise<ApiResponse<{ list: UserBoardItem[] }>> =>
-    listUserBoards(),
+  list: (): Promise<ApiResponse<{ list: UserBoardItem[] }>> => listUserBoards(),
   upsert: (
     boardId: string,
     payload: Omit<UserBoardPayload, 'board_id'>,
@@ -35,8 +34,7 @@ export const boardApi = {
       ...payload,
       state: (payload.state ?? null) as UserBoardUpsertRequestState,
     }),
-  remove: (boardId: string): Promise<ApiResponse<{ deleted: boolean }>> =>
-    deleteUserBoard(boardId),
+  remove: (boardId: string): Promise<ApiResponse<{ deleted: boolean }>> => deleteUserBoard(boardId),
   joinByShareToken: (token: string): Promise<ApiResponse<{ board: UserBoardItem }>> =>
     joinBoardByShareToken({ token }),
 }

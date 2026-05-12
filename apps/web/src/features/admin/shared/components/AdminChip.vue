@@ -1,5 +1,10 @@
 <template>
-  <span class="admin-chip" :class="chipClasses">{{ label }}</span>
+  <span
+    class="inline-flex min-h-7 items-center rounded-[999px] border px-[10px] text-[11px]"
+    :class="chipClasses"
+  >
+    {{ label }}
+  </span>
 </template>
 
 <script setup lang="ts">
@@ -18,46 +23,18 @@ const props = withDefaults(
   },
 )
 
-const chipClasses = computed(() => ({
-  'is-strong': props.tone === 'strong',
-  'is-current': props.variant === 'current',
-  'is-enabled': props.variant === 'enabled',
-  'is-empty': props.variant === 'empty',
-}))
+const chipClasses = computed(() => {
+  const neutralText =
+    props.tone === 'strong' ? 'text-[var(--admin-text-1)]' : 'text-[var(--admin-text-2)]'
+  const variantClasses: Record<ChipVariant, string> = {
+    neutral: `bg-[var(--admin-surface-muted,#151618)] border-[var(--admin-border)] ${neutralText}`,
+    current:
+      'text-[var(--admin-success)] bg-[rgba(74,222,128,0.12)] border-[rgba(74,222,128,0.24)]',
+    enabled:
+      'text-[var(--admin-text-2)] bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.14)]',
+    empty: 'text-[var(--admin-warning)] bg-[rgba(251,191,36,0.12)] border-[rgba(251,191,36,0.24)]',
+  }
+
+  return variantClasses[props.variant]
+})
 </script>
-
-<style scoped>
-.admin-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--admin-surface-muted, #151618);
-  border: 1px solid var(--admin-border);
-  color: var(--admin-text-2);
-  font-size: 11px;
-}
-
-.admin-chip.is-strong {
-  color: var(--admin-text-1);
-}
-
-.admin-chip.is-current {
-  color: var(--admin-success);
-  background: rgba(74, 222, 128, 0.12);
-  border-color: rgba(74, 222, 128, 0.24);
-}
-
-.admin-chip.is-enabled {
-  color: var(--admin-text-2);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.14);
-}
-
-.admin-chip.is-empty {
-  color: var(--admin-warning);
-  background: rgba(251, 191, 36, 0.12);
-  border-color: rgba(251, 191, 36, 0.24);
-}
-</style>

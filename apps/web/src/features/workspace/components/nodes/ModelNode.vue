@@ -27,16 +27,21 @@
       </template>
     </NodeHeader>
 
-    <div class="model-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
-      <div class="model-mode-card node-mode-card">
-        <div class="model-summary-row">
-          <span class="model-summary-value">{{ describeModelAngleSpec(node.angleSpec) }}</span>
+    <div class="node-execution-body" @mousedown.stop @contextmenu.stop>
+      <div class="node-mode-card gap-2">
+        <div class="flex items-center justify-between gap-1.5">
+          <span class="text-xs font-semibold text-[#475569]">{{
+            describeModelAngleSpec(node.angleSpec)
+          }}</span>
         </div>
 
-        <div class="model-angle-row">
-          <span class="model-angle-anchor">L</span>
+        <div class="flex items-center gap-1.5">
+          <span
+            class="w-4 flex-[0_0_16px] text-center text-[10px] font-bold tracking-[0.06em] text-[#9aa4b2]"
+            >L</span
+          >
           <input
-            class="model-angle-range node-inline-range"
+            class="node-inline-range flex-1"
             :style="{ '--slider-pct': `${((node.angleSpec.yaw + 180) / 360) * 100}%` }"
             :value="node.angleSpec.yaw"
             type="range"
@@ -50,7 +55,10 @@
               )
             "
           />
-          <span class="model-angle-anchor">R</span>
+          <span
+            class="w-4 flex-[0_0_16px] text-center text-[10px] font-bold tracking-[0.06em] text-[#9aa4b2]"
+            >R</span
+          >
         </div>
 
         <div class="node-option-row">
@@ -81,10 +89,10 @@
       <div v-if="showModelStrength" class="model-control-group node-control-group">
         <div class="node-control-head">
           <span class="model-control-label node-control-label">Model</span>
-          <span class="model-strength-value">{{ node.modelStrength }}%</span>
+          <span class="text-[11px] font-bold text-[#667085]">{{ node.modelStrength }}%</span>
         </div>
         <input
-          class="model-strength-range node-inline-range"
+          class="node-inline-range w-full"
           :value="node.modelStrength"
           :style="{ '--slider-pct': `${node.modelStrength}%` }"
           type="range"
@@ -103,10 +111,10 @@
       <div v-if="showPoseStrength" class="model-control-group node-control-group">
         <div class="node-control-head">
           <span class="model-control-label node-control-label">Pose</span>
-          <span class="model-strength-value">{{ node.poseStrength }}%</span>
+          <span class="text-[11px] font-bold text-[#667085]">{{ node.poseStrength }}%</span>
         </div>
         <input
-          class="model-strength-range node-inline-range"
+          class="node-inline-range w-full"
           :value="node.poseStrength"
           :style="{ '--slider-pct': `${node.poseStrength}%` }"
           type="range"
@@ -192,53 +200,3 @@ const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
 </script>
 
 <style scoped src="./node-shared.css"></style>
-<style scoped>
-.model-node-body {
-  gap: 8px;
-}
-
-.model-mode-card {
-  gap: 8px;
-}
-
-.model-summary-row,
-.model-angle-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.model-summary-row {
-  justify-content: space-between;
-}
-
-.model-summary-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-}
-
-.model-angle-anchor {
-  width: 16px;
-  flex: 0 0 16px;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 700;
-  color: #9aa4b2;
-  letter-spacing: 0.06em;
-}
-
-.model-angle-range {
-  flex: 1;
-}
-
-.model-strength-value {
-  font-size: 11px;
-  color: #667085;
-  font-weight: 700;
-}
-
-.model-strength-range {
-  width: 100%;
-}
-</style>

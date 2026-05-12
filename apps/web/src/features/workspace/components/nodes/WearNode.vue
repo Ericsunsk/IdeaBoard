@@ -26,8 +26,8 @@
       </template>
     </NodeHeader>
 
-    <div class="wear-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
-      <div class="wear-tile-card node-mode-card">
+    <div class="node-execution-body gap-[7px]" @mousedown.stop @contextmenu.stop>
+      <div class="node-mode-card">
         <div class="wear-tile-row node-option-row">
           <NodeActionButton
             v-for="option in wearTileModeOptions"
@@ -41,11 +41,13 @@
         </div>
       </div>
 
-      <div class="wear-control-group node-control-group">
-        <div class="wear-control-row">
-          <span class="node-control-label">Direction</span>
+      <div class="node-control-group">
+        <div class="flex items-center gap-1.5">
+          <span class="node-control-label w-14 flex-[0_0_56px] text-[10.5px] tracking-[0.02em]"
+            >Direction</span
+          >
           <input
-            class="wear-slider node-inline-range"
+            class="node-inline-range min-w-0 flex-1"
             :style="{ '--slider-pct': `${(node.rotation / 360) * 100}%` }"
             type="range"
             min="0"
@@ -55,10 +57,12 @@
             @input="emit('update:rotation', Number(($event.target as HTMLInputElement).value))"
           />
         </div>
-        <div class="wear-control-row">
-          <span class="node-control-label">Size</span>
+        <div class="flex items-center gap-1.5">
+          <span class="node-control-label w-14 flex-[0_0_56px] text-[10.5px] tracking-[0.02em]"
+            >Size</span
+          >
           <input
-            class="wear-slider node-inline-range"
+            class="node-inline-range min-w-0 flex-1"
             :style="{ '--slider-pct': `${((node.scale - 10) / 290) * 100}%` }"
             type="range"
             min="10"
@@ -68,10 +72,12 @@
             @input="emit('update:scale', Number(($event.target as HTMLInputElement).value))"
           />
         </div>
-        <div class="wear-control-row">
-          <span class="node-control-label">Blend</span>
+        <div class="flex items-center gap-1.5">
+          <span class="node-control-label w-14 flex-[0_0_56px] text-[10.5px] tracking-[0.02em]"
+            >Blend</span
+          >
           <input
-            class="wear-slider node-inline-range"
+            class="node-inline-range min-w-0 flex-1"
             :style="{ '--slider-pct': `${node.opacity}%` }"
             type="range"
             min="0"
@@ -144,34 +150,3 @@ const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
 <style scoped src="./node-shared.css"></style>
-<style scoped>
-.wear-node-body {
-  gap: 7px;
-}
-
-.wear-tile-card {
-  gap: 6px;
-}
-
-.wear-control-group {
-  gap: 6px;
-}
-
-.wear-control-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.wear-control-row .node-control-label {
-  width: 56px;
-  flex: 0 0 56px;
-  font-size: 10.5px;
-  letter-spacing: 0.02em;
-}
-
-.wear-slider {
-  flex: 1;
-  min-width: 0;
-}
-</style>

@@ -1,4 +1,8 @@
-import { getAdminTask, listAdminTasks, submitAdminTask } from './generated-query/admin-tasks/admin-tasks'
+import {
+  getAdminTask,
+  listAdminTasks,
+  submitAdminTask,
+} from './generated-query/admin-tasks/admin-tasks'
 import type {
   ApiResponseTaskData,
   ApiResponseTaskIdData,
@@ -11,8 +15,7 @@ import type { SubmitTaskData } from './task'
 export const adminTaskApi = {
   submit: (data: SubmitTaskData): Promise<ApiResponse<ApiResponseTaskIdData>> =>
     submitAdminTask(data),
-  get: (task_id: string): Promise<ApiResponse<ApiResponseTaskData>> =>
-    getAdminTask(task_id),
+  get: (task_id: string): Promise<ApiResponse<ApiResponseTaskData>> => getAdminTask(task_id),
   list: (params?: ListAdminTasksParams): Promise<ApiResponse<ApiResponseTaskListData>> =>
     listAdminTasks(params),
 }

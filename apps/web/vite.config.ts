@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
-import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
+import tailwindcss from '@tailwindcss/vite'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
@@ -8,9 +8,10 @@ import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    tailwindcss(),
     vue(),
+    tailwindcss(),
     AutoImport({
+      include: [/\.[tj]sx?$/, /\.vue$/, /\.vue\?vue/],
       imports: [
         'vue',
         'vue-router',
@@ -23,6 +24,7 @@ export default defineConfig({
       vueTemplate: true,
     }),
     Components({
+      include: [/\.vue$/, /\.vue\?vue/],
       dirs: [
         'src/features/admin/shared/components',
         'src/features/auth/components',

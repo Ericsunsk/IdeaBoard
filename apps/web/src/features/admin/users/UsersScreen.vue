@@ -66,14 +66,14 @@
                 :show-feedback="false"
               >
                 <div class="form-row">
-                  <n-form-item label="最大请求 (次)" class="flex-1">
+                  <n-form-item label="最大请求 (次)" class="rate-limit-field">
                     <n-input-number
                       v-model:value="rateLimitForm.max_requests"
                       :min="1"
                       placeholder="100"
                     />
                   </n-form-item>
-                  <n-form-item label="窗口周期 (秒)" class="flex-1">
+                  <n-form-item label="窗口周期 (秒)" class="rate-limit-field">
                     <n-input-number
                       v-model:value="rateLimitForm.window_seconds"
                       :min="1"
@@ -99,62 +99,54 @@
     </div>
 
     <div class="table-card users-table-card">
-      <AdminCardHeader
-        title="用户目录"
-        subtitle="管理平台所有注册用户的权限、状态及会话"
-        status="全部用户"
-      >
-        <template #prefix>
-          <n-icon size="18" class="admin-card-title-icon"><PeopleOutline /></n-icon>
-        </template>
-        <template #extra>
-          <n-popover
-            placement="bottom-end"
-            trigger="click"
-            :show-arrow="false"
-            class="admin-popover-panel"
+      <div class="users-card-header">
+        <h3 class="users-card-title">用户目录</h3>
+        <n-popover
+          placement="bottom-end"
+          trigger="click"
+          :show-arrow="false"
+          class="admin-popover-panel"
+        >
+          <template #trigger>
+            <n-button quaternary size="small" class="sort-btn">
+              <template #icon
+                ><n-icon><FilterOutline /></n-icon
+              ></template>
+              Sort
+              <span v-if="currentSorts.length > 0" style="margin-left: 4px; opacity: 0.8"
+                >({{ currentSorts.length }})</span
+              >
+            </n-button>
+          </template>
+          <div
+            style="
+              padding: 12px;
+              background: var(--admin-card);
+              min-width: 130px;
+              border-radius: 8px;
+            "
           >
-            <template #trigger>
-              <n-button quaternary size="small" class="sort-btn">
-                <template #icon
-                  ><n-icon><FilterOutline /></n-icon
-                ></template>
-                Sort
-                <span v-if="currentSorts.length > 0" style="margin-left: 4px; opacity: 0.8"
-                  >({{ currentSorts.length }})</span
+            <n-checkbox-group v-model:value="currentSorts">
+              <n-space vertical :size="12">
+                <n-checkbox value="role" class="minimal-checkbox">管理员优先</n-checkbox>
+                <n-checkbox value="status" class="minimal-checkbox">正常状态优先</n-checkbox>
+                <n-checkbox
+                  value="newest"
+                  :disabled="currentSorts.includes('oldest')"
+                  class="minimal-checkbox"
+                  >最新加入</n-checkbox
                 >
-              </n-button>
-            </template>
-            <div
-              style="
-                padding: 12px;
-                background: var(--admin-card);
-                min-width: 130px;
-                border-radius: 8px;
-              "
-            >
-              <n-checkbox-group v-model:value="currentSorts">
-                <n-space vertical :size="12">
-                  <n-checkbox value="role" class="minimal-checkbox">管理员优先</n-checkbox>
-                  <n-checkbox value="status" class="minimal-checkbox">正常状态优先</n-checkbox>
-                  <n-checkbox
-                    value="newest"
-                    :disabled="currentSorts.includes('oldest')"
-                    class="minimal-checkbox"
-                    >最新加入</n-checkbox
-                  >
-                  <n-checkbox
-                    value="oldest"
-                    :disabled="currentSorts.includes('newest')"
-                    class="minimal-checkbox"
-                    >最早加入</n-checkbox
-                  >
-                </n-space>
-              </n-checkbox-group>
-            </div>
-          </n-popover>
-        </template>
-      </AdminCardHeader>
+                <n-checkbox
+                  value="oldest"
+                  :disabled="currentSorts.includes('newest')"
+                  class="minimal-checkbox"
+                  >最早加入</n-checkbox
+                >
+              </n-space>
+            </n-checkbox-group>
+          </div>
+        </n-popover>
+      </div>
       <div class="table-container">
         <n-data-table
           :columns="columns"
@@ -162,9 +154,8 @@
           :loading="loading"
           :pagination="false"
           :bordered="false"
-          :show-header="false"
           :row-key="(row: User) => row.id"
-          class="admin-compact-table"
+          class="admin-compact-table users-directory-table"
         />
       </div>
     </div>
@@ -271,7 +262,6 @@ import {
   RefreshOutline,
   EllipsisHorizontal,
   SettingsOutline,
-  PeopleOutline,
   FilterOutline,
 } from '@vicons/ionicons5'
 
@@ -788,6 +778,13 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
   color: var(--admin-text-2);
 }
 
+.users-directory-table :deep(.n-data-table-base-table-header),
+.users-directory-table :deep(.n-data-table-thead),
+.users-directory-table :deep(.n-data-table-th),
+.users-directory-table :deep(thead) {
+  display: none !important;
+}
+
 /* align with shared admin toolbar card style */
 .users-toolbar {
   justify-content: space-between;
@@ -824,7 +821,7 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
   gap: 12px;
 }
 
-.flex-1 {
+.rate-limit-field {
   flex: 1;
 }
 
@@ -835,6 +832,23 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 .users-table-card {
   padding: 0;
   overflow: hidden;
+}
+
+.users-card-header {
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.users-card-title {
+  margin: 0;
+  color: var(--admin-text-1);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 .sort-btn {

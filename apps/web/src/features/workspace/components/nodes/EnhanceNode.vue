@@ -26,7 +26,7 @@
       </template>
     </NodeHeader>
 
-    <div class="enhance-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
+    <div class="node-execution-body" @mousedown.stop @contextmenu.stop>
       <div class="enhance-mode-card node-mode-card">
         <div class="enhance-mode-row node-option-row">
           <NodeActionButton
@@ -72,9 +72,9 @@
               {{ option.label }}
             </NodeActionButton>
           </div>
-          <div class="enhance-quality-row">
+          <div class="mt-px flex items-center">
             <input
-              class="enhance-quality-slider node-inline-range"
+              class="node-inline-range m-0 min-w-0 flex-1"
               :style="{ '--slider-pct': `${((node.outputQuality - 30) / 70) * 100}%` }"
               type="range"
               min="30"
@@ -88,11 +88,11 @@
             />
           </div>
         </template>
-        <div v-else class="enhance-extend-group node-control-group">
-          <div class="enhance-extend-row">
-            <span class="node-control-label">Top</span>
+        <div v-else class="node-control-group">
+          <div class="flex items-center gap-1.5">
+            <span class="node-control-label min-w-9 text-[10.5px] tracking-[0.02em]">Top</span>
             <input
-              class="enhance-extend-slider node-inline-range"
+              class="node-inline-range min-w-0 flex-1"
               :style="{ '--slider-pct': `${toExtendSliderPct(node.extendTop)}%` }"
               type="range"
               :min="extendMin"
@@ -101,12 +101,12 @@
               :value="node.extendTop"
               @input="emit('update:extend-top', Number(($event.target as HTMLInputElement).value))"
             />
-            <span class="enhance-extend-value">{{ node.extendTop }}%</span>
+            <span class="min-w-8 text-right text-[10px] text-[#a1a1aa]">{{ node.extendTop }}%</span>
           </div>
-          <div class="enhance-extend-row">
-            <span class="node-control-label">Right</span>
+          <div class="flex items-center gap-1.5">
+            <span class="node-control-label min-w-9 text-[10.5px] tracking-[0.02em]">Right</span>
             <input
-              class="enhance-extend-slider node-inline-range"
+              class="node-inline-range min-w-0 flex-1"
               :style="{ '--slider-pct': `${toExtendSliderPct(node.extendRight)}%` }"
               type="range"
               :min="extendMin"
@@ -117,12 +117,14 @@
                 emit('update:extend-right', Number(($event.target as HTMLInputElement).value))
               "
             />
-            <span class="enhance-extend-value">{{ node.extendRight }}%</span>
+            <span class="min-w-8 text-right text-[10px] text-[#a1a1aa]"
+              >{{ node.extendRight }}%</span
+            >
           </div>
-          <div class="enhance-extend-row">
-            <span class="node-control-label">Bottom</span>
+          <div class="flex items-center gap-1.5">
+            <span class="node-control-label min-w-9 text-[10.5px] tracking-[0.02em]">Bottom</span>
             <input
-              class="enhance-extend-slider node-inline-range"
+              class="node-inline-range min-w-0 flex-1"
               :style="{ '--slider-pct': `${toExtendSliderPct(node.extendBottom)}%` }"
               type="range"
               :min="extendMin"
@@ -133,12 +135,14 @@
                 emit('update:extend-bottom', Number(($event.target as HTMLInputElement).value))
               "
             />
-            <span class="enhance-extend-value">{{ node.extendBottom }}%</span>
+            <span class="min-w-8 text-right text-[10px] text-[#a1a1aa]"
+              >{{ node.extendBottom }}%</span
+            >
           </div>
-          <div class="enhance-extend-row">
-            <span class="node-control-label">Left</span>
+          <div class="flex items-center gap-1.5">
+            <span class="node-control-label min-w-9 text-[10.5px] tracking-[0.02em]">Left</span>
             <input
-              class="enhance-extend-slider node-inline-range"
+              class="node-inline-range min-w-0 flex-1"
               :style="{ '--slider-pct': `${toExtendSliderPct(node.extendLeft)}%` }"
               type="range"
               :min="extendMin"
@@ -147,7 +151,9 @@
               :value="node.extendLeft"
               @input="emit('update:extend-left', Number(($event.target as HTMLInputElement).value))"
             />
-            <span class="enhance-extend-value">{{ node.extendLeft }}%</span>
+            <span class="min-w-8 text-right text-[10px] text-[#a1a1aa]"
+              >{{ node.extendLeft }}%</span
+            >
           </div>
         </div>
       </div>
@@ -242,48 +248,3 @@ function toExtendSliderPct(value: number): number {
 </script>
 
 <style scoped src="./node-shared.css"></style>
-<style scoped>
-.enhance-node-body {
-  gap: 8px;
-}
-
-.enhance-quality-row {
-  display: flex;
-  align-items: center;
-  margin-top: 1px;
-}
-
-.enhance-quality-slider {
-  flex: 1;
-  margin: 0;
-  min-width: 0;
-}
-
-.enhance-extend-group {
-  gap: 6px;
-}
-
-.enhance-extend-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.enhance-extend-row .node-control-label {
-  min-width: 36px;
-  font-size: 10.5px;
-  letter-spacing: 0.02em;
-}
-
-.enhance-extend-slider {
-  flex: 1;
-  min-width: 0;
-}
-
-.enhance-extend-value {
-  min-width: 32px;
-  font-size: 10px;
-  color: #a1a1aa;
-  text-align: right;
-}
-</style>

@@ -1,8 +1,8 @@
 <template>
   <button
     type="button"
-    class="node-action-btn"
-    :class="[`variant-${variant}`, { active, full, 'push-right': pushRight }]"
+    class="inline-flex items-center justify-center border text-[11px] leading-none whitespace-nowrap transition-all duration-200 ease-[ease] enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-45"
+    :class="buttonClasses"
     :disabled="disabled"
     @click="emit('click', $event)"
   >
@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(
+const props = withDefaults(
   defineProps<{
     variant?: 'stage' | 'stage-ghost' | 'tool' | 'chip' | 'primary'
     active?: boolean
@@ -31,113 +31,35 @@ withDefaults(
 const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void
 }>()
+
+type ButtonVariant = NonNullable<(typeof props)['variant']>
+
+function getVariantClasses(variant: ButtonVariant, active: boolean) {
+  if (variant === 'stage') {
+    return 'min-h-[26px] rounded-lg border-none bg-[rgba(17,24,39,0.74)] px-[10px] font-medium text-[#f9fafb] enabled:hover:bg-[rgba(17,24,39,0.9)]'
+  }
+  if (variant === 'stage-ghost') {
+    return 'min-h-[26px] rounded-lg border-none bg-[rgba(75,85,99,0.72)] px-[10px] font-medium text-[#f9fafb] enabled:hover:bg-[rgba(75,85,99,0.88)]'
+  }
+  if (variant === 'primary') {
+    return 'min-h-[34px] rounded-[10px] border-[#9278e6] bg-[#9278e6] px-3 text-xs font-bold tracking-[0.01em] text-white enabled:hover:border-[#7f68db] enabled:hover:bg-[#7f68db]'
+  }
+
+  const activeColors = 'border-[rgba(122,107,213,0.4)] bg-[rgba(122,107,213,0.12)] text-[#6757c8]'
+  const baseColors =
+    'border-[#d6dcec] bg-white text-[#5f6877] enabled:hover:border-[#c4b7f4] enabled:hover:text-[#6757c8]'
+  const colors = active ? activeColors : baseColors
+
+  if (variant === 'chip') {
+    return `h-6 min-h-6 rounded-lg px-2 text-[10px] font-bold tracking-[0.02em] ${colors}`
+  }
+
+  return `min-h-7 rounded-lg px-[9px] font-semibold ${colors}`
+}
+
+const buttonClasses = computed(() => [
+  getVariantClasses(props.variant, props.active),
+  props.full && 'w-full',
+  props.pushRight && 'ml-auto',
+])
 </script>
-
-<style scoped>
-.node-action-btn {
-  border: 1px solid #d6dcec;
-  background: #ffffff;
-  color: #5f6877;
-  border-radius: 8px;
-  min-height: 28px;
-  padding: 0 9px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.node-action-btn.full {
-  width: 100%;
-}
-
-.node-action-btn.push-right {
-  margin-left: auto;
-}
-
-.node-action-btn.variant-stage {
-  border: none;
-  border-radius: 8px;
-  background: rgba(17, 24, 39, 0.74);
-  color: #f9fafb;
-  min-height: 26px;
-  padding: 0 10px;
-  font-weight: 500;
-}
-
-.node-action-btn.variant-stage:hover:not(:disabled) {
-  background: rgba(17, 24, 39, 0.9);
-}
-
-.node-action-btn.variant-stage-ghost {
-  border: none;
-  border-radius: 8px;
-  background: rgba(75, 85, 99, 0.72);
-  color: #f9fafb;
-  min-height: 26px;
-  padding: 0 10px;
-  font-weight: 500;
-}
-
-.node-action-btn.variant-stage-ghost:hover:not(:disabled) {
-  background: rgba(75, 85, 99, 0.88);
-}
-
-.node-action-btn.variant-tool:hover:not(:disabled) {
-  border-color: #c4b7f4;
-  color: #6757c8;
-}
-
-.node-action-btn.variant-tool.active {
-  border-color: rgba(122, 107, 213, 0.4);
-  background: rgba(122, 107, 213, 0.12);
-  color: #6757c8;
-}
-
-.node-action-btn.variant-chip {
-  height: 24px;
-  min-height: 24px;
-  padding: 0 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.node-action-btn.variant-chip:hover:not(:disabled) {
-  border-color: #c4b7f4;
-  color: #6757c8;
-}
-
-.node-action-btn.variant-chip.active {
-  border-color: rgba(122, 107, 213, 0.4);
-  background: rgba(122, 107, 213, 0.12);
-  color: #6757c8;
-}
-
-.node-action-btn.variant-primary {
-  min-height: 34px;
-  border-color: #9278e6;
-  border-radius: 10px;
-  background: #9278e6;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  padding: 0 12px;
-}
-
-.node-action-btn.variant-primary:hover:not(:disabled) {
-  background: #7f68db;
-  border-color: #7f68db;
-}
-
-.node-action-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-</style>
