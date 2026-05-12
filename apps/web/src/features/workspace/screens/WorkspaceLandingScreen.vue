@@ -35,7 +35,7 @@
             IdeaBoard
           </h1>
           <p
-            class="mt-[18px] [font-family:'Comic_Sans_MS','Chalkboard_SE','Bradley_Hand','Caveat',cursive,sans-serif] text-[15px] font-normal tracking-[0.1em] text-[#202124] uppercase"
+            class="mt-[18px] max-w-full px-4 text-center [font-family:'Comic_Sans_MS','Chalkboard_SE','Bradley_Hand','Caveat',cursive,sans-serif] text-[15px] leading-[1.45] font-normal tracking-[0.1em] text-[#202124] uppercase max-[480px]:text-[12px] max-[480px]:tracking-[0.05em]"
           >
             EXPLORE, EXPAND, AND REFINE YOUR IDEAS
           </p>

@@ -1,6 +1,10 @@
 <template>
   <article
     class="relative h-[244px] cursor-pointer overflow-hidden rounded-[12px] border border-[#d9dfec] bg-[rgba(255,255,255,0.92)] text-left transition-[transform,border-color] duration-[140ms] ease-[ease] hover:translate-y-[-1px] hover:border-[#cdd4e6]"
+    role="button"
+    tabindex="0"
+    @keydown.enter.self.prevent="emit('click-board')"
+    @keydown.space.self.prevent="emit('click-board')"
     @click="emit('click-board')"
   >
     <div
