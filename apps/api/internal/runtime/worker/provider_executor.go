@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"api/internal/platform/outbound"
 	"api/internal/runtime/queuetypes"
 	"context"
 	"encoding/json"
@@ -68,7 +69,11 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		if err != nil {
 			return "", fmt.Errorf("渠道商(ID=%d)不存在: %v", account.ChannelID, err)
 		}
-		account.ProxyURL = channel.ApiURL
+		proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(channel.ApiURL, outbound.AllowHostsFromEnv()...)
+		if validateErr != nil {
+			return "", fmt.Errorf("渠道商 API URL 不可用")
+		}
+		account.ProxyURL = proxyURL
 		channelName = channel.Name
 		log.Printf("[Worker] 使用渠道商「%s」API URL: %s", channel.Name, channel.ApiURL)
 	}

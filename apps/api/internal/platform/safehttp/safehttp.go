@@ -24,7 +24,15 @@ func ValidateURL(rawURL string) (*url.URL, error) {
 }
 
 func ValidateURLWithAllowHosts(rawURL string, allowHosts ...string) (*url.URL, error) {
-	policy, err := resolvePolicy(rawURL, allowHosts...)
+	policy, err := resolvePolicyWithTimeout(rawURL, defaultTimeout, allowHosts...)
+	if err != nil {
+		return nil, err
+	}
+	return policy.parsed, nil
+}
+
+func ValidateURLWithAllowHostsAndTimeout(rawURL string, timeout time.Duration, allowHosts ...string) (*url.URL, error) {
+	policy, err := resolvePolicyWithTimeout(rawURL, timeout, allowHosts...)
 	if err != nil {
 		return nil, err
 	}
@@ -32,6 +40,10 @@ func ValidateURLWithAllowHosts(rawURL string, allowHosts ...string) (*url.URL, e
 }
 
 func resolvePolicy(rawURL string, allowHosts ...string) (*resolvedPolicy, error) {
+	return resolvePolicyWithTimeout(rawURL, defaultTimeout, allowHosts...)
+}
+
+func resolvePolicyWithTimeout(rawURL string, resolveTimeout time.Duration, allowHosts ...string) (*resolvedPolicy, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("URL 格式错误")
@@ -46,7 +58,10 @@ func resolvePolicy(rawURL string, allowHosts ...string) (*resolvedPolicy, error)
 		return nil, fmt.Errorf("URL 缺少主机名")
 	}
 
-	resolveCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	if resolveTimeout <= 0 {
+		resolveTimeout = defaultTimeout
+	}
+	resolveCtx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
 	defer cancel()
 
 	normalizedAllowedHosts := normalizeAllowedHosts(allowHosts)
@@ -116,6 +131,35 @@ func DoWithAllowHosts(
 	}
 
 	return client.Do(req)
+}
+
+func DoRequestWithAllowHosts(
+	ctx context.Context,
+	req *http.Request,
+	timeout time.Duration,
+	allowHosts ...string,
+) (*http.Response, error) {
+	if req == nil || req.URL == nil {
+		return nil, fmt.Errorf("请求参数错误")
+	}
+	policy, err := resolvePolicy(req.URL.String(), allowHosts...)
+	if err != nil {
+		return nil, err
+	}
+	transport := cloneDefaultTransport()
+	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedIPs)
+	client := &http.Client{
+		Timeout:   effectiveTimeout(timeout),
+		Transport: transport,
+		CheckRedirect: func(next *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("重定向次数过多")
+			}
+			_, err := ValidateURLWithAllowHosts(next.URL.String(), allowHosts...)
+			return err
+		},
+	}
+	return client.Do(req.WithContext(ctx))
 }
 
 func cloneDefaultTransport() *http.Transport {

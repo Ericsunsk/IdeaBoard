@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"api/internal/platform/media"
+	"api/internal/platform/mediarefs"
 	"api/internal/platform/safehttp"
 )
 
@@ -493,9 +493,8 @@ func imageExtensionFromContentType(contentType string) string {
 		return ".gif"
 	case "image/webp":
 		return ".webp"
-	default:
-		return ""
 	}
+	return ""
 }
 
 func validateRemoteImageBytes(filename string, data []byte) error {
@@ -515,27 +514,11 @@ func createMemoryFileHeader(filename string, data []byte) *multipart.FileHeader 
 }
 
 func decodeDataURL(dataURL string) (string, []byte, error) {
-	parts := strings.SplitN(dataURL, ",", 2)
-	if len(parts) != 2 {
+	parsed, err := mediarefs.ParseDataImageURL(dataURL, maxRemoteFileSize)
+	if err != nil {
 		return "", nil, fmt.Errorf("无效的 base64 图片格式")
 	}
-
-	decoded, err := base64.StdEncoding.DecodeString(parts[1])
-	if err != nil {
-		return "", nil, fmt.Errorf("base64 解码失败: %v", err)
-	}
-
-	ext := ".png"
-	switch {
-	case strings.Contains(parts[0], "jpeg"), strings.Contains(parts[0], "jpg"):
-		ext = ".jpg"
-	case strings.Contains(parts[0], "webp"):
-		ext = ".webp"
-	case strings.Contains(parts[0], "gif"):
-		ext = ".gif"
-	}
-
-	return fmt.Sprintf("gen_%d%s", time.Now().UnixNano(), ext), decoded, nil
+	return fmt.Sprintf("gen_%d%s", time.Now().UnixNano(), parsed.Ext), parsed.Data, nil
 }
 
 type multipartBuffer struct {

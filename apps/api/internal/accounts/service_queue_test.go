@@ -103,6 +103,12 @@ func createTestAccount(t *testing.T, repo *AccountRepository, name string, statu
 	if err := repo.Create(acc); err != nil {
 		t.Fatalf("create account failed: %v", err)
 	}
+	if status == 0 {
+		if err := repo.UpdateStatus(acc.ID, 0); err != nil {
+			t.Fatalf("update account status failed: %v", err)
+		}
+		acc.Status = 0
+	}
 	return acc
 }
 
@@ -168,7 +174,7 @@ func TestDeleteAccountCallsDeleteAccountConcurrent(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
 	taskRepo := NewTaskRepository(db)
-	acc := createTestAccount(t, accountRepo, "a1", 1)
+	acc := createTestAccount(t, accountRepo, "a1", 0)
 	concurrency := &fakeConcurrencyStore{}
 	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, &fakeCancelStore{}, &fakeMonitorStore{}, nil, nil)
 
@@ -177,6 +183,18 @@ func TestDeleteAccountCallsDeleteAccountConcurrent(t *testing.T) {
 	}
 	if len(concurrency.deleted) != 1 || concurrency.deleted[0] != acc.ID {
 		t.Fatalf("DeleteAccountConcurrent calls=%v, want [%d]", concurrency.deleted, acc.ID)
+	}
+}
+
+func TestDeleteAccountRequiresStoppedAccount(t *testing.T) {
+	db := newQueueServiceTestDB(t)
+	accountRepo := NewAccountRepository(db)
+	taskRepo := NewTaskRepository(db)
+	acc := createTestAccount(t, accountRepo, "running", 1)
+	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, &fakeConcurrencyStore{}, &fakeCancelStore{}, &fakeMonitorStore{}, nil, nil)
+
+	if err := svc.DeleteAccount(acc.ID); err == nil {
+		t.Fatal("expected delete to fail for running account")
 	}
 }
 

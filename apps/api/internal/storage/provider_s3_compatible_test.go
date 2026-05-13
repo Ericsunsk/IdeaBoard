@@ -118,3 +118,40 @@ func TestEnsureS3BucketAccessible(t *testing.T) {
 		}
 	})
 }
+
+func TestS3CompatibleValidateBaseConfigEndpointPolicy(t *testing.T) {
+	service := NewS3CompatibleService()
+	base := &S3CompatibleConfig{
+		AccessKeyID:     "ak",
+		SecretAccessKey: "sk",
+		BucketName:      "bucket",
+		AccessDomain:    "https://cdn.example.com",
+	}
+
+	t.Run("plain public host endpoint passes", func(t *testing.T) {
+		t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "")
+		cfg := *base
+		cfg.Endpoint = "s3.us-east-1.amazonaws.com"
+		if err := service.validateBaseConfig(&cfg); err != nil {
+			t.Fatalf("expected plain public host endpoint to pass, got %v", err)
+		}
+	})
+
+	t.Run("plain localhost endpoint rejected by default", func(t *testing.T) {
+		t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "")
+		cfg := *base
+		cfg.Endpoint = "127.0.0.1:9000"
+		if err := service.validateBaseConfig(&cfg); err == nil {
+			t.Fatal("expected localhost endpoint to be rejected")
+		}
+	})
+
+	t.Run("plain localhost endpoint allowed when allowlisted", func(t *testing.T) {
+		t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "127.0.0.1")
+		cfg := *base
+		cfg.Endpoint = "127.0.0.1:9000"
+		if err := service.validateBaseConfig(&cfg); err != nil {
+			t.Fatalf("expected localhost endpoint to pass with allowlist, got %v", err)
+		}
+	})
+}

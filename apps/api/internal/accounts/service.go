@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"api/internal/platform/outbound"
 	"api/internal/runtime/queuetypes"
 	"context"
 	"crypto/rand"
@@ -48,6 +49,9 @@ const maxSubmitTaskImageURLs = 16
 const maxSubmitTaskImageURLBytes = 4096
 const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
 const maxSubmitTaskParamsDepth = 24
+const maxSubmitTaskMediaDataURLBytes = 10 * 1024 * 1024
+const maxAccountMaxConcurrent = 64
+const maxAccountTimeoutSeconds = 600
 
 func NewAccountServiceWithQueue(
 	accountRepo *AccountRepository,
@@ -90,6 +94,10 @@ func (s *AccountService) TaskEventHub() *TaskEventHub {
 // ============ 账号池管理 ============
 
 func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, error) {
+	proxyURL, err := outbound.ValidateConfiguredEndpoint(req.ProxyURL, outbound.AllowHostsFromEnv()...)
+	if err != nil {
+		return nil, fmt.Errorf("proxy_url 不可用，仅支持可达的公网 http(s) 地址")
+	}
 	req.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
 	req.Timeout = NormalizeAccountTimeout(req.Timeout)
 	if req.Weight <= 0 {
@@ -103,7 +111,7 @@ func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, 
 		ApiType:       req.ApiType,
 		ModelSet:      req.ModelSet,
 		ApiKey:        req.ApiKey,
-		ProxyURL:      req.ProxyURL,
+		ProxyURL:      proxyURL,
 		MaxConcurrent: req.MaxConcurrent,
 		Timeout:       req.Timeout,
 		ExtraConfig:   req.ExtraConfig,
@@ -190,6 +198,10 @@ func (s *AccountService) ListAccounts(req *AccountListRequest) ([]*AccountWithLo
 }
 
 func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) error {
+	proxyURL, err := outbound.ValidateConfiguredEndpoint(req.ProxyURL, outbound.AllowHostsFromEnv()...)
+	if err != nil {
+		return fmt.Errorf("proxy_url 不可用，仅支持可达的公网 http(s) 地址")
+	}
 	account, err := s.accountRepo.GetByID(id)
 	if err != nil {
 		return fmt.Errorf("账号不存在")
@@ -202,7 +214,7 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 	account.Platform = req.Platform
 	account.ApiType = req.ApiType
 	account.ModelSet = req.ModelSet
-	account.ProxyURL = req.ProxyURL
+	account.ProxyURL = proxyURL
 	account.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
 	account.Timeout = NormalizeAccountTimeout(req.Timeout)
 	account.ExtraConfig = req.ExtraConfig
@@ -226,6 +238,13 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 }
 
 func (s *AccountService) DeleteAccount(id uint64) error {
+	account, err := s.accountRepo.GetByID(id)
+	if err != nil {
+		return fmt.Errorf("账号不存在")
+	}
+	if account.Status != 0 {
+		return fmt.Errorf("请先停用账号后再删除")
+	}
 	ctx := context.Background()
 	if s.concurrencyStore != nil {
 		if err := s.concurrencyStore.DeleteAccountConcurrent(ctx, id); err != nil {
@@ -339,6 +358,9 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		params["image_urls"] = req.ImageURLs
 	}
 	req.Params = params
+	if err := validateSubmitTaskMediaParams(req.Params); err != nil {
+		return "", err
+	}
 
 	fullPrompt := req.Prompt
 
@@ -423,69 +445,6 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	return taskID, nil
 }
 
-func validateSubmitTaskPrompt(prompt string, maxBytes int, label string) error {
-	if len([]byte(prompt)) > maxBytes {
-		return fmt.Errorf("%s长度不能超过 %dKB", label, maxBytes/1024)
-	}
-	return nil
-}
-
-func validateSubmitTaskImageURLs(imageURLs []string) error {
-	if len(imageURLs) > maxSubmitTaskImageURLs {
-		return fmt.Errorf("图片数量不能超过 %d 张", maxSubmitTaskImageURLs)
-	}
-	for _, raw := range imageURLs {
-		url := strings.TrimSpace(raw)
-		if url == "" {
-			return fmt.Errorf("图片地址不能为空")
-		}
-		if len([]byte(url)) > maxSubmitTaskImageURLBytes {
-			return fmt.Errorf("图片地址长度不能超过 %d 字符", maxSubmitTaskImageURLBytes)
-		}
-	}
-	return nil
-}
-
-func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {
-	if params == nil {
-		return "", nil
-	}
-	if jsonValueDepth(params) > maxSubmitTaskParamsDepth {
-		return "", fmt.Errorf("任务参数层级过深")
-	}
-	payload, err := json.Marshal(params)
-	if err != nil {
-		return "", fmt.Errorf("任务参数格式错误")
-	}
-	if len(payload) > maxSubmitTaskParamsBytes {
-		return "", fmt.Errorf("任务参数不能超过 %dMB", maxSubmitTaskParamsBytes/1024/1024)
-	}
-	return string(payload), nil
-}
-
-func jsonValueDepth(value interface{}) int {
-	switch v := value.(type) {
-	case map[string]interface{}:
-		maxDepth := 1
-		for _, child := range v {
-			if depth := 1 + jsonValueDepth(child); depth > maxDepth {
-				maxDepth = depth
-			}
-		}
-		return maxDepth
-	case []interface{}:
-		maxDepth := 1
-		for _, child := range v {
-			if depth := 1 + jsonValueDepth(child); depth > maxDepth {
-				maxDepth = depth
-			}
-		}
-		return maxDepth
-	default:
-		return 1
-	}
-}
-
 func (s *AccountService) GetTask(taskID string) (*tasks.Task, error) {
 	task, err := s.taskRepo.GetByTaskID(taskID)
 	if err != nil {
@@ -564,20 +523,6 @@ func (s *AccountService) GetMonitorInfo() (*queuetypes.MonitorInfo, error) {
 		accountIDs[i] = acc.ID
 	}
 	return s.monitorStore.MonitorInfo(ctx, accountIDs)
-}
-
-func normalizeMaxConcurrent(value int) int {
-	if value <= 0 {
-		return defaultAccountMaxConcurrent
-	}
-	return value
-}
-
-func NormalizeAccountTimeout(value int) int {
-	if value <= 0 {
-		return defaultAccountTimeoutSeconds
-	}
-	return value
 }
 
 func (s *AccountService) GetTaskStats() (map[string]int64, error) {
@@ -1092,62 +1037,4 @@ func validateExecutablePrompt(fullPrompt string) error {
 		return fmt.Errorf("缺少提示词，请填写 Prompt 或配置后台 system prompt")
 	}
 	return nil
-}
-
-func (s *AccountService) applyPreviewForTasks(items []*tasks.Task) {
-	if len(items) == 0 || s.previewResolver == nil {
-		return
-	}
-	transform := s.previewResolver.PreviewURLTransformer()
-	if transform == nil {
-		return
-	}
-	for _, item := range items {
-		s.applyPreviewForTask(item, transform)
-	}
-}
-
-func (s *AccountService) applyPreviewForTask(task *tasks.Task, transform func(string) string) {
-	if task == nil || strings.TrimSpace(task.Result) == "" {
-		return
-	}
-	if !strings.Contains(task.Result, "image_url") && !strings.Contains(task.Result, "image_urls") {
-		return
-	}
-
-	var resultMap map[string]interface{}
-	if err := json.Unmarshal([]byte(task.Result), &resultMap); err != nil {
-		return
-	}
-
-	changed := false
-	if raw, ok := resultMap["image_url"].(string); ok {
-		next := transform(strings.TrimSpace(raw))
-		if next != raw {
-			resultMap["image_url"] = next
-			changed = true
-		}
-	}
-
-	if rawList, ok := resultMap["image_urls"].([]interface{}); ok {
-		for i, item := range rawList {
-			raw, ok := item.(string)
-			if !ok {
-				continue
-			}
-			next := transform(strings.TrimSpace(raw))
-			if next != raw {
-				rawList[i] = next
-				changed = true
-			}
-		}
-		resultMap["image_urls"] = rawList
-	}
-
-	if !changed {
-		return
-	}
-	if encoded, err := json.Marshal(resultMap); err == nil {
-		task.Result = string(encoded)
-	}
 }

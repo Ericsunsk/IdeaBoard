@@ -1,6 +1,7 @@
 package channels
 
 import (
+	"api/internal/platform/outbound"
 	"fmt"
 	"strings"
 	"testing"
@@ -38,6 +39,13 @@ func TestBuildModelsURL(t *testing.T) {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestChannelCreateRejectsLocalhostAPIURL(t *testing.T) {
+	t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "")
+	if _, err := outbound.ValidateConfiguredEndpoint("http://127.0.0.1:8080/v1"); err == nil {
+		t.Fatal("expected localhost api_url to be rejected")
 	}
 }
 

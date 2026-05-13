@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"api/internal/platform/outbound"
 	"api/internal/platform/response"
 	"api/internal/platform/safehttp"
 
@@ -51,10 +52,16 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 		return
 	}
 
+	apiURL, err := outbound.ValidateConfiguredEndpoint(req.ApiURL, outbound.AllowHostsFromEnv()...)
+	if err != nil {
+		response.Error(c, 400, "api_url 不可用，仅支持可达的公网 http(s) 地址")
+		return
+	}
+
 	channel := &Channel{
 		Type:   req.Type,
 		Name:   req.Name,
-		ApiURL: req.ApiURL,
+		ApiURL: apiURL,
 		Status: 1,
 	}
 
@@ -79,6 +86,12 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 		return
 	}
 
+	apiURL, err := outbound.ValidateConfiguredEndpoint(req.ApiURL, outbound.AllowHostsFromEnv()...)
+	if err != nil {
+		response.Error(c, 400, "api_url 不可用，仅支持可达的公网 http(s) 地址")
+		return
+	}
+
 	channel, err := h.channelRepo.GetByID(id)
 	if err != nil {
 		response.Error(c, 404, "渠道商不存在")
@@ -87,7 +100,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 
 	channel.Type = req.Type
 	channel.Name = req.Name
-	channel.ApiURL = req.ApiURL
+	channel.ApiURL = apiURL
 
 	if err := h.channelRepo.Update(channel); err != nil {
 		response.InternalError(c, 500, "更新渠道商失败", err)

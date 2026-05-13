@@ -314,4 +314,29 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 			t.Fatalf("expected params depth error")
 		}
 	})
+
+	t.Run("reject private image url", func(t *testing.T) {
+		if err := validateSubmitTaskMediaRef("http://127.0.0.1:8080/a.png"); err == nil {
+			t.Fatal("expected private url to be rejected")
+		}
+	})
+
+	t.Run("allow uploads relative path", func(t *testing.T) {
+		if err := validateSubmitTaskMediaRef("/uploads/2026/05/13/a.png"); err != nil {
+			t.Fatalf("expected upload path to pass: %v", err)
+		}
+	})
+
+	t.Run("reject non upload relative path", func(t *testing.T) {
+		if err := validateSubmitTaskMediaRef("/tmp/a.png"); err == nil {
+			t.Fatal("expected non upload relative path to fail")
+		}
+	})
+
+	t.Run("reject oversized data url", func(t *testing.T) {
+		tooLarge := "data:image/png;base64," + strings.Repeat("a", maxSubmitTaskMediaDataURLBytes)
+		if err := validateSubmitTaskMediaRef(tooLarge); err == nil {
+			t.Fatal("expected oversized data url to fail")
+		}
+	})
 }

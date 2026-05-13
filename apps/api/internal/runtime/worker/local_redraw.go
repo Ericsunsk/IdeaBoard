@@ -2,6 +2,7 @@ package worker
 
 import (
 	"api/internal/accounts"
+	"api/internal/platform/mediarefs"
 	"api/internal/platform/safehttp"
 	"api/internal/storage"
 	"api/internal/workflow"
@@ -214,7 +215,7 @@ func readLocalRedrawOriginalImageRef(params map[string]interface{}) (string, boo
 	if ref, ok := workflow.ReadWorkflowStringParam(params, "original_image_url"); ok {
 		return ref, true
 	}
-	for _, ref := range readImageURLValues(params) {
+	for _, ref := range mediarefs.CollectStringList(params["image_urls"]) {
 		if strings.TrimSpace(ref) != "" {
 			return strings.TrimSpace(ref), true
 		}
@@ -229,29 +230,16 @@ func readLocalRedrawMaskRef(params map[string]interface{}) (string, bool) {
 	if ref, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
 		return ref, true
 	}
-	switch values := params["mask_image_urls"].(type) {
-	case []string:
-		for _, value := range values {
-			if trimmed := strings.TrimSpace(value); trimmed != "" {
-				return trimmed, true
-			}
-		}
-	case []interface{}:
-		for _, value := range values {
-			text, ok := value.(string)
-			if !ok {
-				continue
-			}
-			if trimmed := strings.TrimSpace(text); trimmed != "" {
-				return trimmed, true
-			}
+	for _, value := range mediarefs.CollectStringList(params["mask_image_urls"]) {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed, true
 		}
 	}
 	return "", false
 }
 
 func rewriteLocalRedrawUpstreamInputs(params map[string]interface{}, featureSlug, roiDataURL string, roi image.Rectangle) error {
-	imageURLs := readImageURLValues(params)
+	imageURLs := mediarefs.CollectStringList(params["image_urls"])
 	switch featureSlug {
 	case workflow.FeatureSlugFabricOnBody:
 		if len(imageURLs) == 0 {
@@ -297,11 +285,11 @@ func loadImageFromRef(ctx context.Context, ref string, timeout time.Duration, al
 
 func loadImageBytesFromRef(ctx context.Context, ref string, timeout time.Duration, allowHosts []string) ([]byte, error) {
 	if strings.HasPrefix(ref, "data:") {
-		_, data, err := decodeOpenAIDataURL(ref)
+		parsed, err := mediarefs.ParseDataImageURL(ref, maxOpenAIDataURLBytes)
 		if err != nil {
 			return nil, fmt.Errorf("解析 data URL 失败: %w", err)
 		}
-		return data, nil
+		return parsed.Data, nil
 	}
 	resp, err := safehttp.GetWithAllowHosts(ctx, ref, timeout, allowHosts...)
 	if err != nil {
@@ -509,36 +497,6 @@ func blendChannel(dst, src uint8, alpha int) uint8 {
 		return src
 	}
 	return uint8((int(dst)*(255-alpha) + int(src)*alpha + 127) / 255)
-}
-
-func readImageURLValues(params map[string]interface{}) []string {
-	if params == nil {
-		return nil
-	}
-	raw, ok := params["image_urls"]
-	if !ok {
-		return nil
-	}
-	values := make([]string, 0, 4)
-	switch typed := raw.(type) {
-	case []string:
-		for _, value := range typed {
-			if trimmed := strings.TrimSpace(value); trimmed != "" {
-				values = append(values, trimmed)
-			}
-		}
-	case []interface{}:
-		for _, value := range typed {
-			text, ok := value.(string)
-			if !ok {
-				continue
-			}
-			if trimmed := strings.TrimSpace(text); trimmed != "" {
-				values = append(values, trimmed)
-			}
-		}
-	}
-	return values
 }
 
 func toInterfaceSlice(values []string) []interface{} {

@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"api/internal/platform/outbound"
+	"api/internal/platform/safehttp"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -19,6 +21,11 @@ func (c *ProviderExecutor) callStabilityAI(ctx context.Context, account *account
 	if account.ProxyURL != "" {
 		baseURL = account.ProxyURL
 	}
+	validatedBaseURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHostsFromEnv()...)
+	if validateErr != nil {
+		return providerCallResult{}, validateErr
+	}
+	baseURL = validatedBaseURL
 
 	engine := "stable-diffusion-xl-1024-v1-0"
 	if strings.TrimSpace(resolvedModel) != "" {
@@ -35,7 +42,6 @@ func (c *ProviderExecutor) callStabilityAI(ctx context.Context, account *account
 	}
 	bodyJSON, _ := json.Marshal(reqBody)
 
-	client := &http.Client{Timeout: timeout}
 	url := fmt.Sprintf("%s/v1/generation/%s/text-to-image", baseURL, engine)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(bodyJSON))
 	if err != nil {
@@ -47,7 +53,7 @@ func (c *ProviderExecutor) callStabilityAI(ctx context.Context, account *account
 
 	log.Printf("[Worker] StabilityAI 请求: engine=%s, %dx%d", engine, width, height)
 
-	resp, err := client.Do(req)
+	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return providerCallResult{}, err

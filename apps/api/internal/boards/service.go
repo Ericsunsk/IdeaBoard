@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"api/internal/platform/jsonlimit"
 	"api/internal/users"
 
 	"gorm.io/gorm"
@@ -514,7 +515,7 @@ func marshalState(state interface{}) (string, error) {
 	if state == nil {
 		return "null", nil
 	}
-	if boardJSONValueDepth(state) > maxBoardStateDepth {
+	if jsonlimit.ValueDepth(state) > maxBoardStateDepth {
 		return "", ErrInvalidBoardInput
 	}
 	payload, err := json.Marshal(state)
@@ -525,29 +526,6 @@ func marshalState(state interface{}) (string, error) {
 		return "", ErrInvalidBoardInput
 	}
 	return string(payload), nil
-}
-
-func boardJSONValueDepth(value interface{}) int {
-	switch v := value.(type) {
-	case map[string]interface{}:
-		maxDepth := 1
-		for _, child := range v {
-			if depth := 1 + boardJSONValueDepth(child); depth > maxDepth {
-				maxDepth = depth
-			}
-		}
-		return maxDepth
-	case []interface{}:
-		maxDepth := 1
-		for _, child := range v {
-			if depth := 1 + boardJSONValueDepth(child); depth > maxDepth {
-				maxDepth = depth
-			}
-		}
-		return maxDepth
-	default:
-		return 1
-	}
 }
 
 func resolveClientTime(raw *int64, fallback time.Time) time.Time {

@@ -78,6 +78,7 @@ func TestNormalizeAccountTimeout(t *testing.T) {
 		{name: "negative fallback", input: -1, want: defaultAccountTimeoutSeconds},
 		{name: "zero fallback", input: 0, want: defaultAccountTimeoutSeconds},
 		{name: "positive keep", input: 35, want: 35},
+		{name: "enforce upper bound", input: maxAccountTimeoutSeconds + 99, want: maxAccountTimeoutSeconds},
 	}
 
 	for _, tt := range tests {

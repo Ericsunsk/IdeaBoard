@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"api/internal/platform/mediarefs"
 	"encoding/base64"
 	"log"
 	"net/http"
@@ -220,10 +221,10 @@ func (c *ProviderExecutor) normalizeUpstreamMediaParams(params map[string]interf
 		}
 	}
 
-	for _, key := range []string{"image_url", "original_image_url", "mask_image_url", "model_url", "pose_url"} {
+	for _, key := range mediarefs.CanonicalStringKeys() {
 		normalizeStringKey(key)
 	}
-	for _, key := range []string{"image_urls", "mask_image_urls"} {
+	for _, key := range mediarefs.CanonicalListKeys() {
 		normalizeListKey(key)
 	}
 

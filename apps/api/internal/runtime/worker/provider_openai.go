@@ -3,7 +3,6 @@ package worker
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,9 +18,13 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/platform/mediarefs"
+	"api/internal/platform/outbound"
 	"api/internal/platform/safehttp"
 	"api/internal/workflow"
 )
+
+const maxOpenAIDataURLBytes = 10 * 1024 * 1024
 
 // callOpenAI 调用 OpenAI DALL-E 风格接口（也兼容其他 OpenAI 兼容平台）
 func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
@@ -29,6 +32,11 @@ func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.Api
 	if account.ProxyURL != "" {
 		baseURL = strings.TrimRight(account.ProxyURL, "/")
 	}
+	validatedBaseURL, validateErr := outbound.ValidateConfiguredEndpoint(baseURL, outbound.AllowHostsFromEnv()...)
+	if validateErr != nil {
+		return providerCallResult{}, validateErr
+	}
+	baseURL = validatedBaseURL
 
 	model := "dall-e-3"
 	if strings.TrimSpace(resolvedModel) != "" {
@@ -66,7 +74,6 @@ func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.Api
 		}
 	}
 
-	client := &http.Client{Timeout: timeout}
 	var req *http.Request
 	var err error
 	if useEditEndpoint {
@@ -99,7 +106,7 @@ func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.Api
 		imageInputCount,
 	)
 
-	resp, err := client.Do(req)
+	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return providerCallResult{}, err
@@ -226,12 +233,12 @@ func writeOpenAIMultipartImagePart(ctx context.Context, writer *multipart.Writer
 
 func resolveOpenAIImageBytes(ctx context.Context, ref string, index int, timeout time.Duration) (filename string, mimeType string, data []byte, err error) {
 	if strings.HasPrefix(ref, "data:") {
-		decodedMimeType, decodedData, decodeErr := decodeOpenAIDataURL(ref)
+		parsed, decodeErr := mediarefs.ParseDataImageURL(ref, maxOpenAIDataURLBytes)
 		if decodeErr != nil {
 			return "", "", nil, fmt.Errorf("解析 data URL 失败: %w", decodeErr)
 		}
-		ext := inferOpenAIImageFileExtension(decodedMimeType)
-		return fmt.Sprintf("image-%d.%s", index+1, ext), decodedMimeType, decodedData, nil
+		ext := strings.TrimPrefix(parsed.Ext, ".")
+		return fmt.Sprintf("image-%d.%s", index+1, ext), parsed.MIMEType, parsed.Data, nil
 	}
 
 	parsed, parseErr := url.Parse(ref)
@@ -274,45 +281,6 @@ func resolveOpenAIImageBytes(ctx context.Context, ref string, index int, timeout
 	}
 
 	return filename, detectedMimeType, body, nil
-}
-
-func decodeOpenAIDataURL(raw string) (string, []byte, error) {
-	trimmed := strings.TrimSpace(raw)
-	if !strings.HasPrefix(trimmed, "data:") {
-		return "", nil, fmt.Errorf("不是 data URL")
-	}
-	comma := strings.Index(trimmed, ",")
-	if comma <= 5 {
-		return "", nil, fmt.Errorf("data URL 格式无效")
-	}
-	header := trimmed[5:comma]
-	payload := trimmed[comma+1:]
-	parts := strings.Split(header, ";")
-	mimeType := strings.TrimSpace(parts[0])
-	if mimeType == "" {
-		mimeType = "image/png"
-	}
-
-	isBase64 := false
-	for _, part := range parts[1:] {
-		if strings.EqualFold(strings.TrimSpace(part), "base64") {
-			isBase64 = true
-			break
-		}
-	}
-	if !isBase64 {
-		decoded, err := url.QueryUnescape(payload)
-		if err != nil {
-			return "", nil, err
-		}
-		return mimeType, []byte(decoded), nil
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(payload)
-	if err != nil {
-		return "", nil, err
-	}
-	return mimeType, decoded, nil
 }
 
 func inferOpenAIImageFileExtension(mimeType string) string {
@@ -553,11 +521,6 @@ func normalizeOpenAIImageInputs(params map[string]interface{}) []map[string]stri
 	if params == nil {
 		return nil
 	}
-	raw, ok := params["image_urls"]
-	if !ok {
-		return nil
-	}
-
 	var refs []map[string]string
 	appendRef := func(url string) {
 		trimmed := strings.TrimSpace(url)
@@ -566,18 +529,8 @@ func normalizeOpenAIImageInputs(params map[string]interface{}) []map[string]stri
 		}
 		refs = append(refs, map[string]string{"image_url": trimmed})
 	}
-
-	switch urls := raw.(type) {
-	case []string:
-		for _, url := range urls {
-			appendRef(url)
-		}
-	case []interface{}:
-		for _, item := range urls {
-			if url, ok := item.(string); ok {
-				appendRef(url)
-			}
-		}
+	for _, url := range mediarefs.CollectStringList(params["image_urls"]) {
+		appendRef(url)
 	}
 	return refs
 }

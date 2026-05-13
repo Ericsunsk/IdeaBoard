@@ -233,6 +233,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 	if err := h.authService.SetUserRole(c.Request.Context(), authUserID, nextRole); err != nil {
+		log.Printf("[users] role drift detected: local updated but auth sync failed user_id=%d auth_user_id=%s target_role=%s", targetUser.ID, authUserID, nextRole)
 		response.InternalError(c, 502, "业务侧已取消管理员，但 Auth 角色同步失败，请重试或按运维流程补偿处理", err)
 		return
 	}

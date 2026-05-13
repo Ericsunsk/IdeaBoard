@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"api/internal/platform/outbound"
 	"bytes"
 	"context"
 	"fmt"
@@ -191,6 +192,18 @@ func (s *S3CompatibleService) validateBaseConfig(cfg *S3CompatibleConfig) error 
 	}
 	if strings.TrimSpace(cfg.Endpoint) == "" {
 		return fmt.Errorf("请先填写 Endpoint")
+	}
+
+	endpointHost, secure, err := parseS3Endpoint(cfg.Endpoint)
+	if err != nil {
+		return err
+	}
+	endpointURL := "https://" + endpointHost
+	if !secure {
+		endpointURL = "http://" + endpointHost
+	}
+	if _, err := outbound.ValidateConfiguredEndpoint(endpointURL, outbound.AllowHostsFromEnv()...); err != nil {
+		return fmt.Errorf("Endpoint 不可用，仅支持可达的公网 http(s) 地址")
 	}
 	return nil
 }
