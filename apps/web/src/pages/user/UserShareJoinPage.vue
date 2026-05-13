@@ -1,18 +1,9 @@
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-[#f7f8fb] p-6">
-    <div
-      class="w-[min(520px,100%)] rounded-2xl border border-[#e7e9ef] bg-white p-7 shadow-[0_12px_24px_rgba(18,30,54,0.08)]"
-    >
-      <h1 class="m-0 text-[22px] text-[#1f2a44]">正在加入共享画布</h1>
-      <p class="mt-3.5 mb-0 leading-[1.6] text-[#5b667f]">{{ statusText }}</p>
-      <button
-        v-if="failed"
-        type="button"
-        class="mt-5 cursor-pointer rounded-[10px] border-0 bg-[#1f2a44] px-4 py-2.5 text-sm text-white hover:bg-[#162039]"
-        @click="goBoards"
-      >
-        返回画布列表
-      </button>
+  <div class="share-page">
+    <div class="share-card">
+      <h1>正在加入共享画布</h1>
+      <p>{{ statusText }}</p>
+      <button v-if="failed" type="button" class="share-btn" @click="goBoards">返回画布列表</button>
     </div>
   </div>
 </template>
@@ -80,3 +71,50 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.share-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f7f8fb;
+}
+
+.share-card {
+  width: min(520px, 100%);
+  background: #fff;
+  border: 1px solid #e7e9ef;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 12px 24px rgba(18, 30, 54, 0.08);
+}
+
+.share-card h1 {
+  margin: 0;
+  font-size: 22px;
+  color: #1f2a44;
+}
+
+.share-card p {
+  margin: 14px 0 0;
+  color: #5b667f;
+  line-height: 1.6;
+}
+
+.share-btn {
+  margin-top: 20px;
+  border: none;
+  border-radius: 10px;
+  background: #1f2a44;
+  color: #fff;
+  font-size: 14px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.share-btn:hover {
+  background: #162039;
+}
+</style>

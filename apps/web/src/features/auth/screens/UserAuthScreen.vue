@@ -1,13 +1,5 @@
 <template>
-  <div class="relative min-h-screen w-full overflow-hidden bg-[#f8f9fd]">
-    <div class="auth-bg"></div>
-    <div
-      class="pointer-events-none absolute top-[42px] left-1/2 z-[1] -translate-x-1/2 text-center"
-    >
-      <h1 class="text-[30px] leading-[1.1] font-bold text-[#222a3c]">IdeaBoard</h1>
-      <p class="mt-1.5 text-[13px] text-[#6f768a]">登录 IdeaBoard，继续你的创作流程。</p>
-    </div>
-
+  <div aria-live="polite">
     <LoginModal
       :show="showLogin"
       @update:show="onLoginVisibleChange"
@@ -78,17 +70,3 @@ function onRegisterVisibleChange(visible: boolean) {
   void router.replace('/user/home')
 }
 </script>
-
-<style scoped>
-.auth-bg {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(40% 30% at 50% 20%, rgba(146, 120, 230, 0.14) 0%, rgba(146, 120, 230, 0) 100%),
-    radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size:
-    100% 100%,
-    24px 24px;
-  opacity: 1;
-}
-</style>

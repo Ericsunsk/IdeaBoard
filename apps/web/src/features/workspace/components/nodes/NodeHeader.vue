@@ -1,21 +1,16 @@
 <template>
   <div
     class="workflow-node-header"
-    :class="rounded ? 'rounded-t-[12px]' : ''"
+    :class="{ 'workflow-node-header--rounded': rounded }"
     @mousedown="emit('node-mousedown', $event)"
   >
-    <div class="flex items-center">
-      <span v-if="$slots.icon" class="mr-1.5 inline-flex opacity-80 [&_svg]:block">
+    <div class="node-header-title">
+      <span v-if="$slots.icon" class="node-header-icon">
         <slot name="icon" />
       </span>
       {{ title }}
     </div>
-    <button
-      class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-[#94a3b8] transition-all hover:bg-[rgba(239,68,68,0.08)] hover:text-[#ef4444]"
-      title="删除"
-      @mousedown.stop
-      @click.stop="emit('delete')"
-    >
+    <button class="node-delete-btn" title="删除" @mousedown.stop @click.stop="emit('delete')">
       <svg
         width="14"
         height="14"
@@ -44,3 +39,19 @@ const emit = defineEmits<{
 </script>
 
 <style scoped src="./node-shared.css"></style>
+<style scoped>
+.node-header-icon {
+  display: inline-flex;
+  margin-right: 6px;
+  opacity: 0.8;
+}
+
+.node-header-icon :deep(svg) {
+  display: block;
+}
+
+.workflow-node-header--rounded {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+</style>

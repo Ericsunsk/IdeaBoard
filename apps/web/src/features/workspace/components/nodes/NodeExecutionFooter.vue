@@ -1,6 +1,6 @@
 <template>
   <NodeConnectionChips :items="items" />
-  <div class="pt-0.5">
+  <div class="node-primary-action-slot">
     <NodeActionButton variant="primary" :disabled="disabled" full @click="emit('generate')">
       {{ label }}
     </NodeActionButton>
@@ -29,3 +29,9 @@ const emit = defineEmits<{
   (e: 'generate'): void
 }>()
 </script>
+
+<style scoped>
+.node-primary-action-slot {
+  padding-top: 2px;
+}
+</style>

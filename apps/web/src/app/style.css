@@ -1,5 +1,3 @@
-@import 'tailwindcss/utilities.css';
-
 /* 全局样式重置 */
 * {
   margin: 0;
@@ -10,8 +8,8 @@
 html,
 body {
   height: 100%;
-  background: #0a0a0f;
-  color: #fff;
+  background: #f8f9fd;
+  color: #202436;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -36,27 +34,22 @@ a {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0a0f;
+  background: #f8f9fd;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: #c8d0e4;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3a3a;
+  background: #aeb8cf;
 }
 
 /* 选中文字颜色 */
 ::selection {
   background: rgba(102, 126, 234, 0.3);
-  color: #fff;
-}
-
-/* Naive UI 暗色主题覆盖 */
-.n-config-provider {
-  background: #0a0a0f;
+  color: #202436;
 }
 
 /* Admin-only Naive UI teleported overlays (modal/dialog/mask). */

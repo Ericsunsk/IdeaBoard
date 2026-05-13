@@ -1,8 +1,8 @@
 <template>
-  <div class="relative flex items-center gap-2">
+  <div class="node-color-field">
     <button
       type="button"
-      class="inline-flex h-[30px] w-[30px] shrink-0 cursor-pointer appearance-none items-center justify-center overflow-hidden rounded-full border border-[#d6dcec] bg-white p-0 transition-colors hover:border-[#b6a6f0]"
+      class="node-color-field-swatch-btn"
       :style="{ background: value }"
       :aria-label="swatchAriaLabel"
       @click.stop="emit('swatch-click')"
@@ -11,7 +11,7 @@
     </button>
     <input
       :value="value"
-      class="h-[30px] min-w-0 flex-1 rounded-[8px] border border-[#d6dcec] bg-white px-2 font-mono text-xs text-[#425067] uppercase outline-none focus:border-[#9278e6]"
+      class="node-color-field-input"
       type="text"
       maxlength="7"
       :placeholder="placeholder"
@@ -40,3 +40,54 @@ const emit = defineEmits<{
   (e: 'change:value', value: string): void
 }>()
 </script>
+
+<style scoped>
+.node-color-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-color-field-swatch-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d6dcec;
+  border-radius: 999px;
+  background: #fff;
+  appearance: none;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.node-color-field-swatch-btn:hover {
+  border-color: #b6a6f0;
+}
+
+.node-color-field-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #d6dcec;
+  background: #fff;
+  color: #425067;
+  font-size: 12px;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  padding: 0 8px;
+  outline: none;
+  text-transform: uppercase;
+}
+
+.node-color-field-input:focus {
+  border-color: #9278e6;
+}
+</style>

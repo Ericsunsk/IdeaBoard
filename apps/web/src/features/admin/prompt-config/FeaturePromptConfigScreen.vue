@@ -1,39 +1,37 @@
 <template>
-  <div class="admin-page">
-    <div class="node-grid">
-      <section v-for="group in groupedFeatureGroups" :key="group.key" class="node-card">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <h2 class="m-0 text-base font-[650] text-[var(--admin-text-1)]">
-                {{ group.title }}
-              </h2>
-              <span
-                class="rounded-md border border-[var(--admin-border)] bg-[#17181a] px-2 py-[3px] text-[11px] text-[var(--admin-text-3)]"
-              >
-                {{ group.items.length }} 项功能
-              </span>
+  <div class="admin-page prompt-config-page">
+    <div v-if="featureGroups.length > 0" class="node-grid">
+      <section v-for="group in featureGroups" :key="group.key" class="node-card">
+        <div class="node-card-header">
+          <div class="node-card-copy">
+            <div class="node-title-row">
+              <h2 class="node-card-title">{{ group.title }}</h2>
+              <span class="node-card-count">{{ group.items.length }} 项功能</span>
             </div>
           </div>
         </div>
 
-        <div class="flex flex-wrap gap-2">
+        <div class="node-card-meta">
           <span class="meta-chip">{{ getGroupVariableCount(group) }} 个变量</span>
           <span class="meta-chip"
             >{{ getGroupFilledCount(group) }}/{{ group.items.length }} 已配置</span
           >
         </div>
 
-        <div class="flex flex-wrap content-start gap-2">
+        <div class="node-feature-preview">
           <span v-for="item in group.items" :key="item.slug" class="feature-pill">{{
             item.title
           }}</span>
         </div>
 
-        <div class="mt-auto flex justify-start">
+        <div class="node-card-actions">
           <n-button size="small" type="primary" @click="openEditor(group.key)">编辑</n-button>
         </div>
       </section>
+    </div>
+    <div v-else class="node-empty-state">
+      <div class="node-empty-title">未加载到节点配置</div>
+      <div class="node-empty-desc">请检查功能分组定义或刷新页面重试。</div>
     </div>
   </div>
 
@@ -45,22 +43,18 @@
     @close="closeEditor"
   >
     <template #header-aside>
-      <div v-if="activeGroup" class="flex flex-wrap gap-2">
+      <div v-if="activeGroup" class="editor-meta">
         <span class="meta-chip">{{ activeGroup.items.length }} 项功能</span>
         <span class="meta-chip">{{ getGroupVariableCount(activeGroup) }} 个变量</span>
       </div>
     </template>
 
-    <div v-if="activeGroup" class="flex flex-col">
+    <div v-if="activeGroup" class="editor-feature-stack">
       <article v-for="item in activeGroup.items" :key="item.slug" class="feature-block">
-        <div class="flex flex-wrap items-center gap-2.5">
-          <div class="flex flex-wrap items-center gap-2.5">
-            <span class="text-sm font-semibold text-[var(--admin-text-1)]">{{ item.title }}</span>
-            <span
-              class="rounded-md border border-[var(--admin-border)] bg-[#17181a] px-2 py-0.5 font-mono text-[11px] text-[var(--admin-text-3)]"
-            >
-              {{ item.slug }}
-            </span>
+        <div class="feature-header">
+          <div class="feature-title-row">
+            <span class="feature-title">{{ item.title }}</span>
+            <span class="feature-slug">{{ item.slug }}</span>
           </div>
         </div>
 
@@ -76,7 +70,7 @@
           </button>
         </div>
 
-        <div v-if="getFeatureNote(item.slug)" class="text-[11px] text-[var(--admin-text-3)]">
+        <div v-if="getFeatureNote(item.slug)" class="var-note">
           {{ getFeatureNote(item.slug) }}
         </div>
 
@@ -89,10 +83,8 @@
           :loading="saving[item.slug]"
         />
 
-        <div class="flex items-center justify-between max-[720px]:gap-2.5">
-          <span class="text-[11px] text-[var(--admin-text-3)] max-[720px]:shrink-0"
-            >{{ (promptMap[item.slug] || '').length }} 字</span
-          >
+        <div class="feature-actions">
+          <span class="feature-count">{{ (promptMap[item.slug] || '').length }} 字</span>
           <n-button
             size="small"
             type="primary"
@@ -108,7 +100,10 @@
 </template>
 
 <script setup lang="ts">
+import { computed, reactive, ref, watch } from 'vue'
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { NButton, NInput, useMessage } from 'naive-ui'
+import AdminEditorModal from '../shared/components/AdminEditorModal.vue'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import { saveFeaturePrompt } from '../../../shared/query/adminQueries'
 import {
@@ -134,12 +129,15 @@ const queryClient = useQueryClient()
 type TextareaRefLike = { textareaElRef?: HTMLTextAreaElement; $el?: Element }
 const textareaRefs = reactive<Record<string, TextareaRefLike>>({})
 const activeGroupKey = ref<string | null>(null)
+const featureGroups = computed<FeatureGroup[]>(() =>
+  groupedFeatureGroups.filter((group) => group.items.length > 0),
+)
 const activeGroup = computed<FeatureGroup | null>(() => {
-  return groupedFeatureGroups.find((group) => group.key === activeGroupKey.value) || null
+  return featureGroups.value.find((group) => group.key === activeGroupKey.value) || null
 })
 
 function openEditor(groupKey: string) {
-  const group = groupedFeatureGroups.find((item) => item.key === groupKey)
+  const group = featureGroups.value.find((item) => item.key === groupKey)
   if (group) {
     resetGroupDraftFromSaved(group)
   }
@@ -163,9 +161,9 @@ function getGroupFilledCount(group: FeatureGroup) {
 
 function insertVar(slug: FeatureSlug, varKey: string) {
   const current = promptMap[slug] || ''
-  const textareaRef = textareaRefs[slug]
+  const ref = textareaRefs[slug]
   let pos = current.length
-  const textareaEl = textareaRef?.textareaElRef ?? textareaRef?.$el?.querySelector?.('textarea')
+  const textareaEl = ref?.textareaElRef ?? ref?.$el?.querySelector?.('textarea')
   if (textareaEl instanceof HTMLTextAreaElement) {
     pos = textareaEl.selectionStart ?? current.length
   }
@@ -236,10 +234,38 @@ async function savePrompt(slug: FeatureSlug) {
 <style scoped>
 @import '../shared/adminCommon.css';
 
+.prompt-config-page {
+  min-width: 0;
+}
+
 .node-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.node-empty-state {
+  display: flex;
+  min-height: 260px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--admin-border-soft);
+  border-radius: 16px;
+  background: var(--admin-card);
+  color: var(--admin-text-2);
+}
+
+.node-empty-title {
+  color: var(--admin-text-1);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.node-empty-desc {
+  margin-top: 8px;
+  color: var(--admin-text-3);
+  font-size: 12px;
 }
 
 .node-card {
@@ -261,11 +287,51 @@ async function savePrompt(slug: FeatureSlug) {
   background: #141416;
 }
 
+.node-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.node-card-copy {
+  min-width: 0;
+}
+
+.node-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.node-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--admin-text-1);
+}
+
+.node-card-count {
+  font-size: 11px;
+  color: var(--admin-text-3);
+  background: #17181a;
+  border: 1px solid var(--admin-border);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
 .node-card-desc {
   margin: 6px 0 0;
   color: var(--admin-text-2);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.node-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .meta-chip {
@@ -278,6 +344,13 @@ async function savePrompt(slug: FeatureSlug) {
   background: #17181a;
   color: var(--admin-text-2);
   font-size: 11px;
+}
+
+.node-feature-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
 }
 
 .feature-pill {
@@ -293,6 +366,23 @@ async function savePrompt(slug: FeatureSlug) {
   line-height: 1.4;
 }
 
+.node-card-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.editor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editor-feature-stack {
+  display: flex;
+  flex-direction: column;
+}
+
 .feature-block {
   display: flex;
   flex-direction: column;
@@ -306,6 +396,41 @@ async function savePrompt(slug: FeatureSlug) {
   border-top: 0;
 }
 
+.feature-header,
+.feature-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.feature-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--admin-text-1);
+}
+
+.feature-slug {
+  font-size: 11px;
+  color: var(--admin-text-3);
+  background: #17181a;
+  border: 1px solid var(--admin-border);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: monospace;
+}
+
+.feature-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feature-count {
+  font-size: 11px;
+  color: var(--admin-text-3);
+}
+
 .var-buttons {
   display: flex;
   align-items: center;
@@ -317,6 +442,11 @@ async function savePrompt(slug: FeatureSlug) {
   font-size: 11px;
   color: var(--admin-text-2);
   flex-shrink: 0;
+}
+
+.var-note {
+  font-size: 11px;
+  color: var(--admin-text-3);
 }
 
 .var-btn {
@@ -379,6 +509,14 @@ async function savePrompt(slug: FeatureSlug) {
   .node-card {
     padding: 14px;
     min-height: unset;
+  }
+
+  .feature-actions {
+    gap: 10px;
+  }
+
+  .feature-count {
+    flex-shrink: 0;
   }
 }
 

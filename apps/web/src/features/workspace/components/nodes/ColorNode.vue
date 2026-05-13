@@ -29,12 +29,12 @@
       </template>
     </NodeHeader>
 
-    <div class="node-execution-body" @mousedown.stop @contextmenu.stop>
+    <div class="color-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
       <div class="color-mode-card node-mode-card">
-        <div class="flex items-center">
+        <div class="color-strength-row">
           <input
             :value="node.strength"
-            class="node-inline-range w-full"
+            class="color-strength-range node-inline-range"
             :style="{ '--slider-pct': `${node.strength}%` }"
             type="range"
             min="0"
@@ -48,12 +48,12 @@
           />
         </div>
 
-        <div class="grid grid-cols-2 gap-1.5">
+        <div class="color-preset-grid">
           <button
             v-for="(preset, index) in colorPresets"
             :key="`color-preset-${index}`"
             type="button"
-            class="flex cursor-pointer items-center gap-[5px] rounded-xl border border-slate-200 bg-white px-2 py-1.5"
+            class="color-preset-card"
             @click="applyPreset(preset)"
           >
             <NodeColorSwatch
@@ -66,10 +66,10 @@
           </button>
         </div>
 
-        <div class="flex w-full items-center gap-1.5">
-          <div ref="colorFieldRef" class="relative min-w-0 flex-1">
+        <div class="color-custom-row">
+          <div ref="colorFieldRef" class="color-field-wrap">
             <NodeColorField
-              class="w-full"
+              class="color-field"
               :value="customColor"
               swatch-aria-label="选择颜色"
               @swatch-click="togglePopover"
@@ -95,7 +95,7 @@
               @set-spectrum-ref="picker.setSpectrumRef"
             />
           </div>
-          <div class="flex shrink-0 items-center gap-1.5">
+          <div class="color-action-buttons">
             <NodeIconButton
               tone="accent"
               :size="28"
@@ -124,7 +124,7 @@
               @click="onEyedropperClick"
             >
               <svg
-                class="block h-3.5 w-3.5 object-contain"
+                class="color-eyedropper-icon"
                 viewBox="0 0 242.63 240.1"
                 fill="none"
                 aria-hidden="true"
@@ -163,12 +163,12 @@
           </div>
         </div>
 
-        <div v-if="hasSelectedColors" class="flex min-h-7 flex-wrap items-center gap-1.5">
+        <div v-if="hasSelectedColors" class="color-selected-row">
           <button
             v-for="(color, index) in node.colors"
             :key="`${color}-${index}`"
             type="button"
-            class="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--color-chip)_22%,#d7deea)] bg-white p-0"
+            class="color-selected-chip"
             :style="{ '--color-chip': color }"
             @mousedown.prevent
             @click.stop="emit('remove-color', index)"
@@ -363,3 +363,86 @@ onUnmounted(() => {
 </script>
 
 <style scoped src="./node-shared.css"></style>
+<style scoped>
+.color-node-body {
+  gap: 8px;
+}
+
+.color-strength-row {
+  display: flex;
+  align-items: center;
+}
+
+.color-strength-range {
+  width: 100%;
+}
+
+.color-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.color-preset-card {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 12px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.color-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.color-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.color-field-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.color-field {
+  width: 100%;
+}
+
+.color-eyedropper-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  object-fit: contain;
+}
+
+.color-selected-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.color-selected-chip {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--color-chip) 22%, #d7deea);
+  cursor: pointer;
+}
+</style>

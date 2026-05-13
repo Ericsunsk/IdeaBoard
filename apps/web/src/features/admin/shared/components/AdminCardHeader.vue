@@ -1,27 +1,17 @@
 <template>
-  <div class="flex items-center justify-between gap-3">
-    <div class="flex min-w-0 flex-1 items-center gap-3">
+  <div class="admin-card-header" :class="{ 'is-small': size === 'small' }">
+    <div class="admin-card-header-main">
       <slot name="prefix" />
-      <div class="min-w-0 flex-1">
-        <div v-if="status || provider" class="mb-1 flex flex-wrap items-center gap-2">
+      <div class="admin-card-copy">
+        <div v-if="status || provider" class="admin-card-title-row">
           <AdminChip v-if="provider" :label="provider" tone="strong" />
           <AdminChip v-if="status" :label="status" :variant="statusVariant" />
         </div>
-        <h3
-          class="m-0 leading-[1.2] font-bold text-[var(--admin-text-1)]"
-          :class="size === 'small' ? 'mt-0.5 text-[15px]' : 'text-[18px]'"
-        >
-          {{ title }}
-        </h3>
-        <p
-          class="mt-1 mr-0 mb-0 ml-0 overflow-hidden text-xs text-ellipsis whitespace-nowrap text-[var(--admin-text-2)] opacity-80"
-          :title="subtitle"
-        >
-          {{ subtitle }}
-        </p>
+        <h3 class="admin-card-title">{{ title }}</h3>
+        <p class="admin-card-subtitle" :title="subtitle">{{ subtitle }}</p>
       </div>
     </div>
-    <div v-if="$slots.extra">
+    <div v-if="$slots.extra" class="admin-card-header-side">
       <slot name="extra" />
     </div>
   </div>
@@ -45,3 +35,56 @@ withDefaults(
   },
 )
 </script>
+
+<style scoped>
+.admin-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-card-header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-card-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.admin-card-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--admin-text-1);
+  line-height: 1.2;
+}
+
+.admin-card-header.is-small .admin-card-title {
+  font-size: 15px;
+  margin-top: 2px;
+}
+
+.admin-card-subtitle {
+  margin: 4px 0 0;
+  color: var(--admin-text-2);
+  font-size: 12px;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>

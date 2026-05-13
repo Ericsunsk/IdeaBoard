@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme-overrides="adminThemeOverrides">
+  <n-config-provider :theme="darkTheme" :theme-overrides="adminThemeOverrides">
     <router-view v-if="isLoginRoute" />
     <template v-else>
       <div class="admin-layout-shell">
@@ -83,6 +83,7 @@ import {
   NIcon,
   NDrawer,
   NDrawerContent,
+  darkTheme,
   type GlobalThemeOverrides,
 } from 'naive-ui'
 import {

@@ -26,7 +26,7 @@
       </template>
     </NodeHeader>
 
-    <div class="node-execution-body" @contextmenu.stop>
+    <div class="edit-node-body node-execution-body" @contextmenu.stop>
       <div class="edit-mode-card node-mode-card">
         <div class="edit-mode-row node-option-row">
           <NodeActionButton
@@ -108,3 +108,8 @@ const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
 <style scoped src="./node-shared.css"></style>
+<style scoped>
+.edit-node-body {
+  gap: 8px;
+}
+</style>

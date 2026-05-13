@@ -1,17 +1,10 @@
 <template>
-  <div
-    class="absolute top-[calc(100%+8px)] left-0 z-24 flex w-[210px] flex-col gap-2 rounded-xl border border-[#dce2f1] bg-white p-2.5"
-    @mousedown.stop
-    @click.stop
-  >
-    <div class="flex min-w-0 items-center gap-2">
-      <div
-        class="h-7 w-7 shrink-0 rounded-full border border-[rgba(0,0,0,0.08)]"
-        :style="{ background: hex }"
-      ></div>
+  <div class="node-color-popover" @mousedown.stop @click.stop>
+    <div class="node-color-popover-top">
+      <div class="node-color-popover-preview" :style="{ background: hex }"></div>
       <input
         :value="hex"
-        class="box-border h-7 min-w-0 flex-1 rounded-lg border border-[#d6dcec] bg-[#f9fbff] px-2 font-mono text-xs text-[#425067] uppercase outline-none focus:border-[#9278e6] focus:bg-white"
+        class="node-color-popover-hex"
         type="text"
         maxlength="7"
         @input="emit('hex-input', $event)"
@@ -19,22 +12,22 @@
         @keydown.enter.prevent="emit('hex-commit')"
       />
     </div>
-    <label class="grid grid-cols-[72px_1fr] items-center gap-2">
-      <span class="text-[11px] font-semibold text-[#6b7688]">Hue</span>
+    <label class="node-color-popover-control">
+      <span>Hue</span>
       <input
         :value="hue"
-        class="node-color-popover-range hue h-3.5 w-full cursor-pointer appearance-none bg-transparent"
+        class="node-color-popover-range hue"
         type="range"
         min="0"
         max="360"
         @input="emit('hue-input', toNumber(($event.target as HTMLInputElement).value, hue))"
       />
     </label>
-    <label class="grid grid-cols-[72px_1fr] items-center gap-2">
-      <span class="text-[11px] font-semibold text-[#6b7688]">Saturation</span>
+    <label class="node-color-popover-control">
+      <span>Saturation</span>
       <input
         :value="saturation"
-        class="node-color-popover-range h-3.5 w-full cursor-pointer appearance-none bg-transparent"
+        class="node-color-popover-range"
         type="range"
         min="0"
         max="100"
@@ -43,11 +36,11 @@
         "
       />
     </label>
-    <label class="grid grid-cols-[72px_1fr] items-center gap-2">
-      <span class="text-[11px] font-semibold text-[#6b7688]">Brightness</span>
+    <label class="node-color-popover-control">
+      <span>Brightness</span>
       <input
         :value="brightness"
-        class="node-color-popover-range h-3.5 w-full cursor-pointer appearance-none bg-transparent"
+        class="node-color-popover-range"
         type="range"
         min="0"
         max="100"
@@ -58,21 +51,18 @@
     </label>
     <div
       ref="spectrumRefEl"
-      class="relative h-[94px] w-full cursor-crosshair overflow-hidden rounded-[10px] border border-[#d6dcec]"
+      class="node-color-popover-spectrum"
       :style="spectrumStyle"
       @pointerdown.stop.prevent="emit('spectrum-pointerdown', $event)"
     >
-      <span
-        class="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(25,31,45,0.48)]"
-        :style="cursorStyle"
-      ></span>
+      <span class="node-color-popover-spectrum-cursor" :style="cursorStyle"></span>
     </div>
-    <div class="grid grid-cols-8 gap-1.5 pt-0.5">
+    <div class="node-color-popover-swatches">
       <button
         v-for="swatch in quickSwatches"
         :key="swatch"
         type="button"
-        class="h-4 w-4 rounded-full border border-[rgba(0,0,0,0.08)]"
+        class="node-color-popover-swatch"
         :style="{ background: swatch }"
         @click="emit('select-swatch', swatch)"
       ></button>
@@ -116,6 +106,81 @@ watch(
 </script>
 
 <style scoped>
+.node-color-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 210px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #dce2f1;
+  background: #ffffff;
+  z-index: 24;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.node-color-popover-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.node-color-popover-preview {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.node-color-popover-hex {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #d6dcec;
+  background: #f9fbff;
+  color: #425067;
+  font-size: 12px;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  padding: 0 8px;
+  outline: none;
+  text-transform: uppercase;
+}
+
+.node-color-popover-hex:focus {
+  border-color: #9278e6;
+  background: #fff;
+}
+
+.node-color-popover-control {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.node-color-popover-control > span {
+  font-size: 11px;
+  color: #6b7688;
+  font-weight: 600;
+}
+
+.node-color-popover-range {
+  width: 100%;
+  height: 14px;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
 .node-color-popover-range.hue {
   --range-accent: #a855f7;
 }
@@ -173,5 +238,40 @@ watch(
 .node-color-popover-range::-moz-range-thumb:active {
   opacity: 1;
   filter: none;
+}
+
+.node-color-popover-spectrum {
+  position: relative;
+  width: 100%;
+  height: 94px;
+  border: 1px solid #d6dcec;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+.node-color-popover-spectrum-cursor {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(25, 31, 45, 0.48);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.node-color-popover-swatches {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.node-color-popover-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 </style>

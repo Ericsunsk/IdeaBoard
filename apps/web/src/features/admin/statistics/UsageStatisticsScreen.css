@@ -5,6 +5,35 @@
   padding-bottom: 24px;
 }
 
+.backfill-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 10px;
+  gap: 12px;
+}
+
+.backfill-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--admin-text-2);
+}
+
+.backfill-banner-content strong {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.backfill-banner-icon {
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
 .charts-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -178,6 +207,106 @@
   flex-shrink: 0;
 }
 
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--admin-text-2);
+}
+
+.section-title .n-icon {
+  color: var(--admin-text-3);
+}
+
+.title-action {
+  margin-left: auto;
+  font-size: 11px !important;
+  color: var(--admin-text-3) !important;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.meta-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-item .label {
+  font-size: 11px;
+  color: var(--admin-text-3);
+}
+
+.meta-item .value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--admin-text-1);
+}
+
+.val-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.prompt-card {
+  background: var(--admin-card-strong);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.prompt-content {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--admin-text-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.result-image-box {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  background: #000;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.result-image-box:hover {
+  border-color: var(--admin-text-3);
+}
+
+.image-overlay {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.result-image-box:hover .image-overlay {
+  opacity: 1;
+}
+
 .json-card {
   background: #0f1012;
   border: 1px solid var(--admin-border);
@@ -226,6 +355,17 @@
 
 .debug-mode pre {
   color: #71717a;
+}
+
+.premium-drawer-footer {
+  margin-top: 12px;
+  padding: 20px 0;
+  border-top: 1px solid var(--admin-divider);
+  font-size: 10px;
+  color: var(--admin-text-3);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .metric-mini-card {

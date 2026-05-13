@@ -26,7 +26,7 @@
     </NodeHeader>
     <textarea
       :value="node.text"
-      class="min-h-[100px] w-full resize-none border-none bg-transparent p-3 font-[inherit] text-sm leading-[1.6] text-[#334155] outline-none placeholder:text-[#94a3b8]"
+      class="workflow-node-input"
       placeholder="type your idea..."
       @input="onInput"
       @focus="emit('focus')"
@@ -64,3 +64,22 @@ function onInput(event: Event) {
 </script>
 
 <style scoped src="./node-shared.css"></style>
+<style scoped>
+.workflow-node-input {
+  width: 100%;
+  min-height: 100px;
+  border: none;
+  resize: none;
+  outline: none;
+  padding: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+  background: transparent;
+  font-family: inherit;
+}
+
+.workflow-node-input::placeholder {
+  color: #94a3b8;
+}
+</style>

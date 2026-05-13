@@ -13,10 +13,7 @@ app.use(pinia)
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
 
-async function bootstrap() {
-  const userStore = useUserStore(pinia)
-  await userStore.fetchUserInfo(true)
-  app.mount('#app')
-}
+const userStore = useUserStore(pinia)
+void userStore.fetchUserInfo()
 
-void bootstrap()
+app.mount('#app')

@@ -1,12 +1,10 @@
 <template>
-  <div
-    class="flex min-h-24 flex-col justify-between rounded-[14px] border border-[var(--admin-border-soft,var(--admin-border))] bg-[var(--admin-card-strong,var(--admin-card))] px-[18px] py-4"
-  >
-    <span class="text-xs tracking-[0.02em] text-[var(--admin-text-3)]">{{ label }}</span>
-    <span class="text-[28px] font-bold tracking-[0.01em] text-[var(--admin-text-1)]">
+  <div class="summary-card">
+    <span class="summary-label">{{ label }}</span>
+    <span class="summary-value">
       <slot>{{ value }}</slot>
     </span>
-    <span v-if="foot || $slots.foot" class="text-xs text-[var(--admin-text-2)]">
+    <span v-if="foot || $slots.foot" class="summary-foot">
       <slot name="foot">{{ foot }}</slot>
     </span>
   </div>
@@ -25,3 +23,34 @@ withDefaults(
   },
 )
 </script>
+
+<style scoped>
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 96px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--admin-card-strong, var(--admin-card));
+  border: 1px solid var(--admin-border-soft, var(--admin-border));
+}
+
+.summary-label {
+  font-size: 12px;
+  color: var(--admin-text-3);
+  letter-spacing: 0.02em;
+}
+
+.summary-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--admin-text-1);
+}
+
+.summary-foot {
+  font-size: 12px;
+  color: var(--admin-text-2);
+}
+</style>

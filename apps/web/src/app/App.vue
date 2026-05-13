@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides" :locale="naiveLocale">
+  <n-config-provider :theme-overrides="themeOverrides" :locale="naiveLocale">
     <n-message-provider
       :container-class="messageContainerClass"
       :theme-overrides="messageThemeOverrides"
@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { darkTheme, zhCN } from 'naive-ui'
+import { zhCN } from 'naive-ui'
 
 const naiveLocale = zhCN
 const route = useRoute()
@@ -61,8 +61,8 @@ const themeOverrides = {
 html,
 body {
   height: 100%;
-  background: #18181b;
-  color: #e4e4e7;
+  background: #f8f9fd;
+  color: #202436;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -83,11 +83,11 @@ a {
 }
 
 ::-webkit-scrollbar-track {
-  background: #18181b;
+  background: #f8f9fd;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: #c8d0e4;
   border-radius: 3px;
 }
 </style>

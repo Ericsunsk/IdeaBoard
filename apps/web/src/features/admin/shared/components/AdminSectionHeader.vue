@@ -1,11 +1,8 @@
 <template>
-  <div class="flex flex-wrap items-center justify-between gap-4">
+  <div :class="headerClass">
     <div>
-      <h3 class="m-0 text-base font-semibold text-[var(--admin-text-1)]">{{ title }}</h3>
-      <p
-        v-if="description || $slots.description"
-        class="mt-1.5 mb-0 text-[13px] text-[var(--admin-text-2)]"
-      >
+      <h3 class="panel-title">{{ title }}</h3>
+      <p v-if="description || $slots.description" class="panel-desc">
         <slot name="description">{{ description }}</slot>
       </p>
     </div>
@@ -14,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title: string
     description?: string
@@ -25,4 +22,31 @@ withDefaults(
     variant: 'panel',
   },
 )
+
+const headerClass = computed(() =>
+  props.variant === 'section' ? 'section-header' : 'panel-header',
+)
 </script>
+
+<style scoped>
+.panel-header,
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--admin-text-1);
+}
+
+.panel-desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--admin-text-2);
+}
+</style>

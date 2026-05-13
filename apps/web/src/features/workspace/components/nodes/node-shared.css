@@ -62,11 +62,39 @@
   }
 }
 
+.node-header-title {
+  display: flex;
+  align-items: center;
+}
+
+.node-delete-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.node-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+
 .node-execution-body {
   padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.node-primary-action-slot {
+  padding-top: 2px;
 }
 
 .node-mode-card {

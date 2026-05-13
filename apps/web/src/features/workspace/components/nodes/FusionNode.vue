@@ -30,12 +30,12 @@
       </template>
     </NodeHeader>
 
-    <div class="node-execution-body" @mousedown.stop @contextmenu.stop>
-      <div class="node-control-group">
-        <div class="flex items-center gap-1.5">
-          <span class="node-control-label min-w-[46px]">Image A</span>
+    <div class="fusion-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
+      <div class="fusion-control-group node-control-group">
+        <div class="fusion-control-row">
+          <span class="node-control-label">Image A</span>
           <input
-            class="node-inline-range min-w-0 flex-1"
+            class="fusion-slider node-inline-range"
             :style="{ '--slider-pct': `${imageAWeight}%` }"
             type="range"
             min="0"
@@ -49,14 +49,12 @@
               )
             "
           />
-          <span class="min-w-[42px] text-right text-[10px] font-bold text-[#7b8798]"
-            >{{ imageAWeight }}%</span
-          >
+          <span class="fusion-slider-value">{{ imageAWeight }}%</span>
         </div>
-        <div class="flex items-center gap-1.5">
-          <span class="node-control-label min-w-[46px]">Image B</span>
+        <div class="fusion-control-row">
+          <span class="node-control-label">Image B</span>
           <input
-            class="node-inline-range min-w-0 flex-1"
+            class="fusion-slider node-inline-range"
             :style="{ '--slider-pct': `${imageBWeight}%` }"
             type="range"
             min="0"
@@ -70,9 +68,7 @@
               )
             "
           />
-          <span class="min-w-[42px] text-right text-[10px] font-bold text-[#7b8798]"
-            >{{ imageBWeight }}%</span
-          >
+          <span class="fusion-slider-value">{{ imageBWeight }}%</span>
         </div>
       </div>
 
@@ -132,3 +128,35 @@ const imageBWeight = computed(() => 100 - props.node.blendRatio)
 </script>
 
 <style scoped src="./node-shared.css"></style>
+<style scoped>
+.fusion-node-body {
+  gap: 8px;
+}
+
+.fusion-control-group {
+  gap: 6px;
+}
+
+.fusion-control-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fusion-control-row .node-control-label {
+  min-width: 46px;
+}
+
+.fusion-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.fusion-slider-value {
+  min-width: 42px;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 700;
+  color: #7b8798;
+}
+</style>

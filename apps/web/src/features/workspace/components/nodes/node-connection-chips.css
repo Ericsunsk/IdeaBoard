@@ -1,8 +1,38 @@
+.node-connection-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.node-connection-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .node-connection-chip {
   --chip-color: #9278e6;
   --chip-dot: rgba(146, 120, 230, 0.36);
   --chip-border: rgba(146, 120, 230, 0.2);
   --chip-bg: rgba(247, 243, 255, 0.9);
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #7b8798;
+  letter-spacing: 0.02em;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .node-connection-chip.is-image {

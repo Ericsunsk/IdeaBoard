@@ -1,6 +1,6 @@
 <template>
   <span
-    class="inline-flex [flex:0_0_auto] rounded-full border border-[rgba(15,23,42,0.08)]"
+    class="node-color-swatch"
     :style="{
       width: `${size}px`,
       height: `${size}px`,
@@ -17,3 +17,12 @@ defineProps<{
   borderless?: boolean
 }>()
 </script>
+
+<style scoped>
+.node-color-swatch {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  flex: 0 0 auto;
+}
+</style>

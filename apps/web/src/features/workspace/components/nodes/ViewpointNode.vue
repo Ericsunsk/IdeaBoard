@@ -28,7 +28,7 @@
       </template>
     </NodeHeader>
 
-    <div class="node-execution-body" @mousedown.stop @contextmenu.stop>
+    <div class="viewpoint-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
       <div class="viewpoint-mode-card node-mode-card">
         <div class="viewpoint-control-row node-control-head">
           <span class="node-control-label">Garment</span>
@@ -58,7 +58,7 @@
             {{ option.label }}
           </NodeActionButton>
         </div>
-        <div class="viewpoint-control-row node-control-head mt-0.5">
+        <div class="viewpoint-control-row node-control-head viewpoint-lighting-head">
           <span class="node-control-label">Light</span>
         </div>
         <div class="viewpoint-lighting-row node-option-row">
@@ -137,3 +137,12 @@ const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
 <style scoped src="./node-shared.css"></style>
+<style scoped>
+.viewpoint-node-body {
+  gap: 8px;
+}
+
+.viewpoint-lighting-head {
+  margin-top: 2px;
+}
+</style>

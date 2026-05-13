@@ -9,20 +9,6 @@ const routes: RouteRecordRaw[] = [
     redirect: '/user/home',
   },
   {
-    path: '/user/login',
-    name: 'UserLogin',
-    component: () => import('../../pages/user/UserAuthPage.vue'),
-    props: { mode: 'login' },
-    meta: { guest: true },
-  },
-  {
-    path: '/user/register',
-    name: 'UserRegister',
-    component: () => import('../../pages/user/UserAuthPage.vue'),
-    props: { mode: 'register' },
-    meta: { guest: true },
-  },
-  {
     path: '/share',
     name: 'ShareJoin',
     component: () => import('../../pages/user/UserShareJoinPage.vue'),
@@ -36,6 +22,18 @@ const routes: RouteRecordRaw[] = [
         path: 'home',
         name: 'UserHome',
         component: () => import('../../pages/user/UserHomePage.vue'),
+      },
+      {
+        path: 'login',
+        name: 'UserLogin',
+        component: () => import('../../pages/user/UserHomePage.vue'),
+        meta: { guest: true },
+      },
+      {
+        path: 'register',
+        name: 'UserRegister',
+        component: () => import('../../pages/user/UserHomePage.vue'),
+        meta: { guest: true },
       },
       {
         path: 'boards',
@@ -121,6 +119,7 @@ router.beforeEach(async (to) => {
   const isAdminRoute = to.path.startsWith('/admin')
   const requiresFreshAuth = !!to.meta.requiresAuth || !!to.meta.guest
   const shouldRefreshSession = isAdminRoute || !!to.meta.requiresAuth || !!to.meta.guest
+  const hadStoredUser = !!user
 
   if (shouldRefreshSession) {
     const now = Date.now()
@@ -146,11 +145,11 @@ router.beforeEach(async (to) => {
           clearStoredAuth()
           user = null
         } else {
-          if (requiresFreshAuth) {
+          if (requiresFreshAuth && !hadStoredUser) {
             clearStoredAuth()
             user = null
           }
-          if (isAdminRoute) {
+          if (isAdminRoute && !hadStoredUser) {
             return '/user/home'
           }
         }

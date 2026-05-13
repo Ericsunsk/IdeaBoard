@@ -1,6 +1,6 @@
 <template>
   <div
-    class="workflow-node mask-node overflow-visible"
+    class="workflow-node mask-node"
     data-node-kind="mask"
     :data-node-id="node.id"
     :class="{ active, dragging, 'copy-mode': copyMode }"
@@ -28,7 +28,7 @@
       </template>
     </NodeHeader>
 
-    <div class="relative flex flex-col gap-2 px-3 pt-2.5 pb-3" @mousedown.stop @contextmenu.stop>
+    <div class="mask-node-body" @mousedown.stop @contextmenu.stop>
       <div
         class="mask-stage"
         :data-mask-id="node.id"
@@ -38,14 +38,11 @@
         @contextmenu.prevent.stop="togglePaintPopup"
       >
         <template v-if="effectiveSourceImageUrl">
-          <img
-            :src="effectiveSourceImageUrl"
-            class="pointer-events-none h-full w-full object-cover"
-          />
+          <img :src="effectiveSourceImageUrl" class="mask-stage-image" />
           <canvas
             v-if="!paintPopupOpen"
             :ref="onCanvasRef"
-            class="absolute inset-0 h-full w-full opacity-50"
+            class="mask-stage-canvas"
             :style="maskCanvasCursorStyle"
             :width="canvasWidth"
             :height="stageHeight"
@@ -77,7 +74,7 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-1.5">
+      <div class="mask-toolbar">
         <NodeIconButton
           :active="node.drawMode === 'paint'"
           title="Brush"
@@ -120,7 +117,7 @@
         </NodeIconButton>
         <input
           :value="node.brushSize"
-          class="node-inline-range min-w-20 flex-1"
+          class="mask-brush-range node-inline-range"
           :style="{ '--slider-pct': `${((node.brushSize - 4) / 44) * 100}%` }"
           type="range"
           min="4"
@@ -134,11 +131,11 @@
         />
       </div>
 
-      <div class="flex items-center gap-1.5">
-        <span class="text-[11px] font-bold tracking-[0.02em] text-[#7b8798]">Refine</span>
+      <div class="mask-refine-row">
+        <span class="mask-refine-label">Refine</span>
         <input
           :value="node.refineAmount"
-          class="node-inline-range min-w-20 flex-1"
+          class="mask-refine-range node-inline-range"
           :style="{ '--slider-pct': `${((node.refineAmount + 100) / 200) * 100}%` }"
           type="range"
           min="-100"
@@ -161,22 +158,19 @@
       <div
         v-if="paintPopupOpen"
         ref="popupRef"
-        class="mask-paint-popup z-30 w-max"
+        class="mask-paint-popup"
         @mousedown.stop
         @click.stop
         @contextmenu.prevent.stop="togglePaintPopup"
       >
         <div
-          class="mask-paint-popup-stage relative border border-[#d8ddea]"
+          class="mask-paint-popup-stage"
           :style="{ width: `${popupStageWidth}px`, height: `${popupStageHeight}px` }"
         >
-          <img
-            :src="effectiveSourceImageUrl"
-            class="pointer-events-none h-full w-full object-cover"
-          />
+          <img :src="effectiveSourceImageUrl" class="mask-stage-image" />
           <canvas
             :ref="onCanvasRef"
-            class="absolute inset-0 h-full w-full opacity-50"
+            class="mask-paint-popup-canvas"
             :style="maskCanvasCursorStyle"
             :width="canvasWidth"
             :height="stageHeight"
@@ -379,3 +373,74 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped src="./node-shared.css"></style>
+<style scoped>
+.workflow-node.mask-node {
+  overflow: visible;
+}
+
+.mask-node-body {
+  position: relative;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mask-stage-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.mask-stage-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.5;
+}
+
+.mask-paint-popup {
+  z-index: 30;
+  width: max-content;
+}
+
+.mask-paint-popup-stage {
+  position: relative;
+  border: 1px solid #d8ddea;
+}
+
+.mask-paint-popup-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.5;
+}
+
+.mask-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mask-refine-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mask-refine-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7b8798;
+  letter-spacing: 0.02em;
+}
+
+.mask-brush-range,
+.mask-refine-range {
+  flex: 1;
+  min-width: 80px;
+}
+</style>
