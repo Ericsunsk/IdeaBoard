@@ -25,7 +25,7 @@ type PersistedCanvasBoardState = CanvasBoardSnapshot & {
 
 const finiteNumberSchema = z.number().finite()
 
-const workflowNodeOutputStatusSchema = z.enum(['idle', 'ready', 'stale'])
+const workflowNodeOutputStatusSchema = z.enum(['idle', 'running', 'ready', 'stale'])
 const canvasConnectionNodeTypeSchema = z.enum([
   'image',
   'prompt',
@@ -110,6 +110,7 @@ const imageNodeItemSchema = z.object({
   width: finiteNumberSchema,
   sourceImageUrl: z.string(),
   sourceImageRatio: finiteNumberSchema.positive(),
+  outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
 })
 

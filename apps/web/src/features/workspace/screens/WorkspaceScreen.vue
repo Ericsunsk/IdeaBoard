@@ -103,6 +103,7 @@
         :selection-key-code="activeTool === 'select' ? 'Shift' : false"
         :multi-selection-key-code="activeTool === 'select' ? 'Shift' : null"
         :default-edge-options="{ animated: false, updatable: true }"
+        :min-zoom="0.1"
         :only-render-visible-elements="FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING"
         :is-valid-connection="isValidConnection"
         @connect="onConnect"
@@ -575,6 +576,10 @@ function commitFlowEdges(nextEdges: Edge[]) {
   setEdges(nextEdges)
 }
 
+function commitFlowEdgesAppend(nextEdges: Edge[]) {
+  setEdges((currentEdges) => [...(currentEdges as Edge[]), ...nextEdges])
+}
+
 function commitFlowNodesAppend(nextNodes: Node[]) {
   setNodes((currentNodes) => [...(currentNodes as Node[]), ...nextNodes])
   scheduleFlowNodeInternalsRefresh(nextNodes.map((node) => node.id))
@@ -790,6 +795,7 @@ const {
   pushHistory: flowHistory.push,
   markDirty,
   refreshSnapshot,
+  refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
   onSuccess: (text) => {
     message.success(text)
   },
@@ -802,6 +808,7 @@ const {
   commitEdges: (nextEdges) => {
     commitFlowEdges(nextEdges)
   },
+  appendEdges: commitFlowEdgesAppend,
 })
 
 const {

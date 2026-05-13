@@ -17,6 +17,7 @@ function createValidState() {
         width: 320,
         sourceImageUrl: 'https://example.com/b.png',
         sourceImageRatio: 1,
+        outputStatus: 'ready' as const,
         outputImages: [{ url: 'https://example.com/o1.png', ratio: 1 }],
       },
     ],

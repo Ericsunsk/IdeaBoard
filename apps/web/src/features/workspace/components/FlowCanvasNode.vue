@@ -39,9 +39,10 @@
           :stage-height="stageHeight"
           :display-image="displayImage"
           :display-mode="displayMode"
+          :input-locked="imageInputLocked"
           :action-menu-visible="!!props.imageActionVisible"
           :prompt-composer-visible="!!props.imagePromptComposerVisible"
-          :direct-generating="!!props.imageDirectGenerating"
+          :direct-generating="imageGenerating"
           :show-style-strength-control="!!props.showStyleStrengthControl"
           :style-innovate-strength-pct="props.styleInnovateStrengthPct ?? 50"
           :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
@@ -426,6 +427,11 @@ const displayMode = computed<'source' | 'node-output'>(() => {
   if (!imageSnapshot.value) return 'source'
   return (imageSnapshot.value.outputImages?.length ?? 0) > 0 ? 'node-output' : 'source'
 })
+
+const imageGenerating = computed(
+  () => !!props.imageDirectGenerating || imageSnapshot.value?.outputStatus === 'running',
+)
+const imageInputLocked = computed(() => imageGenerating.value && !displayImage.value)
 
 const stageHeight = computed(() => {
   if (!imageSnapshot.value) return 180

@@ -72,6 +72,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
     imageNode.width = sourceNode.width
     imageNode.sourceImageUrl = payload.url
     imageNode.sourceImageRatio = payload.ratio
+    imageNode.outputStatus = 'ready'
     imageNode.outputImages = []
     appendImageFlowNode(imageNode)
   }
@@ -142,6 +143,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
           ? Number(source.sourceImageRatio)
           : 1
       copied.outputImages = cloneImageOutputs(source)
+      copied.outputStatus = source.outputStatus
       appended.push(createImageFlowNode(copied))
     })
     if (appended.length === 0) return

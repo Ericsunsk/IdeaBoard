@@ -33,6 +33,7 @@
         class="image-node-stage"
         data-flow-handle-frame
         :data-image-node-id="node.id"
+        :class="{ 'is-loading': props.directGenerating && !displayImage }"
         :style="{ height: `${stageHeight}px` }"
         @dragover.stop="onStageDragOver"
         @drop.stop="onStageDrop"
@@ -52,10 +53,12 @@
         <div
           v-if="!displayImage"
           class="image-node-stage-empty"
-          :class="{ 'is-readonly': props.inputLocked }"
+          :class="{ 'is-readonly': props.inputLocked, 'is-loading': props.directGenerating }"
           @click="onEmptyStateClick"
         >
           <svg
+            v-if="props.directGenerating"
+            class="image-node-stage-loader-logo"
             width="24"
             height="24"
             viewBox="0 0 24 24"
@@ -67,7 +70,20 @@
             <circle cx="15.5" cy="8.5" r="1.5" />
             <path d="M5 16l4.5-4.5 4 4 2-2L19 17" />
           </svg>
-          <span>{{ emptyStateLabel }}</span>
+          <svg
+            v-else
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+            <circle cx="15.5" cy="8.5" r="1.5" />
+            <path d="M5 16l4.5-4.5 4 4 2-2L19 17" />
+          </svg>
+          <span v-if="!props.directGenerating">{{ emptyStateLabel }}</span>
         </div>
       </div>
 
@@ -289,7 +305,50 @@ function resizePromptInput() {
   border-color: #9278e6;
 }
 
+.image-node-stage.is-loading {
+  border-color: #e2e8f0;
+  box-shadow:
+    0 0 30px rgba(239, 68, 68, 0.2),
+    0 0 48px rgba(146, 120, 230, 0.18);
+  isolation: isolate;
+}
+
+.image-node-stage.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: -48px;
+  z-index: 0;
+  border-radius: 42% 58% 48% 52% / 54% 42% 58% 46%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08) 0 24%, transparent 38%),
+    repeating-conic-gradient(
+      from 12deg at 50% 50%,
+      transparent 0deg 18deg,
+      rgba(239, 68, 68, 0.38) 22deg 44deg,
+      rgba(244, 114, 182, 0.3) 50deg 64deg,
+      transparent 70deg 91deg,
+      rgba(146, 120, 230, 0.36) 96deg 122deg,
+      rgba(239, 68, 68, 0.22) 128deg 142deg,
+      transparent 148deg 180deg
+    );
+  filter: blur(18px);
+  opacity: 0.92;
+  animation:
+    image-node-loading-aura-flow 3.8s linear infinite,
+    image-node-loading-aura-wave 5.4s ease-in-out infinite;
+  pointer-events: none;
+  -webkit-mask: radial-gradient(ellipse at center, transparent 0 24%, #000 38% 78%, transparent 86%);
+  mask: radial-gradient(
+    ellipse at center,
+    transparent 0 24%,
+    #000 38% 78%,
+    transparent 86%
+  );
+}
+
 .image-node-stage-empty {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   border: 0;
@@ -324,6 +383,19 @@ function resizePromptInput() {
 
 .image-node-stage-empty.is-readonly {
   cursor: default;
+}
+
+.image-node-stage-empty.is-loading {
+  background: rgba(255, 255, 255, 0.56);
+  color: #a8b3be;
+  cursor: wait;
+}
+
+.image-node-stage-loader-logo {
+  width: 84px;
+  height: 84px;
+  stroke-width: 0.85;
+  animation: image-node-logo-spin-cycle 4s linear infinite;
 }
 
 .image-node-stage-actions {
@@ -418,6 +490,34 @@ function resizePromptInput() {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes image-node-logo-spin-cycle {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(3turn);
+  }
+  100% {
+    transform: rotate(3turn);
+  }
+}
+
+@keyframes image-node-loading-aura-flow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes image-node-loading-aura-wave {
+  0%,
+  100% {
+    border-radius: 42% 58% 48% 52% / 54% 42% 58% 46%;
+  }
+  50% {
+    border-radius: 56% 44% 60% 40% / 42% 58% 44% 56%;
   }
 }
 </style>

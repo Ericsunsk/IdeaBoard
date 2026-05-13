@@ -63,7 +63,7 @@ export function isCanvasConnectionAllowed(
   }
 
   if (from.nodeType === 'image') {
-    return fromPort.kind === 'image' && toPort.kind === 'image' && to.nodeType !== 'image'
+    return fromPort.kind === 'image' && toPort.kind === 'image'
   }
 
   if (RELAY_IMAGE_OUTPUT_NODE_TYPES.has(from.nodeType)) {

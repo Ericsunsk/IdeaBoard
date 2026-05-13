@@ -99,6 +99,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
         title: resolveImageFileTitle(file) || prev.title,
         sourceImageUrl: uploaded.url,
         sourceImageRatio: uploaded.ratio,
+        outputStatus: 'ready',
         outputImages: [],
       }))
       options.onNodeMutated?.(nodeId)
@@ -147,6 +148,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
       ...(title ? { title } : {}),
       sourceImageUrl: payload.url,
       sourceImageRatio: payload.ratio,
+      outputStatus: 'ready',
       outputImages: [],
     })
     if (!nodeId) return

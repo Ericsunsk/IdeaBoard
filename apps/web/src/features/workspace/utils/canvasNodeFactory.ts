@@ -103,6 +103,7 @@ export function createImageNodeAt(point: CanvasPoint): ImageNodeItem {
     title: getDefaultCanvasNodeTitle('image'),
     sourceImageUrl: '',
     sourceImageRatio: 1,
+    outputStatus: 'idle',
     outputImages: [],
   }
 }

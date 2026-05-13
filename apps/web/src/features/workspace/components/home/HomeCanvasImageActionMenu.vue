@@ -110,7 +110,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn image-action-icon-btn--mock"
+        class="image-action-icon-btn image-action-icon-btn--placeholder"
         disabled
         title="局部重绘（占位）"
       >
@@ -135,7 +135,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn image-action-icon-btn--mock"
+        class="image-action-icon-btn image-action-icon-btn--placeholder"
         disabled
         title="扩图（占位）"
       >
@@ -162,7 +162,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn image-action-icon-btn--mock"
+        class="image-action-icon-btn image-action-icon-btn--placeholder"
         disabled
         title="调色（占位）"
       >
@@ -288,7 +288,7 @@ const emit = defineEmits<{
   opacity: 0.45;
 }
 
-.image-action-icon-btn--mock:disabled {
+.image-action-icon-btn--placeholder:disabled {
   cursor: default;
   opacity: 0.58;
 }

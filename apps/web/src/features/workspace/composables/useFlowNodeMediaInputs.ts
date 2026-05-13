@@ -163,6 +163,7 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
       ...prev,
       sourceImageUrl: '',
       sourceImageRatio: 1,
+      outputStatus: 'idle',
       outputImages: [],
     }))
     options.markFlowExecutionNodeDirty(nodeId)

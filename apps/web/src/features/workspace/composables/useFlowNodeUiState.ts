@@ -134,7 +134,9 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       const snapshotNode = node.data.snapshotNode as Record<string, unknown>
       const nodeType = getNodeType(nodeId)
       if (nodeType === 'image') {
-        return !!`${snapshotNode.sourceImageUrl ?? ''}`.trim()
+        const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages : []
+        const outputStatus = resolveWorkflowNodeOutputStatus(snapshotNode.outputStatus, outputImages)
+        return outputStatus !== 'running' && !!`${snapshotNode.sourceImageUrl ?? ''}`.trim()
       }
       if (!nodeType || !isCanvasExecutionOutputNodeType(nodeType)) return false
       const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()

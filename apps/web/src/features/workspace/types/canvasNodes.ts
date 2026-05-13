@@ -5,7 +5,7 @@ export interface CanvasPoint {
   y: number
 }
 
-export type WorkflowNodeOutputStatus = 'idle' | 'ready' | 'stale'
+export type WorkflowNodeOutputStatus = 'idle' | 'running' | 'ready' | 'stale'
 export const DEFAULT_COLOR_STRENGTH = 70
 export const MAX_COLOR_NODE_SWATCHES = 8
 export const DEFAULT_COLOR_NODE_COLOR = DEFAULT_COLOR_HEX
@@ -34,6 +34,7 @@ export const WEAR_TILE_MODE_DEFAULT = 'single'
 
 export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = [
   'idle',
+  'running',
   'ready',
   'stale',
 ]
@@ -188,6 +189,7 @@ export interface ImageNodeItem {
   title?: string
   sourceImageUrl: string
   sourceImageRatio: number
+  outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }
 
