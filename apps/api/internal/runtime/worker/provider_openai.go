@@ -219,6 +219,10 @@ func writeOpenAIMultipartImagePart(ctx context.Context, writer *multipart.Writer
 	if err != nil {
 		return err
 	}
+	filename, mimeType, data, err = normalizeOpenAIEditMultipartImage(filename, mimeType, data)
+	if err != nil {
+		return fmt.Errorf("归一化图像失败: %w", err)
+	}
 
 	headers := make(textproto.MIMEHeader)
 	headers.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, filename))

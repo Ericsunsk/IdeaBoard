@@ -146,14 +146,18 @@ watch(
 
 .flow-canvas-node__handle-aggregate {
   --handle-ring-color: #d8e0ea;
-  --handle-plus-x: -26px;
+  --handle-plus-rest-x: -12px;
+  --handle-plus-active-x: -26px;
+  --handle-plus-hover-x: -29px;
+  --handle-plus-hit-x: -26px;
+  --handle-plus-x: var(--handle-plus-rest-x);
   width: 1px;
   height: 1px;
   min-width: 1px;
   min-height: 1px;
   border: 0;
   background: transparent;
-  color: #64748b;
+  color: var(--handle-ring-color);
   opacity: 0;
   box-shadow: none;
   pointer-events: all;
@@ -166,7 +170,22 @@ watch(
 }
 
 .flow-canvas-node__handle-aggregate--output {
-  --handle-plus-x: 27px;
+  --handle-plus-rest-x: 13px;
+  --handle-plus-active-x: 27px;
+  --handle-plus-hover-x: 30px;
+  --handle-plus-hit-x: 27px;
+}
+
+.flow-canvas-node__handle-aggregate::before {
+  content: '';
+  position: absolute;
+  left: var(--handle-plus-hit-x);
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
 }
 
 .flow-canvas-node__handle-plus {
@@ -182,6 +201,9 @@ watch(
   box-shadow: none;
   transform: translate(-50%, -50%);
   pointer-events: auto;
+  transition:
+    left 0.18s ease,
+    border-color 0.14s ease;
 }
 
 .flow-canvas-node__handle-plus::before,
@@ -204,11 +226,17 @@ watch(
 .flow-canvas-node__handle-aggregate:hover,
 .flow-canvas-node__handle-aggregate.connecting {
   --handle-ring-color: #c4ccd8;
-  color: #334155;
+  --handle-plus-x: var(--handle-plus-hover-x);
+  opacity: 1;
 }
 
 .flow-canvas-node__handle-aggregate.is-visible,
 .flow-canvas-node__handle-aggregate.connecting {
+  --handle-plus-x: var(--handle-plus-active-x);
   opacity: 1;
+}
+
+.flow-canvas-node__handle-aggregate.is-visible:hover {
+  --handle-plus-x: var(--handle-plus-hover-x);
 }
 </style>

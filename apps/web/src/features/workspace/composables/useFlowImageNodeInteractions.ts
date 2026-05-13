@@ -10,7 +10,6 @@ type FlowHistorySnapshot = { nodes: unknown[]; edges: unknown[] }
 
 type UseFlowImageNodeInteractionsOptions = {
   nodes: Ref<Node[]>
-  FLOW_NODE_IMAGE_DRAG_MIME: string
   getImageNodeDisplayPayload: (nodeId: string) => { url: string; ratio: number } | null
   getImageNodeSnapshot: (nodeId: string) => { x: number; y: number; width: number } | null
   captureFlowHistorySnapshot: () => FlowHistorySnapshot
@@ -75,14 +74,6 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
     imageNode.sourceImageRatio = payload.ratio
     imageNode.outputImages = []
     appendImageFlowNode(imageNode)
-  }
-
-  function onFlowImageDisplayDragStart(nodeId: string, event: DragEvent) {
-    const payload = options.getImageNodeDisplayPayload(nodeId)
-    if (!payload || !event.dataTransfer) return
-    event.dataTransfer.effectAllowed = 'copy'
-    event.dataTransfer.setData(options.FLOW_NODE_IMAGE_DRAG_MIME, payload.url)
-    event.dataTransfer.setData(`${options.FLOW_NODE_IMAGE_DRAG_MIME}-ratio`, String(payload.ratio))
   }
 
   function beginFlowNodeDragDuplicateTracking(isDuplicateMode: boolean) {
@@ -165,6 +156,5 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
     onFlowImageAppendToCanvas,
-    onFlowImageDisplayDragStart,
   }
 }

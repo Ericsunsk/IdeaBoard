@@ -40,9 +40,8 @@
         <template v-if="displayImage">
           <img
             :src="stageDisplayUrl"
-            class="image-node-stage-image nodrag"
-            draggable="true"
-            @dragstart="emit('display-dragstart', $event)"
+            class="image-node-stage-image"
+            draggable="false"
             @dblclick="emit('append-to-canvas')"
           />
           <div v-if="!props.inputLocked" class="image-node-stage-actions">
@@ -52,26 +51,10 @@
         <div
           v-else
           class="image-node-stage-empty"
-          :class="{
-            'is-pending': isPendingDisplayMode,
-            'is-readonly': props.inputLocked,
-          }"
+          :class="{ 'is-readonly': props.inputLocked }"
           @click="onEmptyStateClick"
         >
           <svg
-            v-if="isPendingDisplayMode"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-          >
-            <circle cx="12" cy="12" r="8" />
-            <path d="M12 8v4l2.5 2.5" />
-          </svg>
-          <svg
-            v-else
             width="24"
             height="24"
             viewBox="0 0 24 24"
@@ -136,7 +119,6 @@ const emit = defineEmits<{
   (e: 'open-file'): void
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
-  (e: 'display-dragstart', event: DragEvent): void
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'action', action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
@@ -146,9 +128,8 @@ const emit = defineEmits<{
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
-const isPendingDisplayMode = computed(() => props.displayMode === 'pending')
 const emptyStateLabel = computed(() => {
-  if (props.displayMode === 'pending' || props.inputLocked) return 'Waiting...'
+  if (props.inputLocked) return 'Waiting...'
   return '上传或拖拽图片作为输入'
 })
 
@@ -197,6 +178,12 @@ function onStageContextMenu(event: MouseEvent) {
   height: 100%;
   object-fit: contain;
   background: #fff;
+  cursor: grab;
+  user-select: none;
+}
+
+.workflow-node.image-node.dragging .image-node-stage-image {
+  cursor: grabbing;
 }
 
 .image-node-stage-image.preview {
@@ -227,7 +214,7 @@ function onStageContextMenu(event: MouseEvent) {
   border: 0;
   border-radius: 16px;
   background: #ffffff;
-  color: #8a95a5;
+  color: #a8b3be;
   gap: 0;
   display: flex;
   flex-direction: column;
@@ -241,13 +228,13 @@ function onStageContextMenu(event: MouseEvent) {
 
 .image-node-stage-empty:hover {
   background: #ffffff;
-  color: #64748b;
+  color: #8894a5;
 }
 
 .image-node-stage-empty svg {
   width: 84px;
   height: 84px;
-  stroke-width: 1.7;
+  stroke-width: 0.85;
 }
 
 .image-node-stage-empty span {
@@ -256,10 +243,6 @@ function onStageContextMenu(event: MouseEvent) {
 
 .image-node-stage-empty.is-readonly {
   cursor: default;
-}
-
-.image-node-stage-empty.is-pending {
-  color: #8f789b;
 }
 
 .image-node-stage-actions {

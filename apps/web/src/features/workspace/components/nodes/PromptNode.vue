@@ -6,8 +6,12 @@
     :class="{ active, dragging, 'copy-mode': copyMode }"
     :style="nodeStyle"
   >
-    <div class="prompt-node-head" aria-hidden="true">
-      <span class="prompt-node-head-icon">
+    <NodeHeader
+      title="Prompt"
+      @node-mousedown="emit('node-mousedown', $event)"
+      @delete="emit('delete')"
+    >
+      <template #icon>
         <svg
           width="12"
           height="12"
@@ -18,9 +22,8 @@
         >
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
-      </span>
-      <span class="prompt-node-head-title">Prompt</span>
-    </div>
+      </template>
+    </NodeHeader>
     <div class="prompt-node-shell" data-flow-handle-frame>
       <textarea
         :value="node.text"
@@ -70,36 +73,7 @@ function onInput(event: Event) {
   box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.prompt-node-head {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  width: 100%;
-  padding: 0 13px;
-  box-sizing: border-box;
-  color: #64748b;
-  user-select: none;
-  pointer-events: none;
-}
-
-.prompt-node-head-icon {
-  width: 16px;
-  height: 16px;
-  color: #64748b;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.prompt-node-head-title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  gap: 5px;
 }
 
 .prompt-node-shell {

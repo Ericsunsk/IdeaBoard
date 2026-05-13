@@ -28,8 +28,8 @@ const emit = defineEmits<{
 <style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .node-header-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -38,6 +38,8 @@ const emit = defineEmits<{
 
 .node-header-icon :deep(svg) {
   display: block;
+  width: 14px;
+  height: 14px;
 }
 
 .workflow-node-header--rounded {

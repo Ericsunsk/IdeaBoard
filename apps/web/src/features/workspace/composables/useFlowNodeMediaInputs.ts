@@ -11,10 +11,8 @@ type UseFlowNodeMediaInputsOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   canvasDrop: {
-    readNodeImageDropPayload: (event: DragEvent) => { url: string; ratio: number } | null
     applyImageFileToImageNode: (nodeId: string, file: File) => Promise<void>
     applyImageFileToMaskNode: (nodeId: string, file: File) => Promise<void>
-    applyMaskSourceByUrl: (nodeId: string, url: string, ratio?: number) => Promise<void>
   }
   updateSnapshotNode: (
     nodeId: string,
@@ -147,10 +145,6 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
     )
   }
 
-  function readNodeImageDropPayload(event: DragEvent): { url: string; ratio: number } | null {
-    return options.canvasDrop.readNodeImageDropPayload(event)
-  }
-
   // --- Image node handlers ---
   function onFlowImageOpenFile(nodeId: string) {
     const input = document.createElement('input')
@@ -176,17 +170,6 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
 
   function onFlowImageStageDrop(nodeId: string, event: DragEvent) {
     event.preventDefault()
-    const payload = readNodeImageDropPayload(event)
-    if (payload) {
-      options.updateSnapshotNode(nodeId, (prev) => ({
-        ...prev,
-        sourceImageUrl: payload.url,
-        sourceImageRatio: payload.ratio,
-        outputImages: [],
-      }))
-      options.markFlowExecutionNodeDirty(nodeId)
-      return
-    }
     const file = event.dataTransfer?.files?.[0]
     if (!file) return
     void options.canvasDrop.applyImageFileToImageNode(nodeId, file)
@@ -229,11 +212,6 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
 
   function onFlowMaskStageDrop(nodeId: string, event: DragEvent) {
     event.preventDefault()
-    const payload = readNodeImageDropPayload(event)
-    if (payload) {
-      void options.canvasDrop.applyMaskSourceByUrl(nodeId, payload.url, payload.ratio)
-      return
-    }
     const file = event.dataTransfer?.files?.[0]
     if (!file) return
     void options.canvasDrop.applyImageFileToMaskNode(nodeId, file)
@@ -248,7 +226,6 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
     getFlowMaskEffectiveSource,
     getFlowMaskEffectiveSourceCached,
     flowMaskEffectiveSourceCache,
-    readNodeImageDropPayload,
     onFlowImageOpenFile,
     onFlowImageReset,
     onFlowImageStageDrop,

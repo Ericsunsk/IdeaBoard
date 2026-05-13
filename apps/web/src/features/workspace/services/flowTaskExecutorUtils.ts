@@ -16,6 +16,10 @@ export interface FlowConnectedInput {
   snapshotNode: Record<string, unknown>
 }
 
+type FlowConnectedInputPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
+type FlowGraphNode = FlowTaskExecutorGraphOptions['nodes'][number]
+type FlowSourceTypeResolver = (sourceNode: FlowGraphNode) => CanvasConnectionNodeType | null
+
 function resolvePromptInputSourceNodeId(
   options: FlowTaskExecutorGraphOptions,
   targetNodeId: string,
@@ -115,10 +119,11 @@ export function resolveSourceImageFromNode(
   return (latestOutput?.url || '').trim()
 }
 
-export function resolveConnectedInput(
+function resolveConnectedNodeInput(
   options: FlowTaskExecutorGraphOptions,
   targetNodeId: string,
-  targetPort: 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB',
+  targetPort: FlowConnectedInputPort,
+  resolveSourceType: FlowSourceTypeResolver,
 ): FlowConnectedInput | null {
   const incoming = options.edges.find(
     (edge) => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === targetPort,
@@ -131,7 +136,7 @@ export function resolveConnectedInput(
     typeof sourceNode.data.snapshotNode !== 'object'
   )
     return null
-  const sourceType = resolveNodeType(sourceNode.id)
+  const sourceType = resolveSourceType(sourceNode)
   if (!sourceType) return null
   return {
     sourceType,
@@ -139,28 +144,25 @@ export function resolveConnectedInput(
   }
 }
 
+export function resolveConnectedInput(
+  options: FlowTaskExecutorGraphOptions,
+  targetNodeId: string,
+  targetPort: FlowConnectedInputPort,
+): FlowConnectedInput | null {
+  return resolveConnectedNodeInput(options, targetNodeId, targetPort, (sourceNode) =>
+    resolveNodeType(sourceNode.id),
+  )
+}
+
 export function resolveConnectedExecutionInput(
   options: FlowTaskExecutorGraphOptions,
   targetNodeId: string,
-  targetPort: 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB',
+  targetPort: FlowConnectedInputPort,
 ): FlowConnectedInput | null {
-  const incoming = options.edges.find(
-    (edge) => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === targetPort,
-  )
-  if (!incoming) return null
-  const sourceNode = options.nodes.find((node) => node.id === incoming.source)
-  if (
-    !sourceNode ||
-    !sourceNode.data?.snapshotNode ||
-    typeof sourceNode.data.snapshotNode !== 'object'
-  )
-    return null
-  const sourceKind = sourceNode.data.kind
-  if (!sourceKind || !isFlowExecutionSourceKind(sourceKind)) return null
-  return {
-    sourceType: sourceKind as CanvasConnectionNodeType,
-    snapshotNode: sourceNode.data.snapshotNode as Record<string, unknown>,
-  }
+  return resolveConnectedNodeInput(options, targetNodeId, targetPort, (sourceNode) => {
+    const sourceKind = sourceNode.data?.kind
+    return sourceKind && isFlowExecutionSourceKind(sourceKind) ? sourceKind : null
+  })
 }
 
 export async function waitTaskResult(taskId: string): Promise<string[]> {

@@ -151,7 +151,6 @@
             @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
             @image-open-file="() => onFlowImageOpenFile(nodeProps.id)"
             @image-append-to-canvas="() => onFlowImageAppendToCanvas(nodeProps.id)"
-            @image-display-dragstart="(event) => onFlowImageDisplayDragStart(nodeProps.id, event)"
             @image-reset="() => onFlowImageReset(nodeProps.id)"
             @mask-open-file="() => onFlowMaskOpenFile(nodeProps.id)"
             @mask-clear-image="() => onFlowMaskClearImage(nodeProps.id)"
@@ -179,12 +178,18 @@
 
     <div class="floating-status">
       <div class="zoom-controls">
-        <button class="zoom-btn" @click="onZoomOut">−</button>
+        <button type="button" class="zoom-btn" title="缩小" @click="onZoomOut">−</button>
         <span class="zoom-level">{{ zoomLevel }}%</span>
-        <button class="zoom-btn" @click="onZoomIn">+</button>
+        <button type="button" class="zoom-btn" title="放大" @click="onZoomIn">+</button>
       </div>
-      <button class="logo-btn" title="返回画布列表" @click="onNavigateRequest('/user/boards')">
+      <button
+        type="button"
+        class="logo-btn"
+        title="返回画布列表"
+        @click="onNavigateRequest('/user/boards')"
+      >
         <svg
+          class="logo-btn-icon"
           width="18"
           height="18"
           viewBox="0 0 24 24"
@@ -194,8 +199,8 @@
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <line x1="16" y1="12" x2="6" y2="12" />
-          <polyline points="10 8 6 12 10 16" />
+          <path d="M9 7 5 11l4 4" />
+          <path d="M5 11h8.5c3.2 0 5.5 2.3 5.5 5.4 0 1.1-.28 2.1-.78 2.9" />
         </svg>
       </button>
     </div>
@@ -326,7 +331,6 @@ const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING =
   import.meta.env.VITE_WORKSPACE_FLOW_ENABLE_CULLING === 'true'
 
-const FLOW_NODE_IMAGE_DRAG_MIME = 'application/x-canvas-node-image'
 let pendingNodeInternalsRefresh = false
 let queuedNodeInternalsIds: Set<string> | null = null
 let leaveConfirmResolver: ((choice: 'save' | 'discard' | 'cancel') => void) | null = null
@@ -689,7 +693,6 @@ const {
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
   canvasDrop: {
-    readNodeImageDropPayload: (event) => canvasDropRef?.readNodeImageDropPayload(event) ?? null,
     applyImageFileToImageNode: async (nodeId, file) => {
       if (!canvasDropRef) return
       await canvasDropRef.applyImageFileToImageNode(nodeId, file)
@@ -697,10 +700,6 @@ const {
     applyImageFileToMaskNode: async (nodeId, file) => {
       if (!canvasDropRef) return
       await canvasDropRef.applyImageFileToMaskNode(nodeId, file)
-    },
-    applyMaskSourceByUrl: async (nodeId, url, ratio) => {
-      if (!canvasDropRef) return
-      await canvasDropRef.applyMaskSourceByUrl(nodeId, url, ratio)
     },
   },
   updateSnapshotNode,
@@ -846,12 +845,10 @@ const {
 
 const {
   onFlowImageAppendToCanvas,
-  onFlowImageDisplayDragStart,
   beginFlowNodeDragDuplicateTracking,
   finishFlowNodeDragDuplicateTracking,
 } = useFlowImageNodeInteractions({
   nodes: nodes as Ref<Node[]>,
-  FLOW_NODE_IMAGE_DRAG_MIME,
   getImageNodeDisplayPayload,
   getImageNodeSnapshot: (nodeId) => {
     const snapshot = getImageNodeSnapshot(nodeId)
@@ -1092,19 +1089,18 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(8px);
-  border: 1px solid #e8eaed;
-  border-radius: 999px;
-  padding: 6px 10px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  min-height: 40px;
+  background: #f1f3f9;
+  border-radius: 12px;
+  padding: 6px 8px;
+  color: #202124;
 }
 .zoom-btn {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  border: 1px solid #eef1f6;
-  background: #fff;
+  border: none;
+  background: transparent;
   cursor: pointer;
   color: #5f6368;
   font-size: 18px;
@@ -1112,12 +1108,20 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.zoom-btn:hover {
+  background: #fff;
+  color: #6757c8;
 }
 .zoom-level {
-  font-size: 13px;
-  font-weight: 600;
-  color: #5f6368;
-  min-width: 40px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: #202124;
+  min-width: 44px;
   text-align: center;
 }
 .logo-btn {
@@ -1131,7 +1135,26 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+.logo-btn:hover {
+  background: #fff;
+  border-color: #d8ddea;
+  color: #6757c8;
+  transform: rotate(-90deg);
+}
+.logo-btn:active {
+  transform: rotate(-84deg) scale(0.98);
+}
+.logo-btn:focus-visible {
+  outline: 2px solid rgba(146, 120, 230, 0.36);
+  outline-offset: 2px;
+}
+.logo-btn-icon {
+  transition: transform 0.2s ease;
 }
 
 .leave-confirm-mask {

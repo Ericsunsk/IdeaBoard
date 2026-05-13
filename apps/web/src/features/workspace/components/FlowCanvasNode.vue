@@ -49,7 +49,6 @@
           @open-file="onImageOpenFile"
           @append-to-canvas="onImageAppendToCanvas"
           @reset="onImageReset"
-          @display-dragstart="onImageDisplayDragStart"
           @contextmenu="onImageContextMenu"
           @action="onImageAction"
           @style-innovate-mousedown="onStyleInnovateMouseDown"
@@ -291,7 +290,6 @@ const emit = defineEmits<{
   (e: 'image-stage-drop', event: DragEvent): void
   (e: 'image-open-file'): void
   (e: 'image-append-to-canvas'): void
-  (e: 'image-display-dragstart', event: DragEvent): void
   (e: 'image-reset'): void
   (e: 'mask-open-file'): void
   (e: 'mask-clear-image'): void
@@ -443,7 +441,6 @@ function getNodeHandleFrameElement(): HTMLElement | null {
   for (const child of Array.from(workflowNode.children)) {
     if (!(child instanceof HTMLElement)) continue
     if (child.classList.contains('workflow-node-header')) continue
-    if (child.classList.contains('prompt-node-head')) continue
     return child
   }
   return null
@@ -632,10 +629,6 @@ function onImageAppendToCanvas() {
   emit('image-append-to-canvas')
 }
 
-function onImageDisplayDragStart(event: DragEvent) {
-  emit('image-display-dragstart', event)
-}
-
 function onImageReset() {
   emit('image-reset')
 }
@@ -756,7 +749,7 @@ function noopMouse() {}
   box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
 }
 
 .flow-canvas-node

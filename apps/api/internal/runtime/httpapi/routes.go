@@ -198,7 +198,7 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		if _, ok := validateUploadFileHeader(c, file, 30*1024*1024, map[string]bool{".jpg": true, ".jpeg": true, ".png": true}); !ok {
+		if _, ok := validateUploadFileHeader(c, file, 30*1024*1024, map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}); !ok {
 			return
 		}
 		userID := c.GetUint64("user_id")

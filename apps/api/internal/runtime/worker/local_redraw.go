@@ -21,6 +21,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	_ "golang.org/x/image/webp"
 )
 
 const (

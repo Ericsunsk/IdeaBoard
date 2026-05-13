@@ -2,9 +2,13 @@ package worker
 
 import (
 	"api/internal/runtime/queuetypes"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -18,6 +22,8 @@ import (
 
 	"api/internal/accounts"
 )
+
+const tinyWebPBase64 = "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA"
 
 type multipartFilePart struct {
 	Filename    string
@@ -37,6 +43,22 @@ func mustDecodeBase64(t *testing.T, value string) []byte {
 		t.Fatalf("decode base64: %v", err)
 	}
 	return decoded
+}
+
+func buildTinyPNGBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.NRGBA{R: 10, G: 20, B: 30, A: 255})
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode tiny png: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func buildTinyWebPBytes(t *testing.T) []byte {
+	t.Helper()
+	return mustDecodeBase64(t, tinyWebPBase64)
 }
 
 func readMultipartRequest(t *testing.T, r *http.Request) multipartRequestCapture {
@@ -88,7 +110,7 @@ func TestCallOpenAIUsesEditEndpointForCanvasExtend(t *testing.T) {
 	var gotPath string
 	var gotContentType string
 	var gotMultipart multipartRequestCapture
-	sourcePNG := mustDecodeBase64(t, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCwkAAAAASUVORK5CYII=")
+	sourcePNG := buildTinyPNGBytes(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/source.png" {
@@ -544,6 +566,107 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	}
 	if gotMultipart.Fields["original_image_url"][0] != sourceDataURL {
 		t.Fatalf("expected original_image_url field to stay, got %#v", gotMultipart.Fields["original_image_url"])
+	}
+}
+
+func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) {
+	var gotMultipart multipartRequestCapture
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMultipart = readMultipartRequest(t, r)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/edit.png"}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL,
+		ApiKey:   "test-key",
+		ModelSet: "gpt-image-1",
+	}
+	sourceWebPDataURL := "data:image/webp;base64," + tinyWebPBase64
+	maskDataURL := "data:image/png;base64,bWFzaw=="
+	params := map[string]interface{}{
+		"feature":            "partial-edit",
+		"image_urls":         []interface{}{sourceWebPDataURL},
+		"original_image_url": sourceWebPDataURL,
+		"mask_image_url":     maskDataURL,
+	}
+
+	if _, err := c.callOpenAI(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+		t.Fatalf("callOpenAI returned error: %v", err)
+	}
+	images := gotMultipart.Files["image"]
+	if len(images) != 1 {
+		t.Fatalf("expected one image file, got %#v", images)
+	}
+	if images[0].ContentType != "image/png" {
+		t.Fatalf("expected image/png, got %s", images[0].ContentType)
+	}
+	if !strings.HasSuffix(images[0].Filename, ".png") {
+		t.Fatalf("expected .png filename, got %s", images[0].Filename)
+	}
+	if !bytes.HasPrefix(images[0].Data, []byte{0x89, 0x50, 0x4e, 0x47}) {
+		headerLen := 8
+		if len(images[0].Data) < headerLen {
+			headerLen = len(images[0].Data)
+		}
+		t.Fatalf("expected png bytes, got header=%x", images[0].Data[:headerLen])
+	}
+}
+
+func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
+	var gotMultipart multipartRequestCapture
+	webpBytes := buildTinyWebPBytes(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/source.webp" {
+			w.Header().Set("Content-Type", "image/webp")
+			_, _ = w.Write(webpBytes)
+			return
+		}
+		gotMultipart = readMultipartRequest(t, r)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/edit.png"}]}`))
+	}))
+	defer server.Close()
+	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL,
+		ApiKey:   "test-key",
+		ModelSet: "gpt-image-1",
+	}
+	sourceURL := server.URL + "/source.webp"
+	maskDataURL := "data:image/png;base64,bWFzaw=="
+	params := map[string]interface{}{
+		"feature":            "partial-edit",
+		"image_urls":         []interface{}{sourceURL},
+		"original_image_url": sourceURL,
+		"mask_image_url":     maskDataURL,
+	}
+
+	if _, err := c.callOpenAI(context.Background(), account, "edit prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
+		t.Fatalf("callOpenAI returned error: %v", err)
+	}
+	images := gotMultipart.Files["image"]
+	if len(images) != 1 {
+		t.Fatalf("expected one image file, got %#v", images)
+	}
+	if images[0].ContentType != "image/png" {
+		t.Fatalf("expected image/png, got %s", images[0].ContentType)
+	}
+	if !strings.HasSuffix(images[0].Filename, ".png") {
+		t.Fatalf("expected .png filename, got %s", images[0].Filename)
+	}
+	if !bytes.HasPrefix(images[0].Data, []byte{0x89, 0x50, 0x4e, 0x47}) {
+		headerLen := 8
+		if len(images[0].Data) < headerLen {
+			headerLen = len(images[0].Data)
+		}
+		t.Fatalf("expected png bytes, got header=%x", images[0].Data[:headerLen])
 	}
 }
 

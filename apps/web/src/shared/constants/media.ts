@@ -1,7 +1,7 @@
 export const ADMIN_UPLOAD_ENDPOINT = '/api/admin/upload'
 export const USER_DOWNLOAD_ENDPOINT = '/api/user/download'
 
-export const IMAGE_UPLOAD_ACCEPT = 'image/jpeg,image/png'
+export const IMAGE_UPLOAD_ACCEPT = 'image/jpeg,image/png,image/webp'
 export const IMAGE_UPLOAD_ACCEPT_EXTENDED = 'image/jpeg,image/png,image/gif,image/webp'
 
 export const DEFAULT_IMAGE_DOWNLOAD_NAME = 'image.png'

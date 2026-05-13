@@ -3,7 +3,6 @@ import type { ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
 import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
 
 const FLOW_NODE_KIND_DRAG_MIME = 'application/x-ideaboard-flow-node-kind'
-const FLOW_NODE_IMAGE_DRAG_MIME = 'application/x-canvas-node-image'
 
 type UploadImageResult = { url: string; ratio: number }
 
@@ -83,22 +82,6 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     return uploadTask
   }
 
-  async function loadImageRatioFromUrl(url: string): Promise<number | null> {
-    const size = await loadImageSizeFromUrl(url)
-    if (!size || !size.width || !size.height) return null
-    return size.height / size.width
-  }
-
-  function readNodeImageDropPayload(event: DragEvent): { url: string; ratio: number } | null {
-    const rawUrl = event.dataTransfer?.getData(FLOW_NODE_IMAGE_DRAG_MIME)
-    if (!rawUrl) return null
-    const url = rawUrl.trim()
-    if (!url) return null
-    const ratioRaw = event.dataTransfer?.getData(`${FLOW_NODE_IMAGE_DRAG_MIME}-ratio`) || ''
-    const ratio = Number(ratioRaw)
-    return { url, ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1 }
-  }
-
   async function applyImageFileToImageNode(nodeId: string, file: File): Promise<void> {
     const snapshotNode = options.getImageNodeSnapshot(nodeId)
     if (!snapshotNode) {
@@ -145,22 +128,6 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     }
   }
 
-  async function applyMaskSourceByUrl(nodeId: string, url: string, ratio?: number) {
-    const nextRatio =
-      Number.isFinite(ratio) && Number(ratio) > 0
-        ? Number(ratio)
-        : (await loadImageRatioFromUrl(url)) || 1
-    options.updateSnapshotNode(nodeId, (prev) => ({
-      ...prev,
-      sourceImageUrl: url,
-      sourceImageRatio: nextRatio,
-      executionMaskDataUrl: '',
-      maskDataUrl: '',
-    }))
-    options.onNodeMutated?.(nodeId)
-    void nextTick(() => options.renderMaskNodeMask(nodeId))
-  }
-
   function onCanvasDragOver(event: DragEvent) {
     if (!event.dataTransfer) return
     event.dataTransfer.dropEffect = 'copy'
@@ -185,12 +152,6 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
       return
     }
 
-    const payload = readNodeImageDropPayload(event)
-    if (payload) {
-      createImageNodeFromPayload(point, payload)
-      return
-    }
-
     const file = event.dataTransfer?.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
@@ -207,17 +168,13 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
   }
 
   return {
-    readNodeImageDropPayload,
     onCanvasDragOver,
     onCanvasDrop,
     uploadImageToBoard,
     loadImageRatioFromFile,
-    loadImageRatioFromUrl,
     applyImageFileToImageNode,
     applyImageFileToMaskNode,
-    applyMaskSourceByUrl,
-    FLOW_NODE_IMAGE_DRAG_MIME,
   }
 }
 
-export { FLOW_NODE_KIND_DRAG_MIME, FLOW_NODE_IMAGE_DRAG_MIME }
+export { FLOW_NODE_KIND_DRAG_MIME }
