@@ -42,4 +42,4 @@ const props = defineProps<{
 const visibleItems = computed(() => props.items.filter((item) => item.visible !== false))
 </script>
 
-<style scoped src="./node-connection-chips.css"></style>
+<style scoped src="./styles/node-connection-chips.css"></style>

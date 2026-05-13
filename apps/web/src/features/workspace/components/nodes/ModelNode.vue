@@ -133,12 +133,12 @@
 </template>
 
 <script setup lang="ts">
-import { MODEL_ANGLE_FRAMING_OPTIONS, describeModelAngleSpec } from './nodeOptionConfig'
+import { MODEL_ANGLE_FRAMING_OPTIONS, describeModelAngleSpec } from './config/nodeOptionConfig'
 import type { ModelAngleFraming, ModelNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, MODEL_NODE_IO_SLOTS } from './nodeIoConfig'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+import { buildNodeIoFromSlots, MODEL_NODE_IO_SLOTS } from './config/nodeIoConfig'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: ModelNodeItem
@@ -191,7 +191,7 @@ const showPoseStrength = computed(
 const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .model-node-body {
   gap: 8px;

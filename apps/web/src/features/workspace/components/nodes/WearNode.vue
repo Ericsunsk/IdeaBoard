@@ -97,9 +97,9 @@
 import type { WearNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, WEAR_NODE_IO_SLOTS } from './nodeIoConfig'
-import { WEAR_TILE_MODE_OPTIONS } from './nodeOptionConfig'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+import { buildNodeIoFromSlots, WEAR_NODE_IO_SLOTS } from './config/nodeIoConfig'
+import { WEAR_TILE_MODE_OPTIONS } from './config/nodeOptionConfig'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: WearNodeItem
@@ -143,7 +143,7 @@ const io = computed(() =>
 const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .wear-node-body {
   gap: 7px;

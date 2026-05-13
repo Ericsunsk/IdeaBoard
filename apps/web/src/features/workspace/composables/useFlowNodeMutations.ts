@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, Node } from '@vue-flow/core'
-import { normalizeHexColor } from '../components/nodes/colorPopoverUtils'
+import { normalizeHexColor } from '../components/nodes/utils/colorPopoverUtils'
 import {
   createColorNodeAt,
   createEditNodeAt,

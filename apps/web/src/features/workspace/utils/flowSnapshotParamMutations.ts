@@ -2,7 +2,7 @@ import {
   normalizeViewpointSelectionByCategory,
   VIEWPOINT_LIGHTING_OPTIONS,
   ENHANCE_UPSCALE_FACTOR_OPTIONS,
-} from '../components/nodes/nodeOptionConfig'
+} from '../components/nodes/config/nodeOptionConfig'
 import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
 import type { EnhanceNodeItem, ViewpointNodeItem } from '../types/canvasNodes'
 import {

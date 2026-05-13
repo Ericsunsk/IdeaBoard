@@ -1,4 +1,4 @@
-import { describeWearTileMode } from '../components/nodes/nodeOptionConfig'
+import { describeWearTileMode } from '../components/nodes/config/nodeOptionConfig'
 import { buildExecutionTaskRequest, EXECUTION_WEAR_META } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import type { MaskNodeItem, WearNodeItem } from '../types/canvasNodes'

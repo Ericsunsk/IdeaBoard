@@ -170,14 +170,14 @@ import {
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, ENHANCE_NODE_IO_SLOTS } from './nodeIoConfig'
+import { buildNodeIoFromSlots, ENHANCE_NODE_IO_SLOTS } from './config/nodeIoConfig'
 import {
   ENHANCE_MODE_OPTIONS,
   ENHANCE_OUTPUT_FORMAT_OPTIONS,
   ENHANCE_UPSCALE_FACTOR_OPTIONS,
   ENHANCE_UPSCALE_MODE_OPTIONS,
-} from './nodeOptionConfig'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+} from './config/nodeOptionConfig'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: EnhanceNodeItem
@@ -241,7 +241,7 @@ function toExtendSliderPct(value: number): number {
 }
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .enhance-node-body {
   gap: 8px;

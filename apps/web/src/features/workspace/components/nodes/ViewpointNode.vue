@@ -88,13 +88,13 @@
 import type { ViewpointNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, VIEWPOINT_NODE_IO_SLOTS } from './nodeIoConfig'
+import { buildNodeIoFromSlots, VIEWPOINT_NODE_IO_SLOTS } from './config/nodeIoConfig'
 import {
   VIEWPOINT_CATEGORY_OPTIONS,
   VIEWPOINT_LIGHTING_OPTIONS,
   VIEWPOINT_OPTIONS_BY_CATEGORY,
-} from './nodeOptionConfig'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+} from './config/nodeOptionConfig'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: ViewpointNodeItem
@@ -136,7 +136,7 @@ const io = computed(() =>
 const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .viewpoint-node-body {
   gap: 8px;

@@ -56,7 +56,7 @@ import {
   PROMPT_NODE_IO_SLOTS,
   VIEWPOINT_NODE_IO_SLOTS,
   WEAR_NODE_IO_SLOTS,
-} from '../components/nodes/nodeIoConfig'
+} from '../components/nodes/config/nodeIoConfig'
 import type {
   CanvasConnectionNodeType,
   CanvasConnectionPort,

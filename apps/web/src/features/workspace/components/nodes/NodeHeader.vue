@@ -38,7 +38,7 @@ const emit = defineEmits<{
 }>()
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .node-header-icon {
   display: inline-flex;

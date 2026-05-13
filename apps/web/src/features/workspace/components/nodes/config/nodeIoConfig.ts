@@ -15,13 +15,13 @@
 //     is visible), use a resolver function.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import type { EditNodeItem } from '../../types/canvasNodes'
+import type { EditNodeItem } from '../../../types/canvasNodes'
 import {
   editModeRequiresMask,
   editModeSupportsPrompt,
   editModeSupportsSourceImage,
   getEditNodePortLabel,
-} from '../../config/canvasNodeConnectionContract'
+} from '../../../config/canvasNodeConnectionContract'
 
 export type NodeIoKind = 'image' | 'mask' | 'prompt'
 export type NodeIoDirection = 'input' | 'output'

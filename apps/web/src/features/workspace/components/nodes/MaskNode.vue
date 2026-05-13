@@ -190,8 +190,8 @@ import type { ComponentPublicInstance } from 'vue'
 import type { MaskNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { toNumber } from './numberUtils'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+import { toNumber } from './utils/numberUtils'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: MaskNodeItem
@@ -372,7 +372,7 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .workflow-node.mask-node {
   overflow: visible;

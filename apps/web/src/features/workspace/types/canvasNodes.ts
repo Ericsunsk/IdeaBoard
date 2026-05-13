@@ -1,4 +1,4 @@
-import { DEFAULT_COLOR_HEX } from '../components/nodes/colorPopoverUtils'
+import { DEFAULT_COLOR_HEX } from '../components/nodes/utils/colorPopoverUtils'
 
 export interface CanvasPoint {
   x: number

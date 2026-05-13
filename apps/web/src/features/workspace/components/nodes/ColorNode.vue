@@ -194,11 +194,11 @@ import type { ColorNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useColorPickerState } from '../../composables/useColorPickerState'
 
-import { buildNodeIoFromSlots, COLOR_NODE_IO_SLOTS } from './nodeIoConfig'
-import { DEFAULT_COLOR_HEX, normalizeHexColor } from './colorPopoverUtils'
-import { toNumber } from './numberUtils'
+import { buildNodeIoFromSlots, COLOR_NODE_IO_SLOTS } from './config/nodeIoConfig'
+import { DEFAULT_COLOR_HEX, normalizeHexColor } from './utils/colorPopoverUtils'
+import { toNumber } from './utils/numberUtils'
 import { isEyeDropperSupported } from '../../utils/eyedropper'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: ColorNodeItem
@@ -362,7 +362,7 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .color-node-body {
   gap: 8px;

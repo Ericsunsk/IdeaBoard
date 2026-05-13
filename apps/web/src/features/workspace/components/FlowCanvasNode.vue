@@ -224,7 +224,7 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/nodeOptionConfig'
+import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/config/nodeOptionConfig'
 import type {
   CanvasImageItem,
   ColorNodeItem,

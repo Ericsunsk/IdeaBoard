@@ -112,7 +112,7 @@
 import type { ImageNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: ImageNodeItem
@@ -214,7 +214,7 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .workflow-node.image-node {
   overflow: visible;

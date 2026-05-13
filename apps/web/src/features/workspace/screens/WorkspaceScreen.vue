@@ -302,7 +302,7 @@ import {
   PATTERN_GENERATE_RATIO_OPTIONS,
   type GenerateQualityOption,
   type PatternGenerateRatioOption,
-} from '../../workspace/components/nodes/nodeOptionConfig'
+} from '../../workspace/components/nodes/config/nodeOptionConfig'
 import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
 import { useFlowSelectionPreviewBar } from '../composables/useFlowSelectionPreviewBar'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'

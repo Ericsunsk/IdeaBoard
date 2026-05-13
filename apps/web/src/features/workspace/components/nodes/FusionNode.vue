@@ -86,9 +86,9 @@
 import type { FusionNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, FUSION_NODE_IO_SLOTS } from './nodeIoConfig'
-import { toNumber } from './numberUtils'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+import { buildNodeIoFromSlots, FUSION_NODE_IO_SLOTS } from './config/nodeIoConfig'
+import { toNumber } from './utils/numberUtils'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: FusionNodeItem
@@ -127,7 +127,7 @@ const imageAWeight = computed(() => props.node.blendRatio)
 const imageBWeight = computed(() => 100 - props.node.blendRatio)
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .fusion-node-body {
   gap: 8px;

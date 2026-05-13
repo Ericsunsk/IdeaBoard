@@ -39,7 +39,7 @@
 <script setup lang="ts">
 import type { PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: PromptNodeItem
@@ -63,7 +63,7 @@ function onInput(event: Event) {
 }
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .workflow-node-input {
   width: 100%;

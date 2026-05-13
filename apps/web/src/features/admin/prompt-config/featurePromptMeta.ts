@@ -1,4 +1,4 @@
-import { WEAR_TILE_MODE_TEMPLATE_DESC } from '../../workspace/components/nodes/nodeOptionConfig'
+import { WEAR_TILE_MODE_TEMPLATE_DESC } from '../../workspace/components/nodes/config/nodeOptionConfig'
 
 export interface VarDef {
   key: string

@@ -67,8 +67,8 @@
 import type { EditNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildEditNodeIoContext, buildNodeIoFromSlots, EDIT_NODE_IO_SLOTS } from './nodeIoConfig'
-import { useCanvasNodeStyle } from './useCanvasNodeStyle'
+import { buildEditNodeIoContext, buildNodeIoFromSlots, EDIT_NODE_IO_SLOTS } from './config/nodeIoConfig'
+import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: EditNodeItem
@@ -107,7 +107,7 @@ const io = computed(() =>
 const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
-<style scoped src="./node-shared.css"></style>
+<style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .edit-node-body {
   gap: 8px;

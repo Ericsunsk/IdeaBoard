@@ -71,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { toNumber } from './numberUtils'
+import { toNumber } from './utils/numberUtils'
 
 defineProps<{
   hex: string

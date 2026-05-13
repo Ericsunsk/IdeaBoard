@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import type { GenerateQualityOption, PatternGenerateRatioOption } from '../nodes/nodeOptionConfig'
+import type { GenerateQualityOption, PatternGenerateRatioOption } from '../nodes/config/nodeOptionConfig'
 
 type SelectedPreviewItem = {
   id: number

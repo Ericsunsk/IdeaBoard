@@ -7,7 +7,7 @@ import {
   normalizeHexColor,
   rgbToHex,
   rgbToHsv,
-} from '../components/nodes/colorPopoverUtils'
+} from '../components/nodes/utils/colorPopoverUtils'
 import { pickHexColor } from '../utils/eyedropper'
 
 interface UseColorPickerStateOptions {

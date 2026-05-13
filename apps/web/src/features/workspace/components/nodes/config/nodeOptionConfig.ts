@@ -4,7 +4,7 @@ import type {
   ModelAngleSpec,
   WearNodeItem,
   ViewpointNodeItem,
-} from '../../types/canvasNodes'
+} from '../../../types/canvasNodes'
 
 type OptionItem<T extends string | number> = { label: string; value: T }
 type ModelOptionItem = { key: string; label: string }
