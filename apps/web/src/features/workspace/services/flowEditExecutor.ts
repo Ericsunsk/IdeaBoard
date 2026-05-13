@@ -4,7 +4,7 @@ import {
   EXECUTION_FACE_SWAP_META,
 } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
-import type { EditNodeItem, MaskNodeItem, PromptNodeItem } from '../types/canvasNodes'
+import type { EditNodeItem, MaskNodeItem } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api/task'
 import { uploadApi } from '../../../shared/api/upload'
@@ -17,6 +17,7 @@ import {
 } from './flowLocalInpaint'
 import {
   parseHandlePort,
+  resolveConnectedPromptText,
   resolveConnectedInput,
   resolveSourceImageFromNode,
   waitTaskResult,
@@ -129,7 +130,7 @@ export function validateFlowEditNodeInputs(
   if (!promptInput || promptInput.sourceType !== 'prompt') {
     return 'Edit 节点缺少 Prompt 连线'
   }
-  const promptText = ((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim()
+  const promptText = resolveConnectedPromptText(options, context.nodeId)
   if (!promptText) {
     return 'Edit 节点缺少 Prompt 内容（请填写 Prompt 节点）'
   }
@@ -200,8 +201,7 @@ export async function executeFlowEditNode(
       }
     }
 
-    const promptInput = resolveConnectedInput(options, context.nodeId, 'prompt')!
-    const promptText = ((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim()
+    const promptText = resolveConnectedPromptText(options, context.nodeId)
     if (!promptText) {
       throw new Error('Edit 节点缺少 Prompt 内容（请填写 Prompt 节点）')
     }

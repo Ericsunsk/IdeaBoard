@@ -1,6 +1,5 @@
 import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
-import type { CanvasImageItem, ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
-import { createCanvasImageItemAt } from '../utils/canvasNodeFactory'
+import type { ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
 import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
 
 const FLOW_NODE_KIND_DRAG_MIME = 'application/x-ideaboard-flow-node-kind'
@@ -12,7 +11,6 @@ type UseFlowCanvasDropOptions = {
   currentBoardId: { value: string | null | undefined }
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   createNodeAtPosition: (kind: FlowCreatableNodeKind, x: number, y: number) => string | null
-  appendMessageFlowNode: (item: CanvasImageItem) => void
   updateSnapshotNode: (
     nodeId: string,
     patcher: (prev: Record<string, unknown>) => Record<string, unknown>,
@@ -163,6 +161,18 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     event.dataTransfer.dropEffect = 'copy'
   }
 
+  function createImageNodeFromPayload(point: { x: number; y: number }, payload: UploadImageResult) {
+    const nodeId = options.createNodeAtPosition('image', point.x, point.y)
+    if (!nodeId) return
+    options.updateSnapshotNode(nodeId, (prev) => ({
+      ...prev,
+      sourceImageUrl: payload.url,
+      sourceImageRatio: payload.ratio,
+      outputImages: [],
+    }))
+    options.onNodeMutated?.(nodeId)
+  }
+
   async function onCanvasDrop(event: DragEvent) {
     const point = options.screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
     const nodeKindRaw = event.dataTransfer?.getData(FLOW_NODE_KIND_DRAG_MIME) || ''
@@ -174,12 +184,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
 
     const payload = readNodeImageDropPayload(event)
     if (payload) {
-      const messageNode = createCanvasImageItemAt(
-        { x: point.x, y: point.y },
-        payload.url,
-        payload.ratio,
-      )
-      options.appendMessageFlowNode(messageNode)
+      createImageNodeFromPayload(point, payload)
       return
     }
 
@@ -191,12 +196,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     }
     try {
       const uploaded = await uploadImageToBoard(file)
-      const messageNode = createCanvasImageItemAt(
-        { x: point.x, y: point.y },
-        uploaded.url,
-        uploaded.ratio,
-      )
-      options.appendMessageFlowNode(messageNode)
+      createImageNodeFromPayload(point, uploaded)
     } catch (error) {
       const msg = error instanceof Error ? error.message : '上传失败'
       options.onWarning(msg)

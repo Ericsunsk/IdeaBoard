@@ -9,7 +9,7 @@ import {
 } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import { createCanvasImageItemAt } from '../utils/canvasNodeFactory'
-import type { CanvasImageItem } from '../types/canvasNodes'
+import type { CanvasImageItem, ImageNodeItem } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { waitTaskResult } from '../services/flowTaskExecutorUtils'
@@ -42,15 +42,39 @@ const STYLE_INNOVATE_DEFAULT_STRENGTH = 50
 export function useFlowMessageDirectActions(options: UseFlowMessageDirectActionsOptions) {
   const runningNodeIds = ref<Set<string>>(new Set())
 
-  function getMessageNodeById(nodeId: string): Node<FlowNodeData> | null {
+  function getDirectActionNodeById(nodeId: string): Node<FlowNodeData> | null {
     const target = options.nodes.value.find((node) => node.id === nodeId)
-    if (!target || target.data?.kind !== 'message') return null
+    if (!target || (target.data?.kind !== 'message' && target.data?.kind !== 'image')) return null
     return target as Node<FlowNodeData>
   }
 
   function readMessageSnapshot(nodeId: string): CanvasImageItem | null {
-    const node = getMessageNodeById(nodeId)
+    const node = getDirectActionNodeById(nodeId)
     if (!node?.data?.snapshotNode || typeof node.data.snapshotNode !== 'object') return null
+    if (node.data.kind === 'image') {
+      const snapshot = node.data.snapshotNode as ImageNodeItem
+      const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
+      const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
+      const url = `${latestOutput?.url || snapshot.sourceImageUrl || ''}`.trim()
+      if (!url) return null
+      const outputRatio = Number(latestOutput?.ratio)
+      const sourceRatio = Number(snapshot.sourceImageRatio)
+      const ratio =
+        Number.isFinite(outputRatio) && outputRatio > 0
+          ? outputRatio
+          : Number.isFinite(sourceRatio) && sourceRatio > 0
+            ? sourceRatio
+            : 1
+      return {
+        id: snapshot.id,
+        type: 'image',
+        url,
+        x: snapshot.x,
+        y: snapshot.y,
+        width: snapshot.width,
+        height_ratio: ratio,
+      }
+    }
     return node.data.snapshotNode as CanvasImageItem
   }
 

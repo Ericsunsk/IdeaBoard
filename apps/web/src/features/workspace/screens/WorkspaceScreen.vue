@@ -854,7 +854,6 @@ const {
 const {
   onFlowImageAppendToCanvas,
   onFlowImageDisplayDragStart,
-  appendMessageFlowNode,
   onFlowMessageImageDragStart,
   onFlowMessageResizeMouseDown,
   beginFlowNodeDragDuplicateTracking,
@@ -904,7 +903,6 @@ const canvasDrop = useFlowCanvasDrop({
   currentBoardId,
   screenToFlowCoordinate,
   createNodeAtPosition,
-  appendMessageFlowNode,
   updateSnapshotNode,
   getImageNodeSnapshot,
   getMaskNodeSnapshot,

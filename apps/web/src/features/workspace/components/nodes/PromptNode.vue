@@ -6,12 +6,8 @@
     :class="{ active, dragging, 'copy-mode': copyMode }"
     :style="nodeStyle"
   >
-    <NodeHeader
-      title="Prompt"
-      @node-mousedown="emit('node-mousedown', $event)"
-      @delete="emit('delete')"
-    >
-      <template #icon>
+    <div class="prompt-node-head" aria-hidden="true">
+      <span class="prompt-node-head-icon">
         <svg
           width="12"
           height="12"
@@ -22,17 +18,20 @@
         >
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
-      </template>
-    </NodeHeader>
-    <textarea
-      :value="node.text"
-      class="workflow-node-input"
-      placeholder="type your idea..."
-      @input="onInput"
-      @focus="emit('focus')"
-      @mousedown.stop
-      @contextmenu.stop
-    />
+      </span>
+      <span class="prompt-node-head-title">Prompt</span>
+    </div>
+    <div class="prompt-node-shell" data-flow-handle-frame>
+      <textarea
+        :value="node.text"
+        class="workflow-node-input"
+        placeholder="type your idea..."
+        @input="onInput"
+        @focus="emit('focus')"
+        @mousedown.stop
+        @contextmenu.stop
+      />
+    </div>
   </div>
 </template>
 
@@ -65,13 +64,66 @@ function onInput(event: Event) {
 
 <style scoped src="./styles/node-shared.css"></style>
 <style scoped>
+.workflow-node.prompt-node {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prompt-node-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 0 13px;
+  box-sizing: border-box;
+  color: #64748b;
+  user-select: none;
+  pointer-events: none;
+}
+
+.prompt-node-head-icon {
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prompt-node-head-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.prompt-node-shell {
+  aspect-ratio: 1 / 1;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.workflow-node.prompt-node.active .prompt-node-shell {
+  border-color: #9278e6;
+}
+
 .workflow-node-input {
   width: 100%;
-  min-height: 100px;
+  height: 100%;
+  min-height: 0;
   border: none;
   resize: none;
   outline: none;
-  padding: 12px;
+  padding: 12px 13px;
+  box-sizing: border-box;
   font-size: 14px;
   line-height: 1.6;
   color: #334155;

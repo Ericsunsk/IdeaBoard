@@ -111,7 +111,7 @@ export function createImageNodeAt(point: CanvasPoint): ImageNodeItem {
     type: 'image-node',
     x: point.x,
     y: point.y,
-    width: 286,
+    width: 280,
     sourceImageUrl: '',
     sourceImageRatio: 1,
     outputImages: [],

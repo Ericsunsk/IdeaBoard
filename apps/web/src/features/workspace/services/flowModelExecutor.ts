@@ -4,12 +4,12 @@ import {
   clampModelPoseStrength,
   clampModelReferenceStrength,
   type ModelNodeItem,
-  type PromptNodeItem,
 } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api/task'
 import {
   resolveConnectedInput,
+  resolveConnectedPromptText,
   resolveSourceImageFromNode,
   waitTaskResult,
 } from './flowTaskExecutorUtils'
@@ -69,10 +69,7 @@ export async function executeFlowModelNode(
   const imageBUrl = imageBInput
     ? resolveSourceImageFromNode(imageBInput.sourceType, imageBInput.snapshotNode)
     : ''
-  const promptText =
-    promptInput?.sourceType === 'prompt'
-      ? ((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim()
-      : ''
+  const promptText = promptInput ? resolveConnectedPromptText(options, context.nodeId) : ''
   const imageSize = await options.loadImageSizeFromUrl(sourceUrl)
 
   const request = buildExecutionTaskRequest({

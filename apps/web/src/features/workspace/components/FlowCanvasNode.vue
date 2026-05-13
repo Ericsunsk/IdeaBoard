@@ -38,6 +38,11 @@
           :stage-height="stageHeight"
           :display-image="displayImage"
           :display-mode="displayMode"
+          :action-menu-visible="!!props.messageActionVisible"
+          :direct-generating="!!props.messageDirectGenerating"
+          :show-style-strength-control="!!props.showStyleStrengthControl"
+          :style-innovate-strength-pct="props.styleInnovateStrengthPct ?? 50"
+          :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
           @node-mousedown="noopMouse"
           @delete="onDeleteRequest"
           @stage-drop="onImageStageDrop"
@@ -45,6 +50,10 @@
           @append-to-canvas="onImageAppendToCanvas"
           @reset="onImageReset"
           @display-dragstart="onImageDisplayDragStart"
+          @contextmenu="onMessageContextMenu"
+          @action="onMessageAction"
+          @style-innovate-mousedown="onStyleInnovateMouseDown"
+          @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
         />
       </div>
     </template>
@@ -215,13 +224,19 @@
       <div class="flow-canvas-node__unsupported">Unsupported node</div>
     </template>
 
-    <FlowNodeHandles
-      :kind="data.kind"
-      :snapshot-node="data.snapshotNode"
-      :ui-state="props.uiState"
-      :show-handles="isPointerOverNode"
-      @request-internals-update="emit('request-internals-update')"
-    />
+    <div
+      v-if="showHandleRail"
+      class="flow-canvas-node__handle-rail"
+      :style="handleRailStyle"
+    >
+      <FlowNodeHandles
+        :kind="data.kind"
+        :snapshot-node="data.snapshotNode"
+        :ui-state="props.uiState"
+        :show-handles="isPointerOverNode"
+        @request-internals-update="emit('request-internals-update')"
+      />
+    </div>
   </div>
 </template>
 
@@ -328,11 +343,31 @@ const isModelNode = computed(() => props.data.kind === 'model')
 const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const isMessageNode = computed(() => props.data.kind === 'message')
 const showDefaultDragZone = computed(() => !isMessageNode.value)
+const showHandleRail = computed(() => !isMessageNode.value)
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
 )
 const isPointerOverNode = ref(false)
+const flowCanvasNodeRef = ref<HTMLElement | null>(null)
+const handleRailBounds = reactive({
+  left: 0,
+  top: 0,
+  width: 0,
+  height: 0,
+})
+let handleRailMeasureFrame = 0
+let handleRailResizeObserver: ResizeObserver | null = null
+let observedHandleRailRoot: HTMLElement | null = null
+let observedHandleRailFrame: HTMLElement | null = null
+
+const handleRailStyle = computed(() => ({
+  left: `${handleRailBounds.left}px`,
+  top: `${handleRailBounds.top}px`,
+  width: `${handleRailBounds.width}px`,
+  height: `${handleRailBounds.height}px`,
+}))
+
 function resolveSnapshotNode<T>() {
   return props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
     ? ({ ...(props.data.snapshotNode as T), x: 0, y: 0 } as T)
@@ -409,9 +444,152 @@ const displayMode = computed<'source' | 'node-output'>(() => {
 
 const stageHeight = computed(() => {
   if (!imageSnapshot.value) return 180
-  const stageWidth = Math.max(120, Math.round(imageSnapshot.value.width - 24))
-  const ratio = imageSnapshot.value.sourceImageRatio > 0 ? imageSnapshot.value.sourceImageRatio : 1
+  const stageWidth = Math.max(120, Math.round(imageSnapshot.value.width))
+  const outputs = Array.isArray(imageSnapshot.value.outputImages)
+    ? imageSnapshot.value.outputImages
+    : []
+  const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
+  const outputRatio = Number(latestOutput?.ratio)
+  const sourceRatio = Number(imageSnapshot.value.sourceImageRatio)
+  const ratio =
+    displayImage.value && Number.isFinite(outputRatio) && outputRatio > 0
+      ? outputRatio
+      : displayImage.value && Number.isFinite(sourceRatio) && sourceRatio > 0
+        ? sourceRatio
+        : 1
   return Math.max(120, Math.min(360, Math.round(stageWidth * ratio)))
+})
+
+function getNodeHandleFrameElement(): HTMLElement | null {
+  const root = flowCanvasNodeRef.value
+  const explicitFrame = root?.querySelector<HTMLElement>('[data-flow-handle-frame]')
+  if (explicitFrame) return explicitFrame
+
+  const workflowNode = root?.querySelector<HTMLElement>('.workflow-node')
+  if (!workflowNode) return null
+
+  for (const child of Array.from(workflowNode.children)) {
+    if (!(child instanceof HTMLElement)) continue
+    if (child.classList.contains('workflow-node-header')) continue
+    if (child.classList.contains('prompt-node-head')) continue
+    return child
+  }
+  return null
+}
+
+function getLayoutOffsetWithinRoot(element: HTMLElement, root: HTMLElement) {
+  let left = 0
+  let top = 0
+  let current: HTMLElement | null = element
+
+  while (current && current !== root) {
+    left += current.offsetLeft
+    top += current.offsetTop
+    current = current.offsetParent as HTMLElement | null
+  }
+
+  return current === root ? { left, top } : null
+}
+
+function refreshHandleRailObserver() {
+  if (typeof ResizeObserver === 'undefined') return
+
+  if (!handleRailResizeObserver) {
+    handleRailResizeObserver = new ResizeObserver(() => requestHandleRailMeasure())
+  }
+
+  const root = flowCanvasNodeRef.value
+  const frame = getNodeHandleFrameElement()
+
+  if (observedHandleRailRoot !== root) {
+    if (observedHandleRailRoot) handleRailResizeObserver.unobserve(observedHandleRailRoot)
+    observedHandleRailRoot = root
+    if (observedHandleRailRoot) handleRailResizeObserver.observe(observedHandleRailRoot)
+  }
+
+  if (observedHandleRailFrame !== frame) {
+    if (observedHandleRailFrame) handleRailResizeObserver.unobserve(observedHandleRailFrame)
+    observedHandleRailFrame = frame
+    if (observedHandleRailFrame) handleRailResizeObserver.observe(observedHandleRailFrame)
+  }
+}
+
+function setHandleRailBounds(next: {
+  left: number
+  top: number
+  width: number
+  height: number
+}) {
+  const changed =
+    handleRailBounds.left !== next.left ||
+    handleRailBounds.top !== next.top ||
+    handleRailBounds.width !== next.width ||
+    handleRailBounds.height !== next.height
+
+  if (!changed) return
+
+  handleRailBounds.left = next.left
+  handleRailBounds.top = next.top
+  handleRailBounds.width = next.width
+  handleRailBounds.height = next.height
+  void nextTick(() => emit('request-internals-update'))
+}
+
+function updateHandleRailBounds() {
+  handleRailMeasureFrame = 0
+  const root = flowCanvasNodeRef.value
+  const frame = getNodeHandleFrameElement()
+
+  if (!root) {
+    return
+  }
+
+  if (!frame) {
+    setHandleRailBounds({
+      left: 0,
+      top: 0,
+      width: Math.max(1, root.offsetWidth),
+      height: Math.max(1, root.offsetHeight),
+    })
+    return
+  }
+
+  const offset = getLayoutOffsetWithinRoot(frame, root)
+  if (!offset) return
+
+  setHandleRailBounds({
+    left: Math.round(offset.left),
+    top: Math.round(offset.top),
+    width: Math.max(1, Math.round(frame.offsetWidth)),
+    height: Math.max(1, Math.round(frame.offsetHeight)),
+  })
+}
+
+function requestHandleRailMeasure() {
+  if (typeof requestAnimationFrame === 'undefined') {
+    refreshHandleRailObserver()
+    updateHandleRailBounds()
+    return
+  }
+
+  if (handleRailMeasureFrame) cancelAnimationFrame(handleRailMeasureFrame)
+  handleRailMeasureFrame = requestAnimationFrame(() => {
+    refreshHandleRailObserver()
+    updateHandleRailBounds()
+  })
+}
+
+onMounted(() => {
+  void nextTick(requestHandleRailMeasure)
+})
+
+onUpdated(() => {
+  requestHandleRailMeasure()
+})
+
+onBeforeUnmount(() => {
+  if (handleRailMeasureFrame) cancelAnimationFrame(handleRailMeasureFrame)
+  handleRailResizeObserver?.disconnect()
 })
 
 function onPromptTextUpdate(value: string) {
@@ -595,26 +773,47 @@ function noopMouse() {}
   font-size: 12px;
 }
 
+.flow-canvas-node__handle-rail {
+  position: absolute;
+  z-index: 24;
+  pointer-events: none;
+  overflow: visible;
+}
+
 .flow-canvas-node :deep(.workflow-node) {
   position: relative;
   left: 0 !important;
   top: 0 !important;
   transform: none !important;
   z-index: 1;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
-  background: #ffffff;
   overflow: visible;
-  transition: border-color 0.2s ease;
   pointer-events: auto;
 }
 
-.flow-canvas-node :deep(.workflow-node .workflow-node-header) {
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
+.flow-canvas-node :deep(.workflow-node:not(.prompt-node)) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.flow-canvas-node :deep(.workflow-node.active) {
+.flow-canvas-node
+  :deep(
+    .workflow-node:not(.prompt-node):not(.image-node) > :not(.workflow-node-header):first-of-type
+  ) {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  transition: border-color 0.2s ease;
+}
+
+.flow-canvas-node
+  :deep(
+    .workflow-node:not(.prompt-node):not(.image-node).active
+      > :not(.workflow-node-header):first-of-type
+  ) {
   border-color: #9278e6;
 }
 

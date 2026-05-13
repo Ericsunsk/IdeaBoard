@@ -1,10 +1,11 @@
 import { buildExecutionTaskRequest, EXECUTION_VIEWPOINT_META } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
-import type { PromptNodeItem, ViewpointNodeItem } from '../types/canvasNodes'
+import type { ViewpointNodeItem } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api/task'
 import {
   resolveConnectedInput,
+  resolveConnectedPromptText,
   resolveSourceImageFromNode,
   waitTaskResult,
 } from './flowTaskExecutorUtils'
@@ -52,10 +53,7 @@ export async function executeFlowViewpointNode(
   const imageInput = resolveConnectedInput(options, context.nodeId, 'image')!
   const imageUrl = resolveSourceImageFromNode(imageInput.sourceType, imageInput.snapshotNode)
   const promptInput = resolveConnectedInput(options, context.nodeId, 'prompt')
-  const promptText =
-    promptInput?.sourceType === 'prompt'
-      ? ((promptInput.snapshotNode as unknown as PromptNodeItem).text || '').trim()
-      : ''
+  const promptText = promptInput ? resolveConnectedPromptText(options, context.nodeId) : ''
   const imageSize = await options.loadImageSizeFromUrl(imageUrl)
 
   const request = buildExecutionTaskRequest({

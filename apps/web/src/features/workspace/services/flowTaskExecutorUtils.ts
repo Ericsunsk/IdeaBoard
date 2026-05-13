@@ -16,6 +16,56 @@ export interface FlowConnectedInput {
   snapshotNode: Record<string, unknown>
 }
 
+function resolvePromptInputSourceNodeId(
+  options: FlowTaskExecutorGraphOptions,
+  targetNodeId: string,
+): string {
+  const incoming = options.edges.find(
+    (edge) => edge.target === targetNodeId && parseHandlePort(edge.targetHandle) === 'prompt',
+  )
+  return incoming?.source || ''
+}
+
+function resolvePromptChainText(
+  options: FlowTaskExecutorGraphOptions,
+  promptNodeId: string,
+  visited: Set<string>,
+): string {
+  if (!promptNodeId || visited.has(promptNodeId)) return ''
+  visited.add(promptNodeId)
+  const promptNode = options.nodes.find((node) => node.id === promptNodeId)
+  if (
+    !promptNode ||
+    promptNode.data?.kind !== 'prompt' ||
+    !promptNode.data.snapshotNode ||
+    typeof promptNode.data.snapshotNode !== 'object'
+  ) {
+    return ''
+  }
+
+  const snapshotNode = promptNode.data.snapshotNode as { text?: unknown }
+  const selfText =
+    typeof snapshotNode.text === 'string'
+      ? snapshotNode.text.trim()
+      : `${snapshotNode.text ?? ''}`.trim()
+
+  const upstreamPromptNodeId = resolvePromptInputSourceNodeId(options, promptNodeId)
+  const upstreamText = upstreamPromptNodeId
+    ? resolvePromptChainText(options, upstreamPromptNodeId, visited)
+    : ''
+
+  return [upstreamText, selfText].filter((item) => item.length > 0).join('\n')
+}
+
+export function resolveConnectedPromptText(
+  options: FlowTaskExecutorGraphOptions,
+  targetNodeId: string,
+): string {
+  const promptSourceNodeId = resolvePromptInputSourceNodeId(options, targetNodeId)
+  if (!promptSourceNodeId) return ''
+  return resolvePromptChainText(options, promptSourceNodeId, new Set<string>())
+}
+
 export function parseHandlePort(handle: string | null | undefined): string {
   if (!handle) return ''
   const [prefix, port] = handle.split(':')

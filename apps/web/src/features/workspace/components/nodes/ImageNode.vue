@@ -30,17 +30,14 @@
     <div class="image-node-body" @contextmenu.stop>
       <div
         class="image-node-stage"
+        data-flow-handle-frame
         :data-image-node-id="node.id"
         :style="{ height: `${stageHeight}px` }"
         @dragover.stop="onStageDragOver"
         @drop.stop="onStageDrop"
-        @mousedown="onStageMouseDown"
-        @contextmenu.prevent.stop
+        @contextmenu.prevent.stop="onStageContextMenu"
       >
         <template v-if="displayImage">
-          <div class="image-node-stage-badge" :class="displayModeClass">
-            {{ displayModeLabel }}
-          </div>
           <img
             :src="stageDisplayUrl"
             class="image-node-stage-image nodrag"
@@ -82,33 +79,34 @@
             stroke="currentColor"
             stroke-width="1.8"
           >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+            <circle cx="15.5" cy="8.5" r="1.5" />
+            <path d="M5 16l4.5-4.5 4 4 2-2L19 17" />
           </svg>
           <span>{{ emptyStateLabel }}</span>
         </div>
       </div>
 
-      <div
-        v-if="previewPopupOpen && displayImage"
-        class="image-preview-popup"
-        @mousedown.stop
-        @click.stop
-        @contextmenu.prevent.stop
-      >
-        <div
-          class="image-preview-popup-stage"
-          :style="{ width: `${popupStageWidth}px`, height: `${popupStageHeight}px` }"
-        >
-          <img :src="displayImage.url" class="image-node-stage-image preview" draggable="false" />
-        </div>
-      </div>
+      <HomeCanvasImageActionMenu
+        v-if="showImageActionMenu"
+        :show-style-strength-control="!!showStyleStrengthControl"
+        :direct-generating="!!directGenerating"
+        :display-height="stageHeight"
+        :style-innovate-strength-pct="styleInnovateStrengthPct ?? 50"
+        :set-style-strength-track-ref="setStyleStrengthTrackRef"
+        @action-remove-bg="emit('action', 'remove-bg')"
+        @style-innovate-mousedown="emit('style-innovate-mousedown', $event)"
+        @style-innovate-click="emit('action', 'style-innovate')"
+        @action-to-vector="emit('action', 'to-vector')"
+        @action-sketch-to-design="emit('action', 'sketch-to-design')"
+        @style-strength-track-mousedown="emit('style-strength-track-mousedown', $event)"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import type { ComponentPublicInstance } from 'vue'
 import type { ImageNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
@@ -124,6 +122,11 @@ const props = defineProps<{
   displayMode?: 'source' | 'node-output' | 'linked-output' | 'mask' | 'pending'
   inputLocked?: boolean
   uiState?: NodeUiState
+  actionMenuVisible?: boolean
+  directGenerating?: boolean
+  showStyleStrengthControl?: boolean
+  styleInnovateStrengthPct?: number
+  setStyleStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
 }>()
 
 const emit = defineEmits<{
@@ -134,52 +137,22 @@ const emit = defineEmits<{
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'display-dragstart', event: DragEvent): void
+  (e: 'contextmenu', event: MouseEvent): void
+  (e: 'action', action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'): void
+  (e: 'style-innovate-mousedown', event: MouseEvent): void
+  (e: 'style-strength-track-mousedown', event: MouseEvent): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-const previewPopupOpen = ref(false)
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
-const displayModeLabel = computed(() => {
-  if (props.displayMode === 'pending') return 'Pending'
-  if (props.displayMode === 'linked-output') return 'Linked'
-  if (props.displayMode === 'node-output') return 'Output'
-  if (props.displayMode === 'mask') return 'Mask'
-  return 'Source'
-})
-const displayModeClass = computed(() => {
-  if (props.displayMode === 'pending') return 'is-pending'
-  if (props.displayMode === 'linked-output') return 'is-linked-output'
-  if (props.displayMode === 'node-output') return 'is-output'
-  if (props.displayMode === 'mask') return 'is-mask'
-  return 'is-source'
-})
 const isPendingDisplayMode = computed(() => props.displayMode === 'pending')
 const emptyStateLabel = computed(() => {
   if (props.displayMode === 'pending' || props.inputLocked) return 'Waiting...'
   return '上传或拖拽图片作为输入'
 })
 
-const popupStageHeight = computed(() =>
-  Math.max(280, Math.min(560, Math.round(props.stageHeight * 2))),
-)
-
-const popupStageWidth = computed(() => {
-  const stageWidth = Math.max(120, Math.round(props.node.width - 24))
-  const scale = props.stageHeight > 0 ? popupStageHeight.value / props.stageHeight : 1
-  return Math.round(stageWidth * scale)
-})
-
-function closePreviewPopup() {
-  previewPopupOpen.value = false
-}
-
-function onStageMouseDown(event: MouseEvent) {
-  if (event.button !== 2 || !props.displayImage) return
-  event.preventDefault()
-  event.stopPropagation()
-  previewPopupOpen.value = true
-}
+const showImageActionMenu = computed(() => !!props.actionMenuVisible && !!props.displayImage)
 
 function onStageDragOver(event: DragEvent) {
   event.preventDefault()
@@ -196,22 +169,10 @@ function onEmptyStateClick() {
   emit('open-file')
 }
 
-function onGlobalMouseUp(event: MouseEvent) {
-  if (event.button !== 2 && event.button !== 0) return
-  closePreviewPopup()
+function onStageContextMenu(event: MouseEvent) {
+  if (!props.displayImage) return
+  emit('contextmenu', event)
 }
-
-function onWindowBlur() {
-  closePreviewPopup()
-}
-
-window.addEventListener('mouseup', onGlobalMouseUp, true)
-window.addEventListener('blur', onWindowBlur, true)
-
-onBeforeUnmount(() => {
-  window.removeEventListener('mouseup', onGlobalMouseUp, true)
-  window.removeEventListener('blur', onWindowBlur, true)
-})
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>
@@ -222,10 +183,13 @@ onBeforeUnmount(() => {
 
 .image-node-body {
   position: relative;
-  padding: 10px 12px 12px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: visible;
 }
 
 .image-node-stage-image {
@@ -239,48 +203,55 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.image-node-stage-badge {
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  z-index: 2;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  backdrop-filter: blur(8px);
+.image-node-stage {
+  position: relative;
+  width: 100%;
+  min-height: 120px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.image-node-stage-badge.is-source {
-  border: 1px solid rgba(146, 120, 230, 0.2);
-  background: rgba(255, 255, 255, 0.9);
-  color: #7b67d1;
+.workflow-node.image-node.active .image-node-stage {
+  border-color: #9278e6;
 }
 
-.image-node-stage-badge.is-output {
-  border: 1px solid rgba(53, 171, 123, 0.18);
-  background: rgba(240, 255, 248, 0.92);
-  color: #1d8b61;
+.image-node-stage-empty {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #8a95a5;
+  gap: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
-.image-node-stage-badge.is-linked-output {
-  border: 1px solid rgba(76, 118, 229, 0.18);
-  background: rgba(244, 247, 255, 0.92);
-  color: #496ad5;
+.image-node-stage-empty:hover {
+  background: #ffffff;
+  color: #64748b;
 }
 
-.image-node-stage-badge.is-mask {
-  border: 1px solid rgba(146, 120, 230, 0.2);
-  background: rgba(247, 243, 255, 0.94);
-  color: #7b67d1;
+.image-node-stage-empty svg {
+  width: 84px;
+  height: 84px;
+  stroke-width: 1.7;
 }
 
-.image-node-stage-badge.is-pending {
-  border: 1px solid rgba(243, 187, 64, 0.18);
-  background: rgba(255, 250, 239, 0.94);
-  color: #bb7b00;
+.image-node-stage-empty span {
+  display: none;
 }
 
 .image-node-stage-empty.is-readonly {
@@ -291,7 +262,19 @@ onBeforeUnmount(() => {
   color: #8f789b;
 }
 
-.image-preview-popup {
-  z-index: 28;
+.image-node-stage-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.image-node-stage:hover .image-node-stage-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 </style>

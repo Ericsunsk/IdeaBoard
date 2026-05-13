@@ -1,16 +1,16 @@
 .workflow-node-header {
-  height: 34px;
-  padding: 0 8px 0 12px;
+  min-height: 22px;
+  padding: 8px 12px 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
+  justify-content: flex-start;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: #64748b;
-  background: #f8fafc;
-  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+  border-bottom: 0;
   cursor: grab;
   user-select: none;
   transition:
@@ -19,7 +19,6 @@
 }
 
 .workflow-node.active .workflow-node-header {
-  background: #fdfdff;
   color: #9278e6;
 }
 
@@ -65,6 +64,7 @@
 .node-header-title {
   display: flex;
   align-items: center;
+  gap: 6px;
 }
 
 .node-delete-btn {
@@ -207,7 +207,6 @@
   filter: none;
 }
 
-.image-node-stage,
 .model-stage,
 .mask-stage {
   position: relative;
@@ -221,7 +220,6 @@
   justify-content: center;
 }
 
-.image-node-stage-empty,
 .model-stage-empty,
 .mask-stage-empty {
   width: calc(100% - 20px);
@@ -240,7 +238,6 @@
   transition: all 0.2s ease;
 }
 
-.image-node-stage-empty:hover,
 .model-stage-empty:hover,
 .mask-stage-empty:hover {
   border-color: #9278e6;
@@ -248,7 +245,6 @@
   background: rgba(146, 120, 230, 0.05);
 }
 
-.image-node-stage-actions,
 .model-stage-actions,
 .mask-stage-actions {
   position: absolute;
@@ -258,7 +254,6 @@
   gap: 6px;
 }
 
-.image-preview-popup,
 .mask-paint-popup {
   position: absolute;
   left: 50%;
@@ -271,7 +266,6 @@
   backdrop-filter: blur(10px);
 }
 
-.image-preview-popup-stage,
 .mask-paint-popup-stage {
   overflow: hidden;
   border-radius: 12px;
