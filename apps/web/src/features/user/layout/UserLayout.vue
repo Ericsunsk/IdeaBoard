@@ -28,7 +28,7 @@
       <router-view :key="route.path === '/user/picture' ? route.path : route.fullPath" />
     </div>
 
-    <UserAuthScreen v-if="authMode" :mode="authMode" />
+    <UserAuthModals v-if="authMode" :mode="authMode" />
   </div>
 </template>
 
@@ -36,7 +36,7 @@
 import { CloseOutline, ShieldHalfOutline } from '@vicons/ionicons5'
 import { useUserStore } from '../../../app/stores/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
-import UserAuthScreen from '../../auth/screens/UserAuthScreen.vue'
+import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 
 const router = useRouter()
 const route = useRoute()
