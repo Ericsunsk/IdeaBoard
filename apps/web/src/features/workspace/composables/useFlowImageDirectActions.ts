@@ -1,11 +1,12 @@
 import { ref, type Ref } from 'vue'
-import type { Node } from '@vue-flow/core'
+import type { Edge, Node } from '@vue-flow/core'
 import { taskApi } from '../../../shared/api/task'
 import { vectorizeApi } from '../../../shared/api/vectorize'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
+  EXECUTION_EDIT_MODE_META,
 } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import { createImageNodeAt } from '../utils/canvasNodeFactory'
@@ -23,11 +24,13 @@ type RunImageDirectActionOptions = {
 
 type UseFlowImageDirectActionsOptions = {
   nodes: Ref<Node[]>
+  edges: Ref<Edge[]>
   captureHistory: () => FlowHistorySnapshot
   pushHistory: (snapshot: FlowHistorySnapshot) => void
   markDirty: () => void
   refreshSnapshot: () => void
   commitNodes: (nextNodes: Node[]) => void
+  commitEdges: (nextEdges: Edge[]) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
 }
@@ -87,16 +90,25 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
   }
 
-  function commitNodeMutation(mutator: (items: Node[]) => Node[]) {
+  function commitGraphMutation(mutator: (items: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[] }) {
     const historyBefore = options.captureHistory()
-    const nextNodes = mutator(options.nodes.value)
+    const { nodes: nextNodes, edges: nextEdges } = mutator(
+      options.nodes.value,
+      options.edges.value,
+    )
     options.commitNodes(nextNodes)
+    options.commitEdges(nextEdges)
     options.pushHistory(historyBefore)
     options.markDirty()
     options.refreshSnapshot()
   }
 
-  function appendImageResultNode(source: ImageDirectActionSource, url: string, ratio: number) {
+  function appendImageResultNode(
+    source: ImageDirectActionSource,
+    url: string,
+    ratio: number,
+    sourceNodeId?: string,
+  ) {
     const imageNode = createImageNodeAt({ x: source.x + source.width + 48, y: source.y })
     imageNode.width = source.width
     imageNode.sourceImageUrl = url
@@ -117,7 +129,19 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       },
     }
 
-    commitNodeMutation((items) => [...items, nextNode as Node])
+    commitGraphMutation((items, currentEdges) => {
+      const nextNodes = [...items, nextNode as Node]
+      if (!sourceNodeId) return { nodes: nextNodes, edges: currentEdges }
+      const nextEdge: Edge = {
+        id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        source: sourceNodeId,
+        sourceHandle: 'out:image',
+        target: nextNode.id,
+        targetHandle: 'in:image',
+        animated: false,
+      }
+      return { nodes: nextNodes, edges: [...currentEdges, nextEdge] }
+    })
   }
 
   async function resolveResultRatio(url: string, fallbackRatio: number): Promise<number> {
@@ -163,6 +187,28 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
             imageUrls: [source.url],
             params: buildExecutionSizeParams(imageSize),
           })
+
+    const submitRes = await taskApi.submit(request)
+    if (submitRes.code !== 0 || !submitRes.data?.task_id) {
+      throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
+    }
+    return waitTaskResult(submitRes.data.task_id)
+  }
+
+  async function runPromptImageGeneration(
+    source: ImageDirectActionSource,
+    prompt: string,
+  ): Promise<string[]> {
+    const imageSize = await loadImageSizeFromUrl(source.url)
+    const request = buildExecutionTaskRequest({
+      prompt: `${EXECUTION_EDIT_MODE_META['partial-edit'].promptPrefix} ${prompt}`,
+      feature: EXECUTION_EDIT_MODE_META['partial-edit'].feature,
+      imageUrls: [source.url],
+      params: {
+        original_image_url: source.url,
+        ...buildExecutionSizeParams(imageSize),
+      },
+    })
 
     const submitRes = await taskApi.submit(request)
     if (submitRes.code !== 0 || !submitRes.data?.task_id) {
@@ -219,6 +265,35 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
   }
 
+  async function runImagePromptGeneration(nodeId: string, prompt: string) {
+    const normalizedPrompt = prompt.trim()
+    if (!normalizedPrompt) {
+      options.onWarning('请输入 Prompt')
+      return
+    }
+    if (runningNodeIds.value.has(nodeId)) return
+    const source = readImageSnapshot(nodeId)
+    if (!source?.url) {
+      options.onWarning('图片节点不存在或缺少 URL')
+      return
+    }
+
+    setNodeRunning(nodeId, true)
+    try {
+      const urls = await runPromptImageGeneration(source, normalizedPrompt)
+      const firstUrl = urls.find((url) => typeof url === 'string' && url.trim())?.trim()
+      if (!firstUrl) throw new Error('任务完成但未返回图片')
+      const ratio = await resolveResultRatio(firstUrl, source.ratio)
+      appendImageResultNode(source, firstUrl, ratio, nodeId)
+      options.onSuccess('生成完成')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '生成失败'
+      options.onWarning(msg)
+    } finally {
+      setNodeRunning(nodeId, false)
+    }
+  }
+
   function isNodeDirectActionRunning(nodeId: string): boolean {
     return runningNodeIds.value.has(nodeId)
   }
@@ -226,5 +301,6 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   return {
     isNodeDirectActionRunning,
     runImageDirectAction,
+    runImagePromptGeneration,
   }
 }

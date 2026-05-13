@@ -61,6 +61,7 @@ export interface PromptNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   text: string
 }
 
@@ -133,6 +134,7 @@ export interface ModelNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   angleSpec: ModelAngleSpec
   modelStrength: number
   poseStrength: number
@@ -147,6 +149,7 @@ export interface ViewpointNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   activeCategory: 'top' | 'bottom' | 'set'
   selectedViewpoint: string
   lighting: 'warm_white' | 'afternoon' | 'hard_light'
@@ -160,6 +163,7 @@ export interface MaskNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   sourceImageUrl: string
   sourceImageRatio: number
   executionMaskDataUrl: string
@@ -181,6 +185,7 @@ export interface ImageNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   sourceImageUrl: string
   sourceImageRatio: number
   outputImages: ImageNodeOutputItem[]
@@ -192,6 +197,7 @@ export interface ColorNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   colors: string[]
   strength: number
   outputStatus: WorkflowNodeOutputStatus
@@ -204,6 +210,7 @@ export interface EditNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   mode: 'partial-edit' | 'bg-swap' | 'face-swap'
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
@@ -215,6 +222,7 @@ export interface FusionNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   blendRatio: number
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
@@ -226,6 +234,7 @@ export interface EnhanceNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   mode: 'hd-upscale' | 'canvas-extend'
   upscaleMode: 'base' | 'enhancement'
   upscaleFactor: 2 | 3 | 4
@@ -245,6 +254,7 @@ export interface WearNodeItem {
   x: number
   y: number
   width: number
+  title?: string
   tileMode: 'seamless' | 'single'
   rotation: number
   scale: number
@@ -331,6 +341,31 @@ export type CanvasConnectionNodeType =
   | 'fusion'
   | 'enhance'
   | 'wear'
+
+export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): string {
+  switch (nodeType) {
+    case 'image':
+      return 'IMAGE'
+    case 'prompt':
+      return 'PROMPT'
+    case 'mask':
+      return 'MASK'
+    case 'color':
+      return 'COLOR'
+    case 'model':
+      return 'MODEL'
+    case 'viewpoint':
+      return 'DISPLAY'
+    case 'edit':
+      return 'EDIT'
+    case 'fusion':
+      return 'FUSION'
+    case 'enhance':
+      return 'ENHANCE'
+    case 'wear':
+      return 'WEAR'
+  }
+}
 export type CanvasConnectionPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
 
 export interface CanvasConnection {

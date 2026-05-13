@@ -8,8 +8,9 @@
     @mousedown.stop
   >
     <NodeHeader
-      title="Enhance"
+      :title="node.title || 'ENHANCE'"
       @node-mousedown="emit('node-mousedown', $event)"
+      @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
@@ -190,6 +191,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
+  (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'update:mode', value: EnhanceNodeItem['mode']): void
   (e: 'update:upscale-mode', value: EnhanceNodeItem['upscaleMode']): void

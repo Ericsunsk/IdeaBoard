@@ -7,8 +7,9 @@
     :style="nodeStyle"
   >
     <NodeHeader
-      title="Edit"
+      :title="node.title || 'EDIT'"
       @node-mousedown="emit('node-mousedown', $event)"
+      @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
@@ -81,6 +82,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
+  (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'update:mode', value: 'partial-edit' | 'bg-swap' | 'face-swap'): void
   (e: 'generate'): void

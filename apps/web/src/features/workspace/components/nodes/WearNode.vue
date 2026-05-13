@@ -8,8 +8,9 @@
     @mousedown.stop
   >
     <NodeHeader
-      title="Wear"
+      :title="node.title || 'WEAR'"
       @node-mousedown="emit('node-mousedown', $event)"
+      @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
@@ -112,6 +113,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
+  (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'update:tile-mode', value: WearNodeItem['tileMode']): void
   (e: 'update:rotation', value: number): void

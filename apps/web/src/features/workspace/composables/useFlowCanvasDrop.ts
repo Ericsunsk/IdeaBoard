@@ -43,6 +43,10 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     return `${boardId}::${file.name}::${file.size}::${file.lastModified}`
   }
 
+  function resolveImageFileTitle(file: File): string {
+    return file.name.trim()
+  }
+
   async function loadImageRatioFromFile(file: File): Promise<number | null> {
     const localUrl = URL.createObjectURL(file)
     try {
@@ -92,6 +96,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
       const uploaded = await uploadImageToBoard(file)
       options.updateSnapshotNode(nodeId, (prev) => ({
         ...prev,
+        title: resolveImageFileTitle(file) || prev.title,
         sourceImageUrl: uploaded.url,
         sourceImageRatio: uploaded.ratio,
         outputImages: [],
@@ -133,8 +138,13 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     event.dataTransfer.dropEffect = 'copy'
   }
 
-  function createImageNodeFromPayload(point: { x: number; y: number }, payload: UploadImageResult) {
+  function createImageNodeFromPayload(
+    point: { x: number; y: number },
+    payload: UploadImageResult,
+    title?: string,
+  ) {
     const nodeId = options.createNodeAtPosition('image', point.x, point.y, {
+      ...(title ? { title } : {}),
       sourceImageUrl: payload.url,
       sourceImageRatio: payload.ratio,
       outputImages: [],
@@ -160,7 +170,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     }
     try {
       const uploaded = await uploadImageToBoard(file)
-      createImageNodeFromPayload(point, uploaded)
+      createImageNodeFromPayload(point, uploaded, resolveImageFileTitle(file))
     } catch (error) {
       const msg = error instanceof Error ? error.message : '上传失败'
       options.onWarning(msg)

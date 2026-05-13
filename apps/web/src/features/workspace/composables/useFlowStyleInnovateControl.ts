@@ -9,7 +9,7 @@ export function useFlowStyleInnovateControl(options: { onCommit: (strength: numb
 
   let flowStyleStrengthLongPressTimer: number | null = null
   let flowStyleStrengthDragging = false
-  let flowStyleStrengthPointerY = 0
+  let flowStyleStrengthPointerX = 0
 
   function clearFlowStyleStrengthLongPressTimer() {
     if (!flowStyleStrengthLongPressTimer) return
@@ -34,12 +34,12 @@ export function useFlowStyleInnovateControl(options: { onCommit: (strength: numb
     flowStyleStrengthTrackRef.value = targetEl
   }
 
-  function updateFlowStyleStrengthFromClientY(clientY: number) {
+  function updateFlowStyleStrengthFromClientX(clientX: number) {
     const track = getFlowStyleStrengthTrackEl()
     if (!track) return
     const rect = track.getBoundingClientRect()
-    if (rect.height <= 0) return
-    const ratio = 1 - (clientY - rect.top) / rect.height
+    if (rect.width <= 0) return
+    const ratio = (clientX - rect.left) / rect.width
     const clamped = Math.max(0, Math.min(1, ratio))
     flowStyleInnovateStrength.value = Math.max(0, Math.min(100, Math.round(clamped * 100)))
   }
@@ -54,12 +54,12 @@ export function useFlowStyleInnovateControl(options: { onCommit: (strength: numb
     window.addEventListener('mouseup', onFlowStyleInnovateMouseUp, true)
   }
 
-  function beginFlowStyleStrengthDragging(clientY: number) {
+  function beginFlowStyleStrengthDragging(clientX: number) {
     flowShowStyleStrengthControl.value = true
     flowStyleStrengthDragging = true
-    flowStyleStrengthPointerY = clientY
+    flowStyleStrengthPointerX = clientX
     addFlowStyleStrengthGlobalListeners()
-    void nextTick(() => updateFlowStyleStrengthFromClientY(flowStyleStrengthPointerY))
+    void nextTick(() => updateFlowStyleStrengthFromClientX(flowStyleStrengthPointerX))
   }
 
   function hideFlowStyleStrengthControl() {
@@ -74,18 +74,18 @@ export function useFlowStyleInnovateControl(options: { onCommit: (strength: numb
     clearFlowStyleStrengthLongPressTimer()
     flowSuppressStyleInnovateClick.value = false
     flowStyleStrengthDragging = false
-    flowStyleStrengthPointerY = e.clientY
+    flowStyleStrengthPointerX = e.clientX
     flowStyleStrengthLongPressTimer = window.setTimeout(() => {
       flowSuppressStyleInnovateClick.value = true
-      beginFlowStyleStrengthDragging(flowStyleStrengthPointerY)
+      beginFlowStyleStrengthDragging(flowStyleStrengthPointerX)
     }, 260)
     addFlowStyleStrengthGlobalListeners()
   }
 
   function onFlowStyleInnovateMouseMove(e: MouseEvent) {
-    flowStyleStrengthPointerY = e.clientY
+    flowStyleStrengthPointerX = e.clientX
     if (!flowStyleStrengthDragging || !flowShowStyleStrengthControl.value) return
-    updateFlowStyleStrengthFromClientY(e.clientY)
+    updateFlowStyleStrengthFromClientX(e.clientX)
   }
 
   function onFlowStyleInnovateMouseUp() {
@@ -98,7 +98,7 @@ export function useFlowStyleInnovateControl(options: { onCommit: (strength: numb
   }
 
   function onFlowStyleStrengthTrackMouseDown(e: MouseEvent) {
-    beginFlowStyleStrengthDragging(e.clientY)
+    beginFlowStyleStrengthDragging(e.clientX)
   }
 
   onBeforeUnmount(() => {

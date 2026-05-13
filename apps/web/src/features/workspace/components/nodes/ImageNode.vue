@@ -7,9 +7,10 @@
     :style="nodeStyle"
   >
     <NodeHeader
-      title="Image"
+      :title="node.title || 'IMAGE'"
       rounded
       @node-mousedown="emit('node-mousedown', $event)"
+      @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
@@ -49,7 +50,7 @@
           </div>
         </template>
         <div
-          v-else
+          v-if="!displayImage"
           class="image-node-stage-empty"
           :class="{ 'is-readonly': props.inputLocked }"
           @click="onEmptyStateClick"
@@ -84,6 +85,45 @@
         @action-sketch-to-design="emit('action', 'sketch-to-design')"
         @style-strength-track-mousedown="emit('style-strength-track-mousedown', $event)"
       />
+      <form
+        v-if="showPromptComposer"
+        class="image-node-prompt-composer"
+        @submit.prevent="submitPrompt"
+        @mousedown.stop
+        @click.stop
+        @contextmenu.stop.prevent
+      >
+        <textarea
+          ref="promptInputRef"
+          v-model="promptDraft"
+          class="image-node-prompt-input"
+          rows="1"
+          placeholder="输入提示词改造这张图"
+          :disabled="directGenerating"
+          @input="resizePromptInput"
+          @keydown.enter.exact="onPromptEnter"
+        />
+        <button
+          class="image-node-prompt-send"
+          type="submit"
+          :disabled="directGenerating || !promptDraft.trim()"
+          title="发送"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.1"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M5 12h13" />
+            <path d="m13 6 6 6-6 6" />
+          </svg>
+        </button>
+      </form>
     </div>
   </div>
 </template>
@@ -106,6 +146,7 @@ const props = defineProps<{
   inputLocked?: boolean
   uiState?: NodeUiState
   actionMenuVisible?: boolean
+  promptComposerVisible?: boolean
   directGenerating?: boolean
   showStyleStrengthControl?: boolean
   styleInnovateStrengthPct?: number
@@ -114,12 +155,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
+  (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'stage-drop', event: DragEvent): void
   (e: 'open-file'): void
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
+  (e: 'prompt-generate', prompt: string): void
   (e: 'action', action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
@@ -134,6 +177,21 @@ const emptyStateLabel = computed(() => {
 })
 
 const showImageActionMenu = computed(() => !!props.actionMenuVisible && !!props.displayImage)
+const showPromptComposer = computed(() => !!props.promptComposerVisible && !!props.displayImage)
+const promptDraft = ref('')
+const promptInputRef = ref<HTMLTextAreaElement | null>(null)
+
+watch(showPromptComposer, async (visible) => {
+  if (!visible) return
+  await nextTick()
+  resizePromptInput()
+  promptInputRef.value?.focus()
+})
+
+watch(promptDraft, async () => {
+  await nextTick()
+  resizePromptInput()
+})
 
 function onStageDragOver(event: DragEvent) {
   event.preventDefault()
@@ -153,6 +211,29 @@ function onEmptyStateClick() {
 function onStageContextMenu(event: MouseEvent) {
   if (!props.displayImage) return
   emit('contextmenu', event)
+}
+
+function submitPrompt() {
+  const prompt = promptDraft.value.trim()
+  if (!prompt || props.directGenerating) return
+  emit('prompt-generate', prompt)
+  promptDraft.value = ''
+  void nextTick(resizePromptInput)
+}
+
+function onPromptEnter(event: KeyboardEvent) {
+  if (event.isComposing) return
+  event.preventDefault()
+  submitPrompt()
+}
+
+function resizePromptInput() {
+  const input = promptInputRef.value
+  if (!input) return
+  const maxHeight = 108
+  input.style.height = 'auto'
+  input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`
+  input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden'
 }
 </script>
 
@@ -259,5 +340,84 @@ function onStageContextMenu(event: MouseEvent) {
 .image-node-stage:hover .image-node-stage-actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+.image-node-prompt-composer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 52px);
+  z-index: 7;
+  display: grid;
+  grid-template-columns: 1fr 32px;
+  align-items: end;
+  gap: 7px;
+  padding: 5px 5px 5px 13px;
+  border: 1px solid rgba(122, 107, 213, 0.28);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  animation: image-node-prompt-rise 0.16s ease-out;
+}
+
+.image-node-prompt-input {
+  min-width: 0;
+  max-height: 108px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #272932;
+  cursor: text;
+  font-size: 12px;
+  line-height: 18px;
+  resize: none;
+  overflow: hidden;
+  padding: 6px 0;
+}
+
+.image-node-prompt-input::placeholder {
+  color: #9aa4b2;
+}
+
+.image-node-prompt-input:disabled {
+  cursor: wait;
+}
+
+.image-node-prompt-send {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  background: #7a6bd5;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    opacity 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.image-node-prompt-send:hover:not(:disabled) {
+  transform: translateX(1px);
+  background: #6f61c6;
+}
+
+.image-node-prompt-send:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@keyframes image-node-prompt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

@@ -108,11 +108,88 @@
         </span>
         <span class="action-tooltip">线稿成款</span>
       </button>
+      <button
+        type="button"
+        class="image-action-icon-btn image-action-icon-btn--mock"
+        disabled
+        title="局部重绘（占位）"
+      >
+        <span class="action-logo">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M4 15s2-3 5-3 4 3 7 3 4-3 4-3" />
+            <path d="M4 19s2-3 5-3 4 3 7 3 4-3 4-3" />
+            <path d="M8 5h8" />
+            <path d="M12 5v5" />
+          </svg>
+        </span>
+        <span class="action-tooltip">局部重绘</span>
+      </button>
+      <button
+        type="button"
+        class="image-action-icon-btn image-action-icon-btn--mock"
+        disabled
+        title="扩图（占位）"
+      >
+        <span class="action-logo">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 4H5a1 1 0 0 0-1 1v4" />
+            <path d="M15 4h4a1 1 0 0 1 1 1v4" />
+            <path d="M9 20H5a1 1 0 0 1-1-1v-4" />
+            <path d="M15 20h4a1 1 0 0 0 1-1v-4" />
+            <path d="M8 12h8" />
+            <path d="M12 8v8" />
+          </svg>
+        </span>
+        <span class="action-tooltip">扩图</span>
+      </button>
+      <button
+        type="button"
+        class="image-action-icon-btn image-action-icon-btn--mock"
+        disabled
+        title="调色（占位）"
+      >
+        <span class="action-logo">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="8" />
+            <path d="M12 4v16" />
+            <path d="M4 12h16" />
+            <path d="M7.5 7.5l9 9" />
+            <path d="M16.5 7.5l-9 9" />
+          </svg>
+        </span>
+        <span class="action-tooltip">调色</span>
+      </button>
     </template>
     <div
       v-else
       class="style-strength-pop"
-      :style="{ height: `${displayHeight}px` }"
       @mousedown.stop
     >
       <div
@@ -120,7 +197,7 @@
         class="style-strength-track"
         @mousedown.stop.prevent="emit('style-strength-track-mousedown', $event)"
       >
-        <div class="style-strength-fill" :style="{ height: `${styleInnovateStrengthPct}%` }"></div>
+        <div class="style-strength-fill" :style="{ width: `${styleInnovateStrengthPct}%` }"></div>
       </div>
     </div>
   </div>
@@ -151,8 +228,10 @@ const emit = defineEmits<{
 <style scoped>
 .image-action-menu {
   position: absolute;
-  top: 0;
-  left: calc(100% + 12px);
+  top: calc(100% + 10px);
+  left: 0;
+  width: 100%;
+  transform: none;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -161,20 +240,25 @@ const emit = defineEmits<{
   box-shadow: none;
   z-index: 14;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 0;
+  box-sizing: border-box;
 }
 
 .image-action-menu.strength-mode {
-  top: 8px;
+  top: calc(100% + 10px);
+  left: 0;
+  transform: none;
+  width: 100%;
   gap: 0;
 }
 
 .image-action-icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 35px;
+  height: 35px;
   border: 1px solid rgba(122, 107, 213, 0.28);
-  background: rgba(255, 255, 255, 0.92);
+  background: #ffffff;
   border-radius: 10px;
   padding: 0;
   position: relative;
@@ -194,7 +278,7 @@ const emit = defineEmits<{
 
 .image-action-icon-btn:hover:not(:disabled) {
   border-color: #7a6bd5;
-  background: rgba(122, 107, 213, 0.12);
+  background: #ffffff;
   color: #7a6bd5;
   transform: scale(1.06);
 }
@@ -204,6 +288,11 @@ const emit = defineEmits<{
   opacity: 0.45;
 }
 
+.image-action-icon-btn--mock:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
 .action-logo {
   display: flex;
   align-items: center;
@@ -211,15 +300,15 @@ const emit = defineEmits<{
 }
 
 .action-logo svg {
-  width: 21.3px;
-  height: 21.3px;
+  width: 21px;
+  height: 21px;
 }
 
 .action-tooltip {
   position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translate(-50%, 2px);
   white-space: nowrap;
   background: rgba(24, 24, 27, 0.94);
   color: #f4f4f5;
@@ -238,32 +327,36 @@ const emit = defineEmits<{
 
 .image-action-icon-btn:hover:not(:disabled) .action-tooltip {
   opacity: 1;
-  transform: translate(2px, -50%);
+  transform: translate(-50%, 0);
 }
 
 .style-strength-pop {
   position: relative;
-  width: 5px;
-  min-height: 72px;
+  width: 100%;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  padding: 0;
 }
 
 .style-strength-track {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: 6px;
   border-radius: 999px;
   overflow: hidden;
   border: none;
   background: rgba(122, 107, 213, 0.2);
-  cursor: ns-resize;
+  cursor: ew-resize;
 }
 
 .style-strength-fill {
   position: absolute;
   left: 0;
-  right: 0;
+  top: 0;
   bottom: 0;
   background: #7a6bd5;
-  transition: height 0.06s linear;
+  border-radius: inherit;
+  transition: width 0.06s linear;
 }
 </style>

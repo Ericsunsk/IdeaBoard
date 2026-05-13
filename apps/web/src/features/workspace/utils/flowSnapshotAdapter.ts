@@ -6,6 +6,7 @@ import type {
   CanvasNodeItem,
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
+import { getDefaultCanvasNodeTitle } from '../types/canvasNodes'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
 export interface FlowAdapterNode {
@@ -114,8 +115,9 @@ function parsePortFromHandle(
   return port as CanvasConnectionPort
 }
 
-function resolveNodeTitle(nodeType: CanvasConnectionNodeType, node: { id: number }): string {
-  return `${nodeType[0].toUpperCase()}${nodeType.slice(1)} #${node.id}`
+function resolveNodeTitle(nodeType: CanvasConnectionNodeType, node: { title?: unknown }): string {
+  const title = typeof node.title === 'string' ? node.title.trim() : ''
+  return title || getDefaultCanvasNodeTitle(nodeType)
 }
 
 function toFlowDataFromCanvasNode(

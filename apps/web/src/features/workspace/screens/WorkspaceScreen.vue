@@ -128,6 +128,7 @@
               getFlowMaskEffectiveSourceCached(nodeProps.id).hasConnectedImageInput
             "
             :image-action-visible="activeImageActionNodeId === nodeProps.id"
+            :image-prompt-composer-visible="activeImagePromptNodeId === nodeProps.id"
             :image-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
             :show-style-strength-control="
               flowShowStyleStrengthControl && activeImageActionNodeId === nodeProps.id
@@ -161,6 +162,7 @@
             @node-mousedown="(event) => onFlowNodeMouseDown(nodeProps.id, event)"
             @request-internals-update="() => scheduleFlowNodeInternalsRefresh([nodeProps.id])"
             @image-contextmenu="(event) => onFlowImageContextMenu(nodeProps.id, event)"
+            @image-prompt-generate="(prompt) => onFlowImagePromptGenerate(nodeProps.id, prompt)"
             @image-action="(action) => onFlowImageDirectAction(nodeProps.id, action)"
             @style-innovate-mousedown="onFlowStyleInnovateMouseDown"
             @style-strength-track-mousedown="onFlowStyleStrengthTrackMouseDown"
@@ -337,6 +339,7 @@ let leaveConfirmResolver: ((choice: 'save' | 'discard' | 'cancel') => void) | nu
 let leaveConfirmPromise: Promise<'save' | 'discard' | 'cancel'> | null = null
 let skipNextLeaveConfirm = false
 const activeImageActionNodeId = ref<string | null>(null)
+const activeImagePromptNodeId = ref<string | null>(null)
 const duplicateModifierPressed = ref(false)
 
 function scheduleFlowNodeInternalsRefresh(nodeIds: string[]) {
@@ -379,6 +382,7 @@ function onPaneContextMenu(event: MouseEvent) {
   event.preventDefault()
   closeBoardHeaderEditing()
   activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
   hideFlowStyleStrengthControl()
   clearFlowSelection()
   const flowPoint = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
@@ -392,6 +396,7 @@ function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
   createNodeAtPosition(kind, nodeContextMenu.value.flowX, nodeContextMenu.value.flowY)
   closeNodeContextMenu()
   activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
   hideFlowStyleStrengthControl()
 }
 
@@ -428,6 +433,7 @@ async function confirmFlowLeave(): Promise<boolean> {
 function setActiveTool(tool: 'select' | 'hand' | 'text') {
   closeBoardHeaderEditing()
   activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
   hideFlowStyleStrengthControl()
   activeTool.value = tool
   if (tool === 'text') {
@@ -441,6 +447,7 @@ function onEscapeShortcut() {
     return true
   }
   activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
   hideFlowStyleStrengthControl()
   return clearFlowSelection()
 }
@@ -608,6 +615,7 @@ const createNodeAtPosition = flowNodeMutations.createNodeAtPosition
 const _onFlowDeleteNode = flowNodeMutations.onFlowDeleteNode
 function onFlowDeleteNode(nodeId: string) {
   activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
   hideFlowStyleStrengthControl()
   closeNodeContextMenu()
   _onFlowDeleteNode(nodeId)
@@ -711,6 +719,7 @@ const {
 
 function onCanvasDragOver(event: DragEvent) {
   activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
   hideFlowStyleStrengthControl()
   canvasDrop.onCanvasDragOver(event)
 }
@@ -723,6 +732,8 @@ function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
   event.preventDefault()
   selectFlowNodeForContextMenu(nodeId)
   activeImageActionNodeId.value = nodeId
+  activeImagePromptNodeId.value = nodeId
+  hideFlowStyleStrengthControl()
 }
 
 const {
@@ -771,8 +782,10 @@ const {
 const {
   isNodeDirectActionRunning,
   runImageDirectAction,
+  runImagePromptGeneration,
 } = useFlowImageDirectActions({
   nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
   captureHistory: flowHistory.capture as () => FlowHistorySnapshot,
   pushHistory: flowHistory.push,
   markDirty,
@@ -785,6 +798,9 @@ const {
   },
   commitNodes: (nextNodes) => {
     commitFlowNodes(nextNodes)
+  },
+  commitEdges: (nextEdges) => {
+    commitFlowEdges(nextEdges)
   },
 })
 
@@ -801,6 +817,7 @@ const {
     const targetNodeId = activeImageActionNodeId.value
     if (!targetNodeId) return
     activeImageActionNodeId.value = null
+    activeImagePromptNodeId.value = null
     void runImageDirectAction(targetNodeId, 'style-innovate', { strength })
   },
 })
@@ -813,12 +830,20 @@ function onFlowImageDirectAction(
     return
   }
   activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
   hideFlowStyleStrengthControl()
   void runImageDirectAction(
     nodeId,
     action,
     action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined,
   )
+}
+
+function onFlowImagePromptGenerate(nodeId: string, prompt: string) {
+  activeImagePromptNodeId.value = null
+  activeImageActionNodeId.value = null
+  hideFlowStyleStrengthControl()
+  void runImagePromptGeneration(nodeId, prompt)
 }
 
 const {
@@ -833,6 +858,7 @@ const {
   edges: edges as Ref<Edge[]>,
   activeTool: activeTool as Ref<string>,
   activeImageActionNodeId,
+  activeImagePromptNodeId,
   hideFlowStyleStrengthControl,
   closeBoardHeaderEditing,
   closeNodeContextMenu,
@@ -878,6 +904,7 @@ const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
   finishFlowNodeDragDuplicateTracking,
   markDirty,
   activeImageActionNodeId,
+  activeImagePromptNodeId,
   hideFlowStyleStrengthControl,
 })
 

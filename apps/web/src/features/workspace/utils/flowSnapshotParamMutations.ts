@@ -22,6 +22,11 @@ export function patchFlowSnapshotParam(
 ): Record<string, any> {
   const { key, value } = payload
   switch (key) {
+    case 'title': {
+      const nextTitle = String(value ?? '').trim()
+      if (!nextTitle || snapshotNode.title === nextTitle) return snapshotNode
+      return { ...snapshotNode, title: nextTitle }
+    }
     case 'mode':
       if (snapshotNode.mode === value) return snapshotNode
       return { ...snapshotNode, mode: value }

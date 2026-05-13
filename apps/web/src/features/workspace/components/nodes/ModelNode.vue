@@ -8,8 +8,9 @@
     @mousedown.stop
   >
     <NodeHeader
-      title="Model"
+      :title="node.title || 'MODEL'"
       @node-mousedown="emit('node-mousedown', $event)"
+      @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
@@ -152,6 +153,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
+  (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'update-angle-yaw', value: number): void
   (e: 'update-angle-framing', value: ModelAngleFraming): void

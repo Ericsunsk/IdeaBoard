@@ -18,6 +18,7 @@
         :copy-mode="props.copyMode"
         :ui-state="promptUiState"
         @update:text="onPromptTextUpdate"
+        @update:title="emitNodeParam('title', $event)"
         @node-mousedown="noopMouse"
         @delete="onDeleteRequest"
         @focus="noop"
@@ -39,17 +40,20 @@
           :display-image="displayImage"
           :display-mode="displayMode"
           :action-menu-visible="!!props.imageActionVisible"
+          :prompt-composer-visible="!!props.imagePromptComposerVisible"
           :direct-generating="!!props.imageDirectGenerating"
           :show-style-strength-control="!!props.showStyleStrengthControl"
           :style-innovate-strength-pct="props.styleInnovateStrengthPct ?? 50"
           :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
           @node-mousedown="noopMouse"
+          @update:title="emitNodeParam('title', $event)"
           @delete="onDeleteRequest"
           @stage-drop="onImageStageDrop"
           @open-file="onImageOpenFile"
           @append-to-canvas="onImageAppendToCanvas"
           @reset="onImageReset"
           @contextmenu="onImageContextMenu"
+          @prompt-generate="onImagePromptGenerate"
           @action="onImageAction"
           @style-innovate-mousedown="onStyleInnovateMouseDown"
           @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
@@ -65,6 +69,7 @@
         :ui-state="props.uiState"
         :error-port-keys="[]"
         @node-mousedown="noopMouse"
+        @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
         @update:mode="emitNodeParam('mode', $event)"
         @generate="onEditGenerate"
@@ -79,6 +84,7 @@
         :ui-state="props.uiState"
         :error-port-keys="[]"
         @node-mousedown="noopMouse"
+        @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
         @update:mode="emitNodeParam('mode', $event)"
         @update:upscale-mode="emitNodeParam('upscaleMode', $event)"
@@ -101,6 +107,7 @@
         :ui-state="props.uiState"
         :error-port-keys="[]"
         @node-mousedown="noopMouse"
+        @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
         @apply-preset="onColorApplyPreset"
         @remove-color="onColorRemove"
@@ -118,6 +125,7 @@
         :ui-state="props.uiState"
         :error-port-keys="[]"
         @node-mousedown="noopMouse"
+        @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
         @update:blend-ratio="emitNodeParam('blendRatio', $event)"
         @generate="onFusionGenerate"
@@ -132,6 +140,7 @@
         :ui-state="props.uiState"
         :error-port-keys="[]"
         @node-mousedown="noopMouse"
+        @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
         @update:tile-mode="emitNodeParam('tileMode', $event)"
         @update:rotation="emitNodeParam('rotation', $event)"
@@ -152,6 +161,7 @@
         :source-image-url="props.maskSourceImageUrl"
         :has-connected-image-input="props.maskHasConnectedImageInput"
         @node-mousedown="noopMouse"
+        @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
         @open-file-picker="onMaskOpenFile"
         @clear-image="onMaskClearImage"
@@ -175,6 +185,7 @@
         :error-port-keys="[]"
         :background-options="modelBackgroundOptions"
         @node-mousedown="noopMouse"
+        @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
         @update-angle-yaw="emitNodeParam('angleSpec.yaw', $event)"
         @update-angle-framing="emitNodeParam('angleSpec.framing', $event)"
@@ -193,6 +204,7 @@
         :ui-state="props.uiState"
         :error-port-keys="[]"
         @node-mousedown="noopMouse"
+        @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
         @update:category="emitNodeParam('activeCategory', $event)"
         @select:viewpoint="emitNodeParam('selectedViewpoint', $event)"
@@ -251,6 +263,7 @@ const props = withDefaults(
     maskSourceImageRatio?: number
     maskHasConnectedImageInput?: boolean
     imageActionVisible?: boolean
+    imagePromptComposerVisible?: boolean
     imageDirectGenerating?: boolean
     showStyleStrengthControl?: boolean
     styleInnovateStrengthPct?: number
@@ -265,6 +278,7 @@ const props = withDefaults(
     maskSourceImageRatio: 1,
     maskHasConnectedImageInput: false,
     imageActionVisible: false,
+    imagePromptComposerVisible: false,
     imageDirectGenerating: false,
     showStyleStrengthControl: false,
     styleInnovateStrengthPct: 50,
@@ -299,6 +313,7 @@ const emit = defineEmits<{
   (e: 'mask-set-canvas-ref', element: Element | null): void
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'image-contextmenu', event: MouseEvent): void
+  (e: 'image-prompt-generate', prompt: string): void
   (e: 'image-action', action: ImageAction): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
@@ -315,7 +330,7 @@ const isWearNode = computed(() => props.data.kind === 'wear')
 const isMaskNode = computed(() => props.data.kind === 'mask')
 const isModelNode = computed(() => props.data.kind === 'model')
 const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
-const showDefaultDragZone = true
+const showDefaultDragZone = false
 const showHandleRail = true
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const promptUiState = computed<PromptNodeUiState | undefined>(
@@ -661,6 +676,10 @@ function onImageContextMenu(event: MouseEvent) {
   emit('image-contextmenu', event)
 }
 
+function onImagePromptGenerate(prompt: string) {
+  emit('image-prompt-generate', prompt)
+}
+
 function onImageAction(action: ImageAction) {
   emit('image-action', action)
 }
@@ -749,7 +768,7 @@ function noopMouse() {}
   box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 2px;
 }
 
 .flow-canvas-node
@@ -775,7 +794,17 @@ function noopMouse() {}
 }
 
 .flow-canvas-node :deep(.image-action-menu) {
-  left: calc(100% + 12px);
+  top: calc(100% + 10px);
+  left: 0;
+  transform: none;
+  width: 100%;
   z-index: 30;
+}
+
+.flow-canvas-node :deep(.image-action-menu.strength-mode) {
+  top: calc(100% + 10px);
+  left: 0;
+  transform: none;
+  width: 100%;
 }
 </style>

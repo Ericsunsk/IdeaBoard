@@ -20,6 +20,7 @@ import { useFlowConnectionMutations } from './useFlowConnectionMutations'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 import {
   MAX_COLOR_NODE_SWATCHES,
+  getDefaultCanvasNodeTitle,
   isColorNodePlaceholderState,
   normalizeColorNodeColors,
 } from '../types/canvasNodes'
@@ -142,6 +143,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const snapshotId = Number(snapshotNode.id)
     if (!Number.isFinite(snapshotId) || snapshotId <= 0) return null
     const flowNodeId = `${kind}-${snapshotId}`
+    const flowNodeTitle =
+      typeof snapshotNode.title === 'string' && snapshotNode.title.trim()
+        ? snapshotNode.title.trim()
+        : getDefaultCanvasNodeTitle(kind)
     const flowNode: Node = {
       id: flowNodeId,
       type: 'canvas',
@@ -150,7 +155,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       data: {
         kind,
         nodeType: kind,
-        title: `${kind[0].toUpperCase()}${kind.slice(1)} #${snapshotId}`,
+        title: flowNodeTitle,
         snapshotNode,
       } satisfies FlowNodeData,
     }
@@ -207,6 +212,9 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const nextSnapshotNode = patcher(snapshotNode)
     if (nextSnapshotNode === snapshotNode) return
     node.data.snapshotNode = nextSnapshotNode
+    if (typeof nextSnapshotNode.title === 'string' && nextSnapshotNode.title.trim()) {
+      node.data.title = nextSnapshotNode.title.trim()
+    }
     if (shouldPushHistory) {
       options.pushHistory(before)
     }

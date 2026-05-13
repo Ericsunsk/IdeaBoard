@@ -7,8 +7,9 @@
     :style="nodeStyle"
   >
     <NodeHeader
-      title="Prompt"
+      :title="node.title || 'PROMPT'"
       @node-mousedown="emit('node-mousedown', $event)"
+      @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
@@ -53,6 +54,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
+  (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'focus'): void
   (e: 'update:text', value: string): void
@@ -73,7 +75,7 @@ function onInput(event: Event) {
   box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 2px;
 }
 
 .prompt-node-shell {
@@ -93,6 +95,7 @@ function onInput(event: Event) {
   width: 100%;
   height: 100%;
   min-height: 0;
+  cursor: text;
   border: none;
   resize: none;
   outline: none;

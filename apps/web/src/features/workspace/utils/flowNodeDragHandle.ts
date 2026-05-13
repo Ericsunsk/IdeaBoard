@@ -1,7 +1,7 @@
 import type { FlowNodeKind } from '../types/flowTypes'
 
 export const FLOW_NODE_DRAG_HANDLE = [
-  '.flow-canvas-node__drag-zone',
+  '.workflow-node-header',
   '.flow-canvas-node__drag-surface',
 ].join(', ')
 

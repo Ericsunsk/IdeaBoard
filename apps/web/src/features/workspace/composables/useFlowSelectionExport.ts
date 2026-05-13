@@ -27,26 +27,70 @@ type FlowNodeLike = {
   data?: FlowNodeData
 }
 
+type ExportImageEntry = {
+  url: string
+  title: string
+}
+
 type UseFlowSelectionExportOptions = {
   nodes: Ref<FlowNodeLike[]>
   message: MessageApiLike
 }
 
-function toSafeFileName(rawName: string): string {
-  const decoded = rawName ? decodeURIComponent(rawName) : ''
-  const cleaned = decoded.replace(/[\\/:*?"<>|]+/g, '_').trim()
-  if (!cleaned) return `export-${Date.now()}.png`
-  if (/\.[a-z0-9]+$/i.test(cleaned)) return cleaned
-  return `${cleaned}.png`
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
 }
 
-function buildExportFileName(url: string, index: number, total: number, timestamp: number): string {
-  const fromUrl = String(url).split('/').pop()?.split('?')[0] || ''
-  const safeName = toSafeFileName(fromUrl)
-  if (total > 1) {
-    return `${String(index + 1).padStart(2, '0')}-${timestamp}-${safeName}`
+function sanitizeFileNameSegment(rawName: string): string {
+  return rawName
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .split('')
+    .filter((char) => char.charCodeAt(0) >= 32)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '')
+}
+
+function inferExtensionFromUrl(rawUrl: string): string {
+  const rawName = String(rawUrl).split('/').pop()?.split('?')[0] || ''
+  const decodedName = safeDecodeURIComponent(rawName)
+  const extension = decodedName.match(/\.([a-z0-9]{2,5})$/i)?.[1]
+  return extension ? `.${extension.toLowerCase()}` : '.png'
+}
+
+function splitTitleAndExtension(rawTitle: string, rawUrl: string): { stem: string; extension: string } {
+  const safeTitle = sanitizeFileNameSegment(rawTitle)
+  const titleExtension = safeTitle.match(/\.([a-z0-9]{2,5})$/i)?.[0] ?? ''
+  if (titleExtension) {
+    const stem = sanitizeFileNameSegment(safeTitle.slice(0, -titleExtension.length))
+    return {
+      stem: stem || 'image',
+      extension: titleExtension.toLowerCase(),
+    }
   }
-  return safeName
+  return {
+    stem: safeTitle || 'image',
+    extension: inferExtensionFromUrl(rawUrl),
+  }
+}
+
+function buildUniqueExportFileName(
+  entry: ExportImageEntry,
+  titleCounts: Map<string, number>,
+): string {
+  const { stem, extension } = splitTitleAndExtension(entry.title, entry.url)
+  const dedupeKey = `${stem}${extension}`.toLowerCase()
+  const count = titleCounts.get(dedupeKey) ?? 0
+  titleCounts.set(dedupeKey, count + 1)
+  if (count === 0) {
+    return `${stem}${extension}`
+  }
+  return `${stem}(${count})${extension}`
 }
 
 function buildExportDownloadHref(rawUrl: string): string {
@@ -98,12 +142,18 @@ function resolveExportUrls(
   return outputUrls
 }
 
+function resolveExportTitle(data: FlowNodeData, snapshotNode: Record<string, unknown>): string {
+  const snapshotTitle = typeof snapshotNode.title === 'string' ? snapshotNode.title.trim() : ''
+  if (snapshotTitle) return snapshotTitle
+  return data.title.trim() || 'image'
+}
+
 export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
   let exportLoading: MessageLoadingHandle | null = null
 
-  function getSelectedExportUrls(): string[] {
+  function getSelectedExportEntries(): ExportImageEntry[] {
     const selectedNodes = options.nodes.value.filter((node) => !!node.selected)
-    const urls: string[] = []
+    const entries: ExportImageEntry[] = []
     for (const node of selectedNodes) {
       const data = node.data
       if (!data) continue
@@ -122,14 +172,21 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       }
       const snapshotNode = data.snapshotNode
       if (!snapshotNode || typeof snapshotNode !== 'object') continue
-      urls.push(...resolveExportUrls(kind, snapshotNode as Record<string, unknown>))
+      const snapshotRecord = snapshotNode as Record<string, unknown>
+      const title = resolveExportTitle(data, snapshotRecord)
+      entries.push(
+        ...resolveExportUrls(kind, snapshotRecord)
+          .map((url) => url.trim())
+          .filter(Boolean)
+          .map((url) => ({ url, title })),
+      )
     }
-    return Array.from(new Set(urls.map((url) => url.trim()).filter(Boolean)))
+    return entries
   }
 
   async function exportSelectedImages() {
-    const urls = getSelectedExportUrls()
-    if (urls.length === 0) {
+    const entries = getSelectedExportEntries()
+    if (entries.length === 0) {
       options.message.warning('当前选中节点没有可导出的图片')
       return
     }
@@ -137,20 +194,19 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       exportLoading.destroy()
       exportLoading = null
     }
-    const loading = options.message.loading(`Exporting ${urls.length} images...`, {
+    const loading = options.message.loading(`Exporting ${entries.length} images...`, {
       duration: 1500,
       keepAliveOnHover: false,
     })
     exportLoading = loading
-    const timestamp = Date.now()
     let failed = 0
+    const titleCounts = new Map<string, number>()
     try {
-      for (let i = 0; i < urls.length; i += 1) {
-        const url = urls[i]
-        const fileName = buildExportFileName(url, i, urls.length, timestamp)
+      for (const entry of entries) {
+        const fileName = buildUniqueExportFileName(entry, titleCounts)
         try {
           const link = document.createElement('a')
-          link.href = buildExportDownloadHref(url)
+          link.href = buildExportDownloadHref(entry.url)
           link.download = fileName
           link.rel = 'noopener'
           link.style.display = 'none'
@@ -167,10 +223,12 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
     }
 
     if (failed === 0) {
-      options.message.success(`Export queued: ${urls.length} image${urls.length > 1 ? 's' : ''}`)
+      options.message.success(
+        `Export queued: ${entries.length} image${entries.length > 1 ? 's' : ''}`,
+      )
     } else {
-      const success = urls.length - failed
-      options.message.warning(`Export queued ${success}/${urls.length}, failed ${failed}`)
+      const success = entries.length - failed
+      options.message.warning(`Export queued ${success}/${entries.length}, failed ${failed}`)
     }
   }
 

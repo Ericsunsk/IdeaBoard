@@ -8,9 +8,10 @@
     @mousedown.stop
   >
     <NodeHeader
-      title="Mask"
+      :title="node.title || 'MASK'"
       rounded
       @node-mousedown="emit('node-mousedown', $event)"
+      @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
@@ -207,6 +208,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
+  (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'open-file-picker'): void
   (e: 'clear-image'): void

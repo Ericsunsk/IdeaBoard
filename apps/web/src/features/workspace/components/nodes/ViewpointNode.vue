@@ -8,8 +8,9 @@
     @mousedown.stop
   >
     <NodeHeader
-      title="Display"
+      :title="node.title || 'DISPLAY'"
       @node-mousedown="emit('node-mousedown', $event)"
+      @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
@@ -107,6 +108,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
+  (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'update:category', value: ViewpointNodeItem['activeCategory']): void
   (e: 'select:viewpoint', value: string): void
