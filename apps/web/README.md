@@ -30,11 +30,14 @@ npm run build
 
 ```text
 apps/web/
-├── src/app/        # 入口、router、store 装配
-├── src/pages/      # 路由级页面容器
-├── src/features/   # 领域功能模块
-├── src/shared/     # 共享 API、UI、types、utils、assets
-└── vite.config.ts  # 开发代理
+├── src/app/                  # 入口、router、store 装配
+├── src/pages/                # 路由级页面容器
+├── src/features/             # 领域功能模块
+│   ├── user/                 # 用户侧 layout 与壳层
+│   └── workspace/            # 画布、节点与执行链路
+├── src/shared/               # 共享 API、auth、types、utils、assets
+│   └── api/generated-query/  # Orval 生成代码，不手动编辑
+└── vite.config.ts            # 开发代理
 ```
 
 ## 相关文档

@@ -13,7 +13,11 @@
 - `apps/web/src/app` 负责启动装配、router 和 store wiring。
 - `apps/web/src/pages` 只负责路由级页面组装。
 - `apps/web/src/features` 负责业务逻辑和 feature 内部 UI。
-- `apps/web/src/shared` 负责复用 API helper、UI primitive、types、utils 和 assets。
+- `apps/web/src/features/user` 负责用户侧 layout、路由壳层与跨用户页的状态提示。
+- `apps/web/src/features/workspace/components/nodes` 只保留节点 Vue 组件；节点配置、工具、样式和 composable 分别放入该目录下的 `config/`、`utils/`、`styles/`、`composables/`。
+- `apps/web/src/shared` 负责复用 API helper、auth、types、utils 和 assets。
+- `apps/web/src/shared/api/generated-query` 是 Orval 生成代码，不手动编辑。
+- 手写 API 补充层用于聚合、补齐未生成接口或适配业务返回类型；新增文件优先沿用现有 `shared/api/*.ts` 扁平 wrapper，只有明确需要分组时再放入子目录。
 
 > [!IMPORTANT]
 > `shared` 不得依赖任何具体 feature。
@@ -36,6 +40,8 @@
 | Vue SFC | `PascalCase` | `WorkspaceScreen.vue` |
 | TS helper / composable | `camelCase.ts` | `useChannelAccounts.ts` |
 | Go 文件 | `snake_case.go` | `task_runtime_service.go` |
+
+Go package 目录例外：保持 Go 生态习惯，使用小写无分隔符命名，例如 `autherrors/`、`imageproc/`；不要为了匹配前端目录风格改成 `kebab-case`。
 
 
 ## 验证要求

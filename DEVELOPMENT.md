@@ -414,12 +414,14 @@ apps/web/src/
 ├── pages/                    # 路由级容器
 ├── features/                 # 领域模块
 │   ├── workspace/            # 画布、节点与执行链路
+│   │   └── components/nodes/ # 节点组件，内部按 config/utils/styles/composables 拆分
 │   ├── boards/               # 画板列表、预览与同步
 │   ├── admin/                # 管理后台
 │   ├── auth/                 # 登录、注册与会话相关
+│   ├── user/                 # 用户侧 layout 与壳层
 │   └── profile/              # 用户中心
-├── shared/                   # 共享 API、UI、auth、types、utils、assets
-└── config/                   # 仅保留跨 feature 运行配置
+└── shared/                   # 共享 API、auth、types、utils、assets
+    └── api/generated-query/  # Orval 生成代码，不手动编辑
 
 apps/api/
 ├── cmd/                      # 服务入口

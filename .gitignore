@@ -33,6 +33,7 @@ Thumbs.db
 *.swo
 *~
 .playwright-cli/
+.playwright-mcp/
 
 # ===== Env / Secrets =====
 .env
