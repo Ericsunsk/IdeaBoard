@@ -21,7 +21,6 @@ declare module 'vue' {
     EditNode: typeof import('./features/workspace/components/nodes/EditNode.vue')['default']
     EnhanceNode: typeof import('./features/workspace/components/nodes/EnhanceNode.vue')['default']
     FlowCanvasNode: typeof import('./features/workspace/components/FlowCanvasNode.vue')['default']
-    FlowMessageNodeView: typeof import('./features/workspace/components/FlowMessageNodeView.vue')['default']
     FlowNodeHandles: typeof import('./features/workspace/components/FlowNodeHandles.vue')['default']
     FusionNode: typeof import('./features/workspace/components/nodes/FusionNode.vue')['default']
     HomeCanvasHeader: typeof import('./features/workspace/components/home/HomeCanvasHeader.vue')['default']

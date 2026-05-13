@@ -19,7 +19,7 @@ interface MessageApiLike {
   ): MessageLoadingHandle
 }
 
-type ExportableNodeKind = CanvasConnectionNodeType | 'message'
+type ExportableNodeKind = CanvasConnectionNodeType
 
 type FlowNodeLike = {
   id: string
@@ -85,10 +85,6 @@ function resolveExportUrls(
   kind: ExportableNodeKind,
   snapshotNode: Record<string, unknown>,
 ): string[] {
-  if (kind === 'message') {
-    const messageUrl = typeof snapshotNode.url === 'string' ? snapshotNode.url.trim() : ''
-    return messageUrl ? [messageUrl] : []
-  }
   const outputUrls = readOutputImages(snapshotNode)
     .map((item) => item.url)
     .filter(Boolean)
@@ -113,7 +109,6 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       if (!data) continue
       const kind = data.kind
       if (
-        kind !== 'message' &&
         kind !== 'image' &&
         kind !== 'edit' &&
         kind !== 'enhance' &&

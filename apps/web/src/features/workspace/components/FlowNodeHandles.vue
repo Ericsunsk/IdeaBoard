@@ -1,52 +1,50 @@
 <template>
-  <template v-if="kind !== 'message'">
-    <Handle
-      v-for="port in handleInputPorts"
-      :id="`in:${port}`"
-      :key="`canvas-in-anchor:${port}`"
-      type="target"
-      :position="Position.Left"
-      class="flow-canvas-node__handle-anchor"
-      :style="inputAnchorHandleStyle"
-    />
-    <Handle
-      v-if="hasInputPorts"
-      id="in:__auto"
-      type="target"
-      :position="Position.Left"
-      :class="[
-        'flow-canvas-node__handle-aggregate',
-        'flow-canvas-node__handle-aggregate--input',
-        { 'is-visible': props.showHandles },
-      ]"
-      :style="inputAggregateHandleStyle"
-    >
-      <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
-    </Handle>
-    <Handle
-      v-if="aggregateOutputHandleId"
-      :id="aggregateOutputHandleId"
-      type="source"
-      :position="Position.Right"
-      :class="[
-        'flow-canvas-node__handle-aggregate',
-        'flow-canvas-node__handle-aggregate--output',
-        { 'is-visible': props.showHandles },
-      ]"
-      :style="outputAggregateHandleStyle"
-    >
-      <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
-    </Handle>
-    <Handle
-      v-for="port in hiddenOutputAnchorPorts"
-      :id="`out:${port}`"
-      :key="`canvas-out-anchor:${port}`"
-      type="source"
-      :position="Position.Right"
-      class="flow-canvas-node__handle-anchor"
-      :style="outputAnchorHandleStyle"
-    />
-  </template>
+  <Handle
+    v-for="port in handleInputPorts"
+    :id="`in:${port}`"
+    :key="`canvas-in-anchor:${port}`"
+    type="target"
+    :position="Position.Left"
+    class="flow-canvas-node__handle-anchor"
+    :style="inputAnchorHandleStyle"
+  />
+  <Handle
+    v-if="hasInputPorts"
+    id="in:__auto"
+    type="target"
+    :position="Position.Left"
+    :class="[
+      'flow-canvas-node__handle-aggregate',
+      'flow-canvas-node__handle-aggregate--input',
+      { 'is-visible': props.showHandles },
+    ]"
+    :style="inputAggregateHandleStyle"
+  >
+    <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
+  </Handle>
+  <Handle
+    v-if="aggregateOutputHandleId"
+    :id="aggregateOutputHandleId"
+    type="source"
+    :position="Position.Right"
+    :class="[
+      'flow-canvas-node__handle-aggregate',
+      'flow-canvas-node__handle-aggregate--output',
+      { 'is-visible': props.showHandles },
+    ]"
+    :style="outputAggregateHandleStyle"
+  >
+    <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
+  </Handle>
+  <Handle
+    v-for="port in hiddenOutputAnchorPorts"
+    :id="`out:${port}`"
+    :key="`canvas-out-anchor:${port}`"
+    type="source"
+    :position="Position.Right"
+    class="flow-canvas-node__handle-anchor"
+    :style="outputAnchorHandleStyle"
+  />
 </template>
 
 <script setup lang="ts">
@@ -70,10 +68,6 @@ const emit = defineEmits<{
   (e: 'request-internals-update'): void
 }>()
 
-function getCanvasNodeType(): CanvasConnectionNodeType | null {
-  return props.kind === 'message' ? null : props.kind
-}
-
 function getNodePortsByKind(
   kind: CanvasConnectionNodeType,
   direction: 'input' | 'output',
@@ -90,9 +84,7 @@ function getNodePortsByKind(
 }
 
 function getCanvasNodeVisiblePortsForKind(direction: 'input' | 'output'): CanvasConnectionPort[] {
-  const kind = getCanvasNodeType()
-  if (!kind) return []
-  return getNodePortsByKind(kind, direction)
+  return getNodePortsByKind(props.kind, direction)
 }
 
 const handleInputPorts = computed(() => getCanvasNodeVisiblePortsForKind('input'))

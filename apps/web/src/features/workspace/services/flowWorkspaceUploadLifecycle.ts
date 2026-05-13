@@ -80,15 +80,6 @@ function appendOutputImageRefs(
 
 function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
   const refs: StableRef[] = []
-  snapshot.messages.forEach((item, index) => {
-    refs.push({
-      path: `messages[${index}].url`,
-      get: () => item.url,
-      set: (url) => {
-        item.url = url
-      },
-    })
-  })
   snapshot.imageNodes.forEach((node, index) => {
     refs.push({
       path: `imageNodes[${index}].sourceImageUrl`,

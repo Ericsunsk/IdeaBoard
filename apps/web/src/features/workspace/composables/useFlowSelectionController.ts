@@ -5,7 +5,7 @@ type UseFlowSelectionControllerOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   activeTool: Ref<string>
-  activeMessageActionNodeId: Ref<string | null>
+  activeImageActionNodeId: Ref<string | null>
   hideFlowStyleStrengthControl: () => void
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
@@ -49,26 +49,26 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
   function onPaneClick() {
     options.closeBoardHeaderEditing()
     options.closeNodeContextMenu()
-    options.activeMessageActionNodeId.value = null
+    options.activeImageActionNodeId.value = null
     options.hideFlowStyleStrengthControl()
   }
 
   function onFlowNodeClick() {
     if (options.activeTool.value === 'hand') return
-    options.activeMessageActionNodeId.value = null
+    options.activeImageActionNodeId.value = null
     options.hideFlowStyleStrengthControl()
   }
 
   function onFlowNodeMouseDown(...args: [string, MouseEvent]) {
     const event = args[1]
     if (event.button === 0) {
-      options.activeMessageActionNodeId.value = null
+      options.activeImageActionNodeId.value = null
       options.hideFlowStyleStrengthControl()
     }
   }
 
   function deleteSelectedFlowElements() {
-    options.activeMessageActionNodeId.value = null
+    options.activeImageActionNodeId.value = null
     options.hideFlowStyleStrengthControl()
     options.closeNodeContextMenu()
     options._deleteSelectedFlowElements()

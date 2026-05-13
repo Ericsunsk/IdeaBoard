@@ -292,23 +292,7 @@ function collectNodeFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
 }
 
 export function collectBoardPreviewFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
-  const imageFrames: BoardPreviewFrame[] = state.messages
-    .filter((item) => item.type === 'image' && !!item.url)
-    .map((item) => {
-      const width = item.width && item.width > 0 ? item.width : 300
-      const ratio = item.height_ratio && item.height_ratio > 0 ? item.height_ratio : 1
-      return {
-        key: `image-${item.id}`,
-        kind: 'image',
-        x: item.x,
-        y: item.y,
-        width,
-        height: width * clamp(ratio, 0.05, 12),
-        imageUrl: item.url,
-      }
-    })
-
-  return [...imageFrames, ...collectNodeFrames(state)]
+  return collectNodeFrames(state)
 }
 
 function collectBoardPreviewConnections(

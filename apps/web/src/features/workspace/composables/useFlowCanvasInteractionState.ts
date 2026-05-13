@@ -1,24 +1,15 @@
-export type CanvasInteractionKey = 'mask-painting' | 'message-resize'
+export type CanvasInteractionKey = 'mask-painting'
 
 export function useFlowCanvasInteractionState() {
   const isMaskPainting = ref(false)
-  const isMessageResizing = ref(false)
-  const isCanvasInteractionActive = computed(() => isMaskPainting.value || isMessageResizing.value)
+  const isCanvasInteractionActive = computed(() => isMaskPainting.value)
 
-  function startCanvasInteraction(key: CanvasInteractionKey) {
-    if (key === 'mask-painting') {
-      isMaskPainting.value = true
-      return
-    }
-    isMessageResizing.value = true
+  function startCanvasInteraction(_key: CanvasInteractionKey) {
+    isMaskPainting.value = true
   }
 
-  function stopCanvasInteraction(key: CanvasInteractionKey) {
-    if (key === 'mask-painting') {
-      isMaskPainting.value = false
-      return
-    }
-    isMessageResizing.value = false
+  function stopCanvasInteraction(_key: CanvasInteractionKey) {
+    isMaskPainting.value = false
   }
 
   return {

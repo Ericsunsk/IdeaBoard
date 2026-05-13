@@ -59,6 +59,8 @@ type UpdateSnapshotNodeOptions = {
   historyBefore?: { nodes: unknown[]; edges: unknown[] }
 }
 
+type InitialSnapshotPatch = Record<string, unknown>
+
 export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   function resolveNodePosition(baseX = 120, baseY = 100) {
     if (options.nodes.value.length === 0) return { x: baseX, y: baseY }
@@ -126,9 +128,17 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     appendNodeAtPosition(kind, position.x, position.y)
   }
 
-  function appendNodeAtPosition(kind: FlowCreatableNodeKind, x: number, y: number) {
+  function appendNodeAtPosition(
+    kind: FlowCreatableNodeKind,
+    x: number,
+    y: number,
+    initialSnapshotPatch?: InitialSnapshotPatch,
+  ) {
     const before = options.captureHistory()
-    const snapshotNode = createSnapshotNodeForKind(kind, x, y)
+    const baseSnapshotNode = createSnapshotNodeForKind(kind, x, y)
+    const snapshotNode = initialSnapshotPatch
+      ? { ...baseSnapshotNode, ...initialSnapshotPatch }
+      : baseSnapshotNode
     const snapshotId = Number(snapshotNode.id)
     if (!Number.isFinite(snapshotId) || snapshotId <= 0) return null
     const flowNodeId = `${kind}-${snapshotId}`
@@ -151,8 +161,13 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return flowNodeId
   }
 
-  function createNodeAtPosition(kind: FlowCreatableNodeKind, x: number, y: number) {
-    return appendNodeAtPosition(kind, x, y)
+  function createNodeAtPosition(
+    kind: FlowCreatableNodeKind,
+    x: number,
+    y: number,
+    initialSnapshotPatch?: InitialSnapshotPatch,
+  ) {
+    return appendNodeAtPosition(kind, x, y, initialSnapshotPatch)
   }
 
   function onFlowDeleteNode(nodeId: string) {
@@ -160,7 +175,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const target = flowNodes.find((node) => node.id === nodeId)
     if (!target) return
     const targetKind = (target.data as { kind?: string } | undefined)?.kind
-    if (!targetKind || targetKind === 'message') return
+    if (!targetKind) return
     options.onNodeDeleted?.(nodeId, targetKind)
     const before = options.captureHistory()
     const nextNodes = (options.nodes.value as Node[]).filter((node) => node.id !== nodeId)
@@ -222,7 +237,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     )
     if (selectedNodeIds.size === 0 && selectedEdgeIds.size === 0) return
     selectedNodeKinds.forEach((kind, nodeId) => {
-      if (kind === 'message') return
       options.onNodeDeleted?.(nodeId, kind)
     })
     const before = options.captureHistory()

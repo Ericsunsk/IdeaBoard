@@ -11,7 +11,6 @@ import {
   WEAR_TILE_MODE_DEFAULT,
 } from '../types/canvasNodes'
 import type {
-  CanvasImageItem,
   CanvasPoint,
   ColorNodeItem,
   EnhanceNodeItem,
@@ -27,22 +26,6 @@ import type {
 
 function createCanvasEntityId(): number {
   return Date.now() + Math.random()
-}
-
-export function createCanvasImageItemAt(
-  point: CanvasPoint,
-  url: string,
-  heightRatio?: number,
-): CanvasImageItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'image',
-    url,
-    x: point.x,
-    y: point.y,
-    width: 300,
-    height_ratio: heightRatio && heightRatio > 0 ? heightRatio : undefined,
-  }
 }
 
 export function createPromptNodeAt(point: CanvasPoint): PromptNodeItem {

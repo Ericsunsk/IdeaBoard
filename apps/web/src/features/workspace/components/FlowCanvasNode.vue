@@ -38,8 +38,8 @@
           :stage-height="stageHeight"
           :display-image="displayImage"
           :display-mode="displayMode"
-          :action-menu-visible="!!props.messageActionVisible"
-          :direct-generating="!!props.messageDirectGenerating"
+          :action-menu-visible="!!props.imageActionVisible"
+          :direct-generating="!!props.imageDirectGenerating"
           :show-style-strength-control="!!props.showStyleStrengthControl"
           :style-innovate-strength-pct="props.styleInnovateStrengthPct ?? 50"
           :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
@@ -50,31 +50,12 @@
           @append-to-canvas="onImageAppendToCanvas"
           @reset="onImageReset"
           @display-dragstart="onImageDisplayDragStart"
-          @contextmenu="onMessageContextMenu"
-          @action="onMessageAction"
+          @contextmenu="onImageContextMenu"
+          @action="onImageAction"
           @style-innovate-mousedown="onStyleInnovateMouseDown"
           @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
         />
       </div>
-    </template>
-    <template v-else-if="isMessageNode && messageSnapshot">
-      <FlowMessageNodeView
-        :node="messageSnapshot"
-        :selected="!!selected"
-        :message-action-visible="!!props.messageActionVisible"
-        :message-direct-generating="!!messageDirectGenerating"
-        :show-style-strength-control="!!props.showStyleStrengthControl"
-        :style-innovate-strength-pct="props.styleInnovateStrengthPct ?? 50"
-        :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
-        @node-mousedown="onMessageMouseDown"
-        @contextmenu="onMessageContextMenu"
-        @image-dragstart="onMessageImageDragStart"
-        @resize-mousedown="onMessageResizeMouseDown($event.event, $event.direction)"
-        @message-action="onMessageAction"
-        @style-innovate-mousedown="onStyleInnovateMouseDown"
-        @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
-        @request-internals-update="emit('request-internals-update')"
-      />
     </template>
     <template v-else-if="isEditNode && editSnapshot">
       <EditNode
@@ -244,7 +225,6 @@
 import type { ComponentPublicInstance } from 'vue'
 import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/config/nodeOptionConfig'
 import type {
-  CanvasImageItem,
   ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
@@ -256,9 +236,10 @@ import type {
   ViewpointNodeItem,
   WearNodeItem,
 } from '../types/canvasNodes'
-import type { MessageAction, ResizeDirection } from '../composables/useFlowMessageNode'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
+
+type ImageAction = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
 
 const props = withDefaults(
   defineProps<{
@@ -270,8 +251,8 @@ const props = withDefaults(
     maskSourceImageUrl?: string
     maskSourceImageRatio?: number
     maskHasConnectedImageInput?: boolean
-    messageActionVisible?: boolean
-    messageDirectGenerating?: boolean
+    imageActionVisible?: boolean
+    imageDirectGenerating?: boolean
     showStyleStrengthControl?: boolean
     styleInnovateStrengthPct?: number
     setStyleStrengthTrackRef?: (el: Element | ComponentPublicInstance | null) => void
@@ -284,8 +265,8 @@ const props = withDefaults(
     maskSourceImageUrl: '',
     maskSourceImageRatio: 1,
     maskHasConnectedImageInput: false,
-    messageActionVisible: false,
-    messageDirectGenerating: false,
+    imageActionVisible: false,
+    imageDirectGenerating: false,
     showStyleStrengthControl: false,
     styleInnovateStrengthPct: 50,
     setStyleStrengthTrackRef: () => undefined,
@@ -319,13 +300,8 @@ const emit = defineEmits<{
   (e: 'mask-clear-mask'): void
   (e: 'mask-set-canvas-ref', element: Element | null): void
   (e: 'node-mousedown', event: MouseEvent): void
-  (e: 'message-contextmenu', event: MouseEvent): void
-  (e: 'message-image-dragstart', event: DragEvent): void
-  (e: 'message-resize-mousedown', payload: { event: MouseEvent; direction: ResizeDirection }): void
-  (
-    e: 'message-action',
-    action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design',
-  ): void
+  (e: 'image-contextmenu', event: MouseEvent): void
+  (e: 'image-action', action: ImageAction): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
   (e: 'request-internals-update'): void
@@ -341,9 +317,8 @@ const isWearNode = computed(() => props.data.kind === 'wear')
 const isMaskNode = computed(() => props.data.kind === 'mask')
 const isModelNode = computed(() => props.data.kind === 'model')
 const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
-const isMessageNode = computed(() => props.data.kind === 'message')
-const showDefaultDragZone = computed(() => !isMessageNode.value)
-const showHandleRail = computed(() => !isMessageNode.value)
+const showDefaultDragZone = true
+const showHandleRail = true
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
@@ -406,9 +381,6 @@ const modelSnapshot = computed<ModelNodeItem | null>(() =>
 )
 const viewpointSnapshot = computed<ViewpointNodeItem | null>(() =>
   isViewpointNode.value ? resolveSnapshotNode<ViewpointNodeItem>() : null,
-)
-const messageSnapshot = computed<CanvasImageItem | null>(() =>
-  isMessageNode.value ? resolveSnapshotNode<CanvasImageItem>() : null,
 )
 
 const displayImage = computed<{ url: string } | null>(() => {
@@ -692,24 +664,12 @@ function onMaskSetCanvasRef(element: Element | null) {
   emit('mask-set-canvas-ref', element)
 }
 
-function onMessageMouseDown(event: MouseEvent) {
-  emit('node-mousedown', event)
+function onImageContextMenu(event: MouseEvent) {
+  emit('image-contextmenu', event)
 }
 
-function onMessageContextMenu(event: MouseEvent) {
-  emit('message-contextmenu', event)
-}
-
-function onMessageImageDragStart(event: DragEvent) {
-  emit('message-image-dragstart', event)
-}
-
-function onMessageResizeMouseDown(event: MouseEvent, direction: ResizeDirection) {
-  emit('message-resize-mousedown', { event, direction })
-}
-
-function onMessageAction(action: MessageAction) {
-  emit('message-action', action)
+function onImageAction(action: ImageAction) {
+  emit('image-action', action)
 }
 function onStyleInnovateMouseDown(event: MouseEvent) {
   emit('style-innovate-mousedown', event)

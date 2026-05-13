@@ -8,15 +8,6 @@ function expect(condition: unknown, message: string) {
 
 function createValidState() {
   return {
-    messages: [
-      {
-        id: 1,
-        type: 'image' as const,
-        url: 'https://example.com/a.png',
-        x: 0,
-        y: 0,
-      },
-    ],
     imageNodes: [
       {
         id: 2,
@@ -170,7 +161,6 @@ function createValidState() {
 
 function testValidEmptySnapshot() {
   const parsed = canvasBoardStateSchema.safeParse({
-    messages: [],
     imageNodes: [],
     promptNodes: [],
     modelNodes: [],

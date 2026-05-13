@@ -10,7 +10,12 @@ type UploadImageResult = { url: string; ratio: number }
 type UseFlowCanvasDropOptions = {
   currentBoardId: { value: string | null | undefined }
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
-  createNodeAtPosition: (kind: FlowCreatableNodeKind, x: number, y: number) => string | null
+  createNodeAtPosition: (
+    kind: FlowCreatableNodeKind,
+    x: number,
+    y: number,
+    initialSnapshotPatch?: Record<string, unknown>,
+  ) => string | null
   updateSnapshotNode: (
     nodeId: string,
     patcher: (prev: Record<string, unknown>) => Record<string, unknown>,
@@ -162,14 +167,12 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
   }
 
   function createImageNodeFromPayload(point: { x: number; y: number }, payload: UploadImageResult) {
-    const nodeId = options.createNodeAtPosition('image', point.x, point.y)
-    if (!nodeId) return
-    options.updateSnapshotNode(nodeId, (prev) => ({
-      ...prev,
+    const nodeId = options.createNodeAtPosition('image', point.x, point.y, {
       sourceImageUrl: payload.url,
       sourceImageRatio: payload.ratio,
       outputImages: [],
-    }))
+    })
+    if (!nodeId) return
     options.onNodeMutated?.(nodeId)
   }
 

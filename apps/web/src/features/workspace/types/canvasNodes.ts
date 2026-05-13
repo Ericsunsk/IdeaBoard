@@ -5,29 +5,6 @@ export interface CanvasPoint {
   y: number
 }
 
-export interface CanvasImageItem {
-  id: number
-  type: 'image'
-  url: string
-  x: number
-  y: number
-  width?: number
-  height_ratio?: number
-  renderState?: 'ready' | 'pending'
-  uploadMeta?: CanvasImageUploadMeta
-}
-
-export interface CanvasImageUploadMeta {
-  kind: 'workspace-local-drop-upload'
-  userId: number
-}
-
-export function isCanvasImagePending(item: {
-  renderState?: CanvasImageItem['renderState'] | null | undefined
-}) {
-  return item.renderState === 'pending'
-}
-
 export type WorkflowNodeOutputStatus = 'idle' | 'ready' | 'stale'
 export const DEFAULT_COLOR_STRENGTH = 70
 export const MAX_COLOR_NODE_SWATCHES = 8
@@ -385,7 +362,6 @@ export interface CanvasViewportState {
 }
 
 export interface CanvasBoardSnapshot {
-  messages: CanvasImageItem[]
   imageNodes: ImageNodeItem[]
   promptNodes: PromptNodeItem[]
   modelNodes: ModelNodeItem[]

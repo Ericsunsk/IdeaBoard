@@ -1,6 +1,5 @@
 import type {
   CanvasBoardSnapshot,
-  CanvasImageItem,
   CanvasConnection,
   CanvasViewportState,
   ColorNodeItem,
@@ -18,7 +17,6 @@ import type {
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import { canvasBoardStateSchema } from './canvasBoardStateSchema'
 
-export type CanvasBoardStateMessage = CanvasImageItem
 export type CanvasBoardStatePromptNode = PromptNodeItem
 export type CanvasBoardStateModelNode = ModelNodeItem
 export type CanvasBoardStateViewpointNode = ViewpointNodeItem
@@ -118,13 +116,6 @@ export function collectCanvasBoardImageUrls(
 ): Set<string> {
   const urls = new Set<string>()
   if (!snapshot) return urls
-
-  snapshot.messages.forEach((item) => {
-    const normalized = `${item.url ?? ''}`.trim()
-    if (normalized) {
-      urls.add(normalized)
-    }
-  })
 
   snapshot.imageNodes.forEach((node) => {
     const normalized = `${node.sourceImageUrl ?? ''}`.trim()

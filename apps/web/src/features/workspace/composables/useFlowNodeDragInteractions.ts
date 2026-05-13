@@ -6,13 +6,13 @@ type UseFlowNodeDragInteractionsOptions = {
   beginFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   finishFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   markDirty: () => void
-  activeMessageActionNodeId: { value: string | null }
+  activeImageActionNodeId: { value: string | null }
   hideFlowStyleStrengthControl: () => void
 }
 
 export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractionsOptions) {
   function onNodeDragStart() {
-    options.activeMessageActionNodeId.value = null
+    options.activeImageActionNodeId.value = null
     options.hideFlowStyleStrengthControl()
     options.flowHistory.onNodeDragStart()
     options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)

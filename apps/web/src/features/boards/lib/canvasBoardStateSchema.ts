@@ -40,26 +40,9 @@ const canvasConnectionNodeTypeSchema = z.enum([
 ])
 const canvasConnectionPortSchema = z.enum(['image', 'mask', 'prompt', 'imageA', 'imageB'])
 
-const canvasImageUploadMetaSchema = z.object({
-  kind: z.literal('workspace-local-drop-upload'),
-  userId: z.number().int().positive().finite(),
-})
-
 const imageNodeOutputItemSchema = z.object({
   url: z.string().min(1),
   ratio: finiteNumberSchema.positive(),
-})
-
-const canvasImageItemSchema = z.object({
-  id: finiteNumberSchema,
-  type: z.literal('image'),
-  url: z.string(),
-  x: finiteNumberSchema,
-  y: finiteNumberSchema,
-  width: finiteNumberSchema.optional(),
-  height_ratio: finiteNumberSchema.optional(),
-  renderState: z.enum(['ready', 'pending']).optional(),
-  uploadMeta: canvasImageUploadMetaSchema.optional(),
 })
 
 const promptNodeItemSchema = z.object({
@@ -218,7 +201,6 @@ const canvasViewportStateSchema = z.object({
 // and discard unsupported fields instead of hard-failing workspace hydration.
 export const canvasBoardSnapshotSchema = z
   .object({
-    messages: z.array(canvasImageItemSchema),
     imageNodes: z.array(imageNodeItemSchema),
     promptNodes: z.array(promptNodeItemSchema),
     modelNodes: z.array(modelNodeItemSchema),

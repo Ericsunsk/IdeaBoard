@@ -127,10 +127,10 @@
             :mask-has-connected-image-input="
               getFlowMaskEffectiveSourceCached(nodeProps.id).hasConnectedImageInput
             "
-            :message-action-visible="activeMessageActionNodeId === nodeProps.id"
-            :message-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
+            :image-action-visible="activeImageActionNodeId === nodeProps.id"
+            :image-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
             :show-style-strength-control="
-              flowShowStyleStrengthControl && activeMessageActionNodeId === nodeProps.id
+              flowShowStyleStrengthControl && activeImageActionNodeId === nodeProps.id
             "
             :style-innovate-strength-pct="flowStyleInnovateStrength"
             :set-style-strength-track-ref="setFlowStyleStrengthTrackRef"
@@ -153,10 +153,6 @@
             @image-append-to-canvas="() => onFlowImageAppendToCanvas(nodeProps.id)"
             @image-display-dragstart="(event) => onFlowImageDisplayDragStart(nodeProps.id, event)"
             @image-reset="() => onFlowImageReset(nodeProps.id)"
-            @message-image-dragstart="(event) => onFlowMessageImageDragStart(nodeProps.id, event)"
-            @message-resize-mousedown="
-              (payload) => onFlowMessageResizeMouseDown(nodeProps.id, payload)
-            "
             @mask-open-file="() => onFlowMaskOpenFile(nodeProps.id)"
             @mask-clear-image="() => onFlowMaskClearImage(nodeProps.id)"
             @mask-stage-drop="(event) => onFlowMaskStageDrop(nodeProps.id, event)"
@@ -165,8 +161,8 @@
             @mask-set-canvas-ref="(element) => onFlowMaskSetCanvasRef(nodeProps.id, element)"
             @node-mousedown="(event) => onFlowNodeMouseDown(nodeProps.id, event)"
             @request-internals-update="() => scheduleFlowNodeInternalsRefresh([nodeProps.id])"
-            @message-contextmenu="(event) => onFlowMessageContextMenu(nodeProps.id, event)"
-            @message-action="(action) => onFlowMessageDirectAction(nodeProps.id, action)"
+            @image-contextmenu="(event) => onFlowImageContextMenu(nodeProps.id, event)"
+            @image-action="(action) => onFlowImageDirectAction(nodeProps.id, action)"
             @style-innovate-mousedown="onFlowStyleInnovateMouseDown"
             @style-strength-track-mousedown="onFlowStyleStrengthTrackMouseDown"
           />
@@ -249,9 +245,9 @@ import {
   type FlowCreatableNodeKind,
 } from '../composables/useFlowNodeMutations'
 import { useFlowGenerationHandlers } from '../composables/useFlowGenerationHandlers'
-import { useFlowMessageDirectActions } from '../composables/useFlowMessageDirectActions'
+import { useFlowImageDirectActions } from '../composables/useFlowImageDirectActions'
 import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovateControl'
-import { useFlowMessageImageInteractions } from '../composables/useFlowMessageImageInteractions'
+import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
@@ -336,7 +332,7 @@ let queuedNodeInternalsIds: Set<string> | null = null
 let leaveConfirmResolver: ((choice: 'save' | 'discard' | 'cancel') => void) | null = null
 let leaveConfirmPromise: Promise<'save' | 'discard' | 'cancel'> | null = null
 let skipNextLeaveConfirm = false
-const activeMessageActionNodeId = ref<string | null>(null)
+const activeImageActionNodeId = ref<string | null>(null)
 const duplicateModifierPressed = ref(false)
 
 function scheduleFlowNodeInternalsRefresh(nodeIds: string[]) {
@@ -378,7 +374,7 @@ function selectFlowNodes(nextNodes: Node[]) {
 function onPaneContextMenu(event: MouseEvent) {
   event.preventDefault()
   closeBoardHeaderEditing()
-  activeMessageActionNodeId.value = null
+  activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
   clearFlowSelection()
   const flowPoint = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
@@ -391,7 +387,7 @@ function onPaneContextMenu(event: MouseEvent) {
 function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
   createNodeAtPosition(kind, nodeContextMenu.value.flowX, nodeContextMenu.value.flowY)
   closeNodeContextMenu()
-  activeMessageActionNodeId.value = null
+  activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
 }
 
@@ -427,7 +423,7 @@ async function confirmFlowLeave(): Promise<boolean> {
 
 function setActiveTool(tool: 'select' | 'hand' | 'text') {
   closeBoardHeaderEditing()
-  activeMessageActionNodeId.value = null
+  activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
   activeTool.value = tool
   if (tool === 'text') {
@@ -440,7 +436,7 @@ function onEscapeShortcut() {
     closeBoardHeaderEditing()
     return true
   }
-  activeMessageActionNodeId.value = null
+  activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
   return clearFlowSelection()
 }
@@ -607,7 +603,7 @@ const onEdgeUpdate = flowNodeMutations.onEdgeUpdate
 const createNodeAtPosition = flowNodeMutations.createNodeAtPosition
 const _onFlowDeleteNode = flowNodeMutations.onFlowDeleteNode
 function onFlowDeleteNode(nodeId: string) {
-  activeMessageActionNodeId.value = null
+  activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
   closeNodeContextMenu()
   _onFlowDeleteNode(nodeId)
@@ -715,7 +711,7 @@ const {
 })
 
 function onCanvasDragOver(event: DragEvent) {
-  activeMessageActionNodeId.value = null
+  activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
   canvasDrop.onCanvasDragOver(event)
 }
@@ -724,10 +720,10 @@ async function onCanvasDrop(event: DragEvent) {
   await canvasDrop.onCanvasDrop(event)
 }
 
-function onFlowMessageContextMenu(nodeId: string, event: MouseEvent) {
+function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
   event.preventDefault()
   selectFlowNodeForContextMenu(nodeId)
-  activeMessageActionNodeId.value = nodeId
+  activeImageActionNodeId.value = nodeId
 }
 
 const {
@@ -775,8 +771,8 @@ const {
 
 const {
   isNodeDirectActionRunning,
-  runMessageDirectAction,
-} = useFlowMessageDirectActions({
+  runImageDirectAction,
+} = useFlowImageDirectActions({
   nodes: nodes as Ref<Node[]>,
   captureHistory: flowHistory.capture as () => FlowHistorySnapshot,
   pushHistory: flowHistory.push,
@@ -787,9 +783,6 @@ const {
   },
   onWarning: (text) => {
     message.warning(text)
-  },
-  updateSnapshotNodeSilently: (nodeId, patcher) => {
-    updateSnapshotNodeBase(nodeId, patcher, { history: false })
   },
   commitNodes: (nextNodes) => {
     commitFlowNodes(nextNodes)
@@ -806,23 +799,23 @@ const {
   onFlowStyleStrengthTrackMouseDown,
 } = useFlowStyleInnovateControl({
   onCommit: (strength) => {
-    const targetNodeId = activeMessageActionNodeId.value
+    const targetNodeId = activeImageActionNodeId.value
     if (!targetNodeId) return
-    activeMessageActionNodeId.value = null
-    void runMessageDirectAction(targetNodeId, 'style-innovate', { strength })
+    activeImageActionNodeId.value = null
+    void runImageDirectAction(targetNodeId, 'style-innovate', { strength })
   },
 })
 
-function onFlowMessageDirectAction(
+function onFlowImageDirectAction(
   nodeId: string,
   action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design',
 ) {
   if (action === 'style-innovate' && flowSuppressStyleInnovateClick.value) {
     return
   }
-  activeMessageActionNodeId.value = null
+  activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
-  void runMessageDirectAction(
+  void runImageDirectAction(
     nodeId,
     action,
     action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined,
@@ -840,7 +833,7 @@ const {
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
   activeTool: activeTool as Ref<string>,
-  activeMessageActionNodeId,
+  activeImageActionNodeId,
   hideFlowStyleStrengthControl,
   closeBoardHeaderEditing,
   closeNodeContextMenu,
@@ -854,15 +847,11 @@ const {
 const {
   onFlowImageAppendToCanvas,
   onFlowImageDisplayDragStart,
-  onFlowMessageImageDragStart,
-  onFlowMessageResizeMouseDown,
   beginFlowNodeDragDuplicateTracking,
   finishFlowNodeDragDuplicateTracking,
-} = useFlowMessageImageInteractions({
+} = useFlowImageNodeInteractions({
   nodes: nodes as Ref<Node[]>,
   FLOW_NODE_IMAGE_DRAG_MIME,
-  MIN_MESSAGE_IMAGE_WIDTH: 120,
-  MIN_MESSAGE_IMAGE_HEIGHT: 72,
   getImageNodeDisplayPayload,
   getImageNodeSnapshot: (nodeId) => {
     const snapshot = getImageNodeSnapshot(nodeId)
@@ -873,8 +862,6 @@ const {
       width: Number(snapshot.width ?? 300),
     }
   },
-  getViewport,
-  updateSnapshotNode,
   captureFlowHistorySnapshot: flowHistory.capture as () => FlowHistorySnapshot,
   pushFlowHistorySnapshot: flowHistory.push,
   markDirty,
@@ -882,8 +869,6 @@ const {
   appendFlowNodes: (nextNodes) => {
     commitFlowNodesAppend(nextNodes)
   },
-  startCanvasInteraction: startFlowInteraction,
-  stopCanvasInteraction: stopFlowInteraction,
 })
 
 const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
@@ -895,7 +880,7 @@ const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
   beginFlowNodeDragDuplicateTracking,
   finishFlowNodeDragDuplicateTracking,
   markDirty,
-  activeMessageActionNodeId,
+  activeImageActionNodeId,
   hideFlowStyleStrengthControl,
 })
 
@@ -981,13 +966,11 @@ onMounted(async () => {
 }
 
 .canvas-layout.interaction-lite :deep(.workflow-node),
-.canvas-layout.interaction-lite :deep(.flow-canvas-node__message),
 .canvas-layout.interaction-lite :deep(.vue-flow__edge-path) {
   transition: none !important;
 }
 
-.canvas-layout.interaction-lite :deep(.workflow-node *),
-.canvas-layout.interaction-lite :deep(.flow-canvas-node__message *) {
+.canvas-layout.interaction-lite :deep(.workflow-node *) {
   transition-duration: 0s !important;
 }
 

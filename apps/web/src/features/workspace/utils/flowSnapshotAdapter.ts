@@ -3,7 +3,6 @@ import type {
   CanvasConnection,
   CanvasConnectionNodeType,
   CanvasConnectionPort,
-  CanvasImageItem,
   CanvasNodeItem,
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -66,7 +65,6 @@ function cloneSnapshot(snapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {
 
 export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
   return {
-    messages: [],
     imageNodes: [],
     promptNodes: [],
     modelNodes: [],
@@ -86,21 +84,24 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
   }
 }
 
-function toFlowNodeId(nodeType: CanvasConnectionNodeType | 'message', id: number) {
+function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
   return `${nodeType}-${id}`
 }
 
-function parseFlowNodeId(
-  nodeId: string,
-): { nodeType: CanvasConnectionNodeType | 'message'; id: number } | null {
+function isCanvasConnectionNodeType(value: string): value is CanvasConnectionNodeType {
+  return SNAPSHOT_NODE_COLLECTIONS.some((item) => item.nodeType === value)
+}
+
+function parseFlowNodeId(nodeId: string): { nodeType: CanvasConnectionNodeType; id: number } | null {
   const dashIndex = nodeId.indexOf('-')
   if (dashIndex <= 0) return null
   const prefix = nodeId.slice(0, dashIndex)
+  if (!isCanvasConnectionNodeType(prefix)) return null
   const idPart = nodeId.slice(dashIndex + 1)
   if (!/^\d+(?:\.\d+)?$/.test(idPart)) return null
   const parsedId = Number(idPart)
   if (!Number.isFinite(parsedId)) return null
-  return { nodeType: prefix as CanvasConnectionNodeType | 'message', id: parsedId }
+  return { nodeType: prefix, id: parsedId }
 }
 
 function parsePortFromHandle(
@@ -113,11 +114,7 @@ function parsePortFromHandle(
   return port as CanvasConnectionPort
 }
 
-function resolveNodeTitle(
-  nodeType: CanvasConnectionNodeType | 'message',
-  node: { id: number },
-): string {
-  if (nodeType === 'message') return `Message #${node.id}`
+function resolveNodeTitle(nodeType: CanvasConnectionNodeType, node: { id: number }): string {
   return `${nodeType[0].toUpperCase()}${nodeType.slice(1)} #${node.id}`
 }
 
@@ -138,31 +135,12 @@ function toFlowDataFromCanvasNode(
   }
 }
 
-function toFlowDataFromMessageNode(node: CanvasImageItem): FlowNodeData {
-  return {
-    kind: 'message',
-    title: resolveNodeTitle('message', node),
-    summary: 'Canvas message image',
-    snapshotNode: clone(node),
-  }
-}
-
 export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
   nodes: FlowAdapterNode[]
   edges: FlowAdapterEdge[]
 } {
   const nodes: FlowAdapterNode[] = []
   const edges: FlowAdapterEdge[] = []
-
-  snapshot.messages.forEach((message) => {
-    nodes.push({
-      id: toFlowNodeId('message', message.id),
-      type: 'canvas',
-      dragHandle: resolveFlowNodeDragHandle('message'),
-      position: { x: message.x, y: message.y },
-      data: toFlowDataFromMessageNode(message),
-    })
-  })
 
   SNAPSHOT_NODE_COLLECTIONS.forEach(({ key, nodeType }) => {
     snapshot[key].forEach((node) => {
@@ -226,7 +204,6 @@ export function flowToCanvasBoardSnapshot(
 ): CanvasBoardSnapshot {
   const snapshot = base ? cloneSnapshot(base) : createEmptyCanvasBoardSnapshot()
 
-  snapshot.messages = []
   SNAPSHOT_NODE_COLLECTIONS.forEach(({ key }) => {
     snapshot[key] = []
   })
@@ -243,18 +220,14 @@ export function flowToCanvasBoardSnapshot(
     const ref = parseFlowNodeId(node.id)
     if (!ref) return
     const data = (node.data ?? {}) as FlowNodeData
-    const snapshotNode = data.snapshotNode as CanvasNodeItem | CanvasImageItem | undefined
+    const snapshotNode = data.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode || typeof snapshotNode !== 'object') return
     const positionedNode = {
       ...snapshotNode,
       x: node.position.x,
       y: node.position.y,
-    } as CanvasNodeItem | CanvasImageItem
+    } as CanvasNodeItem
 
-    if (ref.nodeType === 'message') {
-      snapshot.messages.push(positionedNode as CanvasImageItem)
-      return
-    }
     const collectionKey = resolveCollectionKeyByNodeType(ref.nodeType)
     ;(snapshot[collectionKey] as CanvasNodeItem[]).push(positionedNode as CanvasNodeItem)
   })
@@ -263,7 +236,6 @@ export function flowToCanvasBoardSnapshot(
     const fromRef = parseFlowNodeId(edge.source)
     const toRef = parseFlowNodeId(edge.target)
     if (!fromRef || !toRef) return
-    if (fromRef.nodeType === 'message' || toRef.nodeType === 'message') return
     const fromPort = parsePortFromHandle(edge.sourceHandle ?? null, 'out')
     const toPort = parsePortFromHandle(edge.targetHandle ?? null, 'in')
     if (!fromPort || !toPort) return

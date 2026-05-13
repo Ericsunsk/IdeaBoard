@@ -1,6 +1,6 @@
 import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 
-export type FlowNodeKind = CanvasConnectionNodeType | 'message'
+export type FlowNodeKind = CanvasConnectionNodeType
 
 export interface FlowNodeData {
   kind: FlowNodeKind
