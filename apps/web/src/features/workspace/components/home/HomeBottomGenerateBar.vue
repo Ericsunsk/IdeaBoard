@@ -85,13 +85,6 @@
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
       </button>
-      <input
-        :value="userPrompt"
-        type="text"
-        :placeholder="promptPlaceholder"
-        @input="onPromptInput"
-        @keyup.enter="emit('generate')"
-      />
       <button type="button" class="send-btn" :disabled="directGenerating" @click="emit('generate')">
         <svg
           v-if="!directGenerating"
@@ -126,9 +119,6 @@ const props = defineProps<{
   selectedRatio: PatternGenerateRatioOption
   selectedQuality: GenerateQualityOption
   selectedPreviewItems: SelectedPreviewItem[]
-  userPrompt: string
-  promptPlaceholder: string
-  hasDirectPrompt: boolean
   directGenerating: boolean
 }>()
 
@@ -139,7 +129,6 @@ const emit = defineEmits<{
   (event: 'clear-selected'): void
   (event: 'focus-selected', id: number): void
   (event: 'remove-selected', id: number): void
-  (event: 'update:user-prompt', value: string): void
   (event: 'generate'): void
 }>()
 
@@ -147,10 +136,6 @@ const visiblePreviewItems = computed(() => props.selectedPreviewItems.slice(0, 6
 const previewOverflowCount = computed(() =>
   Math.max(0, props.selectedPreviewItems.length - visiblePreviewItems.value.length),
 )
-
-function onPromptInput(event: Event) {
-  emit('update:user-prompt', (event.target as HTMLInputElement).value)
-}
 </script>
 
 <style scoped>
@@ -341,13 +326,6 @@ function onPromptInput(event: Event) {
   align-items: center;
   gap: 12px;
   border: 1px solid #e2e4e8;
-}
-
-.prompt-container input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 16px;
 }
 
 .add-btn,

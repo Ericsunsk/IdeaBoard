@@ -3,6 +3,8 @@
     ref="flowCanvasNodeRef"
     class="flow-canvas-node"
     :class="[`is-${data.kind}`, { 'is-selected': selected }]"
+    @mouseenter="isPointerOverNode = true"
+    @mouseleave="isPointerOverNode = false"
   >
     <div
       v-if="showDefaultDragZone"
@@ -217,6 +219,7 @@
       :kind="data.kind"
       :snapshot-node="data.snapshotNode"
       :ui-state="props.uiState"
+      :show-handles="isPointerOverNode"
       @request-internals-update="emit('request-internals-update')"
     />
   </div>
@@ -329,6 +332,7 @@ const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
 )
+const isPointerOverNode = ref(false)
 function resolveSnapshotNode<T>() {
   return props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
     ? ({ ...(props.data.snapshotNode as T), x: 0, y: 0 } as T)

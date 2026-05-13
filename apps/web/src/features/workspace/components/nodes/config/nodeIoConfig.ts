@@ -1,19 +1,5 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// MAINTENANCE CONSTRAINT: The `top` field on every IO slot template is the
-// SOLE Y-coordinate source for Vue Flow <Handle> positioning.
-//
-// FlowNodeHandles.vue reads these tops via getNodeIoTopMap() for Handle positioning
-// and applies them directly as CSS `top` values on Handles.  Do NOT re-
-// introduce DOM-rect-based measurement (getBoundingClientRect) as a primary
-// positioning source — it bakes the viewport transform into node-local
-// coordinates and causes port drift at non-default zoom levels.
-//
-// When adding a new node type or editing an existing one:
-//   - Set `top` on every slot that has a `direction` + `portName`.
-//   - Match the `top` value to the port's visual center in the node body.
-//   - If a port is conditional (e.g. Edit mask port shifts when imageB
-//     is visible), use a resolver function.
-// ═══════════════════════════════════════════════════════════════════════════
+// `top` is retained as IO metadata only. FlowNodeHandles intentionally ignores
+// it so VueFlow can use its default centered handle positioning.
 
 import type { EditNodeItem } from '../../../types/canvasNodes'
 import {

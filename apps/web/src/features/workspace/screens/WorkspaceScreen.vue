@@ -84,21 +84,6 @@
           <line x1="12" y1="4" x2="12" y2="20" />
         </svg>
       </div>
-      <div class="toolbar-divider"></div>
-      <div class="tool-item" title="图·文生图" @click="onNavigateRequest('/user/picture')">
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <path d="M3 14l4-4 5 5 5-5 4 4" />
-        </svg>
-      </div>
     </aside>
 
     <div
@@ -120,12 +105,8 @@
         :default-edge-options="{ animated: false, updatable: true }"
         :only-render-visible-elements="FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING"
         :is-valid-connection="isValidConnection"
-        :connection-line-style="flowConnectionLineStyle"
         @connect="onConnect"
-        @connect-start="onFlowConnectStart"
-        @connect-end="onFlowConnectEnd"
         @edge-update="onEdgeUpdate"
-        @edge-update-end="onFlowEdgeUpdateEnd"
         @move-start="closeBoardHeaderEditing"
         @move="onFlowMove"
         @node-click="onFlowNodeClick"
@@ -199,28 +180,6 @@
         @create="handleNodeContextMenuCreate"
       />
     </div>
-
-    <HomeBottomGenerateBar
-      class="workspace-flow-bottom-bar"
-      :show-settings="flowPromptShowSettings"
-      :ratio-options="flowPromptRatioOptions"
-      :quality-options="flowPromptQualityOptions"
-      :selected-ratio="flowPromptRatio"
-      :selected-quality="flowPromptQuality"
-      :selected-preview-items="selectedPreviewItems"
-      :user-prompt="flowPromptText"
-      :prompt-placeholder="flowPromptPlaceholder"
-      :has-direct-prompt="flowPromptText.trim().length > 0"
-      :direct-generating="isDirectGenerating"
-      @toggle-settings="flowPromptShowSettings = !flowPromptShowSettings"
-      @select-ratio="flowPromptRatio = $event"
-      @select-quality="flowPromptQuality = $event"
-      @update:user-prompt="flowPromptText = $event"
-      @generate="onFlowGenerate"
-      @clear-selected="onClearSelected"
-      @remove-selected="onRemoveSelectedPreviewItem"
-      @focus-selected="onFocusSelectedPreviewItem"
-    />
 
     <div class="floating-status">
       <div class="zoom-controls">
@@ -297,17 +256,9 @@ import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInter
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 import type { CanvasBoardSnapshot } from '../../workspace/types/canvasNodes'
-import {
-  GENERATE_QUALITY_OPTIONS,
-  PATTERN_GENERATE_RATIO_OPTIONS,
-  type GenerateQualityOption,
-  type PatternGenerateRatioOption,
-} from '../../workspace/components/nodes/config/nodeOptionConfig'
 import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
-import { useFlowSelectionPreviewBar } from '../composables/useFlowSelectionPreviewBar'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActions'
-import { useFlowConnectionVisuals } from '../composables/useFlowConnectionVisuals'
 import { useFlowSelectionController } from '../composables/useFlowSelectionController'
 import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
@@ -373,10 +324,6 @@ const isDirty = ref(false)
 const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
 const leaveConfirmVisible = ref(false)
 const activeTool = ref<'select' | 'hand' | 'text'>('select')
-const flowPromptShowSettings = ref(false)
-const flowPromptText = ref('')
-const flowPromptRatio = ref<PatternGenerateRatioOption>('1:1')
-const flowPromptQuality = ref<GenerateQualityOption>('1k')
 
 const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 
@@ -428,11 +375,6 @@ function selectFlowNodes(nextNodes: Node[]) {
   addSelectedNodes(nextNodes as Parameters<typeof addSelectedNodes>[0])
 }
 
-const flowPromptRatioOptions = PATTERN_GENERATE_RATIO_OPTIONS
-const flowPromptQualityOptions = GENERATE_QUALITY_OPTIONS
-const flowPromptPlaceholder = computed(() => {
-  return activeTool.value === 'text' ? '文本工具稍后接入，请在节点内执行生成' : '请在节点内执行生成'
-})
 function onPaneContextMenu(event: MouseEvent) {
   event.preventDefault()
   closeBoardHeaderEditing()
@@ -732,9 +674,6 @@ const {
 const { nodeContextMenu, canvasNodeMenuItems, closeNodeContextMenu, openNodeContextMenu } =
   useFlowNodeContextMenu()
 
-const { flowConnectionLineStyle, onFlowConnectStart, onFlowConnectEnd, onFlowEdgeUpdateEnd } =
-  useFlowConnectionVisuals()
-
 let canvasDropRef: ReturnType<typeof useFlowCanvasDrop> | null = null
 let clearMaskCanvasRef: (nodeId: string) => void = () => {}
 
@@ -837,7 +776,6 @@ const {
 const {
   isDirectGenerating,
   isNodeDirectActionRunning,
-  runPatternGenerate,
   runMessageDirectAction,
 } = useFlowMessageDirectActions({
   nodes: nodes as Ref<Node[]>,
@@ -912,25 +850,6 @@ const {
   },
   clearSelectedElements: clearSelectedFlowElements,
   selectFlowNodes,
-})
-
-const {
-  selectedPreviewItems,
-  onClearSelected,
-  onRemoveSelectedPreviewItem,
-  onFocusSelectedPreviewItem,
-  onFlowGenerate,
-} = useFlowSelectionPreviewBar({
-  nodes: nodes as Ref<Node[]>,
-  flowPromptText,
-  flowPromptRatio,
-  flowPromptQuality,
-  clearFlowSelection,
-  getViewport,
-  setViewport,
-  get runPatternGenerate() {
-    return runPatternGenerate
-  },
 })
 
 const {
@@ -1066,8 +985,7 @@ onMounted(async () => {
 
 .canvas-layout.interaction-lite :deep(.workflow-node),
 .canvas-layout.interaction-lite :deep(.flow-canvas-node__message),
-.canvas-layout.interaction-lite :deep(.vue-flow__edge-path),
-.canvas-layout.interaction-lite :deep(.workspace-connection-line path) {
+.canvas-layout.interaction-lite :deep(.vue-flow__edge-path) {
   transition: none !important;
 }
 
@@ -1076,8 +994,7 @@ onMounted(async () => {
   transition-duration: 0s !important;
 }
 
-.canvas-layout.interaction-lite :deep(.vue-flow__edge.selected .vue-flow__edge-path),
-.canvas-layout.interaction-lite :deep(.workspace-flow-edge.is-selected .vue-flow__edge-path) {
+.canvas-layout.interaction-lite :deep(.vue-flow__edge.selected .vue-flow__edge-path) {
   filter: none !important;
 }
 .workspace-flow-canvas-wrap :deep(.vue-flow__viewport) {
@@ -1133,6 +1050,17 @@ onMounted(async () => {
   background: transparent;
 }
 
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge-path),
+.workspace-flow-canvas-wrap :deep(.vue-flow__connection-path) {
+  stroke-width: 2;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge.selected .vue-flow__edge-path),
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge:focus .vue-flow__edge-path),
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge:focus-visible .vue-flow__edge-path) {
+  stroke: #7b8798;
+}
+
 .workspace-flow-canvas-wrap :deep(.vue-flow__node) {
   background: transparent;
   border: 0;
@@ -1169,73 +1097,6 @@ onMounted(async () => {
 
 .canvas-layout.tool-text .workspace-flow-canvas-wrap :deep(.vue-flow__pane) {
   cursor: text;
-}
-
-.workspace-flow-canvas-wrap :deep(.vue-flow__handle) {
-  width: 9px;
-  height: 9px;
-  min-width: 9px;
-  min-height: 9px;
-  border: 0;
-  border-radius: 999px;
-  box-shadow: none;
-  opacity: 1;
-  cursor: crosshair;
-}
-
-.workspace-flow-canvas-wrap :deep(.vue-flow__handle.connecting),
-.workspace-flow-canvas-wrap :deep(.vue-flow__handle.connectionindicator) {
-  opacity: 1 !important;
-}
-
-.workspace-flow-canvas-wrap :deep(.vue-flow__edge.tone-image .vue-flow__edge-path) {
-  stroke: #5b8def;
-}
-
-.workspace-flow-canvas-wrap :deep(.vue-flow__edge.tone-mask .vue-flow__edge-path) {
-  stroke: #34c38f;
-}
-
-.workspace-flow-canvas-wrap :deep(.vue-flow__edge.tone-prompt .vue-flow__edge-path) {
-  stroke: #f59e0b;
-}
-
-.workspace-flow-canvas-wrap :deep(.vue-flow__edge .vue-flow__edge-path) {
-  stroke-width: 1.8;
-  opacity: 0.78;
-}
-
-.workspace-flow-canvas-wrap :deep(.vue-flow__edge.selected .vue-flow__edge-path) {
-  opacity: 0.98;
-  stroke-width: 2.2;
-}
-
-.workspace-flow-canvas-wrap :deep(.workspace-flow-edge) {
-  pointer-events: visibleStroke;
-}
-
-.workspace-flow-canvas-wrap :deep(.workspace-flow-edge .vue-flow__edge-path) {
-  transition:
-    opacity 0.18s ease,
-    stroke-width 0.18s ease;
-}
-
-.workspace-flow-canvas-wrap :deep(.workspace-flow-edge.is-selected .vue-flow__edge-path) {
-  opacity: 0.98;
-  stroke-width: 2.2;
-}
-
-.workspace-flow-canvas-wrap :deep(.workspace-connection-line path) {
-  stroke-width: 2;
-  opacity: 0.9;
-}
-
-.workspace-flow-bottom-bar {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 24px;
-  z-index: 100;
 }
 
 .floating-status {

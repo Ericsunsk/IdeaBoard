@@ -3,36 +3,48 @@
     <Handle
       v-for="port in handleInputPorts"
       :id="`in:${port}`"
-      :key="`canvas-in:${port}`"
+      :key="`canvas-in-anchor:${port}`"
+      type="target"
+      :position="Position.Left"
+      class="flow-canvas-node__handle-anchor"
+      :style="inputAnchorHandleStyle"
+    />
+    <Handle
+      v-if="hasInputPorts"
+      id="in:__auto"
       type="target"
       :position="Position.Left"
       :class="[
-        'flow-canvas-node__handle',
-        'flow-canvas-node__handle--input',
-        {
-          'is-connected': isHandleConnected(port, 'input'),
-          'is-pending': isHandlePending(port),
-        },
+        'flow-canvas-node__handle-aggregate',
+        'flow-canvas-node__handle-aggregate--input',
+        { 'is-visible': props.showHandles },
       ]"
-      :data-port-kind="resolvePortVisualKind(port)"
-      :style="resolveHandleStyle(port, 'input')"
-    />
+      :style="inputAggregateHandleStyle"
+    >
+      <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
+    </Handle>
     <Handle
-      v-for="port in handleOutputPorts"
-      :id="`out:${port}`"
-      :key="`canvas-out:${port}`"
+      v-if="aggregateOutputHandleId"
+      :id="aggregateOutputHandleId"
       type="source"
       :position="Position.Right"
       :class="[
-        'flow-canvas-node__handle',
-        'flow-canvas-node__handle--output',
-        {
-          'is-connected': isHandleConnected(port, 'output'),
-          'is-pending': isHandlePending(port),
-        },
+        'flow-canvas-node__handle-aggregate',
+        'flow-canvas-node__handle-aggregate--output',
+        { 'is-visible': props.showHandles },
       ]"
-      :data-port-kind="resolvePortVisualKind(port)"
-      :style="resolveHandleStyle(port, 'output')"
+      :style="outputAggregateHandleStyle"
+    >
+      <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
+    </Handle>
+    <Handle
+      v-for="port in hiddenOutputAnchorPorts"
+      :id="`out:${port}`"
+      :key="`canvas-out-anchor:${port}`"
+      type="source"
+      :position="Position.Right"
+      class="flow-canvas-node__handle-anchor"
+      :style="outputAnchorHandleStyle"
     />
   </template>
 </template>
@@ -43,26 +55,7 @@ import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
 } from '../config/canvasNodeConnectionContract'
-import {
-  buildEditNodeIoContext,
-  buildNodeIoFromSlots,
-  COLOR_NODE_IO_SLOTS,
-  EDIT_NODE_IO_SLOTS,
-  ENHANCE_NODE_IO_SLOTS,
-  FUSION_NODE_IO_SLOTS,
-  IMAGE_NODE_IO_SLOTS,
-  MASK_NODE_IO_SLOTS,
-  MODEL_NODE_IO_SLOTS,
-  PROMPT_NODE_IO_SLOTS,
-  VIEWPOINT_NODE_IO_SLOTS,
-  WEAR_NODE_IO_SLOTS,
-} from '../components/nodes/config/nodeIoConfig'
-import type {
-  CanvasConnectionNodeType,
-  CanvasConnectionPort,
-  EditNodeItem,
-  EnhanceNodeItem,
-} from '../types/canvasNodes'
+import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 
@@ -70,6 +63,7 @@ const props = defineProps<{
   kind: FlowNodeData['kind']
   snapshotNode: unknown
   uiState?: NodeUiState | PromptNodeUiState
+  showHandles?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -95,98 +89,41 @@ function getNodePortsByKind(
   return list.map((port) => port.port)
 }
 
-function getNodeIoTopMap(
-  kind: CanvasConnectionNodeType,
-): Partial<Record<CanvasConnectionPort, number>> {
-  if (!props.snapshotNode || typeof props.snapshotNode !== 'object') return {}
-  const snapshotNode = props.snapshotNode as Record<string, unknown>
-  const state = {}
-  if (kind === 'prompt') return portTopMapFromSlots(PROMPT_NODE_IO_SLOTS, null, state)
-  if (kind === 'image') return portTopMapFromSlots(IMAGE_NODE_IO_SLOTS, null, state)
-  if (kind === 'mask') return portTopMapFromSlots(MASK_NODE_IO_SLOTS, null, state)
-  if (kind === 'color') return portTopMapFromSlots(COLOR_NODE_IO_SLOTS, null, state)
-  if (kind === 'model') return portTopMapFromSlots(MODEL_NODE_IO_SLOTS, null, state)
-  if (kind === 'viewpoint') return portTopMapFromSlots(VIEWPOINT_NODE_IO_SLOTS, null, state)
-  if (kind === 'fusion') return portTopMapFromSlots(FUSION_NODE_IO_SLOTS, null, state)
-  if (kind === 'wear') return portTopMapFromSlots(WEAR_NODE_IO_SLOTS, null, state)
-  if (kind === 'edit')
-    return portTopMapFromSlots(
-      EDIT_NODE_IO_SLOTS,
-      buildEditNodeIoContext(snapshotNode as unknown as EditNodeItem),
-      state,
-    )
-  if (kind === 'enhance')
-    return portTopMapFromSlots(
-      ENHANCE_NODE_IO_SLOTS,
-      {
-        supportsPrompt: (snapshotNode as unknown as EnhanceNodeItem).mode === 'canvas-extend',
-        supportsMask: (snapshotNode as unknown as EnhanceNodeItem).mode === 'hd-upscale',
-      },
-      state,
-    )
-  return {}
-}
-
-function portTopMapFromSlots<T>(
-  slots: readonly unknown[],
-  context: T,
-  state: { connected?: Record<string, boolean>; pending?: Record<string, boolean> },
-): Partial<Record<CanvasConnectionPort, number>> {
-  const built = buildNodeIoFromSlots(slots as never, context, state)
-  const map: Partial<Record<CanvasConnectionPort, number>> = {}
-  for (const port of built.ports) {
-    if (port.visible === false) continue
-    if (port.top == null) continue
-    map[port.name as CanvasConnectionPort] = port.top
-  }
-  return map
-}
-
 function getCanvasNodeVisiblePortsForKind(direction: 'input' | 'output'): CanvasConnectionPort[] {
   const kind = getCanvasNodeType()
   if (!kind) return []
   return getNodePortsByKind(kind, direction)
 }
 
-function resolveHandleStyle(port: CanvasConnectionPort, direction: 'input' | 'output') {
-  const kind = getCanvasNodeType()
-  if (!kind) return undefined
-  const topMap = getNodeIoTopMap(kind)
-  const top = topMap[port]
-  const side = direction === 'input' ? { left: '-5.5px' } : { right: '-5.5px' }
-  if (typeof top === 'number' && Number.isFinite(top)) {
-    return { top: `${top}px`, transform: 'translateY(-50%)', ...side }
-  }
-  return { ...side }
-}
-
-function resolvePortVisualKind(port: string): 'image' | 'mask' | 'prompt' | null {
-  if (port === 'image' || port === 'imageA' || port === 'imageB' || port === 'output')
-    return 'image'
-  if (port === 'mask') return 'mask'
-  if (port === 'prompt') return 'prompt'
-  return null
-}
-
-function isHandleConnected(port: CanvasConnectionPort, direction: 'input' | 'output'): boolean {
-  const connected = props.uiState?.connection?.connected as
-    | Partial<Record<string, boolean | undefined>>
-    | undefined
-  if (!connected) return false
-  if (direction === 'output') return !!connected.output
-  return !!connected[port]
-}
-
-function isHandlePending(port: CanvasConnectionPort): boolean {
-  const pending = props.uiState?.connection?.pending as
-    | Partial<Record<string, boolean | undefined>>
-    | undefined
-  if (!pending) return false
-  return !!pending[port]
-}
-
 const handleInputPorts = computed(() => getCanvasNodeVisiblePortsForKind('input'))
 const handleOutputPorts = computed(() => getCanvasNodeVisiblePortsForKind('output'))
+const hasInputPorts = computed(() => handleInputPorts.value.length > 0)
+const aggregateOutputHandleId = computed(() => {
+  const [firstPort] = handleOutputPorts.value
+  return firstPort ? `out:${firstPort}` : null
+})
+const hiddenOutputAnchorPorts = computed(() => handleOutputPorts.value.slice(1))
+
+const inputAnchorHandleStyle = {
+  left: '0',
+  top: '50%',
+  transform: 'translateY(-50%)',
+}
+const outputAnchorHandleStyle = {
+  right: '0',
+  top: '50%',
+  transform: 'translateY(-50%)',
+}
+const inputAggregateHandleStyle = {
+  left: '0',
+  top: '50%',
+  transform: 'translateY(-50%)',
+}
+const outputAggregateHandleStyle = {
+  right: '0',
+  top: '50%',
+  transform: 'translateY(-50%)',
+}
 
 watch(
   () => [
@@ -202,59 +139,84 @@ watch(
 )
 </script>
 <style scoped>
-.flow-canvas-node__handle {
-  --port-color: #9278e6;
-  --port-glow: rgba(146, 120, 230, 0.24);
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid #fff;
-  border-radius: 999px;
-  opacity: 1;
-  z-index: 24;
-  transform: translateY(-50%);
-  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.16);
-  background: var(--port-color) !important;
-  cursor: crosshair;
+.flow-canvas-node__handle-anchor {
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  box-shadow: none;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.flow-canvas-node__handle-aggregate {
+  --handle-ring-color: #d8e0ea;
+  --handle-plus-x: -26px;
+  width: 1px;
+  height: 1px;
+  min-width: 1px;
+  min-height: 1px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  opacity: 0;
+  box-shadow: none;
   pointer-events: all;
+  z-index: 24;
+  cursor: crosshair;
+  touch-action: none;
   transition:
-    transform 0.16s ease,
-    border-color 0.16s ease,
-    background-color 0.16s ease,
-    box-shadow 0.16s ease;
+    opacity 0.14s ease,
+    color 0.14s ease;
 }
 
-.flow-canvas-node__handle[data-port-kind='image'] {
-  --port-color: #5b8def;
-  --port-glow: rgba(91, 141, 239, 0.24);
+.flow-canvas-node__handle-aggregate--output {
+  --handle-plus-x: 27px;
 }
 
-.flow-canvas-node__handle[data-port-kind='mask'] {
-  --port-color: #34c38f;
-  --port-glow: rgba(52, 195, 143, 0.24);
+.flow-canvas-node__handle-plus {
+  position: absolute;
+  left: var(--handle-plus-x);
+  top: 50%;
+  display: block;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--handle-ring-color);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: none;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
 }
 
-.flow-canvas-node__handle[data-port-kind='prompt'] {
-  --port-color: #f59e0b;
-  --port-glow: rgba(245, 158, 11, 0.24);
+.flow-canvas-node__handle-plus::before,
+.flow-canvas-node__handle-plus::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
 }
 
-.flow-canvas-node__handle:hover {
-  transform: translateY(-50%) scale(1.08);
-  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.18));
+.flow-canvas-node__handle-plus::after {
+  transform: translate(-50%, -50%) rotate(90deg);
 }
 
-.flow-canvas-node__handle.is-connected {
-  box-shadow: 0 0 0 3px var(--port-glow, rgba(146, 120, 230, 0.2));
+.flow-canvas-node__handle-aggregate:hover,
+.flow-canvas-node__handle-aggregate.connecting {
+  --handle-ring-color: #c4ccd8;
+  color: #334155;
 }
 
-.flow-canvas-node__handle.is-pending {
-  background: #fff !important;
-  border-color: var(--port-color, #9278e6);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--port-color, #9278e6) 18%, transparent);
-}
-
-:deep(.flow-canvas-node__handle.vue-flow__handle-left),
-:deep(.flow-canvas-node__handle.vue-flow__handle-right) {
-  transform: translateY(-50%) !important;
+.flow-canvas-node__handle-aggregate.is-visible,
+.flow-canvas-node__handle-aggregate.connecting {
+  opacity: 1;
 }
 </style>

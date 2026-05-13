@@ -1,10 +1,10 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, EdgeUpdateEvent } from '@vue-flow/core'
-import { buildFlowEdgeClassName, resolveFlowEdgeToneFromHandles } from '../utils/flowEdgeVisual'
 
 type UseFlowConnectionMutationsOptions = {
   edges: Ref<Array<Record<string, any>>>
   isValidConnection: (connection: Connection) => boolean
+  normalizeConnection?: (connection: Connection, existingEdges: readonly Edge[]) => Connection | null
   captureHistory: () => { nodes: unknown[]; edges: unknown[] }
   pushHistory: (snapshot: { nodes: unknown[]; edges: unknown[] }) => void
   commitEdges: (nextEdges: Edge[]) => void
@@ -16,31 +16,34 @@ type UseFlowConnectionMutationsOptions = {
 
 export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOptions) {
   function onConnect(connection: Connection) {
-    if (!options.isValidConnection(connection)) {
+    const existingEdges = options.edges.value as unknown as Edge[]
+    const resolvedConnection = options.normalizeConnection
+      ? options.normalizeConnection(connection, existingEdges)
+      : connection
+    if (!resolvedConnection || !options.isValidConnection(resolvedConnection)) {
       options.onWarning('该连线不符合当前连接语义')
       return
     }
-    if (!connection.source || !connection.target) return
-    const tone = resolveFlowEdgeToneFromHandles(connection.sourceHandle, connection.targetHandle)
+    if (!resolvedConnection.source || !resolvedConnection.target) return
     const nextEdge = {
-      ...connection,
+      ...resolvedConnection,
       id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      source: connection.source,
-      target: connection.target,
+      source: resolvedConnection.source,
+      target: resolvedConnection.target,
       animated: false,
-      class: buildFlowEdgeClassName(tone, false),
-      data: { tone },
     } as Edge
     const before = options.captureHistory()
-    const existingEdges = options.edges.value as unknown as Edge[]
     const filteredEdges = existingEdges.filter((edge) => {
-      if (edge.target === connection.target && edge.targetHandle === connection.targetHandle)
+      if (
+        edge.target === resolvedConnection.target &&
+        edge.targetHandle === resolvedConnection.targetHandle
+      )
         return false
       if (
-        edge.source === connection.source &&
-        edge.target === connection.target &&
-        edge.sourceHandle === connection.sourceHandle &&
-        edge.targetHandle === connection.targetHandle
+        edge.source === resolvedConnection.source &&
+        edge.target === resolvedConnection.target &&
+        edge.sourceHandle === resolvedConnection.sourceHandle &&
+        edge.targetHandle === resolvedConnection.targetHandle
       )
         return false
       return true
@@ -49,45 +52,47 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     options.pushHistory(before)
     options.markDirty()
     options.refreshSnapshot()
-    options.markFlowExecutionNodeDirty(connection.target, { includeSelf: true })
+    options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
   }
 
   function onEdgeUpdate(event: EdgeUpdateEvent) {
     const { edge, connection } = event
-    if (!options.isValidConnection(connection)) {
+    const existingEdges = (options.edges.value as unknown as Edge[]).filter(
+      (item) => item.id !== edge.id,
+    )
+    const resolvedConnection = options.normalizeConnection
+      ? options.normalizeConnection(connection, existingEdges)
+      : connection
+    if (!resolvedConnection || !options.isValidConnection(resolvedConnection)) {
       options.onWarning('该连线不符合当前连接语义')
       return
     }
-    if (!connection.source || !connection.target) return
+    if (!resolvedConnection.source || !resolvedConnection.target) return
     const before = options.captureHistory()
-    const tone = resolveFlowEdgeToneFromHandles(connection.sourceHandle, connection.targetHandle)
     const nextEdges = (options.edges.value as unknown as Edge[])
       .filter(
         (item) =>
           item.id === edge.id ||
           !(
-            item.target === connection.target &&
-            (item.targetHandle ?? null) === (connection.targetHandle ?? null)
+            item.target === resolvedConnection.target &&
+            (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
           ),
       )
       .map((item) => {
         if (item.id !== edge.id) return item
-        const nextData = { ...((item.data ?? {}) as Record<string, unknown>), tone }
         return {
           ...item,
-          source: connection.source!,
-          target: connection.target!,
-          sourceHandle: connection.sourceHandle ?? null,
-          targetHandle: connection.targetHandle ?? null,
-          class: buildFlowEdgeClassName(tone, false),
-          data: nextData,
+          source: resolvedConnection.source!,
+          target: resolvedConnection.target!,
+          sourceHandle: resolvedConnection.sourceHandle ?? null,
+          targetHandle: resolvedConnection.targetHandle ?? null,
         } as Edge
       })
     options.commitEdges(nextEdges)
     options.pushHistory(before)
     options.markDirty()
     options.refreshSnapshot()
-    options.markFlowExecutionNodeDirty(connection.target, { includeSelf: true })
+    options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
   }
 
   return {

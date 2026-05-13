@@ -11,7 +11,6 @@ import type {
   CanvasNodeItem,
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
-import { buildFlowEdgeClassName, resolveFlowEdgeToneFromHandles } from './flowEdgeVisual'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
 export interface FlowAdapterNode {
@@ -190,7 +189,6 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
   snapshot.connections.forEach((connection) => {
     const sourceHandle = `out:${connection.fromPort}`
     const targetHandle = `in:${connection.toPort}`
-    const tone = resolveFlowEdgeToneFromHandles(sourceHandle, targetHandle)
     edges.push({
       id: `connection-${connection.id}`,
       source: toFlowNodeId(connection.fromNodeType, connection.fromNodeId),
@@ -198,8 +196,7 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
       target: toFlowNodeId(connection.toNodeType, connection.toNodeId),
       targetHandle,
       animated: false,
-      class: buildFlowEdgeClassName(tone, false),
-      data: { connectionSnapshot: clone(connection), tone },
+      data: { connectionSnapshot: clone(connection) },
     })
   })
 

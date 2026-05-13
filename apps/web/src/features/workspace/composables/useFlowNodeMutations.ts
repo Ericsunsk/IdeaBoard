@@ -17,7 +17,7 @@ import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
 } from '../config/canvasNodeConnectionContract'
-import { isFlowConnectionAllowed } from '../utils/flowConnectionAdapter'
+import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { patchFlowSnapshotParam } from '../utils/flowSnapshotParamMutations'
 import { useFlowConnectionMutations } from './useFlowConnectionMutations'
@@ -113,6 +113,8 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   const connectionMutations = useFlowConnectionMutations({
     edges: options.edges,
     isValidConnection,
+    normalizeConnection: (connection, existingEdges) =>
+      normalizeFlowConnection(connection, lookupData, existingEdges),
     captureHistory: options.captureHistory,
     pushHistory: options.pushHistory,
     commitEdges: options.commitEdges,
