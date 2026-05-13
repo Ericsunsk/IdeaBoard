@@ -1,7 +1,3 @@
-import {
-  getCanvasNodeVisibleInputPorts,
-  getCanvasNodeVisibleOutputPorts,
-} from '../config/canvasNodeConnectionContract'
 import type {
   CanvasBoardSnapshot,
   CanvasConnection,
@@ -129,8 +125,6 @@ function toFlowDataFromCanvasNode(
   nodeType: CanvasConnectionNodeType,
   node: CanvasNodeItem,
 ): FlowNodeData {
-  const inputPorts = getCanvasNodeVisibleInputPorts(nodeType, node).map((port) => port.port)
-  const outputPorts = getCanvasNodeVisibleOutputPorts(nodeType, node).map((port) => port.port)
   return {
     kind: nodeType,
     nodeType,
@@ -140,8 +134,6 @@ function toFlowDataFromCanvasNode(
       nodeType === 'edit' || nodeType === 'enhance'
         ? (node as { mode?: FlowNodeData['mode'] }).mode
         : undefined,
-    inputPorts,
-    outputPorts,
     snapshotNode: clone(node),
   }
 }
@@ -151,8 +143,6 @@ function toFlowDataFromMessageNode(node: CanvasImageItem): FlowNodeData {
     kind: 'message',
     title: resolveNodeTitle('message', node),
     summary: 'Canvas message image',
-    inputPorts: [],
-    outputPorts: [],
     snapshotNode: clone(node),
   }
 }

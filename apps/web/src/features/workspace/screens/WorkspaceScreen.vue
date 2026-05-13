@@ -774,7 +774,6 @@ const {
 })
 
 const {
-  isDirectGenerating,
   isNodeDirectActionRunning,
   runMessageDirectAction,
 } = useFlowMessageDirectActions({

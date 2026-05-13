@@ -43,9 +43,7 @@ export function useFlowMessageImageInteractions(options: UseFlowMessageImageInte
       kind: 'message',
       title: `Message #${item.id}`,
       summary: 'Canvas message image',
-      inputPorts: [],
-      outputPorts: [],
-      snapshotNode: item,
+                  snapshotNode: item,
     }
     const nextNode: FlowAdapterNode = {
       id: `message-${item.id}`,
@@ -309,9 +307,7 @@ export function useFlowMessageImageInteractions(options: UseFlowMessageImageInte
           kind: 'message',
           title: `Message #${copied.id}`,
           summary: 'Canvas message image',
-          inputPorts: [],
-          outputPorts: [],
-          snapshotNode: copied,
+                              snapshotNode: copied,
         },
       }
       appended.push(nextNode as Node)

@@ -8,7 +8,7 @@ export interface FlowNodeData {
   title: string
   summary?: string
   mode?: 'partial-edit' | 'bg-swap' | 'face-swap' | 'hd-upscale' | 'canvas-extend'
-  inputPorts: CanvasConnectionPort[]
-  outputPorts: CanvasConnectionPort[]
+  inputPorts?: CanvasConnectionPort[]
+  outputPorts?: CanvasConnectionPort[]
   snapshotNode?: unknown
 }

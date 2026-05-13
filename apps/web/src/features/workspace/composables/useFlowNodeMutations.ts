@@ -13,10 +13,6 @@ import {
   createViewpointNodeAt,
   createWearNodeAt,
 } from '../utils/canvasNodeFactory'
-import {
-  getCanvasNodeVisibleInputPorts,
-  getCanvasNodeVisibleOutputPorts,
-} from '../config/canvasNodeConnectionContract'
 import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { patchFlowSnapshotParam } from '../utils/flowSnapshotParamMutations'
@@ -145,8 +141,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         kind,
         nodeType: kind,
         title: `${kind[0].toUpperCase()}${kind.slice(1)} #${snapshotId}`,
-        inputPorts: getCanvasNodeVisibleInputPorts(kind, snapshotNode).map((port) => port.port),
-        outputPorts: getCanvasNodeVisibleOutputPorts(kind, snapshotNode).map((port) => port.port),
         snapshotNode,
       } satisfies FlowNodeData,
     }

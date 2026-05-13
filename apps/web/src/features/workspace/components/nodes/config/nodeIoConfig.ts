@@ -1,6 +1,3 @@
-// `top` is retained as IO metadata only. FlowNodeHandles intentionally ignores
-// it so VueFlow can use its default centered handle positioning.
-
 import type { EditNodeItem } from '../../../types/canvasNodes'
 import {
   editModeRequiresMask,
@@ -18,10 +15,6 @@ type NodeIoSlotTemplate<T> = {
   key: string
   kind: NodeIoKind
   label?: Resolvable<T, string>
-  direction?: NodeIoDirection
-  portName?: string
-  portKey?: string
-  top?: Resolvable<T, number>
   required?: Resolvable<T, boolean>
   visible?: Resolvable<T, boolean>
 }
@@ -43,17 +36,6 @@ type NodeConnectionChipItem = {
   visible?: boolean
 }
 
-type NodePortItem = {
-  key: string
-  direction: NodeIoDirection
-  kind: NodeIoKind
-  name: string
-  top?: number
-  connected?: boolean
-  pending?: boolean
-  visible?: boolean
-}
-
 function resolveValue<T, V>(value: Resolvable<T, V>, context: T): V {
   return typeof value === 'function' ? (value as (ctx: T) => V)(context) : value
 }
@@ -62,10 +44,6 @@ export const PROMPT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   {
     key: 'output',
     kind: 'prompt',
-    direction: 'output',
-    portName: 'prompt',
-    portKey: 'prompt-output',
-    top: 92,
   },
 ]
 
@@ -73,18 +51,10 @@ export const IMAGE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   {
     key: 'image',
     kind: 'image',
-    direction: 'input',
-    portName: 'image',
-    portKey: 'image-input',
-    top: 92,
   },
   {
     key: 'output',
     kind: 'image',
-    direction: 'output',
-    portName: 'image',
-    portKey: 'image-output',
-    top: 92,
   },
 ]
 
@@ -92,18 +62,10 @@ export const MASK_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   {
     key: 'image',
     kind: 'image',
-    direction: 'input',
-    portName: 'image',
-    portKey: 'mask-image-input',
-    top: 92,
   },
   {
     key: 'output',
     kind: 'mask',
-    direction: 'output',
-    portName: 'mask',
-    portKey: 'mask-output',
-    top: 92,
   },
 ]
 
@@ -113,37 +75,21 @@ export const COLOR_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
     label: 'Image',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'image',
-    portKey: 'color-image-input',
-    top: 96,
   },
   {
     key: 'mask',
     label: 'Mask',
     kind: 'mask',
-    direction: 'input',
-    portName: 'mask',
-    portKey: 'color-mask-input',
-    top: 152,
   },
   {
     key: 'prompt',
     label: 'Prompt',
     kind: 'prompt',
-    direction: 'input',
-    portName: 'prompt',
-    portKey: 'color-prompt-input',
-    top: 208,
   },
   {
     key: 'output',
     label: 'Output',
     kind: 'image',
-    direction: 'output',
-    portName: 'image',
-    portKey: 'color-output',
-    top: 96,
   },
 ]
 
@@ -153,47 +99,27 @@ export const MODEL_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
     label: 'Image',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'image',
-    portKey: 'model-image-input',
-    top: 92,
   },
   {
     key: 'modelImage',
     label: 'Model',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'imageA',
-    portKey: 'model-reference-image-input',
-    top: 136,
   },
   {
     key: 'poseImage',
     label: 'Pose',
     kind: 'image',
-    direction: 'input',
-    portName: 'imageB',
-    portKey: 'model-pose-image-input',
-    top: 180,
   },
   {
     key: 'prompt',
     label: 'Prompt',
     kind: 'prompt',
-    direction: 'input',
-    portName: 'prompt',
-    portKey: 'model-prompt-input',
-    top: 224,
   },
   {
     key: 'output',
     label: 'Output',
     kind: 'image',
-    direction: 'output',
-    portName: 'image',
-    portKey: 'model-output',
-    top: 92,
   },
 ]
 
@@ -203,28 +129,16 @@ export const VIEWPOINT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
     label: 'Image',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'image',
-    portKey: 'viewpoint-image-input',
-    top: 112,
   },
   {
     key: 'prompt',
     label: 'Prompt',
     kind: 'prompt',
-    direction: 'input',
-    portName: 'prompt',
-    portKey: 'viewpoint-prompt-input',
-    top: 168,
   },
   {
     key: 'output',
     label: 'Output',
     kind: 'image',
-    direction: 'output',
-    portName: 'image',
-    portKey: 'viewpoint-output',
-    top: 112,
   },
 ]
 
@@ -254,20 +168,12 @@ export const EDIT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EditNodeIoContext>[
     label: (ctx) => ctx.imageLabel,
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'image',
-    portKey: 'edit-image-input',
-    top: 92,
   },
   {
     key: 'imageB',
     label: (ctx) => ctx.sourceLabel,
     kind: 'image',
     required: (ctx) => ctx.supportsSourceImage,
-    direction: 'input',
-    portName: 'imageB',
-    portKey: 'edit-image-b-input',
-    top: 136,
     visible: (ctx) => ctx.supportsSourceImage,
   },
   {
@@ -275,30 +181,18 @@ export const EDIT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EditNodeIoContext>[
     label: (ctx) => ctx.maskLabel,
     kind: 'mask',
     required: (ctx) => ctx.requiresMask,
-    direction: 'input',
-    portName: 'mask',
-    portKey: 'edit-mask-input',
-    top: (ctx) => (ctx.supportsSourceImage ? 180 : 136),
   },
   {
     key: 'prompt',
     label: 'Prompt',
     kind: 'prompt',
     required: (ctx) => ctx.supportsPrompt,
-    direction: 'input',
-    portName: 'prompt',
-    portKey: 'edit-prompt-input',
-    top: (ctx) => (ctx.supportsSourceImage ? 224 : 180),
     visible: (ctx) => ctx.supportsPrompt,
   },
   {
     key: 'output',
     label: 'Output',
     kind: 'image',
-    direction: 'output',
-    portName: 'image',
-    portKey: 'edit-output',
-    top: 92,
   },
 ]
 
@@ -308,38 +202,22 @@ export const FUSION_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
     label: 'Image A',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'imageA',
-    portKey: 'fusion-image-a',
-    top: 92,
   },
   {
     key: 'imageB',
     label: 'Image B',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'imageB',
-    portKey: 'fusion-image-b',
-    top: 136,
   },
   {
     key: 'prompt',
     label: 'Prompt',
     kind: 'prompt',
-    direction: 'input',
-    portName: 'prompt',
-    portKey: 'fusion-prompt',
-    top: 180,
   },
   {
     key: 'output',
     label: 'Output',
     kind: 'image',
-    direction: 'output',
-    portName: 'image',
-    portKey: 'fusion-output',
-    top: 92,
   },
 ]
 
@@ -354,39 +232,23 @@ export const ENHANCE_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EnhanceNodeIoCon
     label: 'Image',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'image',
-    portKey: 'enhance-image-input',
-    top: 92,
   },
   {
     key: 'mask',
     label: 'Mask',
     kind: 'mask',
-    direction: 'input',
-    portName: 'mask',
-    portKey: 'enhance-mask-input',
-    top: 136,
     visible: (ctx) => ctx.supportsMask,
   },
   {
     key: 'prompt',
     label: 'Prompt',
     kind: 'prompt',
-    direction: 'input',
-    portName: 'prompt',
-    portKey: 'enhance-prompt-input',
-    top: 136,
     visible: (ctx) => ctx.supportsPrompt,
   },
   {
     key: 'output',
     label: 'Output',
     kind: 'image',
-    direction: 'output',
-    portName: 'image',
-    portKey: 'enhance-output',
-    top: 92,
   },
 ]
 
@@ -396,38 +258,22 @@ export const WEAR_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
     label: 'Body',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'imageA',
-    portKey: 'wear-image-a',
-    top: 92,
   },
   {
     key: 'imageB',
     label: 'Texture',
     kind: 'image',
     required: true,
-    direction: 'input',
-    portName: 'imageB',
-    portKey: 'wear-image-b',
-    top: 136,
   },
   {
     key: 'mask',
     label: 'Mask',
     kind: 'mask',
-    direction: 'input',
-    portName: 'mask',
-    portKey: 'wear-mask-input',
-    top: 180,
   },
   {
     key: 'output',
     label: 'Output',
     kind: 'image',
-    direction: 'output',
-    portName: 'image',
-    portKey: 'wear-output',
-    top: 92,
   },
 ]
 
@@ -435,13 +281,12 @@ export function buildNodeIoFromSlots<T>(
   slots: readonly NodeIoSlotTemplate<T>[],
   context: T,
   state: NodeIoBuildState,
-): { connectionChips: NodeConnectionChipItem[]; ports: NodePortItem[] } {
+): { connectionChips: NodeConnectionChipItem[] } {
   const errorSet = new Set(state.errorPortKeys ?? [])
   const connectedMap = state.connected ?? {}
   const pendingMap = state.pending ?? {}
 
   const connectionChips: NodeConnectionChipItem[] = []
-  const ports: NodePortItem[] = []
 
   for (const slot of slots) {
     const connected = Boolean(connectedMap[slot.key])
@@ -462,22 +307,9 @@ export function buildNodeIoFromSlots<T>(
         visible,
       })
     }
-
-    if (slot.direction && slot.portName) {
-      ports.push({
-        key: slot.portKey ?? slot.key,
-        direction: slot.direction,
-        kind: slot.kind,
-        name: slot.portName,
-        top: slot.top == null ? undefined : resolveValue(slot.top, context),
-        connected,
-        pending,
-        visible,
-      })
-    }
   }
 
-  return { connectionChips, ports }
+  return { connectionChips }
 }
 
-export type { NodeConnectionChipItem, NodeIoSlotTemplate, NodePortItem }
+export type { NodeConnectionChipItem, NodeIoSlotTemplate }

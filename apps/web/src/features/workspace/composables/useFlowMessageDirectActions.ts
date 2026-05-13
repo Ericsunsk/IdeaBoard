@@ -38,17 +38,9 @@ type UseFlowMessageDirectActionsOptions = {
 
 const STYLE_INNOVATE_DEFAULT_STRENGTH = 50
 
-function parseAspectRatio(rawRatio: string): number {
-  const [width, height] = rawRatio.split(':').map((part) => Number(part))
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return 1
-  }
-  return height / width
-}
 
 export function useFlowMessageDirectActions(options: UseFlowMessageDirectActionsOptions) {
   const runningNodeIds = ref<Set<string>>(new Set())
-  const isDirectGenerating = ref(false)
 
   function getMessageNodeById(nodeId: string): Node<FlowNodeData> | null {
     const target = options.nodes.value.find((node) => node.id === nodeId)
@@ -91,8 +83,6 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
         kind: 'message',
         title: `Message #${pendingItem.id}`,
         summary: 'Canvas message image',
-        inputPorts: [],
-        outputPorts: [],
         snapshotNode: pendingItem,
       },
     }
@@ -101,44 +91,6 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
     return nextNode.id
   }
 
-  function appendPendingPatternMessageNode(heightRatio?: number): string {
-    const messageNodes = options.nodes.value.filter(
-      (node) => node.data?.kind === 'message',
-    ) as Array<Node<FlowNodeData>>
-    const lastMessageNode = messageNodes[messageNodes.length - 1]
-    const lastSnapshot = lastMessageNode?.data?.snapshotNode as CanvasImageItem | undefined
-    const baseX = Number(lastSnapshot?.x)
-    const baseY = Number(lastSnapshot?.y)
-    const baseWidth = Number(lastSnapshot?.width)
-    const width = Number.isFinite(baseWidth) && baseWidth > 0 ? baseWidth : 300
-    const pendingItem = createCanvasImageItemAt(
-      {
-        x: Number.isFinite(baseX) ? baseX + width + 48 : 240,
-        y: Number.isFinite(baseY) ? baseY : 180,
-      },
-      '',
-      heightRatio,
-    )
-    pendingItem.width = width
-    pendingItem.renderState = 'pending'
-
-    const nextNode: Node<FlowNodeData> = {
-      id: `message-${pendingItem.id}`,
-      type: 'canvas',
-      dragHandle: resolveFlowNodeDragHandle('message'),
-      position: { x: pendingItem.x, y: pendingItem.y },
-      data: {
-        kind: 'message',
-        title: `Message #${pendingItem.id}`,
-        summary: 'Canvas message image',
-        inputPorts: [],
-        outputPorts: [],
-        snapshotNode: pendingItem,
-      },
-    }
-    commitNodeMutation((items) => [...items, nextNode as Node])
-    return nextNode.id
-  }
 
   function removeMessageNode(nodeId: string) {
     commitNodeMutation((items) => items.filter((node) => node.id !== nodeId))
@@ -218,29 +170,6 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
     return waitTaskResult(submitRes.data.task_id)
   }
 
-  async function submitPatternGenerateTask(
-    prompt: string,
-    ratio: string,
-    quality: string,
-    runOptions?: {
-      onSubmitted?: () => void
-    },
-  ): Promise<string[]> {
-    const request = buildExecutionTaskRequest({
-      prompt,
-      feature: EXECUTION_DIRECT_ACTION_META.patternGen.feature,
-      params: {
-        ratio,
-        quality,
-      },
-    })
-    const submitRes = await taskApi.submit(request)
-    if (submitRes.code !== 0 || !submitRes.data?.task_id) {
-      throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
-    }
-    runOptions?.onSubmitted?.()
-    return waitTaskResult(submitRes.data.task_id)
-  }
 
   async function runToVector(source: CanvasImageItem): Promise<string[]> {
     const res = await vectorizeApi.vectorize({
@@ -291,42 +220,13 @@ export function useFlowMessageDirectActions(options: UseFlowMessageDirectActions
     }
   }
 
-  async function runPatternGenerate(
-    prompt: string,
-    ratio: string,
-    quality: string,
-    runOptions?: {
-      onSubmitted?: () => void
-    },
-  ) {
-    if (isDirectGenerating.value) return
-    isDirectGenerating.value = true
-    const pendingNodeId = appendPendingPatternMessageNode(parseAspectRatio(ratio))
-    try {
-      const urls = await submitPatternGenerateTask(prompt, ratio, quality, {
-        onSubmitted: runOptions?.onSubmitted,
-      })
-      const firstUrl = urls.find((url) => typeof url === 'string' && url.trim())
-      if (!firstUrl) throw new Error('任务完成但未返回图片')
-      replacePendingNodeResultUrl(pendingNodeId, firstUrl)
-      options.onSuccess('生成完成')
-    } catch (error) {
-      removeMessageNode(pendingNodeId)
-      const msg = error instanceof Error ? error.message : '执行失败'
-      options.onWarning(msg)
-    } finally {
-      isDirectGenerating.value = false
-    }
-  }
 
   function isNodeDirectActionRunning(nodeId: string): boolean {
     return runningNodeIds.value.has(nodeId)
   }
 
   return {
-    isDirectGenerating,
     isNodeDirectActionRunning,
-    runPatternGenerate,
     runMessageDirectAction,
   }
 }

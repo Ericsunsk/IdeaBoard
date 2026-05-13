@@ -24,7 +24,6 @@ declare module 'vue' {
     FlowMessageNodeView: typeof import('./features/workspace/components/FlowMessageNodeView.vue')['default']
     FlowNodeHandles: typeof import('./features/workspace/components/FlowNodeHandles.vue')['default']
     FusionNode: typeof import('./features/workspace/components/nodes/FusionNode.vue')['default']
-    HomeBottomGenerateBar: typeof import('./features/workspace/components/home/HomeBottomGenerateBar.vue')['default']
     HomeCanvasHeader: typeof import('./features/workspace/components/home/HomeCanvasHeader.vue')['default']
     HomeCanvasImageActionMenu: typeof import('./features/workspace/components/home/HomeCanvasImageActionMenu.vue')['default']
     ImageNode: typeof import('./features/workspace/components/nodes/ImageNode.vue')['default']
