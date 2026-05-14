@@ -15,6 +15,14 @@ func TestValidateImageMagicAcceptsWebPWithWebPChunk(t *testing.T) {
 	}
 }
 
+func TestValidateImageMagicAcceptsBmpHeader(t *testing.T) {
+	buf := []byte{0x42, 0x4D, 0x46, 0x00}
+
+	if err := validateImageMagic(buf, ".bmp"); err != nil {
+		t.Fatalf("expected valid bmp header, got %v", err)
+	}
+}
+
 func TestValidateImageMagicRejectsRiffWithoutWebPChunk(t *testing.T) {
 	buf := []byte{
 		0x52, 0x49, 0x46, 0x46,

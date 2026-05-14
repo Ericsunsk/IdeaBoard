@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/platform/media"
 	"api/internal/platform/mediarefs"
 	"api/internal/platform/outbound"
 	"api/internal/platform/safehttp"
@@ -288,16 +289,10 @@ func resolveOpenAIImageBytes(ctx context.Context, ref string, index int, timeout
 }
 
 func inferOpenAIImageFileExtension(mimeType string) string {
-	switch strings.ToLower(strings.TrimSpace(mimeType)) {
-	case "image/jpeg", "image/jpg":
-		return "jpg"
-	case "image/webp":
-		return "webp"
-	case "image/gif":
-		return "gif"
-	default:
-		return "png"
+	if ext := media.ImageExtensionFromMIME(mimeType); ext != "" {
+		return strings.TrimPrefix(ext, ".")
 	}
+	return "png"
 }
 
 func extractOpenAIImageRef(raw interface{}) string {

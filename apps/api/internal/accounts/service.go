@@ -52,6 +52,7 @@ const maxSubmitTaskParamsDepth = 24
 const maxSubmitTaskMediaDataURLBytes = 10 * 1024 * 1024
 const maxAccountMaxConcurrent = 64
 const maxAccountTimeoutSeconds = 600
+const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加账号"
 
 func NewAccountServiceWithQueue(
 	accountRepo *AccountRepository,
@@ -327,73 +328,16 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
-		return "", err
-	}
-	if err := validateSubmitTaskImageURLs(req.ImageURLs); err != nil {
-		return "", err
-	}
-
-	// 获取所有可用的账号
-	accounts, err := s.accountRepo.GetAllEnabled()
+	accounts, params, _, fullPrompt, err := s.prepareSubmitTask(req)
 	if err != nil {
-		return "", fmt.Errorf("任务提交失败，请稍后重试")
-	}
-
-	if len(accounts) == 0 {
-		return "", fmt.Errorf("没有可用的 API 账号，请先添加账号")
+		return "", err
 	}
 
 	// 生成任务ID
 	taskID := generateSecureTaskID("task")
 
-	params := req.Params
-	if params == nil {
-		params = map[string]interface{}{}
-	}
-	if req.Feature != "" {
-		params["feature"] = req.Feature
-	}
-	if len(req.ImageURLs) > 0 {
-		params["image_urls"] = req.ImageURLs
-	}
-	req.Params = params
-	if err := validateSubmitTaskMediaParams(req.Params); err != nil {
-		return "", err
-	}
-
-	fullPrompt := req.Prompt
-
-	featureSlug := ""
-	if req.Params != nil {
-		featureSlug, err = workflow.ResolveWorkflowFeatureSlug(req.Params)
-		if err != nil {
-			return "", err
-		}
-		if featureSlug != "" {
-			req.Params["feature"] = featureSlug
-		}
-	}
-	accounts = filterAccountsByFeature(accounts, featureSlug)
-	if len(accounts) == 0 {
-		return "", fmt.Errorf("没有可用的 API 账号，请先添加账号")
-	}
-
-	fullPrompt = applyTaskSystemPrompt(fullPrompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {
-		if s.systemConfigRepo == nil {
-			return "", fmt.Errorf("system config repo 未配置")
-		}
-		return s.systemConfigRepo.Get(prompts.FeaturePromptConfigKey(slug))
-	})
-	if err := validateExecutablePrompt(fullPrompt); err != nil {
-		return "", err
-	}
-	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
-		return "", err
-	}
-
 	// 序列化参数
-	paramsJSON, err := marshalSubmitTaskParams(req.Params)
+	paramsJSON, err := marshalSubmitTaskParams(params)
 	if err != nil {
 		return "", err
 	}
@@ -443,6 +387,79 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	}
 
 	return taskID, nil
+}
+
+func (s *AccountService) CheckSubmitTaskReadiness(req *tasks.SubmitTaskRequest) (string, error) {
+	if req == nil {
+		return "", fmt.Errorf("请求参数错误")
+	}
+	_, _, featureSlug, _, err := s.prepareSubmitTask(req)
+	if err != nil {
+		return "", err
+	}
+	return featureSlug, nil
+}
+
+func (s *AccountService) prepareSubmitTask(req *tasks.SubmitTaskRequest) ([]*ApiAccount, map[string]interface{}, string, string, error) {
+	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
+		return nil, nil, "", "", err
+	}
+	if err := validateSubmitTaskImageURLs(req.ImageURLs); err != nil {
+		return nil, nil, "", "", err
+	}
+
+	accounts, err := s.accountRepo.GetAllEnabled()
+	if err != nil {
+		return nil, nil, "", "", fmt.Errorf("任务提交失败，请稍后重试")
+	}
+	if len(accounts) == 0 {
+		return nil, nil, "", "", fmt.Errorf(noAvailableAPIAccountMessage)
+	}
+
+	params := make(map[string]interface{}, len(req.Params)+2)
+	for key, value := range req.Params {
+		params[key] = value
+	}
+	if req.Feature != "" {
+		params["feature"] = req.Feature
+	}
+	if len(req.ImageURLs) > 0 {
+		params["image_urls"] = req.ImageURLs
+	}
+	req.Params = params
+	if err := validateSubmitTaskMediaParams(req.Params); err != nil {
+		return nil, nil, "", "", err
+	}
+
+	featureSlug := ""
+	if req.Params != nil {
+		featureSlug, err = workflow.ResolveWorkflowFeatureSlug(req.Params)
+		if err != nil {
+			return nil, nil, "", "", err
+		}
+		if featureSlug != "" {
+			req.Params["feature"] = featureSlug
+		}
+	}
+	accounts = filterAccountsByFeature(accounts, featureSlug)
+	if len(accounts) == 0 {
+		return nil, nil, "", "", fmt.Errorf(noAvailableAPIAccountMessage)
+	}
+
+	fullPrompt := applyTaskSystemPrompt(req.Prompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {
+		if s.systemConfigRepo == nil {
+			return "", fmt.Errorf("system config repo 未配置")
+		}
+		return s.systemConfigRepo.Get(prompts.FeaturePromptConfigKey(slug))
+	})
+	if err := validateExecutablePrompt(fullPrompt); err != nil {
+		return nil, nil, "", "", err
+	}
+	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
+		return nil, nil, "", "", err
+	}
+
+	return accounts, req.Params, featureSlug, fullPrompt, nil
 }
 
 func (s *AccountService) GetTask(taskID string) (*tasks.Task, error) {

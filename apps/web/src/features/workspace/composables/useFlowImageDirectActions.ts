@@ -13,7 +13,8 @@ import { createImageNodeAt } from '../utils/canvasNodeFactory'
 import type { ImageNodeItem } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
-import { waitTaskResult } from '../services/flowTaskExecutorUtils'
+import { assertTaskSubmitReady, waitTaskResult } from '../services/flowTaskExecutorUtils'
+import { resolveImageNodeFrameSize, resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
 import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
 
 type DirectActionKey = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
@@ -51,9 +52,7 @@ const IMAGE_RESULT_NODE_Y_GAP = 14
 const IMAGE_NODE_HEADER_HEIGHT = 26
 
 function estimateImageNodeHeight(source: Pick<ImageDirectActionSource, 'width' | 'ratio'>): number {
-  const width = Number.isFinite(source.width) && source.width > 0 ? source.width : 280
-  const ratio = Number.isFinite(source.ratio) && source.ratio > 0 ? source.ratio : 1
-  const stageHeight = Math.max(120, Math.min(360, Math.round(width * ratio)))
+  const stageHeight = resolveImageNodeStageHeight(source.width, source.ratio, true)
   return IMAGE_NODE_HEADER_HEIGHT + stageHeight
 }
 
@@ -299,9 +298,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     pruneResultNodeLayouts()
     const position = resolvePendingImageResultPosition(source, sourceNodeId)
     const imageNode = createImageNodeAt(position)
-    imageNode.width = source.width
     imageNode.sourceImageUrl = ''
     imageNode.sourceImageRatio = source.ratio > 0 ? source.ratio : 1
+    imageNode.width = resolveImageNodeFrameSize(imageNode.sourceImageRatio, true).width
     imageNode.outputStatus = 'running'
     imageNode.outputImages = []
 
@@ -335,6 +334,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   }
 
   function updatePendingImageResultNode(nodeId: string, url: string, ratio: number) {
+    const frameSize = resolveImageNodeFrameSize(ratio, true)
     commitGraphMutation(
       (items, currentEdges) => ({
         nodes: items.map((item) => {
@@ -347,6 +347,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
               ...item.data,
               snapshotNode: {
                 ...(snapshot as ImageNodeItem),
+                width: frameSize.width,
                 sourceImageUrl: url,
                 sourceImageRatio: ratio > 0 ? ratio : 1,
                 outputStatus: 'ready',
@@ -389,6 +390,34 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       // Non-critical: layout can use the source ratio if result probing fails.
     }
     return fallbackRatio > 0 ? fallbackRatio : 1
+  }
+
+  async function assertDirectActionSubmitReady(
+    action: Exclude<DirectActionKey, 'to-vector'>,
+  ): Promise<void> {
+    const feature =
+      action === 'style-innovate'
+        ? EXECUTION_DIRECT_ACTION_META.styleInnovate.feature
+        : action === 'remove-bg'
+          ? EXECUTION_DIRECT_ACTION_META.removeBg.feature
+          : EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature
+    await assertTaskSubmitReady(
+      buildExecutionTaskRequest({
+        prompt: 'submit readiness',
+        feature,
+      }),
+      '提交任务失败',
+    )
+  }
+
+  async function assertPromptImageSubmitReady(): Promise<void> {
+    await assertTaskSubmitReady(
+      buildExecutionTaskRequest({
+        prompt: 'submit readiness',
+        feature: EXECUTION_EDIT_MODE_META['partial-edit'].feature,
+      }),
+      '提交任务失败',
+    )
   }
 
   async function runSubmitAndWait(
@@ -482,6 +511,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
 
     let resultNodeId: string | null = null
     try {
+      if (action !== 'to-vector') {
+        await assertDirectActionSubmitReady(action)
+      }
       resultNodeId = appendPendingImageResultNode(source, nodeId)
       setNodeRunning(resultNodeId, true)
       const urls =
@@ -520,6 +552,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
 
     let resultNodeId: string | null = null
     try {
+      await assertPromptImageSubmitReady()
       resultNodeId = appendPendingImageResultNode(source, nodeId)
       setNodeRunning(resultNodeId, true)
       const urls = await runPromptImageGeneration(source, normalizedPrompt)

@@ -28,6 +28,14 @@ func TestParseDataImageURL(t *testing.T) {
 	if _, err := ParseDataImageURL(tooLarge, 8); err == nil {
 		t.Fatalf("expected size limit error")
 	}
+
+	if _, err := ParseDataImageURL("data:image/svg+xml;base64,PHN2Zy8+", 1024); err == nil {
+		t.Fatalf("expected svg data url to be rejected")
+	}
+
+	if _, err := ParseDataImageURL("data:image/heic;base64,aGVsbG8=", 1024); err == nil {
+		t.Fatalf("expected heic data url to be rejected")
+	}
 }
 
 func TestForEachParamMediaRef(t *testing.T) {

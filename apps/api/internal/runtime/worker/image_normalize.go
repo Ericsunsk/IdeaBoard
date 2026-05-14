@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"api/internal/platform/media"
 	"bytes"
 	"fmt"
 	"image"
@@ -8,10 +9,10 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"mime"
-	"net/http"
 	"path"
 	"strings"
 
+	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
 )
 
@@ -35,25 +36,16 @@ func normalizeOpenAIEditMultipartImage(filename, mimeType string, data []byte) (
 
 func normalizeImageMIMEType(mimeType string, data []byte) string {
 	if parsed, _, err := mime.ParseMediaType(strings.TrimSpace(mimeType)); err == nil && strings.HasPrefix(parsed, "image/") {
-		switch strings.ToLower(parsed) {
-		case "image/jpg":
-			return "image/jpeg"
-		case "image/jpeg", "image/png", "image/webp", "image/gif":
-			return strings.ToLower(parsed)
+		if normalized, ok := media.NormalizeImageMIME(parsed); ok {
+			return normalized
 		}
 	}
-	switch strings.ToLower(strings.TrimSpace(http.DetectContentType(data))) {
-	case "image/jpeg":
-		return "image/jpeg"
-	case "image/png":
-		return "image/png"
-	case "image/webp":
-		return "image/webp"
-	case "image/gif":
-		return "image/gif"
-	default:
-		return "image/png"
+	if ext := media.DetectImageExtensionFromBytes(data); ext != "" {
+		if normalized := media.ImageMIMEFromExtension(ext); normalized != "" {
+			return normalized
+		}
 	}
+	return "image/png"
 }
 
 func ensureFilenameHasImageExt(filename string, mimeType string) string {

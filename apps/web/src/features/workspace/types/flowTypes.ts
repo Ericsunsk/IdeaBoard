@@ -1,4 +1,4 @@
-import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
+import type { CanvasConnectionNodeType } from '../types/canvasNodes'
 
 export type FlowNodeKind = CanvasConnectionNodeType
 
@@ -8,7 +8,5 @@ export interface FlowNodeData {
   title: string
   summary?: string
   mode?: 'partial-edit' | 'bg-swap' | 'face-swap' | 'hd-upscale' | 'canvas-extend'
-  inputPorts?: CanvasConnectionPort[]
-  outputPorts?: CanvasConnectionPort[]
   snapshotNode?: unknown
 }

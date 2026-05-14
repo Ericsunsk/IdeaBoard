@@ -1,6 +1,19 @@
 import { ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import {
+  buildExecutionTaskRequest,
+  EXECUTION_DIRECTED_RECOLOR_META,
+  EXECUTION_EDIT_MODE_META,
+  EXECUTION_ENHANCE_META,
+  EXECUTION_FACE_SWAP_META,
+  EXECUTION_FUSION_META,
+  EXECUTION_MODEL_META,
+  EXECUTION_VIEWPOINT_META,
+  EXECUTION_WEAR_META,
+  type ExecutionFeature,
+} from '../config/executionContract'
+import { assertTaskSubmitReady } from '../services/flowTaskExecutorUtils'
+import {
   executeFlowEnhanceNode,
   validateFlowEnhanceNodeInputs,
 } from '../services/flowEnhanceExecutor'
@@ -23,6 +36,7 @@ import type {
   ViewpointNodeItem,
   WearNodeItem,
 } from '../types/canvasNodes'
+import type { SubmitTaskData } from '../../../shared/api/task'
 
 type FlowRuntimeNode = { id: string; data?: { kind?: string; snapshotNode?: unknown } }
 type FlowRuntimeEdge = {
@@ -117,8 +131,20 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     buildContext: (target: { data: { snapshotNode: unknown } }, nodeId: string) => TContext
     buildOptions: () => TOptions
     validate: (context: TContext, opts: TOptions) => string | null
+    preflight?: (context: TContext, opts: TOptions) => Promise<void>
     execute: (context: TContext, opts: TOptions) => Promise<{ urls: string[] }>
     preserveOutputImagesOnFailure?: boolean
+  }
+
+  function buildExecutionReadinessRequest(feature: ExecutionFeature): SubmitTaskData {
+    return buildExecutionTaskRequest({
+      prompt: 'submit readiness',
+      feature,
+    })
+  }
+
+  async function assertExecutionSubmitReady(feature: ExecutionFeature): Promise<void> {
+    await assertTaskSubmitReady(buildExecutionReadinessRequest(feature), '提交任务失败')
   }
 
   async function runFlowGenerationNode<TContext, TOptions>(
@@ -146,6 +172,15 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     if (validationError) {
       options.onWarning(validationError)
       return
+    }
+    if (config.preflight) {
+      try {
+        await config.preflight(context, opts)
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : config.failureMessage
+        options.onWarning(msg)
+        return
+      }
     }
 
     config.runningSet.value.add(nodeId)
@@ -272,6 +307,12 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         boardId: options.currentBoardId.value || undefined,
       }),
       validate: (ctx, opts) => validateFlowEnhanceNodeInputs(ctx, opts),
+      preflight: (ctx) =>
+        assertExecutionSubmitReady(
+          ctx.snapshotNode.mode === 'hd-upscale'
+            ? EXECUTION_ENHANCE_META.hdUpscale.feature
+            : EXECUTION_ENHANCE_META.canvasExtend.feature,
+        ),
       execute: (ctx, opts) => executeFlowEnhanceNode(ctx, opts),
     })
   }
@@ -296,6 +337,12 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         boardId: options.currentBoardId.value || undefined,
       }),
       validate: (ctx, opts) => validateFlowEditNodeInputs(ctx, opts),
+      preflight: (ctx) =>
+        assertExecutionSubmitReady(
+          ctx.snapshotNode.mode === 'face-swap'
+            ? EXECUTION_FACE_SWAP_META.feature
+            : EXECUTION_EDIT_MODE_META[ctx.snapshotNode.mode].feature,
+        ),
       execute: (ctx, opts) => executeFlowEditNode(ctx, opts),
     })
   }
@@ -320,6 +367,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         boardId: options.currentBoardId.value || undefined,
       }),
       validate: (ctx, opts) => validateFlowColorNodeInputs(ctx, opts),
+      preflight: () => assertExecutionSubmitReady(EXECUTION_DIRECTED_RECOLOR_META.feature),
       execute: (ctx, opts) => executeFlowColorNode(ctx, opts),
     })
   }
@@ -344,6 +392,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         boardId: options.currentBoardId.value || undefined,
       }),
       validate: (ctx, opts) => validateFlowFusionNodeInputs(ctx, opts),
+      preflight: () => assertExecutionSubmitReady(EXECUTION_FUSION_META.feature),
       execute: (ctx, opts) => executeFlowFusionNode(ctx, opts),
     })
   }
@@ -369,6 +418,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         boardId: options.currentBoardId.value || undefined,
       }),
       validate: (ctx, opts) => validateFlowWearNodeInputs(ctx, opts),
+      preflight: () => assertExecutionSubmitReady(EXECUTION_WEAR_META.feature),
       execute: (ctx, opts) => executeFlowWearNode(ctx, opts),
     })
   }
@@ -394,6 +444,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         boardId: options.currentBoardId.value || undefined,
       }),
       validate: (ctx, opts) => validateFlowModelNodeInputs(ctx, opts),
+      preflight: () => assertExecutionSubmitReady(EXECUTION_MODEL_META.feature),
       execute: (ctx, opts) => executeFlowModelNode(ctx, opts),
     })
   }
@@ -419,6 +470,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         boardId: options.currentBoardId.value || undefined,
       }),
       validate: (ctx, opts) => validateFlowViewpointNodeInputs(ctx, opts),
+      preflight: () => assertExecutionSubmitReady(EXECUTION_VIEWPOINT_META.feature),
       execute: (ctx, opts) => executeFlowViewpointNode(ctx, opts),
     })
   }

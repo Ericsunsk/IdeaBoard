@@ -2,6 +2,7 @@ import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { createImageNodeAt } from '../utils/canvasNodeFactory'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
+import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
 import type { ImageNodeItem } from '../types/canvasNodes'
 import type { FlowAdapterNode } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -69,9 +70,9 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
       x: sourceNode.x + Math.max(240, sourceNode.width + 64),
       y: sourceNode.y + 18,
     })
-    imageNode.width = sourceNode.width
     imageNode.sourceImageUrl = payload.url
     imageNode.sourceImageRatio = payload.ratio
+    imageNode.width = resolveImageNodeFrameSize(payload.ratio, true).width
     imageNode.outputStatus = 'ready'
     imageNode.outputImages = []
     appendImageFlowNode(imageNode)
@@ -135,14 +136,18 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
         x: Number(source.x ?? 0) + delta.x,
         y: Number(source.y ?? 0) + delta.y,
       })
-      const sourceWidth = Number(source.width)
-      copied.width = Number.isFinite(sourceWidth) && sourceWidth > 0 ? sourceWidth : copied.width
       copied.sourceImageUrl = `${source.sourceImageUrl ?? ''}`.trim()
       copied.sourceImageRatio =
         Number.isFinite(source.sourceImageRatio) && Number(source.sourceImageRatio) > 0
           ? Number(source.sourceImageRatio)
           : 1
       copied.outputImages = cloneImageOutputs(source)
+      const latestOutput =
+        copied.outputImages.length > 0 ? copied.outputImages[copied.outputImages.length - 1] : null
+      copied.width = resolveImageNodeFrameSize(
+        latestOutput?.ratio ?? copied.sourceImageRatio,
+        !!(latestOutput?.url || copied.sourceImageUrl),
+      ).width
       copied.outputStatus = source.outputStatus
       appended.push(createImageFlowNode(copied))
     })

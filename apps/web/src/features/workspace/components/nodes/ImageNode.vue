@@ -265,7 +265,7 @@ function resizePromptInput() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-radius: 16px;
+  border-radius: 11px;
   background: #ffffff;
   overflow: visible;
 }
@@ -290,9 +290,8 @@ function resizePromptInput() {
 .image-node-stage {
   position: relative;
   width: 100%;
-  min-height: 120px;
   border: 1.5px solid #e2e8f0;
-  border-radius: 16px;
+  border-radius: 11px;
   background: #ffffff;
   box-sizing: border-box;
   overflow: hidden;
@@ -352,7 +351,7 @@ function resizePromptInput() {
   width: 100%;
   height: 100%;
   border: 0;
-  border-radius: 16px;
+  border-radius: 11px;
   background: #ffffff;
   color: #a8b3be;
   gap: 0;

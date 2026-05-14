@@ -469,10 +469,10 @@ func (s *StorageService) downloadRemoteFile(ctx context.Context, remoteURL strin
 	if normalized, ok := media.NormalizeImageExtension(ext); ok {
 		ext = normalized
 	} else {
-		ext = imageExtensionFromContentType(resp.Header.Get("Content-Type"))
+		ext = media.ImageExtensionFromMIME(resp.Header.Get("Content-Type"))
 	}
 	if ext == "" {
-		return nil, "", fmt.Errorf("仅支持 JPG / PNG / GIF / WEBP 图片")
+		return nil, "", fmt.Errorf("仅支持 %s 图片", media.SupportedUploadImageLabel())
 	}
 	if err := validateRemoteImageBytes("remote"+ext, data); err != nil {
 		return nil, "", err
@@ -482,25 +482,10 @@ func (s *StorageService) downloadRemoteFile(ctx context.Context, remoteURL strin
 	return data, filename, nil
 }
 
-func imageExtensionFromContentType(contentType string) string {
-	ct := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
-	switch ct {
-	case "image/jpeg", "image/jpg":
-		return ".jpg"
-	case "image/png":
-		return ".png"
-	case "image/gif":
-		return ".gif"
-	case "image/webp":
-		return ".webp"
-	}
-	return ""
-}
-
 func validateRemoteImageBytes(filename string, data []byte) error {
 	ext, ok := media.NormalizeImageExtension(filepath.Ext(filename))
 	if !ok {
-		return fmt.Errorf("仅支持 JPG / PNG / GIF / WEBP 图片")
+		return fmt.Errorf("仅支持 %s 图片", media.SupportedUploadImageLabel())
 	}
 	if err := media.ValidateImageBytes(data, ext); err != nil {
 		return fmt.Errorf("远程文件校验失败: %v", err)

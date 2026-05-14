@@ -1,5 +1,7 @@
 import type { CanvasConnectionNodeType, ImageNodeOutputItem } from '../types/canvasNodes'
 import { waitTaskResultWithSse } from '../../../shared/api/taskEvents'
+import { taskApi, type SubmitTaskData } from '../../../shared/api/task'
+import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 
 export interface FlowTaskExecutorGraphOptions {
   nodes: Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>
@@ -167,6 +169,19 @@ export function resolveConnectedExecutionInput(
 
 export async function waitTaskResult(taskId: string): Promise<string[]> {
   return waitTaskResultWithSse(taskId)
+}
+
+export async function assertTaskSubmitReady(
+  request: SubmitTaskData,
+  fallbackMessage = '提交任务失败',
+): Promise<void> {
+  const readiness = await taskApi.checkSubmitReadiness(request)
+  if (readiness.code !== 0) {
+    throw new Error(sanitizeApiErrorMessage(readiness.msg, fallbackMessage))
+  }
+  if (!readiness.data?.ready) {
+    throw new Error(sanitizeApiErrorMessage(readiness.data?.message, fallbackMessage))
+  }
 }
 
 /** All node kinds that can produce image output usable as downstream source. */

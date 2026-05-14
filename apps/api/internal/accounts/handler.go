@@ -166,6 +166,25 @@ func (h *AccountHandler) SubmitTask(c *gin.Context) {
 	response.Success(c, gin.H{"task_id": taskID})
 }
 
+func (h *AccountHandler) CheckSubmitTaskReadiness(c *gin.Context) {
+	userID := c.GetUint64("user_id")
+	if userID == 0 {
+		response.Error(c, 401, "未登录")
+		return
+	}
+	var req tasks.SubmitTaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	featureSlug, err := h.accountService.CheckSubmitTaskReadiness(&req)
+	if err != nil {
+		response.Success(c, gin.H{"ready": false, "message": err.Error()})
+		return
+	}
+	response.Success(c, gin.H{"ready": true, "feature": featureSlug})
+}
+
 func (h *AccountHandler) GetTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 	task, err := h.accountService.GetTask(taskID)

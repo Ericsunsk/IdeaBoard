@@ -1,10 +1,10 @@
 package worker
 
 import (
+	"api/internal/platform/media"
 	"api/internal/platform/mediarefs"
 	"encoding/base64"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -56,21 +56,18 @@ func resolveLocalUploadFilePath(raw string) (string, bool) {
 
 func inferLocalAssetMimeType(filename string, data []byte) string {
 	if len(data) > 0 {
-		detected := strings.ToLower(strings.TrimSpace(http.DetectContentType(data)))
-		if strings.HasPrefix(detected, "image/") {
-			return detected
+		if ext := media.DetectImageExtensionFromBytes(data); ext != "" {
+			if mimeType := media.ImageMIMEFromExtension(ext); mimeType != "" {
+				return mimeType
+			}
 		}
 	}
-	switch strings.ToLower(filepath.Ext(filename)) {
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".webp":
-		return "image/webp"
-	case ".gif":
-		return "image/gif"
-	default:
-		return "image/png"
+	if ext, ok := media.NormalizeImageExtFromFilename(filename); ok {
+		if mimeType := media.ImageMIMEFromExtension(ext); mimeType != "" {
+			return mimeType
+		}
 	}
+	return "image/png"
 }
 
 func inlineLocalAssetDataURL(raw string) (string, bool, error) {

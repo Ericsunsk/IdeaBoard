@@ -109,6 +109,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskId'
+  /user/drawing/submit/readiness:
+    post:
+      tags: [Tasks]
+      operationId: checkUserTaskSubmitReadiness
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTaskRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseTaskSubmitReadiness'
   /user/drawing:
     get:
       tags: [Tasks]
@@ -1119,6 +1136,19 @@ components:
               required: [task_id]
               properties:
                 task_id: { type: string }
+
+    ApiResponseTaskSubmitReadiness:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [ready]
+              properties:
+                ready: { type: boolean }
+                message: { type: string }
+                feature: { type: string }
 
     ApiResponseTaskList:
       allOf:

@@ -6,6 +6,8 @@ import {
   resolveSourceImageFromNode,
 } from '../services/flowTaskExecutorUtils'
 import type { CanvasConnectionNodeType, ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
+import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
+import { IMAGE_NODE_EMPTY_SIZE } from '../utils/imageNodeSizing'
 
 type UseFlowNodeMediaInputsOptions = {
   nodes: Ref<Node[]>
@@ -149,7 +151,7 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
   function onFlowImageOpenFile(nodeId: string) {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/*'
+    input.accept = IMAGE_UPLOAD_ACCEPT
     input.onchange = () => {
       const file = input.files?.[0]
       if (!file) return
@@ -161,6 +163,7 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
   function onFlowImageReset(nodeId: string) {
     options.updateSnapshotNode(nodeId, (prev) => ({
       ...prev,
+      width: IMAGE_NODE_EMPTY_SIZE,
       sourceImageUrl: '',
       sourceImageRatio: 1,
       outputStatus: 'idle',
@@ -180,7 +183,7 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
   function onFlowMaskOpenFile(nodeId: string) {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/*'
+    input.accept = IMAGE_UPLOAD_ACCEPT
     input.onchange = () => {
       const file = input.files?.[0]
       if (!file) return

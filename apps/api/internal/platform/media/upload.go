@@ -3,25 +3,7 @@ package media
 import (
 	"fmt"
 	"mime/multipart"
-	"strings"
 )
-
-type imageSignature struct {
-	offset int
-	bytes  []byte
-}
-
-// Magic number signatures for allowed image types.
-var imageMagic = map[string][]imageSignature{
-	".jpg":  {{bytes: []byte{0xFF, 0xD8, 0xFF}}},
-	".jpeg": {{bytes: []byte{0xFF, 0xD8, 0xFF}}},
-	".png":  {{bytes: []byte{0x89, 0x50, 0x4E, 0x47}}},
-	".gif":  {{bytes: []byte{0x47, 0x49, 0x46}}},
-	".webp": {
-		{bytes: []byte{0x52, 0x49, 0x46, 0x46}},
-		{offset: 8, bytes: []byte{0x57, 0x45, 0x42, 0x50}},
-	},
-}
 
 // ValidateImageContent reads the first bytes of an uploaded file and verifies
 // the magic number matches the claimed extension. This prevents uploading
@@ -38,7 +20,7 @@ func ValidateImageContent(fh *multipart.FileHeader, ext string) error {
 	}
 	defer f.Close()
 
-	signatures := imageMagic[normalizedExt]
+	signatures := imageSignaturesByExtension(normalizedExt)
 	buf := make([]byte, requiredImageHeaderLength(signatures))
 	n, err := f.Read(buf)
 	if err != nil || n < len(buf) {
@@ -55,23 +37,13 @@ func ValidateImageBytes(data []byte, ext string) error {
 		return fmt.Errorf("不支持的图片格式: %s", ext)
 	}
 
-	signatures := imageMagic[normalizedExt]
+	signatures := imageSignaturesByExtension(normalizedExt)
 	required := requiredImageHeaderLength(signatures)
 	if len(data) < required {
 		return fmt.Errorf("文件内容不合法")
 	}
 
 	return validateImageMagic(data[:required], normalizedExt)
-}
-
-// NormalizeImageExtension canonicalizes an extension and reports whether it is
-// one of the explicitly allowed raster image types.
-func NormalizeImageExtension(ext string) (string, bool) {
-	normalized := strings.ToLower(strings.TrimSpace(ext))
-	if normalized == ".jpg" || normalized == ".jpeg" || normalized == ".png" || normalized == ".gif" || normalized == ".webp" {
-		return normalized, true
-	}
-	return "", false
 }
 
 func requiredImageHeaderLength(signatures []imageSignature) int {
@@ -85,8 +57,8 @@ func requiredImageHeaderLength(signatures []imageSignature) int {
 }
 
 func validateImageMagic(buf []byte, ext string) error {
-	signatures, ok := imageMagic[ext]
-	if !ok {
+	signatures := imageSignaturesByExtension(ext)
+	if len(signatures) == 0 {
 		return fmt.Errorf("不支持的图片格式: %s", ext)
 	}
 	for _, sig := range signatures {

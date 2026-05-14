@@ -3,7 +3,6 @@ package mediarefs
 import (
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"path"
 	"strings"
 
@@ -76,11 +75,7 @@ func ParseDataImageURL(raw string, maxDecodedBytes int) (*DataImage, error) {
 	}
 	ext := imageExtensionFromMIME(mimeType)
 	if ext == "" {
-		detected := strings.ToLower(strings.TrimSpace(http.DetectContentType(decoded)))
-		ext, _ = media.NormalizeImageExtension(path.Ext("x." + strings.TrimPrefix(detected, "image/")))
-	}
-	if ext == "" {
-		ext = ".png"
+		return nil, fmt.Errorf("不支持的图片格式")
 	}
 	return &DataImage{
 		MIMEType: mimeType,
@@ -190,16 +185,5 @@ func CollectStringList(raw interface{}) []string {
 }
 
 func imageExtensionFromMIME(mimeType string) string {
-	switch strings.ToLower(strings.TrimSpace(mimeType)) {
-	case "image/jpeg", "image/jpg":
-		return ".jpg"
-	case "image/png":
-		return ".png"
-	case "image/gif":
-		return ".gif"
-	case "image/webp":
-		return ".webp"
-	default:
-		return ""
-	}
+	return media.ImageExtensionFromMIME(mimeType)
 }

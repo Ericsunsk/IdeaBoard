@@ -3,6 +3,10 @@ package httpapi
 import (
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	iofs "io/fs"
 	"log"
@@ -29,6 +33,8 @@ import (
 	"api/internal/users"
 
 	"github.com/gin-gonic/gin"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/webp"
 )
 
 type Dependencies struct {
@@ -65,11 +71,7 @@ func validateUploadFileHeader(c *gin.Context, fh *multipart.FileHeader, maxBytes
 	}
 	ext = strings.ToLower(filepath.Ext(fh.Filename))
 	if !allowedExts[ext] {
-		allowed := make([]string, 0, len(allowedExts))
-		for e := range allowedExts {
-			allowed = append(allowed, strings.TrimPrefix(e, "."))
-		}
-		response.Error(c, 400, "仅支持 "+strings.Join(allowed, "/")+" 格式")
+		response.Error(c, 400, "仅支持 "+media.SupportedUploadImageLabel()+" 格式")
 		return "", false
 	}
 	if err := media.ValidateImageContent(fh, ext); err != nil {
@@ -77,6 +79,32 @@ func validateUploadFileHeader(c *gin.Context, fh *multipart.FileHeader, maxBytes
 		return "", false
 	}
 	return ext, true
+}
+
+func decodeUploadImageMetadata(fh *multipart.FileHeader, ext string) (map[string]interface{}, bool) {
+	f, err := fh.Open()
+	if err != nil {
+		return nil, false
+	}
+	defer f.Close()
+	cfg, format, err := image.DecodeConfig(f)
+	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
+		return nil, false
+	}
+	formatExt, ok := media.NormalizeImageExtension(format)
+	if !ok {
+		formatExt = ext
+	}
+	mimeType := media.ImageMIMEFromExtension(formatExt)
+	if mimeType == "" {
+		mimeType = media.ImageMIMEFromExtension(ext)
+	}
+	return map[string]interface{}{
+		"width":  cfg.Width,
+		"height": cfg.Height,
+		"mime":   mimeType,
+		"ext":    strings.TrimPrefix(formatExt, "."),
+	}, true
 }
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
@@ -173,6 +201,7 @@ func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 
 func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 	userApi.GET("/info", h.AuthHandler.GetCurrentUser)
+	userApi.POST("/drawing/submit/readiness", h.AccountHandler.CheckSubmitTaskReadiness)
 	userApi.POST("/drawing/submit", h.AccountHandler.SubmitTask)
 	userApi.GET("/drawing/:task_id/events", h.AccountHandler.StreamUserTask)
 	userApi.GET("/drawing/:task_id", h.AccountHandler.GetUserTask)
@@ -198,7 +227,8 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		if _, ok := validateUploadFileHeader(c, file, 30*1024*1024, map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}); !ok {
+		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, media.UploadAllowedImageExtensions())
+		if !ok {
 			return
 		}
 		userID := c.GetUint64("user_id")
@@ -247,7 +277,13 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		response.Success(c, gin.H{"url": url})
+		payload := gin.H{"url": url}
+		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
+			for k, v := range meta {
+				payload[k] = v
+			}
+		}
+		response.Success(c, payload)
 	})
 
 	userApi.DELETE("/upload", func(c *gin.Context) {
@@ -314,6 +350,11 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 400, "仅支持下载图片类型文件")
 			return
 		}
+		magicExt := media.ImageExtensionFromMIME(contentType)
+		if magicExt == "" {
+			response.Error(c, 400, "仅支持 "+media.SupportedUploadImageLabel()+" 图片")
+			return
+		}
 
 		if resp.ContentLength > maxDownloadSize {
 			response.Error(c, 400, "文件大小不能超过 50MB")
@@ -342,26 +383,16 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 			return
 		}
 
-		// Derive extension from Content-Type for magic bytes validation.
-		ctToExt := map[string]string{
-			"image/jpeg": ".jpg",
-			"image/png":  ".png",
-			"image/gif":  ".gif",
-			"image/webp": ".webp",
-		}
-		magicExt, knownType := ctToExt[strings.ToLower(contentType)]
-		if knownType {
-			header := make([]byte, 16)
-			if n, readErr := tmpFile.Read(header); readErr == nil && n > 0 {
-				if validateErr := media.ValidateImageBytes(header[:n], magicExt); validateErr != nil {
-					response.Error(c, 400, "文件内容与类型不匹配")
-					return
-				}
-			}
-			if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-				response.Error(c, 500, "读取临时文件失败")
+		header := make([]byte, 16)
+		if n, readErr := tmpFile.Read(header); readErr == nil && n > 0 {
+			if validateErr := media.ValidateImageBytes(header[:n], magicExt); validateErr != nil {
+				response.Error(c, 400, "文件内容与类型不匹配")
 				return
 			}
+		}
+		if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+			response.Error(c, 500, "读取临时文件失败")
+			return
 		}
 
 		c.Header("Content-Disposition", "attachment; filename=image.png")
@@ -410,7 +441,8 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 			response.Error(c, 400, "请选择文件")
 			return
 		}
-		if _, ok := validateUploadFileHeader(c, file, 50*1024*1024, map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}); !ok {
+		ext, ok := validateUploadFileHeader(c, file, 50*1024*1024, media.UploadAllowedImageExtensions())
+		if !ok {
 			return
 		}
 
@@ -419,7 +451,13 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		response.Success(c, gin.H{"url": url})
+		payload := gin.H{"url": url}
+		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
+			for k, v := range meta {
+				payload[k] = v
+			}
+		}
+		response.Success(c, payload)
 	})
 
 	adminApi.GET("/storage/providers", h.StorageHandler.ListProviders)

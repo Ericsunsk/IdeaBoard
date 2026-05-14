@@ -114,8 +114,8 @@ function resolveSourcePort(
   lookupData: (nodeId: string) => FlowNodeData | undefined,
 ): CanvasConnectionPort | null {
   if (sourceHandle.port) return sourceHandle.port
-  const outputPorts = getVisiblePorts(sourceRef, 'output', lookupData)
-  return outputPorts.length === 1 ? outputPorts[0].port : null
+  const visibleOutputPortContracts = getVisiblePorts(sourceRef, 'output', lookupData)
+  return visibleOutputPortContracts.length === 1 ? visibleOutputPortContracts[0].port : null
 }
 
 function collectUsedTargetPorts(targetNodeId: string, existingEdges: readonly FlowEdgeLike[]) {

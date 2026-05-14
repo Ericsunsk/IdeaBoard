@@ -1,10 +1,22 @@
 import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
 import type { ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
 import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
+import {
+  isSupportedUploadImageFile,
+  unsupportedUploadImageMessage,
+} from '../../../shared/utils/imageUploadSupport'
+import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
 
 const FLOW_NODE_KIND_DRAG_MIME = 'application/x-ideaboard-flow-node-kind'
 
 type UploadImageResult = { url: string; ratio: number }
+type UploadImageResponseData = {
+  url?: string
+  width?: number
+  height?: number
+  mime?: string
+  ext?: string
+}
 
 type UseFlowCanvasDropOptions = {
   currentBoardId: { value: string | null | undefined }
@@ -22,10 +34,7 @@ type UseFlowCanvasDropOptions = {
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
   getMaskNodeSnapshot: (nodeId: string) => MaskNodeItem | null
   uploadApi: {
-    upload: (
-      file: File,
-      boardId: string,
-    ) => Promise<{ code: number; msg?: string; data?: { url?: string } }>
+    upload: (file: File, boardId: string) => Promise<{ code: number; msg?: string; data?: UploadImageResponseData }>
   }
   sanitizeApiErrorMessage: (msg: string | null | undefined, fallback: string) => string
   renderMaskNodeMask: (nodeId: string) => void
@@ -59,8 +68,8 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
   }
 
   async function uploadImageToBoard(file: File): Promise<UploadImageResult> {
-    if (!file.type.startsWith('image/')) {
-      throw new Error('请上传图片文件')
+    if (!isSupportedUploadImageFile(file)) {
+      throw new Error(unsupportedUploadImageMessage())
     }
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) {
@@ -76,7 +85,13 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
         if (uploadRes.code !== 0 || !uploadRes.data?.url) {
           throw new Error(options.sanitizeApiErrorMessage(uploadRes.msg, '上传失败'))
         }
-        return { url: uploadRes.data.url, ratio: ratio && ratio > 0 ? ratio : 1 }
+        const width = Number(uploadRes.data.width)
+        const height = Number(uploadRes.data.height)
+        const serverRatio =
+          Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0 ? height / width : null
+        const resolvedRatio =
+          serverRatio && serverRatio > 0 ? serverRatio : ratio && ratio > 0 ? ratio : 1
+        return { url: uploadRes.data.url, ratio: resolvedRatio }
       } catch (error) {
         uploadCache.delete(cacheKey)
         throw error
@@ -97,6 +112,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
       options.updateSnapshotNode(nodeId, (prev) => ({
         ...prev,
         title: resolveImageFileTitle(file) || prev.title,
+        width: resolveImageNodeFrameSize(uploaded.ratio, true).width,
         sourceImageUrl: uploaded.url,
         sourceImageRatio: uploaded.ratio,
         outputStatus: 'ready',
@@ -144,8 +160,10 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     payload: UploadImageResult,
     title?: string,
   ) {
+    const frameSize = resolveImageNodeFrameSize(payload.ratio, true)
     const nodeId = options.createNodeAtPosition('image', point.x, point.y, {
       ...(title ? { title } : {}),
+      width: frameSize.width,
       sourceImageUrl: payload.url,
       sourceImageRatio: payload.ratio,
       outputStatus: 'ready',
@@ -166,8 +184,8 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
 
     const file = event.dataTransfer?.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      options.onWarning('请上传图片文件')
+    if (!isSupportedUploadImageFile(file)) {
+      options.onWarning(unsupportedUploadImageMessage())
       return
     }
     try {

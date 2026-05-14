@@ -250,6 +250,7 @@ import type {
 } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
+import { resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
 
 type ImageAction = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
 
@@ -434,8 +435,7 @@ const imageGenerating = computed(
 const imageInputLocked = computed(() => imageGenerating.value && !displayImage.value)
 
 const stageHeight = computed(() => {
-  if (!imageSnapshot.value) return 180
-  const stageWidth = Math.max(120, Math.round(imageSnapshot.value.width))
+  if (!imageSnapshot.value) return 280
   const outputs = Array.isArray(imageSnapshot.value.outputImages)
     ? imageSnapshot.value.outputImages
     : []
@@ -448,7 +448,7 @@ const stageHeight = computed(() => {
       : displayImage.value && Number.isFinite(sourceRatio) && sourceRatio > 0
         ? sourceRatio
         : 1
-  return Math.max(120, Math.min(360, Math.round(stageWidth * ratio)))
+  return resolveImageNodeStageHeight(imageSnapshot.value.width, ratio, !!displayImage.value)
 })
 
 function getNodeHandleFrameElement(): HTMLElement | null {
