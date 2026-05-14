@@ -87,8 +87,10 @@ func (c *ProviderExecutor) callStabilityAI(ctx context.Context, account *account
 	}
 
 	// 返回 base64 数据 URL
+	imageURL := "data:image/png;base64," + respData.Artifacts[0].Base64
 	return providerCallResult{
-		ImageURL: "data:image/png;base64," + respData.Artifacts[0].Base64,
-		Model:    engine,
+		ImageURL:  imageURL,
+		ImageURLs: []string{imageURL},
+		Model:     engine,
 	}, nil
 }

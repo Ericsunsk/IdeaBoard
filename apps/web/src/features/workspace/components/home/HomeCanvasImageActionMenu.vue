@@ -1,6 +1,6 @@
 <template>
   <div
-    class="image-action-menu"
+    class="image-action-menu node-tool-surface"
     :class="{ 'strength-mode': showStyleStrengthControl }"
     :style="showStyleStrengthControl ? styleStrengthMenuStyle : undefined"
     @mousedown.stop
@@ -9,7 +9,7 @@
     <template v-if="!showStyleStrengthControl">
       <button
         type="button"
-        class="image-action-icon-btn"
+        class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
         title="抠图"
         @click="emit('action-remove-bg')"
@@ -33,7 +33,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn"
+        class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
         title="款式创新"
         @mousedown.stop="emit('style-innovate-mousedown', $event)"
@@ -59,7 +59,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn"
+        class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
         title="转矢量图"
         @click="emit('action-to-vector')"
@@ -84,7 +84,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn"
+        class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
         title="线稿成款"
         @click="emit('action-sketch-to-design')"
@@ -110,7 +110,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn image-action-icon-btn--placeholder"
+        class="image-action-icon-btn image-action-icon-btn--placeholder node-tool-button"
         disabled
         title="局部重绘（占位）"
       >
@@ -135,7 +135,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn image-action-icon-btn--placeholder"
+        class="image-action-icon-btn image-action-icon-btn--placeholder node-tool-button"
         disabled
         title="扩图（占位）"
       >
@@ -162,7 +162,7 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn image-action-icon-btn--placeholder"
+        class="image-action-icon-btn image-action-icon-btn--placeholder node-tool-button"
         disabled
         title="调色（占位）"
       >
@@ -225,13 +225,15 @@ const emit = defineEmits<{
 }>()
 </script>
 
+<style scoped src="../nodes/styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-action-menu {
   position: absolute;
   top: calc(100% + 10px);
-  left: 0;
-  width: 100%;
-  transform: none;
+  left: 50%;
+  width: max-content;
+  max-width: min(100vw - 32px, 320px);
+  transform: translateX(-50%);
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -241,8 +243,9 @@ const emit = defineEmits<{
   z-index: 14;
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
-  gap: 0;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--node-tool-button-gap);
   box-sizing: border-box;
 }
 
@@ -251,22 +254,16 @@ const emit = defineEmits<{
   left: 0;
   transform: none;
   width: 100%;
+  max-width: none;
   gap: 0;
 }
 
 .image-action-icon-btn {
-  width: 35px;
-  height: 35px;
-  border: 1px solid rgba(122, 107, 213, 0.28);
+  flex: 0 0 var(--node-tool-button-size);
+  border: 1px solid var(--node-tool-button-border);
   background: #ffffff;
-  border-radius: 10px;
-  padding: 0;
   position: relative;
   overflow: visible;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
   transition:
     transform 0.18s ease,
     color 0.18s ease,
@@ -333,7 +330,7 @@ const emit = defineEmits<{
 .style-strength-pop {
   position: relative;
   width: 100%;
-  height: 35px;
+  height: var(--node-tool-button-size);
   display: flex;
   align-items: center;
   padding: 0;

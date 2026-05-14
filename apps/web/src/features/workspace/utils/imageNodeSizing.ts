@@ -1,6 +1,7 @@
 export const IMAGE_NODE_EMPTY_SIZE = 280
-const IMAGE_NODE_TARGET_AREA = IMAGE_NODE_EMPTY_SIZE * IMAGE_NODE_EMPTY_SIZE
-const IMAGE_NODE_MAX_SIDE = 360
+const IMAGE_NODE_TARGET_SHORT_SIDE = 260
+const IMAGE_NODE_MAX_LONG_SIDE = 640
+const IMAGE_NODE_MIN_SHORT_SIDE = 120
 
 export type ImageNodeFrameSize = {
   width: number
@@ -21,11 +22,23 @@ export function resolveImageNodeFrameSize(
   }
 
   const ratio = normalizeImageNodeRatio(ratioValue)
-  let width = Math.sqrt(IMAGE_NODE_TARGET_AREA / ratio)
-  let height = width * ratio
-  const scale = Math.min(1, IMAGE_NODE_MAX_SIDE / width, IMAGE_NODE_MAX_SIDE / height)
-  width *= scale
-  height *= scale
+  const isTall = ratio >= 1
+  let width = isTall ? IMAGE_NODE_TARGET_SHORT_SIDE : IMAGE_NODE_TARGET_SHORT_SIDE / ratio
+  let height = isTall ? IMAGE_NODE_TARGET_SHORT_SIDE * ratio : IMAGE_NODE_TARGET_SHORT_SIDE
+  const longSide = Math.max(width, height)
+
+  if (longSide > IMAGE_NODE_MAX_LONG_SIDE) {
+    const scale = IMAGE_NODE_MAX_LONG_SIDE / longSide
+    width *= scale
+    height *= scale
+  }
+
+  const shortSide = Math.min(width, height)
+  if (shortSide > 0 && shortSide < IMAGE_NODE_MIN_SHORT_SIDE) {
+    const scale = IMAGE_NODE_MIN_SHORT_SIDE / shortSide
+    width *= scale
+    height *= scale
+  }
 
   return {
     width: Math.max(1, Math.round(width)),

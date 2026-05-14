@@ -50,8 +50,9 @@ type ProviderExecutor struct {
 }
 
 type providerCallResult struct {
-	ImageURL string
-	Model    string
+	ImageURL  string
+	ImageURLs []string
+	Model     string
 }
 
 func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (string, error) {
@@ -122,7 +123,11 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		}
 		return "", fmt.Errorf("调用 API 失败 (渠道: %s): %w", channelName, err)
 	}
-	imageURL := callResult.ImageURL
+	imageURLs := normalizeProviderResultImageURLs(callResult)
+	if len(imageURLs) == 0 {
+		return "", fmt.Errorf("API 未返回图片")
+	}
+	imageURL := imageURLs[0]
 
 	if localRedrawCtx != nil {
 		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, localRedrawCtx, imageURL, timeout)
@@ -132,23 +137,27 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 			}
 			return "", err
 		}
+		imageURLs = []string{imageURL}
 	}
 
 	// 如果对象存储已启用，将图片转存到当前存储
 	log.Printf("[Worker] 存储检查: service=%v, objectStorage=%v", c.storageService != nil, c.storageService != nil && c.storageService.UsesObjectStorage())
 	if !localRedrawStored && c.storageService != nil && c.storageService.UsesObjectStorage() {
-		log.Printf("[Worker] 对象存储已启用，开始转存图片, directFetch=%v, imageURL=%.80s", c.storageService.IsDirectFetchEnabled(), imageURL)
-		reURL, reErr := c.storageService.StoreRemote(ctx, imageURL, storage.StorageStoreOptions{
-			AllowHosts: []string{account.ProxyURL},
-		})
-		if reErr == nil {
-			log.Printf("[Worker] 转存成功: %s -> %s", imageURL[:min(80, len(imageURL))], reURL)
-			imageURL = reURL
-		} else if errors.Is(reErr, context.Canceled) {
-			return "", reErr
-		} else {
-			log.Printf("[Worker] 转存对象存储失败，使用原始 URL: %v", reErr)
+		log.Printf("[Worker] 对象存储已启用，开始转存图片, directFetch=%v, imageCount=%d", c.storageService.IsDirectFetchEnabled(), len(imageURLs))
+		for index, currentURL := range imageURLs {
+			reURL, reErr := c.storageService.StoreRemote(ctx, currentURL, storage.StorageStoreOptions{
+				AllowHosts: []string{account.ProxyURL},
+			})
+			if reErr == nil {
+				log.Printf("[Worker] 转存成功: %s -> %s", currentURL[:min(80, len(currentURL))], reURL)
+				imageURLs[index] = reURL
+			} else if errors.Is(reErr, context.Canceled) {
+				return "", reErr
+			} else {
+				log.Printf("[Worker] 转存对象存储失败，使用原始 URL: %v", reErr)
+			}
 		}
+		imageURL = imageURLs[0]
 	} else {
 		log.Printf("[Worker] 对象存储未启用，跳过转存")
 	}
@@ -162,6 +171,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		"api_type":     account.ApiType,
 		"status":       tasks.ResultStatusSuccess,
 		"image_url":    imageURL,
+		"image_urls":   imageURLs,
 	}
 	if strings.TrimSpace(account.ModelSet) != "" && !strings.Contains(account.ModelSet, ",") {
 		result["model_set"] = strings.TrimSpace(account.ModelSet)
@@ -172,6 +182,22 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 
 	resultJSON, _ := json.Marshal(result)
 	return string(resultJSON), nil
+}
+
+func normalizeProviderResultImageURLs(result providerCallResult) []string {
+	source := result.ImageURLs
+	if len(source) == 0 && strings.TrimSpace(result.ImageURL) != "" {
+		source = []string{result.ImageURL}
+	}
+	urls := make([]string, 0, len(source))
+	for _, raw := range source {
+		url := strings.TrimSpace(raw)
+		if url == "" {
+			continue
+		}
+		urls = append(urls, url)
+	}
+	return urls
 }
 
 func resolveRequestedModel(accountModelSet string, params map[string]interface{}) string {

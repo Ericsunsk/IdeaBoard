@@ -2,6 +2,8 @@ import { z } from 'zod'
 import {
   ENHANCE_EXTEND_PERCENT_MAX,
   ENHANCE_EXTEND_PERCENT_MIN,
+  MAX_IMAGE_NODE_OUTPUT_COUNT,
+  MIN_IMAGE_NODE_OUTPUT_COUNT,
   MODEL_ANGLE_YAW_MAX,
   MODEL_ANGLE_YAW_MIN,
   MODEL_POSE_STRENGTH_MAX,
@@ -110,6 +112,11 @@ const imageNodeItemSchema = z.object({
   width: finiteNumberSchema,
   sourceImageUrl: z.string(),
   sourceImageRatio: finiteNumberSchema.positive(),
+  outputCount: finiteNumberSchema
+    .int()
+    .min(MIN_IMAGE_NODE_OUTPUT_COUNT)
+    .max(MAX_IMAGE_NODE_OUTPUT_COUNT)
+    .optional(),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
 })

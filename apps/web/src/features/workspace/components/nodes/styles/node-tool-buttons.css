@@ -1,0 +1,20 @@
+.node-tool-surface {
+  --node-tool-button-size: 35px;
+  --node-tool-button-radius: 10px;
+  --node-tool-button-gap: 7px;
+  --node-tool-popover-option-height: 33px;
+  --node-tool-button-border: rgba(122, 107, 213, 0.28);
+  --node-tool-button-accent: #9278e6;
+  --node-tool-button-brand: #7a6bd5;
+}
+
+.node-tool-button {
+  width: var(--node-tool-button-size);
+  height: var(--node-tool-button-size);
+  border-radius: var(--node-tool-button-radius);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}

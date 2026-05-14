@@ -217,6 +217,50 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 	}
 }
 
+func TestCallOpenAIIgnoresOutputCountAndReturnsMultipleImagesWhenUpstreamDoes(t *testing.T) {
+	var gotBody map[string]interface{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &gotBody); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/a.png"},{"url":"https://cdn.example/b.png"}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL,
+		ApiKey:   "test-key",
+		ModelSet: "gpt-image-1",
+	}
+	params := map[string]interface{}{
+		"feature":      "pattern-gen",
+		"output_count": 2,
+	}
+
+	gotResult, err := c.callOpenAI(context.Background(), account, "pattern prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
+	if err != nil {
+		t.Fatalf("callOpenAI returned error: %v", err)
+	}
+	if _, exists := gotBody["n"]; exists {
+		t.Fatalf("did not expect n field, got %#v", gotBody["n"])
+	}
+	if gotResult.ImageURL != "https://cdn.example/a.png" {
+		t.Fatalf("unexpected first image url: %s", gotResult.ImageURL)
+	}
+	if len(gotResult.ImageURLs) != 2 ||
+		gotResult.ImageURLs[0] != "https://cdn.example/a.png" ||
+		gotResult.ImageURLs[1] != "https://cdn.example/b.png" {
+		t.Fatalf("unexpected image urls: %#v", gotResult.ImageURLs)
+	}
+}
+
 func TestCallOpenAIGenerationMapsImageURLsToStringImageField(t *testing.T) {
 	var gotPath string
 	var gotBody map[string]interface{}

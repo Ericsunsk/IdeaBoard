@@ -52,7 +52,6 @@ func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.Api
 	reqBody := map[string]interface{}{
 		"model":  model,
 		"prompt": prompt,
-		"n":      1,
 		"size":   size,
 	}
 
@@ -128,13 +127,14 @@ func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.Api
 		return providerCallResult{}, newUpstreamHTTPError(resp.StatusCode, truncateErrorBody(string(respBody)))
 	}
 
-	imageURL, err := extractOpenAIImageResponse(respBody, params)
+	imageURLs, err := extractOpenAIImageResponses(respBody, params)
 	if err != nil {
 		return providerCallResult{}, err
 	}
 	return providerCallResult{
-		ImageURL: imageURL,
-		Model:    model,
+		ImageURL:  imageURLs[0],
+		ImageURLs: imageURLs,
+		Model:     model,
 	}, nil
 }
 
@@ -590,7 +590,7 @@ func collectOpenAIEditImageInputs(params map[string]interface{}) []map[string]st
 	return refs
 }
 
-func extractOpenAIImageResponse(respBody []byte, params map[string]interface{}) (string, error) {
+func extractOpenAIImageResponses(respBody []byte, params map[string]interface{}) ([]string, error) {
 	var respData struct {
 		Data []struct {
 			URL     string `json:"url"`
@@ -598,18 +598,25 @@ func extractOpenAIImageResponse(respBody []byte, params map[string]interface{}) 
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &respData); err != nil {
-		return "", fmt.Errorf("解析响应失败: %v", err)
+		return nil, fmt.Errorf("解析响应失败: %v", err)
 	}
 	if len(respData.Data) == 0 {
-		return "", fmt.Errorf("API 未返回图片")
+		return nil, fmt.Errorf("API 未返回图片")
 	}
-	if strings.TrimSpace(respData.Data[0].URL) != "" {
-		return strings.TrimSpace(respData.Data[0].URL), nil
+	urls := make([]string, 0, len(respData.Data))
+	for _, item := range respData.Data {
+		if strings.TrimSpace(item.URL) != "" {
+			urls = append(urls, strings.TrimSpace(item.URL))
+			continue
+		}
+		if strings.TrimSpace(item.B64JSON) != "" {
+			urls = append(urls, "data:"+inferOpenAIImageMimeType(params)+";base64,"+strings.TrimSpace(item.B64JSON))
+		}
 	}
-	if strings.TrimSpace(respData.Data[0].B64JSON) != "" {
-		return "data:" + inferOpenAIImageMimeType(params) + ";base64," + strings.TrimSpace(respData.Data[0].B64JSON), nil
+	if len(urls) == 0 {
+		return nil, fmt.Errorf("API 未返回可用图片")
 	}
-	return "", fmt.Errorf("API 未返回可用图片")
+	return urls, nil
 }
 
 func inferOpenAIImageMimeType(params map[string]interface{}) string {

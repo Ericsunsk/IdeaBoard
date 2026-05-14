@@ -1,6 +1,7 @@
 import {
   DEFAULT_COLOR_NODE_COLOR,
   DEFAULT_COLOR_STRENGTH,
+  DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
   createDefaultModelAngleSpec,
   ENHANCE_EXTEND_PERCENT_DEFAULT,
   MODEL_REFERENCE_STRENGTH_DEFAULT,
@@ -103,6 +104,7 @@ export function createImageNodeAt(point: CanvasPoint): ImageNodeItem {
     title: getDefaultCanvasNodeTitle('image'),
     sourceImageUrl: '',
     sourceImageRatio: 1,
+    outputCount: DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
     outputStatus: 'idle',
     outputImages: [],
   }

@@ -48,6 +48,7 @@
           :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
+          @update:output-count="emitNodeParam('outputCount', $event)"
           @delete="onDeleteRequest"
           @stage-drop="onImageStageDrop"
           @open-file="onImageOpenFile"
@@ -315,7 +316,7 @@ const emit = defineEmits<{
   (e: 'mask-set-canvas-ref', element: Element | null): void
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'image-contextmenu', event: MouseEvent): void
-  (e: 'image-prompt-generate', prompt: string): void
+  (e: 'image-prompt-generate', prompt: string, outputCount: number): void
   (e: 'image-action', action: ImageAction): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
@@ -360,7 +361,7 @@ const handleRailStyle = computed(() => ({
 
 function resolveSnapshotNode<T>() {
   return props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
-    ? ({ ...(props.data.snapshotNode as T), x: 0, y: 0 } as T)
+    ? ({ ...(props.data.snapshotNode as T) } as T)
     : null
 }
 
@@ -682,8 +683,8 @@ function onImageContextMenu(event: MouseEvent) {
   emit('image-contextmenu', event)
 }
 
-function onImagePromptGenerate(prompt: string) {
-  emit('image-prompt-generate', prompt)
+function onImagePromptGenerate(prompt: string, outputCount: number) {
+  emit('image-prompt-generate', prompt, outputCount)
 }
 
 function onImageAction(action: ImageAction) {
@@ -760,9 +761,6 @@ function noopMouse() {}
 
 .flow-canvas-node :deep(.workflow-node) {
   position: relative;
-  left: 0 !important;
-  top: 0 !important;
-  transform: none !important;
   z-index: 1;
   overflow: visible;
   pointer-events: auto;
@@ -801,16 +799,10 @@ function noopMouse() {}
 
 .flow-canvas-node :deep(.image-action-menu) {
   top: calc(100% + 10px);
-  left: 0;
-  transform: none;
-  width: 100%;
   z-index: 30;
 }
 
 .flow-canvas-node :deep(.image-action-menu.strength-mode) {
   top: calc(100% + 10px);
-  left: 0;
-  transform: none;
-  width: 100%;
 }
 </style>

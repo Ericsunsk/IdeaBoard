@@ -38,6 +38,9 @@ export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] 
   'ready',
   'stale',
 ]
+export const MIN_IMAGE_NODE_OUTPUT_COUNT = 1
+export const MAX_IMAGE_NODE_OUTPUT_COUNT = 8
+export const DEFAULT_IMAGE_NODE_OUTPUT_COUNT = 1
 
 export function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {
   return (
@@ -54,6 +57,18 @@ export function resolveWorkflowNodeOutputStatus(
     return outputStatus
   }
   return (outputImages?.length ?? 0) > 0 ? 'ready' : 'idle'
+}
+
+export function clampImageNodeOutputCount(value: unknown): number {
+  const normalized = typeof value === 'string' ? Number(value.trim()) : value
+  const count =
+    typeof normalized === 'number' && Number.isFinite(normalized)
+      ? Math.round(normalized)
+      : normalized
+  if (typeof count !== 'number' || !Number.isFinite(count)) {
+    return DEFAULT_IMAGE_NODE_OUTPUT_COUNT
+  }
+  return Math.max(MIN_IMAGE_NODE_OUTPUT_COUNT, Math.min(MAX_IMAGE_NODE_OUTPUT_COUNT, count))
 }
 
 export interface PromptNodeItem {
@@ -189,6 +204,7 @@ export interface ImageNodeItem {
   title?: string
   sourceImageUrl: string
   sourceImageRatio: number
+  outputCount?: number
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }

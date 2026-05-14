@@ -7,6 +7,7 @@ import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
 import type { EnhanceNodeItem, ViewpointNodeItem } from '../types/canvasNodes'
 import {
   clampEnhanceExtendPercent,
+  clampImageNodeOutputCount,
   clampModelAngleYaw,
   clampModelPoseStrength,
   clampModelReferenceStrength,
@@ -30,6 +31,11 @@ export function patchFlowSnapshotParam(
     case 'mode':
       if (snapshotNode.mode === value) return snapshotNode
       return { ...snapshotNode, mode: value }
+    case 'outputCount': {
+      const nextOutputCount = clampImageNodeOutputCount(value)
+      if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
+      return { ...snapshotNode, outputCount: nextOutputCount }
+    }
     case 'upscaleMode':
       if (snapshotNode.upscaleMode === value) return snapshotNode
       return { ...snapshotNode, upscaleMode: value }

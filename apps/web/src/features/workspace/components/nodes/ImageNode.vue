@@ -103,7 +103,8 @@
       />
       <form
         v-if="showPromptComposer"
-        class="image-node-prompt-composer"
+        class="image-node-prompt-composer node-tool-surface"
+        :class="{ 'count-stacked': shouldStackOutputCount, 'has-text': promptDraft.trim() }"
         @submit.prevent="submitPrompt"
         @mousedown.stop
         @click.stop
@@ -116,29 +117,72 @@
           rows="1"
           placeholder="输入提示词改造这张图"
           :disabled="directGenerating"
-          @input="resizePromptInput"
           @keydown.enter.exact="onPromptEnter"
         />
-        <button
-          class="image-node-prompt-send"
-          type="submit"
-          :disabled="directGenerating || !promptDraft.trim()"
-          title="发送"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.1"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+        <div class="image-node-prompt-actions" @keydown.esc.stop="closeOutputCountPicker">
+          <div class="image-node-output-count-wrap">
+            <button
+              v-if="!outputCountEditing"
+              class="image-node-output-count node-tool-button"
+              type="button"
+              :class="{ active: outputCountPickerVisible }"
+              :disabled="directGenerating"
+              title="单击选择张数，双击自定义"
+              aria-label="输出张数"
+              @click.stop="toggleOutputCountPicker"
+              @dblclick.stop.prevent="startOutputCountEditing"
+            >
+              {{ outputCountLabel }}
+            </button>
+            <input
+              v-else
+              ref="outputCountInputRef"
+              v-model="outputCountDraft"
+              class="image-node-output-count image-node-output-count-input node-tool-button"
+              type="number"
+              inputmode="numeric"
+              :min="MIN_IMAGE_NODE_OUTPUT_COUNT"
+              :max="MAX_IMAGE_NODE_OUTPUT_COUNT"
+              step="1"
+              :disabled="directGenerating"
+              aria-label="自定义输出张数"
+              @blur="finishOutputCountEditing"
+              @keydown.enter.stop.prevent="finishOutputCountEditing"
+            />
+            <div v-if="outputCountPickerVisible" class="image-node-output-count-popover">
+              <button
+                v-for="option in outputCountPresetOptions"
+                :key="option"
+                type="button"
+                class="image-node-output-count-option"
+                :class="{ active: option === outputCountValue }"
+                @click.stop="selectOutputCount(option)"
+              >
+                {{ option }}
+              </button>
+            </div>
+          </div>
+          <button
+            class="image-node-prompt-send node-tool-button"
+            type="submit"
+            :disabled="directGenerating || !promptDraft.trim()"
+            title="发送"
           >
-            <path d="M5 12h13" />
-            <path d="m13 6 6 6-6 6" />
-          </svg>
-        </button>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.1"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12h13" />
+              <path d="m13 6 6 6-6 6" />
+            </svg>
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -146,7 +190,12 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import type { ImageNodeItem } from '../../types/canvasNodes'
+import {
+  clampImageNodeOutputCount,
+  MAX_IMAGE_NODE_OUTPUT_COUNT,
+  MIN_IMAGE_NODE_OUTPUT_COUNT,
+  type ImageNodeItem,
+} from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
@@ -172,13 +221,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'update:title', value: string): void
+  (e: 'update:output-count', value: number): void
   (e: 'delete'): void
   (e: 'stage-drop', event: DragEvent): void
   (e: 'open-file'): void
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
-  (e: 'prompt-generate', prompt: string): void
+  (e: 'prompt-generate', prompt: string, outputCount: number): void
   (e: 'action', action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
@@ -196,9 +246,22 @@ const showImageActionMenu = computed(() => !!props.actionMenuVisible && !!props.
 const showPromptComposer = computed(() => !!props.promptComposerVisible && !!props.displayImage)
 const promptDraft = ref('')
 const promptInputRef = ref<HTMLTextAreaElement | null>(null)
+const outputCountInputRef = ref<HTMLInputElement | null>(null)
+const shouldStackOutputCount = ref(false)
+const outputCountDraft = ref(String(clampImageNodeOutputCount(props.node.outputCount)))
+const outputCountPickerVisible = ref(false)
+const outputCountEditing = ref(false)
+const outputCountPresetOptions = [1, 2, 4, 8]
+const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
+const outputCountLabel = computed(() => String(outputCountValue.value))
 
 watch(showPromptComposer, async (visible) => {
-  if (!visible) return
+  if (!visible) {
+    closeOutputCountPicker()
+    outputCountEditing.value = false
+    return
+  }
+  syncOutputCountDraft()
   await nextTick()
   resizePromptInput()
   promptInputRef.value?.focus()
@@ -208,6 +271,11 @@ watch(promptDraft, async () => {
   await nextTick()
   resizePromptInput()
 })
+
+watch(
+  () => props.node.outputCount,
+  () => syncOutputCountDraft(),
+)
 
 function onStageDragOver(event: DragEvent) {
   event.preventDefault()
@@ -232,7 +300,9 @@ function onStageContextMenu(event: MouseEvent) {
 function submitPrompt() {
   const prompt = promptDraft.value.trim()
   if (!prompt || props.directGenerating) return
-  emit('prompt-generate', prompt)
+  const outputCount = commitOutputCount()
+  closeOutputCountPicker()
+  emit('prompt-generate', prompt, outputCount)
   promptDraft.value = ''
   void nextTick(resizePromptInput)
 }
@@ -246,14 +316,73 @@ function onPromptEnter(event: KeyboardEvent) {
 function resizePromptInput() {
   const input = promptInputRef.value
   if (!input) return
-  const maxHeight = 108
+  const singleLineHeight = resolvePromptSingleLineHeight(input)
+  const previousMinHeight = input.style.minHeight
+  input.style.minHeight = '0'
   input.style.height = 'auto'
-  input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`
-  input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  const naturalHeight = input.scrollHeight
+  input.style.minHeight = previousMinHeight
+  input.style.height = `${naturalHeight}px`
+  input.style.overflowY = 'hidden'
+  shouldStackOutputCount.value = naturalHeight > singleLineHeight + 2
+}
+
+function syncOutputCountDraft() {
+  outputCountDraft.value = String(clampImageNodeOutputCount(props.node.outputCount))
+}
+
+function commitOutputCount(): number {
+  const outputCount = clampImageNodeOutputCount(outputCountDraft.value)
+  outputCountDraft.value = String(outputCount)
+  emit('update:output-count', outputCount)
+  return outputCount
+}
+
+function toggleOutputCountPicker() {
+  if (props.directGenerating) return
+  outputCountPickerVisible.value = !outputCountPickerVisible.value
+}
+
+function closeOutputCountPicker() {
+  outputCountPickerVisible.value = false
+}
+
+function selectOutputCount(value: number) {
+  outputCountDraft.value = String(clampImageNodeOutputCount(value))
+  commitOutputCount()
+  closeOutputCountPicker()
+}
+
+async function startOutputCountEditing() {
+  if (props.directGenerating) return
+  closeOutputCountPicker()
+  syncOutputCountDraft()
+  outputCountEditing.value = true
+  await nextTick()
+  outputCountInputRef.value?.focus()
+  outputCountInputRef.value?.select()
+}
+
+function finishOutputCountEditing() {
+  commitOutputCount()
+  outputCountEditing.value = false
+}
+
+function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {
+  const style = window.getComputedStyle(input)
+  const lineHeight = Number.parseFloat(style.lineHeight)
+  const paddingTop = Number.parseFloat(style.paddingTop)
+  const paddingBottom = Number.parseFloat(style.paddingBottom)
+  return (
+    (Number.isFinite(lineHeight) ? lineHeight : 18) +
+    (Number.isFinite(paddingTop) ? paddingTop : 0) +
+    (Number.isFinite(paddingBottom) ? paddingBottom : 0)
+  )
 }
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>
+<style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .workflow-node.image-node {
   overflow: visible;
@@ -418,11 +547,11 @@ function resizePromptInput() {
   left: 0;
   right: 0;
   top: calc(100% + 52px);
-  z-index: 7;
+  z-index: 42;
   display: grid;
-  grid-template-columns: 1fr 32px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 7px;
+  gap: var(--node-tool-button-gap);
   padding: 5px 5px 5px 13px;
   border: 1px solid rgba(122, 107, 213, 0.28);
   border-radius: 13px;
@@ -431,9 +560,21 @@ function resizePromptInput() {
   animation: image-node-prompt-rise 0.16s ease-out;
 }
 
+.image-node-prompt-composer.node-tool-surface {
+  --node-tool-button-border: #e2e8f0;
+}
+
+.image-node-prompt-composer.has-text {
+  border-color: #9278e6;
+}
+
+.image-node-prompt-composer.count-stacked {
+  min-height: 73px;
+}
+
 .image-node-prompt-input {
+  align-self: end;
   min-width: 0;
-  max-height: 108px;
   border: 0;
   outline: none;
   background: transparent;
@@ -446,6 +587,10 @@ function resizePromptInput() {
   padding: 6px 0;
 }
 
+.image-node-prompt-composer.count-stacked .image-node-prompt-input {
+  min-height: 73px;
+}
+
 .image-node-prompt-input::placeholder {
   color: #9aa4b2;
 }
@@ -454,17 +599,106 @@ function resizePromptInput() {
   cursor: wait;
 }
 
-.image-node-prompt-send {
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 10px;
+.image-node-prompt-actions {
+  align-self: end;
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  background: #7a6bd5;
+  gap: var(--node-tool-button-gap);
+}
+
+.image-node-prompt-composer.count-stacked .image-node-prompt-actions {
+  flex-direction: column;
+  gap: var(--node-tool-button-gap);
+}
+
+.image-node-output-count-wrap {
+  position: relative;
+  width: var(--node-tool-button-size);
+  height: var(--node-tool-button-size);
+}
+
+.image-node-output-count {
+  border: 1px solid var(--node-tool-button-border);
+  background: #ffffff;
+  color: #505766;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  outline: none;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.image-node-output-count-input {
+  text-align: center;
+  appearance: textfield;
+}
+
+.image-node-output-count-input::-webkit-outer-spin-button,
+.image-node-output-count-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.image-node-output-count:hover:not(:disabled),
+.image-node-output-count:focus,
+.image-node-output-count.active {
+  background: #f8f7ff;
+  border-color: var(--node-tool-button-accent);
+  color: #272932;
+}
+
+.image-node-output-count:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.image-node-output-count-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--node-tool-button-gap));
+  z-index: 43;
+  display: grid;
+  grid-template-columns: repeat(2, var(--node-tool-button-size));
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid rgba(122, 107, 213, 0.22);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
+  backdrop-filter: blur(10px);
+  animation: image-node-count-pop 0.12s ease-out;
+}
+
+.image-node-output-count-option {
+  width: var(--node-tool-button-size);
+  height: var(--node-tool-popover-option-height);
+  border: 1px solid #e8ecf4;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #5f6878;
   cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.image-node-output-count-option:hover,
+.image-node-output-count-option.active {
+  border-color: var(--node-tool-button-accent);
+  background: #f5f2ff;
+  color: var(--node-tool-button-accent);
+}
+
+.image-node-prompt-send {
+  border: 0;
+  color: #ffffff;
+  background: var(--node-tool-button-brand);
   transition:
     transform 0.16s ease,
     opacity 0.16s ease,
@@ -489,6 +723,17 @@ function resizePromptInput() {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes image-node-count-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

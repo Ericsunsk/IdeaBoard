@@ -12,7 +12,9 @@ type FlowHistorySnapshot = { nodes: unknown[]; edges: unknown[] }
 type UseFlowImageNodeInteractionsOptions = {
   nodes: Ref<Node[]>
   getImageNodeDisplayPayload: (nodeId: string) => { url: string; ratio: number } | null
-  getImageNodeSnapshot: (nodeId: string) => { x: number; y: number; width: number } | null
+  getImageNodeSnapshot: (
+    nodeId: string,
+  ) => { x: number; y: number; width: number; outputCount?: ImageNodeItem['outputCount'] } | null
   captureFlowHistorySnapshot: () => FlowHistorySnapshot
   pushFlowHistorySnapshot: (snapshot: FlowHistorySnapshot) => void
   markDirty: () => void
@@ -72,6 +74,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
     })
     imageNode.sourceImageUrl = payload.url
     imageNode.sourceImageRatio = payload.ratio
+    imageNode.outputCount = sourceNode.outputCount ?? imageNode.outputCount
     imageNode.width = resolveImageNodeFrameSize(payload.ratio, true).width
     imageNode.outputStatus = 'ready'
     imageNode.outputImages = []
@@ -141,6 +144,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
         Number.isFinite(source.sourceImageRatio) && Number(source.sourceImageRatio) > 0
           ? Number(source.sourceImageRatio)
           : 1
+      copied.outputCount = source.outputCount ?? copied.outputCount
       copied.outputImages = cloneImageOutputs(source)
       const latestOutput =
         copied.outputImages.length > 0 ? copied.outputImages[copied.outputImages.length - 1] : null

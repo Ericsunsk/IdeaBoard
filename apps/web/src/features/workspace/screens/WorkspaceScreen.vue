@@ -163,7 +163,7 @@
             @node-mousedown="(event) => onFlowNodeMouseDown(nodeProps.id, event)"
             @request-internals-update="() => scheduleFlowNodeInternalsRefresh([nodeProps.id])"
             @image-contextmenu="(event) => onFlowImageContextMenu(nodeProps.id, event)"
-            @image-prompt-generate="(prompt) => onFlowImagePromptGenerate(nodeProps.id, prompt)"
+            @image-prompt-generate="(prompt, outputCount) => onFlowImagePromptGenerate(nodeProps.id, prompt, outputCount)"
             @image-action="(action) => onFlowImageDirectAction(nodeProps.id, action)"
             @style-innovate-mousedown="onFlowStyleInnovateMouseDown"
             @style-strength-track-mousedown="onFlowStyleStrengthTrackMouseDown"
@@ -846,11 +846,11 @@ function onFlowImageDirectAction(
   )
 }
 
-function onFlowImagePromptGenerate(nodeId: string, prompt: string) {
+function onFlowImagePromptGenerate(nodeId: string, prompt: string, outputCount: number) {
   activeImagePromptNodeId.value = null
   activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
-  void runImagePromptGeneration(nodeId, prompt)
+  void runImagePromptGeneration(nodeId, prompt, outputCount)
 }
 
 const {
@@ -890,6 +890,7 @@ const {
       x: Number(snapshot.x ?? 0),
       y: Number(snapshot.y ?? 0),
       width: Number(snapshot.width ?? 300),
+      outputCount: snapshot.outputCount,
     }
   },
   captureFlowHistorySnapshot: flowHistory.capture as () => FlowHistorySnapshot,
