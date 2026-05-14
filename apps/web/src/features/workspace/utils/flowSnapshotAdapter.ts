@@ -4,6 +4,7 @@ import type {
   CanvasConnectionNodeType,
   CanvasConnectionPort,
   CanvasNodeItem,
+  ImageNodeItem,
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import { getDefaultCanvasNodeTitle } from '../types/canvasNodes'
@@ -93,7 +94,9 @@ function isCanvasConnectionNodeType(value: string): value is CanvasConnectionNod
   return SNAPSHOT_NODE_COLLECTIONS.some((item) => item.nodeType === value)
 }
 
-function parseFlowNodeId(nodeId: string): { nodeType: CanvasConnectionNodeType; id: number } | null {
+function parseFlowNodeId(
+  nodeId: string,
+): { nodeType: CanvasConnectionNodeType; id: number } | null {
   const dashIndex = nodeId.indexOf('-')
   if (dashIndex <= 0) return null
   const prefix = nodeId.slice(0, dashIndex)
@@ -200,6 +203,20 @@ function resolveCollectionKeyByNodeType(
   }
 }
 
+function hasRenderableImageSource(node: CanvasNodeItem): boolean {
+  if (node.type !== 'image-node') return true
+  const imageNode = node as ImageNodeItem
+  const sourceUrl = imageNode.sourceImageUrl.trim()
+  const hasOutputImage = Array.isArray(imageNode.outputImages)
+    ? imageNode.outputImages.some(
+        (item) => typeof item?.url === 'string' && item.url.trim().length > 0,
+      )
+    : false
+  // A pending result image node with no source and no outputs is transient and should not persist.
+  if (imageNode.outputStatus === 'running' && !sourceUrl && !hasOutputImage) return false
+  return true
+}
+
 export function flowToCanvasBoardSnapshot(
   input: { nodes: FlowAdapterNode[]; edges: FlowAdapterEdge[] },
   base?: CanvasBoardSnapshot,
@@ -211,6 +228,7 @@ export function flowToCanvasBoardSnapshot(
   })
   snapshot.connections = []
   const usedConnectionIds = new Set<number>()
+  const persistedFlowNodeIds = new Set<string>()
 
   const nextConnectionId = () => {
     const existingIds = snapshot.connections.map((connection) => connection.id)
@@ -229,12 +247,15 @@ export function flowToCanvasBoardSnapshot(
       x: node.position.x,
       y: node.position.y,
     } as CanvasNodeItem
+    if (!hasRenderableImageSource(positionedNode)) return
 
     const collectionKey = resolveCollectionKeyByNodeType(ref.nodeType)
     ;(snapshot[collectionKey] as CanvasNodeItem[]).push(positionedNode as CanvasNodeItem)
+    persistedFlowNodeIds.add(node.id)
   })
 
   input.edges.forEach((edge) => {
+    if (!persistedFlowNodeIds.has(edge.source) || !persistedFlowNodeIds.has(edge.target)) return
     const fromRef = parseFlowNodeId(edge.source)
     const toRef = parseFlowNodeId(edge.target)
     if (!fromRef || !toRef) return

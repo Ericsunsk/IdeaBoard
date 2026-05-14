@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "css:audit": "tsx scripts/audit-css-migration.ts",
-    "test:schema": "tsx src/features/boards/lib/canvasBoardStateSchema.spec.ts"
+    "test:schema": "tsx src/features/boards/lib/canvasBoardStateSchema.spec.ts && tsx src/features/workspace/utils/flowSnapshotAdapter.schema.spec.ts"
   },
   "dependencies": {
     "@tanstack/vue-query": "^5.100.9",
