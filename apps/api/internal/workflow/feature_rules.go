@@ -5,7 +5,6 @@ import "strings"
 const (
 	ProviderOpenAICompatible = "openai-compatible"
 	ProviderGoogleAI         = "google-ai"
-	ProviderStability        = "stability"
 )
 
 func NormalizeProviderAPIType(apiType string, baseURL ...string) string {
@@ -15,8 +14,6 @@ func NormalizeProviderAPIType(apiType string, baseURL ...string) string {
 		return ProviderOpenAICompatible
 	case ProviderGoogleAI:
 		return ProviderGoogleAI
-	case ProviderStability:
-		return ProviderStability
 	}
 
 	if len(baseURL) > 0 {
@@ -30,8 +27,6 @@ func InferProviderAPITypeFromBaseURL(rawBaseURL string) string {
 	switch {
 	case strings.Contains(normalized, "generativelanguage.googleapis.com"):
 		return ProviderGoogleAI
-	case strings.Contains(normalized, "api.stability.ai"):
-		return ProviderStability
 	default:
 		return ProviderOpenAICompatible
 	}
@@ -39,10 +34,6 @@ func InferProviderAPITypeFromBaseURL(rawBaseURL string) string {
 
 func IsGoogleNativeAPIType(apiType string) bool {
 	return NormalizeProviderAPIType(apiType) == ProviderGoogleAI
-}
-
-func IsStabilityAPIType(apiType string) bool {
-	return NormalizeProviderAPIType(apiType) == ProviderStability
 }
 
 func IsReferenceImageFeature(featureSlug string) bool {

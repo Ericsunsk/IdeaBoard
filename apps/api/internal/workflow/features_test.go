@@ -91,9 +91,8 @@ func TestNormalizeProviderAPIType(t *testing.T) {
 	}{
 		{name: "openai compatible", apiType: ProviderOpenAICompatible, want: ProviderOpenAICompatible},
 		{name: "google ai", apiType: ProviderGoogleAI, want: ProviderGoogleAI},
-		{name: "stability", apiType: ProviderStability, want: ProviderStability},
 		{name: "infer google from base url", baseURL: "https://generativelanguage.googleapis.com", want: ProviderGoogleAI},
-		{name: "infer stability from base url", baseURL: "https://api.stability.ai", want: ProviderStability},
+		{name: "unknown provider falls back", apiType: "legacy-provider", baseURL: "https://api.legacy.example", want: ProviderOpenAICompatible},
 		{name: "default openai compatible", apiType: "", baseURL: "https://api.example.com/v1", want: ProviderOpenAICompatible},
 	}
 

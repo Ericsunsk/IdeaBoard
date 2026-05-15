@@ -62,47 +62,6 @@ func TestFilterAccountsByFeatureIgnoresMalformedFeatureConfig(t *testing.T) {
 	}
 }
 
-func TestFilterAccountsByFeatureFiltersStabilityPlatformsForIncompatibleFeatures(t *testing.T) {
-	accounts := []*ApiAccount{
-		{ID: 1, ApiType: workflow.ProviderStability},
-		{ID: 2, ApiType: workflow.ProviderOpenAICompatible},
-	}
-
-	testCases := []struct {
-		name    string
-		feature string
-	}{
-		{name: "style-fusion", feature: workflow.FeatureSlugStyleFusion},
-		{name: "face-swap", feature: workflow.FeatureSlugFaceSwap},
-		{name: "fabric-on-body", feature: workflow.FeatureSlugFabricOnBody},
-		{name: "multi-angle", feature: workflow.FeatureSlugMultiAngle},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := filterAccountsByFeature(accounts, tc.feature)
-			if len(got) != 1 {
-				t.Fatalf("expected only non-stability accounts, got=%d", len(got))
-			}
-			if got[0].ID != 2 {
-				t.Fatalf("unexpected account id: got=%d, want=2", got[0].ID)
-			}
-		})
-	}
-}
-
-func TestFilterAccountsByFeatureKeepsStabilityPlatformsForRemoveBg(t *testing.T) {
-	accounts := []*ApiAccount{
-		{ID: 1, ApiType: workflow.ProviderStability},
-		{ID: 2, ApiType: workflow.ProviderOpenAICompatible},
-	}
-
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugRemoveBg)
-	if len(got) != 2 {
-		t.Fatalf("expected remove-bg to stay platform-compatible, got=%d", len(got))
-	}
-}
-
 func TestFilterAccountsByFeatureKeepsGooglePlatformsForReferenceFeatures(t *testing.T) {
 	accounts := []*ApiAccount{
 		{ID: 1, ApiType: workflow.ProviderGoogleAI},

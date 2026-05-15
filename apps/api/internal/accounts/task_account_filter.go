@@ -50,12 +50,6 @@ func accountAllowsFeature(account *ApiAccount, featureSlug string) bool {
 }
 
 func isFeatureCompatibleWithAPIType(featureSlug, apiType string) bool {
-	if featureSlug == "" {
-		return true
-	}
-	if workflow.IsStabilityAPIType(apiType) && workflow.IsReferenceImageFeature(featureSlug) {
-		return false
-	}
 	return true
 }
 

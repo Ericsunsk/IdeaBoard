@@ -1039,7 +1039,7 @@ components:
 
     ProviderAPIType:
       type: string
-      enum: [openai-compatible, google-ai, stability]
+      enum: [openai-compatible, google-ai]
 
     DetectModelsRequest:
       type: object

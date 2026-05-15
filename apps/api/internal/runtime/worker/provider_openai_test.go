@@ -369,49 +369,6 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	}
 }
 
-func TestCallDrawingAPIRejectsStabilityForReferenceImageFeatures(t *testing.T) {
-	c := &ProviderExecutor{}
-	account := &accounts.ApiAccount{
-		ApiType: workflow.ProviderStability,
-		ApiKey:  "test-key",
-	}
-
-	testCases := []struct {
-		name    string
-		feature string
-	}{
-		{name: "style-fusion", feature: "style-fusion"},
-		{name: "face-swap", feature: "face-swap"},
-		{name: "fabric-on-body", feature: "fabric-on-body"},
-		{name: "multi-angle", feature: "multi-angle"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			params := map[string]interface{}{
-				"feature": tc.feature,
-			}
-			paramsJSON, err := json.Marshal(params)
-			if err != nil {
-				t.Fatalf("marshal params: %v", err)
-			}
-			task := &queuetypes.TaskPayload{
-				TaskID: "task_test",
-				Prompt: "test prompt",
-				Params: string(paramsJSON),
-			}
-
-			_, err = c.callDrawingAPI(context.Background(), account, task)
-			if err == nil {
-				t.Fatalf("expected unsupported-platform error")
-			}
-			if !strings.Contains(err.Error(), "当前渠道不支持该图像参考能力") {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
 func TestCallOpenAIFaceSwapUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	var gotPath string
 	var gotMultipart multipartRequestCapture

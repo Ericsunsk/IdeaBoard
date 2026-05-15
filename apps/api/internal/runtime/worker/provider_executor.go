@@ -87,12 +87,8 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		}
 	}
 	c.normalizeUpstreamMediaParams(params)
-	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
 
 	apiType := workflow.NormalizeProviderAPIType(account.ApiType, account.ProxyURL)
-	if workflow.IsStabilityAPIType(apiType) && workflow.IsReferenceImageFeature(featureSlug) {
-		return "", fmt.Errorf("当前渠道不支持该图像参考能力")
-	}
 
 	timeout := resolveAccountTimeout(account)
 
@@ -115,8 +111,6 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	switch {
 	case workflow.IsGoogleNativeAPIType(apiType):
 		callResult, err = c.callGoogleAI(ctx, account, task.Prompt, timeout, params, resolvedModel)
-	case workflow.IsStabilityAPIType(apiType):
-		callResult, err = c.callStabilityAI(ctx, account, task.Prompt, width, height, timeout, resolvedModel)
 	default:
 		// OpenAI-compatible providers use the DALL-E style image endpoints.
 		callResult, err = c.callOpenAI(ctx, account, task.Prompt, width, height, timeout, params, resolvedModel)

@@ -333,8 +333,7 @@ const createEmptyChannelForm = (): ChannelFormData => ({
 const channelForm = ref<ChannelFormData>(createEmptyChannelForm())
 const apiTypeOptions = [
   { label: 'OpenAI Compatible', value: 'openai-compatible' },
-  { label: 'Google AI 官方', value: 'google-ai' },
-  { label: 'Stability AI 官方', value: 'stability' },
+  { label: 'Google', value: 'google-ai' },
 ]
 const apiTypeLabelByValue = new Map(apiTypeOptions.map((item) => [item.value, item.label]))
 
@@ -353,10 +352,6 @@ function inferChannelApiTypeFromUrl() {
   if (!apiUrl) return
   if (apiUrl.includes('generativelanguage.googleapis.com')) {
     channelForm.value.type = 'google-ai'
-    return
-  }
-  if (apiUrl.includes('api.stability.ai')) {
-    channelForm.value.type = 'stability'
     return
   }
   if (apiUrl.includes('api.openai.com')) {

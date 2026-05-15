@@ -39,31 +39,3 @@ func TestCallOpenAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
 		t.Fatalf("unexpected status code: got=%d want=%d", upstreamErr.statusCode, http.StatusUnprocessableEntity)
 	}
 }
-
-func TestCallStabilityAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte(`{"error":"rate_limited"}`))
-	}))
-	defer server.Close()
-
-	c := &ProviderExecutor{}
-	account := &accounts.ApiAccount{
-		ProxyURL: server.URL,
-		ApiKey:   "test-key",
-		ModelSet: "sdxl",
-	}
-
-	_, err := c.callStabilityAI(context.Background(), account, "prompt", 1024, 1024, time.Second, "sdxl")
-	if err == nil {
-		t.Fatalf("expected callStabilityAI error")
-	}
-
-	var upstreamErr *upstreamHTTPError
-	if !errors.As(err, &upstreamErr) {
-		t.Fatalf("expected upstreamHTTPError, got %T (%v)", err, err)
-	}
-	if upstreamErr.statusCode != http.StatusTooManyRequests {
-		t.Fatalf("unexpected status code: got=%d want=%d", upstreamErr.statusCode, http.StatusTooManyRequests)
-	}
-}

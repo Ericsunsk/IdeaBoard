@@ -11,5 +11,4 @@ export type ProviderAPIType = typeof ProviderAPIType[keyof typeof ProviderAPITyp
 export const ProviderAPIType = {
   'openai-compatible': 'openai-compatible',
   'google-ai': 'google-ai',
-  stability: 'stability',
 } as const;
