@@ -38,6 +38,7 @@ type AppConfig struct {
 	Host               string
 	Env                string
 	GinMode            string
+	LogFile            string
 	CORSAllowedOrigins []string
 }
 
@@ -91,6 +92,7 @@ func Load() *Config {
 			Host:               getFirstEnv("APP_HOST", "APP_BIND_HOST"),
 			Env:                appEnv,
 			GinMode:            ginMode,
+			LogFile:            getEnv("APP_LOG_FILE", "server.log"),
 			CORSAllowedOrigins: detectCORSAllowedOrigins(appEnv),
 		},
 		Auth: AuthServiceConfig{

@@ -39,19 +39,30 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+func configureLogging(logFilePath string) {
+	logPath := strings.TrimSpace(logFilePath)
+	if logPath == "" {
+		logPath = "server.log"
+	}
+	if strings.EqualFold(logPath, "none") {
+		return
+	}
+	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if logFile != nil {
+		log.SetOutput(io.MultiWriter(os.Stderr, logFile))
+	}
+}
+
 func Run(args []string) {
 	if len(args) > 1 && args[1] == "init-admin" {
 		runInitAdmin()
 		return
 	}
 
-	logFile, _ := os.OpenFile("server.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if logFile != nil {
-		log.SetOutput(io.MultiWriter(os.Stderr, logFile))
-	}
+	cfg := config.Load()
+	configureLogging(cfg.App.LogFile)
 	log.Println("[Main] ===== Server starting (build with storage profiles) =====")
 
-	cfg := config.Load()
 	requireAuthInternalKeyForProduction(cfg)
 	gin.SetMode(cfg.App.GinMode)
 	log.Printf("[Main] Gin mode: %s (app env: %s)", gin.Mode(), cfg.App.Env)

@@ -218,12 +218,36 @@ if (isProductionRuntime() && !env.auth.internalKey) {
   throw new Error('AUTH_INTERNAL_KEY is required when NODE_ENV=production')
 }
 
-app.listen(env.auth.port, env.auth.host, () => {
+const server = app.listen(env.auth.port, env.auth.host, () => {
   if (!env.auth.internalKey) {
     console.warn('[auth] AUTH_INTERNAL_KEY is empty; internal endpoints are not protected')
   }
   console.log(`[auth] Better Auth service listening on http://${env.auth.host}:${env.auth.port}`)
 })
+
+function gracefulShutdown(signal: string) {
+  console.log(`[auth] ${signal} received, shutting down gracefully...`)
+  server.close(() => {
+    authDB
+      .end()
+      .then(() => {
+        console.log('[auth] Database pool closed')
+        process.exit(0)
+      })
+      .catch((err) => {
+        console.error('[auth] Error closing database pool', err)
+        process.exit(1)
+      })
+  })
+  // Force exit after 10s if graceful close hangs
+  setTimeout(() => {
+    console.error('[auth] Graceful shutdown timed out, forcing exit')
+    process.exit(1)
+  }, 10_000).unref()
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
 function isProductionRuntime(): boolean {
   const value = String(process.env.NODE_ENV || process.env.APP_ENV || '').trim().toLowerCase()

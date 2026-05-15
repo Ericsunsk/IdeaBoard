@@ -34,6 +34,18 @@ export default defineConfig({
       resolvers: [NaiveUiResolver()],
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/node_modules/@vue-flow/core/')) {
+            return 'vue-flow'
+          }
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

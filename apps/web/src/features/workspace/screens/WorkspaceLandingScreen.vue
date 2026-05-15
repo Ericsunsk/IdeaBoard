@@ -187,19 +187,20 @@ function startJourney() {
   overflow: hidden;
 }
 
-/* 核心舞台容器：锁定 1440x900 的设计基准 */
+/* 核心舞台容器：响应式设计基准 */
 .hero-stage {
-  width: 1440px;
-  height: 900px;
+  width: 100%;
+  max-width: 1440px;
+  aspect-ratio: 1440 / 900;
   position: relative;
   flex-shrink: 0;
 }
 
 .hero-content {
   position: absolute;
-  left: 320px;
-  top: 350px;
-  width: 800px;
+  left: 22.2%;
+  top: 38.9%;
+  width: 55.6%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -293,9 +294,10 @@ function startJourney() {
 }
 
 .text-note {
-  left: 380px;
-  top: 172px;
-  width: 220px;
+  left: 26.4%;
+  top: 19.1%;
+  width: 15.3%;
+  min-width: 160px;
   padding: 32px;
   background: #e6ded5; /* Match exactly the warm beige */
   color: #202124;
@@ -308,10 +310,11 @@ function startJourney() {
 }
 
 .layers-icon {
-  left: 328px;
-  top: 349px;
-  width: 100px;
-  height: 100px;
+  left: 22.8%;
+  top: 38.8%;
+  width: 6.9%;
+  aspect-ratio: 1;
+  min-width: 60px;
   background: transparent !important; /* 强制透明，防止继承 float-item 的白色 */
   border-radius: 0 !important;
   display: flex;
@@ -325,23 +328,23 @@ function startJourney() {
 
 .layers-icon .layer {
   position: absolute;
-  width: 75px;
-  height: 75px;
+  width: 75%;
+  aspect-ratio: 1;
   border-radius: 12px;
 }
 
 .layers-icon .bottom-layer {
   background: linear-gradient(135deg, #a855f7, #3b82f6);
-  top: 13px;
-  left: 2px;
+  top: 13%;
+  left: 2%;
   transform: rotate(-7.5deg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .layers-icon .top-layer {
   border: 2px solid rgba(0, 0, 0, 0.2);
-  top: 0px;
-  left: 0px;
+  top: 0;
+  left: 0;
   background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(4px);
   transform: rotate(15.6deg);
@@ -349,20 +352,22 @@ function startJourney() {
 }
 
 .circle-gradient {
-  left: 394px;
-  top: 540px;
-  width: 124px;
-  height: 124px;
+  left: 27.4%;
+  top: 60%;
+  width: 8.6%;
+  aspect-ratio: 1;
+  min-width: 64px;
   border-radius: 50%;
   background: linear-gradient(135deg, #34d399 0%, #3a92e3 73%, #3b82f6 100%);
   border: 4px solid #ffffff;
 }
 
 .orange-rect {
-  left: 978px;
-  top: 166px;
-  width: 92px;
-  height: 143px;
+  left: 67.9%;
+  top: 18.4%;
+  width: 6.4%;
+  aspect-ratio: 92 / 143;
+  min-width: 48px;
   border-radius: 16px;
   background: linear-gradient(180deg, #fbbf24, #f97316);
   border: 4px solid #ffffff;
@@ -370,10 +375,11 @@ function startJourney() {
 }
 
 .purple-sq {
-  left: 910px;
-  top: 548px;
-  width: 150px;
-  height: 150px;
+  left: 63.2%;
+  top: 60.9%;
+  width: 10.4%;
+  aspect-ratio: 1;
+  min-width: 64px;
   border-radius: 20px;
   background: conic-gradient(from 135deg, #d946ef, #3b82f6, #ec4899);
   border: 4px solid #ffffff;
@@ -381,13 +387,24 @@ function startJourney() {
 }
 
 /* 响应式设计 */
+@media (max-width: 1024px) {
+  .hero-title {
+    font-size: 64px;
+  }
+
+  .text-note {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
   .hero-title {
     font-size: 3.5rem;
   }
 
-  .bento-card.card-large {
-    grid-column: span 1;
+  .hero-content {
+    left: 10%;
+    width: 80%;
   }
 
   .hero-actions {
@@ -396,9 +413,12 @@ function startJourney() {
     max-width: 300px;
   }
 
-  .btn-primary,
-  .btn-secondary {
+  .mixboard-btn {
     width: 100%;
+  }
+
+  .float-item:not(.circle-gradient):not(.purple-sq) {
+    display: none;
   }
 }
 
@@ -406,8 +426,13 @@ function startJourney() {
   .hero-title {
     font-size: 2.5rem;
   }
-  .hero-subtitle {
-    font-size: 1.0625rem;
+
+  .mixboard-subtitle {
+    font-size: 12px;
+  }
+
+  .float-item {
+    display: none;
   }
 }
 </style>
