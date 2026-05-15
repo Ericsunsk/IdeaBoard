@@ -14,7 +14,6 @@ interface MessageApiLike {
     content: string,
     options?: {
       duration?: number
-      keepAliveOnHover?: boolean
     },
   ): MessageLoadingHandle
 }
@@ -196,7 +195,6 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
     }
     const loading = options.message.loading(`Exporting ${entries.length} images...`, {
       duration: 1500,
-      keepAliveOnHover: false,
     })
     exportLoading = loading
     let failed = 0

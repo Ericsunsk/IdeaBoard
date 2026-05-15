@@ -1,5 +1,19 @@
 <template>
   <article
+    v-motion="{
+      initial: { opacity: 0, y: 12, scale: 0.985 },
+      enter: {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: { duration: 220, easing: 'ease-out' },
+      },
+      hovered: {
+        y: -2,
+        scale: 1.006,
+        transition: { duration: 160, easing: 'ease-out' },
+      },
+    }"
     class="board-card board-item"
     role="button"
     tabindex="0"
@@ -119,14 +133,11 @@ function onRenameInput(event: Event) {
 
 .board-item {
   cursor: pointer;
-  transition:
-    transform 0.14s ease,
-    border-color 0.14s ease;
+  transition: border-color 0.14s ease;
 }
 
 .board-item:hover {
   border-color: #cdd4e6;
-  transform: translateY(-1px);
 }
 
 .board-preview {

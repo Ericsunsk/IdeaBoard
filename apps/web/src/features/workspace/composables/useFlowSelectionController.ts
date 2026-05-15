@@ -25,17 +25,25 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     return true
   }
 
-  function selectFlowNodeForContextMenu(nodeId: string): boolean {
+  function selectFlowNode(nodeId: string, options?: { keepExisting?: boolean }): boolean {
     const targetNode = findNode(nodeId)
     if (!targetNode) return false
     const selectedElements = readSelectedElements()
-    const hasChanged = selectedElements.length !== 1 || selectedElements[0]?.id !== nodeId
-    if (!hasChanged) return false
-    if (selectedElements.length > 0) {
+    const keepExisting = options?.keepExisting ?? false
+    const isAlreadySelected = selectedElements.some((element) => element.id === nodeId)
+
+    if (!keepExisting && selectedElements.length === 1 && isAlreadySelected) return false
+    if (!keepExisting && selectedElements.length > 0) {
       removeSelectedElements(selectedElements)
     }
-    addSelectedNodes([targetNode])
+    if (!isAlreadySelected) {
+      addSelectedNodes([targetNode])
+    }
     return true
+  }
+
+  function selectFlowNodeForContextMenu(nodeId: string): boolean {
+    return selectFlowNode(nodeId, { keepExisting: false })
   }
 
   function onPaneClick() {
@@ -54,8 +62,12 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
   }
 
   function onFlowNodeMouseDown(...args: [string, MouseEvent]) {
+    const nodeId = args[0]
     const event = args[1]
     if (event.button === 0) {
+      if (options.activeTool.value !== 'hand') {
+        selectFlowNode(nodeId, { keepExisting: event.shiftKey })
+      }
       options.activeImageActionNodeId.value = null
       if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
       options.hideFlowStyleStrengthControl()

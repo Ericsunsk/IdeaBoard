@@ -239,12 +239,13 @@
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
 import { useListUserTasks } from '../../../shared/api/generated-query/tasks/tasks'
+import { useAppToast } from '../../../shared/composables/useAppToast'
 import { NTag } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 
 const router = useRouter()
 const userStore = useUserStore()
-const message = useMessage()
+const appToast = useAppToast()
 
 const activeTab = ref('profile')
 
@@ -392,11 +393,11 @@ async function handleUpdatePassword() {
     await pwdFormRef.value?.validate()
     pwdLoading.value = true
     await userStore.updatePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
-    message.success('密码更新成功，请重新登录')
+    appToast.success('密码更新成功，请重新登录')
     pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
     await router.push('/user/login')
   } catch (error: any) {
-    if (error.message) message.error(error.message)
+    if (error.message) appToast.error(error.message)
   } finally {
     pwdLoading.value = false
   }

@@ -14,16 +14,14 @@ type UseFlowBoardHeaderActionsOptions = {
   message: { warning: (msg: string) => void; success: (msg: string) => void }
   router: Router
   route: { query: Record<string, unknown> }
-  isDirty: Ref<boolean>
-  confirmFlowLeave: () => Promise<boolean>
-  skipNextLeaveConfirm: { value: boolean }
+  flushAutosave: () => void
 }
 
 export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOptions) {
   const isBoardMenuOpen = ref(false)
   const isRenamingBoard = ref(false)
   const boardNameDraft = ref('')
-  const boardNameInputRef = ref<HTMLInputElement | null>(null)
+  const boardNameInputRef = ref<HTMLElement | null>(null)
   const boardMetas = ref<BoardMeta[]>(listCanvasBoards())
 
   const currentBoardName = computed(() => {
@@ -36,7 +34,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     boardMetas.value.map((board) => ({ id: board.id, name: board.name })),
   )
 
-  function setBoardNameInputRef(el: HTMLInputElement | null) {
+  function setBoardNameInputRef(el: HTMLElement | null) {
     boardNameInputRef.value = el
   }
 
@@ -55,8 +53,16 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     isBoardMenuOpen.value = false
     boardNameDraft.value = currentBoardName.value
     void nextTick(() => {
-      boardNameInputRef.value?.focus()
-      boardNameInputRef.value?.select()
+      const titleElement = boardNameInputRef.value
+      if (!titleElement) return
+      titleElement.textContent = boardNameDraft.value
+      titleElement.focus()
+      const range = document.createRange()
+      range.selectNodeContents(titleElement)
+      range.collapse(false)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
     })
   }
 
@@ -101,8 +107,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
   }
 
   async function navigateToBoard(boardId: string) {
-    if (options.isDirty.value && !(await options.confirmFlowLeave())) return
-    options.skipNextLeaveConfirm.value = true
+    options.flushAutosave()
     await options.router.push({
       path: '/user/workspace',
       query: { ...options.route.query, boardId },

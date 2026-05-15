@@ -10,7 +10,6 @@
       :current-board-id="currentBoardId"
       :is-board-menu-open="isBoardMenuOpen"
       :is-renaming-board="isRenamingBoard"
-      :board-name-draft="boardNameDraft"
       :set-board-name-input-ref="setBoardNameInputRef"
       :export-disabled="!hasSelectedFlowNodes"
       :avatar-url="userStore.user?.avatar"
@@ -22,9 +21,10 @@
       @select-board="onSelectBoard"
       @export="onExportSelectedImages"
       @open-center="onNavigateRequest('/user/center')"
+      @navigate-back="onNavigateRequest('/user/boards')"
     />
 
-    <aside class="floating-toolbar">
+    <aside class="floating-toolbar" @wheel.prevent.stop>
       <div
         class="tool-item"
         :class="{ active: activeTool === 'select' }"
@@ -91,6 +91,7 @@
       class="workspace-flow-canvas-wrap"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
+      @wheel.capture="onCanvasWheelCapture"
     >
       <VueFlow
         v-model:nodes="nodes"
@@ -181,57 +182,14 @@
       />
     </div>
 
-    <div class="floating-status">
+    <div class="floating-status" @wheel.prevent.stop>
       <div class="zoom-controls">
         <button type="button" class="zoom-btn" title="缩小" @click="onZoomOut">−</button>
         <span class="zoom-level">{{ zoomLevel }}%</span>
         <button type="button" class="zoom-btn" title="放大" @click="onZoomIn">+</button>
       </div>
-      <button
-        type="button"
-        class="logo-btn"
-        title="返回画布列表"
-        @click="onNavigateRequest('/user/boards')"
-      >
-        <svg
-          class="logo-btn-icon"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M9 7 5 11l4 4" />
-          <path d="M5 11h8.5c3.2 0 5.5 2.3 5.5 5.4 0 1.1-.28 2.1-.78 2.9" />
-        </svg>
-      </button>
     </div>
 
-    <div
-      v-if="leaveConfirmVisible"
-      class="leave-confirm-mask"
-      @mousedown.stop.prevent
-      @click.self="resolveLeaveConfirm('cancel')"
-    >
-      <div class="leave-confirm-card" @mousedown.stop @click.stop>
-        <div class="leave-confirm-title">离开前是否保存？</div>
-        <div class="leave-confirm-desc">当前画布有未保存更改。</div>
-        <div class="leave-confirm-actions">
-          <button type="button" class="leave-btn ghost" @click="resolveLeaveConfirm('cancel')">
-            继续编辑
-          </button>
-          <button type="button" class="leave-btn danger" @click="resolveLeaveConfirm('discard')">
-            不保存
-          </button>
-          <button type="button" class="leave-btn primary" @click="resolveLeaveConfirm('save')">
-            保存并离开
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -269,8 +227,10 @@ import { useFlowSelectionController } from '../composables/useFlowSelectionContr
 import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
+import { useFlowAutosave } from '../composables/useFlowAutosave'
+import { useAppToast } from '../../../shared/composables/useAppToast'
 
-const message = useMessage()
+const appToast = useAppToast()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -306,6 +266,17 @@ function onZoomOut() {
   zoomOut()
 }
 
+function onCanvasWheelCapture(event: WheelEvent) {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const interactiveTarget = target.closest(
+    'button, input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="button"]',
+  )
+  if (!interactiveTarget) return
+  event.preventDefault()
+  event.stopPropagation()
+}
+
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 const canvasWrapRef = ref<HTMLElement | null>(null)
@@ -327,7 +298,6 @@ const isLoadingBoardSnapshot = ref(false)
 const isSavingBoard = ref(false)
 const isDirty = ref(false)
 const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
-const leaveConfirmVisible = ref(false)
 const activeTool = ref<'select' | 'hand' | 'text'>('select')
 
 const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
@@ -337,9 +307,6 @@ const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING =
 
 let pendingNodeInternalsRefresh = false
 let queuedNodeInternalsIds: Set<string> | null = null
-let leaveConfirmResolver: ((choice: 'save' | 'discard' | 'cancel') => void) | null = null
-let leaveConfirmPromise: Promise<'save' | 'discard' | 'cancel'> | null = null
-let skipNextLeaveConfirm = false
 const activeImageActionNodeId = ref<string | null>(null)
 const activeImagePromptNodeId = ref<string | null>(null)
 const duplicateModifierPressed = ref(false)
@@ -394,36 +361,6 @@ function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
   hideFlowStyleStrengthControl()
 }
 
-function requestLeaveConfirm(): Promise<'save' | 'discard' | 'cancel'> {
-  if (leaveConfirmPromise) return leaveConfirmPromise
-  leaveConfirmVisible.value = true
-  leaveConfirmPromise = new Promise((resolve) => {
-    leaveConfirmResolver = resolve
-  })
-  return leaveConfirmPromise
-}
-
-function resolveLeaveConfirm(choice: 'save' | 'discard' | 'cancel') {
-  if (!leaveConfirmPromise) return
-  leaveConfirmVisible.value = false
-  const resolver = leaveConfirmResolver
-  leaveConfirmResolver = null
-  leaveConfirmPromise = null
-  resolver?.(choice)
-}
-
-async function confirmFlowLeave(): Promise<boolean> {
-  if (skipNextLeaveConfirm) {
-    skipNextLeaveConfirm = false
-    return true
-  }
-  if (!isDirty.value || isSavingBoard.value) return true
-  const choice = await requestLeaveConfirm()
-  if (choice === 'discard') return true
-  if (choice === 'cancel') return false
-  return !!(await saveCurrentBoardSnapshot({ waitForPreview: true }))
-}
-
 function setActiveTool(tool: 'select' | 'hand' | 'text') {
   closeBoardHeaderEditing()
   activeImageActionNodeId.value = null
@@ -431,7 +368,7 @@ function setActiveTool(tool: 'select' | 'hand' | 'text') {
   hideFlowStyleStrengthControl()
   activeTool.value = tool
   if (tool === 'text') {
-    message.info('文本工具稍后接入')
+    appToast.info('文本工具稍后接入')
   }
 }
 
@@ -456,8 +393,7 @@ function onPanViewport(delta: { x: number; y: number }) {
 }
 
 async function onNavigateRequest(path: string) {
-  if (isDirty.value && !(await confirmFlowLeave())) return
-  skipNextLeaveConfirm = true
+  void flushAutosave()
   await router.push(path)
 }
 
@@ -472,6 +408,7 @@ function markDirty() {
   if (canSaveBoard.value) {
     isDirty.value = true
     if (saveStatus.value !== 'failed') saveStatus.value = 'idle'
+    markDirtyAndSchedule()
   }
 }
 
@@ -502,13 +439,13 @@ const boardPersistence = useFlowBoardPersistence({
   isSavingBoard,
   getBoardIdQuery: () => route.query.boardId,
   onWarning: (msg) => {
-    message.warning(msg)
+    appToast.warning(msg)
   },
   onSuccess: (msg) => {
-    message.success(msg)
+    appToast.success(msg)
   },
   onError: (msg) => {
-    message.error(msg)
+    appToast.error(msg)
   },
   refreshSnapshot,
   clearFlowHistoryBaseline: flowHistory.clearBaseline,
@@ -526,6 +463,11 @@ const currentBoardId = boardPersistence.currentBoardId
 const canSaveBoard = boardPersistence.canSaveBoard
 const loadInitialOrRouteBoard = boardPersistence.loadInitialOrRouteBoard
 const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
+const { markDirtyAndSchedule, flushAutosave } = useFlowAutosave({
+  isDirty,
+  isSaving: isSavingBoard,
+  save: (options) => saveCurrentBoardSnapshot({ waitForPreview: false, silent: options?.silent }),
+})
 
 const {
   isBoardMenuOpen,
@@ -544,20 +486,13 @@ const {
 } = useFlowBoardHeaderActions({
   currentBoardId,
   message: {
-    warning: (msg: string) => message.warning(msg),
-    success: (msg: string) => message.success(msg),
+    warning: (msg: string) => appToast.warning(msg),
+    success: (msg: string) => appToast.success(msg),
   },
   router,
   route,
-  isDirty,
-  confirmFlowLeave,
-  skipNextLeaveConfirm: {
-    get value() {
-      return skipNextLeaveConfirm
-    },
-    set value(v: boolean) {
-      skipNextLeaveConfirm = v
-    },
+  flushAutosave: () => {
+    void flushAutosave()
   },
 })
 
@@ -601,7 +536,7 @@ const flowNodeMutations = useFlowNodeMutations({
     commitFlowEdges(nextEdges)
   },
   onWarning: (text) => {
-    message.warning(text)
+    appToast.warning(text)
   },
   onNodeDeleted: (nodeId, kind) => {
     if (kind === 'mask') {
@@ -668,7 +603,7 @@ function updateSnapshotNode(
   scheduleFlowNodeInternalsRefresh([nodeId])
 }
 
-const selectionExport = useFlowSelectionExport({ nodes, message })
+const selectionExport = useFlowSelectionExport({ nodes, message: appToast })
 const hasSelectedFlowNodes = computed(() => selectionExport.hasSelectedNodes())
 
 function onExportSelectedImages() {
@@ -775,13 +710,13 @@ const {
   updateSnapshotNode,
   captureHistory: flowHistory.capture as () => FlowHistorySnapshot,
   onWarning: (text) => {
-    message.warning(text)
+    appToast.warning(text)
   },
   onSuccess: (text) => {
-    message.success(text)
+    appToast.success(text)
   },
   onError: (text) => {
-    message.error(text)
+    appToast.error(text)
   },
   onOutputCommitted: (nodeId) => {
     markFlowExecutionNodeDirty(nodeId)
@@ -801,10 +736,10 @@ const {
   refreshSnapshot,
   refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
   onSuccess: (text) => {
-    message.success(text)
+    appToast.success(text)
   },
   onWarning: (text) => {
-    message.warning(text)
+    appToast.warning(text)
   },
   commitNodes: (nextNodes) => {
     commitFlowNodes(nextNodes)
@@ -927,8 +862,8 @@ const canvasDrop = useFlowCanvasDrop({
   sanitizeApiErrorMessage,
   renderMaskNodeMask,
   clearMaskCanvas,
-  onWarning: (msg) => message.warning(msg),
-  onSuccess: (msg) => message.success(msg),
+  onWarning: (msg) => appToast.warning(msg),
+  onSuccess: (msg) => appToast.success(msg),
   onNodeMutated: (nodeId) => markFlowExecutionNodeDirty(nodeId),
   createNodeOptions: createNodeOptions as unknown as ReadonlyArray<{ value?: unknown }>,
 })
@@ -950,15 +885,11 @@ watch(
 
 useFlowKeyboardShortcuts({
   onSave: () => {
-    void saveCurrentBoardSnapshot()
+    void flushAutosave({ silent: false })
   },
   onUndo: flowHistory.undo,
   onRedo: flowHistory.redo,
   onDeleteSelected: deleteSelectedFlowElements,
-  isLeaveConfirmVisible: () => leaveConfirmVisible.value,
-  onCancelLeaveConfirm: () => {
-    resolveLeaveConfirm('cancel')
-  },
   onEscape: onEscapeShortcut,
   onPanViewport,
   onToolSelect: () => {
@@ -976,9 +907,9 @@ useFlowKeyboardShortcuts({
 })
 
 useFlowLeaveGuard({
-  isDirty,
-  isSaving: isSavingBoard,
-  confirmLeave: confirmFlowLeave,
+  onLeave: () => {
+    void flushAutosave()
+  },
 })
 
 onMounted(async () => {
@@ -1020,19 +951,19 @@ onMounted(async () => {
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  background: #fff;
-  padding: 8px;
-  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 4px;
+  border-radius: 999px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border: 1px solid #e2e4e8;
+  border: 1px solid #d8ddea;
   z-index: 100;
 }
 .tool-item {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1040,6 +971,13 @@ onMounted(async () => {
   cursor: pointer;
   border: none;
   background: transparent;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.tool-item:hover {
+  background: #e8eaed;
+  color: #6757c8;
 }
 .tool-item.active {
   background: #f1f3f9;
@@ -1116,28 +1054,30 @@ onMounted(async () => {
   right: 24px;
   bottom: 24px;
   z-index: 100;
-  display: flex;
-  gap: 10px;
-  align-items: center;
+  pointer-events: auto;
 }
 .zoom-controls {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  background: #f1f3f9;
-  border-radius: 12px;
-  padding: 6px 8px;
+  gap: 9px;
+  height: 33px;
+  padding: 4px;
+  border: 1px solid #d8ddea;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
   color: #202124;
 }
 .zoom-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 23px;
+  height: 23px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #5f6368;
+  color: #4f5563;
   font-size: 18px;
   line-height: 1;
   display: flex;
@@ -1148,111 +1088,15 @@ onMounted(async () => {
     color 0.2s ease;
 }
 .zoom-btn:hover {
-  background: #fff;
+  background: #f1f3f9;
   color: #6757c8;
 }
 .zoom-level {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
   line-height: 1.2;
   color: #202124;
-  min-width: 44px;
+  min-width: 33px;
   text-align: center;
-}
-.logo-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 1px solid #e8eaed;
-  background: rgba(255, 255, 255, 0.95);
-  color: #5f6368;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease;
-}
-.logo-btn:hover {
-  background: #fff;
-  border-color: #d8ddea;
-  color: #6757c8;
-  transform: rotate(-90deg);
-}
-.logo-btn:active {
-  transform: rotate(-84deg) scale(0.98);
-}
-.logo-btn:focus-visible {
-  outline: 2px solid rgba(146, 120, 230, 0.36);
-  outline-offset: 2px;
-}
-.logo-btn-icon {
-  transition: transform 0.2s ease;
-}
-
-.leave-confirm-mask {
-  position: absolute;
-  inset: 0;
-  z-index: 500;
-  background: rgba(15, 23, 42, 0.16);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.leave-confirm-card {
-  width: min(90vw, 340px);
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
-  padding: 18px 18px 14px;
-}
-
-.leave-confirm-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.leave-confirm-desc {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #475569;
-}
-
-.leave-confirm-actions {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.leave-btn {
-  border: 1px solid #dbe3ef;
-  border-radius: 10px;
-  padding: 7px 12px;
-  font-size: 13px;
-  cursor: pointer;
-  background: #fff;
-  color: #334155;
-}
-
-.leave-btn.ghost {
-  background: #fff;
-}
-
-.leave-btn.danger {
-  border-color: #fecaca;
-  color: #b91c1c;
-  background: #fff5f5;
-}
-
-.leave-btn.primary {
-  border-color: #9278e6;
-  background: #9278e6;
-  color: #fff;
 }
 </style>

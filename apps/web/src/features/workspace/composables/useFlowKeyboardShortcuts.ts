@@ -5,8 +5,6 @@ type UseFlowKeyboardShortcutsOptions = {
   onUndo?: () => void
   onRedo?: () => void
   onDeleteSelected?: () => void
-  isLeaveConfirmVisible?: () => boolean
-  onCancelLeaveConfirm?: () => void
   onEscape?: () => boolean | void
   onPanViewport?: (delta: { x: number; y: number }) => void
   onToolSelect?: () => void
@@ -58,13 +56,6 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
   function onWindowKeydown(event: KeyboardEvent) {
     const key = event.key.toLowerCase()
     const hasCommand = event.metaKey || event.ctrlKey
-    if (options.isLeaveConfirmVisible?.()) {
-      if (key === 'escape') {
-        event.preventDefault()
-        options.onCancelLeaveConfirm?.()
-      }
-      return
-    }
     if (hasCommand && key === 's') {
       event.preventDefault()
       void options.onSave()

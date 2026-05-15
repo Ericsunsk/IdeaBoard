@@ -27,6 +27,7 @@
     <template v-else-if="isImageNode && imageSnapshot">
       <div
         class="flow-canvas-node__image-wrap flow-canvas-node__drag-surface"
+        @mousedown="onNodeMouseDown"
         @click.stop
         @contextmenu.stop
       >
@@ -687,6 +688,10 @@ function onMaskSetCanvasRef(element: Element | null) {
 
 function onImageContextMenu(event: MouseEvent) {
   emit('image-contextmenu', event)
+}
+
+function onNodeMouseDown(event: MouseEvent) {
+  emit('node-mousedown', event)
 }
 
 function onImagePromptGenerate(prompt: string, outputCount: number) {

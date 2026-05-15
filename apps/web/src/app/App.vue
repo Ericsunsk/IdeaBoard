@@ -1,12 +1,21 @@
 <template>
   <n-config-provider :theme-overrides="themeOverrides" :locale="naiveLocale">
-    <n-message-provider
-      :container-class="messageContainerClass"
-      :theme-overrides="messageThemeOverrides"
-    >
+    <n-message-provider>
       <n-dialog-provider>
         <n-notification-provider>
           <router-view />
+          <Toaster
+            class="ideaboard-toaster"
+            position="top-center"
+            :visible-toasts="4"
+            :close-button="true"
+            :rich-colors="false"
+            :expand="true"
+            :duration="2600"
+            :gap="10"
+            :offset="16"
+            :toast-options="toastOptions"
+          />
         </n-notification-provider>
       </n-dialog-provider>
     </n-message-provider>
@@ -15,24 +24,13 @@
 
 <script setup lang="ts">
 import { zhCN } from 'naive-ui'
+import { Toaster } from 'vue-sonner'
 
 const naiveLocale = zhCN
-const route = useRoute()
-const isUserRoute = computed(() => route.path.startsWith('/user'))
-const messageContainerClass = computed(() =>
-  isUserRoute.value ? 'user-message-container' : undefined,
-)
-
-const userMessageThemeOverrides = {
-  borderRadius: '14px',
-  closeBorderRadius: '999px',
-  closeSize: '22px',
-  closeIconSize: '16px',
-  fontSize: '13px',
+const toastOptions = {
+  class: 'ideaboard-toast',
+  closeButtonPosition: 'top-right' as const,
 }
-const messageThemeOverrides = computed(() =>
-  isUserRoute.value ? userMessageThemeOverrides : undefined,
-)
 
 const themeOverrides = {
   common: {

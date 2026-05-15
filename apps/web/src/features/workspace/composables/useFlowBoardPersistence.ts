@@ -24,6 +24,7 @@ type ArrayRef = { value: unknown[] }
 
 export type SaveCurrentBoardSnapshotOptions = {
   waitForPreview?: boolean
+  silent?: boolean
 }
 
 export type UseFlowBoardPersistenceOptions = {
@@ -198,7 +199,9 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       options.clearFlowHistoryBaseline()
       options.isDirty.value = false
       options.saveStatus.value = 'saved'
-      options.onSuccess('已保存')
+      if (!saveOptions.silent) {
+        options.onSuccess('已保存')
+      }
       const previewRefreshTask = refreshBoardPreviewAfterSave(boardId, stabilizedSnapshot).catch(
         (error) => {
           console.warn('[workspace] refresh board preview after save failed', boardId, error)

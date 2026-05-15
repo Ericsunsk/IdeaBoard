@@ -97,9 +97,10 @@ import {
   syncCanvasBoardToServer,
   syncDeleteCanvasBoardToServer,
 } from '../lib/boardSync'
+import { useAppToast } from '../../../shared/composables/useAppToast'
 
 const router = useRouter()
-const message = useMessage()
+const appToast = useAppToast()
 
 const boards = ref<CanvasBoardMeta[]>([])
 const searchKeyword = ref('')
@@ -238,7 +239,7 @@ async function createAndOpenBoard() {
     if (isBoardNameConflictError(error)) {
       await hydrateCanvasBoardsFromServer()
       reloadBoards()
-      message.error('画布名称已存在，请重试')
+      appToast.error('画布名称已存在，请重试')
       return
     }
     console.warn('[boards] failed to sync new board', error)
@@ -251,7 +252,7 @@ function openBoard(board: CanvasBoardMeta) {
   touchCanvasBoard(board.id)
   void syncCanvasBoardToServer(board.id).catch((error) => {
     if (isBoardNameConflictError(error)) {
-      message.error('当前画布名称与其他画布重复，请先重命名')
+      appToast.error('当前画布名称与其他画布重复，请先重命名')
     }
     console.warn('[boards] failed to sync board open touch', error)
   })
@@ -300,14 +301,14 @@ async function commitRename() {
   const boardId = renamingBoardId.value
   if (!boardId) return
   if (isCanvasBoardNameTaken(renameDraft.value, boardId)) {
-    message.warning('名称已存在')
+    appToast.warning('名称已存在')
     return
   }
   const renamed = renameCanvasBoard(boardId, renameDraft.value)
   renamingBoardId.value = null
   suppressNextBoardOpen.value = true
   if (!renamed) {
-    message.warning('画布名称不能为空')
+    appToast.warning('画布名称不能为空')
     return
   }
   try {
@@ -316,13 +317,13 @@ async function commitRename() {
     if (isBoardNameConflictError(error)) {
       await hydrateCanvasBoardsFromServer()
       reloadBoards()
-      message.error('名称已存在，请更换后再试')
+      appToast.error('名称已存在，请更换后再试')
       return
     }
     console.warn('[boards] failed to sync renamed board', error)
   }
   reloadBoards()
-  message.success('画布已重命名')
+  appToast.success('画布已重命名')
 }
 
 function cancelRename() {
@@ -346,7 +347,7 @@ async function handleDuplicateAction(board: CanvasBoardMeta) {
   activeMenuBoardId.value = null
   const copy = duplicateCanvasBoard(board.id)
   if (!copy) {
-    message.error('复制失败')
+    appToast.error('复制失败')
     return
   }
   duplicateCanvasBoardState(board.id, copy.id)
@@ -356,13 +357,13 @@ async function handleDuplicateAction(board: CanvasBoardMeta) {
     if (isBoardNameConflictError(error)) {
       await hydrateCanvasBoardsFromServer()
       reloadBoards()
-      message.error('复制后的画布名称已存在，请重试')
+      appToast.error('复制后的画布名称已存在，请重试')
       return
     }
     console.warn('[boards] failed to sync duplicated board', error)
   }
   reloadBoards()
-  message.success('已复制画布')
+  appToast.success('已复制画布')
 }
 
 async function handleDeleteAction(board: CanvasBoardMeta) {
@@ -374,14 +375,14 @@ async function handleDeleteAction(board: CanvasBoardMeta) {
     if (isNotFoundError(error)) {
       // remote already deleted, continue cleaning local state
     } else {
-      message.error('删除失败，请稍后重试')
+      appToast.error('删除失败，请稍后重试')
       console.warn('[boards] failed to sync deleted board', error)
       return
     }
   }
   const ok = deleteCanvasBoard(board.id)
   if (!ok) {
-    message.error('删除失败')
+    appToast.error('删除失败')
     return
   }
   deleteCanvasBoardState(board.id)
@@ -389,7 +390,7 @@ async function handleDeleteAction(board: CanvasBoardMeta) {
     cancelRename()
   }
   reloadBoards()
-  message.success('已删除画布')
+  appToast.success('已删除画布')
 }
 
 function handleWindowMouseDown(e: MouseEvent) {

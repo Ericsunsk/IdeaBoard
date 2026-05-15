@@ -2,7 +2,18 @@
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="show" class="login-modal-overlay" @click.self="handleClose">
-        <div class="login-modal-content">
+        <div
+          v-motion="{
+            initial: { opacity: 0, y: 20, scale: 0.96 },
+            enter: {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { duration: 260, easing: 'ease-out' },
+            },
+          }"
+          class="login-modal-content"
+        >
           <button class="close-btn" :disabled="loading" @click="handleClose">
             <svg
               width="24"
@@ -73,6 +84,7 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
+import { useAppToast } from '../../../shared/composables/useAppToast'
 import type { FormInst } from 'naive-ui'
 
 const props = defineProps<{
@@ -86,7 +98,7 @@ const emit = defineEmits<{
 }>()
 
 const userStore = useUserStore()
-const message = useMessage()
+const appToast = useAppToast()
 
 const formRef = ref<FormInst | null>(null)
 const loading = ref(false)
@@ -132,13 +144,13 @@ async function handleLogin() {
     await formRef.value?.validate()
     loading.value = true
     await userStore.login(formValue.value.username, formValue.value.password)
-    message.success('登录成功')
+    appToast.success('登录成功')
     resetForm()
     emit('login-success')
     emit('update:show', false)
   } catch (error: any) {
     if (Array.isArray(error)) return
-    message.error(error?.message || '登录失败，请稍后重试')
+    appToast.error(error?.message || '登录失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -168,18 +180,6 @@ async function handleLogin() {
   box-shadow: 0 24px 40px rgba(34, 45, 76, 0.16);
   position: relative;
   border: 1px solid #d9dfec;
-  animation: modalIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes modalIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
 }
 
 .close-btn {

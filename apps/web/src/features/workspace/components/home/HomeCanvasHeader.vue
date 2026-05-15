@@ -1,38 +1,47 @@
 <template>
-  <header class="floating-header">
-    <div class="header-left">
-      <div class="file-name-chip" @mousedown.stop>
+  <header class="floating-header" @wheel.prevent.stop>
+    <div class="header-shell" @mousedown.stop>
+      <button
+        type="button"
+        class="header-back-btn"
+        title="返回画布列表"
+        @click.stop="emit('navigate-back')"
+      >
         <svg
-          width="16"
-          height="16"
+          width="20"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
           stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <path d="M19 12H7" />
+          <path d="M12 17l-5-5 5-5" />
         </svg>
-        <input
-          v-if="isRenamingBoard"
+      </button>
+
+      <div class="header-title-slot">
+        <span
           :ref="bindBoardNameInputRef"
-          :value="boardNameDraft"
-          class="board-name-input"
-          type="text"
-          maxlength="60"
-          @input="emit('update:boardNameDraft', ($event.target as HTMLInputElement).value)"
+          class="file-name-btn"
+          :class="{ 'is-editing': isRenamingBoard }"
+          :contenteditable="isRenamingBoard ? 'plaintext-only' : 'false'"
+          spellcheck="false"
+          title="点击重命名画布"
+          @click.stop="emit('start-board-rename')"
+          @mousedown.stop
+          @input="emit('update:boardNameDraft', ($event.target as HTMLElement).textContent ?? '')"
           @keydown.enter.prevent="emit('confirm-board-rename')"
           @keydown.esc.prevent="emit('cancel-board-rename')"
           @blur="emit('confirm-board-rename')"
-        />
-        <button
-          v-else
-          type="button"
-          class="file-name-btn"
-          title="点击重命名画布"
-          @click.stop="emit('start-board-rename')"
         >
           {{ currentBoardName }}
-        </button>
+        </span>
+      </div>
+
+      <div class="header-actions">
         <button
           type="button"
           class="board-switch-btn"
@@ -68,14 +77,42 @@
       </div>
     </div>
     <div class="header-right">
-      <button class="btn-ghost share-btn" @mousedown.stop>Share</button>
+      <button class="header-icon-btn share-btn" title="分享" @mousedown.stop>
+        <svg
+          width="19"
+          height="19"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L10.9 5.03" />
+          <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07l1.22-1.22" />
+        </svg>
+      </button>
       <button
-        class="btn-primary export-btn"
+        class="header-icon-btn export-btn"
+        title="导出"
         :disabled="exportDisabled"
         @mousedown.stop
         @click="emit('export')"
       >
-        Export
+        <svg
+          width="19"
+          height="19"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <path d="M7 10l5 5 5-5" />
+          <path d="M12 15V3" />
+        </svg>
       </button>
       <div class="user-avatar-wrap" title="个人中心" @click="emit('open-center')">
         <img v-if="avatarUrl" :src="avatarUrl" class="user-avatar" />
@@ -106,8 +143,7 @@ const props = defineProps<{
   currentBoardId: string | null
   isBoardMenuOpen: boolean
   isRenamingBoard: boolean
-  boardNameDraft: string
-  setBoardNameInputRef: (el: HTMLInputElement | null) => void
+  setBoardNameInputRef: (el: HTMLElement | null) => void
   exportDisabled: boolean
   avatarUrl?: string
 }>()
@@ -121,10 +157,11 @@ const emit = defineEmits<{
   (e: 'select-board', boardId: string): void
   (e: 'export'): void
   (e: 'open-center'): void
+  (e: 'navigate-back'): void
 }>()
 
 function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null) {
-  props.setBoardNameInputRef(element as HTMLInputElement | null)
+  props.setBoardNameInputRef(element as HTMLElement | null)
 }
 </script>
 
@@ -134,72 +171,92 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   top: 16px;
   left: 16px;
   right: 16px;
-  display: flex;
-  justify-content: space-between;
   z-index: 100;
   pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
-.header-left,
+.header-shell {
+  position: relative;
+  width: min(200px, calc(100vw - 32px));
+  box-sizing: border-box;
+  height: 39px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid #d8ddea;
+  background: rgba(255, 255, 255, 0.94);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
 .header-right {
   display: flex;
   gap: 12px;
   pointer-events: auto;
 }
-.file-name-chip {
-  background: #f1f3f9;
-  padding: 8px 16px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #202124;
-  cursor: pointer;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  transition: background 0.2s;
+.header-title-slot {
   position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
-.file-name-chip:hover {
+.header-back-btn {
+  width: 29px;
+  height: 29px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #202124;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+.header-back-btn:hover {
   background: #e8eaed;
+  color: #6757c8;
 }
 .file-name-btn {
-  border: none;
-  background: transparent;
   padding: 0;
   margin: 0;
   color: #202124;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
+  font-size: 15px;
+  font-weight: 400;
+  cursor: text;
+  outline: none;
   line-height: 1.2;
-  max-width: 220px;
+  width: 100%;
+  max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.file-name-btn:hover {
-  color: #6757c8;
+.file-name-btn.is-editing {
+  text-overflow: clip;
 }
-.board-name-input {
-  height: 24px;
-  min-width: 140px;
-  max-width: 220px;
-  border-radius: 6px;
-  border: 1px solid #cfd5e3;
-  padding: 0 8px;
-  font-size: 14px;
-  outline: none;
-  color: #202124;
-  background: #fff;
-}
-.board-name-input:focus {
-  border-color: #9278e6;
+.header-actions {
+  flex: 0 0 auto;
+  width: 29px;
+  height: 29px;
 }
 .board-switch-btn {
-  width: 20px;
-  height: 20px;
+  width: 29px;
+  height: 29px;
+  margin: 0;
+  padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 999px;
   background: transparent;
   color: #5f6368;
   display: flex;
@@ -211,7 +268,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
     color 0.2s ease;
 }
 .board-switch-btn:hover {
-  background: #fff;
+  background: #e8eaed;
   color: #6757c8;
 }
 .chevron-down {
@@ -222,7 +279,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 }
 .board-switch-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   left: 0;
   min-width: 220px;
   max-width: 280px;
@@ -231,7 +288,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   padding: 6px;
   border-radius: 10px;
   border: 1px solid #d8ddea;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(10px);
   z-index: 140;
 }
@@ -267,33 +324,39 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   font-size: 12px;
   color: #8a91a3;
 }
-.btn-ghost,
-.btn-primary {
+.header-icon-btn {
+  width: 40px;
   height: 40px;
-  padding: 0 16px;
-  border-radius: 10px;
-  font-size: 14px;
-  border: none;
+  padding: 0;
+  border: 1px solid #e2e4e8;
+  border-radius: 50%;
+  background: #fff;
+  color: #5f6368;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
-.btn-ghost {
-  background: #f1f3f9;
+.header-icon-btn:hover:not(:disabled) {
+  border-color: #d8ddea;
+  background: #e8eaed;
+  color: #6757c8;
 }
-.btn-ghost:hover {
-  background: #f1f3f9;
-}
-.share-btn {
-  background: #f1f3f9 !important;
-}
-.share-btn:hover {
-  background: #f1f3f9 !important;
-  transform: none;
-}
-.btn-primary {
+.export-btn:not(:disabled) {
+  border-color: #9278e6;
   background: #9278e6;
-  color: white;
+  color: #fff;
 }
-.btn-primary:disabled {
+.export-btn:hover:not(:disabled) {
+  border-color: #8067d8;
+  background: #8067d8;
+  color: #fff;
+}
+.header-icon-btn:disabled {
   background: #e2e4e8;
   color: #a8adb7;
   cursor: not-allowed;

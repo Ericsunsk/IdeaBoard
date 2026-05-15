@@ -1,29 +1,17 @@
-import { onMounted, onUnmounted, type Ref } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 
 type UseFlowLeaveGuardOptions = {
-  isDirty: Ref<boolean>
-  isSaving: Ref<boolean>
-  confirmLeave?: () => Promise<boolean> | boolean
+  onLeave?: () => void
 }
 
-export function useFlowLeaveGuard(options: UseFlowLeaveGuardOptions) {
-  function onWindowBeforeUnload(event: BeforeUnloadEvent) {
-    if (!options.isDirty.value || options.isSaving.value) return
-    event.preventDefault()
-    event.returnValue = ''
-  }
-
-  onBeforeRouteLeave(async () => {
-    if (!options.isDirty.value || options.isSaving.value) return true
-    return options.confirmLeave ? await options.confirmLeave() : false
+export function useFlowLeaveGuard(options: UseFlowLeaveGuardOptions = {}) {
+  onBeforeRouteUpdate(() => {
+    options.onLeave?.()
+    return true
   })
 
-  onMounted(() => {
-    window.addEventListener('beforeunload', onWindowBeforeUnload)
-  })
-
-  onUnmounted(() => {
-    window.removeEventListener('beforeunload', onWindowBeforeUnload)
+  onBeforeRouteLeave(() => {
+    options.onLeave?.()
+    return true
   })
 }

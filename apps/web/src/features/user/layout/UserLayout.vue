@@ -36,11 +36,12 @@
 import { CloseOutline, ShieldHalfOutline } from '@vicons/ionicons5'
 import { useUserStore } from '../../../app/stores/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
+import { useAppToast } from '../../../shared/composables/useAppToast'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 
 const router = useRouter()
 const route = useRoute()
-const message = useMessage()
+const appToast = useAppToast()
 const userStore = useUserStore()
 
 const stopImpersonatingLoading = ref(false)
@@ -61,10 +62,10 @@ async function handleStopImpersonating() {
     if (error) throw error
     await userStore.fetchUserInfo(true)
     await authSession.value?.refetch?.()
-    message.success('已退出伪装身份')
+    appToast.success('已退出伪装身份')
     router.push('/admin/users')
   } catch (err: any) {
-    message.error(extractBetterAuthErrorMessage(err, '退出伪装失败，请重新登录管理员账号'))
+    appToast.error(extractBetterAuthErrorMessage(err, '退出伪装失败，请重新登录管理员账号'))
   } finally {
     stopImpersonatingLoading.value = false
   }
