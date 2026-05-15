@@ -30,8 +30,10 @@ import type {
 import type {
   ApiResponseChannel,
   ApiResponseChannelList,
+  ApiResponseDetectModels,
   ApiResponseEmpty,
-  ChannelFormData
+  ChannelFormData,
+  DetectModelsRequest
 } from '../model';
 
 import { orvalMutator } from '../../orvalMutator';
@@ -162,6 +164,63 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCreateAdminChannelMutationOptions(options), queryClient);
+    }
+    export const detectAdminChannelModels = (
+    detectModelsRequest: MaybeRef<DetectModelsRequest>,
+ options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+) => {
+      detectModelsRequest = unref(detectModelsRequest);
+
+      return orvalMutator<ApiResponseDetectModels>(
+      {url: `/admin/channels/detect-models`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: detectModelsRequest, signal
+    },
+      options);
+    }
+
+
+
+export const getDetectAdminChannelModelsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof detectAdminChannelModels>>, TError,{data: BodyType<DetectModelsRequest>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof detectAdminChannelModels>>, TError,{data: BodyType<DetectModelsRequest>}, TContext> => {
+
+const mutationKey = ['detectAdminChannelModels'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof detectAdminChannelModels>>, {data: BodyType<DetectModelsRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  detectAdminChannelModels(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DetectAdminChannelModelsMutationResult = NonNullable<Awaited<ReturnType<typeof detectAdminChannelModels>>>
+    export type DetectAdminChannelModelsMutationBody = BodyType<DetectModelsRequest>
+    export type DetectAdminChannelModelsMutationError = ErrorType<unknown>
+
+    export const useDetectAdminChannelModels = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof detectAdminChannelModels>>, TError,{data: BodyType<DetectModelsRequest>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationReturnType<
+        Awaited<ReturnType<typeof detectAdminChannelModels>>,
+        TError,
+        {data: BodyType<DetectModelsRequest>},
+        TContext
+      > => {
+      return useMutation(getDetectAdminChannelModelsMutationOptions(options), queryClient);
     }
     export const updateAdminChannel = (
     id: MaybeRef<number>,

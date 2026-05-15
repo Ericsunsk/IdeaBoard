@@ -349,8 +349,8 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 	account := &ApiAccount{
 		Name:      "acc-multi",
 		ChannelID: 1,
-		Platform:  "openai",
-		ApiType:   "official",
+		Platform:  "openai-compatible",
+		ApiType:   "openai-compatible",
 		ModelSet:  "a,b",
 		ApiKey:    "test",
 		Status:    1,

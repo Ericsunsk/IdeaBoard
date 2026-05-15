@@ -82,22 +82,25 @@ func TestResolveWorkflowFeatureSlug(t *testing.T) {
 	}
 }
 
-func TestIsStabilityTextToImagePlatform(t *testing.T) {
+func TestNormalizeProviderAPIType(t *testing.T) {
 	tests := []struct {
-		name     string
-		platform string
-		want     bool
+		name    string
+		apiType string
+		baseURL string
+		want    string
 	}{
-		{name: "stability exact", platform: "stability", want: true},
-		{name: "stability ai exact", platform: "Stability AI", want: true},
-		{name: "stable diffusion contains", platform: "custom stable diffusion proxy", want: true},
-		{name: "openai", platform: "openai", want: false},
+		{name: "openai compatible", apiType: ProviderOpenAICompatible, want: ProviderOpenAICompatible},
+		{name: "google ai", apiType: ProviderGoogleAI, want: ProviderGoogleAI},
+		{name: "stability", apiType: ProviderStability, want: ProviderStability},
+		{name: "infer google from base url", baseURL: "https://generativelanguage.googleapis.com", want: ProviderGoogleAI},
+		{name: "infer stability from base url", baseURL: "https://api.stability.ai", want: ProviderStability},
+		{name: "default openai compatible", apiType: "", baseURL: "https://api.example.com/v1", want: ProviderOpenAICompatible},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsStabilityTextToImagePlatform(tt.platform); got != tt.want {
-				t.Fatalf("platform=%q got=%v, want=%v", tt.platform, got, tt.want)
+			if got := NormalizeProviderAPIType(tt.apiType, tt.baseURL); got != tt.want {
+				t.Fatalf("apiType=%q baseURL=%q got=%q, want=%q", tt.apiType, tt.baseURL, got, tt.want)
 			}
 		})
 	}

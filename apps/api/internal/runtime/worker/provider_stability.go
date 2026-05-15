@@ -27,10 +27,7 @@ func (c *ProviderExecutor) callStabilityAI(ctx context.Context, account *account
 	}
 	baseURL = validatedBaseURL
 
-	engine := "stable-diffusion-xl-1024-v1-0"
-	if strings.TrimSpace(resolvedModel) != "" {
-		engine = strings.TrimSpace(resolvedModel)
-	}
+	engine := strings.TrimSpace(resolvedModel)
 
 	reqBody := map[string]interface{}{
 		"text_prompts": []map[string]interface{}{

@@ -162,13 +162,18 @@ export function useChannelAccounts(options: {
     }
     if (detectModelsLoading.value) return
 
-    const sessionKey = `${baseURL}::${apiKey}`
+    const apiType = channel?.type || 'openai-compatible'
+    const sessionKey = `${apiType}::${baseURL}::${apiKey}`
     if (detectedModelSessionCache.value.has(sessionKey)) return
     detectedModelSessionCache.value.add(sessionKey)
 
     detectModelsLoading.value = true
     try {
-      const res = await channelApi.detectModels({ base_url: baseURL, api_key: apiKey })
+      const res = await channelApi.detectModels({
+        base_url: baseURL,
+        api_key: apiKey,
+        api_type: apiType,
+      })
       const models = (res.data?.models || [])
         .map((m) => (m || '').trim())
         .filter(Boolean)
@@ -201,14 +206,16 @@ export function useChannelAccounts(options: {
         max_concurrent: accountForm.value.max_concurrent,
         timeout: accountForm.value.timeout,
         name: ch?.name || 'Unknown',
-        platform: ch?.name || 'Unknown',
-        api_type: 'official',
+        platform: ch?.type || 'openai-compatible',
+        api_type: ch?.type || 'openai-compatible',
         proxy_url: ch?.api_url || '',
       }
 
       if (isEditAccount.value) {
-        const updateData: Record<string, unknown> = { ...baseData }
-        if (accountForm.value.api_key) updateData.api_key = accountForm.value.api_key
+        const updateData = {
+          ...baseData,
+          ...(accountForm.value.api_key ? { api_key: accountForm.value.api_key } : {}),
+        }
         await accountApi.updateAccount(currentAccountId.value, updateData)
         options.message.success('账号已更新')
       } else {

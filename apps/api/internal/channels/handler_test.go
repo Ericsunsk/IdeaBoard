@@ -13,10 +13,13 @@ func TestBuildModelsURL(t *testing.T) {
 	tests := []struct {
 		name    string
 		baseURL string
+		apiType string
 		want    string
 		wantErr bool
 	}{
 		{name: "with v1", baseURL: "https://api.example.com/v1", want: "https://api.example.com/v1/models"},
+		{name: "google root path", baseURL: "https://generativelanguage.googleapis.com", apiType: "google-ai", want: "https://generativelanguage.googleapis.com/v1beta/models"},
+		{name: "google v1beta", baseURL: "https://generativelanguage.googleapis.com/v1beta", apiType: "google-ai", want: "https://generativelanguage.googleapis.com/v1beta/models"},
 		{name: "trailing slash", baseURL: "https://api.example.com/v1/", want: "https://api.example.com/v1/models"},
 		{name: "root path", baseURL: "https://api.example.com", want: "https://api.example.com/models"},
 		{name: "drop query", baseURL: "https://api.example.com/v1?x=1", want: "https://api.example.com/v1/models"},
@@ -25,7 +28,7 @@ func TestBuildModelsURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := buildModelsURL(tt.baseURL)
+			got, err := buildModelsURL(tt.baseURL, tt.apiType)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
@@ -64,6 +67,11 @@ func TestParseModelIDs(t *testing.T) {
 			name: "models mixed",
 			body: `{"models":["model-a",{"id":"model-b"}," ",{"id":"model-a"}]}`,
 			want: []string{"model-a", "model-b"},
+		},
+		{
+			name: "google model names",
+			body: `{"models":[{"name":"models/gemini-2.5-flash-image"},{"name":"models/imagen-4.0-generate-001"}]}`,
+			want: []string{"gemini-2.5-flash-image", "imagen-4.0-generate-001"},
 		},
 		{
 			name: "top level array",

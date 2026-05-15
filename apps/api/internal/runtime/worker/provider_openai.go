@@ -39,10 +39,7 @@ func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.Api
 	}
 	baseURL = validatedBaseURL
 
-	model := "dall-e-3"
-	if strings.TrimSpace(resolvedModel) != "" {
-		model = strings.TrimSpace(resolvedModel)
-	}
+	model := strings.TrimSpace(resolvedModel)
 
 	size := fmt.Sprintf("%dx%d", width, height)
 	useEditEndpoint := shouldUseOpenAIEditEndpoint(params)

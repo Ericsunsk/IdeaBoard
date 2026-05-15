@@ -7,10 +7,11 @@
 
 export interface AdminAccountCreateRequest {
   name: string;
+  channel_id: number;
   platform: string;
   api_type: string;
   api_key: string;
-  model_set?: string;
+  model_set: string;
   proxy_url?: string;
   max_concurrent?: number;
   timeout?: number;

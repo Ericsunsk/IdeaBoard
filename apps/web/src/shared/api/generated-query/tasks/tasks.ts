@@ -33,6 +33,7 @@ import type {
   ApiResponseTask,
   ApiResponseTaskId,
   ApiResponseTaskList,
+  ApiResponseTaskSubmitReadiness,
   ListUserTasksParams,
   SubmitTaskRequest
 } from '../model';
@@ -101,6 +102,63 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getSubmitUserTaskMutationOptions(options), queryClient);
+    }
+    export const checkUserTaskSubmitReadiness = (
+    submitTaskRequest: MaybeRef<SubmitTaskRequest>,
+ options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+) => {
+      submitTaskRequest = unref(submitTaskRequest);
+
+      return orvalMutator<ApiResponseTaskSubmitReadiness>(
+      {url: `/user/drawing/submit/readiness`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: submitTaskRequest, signal
+    },
+      options);
+    }
+
+
+
+export const getCheckUserTaskSubmitReadinessMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError,{data: BodyType<SubmitTaskRequest>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError,{data: BodyType<SubmitTaskRequest>}, TContext> => {
+
+const mutationKey = ['checkUserTaskSubmitReadiness'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, {data: BodyType<SubmitTaskRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  checkUserTaskSubmitReadiness(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckUserTaskSubmitReadinessMutationResult = NonNullable<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>>
+    export type CheckUserTaskSubmitReadinessMutationBody = BodyType<SubmitTaskRequest>
+    export type CheckUserTaskSubmitReadinessMutationError = ErrorType<unknown>
+
+    export const useCheckUserTaskSubmitReadiness = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError,{data: BodyType<SubmitTaskRequest>}, TContext>, request?: SecondParameter<typeof orvalMutator>}
+ , queryClient?: QueryClient): UseMutationReturnType<
+        Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+        TError,
+        {data: BodyType<SubmitTaskRequest>},
+        TContext
+      > => {
+      return useMutation(getCheckUserTaskSubmitReadinessMutationOptions(options), queryClient);
     }
     export const listUserTasks = (
     params?: MaybeRef<ListUserTasksParams>,

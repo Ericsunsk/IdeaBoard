@@ -30,8 +30,8 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 	account := &ApiAccount{
 		Name:          "demo",
 		ChannelID:     1,
-		Platform:      "openai",
-		ApiType:       "chat",
+		Platform:      "openai-compatible",
+		ApiType:       "openai-compatible",
 		ModelSet:      "gpt-image-1",
 		ApiKey:        "test-key",
 		MaxConcurrent: 1,

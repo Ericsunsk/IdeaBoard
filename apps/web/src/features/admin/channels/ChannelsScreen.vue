@@ -53,6 +53,11 @@
           </template>
         </AdminCardHeader>
 
+        <div class="api-type-row">
+          <span class="api-type-label">接口类型</span>
+          <span class="api-type-pill">{{ getApiTypeLabel(channel.type) }}</span>
+        </div>
+
         <div class="models-shelf">
           <div class="shelf-label">当前生效模型</div>
           <div v-if="getChannelActiveModels(channel.id).length > 0" class="shelf-content">
@@ -161,10 +166,18 @@
         <n-form-item label="渠道商名称" path="name">
           <n-input v-model:value="channelForm.name" placeholder="例如：Nano Banana 官方" />
         </n-form-item>
+        <n-form-item label="接口类型" path="type">
+          <n-select
+            v-model:value="channelForm.type"
+            :options="apiTypeOptions"
+            placeholder="选择接口协议"
+          />
+        </n-form-item>
         <n-form-item label="Base URL地址" path="api_url">
           <n-input
             v-model:value="channelForm.api_url"
             placeholder="例如：https://api.example.com/v1"
+            @blur="inferChannelApiTypeFromUrl"
           />
         </n-form-item>
       </n-form>
@@ -254,7 +267,7 @@
 
 <script setup lang="ts">
 import channelApi from '../../../shared/api/channel'
-import type { Channel } from '../../../shared/api/channel'
+import type { Channel, ChannelFormData } from '../../../shared/api/channel'
 import { NButton, NIcon } from 'naive-ui'
 import { AddOutline, RefreshOutline, SearchOutline } from '@vicons/ionicons5'
 import { extractApiErrorMessage, getModelCategoryClass } from '../shared/assetLibraryShared'
@@ -312,16 +325,48 @@ const isEditChannel = ref(false)
 const channelFormRef = ref()
 const channelSaveLoading = ref(false)
 const currentChannelId = ref(0)
-const channelForm = ref({ type: 'banana', name: '', api_url: '' })
+const createEmptyChannelForm = (): ChannelFormData => ({
+  type: 'openai-compatible',
+  name: '',
+  api_url: '',
+})
+const channelForm = ref<ChannelFormData>(createEmptyChannelForm())
+const apiTypeOptions = [
+  { label: 'OpenAI Compatible', value: 'openai-compatible' },
+  { label: 'Google AI 官方', value: 'google-ai' },
+  { label: 'Stability AI 官方', value: 'stability' },
+]
+const apiTypeLabelByValue = new Map(apiTypeOptions.map((item) => [item.value, item.label]))
 
 const channelRules = {
   name: [{ required: true, message: '请输入渠道商名称', trigger: 'blur' }],
+  type: [{ required: true, message: '请选择接口类型', trigger: 'change' }],
   api_url: [{ required: true, message: '请输入 Base URL地址', trigger: 'blur' }],
+}
+
+function getApiTypeLabel(value: string) {
+  return apiTypeLabelByValue.get(value) || value || '未配置'
+}
+
+function inferChannelApiTypeFromUrl() {
+  const apiUrl = channelForm.value.api_url.trim().toLowerCase()
+  if (!apiUrl) return
+  if (apiUrl.includes('generativelanguage.googleapis.com')) {
+    channelForm.value.type = 'google-ai'
+    return
+  }
+  if (apiUrl.includes('api.stability.ai')) {
+    channelForm.value.type = 'stability'
+    return
+  }
+  if (apiUrl.includes('api.openai.com')) {
+    channelForm.value.type = 'openai-compatible'
+  }
 }
 
 function openAddChannelModal() {
   isEditChannel.value = false
-  channelForm.value = { type: 'banana', name: '', api_url: '' }
+  channelForm.value = createEmptyChannelForm()
   showChannelModal.value = true
 }
 
@@ -461,6 +506,33 @@ onMounted(() => {
   color: var(--admin-text-1);
   border: 1px solid var(--admin-border);
   flex-shrink: 0;
+}
+
+.api-type-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+}
+
+.api-type-label {
+  color: var(--admin-text-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.api-type-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 999px;
+  padding: 0 10px;
+  color: #c4b5fd;
+  background: rgba(129, 140, 248, 0.08);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .models-shelf {

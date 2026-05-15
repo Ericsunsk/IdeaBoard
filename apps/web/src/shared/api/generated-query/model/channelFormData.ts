@@ -4,9 +4,10 @@
  * Feng-AI API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProviderAPIType } from './providerAPIType';
 
 export interface ChannelFormData {
-  type: string;
+  type: ProviderAPIType;
   name: string;
   api_url: string;
 }

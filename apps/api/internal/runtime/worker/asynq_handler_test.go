@@ -111,8 +111,8 @@ func createAsynqTestAccount(t *testing.T, repo *accounts.AccountRepository, name
 	acc := &accounts.ApiAccount{
 		Name:          name,
 		ChannelID:     1,
-		Platform:      "openai",
-		ApiType:       "chat",
+		Platform:      "openai-compatible",
+		ApiType:       "openai-compatible",
 		ModelSet:      "gpt-image-1",
 		ApiKey:        "k",
 		MaxConcurrent: 3,

@@ -1,0 +1,176 @@
+package worker
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"api/internal/accounts"
+	"api/internal/runtime/queuetypes"
+	"api/internal/workflow"
+)
+
+func TestCallGoogleGeminiGenerateContent(t *testing.T) {
+	var gotPath string
+	var gotAPIKey string
+	var gotAuth string
+	var gotBody map[string]interface{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAPIKey = r.Header.Get("x-goog-api-key")
+		gotAuth = r.Header.Get("Authorization")
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &gotBody); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"aGVsbG8="}}]}}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{ProxyURL: server.URL, ApiKey: "google-key", ModelSet: "gemini-2.5-flash-image"}
+	params := map[string]interface{}{
+		"image_urls": []interface{}{"data:image/png;base64,aGVsbG8="},
+	}
+
+	got, err := c.callGoogleAI(context.Background(), account, "draw a cat", 2*time.Second, params, "gemini-2.5-flash-image")
+	if err != nil {
+		t.Fatalf("callGoogleAI error: %v", err)
+	}
+	if gotPath != "/v1beta/models/gemini-2.5-flash-image:generateContent" {
+		t.Fatalf("unexpected path: %s", gotPath)
+	}
+	if gotAPIKey != "google-key" {
+		t.Fatalf("unexpected x-goog-api-key: %q", gotAPIKey)
+	}
+	if gotAuth != "" {
+		t.Fatalf("did not expect Authorization header, got %q", gotAuth)
+	}
+	if got.ImageURL != "data:image/png;base64,aGVsbG8=" {
+		t.Fatalf("unexpected image url: %s", got.ImageURL)
+	}
+
+	contents := gotBody["contents"].([]interface{})
+	parts := contents[0].(map[string]interface{})["parts"].([]interface{})
+	if len(parts) != 2 {
+		t.Fatalf("expected prompt+inlineData parts, got %d", len(parts))
+	}
+	inline := parts[1].(map[string]interface{})["inlineData"].(map[string]interface{})
+	if inline["mimeType"] != "image/png" || inline["data"] != "aGVsbG8=" {
+		t.Fatalf("unexpected inlineData: %#v", inline)
+	}
+}
+
+func TestCallGoogleImagenPredict(t *testing.T) {
+	var gotPath string
+	var gotAPIKey string
+	var gotAuth string
+	var gotBody map[string]interface{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAPIKey = r.Header.Get("x-goog-api-key")
+		gotAuth = r.Header.Get("Authorization")
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &gotBody); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"predictions":[{"bytesBase64Encoded":"YQ=="},{"image":{"bytesBase64Encoded":"Yg=="}}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{ProxyURL: server.URL, ApiKey: "google-key"}
+	params := map[string]interface{}{
+		"model":        "imagen-4.0-generate-001",
+		"output_count": 9,
+		"ratio":        "16:9",
+	}
+
+	got, err := c.callGoogleAI(context.Background(), account, "draw skyline", 2*time.Second, params, "")
+	if err != nil {
+		t.Fatalf("callGoogleAI error: %v", err)
+	}
+	if gotPath != "/v1beta/models/imagen-4.0-generate-001:predict" {
+		t.Fatalf("unexpected path: %s", gotPath)
+	}
+	if gotAPIKey != "google-key" {
+		t.Fatalf("unexpected x-goog-api-key: %q", gotAPIKey)
+	}
+	if gotAuth != "" {
+		t.Fatalf("did not expect Authorization header, got %q", gotAuth)
+	}
+	if len(got.ImageURLs) != 2 || !strings.HasPrefix(got.ImageURLs[0], "data:image/png;base64,") || !strings.HasPrefix(got.ImageURLs[1], "data:image/png;base64,") {
+		t.Fatalf("unexpected image urls: %#v", got.ImageURLs)
+	}
+
+	parameters := gotBody["parameters"].(map[string]interface{})
+	if parameters["sampleCount"] != float64(4) {
+		t.Fatalf("expected sampleCount capped at 4, got %#v", parameters["sampleCount"])
+	}
+	if parameters["aspectRatio"] != "16:9" {
+		t.Fatalf("unexpected aspectRatio: %#v", parameters["aspectRatio"])
+	}
+}
+
+func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
+	var gotPath string
+	var gotAPIKey string
+	var gotAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAPIKey = r.Header.Get("x-goog-api-key")
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"aGVsbG8="}}]}}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{
+		ID:       1,
+		Name:     "google-native",
+		Platform: "custom display name",
+		ApiType:  workflow.ProviderGoogleAI,
+		ProxyURL: server.URL,
+		ApiKey:   "google-key",
+		ModelSet: "gemini-2.5-flash-image",
+	}
+	task := &queuetypes.TaskPayload{
+		TaskID: "task-google-native",
+		Prompt: "draw a cat",
+		Params: `{"feature":"pattern-gen"}`,
+	}
+
+	result, err := c.callDrawingAPI(context.Background(), account, task)
+	if err != nil {
+		t.Fatalf("callDrawingAPI error: %v", err)
+	}
+	if gotPath != "/v1beta/models/gemini-2.5-flash-image:generateContent" {
+		t.Fatalf("unexpected path: %s", gotPath)
+	}
+	if gotAPIKey != "google-key" {
+		t.Fatalf("unexpected x-goog-api-key: %q", gotAPIKey)
+	}
+	if gotAuth != "" {
+		t.Fatalf("did not expect Authorization header, got %q", gotAuth)
+	}
+	if !strings.Contains(result, `"image_urls":["data:image/png;base64,aGVsbG8="]`) {
+		t.Fatalf("expected google image_urls result, got %s", result)
+	}
+}

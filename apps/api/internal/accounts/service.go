@@ -104,12 +104,20 @@ func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, 
 	if req.Weight <= 0 {
 		req.Weight = 1
 	}
+	if strings.TrimSpace(req.ModelSet) == "" {
+		return nil, fmt.Errorf("model_set 不能为空，请先检测并选择模型")
+	}
+	apiType := workflow.NormalizeProviderAPIType(req.ApiType, proxyURL)
+	platform := strings.TrimSpace(req.Platform)
+	if platform == "" {
+		platform = apiType
+	}
 
 	account := &ApiAccount{
 		Name:          req.Name,
 		ChannelID:     req.ChannelID,
-		Platform:      req.Platform,
-		ApiType:       req.ApiType,
+		Platform:      platform,
+		ApiType:       apiType,
 		ModelSet:      req.ModelSet,
 		ApiKey:        req.ApiKey,
 		ProxyURL:      proxyURL,
@@ -212,8 +220,15 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 	if req.ChannelID > 0 {
 		account.ChannelID = req.ChannelID
 	}
-	account.Platform = req.Platform
-	account.ApiType = req.ApiType
+	if strings.TrimSpace(req.ModelSet) == "" {
+		return fmt.Errorf("model_set 不能为空，请先检测并选择模型")
+	}
+	account.ApiType = workflow.NormalizeProviderAPIType(req.ApiType, proxyURL)
+	if strings.TrimSpace(req.Platform) == "" {
+		account.Platform = account.ApiType
+	} else {
+		account.Platform = req.Platform
+	}
 	account.ModelSet = req.ModelSet
 	account.ProxyURL = proxyURL
 	account.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)

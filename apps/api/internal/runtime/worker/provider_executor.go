@@ -89,7 +89,8 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	c.normalizeUpstreamMediaParams(params)
 	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
 
-	if workflow.IsStabilityTextToImagePlatform(account.Platform) && workflow.IsReferenceImageFeature(featureSlug) {
+	apiType := workflow.NormalizeProviderAPIType(account.ApiType, account.ProxyURL)
+	if workflow.IsStabilityAPIType(apiType) && workflow.IsReferenceImageFeature(featureSlug) {
 		return "", fmt.Errorf("当前渠道不支持该图像参考能力")
 	}
 
@@ -107,13 +108,17 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	var callResult providerCallResult
 	var err error
 
-	platform := strings.ToLower(strings.TrimSpace(account.Platform))
 	resolvedModel := resolveRequestedModel(account.ModelSet, params)
+	if strings.TrimSpace(resolvedModel) == "" {
+		return "", fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name)
+	}
 	switch {
-	case workflow.IsStabilityTextToImagePlatform(platform):
+	case workflow.IsGoogleNativeAPIType(apiType):
+		callResult, err = c.callGoogleAI(ctx, account, task.Prompt, timeout, params, resolvedModel)
+	case workflow.IsStabilityAPIType(apiType):
 		callResult, err = c.callStabilityAI(ctx, account, task.Prompt, width, height, timeout, resolvedModel)
 	default:
-		// nano banana / openai / gemini 等 OpenAI 兼容平台（官方原生格式）
+		// OpenAI-compatible providers use the DALL-E style image endpoints.
 		callResult, err = c.callOpenAI(ctx, account, task.Prompt, width, height, timeout, params, resolvedModel)
 	}
 

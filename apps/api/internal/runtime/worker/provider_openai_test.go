@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/workflow"
 )
 
 const tinyWebPBase64 = "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA"
@@ -371,8 +372,8 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 func TestCallDrawingAPIRejectsStabilityForReferenceImageFeatures(t *testing.T) {
 	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{
-		Platform: "Stability AI",
-		ApiKey:   "test-key",
+		ApiType: workflow.ProviderStability,
+		ApiKey:  "test-key",
 	}
 
 	testCases := []struct {
@@ -757,8 +758,8 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ID:       1,
 		Name:     "test",
-		Platform: "openai",
-		ApiType:  "official",
+		Platform: "openai-compatible",
+		ApiType:  workflow.ProviderOpenAICompatible,
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
 		ModelSet: "gpt-image-1",

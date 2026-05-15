@@ -509,6 +509,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseChannel'
+  /admin/channels/detect-models:
+    post:
+      tags: [AdminChannels]
+      operationId: detectAdminChannelModels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectModelsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDetectModels'
   /admin/channels/{id}:
     put:
       tags: [AdminChannels]
@@ -849,9 +866,10 @@ components:
 
     AdminAccountCreateRequest:
       type: object
-      required: [name, platform, api_type, api_key]
+      required: [name, channel_id, platform, api_type, api_key, model_set]
       properties:
         name: { type: string }
+        channel_id: { type: integer }
         platform: { type: string }
         api_type: { type: string }
         api_key: { type: string }
@@ -864,8 +882,10 @@ components:
 
     AdminAccountUpdateRequest:
       type: object
+      required: [model_set]
       properties:
         name: { type: string }
+        channel_id: { type: integer }
         platform: { type: string }
         api_type: { type: string }
         api_key: { type: string }
@@ -1000,7 +1020,8 @@ components:
       required: [id, type, name, api_url, status, created_at, updated_at]
       properties:
         id: { type: integer }
-        type: { type: string }
+        type:
+          $ref: '#/components/schemas/ProviderAPIType'
         name: { type: string }
         api_url: { type: string }
         status: { type: integer }
@@ -1011,9 +1032,33 @@ components:
       type: object
       required: [type, name, api_url]
       properties:
-        type: { type: string }
+        type:
+          $ref: '#/components/schemas/ProviderAPIType'
         name: { type: string }
         api_url: { type: string }
+
+    ProviderAPIType:
+      type: string
+      enum: [openai-compatible, google-ai, stability]
+
+    DetectModelsRequest:
+      type: object
+      required: [base_url, api_key]
+      properties:
+        base_url: { type: string }
+        api_key: { type: string }
+        api_type:
+          $ref: '#/components/schemas/ProviderAPIType'
+
+    DetectModelsResponse:
+      type: object
+      required: [models, api_type]
+      properties:
+        models:
+          type: array
+          items: { type: string }
+        api_type:
+          $ref: '#/components/schemas/ProviderAPIType'
 
     StorageProviderField:
       type: object
@@ -1294,6 +1339,14 @@ components:
               properties:
                 channel:
                   $ref: '#/components/schemas/Channel'
+
+    ApiResponseDetectModels:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/DetectModelsResponse'
 
     ApiResponseStorageProviderList:
       allOf:

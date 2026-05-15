@@ -13,6 +13,7 @@ import (
 	"api/internal/platform/outbound"
 	"api/internal/platform/response"
 	"api/internal/platform/safehttp"
+	"api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
 )
@@ -59,7 +60,7 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 	}
 
 	channel := &Channel{
-		Type:   req.Type,
+		Type:   workflow.NormalizeProviderAPIType(req.Type, apiURL),
 		Name:   req.Name,
 		ApiURL: apiURL,
 		Status: 1,
@@ -98,7 +99,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 		return
 	}
 
-	channel.Type = req.Type
+	channel.Type = workflow.NormalizeProviderAPIType(req.Type, apiURL)
 	channel.Name = req.Name
 	channel.ApiURL = apiURL
 
@@ -139,14 +140,19 @@ func (h *ChannelHandler) DetectModels(c *gin.Context) {
 		return
 	}
 
-	modelsURL, err := buildModelsURL(baseURL)
+	apiType := workflow.NormalizeProviderAPIType(req.APIType, baseURL)
+	modelsURL, err := buildModelsURL(baseURL, apiType)
 	if err != nil {
 		response.Error(c, 400, "Base URL 无效")
 		return
 	}
 
 	resp, err := safehttp.DoWithAllowHosts(c.Request.Context(), http.MethodGet, modelsURL, func(r *http.Request) {
-		r.Header.Set("Authorization", "Bearer "+apiKey)
+		if workflow.IsGoogleNativeAPIType(apiType) {
+			r.Header.Set("x-goog-api-key", apiKey)
+		} else {
+			r.Header.Set("Authorization", "Bearer "+apiKey)
+		}
 		r.Header.Set("Accept", "application/json")
 	}, detectModelsTimeout, h.detectModelsAllowHosts()...)
 	if err != nil {
@@ -177,7 +183,7 @@ func (h *ChannelHandler) DetectModels(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"models": models})
+	response.Success(c, gin.H{"models": models, "api_type": apiType})
 }
 
 func (h *ChannelHandler) detectModelsAllowHosts() []string {
@@ -203,7 +209,7 @@ func (h *ChannelHandler) isDevLikeEnvironment() bool {
 	return false
 }
 
-func buildModelsURL(rawBaseURL string) (string, error) {
+func buildModelsURL(rawBaseURL string, apiType ...string) (string, error) {
 	parsed, err := url.Parse(strings.TrimSpace(rawBaseURL))
 	if err != nil {
 		return "", err
@@ -212,7 +218,17 @@ func buildModelsURL(rawBaseURL string) (string, error) {
 		return "", fmt.Errorf("invalid base url")
 	}
 	basePath := strings.TrimRight(parsed.Path, "/")
-	parsed.Path = basePath + "/models"
+	if len(apiType) > 0 && workflow.IsGoogleNativeAPIType(apiType[0]) {
+		if basePath == "" {
+			parsed.Path = "/v1beta/models"
+		} else if strings.HasSuffix(basePath, "/v1beta") {
+			parsed.Path = basePath + "/models"
+		} else {
+			parsed.Path = basePath + "/v1beta/models"
+		}
+	} else {
+		parsed.Path = basePath + "/models"
+	}
 	parsed.RawPath = ""
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
@@ -279,13 +295,23 @@ func normalizeToSlice(v any) []any {
 func extractModelID(v any) string {
 	switch item := v.(type) {
 	case string:
-		return strings.TrimSpace(item)
+		return normalizeDetectedModelID(item)
 	case map[string]any:
 		if rawID, ok := item["id"]; ok {
 			if id, ok := rawID.(string); ok {
-				return strings.TrimSpace(id)
+				return normalizeDetectedModelID(id)
+			}
+		}
+		if rawName, ok := item["name"]; ok {
+			if name, ok := rawName.(string); ok {
+				return normalizeDetectedModelID(name)
 			}
 		}
 	}
 	return ""
+}
+
+func normalizeDetectedModelID(value string) string {
+	trimmed := strings.TrimSpace(value)
+	return strings.TrimPrefix(trimmed, "models/")
 }

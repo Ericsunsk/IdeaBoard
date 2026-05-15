@@ -64,10 +64,8 @@ func TestFilterAccountsByFeatureIgnoresMalformedFeatureConfig(t *testing.T) {
 
 func TestFilterAccountsByFeatureFiltersStabilityPlatformsForIncompatibleFeatures(t *testing.T) {
 	accounts := []*ApiAccount{
-		{ID: 1, Platform: "stability"},
-		{ID: 2, Platform: "stable diffusion"},
-		{ID: 3, Platform: "Stability AI"},
-		{ID: 4, Platform: "openai"},
+		{ID: 1, ApiType: workflow.ProviderStability},
+		{ID: 2, ApiType: workflow.ProviderOpenAICompatible},
 	}
 
 	testCases := []struct {
@@ -86,8 +84,8 @@ func TestFilterAccountsByFeatureFiltersStabilityPlatformsForIncompatibleFeatures
 			if len(got) != 1 {
 				t.Fatalf("expected only non-stability accounts, got=%d", len(got))
 			}
-			if got[0].ID != 4 {
-				t.Fatalf("unexpected account id: got=%d, want=4", got[0].ID)
+			if got[0].ID != 2 {
+				t.Fatalf("unexpected account id: got=%d, want=2", got[0].ID)
 			}
 		})
 	}
@@ -95,15 +93,25 @@ func TestFilterAccountsByFeatureFiltersStabilityPlatformsForIncompatibleFeatures
 
 func TestFilterAccountsByFeatureKeepsStabilityPlatformsForRemoveBg(t *testing.T) {
 	accounts := []*ApiAccount{
-		{ID: 1, Platform: "stability"},
-		{ID: 2, Platform: "stable diffusion"},
-		{ID: 3, Platform: "Stability AI"},
-		{ID: 4, Platform: "openai"},
+		{ID: 1, ApiType: workflow.ProviderStability},
+		{ID: 2, ApiType: workflow.ProviderOpenAICompatible},
 	}
 
 	got := filterAccountsByFeature(accounts, workflow.FeatureSlugRemoveBg)
-	if len(got) != 4 {
+	if len(got) != 2 {
 		t.Fatalf("expected remove-bg to stay platform-compatible, got=%d", len(got))
+	}
+}
+
+func TestFilterAccountsByFeatureKeepsGooglePlatformsForReferenceFeatures(t *testing.T) {
+	accounts := []*ApiAccount{
+		{ID: 1, ApiType: workflow.ProviderGoogleAI},
+		{ID: 2, ApiType: workflow.ProviderOpenAICompatible},
+	}
+
+	got := filterAccountsByFeature(accounts, workflow.FeatureSlugStyleFusion)
+	if len(got) != 2 {
+		t.Fatalf("expected google native platforms to remain compatible, got=%d", len(got))
 	}
 }
 

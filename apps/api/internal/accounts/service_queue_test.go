@@ -91,8 +91,8 @@ func createTestAccount(t *testing.T, repo *AccountRepository, name string, statu
 	acc := &ApiAccount{
 		Name:          name,
 		ChannelID:     1,
-		Platform:      "openai",
-		ApiType:       "chat",
+		Platform:      "openai-compatible",
+		ApiType:       "openai-compatible",
 		ModelSet:      "gpt-image-1",
 		ApiKey:        "k",
 		MaxConcurrent: 3,

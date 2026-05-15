@@ -5,7 +5,7 @@ import "time"
 // Channel 渠道商
 type Channel struct {
 	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	Type      string    `gorm:"type:varchar(50);not null;default:'banana'" json:"type"`
+	Type      string    `gorm:"type:varchar(50);not null;default:'openai-compatible'" json:"type"`
 	Name      string    `gorm:"type:varchar(100);not null" json:"name"`
 	ApiURL    string    `gorm:"type:varchar(500);not null" json:"api_url"`
 	Status    int8      `gorm:"type:tinyint;default:1" json:"status"`
@@ -28,4 +28,5 @@ type UpdateChannelRequest struct {
 type DetectModelsRequest struct {
 	BaseURL string `json:"base_url" binding:"required"`
 	APIKey  string `json:"api_key" binding:"required"`
+	APIType string `json:"api_type"`
 }
