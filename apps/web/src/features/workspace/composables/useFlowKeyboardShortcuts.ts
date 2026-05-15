@@ -2,9 +2,9 @@ import { onMounted, onUnmounted } from 'vue'
 
 type UseFlowKeyboardShortcutsOptions = {
   onSave: () => void | Promise<void>
-  onUndo: () => void
-  onRedo: () => void
-  onDeleteSelected: () => void
+  onUndo?: () => void
+  onRedo?: () => void
+  onDeleteSelected?: () => void
   isLeaveConfirmVisible?: () => boolean
   onCancelLeaveConfirm?: () => void
   onEscape?: () => boolean | void
@@ -78,17 +78,18 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
       return
     }
     if (hasCommand && key === 'z') {
-      event.preventDefault()
-      if (event.shiftKey) {
-        options.onRedo()
-        return
+      const handler = event.shiftKey ? options.onRedo : options.onUndo
+      if (handler) {
+        event.preventDefault()
+        handler()
       }
-      options.onUndo()
       return
     }
     if (!event.metaKey && event.ctrlKey && key === 'y') {
-      event.preventDefault()
-      options.onRedo()
+      if (options.onRedo) {
+        event.preventDefault()
+        options.onRedo()
+      }
       return
     }
     if (!event.metaKey && !event.ctrlKey && !event.altKey) {
@@ -122,6 +123,7 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
     if (event.key === 'Alt') {
       options.onDuplicateModifierChange?.(true)
     }
+    if (!options.onDeleteSelected) return
     if (key !== 'delete' && key !== 'backspace') return
     if (event.metaKey || event.ctrlKey || event.altKey) return
     event.preventDefault()

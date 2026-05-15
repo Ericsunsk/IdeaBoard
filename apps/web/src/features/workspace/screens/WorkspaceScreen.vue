@@ -102,6 +102,7 @@
         :select-nodes-on-drag="activeTool === 'select'"
         :selection-key-code="activeTool === 'select' ? 'Shift' : false"
         :multi-selection-key-code="activeTool === 'select' ? 'Shift' : null"
+        :delete-key-code="null"
         :default-edge-options="{ animated: false, updatable: true }"
         :min-zoom="0.1"
         :only-render-visible-elements="FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING"
@@ -280,8 +281,6 @@ const {
   setViewport,
   setNodes,
   setEdges,
-  removeSelectedElements,
-  addSelectedNodes,
 } = useVueFlow()
 
 const zoomLevel = ref(100)
@@ -369,14 +368,6 @@ function readQueuedNodeInternalsRefreshIds(): string[] {
   const ids = queuedNodeInternalsIds ? Array.from(queuedNodeInternalsIds) : []
   queuedNodeInternalsIds = null
   return ids
-}
-
-function clearSelectedFlowElements(elements?: Parameters<typeof removeSelectedElements>[0]) {
-  removeSelectedElements(elements)
-}
-
-function selectFlowNodes(nextNodes: Node[]) {
-  addSelectedNodes(nextNodes as Parameters<typeof addSelectedNodes>[0])
 }
 
 function onPaneContextMenu(event: MouseEvent) {
@@ -865,8 +856,6 @@ const {
   onFlowNodeMouseDown,
   deleteSelectedFlowElements,
 } = useFlowSelectionController({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
   activeTool: activeTool as Ref<string>,
   activeImageActionNodeId,
   activeImagePromptNodeId,
@@ -876,8 +865,6 @@ const {
   _deleteSelectedFlowElements: () => {
     flowNodeMutations.deleteSelectedFlowElements()
   },
-  clearSelectedElements: clearSelectedFlowElements,
-  selectFlowNodes,
 })
 
 const {

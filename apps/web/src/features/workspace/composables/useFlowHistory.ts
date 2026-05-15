@@ -28,19 +28,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object'
 }
 
-function cloneFlowHistorySnapshot(snapshot: FlowHistorySnapshot): FlowHistorySnapshot {
+function cloneSnapshot(snapshot: FlowHistorySnapshot): FlowHistorySnapshot {
   return {
     nodes: cloneJson(snapshot.nodes) as unknown[],
     edges: cloneJson(snapshot.edges) as unknown[],
   }
 }
 
-function isSameFlowHistorySnapshot(a: FlowHistorySnapshot, b: FlowHistorySnapshot): boolean {
+function isSameSnapshot(a: FlowHistorySnapshot, b: FlowHistorySnapshot): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
 
 export function useFlowHistory(options: UseFlowHistoryOptions) {
-  const maxSteps = options.maxSteps ?? 10
+  const maxSteps = Math.max(1, options.maxSteps ?? 10)
   const flowHistoryPast = ref<FlowHistorySnapshot[]>([])
   const flowHistoryFuture = ref<FlowHistorySnapshot[]>([])
   const dragBeforeSnapshot = ref<FlowHistorySnapshot | null>(null)
@@ -107,26 +107,43 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
     }
   }
 
-  function cloneFlowNodesForHistory(nodes: unknown[]): unknown[] {
-    const serialized = JSON.stringify(nodes, (key, value) => {
+  function serializeForHistory(value: unknown): string {
+    return JSON.stringify(value, (key, currentValue) => {
       if (
-        typeof value === 'string' &&
+        typeof currentValue === 'string' &&
         HISTORY_BLOB_DATA_KEYS.has(key) &&
-        value.startsWith('data:') &&
-        value.length >= HISTORY_BLOB_MIN_LENGTH
+        currentValue.startsWith('data:') &&
+        currentValue.length >= HISTORY_BLOB_MIN_LENGTH
       ) {
-        return encodeHistoryBlob(value)
+        return encodeHistoryBlob(currentValue)
       }
-      return value
+      return currentValue
     })
-    return JSON.parse(serialized) as unknown[]
+  }
+
+  function deserializeFromHistory<T>(serialized: string): T {
+    return JSON.parse(serialized) as T
   }
 
   function capture(): FlowHistorySnapshot {
+    const serialized = serializeForHistory({
+      nodes: options.nodes.value as unknown[],
+      edges: options.edges.value as unknown[],
+    })
+    const snapshot = deserializeFromHistory<FlowHistorySnapshot>(serialized)
     return {
-      nodes: cloneFlowNodesForHistory(options.nodes.value as unknown[]),
-      edges: cloneJson(options.edges.value as unknown[]),
+      nodes: snapshot.nodes,
+      edges: snapshot.edges,
     }
+  }
+
+  function pushBoundedStack(
+    current: FlowHistorySnapshot[],
+    snapshot: FlowHistorySnapshot,
+  ): FlowHistorySnapshot[] {
+    const next = current.slice()
+    next.push(snapshot)
+    return next.slice(-maxSteps)
   }
 
   function clearBaseline() {
@@ -136,21 +153,19 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
     pruneBlobStore()
   }
 
-  function push(before: FlowHistorySnapshot) {
-    const current = capture()
-    if (isSameFlowHistorySnapshot(before, current)) {
+  function push(before: FlowHistorySnapshot, after = capture()): boolean {
+    if (isSameSnapshot(before, after)) {
       pruneBlobStore()
-      return
+      return false
     }
-    const nextPast = flowHistoryPast.value.slice()
-    nextPast.push(cloneFlowHistorySnapshot(before))
-    flowHistoryPast.value = nextPast.slice(-maxSteps)
+    flowHistoryPast.value = pushBoundedStack(flowHistoryPast.value, cloneSnapshot(before))
     flowHistoryFuture.value = []
     pruneBlobStore()
+    return true
   }
 
   function restore(snapshot: FlowHistorySnapshot) {
-    const restored = cloneFlowHistorySnapshot(snapshot)
+    const restored = cloneSnapshot(snapshot)
     decodeHistoryBlobsInPlace(restored.nodes)
     options.commitNodes(restored.nodes)
     options.commitEdges(restored.edges)
@@ -162,9 +177,7 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
     const before = flowHistoryPast.value[flowHistoryPast.value.length - 1]
     const current = capture()
     flowHistoryPast.value = flowHistoryPast.value.slice(0, -1)
-    const nextFuture = flowHistoryFuture.value.slice()
-    nextFuture.push(current)
-    flowHistoryFuture.value = nextFuture.slice(-maxSteps)
+    flowHistoryFuture.value = pushBoundedStack(flowHistoryFuture.value, current)
     restore(before)
     pruneBlobStore()
   }
@@ -174,9 +187,7 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
     const next = flowHistoryFuture.value[flowHistoryFuture.value.length - 1]
     const current = capture()
     flowHistoryFuture.value = flowHistoryFuture.value.slice(0, -1)
-    const nextPast = flowHistoryPast.value.slice()
-    nextPast.push(current)
-    flowHistoryPast.value = nextPast.slice(-maxSteps)
+    flowHistoryPast.value = pushBoundedStack(flowHistoryPast.value, current)
     restore(next)
     pruneBlobStore()
   }
@@ -188,9 +199,9 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
   function onNodeDragStop(onChanged?: () => void) {
     if (!dragBeforeSnapshot.value) return
     const before = dragBeforeSnapshot.value
+    const after = capture()
     dragBeforeSnapshot.value = null
-    push(before)
-    if (isSameFlowHistorySnapshot(before, capture())) return
+    if (!push(before, after)) return
     onChanged?.()
   }
 
@@ -202,6 +213,6 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
     clearBaseline,
     onNodeDragStart,
     onNodeDragStop,
-    isSameSnapshot: isSameFlowHistorySnapshot,
+    isSameSnapshot,
   }
 }

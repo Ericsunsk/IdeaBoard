@@ -1,9 +1,7 @@
 import { type Ref } from 'vue'
-import type { Edge, Elements, Node } from '@vue-flow/core'
+import { useVueFlow, type Elements } from '@vue-flow/core'
 
 type UseFlowSelectionControllerOptions = {
-  nodes: Ref<Node[]>
-  edges: Ref<Edge[]>
   activeTool: Ref<string>
   activeImageActionNodeId: Ref<string | null>
   activeImagePromptNodeId?: Ref<string | null>
@@ -11,39 +9,32 @@ type UseFlowSelectionControllerOptions = {
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
   _deleteSelectedFlowElements: () => void
-  clearSelectedElements: (elements?: Elements) => void
-  selectFlowNodes: (nodes: Node[]) => void
 }
 
 export function useFlowSelectionController(options: UseFlowSelectionControllerOptions) {
-  function getSelectedElements(): Elements {
-    return [
-      ...(options.nodes.value as Array<Node & { selected?: boolean }>).filter(
-        (node) => !!node.selected,
-      ),
-      ...(options.edges.value as Array<Edge & { selected?: boolean }>).filter(
-        (edge) => !!edge.selected,
-      ),
-    ]
+  const { getSelectedElements, removeSelectedElements, addSelectedNodes, findNode } = useVueFlow()
+
+  function readSelectedElements(): Elements {
+    return [...getSelectedElements.value]
   }
 
   function clearFlowSelection(elements?: Elements): boolean {
-    const targetElements = elements ?? getSelectedElements()
+    const targetElements = elements ?? readSelectedElements()
     if (targetElements.length === 0) return false
-    options.clearSelectedElements(targetElements)
+    removeSelectedElements(targetElements)
     return true
   }
 
   function selectFlowNodeForContextMenu(nodeId: string): boolean {
-    const targetNode = options.nodes.value.find((node) => node.id === nodeId)
+    const targetNode = findNode(nodeId)
     if (!targetNode) return false
-    const selectedElements = getSelectedElements()
+    const selectedElements = readSelectedElements()
     const hasChanged = selectedElements.length !== 1 || selectedElements[0]?.id !== nodeId
     if (!hasChanged) return false
     if (selectedElements.length > 0) {
-      options.clearSelectedElements(selectedElements)
+      removeSelectedElements(selectedElements)
     }
-    options.selectFlowNodes([targetNode])
+    addSelectedNodes([targetNode])
     return true
   }
 
