@@ -153,6 +153,7 @@
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
             @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
             @image-open-file="() => onFlowImageOpenFile(nodeProps.id)"
+            @image-open-preview="() => onFlowImageOpenPreview(nodeProps.id)"
             @image-append-to-canvas="() => onFlowImageAppendToCanvas(nodeProps.id)"
             @image-reset="() => onFlowImageReset(nodeProps.id)"
             @mask-open-file="() => onFlowMaskOpenFile(nodeProps.id)"
@@ -267,6 +268,7 @@ import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActi
 import { useFlowSelectionController } from '../composables/useFlowSelectionController'
 import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
+import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
 
 const message = useMessage()
 const route = useRoute()
@@ -716,6 +718,7 @@ const {
     clearMaskCanvasRef(nodeId)
   },
 })
+const { openNodeImagePreview } = useFlowImagePreviewLightbox()
 
 function onCanvasDragOver(event: DragEvent) {
   activeImageActionNodeId.value = null
@@ -726,6 +729,12 @@ function onCanvasDragOver(event: DragEvent) {
 
 async function onCanvasDrop(event: DragEvent) {
   await canvasDrop.onCanvasDrop(event)
+}
+
+function onFlowImageOpenPreview(nodeId: string) {
+  const snapshot = getImageNodeSnapshot(nodeId)
+  if (!snapshot) return
+  void openNodeImagePreview(snapshot, 'latest-output')
 }
 
 function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {

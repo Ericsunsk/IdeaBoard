@@ -52,6 +52,7 @@
           @delete="onDeleteRequest"
           @stage-drop="onImageStageDrop"
           @open-file="onImageOpenFile"
+          @open-preview="onImageOpenPreview"
           @append-to-canvas="onImageAppendToCanvas"
           @reset="onImageReset"
           @contextmenu="onImageContextMenu"
@@ -306,6 +307,7 @@ const emit = defineEmits<{
   (e: 'generate-viewpoint'): void
   (e: 'image-stage-drop', event: DragEvent): void
   (e: 'image-open-file'): void
+  (e: 'image-open-preview'): void
   (e: 'image-append-to-canvas'): void
   (e: 'image-reset'): void
   (e: 'mask-open-file'): void
@@ -645,6 +647,10 @@ function onImageStageDrop(event: DragEvent) {
 
 function onImageOpenFile() {
   emit('image-open-file')
+}
+
+function onImageOpenPreview() {
+  emit('image-open-preview')
 }
 
 function onImageAppendToCanvas() {

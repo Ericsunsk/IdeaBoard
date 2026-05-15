@@ -46,8 +46,11 @@
             draggable="false"
             @dblclick="emit('append-to-canvas')"
           />
-          <div v-if="!props.inputLocked" class="image-node-stage-actions">
-            <NodeActionButton variant="stage-ghost" @click="emit('reset')">清空</NodeActionButton>
+          <div class="image-node-stage-actions">
+            <NodeActionButton variant="stage-ghost" @click="emit('open-preview')">预览</NodeActionButton>
+            <NodeActionButton v-if="!props.inputLocked" variant="stage-ghost" @click="emit('reset')">
+              清空
+            </NodeActionButton>
           </div>
         </template>
         <div
@@ -225,6 +228,7 @@ const emit = defineEmits<{
   (e: 'delete'): void
   (e: 'stage-drop', event: DragEvent): void
   (e: 'open-file'): void
+  (e: 'open-preview'): void
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
