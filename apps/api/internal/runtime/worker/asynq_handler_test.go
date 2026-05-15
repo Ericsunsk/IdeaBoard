@@ -100,7 +100,7 @@ func newAsynqWorkerTestRepos(t *testing.T) (*accounts.AccountRepository, *accoun
 	if err != nil {
 		t.Fatalf("open sqlite db failed: %v", err)
 	}
-	if err := db.AutoMigrate(&accounts.ApiAccount{}, &tasks.Task{}); err != nil {
+	if err := db.AutoMigrate(&accounts.ApiAccount{}, &tasks.Task{}, &tasks.TaskOutput{}); err != nil {
 		t.Fatalf("auto migrate failed: %v", err)
 	}
 	return accounts.NewAccountRepository(db), accounts.NewTaskRepository(db)

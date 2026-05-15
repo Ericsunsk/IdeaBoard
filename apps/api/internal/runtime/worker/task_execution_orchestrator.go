@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"api/internal/accounts"
@@ -189,6 +190,9 @@ func (o *taskExecutionOrchestrator) completeTask(task *queuetypes.TaskPayload, a
 			return false
 		}
 		log.Printf("[Worker] 标记任务完成失败: task=%s err=%v", task.TaskID, err)
+		if failErr := o.taskRuntime.MarkTaskFailed(task.TaskID, "任务结果保存失败，请稍后重试"); failErr != nil {
+			log.Printf("[Worker] 完成回写失败后标记任务失败也失败: task=%s err=%v", task.TaskID, failErr)
+		}
 		return false
 	}
 	log.Printf("[Worker] 任务 %s 完成, 状态: completed, 耗时: %.1fs", task.TaskID, elapsedSec)
@@ -255,6 +259,9 @@ func isContextInterrupted(err error) bool {
 func userFacingProviderError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "上游图像服务响应超时"
+	}
+	if strings.Contains(err.Error(), "持久化上游图片失败") {
+		return "图片结果保存失败，请检查存储配置"
 	}
 	if status, ok := providerHTTPStatus(err); ok {
 		switch status {

@@ -5,7 +5,7 @@ import { extractImageUrlsFromTaskResult } from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import type { Task } from './task'
 
-type TaskEventPayload = Pick<Task, 'task_id' | 'status' | 'result' | 'error_msg'>
+type TaskEventPayload = Pick<Task, 'task_id' | 'status' | 'result' | 'error_msg' | 'outputs'>
 
 const SSE_TIMEOUT_MS = 6 * 60 * 1000
 
@@ -71,7 +71,7 @@ function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[
       )
 
       if (task.status === 'completed') {
-        settleResolve(extractImageUrlsFromTaskResult(task.result))
+        settleResolve(extractImageUrlsFromTaskEvent(task))
         return
       }
       if (task.status === 'failed') {
@@ -92,4 +92,15 @@ function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[
       settleReject(new Error('任务进度连接中断，请稍后重试'))
     }
   })
+}
+
+function extractImageUrlsFromTaskEvent(task: TaskEventPayload): string[] {
+  const outputUrls = Array.isArray(task.outputs)
+    ? task.outputs
+        .filter((output) => output?.role === 'image' && typeof output.url === 'string')
+        .map((output) => output.url.trim())
+        .filter((url) => url.length > 0)
+    : []
+  if (outputUrls.length > 0) return outputUrls
+  return extractImageUrlsFromTaskResult(task.result)
 }

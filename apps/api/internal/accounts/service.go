@@ -489,6 +489,7 @@ func (s *AccountService) GetTask(taskID string) (*tasks.Task, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.attachOutputsForTasks([]*tasks.Task{task})
 	s.applyPreviewForTasks([]*tasks.Task{task})
 	return task, nil
 }
@@ -498,6 +499,7 @@ func (s *AccountService) GetUserTask(taskID string, userID uint64) (*tasks.Task,
 	if err != nil {
 		return nil, err
 	}
+	s.attachOutputsForTasks([]*tasks.Task{task})
 	s.applyPreviewForTasks([]*tasks.Task{task})
 	return task, nil
 }
@@ -517,6 +519,7 @@ func (s *AccountService) ListTasks(req *tasks.TaskListRequest) ([]*tasks.Task, i
 	if err != nil {
 		return nil, 0, err
 	}
+	s.attachOutputsForTasks(items)
 	s.applyPreviewForTasks(items)
 	return items, total, nil
 }
@@ -542,6 +545,7 @@ func (s *AccountService) GetUserTasks(userID uint64, page, pageSize int) ([]*tas
 	if err != nil {
 		return nil, 0, err
 	}
+	s.attachOutputsForTasks(items)
 	s.applyPreviewForTasks(items)
 	return items, total, nil
 }

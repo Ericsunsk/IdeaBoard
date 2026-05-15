@@ -84,7 +84,7 @@ func newTaskRuntimeServiceTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db failed: %v", err)
 	}
-	if err := db.AutoMigrate(&tasks.Task{}); err != nil {
+	if err := db.AutoMigrate(&tasks.Task{}, &tasks.TaskOutput{}); err != nil {
 		t.Fatalf("auto migrate task failed: %v", err)
 	}
 	if err := db.AutoMigrate(&TaskDailyStat{}); err != nil {
@@ -339,5 +339,69 @@ func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 	}
 	if rows[0].LatencySecondsSum <= 0 {
 		t.Fatalf("daily stat latency_seconds_sum = %f, want > 0", rows[0].LatencySecondsSum)
+	}
+}
+
+func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+
+	task := &tasks.Task{
+		TaskID:    "task-completed-outputs",
+		UserID:    7,
+		ChannelID: 1,
+		Status:    tasks.StatusRunning,
+	}
+	if err := taskRepo.Create(task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	result := `{"status":"success","image_url":"/uploads/2026/05/15/out-a.png","image_urls":["/uploads/2026/05/15/out-a.png","https://cdn.example.com/uploads/2026/05/15/out-b.png"]}`
+	if err := service.MarkTaskCompleted(task.TaskID, result); err != nil {
+		t.Fatalf("MarkTaskCompleted returned error: %v", err)
+	}
+
+	outputsByTaskID, err := taskRepo.ListOutputsByTaskIDs([]string{task.TaskID})
+	if err != nil {
+		t.Fatalf("ListOutputsByTaskIDs returned error: %v", err)
+	}
+	outputs := outputsByTaskID[task.TaskID]
+	if len(outputs) != 2 {
+		t.Fatalf("outputs len=%d, want 2", len(outputs))
+	}
+	if outputs[0].URL != "/uploads/2026/05/15/out-a.png" || outputs[0].StorageKey != "uploads/2026/05/15/out-a.png" {
+		t.Fatalf("unexpected first output: %+v", outputs[0])
+	}
+	if outputs[1].URL != "https://cdn.example.com/uploads/2026/05/15/out-b.png" || outputs[1].StorageKey != "uploads/2026/05/15/out-b.png" {
+		t.Fatalf("unexpected second output: %+v", outputs[1])
+	}
+}
+
+func TestMarkTaskCompletedRejectsInlineImageResult(t *testing.T) {
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+
+	task := &tasks.Task{
+		TaskID:    "task-inline-result",
+		UserID:    7,
+		ChannelID: 1,
+		Status:    tasks.StatusRunning,
+	}
+	if err := taskRepo.Create(task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	err := service.MarkTaskCompleted(task.TaskID, `{"status":"success","image_url":"data:image/png;base64,aGVsbG8="}`)
+	if err == nil {
+		t.Fatal("expected inline image result to be rejected")
+	}
+	updated, getErr := taskRepo.GetByTaskID(task.TaskID)
+	if getErr != nil {
+		t.Fatalf("reload task failed: %v", getErr)
+	}
+	if updated.Status != tasks.StatusRunning {
+		t.Fatalf("status=%s, want running after rejected completion", updated.Status)
 	}
 }

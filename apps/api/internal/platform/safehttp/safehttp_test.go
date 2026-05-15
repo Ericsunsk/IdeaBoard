@@ -3,8 +3,10 @@ package safehttp
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -71,5 +73,23 @@ func TestGetRejectsLocalhostWithoutAllowHosts(t *testing.T) {
 
 	if _, err := Get(context.Background(), server.URL, time.Second); err == nil {
 		t.Fatal("expected localhost fetch without allow hosts to fail")
+	}
+}
+
+func TestProxyDialAllowanceAllowsConfiguredLoopbackProxy(t *testing.T) {
+	proxyURL, err := url.Parse("http://127.0.0.1:7890")
+	if err != nil {
+		t.Fatalf("parse proxy URL: %v", err)
+	}
+	policy := &resolvedPolicy{
+		allowedHosts: map[string]bool{},
+		allowedIPs:   map[string]bool{},
+	}
+
+	addProxyDialAllowance(context.Background(), policy, proxyURL)
+
+	addrs := []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}
+	if _, err := filterAllowedIPs("127.0.0.1", addrs, policy.allowedHosts, policy.allowedIPs); err != nil {
+		t.Fatalf("expected configured loopback proxy to be allowed, got %v", err)
 	}
 }

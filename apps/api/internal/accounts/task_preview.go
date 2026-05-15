@@ -21,7 +21,13 @@ func (s *AccountService) applyPreviewForTasks(items []*tasks.Task) {
 }
 
 func (s *AccountService) applyPreviewForTask(task *tasks.Task, transform func(string) string) {
-	if task == nil || strings.TrimSpace(task.Result) == "" {
+	if task == nil {
+		return
+	}
+	for i := range task.Outputs {
+		task.Outputs[i].URL = transform(strings.TrimSpace(task.Outputs[i].URL))
+	}
+	if strings.TrimSpace(task.Result) == "" {
 		return
 	}
 	if !strings.Contains(task.Result, "image_url") && !strings.Contains(task.Result, "image_urls") {

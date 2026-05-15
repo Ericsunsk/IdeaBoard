@@ -162,12 +162,16 @@ func (s *TaskRuntimeService) MarkTaskRunning(taskID string, accountID uint64) er
 
 func (s *TaskRuntimeService) MarkTaskCompleted(taskID string, result string) error {
 	now := time.Now()
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+	outputs, err := taskOutputsFromResult(taskID, result)
+	if err != nil {
+		return err
+	}
+	rows, err := s.taskRepo.CompleteWithOutputs(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
 		"status":       tasks.StatusCompleted,
 		"result":       result,
 		"error_msg":    "",
 		"completed_at": now,
-	})
+	}, outputs)
 	if err != nil {
 		return err
 	}

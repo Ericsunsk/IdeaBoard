@@ -154,6 +154,57 @@ func (r *TaskRepository) UpdateByTaskIDAndStatuses(taskID string, statuses []str
 	return result.RowsAffected, result.Error
 }
 
+func (r *TaskRepository) CompleteWithOutputs(taskID string, statuses []string, updates map[string]interface{}, outputs []tasks.TaskOutput) (int64, error) {
+	var rowsAffected int64
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&tasks.Task{}).
+			Where("task_id = ? AND status IN ?", taskID, statuses).
+			Updates(updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		rowsAffected = result.RowsAffected
+		if rowsAffected == 0 {
+			return nil
+		}
+
+		if err := tx.Where("task_id = ?", taskID).Delete(&tasks.TaskOutput{}).Error; err != nil {
+			return err
+		}
+		if len(outputs) == 0 {
+			return nil
+		}
+		for i := range outputs {
+			outputs[i].TaskID = taskID
+			outputs[i].SortIndex = i
+			if strings.TrimSpace(outputs[i].Role) == "" {
+				outputs[i].Role = "image"
+			}
+		}
+		return tx.Create(&outputs).Error
+	})
+	return rowsAffected, err
+}
+
+func (r *TaskRepository) ListOutputsByTaskIDs(taskIDs []string) (map[string][]tasks.TaskOutput, error) {
+	result := make(map[string][]tasks.TaskOutput, len(taskIDs))
+	if len(taskIDs) == 0 {
+		return result, nil
+	}
+
+	var outputs []tasks.TaskOutput
+	if err := r.db.
+		Where("task_id IN ?", taskIDs).
+		Order("task_id ASC, sort_index ASC, id ASC").
+		Find(&outputs).Error; err != nil {
+		return nil, err
+	}
+	for _, output := range outputs {
+		result[output.TaskID] = append(result[output.TaskID], output)
+	}
+	return result, nil
+}
+
 func (r *TaskRepository) List(userID uint64, accountID uint64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error) {
 	var items []*tasks.Task
 	var total int64

@@ -108,7 +108,6 @@ func DoWithAllowHosts(
 	}
 
 	transport := cloneDefaultTransport()
-	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedIPs)
 
 	client := &http.Client{
 		Timeout:   effectiveTimeout(timeout),
@@ -129,6 +128,8 @@ func DoWithAllowHosts(
 	if buildRequest != nil {
 		buildRequest(req)
 	}
+	allowRequestProxyDialTarget(req.Context(), transport, req, policy)
+	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedIPs)
 
 	return client.Do(req)
 }
@@ -147,6 +148,7 @@ func DoRequestWithAllowHosts(
 		return nil, err
 	}
 	transport := cloneDefaultTransport()
+	allowRequestProxyDialTarget(req.Context(), transport, req, policy)
 	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedIPs)
 	client := &http.Client{
 		Timeout:   effectiveTimeout(timeout),
@@ -160,6 +162,44 @@ func DoRequestWithAllowHosts(
 		},
 	}
 	return client.Do(req.WithContext(ctx))
+}
+
+func allowRequestProxyDialTarget(ctx context.Context, transport *http.Transport, req *http.Request, policy *resolvedPolicy) {
+	if transport == nil || transport.Proxy == nil || req == nil || policy == nil {
+		return
+	}
+	proxyURL, err := transport.Proxy(req)
+	if err != nil || proxyURL == nil {
+		return
+	}
+	addProxyDialAllowance(ctx, policy, proxyURL)
+}
+
+func addProxyDialAllowance(ctx context.Context, policy *resolvedPolicy, proxyURL *url.URL) {
+	if policy == nil || proxyURL == nil {
+		return
+	}
+	host := normalizeHost(proxyURL.Hostname())
+	if host == "" {
+		return
+	}
+	if policy.allowedHosts == nil {
+		policy.allowedHosts = map[string]bool{}
+	}
+	policy.allowedHosts[host] = true
+
+	if policy.allowedIPs == nil {
+		policy.allowedIPs = map[string]bool{}
+	}
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return
+	}
+	for _, addr := range addrs {
+		if key := ipKey(addr.IP); key != "" {
+			policy.allowedIPs[key] = true
+		}
+	}
 }
 
 func cloneDefaultTransport() *http.Transport {

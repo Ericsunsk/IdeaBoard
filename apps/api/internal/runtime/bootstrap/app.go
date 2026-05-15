@@ -388,6 +388,7 @@ func migrateModels(db *gorm.DB) error {
 		&users.UsedUID{},
 		&accounts.ApiAccount{},
 		&tasks.Task{},
+		&tasks.TaskOutput{},
 		&accounts.TaskDailyStat{},
 		&accounts.TaskStatEvent{},
 		&accounts.TaskDailyStatBackfill{},

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -172,6 +173,11 @@ func (h *ChannelHandler) DetectModels(c *gin.Context) {
 		r.Header.Set("Accept", "application/json")
 	}, detectModelsTimeout, h.detectModelsAllowHosts()...)
 	if err != nil {
+		log.Printf("[ChannelHandler] 模型检测请求失败: api_type=%s models_url=%s err=%v", apiType, modelsURL, err)
+		if workflow.IsGoogleNativeAPIType(apiType) {
+			response.Error(c, 400, "模型检测失败：Google API 网络不可达，请为后端配置 HTTP_PROXY/HTTPS_PROXY 后重试")
+			return
+		}
 		response.Error(c, 400, "模型检测失败，请检查 Base URL 或网络")
 		return
 	}

@@ -816,11 +816,32 @@ components:
         retry_count: { type: integer }
         error_msg: { type: string }
         result: { type: string }
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskOutput'
         created_at: { type: string }
         updated_at: { type: string }
         completed_at:
           type: string
           nullable: true
+
+    TaskOutput:
+      type: object
+      required: [id, task_id, role, url, sort_index, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        task_id: { type: string }
+        role: { type: string }
+        url: { type: string }
+        storage_key: { type: string }
+        mime_type: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        size_bytes: { type: integer }
+        sort_index: { type: integer }
+        created_at: { type: string }
+        updated_at: { type: string }
 
     SubmitTaskRequest:
       type: object

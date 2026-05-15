@@ -97,6 +97,7 @@ export * from './storageProviderMeta';
 export * from './submitTaskRequest';
 export * from './submitTaskRequestParams';
 export * from './task';
+export * from './taskOutput';
 export * from './updateAdminRegistrationSettingBody';
 export * from './updateAdminUserRoleBody';
 export * from './updateAdminUserRoleBodyRole';

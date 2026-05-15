@@ -81,6 +81,11 @@ func TestUserFacingProviderErrorForHTTPStatus(t *testing.T) {
 			err:  errors.New("boom"),
 			want: "上游图像服务调用失败",
 		},
+		{
+			name: "storage persistence failure",
+			err:  errors.New("持久化上游图片失败: 保存文件失败"),
+			want: "图片结果保存失败，请检查存储配置",
+		},
 	}
 
 	for _, tt := range tests {

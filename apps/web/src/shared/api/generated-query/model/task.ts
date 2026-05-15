@@ -5,6 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+import type { TaskOutput } from './taskOutput';
+
 export interface Task {
   id: number;
   task_id: string;
@@ -17,6 +19,7 @@ export interface Task {
   retry_count?: number;
   error_msg?: string;
   result?: string;
+  outputs?: TaskOutput[];
   created_at: string;
   updated_at: string;
   /** @nullable */

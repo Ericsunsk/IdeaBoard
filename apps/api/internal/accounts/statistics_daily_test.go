@@ -18,7 +18,7 @@ func newStatisticsTestService(t *testing.T) (*AccountService, *TaskRepository, *
 	if err != nil {
 		t.Fatalf("open sqlite db failed: %v", err)
 	}
-	if err := db.AutoMigrate(&ApiAccount{}, &tasks.Task{}, &TaskDailyStat{}, &TaskStatEvent{}, &TaskDailyStatBackfill{}); err != nil {
+	if err := db.AutoMigrate(&ApiAccount{}, &tasks.Task{}, &tasks.TaskOutput{}, &TaskDailyStat{}, &TaskStatEvent{}, &TaskDailyStatBackfill{}); err != nil {
 		t.Fatalf("auto migrate failed: %v", err)
 	}
 	taskRepo := NewTaskRepository(db)
