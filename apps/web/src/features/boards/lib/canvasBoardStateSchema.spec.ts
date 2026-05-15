@@ -21,7 +21,17 @@ function createValidState() {
         outputImages: [{ url: 'https://example.com/o1.png', ratio: 1 }],
       },
     ],
-    promptNodes: [{ id: 3, type: 'prompt' as const, x: 0, y: 0, width: 200, text: 'prompt' }],
+    promptNodes: [
+      {
+        id: 3,
+        type: 'prompt' as const,
+        x: 0,
+        y: 0,
+        width: 200,
+        title: 'Custom Prompt',
+        text: 'prompt',
+      },
+    ],
     modelNodes: [
       {
         id: 4,
@@ -156,6 +166,9 @@ function createValidState() {
       canvasY: 0,
       zoomLevel: 1,
     },
+    previewSnapshotDataUrl: 'data:image/webp;base64,aaa',
+    previewSnapshotUpdatedAt: Date.now(),
+    previewSnapshotVersion: 2,
     updatedAt: Date.now(),
   }
 }
@@ -182,6 +195,13 @@ function testValidEmptySnapshot() {
 function testValidAllNodeMinimumShape() {
   const parsed = canvasBoardStateSchema.safeParse(createValidState())
   expect(parsed.success === true, 'expected minimum node shapes to be valid')
+  if (parsed.success) {
+    expect(
+      parsed.data.promptNodes[0]?.title === 'Custom Prompt',
+      'expected known title field to be preserved',
+    )
+    expect(parsed.data.previewSnapshotVersion === 2, 'expected preview version to be preserved')
+  }
 }
 
 function testInvalidStateRejected() {

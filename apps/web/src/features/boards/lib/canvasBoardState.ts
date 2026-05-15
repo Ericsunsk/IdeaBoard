@@ -34,6 +34,7 @@ export type CanvasBoardStateViewport = CanvasViewportState
 export interface CanvasBoardState extends CanvasBoardSnapshot {
   previewSnapshotDataUrl?: string
   previewSnapshotUpdatedAt?: number
+  previewSnapshotVersion?: number
   updatedAt: number
 }
 
@@ -170,6 +171,7 @@ export function setCanvasBoardState(
     ...state,
     previewSnapshotDataUrl: existing?.previewSnapshotDataUrl,
     previewSnapshotUpdatedAt: existing?.previewSnapshotUpdatedAt,
+    previewSnapshotVersion: existing?.previewSnapshotVersion,
     updatedAt: Date.now(),
   })
   if (!validState) return null
@@ -182,6 +184,7 @@ export function setCanvasBoardPreviewSnapshot(
   boardId: string,
   previewSnapshotDataUrl: string | undefined,
   previewSnapshotUpdatedAt: number | undefined,
+  previewSnapshotVersion: number | undefined,
 ): CanvasBoardState | null {
   const id = normalizeBoardId(boardId)
   if (!id) return null
@@ -192,6 +195,7 @@ export function setCanvasBoardPreviewSnapshot(
     ...existing,
     previewSnapshotDataUrl,
     previewSnapshotUpdatedAt,
+    previewSnapshotVersion,
     updatedAt: existing.updatedAt,
   })
   if (!validState) return null

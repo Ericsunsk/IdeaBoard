@@ -22,6 +22,7 @@ import {
 type PersistedCanvasBoardState = CanvasBoardSnapshot & {
   previewSnapshotDataUrl?: string
   previewSnapshotUpdatedAt?: number
+  previewSnapshotVersion?: number
   updatedAt: number
 }
 
@@ -53,6 +54,7 @@ const promptNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   text: z.string(),
 })
 
@@ -62,6 +64,7 @@ const modelNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   angleSpec: z.object({
     yaw: finiteNumberSchema.min(MODEL_ANGLE_YAW_MIN).max(MODEL_ANGLE_YAW_MAX),
     framing: z.enum(['full', 'half', 'portrait']),
@@ -81,6 +84,7 @@ const viewpointNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   activeCategory: z.enum(['top', 'bottom', 'set']),
   selectedViewpoint: z.string(),
   lighting: z.enum(['warm_white', 'afternoon', 'hard_light']),
@@ -94,6 +98,7 @@ const maskNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   sourceImageUrl: z.string(),
   sourceImageRatio: finiteNumberSchema.positive(),
   executionMaskDataUrl: z.string(),
@@ -110,6 +115,7 @@ const imageNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   sourceImageUrl: z.string(),
   sourceImageRatio: finiteNumberSchema.positive(),
   outputCount: finiteNumberSchema
@@ -127,6 +133,7 @@ const colorNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   colors: z.array(z.string()),
   strength: finiteNumberSchema.min(0).max(100),
   outputStatus: workflowNodeOutputStatusSchema,
@@ -139,6 +146,7 @@ const editNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   mode: z.enum(['partial-edit', 'bg-swap', 'face-swap']),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
@@ -150,6 +158,7 @@ const fusionNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   blendRatio: finiteNumberSchema.min(0).max(100),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
@@ -161,6 +170,7 @@ const enhanceNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   mode: z.enum(['hd-upscale', 'canvas-extend']),
   upscaleMode: z.enum(['base', 'enhancement']),
   upscaleFactor: z.union([z.literal(2), z.literal(3), z.literal(4)]),
@@ -180,6 +190,7 @@ const wearNodeItemSchema = z.object({
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
+  title: z.string().optional(),
   tileMode: z.enum(['seamless', 'single']),
   rotation: finiteNumberSchema.min(WEAR_ROTATION_MIN).max(WEAR_ROTATION_MAX),
   scale: finiteNumberSchema.min(WEAR_SCALE_MIN).max(WEAR_SCALE_MAX),
@@ -228,6 +239,7 @@ export const canvasBoardStateSchema = canvasBoardSnapshotSchema
   .extend({
     previewSnapshotDataUrl: z.string().min(1).optional(),
     previewSnapshotUpdatedAt: finiteNumberSchema.optional(),
+    previewSnapshotVersion: finiteNumberSchema.int().positive().optional(),
     updatedAt: finiteNumberSchema,
   })
   .strip() satisfies z.ZodType<PersistedCanvasBoardState>

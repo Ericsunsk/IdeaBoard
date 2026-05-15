@@ -8,6 +8,7 @@ import type {
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import { getDefaultCanvasNodeTitle } from '../types/canvasNodes'
+import { normalizeFlowConnection } from './flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
 export interface FlowAdapterNode {
@@ -229,6 +230,8 @@ export function flowToCanvasBoardSnapshot(
   snapshot.connections = []
   const usedConnectionIds = new Set<number>()
   const persistedFlowNodeIds = new Set<string>()
+  const flowNodeDataMap = new Map<string, FlowNodeData>()
+  const normalizedEdgesForResolution: FlowAdapterEdge[] = []
 
   const nextConnectionId = () => {
     const existingIds = snapshot.connections.map((connection) => connection.id)
@@ -240,6 +243,7 @@ export function flowToCanvasBoardSnapshot(
     const ref = parseFlowNodeId(node.id)
     if (!ref) return
     const data = (node.data ?? {}) as FlowNodeData
+    flowNodeDataMap.set(node.id, data)
     const snapshotNode = data.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode || typeof snapshotNode !== 'object') return
     const positionedNode = {
@@ -259,9 +263,21 @@ export function flowToCanvasBoardSnapshot(
     const fromRef = parseFlowNodeId(edge.source)
     const toRef = parseFlowNodeId(edge.target)
     if (!fromRef || !toRef) return
-    const fromPort = parsePortFromHandle(edge.sourceHandle ?? null, 'out')
-    const toPort = parsePortFromHandle(edge.targetHandle ?? null, 'in')
+    const normalizedEdge = normalizeFlowConnection(
+      edge,
+      (nodeId) => flowNodeDataMap.get(nodeId),
+      normalizedEdgesForResolution,
+    )
+    const sourceHandle = normalizedEdge?.sourceHandle ?? edge.sourceHandle
+    const targetHandle = normalizedEdge?.targetHandle ?? edge.targetHandle
+    const fromPort = parsePortFromHandle(sourceHandle ?? null, 'out')
+    const toPort = parsePortFromHandle(targetHandle ?? null, 'in')
     if (!fromPort || !toPort) return
+    normalizedEdgesForResolution.push({
+      ...edge,
+      sourceHandle: `out:${fromPort}`,
+      targetHandle: `in:${toPort}`,
+    })
 
     const existingConnection = (edge.data as { connectionSnapshot?: CanvasConnection } | undefined)
       ?.connectionSnapshot

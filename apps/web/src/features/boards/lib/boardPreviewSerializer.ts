@@ -2,10 +2,7 @@ import type {
   CanvasBoardSnapshot,
   CanvasConnectionNodeType,
 } from '../../workspace/types/canvasNodes'
-import {
-  resolveCanvasConnectionTone,
-  type CanvasConnectionTone,
-} from '../../workspace/config/canvasConnections'
+import { resolveImageNodeStageHeight } from '../../workspace/utils/imageNodeSizing'
 
 export interface BoardPreviewFrame {
   key: string
@@ -14,6 +11,8 @@ export interface BoardPreviewFrame {
   y: number
   width: number
   height: number
+  bodyOffsetY: number
+  bodyHeight: number
   imageUrl?: string
   nodeType?: CanvasConnectionNodeType
   nodeId?: number
@@ -21,7 +20,6 @@ export interface BoardPreviewFrame {
 
 interface BoardPreviewConnection {
   key: string
-  tone: CanvasConnectionTone
   startX: number
   startY: number
   endX: number
@@ -38,6 +36,7 @@ interface NodeLike {
   x?: unknown
   y?: unknown
   width?: unknown
+  title?: unknown
   outputImages?: unknown
   sourceImageUrl?: unknown
   sourceImageRatio?: unknown
@@ -75,23 +74,12 @@ const PREVIEW_VIEWPORT_HEIGHT = 490
 const PREVIEW_PADDING = 36
 const PREVIEW_HIGH_DETAIL_QUALITY = 0.78
 const PREVIEW_DENSE_DETAIL_QUALITY = 0.72
-const PREVIEW_BACKGROUND = '#eef3fb'
-const PREVIEW_DOT_COLOR = 'rgba(201, 209, 225, 0.68)'
-const PREVIEW_STAGE_GLOW_PRIMARY = 'rgba(180, 199, 255, 0.28)'
-const PREVIEW_STAGE_GLOW_SECONDARY = 'rgba(224, 233, 255, 0.62)'
+const PREVIEW_BACKGROUND = '#ffffff'
+const PREVIEW_DOT_COLOR = 'rgba(226, 228, 232, 0.86)'
+const PREVIEW_NODE_BORDER = '#e2e8f0'
+const PREVIEW_NODE_TEXT = '#334155'
+const PREVIEW_EDGE_STROKE = '#9aa4b2'
 const USER_DOWNLOAD_ENDPOINT = '/api/user/download'
-const NODE_ACCENT_COLORS: Record<CanvasConnectionNodeType, string> = {
-  image: '#6c8fff',
-  prompt: '#d4a34d',
-  model: '#7b8cf3',
-  viewpoint: '#67a2ff',
-  mask: '#4fcab2',
-  color: '#f09164',
-  edit: '#f17a88',
-  fusion: '#b278ff',
-  enhance: '#5aa5ff',
-  wear: '#7cb86d',
-}
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -197,15 +185,20 @@ function resolveNodePreview(
   return getLatestOutputPreview(node) ?? getSourcePreview(node)
 }
 
-function getImageNodeHeight(width: number, ratio: number): number {
-  const stageWidth = Math.max(120, width - 24)
-  return 46 + Math.max(96, Math.round(stageWidth * ratio))
-}
-
-function getMaskNodeHeight(width: number, ratio: number, hasSource: boolean): number {
-  const stageWidth = Math.max(120, width - 24)
-  const stageHeight = hasSource ? Math.max(112, Math.min(360, Math.round(stageWidth * ratio))) : 172
-  return 46 + stageHeight
+function resolveNodeBodyHeight(
+  nodeType: CanvasConnectionNodeType,
+  width: number,
+  node: NodeLike,
+): number {
+  const preview = resolveNodePreview(nodeType, node)
+  if (nodeType === 'image') {
+    return resolveImageNodeStageHeight(width, preview?.ratio ?? 1, !!preview)
+  }
+  if (nodeType === 'prompt') return width
+  if (nodeType === 'mask') {
+    return preview ? Math.max(120, Math.min(360, Math.round(width * preview.ratio))) : 172
+  }
+  return preview ? Math.max(112, Math.min(180, Math.round(width * 0.56))) : 132
 }
 
 function resolveNodeHeight(
@@ -213,15 +206,7 @@ function resolveNodeHeight(
   width: number,
   node: NodeLike,
 ): number {
-  if (nodeType === 'image') {
-    return getImageNodeHeight(width, resolveNodePreview(nodeType, node)?.ratio ?? 1)
-  }
-  if (nodeType === 'mask') {
-    const preview = resolveNodePreview(nodeType, node)
-    return getMaskNodeHeight(width, preview?.ratio ?? 1, !!preview)
-  }
-  const hasPreviewImage = !!resolveNodePreview(nodeType, node)
-  return hasPreviewImage ? 108 : 88
+  return resolveNodeBodyHeight(nodeType, width, node)
 }
 
 function resolveBounds(frames: readonly BoardPreviewFrame[]): BoardPreviewBounds | null {
@@ -282,6 +267,8 @@ function collectNodeFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
         y: node.y,
         width,
         height: resolveNodeHeight(nodeType, width, node),
+        bodyOffsetY: 0,
+        bodyHeight: resolveNodeBodyHeight(nodeType, width, node),
         imageUrl: preview?.url,
         nodeType,
         nodeId: node.id,
@@ -312,20 +299,13 @@ function collectBoardPreviewConnections(
     return [
       {
         key: `connection-${connection.id}-${index}`,
-        tone: resolveCanvasConnectionTone(connection.fromPort),
         startX: fromFrame.x + fromFrame.width,
-        startY: fromFrame.y + fromFrame.height / 2,
+        startY: fromFrame.y + fromFrame.bodyOffsetY + fromFrame.bodyHeight / 2,
         endX: toFrame.x,
-        endY: toFrame.y + toFrame.height / 2,
+        endY: toFrame.y + toFrame.bodyOffsetY + toFrame.bodyHeight / 2,
       },
     ]
   })
-}
-
-function resolveConnectionStroke(tone: CanvasConnectionTone): string {
-  if (tone === 'mask') return '#34c38f'
-  if (tone === 'prompt') return '#f59e0b'
-  return '#5b8def'
 }
 
 function createPreviewCanvas(): HTMLCanvasElement | null {
@@ -366,44 +346,13 @@ function roundedRectPath(
   ctx.closePath()
 }
 
-function drawBackdropGlow(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
-  color: string,
-) {
-  const glow = ctx.createRadialGradient(x, y, 0, x, y, radius)
-  glow.addColorStop(0, color)
-  glow.addColorStop(1, withAlpha('#FFFFFF', 0))
-  ctx.fillStyle = glow
-  ctx.beginPath()
-  ctx.arc(x, y, radius, 0, Math.PI * 2)
-  ctx.fill()
-}
-
 function drawDotBackground(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = PREVIEW_BACKGROUND
   ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
 
-  drawBackdropGlow(
-    ctx,
-    PREVIEW_VIEWPORT_WIDTH * 0.18,
-    PREVIEW_VIEWPORT_HEIGHT * 0.2,
-    260,
-    PREVIEW_STAGE_GLOW_PRIMARY,
-  )
-  drawBackdropGlow(
-    ctx,
-    PREVIEW_VIEWPORT_WIDTH * 0.84,
-    PREVIEW_VIEWPORT_HEIGHT * 0.82,
-    300,
-    PREVIEW_STAGE_GLOW_SECONDARY,
-  )
-
   const gradient = ctx.createLinearGradient(0, 0, 0, PREVIEW_VIEWPORT_HEIGHT)
-  gradient.addColorStop(0, '#fcfdff')
-  gradient.addColorStop(1, '#f7f9fe')
+  gradient.addColorStop(0, '#ffffff')
+  gradient.addColorStop(1, '#f8fafc')
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
 
@@ -483,7 +432,7 @@ async function buildPreviewImageMap(frames: readonly BoardPreviewFrame[]): Promi
   }
 }
 
-function drawImageCover(
+function drawImageContain(
   ctx: CanvasRenderingContext2D,
   image: CanvasImageSource,
   x: number,
@@ -495,37 +444,12 @@ function drawImageCover(
     (image as HTMLImageElement).naturalWidth || (image as HTMLImageElement).width || width
   const imageHeight =
     (image as HTMLImageElement).naturalHeight || (image as HTMLImageElement).height || height
-  const scale = Math.max(width / imageWidth, height / imageHeight)
+  const scale = Math.min(width / imageWidth, height / imageHeight)
   const drawWidth = imageWidth * scale
   const drawHeight = imageHeight * scale
   const drawX = x + (width - drawWidth) / 2
   const drawY = y + (height - drawHeight) / 2
   ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight)
-}
-
-function drawPreviewPlaceholder(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  label: string,
-  accent = '#8a96ad',
-) {
-  const gradient = ctx.createLinearGradient(x, y, x + width, y + height)
-  gradient.addColorStop(0, withAlpha(accent, 0.08))
-  gradient.addColorStop(1, withAlpha(accent, 0.18))
-  ctx.fillStyle = gradient
-  ctx.fillRect(x, y, width, height)
-  ctx.strokeStyle = withAlpha(accent, 0.2)
-  ctx.lineWidth = 1
-  ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, width - 1), Math.max(0, height - 1))
-  ctx.fillStyle = withAlpha(accent, 0.78)
-  const fontSize = Math.max(11, Math.min(24, width * 0.11))
-  ctx.font = `700 ${fontSize}px system-ui`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(label, x + width / 2, y + height / 2)
 }
 
 function drawNodeImageStage(
@@ -535,43 +459,27 @@ function drawNodeImageStage(
   y: number,
   width: number,
   height: number,
-  accent: string,
 ) {
-  const stageRadius = Math.max(6, Math.min(10, Math.min(width, height) * 0.12))
-  const stageBarHeight = Math.max(8, Math.min(12, height * 0.18))
-
+  const stageRadius = Math.max(6, Math.min(12, Math.min(width, height) * 0.12))
   ctx.fillStyle = '#f7f9ff'
   roundedRectPath(ctx, x, y, width, height, stageRadius)
   ctx.fill()
-  ctx.strokeStyle = withAlpha(accent, 0.22)
+  ctx.strokeStyle = PREVIEW_NODE_BORDER
   ctx.lineWidth = 0.9
   roundedRectPath(ctx, x, y, width, height, stageRadius)
   ctx.stroke()
 
-  ctx.fillStyle = withAlpha(accent, 0.08)
-  roundedRectPath(
-    ctx,
-    x + 1,
-    y + 1,
-    Math.max(0, width - 2),
-    Math.max(0, stageBarHeight),
-    Math.max(4, stageRadius - 2),
-  )
-  ctx.fill()
-
-  const imageY = y + stageBarHeight + 2
-  const imageHeight = Math.max(6, height - stageBarHeight - 3)
   ctx.save()
   roundedRectPath(
     ctx,
     x + 2,
-    imageY,
+    y + 2,
     Math.max(0, width - 4),
-    imageHeight,
+    Math.max(0, height - 4),
     Math.max(4, stageRadius - 3),
   )
   ctx.clip()
-  drawImageCover(ctx, image, x + 2, imageY, Math.max(0, width - 4), imageHeight)
+  drawImageContain(ctx, image, x + 2, y + 2, Math.max(0, width - 4), Math.max(0, height - 4))
   ctx.restore()
 }
 
@@ -587,21 +495,108 @@ function drawConnection(
   const endX = connection.endX * scale + offsetX
   const endY = connection.endY * scale + offsetY
   const curve = Math.max(36, Math.abs(endX - startX) * 0.42)
-  const stroke = resolveConnectionStroke(connection.tone)
   ctx.beginPath()
   ctx.moveTo(startX, startY)
   ctx.bezierCurveTo(startX + curve, startY, endX - curve, endY, endX, endY)
-  ctx.strokeStyle = withAlpha(stroke, 0.78)
-  ctx.lineWidth = connection.tone === 'prompt' ? 1.3 : 1.55
+  ctx.strokeStyle = withAlpha(PREVIEW_EDGE_STROKE, 0.82)
+  ctx.lineWidth = 1.1
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.stroke()
-  ctx.fillStyle = withAlpha(stroke, 0.72)
+}
+
+function drawEmptyImageGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  const strokeWidth = Math.max(0.7, size * 0.011)
+  const left = x - size / 2
+  const top = y - size / 2
+  ctx.strokeStyle = '#a8b3be'
+  ctx.lineWidth = strokeWidth
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  roundedRectPath(ctx, left + size * 0.18, top + size * 0.18, size * 0.64, size * 0.64, size * 0.1)
+  ctx.stroke()
   ctx.beginPath()
-  ctx.arc(startX, startY, 1.45, 0, Math.PI * 2)
+  ctx.arc(left + size * 0.62, top + size * 0.36, size * 0.05, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(left + size * 0.22, top + size * 0.66)
+  ctx.lineTo(left + size * 0.4, top + size * 0.48)
+  ctx.lineTo(left + size * 0.56, top + size * 0.64)
+  ctx.lineTo(left + size * 0.68, top + size * 0.54)
+  ctx.lineTo(left + size * 0.8, top + size * 0.68)
+  ctx.stroke()
+}
+
+function drawPromptPreviewLines(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  scale: number,
+) {
+  const padding = Math.max(8, 12 * scale)
+  const lineHeight = Math.max(8, 14 * scale)
+  const lineCount = Math.max(3, Math.min(6, Math.floor((height - padding * 2) / lineHeight)))
+  ctx.fillStyle = withAlpha(PREVIEW_NODE_TEXT, 0.24)
+  for (let i = 0; i < lineCount; i += 1) {
+    const lineWidth = width * (i === lineCount - 1 ? 0.42 : i % 2 === 0 ? 0.76 : 0.62)
+    roundedRectPath(
+      ctx,
+      x + padding,
+      y + padding + i * lineHeight,
+      Math.max(8, lineWidth - padding * 2),
+      Math.max(2, 3 * scale),
+      999,
+    )
+    ctx.fill()
+  }
+}
+
+function drawExecutionPreviewBody(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  scale: number,
+) {
+  const padding = Math.max(7, 10 * scale)
+  const cardHeight = Math.max(26, Math.min(height * 0.42, 54 * scale))
+  ctx.fillStyle = '#f8fafc'
+  roundedRectPath(
+    ctx,
+    x + padding,
+    y + padding,
+    width - padding * 2,
+    cardHeight,
+    Math.max(8, 12 * scale),
+  )
   ctx.fill()
-  ctx.beginPath()
-  ctx.arc(endX, endY, 1.45, 0, Math.PI * 2)
+  ctx.strokeStyle = '#e8ebf3'
+  ctx.lineWidth = Math.max(0.7, 1 * scale)
+  roundedRectPath(
+    ctx,
+    x + padding,
+    y + padding,
+    width - padding * 2,
+    cardHeight,
+    Math.max(8, 12 * scale),
+  )
+  ctx.stroke()
+
+  ctx.fillStyle = withAlpha(PREVIEW_NODE_TEXT, 0.22)
+  const rowY = y + padding + cardHeight + Math.max(10, 14 * scale)
+  roundedRectPath(ctx, x + padding, rowY, width - padding * 2, Math.max(3, 5 * scale), 999)
+  ctx.fill()
+  roundedRectPath(
+    ctx,
+    x + padding,
+    rowY + Math.max(12, 16 * scale),
+    (width - padding * 2) * 0.68,
+    Math.max(3, 5 * scale),
+    999,
+  )
   ctx.fill()
 }
 
@@ -616,115 +611,49 @@ function drawFrame(
   const x = frame.x * scale + offsetX
   const y = frame.y * scale + offsetY
   const width = frame.width * scale
-  const height = frame.height * scale
-  const radius = Math.min(22, Math.max(12, width * 0.05))
+  const bodyY = y + frame.bodyOffsetY * scale
+  const bodyHeight = frame.bodyHeight * scale
+  const radius = Math.min(8, Math.max(5, width * 0.025))
   const image = frame.imageUrl ? (imageMap.get(frame.imageUrl) ?? null) : null
-  const accent = frame.nodeType ? NODE_ACCENT_COLORS[frame.nodeType] : '#7a90bf'
 
   ctx.save()
-  ctx.fillStyle = '#ffffff'
-  roundedRectPath(ctx, x, y, width, height, radius)
-  ctx.fill()
-  ctx.restore()
-
-  ctx.save()
-  roundedRectPath(ctx, x, y, width, height, radius)
+  roundedRectPath(ctx, x, bodyY, width, bodyHeight, radius)
   ctx.clip()
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(x, bodyY, width, bodyHeight)
 
-  if (frame.kind === 'image') {
-    const inset = Math.max(5, width * 0.024)
-    const imageRadius = Math.max(8, radius - 4)
+  if (frame.nodeType === 'image') {
     if (image) {
-      roundedRectPath(ctx, x + inset, y + inset, width - inset * 2, height - inset * 2, imageRadius)
-      ctx.clip()
-      drawImageCover(ctx, image, x + inset, y + inset, width - inset * 2, height - inset * 2)
+      drawImageContain(ctx, image, x, bodyY, width, bodyHeight)
     } else {
-      drawPreviewPlaceholder(
+      drawEmptyImageGlyph(
         ctx,
-        x + inset,
-        y + inset,
-        width - inset * 2,
-        height - inset * 2,
-        'IMAGE',
-        accent,
+        x + width / 2,
+        bodyY + bodyHeight / 2,
+        Math.min(width, bodyHeight) * 0.62,
       )
     }
+  } else if (frame.nodeType === 'prompt') {
+    drawPromptPreviewLines(ctx, x, bodyY, width, bodyHeight, scale)
+  } else if (image) {
+    const inset = Math.max(7, Math.min(13, bodyHeight * 0.11))
+    drawNodeImageStage(
+      ctx,
+      image,
+      x + inset,
+      bodyY + inset,
+      Math.max(0, width - inset * 2),
+      Math.max(0, bodyHeight - inset * 2),
+    )
   } else {
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(x, y, width, height)
-
-    const inset = Math.max(7, Math.min(13, height * 0.13))
-    const headerHeight = Math.max(18, Math.min(24, height * 0.24))
-    const headerBottomY = y + headerHeight
-    const hasThumb = !!image
-
-    const leftPortX = x + 1.2
-    const rightPortX = x + width - 1.2
-    const portY = y + height / 2
-    const portOuterRadius = Math.max(1.9, Math.min(2.9, width * 0.012))
-    const portInnerRadius = Math.max(0.8, portOuterRadius - 1.2)
-
-    ctx.fillStyle = '#ffffff'
-    ctx.beginPath()
-    ctx.arc(leftPortX, portY, portOuterRadius, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(rightPortX, portY, portOuterRadius, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = withAlpha(accent, 0.65)
-    ctx.lineWidth = 0.9
-    ctx.beginPath()
-    ctx.arc(leftPortX, portY, portOuterRadius, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.arc(rightPortX, portY, portOuterRadius, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.fillStyle = withAlpha(accent, 0.85)
-    ctx.beginPath()
-    ctx.arc(leftPortX, portY, portInnerRadius, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(rightPortX, portY, portInnerRadius, 0, Math.PI * 2)
-    ctx.fill()
-
-    ctx.fillStyle = withAlpha(accent, 0.075)
-    ctx.fillRect(x, y, width, headerHeight)
-    ctx.strokeStyle = withAlpha(accent, 0.12)
-    ctx.lineWidth = 0.8
-    ctx.beginPath()
-    ctx.moveTo(x, headerBottomY)
-    ctx.lineTo(x + width, headerBottomY)
-    ctx.stroke()
-
-    const dotRadius = Math.max(2, Math.min(3.2, headerHeight * 0.14))
-    const dotGap = Math.max(8, dotRadius * 3.6)
-    const dotX = x + inset + dotRadius
-    const headerCenterY = y + headerHeight / 2
-    ctx.fillStyle = withAlpha(accent, 0.9)
-    for (let i = 0; i < 3; i += 1) {
-      ctx.beginPath()
-      ctx.arc(dotX + i * dotGap, headerCenterY, dotRadius, 0, Math.PI * 2)
-      ctx.fill()
-    }
-
-    const bodyTop = headerBottomY + Math.max(4, inset * 0.45)
-    const bodyBottom = y + height - inset
-    const bodyHeight = Math.max(12, bodyBottom - bodyTop)
-    const contentX = x + inset
-    const contentY = bodyTop
-    const contentWidth = Math.max(18, width - inset * 2)
-    const contentHeight = Math.max(14, bodyHeight)
-
-    if (hasThumb) {
-      drawNodeImageStage(ctx, image, contentX, contentY, contentWidth, contentHeight, accent)
-    }
+    drawExecutionPreviewBody(ctx, x, bodyY, width, bodyHeight, scale)
   }
 
   ctx.restore()
 
-  ctx.strokeStyle = frame.kind === 'node' ? withAlpha(accent, 0.2) : '#dce3f3'
-  ctx.lineWidth = frame.kind === 'node' ? 0.95 : Math.max(1.1, scale * 0.9)
-  roundedRectPath(ctx, x, y, width, height, radius)
+  ctx.strokeStyle = PREVIEW_NODE_BORDER
+  ctx.lineWidth = 1.5
+  roundedRectPath(ctx, x, bodyY, width, bodyHeight, radius)
   ctx.stroke()
 }
 

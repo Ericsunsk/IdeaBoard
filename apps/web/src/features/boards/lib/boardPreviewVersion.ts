@@ -1,0 +1,1 @@
+export const BOARD_PREVIEW_RENDERER_VERSION = 4

@@ -569,19 +569,23 @@ const {
 })
 
 function commitFlowNodes(nextNodes: Node[]) {
+  nodes.value = nextNodes
   setNodes(nextNodes)
 }
 
 function commitFlowEdges(nextEdges: Edge[]) {
+  edges.value = nextEdges
   setEdges(nextEdges)
 }
 
 function commitFlowEdgesAppend(nextEdges: Edge[]) {
-  setEdges((currentEdges) => [...(currentEdges as Edge[]), ...nextEdges])
+  const currentEdges = edges.value as Edge[]
+  commitFlowEdges([...currentEdges, ...nextEdges])
 }
 
 function commitFlowNodesAppend(nextNodes: Node[]) {
-  setNodes((currentNodes) => [...(currentNodes as Node[]), ...nextNodes])
+  const currentNodes = nodes.value as Node[]
+  commitFlowNodes([...currentNodes, ...nextNodes])
   scheduleFlowNodeInternalsRefresh(nextNodes.map((node) => node.id))
 }
 

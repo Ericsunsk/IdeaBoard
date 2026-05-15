@@ -1,4 +1,5 @@
 import { renderBoardPreviewDataUrl } from '../../boards/lib/boardPreviewSerializer'
+import { BOARD_PREVIEW_RENDERER_VERSION } from '../../boards/lib/boardPreviewVersion'
 import { setCanvasBoardPreviewSnapshot } from '../../boards/lib/canvasBoardState'
 import { syncCanvasBoardToServer } from '../../boards/lib/boardSync'
 import { getCanvasBoardById } from '../../boards/lib/canvasBoards'
@@ -153,6 +154,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       boardId,
       snapshotDataUrl || undefined,
       snapshotDataUrl ? Date.now() : undefined,
+      snapshotDataUrl ? BOARD_PREVIEW_RENDERER_VERSION : undefined,
     )
     await syncCanvasBoardToServer(boardId)
   }

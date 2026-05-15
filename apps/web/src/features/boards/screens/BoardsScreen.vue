@@ -90,6 +90,7 @@ import {
   setCanvasBoardPreviewSnapshot,
 } from '../lib/canvasBoardState'
 import { renderBoardPreviewDataUrl } from '../lib/boardPreviewSerializer'
+import { BOARD_PREVIEW_RENDERER_VERSION } from '../lib/boardPreviewVersion'
 import {
   hydrateCanvasBoardsFromServer,
   isBoardNameConflictError,
@@ -153,6 +154,7 @@ function isBoardPreviewStale(boardId: string): boolean {
   if (!state) return false
   if (!state.previewSnapshotDataUrl) return true
   if (!Number.isFinite(state.previewSnapshotUpdatedAt)) return true
+  if (state.previewSnapshotVersion !== BOARD_PREVIEW_RENDERER_VERSION) return true
   return (state.previewSnapshotUpdatedAt || 0) < state.updatedAt
 }
 
@@ -182,7 +184,12 @@ async function refreshBoardPreviewInBackground(boardId: string) {
     enqueueBoardPreviewRefresh(boardId)
     return
   }
-  const updatedState = setCanvasBoardPreviewSnapshot(boardId, snapshotDataUrl, snapshotUpdatedAt)
+  const updatedState = setCanvasBoardPreviewSnapshot(
+    boardId,
+    snapshotDataUrl,
+    snapshotUpdatedAt,
+    snapshotDataUrl ? BOARD_PREVIEW_RENDERER_VERSION : undefined,
+  )
   if (!updatedState) return
   boardPreviewMap.value = {
     ...boardPreviewMap.value,
