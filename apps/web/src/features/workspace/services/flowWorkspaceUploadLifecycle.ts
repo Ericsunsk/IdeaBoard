@@ -6,6 +6,7 @@ import {
 import { uploadApi } from '../../../shared/api/upload'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from './flowMediaIO'
+import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 
 interface StableRef {
   path: string
@@ -130,7 +131,10 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
     return isBoardWorkspaceUploadPath(path, normalizedUserUid, normalizedBoardId)
   }
 
-  async function fetchAndUploadStable(raw: string): Promise<string> {
+  async function fetchAndUploadStable(
+    raw: string,
+    options?: { keepPng?: boolean },
+  ): Promise<string> {
     const blob = await fetchImageBlob(raw)
     if (!blob.size) {
       throw new Error('下载图片失败：响应为空')
@@ -138,7 +142,11 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
     const file = new File([blob], filenameFromImageUrl(raw, blob.type || 'image/jpeg'), {
       type: blob.type || 'image/jpeg',
     })
-    const uploadRes = await uploadApi.upload(file, normalizedBoardId)
+    const prepared = await prepareImageAssetForUpload(file, {
+      compressionPolicy: options?.keepPng ? 'none' : 'default',
+    })
+    prepared.warnings.forEach((message) => warning(message))
+    const uploadRes = await uploadApi.upload(prepared.uploadFile, normalizedBoardId)
     if (uploadRes.code !== 0 || !uploadRes.data?.url) {
       throw new Error(uploadRes.msg || '上传图片失败')
     }
@@ -243,10 +251,12 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
       if (!normalized) continue
       if (normalized !== current) ref.set(normalized)
       if (isStableWorkspaceUrl(normalized)) continue
-      let task = tasks.get(normalized)
+      const keepPng = ref.path.includes('executionMaskDataUrl')
+      const taskKey = `${keepPng ? 'png' : 'default'}::${normalized}`
+      let task = tasks.get(taskKey)
       if (!task) {
-        task = fetchAndUploadStable(normalized)
-        tasks.set(normalized, task)
+        task = fetchAndUploadStable(normalized, { keepPng })
+        tasks.set(taskKey, task)
       }
       try {
         ref.set(await task)

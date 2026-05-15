@@ -1,11 +1,11 @@
 import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
 import type { ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
-import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
 } from '../../../shared/utils/imageUploadSupport'
 import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
+import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 
 const FLOW_NODE_KIND_DRAG_MIME = 'application/x-ideaboard-flow-node-kind'
 
@@ -34,7 +34,10 @@ type UseFlowCanvasDropOptions = {
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
   getMaskNodeSnapshot: (nodeId: string) => MaskNodeItem | null
   uploadApi: {
-    upload: (file: File, boardId: string) => Promise<{ code: number; msg?: string; data?: UploadImageResponseData }>
+    upload: (
+      file: File,
+      boardId: string,
+    ) => Promise<{ code: number; msg?: string; data?: UploadImageResponseData }>
   }
   sanitizeApiErrorMessage: (msg: string | null | undefined, fallback: string) => string
   renderMaskNodeMask: (nodeId: string) => void
@@ -56,17 +59,6 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     return file.name.trim()
   }
 
-  async function loadImageRatioFromFile(file: File): Promise<number | null> {
-    const localUrl = URL.createObjectURL(file)
-    try {
-      const size = await loadImageSizeFromUrl(localUrl)
-      if (!size || !size.width || !size.height) return null
-      return size.height / size.width
-    } finally {
-      URL.revokeObjectURL(localUrl)
-    }
-  }
-
   async function uploadImageToBoard(file: File): Promise<UploadImageResult> {
     if (!isSupportedUploadImageFile(file)) {
       throw new Error(unsupportedUploadImageMessage())
@@ -80,17 +72,21 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     if (cached) return cached
     const uploadTask = (async () => {
       try {
-        const ratio = await loadImageRatioFromFile(file)
-        const uploadRes = await options.uploadApi.upload(file, boardId)
+        const prepared = await prepareImageAssetForUpload(file)
+        prepared.warnings.forEach((message) => options.onWarning(message))
+        const uploadRes = await options.uploadApi.upload(prepared.uploadFile, boardId)
         if (uploadRes.code !== 0 || !uploadRes.data?.url) {
           throw new Error(options.sanitizeApiErrorMessage(uploadRes.msg, '上传失败'))
         }
         const width = Number(uploadRes.data.width)
         const height = Number(uploadRes.data.height)
         const serverRatio =
-          Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0 ? height / width : null
+          Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+            ? height / width
+            : null
+        const preparedRatio = prepared.dimensionsKnown && prepared.ratio > 0 ? prepared.ratio : null
         const resolvedRatio =
-          serverRatio && serverRatio > 0 ? serverRatio : ratio && ratio > 0 ? ratio : 1
+          preparedRatio ?? (serverRatio && serverRatio > 0 ? serverRatio : null) ?? 1
         return { url: uploadRes.data.url, ratio: resolvedRatio }
       } catch (error) {
         uploadCache.delete(cacheKey)
@@ -201,7 +197,6 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     onCanvasDragOver,
     onCanvasDrop,
     uploadImageToBoard,
-    loadImageRatioFromFile,
     applyImageFileToImageNode,
     applyImageFileToMaskNode,
   }

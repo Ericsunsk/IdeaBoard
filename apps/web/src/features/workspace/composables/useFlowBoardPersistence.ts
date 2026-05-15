@@ -22,6 +22,10 @@ type SaveStatus = 'idle' | 'saved' | 'failed'
 type ValueRef<T> = { value: T }
 type ArrayRef = { value: unknown[] }
 
+export type SaveCurrentBoardSnapshotOptions = {
+  waitForPreview?: boolean
+}
+
 export type UseFlowBoardPersistenceOptions = {
   nodes: ArrayRef
   edges: ArrayRef
@@ -156,10 +160,14 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       snapshotDataUrl ? Date.now() : undefined,
       snapshotDataUrl ? BOARD_PREVIEW_RENDERER_VERSION : undefined,
     )
-    await syncCanvasBoardToServer(boardId)
+    void syncCanvasBoardToServer(boardId).catch((error) => {
+      console.warn('[workspace] sync board preview after save failed', boardId, error)
+    })
   }
 
-  async function saveCurrentBoardSnapshot(): Promise<boolean> {
+  async function saveCurrentBoardSnapshot(
+    saveOptions: SaveCurrentBoardSnapshotOptions = {},
+  ): Promise<boolean> {
     const boardId = currentBoardId.value
     if (!boardId) {
       options.onWarning('缺少 boardId，无法保存')
@@ -191,9 +199,14 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       options.isDirty.value = false
       options.saveStatus.value = 'saved'
       options.onSuccess('已保存')
-      void refreshBoardPreviewAfterSave(boardId, stabilizedSnapshot).catch((error) => {
-        console.warn('[workspace] refresh board preview after save failed', boardId, error)
-      })
+      const previewRefreshTask = refreshBoardPreviewAfterSave(boardId, stabilizedSnapshot).catch(
+        (error) => {
+          console.warn('[workspace] refresh board preview after save failed', boardId, error)
+        },
+      )
+      if (saveOptions.waitForPreview) {
+        await previewRefreshTask
+      }
       await uploadLifecycle.recycleRemovedUploadsAfterSave(previousSnapshot, stabilizedSnapshot)
       options.refreshSnapshot()
       options.onGraphCommitted?.()

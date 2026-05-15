@@ -428,7 +428,7 @@ async function confirmFlowLeave(): Promise<boolean> {
   const choice = await requestLeaveConfirm()
   if (choice === 'discard') return true
   if (choice === 'cancel') return false
-  return !!(await saveCurrentBoardSnapshot())
+  return !!(await saveCurrentBoardSnapshot({ waitForPreview: true }))
 }
 
 function setActiveTool(tool: 'select' | 'hand' | 'text') {
