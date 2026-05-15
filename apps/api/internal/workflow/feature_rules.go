@@ -7,19 +7,24 @@ const (
 	ProviderGoogleAI         = "google-ai"
 )
 
-func NormalizeProviderAPIType(apiType string, baseURL ...string) string {
-	normalized := strings.ToLower(strings.TrimSpace(apiType))
-	switch normalized {
-	case ProviderOpenAICompatible:
-		return ProviderOpenAICompatible
-	case ProviderGoogleAI:
-		return ProviderGoogleAI
+func IsSupportedProviderAPIType(apiType string) bool {
+	switch strings.ToLower(strings.TrimSpace(apiType)) {
+	case ProviderOpenAICompatible, ProviderGoogleAI:
+		return true
+	default:
+		return false
 	}
+}
 
-	if len(baseURL) > 0 {
-		return InferProviderAPITypeFromBaseURL(baseURL[0])
+func ValidateProviderAPIType(apiType string, baseURL ...string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(apiType))
+	if normalized == "" && len(baseURL) > 0 && strings.TrimSpace(baseURL[0]) != "" {
+		return InferProviderAPITypeFromBaseURL(baseURL[0]), true
 	}
-	return ProviderOpenAICompatible
+	if IsSupportedProviderAPIType(normalized) {
+		return normalized, true
+	}
+	return "", false
 }
 
 func InferProviderAPITypeFromBaseURL(rawBaseURL string) string {
@@ -33,7 +38,7 @@ func InferProviderAPITypeFromBaseURL(rawBaseURL string) string {
 }
 
 func IsGoogleNativeAPIType(apiType string) bool {
-	return NormalizeProviderAPIType(apiType) == ProviderGoogleAI
+	return strings.ToLower(strings.TrimSpace(apiType)) == ProviderGoogleAI
 }
 
 func IsReferenceImageFeature(featureSlug string) bool {

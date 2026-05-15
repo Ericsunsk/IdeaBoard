@@ -59,8 +59,14 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 		return
 	}
 
+	apiType, ok := workflow.ValidateProviderAPIType(req.Type, apiURL)
+	if !ok {
+		response.Error(c, 400, "接口类型不支持")
+		return
+	}
+
 	channel := &Channel{
-		Type:   workflow.NormalizeProviderAPIType(req.Type, apiURL),
+		Type:   apiType,
 		Name:   req.Name,
 		ApiURL: apiURL,
 		Status: 1,
@@ -99,7 +105,13 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 		return
 	}
 
-	channel.Type = workflow.NormalizeProviderAPIType(req.Type, apiURL)
+	apiType, ok := workflow.ValidateProviderAPIType(req.Type, apiURL)
+	if !ok {
+		response.Error(c, 400, "接口类型不支持")
+		return
+	}
+
+	channel.Type = apiType
 	channel.Name = req.Name
 	channel.ApiURL = apiURL
 
@@ -140,7 +152,11 @@ func (h *ChannelHandler) DetectModels(c *gin.Context) {
 		return
 	}
 
-	apiType := workflow.NormalizeProviderAPIType(req.APIType, baseURL)
+	apiType, ok := workflow.ValidateProviderAPIType(req.APIType, baseURL)
+	if !ok {
+		response.Error(c, 400, "接口类型不支持")
+		return
+	}
 	modelsURL, err := buildModelsURL(baseURL, apiType)
 	if err != nil {
 		response.Error(c, 400, "Base URL 无效")

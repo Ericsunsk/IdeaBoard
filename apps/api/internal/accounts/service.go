@@ -107,7 +107,10 @@ func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, 
 	if strings.TrimSpace(req.ModelSet) == "" {
 		return nil, fmt.Errorf("model_set 不能为空，请先检测并选择模型")
 	}
-	apiType := workflow.NormalizeProviderAPIType(req.ApiType, proxyURL)
+	apiType, ok := workflow.ValidateProviderAPIType(req.ApiType, proxyURL)
+	if !ok {
+		return nil, fmt.Errorf("api_type 不支持")
+	}
 	platform := strings.TrimSpace(req.Platform)
 	if platform == "" {
 		platform = apiType
@@ -223,7 +226,11 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 	if strings.TrimSpace(req.ModelSet) == "" {
 		return fmt.Errorf("model_set 不能为空，请先检测并选择模型")
 	}
-	account.ApiType = workflow.NormalizeProviderAPIType(req.ApiType, proxyURL)
+	apiType, ok := workflow.ValidateProviderAPIType(req.ApiType, proxyURL)
+	if !ok {
+		return fmt.Errorf("api_type 不支持")
+	}
+	account.ApiType = apiType
 	if strings.TrimSpace(req.Platform) == "" {
 		account.Platform = account.ApiType
 	} else {

@@ -88,7 +88,10 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	}
 	c.normalizeUpstreamMediaParams(params)
 
-	apiType := workflow.NormalizeProviderAPIType(account.ApiType, account.ProxyURL)
+	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
+	if !ok {
+		return "", fmt.Errorf("账号 %s 的接口类型不支持: %s", account.Name, account.ApiType)
+	}
 
 	timeout := resolveAccountTimeout(account)
 
@@ -167,7 +170,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		"channel_id":   account.ChannelID,
 		"channel_name": channelName,
 		"platform":     account.Platform,
-		"api_type":     account.ApiType,
+		"api_type":     apiType,
 		"status":       tasks.ResultStatusSuccess,
 		"image_url":    imageURL,
 		"image_urls":   imageURLs,

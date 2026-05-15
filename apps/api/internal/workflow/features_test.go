@@ -82,24 +82,30 @@ func TestResolveWorkflowFeatureSlug(t *testing.T) {
 	}
 }
 
-func TestNormalizeProviderAPIType(t *testing.T) {
+func TestValidateProviderAPIType(t *testing.T) {
 	tests := []struct {
 		name    string
 		apiType string
 		baseURL string
 		want    string
+		wantOK  bool
 	}{
-		{name: "openai compatible", apiType: ProviderOpenAICompatible, want: ProviderOpenAICompatible},
-		{name: "google ai", apiType: ProviderGoogleAI, want: ProviderGoogleAI},
-		{name: "infer google from base url", baseURL: "https://generativelanguage.googleapis.com", want: ProviderGoogleAI},
-		{name: "unknown provider falls back", apiType: "legacy-provider", baseURL: "https://api.legacy.example", want: ProviderOpenAICompatible},
-		{name: "default openai compatible", apiType: "", baseURL: "https://api.example.com/v1", want: ProviderOpenAICompatible},
+		{name: "openai compatible", apiType: ProviderOpenAICompatible, want: ProviderOpenAICompatible, wantOK: true},
+		{name: "google ai", apiType: ProviderGoogleAI, want: ProviderGoogleAI, wantOK: true},
+		{name: "infer google", baseURL: "https://generativelanguage.googleapis.com", want: ProviderGoogleAI, wantOK: true},
+		{name: "infer openai compatible", baseURL: "https://api.example.com/v1", want: ProviderOpenAICompatible, wantOK: true},
+		{name: "reject empty without base url", wantOK: false},
+		{name: "reject unsupported explicit type", apiType: "unsupported-provider", baseURL: "https://api.example.com/v1", wantOK: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NormalizeProviderAPIType(tt.apiType, tt.baseURL); got != tt.want {
-				t.Fatalf("apiType=%q baseURL=%q got=%q, want=%q", tt.apiType, tt.baseURL, got, tt.want)
+			got, ok := ValidateProviderAPIType(tt.apiType, tt.baseURL)
+			if ok != tt.wantOK {
+				t.Fatalf("ok=%v, want %v", ok, tt.wantOK)
+			}
+			if got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
 			}
 		})
 	}
