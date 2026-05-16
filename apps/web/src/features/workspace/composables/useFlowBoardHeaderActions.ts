@@ -80,10 +80,14 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) return
     const normalized = normalizeCanvasBoardName(boardNameDraft.value)
+    const currentName = normalizeCanvasBoardName(currentBoardName.value)
     isRenamingBoard.value = false
     boardNameDraft.value = ''
     if (!normalized) {
       options.message.warning('请输入画布名称')
+      return
+    }
+    if (normalized === currentName) {
       return
     }
     if (isCanvasBoardNameTaken(boardId, normalized)) {

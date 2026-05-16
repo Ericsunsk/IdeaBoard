@@ -1,6 +1,15 @@
 <template>
   <div
     v-if="visible"
+    v-motion="{
+      initial: { opacity: 0, y: 6, scale: 0.985 },
+      enter: {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: { duration: 150, easing: 'ease-out' },
+      },
+    }"
     class="node-context-menu"
     :style="{ left: `${x}px`, top: `${y}px` }"
     @mousedown.stop

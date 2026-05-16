@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { userApi } from '../../shared/api/user'
+import { dismissAppToasts } from '../../shared/composables/useAppToast'
 import { getStoredUser, clearStoredAuth, setStoredAuth } from '../../shared/utils/auth'
 
 const routes: RouteRecordRaw[] = [
@@ -180,6 +181,12 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+router.afterEach((to, from) => {
+  if (to.fullPath !== from.fullPath) {
+    dismissAppToasts()
+  }
 })
 
 export default router

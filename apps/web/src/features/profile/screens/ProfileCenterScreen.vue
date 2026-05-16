@@ -99,6 +99,30 @@
               <div v-else class="avatar-placeholder">
                 {{ userStore.user?.username?.[0]?.toUpperCase() }}
               </div>
+              <button
+                class="avatar-edit-btn"
+                :disabled="avatarUploading"
+                title="更换头像"
+                @click="openAvatarPicker"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path
+                    d="M14.5 4h-5L8 6H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3l-1.5-2z"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <circle cx="12" cy="13" r="3.2" stroke-width="2" />
+                </svg>
+              </button>
+              <input
+                ref="avatarInputRef"
+                class="hidden-file-input"
+                type="file"
+                accept="image/*"
+                :disabled="avatarUploading"
+                @change="onAvatarFileChange"
+              />
             </div>
             <div class="user-info-text">
               <h1>{{ userStore.user?.username }}</h1>
@@ -106,10 +130,6 @@
             </div>
           </div>
           <div class="stats-row">
-            <div class="stat-card">
-              <span class="stat-value">{{ taskPagination.total }}</span>
-              <span class="stat-label">累计作品</span>
-            </div>
             <div class="stat-card">
               <span class="stat-value">{{ userStore.user?.uid || '-' }}</span>
               <span class="stat-label">会员编号</span>
@@ -143,42 +163,10 @@
                   <div class="profile-field">
                     <label>加入时间</label>
                     <div class="field-value">
-                      {{ userStore.user?.created_at?.split(' ')?.[0] || '-' }}
+                      {{ formattedJoinedAt }}
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div v-else-if="activeTab === 'tasks'" key="tasks" class="tab-content">
-              <div class="content-card">
-                <div class="card-header">
-                  <h2 class="section-title">我的创作记录</h2>
-                  <button class="refresh-btn" :disabled="taskLoading" @click="loadTasks">
-                    <svg
-                      :class="{ spinning: taskLoading }"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                    >
-                      <path d="M23 4v6h-6" />
-                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                    </svg>
-                    同步记录
-                  </button>
-                </div>
-                <n-data-table
-                  :columns="taskColumns"
-                  :data="tasks"
-                  :loading="taskLoading"
-                  :pagination="taskPagination"
-                  :bordered="false"
-                  size="medium"
-                  class="profile-table"
-                />
               </div>
             </div>
 
@@ -238,10 +226,10 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import { useListUserTasks } from '../../../shared/api/generated-query/tasks/tasks'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { uploadApi } from '../../../shared/api/upload'
 import { NTag } from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
+import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -255,7 +243,7 @@ type NavShape = {
 }
 
 type NavItem = {
-  key: 'profile' | 'tasks' | 'security'
+  key: 'profile' | 'security'
   label: string
   shapes: NavShape[]
 }
@@ -271,20 +259,6 @@ const navItems = [
     ],
   },
   {
-    key: 'tasks',
-    label: '我的作品',
-    shapes: [
-      {
-        tag: 'path',
-        attrs: { d: 'M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z' },
-      },
-      { tag: 'polyline', attrs: { points: '14 2 14 8 20 8' } },
-      { tag: 'line', attrs: { x1: 16, y1: 13, x2: 8, y2: 13 } },
-      { tag: 'line', attrs: { x1: 16, y1: 17, x2: 8, y2: 17 } },
-      { tag: 'line', attrs: { x1: 10, y1: 9, x2: 8, y2: 9 } },
-    ],
-  },
-  {
     key: 'security',
     label: '账号安全',
     shapes: [
@@ -293,81 +267,9 @@ const navItems = [
     ],
   },
 ] satisfies NavItem[]
-
-const taskPage = ref(1)
-const taskPageSize = 8
-
-const tasksQuery = useListUserTasks(
-  computed(() => ({
-    page: taskPage.value,
-    page_size: taskPageSize,
-  })),
-  {
-    query: {
-      placeholderData: (prev) => prev,
-    },
-  },
-)
-
-const tasks = computed(() => tasksQuery.data.value?.data?.list || [])
-const taskLoading = computed(() => tasksQuery.isLoading.value)
-
-const taskPagination = computed(() => ({
-  page: taskPage.value,
-  pageSize: taskPageSize,
-  total: tasksQuery.data.value?.data?.total || 0,
-  onChange: (page: number) => {
-    taskPage.value = page
-  },
-}))
-
-const getStatusConfig = (status: string) => {
-  switch (status) {
-    case 'pending':
-      return { type: 'default' as const, text: '等待中' }
-    case 'running':
-      return { type: 'warning' as const, text: '生成中' }
-    case 'completed':
-      return { type: 'success' as const, text: '已完成' }
-    case 'failed':
-      return { type: 'error' as const, text: '失败' }
-    default:
-      return { type: 'default' as const, text: status }
-  }
-}
-
-const taskColumns: DataTableColumns<any> = [
-  {
-    title: '状态',
-    key: 'status',
-    width: 100,
-    render: (row) => {
-      const cfg = getStatusConfig(row.status)
-      return h(NTag, { type: cfg.type, size: 'small', round: true, ghost: true }, () => cfg.text)
-    },
-  },
-  {
-    title: '内容描述',
-    key: 'prompt',
-    ellipsis: { tooltip: true },
-    render: (row) =>
-      h(
-        'span',
-        { style: { color: '#1d1d1f', fontWeight: '500' } },
-        row.prompt?.replace(/^\[.*?\]\s*/, ''),
-      ),
-  },
-  {
-    title: '创作时间',
-    key: 'created_at',
-    width: 180,
-    render: (row) => h('span', { style: { color: '#86868b', fontSize: '13px' } }, row.created_at),
-  },
-]
-
-function loadTasks() {
-  tasksQuery.refetch()
-}
+const avatarInputRef = ref<HTMLInputElement | null>(null)
+const avatarUploading = ref(false)
+const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
 
 const pwdFormRef = ref()
 const pwdLoading = ref(false)
@@ -388,6 +290,14 @@ const pwdRules = {
   ],
 }
 
+function formatDateWithDots(value?: string) {
+  const datePart = value?.trim().split(/[T\s]/)[0]
+  if (!datePart) return '-'
+  const [year, month, day] = datePart.split('-')
+  if (!year || !month || !day) return datePart.replaceAll('-', '.')
+  return `${year}.${month}.${day}`
+}
+
 async function handleUpdatePassword() {
   try {
     await pwdFormRef.value?.validate()
@@ -405,6 +315,35 @@ async function handleUpdatePassword() {
 
 async function handleLogout() {
   await userStore.logout('/user/home')
+}
+
+function openAvatarPicker() {
+  avatarInputRef.value?.click()
+}
+
+async function onAvatarFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    appToast.warning('仅支持上传图片文件')
+    return
+  }
+  try {
+    avatarUploading.value = true
+    const uploadRes = await uploadApi.upload(file)
+    const avatarUrl = uploadRes.data?.url?.trim()
+    if (!avatarUrl) {
+      throw new Error('头像上传失败，请稍后重试')
+    }
+    await userStore.updateAvatar(avatarUrl)
+    appToast.success('头像已更新')
+  } catch (error) {
+    appToast.error(formatDisplayErrorMessage(error, '头像更新失败'))
+  } finally {
+    avatarUploading.value = false
+  }
 }
 
 onMounted(() => {
@@ -601,12 +540,44 @@ onMounted(() => {
   gap: 20px;
 }
 .avatar-big {
+  position: relative;
   width: 80px;
   height: 80px;
   border-radius: 50%;
   background: #fff;
   border: 4px solid #fff;
   overflow: hidden;
+}
+.avatar-edit-btn {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #d9dfec;
+  background: rgba(255, 255, 255, 0.98);
+  color: #6b7290;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+.avatar-edit-btn:hover:not(:disabled) {
+  border-color: #c8d0e2;
+  background: #f8faff;
+  color: #4a5169;
+}
+.avatar-edit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.hidden-file-input {
+  display: none;
 }
 .avatar-big img {
   width: 100%;

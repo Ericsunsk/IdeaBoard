@@ -6,7 +6,19 @@
     @mousedown.stop
     @click.stop
   >
-    <template v-if="!showStyleStrengthControl">
+    <div
+      v-motion="{
+        initial: { opacity: 0, y: 6, scale: 0.985 },
+        enter: {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          transition: { duration: 160, easing: 'ease-out' },
+        },
+      }"
+      class="image-action-menu-inner"
+    >
+      <template v-if="!showStyleStrengthControl">
       <button
         type="button"
         class="image-action-icon-btn node-tool-button"
@@ -186,18 +198,19 @@
         </span>
         <span class="action-tooltip">调色</span>
       </button>
-    </template>
-    <div
-      v-else
-      class="style-strength-pop"
-      @mousedown.stop
-    >
+      </template>
       <div
-        :ref="setStyleStrengthTrackRef"
-        class="style-strength-track"
-        @mousedown.stop.prevent="emit('style-strength-track-mousedown', $event)"
+        v-else
+        class="style-strength-pop"
+        @mousedown.stop
       >
-        <div class="style-strength-fill" :style="{ width: `${styleInnovateStrengthPct}%` }"></div>
+        <div
+          :ref="setStyleStrengthTrackRef"
+          class="style-strength-track"
+          @mousedown.stop.prevent="emit('style-strength-track-mousedown', $event)"
+        >
+          <div class="style-strength-fill" :style="{ width: `${styleInnovateStrengthPct}%` }"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -256,6 +269,15 @@ const emit = defineEmits<{
   width: 100%;
   max-width: none;
   gap: 0;
+}
+
+.image-action-menu-inner {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: inherit;
+  gap: inherit;
+  width: 100%;
 }
 
 .image-action-icon-btn {

@@ -152,7 +152,19 @@
               @blur="finishOutputCountEditing"
               @keydown.enter.stop.prevent="finishOutputCountEditing"
             />
-            <div v-if="outputCountPickerVisible" class="image-node-output-count-popover">
+            <div
+              v-if="outputCountPickerVisible"
+              v-motion="{
+                initial: { opacity: 0, y: 6, scale: 0.985 },
+                enter: {
+                  opacity: 1,
+                  y: 0,
+                  scale: 1,
+                  transition: { duration: 150, easing: 'ease-out' },
+                },
+              }"
+              class="image-node-output-count-popover"
+            >
               <button
                 v-for="option in outputCountPresetOptions"
                 :key="option"
@@ -639,7 +651,6 @@ function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
   backdrop-filter: blur(10px);
-  animation: image-node-count-pop 0.12s ease-out;
 }
 
 .image-node-output-count-option {
@@ -693,17 +704,6 @@ function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes image-node-count-pop {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 

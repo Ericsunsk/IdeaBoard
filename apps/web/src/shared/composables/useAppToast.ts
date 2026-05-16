@@ -62,3 +62,7 @@ export function useAppToast() {
     dismiss,
   }
 }
+
+export function dismissAppToasts() {
+  toast.dismiss()
+}

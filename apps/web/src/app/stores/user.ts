@@ -134,6 +134,16 @@ export const useUserStore = defineStore('user', () => {
     return true
   }
 
+  async function updateAvatar(avatar: string) {
+    const nextAvatar = avatar.trim()
+    if (!nextAvatar) {
+      throw new Error('头像地址无效')
+    }
+    await userApi.updateProfile({ avatar: nextAvatar })
+    if (!user.value) return
+    updateAuth({ ...user.value, avatar: nextAvatar })
+  }
+
   return {
     user,
     isLoggedIn,
@@ -145,5 +155,6 @@ export const useUserStore = defineStore('user', () => {
     logout,
     fetchUserInfo,
     updatePassword,
+    updateAvatar,
   }
 })

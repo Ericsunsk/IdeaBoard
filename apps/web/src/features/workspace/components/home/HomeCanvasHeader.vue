@@ -49,19 +49,35 @@
           @click.stop="emit('toggle-board-menu')"
         >
           <svg
-            class="chevron-down"
-            :class="{ open: isBoardMenuOpen }"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
+            class="board-switch-icon"
+            width="15"
+            height="15"
+            viewBox="0 0 16 16"
             fill="none"
             stroke="currentColor"
-            stroke-width="3"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <polyline points="6 9 12 15 18 9" />
+            <path d="M9 3h4v4" />
+            <path d="M7 13H3V9" />
           </svg>
         </button>
-        <div v-if="isBoardMenuOpen" class="board-switch-menu" @mousedown.stop @click.stop>
+        <div
+          v-if="isBoardMenuOpen"
+          v-motion="{
+            initial: { opacity: 0, y: 6, scale: 0.98 },
+            enter: {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { duration: 160, easing: 'ease-out' },
+            },
+          }"
+          class="board-switch-menu"
+          @mousedown.stop
+          @click.stop
+        >
           <button
             v-for="board in boardOptions"
             :key="board.id"
@@ -114,20 +130,38 @@
           <path d="M12 15V3" />
         </svg>
       </button>
-      <div class="user-avatar-wrap" title="个人中心" @click="emit('open-center')">
-        <img v-if="avatarUrl" :src="avatarUrl" class="user-avatar" />
-        <div v-else class="user-avatar-placeholder">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
+      <div class="user-menu-wrap" @pointerdown.stop @mousedown.stop @click.stop>
+        <button class="user-avatar-wrap" title="账户菜单" @click="toggleUserMenu">
+          <img v-if="avatarUrl" :src="avatarUrl" class="user-avatar" />
+          <div v-else class="user-avatar-placeholder">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+        </button>
+        <div
+          v-if="isUserMenuOpen"
+          v-motion="{
+            initial: { opacity: 0, y: 6, scale: 0.98 },
+            enter: {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { duration: 160, easing: 'ease-out' },
+            },
+          }"
+          class="user-menu"
+        >
+          <button class="user-menu-item" @click="onOpenCenter">个人中心</button>
+          <button class="user-menu-item danger" @click="onLogout">退出登录</button>
         </div>
       </div>
     </div>
@@ -136,6 +170,7 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps<{
   currentBoardName: string
@@ -157,8 +192,41 @@ const emit = defineEmits<{
   (e: 'select-board', boardId: string): void
   (e: 'export'): void
   (e: 'open-center'): void
+  (e: 'logout'): void
   (e: 'navigate-back'): void
 }>()
+
+const isUserMenuOpen = ref(false)
+
+function closeUserMenu() {
+  isUserMenuOpen.value = false
+}
+
+function toggleUserMenu() {
+  isUserMenuOpen.value = !isUserMenuOpen.value
+}
+
+function onOpenCenter() {
+  closeUserMenu()
+  emit('open-center')
+}
+
+function onLogout() {
+  closeUserMenu()
+  emit('logout')
+}
+
+function onGlobalPointerDown() {
+  closeUserMenu()
+}
+
+onMounted(() => {
+  window.addEventListener('pointerdown', onGlobalPointerDown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('pointerdown', onGlobalPointerDown)
+})
 
 function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null) {
   props.setBoardNameInputRef(element as HTMLElement | null)
@@ -214,7 +282,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: #202124;
+  color: var(--ib-control-icon);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,8 +292,8 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
     color 0.18s ease;
 }
 .header-back-btn:hover {
-  background: #e8eaed;
-  color: #6757c8;
+  background: var(--ib-control-bg-hover);
+  color: var(--ib-control-icon-hover);
 }
 .file-name-btn {
   padding: 0;
@@ -258,7 +326,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: #5f6368;
+  color: var(--ib-control-icon);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -268,14 +336,8 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
     color 0.2s ease;
 }
 .board-switch-btn:hover {
-  background: #e8eaed;
-  color: #6757c8;
-}
-.chevron-down {
-  transition: transform 0.2s ease;
-}
-.chevron-down.open {
-  transform: rotate(180deg);
+  background: var(--ib-control-bg-hover);
+  color: var(--ib-control-icon-hover);
 }
 .board-switch-menu {
   position: absolute;
@@ -331,7 +393,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   border: 1px solid #e2e4e8;
   border-radius: 50%;
   background: #fff;
-  color: #5f6368;
+  color: var(--ib-control-icon);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -343,8 +405,8 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 }
 .header-icon-btn:hover:not(:disabled) {
   border-color: #d8ddea;
-  background: #e8eaed;
-  color: #6757c8;
+  background: var(--ib-control-bg-hover);
+  color: var(--ib-control-icon-hover);
 }
 .export-btn:not(:disabled) {
   border-color: #9278e6;
@@ -377,12 +439,53 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
     border-color 0.2s ease,
     color 0.2s ease;
   flex-shrink: 0;
-  color: #5f6368;
+  color: var(--ib-control-icon);
+}
+.user-menu-wrap {
+  position: relative;
 }
 .user-avatar-wrap:hover {
   border-color: #d8ddea;
-  background: #e8eaed;
-  color: #6757c8;
+  background: var(--ib-control-bg-hover);
+  color: var(--ib-control-icon-hover);
+}
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 128px;
+  border: 1px solid #d8ddea;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 140;
+}
+.user-menu-item {
+  width: 100%;
+  border: none;
+  height: 34px;
+  border-radius: 8px;
+  background: transparent;
+  color: #4b5565;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+.user-menu-item:hover {
+  background: rgba(146, 120, 230, 0.12);
+}
+.user-menu-item.danger {
+  color: #d14343;
+}
+.user-menu-item.danger:hover {
+  background: rgba(209, 67, 67, 0.1);
 }
 .user-avatar {
   width: 100%;

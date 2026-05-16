@@ -21,6 +21,12 @@ body {
   min-height: 100vh;
 }
 
+:root {
+  --ib-control-icon: #5f6368;
+  --ib-control-icon-hover: #6757c8;
+  --ib-control-bg-hover: #e8eaed;
+}
+
 /* 全局链接样式 */
 a {
   color: inherit;

@@ -21,6 +21,7 @@
       @select-board="onSelectBoard"
       @export="onExportSelectedImages"
       @open-center="onNavigateRequest('/user/center')"
+      @logout="onLogoutRequest"
       @navigate-back="onNavigateRequest('/user/boards')"
     />
 
@@ -106,6 +107,9 @@
         :delete-key-code="null"
         :default-edge-options="{ animated: false, updatable: true }"
         :min-zoom="0.1"
+        :zoom-on-scroll="false"
+        :pan-on-scroll="true"
+        :pan-on-scroll-mode="PanOnScrollMode.Free"
         :only-render-visible-elements="FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING"
         :is-valid-connection="isValidConnection"
         @connect="onConnect"
@@ -199,7 +203,7 @@ import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
 import type { Edge, Node } from '@vue-flow/core'
-import { useVueFlow, VueFlow } from '@vue-flow/core'
+import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowHistory } from '../composables/useFlowHistory'
@@ -395,6 +399,11 @@ function onPanViewport(delta: { x: number; y: number }) {
 async function onNavigateRequest(path: string) {
   void flushAutosave()
   await router.push(path)
+}
+
+async function onLogoutRequest() {
+  void flushAutosave()
+  await userStore.logout('/user/home')
 }
 
 function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
@@ -967,7 +976,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #5f6368;
+  color: var(--ib-control-icon);
   cursor: pointer;
   border: none;
   background: transparent;
@@ -976,8 +985,8 @@ onMounted(async () => {
     color 0.2s ease;
 }
 .tool-item:hover {
-  background: #e8eaed;
-  color: #6757c8;
+  background: var(--ib-control-bg-hover);
+  color: var(--ib-control-icon-hover);
 }
 .tool-item.active {
   background: #f1f3f9;
@@ -1077,7 +1086,7 @@ onMounted(async () => {
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #4f5563;
+  color: var(--ib-control-icon);
   font-size: 18px;
   line-height: 1;
   display: flex;
@@ -1089,7 +1098,7 @@ onMounted(async () => {
 }
 .zoom-btn:hover {
   background: #f1f3f9;
-  color: #6757c8;
+  color: var(--ib-control-icon-hover);
 }
 .zoom-level {
   font-size: 13px;
