@@ -21,6 +21,16 @@ import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 type SaveStatus = 'idle' | 'saved' | 'failed'
 type ValueRef<T> = { value: T }
 type ArrayRef = { value: unknown[] }
+type FlowNodeLike = {
+  data?: {
+    snapshotNode?: {
+      type?: unknown
+      sourceImageUrl?: unknown
+      outputStatus?: unknown
+      outputImages?: unknown
+    }
+  }
+}
 
 export type SaveCurrentBoardSnapshotOptions = {
   waitForPreview?: boolean
@@ -50,6 +60,22 @@ export type UseFlowBoardPersistenceOptions = {
 }
 
 export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions) {
+  function hasPendingImageResultNode(nodes: unknown[]): boolean {
+    return nodes.some((node) => {
+      const snapshotNode = (node as FlowNodeLike)?.data?.snapshotNode
+      if (!snapshotNode || snapshotNode.type !== 'image-node') return false
+      const sourceUrl =
+        typeof snapshotNode.sourceImageUrl === 'string' ? snapshotNode.sourceImageUrl.trim() : ''
+      const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages : []
+      const hasOutputImage = outputImages.some(
+        (item) =>
+          typeof (item as { url?: unknown })?.url === 'string' &&
+          ((item as { url: string }).url ?? '').trim().length > 0,
+      )
+      return snapshotNode.outputStatus === 'running' && !sourceUrl && !hasOutputImage
+    })
+  }
+
   function readBoardIdFromQuery() {
     return resolveBoardIdFromQueryValue(
       options.getBoardIdQuery() as string | string[] | null | undefined,
@@ -194,9 +220,11 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       await saveBoardSnapshotFromFlow(boardId, stabilizedSnapshot)
       options.boardBaseSnapshot.value = stabilizedSnapshot
       const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
-      options.commitNodes(nextFlow.nodes as unknown[])
-      options.commitEdges(nextFlow.edges as unknown[])
-      options.clearFlowHistoryBaseline()
+      if (!hasPendingImageResultNode(options.nodes.value)) {
+        options.commitNodes(nextFlow.nodes as unknown[])
+        options.commitEdges(nextFlow.edges as unknown[])
+        options.clearFlowHistoryBaseline()
+      }
       options.isDirty.value = false
       options.saveStatus.value = 'saved'
       if (!saveOptions.silent) {

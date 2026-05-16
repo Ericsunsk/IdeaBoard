@@ -1,8 +1,9 @@
-import { nextTick, ref, type Ref } from 'vue'
+import { nextTick, ref, watch, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { taskApi } from '../../../shared/api/task'
 import { vectorizeApi } from '../../../shared/api/vectorize'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { extractImageUrlsFromTaskResult } from '../../../shared/query/taskResult'
 import {
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
@@ -45,6 +46,11 @@ type ImageDirectActionSource = {
   y: number
   width: number
 }
+type PendingImageNodeItem = ImageNodeItem & {
+  pendingTaskId?: string
+  pendingSourceNodeId?: string
+  pendingPrompt?: string
+}
 
 const STYLE_INNOVATE_DEFAULT_STRENGTH = 50
 const IMAGE_RESULT_NODE_X_GAP = 100
@@ -60,6 +66,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   const runningNodeIds = ref<Set<string>>(new Set())
   const cancelledResultNodeIds = new Set<string>()
   const resultLayoutsBySourceNodeId = new Map<string, Map<string, ImageDirectActionSource>>()
+  const resumedTaskIds = new Set<string>()
 
   function setNodeRunning(nodeId: string, running: boolean) {
     const next = new Set(runningNodeIds.value)
@@ -366,6 +373,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
                 sourceImageRatio: ratio > 0 ? ratio : 1,
                 outputStatus: 'ready',
                 outputImages: [],
+                pendingTaskId: undefined,
+                pendingSourceNodeId: undefined,
+                pendingPrompt: undefined,
               },
             },
           }
@@ -382,6 +392,33 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     options.refreshNodeInternals?.([nodeId])
   }
 
+  function updatePendingImageTaskMeta(
+    nodeId: string,
+    patch: Pick<PendingImageNodeItem, 'pendingTaskId' | 'pendingSourceNodeId' | 'pendingPrompt'>,
+  ) {
+    commitGraphMutation(
+      (items, currentEdges) => ({
+        nodes: items.map((item) => {
+          if (item.id !== nodeId || item.data?.kind !== 'image') return item
+          const snapshot = item.data.snapshotNode
+          if (!snapshot || typeof snapshot !== 'object') return item
+          return {
+            ...item,
+            data: {
+              ...item.data,
+              snapshotNode: {
+                ...(snapshot as ImageNodeItem),
+                ...patch,
+              },
+            },
+          }
+        }),
+        edges: currentEdges,
+      }),
+      { recordHistory: false },
+    )
+  }
+
   function removePendingImageResultNode(nodeId: string) {
     cancelledResultNodeIds.add(nodeId)
     forgetResultNodeLayout(nodeId)
@@ -392,6 +429,49 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       }),
       { recordHistory: false },
     )
+  }
+
+  function extractTaskImageUrls(task: {
+    outputs?: Array<{ role?: string; url?: string }>
+    result?: string | null
+  }): string[] {
+    const outputUrls = Array.isArray(task.outputs)
+      ? task.outputs
+          .filter((output) => output?.role === 'image' && typeof output.url === 'string')
+          .map((output) => output.url?.trim() ?? '')
+          .filter((url) => url.length > 0)
+      : []
+    if (outputUrls.length > 0) return outputUrls
+    return extractImageUrlsFromTaskResult(task.result)
+  }
+
+  async function waitExistingOrLiveTaskResult(taskId: string): Promise<string[]> {
+    let task:
+      | {
+          status?: string
+          outputs?: Array<{ role?: string; url?: string }>
+          result?: string | null
+          error_msg?: string
+        }
+      | undefined
+    try {
+      const taskRes = await taskApi.get(taskId)
+      task = taskRes.data?.task
+    } catch (error) {
+      const status = Number((error as { status?: unknown; code?: unknown })?.status)
+      const code = Number((error as { status?: unknown; code?: unknown })?.code)
+      if (status === 404 || code === 404) throw error
+      return waitTaskResult(taskId)
+    }
+    if (task?.status === 'completed') {
+      const urls = extractTaskImageUrls(task)
+      if (urls.length > 0) return urls
+      throw new Error('任务完成但未返回图片')
+    }
+    if (task?.status === 'failed') {
+      throw new Error(sanitizeApiErrorMessage(task.error_msg, '生成失败'))
+    }
+    return waitTaskResult(taskId)
   }
 
   async function resolveResultRatio(url: string, fallbackRatio: number): Promise<number> {
@@ -434,11 +514,11 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     )
   }
 
-  async function runSubmitAndWait(
+  async function submitDirectActionTask(
     source: ImageDirectActionSource,
     action: Exclude<DirectActionKey, 'to-vector'>,
     strengthOverride?: number,
-  ): Promise<string[]> {
+  ): Promise<string> {
     const imageSize = await loadImageSizeFromUrl(source.url)
     const strength = Number.isFinite(strengthOverride)
       ? Math.max(0, Math.min(100, Math.round(strengthOverride as number)))
@@ -470,13 +550,13 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     if (submitRes.code !== 0 || !submitRes.data?.task_id) {
       throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
     }
-    return waitTaskResult(submitRes.data.task_id)
+    return submitRes.data.task_id
   }
 
-  async function runPromptImageGeneration(
+  async function submitPromptImageGenerationTask(
     source: ImageDirectActionSource,
     prompt: string,
-  ): Promise<string[]> {
+  ): Promise<string> {
     const imageSize = await loadImageSizeFromUrl(source.url)
     const request = buildExecutionTaskRequest({
       prompt: `${EXECUTION_EDIT_MODE_META['partial-edit'].promptPrefix} ${prompt}`,
@@ -492,7 +572,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     if (submitRes.code !== 0 || !submitRes.data?.task_id) {
       throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
     }
-    return waitTaskResult(submitRes.data.task_id)
+    return submitRes.data.task_id
   }
 
   async function runToVector(source: ImageDirectActionSource): Promise<string[]> {
@@ -530,10 +610,19 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       }
       resultNodeId = appendPendingImageResultNode(source, nodeId)
       setNodeRunning(resultNodeId, true)
-      const urls =
+      const taskId =
         action === 'to-vector'
-          ? await runToVector(source)
-          : await runSubmitAndWait(source, action, runOptions?.strength)
+          ? ''
+          : await submitDirectActionTask(source, action, runOptions?.strength)
+      if (taskId) {
+        updatePendingImageTaskMeta(resultNodeId, {
+          pendingTaskId: taskId,
+          pendingSourceNodeId: nodeId,
+          pendingPrompt: '',
+        })
+      }
+      const urls =
+        action === 'to-vector' ? await runToVector(source) : await waitExistingOrLiveTaskResult(taskId)
       const firstUrl = urls.find((url) => typeof url === 'string' && url.trim())?.trim()
       if (!firstUrl) throw new Error('任务完成但未返回图片')
       const ratio = await resolveResultRatio(firstUrl, source.ratio)
@@ -572,7 +661,13 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
       const results = await Promise.allSettled(
         resultNodeIds.map(async (resultNodeId) => {
-          const urls = (await runPromptImageGeneration(source, normalizedPrompt))
+          const taskId = await submitPromptImageGenerationTask(source, normalizedPrompt)
+          updatePendingImageTaskMeta(resultNodeId, {
+            pendingTaskId: taskId,
+            pendingSourceNodeId: nodeId,
+            pendingPrompt: normalizedPrompt,
+          })
+          const urls = (await waitExistingOrLiveTaskResult(taskId))
             .map((url) => (typeof url === 'string' ? url.trim() : ''))
             .filter((url) => url.length > 0)
           const url = urls[0]
@@ -620,6 +715,58 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       }
     }
   }
+
+  async function resumePendingImageResultNode(nodeId: string, taskId: string, fallbackRatio: number) {
+    if (runningNodeIds.value.has(nodeId) || resumedTaskIds.has(taskId)) return
+    resumedTaskIds.add(taskId)
+    setNodeRunning(nodeId, true)
+    try {
+      const urls = (await waitExistingOrLiveTaskResult(taskId))
+        .map((url) => (typeof url === 'string' ? url.trim() : ''))
+        .filter((url) => url.length > 0)
+      const url = urls[0]
+      if (!url) throw new Error('任务完成但未返回图片')
+      const ratio = await resolveResultRatio(url, fallbackRatio)
+      updatePendingImageResultNode(nodeId, url, ratio)
+      options.onSuccess('生成完成')
+    } catch (error) {
+      removePendingImageResultNode(nodeId)
+      const msg = error instanceof Error ? error.message : '生成失败'
+      options.onWarning(msg)
+    } finally {
+      setNodeRunning(nodeId, false)
+      resumedTaskIds.delete(taskId)
+    }
+  }
+
+  watch(
+    () =>
+      options.nodes.value
+        .map((node) => {
+          const snapshot = node.data?.snapshotNode as PendingImageNodeItem | undefined
+          return snapshot?.outputStatus === 'running' && snapshot.pendingTaskId
+            ? `${node.id}:${snapshot.pendingTaskId}`
+            : ''
+        })
+        .filter(Boolean)
+        .join('|'),
+    () => {
+      options.nodes.value.forEach((node) => {
+        if (node.data?.kind !== 'image') return
+        const snapshot = node.data.snapshotNode as PendingImageNodeItem | undefined
+        if (!snapshot || snapshot.outputStatus !== 'running') return
+        const taskId = `${snapshot.pendingTaskId ?? ''}`.trim()
+        if (!taskId) return
+        const fallbackRatio = Number(snapshot.sourceImageRatio)
+        void resumePendingImageResultNode(
+          node.id,
+          taskId,
+          Number.isFinite(fallbackRatio) && fallbackRatio > 0 ? fallbackRatio : 1,
+        )
+      })
+    },
+    { immediate: true },
+  )
 
   function isNodeDirectActionRunning(nodeId: string): boolean {
     return runningNodeIds.value.has(nodeId)

@@ -213,7 +213,9 @@ function hasRenderableImageSource(node: CanvasNodeItem): boolean {
         (item) => typeof item?.url === 'string' && item.url.trim().length > 0,
       )
     : false
-  // A pending result image node with no source and no outputs is transient and should not persist.
+  const pendingTaskId =
+    typeof imageNode.pendingTaskId === 'string' ? imageNode.pendingTaskId.trim() : ''
+  if (imageNode.outputStatus === 'running' && pendingTaskId) return true
   if (imageNode.outputStatus === 'running' && !sourceUrl && !hasOutputImage) return false
   return true
 }
