@@ -3,19 +3,12 @@ import {
   listAdminTasks,
   submitAdminTask,
 } from './generated-query/admin-tasks/admin-tasks'
-import type {
-  ApiResponseTaskData,
-  ApiResponseTaskIdData,
-  ApiResponseTaskListData,
-  ListAdminTasksParams,
-} from './generated-query/model'
-import type { ApiResponse } from './types'
-import type { SubmitTaskData } from './task'
+export type { ListAdminTasksParams, SubmitTaskRequest as AdminSubmitTaskData } from './generated-query/model'
 
 export const adminTaskApi = {
-  submit: (data: SubmitTaskData): Promise<ApiResponse<ApiResponseTaskIdData>> =>
-    submitAdminTask(data),
-  get: (task_id: string): Promise<ApiResponse<ApiResponseTaskData>> => getAdminTask(task_id),
-  list: (params?: ListAdminTasksParams): Promise<ApiResponse<ApiResponseTaskListData>> =>
-    listAdminTasks(params),
+  submit: submitAdminTask,
+  get: getAdminTask,
+  list: listAdminTasks,
 }
+
+export { getAdminTask, listAdminTasks, submitAdminTask }

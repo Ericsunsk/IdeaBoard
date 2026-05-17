@@ -7,40 +7,31 @@ import {
   updateAdminAccount,
 } from './generated-query/admin-accounts/admin-accounts'
 import type {
-  AdminAccount as GeneratedAdminAccount,
-  AdminAccountCreateRequest as GeneratedAdminAccountCreateRequest,
-  AdminAccountUpdateRequest as GeneratedAdminAccountUpdateRequest,
-  ListAdminAccountsParams,
+  AdminAccount,
+  AdminAccountCreateRequest,
+  AdminAccountUpdateRequest,
+  ApiResponseAccountListData,
 } from './generated-query/model'
-import type { ApiResponse } from './types'
 
-export type ApiAccount = GeneratedAdminAccount
+export type ApiAccount = AdminAccount
 
-export type CreateAccountRequest = GeneratedAdminAccountCreateRequest
+export type CreateAccountRequest = AdminAccountCreateRequest
 
-export type UpdateAccountRequest = GeneratedAdminAccountUpdateRequest
+export type UpdateAccountRequest = AdminAccountUpdateRequest
 
-export interface AccountListResponse {
-  list: ApiAccount[]
-  total: number
-}
+export type AccountListResponse = ApiResponseAccountListData
 
-export const createAccount = (
-  data: CreateAccountRequest,
-): Promise<ApiResponse<{ account: ApiAccount }>> => createAdminAccount(data)
+export const createAccount = createAdminAccount
 
-export const updateAccount = (id: number, data: UpdateAccountRequest): Promise<ApiResponse<null>> =>
-  updateAdminAccount(id, data)
+export const updateAccount = updateAdminAccount
 
-export const deleteAccount = (id: number): Promise<ApiResponse<null>> => deleteAdminAccount(id)
+export const deleteAccount = deleteAdminAccount
 
-export const listAccounts = (
-  params?: ListAdminAccountsParams,
-): Promise<ApiResponse<AccountListResponse>> => listAdminAccounts(params)
+export const listAccounts = listAdminAccounts
 
-export const startAccount = (id: number): Promise<ApiResponse<null>> => startAdminAccount(id)
+export const startAccount = startAdminAccount
 
-export const stopAccount = (id: number): Promise<ApiResponse<null>> => stopAdminAccount(id)
+export const stopAccount = stopAdminAccount
 
 export const accountApi = {
   createAccount,

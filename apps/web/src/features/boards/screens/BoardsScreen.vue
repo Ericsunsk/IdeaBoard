@@ -6,7 +6,41 @@
       <div class="brand">
         <span class="brand-name">IdeaBoard</span>
       </div>
-      <button class="header-home-btn" type="button" @click="router.push('/user/home')">Home</button>
+      <div class="user-menu-wrap" @pointerdown.stop @mousedown.stop @click.stop>
+        <button class="user-avatar-wrap" type="button" title="账户菜单" @click="toggleUserMenu">
+          <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="user-avatar" />
+          <div v-else class="user-avatar-placeholder">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+        </button>
+        <div
+          v-if="isUserMenuOpen"
+          v-motion="{
+            initial: { opacity: 0, y: 6, scale: 0.98 },
+            enter: {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { duration: 160, easing: 'ease-out' },
+            },
+          }"
+          class="user-menu"
+        >
+          <button class="user-menu-item" type="button" @click="openCenter">个人中心</button>
+          <button class="user-menu-item" type="button" @click="goHome">返回首页</button>
+          <button class="user-menu-item danger" type="button" @click="logout">退出登录</button>
+        </div>
+      </div>
     </header>
 
     <main class="boards-main">
@@ -15,7 +49,7 @@
 
       <section class="boards-toolbar">
         <button class="create-btn" type="button" @click="createAndOpenBoard">
-          + Create New Project
+          + New Canvas
         </button>
         <label class="search-wrap">
           <svg
@@ -28,7 +62,7 @@
             <circle cx="11" cy="11" r="7"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input v-model.trim="searchKeyword" type="text" placeholder="Search projects..." />
+          <input v-model.trim="searchKeyword" type="text" placeholder="Search canvases..." />
         </label>
         <select v-model="sortMode" class="sort-select">
           <option value="recent">Recent</option>
@@ -98,9 +132,11 @@ import {
   syncDeleteCanvasBoardToServer,
 } from '../lib/boardSync'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useUserStore } from '../../../app/stores/user'
 
 const router = useRouter()
 const appToast = useAppToast()
+const userStore = useUserStore()
 
 const boards = ref<CanvasBoardMeta[]>([])
 const searchKeyword = ref('')
@@ -109,6 +145,7 @@ const renamingBoardId = ref<string | null>(null)
 const renameDraft = ref('')
 const suppressNextBoardOpen = ref(false)
 const activeMenuBoardId = ref<string | null>(null)
+const isUserMenuOpen = ref(false)
 
 const boardPreviewMap = ref<Record<string, string>>({})
 const previewRefreshQueue: string[] = []
@@ -395,10 +432,38 @@ async function handleDeleteAction(board: CanvasBoardMeta) {
 
 function handleWindowMouseDown(e: MouseEvent) {
   const target = e.target as HTMLElement | null
-  if (target?.closest('.board-menu-btn') || target?.closest('.board-action-menu')) {
+  if (
+    target?.closest('.board-menu-btn') ||
+    target?.closest('.board-action-menu') ||
+    target?.closest('.user-menu-wrap')
+  ) {
     return
   }
   activeMenuBoardId.value = null
+  isUserMenuOpen.value = false
+}
+
+function closeUserMenu() {
+  isUserMenuOpen.value = false
+}
+
+function toggleUserMenu() {
+  isUserMenuOpen.value = !isUserMenuOpen.value
+}
+
+function openCenter() {
+  closeUserMenu()
+  router.push('/user/center')
+}
+
+function goHome() {
+  closeUserMenu()
+  router.push('/user/home')
+}
+
+async function logout() {
+  closeUserMenu()
+  await userStore.logout('/user/home')
 }
 
 onMounted(async () => {
@@ -487,16 +552,92 @@ onUnmounted(() => {
   letter-spacing: -0.03em;
 }
 
-.header-home-btn {
-  border: 1px solid #d9dfec;
-  background: rgba(255, 255, 255, 0.9);
-  color: #3d4253;
+.user-menu-wrap {
+  position: relative;
+}
+
+.user-avatar-wrap {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #e2e4e8;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--ib-control-icon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.user-avatar-wrap:hover {
+  border-color: #d8ddea;
+  background: var(--ib-control-bg-hover);
+  color: var(--ib-control-icon-hover);
+}
+
+.user-avatar,
+.user-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.user-avatar {
+  object-fit: cover;
+}
+
+.user-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 128px;
+  padding: 6px;
+  border: 1px solid #d8ddea;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-menu-item {
+  width: 100%;
   height: 34px;
-  min-width: 78px;
-  border-radius: 999px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #4b5565;
+  cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.18s ease;
+}
+
+.user-menu-item:hover {
+  background: rgba(146, 120, 230, 0.12);
+}
+
+.user-menu-item.danger {
+  color: #d14343;
+}
+
+.user-menu-item.danger:hover {
+  background: rgba(209, 67, 67, 0.1);
 }
 
 .boards-main {

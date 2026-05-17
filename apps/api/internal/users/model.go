@@ -7,6 +7,7 @@ type User struct {
 	Username   string    `gorm:"type:varchar(50);not null;uniqueIndex" json:"username"`
 	AuthUserID *string   `gorm:"column:auth_user_id;type:varchar(128);uniqueIndex" json:"auth_user_id"`
 	StorageUID string    `gorm:"type:char(6);not null;uniqueIndex" json:"uid"`
+	Avatar     string    `gorm:"type:varchar(1024)" json:"avatar,omitempty"`
 	Role       string    `gorm:"type:varchar(20);default:'user'" json:"role"`
 	Status     int8      `gorm:"type:tinyint;default:1" json:"status"`
 	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`

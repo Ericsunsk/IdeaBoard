@@ -1,13 +1,11 @@
 package httpapi
 
 import (
-	"errors"
 	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
-	"io"
 	iofs "io/fs"
 	"log"
 	"mime/multipart"
@@ -15,9 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 
 	"api/internal/accounts"
 	"api/internal/assets"
@@ -27,7 +23,6 @@ import (
 	"api/internal/imageproc"
 	"api/internal/platform/media"
 	"api/internal/platform/response"
-	"api/internal/platform/safehttp"
 	"api/internal/prompts"
 	"api/internal/storage"
 	"api/internal/users"
@@ -221,188 +216,10 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 
 	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
 
-	userApi.POST("/upload", func(c *gin.Context) {
-		file, err := c.FormFile("file")
-		if err != nil {
-			response.Error(c, 400, "请选择文件")
-			return
-		}
-		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, media.UploadAllowedImageExtensions())
-		if !ok {
-			return
-		}
-		userID := c.GetUint64("user_id")
-		if userID == 0 {
-			response.Error(c, 401, "未登录")
-			return
-		}
-		boardID := strings.TrimSpace(c.PostForm("board_id"))
-		if h.BoardService == nil {
-			response.InternalError(c, 500, "上传失败", fmt.Errorf("board service not configured"))
-			return
-		}
-		board, _, err := h.BoardService.ResolveBoardWriteAccess(userID, boardID)
-		if err != nil {
-			switch {
-			case errors.Is(err, boards.ErrInvalidBoardInput):
-				response.Error(c, 400, "缺少画布ID")
-			case errors.Is(err, boards.ErrBoardNotFound):
-				response.Error(c, 404, "画布不存在")
-			case errors.Is(err, boards.ErrBoardPermissionDenied):
-				response.Error(c, 403, "无权编辑该画布")
-			default:
-				response.InternalError(c, 500, "上传失败", err)
-			}
-			return
-		}
-		owner, err := h.UserRepo.GetByID(board.UserID)
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		userSegment, err := storage.NormalizeWorkspaceStorageUserSegment(owner.StorageUID)
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		boardSegment, err := storage.NormalizeWorkspaceBoardSegment(board.BoardID)
-		if err != nil {
-			response.Error(c, 400, err.Error())
-			return
-		}
-		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
-			DirPrefix: path.Join("workspace", userSegment, boardSegment, "content"),
-		})
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		payload := gin.H{"url": url}
-		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
-			for k, v := range meta {
-				payload[k] = v
-			}
-		}
-		response.Success(c, payload)
-	})
-
-	userApi.DELETE("/upload", func(c *gin.Context) {
-		var req struct {
-			URL     string `json:"url"`
-			BoardID string `json:"board_id"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			response.Error(c, 400, "请求参数错误")
-			return
-		}
-		userID := c.GetUint64("user_id")
-		if userID == 0 {
-			response.Error(c, 401, "未登录")
-			return
-		}
-		if h.BoardService == nil {
-			response.InternalError(c, 500, "删除失败", fmt.Errorf("board service not configured"))
-			return
-		}
-		board, _, err := h.BoardService.ResolveBoardWriteAccess(userID, req.BoardID)
-		if err != nil {
-			switch {
-			case errors.Is(err, boards.ErrInvalidBoardInput):
-				response.Error(c, 400, "缺少画布ID")
-			case errors.Is(err, boards.ErrBoardNotFound):
-				response.Error(c, 404, "画布不存在")
-			case errors.Is(err, boards.ErrBoardPermissionDenied):
-				response.Error(c, 403, "无权编辑该画布")
-			default:
-				response.InternalError(c, 500, "删除失败", err)
-			}
-			return
-		}
-		owner, err := h.UserRepo.GetByID(board.UserID)
-		if err != nil {
-			response.InternalError(c, 500, "删除失败", err)
-			return
-		}
-		if err := h.StorageService.DeleteWorkspaceUploadByURL(owner.StorageUID, board.BoardID, req.URL); err != nil {
-			response.Error(c, 400, err.Error())
-			return
-		}
-		response.Success(c, gin.H{"deleted": true})
-	})
-
-	userApi.GET("/download", func(c *gin.Context) {
-		const maxDownloadSize = 50 * 1024 * 1024 // 50 MB
-
-		imgURL := c.Query("url")
-		if imgURL == "" {
-			response.Error(c, 400, "缺少 url 参数")
-			return
-		}
-		resp, err := safehttp.Get(c.Request.Context(), imgURL, 20*time.Second)
-		if err != nil {
-			response.Error(c, 400, "下载失败")
-			return
-		}
-		defer resp.Body.Close()
-
-		contentType := strings.TrimSpace(strings.Split(resp.Header.Get("Content-Type"), ";")[0])
-		if !strings.HasPrefix(strings.ToLower(contentType), "image/") {
-			response.Error(c, 400, "仅支持下载图片类型文件")
-			return
-		}
-		magicExt := media.ImageExtensionFromMIME(contentType)
-		if magicExt == "" {
-			response.Error(c, 400, "仅支持 "+media.SupportedUploadImageLabel()+" 图片")
-			return
-		}
-
-		if resp.ContentLength > maxDownloadSize {
-			response.Error(c, 400, "文件大小不能超过 50MB")
-			return
-		}
-
-		tmpFile, err := os.CreateTemp("", "feng-download-*")
-		if err != nil {
-			response.Error(c, 500, "创建临时文件失败")
-			return
-		}
-		defer os.Remove(tmpFile.Name())
-		defer tmpFile.Close()
-
-		written, err := io.Copy(tmpFile, io.LimitReader(resp.Body, maxDownloadSize+1))
-		if err != nil {
-			response.Error(c, 500, "读取远程文件失败")
-			return
-		}
-		if written > maxDownloadSize {
-			response.Error(c, 400, "文件大小不能超过 50MB")
-			return
-		}
-		if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-			response.Error(c, 500, "读取临时文件失败")
-			return
-		}
-
-		header := make([]byte, 16)
-		if n, readErr := tmpFile.Read(header); readErr == nil && n > 0 {
-			if validateErr := media.ValidateImageBytes(header[:n], magicExt); validateErr != nil {
-				response.Error(c, 400, "文件内容与类型不匹配")
-				return
-			}
-		}
-		if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-			response.Error(c, 500, "读取临时文件失败")
-			return
-		}
-
-		c.Header("Content-Disposition", "attachment; filename=image.png")
-		c.Header("Content-Type", contentType)
-		c.Header("Content-Length", strconv.FormatInt(written, 10))
-		c.Status(resp.StatusCode)
-		if _, err := io.Copy(c.Writer, tmpFile); err != nil {
-			c.Error(err)
-		}
-	})
+	userApi.POST("/profile/avatar", uploadProfileAvatarHandler(h))
+	userApi.POST("/boards/:board_id/uploads", uploadBoardAssetHandler(h))
+	userApi.DELETE("/boards/:board_id/uploads", deleteBoardUploadHandler(h))
+	userApi.GET("/download", downloadImageHandler())
 
 	userApi.POST("/vectorize", h.VectorizeHandler.Vectorize)
 	userApi.GET("/vectorize/check", h.VectorizeHandler.CheckPotrace)
@@ -435,30 +252,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 	adminApi.GET("/statistics", h.AccountHandler.GetStatistics)
 	adminApi.POST("/statistics/backfill", h.AccountHandler.BackfillStatistics)
 
-	adminApi.POST("/upload", func(c *gin.Context) {
-		file, err := c.FormFile("file")
-		if err != nil {
-			response.Error(c, 400, "请选择文件")
-			return
-		}
-		ext, ok := validateUploadFileHeader(c, file, 50*1024*1024, media.UploadAllowedImageExtensions())
-		if !ok {
-			return
-		}
-
-		url, err := h.StorageService.Upload(file)
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		payload := gin.H{"url": url}
-		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
-			for k, v := range meta {
-				payload[k] = v
-			}
-		}
-		response.Success(c, payload)
-	})
+	adminApi.POST("/upload", adminUploadHandler(h))
 
 	adminApi.GET("/storage/providers", h.StorageHandler.ListProviders)
 	adminApi.GET("/storage/profiles", h.StorageHandler.ListProfiles)

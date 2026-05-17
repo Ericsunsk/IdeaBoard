@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User } from '../../shared/types'
-import { userApi } from '../../shared/api/user'
+import { getUserInfoApi } from '../../shared/api/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../shared/auth/client'
 import {
   getStoredUser,
@@ -9,7 +9,9 @@ import {
   clearStoredAuth,
   hasValidStoredAuth,
 } from '../../shared/utils/auth'
-import router from '../router'
+import type { ErrorType } from '../../shared/api/orvalMutator'
+
+const SESSION_CACHE_TTL_MS = 30_000
 
 export const useUserStore = defineStore('user', () => {
   const storedUser = getStoredUser()
@@ -21,6 +23,7 @@ export const useUserStore = defineStore('user', () => {
 
   const user = ref<User | null>(hasValidAuth ? storedUser : null)
   const userInfoLoaded = ref(false)
+  const sessionValidatedAt = ref(0)
 
   const isLoggedIn = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
@@ -28,12 +31,14 @@ export const useUserStore = defineStore('user', () => {
   function updateAuth(newUser: User) {
     user.value = newUser
     userInfoLoaded.value = true
+    sessionValidatedAt.value = Date.now()
     setStoredAuth(newUser)
   }
 
   function resetAuth() {
     user.value = null
     userInfoLoaded.value = false
+    sessionValidatedAt.value = 0
     clearStoredAuth()
   }
 
@@ -80,25 +85,38 @@ export const useUserStore = defineStore('user', () => {
       logoutSuccess = false
     }
     resetAuth()
-    router.push(redirectPath)
+    const { default: router } = await import('../router')
+    await router.push(redirectPath)
     return logoutSuccess
   }
 
   async function fetchUserInfo(force = false) {
-    if (userInfoLoaded.value && !force) return
+    if (userInfoLoaded.value && !force) return user.value
     try {
-      const res: any = await userApi.getInfo()
-      if (res.code === 0 && res.data) {
+      const res = await getUserInfoApi()
+      if (res.code === 0 && res.data?.user) {
         updateAuth(res.data.user)
+        return user.value
       }
     } catch (e) {
-      const code = Number((e as any)?.status ?? (e as any)?.code)
+      const error = e as Partial<ErrorType<unknown>> & { code?: number }
+      const code = Number(error.status ?? error.code)
       if (code === 401 || code === 403) {
         resetAuth()
-        return
+        return null
       }
       userInfoLoaded.value = false
     }
+    return user.value
+  }
+
+  async function ensureSession(options: { fresh?: boolean } = {}) {
+    const cacheValid =
+      userInfoLoaded.value &&
+      !options.fresh &&
+      Date.now() - sessionValidatedAt.value < SESSION_CACHE_TTL_MS
+    if (cacheValid) return user.value
+    return await fetchUserInfo(true)
   }
 
   async function updatePassword(oldPassword: string, newPassword: string) {
@@ -134,13 +152,9 @@ export const useUserStore = defineStore('user', () => {
     return true
   }
 
-  async function updateAvatar(avatar: string) {
+  function setAvatarLocal(avatar: string) {
     const nextAvatar = avatar.trim()
-    if (!nextAvatar) {
-      throw new Error('头像地址无效')
-    }
-    await userApi.updateProfile({ avatar: nextAvatar })
-    if (!user.value) return
+    if (!nextAvatar || !user.value) return
     updateAuth({ ...user.value, avatar: nextAvatar })
   }
 
@@ -154,7 +168,8 @@ export const useUserStore = defineStore('user', () => {
     register,
     logout,
     fetchUserInfo,
+    ensureSession,
     updatePassword,
-    updateAvatar,
+    setAvatarLocal,
   }
 })

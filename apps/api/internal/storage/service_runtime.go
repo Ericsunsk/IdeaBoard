@@ -123,6 +123,37 @@ func (s *StorageService) DeleteWorkspaceUploadByURL(storageUID string, boardID s
 	return adapter.Delete(profile, key)
 }
 
+func (s *StorageService) DeleteProfileAvatarByURL(storageUID string, rawURL string) error {
+	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	if err != nil {
+		return err
+	}
+
+	profile, err := s.resolveActiveProfile()
+	if err != nil {
+		return err
+	}
+	key, err := s.extractObjectKeyFromUserUploadURL(*profile, rawURL)
+	if err != nil {
+		return err
+	}
+
+	prefix := path.Join("uploads", "profile", userSegment, "avatar") + "/"
+	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix(key, normalizedPrefix) {
+		return fmt.Errorf("仅允许删除当前用户头像文件")
+	}
+
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	return adapter.Delete(profile, key)
+}
+
 func (s *StorageService) DeleteWorkspaceByStorageUID(storageUID string) error {
 	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
 	if err != nil {

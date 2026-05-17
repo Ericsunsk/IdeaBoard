@@ -95,9 +95,11 @@
         <div class="main-header">
           <div class="user-brief">
             <div class="avatar-big">
-              <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" />
-              <div v-else class="avatar-placeholder">
-                {{ userStore.user?.username?.[0]?.toUpperCase() }}
+              <div class="avatar-face">
+                <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" />
+                <div v-else class="avatar-placeholder">
+                  {{ userStore.user?.username?.[0]?.toUpperCase() }}
+                </div>
               </div>
               <button
                 class="avatar-edit-btn"
@@ -332,12 +334,12 @@ async function onAvatarFileChange(event: Event) {
   }
   try {
     avatarUploading.value = true
-    const uploadRes = await uploadApi.upload(file)
-    const avatarUrl = uploadRes.data?.url?.trim()
+    const uploadRes = await uploadApi.uploadAvatar(file)
+    const avatarUrl = uploadRes.data?.avatar?.trim()
     if (!avatarUrl) {
       throw new Error('头像上传失败，请稍后重试')
     }
-    await userStore.updateAvatar(avatarUrl)
+    userStore.setAvatarLocal(avatarUrl)
     appToast.success('头像已更新')
   } catch (error) {
     appToast.error(formatDisplayErrorMessage(error, '头像更新失败'))
@@ -546,12 +548,18 @@ onMounted(() => {
   border-radius: 50%;
   background: #fff;
   border: 4px solid #fff;
+  overflow: visible;
+}
+.avatar-face {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   overflow: hidden;
 }
 .avatar-edit-btn {
   position: absolute;
-  right: -2px;
-  bottom: -2px;
+  right: -4px;
+  bottom: -4px;
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -579,7 +587,7 @@ onMounted(() => {
 .hidden-file-input {
   display: none;
 }
-.avatar-big img {
+.avatar-face img {
   width: 100%;
   height: 100%;
   object-fit: cover;

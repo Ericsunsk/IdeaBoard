@@ -20,7 +20,7 @@ export interface UserListResponse {
 }
 
 // API 响应
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   code: number
   msg: string
   data?: T

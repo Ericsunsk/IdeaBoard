@@ -1,8 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import { userApi } from '../../shared/api/user'
+import { useUserStore } from '../stores/user'
 import { dismissAppToasts } from '../../shared/composables/useAppToast'
-import { getStoredUser, clearStoredAuth, setStoredAuth } from '../../shared/utils/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -109,54 +108,13 @@ const router = createRouter({
   routes,
 })
 
-// Session cache: avoid hitting /api/user/info on every navigation.
-// Stale-while-revalidate: use cached value for 30s, then refresh in background.
-let sessionCacheUser: any = null
-let sessionCacheAt = 0
-const SESSION_CACHE_TTL_MS = 30_000
-
 router.beforeEach(async (to) => {
-  let user = getStoredUser()
+  const userStore = useUserStore()
   const isAdminRoute = to.path.startsWith('/admin')
-  const requiresFreshAuth = !!to.meta.requiresAuth || !!to.meta.guest
   const shouldRefreshSession = isAdminRoute || !!to.meta.requiresAuth || !!to.meta.guest
-  const hadStoredUser = !!user
-
-  if (shouldRefreshSession) {
-    const now = Date.now()
-    // Admin routes always bypass the cache to ensure fresh auth state.
-    const cacheValid =
-      !isAdminRoute && sessionCacheUser !== null && now - sessionCacheAt < SESSION_CACHE_TTL_MS
-    if (cacheValid) {
-      user = sessionCacheUser
-    } else {
-      try {
-        const res: any = await userApi.getInfo()
-        if (res.code === 0 && res.data?.user) {
-          const refreshedUser = res.data.user
-          user = refreshedUser
-          sessionCacheUser = refreshedUser
-          sessionCacheAt = now
-          setStoredAuth(refreshedUser)
-        }
-      } catch (error: any) {
-        sessionCacheUser = null
-        const code = Number(error?.status ?? error?.code)
-        if (code === 401 || code === 403) {
-          clearStoredAuth()
-          user = null
-        } else {
-          if (requiresFreshAuth && !hadStoredUser) {
-            clearStoredAuth()
-            user = null
-          }
-          if (isAdminRoute && !hadStoredUser) {
-            return '/user/home'
-          }
-        }
-      }
-    }
-  }
+  const user = shouldRefreshSession
+    ? await userStore.ensureSession({ fresh: isAdminRoute })
+    : userStore.user
 
   const isLoggedIn = !!user
 

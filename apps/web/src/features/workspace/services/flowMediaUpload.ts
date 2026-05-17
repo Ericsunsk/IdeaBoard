@@ -19,8 +19,12 @@ export async function ensureFlowMaskImageUrl(
   if (!next) return ''
   if (!isDataUrl(next)) return next
 
+  const boardId = options.boardId?.trim() ?? ''
+  if (!boardId) {
+    throw new Error('缺少 boardId，无法上传蒙版')
+  }
   const file = await dataUrlToFile(next, `flow-mask-${Date.now()}.png`)
-  const uploadRes = await uploadApi.upload(file, options.boardId)
+  const uploadRes = await uploadApi.upload(file, boardId)
   if (uploadRes.code !== 0 || !uploadRes.data?.url) {
     throw new Error(uploadRes.msg || '蒙版上传失败')
   }

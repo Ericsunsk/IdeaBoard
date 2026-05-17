@@ -1,0 +1,210 @@
+package httpapi
+
+import (
+	"errors"
+	"fmt"
+	"log"
+	"path"
+	"strings"
+
+	"api/internal/boards"
+	"api/internal/platform/media"
+	"api/internal/platform/response"
+	"api/internal/storage"
+
+	"github.com/gin-gonic/gin"
+)
+
+func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			response.Error(c, 400, "请选择文件")
+			return
+		}
+		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, media.UploadAllowedImageExtensions())
+		if !ok {
+			return
+		}
+		userID := c.GetUint64("user_id")
+		if userID == 0 {
+			response.Error(c, 401, "未登录")
+			return
+		}
+		if h.UserRepo == nil || h.StorageService == nil {
+			response.InternalError(c, 500, "头像上传失败", fmt.Errorf("profile upload dependencies not configured"))
+			return
+		}
+		user, err := h.UserRepo.GetByID(userID)
+		if err != nil {
+			response.InternalError(c, 500, "头像上传失败", err)
+			return
+		}
+		userSegment, err := storage.NormalizeWorkspaceStorageUserSegment(user.StorageUID)
+		if err != nil {
+			response.InternalError(c, 500, "头像上传失败", err)
+			return
+		}
+		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
+			DirPrefix: path.Join("profile", userSegment, "avatar"),
+		})
+		if err != nil {
+			response.InternalError(c, 500, "头像上传失败", err)
+			return
+		}
+		if err := h.UserRepo.UpdateAvatarByID(userID, url); err != nil {
+			if cleanupErr := h.StorageService.DeleteProfileAvatarByURL(user.StorageUID, url); cleanupErr != nil {
+				log.Printf("[profile] cleanup uploaded avatar failed user_id=%d url=%s: %v", userID, url, cleanupErr)
+			}
+			response.InternalError(c, 500, "头像上传失败", err)
+			return
+		}
+		payload := gin.H{"avatar": url}
+		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
+			for k, v := range meta {
+				payload[k] = v
+			}
+		}
+		response.Success(c, payload)
+	}
+}
+
+func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			response.Error(c, 400, "请选择文件")
+			return
+		}
+		ext, ok := validateUploadFileHeader(c, file, 30*1024*1024, media.UploadAllowedImageExtensions())
+		if !ok {
+			return
+		}
+		userID := c.GetUint64("user_id")
+		if userID == 0 {
+			response.Error(c, 401, "未登录")
+			return
+		}
+		boardID := strings.TrimSpace(c.Param("board_id"))
+		if h.BoardService == nil {
+			response.InternalError(c, 500, "上传失败", fmt.Errorf("board service not configured"))
+			return
+		}
+		board, _, err := h.BoardService.ResolveBoardWriteAccess(userID, boardID)
+		if err != nil {
+			switch {
+			case errors.Is(err, boards.ErrInvalidBoardInput):
+				response.Error(c, 400, "缺少画布ID")
+			case errors.Is(err, boards.ErrBoardNotFound):
+				response.Error(c, 404, "画布不存在")
+			case errors.Is(err, boards.ErrBoardPermissionDenied):
+				response.Error(c, 403, "无权编辑该画布")
+			default:
+				response.InternalError(c, 500, "上传失败", err)
+			}
+			return
+		}
+		owner, err := h.UserRepo.GetByID(board.UserID)
+		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		userSegment, err := storage.NormalizeWorkspaceStorageUserSegment(owner.StorageUID)
+		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		boardSegment, err := storage.NormalizeWorkspaceBoardSegment(board.BoardID)
+		if err != nil {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
+			DirPrefix: path.Join("workspace", userSegment, boardSegment, "content"),
+		})
+		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		payload := gin.H{"url": url}
+		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
+			for k, v := range meta {
+				payload[k] = v
+			}
+		}
+		response.Success(c, payload)
+	}
+}
+
+func deleteBoardUploadHandler(h Dependencies) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			URL string `json:"url"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.Error(c, 400, "请求参数错误")
+			return
+		}
+		userID := c.GetUint64("user_id")
+		if userID == 0 {
+			response.Error(c, 401, "未登录")
+			return
+		}
+		if h.BoardService == nil {
+			response.InternalError(c, 500, "删除失败", fmt.Errorf("board service not configured"))
+			return
+		}
+		boardID := strings.TrimSpace(c.Param("board_id"))
+		board, _, err := h.BoardService.ResolveBoardWriteAccess(userID, boardID)
+		if err != nil {
+			switch {
+			case errors.Is(err, boards.ErrInvalidBoardInput):
+				response.Error(c, 400, "缺少画布ID")
+			case errors.Is(err, boards.ErrBoardNotFound):
+				response.Error(c, 404, "画布不存在")
+			case errors.Is(err, boards.ErrBoardPermissionDenied):
+				response.Error(c, 403, "无权编辑该画布")
+			default:
+				response.InternalError(c, 500, "删除失败", err)
+			}
+			return
+		}
+		owner, err := h.UserRepo.GetByID(board.UserID)
+		if err != nil {
+			response.InternalError(c, 500, "删除失败", err)
+			return
+		}
+		if err := h.StorageService.DeleteWorkspaceUploadByURL(owner.StorageUID, board.BoardID, req.URL); err != nil {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.Success(c, gin.H{"deleted": true})
+	}
+}
+
+func adminUploadHandler(h Dependencies) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			response.Error(c, 400, "请选择文件")
+			return
+		}
+		ext, ok := validateUploadFileHeader(c, file, 50*1024*1024, media.UploadAllowedImageExtensions())
+		if !ok {
+			return
+		}
+
+		url, err := h.StorageService.Upload(file)
+		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		payload := gin.H{"url": url}
+		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
+			for k, v := range meta {
+				payload[k] = v
+			}
+		}
+		response.Success(c, payload)
+	}
+}
