@@ -28,10 +28,5 @@ export {
   stopAccount,
   updateAccount,
 } from './account'
-export type {
-  AccountListResponse,
-  ApiAccount,
-  CreateAccountRequest,
-  UpdateAccountRequest,
-} from './account'
+export type { ApiAccount } from './account'
 export * from './storage'

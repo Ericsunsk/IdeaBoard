@@ -1,5 +1,5 @@
 import { apiDelete, apiPost } from './client'
-import type { ApiResponse } from './types'
+import type { ApiResponse } from '../types'
 
 export type UploadImageMetadata = {
   url: string

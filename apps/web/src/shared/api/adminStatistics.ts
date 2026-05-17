@@ -5,7 +5,7 @@ import type {
   AdminStatisticsBackfillStatus,
   GetAdminStatisticsRange,
 } from './generated-query/model'
-import type { ApiResponse } from './types'
+import type { ApiResponse } from '../types'
 
 export type AdminStatisticsResponse = AdminStatistics
 export type AdminStatisticsBackfillState = AdminStatisticsBackfillStatus

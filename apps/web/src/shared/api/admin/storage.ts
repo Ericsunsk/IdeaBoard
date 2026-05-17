@@ -8,7 +8,7 @@ import {
   testAdminStorageProfile,
   updateAdminStorageProfile,
 } from '../generated-query/admin-storage/admin-storage'
-import type { ApiResponse } from '../types'
+import type { ApiResponse } from '../../types'
 import type {
   StorageProfile as GeneratedStorageProfile,
   StorageProfilePayload as GeneratedStorageProfilePayload,

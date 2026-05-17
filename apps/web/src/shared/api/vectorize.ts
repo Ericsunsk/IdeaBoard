@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from './client'
-import type { ApiResponse } from './types'
+import type { ApiResponse } from '../types'
 
 export const vectorizeApi = {
   vectorize: (data: {

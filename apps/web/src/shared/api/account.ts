@@ -6,20 +6,9 @@ import {
   stopAdminAccount,
   updateAdminAccount,
 } from './generated-query/admin-accounts/admin-accounts'
-import type {
-  AdminAccount,
-  AdminAccountCreateRequest,
-  AdminAccountUpdateRequest,
-  ApiResponseAccountListData,
-} from './generated-query/model'
+import type { AdminAccount } from './generated-query/model'
 
 export type ApiAccount = AdminAccount
-
-export type CreateAccountRequest = AdminAccountCreateRequest
-
-export type UpdateAccountRequest = AdminAccountUpdateRequest
-
-export type AccountListResponse = ApiResponseAccountListData
 
 export const createAccount = createAdminAccount
 
