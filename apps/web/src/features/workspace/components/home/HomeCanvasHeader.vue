@@ -170,7 +170,6 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps<{
   currentBoardName: string

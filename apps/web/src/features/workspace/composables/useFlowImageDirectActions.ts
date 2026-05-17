@@ -1,22 +1,27 @@
-import { nextTick, ref, watch, type Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { taskApi } from '../../../shared/api/task'
-import { vectorizeApi } from '../../../shared/api/vectorize'
-import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
-import { extractImageUrlsFromTaskResult } from '../../../shared/query/taskResult'
-import {
-  buildExecutionTaskRequest,
-  EXECUTION_DIRECT_ACTION_META,
-  EXECUTION_EDIT_MODE_META,
-} from '../config/executionContract'
-import { buildExecutionSizeParams } from '../utils/executionSizeParams'
-import { createImageNodeAt } from '../utils/canvasNodeFactory'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
-import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
-import { assertTaskSubmitReady, waitTaskResult } from '../services/flowTaskExecutorUtils'
-import { resolveImageNodeFrameSize, resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
+import {
+  assertDirectActionSubmitReady,
+  assertPromptImageSubmitReady,
+  runToVector,
+  submitDirectActionTask,
+  submitPromptImageGenerationTask,
+  waitExistingOrLiveTaskResult,
+} from '../services/flowImageDirectActionExecutor'
 import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
+import { usePendingImageResultNodes } from './usePendingImageResultNodes'
+import { usePendingImageTaskResume } from './usePendingImageTaskResume'
+import {
+  normalizeTaskImageUrls,
+  pickFirstValidUrl,
+  resolveTaskImageRatio,
+} from '../utils/flowImageDirectActionTaskResult'
+import {
+  resolveImageDirectActionSource,
+  type ImageDirectActionSource,
+} from '../utils/flowImageDirectActionSource'
 
 type DirectActionKey = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
 type FlowHistorySnapshot = { nodes: unknown[]; edges: unknown[] }
@@ -39,34 +44,15 @@ type UseFlowImageDirectActionsOptions = {
   onWarning: (message: string) => void
 }
 
-type ImageDirectActionSource = {
-  url: string
-  ratio: number
-  x: number
-  y: number
-  width: number
-}
-type PendingImageNodeItem = ImageNodeItem & {
-  pendingTaskId?: string
-  pendingSourceNodeId?: string
-  pendingPrompt?: string
-}
-
-const STYLE_INNOVATE_DEFAULT_STRENGTH = 50
-const IMAGE_RESULT_NODE_X_GAP = 100
-const IMAGE_RESULT_NODE_Y_GAP = 14
-const IMAGE_NODE_HEADER_HEIGHT = 26
-
-function estimateImageNodeHeight(source: Pick<ImageDirectActionSource, 'width' | 'ratio'>): number {
-  const stageHeight = resolveImageNodeStageHeight(source.width, source.ratio, true)
-  return IMAGE_NODE_HEADER_HEIGHT + stageHeight
-}
-
 export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOptions) {
   const runningNodeIds = ref<Set<string>>(new Set())
-  const cancelledResultNodeIds = new Set<string>()
-  const resultLayoutsBySourceNodeId = new Map<string, Map<string, ImageDirectActionSource>>()
-  const resumedTaskIds = new Set<string>()
+  const {
+    appendPendingImageResultNode,
+    appendPendingImageResultNodes,
+    updatePendingImageResultNode,
+    updatePendingImageTaskMeta,
+    removePendingImageResultNode,
+  } = usePendingImageResultNodes(options)
 
   function setNodeRunning(nodeId: string, running: boolean) {
     const next = new Set(runningNodeIds.value)
@@ -78,16 +64,6 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     runningNodeIds.value = next
   }
 
-  function waitForFlowRenderFrame(): Promise<void> {
-    if (typeof window === 'undefined') return nextTick()
-    return nextTick().then(
-      () =>
-        new Promise((resolve) => {
-          window.requestAnimationFrame(() => resolve())
-        }),
-    )
-  }
-
   function getDirectActionNodeById(nodeId: string): Node<FlowNodeData> | null {
     const target = options.nodes.value.find((node) => node.id === nodeId)
     if (!target || target.data?.kind !== 'image') return null
@@ -97,500 +73,21 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   function readImageSnapshot(nodeId: string): ImageDirectActionSource | null {
     const node = getDirectActionNodeById(nodeId)
     if (!node?.data?.snapshotNode || typeof node.data.snapshotNode !== 'object') return null
-    const snapshot = node.data.snapshotNode as ImageNodeItem
-    const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-    const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
-    const url = `${latestOutput?.url || snapshot.sourceImageUrl || ''}`.trim()
-    if (!url) return null
-    const outputRatio = Number(latestOutput?.ratio)
-    const sourceRatio = Number(snapshot.sourceImageRatio)
-    const ratio =
-      Number.isFinite(outputRatio) && outputRatio > 0
-        ? outputRatio
-        : Number.isFinite(sourceRatio) && sourceRatio > 0
-          ? sourceRatio
-          : 1
-    const width = Number(snapshot.width)
-    return {
-      url,
-      ratio,
-      x: Number(node.position?.x ?? snapshot.x ?? 0),
-      y: Number(node.position?.y ?? snapshot.y ?? 0),
-      width: Number.isFinite(width) && width > 0 ? width : 280,
-    }
-  }
-
-  function commitGraphMutation(
-    mutator: (items: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[] },
-    optionsOverride?: { recordHistory?: boolean },
-  ) {
-    const historyBefore = options.captureHistory()
-    const { nodes: nextNodes, edges: nextEdges } = mutator(
-      options.nodes.value,
-      options.edges.value,
-    )
-    options.commitNodes(nextNodes)
-    options.commitEdges(nextEdges)
-    if (optionsOverride?.recordHistory !== false) {
-      options.pushHistory(historyBefore)
-    }
-    options.markDirty()
-    options.refreshSnapshot()
-  }
-
-  function commitNodeMutation(
-    mutator: (items: Node[]) => Node[],
-    optionsOverride?: { recordHistory?: boolean },
-  ) {
-    const historyBefore = options.captureHistory()
-    options.commitNodes(mutator(options.nodes.value))
-    if (optionsOverride?.recordHistory !== false) {
-      options.pushHistory(historyBefore)
-    }
-    options.markDirty()
-    options.refreshSnapshot()
-  }
-
-  function readImageNodeLayout(node: Node): ImageDirectActionSource | null {
-    if (node.data?.kind !== 'image') return null
-    const snapshot = node.data.snapshotNode
-    if (!snapshot || typeof snapshot !== 'object') return null
-    const imageNode = snapshot as ImageNodeItem
-    const outputs = Array.isArray(imageNode.outputImages) ? imageNode.outputImages : []
-    const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
-    const width = Number(imageNode.width)
-    const outputRatio = Number(latestOutput?.ratio)
-    const sourceRatio = Number(imageNode.sourceImageRatio)
-    const ratio =
-      Number.isFinite(outputRatio) && outputRatio > 0
-        ? outputRatio
-        : Number.isFinite(sourceRatio) && sourceRatio > 0
-          ? sourceRatio
-          : 1
-    return {
-      url: `${latestOutput?.url || imageNode.sourceImageUrl || ''}`.trim(),
-      ratio,
-      x: Number(node.position?.x ?? imageNode.x ?? 0),
-      y: Number(node.position?.y ?? imageNode.y ?? 0),
-      width: Number.isFinite(width) && width > 0 ? width : 280,
-    }
-  }
-
-  function resolvePendingImageResultPosition(source: ImageDirectActionSource, sourceNodeId: string) {
-    const defaultPosition = {
-      x: source.x + source.width + IMAGE_RESULT_NODE_X_GAP,
-      y: source.y,
-    }
-    const childNodeIds = new Set<string>(
-      options.edges.value
-        .filter(
-          (edge) =>
-            edge.source === sourceNodeId &&
-            edge.sourceHandle === 'out:image' &&
-            edge.targetHandle === 'in:image',
-        )
-        .map((edge) => edge.target),
-    )
-    const runtimeLayouts = resultLayoutsBySourceNodeId.get(sourceNodeId)
-    runtimeLayouts?.forEach((_, nodeId) => childNodeIds.add(nodeId))
-    if (childNodeIds.size === 0) return defaultPosition
-
-    let nextY = source.y
-    let alignedX = defaultPosition.x
-    const measuredNodeIds = new Set<string>()
-    const visitChildLayout = (nodeId: string, layout: ImageDirectActionSource) => {
-      const bottomY = layout.y + estimateImageNodeHeight(layout) + IMAGE_RESULT_NODE_Y_GAP
-      if (bottomY >= nextY) {
-        alignedX = layout.x
-        nextY = bottomY
-      }
-      measuredNodeIds.add(nodeId)
-    }
-
-    for (const node of options.nodes.value) {
-      if (!childNodeIds.has(node.id)) continue
-      const layout = readImageNodeLayout(node) ?? runtimeLayouts?.get(node.id)
-      if (!layout) continue
-      visitChildLayout(node.id, layout)
-    }
-    runtimeLayouts?.forEach((layout, nodeId) => {
-      if (!childNodeIds.has(nodeId)) return
-      if (measuredNodeIds.has(nodeId)) return
-      visitChildLayout(nodeId, layout)
-    })
-
-    return {
-      x: alignedX,
-      y: nextY,
-    }
-  }
-
-  function rememberResultNodeLayout(
-    sourceNodeId: string,
-    resultNodeId: string,
-    layout: ImageDirectActionSource,
-  ) {
-    const current = resultLayoutsBySourceNodeId.get(sourceNodeId) ?? new Map()
-    current.set(resultNodeId, layout)
-    resultLayoutsBySourceNodeId.set(sourceNodeId, current)
-  }
-
-  function forgetResultNodeLayout(resultNodeId: string) {
-    resultLayoutsBySourceNodeId.forEach((items, sourceNodeId) => {
-      items.delete(resultNodeId)
-      if (items.size === 0) resultLayoutsBySourceNodeId.delete(sourceNodeId)
+    return resolveImageDirectActionSource(node, node.data.snapshotNode as ImageNodeItem, {
+      requireUrl: true,
     })
   }
 
-  function updateResultNodeLayout(resultNodeId: string, patch: Partial<ImageDirectActionSource>) {
-    resultLayoutsBySourceNodeId.forEach((items) => {
-      const current = items.get(resultNodeId)
-      if (!current) return
-      items.set(resultNodeId, { ...current, ...patch })
-    })
-  }
-
-  function pruneResultNodeLayouts() {
-    const existingNodeIds = new Set(options.nodes.value.map((node) => node.id))
-    resultLayoutsBySourceNodeId.forEach((items, sourceNodeId) => {
-      items.forEach((_, nodeId) => {
-        if (!existingNodeIds.has(nodeId)) items.delete(nodeId)
-      })
-      if (items.size === 0) resultLayoutsBySourceNodeId.delete(sourceNodeId)
-    })
-  }
-
-  async function appendPendingImageResultEdge(sourceNodeId: string, resultNodeId: string) {
-    await waitForFlowRenderFrame()
-    if (cancelledResultNodeIds.has(resultNodeId)) return
-    const hasSource = options.nodes.value.some((node) => node.id === sourceNodeId)
-    const targetNode = options.nodes.value.find((node) => node.id === resultNodeId)
-    const hasTarget = !!targetNode
-    if (!hasSource || !hasTarget) return
-    const targetSnapshot =
-      targetNode.data?.snapshotNode && typeof targetNode.data.snapshotNode === 'object'
-        ? (targetNode.data.snapshotNode as ImageNodeItem)
-        : null
-    options.refreshNodeInternals?.([sourceNodeId, resultNodeId])
-    const nextEdge: Edge = {
-      id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      source: sourceNodeId,
-      sourceHandle: 'out:image',
-      target: resultNodeId,
-      targetHandle: 'in:image',
-      animated: targetSnapshot?.outputStatus === 'running',
-    }
-    const hasSameEdge = options.edges.value.some(
-      (edge) =>
-        edge.source === nextEdge.source &&
-        edge.target === nextEdge.target &&
-        edge.sourceHandle === nextEdge.sourceHandle &&
-        edge.targetHandle === nextEdge.targetHandle,
-    )
-    if (hasSameEdge) return
-    if (options.appendEdges) {
-      options.appendEdges([nextEdge])
-    } else {
-      options.commitEdges([...options.edges.value, nextEdge])
-    }
-    options.markDirty()
-    options.refreshSnapshot()
-    options.refreshNodeInternals?.([sourceNodeId, resultNodeId])
-  }
-
-  function appendPendingImageResultNode(
-    source: ImageDirectActionSource,
-    sourceNodeId: string,
-    optionsOverride?: { recordHistory?: boolean },
-  ): string {
-    pruneResultNodeLayouts()
-    const position = resolvePendingImageResultPosition(source, sourceNodeId)
-    const imageNode = createImageNodeAt(position)
-    imageNode.sourceImageUrl = ''
-    imageNode.sourceImageRatio = source.ratio > 0 ? source.ratio : 1
-    imageNode.width = resolveImageNodeFrameSize(imageNode.sourceImageRatio, true).width
-    imageNode.outputStatus = 'running'
-    imageNode.outputImages = []
-
-    const nextNode: Node<FlowNodeData> = {
-      id: `image-${imageNode.id}`,
-      type: 'canvas',
-      dragHandle: resolveFlowNodeDragHandle('image'),
-      position: { x: imageNode.x, y: imageNode.y },
-      data: {
-        kind: 'image',
-        nodeType: 'image',
-        title: `Image #${imageNode.id}`,
-        summary: 'Canvas image node',
-        snapshotNode: imageNode,
-      },
-    }
-
-    commitNodeMutation((items) => [...items, nextNode as Node], optionsOverride)
-    cancelledResultNodeIds.delete(nextNode.id)
-    rememberResultNodeLayout(sourceNodeId, nextNode.id, {
-      url: '',
-      ratio: imageNode.sourceImageRatio,
-      x: imageNode.x,
-      y: imageNode.y,
-      width: imageNode.width,
-    })
-    options.refreshNodeInternals?.([sourceNodeId, nextNode.id])
-    void appendPendingImageResultEdge(sourceNodeId, nextNode.id)
-
-    return nextNode.id
-  }
-
-  function appendPendingImageResultNodes(
-    source: ImageDirectActionSource,
-    sourceNodeId: string,
-    outputCount: number,
-  ): string[] {
-    const count = clampImageNodeOutputCount(outputCount)
-    return Array.from({ length: count }, (_, index) =>
-      appendPendingImageResultNode(source, sourceNodeId, {
-        recordHistory: index === 0,
-      }),
-    )
-  }
-
-  function updatePendingImageResultNode(nodeId: string, url: string, ratio: number) {
-    const frameSize = resolveImageNodeFrameSize(ratio, true)
-    commitGraphMutation(
-      (items, currentEdges) => ({
-        nodes: items.map((item) => {
-          if (item.id !== nodeId || item.data?.kind !== 'image') return item
-          const snapshot = item.data.snapshotNode
-          if (!snapshot || typeof snapshot !== 'object') return item
-          return {
-            ...item,
-            data: {
-              ...item.data,
-              snapshotNode: {
-                ...(snapshot as ImageNodeItem),
-                width: frameSize.width,
-                sourceImageUrl: url,
-                sourceImageRatio: ratio > 0 ? ratio : 1,
-                outputStatus: 'ready',
-                outputImages: [],
-                pendingTaskId: undefined,
-                pendingSourceNodeId: undefined,
-                pendingPrompt: undefined,
-              },
-            },
-          }
-        }),
-        edges: currentEdges.map((edge) =>
-          edge.target === nodeId && edge.targetHandle === 'in:image'
-            ? { ...edge, animated: false }
-            : edge,
-        ),
-      }),
-      { recordHistory: false },
-    )
-    updateResultNodeLayout(nodeId, { url, ratio: ratio > 0 ? ratio : 1 })
-    options.refreshNodeInternals?.([nodeId])
-  }
-
-  function updatePendingImageTaskMeta(
-    nodeId: string,
-    patch: Pick<PendingImageNodeItem, 'pendingTaskId' | 'pendingSourceNodeId' | 'pendingPrompt'>,
-  ) {
-    commitGraphMutation(
-      (items, currentEdges) => ({
-        nodes: items.map((item) => {
-          if (item.id !== nodeId || item.data?.kind !== 'image') return item
-          const snapshot = item.data.snapshotNode
-          if (!snapshot || typeof snapshot !== 'object') return item
-          return {
-            ...item,
-            data: {
-              ...item.data,
-              snapshotNode: {
-                ...(snapshot as ImageNodeItem),
-                ...patch,
-              },
-            },
-          }
-        }),
-        edges: currentEdges,
-      }),
-      { recordHistory: false },
-    )
-  }
-
-  function removePendingImageResultNode(nodeId: string) {
-    cancelledResultNodeIds.add(nodeId)
-    forgetResultNodeLayout(nodeId)
-    commitGraphMutation(
-      (items, currentEdges) => ({
-        nodes: items.filter((item) => item.id !== nodeId),
-        edges: currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
-      }),
-      { recordHistory: false },
-    )
-  }
-
-  function extractTaskImageUrls(task: {
-    outputs?: Array<{ role?: string; url?: string }>
-    result?: string | null
-  }): string[] {
-    const outputUrls = Array.isArray(task.outputs)
-      ? task.outputs
-          .filter((output) => output?.role === 'image' && typeof output.url === 'string')
-          .map((output) => output.url?.trim() ?? '')
-          .filter((url) => url.length > 0)
-      : []
-    if (outputUrls.length > 0) return outputUrls
-    return extractImageUrlsFromTaskResult(task.result)
-  }
-
-  async function waitExistingOrLiveTaskResult(taskId: string): Promise<string[]> {
-    let task:
-      | {
-          status?: string
-          outputs?: Array<{ role?: string; url?: string }>
-          result?: string | null
-          error_msg?: string
-        }
-      | undefined
-    try {
-      const taskRes = await taskApi.get(taskId)
-      task = taskRes.data?.task
-    } catch (error) {
-      const status = Number((error as { status?: unknown; code?: unknown })?.status)
-      const code = Number((error as { status?: unknown; code?: unknown })?.code)
-      if (status === 404 || code === 404) throw error
-      return waitTaskResult(taskId)
-    }
-    if (task?.status === 'completed') {
-      const urls = extractTaskImageUrls(task)
-      if (urls.length > 0) return urls
-      throw new Error('任务完成但未返回图片')
-    }
-    if (task?.status === 'failed') {
-      throw new Error(sanitizeApiErrorMessage(task.error_msg, '生成失败'))
-    }
-    return waitTaskResult(taskId)
-  }
-
-  async function resolveResultRatio(url: string, fallbackRatio: number): Promise<number> {
-    try {
-      const size = await loadImageSizeFromUrl(url)
-      if (size && size.width > 0 && size.height > 0) {
-        return size.height / size.width
-      }
-    } catch {
-      // Non-critical: layout can use the source ratio if result probing fails.
-    }
-    return fallbackRatio > 0 ? fallbackRatio : 1
-  }
-
-  async function assertDirectActionSubmitReady(
-    action: Exclude<DirectActionKey, 'to-vector'>,
-  ): Promise<void> {
-    const feature =
-      action === 'style-innovate'
-        ? EXECUTION_DIRECT_ACTION_META.styleInnovate.feature
-        : action === 'remove-bg'
-          ? EXECUTION_DIRECT_ACTION_META.removeBg.feature
-          : EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature
-    await assertTaskSubmitReady(
-      buildExecutionTaskRequest({
-        prompt: 'submit readiness',
-        feature,
-      }),
-      '提交任务失败',
-    )
-  }
-
-  async function assertPromptImageSubmitReady(): Promise<void> {
-    await assertTaskSubmitReady(
-      buildExecutionTaskRequest({
-        prompt: 'submit readiness',
-        feature: EXECUTION_EDIT_MODE_META['partial-edit'].feature,
-      }),
-      '提交任务失败',
-    )
-  }
-
-  async function submitDirectActionTask(
-    source: ImageDirectActionSource,
-    action: Exclude<DirectActionKey, 'to-vector'>,
-    strengthOverride?: number,
-  ): Promise<string> {
-    const imageSize = await loadImageSizeFromUrl(source.url)
-    const strength = Number.isFinite(strengthOverride)
-      ? Math.max(0, Math.min(100, Math.round(strengthOverride as number)))
-      : STYLE_INNOVATE_DEFAULT_STRENGTH
-    const request =
-      action === 'style-innovate'
-        ? buildExecutionTaskRequest({
-            prompt: '',
-            feature: EXECUTION_DIRECT_ACTION_META.styleInnovate.feature,
-            imageUrls: [source.url],
-            params: {
-              original_image_url: source.url,
-              ...buildExecutionSizeParams(imageSize),
-              variation_strength: strength,
-              strength,
-            },
-          })
-        : buildExecutionTaskRequest({
-            prompt: '',
-            feature:
-              action === 'remove-bg'
-                ? EXECUTION_DIRECT_ACTION_META.removeBg.feature
-                : EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature,
-            imageUrls: [source.url],
-            params: buildExecutionSizeParams(imageSize),
-          })
-
-    const submitRes = await taskApi.submit(request)
-    if (submitRes.code !== 0 || !submitRes.data?.task_id) {
-      throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
-    }
-    return submitRes.data.task_id
-  }
-
-  async function submitPromptImageGenerationTask(
-    source: ImageDirectActionSource,
-    prompt: string,
-  ): Promise<string> {
-    const imageSize = await loadImageSizeFromUrl(source.url)
-    const request = buildExecutionTaskRequest({
-      prompt: `${EXECUTION_EDIT_MODE_META['partial-edit'].promptPrefix} ${prompt}`,
-      feature: EXECUTION_EDIT_MODE_META['partial-edit'].feature,
-      imageUrls: [source.url],
-      params: {
-        original_image_url: source.url,
-        ...buildExecutionSizeParams(imageSize),
-      },
-    })
-
-    const submitRes = await taskApi.submit(request)
-    if (submitRes.code !== 0 || !submitRes.data?.task_id) {
-      throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
-    }
-    return submitRes.data.task_id
-  }
-
-  async function runToVector(source: ImageDirectActionSource): Promise<string[]> {
-    const res = await vectorizeApi.vectorize({
-      image_url: source.url,
-      threshold: 0.45,
-      turd_size: 2,
-      alpha_max: 1.0,
-      opt_tolerance: 0.2,
-      turn_policy: 'minority',
-      invert: false,
-      color_count: 0,
-    })
-    if (res.code !== 0 || !res.data?.svg_url) {
-      throw new Error(sanitizeApiErrorMessage(res.msg, 'Vectorize failed'))
-    }
-    return [res.data.svg_url]
-  }
+  usePendingImageTaskResume({
+    nodes: options.nodes,
+    runningNodeIds,
+    setNodeRunning,
+    waitTaskResult: waitExistingOrLiveTaskResult,
+    updatePendingImageResultNode,
+    removePendingImageResultNode,
+    onSuccess: options.onSuccess,
+    onWarning: options.onWarning,
+  })
 
   async function runImageDirectAction(
     nodeId: string,
@@ -613,7 +110,12 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       const taskId =
         action === 'to-vector'
           ? ''
-          : await submitDirectActionTask(source, action, runOptions?.strength)
+          : await submitDirectActionTask(
+              source,
+              action,
+              loadImageSizeFromUrl,
+              runOptions?.strength,
+            )
       if (taskId) {
         updatePendingImageTaskMeta(resultNodeId, {
           pendingTaskId: taskId,
@@ -623,9 +125,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       }
       const urls =
         action === 'to-vector' ? await runToVector(source) : await waitExistingOrLiveTaskResult(taskId)
-      const firstUrl = urls.find((url) => typeof url === 'string' && url.trim())?.trim()
+      const firstUrl = pickFirstValidUrl(urls)
       if (!firstUrl) throw new Error('任务完成但未返回图片')
-      const ratio = await resolveResultRatio(firstUrl, source.ratio)
+      const ratio = await resolveTaskImageRatio(firstUrl, source.ratio, loadImageSizeFromUrl)
       updatePendingImageResultNode(resultNodeId, firstUrl, ratio)
       options.onSuccess('处理完成')
     } catch (error) {
@@ -661,18 +163,20 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
       const results = await Promise.allSettled(
         resultNodeIds.map(async (resultNodeId) => {
-          const taskId = await submitPromptImageGenerationTask(source, normalizedPrompt)
+          const taskId = await submitPromptImageGenerationTask(
+            source,
+            normalizedPrompt,
+            loadImageSizeFromUrl,
+          )
           updatePendingImageTaskMeta(resultNodeId, {
             pendingTaskId: taskId,
             pendingSourceNodeId: nodeId,
             pendingPrompt: normalizedPrompt,
           })
-          const urls = (await waitExistingOrLiveTaskResult(taskId))
-            .map((url) => (typeof url === 'string' ? url.trim() : ''))
-            .filter((url) => url.length > 0)
+          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
           const url = urls[0]
           if (!url) throw new Error('任务完成但未返回图片')
-          const ratio = await resolveResultRatio(url, source.ratio)
+          const ratio = await resolveTaskImageRatio(url, source.ratio, loadImageSizeFromUrl)
           return { resultNodeId, url, ratio }
         }),
       )
@@ -715,58 +219,6 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       }
     }
   }
-
-  async function resumePendingImageResultNode(nodeId: string, taskId: string, fallbackRatio: number) {
-    if (runningNodeIds.value.has(nodeId) || resumedTaskIds.has(taskId)) return
-    resumedTaskIds.add(taskId)
-    setNodeRunning(nodeId, true)
-    try {
-      const urls = (await waitExistingOrLiveTaskResult(taskId))
-        .map((url) => (typeof url === 'string' ? url.trim() : ''))
-        .filter((url) => url.length > 0)
-      const url = urls[0]
-      if (!url) throw new Error('任务完成但未返回图片')
-      const ratio = await resolveResultRatio(url, fallbackRatio)
-      updatePendingImageResultNode(nodeId, url, ratio)
-      options.onSuccess('生成完成')
-    } catch (error) {
-      removePendingImageResultNode(nodeId)
-      const msg = error instanceof Error ? error.message : '生成失败'
-      options.onWarning(msg)
-    } finally {
-      setNodeRunning(nodeId, false)
-      resumedTaskIds.delete(taskId)
-    }
-  }
-
-  watch(
-    () =>
-      options.nodes.value
-        .map((node) => {
-          const snapshot = node.data?.snapshotNode as PendingImageNodeItem | undefined
-          return snapshot?.outputStatus === 'running' && snapshot.pendingTaskId
-            ? `${node.id}:${snapshot.pendingTaskId}`
-            : ''
-        })
-        .filter(Boolean)
-        .join('|'),
-    () => {
-      options.nodes.value.forEach((node) => {
-        if (node.data?.kind !== 'image') return
-        const snapshot = node.data.snapshotNode as PendingImageNodeItem | undefined
-        if (!snapshot || snapshot.outputStatus !== 'running') return
-        const taskId = `${snapshot.pendingTaskId ?? ''}`.trim()
-        if (!taskId) return
-        const fallbackRatio = Number(snapshot.sourceImageRatio)
-        void resumePendingImageResultNode(
-          node.id,
-          taskId,
-          Number.isFinite(fallbackRatio) && fallbackRatio > 0 ? fallbackRatio : 1,
-        )
-      })
-    },
-    { immediate: true },
-  )
 
   function isNodeDirectActionRunning(nodeId: string): boolean {
     return runningNodeIds.value.has(nodeId)

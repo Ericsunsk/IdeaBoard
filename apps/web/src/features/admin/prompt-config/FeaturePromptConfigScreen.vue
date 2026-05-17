@@ -100,9 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { NButton, NInput, useMessage } from 'naive-ui'
+import { NButton, NInput } from 'naive-ui'
 import AdminEditorModal from '../shared/components/AdminEditorModal.vue'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import { saveFeaturePrompt } from '../../../shared/query/adminQueries'
