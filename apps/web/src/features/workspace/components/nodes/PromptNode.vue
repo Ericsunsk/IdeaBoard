@@ -29,10 +29,10 @@
       <div ref="thumbsRef" class="prompt-node-thumbs node-tool-surface">
         <button
           v-for="item in sortableInputImages"
-          :key="item.sourceNodeId"
+          :key="item.id"
           class="prompt-node-thumb prompt-node-thumb-item node-tool-output-count node-tool-button"
           type="button"
-          :data-source-node-id="item.sourceNodeId"
+          :data-image-id="item.id"
           @mousedown.stop
           @contextmenu.stop.prevent="emit('input-image-preview', item)"
         >
@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useSortable } from '@vueuse/integrations/useSortable'
 import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
@@ -195,6 +195,7 @@ const thumbsRef = ref<HTMLElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
 const sortableInputImages = ref<PromptNodeItem['inputImages']>([])
 const addSlotDragOver = ref(false)
+const thumbReordering = ref(false)
 const maxInputImages = 4
 const outputCount = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
@@ -207,9 +208,19 @@ const toolPopovers = useNodeToolPopoverGroup({
 })
 const outputCountPickerVisible = toolPopovers.isOpen('output-count')
 const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
+function finishThumbReorder() {
+  void nextTick(() => {
+    thumbReordering.value = false
+  })
+}
 watch(
   visibleInputImages,
   (items) => {
+    if (thumbReordering.value) return
+    const same =
+      sortableInputImages.value.length === items.length &&
+      sortableInputImages.value.every((item, index) => item.id === items[index]?.id)
+    if (same) return
     sortableInputImages.value = [...items]
   },
   { immediate: true },
@@ -226,24 +237,37 @@ useSortable(() => thumbsRef.value, sortableInputImages, {
   fallbackOnBody: true,
   fallbackTolerance: 4,
   preventOnFilter: false,
+  onStart() {
+    thumbReordering.value = true
+  },
   onEnd() {
-    const sourceNodeIds = Array.from(
+    const imageIds = Array.from(
       thumbsRef.value?.querySelectorAll<HTMLElement>('.prompt-node-thumb-item') ?? [],
     )
-      .map((item) => item.dataset.sourceNodeId ?? '')
+      .map((item) => item.dataset.imageId ?? '')
       .filter(Boolean)
-    if (sourceNodeIds.length !== visibleInputImages.value.length) return
-    const byId = new Map(visibleInputImages.value.map((item) => [item.sourceNodeId, item]))
-    const next = sourceNodeIds
-      .map((sourceNodeId) => byId.get(sourceNodeId))
+    if (imageIds.length !== visibleInputImages.value.length) {
+      finishThumbReorder()
+      return
+    }
+    const byId = new Map(visibleInputImages.value.map((item) => [item.id, item]))
+    const next = imageIds
+      .map((imageId) => byId.get(imageId))
       .filter((item): item is PromptNodeItem['inputImages'][number] => !!item)
-    if (next.length !== visibleInputImages.value.length) return
+    if (next.length !== visibleInputImages.value.length) {
+      finishThumbReorder()
+      return
+    }
     const same = next.every(
-      (item, index) => item.sourceNodeId === visibleInputImages.value[index]?.sourceNodeId,
+      (item, index) => item.id === visibleInputImages.value[index]?.id,
     )
-    if (same) return
+    if (same) {
+      finishThumbReorder()
+      return
+    }
     sortableInputImages.value = next
     emit('update:input-images', next)
+    finishThumbReorder()
   },
 } as Parameters<typeof useSortable<PromptNodeItem['inputImages'][number]>>[2])
 function toggleOutputCountPicker() {
@@ -346,7 +370,7 @@ function onAddSlotDrop(event: DragEvent) {
     opacity 0.16s ease;
 }
 .prompt-node-thumb:hover,
-.prompt-node-thumb:focus,
+.prompt-node-thumb:focus-visible,
 .prompt-node-thumb.is-drop-target,
 .prompt-node-thumb.is-sortable-chosen {
   border-color: var(--node-tool-button-accent);

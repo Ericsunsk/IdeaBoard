@@ -63,6 +63,45 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     runningNodeIds.value = next
   }
 
+  async function runPendingImageBatchGeneration(params: {
+    resultNodeIds: string[]
+    submitTask: (resultNodeId: string) => Promise<{ taskId: string; sourceNodeId: string; prompt: string }>
+    resolveResult: (taskId: string) => Promise<{ url: string; ratio: number }>
+    totalCount: number
+  }) {
+    const results = await Promise.allSettled(
+      params.resultNodeIds.map(async (resultNodeId) => {
+        const { taskId, sourceNodeId, prompt } = await params.submitTask(resultNodeId)
+        updatePendingImageTaskMeta(resultNodeId, {
+          pendingTaskId: taskId,
+          pendingSourceNodeId: sourceNodeId,
+          pendingPrompt: prompt,
+        })
+        const resolved = await params.resolveResult(taskId)
+        return { resultNodeId, ...resolved }
+      }),
+    )
+    let successCount = 0
+    let firstFailure: unknown = null
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        successCount += 1
+        updatePendingImageResultNode(result.value.resultNodeId, result.value.url, result.value.ratio)
+        return
+      }
+      firstFailure ??= result.reason
+    })
+    params.resultNodeIds.forEach((resultNodeId, index) => {
+      if (results[index]?.status !== 'fulfilled') removePendingImageResultNode(resultNodeId)
+    })
+    if (successCount === 0) throw firstFailure instanceof Error ? firstFailure : new Error('生成失败')
+    if (successCount < params.totalCount) {
+      options.onWarning(`生成完成 ${successCount}/${params.totalCount} 张，部分任务失败`)
+    } else {
+      options.onSuccess(successCount > 1 ? `生成完成（${successCount} 张）` : '生成完成')
+    }
+  }
+
   function getDirectActionNodeById(nodeId: string): Node<FlowNodeData> | null {
     const target = options.nodes.value.find((node) => node.id === nodeId)
     if (!target || target.data?.kind !== 'image') return null
@@ -194,53 +233,26 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         outputAnchorNodeId: optionsOverride.outputAnchorNodeId,
       })
       resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
-      const results = await Promise.allSettled(
-        resultNodeIds.map(async (resultNodeId) => {
+      await runPendingImageBatchGeneration({
+        resultNodeIds,
+        totalCount: resolvedOutputCount,
+        submitTask: async () => {
           const taskId = await submitPromptImageGenerationTask(
             source,
             normalizedPrompt,
             loadImageSizeFromUrl,
             aspectRatio,
           )
-          updatePendingImageTaskMeta(resultNodeId, {
-            pendingTaskId: taskId,
-            pendingSourceNodeId: sourceNodeId,
-            pendingPrompt: normalizedPrompt,
-          })
+          return { taskId, sourceNodeId, prompt: normalizedPrompt }
+        },
+        resolveResult: async (taskId) => {
           const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
           const url = urls[0]
           if (!url) throw new Error('任务完成但未返回图片')
           const ratio = await resolveTaskImageRatio(url, source.ratio, loadImageSizeFromUrl)
-          return { resultNodeId, url, ratio }
-        }),
-      )
-      let successCount = 0
-      let firstFailure: unknown = null
-      results.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          successCount += 1
-          updatePendingImageResultNode(
-            result.value.resultNodeId,
-            result.value.url,
-            result.value.ratio,
-          )
-          return
-        }
-        firstFailure ??= result.reason
+          return { url, ratio }
+        },
       })
-      resultNodeIds.forEach((resultNodeId, index) => {
-        if (results[index]?.status !== 'fulfilled') {
-          removePendingImageResultNode(resultNodeId)
-        }
-      })
-      if (successCount === 0) {
-        throw firstFailure instanceof Error ? firstFailure : new Error('生成失败')
-      }
-      if (successCount < resolvedOutputCount) {
-        options.onWarning(`生成完成 ${successCount}/${resolvedOutputCount} 张，部分任务失败`)
-      } else {
-        options.onSuccess(successCount > 1 ? `生成完成（${successCount} 张）` : '生成完成')
-      }
     } catch (error) {
       for (const resultNodeId of resultNodeIds) {
         removePendingImageResultNode(resultNodeId)
@@ -281,51 +293,24 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         outputAnchorNodeId: anchorNodeId,
       })
       resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
-      const results = await Promise.allSettled(
-        resultNodeIds.map(async (resultNodeId) => {
+      await runPendingImageBatchGeneration({
+        resultNodeIds,
+        totalCount: resolvedOutputCount,
+        submitTask: async () => {
           const taskId = await submitPromptTextGenerationTask(
             normalizedPrompt,
             normalizePromptAspectRatio(aspectRatio),
           )
-          updatePendingImageTaskMeta(resultNodeId, {
-            pendingTaskId: taskId,
-            pendingSourceNodeId: anchorNodeId,
-            pendingPrompt: normalizedPrompt,
-          })
+          return { taskId, sourceNodeId: anchorNodeId, prompt: normalizedPrompt }
+        },
+        resolveResult: async (taskId) => {
           const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
           const url = urls[0]
           if (!url) throw new Error('任务完成但未返回图片')
           const ratio = await resolveTaskImageRatio(url, 1, loadImageSizeFromUrl)
-          return { resultNodeId, url, ratio }
-        }),
-      )
-      let successCount = 0
-      let firstFailure: unknown = null
-      results.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          successCount += 1
-          updatePendingImageResultNode(
-            result.value.resultNodeId,
-            result.value.url,
-            result.value.ratio,
-          )
-          return
-        }
-        firstFailure ??= result.reason
+          return { url, ratio }
+        },
       })
-      resultNodeIds.forEach((resultNodeId, index) => {
-        if (results[index]?.status !== 'fulfilled') {
-          removePendingImageResultNode(resultNodeId)
-        }
-      })
-      if (successCount === 0) {
-        throw firstFailure instanceof Error ? firstFailure : new Error('生成失败')
-      }
-      if (successCount < resolvedOutputCount) {
-        options.onWarning(`生成完成 ${successCount}/${resolvedOutputCount} 张，部分任务失败`)
-      } else {
-        options.onSuccess(successCount > 1 ? `生成完成（${successCount} 张）` : '生成完成')
-      }
     } catch (error) {
       for (const resultNodeId of resultNodeIds) {
         removePendingImageResultNode(resultNodeId)

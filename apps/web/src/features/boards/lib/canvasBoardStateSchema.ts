@@ -52,7 +52,10 @@ const imageNodeOutputItemSchema = z.object({
 })
 
 const promptNodeInputImageSchema = imageNodeOutputItemSchema.extend({
-  sourceNodeId: z.string().min(1),
+  id: z.string().min(1),
+  sourceType: z.enum(['node', 'external']),
+  sourceId: z.string().min(1),
+  sourceNodeId: z.string().min(1).optional(),
 })
 
 const promptNodeItemSchema = z.object({

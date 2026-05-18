@@ -92,7 +92,10 @@ export interface PromptNodeItem {
 }
 
 export interface PromptNodeInputImage extends ImageNodeOutputItem {
-  sourceNodeId: string
+  id: string
+  sourceType: 'node' | 'external'
+  sourceId: string
+  sourceNodeId?: string
 }
 
 export type ModelAngleFraming = 'full' | 'half' | 'portrait'

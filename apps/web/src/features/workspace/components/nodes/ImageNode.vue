@@ -127,15 +127,10 @@
             :model-value="outputCountValue"
             :visible="outputCountPickerVisible"
             :disabled="directGenerating"
-            :custom-editable="true"
-            title="单击选择张数，双击自定义"
+            title="选择张数"
             aria-label="输出张数"
-            :min="MIN_IMAGE_NODE_OUTPUT_COUNT"
-            :max="MAX_IMAGE_NODE_OUTPUT_COUNT"
             @toggle="toggleOutputCountPicker"
             @select="selectOutputCount"
-            @custom-commit="onCustomOutputCountCommit"
-            @edit-start="onOutputCountEditStart"
           />
           <button
             class="image-node-prompt-send node-tool-send node-tool-button"
@@ -167,8 +162,6 @@
 import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
 import {
   clampImageNodeOutputCount,
-  MAX_IMAGE_NODE_OUTPUT_COUNT,
-  MIN_IMAGE_NODE_OUTPUT_COUNT,
   type ImageNodeItem,
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
@@ -309,15 +302,6 @@ function closeOutputCountPicker() {
 
 function selectOutputCount(value: number) {
   emit('update:output-count', clampImageNodeOutputCount(value))
-  closeOutputCountPicker()
-}
-
-function onCustomOutputCountCommit(value: number) {
-  emit('update:output-count', clampImageNodeOutputCount(value))
-  closeOutputCountPicker()
-}
-
-function onOutputCountEditStart() {
   closeOutputCountPicker()
 }
 

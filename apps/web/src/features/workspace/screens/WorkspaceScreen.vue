@@ -668,7 +668,7 @@ const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbo
 
 function resolveNodePreviewImageById(
   nodeId: string,
-): { sourceNodeId: string; url: string; ratio: number } | null {
+): { id: string; sourceType: 'node'; sourceId: string; sourceNodeId: string; url: string; ratio: number } | null {
   const node = (nodes.value as Node[]).find((item) => item.id === nodeId)
   const kind = node?.data?.kind
   const snapshot = node?.data?.snapshotNode as Record<string, unknown> | undefined
@@ -678,17 +678,17 @@ function resolveNodePreviewImageById(
     const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
     const outputUrl = typeof latest?.url === 'string' ? latest.url.trim() : ''
     if (outputUrl) {
-      return { sourceNodeId: nodeId, url: outputUrl, ratio: Number(latest?.ratio) || 1 }
+      return { id: `node:${nodeId}`, sourceType: 'node', sourceId: nodeId, sourceNodeId: nodeId, url: outputUrl, ratio: Number(latest?.ratio) || 1 }
     }
     const sourceUrl = String(snapshot.sourceImageUrl ?? '').trim()
     if (!sourceUrl) return null
-    return { sourceNodeId: nodeId, url: sourceUrl, ratio: Number(snapshot.sourceImageRatio) || 1 }
+    return { id: `node:${nodeId}`, sourceType: 'node', sourceId: nodeId, sourceNodeId: nodeId, url: sourceUrl, ratio: Number(snapshot.sourceImageRatio) || 1 }
   }
   const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
   const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
   const outputUrl = typeof latest?.url === 'string' ? latest.url.trim() : ''
   return outputUrl
-    ? { sourceNodeId: nodeId, url: outputUrl, ratio: Number(latest?.ratio) || 1 }
+    ? { id: `node:${nodeId}`, sourceType: 'node', sourceId: nodeId, sourceNodeId: nodeId, url: outputUrl, ratio: Number(latest?.ratio) || 1 }
     : null
 }
 
@@ -704,48 +704,45 @@ watch(
           .filter((edge) => edge.target === promptNode.id && edge.targetHandle === 'in:image')
           .map((edge) => resolveNodePreviewImageById(edge.source))
           .filter(
-            (item): item is { sourceNodeId: string; url: string; ratio: number } =>
+            (item): item is { id: string; sourceType: 'node'; sourceId: string; sourceNodeId: string; url: string; ratio: number } =>
               !!item && !!item.url,
           )
-        const linkedBySourceId = new Map(linkedImages.map((item) => [item.sourceNodeId, item]))
+        const linkedBySourceId = new Map(linkedImages.map((item) => [item.sourceId, item]))
         updateSnapshotNodeBase(
           promptNode.id,
           (snapshotNode) => {
             const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
-            const currentSourceIds = current
-              .map((item) =>
-                typeof (item as { sourceNodeId?: unknown })?.sourceNodeId === 'string'
-                  ? ((item as { sourceNodeId: string }).sourceNodeId)
-                  : '',
-              )
-              .filter(Boolean)
-            const externalImages = current.filter((item) => {
-              const sourceNodeId = (item as { sourceNodeId?: unknown })?.sourceNodeId
-              return typeof sourceNodeId === 'string' && sourceNodeId.startsWith('external:')
-            })
-            const nextImages = [
-              ...externalImages,
-              ...currentSourceIds
-                .map((sourceNodeId) => linkedBySourceId.get(sourceNodeId))
-                .filter(
-                  (item): item is { sourceNodeId: string; url: string; ratio: number } => !!item,
-                ),
-              ...linkedImages.filter(
-                (item) =>
-                  !currentSourceIds.includes(item.sourceNodeId) &&
-                  !externalImages.some((external) => external.sourceNodeId === item.sourceNodeId),
-              ),
-            ].slice(0, 4)
+            const nextImages = current
+              .map((item) => {
+                const sourceType = (item as { sourceType?: unknown })?.sourceType
+                if (sourceType === 'external') return item
+                const sourceId =
+                  typeof (item as { sourceId?: unknown })?.sourceId === 'string'
+                    ? (item as { sourceId: string }).sourceId
+                    : ''
+                return sourceId ? linkedBySourceId.get(sourceId) : null
+              })
+              .filter((item): item is { id: string; sourceType: 'node' | 'external'; sourceId: string; sourceNodeId?: string; url: string; ratio: number } => !!item)
+            const nextNodeSourceIds = new Set(
+              nextImages
+                .filter((item) => item.sourceType === 'node')
+                .map((item) => item.sourceId),
+            )
+            nextImages.push(
+              ...linkedImages.filter((item) => !nextNodeSourceIds.has(item.sourceId)),
+            )
+            const limitedNextImages = nextImages.slice(0, 4)
             const same =
-              current.length === nextImages.length &&
+              current.length === limitedNextImages.length &&
               current.every(
                 (item, idx) =>
-                  (item as { sourceNodeId?: unknown })?.sourceNodeId ===
-                    nextImages[idx]?.sourceNodeId &&
-                  item?.url === nextImages[idx]?.url &&
-                  item?.ratio === nextImages[idx]?.ratio,
+                  (item as { id?: unknown })?.id === limitedNextImages[idx]?.id &&
+                  (item as { sourceType?: unknown })?.sourceType === limitedNextImages[idx]?.sourceType &&
+                  (item as { sourceId?: unknown })?.sourceId === limitedNextImages[idx]?.sourceId &&
+                  item?.url === limitedNextImages[idx]?.url &&
+                  item?.ratio === limitedNextImages[idx]?.ratio,
               )
-            return same ? snapshotNode : { ...snapshotNode, inputImages: nextImages }
+            return same ? snapshotNode : { ...snapshotNode, inputImages: limitedNextImages }
           },
           { history: false, dirty: true },
         )
@@ -782,7 +779,9 @@ async function onFlowPromptInputImageDrop(promptNodeId: string, event: DragEvent
         inputImages: [
           ...current,
           {
-            sourceNodeId: `external:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
+            id: `external:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
+            sourceType: 'external',
+            sourceId: uploaded.url,
             url: uploaded.url,
             ratio: uploaded.ratio,
           },
@@ -948,29 +947,35 @@ function isImageInputHandle(handle: string | null | undefined) {
 }
 
 function getPromptInputImages(promptNodeId: string): Array<{
-  sourceNodeId: string
+  id: string
+  sourceType: 'node' | 'external'
+  sourceId: string
+  sourceNodeId?: string
   url: string
   ratio: number
 }> {
   const promptNode = (nodes.value as Node[]).find((node) => node.id === promptNodeId)
   const snapshot = promptNode?.data?.snapshotNode as
-    | { inputImages?: Array<{ sourceNodeId?: unknown; url?: unknown; ratio?: unknown }> }
+    | { inputImages?: Array<{ id?: unknown; sourceType?: unknown; sourceId?: unknown; sourceNodeId?: unknown; url?: unknown; ratio?: unknown }> }
     | undefined
   return Array.isArray(snapshot?.inputImages)
     ? snapshot.inputImages
         .map((item) => ({
-          sourceNodeId: typeof item.sourceNodeId === 'string' ? item.sourceNodeId : '',
+          id: typeof item.id === 'string' ? item.id : '',
+          sourceType: (item.sourceType === 'external' ? 'external' : 'node') as 'node' | 'external',
+          sourceId: typeof item.sourceId === 'string' ? item.sourceId : '',
+          sourceNodeId: typeof item.sourceNodeId === 'string' ? item.sourceNodeId : undefined,
           url: typeof item.url === 'string' ? item.url.trim() : '',
           ratio: Number(item.ratio) > 0 ? Number(item.ratio) : 1,
         }))
-        .filter((item) => item.sourceNodeId && item.url)
+        .filter((item) => item.id && item.sourceId && item.url)
     : []
 }
 
 function resolvePromptInputImageNodeIds(promptNodeId: string): string[] {
   const ordered = getPromptInputImages(promptNodeId)
-    .map((item) => item.sourceNodeId)
-    .filter((sourceNodeId) => !sourceNodeId.startsWith('external:'))
+    .filter((item) => item.sourceType === 'node')
+    .map((item) => item.sourceId)
   const linked = new Set(
     (edges.value as Edge[])
       .filter((edge) => edge.target === promptNodeId && isImageInputHandle(edge.targetHandle))
@@ -995,8 +1000,8 @@ function onFlowPromptGenerate(
   }
   const linkedSourceNodeIds = new Set(resolvePromptInputImageNodeIds(promptNodeId))
   inputImages.forEach((item) => {
-    if (linkedSourceNodeIds.has(item.sourceNodeId)) {
-      void runImagePromptGeneration(item.sourceNodeId, prompt, outputCount, normalizedAspectRatio, {
+    if (item.sourceType === 'node' && linkedSourceNodeIds.has(item.sourceId)) {
+      void runImagePromptGeneration(item.sourceId, prompt, outputCount, normalizedAspectRatio, {
         outputAnchorNodeId: promptNodeId,
       })
       return
@@ -1009,7 +1014,7 @@ function onFlowPromptGenerate(
         y: 0,
         width: 280,
       },
-      item.sourceNodeId,
+      item.id,
       prompt,
       outputCount,
       normalizedAspectRatio,
