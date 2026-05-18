@@ -14,7 +14,6 @@ import {
 } from '../services/flowImageDirectActionExecutor'
 import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
 import { usePendingImageResultNodes } from './usePendingImageResultNodes'
-import { usePendingImageTaskResume } from './usePendingImageTaskResume'
 import {
   normalizeTaskImageUrls,
   pickFirstValidUrl,
@@ -49,7 +48,6 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     appendPendingImageResultNode,
     appendPendingImageResultNodes,
     updatePendingImageResultNode,
-    updatePendingImageTaskMeta,
     removePendingImageResultNode,
   } = usePendingImageResultNodes(options)
 
@@ -65,18 +63,13 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
 
   async function runPendingImageBatchGeneration(params: {
     resultNodeIds: string[]
-    submitTask: (resultNodeId: string) => Promise<{ taskId: string; sourceNodeId: string; prompt: string }>
+    submitTask: (resultNodeId: string) => Promise<{ taskId: string }>
     resolveResult: (taskId: string) => Promise<{ url: string; ratio: number }>
     totalCount: number
   }) {
     const results = await Promise.allSettled(
       params.resultNodeIds.map(async (resultNodeId) => {
-        const { taskId, sourceNodeId, prompt } = await params.submitTask(resultNodeId)
-        updatePendingImageTaskMeta(resultNodeId, {
-          pendingTaskId: taskId,
-          pendingSourceNodeId: sourceNodeId,
-          pendingPrompt: prompt,
-        })
+        const { taskId } = await params.submitTask(resultNodeId)
         const resolved = await params.resolveResult(taskId)
         return { resultNodeId, ...resolved }
       }),
@@ -116,17 +109,6 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     })
   }
 
-  usePendingImageTaskResume({
-    nodes: options.nodes,
-    runningNodeIds,
-    setNodeRunning,
-    waitTaskResult: waitExistingOrLiveTaskResult,
-    updatePendingImageResultNode,
-    removePendingImageResultNode,
-    onSuccess: options.onSuccess,
-    onWarning: options.onWarning,
-  })
-
   async function runImageDirectAction(
     nodeId: string,
     action: DirectActionKey,
@@ -154,13 +136,6 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
               loadImageSizeFromUrl,
               runOptions?.strength,
             )
-      if (taskId) {
-        updatePendingImageTaskMeta(resultNodeId, {
-          pendingTaskId: taskId,
-          pendingSourceNodeId: nodeId,
-          pendingPrompt: '',
-        })
-      }
       const urls =
         action === 'to-vector' ? await runToVector(source) : await waitExistingOrLiveTaskResult(taskId)
       const firstUrl = pickFirstValidUrl(urls)
@@ -243,7 +218,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
             loadImageSizeFromUrl,
             aspectRatio,
           )
-          return { taskId, sourceNodeId, prompt: normalizedPrompt }
+          return { taskId }
         },
         resolveResult: async (taskId) => {
           const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
@@ -301,7 +276,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
             normalizedPrompt,
             normalizePromptAspectRatio(aspectRatio),
           )
-          return { taskId, sourceNodeId: anchorNodeId, prompt: normalizedPrompt }
+          return { taskId }
         },
         resolveResult: async (taskId) => {
           const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))

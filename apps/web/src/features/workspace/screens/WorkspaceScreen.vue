@@ -958,18 +958,26 @@ function getPromptInputImages(promptNodeId: string): Array<{
   const snapshot = promptNode?.data?.snapshotNode as
     | { inputImages?: Array<{ id?: unknown; sourceType?: unknown; sourceId?: unknown; sourceNodeId?: unknown; url?: unknown; ratio?: unknown }> }
     | undefined
-  return Array.isArray(snapshot?.inputImages)
-    ? snapshot.inputImages
-        .map((item) => ({
-          id: typeof item.id === 'string' ? item.id : '',
-          sourceType: (item.sourceType === 'external' ? 'external' : 'node') as 'node' | 'external',
-          sourceId: typeof item.sourceId === 'string' ? item.sourceId : '',
-          sourceNodeId: typeof item.sourceNodeId === 'string' ? item.sourceNodeId : undefined,
-          url: typeof item.url === 'string' ? item.url.trim() : '',
-          ratio: Number(item.ratio) > 0 ? Number(item.ratio) : 1,
-        }))
-        .filter((item) => item.id && item.sourceId && item.url)
-    : []
+  if (!Array.isArray(snapshot?.inputImages)) return []
+  const normalized: Array<{
+    id: string
+    sourceType: 'node' | 'external'
+    sourceId: string
+    sourceNodeId?: string
+    url: string
+    ratio: number
+  }> = []
+  snapshot.inputImages.forEach((item) => {
+    const id = typeof item.id === 'string' ? item.id : ''
+    const sourceType = item.sourceType === 'node' || item.sourceType === 'external' ? item.sourceType : null
+    const sourceId = typeof item.sourceId === 'string' ? item.sourceId : ''
+    const sourceNodeId = typeof item.sourceNodeId === 'string' ? item.sourceNodeId : undefined
+    const url = typeof item.url === 'string' ? item.url.trim() : ''
+    const ratio = Number(item.ratio)
+    if (!id || !sourceType || !sourceId || !url || !Number.isFinite(ratio) || ratio <= 0) return
+    normalized.push({ id, sourceType, sourceId, sourceNodeId, url, ratio })
+  })
+  return normalized
 }
 
 function resolvePromptInputImageNodeIds(promptNodeId: string): string[] {

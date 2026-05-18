@@ -211,26 +211,28 @@ function testInvalidStateRejected() {
   expect(parsed.success === false, 'expected invalid state to be rejected')
 }
 
-function testUnknownFieldsAreStripped() {
-  const parsed = canvasBoardStateSchema.parse({
+function testUnknownFieldsAreRejected() {
+  const parsed = canvasBoardStateSchema.safeParse({
     ...createValidState(),
     futureTopLevelField: 'unexpected',
+  })
+  expect(parsed.success === false, 'expected unknown top-level field to be rejected')
+
+  const nestedParsed = canvasBoardStateSchema.safeParse({
+    ...createValidState(),
     modelNodes: [
       {
         ...createValidState().modelNodes[0],
         futureNestedField: 'unexpected',
       },
     ],
-  }) as Record<string, unknown>
-
-  expect(!('futureTopLevelField' in parsed), 'expected unknown top-level field to be stripped')
-  const firstModelNode = (parsed.modelNodes as Array<Record<string, unknown>>)[0]
-  expect(!('futureNestedField' in firstModelNode), 'expected unknown nested field to be stripped')
+  })
+  expect(nestedParsed.success === false, 'expected unknown nested field to be rejected')
 }
 
 testValidEmptySnapshot()
 testValidAllNodeMinimumShape()
 testInvalidStateRejected()
-testUnknownFieldsAreStripped()
+testUnknownFieldsAreRejected()
 
 console.log('canvasBoardStateSchema checks passed')

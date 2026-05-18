@@ -224,9 +224,6 @@ export interface ImageNodeItem {
   outputCount?: number
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
-  pendingTaskId?: string
-  pendingSourceNodeId?: string
-  pendingPrompt?: string
 }
 
 export interface ColorNodeItem {

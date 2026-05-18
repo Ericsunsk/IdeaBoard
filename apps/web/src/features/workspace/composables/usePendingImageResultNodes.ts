@@ -20,17 +20,6 @@ type UsePendingImageResultNodesOptions = {
   refreshNodeInternals?: (nodeIds: string[]) => void
 }
 
-type PendingImageNodeItem = ImageNodeItem & {
-  pendingTaskId?: string
-  pendingSourceNodeId?: string
-  pendingPrompt?: string
-}
-
-type PendingTaskMetaPatch = Pick<
-  PendingImageNodeItem,
-  'pendingTaskId' | 'pendingSourceNodeId' | 'pendingPrompt'
->
-
 type PendingImageResultOptions = {
   outputAnchorNodeId?: string
 }
@@ -347,9 +336,6 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
                 sourceImageRatio: ratio > 0 ? ratio : 1,
                 outputStatus: 'ready',
                 outputImages: [],
-                pendingTaskId: undefined,
-                pendingSourceNodeId: undefined,
-                pendingPrompt: undefined,
               },
             },
           }
@@ -364,30 +350,6 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     )
     updateResultNodeLayout(nodeId, { url, ratio: ratio > 0 ? ratio : 1 })
     options.refreshNodeInternals?.([nodeId])
-  }
-
-  function updatePendingImageTaskMeta(nodeId: string, patch: PendingTaskMetaPatch) {
-    options.commitGraphMutation(
-      (items, currentEdges) => ({
-        nodes: items.map((item) => {
-          if (item.id !== nodeId || item.data?.kind !== 'image') return item
-          const snapshot = item.data.snapshotNode
-          if (!snapshot || typeof snapshot !== 'object') return item
-          return {
-            ...item,
-            data: {
-              ...item.data,
-              snapshotNode: {
-                ...(snapshot as ImageNodeItem),
-                ...patch,
-              },
-            },
-          }
-        }),
-        edges: currentEdges,
-      }),
-      { recordHistory: false },
-    )
   }
 
   function removePendingImageResultNode(nodeId: string) {
@@ -406,7 +368,6 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     appendPendingImageResultNode,
     appendPendingImageResultNodes,
     updatePendingImageResultNode,
-    updatePendingImageTaskMeta,
     removePendingImageResultNode,
   }
 }

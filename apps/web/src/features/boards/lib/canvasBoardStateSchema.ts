@@ -49,14 +49,14 @@ const canvasConnectionPortSchema = z.enum(['image', 'mask', 'prompt', 'imageA', 
 const imageNodeOutputItemSchema = z.object({
   url: z.string().min(1),
   ratio: finiteNumberSchema.positive(),
-})
+}).strict()
 
 const promptNodeInputImageSchema = imageNodeOutputItemSchema.extend({
   id: z.string().min(1),
   sourceType: z.enum(['node', 'external']),
   sourceId: z.string().min(1),
   sourceNodeId: z.string().min(1).optional(),
-})
+}).strict()
 
 const promptNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -73,7 +73,7 @@ const promptNodeItemSchema = z.object({
     .default(DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
   aspectRatio: z.enum(PROMPT_ASPECT_RATIO_OPTIONS).default(DEFAULT_PROMPT_ASPECT_RATIO),
   inputImages: z.array(promptNodeInputImageSchema).default([]),
-})
+}).strict()
 
 const modelNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -93,7 +93,7 @@ const modelNodeItemSchema = z.object({
   background: z.string(),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-})
+}).strict()
 
 const viewpointNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -107,7 +107,7 @@ const viewpointNodeItemSchema = z.object({
   lighting: z.enum(['warm_white', 'afternoon', 'hard_light']),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-})
+}).strict()
 
 const maskNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -124,7 +124,7 @@ const maskNodeItemSchema = z.object({
   drawMode: z.enum(['paint', 'erase']),
   refineAmount: finiteNumberSchema.min(-100).max(100),
   invertMask: z.boolean(),
-})
+}).strict()
 
 const imageNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -142,7 +142,7 @@ const imageNodeItemSchema = z.object({
     .optional(),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-})
+}).strict()
 
 const colorNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -155,7 +155,7 @@ const colorNodeItemSchema = z.object({
   strength: finiteNumberSchema.min(0).max(100),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-})
+}).strict()
 
 const editNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -167,7 +167,7 @@ const editNodeItemSchema = z.object({
   mode: z.enum(['partial-edit', 'bg-swap', 'face-swap']),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-})
+}).strict()
 
 const fusionNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -179,7 +179,7 @@ const fusionNodeItemSchema = z.object({
   blendRatio: finiteNumberSchema.min(0).max(100),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-})
+}).strict()
 
 const enhanceNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -199,7 +199,7 @@ const enhanceNodeItemSchema = z.object({
   extendLeft: finiteNumberSchema.min(ENHANCE_EXTEND_PERCENT_MIN).max(ENHANCE_EXTEND_PERCENT_MAX),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-})
+}).strict()
 
 const wearNodeItemSchema = z.object({
   id: finiteNumberSchema,
@@ -214,7 +214,7 @@ const wearNodeItemSchema = z.object({
   opacity: finiteNumberSchema.min(WEAR_OPACITY_MIN).max(WEAR_OPACITY_MAX),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-})
+}).strict()
 
 const canvasConnectionSchema = z.object({
   id: finiteNumberSchema,
@@ -224,17 +224,14 @@ const canvasConnectionSchema = z.object({
   toNodeType: canvasConnectionNodeTypeSchema,
   toNodeId: finiteNumberSchema,
   toPort: canvasConnectionPortSchema,
-})
+}).strict()
 
 const canvasViewportStateSchema = z.object({
   canvasX: finiteNumberSchema,
   canvasY: finiteNumberSchema,
   zoomLevel: finiteNumberSchema,
-})
+}).strict()
 
-// Board state parsing intentionally uses unknown-key strip mode.
-// Reason: remote/local legacy snapshots may contain stale fields; we keep known data
-// and discard unsupported fields instead of hard-failing workspace hydration.
 export const canvasBoardSnapshotSchema = z
   .object({
     imageNodes: z.array(imageNodeItemSchema),
@@ -250,7 +247,7 @@ export const canvasBoardSnapshotSchema = z
     connections: z.array(canvasConnectionSchema),
     viewport: canvasViewportStateSchema,
   })
-  .strip() satisfies z.ZodType<CanvasBoardSnapshot>
+  .strict() satisfies z.ZodType<CanvasBoardSnapshot>
 
 export const canvasBoardStateSchema = canvasBoardSnapshotSchema
   .extend({
@@ -259,4 +256,4 @@ export const canvasBoardStateSchema = canvasBoardSnapshotSchema
     previewSnapshotVersion: finiteNumberSchema.int().positive().optional(),
     updatedAt: finiteNumberSchema,
   })
-  .strip() satisfies z.ZodType<PersistedCanvasBoardState>
+  .strict() satisfies z.ZodType<PersistedCanvasBoardState>
