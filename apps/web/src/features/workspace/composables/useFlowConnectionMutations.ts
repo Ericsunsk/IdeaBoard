@@ -6,6 +6,11 @@ type UseFlowConnectionMutationsOptions = {
   edges: Ref<Array<Record<string, any>>>
   isValidConnection: (connection: Connection) => boolean
   normalizeConnection?: (connection: Connection, existingEdges: readonly Edge[]) => Connection | null
+  allowsMultipleTargetConnections?: (connection: Connection) => boolean
+  validateConnectionMutation?: (
+    connection: Connection,
+    existingEdges: readonly Edge[],
+  ) => string | null
   commitEdgeMutation: FlowTransactions['commitEdgeMutation']
   onWarning: (message: string) => void
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
@@ -22,6 +27,12 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       return
     }
     if (!resolvedConnection.source || !resolvedConnection.target) return
+    const validationMessage =
+      options.validateConnectionMutation?.(resolvedConnection, existingEdges) ?? null
+    if (validationMessage) {
+      options.onWarning(validationMessage)
+      return
+    }
     const nextEdge = {
       ...resolvedConnection,
       id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -30,12 +41,15 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       animated: false,
     } as Edge
     options.commitEdgeMutation((currentEdges) => {
+      const allowsMultipleTargetConnections =
+        options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
       const filteredEdges = currentEdges.filter((edge) => {
-        if (
+        const isSameTargetHandle =
           edge.target === resolvedConnection.target &&
           edge.targetHandle === resolvedConnection.targetHandle
-        )
+        if (isSameTargetHandle && !allowsMultipleTargetConnections) {
           return false
+        }
         if (
           edge.source === resolvedConnection.source &&
           edge.target === resolvedConnection.target &&
@@ -63,16 +77,29 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
       return
     }
     if (!resolvedConnection.source || !resolvedConnection.target) return
+    const validationMessage =
+      options.validateConnectionMutation?.(resolvedConnection, existingEdges) ?? null
+    if (validationMessage) {
+      options.onWarning(validationMessage)
+      return
+    }
     options.commitEdgeMutation((currentEdges) =>
       currentEdges
-        .filter(
-          (item) =>
-            item.id === edge.id ||
-            !(
-              item.target === resolvedConnection.target &&
-              (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
-            ),
-        )
+        .filter((item) => {
+          if (item.id === edge.id) return true
+          const isSameTargetHandle =
+            item.target === resolvedConnection.target &&
+            (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
+          if (isSameTargetHandle && !options.allowsMultipleTargetConnections?.(resolvedConnection)) {
+            return false
+          }
+          const isSameConnection =
+            item.source === resolvedConnection.source &&
+            item.target === resolvedConnection.target &&
+            (item.sourceHandle ?? null) === (resolvedConnection.sourceHandle ?? null) &&
+            (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
+          return !isSameConnection
+        })
         .map((item) => {
           if (item.id !== edge.id) return item
           return {

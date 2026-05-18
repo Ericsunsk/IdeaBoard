@@ -177,6 +177,20 @@ export function useFlowImagePreviewLightbox() {
     instance.loadAndOpen(index, dataSource)
   }
 
+  async function openImageUrlPreview(src: string, ratio = 1) {
+    const url = normalizeImageUrl(src)
+    if (!url) return
+    const requestId = ++previewRequestId
+    const dataSource = [await createLightboxItem({ src: url, ratio })]
+    if (isDisposed || requestId !== previewRequestId) return
+
+    const instance = ensureLightbox()
+    if (instance.pswp) {
+      instance.pswp.close()
+    }
+    instance.loadAndOpen(0, dataSource)
+  }
+
   onBeforeUnmount(() => {
     isDisposed = true
     if (!lightbox) return
@@ -186,5 +200,6 @@ export function useFlowImagePreviewLightbox() {
 
   return {
     openNodeImagePreview,
+    openImageUrlPreview,
   }
 }

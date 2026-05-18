@@ -7,6 +7,7 @@ import {
   EXECUTION_EDIT_MODE_META,
 } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
+import { buildPromptAspectRatioTaskParams, type PromptAspectRatio } from '../config/promptAspectRatio'
 import { extractTaskImageUrls } from '../utils/flowImageDirectActionTaskResult'
 import { assertTaskSubmitReady, waitTaskResult } from './flowTaskExecutorUtils'
 import type { ImageDirectActionSource } from '../utils/flowImageDirectActionSource'
@@ -45,6 +46,21 @@ export async function assertPromptImageSubmitReady(): Promise<void> {
     }),
     '提交任务失败',
   )
+}
+
+export async function submitPromptTextGenerationTask(
+  prompt: string,
+  aspectRatio: PromptAspectRatio,
+): Promise<string> {
+  const request = buildExecutionTaskRequest({
+    prompt,
+    params: buildPromptAspectRatioTaskParams(aspectRatio),
+  })
+  const submitRes = await taskApi.submit(request)
+  if (submitRes.code !== 0 || !submitRes.data?.task_id) {
+    throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
+  }
+  return submitRes.data.task_id
 }
 
 export async function submitDirectActionTask(
@@ -91,6 +107,7 @@ export async function submitPromptImageGenerationTask(
   source: ImageDirectActionSource,
   prompt: string,
   loadImageSize: ImageSizeLoader,
+  aspectRatio: PromptAspectRatio,
 ): Promise<string> {
   const imageSize = await loadImageSize(source.url)
   const request = buildExecutionTaskRequest({
@@ -100,6 +117,7 @@ export async function submitPromptImageGenerationTask(
     params: {
       original_image_url: source.url,
       ...buildExecutionSizeParams(imageSize),
+      ...buildPromptAspectRatioTaskParams(aspectRatio),
     },
   })
 

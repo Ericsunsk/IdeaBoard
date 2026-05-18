@@ -124,6 +124,7 @@
       >
         <template #node-canvas="nodeProps">
           <FlowCanvasNode
+            :node-id="nodeProps.id"
             :data="nodeProps.data"
             :selected="!!nodeProps.selected"
             :dragging="!!nodeProps.dragging"
@@ -157,6 +158,9 @@
             @generate-model="() => onFlowModelGenerate(nodeProps.id)"
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
             @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
+            @prompt-input-image-drop="onFlowPromptInputImageDrop"
+            @prompt-input-image-open="onFlowPromptInputImageOpen"
+            @prompt-input-image-preview="onFlowPromptInputImagePreview"
             @image-open-file="() => onFlowImageOpenFile(nodeProps.id)"
             @image-open-preview="() => onFlowImageOpenPreview(nodeProps.id)"
             @image-append-to-canvas="() => onFlowImageAppendToCanvas(nodeProps.id)"
@@ -171,6 +175,7 @@
             @request-internals-update="() => scheduleFlowNodeInternalsRefresh([nodeProps.id])"
             @image-contextmenu="(event) => onFlowImageContextMenu(nodeProps.id, event)"
             @image-prompt-generate="(prompt, outputCount) => onFlowImagePromptGenerate(nodeProps.id, prompt, outputCount)"
+            @prompt-generate="(prompt, outputCount, aspectRatio) => onFlowPromptGenerate(nodeProps.id, prompt, outputCount, aspectRatio)"
             @image-action="(action) => onFlowImageDirectAction(nodeProps.id, action)"
             @style-innovate-mousedown="onFlowStyleInnovateMouseDown"
             @style-strength-track-mousedown="onFlowStyleStrengthTrackMouseDown"
@@ -202,6 +207,7 @@ import type { Ref } from 'vue'
 import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
+import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import type { Edge, Node } from '@vue-flow/core'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
@@ -232,6 +238,7 @@ import { useFlowSelectionController } from '../composables/useFlowSelectionContr
 import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
+import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import { useFlowAutosave } from '../composables/useFlowAutosave'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 
@@ -274,6 +281,7 @@ function onZoomOut() {
 function onCanvasWheelCapture(event: WheelEvent) {
   const target = event.target
   if (!(target instanceof Element)) return
+  if (target.closest('[data-node-kind="prompt"]')) return
   const interactiveTarget = target.closest(
     'button, input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="button"]',
   )
@@ -656,7 +664,95 @@ const {
     clearMaskCanvasRef(nodeId)
   },
 })
-const { openNodeImagePreview } = useFlowImagePreviewLightbox()
+const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
+
+function resolveNodePreviewImageById(
+  nodeId: string,
+): { sourceNodeId: string; url: string; ratio: number } | null {
+  const node = (nodes.value as Node[]).find((item) => item.id === nodeId)
+  const kind = node?.data?.kind
+  const snapshot = node?.data?.snapshotNode as Record<string, unknown> | undefined
+  if (!kind || !snapshot) return null
+  if (kind === 'image') {
+    const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
+    const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
+    const outputUrl = typeof latest?.url === 'string' ? latest.url.trim() : ''
+    if (outputUrl) {
+      return { sourceNodeId: nodeId, url: outputUrl, ratio: Number(latest?.ratio) || 1 }
+    }
+    const sourceUrl = String(snapshot.sourceImageUrl ?? '').trim()
+    if (!sourceUrl) return null
+    return { sourceNodeId: nodeId, url: sourceUrl, ratio: Number(snapshot.sourceImageRatio) || 1 }
+  }
+  const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
+  const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
+  const outputUrl = typeof latest?.url === 'string' ? latest.url.trim() : ''
+  return outputUrl
+    ? { sourceNodeId: nodeId, url: outputUrl, ratio: Number(latest?.ratio) || 1 }
+    : null
+}
+
+watch(
+  [nodes, edges],
+  () => {
+    const flowNodes = nodes.value as Node[]
+    const flowEdges = edges.value as Edge[]
+    flowNodes
+      .filter((node) => node.data?.kind === 'prompt')
+      .forEach((promptNode) => {
+        const linkedImages = flowEdges
+          .filter((edge) => edge.target === promptNode.id && edge.targetHandle === 'in:image')
+          .map((edge) => resolveNodePreviewImageById(edge.source))
+          .filter(
+            (item): item is { sourceNodeId: string; url: string; ratio: number } =>
+              !!item && !!item.url,
+          )
+        const linkedBySourceId = new Map(linkedImages.map((item) => [item.sourceNodeId, item]))
+        updateSnapshotNodeBase(
+          promptNode.id,
+          (snapshotNode) => {
+            const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
+            const currentSourceIds = current
+              .map((item) =>
+                typeof (item as { sourceNodeId?: unknown })?.sourceNodeId === 'string'
+                  ? ((item as { sourceNodeId: string }).sourceNodeId)
+                  : '',
+              )
+              .filter(Boolean)
+            const externalImages = current.filter((item) => {
+              const sourceNodeId = (item as { sourceNodeId?: unknown })?.sourceNodeId
+              return typeof sourceNodeId === 'string' && sourceNodeId.startsWith('external:')
+            })
+            const nextImages = [
+              ...externalImages,
+              ...currentSourceIds
+                .map((sourceNodeId) => linkedBySourceId.get(sourceNodeId))
+                .filter(
+                  (item): item is { sourceNodeId: string; url: string; ratio: number } => !!item,
+                ),
+              ...linkedImages.filter(
+                (item) =>
+                  !currentSourceIds.includes(item.sourceNodeId) &&
+                  !externalImages.some((external) => external.sourceNodeId === item.sourceNodeId),
+              ),
+            ].slice(0, 4)
+            const same =
+              current.length === nextImages.length &&
+              current.every(
+                (item, idx) =>
+                  (item as { sourceNodeId?: unknown })?.sourceNodeId ===
+                    nextImages[idx]?.sourceNodeId &&
+                  item?.url === nextImages[idx]?.url &&
+                  item?.ratio === nextImages[idx]?.ratio,
+              )
+            return same ? snapshotNode : { ...snapshotNode, inputImages: nextImages }
+          },
+          { history: false, dirty: true },
+        )
+      })
+  },
+  { deep: true },
+)
 
 function onCanvasDragOver(event: DragEvent) {
   activeImageActionNodeId.value = null
@@ -667,6 +763,63 @@ function onCanvasDragOver(event: DragEvent) {
 
 async function onCanvasDrop(event: DragEvent) {
   await canvasDrop.onCanvasDrop(event)
+}
+
+async function onFlowPromptInputImageDrop(promptNodeId: string, event: DragEvent) {
+  const currentInputCount = getPromptInputImages(promptNodeId).length
+  if (currentInputCount >= 4) {
+    appToast.warning('Prompt 最多接入 4 张图片')
+    return
+  }
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+  try {
+    const uploaded = await canvasDrop.uploadImageToBoard(file)
+    updateSnapshotNodeBase(promptNodeId, (snapshotNode) => {
+      const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
+      return {
+        ...snapshotNode,
+        inputImages: [
+          ...current,
+          {
+            sourceNodeId: `external:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
+            url: uploaded.url,
+            ratio: uploaded.ratio,
+          },
+        ].slice(0, 4),
+      }
+    })
+    markFlowExecutionNodeDirty(promptNodeId, { includeSelf: true })
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : '上传失败'
+    appToast.warning(msg)
+  }
+}
+
+function onFlowPromptInputImageOpen(promptNodeId: string) {
+  const currentInputCount = getPromptInputImages(promptNodeId).length
+  if (currentInputCount >= 4) {
+    appToast.warning('Prompt 最多接入 4 张图片')
+    return
+  }
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = IMAGE_UPLOAD_ACCEPT
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const syntheticDrop = {
+      dataTransfer: { files: [file] },
+      clientX: window.innerWidth / 2,
+      clientY: window.innerHeight / 2,
+    } as unknown as DragEvent
+    void onFlowPromptInputImageDrop(promptNodeId, syntheticDrop)
+  }
+  input.click()
+}
+
+function onFlowPromptInputImagePreview(image: { url: string; ratio: number }) {
+  void openImageUrlPreview(image.url, image.ratio)
 }
 
 function onFlowImageOpenPreview(nodeId: string) {
@@ -730,6 +883,8 @@ const {
   isNodeDirectActionRunning,
   runImageDirectAction,
   runImagePromptGeneration,
+  runImagePromptGenerationFromSource,
+  runTextPromptGeneration,
 } = useFlowImageDirectActions({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
@@ -786,6 +941,81 @@ function onFlowImagePromptGenerate(nodeId: string, prompt: string, outputCount: 
   activeImageActionNodeId.value = null
   hideFlowStyleStrengthControl()
   void runImagePromptGeneration(nodeId, prompt, outputCount)
+}
+
+function isImageInputHandle(handle: string | null | undefined) {
+  return String(handle ?? '') === 'in:image'
+}
+
+function getPromptInputImages(promptNodeId: string): Array<{
+  sourceNodeId: string
+  url: string
+  ratio: number
+}> {
+  const promptNode = (nodes.value as Node[]).find((node) => node.id === promptNodeId)
+  const snapshot = promptNode?.data?.snapshotNode as
+    | { inputImages?: Array<{ sourceNodeId?: unknown; url?: unknown; ratio?: unknown }> }
+    | undefined
+  return Array.isArray(snapshot?.inputImages)
+    ? snapshot.inputImages
+        .map((item) => ({
+          sourceNodeId: typeof item.sourceNodeId === 'string' ? item.sourceNodeId : '',
+          url: typeof item.url === 'string' ? item.url.trim() : '',
+          ratio: Number(item.ratio) > 0 ? Number(item.ratio) : 1,
+        }))
+        .filter((item) => item.sourceNodeId && item.url)
+    : []
+}
+
+function resolvePromptInputImageNodeIds(promptNodeId: string): string[] {
+  const ordered = getPromptInputImages(promptNodeId)
+    .map((item) => item.sourceNodeId)
+    .filter((sourceNodeId) => !sourceNodeId.startsWith('external:'))
+  const linked = new Set(
+    (edges.value as Edge[])
+      .filter((edge) => edge.target === promptNodeId && isImageInputHandle(edge.targetHandle))
+      .map((edge) => edge.source),
+  )
+  return ordered.length
+    ? ordered.filter((sourceNodeId) => linked.has(sourceNodeId))
+    : Array.from(linked)
+}
+
+function onFlowPromptGenerate(
+  promptNodeId: string,
+  prompt: string,
+  outputCount: number,
+  aspectRatio: string,
+) {
+  const normalizedAspectRatio = normalizePromptAspectRatio(aspectRatio)
+  const inputImages = getPromptInputImages(promptNodeId)
+  if (inputImages.length === 0) {
+    void runTextPromptGeneration(promptNodeId, prompt, outputCount, normalizedAspectRatio)
+    return
+  }
+  const linkedSourceNodeIds = new Set(resolvePromptInputImageNodeIds(promptNodeId))
+  inputImages.forEach((item) => {
+    if (linkedSourceNodeIds.has(item.sourceNodeId)) {
+      void runImagePromptGeneration(item.sourceNodeId, prompt, outputCount, normalizedAspectRatio, {
+        outputAnchorNodeId: promptNodeId,
+      })
+      return
+    }
+    void runImagePromptGenerationFromSource(
+      {
+        url: item.url,
+        ratio: item.ratio,
+        x: 0,
+        y: 0,
+        width: 280,
+      },
+      item.sourceNodeId,
+      prompt,
+      outputCount,
+      normalizedAspectRatio,
+      { outputAnchorNodeId: promptNodeId },
+    )
+  })
 }
 
 const {

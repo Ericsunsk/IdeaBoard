@@ -239,9 +239,52 @@ function testConnectionRoundTripPreservesEdges() {
   )
 }
 
+function testPromptImageInputPreservesMultipleConnections() {
+  const nodes: FlowAdapterNode[] = [
+    makeImageFlowNode({
+      flowId: 'image-1',
+      id: 1,
+      outputStatus: 'ready',
+      sourceImageUrl: 'https://example.com/source-1.png',
+    }),
+    makeImageFlowNode({
+      flowId: 'image-2',
+      id: 2,
+      outputStatus: 'ready',
+      sourceImageUrl: 'https://example.com/source-2.png',
+    }),
+    makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
+  ]
+  const snapshot = flowToCanvasBoardSnapshot({
+    nodes,
+    edges: [
+      {
+        id: 'edge-image-1-prompt',
+        source: 'image-1',
+        sourceHandle: 'out:image',
+        target: 'prompt-3',
+        targetHandle: 'in:image',
+      },
+      {
+        id: 'edge-image-2-prompt',
+        source: 'image-2',
+        sourceHandle: 'out:image',
+        target: 'prompt-3',
+        targetHandle: 'in:image',
+      },
+    ],
+  })
+
+  const promptImageInputs = snapshot.connections.filter(
+    (connection) => connection.toNodeType === 'prompt' && connection.toPort === 'image',
+  )
+  expect(promptImageInputs.length === 2, 'expected prompt image input to preserve multiple edges')
+}
+
 testTransientRunningImageNodeIsNotPersisted()
 testReadyImageNodeIsPersistedWithConnection()
 testAggregateInputHandlesAreResolvedBeforePersistence()
 testConnectionRoundTripPreservesEdges()
+testPromptImageInputPreservesMultipleConnections()
 
 console.log('flowSnapshotAdapter snapshot checks passed')

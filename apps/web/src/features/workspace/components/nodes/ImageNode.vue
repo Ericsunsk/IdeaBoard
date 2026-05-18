@@ -123,10 +123,10 @@
           @keydown.enter.exact="onPromptEnter"
         />
         <div class="image-node-prompt-actions" @keydown.esc.stop="closeOutputCountPicker">
-          <div class="image-node-output-count-wrap">
+          <div class="image-node-output-count-wrap node-tool-output-count-wrap">
             <button
               v-if="!outputCountEditing"
-              class="image-node-output-count node-tool-button"
+              class="image-node-output-count node-tool-output-count node-tool-button"
               type="button"
               :class="{ active: outputCountPickerVisible }"
               :disabled="directGenerating"
@@ -141,7 +141,7 @@
               v-else
               ref="outputCountInputRef"
               v-model="outputCountDraft"
-              class="image-node-output-count image-node-output-count-input node-tool-button"
+              class="image-node-output-count image-node-output-count-input node-tool-output-count node-tool-button"
               type="number"
               inputmode="numeric"
               :min="MIN_IMAGE_NODE_OUTPUT_COUNT"
@@ -163,13 +163,13 @@
                   transition: { duration: 150, easing: 'ease-out' },
                 },
               }"
-              class="image-node-output-count-popover"
+              class="image-node-output-count-popover node-tool-output-count-popover"
             >
               <button
                 v-for="option in outputCountPresetOptions"
                 :key="option"
                 type="button"
-                class="image-node-output-count-option"
+                class="image-node-output-count-option node-tool-output-count-option"
                 :class="{ active: option === outputCountValue }"
                 @click.stop="selectOutputCount(option)"
               >
@@ -178,7 +178,7 @@
             </div>
           </div>
           <button
-            class="image-node-prompt-send node-tool-button"
+            class="image-node-prompt-send node-tool-send node-tool-button"
             type="submit"
             :disabled="directGenerating || !promptDraft.trim()"
             title="发送"
@@ -593,24 +593,7 @@ function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {
   gap: var(--node-tool-button-gap);
 }
 
-.image-node-output-count-wrap {
-  position: relative;
-  width: var(--node-tool-button-size);
-  height: var(--node-tool-button-size);
-}
-
 .image-node-output-count {
-  border: 1px solid var(--node-tool-button-border);
-  background: #ffffff;
-  color: #505766;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  outline: none;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
 }
 
 .image-node-output-count-input {
@@ -624,76 +607,10 @@ function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {
   appearance: none;
 }
 
-.image-node-output-count:hover:not(:disabled),
-.image-node-output-count:focus,
-.image-node-output-count.active {
-  background: #f8f7ff;
-  border-color: var(--node-tool-button-accent);
-  color: #272932;
-}
-
-.image-node-output-count:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
-
-.image-node-output-count-popover {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + var(--node-tool-button-gap));
-  z-index: 43;
-  display: grid;
-  grid-template-columns: repeat(2, var(--node-tool-button-size));
-  gap: 5px;
-  padding: 6px;
-  border: 1px solid rgba(122, 107, 213, 0.22);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
-  backdrop-filter: blur(10px);
-}
-
 .image-node-output-count-option {
-  width: var(--node-tool-button-size);
-  height: var(--node-tool-popover-option-height);
-  border: 1px solid #e8ecf4;
-  border-radius: 9px;
-  background: #ffffff;
-  color: #5f6878;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
-}
-
-.image-node-output-count-option:hover,
-.image-node-output-count-option.active {
-  border-color: var(--node-tool-button-accent);
-  background: #f5f2ff;
-  color: var(--node-tool-button-accent);
 }
 
 .image-node-prompt-send {
-  border: 0;
-  color: #ffffff;
-  background: var(--node-tool-button-brand);
-  transition:
-    transform 0.16s ease,
-    opacity 0.16s ease,
-    background-color 0.16s ease;
-}
-
-.image-node-prompt-send:hover:not(:disabled) {
-  transform: translateX(1px);
-  background: #6f61c6;
-}
-
-.image-node-prompt-send:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
 }
 
 @keyframes image-node-prompt-rise {

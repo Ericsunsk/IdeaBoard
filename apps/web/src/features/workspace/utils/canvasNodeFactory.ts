@@ -2,6 +2,8 @@ import {
   DEFAULT_COLOR_NODE_COLOR,
   DEFAULT_COLOR_STRENGTH,
   DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
+  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
+  DEFAULT_PROMPT_ASPECT_RATIO,
   createDefaultModelAngleSpec,
   ENHANCE_EXTEND_PERCENT_DEFAULT,
   MODEL_REFERENCE_STRENGTH_DEFAULT,
@@ -39,6 +41,9 @@ export function createPromptNodeAt(point: CanvasPoint): PromptNodeItem {
     width: 280,
     title: getDefaultCanvasNodeTitle('prompt'),
     text: '',
+    outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
+    aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
+    inputImages: [],
   }
 }
 

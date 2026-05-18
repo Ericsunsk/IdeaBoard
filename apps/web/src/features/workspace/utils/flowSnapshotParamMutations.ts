@@ -5,6 +5,7 @@ import {
 } from '../components/nodes/config/nodeOptionConfig'
 import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
 import type { EnhanceNodeItem, ViewpointNodeItem } from '../types/canvasNodes'
+import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import {
   clampEnhanceExtendPercent,
   clampImageNodeOutputCount,
@@ -35,6 +36,11 @@ export function patchFlowSnapshotParam(
       const nextOutputCount = clampImageNodeOutputCount(value)
       if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
       return { ...snapshotNode, outputCount: nextOutputCount }
+    }
+    case 'aspectRatio': {
+      const nextAspectRatio = normalizePromptAspectRatio(value)
+      if (snapshotNode.aspectRatio === nextAspectRatio) return snapshotNode
+      return { ...snapshotNode, aspectRatio: nextAspectRatio }
     }
     case 'upscaleMode':
       if (snapshotNode.upscaleMode === value) return snapshotNode

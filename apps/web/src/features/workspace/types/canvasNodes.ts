@@ -1,4 +1,8 @@
 import { DEFAULT_COLOR_HEX } from '../components/nodes/utils/colorPopoverUtils'
+import {
+  DEFAULT_PROMPT_ASPECT_RATIO,
+  type PromptAspectRatio,
+} from '../config/promptAspectRatio'
 
 export interface CanvasPoint {
   x: number
@@ -41,6 +45,8 @@ export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] 
 export const MIN_IMAGE_NODE_OUTPUT_COUNT = 1
 export const MAX_IMAGE_NODE_OUTPUT_COUNT = 8
 export const DEFAULT_IMAGE_NODE_OUTPUT_COUNT = 1
+export const DEFAULT_PROMPT_NODE_OUTPUT_COUNT = 1
+export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
 
 export function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {
   return (
@@ -79,6 +85,13 @@ export interface PromptNodeItem {
   width: number
   title?: string
   text: string
+  outputCount: number
+  aspectRatio: PromptAspectRatio
+  inputImages: PromptNodeInputImage[]
+}
+
+export interface PromptNodeInputImage extends ImageNodeOutputItem {
+  sourceNodeId: string
 }
 
 export type ModelAngleFraming = 'full' | 'half' | 'portrait'

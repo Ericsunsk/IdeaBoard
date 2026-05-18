@@ -5,6 +5,7 @@ type UseFlowKeyboardShortcutsOptions = {
   onUndo?: () => void
   onRedo?: () => void
   onDeleteSelected?: () => void
+  onDeleteInlineSelection?: () => boolean
   onEscape?: () => boolean | void
   onPanViewport?: (delta: { x: number; y: number }) => void
   onToolSelect?: () => void
@@ -118,6 +119,7 @@ export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOption
     if (key !== 'delete' && key !== 'backspace') return
     if (event.metaKey || event.ctrlKey || event.altKey) return
     event.preventDefault()
+    if (options.onDeleteInlineSelection?.()) return
     options.onDeleteSelected()
   }
 

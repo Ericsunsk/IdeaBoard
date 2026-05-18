@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import {
+  DEFAULT_PROMPT_ASPECT_RATIO,
+  DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   ENHANCE_EXTEND_PERCENT_MAX,
   ENHANCE_EXTEND_PERCENT_MIN,
   MAX_IMAGE_NODE_OUTPUT_COUNT,
@@ -18,6 +20,7 @@ import {
   WEAR_SCALE_MIN,
   type CanvasBoardSnapshot,
 } from '../../workspace/types/canvasNodes'
+import { PROMPT_ASPECT_RATIO_OPTIONS } from '../../workspace/config/promptAspectRatio'
 
 type PersistedCanvasBoardState = CanvasBoardSnapshot & {
   previewSnapshotDataUrl?: string
@@ -48,6 +51,10 @@ const imageNodeOutputItemSchema = z.object({
   ratio: finiteNumberSchema.positive(),
 })
 
+const promptNodeInputImageSchema = imageNodeOutputItemSchema.extend({
+  sourceNodeId: z.string().min(1),
+})
+
 const promptNodeItemSchema = z.object({
   id: finiteNumberSchema,
   type: z.literal('prompt'),
@@ -56,6 +63,13 @@ const promptNodeItemSchema = z.object({
   width: finiteNumberSchema,
   title: z.string().optional(),
   text: z.string(),
+  outputCount: finiteNumberSchema
+    .int()
+    .min(MIN_IMAGE_NODE_OUTPUT_COUNT)
+    .max(MAX_IMAGE_NODE_OUTPUT_COUNT)
+    .default(DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
+  aspectRatio: z.enum(PROMPT_ASPECT_RATIO_OPTIONS).default(DEFAULT_PROMPT_ASPECT_RATIO),
+  inputImages: z.array(promptNodeInputImageSchema).default([]),
 })
 
 const modelNodeItemSchema = z.object({

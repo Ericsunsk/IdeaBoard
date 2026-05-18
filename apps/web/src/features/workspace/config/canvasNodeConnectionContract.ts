@@ -96,7 +96,7 @@ export function getCanvasNodePortContracts(
 ): CanvasNodePortContract[] {
   switch (nodeType) {
     case 'prompt':
-      return [input('prompt', 'prompt'), output('prompt', 'prompt')]
+      return [input('image', 'image'), output('image', 'image'), output('prompt', 'prompt')]
     case 'image':
       return [input('image', 'image'), output('image', 'image')]
     case 'mask':

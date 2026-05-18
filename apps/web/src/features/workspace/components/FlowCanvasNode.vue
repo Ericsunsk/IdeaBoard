@@ -18,10 +18,17 @@
         :copy-mode="props.copyMode"
         :ui-state="promptUiState"
         @update:text="onPromptTextUpdate"
+        @update:output-count="emitNodeParam('outputCount', $event)"
+        @update:aspect-ratio="emitNodeParam('aspectRatio', $event)"
+        @update:input-images="emitNodeParam('inputImages', $event)"
         @update:title="emitNodeParam('title', $event)"
+        @input-image-drop="onPromptInputImageDrop"
+        @input-image-open="onPromptInputImageOpen"
+        @input-image-preview="onPromptInputImagePreview"
         @node-mousedown="noopMouse"
         @delete="onDeleteRequest"
         @focus="noop"
+        @generate="onPromptGenerate"
       />
     </template>
     <template v-else-if="isImageNode && imageSnapshot">
@@ -238,6 +245,7 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/config/nodeOptionConfig'
 import type {
   ColorNodeItem,
@@ -259,6 +267,7 @@ type ImageAction = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-des
 
 const props = withDefaults(
   defineProps<{
+    nodeId: string
     data: FlowNodeData
     selected?: boolean
     dragging?: boolean
@@ -307,6 +316,9 @@ const emit = defineEmits<{
   (e: 'generate-model'): void
   (e: 'generate-viewpoint'): void
   (e: 'image-stage-drop', event: DragEvent): void
+  (e: 'prompt-input-image-drop', nodeId: string, event: DragEvent): void
+  (e: 'prompt-input-image-open', nodeId: string): void
+  (e: 'prompt-input-image-preview', image: { url: string; ratio: number }): void
   (e: 'image-open-file'): void
   (e: 'image-open-preview'): void
   (e: 'image-append-to-canvas'): void
@@ -320,6 +332,7 @@ const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'image-contextmenu', event: MouseEvent): void
   (e: 'image-prompt-generate', prompt: string, outputCount: number): void
+  (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
   (e: 'image-action', action: ImageAction): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
@@ -690,12 +703,33 @@ function onImageContextMenu(event: MouseEvent) {
   emit('image-contextmenu', event)
 }
 
+function onPromptInputImageDrop(event: DragEvent) {
+  emit('prompt-input-image-drop', props.nodeId, event)
+}
+
+function onPromptInputImageOpen() {
+  emit('prompt-input-image-open', props.nodeId)
+}
+
+function onPromptInputImagePreview(image: { url: string; ratio: number }) {
+  emit('prompt-input-image-preview', image)
+}
+
 function onNodeMouseDown(event: MouseEvent) {
   emit('node-mousedown', event)
 }
 
 function onImagePromptGenerate(prompt: string, outputCount: number) {
   emit('image-prompt-generate', prompt, outputCount)
+}
+function onPromptGenerate() {
+  if (!promptSnapshot.value) return
+  emit(
+    'prompt-generate',
+    promptSnapshot.value.text,
+    promptSnapshot.value.outputCount ?? 1,
+    promptSnapshot.value.aspectRatio ?? 'auto',
+  )
 }
 
 function onImageAction(action: ImageAction) {

@@ -42,7 +42,17 @@ function resolveValue<T, V>(value: Resolvable<T, V>, context: T): V {
 
 export const PROMPT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   {
+    key: 'image',
+    kind: 'image',
+    label: 'Image',
+  },
+  {
     key: 'output',
+    kind: 'image',
+  },
+  {
+    key: 'promptOutput',
+    label: 'Prompt',
     kind: 'prompt',
   },
 ]

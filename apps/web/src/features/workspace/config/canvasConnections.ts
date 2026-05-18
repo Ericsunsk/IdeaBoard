@@ -54,7 +54,7 @@ export function isCanvasConnectionAllowed(
   if (!fromPort || !toPort) return false
 
   if (from.nodeType === 'prompt') {
-    return fromPort.kind === 'prompt' && toPort.kind === 'prompt'
+    return fromPort.kind === toPort.kind
   }
 
   if (from.nodeType === 'mask') {

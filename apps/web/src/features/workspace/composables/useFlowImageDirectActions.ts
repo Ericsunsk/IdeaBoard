@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../types/canvasNodes'
+import { normalizePromptAspectRatio, type PromptAspectRatio } from '../config/promptAspectRatio'
 import type { FlowNodeData } from '../types/flowTypes'
 import {
   assertDirectActionSubmitReady,
@@ -8,6 +9,7 @@ import {
   runToVector,
   submitDirectActionTask,
   submitPromptImageGenerationTask,
+  submitPromptTextGenerationTask,
   waitExistingOrLiveTaskResult,
 } from '../services/flowImageDirectActionExecutor'
 import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
@@ -140,7 +142,13 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
   }
 
-  async function runImagePromptGeneration(nodeId: string, prompt: string, outputCount: number) {
+  async function runImagePromptGeneration(
+    nodeId: string,
+    prompt: string,
+    outputCount: number,
+    aspectRatio = 'auto',
+    optionsOverride: { outputAnchorNodeId?: string } = {},
+  ) {
     const normalizedPrompt = prompt.trim()
     if (!normalizedPrompt) {
       options.onWarning('请输入 Prompt')
@@ -151,12 +159,40 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       options.onWarning('图片节点不存在或缺少 URL')
       return
     }
+    await runImagePromptGenerationFromSource(
+      source,
+      nodeId,
+      normalizedPrompt,
+      outputCount,
+      normalizePromptAspectRatio(aspectRatio),
+      { outputAnchorNodeId: optionsOverride.outputAnchorNodeId },
+    )
+  }
 
+  async function runImagePromptGenerationFromSource(
+    source: ImageDirectActionSource,
+    sourceNodeId: string,
+    prompt: string,
+    outputCount: number,
+    aspectRatio: PromptAspectRatio,
+    optionsOverride: { outputAnchorNodeId?: string } = {},
+  ) {
+    const normalizedPrompt = prompt.trim()
+    if (!normalizedPrompt) {
+      options.onWarning('请输入 Prompt')
+      return
+    }
+    if (!source.url) {
+      options.onWarning('图片缺少 URL')
+      return
+    }
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
     let resultNodeIds: string[] = []
     try {
       await assertPromptImageSubmitReady()
-      resultNodeIds = appendPendingImageResultNodes(source, nodeId, resolvedOutputCount)
+      resultNodeIds = appendPendingImageResultNodes(source, sourceNodeId, resolvedOutputCount, {
+        outputAnchorNodeId: optionsOverride.outputAnchorNodeId,
+      })
       resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
       const results = await Promise.allSettled(
         resultNodeIds.map(async (resultNodeId) => {
@@ -164,16 +200,102 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
             source,
             normalizedPrompt,
             loadImageSizeFromUrl,
+            aspectRatio,
           )
           updatePendingImageTaskMeta(resultNodeId, {
             pendingTaskId: taskId,
-            pendingSourceNodeId: nodeId,
+            pendingSourceNodeId: sourceNodeId,
             pendingPrompt: normalizedPrompt,
           })
           const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
           const url = urls[0]
           if (!url) throw new Error('任务完成但未返回图片')
           const ratio = await resolveTaskImageRatio(url, source.ratio, loadImageSizeFromUrl)
+          return { resultNodeId, url, ratio }
+        }),
+      )
+      let successCount = 0
+      let firstFailure: unknown = null
+      results.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          successCount += 1
+          updatePendingImageResultNode(
+            result.value.resultNodeId,
+            result.value.url,
+            result.value.ratio,
+          )
+          return
+        }
+        firstFailure ??= result.reason
+      })
+      resultNodeIds.forEach((resultNodeId, index) => {
+        if (results[index]?.status !== 'fulfilled') {
+          removePendingImageResultNode(resultNodeId)
+        }
+      })
+      if (successCount === 0) {
+        throw firstFailure instanceof Error ? firstFailure : new Error('生成失败')
+      }
+      if (successCount < resolvedOutputCount) {
+        options.onWarning(`生成完成 ${successCount}/${resolvedOutputCount} 张，部分任务失败`)
+      } else {
+        options.onSuccess(successCount > 1 ? `生成完成（${successCount} 张）` : '生成完成')
+      }
+    } catch (error) {
+      for (const resultNodeId of resultNodeIds) {
+        removePendingImageResultNode(resultNodeId)
+      }
+      const msg = error instanceof Error ? error.message : '生成失败'
+      options.onWarning(msg)
+    } finally {
+      for (const resultNodeId of resultNodeIds) {
+        setNodeRunning(resultNodeId, false)
+      }
+    }
+  }
+
+  async function runTextPromptGeneration(
+    anchorNodeId: string,
+    prompt: string,
+    outputCount: number,
+    aspectRatio: string,
+  ) {
+    const normalizedPrompt = prompt.trim()
+    if (!normalizedPrompt) {
+      options.onWarning('请输入 Prompt')
+      return
+    }
+    const anchorNode = options.nodes.value.find((node) => node.id === anchorNodeId)
+    const snapshot = anchorNode?.data?.snapshotNode as { width?: unknown } | undefined
+    const source: ImageDirectActionSource = {
+      url: '',
+      ratio: 1,
+      x: Number(anchorNode?.position?.x ?? 0),
+      y: Number(anchorNode?.position?.y ?? 0),
+      width: Number(snapshot?.width) > 0 ? Number(snapshot?.width) : 280,
+    }
+    const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
+    let resultNodeIds: string[] = []
+    try {
+      resultNodeIds = appendPendingImageResultNodes(source, anchorNodeId, resolvedOutputCount, {
+        outputAnchorNodeId: anchorNodeId,
+      })
+      resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
+      const results = await Promise.allSettled(
+        resultNodeIds.map(async (resultNodeId) => {
+          const taskId = await submitPromptTextGenerationTask(
+            normalizedPrompt,
+            normalizePromptAspectRatio(aspectRatio),
+          )
+          updatePendingImageTaskMeta(resultNodeId, {
+            pendingTaskId: taskId,
+            pendingSourceNodeId: anchorNodeId,
+            pendingPrompt: normalizedPrompt,
+          })
+          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
+          const url = urls[0]
+          if (!url) throw new Error('任务完成但未返回图片')
+          const ratio = await resolveTaskImageRatio(url, 1, loadImageSizeFromUrl)
           return { resultNodeId, url, ratio }
         }),
       )
@@ -225,5 +347,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     isNodeDirectActionRunning,
     runImageDirectAction,
     runImagePromptGeneration,
+    runImagePromptGenerationFromSource,
+    runTextPromptGeneration,
   }
 }

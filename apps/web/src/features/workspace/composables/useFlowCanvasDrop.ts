@@ -155,7 +155,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     point: { x: number; y: number },
     payload: UploadImageResult,
     title?: string,
-  ) {
+  ): string | null {
     const frameSize = resolveImageNodeFrameSize(payload.ratio, true)
     const nodeId = options.createNodeAtPosition('image', point.x, point.y, {
       ...(title ? { title } : {}),
@@ -165,8 +165,21 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
       outputStatus: 'ready',
       outputImages: [],
     })
-    if (!nodeId) return
+    if (!nodeId) return null
     options.onNodeMutated?.(nodeId)
+    return nodeId
+  }
+
+  async function createImageNodeFromFile(
+    point: { x: number; y: number },
+    file: File,
+  ): Promise<string | null> {
+    if (!isSupportedUploadImageFile(file)) {
+      options.onWarning(unsupportedUploadImageMessage())
+      return null
+    }
+    const uploaded = await uploadImageToBoard(file)
+    return createImageNodeFromPayload(point, uploaded, resolveImageFileTitle(file))
   }
 
   async function onCanvasDrop(event: DragEvent) {
@@ -185,8 +198,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
       return
     }
     try {
-      const uploaded = await uploadImageToBoard(file)
-      createImageNodeFromPayload(point, uploaded, resolveImageFileTitle(file))
+      await createImageNodeFromFile(point, file)
     } catch (error) {
       const msg = error instanceof Error ? error.message : '上传失败'
       options.onWarning(msg)
@@ -197,6 +209,7 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     onCanvasDragOver,
     onCanvasDrop,
     uploadImageToBoard,
+    createImageNodeFromFile,
     applyImageFileToImageNode,
     applyImageFileToMaskNode,
   }

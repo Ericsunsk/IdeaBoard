@@ -31,6 +31,10 @@ type PendingTaskMetaPatch = Pick<
   'pendingTaskId' | 'pendingSourceNodeId' | 'pendingPrompt'
 >
 
+type PendingImageResultOptions = {
+  outputAnchorNodeId?: string
+}
+
 const IMAGE_RESULT_NODE_X_GAP = 100
 const IMAGE_RESULT_NODE_Y_GAP = 14
 const IMAGE_NODE_HEADER_HEIGHT = 26
@@ -51,29 +55,71 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     return resolveImageDirectActionSource(node, snapshot as ImageNodeItem)
   }
 
+  function readOutputAnchorLayout(nodeId: string, fallback: ImageDirectActionSource) {
+    const node = options.nodes.value.find((item) => item.id === nodeId)
+    if (!node) return fallback
+    if (node.data?.kind === 'image') {
+      return readImageNodeLayout(node) ?? fallback
+    }
+    const snapshot = node.data?.snapshotNode as { width?: unknown } | undefined
+    const width = Number(snapshot?.width)
+    return {
+      url: '',
+      ratio: 1,
+      x: Number(node.position?.x ?? 0),
+      y: Number(node.position?.y ?? 0),
+      width: Number.isFinite(width) && width > 0 ? width : fallback.width,
+    }
+  }
+
+  function isEmptyReusableImageNode(node: Node): boolean {
+    if (node.data?.kind !== 'image') return false
+    const snapshot = node.data.snapshotNode as ImageNodeItem | undefined
+    if (!snapshot || typeof snapshot !== 'object') return false
+    const sourceUrl = `${snapshot.sourceImageUrl ?? ''}`.trim()
+    const outputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
+    return !sourceUrl && outputImages.length === 0 && snapshot.outputStatus !== 'running'
+  }
+
+  function findReusableOutputImageNodeId(anchorNodeId: string): string | null {
+    const candidateIds = options.edges.value
+      .filter(
+        (edge) =>
+          edge.source === anchorNodeId &&
+          edge.sourceHandle === 'out:image' &&
+          edge.targetHandle === 'in:image',
+      )
+      .map((edge) => edge.target)
+    for (const candidateId of candidateIds) {
+      const node = options.nodes.value.find((item) => item.id === candidateId)
+      if (node && isEmptyReusableImageNode(node)) return candidateId
+    }
+    return null
+  }
+
   function resolvePendingImageResultPosition(
-    source: ImageDirectActionSource,
-    sourceNodeId: string,
+    anchor: ImageDirectActionSource,
+    anchorNodeId: string,
   ) {
     const defaultPosition = {
-      x: source.x + source.width + IMAGE_RESULT_NODE_X_GAP,
-      y: source.y,
+      x: anchor.x + anchor.width + IMAGE_RESULT_NODE_X_GAP,
+      y: anchor.y,
     }
     const childNodeIds = new Set<string>(
       options.edges.value
         .filter(
           (edge) =>
-            edge.source === sourceNodeId &&
+            edge.source === anchorNodeId &&
             edge.sourceHandle === 'out:image' &&
             edge.targetHandle === 'in:image',
         )
         .map((edge) => edge.target),
     )
-    const runtimeLayouts = resultLayoutsBySourceNodeId.get(sourceNodeId)
+    const runtimeLayouts = resultLayoutsBySourceNodeId.get(anchorNodeId)
     runtimeLayouts?.forEach((_, nodeId) => childNodeIds.add(nodeId))
     if (childNodeIds.size === 0) return defaultPosition
 
-    let nextY = source.y
+    let nextY = anchor.y
     let alignedX = defaultPosition.x
     const measuredNodeIds = new Set<string>()
     const visitChildLayout = (nodeId: string, layout: ImageDirectActionSource) => {
@@ -104,13 +150,13 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
   }
 
   function rememberResultNodeLayout(
-    sourceNodeId: string,
+    anchorNodeId: string,
     resultNodeId: string,
     layout: ImageDirectActionSource,
   ) {
-    const current = resultLayoutsBySourceNodeId.get(sourceNodeId) ?? new Map()
+    const current = resultLayoutsBySourceNodeId.get(anchorNodeId) ?? new Map()
     current.set(resultNodeId, layout)
-    resultLayoutsBySourceNodeId.set(sourceNodeId, current)
+    resultLayoutsBySourceNodeId.set(anchorNodeId, current)
   }
 
   function forgetResultNodeLayout(resultNodeId: string) {
@@ -148,10 +194,10 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     )
   }
 
-  async function appendPendingImageResultEdge(sourceNodeId: string, resultNodeId: string) {
+  async function appendPendingImageResultEdge(anchorNodeId: string, resultNodeId: string) {
     await waitForFlowRenderFrame()
     if (cancelledResultNodeIds.has(resultNodeId)) return
-    const hasSource = options.nodes.value.some((node) => node.id === sourceNodeId)
+    const hasSource = options.nodes.value.some((node) => node.id === anchorNodeId)
     const targetNode = options.nodes.value.find((node) => node.id === resultNodeId)
     const hasTarget = !!targetNode
     if (!hasSource || !hasTarget) return
@@ -159,10 +205,10 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
       targetNode.data?.snapshotNode && typeof targetNode.data.snapshotNode === 'object'
         ? (targetNode.data.snapshotNode as ImageNodeItem)
         : null
-    options.refreshNodeInternals?.([sourceNodeId, resultNodeId])
+    options.refreshNodeInternals?.([anchorNodeId, resultNodeId])
     const nextEdge: Edge = {
       id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      source: sourceNodeId,
+      source: anchorNodeId,
       sourceHandle: 'out:image',
       target: resultNodeId,
       targetHandle: 'in:image',
@@ -177,22 +223,60 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     )
     if (hasSameEdge) return
     options.commitEdgeMutation((items) => [...items, nextEdge], { recordHistory: false })
-    options.refreshNodeInternals?.([sourceNodeId, resultNodeId])
+    options.refreshNodeInternals?.([anchorNodeId, resultNodeId])
   }
 
   function appendPendingImageResultNode(
     source: ImageDirectActionSource,
-    sourceNodeId: string,
+    anchorNodeId: string,
     optionsOverride?: { recordHistory?: boolean },
+    preferredNodeId?: string | null,
   ): string {
     pruneResultNodeLayouts()
-    const position = resolvePendingImageResultPosition(source, sourceNodeId)
+    const anchor = readOutputAnchorLayout(anchorNodeId, source)
+    const position = resolvePendingImageResultPosition(anchor, anchorNodeId)
     const imageNode = createImageNodeAt(position)
     imageNode.sourceImageUrl = ''
     imageNode.sourceImageRatio = source.ratio > 0 ? source.ratio : 1
     imageNode.width = resolveImageNodeFrameSize(imageNode.sourceImageRatio, true).width
     imageNode.outputStatus = 'running'
     imageNode.outputImages = []
+
+    if (preferredNodeId) {
+      options.commitNodeMutation(
+        (items) =>
+          items.map((item) => {
+            if (item.id !== preferredNodeId || item.data?.kind !== 'image') return item
+            const snapshot = item.data.snapshotNode
+            if (!snapshot || typeof snapshot !== 'object') return item
+            return {
+              ...item,
+              data: {
+                ...item.data,
+                snapshotNode: {
+                  ...(snapshot as ImageNodeItem),
+                  sourceImageUrl: '',
+                  sourceImageRatio: imageNode.sourceImageRatio,
+                  width: imageNode.width,
+                  outputStatus: 'running',
+                  outputImages: [],
+                },
+              },
+            }
+          }),
+        optionsOverride,
+      )
+      cancelledResultNodeIds.delete(preferredNodeId)
+      rememberResultNodeLayout(anchorNodeId, preferredNodeId, {
+        url: '',
+        ratio: imageNode.sourceImageRatio,
+        x: position.x,
+        y: position.y,
+        width: imageNode.width,
+      })
+      options.refreshNodeInternals?.([anchorNodeId, preferredNodeId])
+      return preferredNodeId
+    }
 
     const nextNode: Node<FlowNodeData> = {
       id: `image-${imageNode.id}`,
@@ -210,15 +294,15 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
 
     options.commitNodeMutation((items) => [...items, nextNode as Node], optionsOverride)
     cancelledResultNodeIds.delete(nextNode.id)
-    rememberResultNodeLayout(sourceNodeId, nextNode.id, {
+    rememberResultNodeLayout(anchorNodeId, nextNode.id, {
       url: '',
       ratio: imageNode.sourceImageRatio,
       x: imageNode.x,
       y: imageNode.y,
       width: imageNode.width,
     })
-    options.refreshNodeInternals?.([sourceNodeId, nextNode.id])
-    void appendPendingImageResultEdge(sourceNodeId, nextNode.id)
+    options.refreshNodeInternals?.([anchorNodeId, nextNode.id])
+    void appendPendingImageResultEdge(anchorNodeId, nextNode.id)
 
     return nextNode.id
   }
@@ -227,12 +311,20 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     source: ImageDirectActionSource,
     sourceNodeId: string,
     outputCount: number,
+    resultOptions: PendingImageResultOptions = {},
   ): string[] {
     const count = clampImageNodeOutputCount(outputCount)
+    const anchorNodeId = resultOptions.outputAnchorNodeId ?? sourceNodeId
+    const reusableNodeId = findReusableOutputImageNodeId(anchorNodeId)
     return Array.from({ length: count }, (_, index) =>
-      appendPendingImageResultNode(source, sourceNodeId, {
-        recordHistory: index === 0,
-      }),
+      appendPendingImageResultNode(
+        source,
+        anchorNodeId,
+        {
+          recordHistory: index === 0,
+        },
+        index === 0 ? reusableNodeId : null,
+      ),
     )
   }
 
