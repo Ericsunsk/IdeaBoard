@@ -50,6 +50,7 @@ declare module 'vue' {
     NodeExecutionFooter: typeof import('./features/workspace/components/nodes/NodeExecutionFooter.vue')['default']
     NodeHeader: typeof import('./features/workspace/components/nodes/NodeHeader.vue')['default']
     NodeIconButton: typeof import('./features/workspace/components/nodes/NodeIconButton.vue')['default']
+    NodeToolPopover: typeof import('./features/workspace/components/nodes/NodeToolPopover.vue')['default']
     NProgress: typeof import('naive-ui')['NProgress']
     NSelect: typeof import('naive-ui')['NSelect']
     NSpace: typeof import('naive-ui')['NSpace']

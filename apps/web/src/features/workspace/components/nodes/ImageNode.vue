@@ -122,7 +122,11 @@
           :disabled="directGenerating"
           @keydown.enter.exact="onPromptEnter"
         />
-        <div class="image-node-prompt-actions" @keydown.esc.stop="closeOutputCountPicker">
+        <div
+          ref="actionsRef"
+          class="image-node-prompt-actions"
+          @keydown.esc.stop="closeOutputCountPicker"
+        >
           <div class="image-node-output-count-wrap node-tool-output-count-wrap">
             <button
               v-if="!outputCountEditing"
@@ -152,19 +156,7 @@
               @blur="finishOutputCountEditing"
               @keydown.enter.stop.prevent="finishOutputCountEditing"
             />
-            <div
-              v-if="outputCountPickerVisible"
-              v-motion="{
-                initial: { opacity: 0, y: 6, scale: 0.985 },
-                enter: {
-                  opacity: 1,
-                  y: 0,
-                  scale: 1,
-                  transition: { duration: 150, easing: 'ease-out' },
-                },
-              }"
-              class="image-node-output-count-popover node-tool-output-count-popover"
-            >
+            <NodeToolPopover :visible="outputCountPickerVisible">
               <button
                 v-for="option in outputCountPresetOptions"
                 :key="option"
@@ -175,7 +167,7 @@
               >
                 {{ option }}
               </button>
-            </div>
+            </NodeToolPopover>
           </div>
           <button
             class="image-node-prompt-send node-tool-send node-tool-button"
@@ -204,15 +196,17 @@
 </template>
 
 <script setup lang="ts">
-import type { ComponentPublicInstance } from 'vue'
+import { onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue'
 import {
   clampImageNodeOutputCount,
+  IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
   MAX_IMAGE_NODE_OUTPUT_COUNT,
   MIN_IMAGE_NODE_OUTPUT_COUNT,
   type ImageNodeItem,
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
+import NodeToolPopover from './NodeToolPopover.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -263,11 +257,12 @@ const showPromptComposer = computed(() => !!props.promptComposerVisible && !!pro
 const promptDraft = ref('')
 const promptInputRef = ref<HTMLTextAreaElement | null>(null)
 const outputCountInputRef = ref<HTMLInputElement | null>(null)
+const actionsRef = ref<HTMLElement | null>(null)
 const shouldStackOutputCount = ref(false)
 const outputCountDraft = ref(String(clampImageNodeOutputCount(props.node.outputCount)))
 const outputCountPickerVisible = ref(false)
 const outputCountEditing = ref(false)
-const outputCountPresetOptions = [1, 2, 4, 8]
+const outputCountPresetOptions = IMAGE_OUTPUT_COUNT_PRESET_OPTIONS
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 const outputCountLabel = computed(() => String(outputCountValue.value))
 
@@ -362,6 +357,21 @@ function toggleOutputCountPicker() {
 function closeOutputCountPicker() {
   outputCountPickerVisible.value = false
 }
+
+function onGlobalPointerDown(event: PointerEvent) {
+  const target = event.target
+  if (!(target instanceof Node)) return
+  if (actionsRef.value?.contains(target)) return
+  closeOutputCountPicker()
+}
+
+onMounted(() => {
+  window.addEventListener('pointerdown', onGlobalPointerDown, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('pointerdown', onGlobalPointerDown, true)
+})
 
 function selectOutputCount(value: number) {
   outputCountDraft.value = String(clampImageNodeOutputCount(value))
@@ -593,9 +603,6 @@ function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {
   gap: var(--node-tool-button-gap);
 }
 
-.image-node-output-count {
-}
-
 .image-node-output-count-input {
   text-align: center;
   appearance: textfield;
@@ -605,12 +612,6 @@ function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {
 .image-node-output-count-input::-webkit-inner-spin-button {
   margin: 0;
   appearance: none;
-}
-
-.image-node-output-count-option {
-}
-
-.image-node-prompt-send {
 }
 
 @keyframes image-node-prompt-rise {

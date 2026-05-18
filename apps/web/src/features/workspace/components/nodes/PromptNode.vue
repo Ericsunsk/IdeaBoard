@@ -75,10 +75,10 @@
         @focus="emit('focus')"
         @contextmenu.stop
       />
-      <div class="prompt-node-actions node-tool-surface">
+      <div ref="actionsRef" class="prompt-node-actions node-tool-surface">
         <div class="image-node-output-count-wrap node-tool-output-count-wrap">
           <button
-            class="image-node-output-count node-tool-output-count node-tool-button prompt-node-aspect-trigger"
+            class="image-node-output-count node-tool-output-count node-tool-button node-tool-tooltip-trigger prompt-node-aspect-trigger"
             type="button"
             :class="{ active: aspectRatioPickerVisible }"
             title="选择尺寸比例"
@@ -88,39 +88,31 @@
             <span class="prompt-node-aspect-icon" :data-ratio="aspectRatio">
               <span aria-hidden="true"></span>
             </span>
-            <span class="prompt-node-tool-tooltip">
+            <span class="node-tool-tooltip">
               {{ aspectRatio === 'auto' ? 'Auto' : aspectRatio }}
             </span>
           </button>
-          <div
-            v-if="aspectRatioPickerVisible"
-            v-motion="{
-              initial: { opacity: 0, y: 6, scale: 0.985 },
-              enter: {
-                opacity: 1,
-                y: 0,
-                scale: 1,
-                transition: { duration: 150, easing: 'ease-out' },
-              },
-            }"
+          <NodeToolPopover
+            :visible="aspectRatioPickerVisible"
+            layout="row"
             class="prompt-node-aspect-popover"
           >
             <button
               v-for="option in PROMPT_ASPECT_RATIO_OPTIONS"
               :key="option"
               type="button"
-              class="prompt-node-aspect-option"
+              class="prompt-node-aspect-option node-tool-tooltip-trigger"
               :class="{ active: option === aspectRatio }"
               @click.stop="selectAspectRatio(option)"
             >
               <span class="prompt-node-aspect-icon" :data-ratio="option">
                 <span aria-hidden="true"></span>
               </span>
-              <span class="prompt-node-tool-tooltip">
+              <span class="node-tool-tooltip">
                 {{ option === 'auto' ? 'Auto' : option }}
               </span>
             </button>
-          </div>
+          </NodeToolPopover>
         </div>
         <div class="image-node-output-count-wrap node-tool-output-count-wrap">
           <button
@@ -133,19 +125,7 @@
           >
             {{ outputCount }}
           </button>
-          <div
-            v-if="outputCountPickerVisible"
-            v-motion="{
-              initial: { opacity: 0, y: 6, scale: 0.985 },
-              enter: {
-                opacity: 1,
-                y: 0,
-                scale: 1,
-                transition: { duration: 150, easing: 'ease-out' },
-              },
-            }"
-            class="image-node-output-count-popover node-tool-output-count-popover"
-          >
+          <NodeToolPopover :visible="outputCountPickerVisible">
             <button
               v-for="option in outputCountPresetOptions"
               :key="option"
@@ -156,7 +136,7 @@
             >
               {{ option }}
             </button>
-          </div>
+          </NodeToolPopover>
         </div>
         <button
           class="image-node-prompt-send node-tool-send node-tool-button"
@@ -185,10 +165,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSortable } from '@vueuse/integrations/useSortable'
-import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
+import {
+  clampImageNodeOutputCount,
+  IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
+  type PromptNodeItem,
+} from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
+import NodeToolPopover from './NodeToolPopover.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 import {
   PROMPT_ASPECT_RATIO_OPTIONS,
@@ -225,6 +210,7 @@ function onInput(event: Event) {
   emit('update:text', (event.target as HTMLTextAreaElement).value)
 }
 const thumbsRef = ref<HTMLElement | null>(null)
+const actionsRef = ref<HTMLElement | null>(null)
 const sortableInputImages = ref<PromptNodeItem['inputImages']>([])
 const addSlotDragOver = ref(false)
 const outputCountPickerVisible = ref(false)
@@ -235,7 +221,7 @@ const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectR
 const visibleInputImages = computed(() => props.node.inputImages.slice(0, maxInputImages))
 const canAcceptMoreImages = computed(() => visibleInputImages.value.length < maxInputImages)
 const canGenerate = computed(() => props.node.text.trim().length > 0)
-const outputCountPresetOptions = [1, 2, 4, 8]
+const outputCountPresetOptions = IMAGE_OUTPUT_COUNT_PRESET_OPTIONS
 watch(
   visibleInputImages,
   (items) => {
@@ -276,19 +262,39 @@ useSortable(() => thumbsRef.value, sortableInputImages, {
   },
 } as Parameters<typeof useSortable<PromptNodeItem['inputImages'][number]>>[2])
 function toggleOutputCountPicker() {
-  outputCountPickerVisible.value = !outputCountPickerVisible.value
+  const nextVisible = !outputCountPickerVisible.value
+  outputCountPickerVisible.value = nextVisible
+  if (nextVisible) aspectRatioPickerVisible.value = false
 }
 function selectOutputCount(value: number) {
   outputCountPickerVisible.value = false
   emit('update:output-count', clampImageNodeOutputCount(value))
 }
 function toggleAspectRatioPicker() {
-  aspectRatioPickerVisible.value = !aspectRatioPickerVisible.value
+  const nextVisible = !aspectRatioPickerVisible.value
+  aspectRatioPickerVisible.value = nextVisible
+  if (nextVisible) outputCountPickerVisible.value = false
 }
 function selectAspectRatio(value: PromptAspectRatio) {
   aspectRatioPickerVisible.value = false
   emit('update:aspect-ratio', value)
 }
+function closeToolPopovers() {
+  outputCountPickerVisible.value = false
+  aspectRatioPickerVisible.value = false
+}
+function onGlobalPointerDown(event: PointerEvent) {
+  const target = event.target
+  if (!(target instanceof Node)) return
+  if (actionsRef.value?.contains(target)) return
+  closeToolPopovers()
+}
+onMounted(() => {
+  window.addEventListener('pointerdown', onGlobalPointerDown, true)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('pointerdown', onGlobalPointerDown, true)
+})
 function onAddSlotDragOver(event: DragEvent) {
   if (!canAcceptMoreImages.value) return
   addSlotDragOver.value = true
@@ -460,18 +466,7 @@ function onAddSlotDrop(event: DragEvent) {
   height: 13px;
 }
 .prompt-node-aspect-popover {
-  position: absolute;
   right: 0;
-  bottom: calc(100% + var(--node-tool-button-gap));
-  z-index: 43;
-  display: flex;
-  gap: 5px;
-  padding: 6px;
-  border: 1px solid rgba(122, 107, 213, 0.22);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
-  backdrop-filter: blur(10px);
 }
 .prompt-node-aspect-option {
   position: relative;
@@ -498,30 +493,5 @@ function onAddSlotDrop(event: DragEvent) {
 .prompt-node-aspect-trigger.active .prompt-node-aspect-icon > span {
   border-color: var(--node-tool-button-accent);
   color: var(--node-tool-button-accent);
-}
-.prompt-node-tool-tooltip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translate(-50%, 2px);
-  white-space: nowrap;
-  background: rgba(24, 24, 27, 0.94);
-  color: #f4f4f5;
-  border: 1px solid rgba(122, 107, 213, 0.26);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
-}
-.prompt-node-aspect-trigger:hover .prompt-node-tool-tooltip,
-.prompt-node-aspect-option:hover .prompt-node-tool-tooltip {
-  opacity: 1;
-  transform: translate(-50%, 0);
 }
 </style>
