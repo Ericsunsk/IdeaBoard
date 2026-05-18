@@ -122,53 +122,21 @@
           :disabled="directGenerating"
           @keydown.enter.exact="onPromptEnter"
         />
-        <div
-          ref="actionsRef"
-          class="image-node-prompt-actions"
-          @keydown.esc.stop="closeOutputCountPicker"
-        >
-          <div class="image-node-output-count-wrap node-tool-output-count-wrap">
-            <button
-              v-if="!outputCountEditing"
-              class="image-node-output-count node-tool-output-count node-tool-button"
-              type="button"
-              :class="{ active: outputCountPickerVisible }"
-              :disabled="directGenerating"
-              title="单击选择张数，双击自定义"
-              aria-label="输出张数"
-              @click.stop="toggleOutputCountPicker"
-              @dblclick.stop.prevent="startOutputCountEditing"
-            >
-              {{ outputCountLabel }}
-            </button>
-            <input
-              v-else
-              ref="outputCountInputRef"
-              v-model="outputCountDraft"
-              class="image-node-output-count image-node-output-count-input node-tool-output-count node-tool-button"
-              type="number"
-              inputmode="numeric"
-              :min="MIN_IMAGE_NODE_OUTPUT_COUNT"
-              :max="MAX_IMAGE_NODE_OUTPUT_COUNT"
-              step="1"
-              :disabled="directGenerating"
-              aria-label="自定义输出张数"
-              @blur="finishOutputCountEditing"
-              @keydown.enter.stop.prevent="finishOutputCountEditing"
-            />
-            <NodeToolPopover :visible="outputCountPickerVisible">
-              <button
-                v-for="option in outputCountPresetOptions"
-                :key="option"
-                type="button"
-                class="image-node-output-count-option node-tool-output-count-option"
-                :class="{ active: option === outputCountValue }"
-                @click.stop="selectOutputCount(option)"
-              >
-                {{ option }}
-              </button>
-            </NodeToolPopover>
-          </div>
+        <div ref="actionsRef" class="image-node-prompt-actions">
+          <NodeOutputCountPicker
+            :model-value="outputCountValue"
+            :visible="outputCountPickerVisible"
+            :disabled="directGenerating"
+            :custom-editable="true"
+            title="单击选择张数，双击自定义"
+            aria-label="输出张数"
+            :min="MIN_IMAGE_NODE_OUTPUT_COUNT"
+            :max="MAX_IMAGE_NODE_OUTPUT_COUNT"
+            @toggle="toggleOutputCountPicker"
+            @select="selectOutputCount"
+            @custom-commit="onCustomOutputCountCommit"
+            @edit-start="onOutputCountEditStart"
+          />
           <button
             class="image-node-prompt-send node-tool-send node-tool-button"
             type="submit"
@@ -196,18 +164,18 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
 import {
   clampImageNodeOutputCount,
-  IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
   MAX_IMAGE_NODE_OUTPUT_COUNT,
   MIN_IMAGE_NODE_OUTPUT_COUNT,
   type ImageNodeItem,
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
-import NodeToolPopover from './NodeToolPopover.vue'
+import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
+import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
 
 const props = defineProps<{
   node: ImageNodeItem
@@ -256,23 +224,20 @@ const showImageActionMenu = computed(() => !!props.actionMenuVisible && !!props.
 const showPromptComposer = computed(() => !!props.promptComposerVisible && !!props.displayImage)
 const promptDraft = ref('')
 const promptInputRef = ref<HTMLTextAreaElement | null>(null)
-const outputCountInputRef = ref<HTMLInputElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
 const shouldStackOutputCount = ref(false)
-const outputCountDraft = ref(String(clampImageNodeOutputCount(props.node.outputCount)))
-const outputCountPickerVisible = ref(false)
-const outputCountEditing = ref(false)
-const outputCountPresetOptions = IMAGE_OUTPUT_COUNT_PRESET_OPTIONS
+const toolPopovers = useNodeToolPopoverGroup({
+  keys: ['output-count'] as const,
+  rootRefs: [actionsRef],
+})
+const outputCountPickerVisible = toolPopovers.isOpen('output-count')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
-const outputCountLabel = computed(() => String(outputCountValue.value))
 
 watch(showPromptComposer, async (visible) => {
   if (!visible) {
     closeOutputCountPicker()
-    outputCountEditing.value = false
     return
   }
-  syncOutputCountDraft()
   await nextTick()
   resizePromptInput()
   promptInputRef.value?.focus()
@@ -282,11 +247,6 @@ watch(promptDraft, async () => {
   await nextTick()
   resizePromptInput()
 })
-
-watch(
-  () => props.node.outputCount,
-  () => syncOutputCountDraft(),
-)
 
 function onStageDragOver(event: DragEvent) {
   event.preventDefault()
@@ -311,7 +271,7 @@ function onStageContextMenu(event: MouseEvent) {
 function submitPrompt() {
   const prompt = promptDraft.value.trim()
   if (!prompt || props.directGenerating) return
-  const outputCount = commitOutputCount()
+  const outputCount = outputCountValue.value
   closeOutputCountPicker()
   emit('prompt-generate', prompt, outputCount)
   promptDraft.value = ''
@@ -338,60 +298,27 @@ function resizePromptInput() {
   shouldStackOutputCount.value = naturalHeight > singleLineHeight + 2
 }
 
-function syncOutputCountDraft() {
-  outputCountDraft.value = String(clampImageNodeOutputCount(props.node.outputCount))
-}
-
-function commitOutputCount(): number {
-  const outputCount = clampImageNodeOutputCount(outputCountDraft.value)
-  outputCountDraft.value = String(outputCount)
-  emit('update:output-count', outputCount)
-  return outputCount
-}
-
 function toggleOutputCountPicker() {
   if (props.directGenerating) return
-  outputCountPickerVisible.value = !outputCountPickerVisible.value
+  toolPopovers.toggle('output-count')
 }
 
 function closeOutputCountPicker() {
-  outputCountPickerVisible.value = false
+  toolPopovers.close('output-count')
 }
-
-function onGlobalPointerDown(event: PointerEvent) {
-  const target = event.target
-  if (!(target instanceof Node)) return
-  if (actionsRef.value?.contains(target)) return
-  closeOutputCountPicker()
-}
-
-onMounted(() => {
-  window.addEventListener('pointerdown', onGlobalPointerDown, true)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('pointerdown', onGlobalPointerDown, true)
-})
 
 function selectOutputCount(value: number) {
-  outputCountDraft.value = String(clampImageNodeOutputCount(value))
-  commitOutputCount()
+  emit('update:output-count', clampImageNodeOutputCount(value))
   closeOutputCountPicker()
 }
 
-async function startOutputCountEditing() {
-  if (props.directGenerating) return
+function onCustomOutputCountCommit(value: number) {
+  emit('update:output-count', clampImageNodeOutputCount(value))
   closeOutputCountPicker()
-  syncOutputCountDraft()
-  outputCountEditing.value = true
-  await nextTick()
-  outputCountInputRef.value?.focus()
-  outputCountInputRef.value?.select()
 }
 
-function finishOutputCountEditing() {
-  commitOutputCount()
-  outputCountEditing.value = false
+function onOutputCountEditStart() {
+  closeOutputCountPicker()
 }
 
 function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {

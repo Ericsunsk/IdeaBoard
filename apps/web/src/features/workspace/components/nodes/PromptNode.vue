@@ -114,30 +114,14 @@
             </button>
           </NodeToolPopover>
         </div>
-        <div class="image-node-output-count-wrap node-tool-output-count-wrap">
-          <button
-            class="image-node-output-count node-tool-output-count node-tool-button"
-            type="button"
-            :class="{ active: outputCountPickerVisible }"
-            title="选择张数"
-            aria-label="输出张数"
-            @click.stop="toggleOutputCountPicker"
-          >
-            {{ outputCount }}
-          </button>
-          <NodeToolPopover :visible="outputCountPickerVisible">
-            <button
-              v-for="option in outputCountPresetOptions"
-              :key="option"
-              type="button"
-              class="image-node-output-count-option node-tool-output-count-option"
-              :class="{ active: option === outputCount }"
-              @click.stop="selectOutputCount(option)"
-            >
-              {{ option }}
-            </button>
-          </NodeToolPopover>
-        </div>
+        <NodeOutputCountPicker
+          :model-value="outputCount"
+          :visible="outputCountPickerVisible"
+          title="选择张数"
+          aria-label="输出张数"
+          @toggle="toggleOutputCountPicker"
+          @select="selectOutputCount"
+        />
         <button
           class="image-node-prompt-send node-tool-send node-tool-button"
           type="button"
@@ -165,16 +149,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useSortable } from '@vueuse/integrations/useSortable'
-import {
-  clampImageNodeOutputCount,
-  IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
-  type PromptNodeItem,
-} from '../../types/canvasNodes'
+import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
+import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
 import NodeToolPopover from './NodeToolPopover.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
+import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
 import {
   PROMPT_ASPECT_RATIO_OPTIONS,
   normalizePromptAspectRatio,
@@ -213,15 +195,18 @@ const thumbsRef = ref<HTMLElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
 const sortableInputImages = ref<PromptNodeItem['inputImages']>([])
 const addSlotDragOver = ref(false)
-const outputCountPickerVisible = ref(false)
-const aspectRatioPickerVisible = ref(false)
 const maxInputImages = 4
 const outputCount = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const visibleInputImages = computed(() => props.node.inputImages.slice(0, maxInputImages))
 const canAcceptMoreImages = computed(() => visibleInputImages.value.length < maxInputImages)
 const canGenerate = computed(() => props.node.text.trim().length > 0)
-const outputCountPresetOptions = IMAGE_OUTPUT_COUNT_PRESET_OPTIONS
+const toolPopovers = useNodeToolPopoverGroup({
+  keys: ['aspect-ratio', 'output-count'] as const,
+  rootRefs: [actionsRef],
+})
+const outputCountPickerVisible = toolPopovers.isOpen('output-count')
+const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
 watch(
   visibleInputImages,
   (items) => {
@@ -262,39 +247,19 @@ useSortable(() => thumbsRef.value, sortableInputImages, {
   },
 } as Parameters<typeof useSortable<PromptNodeItem['inputImages'][number]>>[2])
 function toggleOutputCountPicker() {
-  const nextVisible = !outputCountPickerVisible.value
-  outputCountPickerVisible.value = nextVisible
-  if (nextVisible) aspectRatioPickerVisible.value = false
+  toolPopovers.toggle('output-count')
 }
 function selectOutputCount(value: number) {
-  outputCountPickerVisible.value = false
+  toolPopovers.close('output-count')
   emit('update:output-count', clampImageNodeOutputCount(value))
 }
 function toggleAspectRatioPicker() {
-  const nextVisible = !aspectRatioPickerVisible.value
-  aspectRatioPickerVisible.value = nextVisible
-  if (nextVisible) outputCountPickerVisible.value = false
+  toolPopovers.toggle('aspect-ratio')
 }
 function selectAspectRatio(value: PromptAspectRatio) {
-  aspectRatioPickerVisible.value = false
+  toolPopovers.close('aspect-ratio')
   emit('update:aspect-ratio', value)
 }
-function closeToolPopovers() {
-  outputCountPickerVisible.value = false
-  aspectRatioPickerVisible.value = false
-}
-function onGlobalPointerDown(event: PointerEvent) {
-  const target = event.target
-  if (!(target instanceof Node)) return
-  if (actionsRef.value?.contains(target)) return
-  closeToolPopovers()
-}
-onMounted(() => {
-  window.addEventListener('pointerdown', onGlobalPointerDown, true)
-})
-onBeforeUnmount(() => {
-  window.removeEventListener('pointerdown', onGlobalPointerDown, true)
-})
 function onAddSlotDragOver(event: DragEvent) {
   if (!canAcceptMoreImages.value) return
   addSlotDragOver.value = true
