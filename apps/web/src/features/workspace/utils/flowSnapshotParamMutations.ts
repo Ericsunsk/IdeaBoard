@@ -4,7 +4,11 @@ import {
   ENHANCE_UPSCALE_FACTOR_OPTIONS,
 } from '../components/nodes/config/nodeOptionConfig'
 import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
-import type { EnhanceNodeItem, ViewpointNodeItem } from '../types/canvasNodes'
+import type {
+  EnhanceNodeItem,
+  PromptNodeInputImage,
+  ViewpointNodeItem,
+} from '../types/canvasNodes'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import {
   clampEnhanceExtendPercent,
@@ -17,6 +21,55 @@ import {
   clampWearScale,
   normalizeWearTileMode,
 } from '../types/canvasNodes'
+
+function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Partial<PromptNodeInputImage>
+  return (
+    typeof item.id === 'string' &&
+    item.id.length > 0 &&
+    (item.sourceType === 'node' || item.sourceType === 'external') &&
+    typeof item.sourceId === 'string' &&
+    item.sourceId.length > 0 &&
+    (item.sourceNodeId === undefined || typeof item.sourceNodeId === 'string') &&
+    typeof item.url === 'string' &&
+    item.url.trim().length > 0 &&
+    typeof item.ratio === 'number' &&
+    Number.isFinite(item.ratio) &&
+    item.ratio > 0
+  )
+}
+
+function normalizePromptInputImages(value: unknown): PromptNodeInputImage[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter(isPromptNodeInputImage)
+    .map((item) => ({
+      id: item.id,
+      sourceType: item.sourceType,
+      sourceId: item.sourceId,
+      sourceNodeId: item.sourceNodeId,
+      url: item.url.trim(),
+      ratio: item.ratio,
+    }))
+    .slice(0, 4)
+}
+
+function arePromptInputImagesEqual(a: unknown, b: PromptNodeInputImage[]): boolean {
+  const current = normalizePromptInputImages(a)
+  return (
+    current.length === b.length &&
+    current.every(
+      (item, index) =>
+        item.id === b[index]?.id &&
+        item.sourceType === b[index]?.sourceType &&
+        item.sourceId === b[index]?.sourceId &&
+        item.sourceNodeId === b[index]?.sourceNodeId &&
+        item.url === b[index]?.url &&
+        item.ratio === b[index]?.ratio,
+    )
+  )
+}
 
 export function patchFlowSnapshotParam(
   snapshotNode: Record<string, any>,
@@ -41,6 +94,11 @@ export function patchFlowSnapshotParam(
       const nextAspectRatio = normalizePromptAspectRatio(value)
       if (snapshotNode.aspectRatio === nextAspectRatio) return snapshotNode
       return { ...snapshotNode, aspectRatio: nextAspectRatio }
+    }
+    case 'inputImages': {
+      const nextInputImages = normalizePromptInputImages(value)
+      if (arePromptInputImagesEqual(snapshotNode.inputImages, nextInputImages)) return snapshotNode
+      return { ...snapshotNode, inputImages: nextInputImages }
     }
     case 'upscaleMode':
       if (snapshotNode.upscaleMode === value) return snapshotNode

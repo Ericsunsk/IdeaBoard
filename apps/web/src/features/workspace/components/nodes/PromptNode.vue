@@ -27,17 +27,40 @@
     </NodeHeader>
     <div class="prompt-node-shell" data-flow-handle-frame>
       <div ref="thumbsRef" class="prompt-node-thumbs node-tool-surface">
-        <button
+        <div
           v-for="item in sortableInputImages"
           :key="item.id"
           class="prompt-node-thumb prompt-node-thumb-item node-tool-output-count node-tool-button"
-          type="button"
+          role="button"
+          tabindex="0"
           :data-image-id="item.id"
           @mousedown.stop
           @contextmenu.stop.prevent="emit('input-image-preview', item)"
         >
           <img :src="item.url" alt="" draggable="false" />
-        </button>
+          <button
+            class="prompt-node-thumb-remove"
+            type="button"
+            title="移除图片输入"
+            aria-label="移除图片输入"
+            @mousedown.stop
+            @pointerdown.stop
+            @click.stop="removeInputImage(item.id)"
+          >
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+            >
+              <path d="M6 6l12 12" />
+              <path d="M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
         <button
           v-if="canAcceptMoreImages"
           class="prompt-node-thumb prompt-node-thumb-add node-tool-output-count node-tool-button"
@@ -183,6 +206,7 @@ const emit = defineEmits<{
   (e: 'input-image-drop', event: DragEvent): void
   (e: 'input-image-open'): void
   (e: 'input-image-preview', value: PromptNodeItem['inputImages'][number]): void
+  (e: 'input-image-remove', value: PromptNodeItem['inputImages'][number]): void
   (e: 'generate'): void
 }>()
 
@@ -228,7 +252,7 @@ watch(
 useSortable(() => thumbsRef.value, sortableInputImages, {
   animation: 150,
   draggable: '.prompt-node-thumb-item',
-  filter: '.prompt-node-thumb-add',
+  filter: '.prompt-node-thumb-add, .prompt-node-thumb-remove',
   ghostClass: 'is-sortable-ghost',
   chosenClass: 'is-sortable-chosen',
   dragClass: 'is-sortable-drag',
@@ -283,6 +307,11 @@ function toggleAspectRatioPicker() {
 function selectAspectRatio(value: PromptAspectRatio) {
   toolPopovers.close('aspect-ratio')
   emit('update:aspect-ratio', value)
+}
+function removeInputImage(imageId: string) {
+  const item = visibleInputImages.value.find((inputImage) => inputImage.id === imageId)
+  if (!item) return
+  emit('input-image-remove', item)
 }
 function onAddSlotDragOver(event: DragEvent) {
   if (!canAcceptMoreImages.value) return
@@ -390,6 +419,34 @@ function onAddSlotDrop(event: DragEvent) {
   display: block;
   border-radius: calc(var(--node-tool-button-radius) - 1px);
   object-fit: cover;
+  pointer-events: none;
+}
+.prompt-node-thumb-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0;
+  transform: scale(0.92);
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease;
+}
+.prompt-node-thumb:hover .prompt-node-thumb-remove,
+.prompt-node-thumb:focus-within .prompt-node-thumb-remove {
+  opacity: 1;
+  transform: scale(1);
 }
 :global(.prompt-node-sortable-fallback) {
   opacity: 0 !important;

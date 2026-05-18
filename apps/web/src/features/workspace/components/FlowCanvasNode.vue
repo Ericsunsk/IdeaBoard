@@ -25,6 +25,7 @@
         @input-image-drop="onPromptInputImageDrop"
         @input-image-open="onPromptInputImageOpen"
         @input-image-preview="onPromptInputImagePreview"
+        @input-image-remove="onPromptInputImageRemove"
         @node-mousedown="noopMouse"
         @delete="onDeleteRequest"
         @focus="noop"
@@ -319,6 +320,7 @@ const emit = defineEmits<{
   (e: 'prompt-input-image-drop', nodeId: string, event: DragEvent): void
   (e: 'prompt-input-image-open', nodeId: string): void
   (e: 'prompt-input-image-preview', image: { url: string; ratio: number }): void
+  (e: 'prompt-input-image-remove', nodeId: string, imageId: string): void
   (e: 'image-open-file'): void
   (e: 'image-open-preview'): void
   (e: 'image-append-to-canvas'): void
@@ -713,6 +715,10 @@ function onPromptInputImageOpen() {
 
 function onPromptInputImagePreview(image: { url: string; ratio: number }) {
   emit('prompt-input-image-preview', image)
+}
+
+function onPromptInputImageRemove(image: { id: string }) {
+  emit('prompt-input-image-remove', props.nodeId, image.id)
 }
 
 function onNodeMouseDown(event: MouseEvent) {

@@ -161,6 +161,7 @@
             @prompt-input-image-drop="onFlowPromptInputImageDrop"
             @prompt-input-image-open="onFlowPromptInputImageOpen"
             @prompt-input-image-preview="onFlowPromptInputImagePreview"
+            @prompt-input-image-remove="onFlowPromptInputImageRemove"
             @image-open-file="() => onFlowImageOpenFile(nodeProps.id)"
             @image-open-preview="() => onFlowImageOpenPreview(nodeProps.id)"
             @image-append-to-canvas="() => onFlowImageAppendToCanvas(nodeProps.id)"
@@ -819,6 +820,42 @@ function onFlowPromptInputImageOpen(promptNodeId: string) {
 
 function onFlowPromptInputImagePreview(image: { url: string; ratio: number }) {
   void openImageUrlPreview(image.url, image.ratio)
+}
+
+function onFlowPromptInputImageRemove(promptNodeId: string, imageId: string) {
+  const currentInputImages = getPromptInputImages(promptNodeId)
+  const removed = currentInputImages.find((item) => item.id === imageId)
+  if (!removed) return
+  flowTransactions.commitGraphMutation((currentNodes, currentEdges) => {
+    const nextNodes = currentNodes.map((node) => {
+      if (node.id !== promptNodeId || node.data?.kind !== 'prompt') return node
+      const snapshotNode = node.data.snapshotNode
+      if (!snapshotNode || typeof snapshotNode !== 'object') return node
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          snapshotNode: {
+            ...(snapshotNode as Record<string, unknown>),
+            inputImages: currentInputImages.filter((item) => item.id !== imageId),
+          },
+        },
+      }
+    })
+    const nextEdges =
+      removed.sourceType === 'node'
+        ? currentEdges.filter(
+            (edge) =>
+              !(
+                edge.source === removed.sourceId &&
+                edge.target === promptNodeId &&
+                isImageInputHandle(edge.targetHandle)
+              ),
+          )
+        : currentEdges
+    return { nodes: nextNodes, edges: nextEdges }
+  })
+  markFlowExecutionNodeDirty(promptNodeId, { includeSelf: true })
 }
 
 function onFlowImageOpenPreview(nodeId: string) {
