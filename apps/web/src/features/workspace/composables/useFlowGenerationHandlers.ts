@@ -37,6 +37,7 @@ import type {
   WearNodeItem,
 } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/task'
+import type { FlowHistorySnapshot } from './useFlowTransactions'
 
 type FlowRuntimeNode = { id: string; data?: { kind?: string; snapshotNode?: unknown } }
 type FlowRuntimeEdge = {
@@ -45,7 +46,6 @@ type FlowRuntimeEdge = {
   target: string
   targetHandle?: string | null
 }
-type FlowHistorySnapshot = { nodes: unknown[]; edges: unknown[] }
 type SnapshotNodeRecord = Record<string, unknown>
 type UpdateSnapshotNodeOptions = {
   history?: boolean

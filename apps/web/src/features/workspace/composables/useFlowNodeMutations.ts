@@ -17,7 +17,6 @@ import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowC
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { patchFlowSnapshotParam } from '../utils/flowSnapshotParamMutations'
 import { useFlowConnectionMutations } from './useFlowConnectionMutations'
-import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 import {
   MAX_COLOR_NODE_SWATCHES,
   getDefaultCanvasNodeTitle,
@@ -25,6 +24,7 @@ import {
   normalizeColorNodeColors,
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
+import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransactions'
 
 export type FlowCreatableNodeKind =
   | 'prompt'
@@ -42,14 +42,9 @@ type UseFlowNodeMutationsOptions = {
   nodes: Ref<Array<Record<string, any>>>
   edges: Ref<Array<Record<string, any>>>
   createNodeKind: Ref<FlowCreatableNodeKind>
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
-  captureHistory: () => { nodes: unknown[]; edges: unknown[] }
-  pushHistory: (snapshot: { nodes: unknown[]; edges: unknown[] }) => void
-  markDirty: () => void
-  refreshSnapshot: () => void
-  appendFlowNodes: (nextNodes: Node[]) => void
-  commitNodes: (nextNodes: Node[]) => void
-  commitEdges: (nextEdges: Edge[]) => void
+  commitGraphMutation: FlowTransactions['commitGraphMutation']
+  commitNodeMutation: FlowTransactions['commitNodeMutation']
+  commitEdgeMutation: FlowTransactions['commitEdgeMutation']
   onWarning: (message: string) => void
   onNodeDeleted?: (nodeId: string, kind: string) => void
 }
@@ -57,7 +52,7 @@ type UseFlowNodeMutationsOptions = {
 type UpdateSnapshotNodeOptions = {
   history?: boolean
   dirty?: boolean
-  historyBefore?: { nodes: unknown[]; edges: unknown[] }
+  historyBefore?: FlowHistorySnapshot
 }
 
 type InitialSnapshotPatch = Record<string, unknown>
@@ -114,11 +109,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     isValidConnection,
     normalizeConnection: (connection, existingEdges) =>
       normalizeFlowConnection(connection, lookupData, existingEdges),
-    captureHistory: options.captureHistory,
-    pushHistory: options.pushHistory,
-    commitEdges: options.commitEdges,
-    markDirty: options.markDirty,
-    refreshSnapshot: options.refreshSnapshot,
+    commitEdgeMutation: options.commitEdgeMutation,
     onWarning: options.onWarning,
     markFlowExecutionNodeDirty,
   })
@@ -135,7 +126,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     y: number,
     initialSnapshotPatch?: InitialSnapshotPatch,
   ) {
-    const before = options.captureHistory()
     const baseSnapshotNode = createSnapshotNodeForKind(kind, x, y)
     const snapshotNode = initialSnapshotPatch
       ? { ...baseSnapshotNode, ...initialSnapshotPatch }
@@ -159,10 +149,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         snapshotNode,
       } satisfies FlowNodeData,
     }
-    options.appendFlowNodes([flowNode])
-    options.pushHistory(before)
-    options.markDirty()
-    options.refreshSnapshot()
+    options.commitNodeMutation((items) => [...items, flowNode])
     return flowNodeId
   }
 
@@ -182,16 +169,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const targetKind = (target.data as { kind?: string } | undefined)?.kind
     if (!targetKind) return
     options.onNodeDeleted?.(nodeId, targetKind)
-    const before = options.captureHistory()
-    const nextNodes = (options.nodes.value as Node[]).filter((node) => node.id !== nodeId)
-    const nextEdges = (options.edges.value as Edge[]).filter(
-      (edge) => edge.source !== nodeId && edge.target !== nodeId,
-    )
-    options.commitNodes(nextNodes)
-    options.commitEdges(nextEdges)
-    options.pushHistory(before)
-    options.markDirty()
-    options.refreshSnapshot()
+    options.commitGraphMutation((items, currentEdges) => ({
+      nodes: items.filter((node) => node.id !== nodeId),
+      edges: currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+    }))
   }
 
   function updateSnapshotNode(
@@ -201,27 +182,36 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   ) {
     const shouldPushHistory = mutationOptions.history ?? true
     const shouldMarkDirty = mutationOptions.dirty ?? true
-    const before = mutationOptions.historyBefore ?? options.captureHistory()
-    const nextNodes = [...options.nodes.value] as Array<Record<string, any>>
-    const index = nextNodes.findIndex((node) => node.id === nodeId)
-    if (index < 0) return
-    const node = nextNodes[index]
-    const data = (node.data ?? {}) as { snapshotNode?: unknown }
-    if (!data.snapshotNode || typeof data.snapshotNode !== 'object') return
-    const snapshotNode = data.snapshotNode as Record<string, any>
-    const nextSnapshotNode = patcher(snapshotNode)
-    if (nextSnapshotNode === snapshotNode) return
-    node.data.snapshotNode = nextSnapshotNode
-    if (typeof nextSnapshotNode.title === 'string' && nextSnapshotNode.title.trim()) {
-      node.data.title = nextSnapshotNode.title.trim()
-    }
-    if (shouldPushHistory) {
-      options.pushHistory(before)
-    }
-    if (shouldMarkDirty) {
-      options.markDirty()
-    }
-    options.refreshSnapshot()
+    options.commitNodeMutation(
+      (items) => {
+        const nextNodes = [...items]
+        const index = nextNodes.findIndex((node) => node.id === nodeId)
+        if (index < 0) return items
+        const node = nextNodes[index]
+        const data = (node.data ?? {}) as { snapshotNode?: unknown; title?: string }
+        if (!data.snapshotNode || typeof data.snapshotNode !== 'object') return items
+        const snapshotNode = data.snapshotNode as Record<string, any>
+        const nextSnapshotNode = patcher(snapshotNode)
+        if (nextSnapshotNode === snapshotNode) return items
+        nextNodes[index] = {
+          ...node,
+          data: {
+            ...data,
+            title:
+              typeof nextSnapshotNode.title === 'string' && nextSnapshotNode.title.trim()
+                ? nextSnapshotNode.title.trim()
+                : data.title,
+            snapshotNode: nextSnapshotNode,
+          },
+        }
+        return nextNodes
+      },
+      {
+        recordHistory: shouldPushHistory,
+        historyBefore: mutationOptions.historyBefore,
+        markDirty: shouldMarkDirty,
+      },
+    )
   }
 
   function deleteSelectedFlowElements() {
@@ -247,19 +237,15 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     selectedNodeKinds.forEach((kind, nodeId) => {
       options.onNodeDeleted?.(nodeId, kind)
     })
-    const before = options.captureHistory()
-    const nextNodes = flowNodes.filter((node) => !selectedNodeIds.has(node.id)) as Node[]
-    const nextEdges = flowEdges.filter(
-      (edge) =>
-        !selectedEdgeIds.has(edge.id) &&
-        !selectedNodeIds.has(edge.source) &&
-        !selectedNodeIds.has(edge.target),
-    ) as Edge[]
-    options.commitNodes(nextNodes)
-    options.commitEdges(nextEdges)
-    options.pushHistory(before)
-    options.markDirty()
-    options.refreshSnapshot()
+    options.commitGraphMutation((items, currentEdges) => ({
+      nodes: items.filter((node) => !selectedNodeIds.has(node.id)),
+      edges: currentEdges.filter(
+        (edge) =>
+          !selectedEdgeIds.has(edge.id) &&
+          !selectedNodeIds.has(edge.source) &&
+          !selectedNodeIds.has(edge.target),
+      ),
+    }))
   }
 
   function onFlowPromptTextUpdate(nodeId: string, value: string) {

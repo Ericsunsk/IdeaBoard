@@ -1,11 +1,11 @@
 import type { Ref } from 'vue'
 
 type UseFlowNodeDragInteractionsOptions = {
-  flowHistory: { onNodeDragStart: () => void; onNodeDragStop: (onCommit: () => void) => void }
+  beginNodeDragTransaction: () => void
+  commitNodeDragTransaction: () => void
   duplicateModifierPressed: Ref<boolean>
   beginFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   finishFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
-  markDirty: () => void
   activeImageActionNodeId: { value: string | null }
   activeImagePromptNodeId?: { value: string | null }
   hideFlowStyleStrengthControl: () => void
@@ -16,15 +16,13 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     options.hideFlowStyleStrengthControl()
-    options.flowHistory.onNodeDragStart()
+    options.beginNodeDragTransaction()
     options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
   }
 
   function onNodeDragStop() {
     options.finishFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
-    options.flowHistory.onNodeDragStop(() => {
-      options.markDirty()
-    })
+    options.commitNodeDragTransaction()
   }
 
   return {

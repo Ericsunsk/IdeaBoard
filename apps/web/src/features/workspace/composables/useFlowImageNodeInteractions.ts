@@ -7,19 +7,16 @@ import type { ImageNodeItem } from '../types/canvasNodes'
 import type { FlowAdapterNode } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 
-type FlowHistorySnapshot = { nodes: unknown[]; edges: unknown[] }
-
 type UseFlowImageNodeInteractionsOptions = {
   nodes: Ref<Node[]>
   getImageNodeDisplayPayload: (nodeId: string) => { url: string; ratio: number } | null
   getImageNodeSnapshot: (
     nodeId: string,
   ) => { x: number; y: number; width: number; outputCount?: ImageNodeItem['outputCount'] } | null
-  captureFlowHistorySnapshot: () => FlowHistorySnapshot
-  pushFlowHistorySnapshot: (snapshot: FlowHistorySnapshot) => void
-  markDirty: () => void
-  refreshSnapshot: () => void
-  appendFlowNodes: (nextNodes: Node[]) => void
+  commitNodeMutation: (
+    mutator: (nodes: Node[]) => Node[],
+    options?: { recordHistory?: boolean },
+  ) => void
 }
 
 function createImageFlowNode(item: ImageNodeItem): Node {
@@ -57,11 +54,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
   } | null>(null)
 
   function appendImageFlowNode(item: ImageNodeItem) {
-    const historyBefore = options.captureFlowHistorySnapshot()
-    options.appendFlowNodes([createImageFlowNode(item)])
-    options.pushFlowHistorySnapshot(historyBefore)
-    options.markDirty()
-    options.refreshSnapshot()
+    options.commitNodeMutation((items) => [...items, createImageFlowNode(item)])
   }
 
   function onFlowImageAppendToCanvas(nodeId: string) {
@@ -124,12 +117,6 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
       duplicateCandidates.push({ nodeId, delta: { x: dx, y: dy } })
     })
     if (duplicateCandidates.length === 0) return
-    duplicateCandidates.forEach(({ nodeId }) => {
-      const node = idToNode.get(nodeId)
-      const startPos = altState.initialPositions.get(nodeId)
-      if (!node || !startPos) return
-      node.position = { x: startPos.x, y: startPos.y }
-    })
     const appended: Node[] = []
     duplicateCandidates.forEach(({ nodeId, delta }) => {
       const sourceNode = idToNode.get(nodeId)
@@ -156,9 +143,21 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
       appended.push(createImageFlowNode(copied))
     })
     if (appended.length === 0) return
-    options.appendFlowNodes(appended)
-    options.markDirty()
-    options.refreshSnapshot()
+    const resetPositionByNodeId = new Map<string, { x: number; y: number }>()
+    duplicateCandidates.forEach(({ nodeId }) => {
+      const startPos = altState.initialPositions.get(nodeId)
+      if (startPos) resetPositionByNodeId.set(nodeId, startPos)
+    })
+    options.commitNodeMutation(
+      (items) => [
+        ...items.map((item) => {
+          const resetPosition = resetPositionByNodeId.get(item.id)
+          return resetPosition ? { ...item, position: resetPosition } : item
+        }),
+        ...appended,
+      ],
+      { recordHistory: false },
+    )
   }
 
   return {

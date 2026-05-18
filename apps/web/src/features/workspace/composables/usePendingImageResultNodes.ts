@@ -9,20 +9,15 @@ import {
   resolveImageDirectActionSource,
   type ImageDirectActionSource,
 } from '../utils/flowImageDirectActionSource'
-
-type FlowHistorySnapshot = { nodes: unknown[]; edges: unknown[] }
+import type { FlowTransactions } from './useFlowTransactions'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  captureHistory: () => FlowHistorySnapshot
-  pushHistory: (snapshot: FlowHistorySnapshot) => void
-  markDirty: () => void
-  refreshSnapshot: () => void
+  commitGraphMutation: FlowTransactions['commitGraphMutation']
+  commitNodeMutation: FlowTransactions['commitNodeMutation']
+  commitEdgeMutation: FlowTransactions['commitEdgeMutation']
   refreshNodeInternals?: (nodeIds: string[]) => void
-  commitNodes: (nextNodes: Node[]) => void
-  commitEdges: (nextEdges: Edge[]) => void
-  appendEdges?: (nextEdges: Edge[]) => void
 }
 
 type PendingImageNodeItem = ImageNodeItem & {
@@ -48,37 +43,6 @@ function estimateImageNodeHeight(source: Pick<ImageDirectActionSource, 'width' |
 export function usePendingImageResultNodes(options: UsePendingImageResultNodesOptions) {
   const cancelledResultNodeIds = new Set<string>()
   const resultLayoutsBySourceNodeId = new Map<string, Map<string, ImageDirectActionSource>>()
-
-  function commitGraphMutation(
-    mutator: (items: Node[], edges: Edge[]) => { nodes: Node[]; edges: Edge[] },
-    optionsOverride?: { recordHistory?: boolean },
-  ) {
-    const historyBefore = options.captureHistory()
-    const { nodes: nextNodes, edges: nextEdges } = mutator(
-      options.nodes.value,
-      options.edges.value,
-    )
-    options.commitNodes(nextNodes)
-    options.commitEdges(nextEdges)
-    if (optionsOverride?.recordHistory !== false) {
-      options.pushHistory(historyBefore)
-    }
-    options.markDirty()
-    options.refreshSnapshot()
-  }
-
-  function commitNodeMutation(
-    mutator: (items: Node[]) => Node[],
-    optionsOverride?: { recordHistory?: boolean },
-  ) {
-    const historyBefore = options.captureHistory()
-    options.commitNodes(mutator(options.nodes.value))
-    if (optionsOverride?.recordHistory !== false) {
-      options.pushHistory(historyBefore)
-    }
-    options.markDirty()
-    options.refreshSnapshot()
-  }
 
   function readImageNodeLayout(node: Node): ImageDirectActionSource | null {
     if (node.data?.kind !== 'image') return null
@@ -212,13 +176,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
         edge.targetHandle === nextEdge.targetHandle,
     )
     if (hasSameEdge) return
-    if (options.appendEdges) {
-      options.appendEdges([nextEdge])
-    } else {
-      options.commitEdges([...options.edges.value, nextEdge])
-    }
-    options.markDirty()
-    options.refreshSnapshot()
+    options.commitEdgeMutation((items) => [...items, nextEdge], { recordHistory: false })
     options.refreshNodeInternals?.([sourceNodeId, resultNodeId])
   }
 
@@ -250,7 +208,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
       },
     }
 
-    commitNodeMutation((items) => [...items, nextNode as Node], optionsOverride)
+    options.commitNodeMutation((items) => [...items, nextNode as Node], optionsOverride)
     cancelledResultNodeIds.delete(nextNode.id)
     rememberResultNodeLayout(sourceNodeId, nextNode.id, {
       url: '',
@@ -280,7 +238,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
 
   function updatePendingImageResultNode(nodeId: string, url: string, ratio: number) {
     const frameSize = resolveImageNodeFrameSize(ratio, true)
-    commitGraphMutation(
+    options.commitGraphMutation(
       (items, currentEdges) => ({
         nodes: items.map((item) => {
           if (item.id !== nodeId || item.data?.kind !== 'image') return item
@@ -317,7 +275,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
   }
 
   function updatePendingImageTaskMeta(nodeId: string, patch: PendingTaskMetaPatch) {
-    commitGraphMutation(
+    options.commitGraphMutation(
       (items, currentEdges) => ({
         nodes: items.map((item) => {
           if (item.id !== nodeId || item.data?.kind !== 'image') return item
@@ -343,7 +301,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
   function removePendingImageResultNode(nodeId: string) {
     cancelledResultNodeIds.add(nodeId)
     forgetResultNodeLayout(nodeId)
-    commitGraphMutation(
+    options.commitGraphMutation(
       (items, currentEdges) => ({
         nodes: items.filter((item) => item.id !== nodeId),
         edges: currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),

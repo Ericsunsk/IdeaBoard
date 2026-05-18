@@ -207,6 +207,7 @@ import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowHistory } from '../composables/useFlowHistory'
+import { useFlowTransactions, type FlowHistorySnapshot } from '../composables/useFlowTransactions'
 import { useFlowBoardPersistence } from '../composables/useFlowBoardPersistence'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
@@ -432,8 +433,6 @@ const flowHistory = useFlowHistory({
   commitEdges: (edges) => commitFlowEdges(edges as Edge[]),
 })
 
-type FlowHistorySnapshot = ReturnType<typeof flowHistory.capture>
-
 function refreshSnapshot() {
   // Snapshot preview UI has been removed; callers keep this hook for flow parity.
 }
@@ -515,35 +514,30 @@ function commitFlowEdges(nextEdges: Edge[]) {
   setEdges(nextEdges)
 }
 
-function commitFlowEdgesAppend(nextEdges: Edge[]) {
-  const currentEdges = edges.value as Edge[]
-  commitFlowEdges([...currentEdges, ...nextEdges])
-}
-
-function commitFlowNodesAppend(nextNodes: Node[]) {
-  const currentNodes = nodes.value as Node[]
-  commitFlowNodes([...currentNodes, ...nextNodes])
-  scheduleFlowNodeInternalsRefresh(nextNodes.map((node) => node.id))
-}
-
-const flowNodeMutations = useFlowNodeMutations({
+const flowTransactions = useFlowTransactions({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
-  createNodeKind,
-  boardBaseSnapshot,
   captureHistory: flowHistory.capture,
   pushHistory: flowHistory.push,
+  beginDragHistory: flowHistory.onNodeDragStart,
+  commitDragHistory: flowHistory.onNodeDragStop,
   markDirty,
   refreshSnapshot,
-  appendFlowNodes: (nextNodes) => {
-    commitFlowNodesAppend(nextNodes)
-  },
   commitNodes: (nextNodes) => {
     commitFlowNodes(nextNodes)
   },
   commitEdges: (nextEdges) => {
     commitFlowEdges(nextEdges)
   },
+})
+
+const flowNodeMutations = useFlowNodeMutations({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  createNodeKind,
+  commitGraphMutation: flowTransactions.commitGraphMutation,
+  commitNodeMutation: flowTransactions.commitNodeMutation,
+  commitEdgeMutation: flowTransactions.commitEdgeMutation,
   onWarning: (text) => {
     appToast.warning(text)
   },
@@ -717,7 +711,7 @@ const {
   edges: edges as Ref<Edge[]>,
   currentBoardId,
   updateSnapshotNode,
-  captureHistory: flowHistory.capture as () => FlowHistorySnapshot,
+  captureHistory: flowTransactions.captureHistory as () => FlowHistorySnapshot,
   onWarning: (text) => {
     appToast.warning(text)
   },
@@ -739,10 +733,10 @@ const {
 } = useFlowImageDirectActions({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
-  captureHistory: flowHistory.capture as () => FlowHistorySnapshot,
-  pushHistory: flowHistory.push,
-  markDirty,
-  refreshSnapshot,
+  commitGraphMutation: flowTransactions.commitGraphMutation,
+  commitNodeMutation: flowTransactions.commitNodeMutation,
+  commitEdgeMutation: flowTransactions.commitEdgeMutation,
+  commitDirty: flowTransactions.commitDirty,
   refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
   onSuccess: (text) => {
     appToast.success(text)
@@ -750,13 +744,6 @@ const {
   onWarning: (text) => {
     appToast.warning(text)
   },
-  commitNodes: (nextNodes) => {
-    commitFlowNodes(nextNodes)
-  },
-  commitEdges: (nextEdges) => {
-    commitFlowEdges(nextEdges)
-  },
-  appendEdges: commitFlowEdgesAppend,
 })
 
 const {
@@ -837,24 +824,15 @@ const {
       outputCount: snapshot.outputCount,
     }
   },
-  captureFlowHistorySnapshot: flowHistory.capture as () => FlowHistorySnapshot,
-  pushFlowHistorySnapshot: flowHistory.push,
-  markDirty,
-  refreshSnapshot,
-  appendFlowNodes: (nextNodes) => {
-    commitFlowNodesAppend(nextNodes)
-  },
+  commitNodeMutation: flowTransactions.commitNodeMutation,
 })
 
 const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
-  flowHistory: {
-    onNodeDragStart: flowHistory.onNodeDragStart,
-    onNodeDragStop: flowHistory.onNodeDragStop,
-  },
+  beginNodeDragTransaction: flowTransactions.beginNodeDragTransaction,
+  commitNodeDragTransaction: flowTransactions.commitNodeDragTransaction,
   duplicateModifierPressed,
   beginFlowNodeDragDuplicateTracking,
   finishFlowNodeDragDuplicateTracking,
-  markDirty,
   activeImageActionNodeId,
   activeImagePromptNodeId,
   hideFlowStyleStrengthControl,

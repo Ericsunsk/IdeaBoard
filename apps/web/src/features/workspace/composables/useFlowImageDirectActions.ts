@@ -22,9 +22,9 @@ import {
   resolveImageDirectActionSource,
   type ImageDirectActionSource,
 } from '../utils/flowImageDirectActionSource'
+import type { FlowTransactions } from './useFlowTransactions'
 
 type DirectActionKey = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
-type FlowHistorySnapshot = { nodes: unknown[]; edges: unknown[] }
 type RunImageDirectActionOptions = {
   strength?: number
 }
@@ -32,14 +32,11 @@ type RunImageDirectActionOptions = {
 type UseFlowImageDirectActionsOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  captureHistory: () => FlowHistorySnapshot
-  pushHistory: (snapshot: FlowHistorySnapshot) => void
-  markDirty: () => void
-  refreshSnapshot: () => void
+  commitGraphMutation: FlowTransactions['commitGraphMutation']
+  commitNodeMutation: FlowTransactions['commitNodeMutation']
+  commitEdgeMutation: FlowTransactions['commitEdgeMutation']
+  commitDirty: FlowTransactions['commitDirty']
   refreshNodeInternals?: (nodeIds: string[]) => void
-  commitNodes: (nextNodes: Node[]) => void
-  commitEdges: (nextEdges: Edge[]) => void
-  appendEdges?: (nextEdges: Edge[]) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
 }
