@@ -168,6 +168,7 @@ import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
+import { useAutoResizeTextarea } from './composables/useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
 
 const props = defineProps<{
@@ -225,6 +226,12 @@ const toolPopovers = useNodeToolPopoverGroup({
 })
 const outputCountPickerVisible = toolPopovers.isOpen('output-count')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
+const promptTextarea = useAutoResizeTextarea(promptInputRef, {
+  watchSource: promptDraft,
+  onResize: ({ naturalHeight, singleLineHeight }) => {
+    shouldStackOutputCount.value = naturalHeight > singleLineHeight + 2
+  },
+})
 
 watch(showPromptComposer, async (visible) => {
   if (!visible) {
@@ -232,13 +239,8 @@ watch(showPromptComposer, async (visible) => {
     return
   }
   await nextTick()
-  resizePromptInput()
+  promptTextarea.resize()
   promptInputRef.value?.focus()
-})
-
-watch(promptDraft, async () => {
-  await nextTick()
-  resizePromptInput()
 })
 
 function onStageDragOver(event: DragEvent) {
@@ -268,27 +270,13 @@ function submitPrompt() {
   closeOutputCountPicker()
   emit('prompt-generate', prompt, outputCount)
   promptDraft.value = ''
-  void nextTick(resizePromptInput)
+  promptTextarea.resizeAfterRender()
 }
 
 function onPromptEnter(event: KeyboardEvent) {
   if (event.isComposing) return
   event.preventDefault()
   submitPrompt()
-}
-
-function resizePromptInput() {
-  const input = promptInputRef.value
-  if (!input) return
-  const singleLineHeight = resolvePromptSingleLineHeight(input)
-  const previousMinHeight = input.style.minHeight
-  input.style.minHeight = '0'
-  input.style.height = 'auto'
-  const naturalHeight = input.scrollHeight
-  input.style.minHeight = previousMinHeight
-  input.style.height = `${naturalHeight}px`
-  input.style.overflowY = 'hidden'
-  shouldStackOutputCount.value = naturalHeight > singleLineHeight + 2
 }
 
 function toggleOutputCountPicker() {
@@ -305,17 +293,6 @@ function selectOutputCount(value: number) {
   closeOutputCountPicker()
 }
 
-function resolvePromptSingleLineHeight(input: HTMLTextAreaElement): number {
-  const style = window.getComputedStyle(input)
-  const lineHeight = Number.parseFloat(style.lineHeight)
-  const paddingTop = Number.parseFloat(style.paddingTop)
-  const paddingBottom = Number.parseFloat(style.paddingBottom)
-  return (
-    (Number.isFinite(lineHeight) ? lineHeight : 18) +
-    (Number.isFinite(paddingTop) ? paddingTop : 0) +
-    (Number.isFinite(paddingBottom) ? paddingBottom : 0)
-  )
-}
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>

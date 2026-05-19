@@ -26,146 +26,149 @@
       </template>
     </NodeHeader>
     <div class="prompt-node-shell" data-flow-handle-frame>
-      <div ref="thumbsRef" class="prompt-node-thumbs node-tool-surface">
-        <div
-          v-for="item in sortableInputImages"
-          :key="item.id"
-          class="prompt-node-thumb prompt-node-thumb-item node-tool-output-count node-tool-button"
-          role="button"
-          tabindex="0"
-          :data-image-id="item.id"
-          @mousedown.stop
-          @contextmenu.stop.prevent="emit('input-image-preview', item)"
-        >
-          <img :src="item.url" alt="" draggable="false" />
+      <div class="prompt-node-content">
+        <div ref="thumbsRef" class="prompt-node-thumbs node-tool-surface">
+          <div
+            v-for="item in sortableInputImages"
+            :key="item.id"
+            class="prompt-node-thumb prompt-node-thumb-item node-tool-output-count node-tool-button"
+            role="button"
+            tabindex="0"
+            :data-image-id="item.id"
+            @mousedown.stop
+            @contextmenu.stop.prevent="emit('input-image-preview', item)"
+          >
+            <img :src="item.url" alt="" draggable="false" />
+            <button
+              class="prompt-node-thumb-remove"
+              type="button"
+              title="移除图片输入"
+              aria-label="移除图片输入"
+              @mousedown.stop
+              @pointerdown.stop
+              @click.stop="removeInputImage(item.id)"
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              >
+                <path d="M6 6l12 12" />
+                <path d="M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
           <button
-            class="prompt-node-thumb-remove"
+            v-if="canAcceptMoreImages"
+            class="prompt-node-thumb prompt-node-thumb-add node-tool-output-count node-tool-button"
+            :class="{ 'is-drop-target': addSlotDragOver }"
             type="button"
-            title="移除图片输入"
-            aria-label="移除图片输入"
+            title="添加图片输入"
+            aria-label="添加图片输入"
             @mousedown.stop
             @pointerdown.stop
-            @click.stop="removeInputImage(item.id)"
+            @click.stop="emit('input-image-open')"
+            @dragenter.stop.prevent="onAddSlotDragOver"
+            @dragover.stop.prevent="onAddSlotDragOver"
+            @dragleave.stop="onAddSlotDragLeave"
+            @drop.stop.prevent="onAddSlotDrop"
           >
             <svg
-              width="10"
-              height="10"
+              width="16"
+              height="16"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              stroke-width="2.4"
+              stroke-width="2"
               stroke-linecap="round"
             >
-              <path d="M6 6l12 12" />
-              <path d="M18 6L6 18" />
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
             </svg>
           </button>
         </div>
-        <button
-          v-if="canAcceptMoreImages"
-          class="prompt-node-thumb prompt-node-thumb-add node-tool-output-count node-tool-button"
-          :class="{ 'is-drop-target': addSlotDragOver }"
-          type="button"
-          title="添加图片输入"
-          aria-label="添加图片输入"
-          @mousedown.stop
-          @pointerdown.stop
-          @click.stop="emit('input-image-open')"
-          @dragenter.stop.prevent="onAddSlotDragOver"
-          @dragover.stop.prevent="onAddSlotDragOver"
-          @dragleave.stop="onAddSlotDragLeave"
-          @drop.stop.prevent="onAddSlotDrop"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-          >
-            <path d="M12 5v14" />
-            <path d="M5 12h14" />
-          </svg>
-        </button>
-      </div>
-      <textarea
-        :value="node.text"
-        class="workflow-node-input"
-        placeholder="type your idea..."
-        @input="onInput"
-        @focus="emit('focus')"
-        @contextmenu.stop
-      />
-      <div ref="actionsRef" class="prompt-node-actions node-tool-surface">
-        <div class="image-node-output-count-wrap node-tool-output-count-wrap">
-          <button
-            class="image-node-output-count node-tool-output-count node-tool-button node-tool-tooltip-trigger prompt-node-aspect-trigger"
-            type="button"
-            :class="{ active: aspectRatioPickerVisible }"
-            title="选择尺寸比例"
-            aria-label="尺寸比例"
-            @click.stop="toggleAspectRatioPicker"
-          >
-            <span class="prompt-node-aspect-icon" :data-ratio="aspectRatio">
-              <span aria-hidden="true"></span>
-            </span>
-            <span class="node-tool-tooltip">
-              {{ aspectRatio === 'auto' ? 'Auto' : aspectRatio }}
-            </span>
-          </button>
-          <NodeToolPopover
-            :visible="aspectRatioPickerVisible"
-            layout="row"
-            class="prompt-node-aspect-popover"
-          >
+        <textarea
+          ref="textInputRef"
+          :value="node.text"
+          class="workflow-node-input"
+          placeholder="type your idea..."
+          @input="onInput"
+          @focus="emit('focus')"
+          @contextmenu.stop
+        />
+        <div ref="actionsRef" class="prompt-node-actions node-tool-surface">
+          <div class="image-node-output-count-wrap node-tool-output-count-wrap">
             <button
-              v-for="option in PROMPT_ASPECT_RATIO_OPTIONS"
-              :key="option"
+              class="image-node-output-count node-tool-output-count node-tool-button node-tool-tooltip-trigger prompt-node-aspect-trigger"
               type="button"
-              class="prompt-node-aspect-option node-tool-tooltip-trigger"
-              :class="{ active: option === aspectRatio }"
-              @click.stop="selectAspectRatio(option)"
+              :class="{ active: aspectRatioPickerVisible }"
+              title="选择尺寸比例"
+              aria-label="尺寸比例"
+              @click.stop="toggleAspectRatioPicker"
             >
-              <span class="prompt-node-aspect-icon" :data-ratio="option">
+              <span class="prompt-node-aspect-icon" :data-ratio="aspectRatio">
                 <span aria-hidden="true"></span>
               </span>
               <span class="node-tool-tooltip">
-                {{ option === 'auto' ? 'Auto' : option }}
+                {{ aspectRatio === 'auto' ? 'Auto' : aspectRatio }}
               </span>
             </button>
-          </NodeToolPopover>
-        </div>
-        <NodeOutputCountPicker
-          :model-value="outputCount"
-          :visible="outputCountPickerVisible"
-          title="选择张数"
-          aria-label="输出张数"
-          @toggle="toggleOutputCountPicker"
-          @select="selectOutputCount"
-        />
-        <button
-          class="image-node-prompt-send node-tool-send node-tool-button"
-          type="button"
-          :disabled="!canGenerate"
-          title="发送"
-          @click="emit('generate')"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.1"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+            <NodeToolPopover
+              :visible="aspectRatioPickerVisible"
+              layout="row"
+              class="prompt-node-aspect-popover"
+            >
+              <button
+                v-for="option in PROMPT_ASPECT_RATIO_OPTIONS"
+                :key="option"
+                type="button"
+                class="prompt-node-aspect-option node-tool-tooltip-trigger"
+                :class="{ active: option === aspectRatio }"
+                @click.stop="selectAspectRatio(option)"
+              >
+                <span class="prompt-node-aspect-icon" :data-ratio="option">
+                  <span aria-hidden="true"></span>
+                </span>
+                <span class="node-tool-tooltip">
+                  {{ option === 'auto' ? 'Auto' : option }}
+                </span>
+              </button>
+            </NodeToolPopover>
+          </div>
+          <NodeOutputCountPicker
+            :model-value="outputCount"
+            :visible="outputCountPickerVisible"
+            title="选择张数"
+            aria-label="输出张数"
+            @toggle="toggleOutputCountPicker"
+            @select="selectOutputCount"
+          />
+          <button
+            class="image-node-prompt-send node-tool-send node-tool-button"
+            type="button"
+            :disabled="!canGenerate"
+            title="发送"
+            @click="emit('generate')"
           >
-            <path d="M5 12h13" />
-            <path d="m13 6 6 6-6 6" />
-          </svg>
-        </button>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.1"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12h13" />
+              <path d="m13 6 6 6-6 6" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -179,6 +182,7 @@ import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
 import NodeToolPopover from './NodeToolPopover.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
+import { useAutoResizeTextarea } from './composables/useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
 import {
   PROMPT_ASPECT_RATIO_OPTIONS,
@@ -213,9 +217,11 @@ const emit = defineEmits<{
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 
 function onInput(event: Event) {
-  emit('update:text', (event.target as HTMLTextAreaElement).value)
+  const input = event.target as HTMLTextAreaElement
+  emit('update:text', input.value)
 }
 const thumbsRef = ref<HTMLElement | null>(null)
+const textInputRef = ref<HTMLTextAreaElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
 const sortableInputImages = ref<PromptNodeItem['inputImages']>([])
 const addSlotDragOver = ref(false)
@@ -232,6 +238,9 @@ const toolPopovers = useNodeToolPopoverGroup({
 })
 const outputCountPickerVisible = toolPopovers.isOpen('output-count')
 const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
+useAutoResizeTextarea(textInputRef, {
+  watchSource: [() => props.node.text, () => props.node.width],
+})
 function finishThumbReorder() {
   void nextTick(() => {
     thumbReordering.value = false
@@ -342,12 +351,20 @@ function onAddSlotDrop(event: DragEvent) {
 
 .prompt-node-shell {
   position: relative;
-  aspect-ratio: 1 / 1;
+  min-height: 280px;
   border: 1.5px solid #e2e8f0;
   border-radius: 16px;
   background: #ffffff;
   overflow: visible;
   transition: border-color 0.2s ease;
+}
+.prompt-node-content {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .workflow-node.prompt-node.active .prompt-node-shell {
@@ -355,20 +372,21 @@ function onAddSlotDrop(event: DragEvent) {
 }
 
 .workflow-node-input {
+  flex: 1 1 auto;
   width: 100%;
-  height: 100%;
   min-height: 0;
   cursor: text;
   border: none;
   resize: none;
   outline: none;
-  padding: 58px 13px 48px;
+  padding: 0;
   box-sizing: border-box;
   font-size: 14px;
   line-height: 1.6;
   color: #334155;
   background: transparent;
   font-family: inherit;
+  overflow: hidden;
 }
 
 .workflow-node-input::placeholder {
@@ -377,10 +395,7 @@ function onAddSlotDrop(event: DragEvent) {
 .prompt-node-thumbs {
   --node-tool-button-size: 46px;
   --node-tool-button-radius: 8px;
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  top: 10px;
+  position: relative;
   display: flex;
   gap: 6px;
   overflow: visible;
@@ -464,9 +479,7 @@ function onAddSlotDrop(event: DragEvent) {
   background: #f8f7ff;
 }
 .prompt-node-actions {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
+  align-self: flex-end;
   display: flex;
   gap: var(--node-tool-button-gap);
 }
