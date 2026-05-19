@@ -89,6 +89,32 @@ function makeModelFlowNode(params: { flowId: string; id: number }): FlowAdapterN
   }
 }
 
+function makeFusionFlowNode(params: { flowId: string; id: number; prompt?: string }): FlowAdapterNode {
+  return {
+    id: params.flowId,
+    type: 'canvas',
+    position: { x: 340, y: 340 },
+    data: {
+      kind: 'fusion',
+      nodeType: 'fusion',
+      title: `Fusion #${params.id}`,
+      summary: 'Canvas fusion node',
+      snapshotNode: {
+        id: params.id,
+        type: 'fusion',
+        x: 340,
+        y: 340,
+        width: 280,
+        prompt: params.prompt ?? '',
+        outputCount: 1,
+        inputImages: [],
+        outputStatus: 'idle',
+        outputImages: [],
+      },
+    },
+  }
+}
+
 function testTransientRunningImageNodeIsNotPersisted() {
   const nodes: FlowAdapterNode[] = [
     makeImageFlowNode({
@@ -281,10 +307,53 @@ function testPromptImageInputPreservesMultipleConnections() {
   expect(promptImageInputs.length === 2, 'expected prompt image input to preserve multiple edges')
 }
 
+function testFusionImageInputPreservesMultipleConnections() {
+  const nodes: FlowAdapterNode[] = [
+    makeImageFlowNode({
+      flowId: 'image-1',
+      id: 1,
+      outputStatus: 'ready',
+      sourceImageUrl: 'https://example.com/source-1.png',
+    }),
+    makeImageFlowNode({
+      flowId: 'image-2',
+      id: 2,
+      outputStatus: 'ready',
+      sourceImageUrl: 'https://example.com/source-2.png',
+    }),
+    makeFusionFlowNode({ flowId: 'fusion-3', id: 3, prompt: 'blend two references' }),
+  ]
+  const snapshot = flowToCanvasBoardSnapshot({
+    nodes,
+    edges: [
+      {
+        id: 'edge-image-1-fusion',
+        source: 'image-1',
+        sourceHandle: 'out:image',
+        target: 'fusion-3',
+        targetHandle: 'in:image',
+      },
+      {
+        id: 'edge-image-2-fusion',
+        source: 'image-2',
+        sourceHandle: 'out:image',
+        target: 'fusion-3',
+        targetHandle: 'in:image',
+      },
+    ],
+  })
+
+  const fusionImageInputs = snapshot.connections.filter(
+    (connection) => connection.toNodeType === 'fusion' && connection.toPort === 'image',
+  )
+  expect(fusionImageInputs.length === 2, 'expected fusion image input to preserve multiple edges')
+}
+
 testTransientRunningImageNodeIsNotPersisted()
 testReadyImageNodeIsPersistedWithConnection()
 testAggregateInputHandlesAreResolvedBeforePersistence()
 testConnectionRoundTripPreservesEdges()
 testPromptImageInputPreservesMultipleConnections()
+testFusionImageInputPreservesMultipleConnections()
 
 console.log('flowSnapshotAdapter snapshot checks passed')

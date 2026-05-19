@@ -8,6 +8,7 @@ type UseFlowNodeDragInteractionsOptions = {
   finishFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   activeImageActionNodeId: { value: string | null }
   activeImagePromptNodeId?: { value: string | null }
+  activeFusionPromptNodeId?: { value: string | null }
   hideFlowStyleStrengthControl: () => void
 }
 
@@ -15,6 +16,7 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   function onNodeDragStart() {
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+    if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
     options.hideFlowStyleStrengthControl()
     options.beginNodeDragTransaction()
     options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)

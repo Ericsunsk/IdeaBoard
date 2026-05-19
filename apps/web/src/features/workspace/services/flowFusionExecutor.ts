@@ -1,12 +1,12 @@
 import { buildExecutionTaskRequest, EXECUTION_FUSION_META } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
-import type { FusionNodeItem } from '../types/canvasNodes'
+import { clampImageNodeOutputCount, type FusionNodeItem } from '../types/canvasNodes'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api/task'
 import {
+  resolveConnectedImageInputs,
   resolveConnectedInput,
   resolveConnectedPromptText,
-  resolveSourceImageFromNode,
   waitTaskResult,
 } from './flowTaskExecutorUtils'
 
@@ -34,15 +34,15 @@ export function validateFlowFusionNodeInputs(
   context: FlowFusionNodeContext,
   options: FlowFusionExecutorOptions,
 ): string | null {
-  const imageAInput = resolveConnectedInput(options, context.nodeId, 'imageA')
-  if (!imageAInput) return 'Fusion 节点缺少 Image A 连线'
-  const imageAUrl = resolveSourceImageFromNode(imageAInput.sourceType, imageAInput.snapshotNode)
-  if (!imageAUrl) return 'Fusion 节点等待上游 Image A 输出'
-
-  const imageBInput = resolveConnectedInput(options, context.nodeId, 'imageB')
-  if (!imageBInput) return 'Fusion 节点缺少 Image B 连线'
-  const imageBUrl = resolveSourceImageFromNode(imageBInput.sourceType, imageBInput.snapshotNode)
-  if (!imageBUrl) return 'Fusion 节点等待上游 Image B 输出'
+  const imageUrls = resolveConnectedImageInputs(
+    options,
+    context.nodeId,
+    context.snapshotNode.inputImages,
+  )
+    .map((item) => item.url.trim())
+    .filter(Boolean)
+  if (imageUrls.length < 2) return 'Fusion 节点至少需要 2 张图片'
+  if (imageUrls.length > 4) return 'Fusion 节点最多支持 4 张图片'
 
   return null
 }
@@ -55,40 +55,40 @@ export async function executeFlowFusionNode(
   if (validationError) throw new Error(validationError)
 
   const node = context.snapshotNode
-  const imageAInput = resolveConnectedInput(options, context.nodeId, 'imageA')!
-  const imageBInput = resolveConnectedInput(options, context.nodeId, 'imageB')!
-  const imageAUrl = resolveSourceImageFromNode(imageAInput.sourceType, imageAInput.snapshotNode)
-  const imageBUrl = resolveSourceImageFromNode(imageBInput.sourceType, imageBInput.snapshotNode)
-  const imageSize = await options.loadImageSizeFromUrl(imageAUrl)
+  const imageUrls = resolveConnectedImageInputs(options, context.nodeId, node.inputImages)
+    .map((item) => item.url.trim())
+    .filter(Boolean)
+    .slice(0, 4)
+  const imageSize = await options.loadImageSizeFromUrl(imageUrls[0])
 
+  const selfPrompt =
+    typeof node.prompt === 'string' ? node.prompt.trim() : `${node.prompt ?? ''}`.trim()
   const promptInput = resolveConnectedInput(options, context.nodeId, 'prompt')
-  const promptText = promptInput ? resolveConnectedPromptText(options, context.nodeId) : ''
+  const promptText = selfPrompt || (promptInput ? resolveConnectedPromptText(options, context.nodeId) : '')
+  const finalPrompt = promptText || EXECUTION_FUSION_META.fallbackPrompt
 
-  const blendRatio = Math.max(0, Math.min(100, Math.round(Number(node.blendRatio) || 0)))
-  const imageAWeight = blendRatio
-  const imageBWeight = 100 - blendRatio
   const request = buildExecutionTaskRequest({
-    prompt: `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`,
+    prompt: `${EXECUTION_FUSION_META.promptPrefix} ${finalPrompt}`,
     feature: EXECUTION_FUSION_META.feature,
-    imageUrls: [imageAUrl, imageBUrl],
-    params: {
-      ...buildExecutionSizeParams(imageSize),
-      blend_ratio: blendRatio,
-      image_a_weight: imageAWeight,
-      image_b_weight: imageBWeight,
-    },
+    imageUrls,
+    params: buildExecutionSizeParams(imageSize),
   })
 
   try {
-    const submitRes = await taskApi.submit(request)
-    if (submitRes.code !== 0 || !submitRes.data?.task_id) {
-      throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交 Fusion 任务失败'))
+    const outputCount = clampImageNodeOutputCount(node.outputCount)
+    const resultUrls: string[] = []
+    for (let index = 0; index < outputCount; index += 1) {
+      const submitRes = await taskApi.submit(request)
+      if (submitRes.code !== 0 || !submitRes.data?.task_id) {
+        throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交 Fusion 任务失败'))
+      }
+      resultUrls.push(...(await waitTaskResult(submitRes.data.task_id)))
     }
-    const urls = await waitTaskResult(submitRes.data.task_id)
+    const urls = resultUrls.filter((url) => url.trim())
     if (urls.length === 0) {
       throw new Error('任务完成，但未返回图片')
     }
-    return { urls }
+    return { urls: urls.slice(0, outputCount) }
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Fusion 任务执行失败'
     throw new Error(sanitizeApiErrorMessage(msg, 'Fusion 任务执行失败'), { cause: error })

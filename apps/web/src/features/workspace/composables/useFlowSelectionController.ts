@@ -5,6 +5,7 @@ type UseFlowSelectionControllerOptions = {
   activeTool: Ref<string>
   activeImageActionNodeId: Ref<string | null>
   activeImagePromptNodeId?: Ref<string | null>
+  activeFusionPromptNodeId?: Ref<string | null>
   hideFlowStyleStrengthControl: () => void
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
@@ -51,6 +52,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     options.closeNodeContextMenu()
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+    if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
     options.hideFlowStyleStrengthControl()
   }
 
@@ -58,6 +60,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     if (options.activeTool.value === 'hand') return
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+    if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
     options.hideFlowStyleStrengthControl()
   }
 
@@ -70,6 +73,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
       }
       options.activeImageActionNodeId.value = null
       if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+      if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
       options.hideFlowStyleStrengthControl()
     }
   }
@@ -77,6 +81,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
   function deleteSelectedFlowElements() {
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+    if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
     options.hideFlowStyleStrengthControl()
     options.closeNodeContextMenu()
     options._deleteSelectedFlowElements()

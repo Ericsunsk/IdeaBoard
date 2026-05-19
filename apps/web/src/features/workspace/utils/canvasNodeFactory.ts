@@ -1,6 +1,7 @@
 import {
   DEFAULT_COLOR_NODE_COLOR,
   DEFAULT_COLOR_STRENGTH,
+  DEFAULT_FUSION_NODE_OUTPUT_COUNT,
   DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   DEFAULT_PROMPT_ASPECT_RATIO,
@@ -137,7 +138,9 @@ export function createFusionNodeAt(point: CanvasPoint): FusionNodeItem {
     y: point.y,
     width: 286,
     title: getDefaultCanvasNodeTitle('fusion'),
-    blendRatio: 50,
+    prompt: '',
+    outputCount: DEFAULT_FUSION_NODE_OUTPUT_COUNT,
+    inputImages: [],
     outputStatus: 'idle',
     outputImages: [],
   }

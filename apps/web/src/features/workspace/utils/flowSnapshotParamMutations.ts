@@ -70,7 +70,6 @@ function arePromptInputImagesEqual(a: unknown, b: PromptNodeInputImage[]): boole
     )
   )
 }
-
 export function patchFlowSnapshotParam(
   snapshotNode: Record<string, any>,
   payload: { key: string; value: unknown },
@@ -89,6 +88,11 @@ export function patchFlowSnapshotParam(
       const nextOutputCount = clampImageNodeOutputCount(value)
       if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
       return { ...snapshotNode, outputCount: nextOutputCount }
+    }
+    case 'prompt': {
+      const nextPrompt = String(value ?? '').trim()
+      if (snapshotNode.prompt === nextPrompt) return snapshotNode
+      return { ...snapshotNode, prompt: nextPrompt }
     }
     case 'aspectRatio': {
       const nextAspectRatio = normalizePromptAspectRatio(value)
@@ -141,11 +145,6 @@ export function patchFlowSnapshotParam(
       const nextStrength = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
       if (snapshotNode.strength === nextStrength) return snapshotNode
       return { ...snapshotNode, strength: nextStrength }
-    }
-    case 'blendRatio': {
-      const nextBlendRatio = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
-      if (snapshotNode.blendRatio === nextBlendRatio) return snapshotNode
-      return { ...snapshotNode, blendRatio: nextBlendRatio }
     }
     case 'tileMode': {
       const nextTileMode = normalizeWearTileMode(value)

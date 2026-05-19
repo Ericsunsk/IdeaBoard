@@ -176,7 +176,13 @@ const fusionNodeItemSchema = z.object({
   y: finiteNumberSchema,
   width: finiteNumberSchema,
   title: z.string().optional(),
-  blendRatio: finiteNumberSchema.min(0).max(100),
+  prompt: z.string().default(''),
+  outputCount: finiteNumberSchema
+    .int()
+    .min(MIN_IMAGE_NODE_OUTPUT_COUNT)
+    .max(MAX_IMAGE_NODE_OUTPUT_COUNT)
+    .default(DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
+  inputImages: z.array(promptNodeInputImageSchema).max(4).default([]),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
 }).strict()

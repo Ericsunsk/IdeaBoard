@@ -110,19 +110,21 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     normalizeConnection: (connection, existingEdges) =>
       normalizeFlowConnection(connection, lookupData, existingEdges),
     allowsMultipleTargetConnections: (connection) =>
-      lookupData(connection.target ?? '')?.kind === 'prompt' &&
+      (lookupData(connection.target ?? '')?.kind === 'prompt' ||
+        lookupData(connection.target ?? '')?.kind === 'fusion') &&
       connection.targetHandle === 'in:image',
     validateConnectionMutation: (connection, existingEdges) => {
-      if (
-        lookupData(connection.target ?? '')?.kind !== 'prompt' ||
-        connection.targetHandle !== 'in:image'
-      ) {
+      const targetKind = lookupData(connection.target ?? '')?.kind
+      if ((targetKind !== 'prompt' && targetKind !== 'fusion') || connection.targetHandle !== 'in:image') {
         return null
       }
       const imageInputCount = existingEdges.filter(
         (edge) => edge.target === connection.target && edge.targetHandle === 'in:image',
       ).length
-      return imageInputCount >= 4 ? 'Prompt 最多接入 4 张图片' : null
+      if (imageInputCount >= 4) {
+        return targetKind === 'fusion' ? 'Fusion 最多接入 4 张图片' : 'Prompt 最多接入 4 张图片'
+      }
+      return null
     },
     commitEdgeMutation: options.commitEdgeMutation,
     onWarning: options.onWarning,

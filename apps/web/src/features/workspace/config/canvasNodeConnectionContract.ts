@@ -133,8 +133,7 @@ export function getCanvasNodePortContracts(
     }
     case 'fusion':
       return [
-        input('imageA', 'image', true),
-        input('imageB', 'image', true),
+        input('image', 'image', true),
         input('prompt', 'prompt'),
         output('image', 'image'),
       ]

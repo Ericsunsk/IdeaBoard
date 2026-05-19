@@ -22,10 +22,10 @@
         @update:aspect-ratio="emitNodeParam('aspectRatio', $event)"
         @update:input-images="emitNodeParam('inputImages', $event)"
         @update:title="emitNodeParam('title', $event)"
-        @input-image-drop="onPromptInputImageDrop"
-        @input-image-open="onPromptInputImageOpen"
-        @input-image-preview="onPromptInputImagePreview"
-        @input-image-remove="onPromptInputImageRemove"
+        @input-image-drop="onMediaInputImageDrop"
+        @input-image-open="onMediaInputImageOpen"
+        @input-image-preview="onMediaInputImagePreview"
+        @input-image-remove="onMediaInputImageRemove"
         @node-mousedown="noopMouse"
         @delete="onDeleteRequest"
         @focus="noop"
@@ -129,19 +129,34 @@
       />
     </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
-      <FusionNode
-        :node="fusionSnapshot"
-        :active="selected"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
-        :ui-state="props.uiState"
-        :error-port-keys="[]"
-        @node-mousedown="noopMouse"
-        @update:title="emitNodeParam('title', $event)"
-        @delete="onDeleteRequest"
-        @update:blend-ratio="emitNodeParam('blendRatio', $event)"
-        @generate="onFusionGenerate"
-      />
+      <div
+        class="flow-canvas-node__fusion-wrap flow-canvas-node__drag-surface"
+        @mousedown="onNodeMouseDown"
+        @click.stop
+        @contextmenu.stop
+      >
+        <FusionNode
+          :node="fusionSnapshot"
+          :active="selected"
+          :dragging="props.dragging"
+          :copy-mode="props.copyMode"
+          :prompt-composer-visible="!!props.fusionPromptComposerVisible"
+          :ui-state="props.uiState"
+          :error-port-keys="[]"
+          @node-mousedown="noopMouse"
+          @update:title="emitNodeParam('title', $event)"
+          @update:output-count="emitNodeParam('outputCount', $event)"
+          @update:prompt="emitNodeParam('prompt', $event)"
+          @delete="onDeleteRequest"
+          @update:input-images="emitNodeParam('inputImages', $event)"
+          @input-image-drop="onMediaInputImageDrop"
+          @input-image-preview="onMediaInputImagePreview"
+          @input-image-remove="onMediaInputImageRemove"
+          @contextmenu="onFusionContextMenu"
+          @prompt-generate="onFusionPromptGenerate"
+          @generate="onFusionGenerate"
+        />
+      </div>
     </template>
     <template v-else-if="isWearNode && wearSnapshot">
       <WearNode
@@ -279,6 +294,7 @@ const props = withDefaults(
     maskHasConnectedImageInput?: boolean
     imageActionVisible?: boolean
     imagePromptComposerVisible?: boolean
+    fusionPromptComposerVisible?: boolean
     imageDirectGenerating?: boolean
     showStyleStrengthControl?: boolean
     styleInnovateStrengthPct?: number
@@ -294,6 +310,7 @@ const props = withDefaults(
     maskHasConnectedImageInput: false,
     imageActionVisible: false,
     imagePromptComposerVisible: false,
+    fusionPromptComposerVisible: false,
     imageDirectGenerating: false,
     showStyleStrengthControl: false,
     styleInnovateStrengthPct: 50,
@@ -317,10 +334,10 @@ const emit = defineEmits<{
   (e: 'generate-model'): void
   (e: 'generate-viewpoint'): void
   (e: 'image-stage-drop', event: DragEvent): void
-  (e: 'prompt-input-image-drop', nodeId: string, event: DragEvent): void
-  (e: 'prompt-input-image-open', nodeId: string): void
-  (e: 'prompt-input-image-preview', image: { url: string; ratio: number }): void
-  (e: 'prompt-input-image-remove', nodeId: string, imageId: string): void
+  (e: 'media-input-image-drop', nodeId: string, event: DragEvent): void
+  (e: 'media-input-image-open', nodeId: string): void
+  (e: 'media-input-image-preview', image: { url: string; ratio: number }): void
+  (e: 'media-input-image-remove', nodeId: string, imageId: string): void
   (e: 'image-open-file'): void
   (e: 'image-open-preview'): void
   (e: 'image-append-to-canvas'): void
@@ -333,7 +350,9 @@ const emit = defineEmits<{
   (e: 'mask-set-canvas-ref', element: Element | null): void
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'image-contextmenu', event: MouseEvent): void
+  (e: 'fusion-contextmenu', event: MouseEvent): void
   (e: 'image-prompt-generate', prompt: string, outputCount: number): void
+  (e: 'fusion-prompt-generate', prompt: string, outputCount: number): void
   (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
   (e: 'image-action', action: ImageAction): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
@@ -704,21 +723,24 @@ function onMaskSetCanvasRef(element: Element | null) {
 function onImageContextMenu(event: MouseEvent) {
   emit('image-contextmenu', event)
 }
-
-function onPromptInputImageDrop(event: DragEvent) {
-  emit('prompt-input-image-drop', props.nodeId, event)
+function onFusionContextMenu(event: MouseEvent) {
+  emit('fusion-contextmenu', event)
 }
 
-function onPromptInputImageOpen() {
-  emit('prompt-input-image-open', props.nodeId)
+function onMediaInputImageDrop(event: DragEvent) {
+  emit('media-input-image-drop', props.nodeId, event)
 }
 
-function onPromptInputImagePreview(image: { url: string; ratio: number }) {
-  emit('prompt-input-image-preview', image)
+function onMediaInputImageOpen() {
+  emit('media-input-image-open', props.nodeId)
 }
 
-function onPromptInputImageRemove(image: { id: string }) {
-  emit('prompt-input-image-remove', props.nodeId, image.id)
+function onMediaInputImagePreview(image: { url: string; ratio: number }) {
+  emit('media-input-image-preview', image)
+}
+
+function onMediaInputImageRemove(image: { id: string }) {
+  emit('media-input-image-remove', props.nodeId, image.id)
 }
 
 function onNodeMouseDown(event: MouseEvent) {
@@ -727,6 +749,9 @@ function onNodeMouseDown(event: MouseEvent) {
 
 function onImagePromptGenerate(prompt: string, outputCount: number) {
   emit('image-prompt-generate', prompt, outputCount)
+}
+function onFusionPromptGenerate(prompt: string, outputCount: number) {
+  emit('fusion-prompt-generate', prompt, outputCount)
 }
 function onPromptGenerate() {
   if (!promptSnapshot.value) return
@@ -786,6 +811,11 @@ function noopMouse() {}
   overflow: visible;
 }
 
+.flow-canvas-node__fusion-wrap {
+  position: relative;
+  overflow: visible;
+}
+
 .flow-canvas-node__drag-surface {
   cursor: grab;
 }
@@ -828,7 +858,8 @@ function noopMouse() {}
 
 .flow-canvas-node
   :deep(
-    .workflow-node:not(.prompt-node):not(.image-node) > :not(.workflow-node-header):first-of-type
+    .workflow-node:not(.prompt-node):not(.image-node):not(.fusion-node)
+      > :not(.workflow-node-header):first-of-type
   ) {
   border: 1.5px solid #e2e8f0;
   border-radius: 14px;
@@ -838,7 +869,7 @@ function noopMouse() {}
 
 .flow-canvas-node
   :deep(
-    .workflow-node:not(.prompt-node):not(.image-node).active
+    .workflow-node:not(.prompt-node):not(.image-node):not(.fusion-node).active
       > :not(.workflow-node-header):first-of-type
   ) {
   border-color: #9278e6;

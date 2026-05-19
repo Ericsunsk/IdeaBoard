@@ -137,6 +137,7 @@
             "
             :image-action-visible="activeImageActionNodeId === nodeProps.id"
             :image-prompt-composer-visible="activeImagePromptNodeId === nodeProps.id"
+            :fusion-prompt-composer-visible="activeFusionPromptNodeId === nodeProps.id"
             :image-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
             :show-style-strength-control="
               flowShowStyleStrengthControl && activeImageActionNodeId === nodeProps.id
@@ -158,10 +159,10 @@
             @generate-model="() => onFlowModelGenerate(nodeProps.id)"
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
             @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
-            @prompt-input-image-drop="onFlowPromptInputImageDrop"
-            @prompt-input-image-open="onFlowPromptInputImageOpen"
-            @prompt-input-image-preview="onFlowPromptInputImagePreview"
-            @prompt-input-image-remove="onFlowPromptInputImageRemove"
+            @media-input-image-drop="onFlowMediaInputImageDrop"
+            @media-input-image-open="onFlowMediaInputImageOpen"
+            @media-input-image-preview="onFlowMediaInputImagePreview"
+            @media-input-image-remove="onFlowMediaInputImageRemove"
             @image-open-file="() => onFlowImageOpenFile(nodeProps.id)"
             @image-open-preview="() => onFlowImageOpenPreview(nodeProps.id)"
             @image-append-to-canvas="() => onFlowImageAppendToCanvas(nodeProps.id)"
@@ -176,6 +177,8 @@
             @request-internals-update="() => scheduleFlowNodeInternalsRefresh([nodeProps.id])"
             @image-contextmenu="(event) => onFlowImageContextMenu(nodeProps.id, event)"
             @image-prompt-generate="(prompt, outputCount) => onFlowImagePromptGenerate(nodeProps.id, prompt, outputCount)"
+            @fusion-contextmenu="(event) => onFlowFusionContextMenu(nodeProps.id, event)"
+            @fusion-prompt-generate="(prompt, outputCount) => onFlowFusionPromptGenerate(nodeProps.id, prompt, outputCount)"
             @prompt-generate="(prompt, outputCount, aspectRatio) => onFlowPromptGenerate(nodeProps.id, prompt, outputCount, aspectRatio)"
             @image-action="(action) => onFlowImageDirectAction(nodeProps.id, action)"
             @style-innovate-mousedown="onFlowStyleInnovateMouseDown"
@@ -323,6 +326,7 @@ let pendingNodeInternalsRefresh = false
 let queuedNodeInternalsIds: Set<string> | null = null
 const activeImageActionNodeId = ref<string | null>(null)
 const activeImagePromptNodeId = ref<string | null>(null)
+const activeFusionPromptNodeId = ref<string | null>(null)
 const duplicateModifierPressed = ref(false)
 
 function scheduleFlowNodeInternalsRefresh(nodeIds: string[]) {
@@ -358,6 +362,7 @@ function onPaneContextMenu(event: MouseEvent) {
   closeBoardHeaderEditing()
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = null
   hideFlowStyleStrengthControl()
   clearFlowSelection()
   const flowPoint = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
@@ -372,6 +377,7 @@ function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
   closeNodeContextMenu()
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = null
   hideFlowStyleStrengthControl()
 }
 
@@ -379,6 +385,7 @@ function setActiveTool(tool: 'select' | 'hand' | 'text') {
   closeBoardHeaderEditing()
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = null
   hideFlowStyleStrengthControl()
   activeTool.value = tool
   if (tool === 'text') {
@@ -393,6 +400,7 @@ function onEscapeShortcut() {
   }
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = null
   hideFlowStyleStrengthControl()
   return clearFlowSelection()
 }
@@ -565,6 +573,7 @@ const _onFlowDeleteNode = flowNodeMutations.onFlowDeleteNode
 function onFlowDeleteNode(nodeId: string) {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = null
   hideFlowStyleStrengthControl()
   closeNodeContextMenu()
   _onFlowDeleteNode(nodeId)
@@ -699,10 +708,10 @@ watch(
     const flowNodes = nodes.value as Node[]
     const flowEdges = edges.value as Edge[]
     flowNodes
-      .filter((node) => node.data?.kind === 'prompt')
-      .forEach((promptNode) => {
+      .filter((node) => node.data?.kind === 'prompt' || node.data?.kind === 'fusion')
+      .forEach((mediaInputNode) => {
         const linkedImages = flowEdges
-          .filter((edge) => edge.target === promptNode.id && edge.targetHandle === 'in:image')
+          .filter((edge) => edge.target === mediaInputNode.id && edge.targetHandle === 'in:image')
           .map((edge) => resolveNodePreviewImageById(edge.source))
           .filter(
             (item): item is { id: string; sourceType: 'node'; sourceId: string; sourceNodeId: string; url: string; ratio: number } =>
@@ -710,7 +719,7 @@ watch(
           )
         const linkedBySourceId = new Map(linkedImages.map((item) => [item.sourceId, item]))
         updateSnapshotNodeBase(
-          promptNode.id,
+          mediaInputNode.id,
           (snapshotNode) => {
             const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
             const nextImages = current
@@ -755,6 +764,7 @@ watch(
 function onCanvasDragOver(event: DragEvent) {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = null
   hideFlowStyleStrengthControl()
   canvasDrop.onCanvasDragOver(event)
 }
@@ -763,17 +773,23 @@ async function onCanvasDrop(event: DragEvent) {
   await canvasDrop.onCanvasDrop(event)
 }
 
-async function onFlowPromptInputImageDrop(promptNodeId: string, event: DragEvent) {
-  const currentInputCount = getPromptInputImages(promptNodeId).length
+function resolveMediaInputNodeLabel(nodeId: string) {
+  const kind = (nodes.value as Node[]).find((node) => node.id === nodeId)?.data?.kind
+  return kind === 'prompt' ? 'Prompt' : '节点'
+}
+
+async function onFlowMediaInputImageDrop(nodeId: string, event: DragEvent) {
+  const currentInputCount = getMediaInputImages(nodeId).length
+  const label = resolveMediaInputNodeLabel(nodeId)
   if (currentInputCount >= 4) {
-    appToast.warning('Prompt 最多接入 4 张图片')
+    appToast.warning(`${label} 最多接入 4 张图片`)
     return
   }
   const file = event.dataTransfer?.files?.[0]
   if (!file) return
   try {
     const uploaded = await canvasDrop.uploadImageToBoard(file)
-    updateSnapshotNodeBase(promptNodeId, (snapshotNode) => {
+    updateSnapshotNodeBase(nodeId, (snapshotNode) => {
       const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
       return {
         ...snapshotNode,
@@ -789,17 +805,20 @@ async function onFlowPromptInputImageDrop(promptNodeId: string, event: DragEvent
         ].slice(0, 4),
       }
     })
-    markFlowExecutionNodeDirty(promptNodeId, { includeSelf: true })
+    markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
   } catch (error) {
     const msg = error instanceof Error ? error.message : '上传失败'
     appToast.warning(msg)
   }
 }
 
-function onFlowPromptInputImageOpen(promptNodeId: string) {
-  const currentInputCount = getPromptInputImages(promptNodeId).length
+function onFlowMediaInputImageOpen(nodeId: string) {
+  const kind = (nodes.value as Node[]).find((node) => node.id === nodeId)?.data?.kind
+  if (kind !== 'prompt') return
+  const currentInputCount = getMediaInputImages(nodeId).length
+  const label = resolveMediaInputNodeLabel(nodeId)
   if (currentInputCount >= 4) {
-    appToast.warning('Prompt 最多接入 4 张图片')
+    appToast.warning(`${label} 最多接入 4 张图片`)
     return
   }
   const input = document.createElement('input')
@@ -813,22 +832,22 @@ function onFlowPromptInputImageOpen(promptNodeId: string) {
       clientX: window.innerWidth / 2,
       clientY: window.innerHeight / 2,
     } as unknown as DragEvent
-    void onFlowPromptInputImageDrop(promptNodeId, syntheticDrop)
+    void onFlowMediaInputImageDrop(nodeId, syntheticDrop)
   }
   input.click()
 }
 
-function onFlowPromptInputImagePreview(image: { url: string; ratio: number }) {
+function onFlowMediaInputImagePreview(image: { url: string; ratio: number }) {
   void openImageUrlPreview(image.url, image.ratio)
 }
 
-function onFlowPromptInputImageRemove(promptNodeId: string, imageId: string) {
-  const currentInputImages = getPromptInputImages(promptNodeId)
+function onFlowMediaInputImageRemove(nodeId: string, imageId: string) {
+  const currentInputImages = getMediaInputImages(nodeId)
   const removed = currentInputImages.find((item) => item.id === imageId)
   if (!removed) return
   flowTransactions.commitGraphMutation((currentNodes, currentEdges) => {
     const nextNodes = currentNodes.map((node) => {
-      if (node.id !== promptNodeId || node.data?.kind !== 'prompt') return node
+      if (node.id !== nodeId || (node.data?.kind !== 'prompt' && node.data?.kind !== 'fusion')) return node
       const snapshotNode = node.data.snapshotNode
       if (!snapshotNode || typeof snapshotNode !== 'object') return node
       return {
@@ -848,14 +867,14 @@ function onFlowPromptInputImageRemove(promptNodeId: string, imageId: string) {
             (edge) =>
               !(
                 edge.source === removed.sourceId &&
-                edge.target === promptNodeId &&
+                edge.target === nodeId &&
                 isImageInputHandle(edge.targetHandle)
               ),
           )
         : currentEdges
     return { nodes: nextNodes, edges: nextEdges }
   })
-  markFlowExecutionNodeDirty(promptNodeId, { includeSelf: true })
+  markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
 }
 
 function onFlowImageOpenPreview(nodeId: string) {
@@ -869,6 +888,16 @@ function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
   selectFlowNodeForContextMenu(nodeId)
   activeImageActionNodeId.value = nodeId
   activeImagePromptNodeId.value = nodeId
+  activeFusionPromptNodeId.value = null
+  hideFlowStyleStrengthControl()
+}
+
+function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
+  event.preventDefault()
+  selectFlowNodeForContextMenu(nodeId)
+  activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = nodeId
   hideFlowStyleStrengthControl()
 }
 
@@ -951,6 +980,7 @@ const {
     if (!targetNodeId) return
     activeImageActionNodeId.value = null
     activeImagePromptNodeId.value = null
+    activeFusionPromptNodeId.value = null
     void runImageDirectAction(targetNodeId, 'style-innovate', { strength })
   },
 })
@@ -964,6 +994,7 @@ function onFlowImageDirectAction(
   }
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = null
   hideFlowStyleStrengthControl()
   void runImageDirectAction(
     nodeId,
@@ -975,15 +1006,26 @@ function onFlowImageDirectAction(
 function onFlowImagePromptGenerate(nodeId: string, prompt: string, outputCount: number) {
   activeImagePromptNodeId.value = null
   activeImageActionNodeId.value = null
+  activeFusionPromptNodeId.value = null
   hideFlowStyleStrengthControl()
   void runImagePromptGeneration(nodeId, prompt, outputCount)
+}
+
+function onFlowFusionPromptGenerate(nodeId: string, prompt: string, outputCount: number) {
+  activeImageActionNodeId.value = null
+  activeImagePromptNodeId.value = null
+  activeFusionPromptNodeId.value = null
+  hideFlowStyleStrengthControl()
+  onFlowNodeParamUpdate(nodeId, { key: 'prompt', value: prompt })
+  onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: outputCount })
+  void onFlowFusionGenerate(nodeId)
 }
 
 function isImageInputHandle(handle: string | null | undefined) {
   return String(handle ?? '') === 'in:image'
 }
 
-function getPromptInputImages(promptNodeId: string): Array<{
+function getMediaInputImages(nodeId: string): Array<{
   id: string
   sourceType: 'node' | 'external'
   sourceId: string
@@ -991,8 +1033,8 @@ function getPromptInputImages(promptNodeId: string): Array<{
   url: string
   ratio: number
 }> {
-  const promptNode = (nodes.value as Node[]).find((node) => node.id === promptNodeId)
-  const snapshot = promptNode?.data?.snapshotNode as
+  const mediaInputNode = (nodes.value as Node[]).find((node) => node.id === nodeId)
+  const snapshot = mediaInputNode?.data?.snapshotNode as
     | { inputImages?: Array<{ id?: unknown; sourceType?: unknown; sourceId?: unknown; sourceNodeId?: unknown; url?: unknown; ratio?: unknown }> }
     | undefined
   if (!Array.isArray(snapshot?.inputImages)) return []
@@ -1018,7 +1060,7 @@ function getPromptInputImages(promptNodeId: string): Array<{
 }
 
 function resolvePromptInputImageNodeIds(promptNodeId: string): string[] {
-  const ordered = getPromptInputImages(promptNodeId)
+  const ordered = getMediaInputImages(promptNodeId)
     .filter((item) => item.sourceType === 'node')
     .map((item) => item.sourceId)
   const linked = new Set(
@@ -1038,7 +1080,7 @@ function onFlowPromptGenerate(
   aspectRatio: string,
 ) {
   const normalizedAspectRatio = normalizePromptAspectRatio(aspectRatio)
-  const inputImages = getPromptInputImages(promptNodeId)
+  const inputImages = getMediaInputImages(promptNodeId)
   if (inputImages.length === 0) {
     void runTextPromptGeneration(promptNodeId, prompt, outputCount, normalizedAspectRatio)
     return
@@ -1079,6 +1121,7 @@ const {
   activeTool: activeTool as Ref<string>,
   activeImageActionNodeId,
   activeImagePromptNodeId,
+  activeFusionPromptNodeId,
   hideFlowStyleStrengthControl,
   closeBoardHeaderEditing,
   closeNodeContextMenu,
@@ -1115,6 +1158,7 @@ const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
   finishFlowNodeDragDuplicateTracking,
   activeImageActionNodeId,
   activeImagePromptNodeId,
+  activeFusionPromptNodeId,
   hideFlowStyleStrengthControl,
 })
 

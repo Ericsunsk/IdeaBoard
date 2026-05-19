@@ -17,6 +17,14 @@ export interface FlowConnectedInput {
   sourceType: CanvasConnectionNodeType
   snapshotNode: Record<string, unknown>
 }
+export interface ResolvedFlowInputImage {
+  id: string
+  sourceType: 'node' | 'external'
+  sourceId: string
+  sourceNodeId?: string
+  url: string
+  ratio: number
+}
 
 type FlowConnectedInputPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
 type FlowGraphNode = FlowTaskExecutorGraphOptions['nodes'][number]
@@ -215,4 +223,86 @@ export function resolveFlowSourceImageRatio(
   const outputRatio = Number(latestOutput?.ratio)
   if (Number.isFinite(outputRatio) && outputRatio > 0) return outputRatio
   return 1
+}
+
+export function resolveConnectedImageInputs(
+  options: FlowTaskExecutorGraphOptions,
+  targetNodeId: string,
+  snapshotInputImages: unknown,
+  maxImages = 4,
+): ResolvedFlowInputImage[] {
+  const normalizedSnapshot: ResolvedFlowInputImage[] = []
+  if (Array.isArray(snapshotInputImages)) {
+    snapshotInputImages.forEach((item) => {
+      const record = item as {
+        id?: unknown
+        sourceType?: unknown
+        sourceId?: unknown
+        sourceNodeId?: unknown
+        url?: unknown
+        ratio?: unknown
+      }
+      const id = typeof record.id === 'string' ? record.id : ''
+      const sourceType =
+        record.sourceType === 'node' || record.sourceType === 'external' ? record.sourceType : null
+      const sourceId = typeof record.sourceId === 'string' ? record.sourceId : ''
+      const sourceNodeId = typeof record.sourceNodeId === 'string' ? record.sourceNodeId : undefined
+      const url = typeof record.url === 'string' ? record.url.trim() : ''
+      const ratio = Number(record.ratio)
+      if (!id || !sourceType || !sourceId || !url || !Number.isFinite(ratio) || ratio <= 0) return
+      if (sourceNodeId) {
+        normalizedSnapshot.push({ id, sourceType, sourceId, sourceNodeId, url, ratio })
+        return
+      }
+      normalizedSnapshot.push({ id, sourceType, sourceId, url, ratio })
+    })
+  }
+
+  const edgeConnectedNodeInputs: ResolvedFlowInputImage[] = []
+  options.edges.forEach((edge) => {
+    if (edge.target !== targetNodeId || parseHandlePort(edge.targetHandle) !== 'image') return
+    const sourceNode = options.nodes.find((node) => node.id === edge.source)
+    const sourceKind = sourceNode?.data?.kind
+    if (
+      !sourceNode ||
+      !sourceNode.data?.snapshotNode ||
+      typeof sourceNode.data.snapshotNode !== 'object' ||
+      !sourceKind ||
+      !isFlowExecutionSourceKind(sourceKind)
+    ) {
+      return
+    }
+    const snapshotNode = sourceNode.data.snapshotNode as Record<string, unknown>
+    const url = resolveSourceImageFromNode(sourceKind, snapshotNode).trim()
+    if (!url) return
+    edgeConnectedNodeInputs.push({
+      id: `node:${sourceNode.id}`,
+      sourceType: 'node',
+      sourceId: sourceNode.id,
+      sourceNodeId: sourceNode.id,
+      url,
+      ratio: resolveFlowSourceImageRatio(sourceKind, snapshotNode),
+    })
+  })
+
+  const edgeBySourceId = new Map(edgeConnectedNodeInputs.map((item) => [item.sourceId, item]))
+  const orderedInputsFromSnapshot: ResolvedFlowInputImage[] = []
+  normalizedSnapshot.forEach((item) => {
+    if (item.sourceType === 'external') {
+      orderedInputsFromSnapshot.push(item)
+      return
+    }
+    const connected = edgeBySourceId.get(item.sourceId)
+    if (connected) orderedInputsFromSnapshot.push(connected)
+  })
+  const usedNodeSourceIds = new Set(
+    orderedInputsFromSnapshot
+      .filter((item) => item.sourceType === 'node')
+      .map((item) => item.sourceId),
+  )
+  const remainingNodeInputs = edgeConnectedNodeInputs.filter(
+    (item) => !usedNodeSourceIds.has(item.sourceId),
+  )
+
+  return [...orderedInputsFromSnapshot, ...remainingNodeInputs].slice(0, maxImages)
 }

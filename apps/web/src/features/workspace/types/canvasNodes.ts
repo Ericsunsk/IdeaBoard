@@ -47,6 +47,7 @@ export const MAX_IMAGE_NODE_OUTPUT_COUNT = 8
 export const DEFAULT_IMAGE_NODE_OUTPUT_COUNT = 1
 export const IMAGE_OUTPUT_COUNT_PRESET_OPTIONS = [1, 2, 4, 8] as const
 export const DEFAULT_PROMPT_NODE_OUTPUT_COUNT = 1
+export const DEFAULT_FUSION_NODE_OUTPUT_COUNT = 1
 export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
 
 export function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {
@@ -97,6 +98,7 @@ export interface PromptNodeInputImage extends ImageNodeOutputItem {
   sourceId: string
   sourceNodeId?: string
 }
+export type FusionNodeInputImage = PromptNodeInputImage
 
 export type ModelAngleFraming = 'full' | 'half' | 'portrait'
 
@@ -258,7 +260,9 @@ export interface FusionNodeItem {
   y: number
   width: number
   title?: string
-  blendRatio: number
+  prompt: string
+  outputCount: number
+  inputImages: FusionNodeInputImage[]
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }

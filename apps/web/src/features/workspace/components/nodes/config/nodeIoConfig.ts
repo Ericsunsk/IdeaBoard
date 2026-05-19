@@ -208,14 +208,8 @@ export const EDIT_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<EditNodeIoContext>[
 
 export const FUSION_NODE_IO_SLOTS: readonly NodeIoSlotTemplate<null>[] = [
   {
-    key: 'imageA',
-    label: 'Image A',
-    kind: 'image',
-    required: true,
-  },
-  {
-    key: 'imageB',
-    label: 'Image B',
+    key: 'image',
+    label: 'Image',
     kind: 'image',
     required: true,
   },

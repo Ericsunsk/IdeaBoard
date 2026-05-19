@@ -288,7 +288,8 @@ export function flowToCanvasBoardSnapshot(
         ? restoredId
         : nextConnectionId()
     usedConnectionIds.add(connectionId)
-    const allowsMultipleInputs = toRef.nodeType === 'prompt' && toPort === 'image'
+    const allowsMultipleInputs =
+      (toRef.nodeType === 'prompt' || toRef.nodeType === 'fusion') && toPort === 'image'
     if (!allowsMultipleInputs) {
       // Remove any existing connection targeting the same input port (last-write wins).
       const dupIndex = snapshot.connections.findIndex(
