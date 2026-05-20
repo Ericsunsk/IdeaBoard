@@ -21,6 +21,11 @@ import {
   clampWearScale,
   normalizeWearTileMode,
 } from '../types/canvasNodes'
+import {
+  areFusionBlendPointsEqual,
+  constrainFusionBlendPoint,
+  normalizeFusionBlendPoint,
+} from './fusionBlend'
 
 function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
   if (!value || typeof value !== 'object') return false
@@ -101,8 +106,36 @@ export function patchFlowSnapshotParam(
     }
     case 'inputImages': {
       const nextInputImages = normalizePromptInputImages(value)
-      if (arePromptInputImagesEqual(snapshotNode.inputImages, nextInputImages)) return snapshotNode
-      return { ...snapshotNode, inputImages: nextInputImages }
+      const inputUnchanged = arePromptInputImagesEqual(snapshotNode.inputImages, nextInputImages)
+      if (snapshotNode.type !== 'fusion') {
+        if (inputUnchanged) return snapshotNode
+        return { ...snapshotNode, inputImages: nextInputImages }
+      }
+
+      const nextBlendPoint = constrainFusionBlendPoint(
+        snapshotNode.blendPoint,
+        nextInputImages.length,
+        snapshotNode.width,
+      )
+      const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
+      const blendUnchanged = areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)
+      if (inputUnchanged && blendUnchanged) return snapshotNode
+      return {
+        ...snapshotNode,
+        inputImages: nextInputImages,
+        ...(blendUnchanged ? {} : { blendPoint: nextBlendPoint }),
+      }
+    }
+    case 'blendPoint': {
+      if (snapshotNode.type !== 'fusion') return snapshotNode
+      const nextBlendPoint = constrainFusionBlendPoint(
+        value,
+        Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages.length : 0,
+        snapshotNode.width,
+      )
+      const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
+      if (areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)) return snapshotNode
+      return { ...snapshotNode, blendPoint: nextBlendPoint }
     }
     case 'upscaleMode':
       if (snapshotNode.upscaleMode === value) return snapshotNode

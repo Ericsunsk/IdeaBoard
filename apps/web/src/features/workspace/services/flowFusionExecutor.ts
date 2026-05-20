@@ -1,6 +1,7 @@
 import { buildExecutionTaskRequest, EXECUTION_FUSION_META } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import { clampImageNodeOutputCount, type FusionNodeItem } from '../types/canvasNodes'
+import { computeFusionBlendWeights } from '../utils/fusionBlend'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { taskApi } from '../../../shared/api/task'
 import {
@@ -59,19 +60,28 @@ export async function executeFlowFusionNode(
     .map((item) => item.url.trim())
     .filter(Boolean)
     .slice(0, 4)
+  const imageWeights = computeFusionBlendWeights(imageUrls.length, node.blendPoint, node.width).slice(
+    0,
+    imageUrls.length,
+  )
   const imageSize = await options.loadImageSizeFromUrl(imageUrls[0])
 
   const selfPrompt =
     typeof node.prompt === 'string' ? node.prompt.trim() : `${node.prompt ?? ''}`.trim()
   const promptInput = resolveConnectedInput(options, context.nodeId, 'prompt')
   const promptText = selfPrompt || (promptInput ? resolveConnectedPromptText(options, context.nodeId) : '')
-  const finalPrompt = promptText || EXECUTION_FUSION_META.fallbackPrompt
+  const taskPrompt = promptText
+    ? `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`
+    : EXECUTION_FUSION_META.promptPrefix
 
   const request = buildExecutionTaskRequest({
-    prompt: `${EXECUTION_FUSION_META.promptPrefix} ${finalPrompt}`,
+    prompt: taskPrompt,
     feature: EXECUTION_FUSION_META.feature,
     imageUrls,
-    params: buildExecutionSizeParams(imageSize),
+    params: {
+      ...buildExecutionSizeParams(imageSize),
+      image_weights: imageWeights,
+    },
   })
 
   try {

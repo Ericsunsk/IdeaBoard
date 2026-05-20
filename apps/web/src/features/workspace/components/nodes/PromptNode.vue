@@ -27,7 +27,10 @@
     </NodeHeader>
     <div class="prompt-node-shell" data-flow-handle-frame>
       <div class="prompt-node-content">
-        <div ref="thumbsRef" class="prompt-node-thumbs node-tool-surface">
+        <div
+          ref="thumbsRef"
+          class="prompt-node-thumbs node-tool-surface"
+        >
           <div
             v-for="item in sortableInputImages"
             :key="item.id"
@@ -175,8 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { useSortable } from '@vueuse/integrations/useSortable'
+import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
@@ -184,6 +186,7 @@ import NodeToolPopover from './NodeToolPopover.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 import { useAutoResizeTextarea } from './composables/useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
+import { useSortableMediaInputs } from './composables/useSortableMediaInputs'
 import {
   PROMPT_ASPECT_RATIO_OPTIONS,
   normalizePromptAspectRatio,
@@ -223,9 +226,7 @@ function onInput(event: Event) {
 const thumbsRef = ref<HTMLElement | null>(null)
 const textInputRef = ref<HTMLTextAreaElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
-const sortableInputImages = ref<PromptNodeItem['inputImages']>([])
 const addSlotDragOver = ref(false)
-const thumbReordering = ref(false)
 const maxInputImages = 4
 const outputCount = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
@@ -241,68 +242,14 @@ const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
 useAutoResizeTextarea(textInputRef, {
   watchSource: [() => props.node.text, () => props.node.width],
 })
-function finishThumbReorder() {
-  void nextTick(() => {
-    thumbReordering.value = false
-  })
-}
-watch(
-  visibleInputImages,
-  (items) => {
-    if (thumbReordering.value) return
-    const same =
-      sortableInputImages.value.length === items.length &&
-      sortableInputImages.value.every((item, index) => item.id === items[index]?.id)
-    if (same) return
-    sortableInputImages.value = [...items]
-  },
-  { immediate: true },
-)
-useSortable(() => thumbsRef.value, sortableInputImages, {
-  animation: 150,
-  draggable: '.prompt-node-thumb-item',
-  filter: '.prompt-node-thumb-add, .prompt-node-thumb-remove',
-  ghostClass: 'is-sortable-ghost',
-  chosenClass: 'is-sortable-chosen',
-  dragClass: 'is-sortable-drag',
+const { sortableItems: sortableInputImages } = useSortableMediaInputs({
+  containerRef: thumbsRef,
+  sourceItems: visibleInputImages,
+  draggableSelector: '.prompt-node-thumb-item',
+  filterSelector: '.prompt-node-thumb-add, .prompt-node-thumb-remove',
   fallbackClass: 'prompt-node-sortable-fallback',
-  forceFallback: true,
-  fallbackOnBody: true,
-  fallbackTolerance: 4,
-  preventOnFilter: false,
-  onStart() {
-    thumbReordering.value = true
-  },
-  onEnd() {
-    const imageIds = Array.from(
-      thumbsRef.value?.querySelectorAll<HTMLElement>('.prompt-node-thumb-item') ?? [],
-    )
-      .map((item) => item.dataset.imageId ?? '')
-      .filter(Boolean)
-    if (imageIds.length !== visibleInputImages.value.length) {
-      finishThumbReorder()
-      return
-    }
-    const byId = new Map(visibleInputImages.value.map((item) => [item.id, item]))
-    const next = imageIds
-      .map((imageId) => byId.get(imageId))
-      .filter((item): item is PromptNodeItem['inputImages'][number] => !!item)
-    if (next.length !== visibleInputImages.value.length) {
-      finishThumbReorder()
-      return
-    }
-    const same = next.every(
-      (item, index) => item.id === visibleInputImages.value[index]?.id,
-    )
-    if (same) {
-      finishThumbReorder()
-      return
-    }
-    sortableInputImages.value = next
-    emit('update:input-images', next)
-    finishThumbReorder()
-  },
-} as Parameters<typeof useSortable<PromptNodeItem['inputImages'][number]>>[2])
+  onUpdate: (next) => emit('update:input-images', next),
+})
 function toggleOutputCountPicker() {
   toolPopovers.toggle('output-count')
 }
@@ -395,9 +342,11 @@ function onAddSlotDrop(event: DragEvent) {
 .prompt-node-thumbs {
   --node-tool-button-size: 46px;
   --node-tool-button-radius: 8px;
+  --prompt-thumb-gap: 6px;
   position: relative;
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(46px, 1fr));
+  gap: var(--prompt-thumb-gap);
   overflow: visible;
   z-index: 3;
 }
@@ -412,6 +361,11 @@ function onAddSlotDrop(event: DragEvent) {
     border-color 0.16s ease,
     color 0.16s ease,
     opacity 0.16s ease;
+}
+.prompt-node-thumbs .prompt-node-thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
 }
 .prompt-node-thumb:hover,
 .prompt-node-thumb:focus-visible,

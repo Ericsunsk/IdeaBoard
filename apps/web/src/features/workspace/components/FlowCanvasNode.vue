@@ -147,14 +147,13 @@
           @update:title="emitNodeParam('title', $event)"
           @update:output-count="emitNodeParam('outputCount', $event)"
           @update:prompt="emitNodeParam('prompt', $event)"
+          @update:blend-point="emitNodeParam('blendPoint', $event)"
           @delete="onDeleteRequest"
           @update:input-images="emitNodeParam('inputImages', $event)"
           @input-image-drop="onMediaInputImageDrop"
-          @input-image-preview="onMediaInputImagePreview"
           @input-image-remove="onMediaInputImageRemove"
           @contextmenu="onFusionContextMenu"
           @prompt-generate="onFusionPromptGenerate"
-          @generate="onFusionGenerate"
         />
       </div>
     </template>
@@ -329,7 +328,6 @@ const emit = defineEmits<{
   (e: 'generate-edit'): void
   (e: 'generate-enhance'): void
   (e: 'generate-color'): void
-  (e: 'generate-fusion'): void
   (e: 'generate-wear'): void
   (e: 'generate-model'): void
   (e: 'generate-viewpoint'): void
@@ -658,10 +656,6 @@ function onEditGenerate() {
 
 function onColorGenerate() {
   emit('generate-color')
-}
-
-function onFusionGenerate() {
-  emit('generate-fusion')
 }
 
 function onWearGenerate() {

@@ -32,7 +32,7 @@
 import { IMAGE_OUTPUT_COUNT_PRESET_OPTIONS } from '../../types/canvasNodes'
 import NodeToolPopover from './NodeToolPopover.vue'
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     modelValue: number
     visible: boolean

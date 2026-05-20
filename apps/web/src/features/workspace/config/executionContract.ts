@@ -24,12 +24,10 @@ export const EXECUTION_EDIT_MODE_META = {
   'partial-edit': {
     feature: EXECUTION_FEATURE.partialEdit,
     promptPrefix: '[partial-edit]',
-    fallbackPrompt: '局部改款',
   },
   'bg-swap': {
     feature: EXECUTION_FEATURE.bgSwap,
     promptPrefix: '[bg-swap]',
-    fallbackPrompt: '换背景',
   },
 } as const
 
@@ -42,7 +40,6 @@ export const EXECUTION_WEAR_META = {
 export const EXECUTION_FUSION_META = {
   feature: EXECUTION_FEATURE.styleFusion,
   promptPrefix: '[style-fusion]',
-  fallbackPrompt: '双图融合',
   successLabel: 'Fusion',
 } as const
 
@@ -97,8 +94,6 @@ export const EXECUTION_ENHANCE_META = {
   canvasExtend: {
     feature: EXECUTION_FEATURE.canvasExtend,
     promptPrefix: '[canvas-extend]',
-    fallbackPrompt:
-      '保持原图主体、人物、服装、构图、光影与透视不变，仅按扩边方向在新增画布区域自然补全连续背景与缺失内容',
   },
 } as const
 

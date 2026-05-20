@@ -1,0 +1,216 @@
+<template>
+  <form
+    class="image-node-prompt-composer node-tool-surface"
+    :class="{ 'count-stacked': shouldStackOutputCount, 'has-text': draft.trim() }"
+    :style="{ '--node-prompt-composer-offset': offset }"
+    @submit.prevent="submitPrompt"
+    @mousedown.stop
+    @click.stop
+    @contextmenu.stop.prevent
+  >
+    <textarea
+      ref="promptInputRef"
+      v-model="draft"
+      class="image-node-prompt-input"
+      rows="1"
+      :placeholder="placeholder"
+      :disabled="disabled"
+      @keydown.enter.exact="onPromptEnter"
+    />
+    <div ref="actionsRef" class="image-node-prompt-actions">
+      <NodeOutputCountPicker
+        :model-value="outputCount"
+        :visible="outputCountPickerVisible"
+        :disabled="disabled"
+        title="选择张数"
+        aria-label="输出张数"
+        @toggle="toggleOutputCountPicker"
+        @select="selectOutputCount"
+      />
+      <button
+        class="image-node-prompt-send node-tool-send node-tool-button"
+        type="submit"
+        :disabled="submitButtonDisabled"
+        title="发送"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.1"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M5 12h13" />
+          <path d="m13 6 6 6-6 6" />
+        </svg>
+      </button>
+    </div>
+  </form>
+</template>
+
+<script setup lang="ts">
+import { computed, nextTick, onMounted, ref } from 'vue'
+import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
+import { useAutoResizeTextarea } from './composables/useAutoResizeTextarea'
+import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
+
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    outputCount: number
+    placeholder: string
+    disabled?: boolean
+    allowEmpty?: boolean
+    submitDisabled?: boolean
+    offset?: string
+  }>(),
+  {
+    allowEmpty: false,
+    disabled: false,
+    offset: '8px',
+    submitDisabled: false,
+  },
+)
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: string): void
+  (e: 'update:output-count', value: number): void
+  (e: 'submit', prompt: string, outputCount: number): void
+}>()
+
+const promptInputRef = ref<HTMLTextAreaElement | null>(null)
+const actionsRef = ref<HTMLElement | null>(null)
+const shouldStackOutputCount = ref(false)
+const toolPopovers = useNodeToolPopoverGroup({
+  keys: ['output-count'] as const,
+  rootRefs: [actionsRef],
+})
+const outputCountPickerVisible = toolPopovers.isOpen('output-count')
+const draft = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value),
+})
+const submitButtonDisabled = computed(
+  () => props.disabled || props.submitDisabled || (!props.allowEmpty && !draft.value.trim()),
+)
+const promptTextarea = useAutoResizeTextarea(promptInputRef, {
+  watchSource: () => props.modelValue,
+  onResize: ({ naturalHeight, singleLineHeight }) => {
+    shouldStackOutputCount.value = naturalHeight > singleLineHeight + 2
+  },
+})
+
+onMounted(async () => {
+  await nextTick()
+  promptTextarea.resize()
+  promptInputRef.value?.focus()
+})
+
+function submitPrompt() {
+  if (submitButtonDisabled.value) return
+  emit('submit', draft.value.trim(), props.outputCount)
+  toolPopovers.close('output-count')
+}
+
+function onPromptEnter(event: KeyboardEvent) {
+  if (event.isComposing) return
+  event.preventDefault()
+  submitPrompt()
+}
+
+function toggleOutputCountPicker() {
+  if (props.disabled) return
+  toolPopovers.toggle('output-count')
+}
+
+function selectOutputCount(value: number) {
+  emit('update:output-count', value)
+  toolPopovers.close('output-count')
+}
+</script>
+
+<style scoped src="./styles/node-tool-buttons.css"></style>
+<style scoped>
+.image-node-prompt-composer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + var(--node-prompt-composer-offset));
+  z-index: 42;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--node-tool-button-gap);
+  padding: 5px 5px 5px 13px;
+  border: 1px solid rgba(122, 107, 213, 0.28);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  animation: image-node-prompt-rise 0.16s ease-out;
+}
+
+.image-node-prompt-composer.node-tool-surface {
+  --node-tool-button-border: #e2e8f0;
+}
+
+.image-node-prompt-composer.has-text {
+  border-color: #9278e6;
+}
+
+.image-node-prompt-composer.count-stacked {
+  min-height: 73px;
+}
+
+.image-node-prompt-input {
+  align-self: end;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #272932;
+  cursor: text;
+  font-size: 12px;
+  line-height: 18px;
+  resize: none;
+  overflow: hidden;
+  padding: 6px 0;
+}
+
+.image-node-prompt-composer.count-stacked .image-node-prompt-input {
+  min-height: 73px;
+}
+
+.image-node-prompt-input::placeholder {
+  color: #9aa4b2;
+}
+
+.image-node-prompt-input:disabled {
+  cursor: wait;
+}
+
+.image-node-prompt-actions {
+  align-self: end;
+  display: flex;
+  align-items: center;
+  gap: var(--node-tool-button-gap);
+}
+
+.image-node-prompt-composer.count-stacked .image-node-prompt-actions {
+  flex-direction: column;
+  gap: var(--node-tool-button-gap);
+}
+
+@keyframes image-node-prompt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

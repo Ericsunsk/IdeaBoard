@@ -92,7 +92,6 @@
       class="workspace-flow-canvas-wrap"
       @dragover.prevent="onCanvasDragOver"
       @drop.prevent="onCanvasDrop"
-      @wheel.capture="onCanvasWheelCapture"
     >
       <VueFlow
         v-model:nodes="nodes"
@@ -154,7 +153,6 @@
             @generate-edit="() => onFlowEditGenerate(nodeProps.id)"
             @generate-enhance="() => onFlowEnhanceGenerate(nodeProps.id)"
             @generate-color="() => onFlowColorGenerate(nodeProps.id)"
-            @generate-fusion="() => onFlowFusionGenerate(nodeProps.id)"
             @generate-wear="() => onFlowWearGenerate(nodeProps.id)"
             @generate-model="() => onFlowModelGenerate(nodeProps.id)"
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
@@ -280,18 +278,6 @@ function onZoomIn() {
 }
 function onZoomOut() {
   zoomOut()
-}
-
-function onCanvasWheelCapture(event: WheelEvent) {
-  const target = event.target
-  if (!(target instanceof Element)) return
-  if (target.closest('[data-node-kind="prompt"]')) return
-  const interactiveTarget = target.closest(
-    'button, input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="button"]',
-  )
-  if (!interactiveTarget) return
-  event.preventDefault()
-  event.stopPropagation()
 }
 
 const nodes = ref<Node[]>([])
@@ -1232,6 +1218,12 @@ onMounted(async () => {
 
 <style scoped>
 .canvas-layout {
+  --flow-edge-color: #b1b1b7;
+  --flow-edge-active-color: #9278e6;
+  --flow-edge-selected-color: #7b8798;
+  --flow-edge-width: 2;
+  --flow-edge-dasharray: 5;
+  --flow-edge-running-duration: 0.5s;
   width: 100%;
   height: 100vh;
   background: #ffffff;
@@ -1240,7 +1232,8 @@ onMounted(async () => {
 }
 
 .canvas-layout.interaction-lite :deep(.workflow-node),
-.canvas-layout.interaction-lite :deep(.vue-flow__edge-path) {
+.canvas-layout.interaction-lite :deep(.vue-flow__edge-path),
+.canvas-layout.interaction-lite :deep(.fusion-node-connection-layer) {
   transition: none !important;
 }
 
@@ -1313,13 +1306,31 @@ onMounted(async () => {
 
 .workspace-flow-canvas-wrap :deep(.vue-flow__edge-path),
 .workspace-flow-canvas-wrap :deep(.vue-flow__connection-path) {
-  stroke-width: 2;
+  stroke: var(--flow-edge-color);
+  stroke-width: var(--flow-edge-width);
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge.animated path) {
+  stroke-dasharray: var(--flow-edge-dasharray);
+  animation: flow-edge-dashdraw var(--flow-edge-running-duration) linear infinite;
+}
+
+.workspace-flow-canvas-wrap :deep(.vue-flow__edge.animated path.vue-flow__edge-interaction) {
+  stroke-dasharray: none;
+  animation: none;
 }
 
 .workspace-flow-canvas-wrap :deep(.vue-flow__edge.selected .vue-flow__edge-path),
 .workspace-flow-canvas-wrap :deep(.vue-flow__edge:focus .vue-flow__edge-path),
 .workspace-flow-canvas-wrap :deep(.vue-flow__edge:focus-visible .vue-flow__edge-path) {
-  stroke: #7b8798;
+  stroke: var(--flow-edge-selected-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-flow-canvas-wrap :deep(.vue-flow__edge.animated path),
+  .workspace-flow-canvas-wrap :deep(.fusion-node-connection-layer path) {
+    animation: none;
+  }
 }
 
 .workspace-flow-canvas-wrap :deep(.vue-flow__node) {
@@ -1409,5 +1420,13 @@ onMounted(async () => {
   color: #202124;
   min-width: 33px;
   text-align: center;
+}
+</style>
+
+<style>
+@keyframes flow-edge-dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
 }
 </style>

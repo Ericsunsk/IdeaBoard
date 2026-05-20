@@ -5,7 +5,6 @@ import {
   listUserTasks,
   submitUserTask,
 } from './generated-query/tasks/tasks'
-import type { SubmitTaskRequest } from './generated-query/model'
 
 export type {
   ApiResponseTaskSubmitReadinessData as SubmitTaskReadinessData,

@@ -107,6 +107,7 @@ function makeFusionFlowNode(params: { flowId: string; id: number; prompt?: strin
         width: 280,
         prompt: params.prompt ?? '',
         outputCount: 1,
+        blendPoint: { x: 0.5, y: 0.5 },
         inputImages: [],
         outputStatus: 'idle',
         outputImages: [],
@@ -349,11 +350,46 @@ function testFusionImageInputPreservesMultipleConnections() {
   expect(fusionImageInputs.length === 2, 'expected fusion image input to preserve multiple edges')
 }
 
+function testFusionBlendPointRoundTripPreserved() {
+  const flow = canvasBoardSnapshotToFlow({
+    imageNodes: [],
+    promptNodes: [],
+    modelNodes: [],
+    viewpointNodes: [],
+    maskNodes: [],
+    colorNodes: [],
+    editNodes: [],
+    fusionNodes: [
+      {
+        id: 31,
+        type: 'fusion',
+        x: 200,
+        y: 120,
+        width: 280,
+        prompt: '',
+        outputCount: 1,
+        blendPoint: { x: 0.62, y: 0.41 },
+        inputImages: [],
+        outputStatus: 'idle',
+        outputImages: [],
+      },
+    ],
+    enhanceNodes: [],
+    wearNodes: [],
+    connections: [],
+    viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },
+  })
+  const restored = flowToCanvasBoardSnapshot(flow)
+  expect(restored.fusionNodes[0]?.blendPoint.x === 0.62, 'expected fusion blendPoint x to persist')
+  expect(restored.fusionNodes[0]?.blendPoint.y === 0.41, 'expected fusion blendPoint y to persist')
+}
+
 testTransientRunningImageNodeIsNotPersisted()
 testReadyImageNodeIsPersistedWithConnection()
 testAggregateInputHandlesAreResolvedBeforePersistence()
 testConnectionRoundTripPreservesEdges()
 testPromptImageInputPreservesMultipleConnections()
 testFusionImageInputPreservesMultipleConnections()
+testFusionBlendPointRoundTripPreserved()
 
 console.log('flowSnapshotAdapter snapshot checks passed')

@@ -3,6 +3,11 @@ import {
   DEFAULT_PROMPT_ASPECT_RATIO,
   type PromptAspectRatio,
 } from '../config/promptAspectRatio'
+import {
+  DEFAULT_FUSION_BLEND_POINT,
+  normalizeFusionBlendPoint,
+  type FusionBlendPoint,
+} from '../utils/fusionBlend'
 
 export interface CanvasPoint {
   x: number
@@ -49,6 +54,7 @@ export const IMAGE_OUTPUT_COUNT_PRESET_OPTIONS = [1, 2, 4, 8] as const
 export const DEFAULT_PROMPT_NODE_OUTPUT_COUNT = 1
 export const DEFAULT_FUSION_NODE_OUTPUT_COUNT = 1
 export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
+export { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint }
 
 export function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {
   return (
@@ -77,6 +83,10 @@ export function clampImageNodeOutputCount(value: unknown): number {
     return DEFAULT_IMAGE_NODE_OUTPUT_COUNT
   }
   return Math.max(MIN_IMAGE_NODE_OUTPUT_COUNT, Math.min(MAX_IMAGE_NODE_OUTPUT_COUNT, count))
+}
+
+export function clampFusionBlendPoint(value: unknown): FusionBlendPoint {
+  return normalizeFusionBlendPoint(value)
 }
 
 export interface PromptNodeItem {
@@ -262,6 +272,7 @@ export interface FusionNodeItem {
   title?: string
   prompt: string
   outputCount: number
+  blendPoint: FusionBlendPoint
   inputImages: FusionNodeInputImage[]
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]

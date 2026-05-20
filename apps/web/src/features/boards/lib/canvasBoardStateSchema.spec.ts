@@ -112,6 +112,7 @@ function createValidState() {
         width: 240,
         prompt: 'fusion prompt',
         outputCount: 1,
+        blendPoint: { x: 0.5, y: 0.5 },
         inputImages: [],
         outputStatus: 'idle' as const,
         outputImages: [],
@@ -213,6 +214,18 @@ function testInvalidStateRejected() {
   expect(parsed.success === false, 'expected invalid state to be rejected')
 }
 
+function testFusionBlendPointDefaultApplied() {
+  const state = createValidState() as Record<string, any>
+  state.fusionNodes = [{ ...state.fusionNodes[0] }]
+  delete state.fusionNodes[0].blendPoint
+  const parsed = canvasBoardStateSchema.safeParse(state)
+  expect(parsed.success === true, 'expected fusion node without blendPoint to stay valid')
+  if (parsed.success) {
+    expect(parsed.data.fusionNodes[0]?.blendPoint.x === 0.5, 'expected blendPoint x default to 0.5')
+    expect(parsed.data.fusionNodes[0]?.blendPoint.y === 0.5, 'expected blendPoint y default to 0.5')
+  }
+}
+
 function testUnknownFieldsAreRejected() {
   const parsed = canvasBoardStateSchema.safeParse({
     ...createValidState(),
@@ -235,6 +248,7 @@ function testUnknownFieldsAreRejected() {
 testValidEmptySnapshot()
 testValidAllNodeMinimumShape()
 testInvalidStateRejected()
+testFusionBlendPointDefaultApplied()
 testUnknownFieldsAreRejected()
 
 console.log('canvasBoardStateSchema checks passed')

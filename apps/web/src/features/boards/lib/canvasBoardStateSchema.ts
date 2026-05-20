@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  DEFAULT_FUSION_BLEND_POINT,
   DEFAULT_PROMPT_ASPECT_RATIO,
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   ENHANCE_EXTEND_PERCENT_MAX,
@@ -182,6 +183,10 @@ const fusionNodeItemSchema = z.object({
     .min(MIN_IMAGE_NODE_OUTPUT_COUNT)
     .max(MAX_IMAGE_NODE_OUTPUT_COUNT)
     .default(DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
+  blendPoint: z.object({
+    x: finiteNumberSchema.min(0).max(1),
+    y: finiteNumberSchema.min(0).max(1),
+  }).default(DEFAULT_FUSION_BLEND_POINT),
   inputImages: z.array(promptNodeInputImageSchema).max(4).default([]),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
