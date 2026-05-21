@@ -103,8 +103,8 @@ graph LR
 
 | 功能 slug | 典型语义 |
 |-----------|----------|
-| `sketch-to-design` | 线稿成款 |
-| `style-innovate` | 款式创新 |
+| `sketch-to-image` | 草图成图 |
+| `style-variation` | 风格延展 |
 | `partial-edit` | 局部改款 |
 | `bg-swap` | 换背景 |
 | `remove-bg` | 抠图 |
@@ -115,7 +115,7 @@ graph LR
 | `virtual-3d` | 虚拟 3D 展示 |
 | `pattern-gen` | 图案生成 |
 | `hd-upscale` | 高清增强 |
-| `canvas-extend` | 画布延伸 |
+| `image-extend` | 图片延伸 |
 
 ### 契约规则
 
@@ -215,7 +215,7 @@ sequenceDiagram
 |------|------|
 | `{{user_prompt}}` | 用户输入文本 |
 | `{{blend_ratio}}` | 融合比例 |
-| `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 画布延伸参数 |
+| `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 图片延伸参数 |
 | `{{tile_mode}}` | Wear 贴图模式 |
 | `{{viewpoint}}` | 展示视角描述 |
 | `{{lighting}}` | 打光描述 |

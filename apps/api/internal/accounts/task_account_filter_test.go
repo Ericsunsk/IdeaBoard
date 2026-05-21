@@ -12,7 +12,7 @@ func TestFilterAccountsByFeatureKeepsAccountsWithoutExplicitConfig(t *testing.T)
 		{ID: 2, ExtraConfig: `{"timeout":120}`},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugCanvasExtend)
+	got := filterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
 	if len(got) != 2 {
 		t.Fatalf("expected all accounts to remain eligible, got=%d", len(got))
 	}
@@ -20,12 +20,12 @@ func TestFilterAccountsByFeatureKeepsAccountsWithoutExplicitConfig(t *testing.T)
 
 func TestFilterAccountsByFeatureSupportsExplicitAllowList(t *testing.T) {
 	accounts := []*ApiAccount{
-		{ID: 1, ExtraConfig: `{"features":["canvas-extend","hd-upscale"]}`},
+		{ID: 1, ExtraConfig: `{"features":["image-extend","hd-upscale"]}`},
 		{ID: 2, ExtraConfig: `{"features":["style-fusion"]}`},
 		{ID: 3, ExtraConfig: `{"timeout":120}`},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugCanvasExtend)
+	got := filterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 eligible accounts, got=%d", len(got))
 	}
@@ -36,12 +36,12 @@ func TestFilterAccountsByFeatureSupportsExplicitAllowList(t *testing.T) {
 
 func TestFilterAccountsByFeatureSupportsExplicitBlockList(t *testing.T) {
 	accounts := []*ApiAccount{
-		{ID: 1, ExtraConfig: `{"disabled_features":["canvas-extend"]}`},
-		{ID: 2, ExtraConfig: `{"disabled_features":"style-fusion, canvas-extend"}`},
-		{ID: 3, ExtraConfig: `{"features":["canvas-extend"],"disabled_features":["style-fusion"]}`},
+		{ID: 1, ExtraConfig: `{"disabled_features":["image-extend"]}`},
+		{ID: 2, ExtraConfig: `{"disabled_features":"style-fusion, image-extend"}`},
+		{ID: 3, ExtraConfig: `{"features":["image-extend"],"disabled_features":["style-fusion"]}`},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugCanvasExtend)
+	got := filterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 eligible account, got=%d", len(got))
 	}
@@ -56,7 +56,7 @@ func TestFilterAccountsByFeatureIgnoresMalformedFeatureConfig(t *testing.T) {
 		{ID: 2, ExtraConfig: `{"features":{"not-a-feature":true}}`},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugCanvasExtend)
+	got := filterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
 	if len(got) != 2 {
 		t.Fatalf("expected malformed feature config to be ignored, got=%d", len(got))
 	}

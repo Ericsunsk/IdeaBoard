@@ -1,14 +1,9 @@
 import {
   normalizeViewpointSelectionByCategory,
   VIEWPOINT_LIGHTING_OPTIONS,
-  ENHANCE_UPSCALE_FACTOR_OPTIONS,
 } from '../components/nodes/config/nodeOptionConfig'
 import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
-import type {
-  EnhanceNodeItem,
-  PromptNodeInputImage,
-  ViewpointNodeItem,
-} from '../types/canvasNodes'
+import type { PromptNodeInputImage, ViewpointNodeItem } from '../types/canvasNodes'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import {
   clampImageNodeOutputCount,
@@ -140,23 +135,6 @@ export function patchFlowSnapshotParam(
       const currentBlendPoint = normalizeFusionBlendPoint(snapshotNode.blendPoint)
       if (areFusionBlendPointsEqual(currentBlendPoint, nextBlendPoint)) return snapshotNode
       return { ...snapshotNode, blendPoint: nextBlendPoint }
-    }
-    case 'upscaleMode':
-      if (snapshotNode.upscaleMode === value) return snapshotNode
-      return { ...snapshotNode, upscaleMode: value }
-    case 'upscaleFactor':
-      if (ENHANCE_UPSCALE_FACTOR_OPTIONS.includes(value as EnhanceNodeItem['upscaleFactor'])) {
-        if (snapshotNode.upscaleFactor === value) return snapshotNode
-        return { ...snapshotNode, upscaleFactor: value }
-      }
-      return snapshotNode
-    case 'outputFormat':
-      if (snapshotNode.outputFormat === value) return snapshotNode
-      return { ...snapshotNode, outputFormat: value }
-    case 'outputQuality': {
-      const nextOutputQuality = Math.max(30, Math.min(100, Math.round(Number(value) || 0)))
-      if (snapshotNode.outputQuality === nextOutputQuality) return snapshotNode
-      return { ...snapshotNode, outputQuality: nextOutputQuality }
     }
     case 'strength': {
       const nextStrength = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))

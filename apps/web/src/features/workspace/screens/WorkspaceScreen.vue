@@ -138,11 +138,11 @@
             :image-prompt-composer-visible="activeImagePromptNodeId === nodeProps.id"
             :fusion-prompt-composer-visible="activeFusionPromptNodeId === nodeProps.id"
             :image-direct-generating="isNodeDirectActionRunning(nodeProps.id)"
-            :show-style-strength-control="
-              flowShowStyleStrengthControl && activeImageActionNodeId === nodeProps.id
+            :show-strength-control="
+              !!activeStrengthAction && activeImageActionNodeId === nodeProps.id
             "
-            :style-innovate-strength-pct="flowStyleInnovateStrength"
-            :set-style-strength-track-ref="setFlowStyleStrengthTrackRef"
+            :strength-pct="activeStrengthValue"
+            :set-strength-track-ref="setStrengthTrackRef"
             :set-image-stage-ref="setImageStageRef"
             :clear-image-stage-ref="clearImageStageRef"
             :expand-mode-active="flowExpandNodeId === nodeProps.id"
@@ -153,7 +153,6 @@
             @mask-toggle-invert="() => onFlowMaskToggleInvert(nodeProps.id)"
             @delete-node="() => onFlowDeleteNode(nodeProps.id)"
             @generate-edit="() => onFlowEditGenerate(nodeProps.id)"
-            @generate-enhance="() => onFlowEnhanceGenerate(nodeProps.id)"
             @generate-wear="() => onFlowWearGenerate(nodeProps.id)"
             @generate-model="() => onFlowModelGenerate(nodeProps.id)"
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
@@ -184,8 +183,8 @@
             "
             @prompt-generate="(prompt, outputCount, aspectRatio) => onFlowPromptGenerate(nodeProps.id, prompt, outputCount, aspectRatio)"
             @image-action="(action) => onFlowImageDirectAction(nodeProps.id, action)"
-            @style-innovate-mousedown="onFlowStyleInnovateMouseDown"
-            @style-strength-track-mousedown="onFlowStyleStrengthTrackMouseDown"
+            @strength-action-mousedown="onFlowImageStrengthActionMouseDown"
+            @strength-track-mousedown="onFlowImageStrengthTrackMouseDown"
             @expand-handle-pointerdown="
               (payload) => onFlowExpandHandlePointerDown(nodeProps.id, payload.anchor, payload.event)
             "
@@ -240,12 +239,15 @@ import {
 } from '../composables/useFlowNodeMutations'
 import { useFlowGenerationHandlers } from '../composables/useFlowGenerationHandlers'
 import { useFlowImageDirectActions } from '../composables/useFlowImageDirectActions'
-import { useFlowStyleInnovateControl } from '../composables/useFlowStyleInnovateControl'
+import {
+  useFlowImageActionStrengthControl,
+} from '../composables/useFlowImageActionStrengthControl'
 import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 import type { CanvasBoardSnapshot } from '../../workspace/types/canvasNodes'
+import { IMAGE_NODE_ACTION, isImageStrengthAction, type ImageNodeAction } from '../types/imageActions'
 import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActions'
@@ -315,7 +317,6 @@ const createNodeOptions: readonly { key: string; label: string; value: FlowCreat
   { key: 'prompt', label: 'Prompt', value: 'prompt' },
   { key: 'image', label: 'Image', value: 'image' },
   { key: 'edit', label: 'Edit', value: 'edit' },
-  { key: 'enhance', label: 'Enhance', value: 'enhance' },
   { key: 'fusion', label: 'Fusion', value: 'fusion' },
   { key: 'wear', label: 'Wear', value: 'wear' },
   { key: 'mask', label: 'Mask', value: 'mask' },
@@ -376,7 +377,7 @@ function onPaneContextMenu(event: MouseEvent) {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   clearFlowSelection()
   const flowPoint = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
   const rect = canvasWrapRef.value?.getBoundingClientRect()
@@ -392,7 +393,7 @@ function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
 }
 
 function setActiveTool(tool: 'select' | 'hand' | 'text') {
@@ -401,7 +402,7 @@ function setActiveTool(tool: 'select' | 'hand' | 'text') {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   activeTool.value = tool
   if (tool === 'text') {
     appToast.info('文本工具稍后接入')
@@ -420,7 +421,7 @@ function onEscapeShortcut() {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   return clearFlowSelection()
 }
 
@@ -593,7 +594,7 @@ function onFlowDeleteNode(nodeId: string) {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   closeNodeContextMenu()
   _onFlowDeleteNode(nodeId)
 }
@@ -766,7 +767,7 @@ function onCanvasDragOver(event: DragEvent) {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   canvasDrop.onCanvasDragOver(event)
 }
 
@@ -891,7 +892,7 @@ function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
   activeImageActionNodeId.value = nodeId
   activeImagePromptNodeId.value = nodeId
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
 }
 
 function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
@@ -901,7 +902,7 @@ function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = nodeId
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
 }
 
 const {
@@ -919,7 +920,6 @@ const {
 clearMaskCanvasRef = clearMaskCanvas
 
 const {
-  onFlowEnhanceGenerate,
   onFlowEditGenerate,
   onFlowWearGenerate,
   onFlowModelGenerate,
@@ -970,21 +970,22 @@ const {
 })
 
 const {
-  flowStyleInnovateStrength,
-  flowShowStyleStrengthControl,
-  flowSuppressStyleInnovateClick,
-  setFlowStyleStrengthTrackRef,
-  hideFlowStyleStrengthControl,
-  onFlowStyleInnovateMouseDown,
-  onFlowStyleStrengthTrackMouseDown,
-} = useFlowStyleInnovateControl({
-  onCommit: (strength) => {
+  activeStrengthAction,
+  activeStrengthValue,
+  suppressClickAction,
+  setStrengthTrackRef,
+  hideStrengthControl,
+  getActionStrength,
+  onActionMouseDown: onFlowImageStrengthActionMouseDown,
+  onStrengthTrackMouseDown: onFlowImageStrengthTrackMouseDown,
+} = useFlowImageActionStrengthControl({
+  onCommit: (action, strength) => {
     const targetNodeId = activeImageActionNodeId.value
     if (!targetNodeId) return
     activeImageActionNodeId.value = null
     activeImagePromptNodeId.value = null
     activeFusionPromptNodeId.value = null
-    void runImageDirectAction(targetNodeId, 'style-innovate', { strength })
+    void runImageDirectAction(targetNodeId, action, { strength })
   },
 })
 
@@ -1017,29 +1018,29 @@ const {
 
 function onFlowImageDirectAction(
   nodeId: string,
-  action: 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'canvas-extend',
+  action: ImageNodeAction,
 ) {
-  if (action === 'canvas-extend') {
+  if (action === IMAGE_NODE_ACTION.imageExtend) {
     const entered = enterFlowExpandMode(nodeId)
     activeImageActionNodeId.value = null
     activeImagePromptNodeId.value = null
     activeFusionPromptNodeId.value = null
-    hideFlowStyleStrengthControl()
+    hideStrengthControl()
     if (!entered) appToast.warning('当前图片不可扩图')
     return
   }
-  if (action === 'style-innovate' && flowSuppressStyleInnovateClick.value) {
+  if (isImageStrengthAction(action) && suppressClickAction.value === action) {
     return
   }
   cancelFlowExpandMode()
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   void runImageDirectAction(
     nodeId,
     action,
-    action === 'style-innovate' ? { strength: flowStyleInnovateStrength.value } : undefined,
+    isImageStrengthAction(action) ? { strength: getActionStrength(action) } : undefined,
   )
 }
 
@@ -1048,7 +1049,7 @@ function onFlowImagePromptGenerate(nodeId: string, prompt: string, outputCount: 
   activeImagePromptNodeId.value = null
   activeImageActionNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   void runImagePromptGeneration(nodeId, prompt, outputCount)
 }
 
@@ -1057,7 +1058,7 @@ function onFlowImageExpandSubmit(nodeId: string, prompt: string, outputCount: nu
   activeImagePromptNodeId.value = null
   activeImageActionNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   void commitFlowExpandMode(prompt, outputCount)
 }
 
@@ -1071,7 +1072,7 @@ function onFlowFusionPromptGenerate(
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
   activeFusionPromptNodeId.value = null
-  hideFlowStyleStrengthControl()
+  hideStrengthControl()
   onFlowNodeParamUpdate(nodeId, { key: 'prompt', value: prompt })
   onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: outputCount })
   onFlowNodeParamUpdate(nodeId, { key: 'aspectRatio', value: aspectRatio })
@@ -1195,7 +1196,7 @@ const {
   activeImagePromptNodeId,
   activeFusionPromptNodeId,
   cancelFlowExpandMode,
-  hideFlowStyleStrengthControl,
+  hideStrengthControl,
   closeBoardHeaderEditing,
   closeNodeContextMenu,
   _deleteSelectedFlowElements: () => {
@@ -1233,7 +1234,7 @@ const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
   activeImagePromptNodeId,
   activeFusionPromptNodeId,
   cancelFlowExpandMode,
-  hideFlowStyleStrengthControl,
+  hideStrengthControl,
 })
 
 const canvasDrop = useFlowCanvasDrop({

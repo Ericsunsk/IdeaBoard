@@ -56,9 +56,9 @@
           :action-menu-visible="!!props.imageActionVisible"
           :prompt-composer-visible="!!props.imagePromptComposerVisible"
           :direct-generating="imageGenerating"
-          :show-style-strength-control="!!props.showStyleStrengthControl"
-          :style-innovate-strength-pct="props.styleInnovateStrengthPct ?? 50"
-          :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
+          :show-strength-control="!!props.showStrengthControl"
+          :strength-pct="props.strengthPct ?? 50"
+          :set-strength-track-ref="props.setStrengthTrackRef ?? (() => {})"
           :expand-mode-active="!!props.expandModeActive"
           :expand-overlay-style="props.expandOverlayStyle ?? null"
           :expand-handle-radius="props.expandHandleRadius ?? 4"
@@ -75,8 +75,8 @@
           @prompt-generate="onImagePromptGenerate"
           @expand-submit="onImageExpandSubmit"
           @action="onImageAction"
-          @style-innovate-mousedown="onStyleInnovateMouseDown"
-          @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
+          @strength-action-mousedown="onStrengthActionMouseDown"
+          @strength-track-mousedown="onStrengthTrackMouseDown"
           @expand-handle-pointerdown="onImageExpandHandlePointerDown"
           @expand-handle-pointermove="onImageExpandHandlePointerMove"
           @expand-handle-pointerup="onImageExpandHandlePointerUp"
@@ -96,23 +96,6 @@
         @delete="onDeleteRequest"
         @update:mode="emitNodeParam('mode', $event)"
         @generate="onEditGenerate"
-      />
-    </template>
-    <template v-else-if="isEnhanceNode && enhanceSnapshot">
-      <EnhanceNode
-        :node="enhanceSnapshot"
-        :active="selected"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
-        :ui-state="props.uiState"
-        @node-mousedown="noopMouse"
-        @update:title="emitNodeParam('title', $event)"
-        @delete="onDeleteRequest"
-        @update:upscale-mode="emitNodeParam('upscaleMode', $event)"
-        @update:upscale-factor="emitNodeParam('upscaleFactor', $event)"
-        @update:output-format="emitNodeParam('outputFormat', $event)"
-        @update:output-quality="emitNodeParam('outputQuality', $event)"
-        @generate="onEnhanceGenerate"
       />
     </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
@@ -247,7 +230,6 @@ import { computed, reactive, ref } from 'vue'
 import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/config/nodeOptionConfig'
 import type {
   EditNodeItem,
-  EnhanceNodeItem,
   FusionNodeItem,
   ImageNodeItem,
   MaskNodeItem,
@@ -258,10 +240,9 @@ import type {
 } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
+import type { ImageNodeAction, ImageStrengthAction } from '../types/imageActions'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import { resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
-
-type ImageAction = 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'canvas-extend'
 
 const props = withDefaults(
   defineProps<{
@@ -278,9 +259,9 @@ const props = withDefaults(
     imagePromptComposerVisible?: boolean
     fusionPromptComposerVisible?: boolean
     imageDirectGenerating?: boolean
-    showStyleStrengthControl?: boolean
-    styleInnovateStrengthPct?: number
-    setStyleStrengthTrackRef?: (el: Element | ComponentPublicInstance | null) => void
+    showStrengthControl?: boolean
+    strengthPct?: number
+    setStrengthTrackRef?: (el: Element | ComponentPublicInstance | null) => void
     setImageStageRef?: (nodeId: string, element: Element | null) => void
     clearImageStageRef?: (nodeId: string, element?: Element | null) => void
     expandModeActive?: boolean
@@ -299,9 +280,9 @@ const props = withDefaults(
     imagePromptComposerVisible: false,
     fusionPromptComposerVisible: false,
     imageDirectGenerating: false,
-    showStyleStrengthControl: false,
-    styleInnovateStrengthPct: 50,
-    setStyleStrengthTrackRef: () => undefined,
+    showStrengthControl: false,
+    strengthPct: 50,
+    setStrengthTrackRef: () => undefined,
     setImageStageRef: () => undefined,
     clearImageStageRef: () => undefined,
     expandModeActive: false,
@@ -316,7 +297,6 @@ const emit = defineEmits<{
   (e: 'mask-toggle-invert'): void
   (e: 'delete-node'): void
   (e: 'generate-edit'): void
-  (e: 'generate-enhance'): void
   (e: 'generate-wear'): void
   (e: 'generate-model'): void
   (e: 'generate-viewpoint'): void
@@ -342,9 +322,9 @@ const emit = defineEmits<{
   (e: 'image-expand-submit', prompt: string, outputCount: number): void
   (e: 'fusion-prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
   (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
-  (e: 'image-action', action: ImageAction): void
-  (e: 'style-innovate-mousedown', event: MouseEvent): void
-  (e: 'style-strength-track-mousedown', event: MouseEvent): void
+  (e: 'image-action', action: ImageNodeAction): void
+  (e: 'strength-action-mousedown', action: ImageStrengthAction, event: MouseEvent): void
+  (e: 'strength-track-mousedown', event: MouseEvent): void
   (e: 'expand-handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
@@ -355,7 +335,6 @@ const emit = defineEmits<{
 const isPromptNode = computed(() => props.data.kind === 'prompt')
 const isImageNode = computed(() => props.data.kind === 'image')
 const isEditNode = computed(() => props.data.kind === 'edit')
-const isEnhanceNode = computed(() => props.data.kind === 'enhance')
 const isFusionNode = computed(() => props.data.kind === 'fusion')
 const isWearNode = computed(() => props.data.kind === 'wear')
 const isMaskNode = computed(() => props.data.kind === 'mask')
@@ -404,9 +383,6 @@ const imageSnapshot = computed<ImageNodeItem | null>(() => {
 })
 const editSnapshot = computed<EditNodeItem | null>(() =>
   isEditNode.value ? resolveSnapshotNode<EditNodeItem>() : null,
-)
-const enhanceSnapshot = computed<EnhanceNodeItem | null>(() =>
-  isEnhanceNode.value ? resolveSnapshotNode<EnhanceNodeItem>() : null,
 )
 const fusionSnapshot = computed<FusionNodeItem | null>(() =>
   isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null,
@@ -630,10 +606,6 @@ function onDeleteRequest() {
   emit('delete-node')
 }
 
-function onEnhanceGenerate() {
-  emit('generate-enhance')
-}
-
 function onEditGenerate() {
   emit('generate-edit')
 }
@@ -740,15 +712,15 @@ function onPromptGenerate() {
   )
 }
 
-function onImageAction(action: ImageAction) {
+function onImageAction(action: ImageNodeAction) {
   emit('image-action', action)
 }
-function onStyleInnovateMouseDown(event: MouseEvent) {
-  emit('style-innovate-mousedown', event)
+function onStrengthActionMouseDown(action: ImageStrengthAction, event: MouseEvent) {
+  emit('strength-action-mousedown', action, event)
 }
 
-function onStyleStrengthTrackMouseDown(event: MouseEvent) {
-  emit('style-strength-track-mousedown', event)
+function onStrengthTrackMouseDown(event: MouseEvent) {
+  emit('strength-track-mousedown', event)
 }
 
 function onImageExpandHandlePointerDown(payload: {

@@ -51,7 +51,6 @@ function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNo
     value === 'viewpoint' ||
     value === 'edit' ||
     value === 'fusion' ||
-    value === 'enhance' ||
     value === 'wear'
   )
 }
@@ -73,8 +72,6 @@ function resolveExecutionActionLabels(
       return { ready: '编辑', running: '编辑中...' }
     case 'fusion':
       return { ready: '融合', running: '融合中...' }
-    case 'enhance':
-      return { ready: '增强', running: '增强中...' }
     case 'wear':
       return { ready: '上身', running: '上身中...' }
   }

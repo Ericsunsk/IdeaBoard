@@ -10,9 +10,9 @@ const promptVars: VarDef[] = [{ key: '{{user_prompt}}', desc: '当前请求拼�
 const noVars: VarDef[] = []
 
 export const featureList = [
-  { slug: 'sketch-to-design', title: 'Quick · 线稿成款' },
+  { slug: 'sketch-to-image', title: 'Quick · 草图成图' },
   { slug: 'partial-edit', title: 'Edit · 局部改款' },
-  { slug: 'style-innovate', title: 'Quick · 款式创新' },
+  { slug: 'style-variation', title: 'Quick · 风格延展' },
   { slug: 'style-fusion', title: 'Fusion · 双图融合' },
   { slug: 'fabric-on-body', title: 'Wear · 上身贴合' },
   { slug: 'multi-angle', title: 'Model · 单视角控制' },
@@ -21,8 +21,8 @@ export const featureList = [
   { slug: 'bg-swap', title: 'Edit · 换背景' },
   { slug: 'remove-bg', title: 'Quick · 抠图' },
   { slug: 'pattern-gen', title: 'Pattern · 图案生成' },
-  { slug: 'hd-upscale', title: 'Enhance · 高清放大' },
-  { slug: 'canvas-extend', title: 'Enhance · 画布延伸' },
+  { slug: 'hd-upscale', title: 'Image Tools · 高清放大' },
+  { slug: 'image-extend', title: 'Image Tools · 图片延伸' },
 ] as const
 
 export type FeatureSlug = (typeof featureList)[number]['slug']
@@ -37,8 +37,8 @@ const featureGroupDefs: Array<{ key: string; title: string; desc: string; slugs:
     {
       key: 'prompt',
       title: 'Prompt',
-      desc: '线稿成款、款式创新、抠图和图案生成类右键/生成工作流。',
-      slugs: ['sketch-to-design', 'style-innovate', 'remove-bg', 'pattern-gen'],
+      desc: '草图成图、风格延展、抠图和图案生成类右键/生成工作流。',
+      slugs: ['sketch-to-image', 'style-variation', 'remove-bg', 'pattern-gen'],
     },
     {
       key: 'wear',
@@ -71,10 +71,10 @@ const featureGroupDefs: Array<{ key: string; title: string; desc: string; slugs:
       slugs: ['partial-edit', 'bg-swap', 'face-swap'],
     },
     {
-      key: 'enhance',
-      title: 'Enhance',
-      desc: '超分、局部增强和画布延伸。',
-      slugs: ['hd-upscale', 'canvas-extend'],
+      key: 'image-tools',
+      title: 'Image Tools',
+      desc: '图片右键工具里的高清放大和图片延伸。',
+      slugs: ['hd-upscale', 'image-extend'],
     },
   ]
 
@@ -86,9 +86,9 @@ export const groupedFeatureGroups = featureGroupDefs.map((group) => ({
 export type FeatureGroup = (typeof groupedFeatureGroups)[number]
 
 const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
-  'sketch-to-design': noVars,
+  'sketch-to-image': noVars,
   'partial-edit': promptVars,
-  'style-innovate': [{ key: '{{strength}}', desc: '款式创新强度百分比（0-100）' }],
+  'style-variation': [{ key: '{{strength}}', desc: '风格延展强度百分比（0-100）' }],
   'fabric-on-body': [
     { key: '{{tile_mode}}', desc: WEAR_TILE_MODE_TEMPLATE_DESC },
     { key: '{{fabric_rotation}}', desc: 'Texture 方向角度（0-360）' },
@@ -144,26 +144,26 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   ],
   'hd-upscale': [
     { key: '{{use_mask}}', desc: '是否启用局部增强（连接 Mask 时自动为 true，否则为 false）' },
-    { key: '{{original_image_url}}', desc: 'Enhance 节点输入的原图 URL（自动传入）' },
+    { key: '{{original_image_url}}', desc: '当前 Image 工具输入的原图 URL（自动传入）' },
     { key: '{{mask_image_url}}', desc: 'Mask 节点输出上传后的 URL（仅连接 Mask 时自动传入）' },
     { key: '{{upscale_mode}}', desc: 'HD 模式（base / enhancement）' },
     { key: '{{upscale_factor}}', desc: '放大倍数（2 / 3 / 4）' },
     { key: '{{output_format}}', desc: '输出格式（jpg / png）' },
     { key: '{{output_quality}}', desc: '输出质量（30-100）' },
   ],
-  'canvas-extend': promptVars,
+  'image-extend': promptVars,
 }
 
 const featureNotes: Partial<Record<FeatureSlug, string>> = {
-  'sketch-to-design':
-    '画布右键「线稿成款」仍需要配置固定 system prompt，只是不使用 {{user_prompt}} 模板变量。',
-  'style-innovate':
-    '画布右键「款式创新」仍需要配置固定 system prompt，只使用 {{strength}} 控制创新幅度百分比（0-100），不使用 {{user_prompt}} 模板变量。',
+  'sketch-to-image':
+    '画布右键「草图成图」仍需要配置固定 system prompt，只是不使用 {{user_prompt}} 模板变量。',
+  'style-variation':
+    '画布右键「风格延展」仍需要配置固定 system prompt，只使用 {{strength}} 控制延展幅度百分比（0-100），不使用 {{user_prompt}} 模板变量。',
   'remove-bg':
     '画布右键「抠图」是快捷工具，不接收用户输入；必须配置固定 system prompt，并且不要使用 {{user_prompt}} 模板变量。',
   'pattern-gen': '底部输入栏「图案生成」建议保持后台 system prompt 为空，让用户输入自由发挥。',
   'hd-upscale':
-    'Enhance · HD 无论是否连接 Mask 都统一走任务链并使用这里的系统提示词；连接 Mask 时 use_mask=true（并自动带入 mask 相关参数），未连接时 use_mask=false。',
+    'Image Tools · HD 无论是否连接 Mask 都统一走任务链并使用这里的系统提示词；连接 Mask 时 use_mask=true（并自动带入 mask 相关参数），未连接时 use_mask=false。',
 }
 
 const CONTROL_VAR_KEYS = new Set([

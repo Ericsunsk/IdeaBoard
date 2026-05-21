@@ -11,7 +11,7 @@ import (
 const (
 	fabricOnBodyFeatureSlug = workflow.FeatureSlugFabricOnBody
 	styleFusionFeatureSlug  = workflow.FeatureSlugStyleFusion
-	canvasExtendFeatureSlug = workflow.FeatureSlugCanvasExtend
+	imageExtendFeatureSlug  = workflow.FeatureSlugImageExtend
 	hdUpscaleFeatureSlug    = workflow.FeatureSlugHDUpscale
 )
 
@@ -307,12 +307,12 @@ func ApplyFeatureSystemPrompt(
 		for k, v := range varMap {
 			result = strings.ReplaceAll(result, k, v)
 		}
-		if featureSlug == workflow.FeatureSlugStyleInnovate {
+		if featureSlug == workflow.FeatureSlugStyleVariation {
 			return result
 		}
 		return result
 	}
-	if featureSlug == workflow.FeatureSlugStyleInnovate {
+	if featureSlug == workflow.FeatureSlugStyleVariation {
 		return sysPrompt
 	}
 	return sysPrompt + " " + basePrompt

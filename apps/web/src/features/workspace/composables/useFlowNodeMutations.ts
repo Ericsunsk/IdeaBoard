@@ -2,7 +2,6 @@ import type { Ref } from 'vue'
 import type { Connection, Edge, Node } from '@vue-flow/core'
 import {
   createEditNodeAt,
-  createEnhanceNodeAt,
   createFusionNodeAt,
   createImageNodeAt,
   createMaskNodeAt,
@@ -23,7 +22,6 @@ export type FlowCreatableNodeKind =
   | 'prompt'
   | 'image'
   | 'edit'
-  | 'enhance'
   | 'fusion'
   | 'wear'
   | 'mask'
@@ -68,8 +66,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         return createImageNodeAt(point)
       case 'edit':
         return createEditNodeAt(point)
-      case 'enhance':
-        return createEnhanceNodeAt(point)
       case 'fusion':
         return createFusionNodeAt(point)
       case 'wear':
@@ -279,7 +275,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   const EXECUTION_NODE_KINDS = new Set([
     'edit',
-    'enhance',
     'fusion',
     'wear',
     'model',

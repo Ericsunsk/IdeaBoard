@@ -10,7 +10,7 @@ type UseFlowNodeDragInteractionsOptions = {
   activeImagePromptNodeId?: { value: string | null }
   activeFusionPromptNodeId?: { value: string | null }
   cancelFlowExpandMode?: () => void
-  hideFlowStyleStrengthControl: () => void
+  hideStrengthControl: () => void
 }
 
 export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractionsOptions) {
@@ -19,7 +19,7 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-    options.hideFlowStyleStrengthControl()
+    options.hideStrengthControl()
     options.beginNodeDragTransaction()
     options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
   }

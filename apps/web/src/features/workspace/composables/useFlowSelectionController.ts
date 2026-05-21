@@ -7,7 +7,7 @@ type UseFlowSelectionControllerOptions = {
   activeImagePromptNodeId?: Ref<string | null>
   activeFusionPromptNodeId?: Ref<string | null>
   cancelFlowExpandMode?: () => void
-  hideFlowStyleStrengthControl: () => void
+  hideStrengthControl: () => void
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
   _deleteSelectedFlowElements: () => void
@@ -55,7 +55,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-    options.hideFlowStyleStrengthControl()
+    options.hideStrengthControl()
   }
 
   function onFlowNodeClick() {
@@ -64,7 +64,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-    options.hideFlowStyleStrengthControl()
+    options.hideStrengthControl()
   }
 
   function onFlowNodeMouseDown(...args: [string, MouseEvent]) {
@@ -78,7 +78,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
       options.activeImageActionNodeId.value = null
       if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
       if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-      options.hideFlowStyleStrengthControl()
+      options.hideStrengthControl()
     }
   }
 
@@ -87,7 +87,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-    options.hideFlowStyleStrengthControl()
+    options.hideStrengthControl()
     options.closeNodeContextMenu()
     options._deleteSelectedFlowElements()
   }

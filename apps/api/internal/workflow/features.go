@@ -9,8 +9,8 @@ import (
 var workflowFeatureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 const (
-	FeatureSlugSketchToDesign = "sketch-to-design"
-	FeatureSlugStyleInnovate  = "style-innovate"
+	FeatureSlugSketchToImage  = "sketch-to-image"
+	FeatureSlugStyleVariation = "style-variation"
 	FeatureSlugPartialEdit    = "partial-edit"
 	FeatureSlugBgSwap         = "bg-swap"
 	FeatureSlugRemoveBg       = "remove-bg"
@@ -21,12 +21,12 @@ const (
 	FeatureSlugVirtual3D      = "virtual-3d"
 	FeatureSlugPatternGen     = "pattern-gen"
 	FeatureSlugHDUpscale      = "hd-upscale"
-	FeatureSlugCanvasExtend   = "canvas-extend"
+	FeatureSlugImageExtend    = "image-extend"
 )
 
 var supportedTaskFeatureSlugs = map[string]struct{}{
-	FeatureSlugSketchToDesign: {},
-	FeatureSlugStyleInnovate:  {},
+	FeatureSlugSketchToImage:  {},
+	FeatureSlugStyleVariation: {},
 	FeatureSlugPartialEdit:    {},
 	FeatureSlugBgSwap:         {},
 	FeatureSlugRemoveBg:       {},
@@ -37,7 +37,7 @@ var supportedTaskFeatureSlugs = map[string]struct{}{
 	FeatureSlugVirtual3D:      {},
 	FeatureSlugPatternGen:     {},
 	FeatureSlugHDUpscale:      {},
-	FeatureSlugCanvasExtend:   {},
+	FeatureSlugImageExtend:    {},
 }
 
 func normalizeWorkflowFeatureSlug(raw string) string {

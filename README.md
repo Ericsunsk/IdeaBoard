@@ -129,7 +129,7 @@ flowchart TB
   <tr>
     <td valign="top" width="33%">
       <strong>设计生成</strong><br/>
-      线稿成款、款式创新、图案生成
+      草图成图、风格延展、图案生成
     </td>
     <td valign="top" width="33%">
       <strong>编辑调整</strong><br/>
@@ -147,7 +147,7 @@ flowchart TB
     </td>
     <td valign="top">
       <strong>后处理</strong><br/>
-      高清增强、画布延伸
+      高清增强、图片延伸
     </td>
     <td valign="top">
       <strong>运营统计</strong><br/>

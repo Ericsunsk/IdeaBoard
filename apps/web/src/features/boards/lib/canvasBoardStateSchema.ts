@@ -39,7 +39,6 @@ const canvasConnectionNodeTypeSchema = z.enum([
   'viewpoint',
   'edit',
   'fusion',
-  'enhance',
   'wear',
 ])
 const canvasConnectionPortSchema = z.enum(['image', 'mask', 'prompt', 'imageA', 'imageB'])
@@ -177,21 +176,6 @@ const fusionNodeItemSchema = z.object({
   outputImages: z.array(imageNodeOutputItemSchema),
 }).strict()
 
-const enhanceNodeItemSchema = z.object({
-  id: finiteNumberSchema,
-  type: z.literal('enhance'),
-  x: finiteNumberSchema,
-  y: finiteNumberSchema,
-  width: finiteNumberSchema,
-  title: z.string().optional(),
-  upscaleMode: z.enum(['base', 'enhancement']),
-  upscaleFactor: z.union([z.literal(2), z.literal(3), z.literal(4)]),
-  outputFormat: z.enum(['jpg', 'png']),
-  outputQuality: finiteNumberSchema.min(30).max(100),
-  outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: z.array(imageNodeOutputItemSchema),
-}).strict()
-
 const wearNodeItemSchema = z.object({
   id: finiteNumberSchema,
   type: z.literal('wear'),
@@ -232,7 +216,6 @@ export const canvasBoardSnapshotSchema = z
     maskNodes: z.array(maskNodeItemSchema),
     editNodes: z.array(editNodeItemSchema),
     fusionNodes: z.array(fusionNodeItemSchema),
-    enhanceNodes: z.array(enhanceNodeItemSchema),
     wearNodes: z.array(wearNodeItemSchema),
     connections: z.array(canvasConnectionSchema),
     viewport: canvasViewportStateSchema,

@@ -8,7 +8,6 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
   'viewpoint',
   'edit',
   'fusion',
-  'enhance',
   'wear',
 ] as const
 

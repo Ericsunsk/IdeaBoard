@@ -7,13 +7,13 @@ export const EXECUTION_FEATURE = {
   fabricOnBody: 'fabric-on-body',
   styleFusion: 'style-fusion',
   patternGen: 'pattern-gen',
-  sketchToDesign: 'sketch-to-design',
-  styleInnovate: 'style-innovate',
+  sketchToImage: 'sketch-to-image',
+  styleVariation: 'style-variation',
   multiAngle: 'multi-angle',
   virtual3d: 'virtual-3d',
   faceSwap: 'face-swap',
   hdUpscale: 'hd-upscale',
-  canvasExtend: 'canvas-extend',
+  imageExtend: 'image-extend',
 } as const
 
 export type ExecutionFeature = (typeof EXECUTION_FEATURE)[keyof typeof EXECUTION_FEATURE]
@@ -45,11 +45,11 @@ export const EXECUTION_DIRECT_ACTION_META = {
   patternGen: {
     feature: EXECUTION_FEATURE.patternGen,
   },
-  sketchToDesign: {
-    feature: EXECUTION_FEATURE.sketchToDesign,
+  sketchToImage: {
+    feature: EXECUTION_FEATURE.sketchToImage,
   },
-  styleInnovate: {
-    feature: EXECUTION_FEATURE.styleInnovate,
+  styleVariation: {
+    feature: EXECUTION_FEATURE.styleVariation,
   },
   removeBg: {
     feature: EXECUTION_FEATURE.removeBg,
@@ -72,14 +72,14 @@ export const EXECUTION_FACE_SWAP_META = {
   prompt: '[face-swap] 换脸',
 } as const
 
-export const EXECUTION_ENHANCE_META = {
+export const EXECUTION_IMAGE_TOOL_META = {
   hdUpscale: {
     feature: EXECUTION_FEATURE.hdUpscale,
     prompt: '[hd-upscale] 局部高清放大，仅增强蒙版区域',
   },
-  canvasExtend: {
-    feature: EXECUTION_FEATURE.canvasExtend,
-    promptPrefix: '[canvas-extend]',
+  imageExtend: {
+    feature: EXECUTION_FEATURE.imageExtend,
+    promptPrefix: '[image-extend]',
   },
 } as const
 

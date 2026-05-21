@@ -107,7 +107,7 @@ func readMultipartRequest(t *testing.T, r *http.Request) multipartRequestCapture
 	return capture
 }
 
-func TestCallOpenAIUsesEditEndpointForCanvasExtend(t *testing.T) {
+func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
 	var gotPath string
 	var gotContentType string
 	var gotMultipart multipartRequestCapture
@@ -135,7 +135,7 @@ func TestCallOpenAIUsesEditEndpointForCanvasExtend(t *testing.T) {
 		ModelSet: "gpt-image-1",
 	}
 	params := map[string]interface{}{
-		"feature":      "canvas-extend",
+		"feature":      "image-extend",
 		"image_urls":   []interface{}{server.URL + "/source.png"},
 		"extend_right": 22,
 	}
@@ -288,7 +288,7 @@ func TestCallOpenAIGenerationMapsImageURLsToStringImageField(t *testing.T) {
 		ModelSet: "gpt-image-1",
 	}
 	params := map[string]interface{}{
-		"feature":    "style-innovate",
+		"feature":    "style-variation",
 		"image_urls": []interface{}{"https://img.example/source.png"},
 	}
 
@@ -480,7 +480,7 @@ func TestCallOpenAIMultiAngleUsesEditEndpointAndIncludesSourceModelPose(t *testi
 	}
 }
 
-func TestCallOpenAIStyleInnovateDataURLDropsRedundantImageCopies(t *testing.T) {
+func TestCallOpenAIStyleVariationDataURLDropsRedundantImageCopies(t *testing.T) {
 	var gotBody map[string]interface{}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -504,7 +504,7 @@ func TestCallOpenAIStyleInnovateDataURLDropsRedundantImageCopies(t *testing.T) {
 	}
 	dataURL := "data:image/png;base64,aGVsbG8="
 	params := map[string]interface{}{
-		"feature":            "style-innovate",
+		"feature":            "style-variation",
 		"image_urls":         []interface{}{dataURL},
 		"original_image_url": dataURL,
 		"variation_strength": 5,
@@ -788,10 +788,10 @@ func TestCallOpenAIHDUpscaleMaskedUsesMultipartFiles(t *testing.T) {
 
 func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
-		"feature":    "canvas-extend",
+		"feature":    "image-extend",
 		"image_urls": []interface{}{"https://img.example/source.png"},
 	}) {
-		t.Fatalf("expected canvas-extend to use edit endpoint")
+		t.Fatalf("expected image-extend to use edit endpoint")
 	}
 
 	if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
@@ -816,7 +816,7 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesRelativeUploadPaths(t *testing.T
 	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
 
 	params := map[string]interface{}{
-		"feature":            "style-innovate",
+		"feature":            "style-variation",
 		"image_urls":         []interface{}{"/uploads/2026/04/23/source.png"},
 		"original_image_url": "/uploads/2026/04/23/source.png",
 		"mask_image_url":     "/uploads/2026/04/23/mask.png",
@@ -870,7 +870,7 @@ func TestNormalizeUpstreamMediaParamsInlinesRelativeUploadPathsWithoutPublicBase
 	}
 
 	params := map[string]interface{}{
-		"feature":            "style-innovate",
+		"feature":            "style-variation",
 		"image_urls":         []interface{}{"/uploads/2026/04/23/source.png"},
 		"original_image_url": "/uploads/2026/04/23/source.png",
 	}

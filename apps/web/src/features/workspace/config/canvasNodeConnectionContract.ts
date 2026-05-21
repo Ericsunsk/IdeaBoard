@@ -2,7 +2,6 @@ import type {
   CanvasConnectionNodeType,
   CanvasConnectionPort,
   EditNodeItem,
-  EnhanceNodeItem,
   FusionNodeItem,
   ImageNodeItem,
   MaskNodeItem,
@@ -23,7 +22,6 @@ export type CanvasConnectionContractNode =
   | ViewpointNodeItem
   | EditNodeItem
   | FusionNodeItem
-  | EnhanceNodeItem
   | WearNodeItem
 
 export interface CanvasNodePortContract {
@@ -127,14 +125,6 @@ export function getCanvasNodePortContracts(
         input('prompt', 'prompt'),
         output('image', 'image'),
       ]
-    case 'enhance': {
-      return [
-        input('image', 'image', true),
-        input('mask', 'mask', false, true),
-        input('prompt', 'prompt', false, false),
-        output('image', 'image'),
-      ]
-    }
     case 'wear':
       return [
         input('imageA', 'image', true),

@@ -404,7 +404,7 @@ func finalizeOpenAIRequestBody(reqBody map[string]interface{}, params map[string
 		}
 	}
 	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
-	if featureSlug != workflow.FeatureSlugStyleInnovate {
+	if featureSlug != workflow.FeatureSlugStyleVariation {
 		return
 	}
 	if original, ok := reqBody["original_image_url"].(string); ok && original == image {
@@ -420,7 +420,7 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 	if !ok {
 		return false
 	}
-	if featureSlug == workflow.FeatureSlugCanvasExtend ||
+	if featureSlug == workflow.FeatureSlugImageExtend ||
 		featureSlug == workflow.FeatureSlugPartialEdit ||
 		featureSlug == workflow.FeatureSlugBgSwap ||
 		featureSlug == workflow.FeatureSlugRemoveBg ||

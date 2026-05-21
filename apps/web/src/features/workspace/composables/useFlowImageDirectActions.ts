@@ -20,9 +20,11 @@ import { resolveFusionOutputSize } from '../utils/fusionOutputSizing'
 import {
   assertCanvasExtendSubmitReady,
   assertDirectActionSubmitReady,
+  assertHdUpscaleSubmitReady,
   assertPromptImageSubmitReady,
   submitCanvasExtendTask,
   submitDirectActionTask,
+  submitHdUpscaleTask,
   submitPromptImageGenerationTask,
   submitPromptTextGenerationTask,
   waitExistingOrLiveTaskResult,
@@ -38,6 +40,11 @@ import {
   resolveImageDirectActionSource,
   type ImageDirectActionSource,
 } from '../utils/flowImageDirectActionSource'
+import {
+  IMAGE_NODE_ACTION,
+  type ImageDirectTaskAction,
+  type ImageStrengthAction,
+} from '../types/imageActions'
 import type { FlowTransactions } from './useFlowTransactions'
 import { resolveCanvasExtendIntent, type CanvasExtendRect } from '../utils/canvasExtendGeometry'
 import {
@@ -47,7 +54,7 @@ import {
   resolveConnectedPromptText,
 } from '../services/flowTaskExecutorUtils'
 
-type DirectActionKey = 'remove-bg' | 'style-innovate' | 'sketch-to-design'
+type DirectActionKey = ImageDirectTaskAction | ImageStrengthAction
 type RunImageDirectActionOptions = {
   strength?: number
 }
@@ -157,15 +164,22 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
 
     let resultNodeId: string | null = null
     try {
-      await assertDirectActionSubmitReady(action)
+      if (action === IMAGE_NODE_ACTION.hdUpscale) {
+        await assertHdUpscaleSubmitReady()
+      } else {
+        await assertDirectActionSubmitReady(action)
+      }
       resultNodeId = appendPendingImageResultNode(source, nodeId)
       setNodeRunning(resultNodeId, true)
-      const taskId = await submitDirectActionTask(
-        source,
-        action,
-        loadImageSizeFromUrl,
-        runOptions?.strength,
-      )
+      const taskId =
+        action === IMAGE_NODE_ACTION.hdUpscale
+          ? await submitHdUpscaleTask(source, loadImageSizeFromUrl, runOptions?.strength)
+          : await submitDirectActionTask(
+              source,
+              action,
+              loadImageSizeFromUrl,
+              runOptions?.strength,
+            )
       const urls = await waitExistingOrLiveTaskResult(taskId)
       const firstUrl = pickFirstValidUrl(urls)
       if (!firstUrl) throw new Error('任务完成但未返回图片')

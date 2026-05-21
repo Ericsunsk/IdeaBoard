@@ -3,7 +3,6 @@ import type { Edge, Node } from '@vue-flow/core'
 import {
   buildExecutionTaskRequest,
   EXECUTION_EDIT_MODE_META,
-  EXECUTION_ENHANCE_META,
   EXECUTION_FACE_SWAP_META,
   EXECUTION_MODEL_META,
   EXECUTION_VIEWPOINT_META,
@@ -11,10 +10,6 @@ import {
   type ExecutionFeature,
 } from '../config/executionContract'
 import { assertTaskSubmitReady } from '../services/flowTaskExecutorUtils'
-import {
-  executeFlowEnhanceNode,
-  validateFlowEnhanceNodeInputs,
-} from '../services/flowEnhanceExecutor'
 import { executeFlowEditNode, validateFlowEditNodeInputs } from '../services/flowEditExecutor'
 import { executeFlowWearNode, validateFlowWearNodeInputs } from '../services/flowWearExecutor'
 import { executeFlowModelNode, validateFlowModelNodeInputs } from '../services/flowModelExecutor'
@@ -25,7 +20,6 @@ import {
 import type {
   CanvasExecutionOutputNodeType,
   EditNodeItem,
-  EnhanceNodeItem,
   ModelNodeItem,
   ViewpointNodeItem,
   WearNodeItem,
@@ -82,7 +76,6 @@ export function loadImageSizeFromUrl(
 }
 
 export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOptions) {
-  const runningEnhanceNodeIds = ref(new Set<string>())
   const runningEditNodeIds = ref(new Set<string>())
   const runningWearNodeIds = ref(new Set<string>())
   const runningModelNodeIds = ref(new Set<string>())
@@ -93,8 +86,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     nodeId: string,
   ): boolean {
     switch (nodeType) {
-      case 'enhance':
-        return runningEnhanceNodeIds.value.has(nodeId)
       case 'edit':
         return runningEditNodeIds.value.has(nodeId)
       case 'fusion':
@@ -277,31 +268,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     options.updateSnapshotNode(nodeId, patcher, { history: false })
   }
 
-  async function onFlowEnhanceGenerate(nodeId: string) {
-    await runFlowGenerationNode(nodeId, {
-      nodeType: 'enhance',
-      runningSet: runningEnhanceNodeIds,
-      runningMessage: 'Enhance 任务正在执行中',
-      missingNodeMessage: 'Enhance 节点不存在',
-      successMessage: 'Enhance 生成完成',
-      failureMessage: 'Enhance 生成失败',
-      errorMessage: 'Enhance 生成失败',
-      buildContext: (target, nodeId) => ({
-        nodeId,
-        snapshotNode: target.data.snapshotNode as EnhanceNodeItem,
-      }),
-      buildOptions: () => ({
-        nodes: options.nodes.value as FlowRuntimeNode[],
-        edges: options.edges.value as FlowRuntimeEdge[],
-        loadImageSizeFromUrl,
-        boardId: options.currentBoardId.value || undefined,
-      }),
-      validate: (ctx, opts) => validateFlowEnhanceNodeInputs(ctx, opts),
-      preflight: (_ctx) => assertExecutionSubmitReady(EXECUTION_ENHANCE_META.hdUpscale.feature),
-      execute: (ctx, opts) => executeFlowEnhanceNode(ctx, opts),
-    })
-  }
-
   async function onFlowEditGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'edit',
@@ -411,7 +377,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
   }
 
   return {
-    onFlowEnhanceGenerate,
     onFlowEditGenerate,
     onFlowWearGenerate,
     onFlowModelGenerate,

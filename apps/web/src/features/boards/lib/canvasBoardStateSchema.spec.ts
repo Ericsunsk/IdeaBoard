@@ -106,21 +106,6 @@ function createValidState() {
         outputImages: [],
       },
     ],
-    enhanceNodes: [
-      {
-        id: 9,
-        type: 'enhance' as const,
-        x: 0,
-        y: 0,
-        width: 240,
-        upscaleMode: 'base' as const,
-        upscaleFactor: 2 as const,
-        outputFormat: 'jpg' as const,
-        outputQuality: 80,
-        outputStatus: 'idle' as const,
-        outputImages: [],
-      },
-    ],
     wearNodes: [
       {
         id: 10,
@@ -168,7 +153,6 @@ function testValidEmptySnapshot() {
     maskNodes: [],
     editNodes: [],
     fusionNodes: [],
-    enhanceNodes: [],
     wearNodes: [],
     connections: [],
     viewport: { canvasX: 0, canvasY: 0, zoomLevel: 1 },

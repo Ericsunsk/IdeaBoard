@@ -112,7 +112,7 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 	got := prompts.ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
-		"canvas-extend",
+		"image-extend",
 		map[string]interface{}{
 			"extend_top": 30,
 		},
@@ -169,7 +169,7 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 		},
 		{
 			name:       "canvas extend",
-			feature:    workflow.FeatureSlugCanvasExtend,
+			feature:    workflow.FeatureSlugImageExtend,
 			basePrompt: "user prompt",
 			userPrompt: "右侧延展为工作室背景",
 			params: map[string]interface{}{
@@ -227,11 +227,11 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 	}
 }
 
-func TestCanvasExtendEmptyUserPromptCanStillBuildExecutablePrompt(t *testing.T) {
+func TestImageExtendEmptyUserPromptCanStillBuildExecutablePrompt(t *testing.T) {
 	fullPrompt := applyTaskSystemPrompt(
 		"",
 		"",
-		workflow.FeatureSlugCanvasExtend,
+		workflow.FeatureSlugImageExtend,
 		map[string]interface{}{
 			"extend_right": 30,
 		},

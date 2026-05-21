@@ -89,17 +89,14 @@
 
       <HomeCanvasImageActionMenu
         v-if="showImageActionMenu"
-        :show-style-strength-control="!!showStyleStrengthControl"
+        :show-strength-control="!!showStrengthControl"
         :direct-generating="!!directGenerating"
         :display-height="stageHeight"
-        :style-innovate-strength-pct="styleInnovateStrengthPct ?? 50"
-        :set-style-strength-track-ref="setStyleStrengthTrackRef"
-        @action-remove-bg="emit('action', 'remove-bg')"
-        @style-innovate-mousedown="emit('style-innovate-mousedown', $event)"
-        @style-innovate-click="emit('action', 'style-innovate')"
-        @action-sketch-to-design="emit('action', 'sketch-to-design')"
-        @action-canvas-extend="emit('action', 'canvas-extend')"
-        @style-strength-track-mousedown="emit('style-strength-track-mousedown', $event)"
+        :strength-pct="strengthPct ?? 50"
+        :set-strength-track-ref="setStrengthTrackRef"
+        @action="emit('action', $event)"
+        @strength-action-mousedown="(action, event) => emit('strength-action-mousedown', action, event)"
+        @strength-track-mousedown="emit('strength-track-mousedown', $event)"
       />
       <NodePromptComposer
         v-if="showPromptComposer"
@@ -122,6 +119,7 @@ import {
   type ImageNodeItem,
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
+import type { ImageNodeAction, ImageStrengthAction } from '../../types/imageActions'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
@@ -146,9 +144,9 @@ const props = defineProps<{
   actionMenuVisible?: boolean
   promptComposerVisible?: boolean
   directGenerating?: boolean
-  showStyleStrengthControl?: boolean
-  styleInnovateStrengthPct?: number
-  setStyleStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
+  showStrengthControl?: boolean
+  strengthPct?: number
+  setStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
   expandModeActive?: boolean
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
@@ -167,9 +165,9 @@ const emit = defineEmits<{
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'prompt-generate', prompt: string, outputCount: number): void
   (e: 'expand-submit', prompt: string, outputCount: number): void
-  (e: 'action', action: 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'canvas-extend'): void
-  (e: 'style-innovate-mousedown', event: MouseEvent): void
-  (e: 'style-strength-track-mousedown', event: MouseEvent): void
+  (e: 'action', action: ImageNodeAction): void
+  (e: 'strength-action-mousedown', action: ImageStrengthAction, event: MouseEvent): void
+  (e: 'strength-track-mousedown', event: MouseEvent): void
   (e: 'expand-handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void

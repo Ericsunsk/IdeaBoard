@@ -375,7 +375,6 @@ function testFusionBlendPointRoundTripPreserved() {
         outputImages: [],
       },
     ],
-    enhanceNodes: [],
     wearNodes: [],
     connections: [],
     viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },

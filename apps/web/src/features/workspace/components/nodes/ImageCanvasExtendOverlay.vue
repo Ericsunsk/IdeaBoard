@@ -2,7 +2,7 @@
   <div class="image-node-expand-overlay">
     <div
       class="image-node-expand-frame"
-      data-canvas-extend-frame
+      data-image-extend-frame
       :style="overlayStyle"
       @pointermove="emit('handle-pointermove', $event)"
       @pointerup="emit('handle-pointerup', $event)"
@@ -20,7 +20,7 @@
       />
       <div
         class="image-node-expand-composer-wrap"
-        data-canvas-extend-composer
+        data-image-extend-composer
         @pointerdown.stop
       >
         <NodePromptComposer

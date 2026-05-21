@@ -72,7 +72,6 @@ const BOARD_NODE_COLLECTIONS = [
   { key: 'maskNodes', nodeType: 'mask' },
   { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
-  { key: 'enhanceNodes', nodeType: 'enhance' },
   { key: 'wearNodes', nodeType: 'wear' },
 ] as const satisfies ReadonlyArray<{
   key: keyof CanvasBoardSnapshot

@@ -30,8 +30,8 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 
 func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	canonical := []string{
-		FeatureSlugSketchToDesign,
-		FeatureSlugStyleInnovate,
+		FeatureSlugSketchToImage,
+		FeatureSlugStyleVariation,
 		FeatureSlugPartialEdit,
 		FeatureSlugBgSwap,
 		FeatureSlugRemoveBg,
@@ -42,7 +42,7 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 		FeatureSlugVirtual3D,
 		FeatureSlugPatternGen,
 		FeatureSlugHDUpscale,
-		FeatureSlugCanvasExtend,
+		FeatureSlugImageExtend,
 	}
 
 	for _, slug := range canonical {
@@ -119,7 +119,7 @@ func TestIsReferenceImageFeature(t *testing.T) {
 		{feature: FeatureSlugFabricOnBody, want: true},
 		{feature: FeatureSlugMultiAngle, want: true},
 		{feature: FeatureSlugRemoveBg, want: false},
-		{feature: FeatureSlugCanvasExtend, want: false},
+		{feature: FeatureSlugImageExtend, want: false},
 	}
 
 	for _, tt := range tests {

@@ -1,18 +1,28 @@
 import { taskApi } from '../../../shared/api/task'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
+  type ExecutionFeature,
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
   EXECUTION_EDIT_MODE_META,
-  EXECUTION_ENHANCE_META,
+  EXECUTION_IMAGE_TOOL_META,
 } from '../config/executionContract'
-import { buildExecutionSizeParams, extendExecutionImageSize } from '../utils/executionSizeParams'
+import {
+  buildExecutionSizeParams,
+  extendExecutionImageSize,
+  scaleExecutionImageSize,
+} from '../utils/executionSizeParams'
 import { buildPromptAspectRatioTaskParams, type PromptAspectRatio } from '../config/promptAspectRatio'
 import { extractTaskImageUrls } from '../utils/flowImageDirectActionTaskResult'
 import { assertTaskSubmitReady, waitTaskResult } from './flowTaskExecutorUtils'
 import type { ImageDirectActionSource } from '../utils/flowImageDirectActionSource'
+import {
+  DEFAULT_IMAGE_ACTION_STRENGTH,
+  IMAGE_NODE_ACTION,
+  type ImageDirectTaskAction,
+} from '../types/imageActions'
 
-export type ImageDirectActionTaskKey = 'remove-bg' | 'style-innovate' | 'sketch-to-design'
+export type ImageHdUpscaleFactor = 2 | 3 | 4
 
 type ImageSizeLoader = (
   url: string,
@@ -32,21 +42,38 @@ type SubmitCanvasExtendTaskInput = {
   prompt?: string
 }
 
-const STYLE_INNOVATE_DEFAULT_STRENGTH = 50
+const DIRECT_ACTION_FEATURES = {
+  [IMAGE_NODE_ACTION.removeBg]: EXECUTION_DIRECT_ACTION_META.removeBg.feature,
+  [IMAGE_NODE_ACTION.styleVariation]: EXECUTION_DIRECT_ACTION_META.styleVariation.feature,
+  [IMAGE_NODE_ACTION.sketchToImage]: EXECUTION_DIRECT_ACTION_META.sketchToImage.feature,
+} satisfies Record<ImageDirectTaskAction, ExecutionFeature>
+
+export function resolveHdUpscaleFactor(strength: number | undefined): ImageHdUpscaleFactor {
+  const normalized = Number.isFinite(strength)
+    ? Math.max(0, Math.min(100, Math.round(strength as number)))
+    : DEFAULT_IMAGE_ACTION_STRENGTH
+  if (normalized >= 67) return 4
+  if (normalized >= 34) return 3
+  return 2
+}
+
+export function resolveSourceOutputFormat(url: string): 'jpg' | 'png' {
+  try {
+    const pathname = new URL(url).pathname
+    return /\.png$/i.test(pathname) ? 'png' : 'jpg'
+  } catch {
+    const path = url.split(/[?#]/)[0] ?? ''
+    return /\.png$/i.test(path) ? 'png' : 'jpg'
+  }
+}
 
 export async function assertDirectActionSubmitReady(
-  action: ImageDirectActionTaskKey,
+  action: ImageDirectTaskAction,
 ): Promise<void> {
-  const feature =
-    action === 'style-innovate'
-      ? EXECUTION_DIRECT_ACTION_META.styleInnovate.feature
-      : action === 'remove-bg'
-        ? EXECUTION_DIRECT_ACTION_META.removeBg.feature
-        : EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature
   await assertTaskSubmitReady(
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
-      feature,
+      feature: DIRECT_ACTION_FEATURES[action],
     }),
     '提交任务失败',
   )
@@ -66,7 +93,17 @@ export async function assertCanvasExtendSubmitReady(): Promise<void> {
   await assertTaskSubmitReady(
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
-      feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
+      feature: EXECUTION_IMAGE_TOOL_META.imageExtend.feature,
+    }),
+    '提交任务失败',
+  )
+}
+
+export async function assertHdUpscaleSubmitReady(): Promise<void> {
+  await assertTaskSubmitReady(
+    buildExecutionTaskRequest({
+      prompt: 'submit readiness',
+      feature: EXECUTION_IMAGE_TOOL_META.hdUpscale.feature,
     }),
     '提交任务失败',
   )
@@ -89,19 +126,19 @@ export async function submitPromptTextGenerationTask(
 
 export async function submitDirectActionTask(
   source: ImageDirectActionSource,
-  action: ImageDirectActionTaskKey,
+  action: ImageDirectTaskAction,
   loadImageSize: ImageSizeLoader,
   strengthOverride?: number,
 ): Promise<string> {
   const imageSize = await loadImageSize(source.url)
   const strength = Number.isFinite(strengthOverride)
     ? Math.max(0, Math.min(100, Math.round(strengthOverride as number)))
-    : STYLE_INNOVATE_DEFAULT_STRENGTH
+    : DEFAULT_IMAGE_ACTION_STRENGTH
   const request =
-    action === 'style-innovate'
+    action === IMAGE_NODE_ACTION.styleVariation
       ? buildExecutionTaskRequest({
           prompt: '',
-          feature: EXECUTION_DIRECT_ACTION_META.styleInnovate.feature,
+          feature: DIRECT_ACTION_FEATURES[action],
           imageUrls: [source.url],
           params: {
             original_image_url: source.url,
@@ -112,10 +149,7 @@ export async function submitDirectActionTask(
         })
       : buildExecutionTaskRequest({
           prompt: '',
-          feature:
-            action === 'remove-bg'
-              ? EXECUTION_DIRECT_ACTION_META.removeBg.feature
-              : EXECUTION_DIRECT_ACTION_META.sketchToDesign.feature,
+          feature: DIRECT_ACTION_FEATURES[action],
           imageUrls: [source.url],
           params: buildExecutionSizeParams(imageSize),
         })
@@ -158,8 +192,8 @@ export async function submitCanvasExtendTask(
   const imageSize = await input.loadImageSize(input.source.url)
   const prompt = `${input.prompt ?? ''}`.trim()
   const request = buildExecutionTaskRequest({
-    prompt: prompt ? `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${prompt}` : '',
-    feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
+    prompt: prompt ? `${EXECUTION_IMAGE_TOOL_META.imageExtend.promptPrefix} ${prompt}` : '',
+    feature: EXECUTION_IMAGE_TOOL_META.imageExtend.feature,
     imageUrls: [input.source.url],
     params: {
       ...buildExecutionSizeParams(
@@ -176,6 +210,35 @@ export async function submitCanvasExtendTask(
   const submitRes = await taskApi.submit(request)
   if (submitRes.code !== 0 || !submitRes.data?.task_id) {
     throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
+  }
+  return submitRes.data.task_id
+}
+
+export async function submitHdUpscaleTask(
+  source: ImageDirectActionSource,
+  loadImageSize: ImageSizeLoader,
+  strength?: number,
+): Promise<string> {
+  const imageSize = await loadImageSize(source.url)
+  const upscaleFactor = resolveHdUpscaleFactor(strength)
+  const outputFormat = resolveSourceOutputFormat(source.url)
+  const request = buildExecutionTaskRequest({
+    prompt: EXECUTION_IMAGE_TOOL_META.hdUpscale.prompt,
+    feature: EXECUTION_IMAGE_TOOL_META.hdUpscale.feature,
+    imageUrls: [source.url],
+    params: {
+      original_image_url: source.url,
+      ...buildExecutionSizeParams(imageSize, scaleExecutionImageSize(imageSize, upscaleFactor)),
+      upscale_mode: 'enhancement',
+      upscale_factor: upscaleFactor,
+      output_format: outputFormat,
+      output_quality: 95,
+    },
+  })
+
+  const submitRes = await taskApi.submit(request)
+  if (submitRes.code !== 0 || !submitRes.data?.task_id) {
+    throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交 HD 任务失败'))
   }
   return submitRes.data.task_id
 }

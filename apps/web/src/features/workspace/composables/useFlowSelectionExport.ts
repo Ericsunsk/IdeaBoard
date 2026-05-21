@@ -160,7 +160,6 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       if (
         kind !== 'image' &&
         kind !== 'edit' &&
-        kind !== 'enhance' &&
         kind !== 'fusion' &&
         kind !== 'wear' &&
         kind !== 'model' &&

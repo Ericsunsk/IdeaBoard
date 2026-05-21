@@ -221,7 +221,7 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
   function onGlobalKeydown(event: KeyboardEvent) {
     if (!state.value) return
     const target = event.target as HTMLElement | null
-    if (target?.closest('[data-canvas-extend-composer]')) return
+    if (target?.closest('[data-image-extend-composer]')) return
     if (isEditableEventTarget(event.target)) return
     if (event.key === 'Escape') {
       event.preventDefault()
@@ -241,8 +241,8 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     if (!target) return
     const stage = options.getImageStageElement(state.value.nodeId)
     const inImageStage = !!stage?.contains(target)
-    const inOverlayFrame = !!target.closest('[data-canvas-extend-frame]')
-    const inOverlayComposer = !!target.closest('[data-canvas-extend-composer]')
+    const inOverlayFrame = !!target.closest('[data-image-extend-frame]')
+    const inOverlayComposer = !!target.closest('[data-image-extend-composer]')
     if (inOverlayComposer) return
     if (inImageStage && !inOverlayFrame) {
       options.onBeforePointerCancel?.()

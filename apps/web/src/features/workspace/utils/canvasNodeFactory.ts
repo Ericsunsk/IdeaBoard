@@ -15,7 +15,6 @@ import {
 } from '../types/canvasNodes'
 import type {
   CanvasPoint,
-  EnhanceNodeItem,
   EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
@@ -140,23 +139,6 @@ export function createFusionNodeAt(point: CanvasPoint): FusionNodeItem {
     aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
     blendPoint: { ...DEFAULT_FUSION_BLEND_POINT },
     inputImages: [],
-    outputStatus: 'idle',
-    outputImages: [],
-  }
-}
-
-export function createEnhanceNodeAt(point: CanvasPoint): EnhanceNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'enhance',
-    x: point.x,
-    y: point.y,
-    width: 286,
-    title: getDefaultCanvasNodeTitle('enhance'),
-    upscaleMode: 'base',
-    upscaleFactor: 2,
-    outputFormat: 'jpg',
-    outputQuality: 95,
     outputStatus: 'idle',
     outputImages: [],
   }

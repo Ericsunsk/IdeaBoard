@@ -253,21 +253,6 @@ export interface FusionNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export interface EnhanceNodeItem {
-  id: number
-  type: 'enhance'
-  x: number
-  y: number
-  width: number
-  title?: string
-  upscaleMode: 'base' | 'enhancement'
-  upscaleFactor: 2 | 3 | 4
-  outputFormat: 'jpg' | 'png'
-  outputQuality: number
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
 export interface WearNodeItem {
   id: number
   type: 'wear'
@@ -288,7 +273,6 @@ export type CanvasExecutionOutputNodeType =
   | 'viewpoint'
   | 'edit'
   | 'fusion'
-  | 'enhance'
   | 'wear'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
@@ -296,7 +280,6 @@ export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType
   'viewpoint',
   'edit',
   'fusion',
-  'enhance',
   'wear',
 ]
 
@@ -314,7 +297,6 @@ export type CanvasExecutionOutputNodeItem =
   | ViewpointNodeItem
   | EditNodeItem
   | FusionNodeItem
-  | EnhanceNodeItem
   | WearNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
@@ -329,7 +311,6 @@ export type CanvasConnectionNodeType =
   | 'viewpoint'
   | 'edit'
   | 'fusion'
-  | 'enhance'
   | 'wear'
 
 export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): string {
@@ -348,8 +329,6 @@ export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): s
       return 'EDIT'
     case 'fusion':
       return 'FUSION'
-    case 'enhance':
-      return 'ENHANCE'
     case 'wear':
       return 'WEAR'
   }
@@ -374,7 +353,6 @@ export type CanvasNodeItem =
   | ImageNodeItem
   | EditNodeItem
   | FusionNodeItem
-  | EnhanceNodeItem
   | WearNodeItem
 
 export interface CanvasViewportState {
@@ -391,7 +369,6 @@ export interface CanvasBoardSnapshot {
   maskNodes: MaskNodeItem[]
   editNodes: EditNodeItem[]
   fusionNodes: FusionNodeItem[]
-  enhanceNodes: EnhanceNodeItem[]
   wearNodes: WearNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState

@@ -18,7 +18,6 @@ declare module 'vue' {
     AdminSummaryCard: typeof import('./features/admin/shared/components/AdminSummaryCard.vue')['default']
     BoardCard: typeof import('./features/boards/components/BoardCard.vue')['default']
     EditNode: typeof import('./features/workspace/components/nodes/EditNode.vue')['default']
-    EnhanceNode: typeof import('./features/workspace/components/nodes/EnhanceNode.vue')['default']
     FlowCanvasNode: typeof import('./features/workspace/components/FlowCanvasNode.vue')['default']
     FlowNodeHandles: typeof import('./features/workspace/components/FlowNodeHandles.vue')['default']
     FusionNode: typeof import('./features/workspace/components/nodes/FusionNode.vue')['default']

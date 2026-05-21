@@ -1,8 +1,8 @@
 <template>
   <div
     class="image-action-menu node-tool-surface"
-    :class="{ 'strength-mode': showStyleStrengthControl }"
-    :style="showStyleStrengthControl ? styleStrengthMenuStyle : undefined"
+    :class="{ 'strength-mode': showStrengthControl }"
+    :style="showStrengthControl ? strengthMenuStyle : undefined"
     @mousedown.stop
     @click.stop
   >
@@ -18,13 +18,13 @@
       }"
       class="image-action-menu-inner"
     >
-      <template v-if="!showStyleStrengthControl">
+      <template v-if="!showStrengthControl">
       <button
         type="button"
         class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
         title="抠图"
-        @click="emit('action-remove-bg')"
+        @click="emit('action', IMAGE_NODE_ACTION.removeBg)"
       >
         <span class="action-logo">
           <svg
@@ -47,9 +47,9 @@
         type="button"
         class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
-        title="款式创新"
-        @mousedown.stop="emit('style-innovate-mousedown', $event)"
-        @click="emit('style-innovate-click')"
+        title="风格延展"
+        @mousedown.stop="emit('strength-action-mousedown', IMAGE_NODE_ACTION.styleVariation, $event)"
+        @click="emit('action', IMAGE_NODE_ACTION.styleVariation)"
       >
         <span class="action-logo">
           <svg
@@ -67,14 +67,14 @@
             />
           </svg>
         </span>
-        <span class="action-tooltip">款式创新</span>
+        <span class="action-tooltip">风格延展</span>
       </button>
       <button
         type="button"
         class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
-        title="线稿成款"
-        @click="emit('action-sketch-to-design')"
+        title="草图成图"
+        @click="emit('action', IMAGE_NODE_ACTION.sketchToImage)"
       >
         <span class="action-logo">
           <svg
@@ -93,39 +93,25 @@
             <path d="M20 7l-2-2" />
           </svg>
         </span>
-        <span class="action-tooltip">线稿成款</span>
+        <span class="action-tooltip">草图成图</span>
       </button>
       <button
         type="button"
-        class="image-action-icon-btn image-action-icon-btn--placeholder node-tool-button"
-        disabled
-        title="局部重绘（占位）"
+        class="image-action-icon-btn node-tool-button"
+        :disabled="directGenerating"
+        title="HD"
+        @mousedown.stop="emit('strength-action-mousedown', IMAGE_NODE_ACTION.hdUpscale, $event)"
+        @click="emit('action', IMAGE_NODE_ACTION.hdUpscale)"
       >
-        <span class="action-logo">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M4 15s2-3 5-3 4 3 7 3 4-3 4-3" />
-            <path d="M4 19s2-3 5-3 4 3 7 3 4-3 4-3" />
-            <path d="M8 5h8" />
-            <path d="M12 5v5" />
-          </svg>
-        </span>
-        <span class="action-tooltip">局部重绘</span>
+        <span class="action-logo action-logo--text">HD</span>
+        <span class="action-tooltip">HD</span>
       </button>
       <button
         type="button"
         class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
         title="扩图"
-        @click="emit('action-canvas-extend')"
+        @click="emit('action', IMAGE_NODE_ACTION.imageExtend)"
       >
         <span class="action-logo">
           <svg
@@ -181,11 +167,11 @@
         @mousedown.stop
       >
         <div
-          :ref="setStyleStrengthTrackRef"
+          :ref="setStrengthTrackRef"
           class="style-strength-track"
-          @mousedown.stop.prevent="emit('style-strength-track-mousedown', $event)"
+          @mousedown.stop.prevent="emit('strength-track-mousedown', $event)"
         >
-          <div class="style-strength-fill" :style="{ width: `${styleInnovateStrengthPct}%` }"></div>
+          <div class="style-strength-fill" :style="{ width: `${strengthPct}%` }"></div>
         </div>
       </div>
     </div>
@@ -194,23 +180,25 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
+import {
+  IMAGE_NODE_ACTION,
+  type ImageNodeAction,
+  type ImageStrengthAction,
+} from '../../types/imageActions'
 
 defineProps<{
-  showStyleStrengthControl: boolean
-  styleStrengthMenuStyle?: string | Record<string, string>
+  showStrengthControl: boolean
+  strengthMenuStyle?: string | Record<string, string>
   directGenerating: boolean
   displayHeight: number
-  styleInnovateStrengthPct: number
-  setStyleStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
+  strengthPct: number
+  setStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
 }>()
 
 const emit = defineEmits<{
-  (event: 'style-innovate-mousedown', value: MouseEvent): void
-  (event: 'style-innovate-click'): void
-  (event: 'action-remove-bg'): void
-  (event: 'action-sketch-to-design'): void
-  (event: 'action-canvas-extend'): void
-  (event: 'style-strength-track-mousedown', value: MouseEvent): void
+  (event: 'action', action: ImageNodeAction): void
+  (event: 'strength-action-mousedown', action: ImageStrengthAction, value: MouseEvent): void
+  (event: 'strength-track-mousedown', value: MouseEvent): void
 }>()
 </script>
 
@@ -297,6 +285,13 @@ const emit = defineEmits<{
 .action-logo svg {
   width: 21px;
   height: 21px;
+}
+
+.action-logo--text {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
 }
 
 .action-tooltip {

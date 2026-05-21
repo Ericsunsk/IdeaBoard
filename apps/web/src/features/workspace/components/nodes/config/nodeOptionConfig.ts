@@ -13,19 +13,6 @@ type ViewpointOptionItem = { key: string; label: string }
 export const GENERATE_RATIO_OPTIONS = ['1:1', '3:4', '4:3', '2:3', '3:2'] as const
 export const GENERATE_COUNT_OPTIONS = [1, 2, 4] as const
 
-
-export const ENHANCE_UPSCALE_MODE_OPTIONS: OptionItem<'base' | 'enhancement'>[] = [
-  { label: 'Base', value: 'base' },
-  { label: 'Enhance', value: 'enhancement' },
-]
-
-export const ENHANCE_UPSCALE_FACTOR_OPTIONS: Array<2 | 3 | 4> = [2, 3, 4]
-
-export const ENHANCE_OUTPUT_FORMAT_OPTIONS: OptionItem<'jpg' | 'png'>[] = [
-  { label: 'JPG', value: 'jpg' },
-  { label: 'PNG', value: 'png' },
-]
-
 export const WEAR_TILE_MODE_OPTIONS: OptionItem<WearNodeItem['tileMode']>[] = [
   { label: 'Repeat', value: 'seamless' },
   { label: 'Placement', value: 'single' },

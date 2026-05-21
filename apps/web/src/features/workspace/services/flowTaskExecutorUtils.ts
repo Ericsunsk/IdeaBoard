@@ -97,7 +97,6 @@ export function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null
     head === 'viewpoint' ||
     head === 'edit' ||
     head === 'fusion' ||
-    head === 'enhance' ||
     head === 'wear'
   ) {
     return head
@@ -195,7 +194,6 @@ export async function assertTaskSubmitReady(
 export const FLOW_EXECUTION_SOURCE_KINDS = new Set<CanvasConnectionNodeType>([
   'image',
   'edit',
-  'enhance',
   'fusion',
   'wear',
   'model',

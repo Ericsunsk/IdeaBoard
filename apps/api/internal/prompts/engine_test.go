@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-func TestApplyFeatureSystemPromptStyleInnovateUsesConfiguredPromptOnly(t *testing.T) {
+func TestApplyFeatureSystemPromptStyleVariationUsesConfiguredPromptOnly(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
-		"[style-innovate] 创新强度：40%，前端默认文案",
-		"[style-innovate] 创新强度：40%，前端默认文案",
-		"style-innovate",
+		"[style-variation] 延展强度：40%，前端默认文案",
+		"[style-variation] 延展强度：40%，前端默认文案",
+		"style-variation",
 		map[string]interface{}{
 			"variation_strength": 40,
 		},
@@ -23,7 +23,7 @@ func TestApplyFeatureSystemPromptStyleInnovateUsesConfiguredPromptOnly(t *testin
 	}
 }
 
-func TestApplyFeatureSystemPromptNonStyleInnovateStillAppendsBasePrompt(t *testing.T) {
+func TestApplyFeatureSystemPromptNonStyleVariationStillAppendsBasePrompt(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
@@ -43,7 +43,7 @@ func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 	features := []string{
 		"style-fusion",
 		"multi-angle",
-		"canvas-extend",
+		"image-extend",
 		"hd-upscale",
 		"fabric-on-body",
 	}
