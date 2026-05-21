@@ -2,7 +2,6 @@ import { ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import {
   buildExecutionTaskRequest,
-  EXECUTION_DIRECTED_RECOLOR_META,
   EXECUTION_EDIT_MODE_META,
   EXECUTION_ENHANCE_META,
   EXECUTION_FACE_SWAP_META,
@@ -17,7 +16,6 @@ import {
   executeFlowEnhanceNode,
   validateFlowEnhanceNodeInputs,
 } from '../services/flowEnhanceExecutor'
-import { executeFlowColorNode, validateFlowColorNodeInputs } from '../services/flowColorExecutor'
 import { executeFlowEditNode, validateFlowEditNodeInputs } from '../services/flowEditExecutor'
 import { executeFlowFusionNode, validateFlowFusionNodeInputs } from '../services/flowFusionExecutor'
 import { executeFlowWearNode, validateFlowWearNodeInputs } from '../services/flowWearExecutor'
@@ -28,7 +26,6 @@ import {
 } from '../services/flowViewpointExecutor'
 import type {
   CanvasExecutionOutputNodeType,
-  ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
@@ -89,7 +86,6 @@ export function loadImageSizeFromUrl(
 
 export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOptions) {
   const runningEnhanceNodeIds = ref(new Set<string>())
-  const runningColorNodeIds = ref(new Set<string>())
   const runningEditNodeIds = ref(new Set<string>())
   const runningFusionNodeIds = ref(new Set<string>())
   const runningWearNodeIds = ref(new Set<string>())
@@ -103,8 +99,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     switch (nodeType) {
       case 'enhance':
         return runningEnhanceNodeIds.value.has(nodeId)
-      case 'color':
-        return runningColorNodeIds.value.has(nodeId)
       case 'edit':
         return runningEditNodeIds.value.has(nodeId)
       case 'fusion':
@@ -347,31 +341,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-  async function onFlowColorGenerate(nodeId: string) {
-    await runFlowGenerationNode(nodeId, {
-      nodeType: 'color',
-      runningSet: runningColorNodeIds,
-      runningMessage: 'Color 任务正在执行中',
-      missingNodeMessage: 'Color 节点不存在',
-      successMessage: 'Color 生成完成',
-      failureMessage: 'Color 生成失败',
-      errorMessage: 'Color 生成失败',
-      buildContext: (target, nodeId) => ({
-        nodeId,
-        snapshotNode: target.data.snapshotNode as ColorNodeItem,
-      }),
-      buildOptions: () => ({
-        nodes: options.nodes.value as FlowRuntimeNode[],
-        edges: options.edges.value as FlowRuntimeEdge[],
-        loadImageSizeFromUrl,
-        boardId: options.currentBoardId.value || undefined,
-      }),
-      validate: (ctx, opts) => validateFlowColorNodeInputs(ctx, opts),
-      preflight: () => assertExecutionSubmitReady(EXECUTION_DIRECTED_RECOLOR_META.feature),
-      execute: (ctx, opts) => executeFlowColorNode(ctx, opts),
-    })
-  }
-
   async function onFlowFusionGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'fusion',
@@ -478,7 +447,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
   return {
     onFlowEnhanceGenerate,
     onFlowEditGenerate,
-    onFlowColorGenerate,
     onFlowFusionGenerate,
     onFlowWearGenerate,
     onFlowModelGenerate,

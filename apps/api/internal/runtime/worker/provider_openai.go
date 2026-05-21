@@ -425,8 +425,6 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 		featureSlug == workflow.FeatureSlugBgSwap ||
 		featureSlug == workflow.FeatureSlugRemoveBg ||
 		featureSlug == workflow.FeatureSlugStyleFusion ||
-		featureSlug == workflow.FeatureSlugSeriesColor ||
-		featureSlug == workflow.FeatureSlugDirectedRecolor ||
 		featureSlug == workflow.FeatureSlugFaceSwap ||
 		featureSlug == workflow.FeatureSlugFabricOnBody ||
 		featureSlug == workflow.FeatureSlugMultiAngle {

@@ -23,6 +23,7 @@
         :style="ray.style"
       />
     </div>
+    <NodeEmptyStateIcon v-if="showEmptyFusionMark" class="fusion-empty-mark" variant="fusion" />
     <div ref="thumbsRef" class="fusion-node-slots">
       <template v-for="(slot, index) in fusionSlotItems" :key="slot.key">
         <NodeInputThumbnail
@@ -87,6 +88,7 @@ import {
   type FusionBlendPoint,
 } from '../../utils/fusionBlend'
 import { useFusionBlendControl } from './composables/useFusionBlendControl'
+import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import { useSortableMediaInputs } from './composables/useSortableMediaInputs'
 
@@ -143,6 +145,7 @@ const visibleInputImages = computed(() => props.inputImages.slice(0, maxInputIma
 const canAcceptMoreImages = computed(() => visibleInputImages.value.length < maxInputImages)
 const imageCount = computed(() => Math.min(visibleInputImages.value.length || 0, maxInputImages))
 const showBlendPad = computed(() => imageCount.value >= 2)
+const showEmptyFusionMark = computed(() => imageCount.value === 0)
 const nodeWidth = computed(() => props.width)
 const sourceBlendPoint = computed(() => props.blendPoint)
 const { sortableItems: sortableInputImages } = useSortableMediaInputs({
@@ -328,6 +331,23 @@ function onAddSlotDrop(event: DragEvent) {
 .fusion-node-stage.is-active .fusion-node-ray,
 .fusion-node-stage.is-drop-target .fusion-node-ray {
   --fusion-node-ray-color: var(--flow-edge-active-color, #9278e6);
+}
+
+.fusion-empty-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 126px;
+  height: 126px;
+  translate: -50% -50%;
+  z-index: 1;
+  pointer-events: none;
+  color: #a8b3be;
+  transition: color 0.2s ease;
+}
+
+.fusion-node-stage:hover .fusion-empty-mark {
+  color: #8894a5;
 }
 
 .fusion-node-slot {

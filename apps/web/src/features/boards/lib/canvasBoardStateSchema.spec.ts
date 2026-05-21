@@ -78,22 +78,9 @@ function createValidState() {
         invertMask: false,
       },
     ],
-    colorNodes: [
-      {
-        id: 7,
-        type: 'color' as const,
-        x: 0,
-        y: 0,
-        width: 240,
-        colors: ['#000000'],
-        strength: 50,
-        outputStatus: 'idle' as const,
-        outputImages: [],
-      },
-    ],
     editNodes: [
       {
-        id: 8,
+        id: 7,
         type: 'edit' as const,
         x: 0,
         y: 0,
@@ -105,7 +92,7 @@ function createValidState() {
     ],
     fusionNodes: [
       {
-        id: 9,
+        id: 8,
         type: 'fusion' as const,
         x: 0,
         y: 0,
@@ -120,7 +107,7 @@ function createValidState() {
     ],
     enhanceNodes: [
       {
-        id: 10,
+        id: 9,
         type: 'enhance' as const,
         x: 0,
         y: 0,
@@ -140,7 +127,7 @@ function createValidState() {
     ],
     wearNodes: [
       {
-        id: 11,
+        id: 10,
         type: 'wear' as const,
         x: 0,
         y: 0,
@@ -183,7 +170,6 @@ function testValidEmptySnapshot() {
     modelNodes: [],
     viewpointNodes: [],
     maskNodes: [],
-    colorNodes: [],
     editNodes: [],
     fusionNodes: [],
     enhanceNodes: [],

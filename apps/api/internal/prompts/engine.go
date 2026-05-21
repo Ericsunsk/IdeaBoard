@@ -210,21 +210,6 @@ func ApplyFeatureSystemPrompt(
 		"{{user_prompt}}": userPrompt,
 	}
 	if params != nil {
-		if v, ok := params["color_type"]; ok {
-			varMap["{{color_type}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["colors"]; ok {
-			switch arr := v.(type) {
-			case []interface{}:
-				strs := make([]string, 0, len(arr))
-				for _, item := range arr {
-					strs = append(strs, fmt.Sprintf("%v", item))
-				}
-				varMap["{{colors}}"] = strings.Join(strs, ", ")
-			default:
-				varMap["{{colors}}"] = fmt.Sprintf("%v", v)
-			}
-		}
 		if v, ok := params["category"]; ok {
 			varMap["{{category}}"] = fmt.Sprintf("%v", v)
 		}
@@ -251,9 +236,6 @@ func ApplyFeatureSystemPrompt(
 		}
 		if v, ok := params["image_b_weight"]; ok {
 			varMap["{{image_b_weight}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["target_color"]; ok {
-			varMap["{{target_color}}"] = fmt.Sprintf("%v", v)
 		}
 		if v, ok := params["fabric_rotation"]; ok {
 			varMap["{{fabric_rotation}}"] = fmt.Sprintf("%v", v)

@@ -137,7 +137,7 @@ flowchart TB
     </td>
     <td valign="top" width="33%">
       <strong>色彩与材质</strong><br/>
-      多色配色、定向换色、上身贴合
+      上身贴合
     </td>
   </tr>
   <tr>

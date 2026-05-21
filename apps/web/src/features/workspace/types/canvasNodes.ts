@@ -1,4 +1,3 @@
-import { DEFAULT_COLOR_HEX } from '../components/nodes/utils/colorPopoverUtils'
 import {
   DEFAULT_PROMPT_ASPECT_RATIO,
   type PromptAspectRatio,
@@ -15,9 +14,6 @@ export interface CanvasPoint {
 }
 
 export type WorkflowNodeOutputStatus = 'idle' | 'running' | 'ready' | 'stale'
-export const DEFAULT_COLOR_STRENGTH = 70
-export const MAX_COLOR_NODE_SWATCHES = 8
-export const DEFAULT_COLOR_NODE_COLOR = DEFAULT_COLOR_HEX
 export const MODEL_POSE_STRENGTH_MIN = 0
 export const MODEL_POSE_STRENGTH_MAX = 100
 export const MODEL_POSE_STRENGTH_DEFAULT = 70
@@ -238,19 +234,6 @@ export interface ImageNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export interface ColorNodeItem {
-  id: number
-  type: 'color'
-  x: number
-  y: number
-  width: number
-  title?: string
-  colors: string[]
-  strength: number
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
 export interface EditNodeItem {
   id: number
   type: 'edit'
@@ -313,36 +296,9 @@ export interface WearNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export function normalizeColorNodeColors(colors: readonly string[] | null | undefined): string[] {
-  return Array.from(
-    new Set(
-      (colors ?? [])
-        .map((color) => color.trim().toUpperCase())
-        .filter((color) => /^#?[0-9A-F]{6}$/.test(color))
-        .map((color) => (color.startsWith('#') ? color : `#${color}`)),
-    ),
-  ).slice(0, MAX_COLOR_NODE_SWATCHES)
-}
-
-export function hasColorNodeColors(node: { colors?: readonly string[] | null }) {
-  return (node.colors?.length ?? 0) > 0
-}
-
-export function isColorNodePlaceholderState(node: { colors?: readonly string[] | null }) {
-  return (
-    (node.colors?.length ?? 0) === 1 &&
-    normalizeColorNodeColors(node.colors)[0] === DEFAULT_COLOR_NODE_COLOR
-  )
-}
-
-export function isColorSingleColorMode(node: { colors?: readonly string[] | null }) {
-  return (node.colors?.length ?? 0) === 1
-}
-
 export type CanvasExecutionOutputNodeType =
   | 'model'
   | 'viewpoint'
-  | 'color'
   | 'edit'
   | 'fusion'
   | 'enhance'
@@ -351,7 +307,6 @@ export type CanvasExecutionOutputNodeType =
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
   'model',
   'viewpoint',
-  'color',
   'edit',
   'fusion',
   'enhance',
@@ -370,7 +325,6 @@ export function isCanvasExecutionOutputNodeType(
 export type CanvasExecutionOutputNodeItem =
   | ModelNodeItem
   | ViewpointNodeItem
-  | ColorNodeItem
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
@@ -384,7 +338,6 @@ export type CanvasConnectionNodeType =
   | 'image'
   | 'prompt'
   | 'mask'
-  | 'color'
   | 'model'
   | 'viewpoint'
   | 'edit'
@@ -400,8 +353,6 @@ export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): s
       return 'PROMPT'
     case 'mask':
       return 'MASK'
-    case 'color':
-      return 'COLOR'
     case 'model':
       return 'MODEL'
     case 'viewpoint':
@@ -434,7 +385,6 @@ export type CanvasNodeItem =
   | ViewpointNodeItem
   | MaskNodeItem
   | ImageNodeItem
-  | ColorNodeItem
   | EditNodeItem
   | FusionNodeItem
   | EnhanceNodeItem
@@ -452,7 +402,6 @@ export interface CanvasBoardSnapshot {
   modelNodes: ModelNodeItem[]
   viewpointNodes: ViewpointNodeItem[]
   maskNodes: MaskNodeItem[]
-  colorNodes: ColorNodeItem[]
   editNodes: EditNodeItem[]
   fusionNodes: FusionNodeItem[]
   enhanceNodes: EnhanceNodeItem[]

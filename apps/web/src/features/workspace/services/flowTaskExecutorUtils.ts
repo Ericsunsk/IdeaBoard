@@ -98,8 +98,7 @@ export function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null
     head === 'edit' ||
     head === 'fusion' ||
     head === 'enhance' ||
-    head === 'wear' ||
-    head === 'color'
+    head === 'wear'
   ) {
     return head
   }
@@ -197,7 +196,6 @@ export const FLOW_EXECUTION_SOURCE_KINDS = new Set<CanvasConnectionNodeType>([
   'image',
   'edit',
   'enhance',
-  'color',
   'fusion',
   'wear',
   'model',

@@ -8,7 +8,6 @@ export type CanvasNodeCreateActionKey =
   | 'createFusionNode'
   | 'createEnhanceNode'
   | 'createWearNode'
-  | 'createColorNode'
 
 export interface CanvasNodeMenuItem {
   key: string
@@ -51,13 +50,6 @@ export const CANVAS_NODE_MENU_ITEMS: readonly CanvasNodeMenuItem[] = [
     actionKey: 'createViewpointNode',
     group: 'process',
     order: 90,
-  },
-  {
-    key: 'color',
-    label: '+ Color 节点',
-    actionKey: 'createColorNode',
-    group: 'process',
-    order: 100,
   },
 ] as const
 

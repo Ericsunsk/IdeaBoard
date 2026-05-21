@@ -45,7 +45,6 @@ function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNo
     value === 'image' ||
     value === 'prompt' ||
     value === 'mask' ||
-    value === 'color' ||
     value === 'model' ||
     value === 'viewpoint' ||
     value === 'edit' ||

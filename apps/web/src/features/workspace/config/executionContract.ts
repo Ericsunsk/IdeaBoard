@@ -6,8 +6,6 @@ export const EXECUTION_FEATURE = {
   removeBg: 'remove-bg',
   fabricOnBody: 'fabric-on-body',
   styleFusion: 'style-fusion',
-  seriesColor: 'series-color',
-  directedRecolor: 'directed-recolor',
   patternGen: 'pattern-gen',
   sketchToDesign: 'sketch-to-design',
   styleInnovate: 'style-innovate',
@@ -41,18 +39,6 @@ export const EXECUTION_FUSION_META = {
   feature: EXECUTION_FEATURE.styleFusion,
   promptPrefix: '[style-fusion]',
   successLabel: 'Fusion',
-} as const
-
-export const EXECUTION_COLOR_SERIES_META = {
-  feature: EXECUTION_FEATURE.seriesColor,
-  colorType: 'reference',
-  promptPrefix: '[series-color] 多色配色',
-} as const
-
-export const EXECUTION_DIRECTED_RECOLOR_META = {
-  feature: EXECUTION_FEATURE.directedRecolor,
-  promptPrefix: '[directed-recolor]',
-  successLabel: 'Color',
 } as const
 
 export const EXECUTION_DIRECT_ACTION_META = {

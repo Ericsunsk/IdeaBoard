@@ -70,7 +70,6 @@ const BOARD_NODE_COLLECTIONS = [
   { key: 'modelNodes', nodeType: 'model' },
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
   { key: 'maskNodes', nodeType: 'mask' },
-  { key: 'colorNodes', nodeType: 'color' },
   { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
   { key: 'enhanceNodes', nodeType: 'enhance' },

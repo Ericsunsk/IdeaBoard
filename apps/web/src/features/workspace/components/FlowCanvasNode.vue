@@ -48,6 +48,7 @@
           :stage-height="stageHeight"
           :display-image="displayImage"
           :display-mode="displayMode"
+          :empty-icon-variant="imageEmptyIconVariant"
           :input-locked="imageInputLocked"
           :action-menu-visible="!!props.imageActionVisible"
           :prompt-composer-visible="!!props.imagePromptComposerVisible"
@@ -108,24 +109,6 @@
         @update:extend-bottom="emitNodeParam('extendBottom', $event)"
         @update:extend-left="emitNodeParam('extendLeft', $event)"
         @generate="onEnhanceGenerate"
-      />
-    </template>
-    <template v-else-if="isColorNode && colorSnapshot">
-      <ColorNode
-        :node="colorSnapshot"
-        :active="selected"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
-        :ui-state="props.uiState"
-        :error-port-keys="[]"
-        @node-mousedown="noopMouse"
-        @update:title="emitNodeParam('title', $event)"
-        @delete="onDeleteRequest"
-        @apply-preset="onColorApplyPreset"
-        @remove-color="onColorRemove"
-        @add-color="onColorAdd"
-        @strength-input="emitNodeParam('strength', $event)"
-        @generate="onColorGenerate"
       />
     </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
@@ -263,7 +246,6 @@ import type { ComponentPublicInstance } from 'vue'
 import { computed, reactive, ref } from 'vue'
 import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/config/nodeOptionConfig'
 import type {
-  ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
@@ -320,14 +302,10 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'update-prompt-text', value: string): void
   (e: 'update-node-param', payload: { key: string; value: unknown }): void
-  (e: 'color-apply-preset', value: string[]): void
-  (e: 'color-remove', index: number): void
-  (e: 'color-add', value: string): void
   (e: 'mask-toggle-invert'): void
   (e: 'delete-node'): void
   (e: 'generate-edit'): void
   (e: 'generate-enhance'): void
-  (e: 'generate-color'): void
   (e: 'generate-wear'): void
   (e: 'generate-model'): void
   (e: 'generate-viewpoint'): void
@@ -362,7 +340,6 @@ const isPromptNode = computed(() => props.data.kind === 'prompt')
 const isImageNode = computed(() => props.data.kind === 'image')
 const isEditNode = computed(() => props.data.kind === 'edit')
 const isEnhanceNode = computed(() => props.data.kind === 'enhance')
-const isColorNode = computed(() => props.data.kind === 'color')
 const isFusionNode = computed(() => props.data.kind === 'fusion')
 const isWearNode = computed(() => props.data.kind === 'wear')
 const isMaskNode = computed(() => props.data.kind === 'mask')
@@ -415,9 +392,6 @@ const editSnapshot = computed<EditNodeItem | null>(() =>
 const enhanceSnapshot = computed<EnhanceNodeItem | null>(() =>
   isEnhanceNode.value ? resolveSnapshotNode<EnhanceNodeItem>() : null,
 )
-const colorSnapshot = computed<ColorNodeItem | null>(() =>
-  isColorNode.value ? resolveSnapshotNode<ColorNodeItem>() : null,
-)
 const fusionSnapshot = computed<FusionNodeItem | null>(() =>
   isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null,
 )
@@ -469,6 +443,10 @@ const imageGenerating = computed(
   () => !!props.imageDirectGenerating || imageSnapshot.value?.outputStatus === 'running',
 )
 const imageInputLocked = computed(() => imageGenerating.value && !displayImage.value)
+const imageEmptyIconVariant = computed<'image' | 'fusion'>(() => {
+  const uiState = props.uiState as NodeUiState<'image'> | undefined
+  return uiState?.connection?.sourceKind?.image === 'fusion' ? 'fusion' : 'image'
+})
 
 const stageHeight = computed(() => {
   if (!imageSnapshot.value) return 280
@@ -626,18 +604,6 @@ function emitNodeParam(key: string, value: unknown) {
   emit('update-node-param', { key, value })
 }
 
-function onColorApplyPreset(value: string[]) {
-  emit('color-apply-preset', value)
-}
-
-function onColorRemove(index: number) {
-  emit('color-remove', index)
-}
-
-function onColorAdd(value: string) {
-  emit('color-add', value)
-}
-
 function onMaskToggleInvert() {
   emit('mask-toggle-invert')
 }
@@ -652,10 +618,6 @@ function onEnhanceGenerate() {
 
 function onEditGenerate() {
   emit('generate-edit')
-}
-
-function onColorGenerate() {
-  emit('generate-color')
 }
 
 function onWearGenerate() {

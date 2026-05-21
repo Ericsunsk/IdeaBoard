@@ -4,7 +4,6 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
   'image',
   'prompt',
   'mask',
-  'color',
   'model',
   'viewpoint',
   'edit',

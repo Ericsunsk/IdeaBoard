@@ -1,7 +1,6 @@
 import type {
   CanvasConnectionNodeType,
   CanvasConnectionPort,
-  ColorNodeItem,
   EditNodeItem,
   EnhanceNodeItem,
   FusionNodeItem,
@@ -20,7 +19,6 @@ export type CanvasConnectionContractNode =
   | PromptNodeItem
   | ImageNodeItem
   | MaskNodeItem
-  | ColorNodeItem
   | ModelNodeItem
   | ViewpointNodeItem
   | EditNodeItem
@@ -153,13 +151,6 @@ export function getCanvasNodePortContracts(
         input('imageA', 'image', true),
         input('imageB', 'image', true),
         input('mask', 'mask', false),
-        output('image', 'image'),
-      ]
-    case 'color':
-      return [
-        input('image', 'image', true),
-        input('mask', 'mask'),
-        input('prompt', 'prompt'),
         output('image', 'image'),
       ]
     default:

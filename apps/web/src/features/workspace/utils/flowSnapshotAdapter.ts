@@ -36,7 +36,6 @@ type SnapshotNodeCollectionKey =
   | 'modelNodes'
   | 'viewpointNodes'
   | 'maskNodes'
-  | 'colorNodes'
   | 'editNodes'
   | 'fusionNodes'
   | 'enhanceNodes'
@@ -51,7 +50,6 @@ const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
   { key: 'modelNodes', nodeType: 'model' },
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
   { key: 'maskNodes', nodeType: 'mask' },
-  { key: 'colorNodes', nodeType: 'color' },
   { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
   { key: 'enhanceNodes', nodeType: 'enhance' },
@@ -73,7 +71,6 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
     modelNodes: [],
     viewpointNodes: [],
     maskNodes: [],
-    colorNodes: [],
     editNodes: [],
     fusionNodes: [],
     enhanceNodes: [],
@@ -191,8 +188,6 @@ function resolveCollectionKeyByNodeType(
       return 'viewpointNodes'
     case 'mask':
       return 'maskNodes'
-    case 'color':
-      return 'colorNodes'
     case 'edit':
       return 'editNodes'
     case 'fusion':

@@ -177,9 +177,7 @@ func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {
 		return false
 	}
 	switch featureSlug {
-	case workflow.FeatureSlugDirectedRecolor,
-		workflow.FeatureSlugSeriesColor,
-		workflow.FeatureSlugPartialEdit,
+	case workflow.FeatureSlugPartialEdit,
 		workflow.FeatureSlugBgSwap,
 		workflow.FeatureSlugFabricOnBody,
 		workflow.FeatureSlugHDUpscale:

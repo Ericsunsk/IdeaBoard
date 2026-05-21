@@ -6,7 +6,6 @@ import {
   getEditNodePortLabel,
 } from '../config/canvasNodeConnectionContract'
 import {
-  hasColorNodeColors,
   isCanvasExecutionOutputNodeType,
   resolveWorkflowNodeOutputStatus,
   type CanvasConnectionNodeType,
@@ -14,7 +13,6 @@ import {
   type CanvasExecutionOutputNodeItem,
   type CanvasExecutionOutputNodeType,
   type CanvasNodeItem,
-  type ColorNodeItem,
   type ViewpointNodeItem,
 } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
@@ -38,6 +36,7 @@ type FlowNodeConnectionStatus = {
   hasAnyConnection: boolean
   incoming: Partial<Record<CanvasConnectionPort, boolean>>
   pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>>
+  incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>>
   outgoing: Partial<Record<CanvasConnectionPort, boolean>>
 }
 
@@ -48,7 +47,6 @@ function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNo
     value === 'image' ||
     value === 'prompt' ||
     value === 'mask' ||
-    value === 'color' ||
     value === 'model' ||
     value === 'viewpoint' ||
     value === 'edit' ||
@@ -71,8 +69,6 @@ function resolveExecutionActionLabels(
     case 'model':
     case 'viewpoint':
       return { ready: '生成', running: '生成中...' }
-    case 'color':
-      return { ready: '应用', running: '应用中...' }
     case 'edit':
       return { ready: '编辑', running: '编辑中...' }
     case 'fusion':
@@ -151,9 +147,17 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       nodeId: string,
     ): FlowNodeConnectionStatus {
       const node = getSnapshotNode(nodeId)
-      if (!node) return { hasAnyConnection: false, incoming: {}, pendingIncoming: {}, outgoing: {} }
+      if (!node)
+        return {
+          hasAnyConnection: false,
+          incoming: {},
+          pendingIncoming: {},
+          incomingSourceKind: {},
+          outgoing: {},
+        }
       const incoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
       const pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
+      const incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>> = {}
       const outgoing: Partial<Record<CanvasConnectionPort, boolean>> = {}
 
       getCanvasNodeVisibleInputPorts(nodeType, node).forEach((portContract) => {
@@ -167,6 +171,8 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
           pendingIncoming[portContract.port] = false
           return
         }
+        const sourceType = getNodeType(matchedEdge.source)
+        if (sourceType) incomingSourceKind[portContract.port] = sourceType
         if (
           portContract.port === 'image' ||
           portContract.port === 'imageA' ||
@@ -189,6 +195,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         ),
         incoming,
         pendingIncoming,
+        incomingSourceKind,
         outgoing,
       }
     }
@@ -200,8 +207,6 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       switch (nodeType) {
         case 'viewpoint':
           return (node as ViewpointNodeItem).selectedViewpoint ? null : '选择视角'
-        case 'color':
-          return hasColorNodeColors(node as ColorNodeItem) ? null : '添加颜色'
         default:
           return null
       }
@@ -289,6 +294,9 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         },
         pending: {
           ...status.pendingIncoming,
+        },
+        sourceKind: {
+          ...status.incomingSourceKind,
         },
       }
 

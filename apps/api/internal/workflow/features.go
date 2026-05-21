@@ -9,39 +9,35 @@ import (
 var workflowFeatureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 const (
-	FeatureSlugSketchToDesign  = "sketch-to-design"
-	FeatureSlugStyleInnovate   = "style-innovate"
-	FeatureSlugPartialEdit     = "partial-edit"
-	FeatureSlugBgSwap          = "bg-swap"
-	FeatureSlugRemoveBg        = "remove-bg"
-	FeatureSlugFaceSwap        = "face-swap"
-	FeatureSlugStyleFusion     = "style-fusion"
-	FeatureSlugSeriesColor     = "series-color"
-	FeatureSlugDirectedRecolor = "directed-recolor"
-	FeatureSlugFabricOnBody    = "fabric-on-body"
-	FeatureSlugMultiAngle      = "multi-angle"
-	FeatureSlugVirtual3D       = "virtual-3d"
-	FeatureSlugPatternGen      = "pattern-gen"
-	FeatureSlugHDUpscale       = "hd-upscale"
-	FeatureSlugCanvasExtend    = "canvas-extend"
+	FeatureSlugSketchToDesign = "sketch-to-design"
+	FeatureSlugStyleInnovate  = "style-innovate"
+	FeatureSlugPartialEdit    = "partial-edit"
+	FeatureSlugBgSwap         = "bg-swap"
+	FeatureSlugRemoveBg       = "remove-bg"
+	FeatureSlugFaceSwap       = "face-swap"
+	FeatureSlugStyleFusion    = "style-fusion"
+	FeatureSlugFabricOnBody   = "fabric-on-body"
+	FeatureSlugMultiAngle     = "multi-angle"
+	FeatureSlugVirtual3D      = "virtual-3d"
+	FeatureSlugPatternGen     = "pattern-gen"
+	FeatureSlugHDUpscale      = "hd-upscale"
+	FeatureSlugCanvasExtend   = "canvas-extend"
 )
 
 var supportedTaskFeatureSlugs = map[string]struct{}{
-	FeatureSlugSketchToDesign:  {},
-	FeatureSlugStyleInnovate:   {},
-	FeatureSlugPartialEdit:     {},
-	FeatureSlugBgSwap:          {},
-	FeatureSlugRemoveBg:        {},
-	FeatureSlugFaceSwap:        {},
-	FeatureSlugStyleFusion:     {},
-	FeatureSlugSeriesColor:     {},
-	FeatureSlugDirectedRecolor: {},
-	FeatureSlugFabricOnBody:    {},
-	FeatureSlugMultiAngle:      {},
-	FeatureSlugVirtual3D:       {},
-	FeatureSlugPatternGen:      {},
-	FeatureSlugHDUpscale:       {},
-	FeatureSlugCanvasExtend:    {},
+	FeatureSlugSketchToDesign: {},
+	FeatureSlugStyleInnovate:  {},
+	FeatureSlugPartialEdit:    {},
+	FeatureSlugBgSwap:         {},
+	FeatureSlugRemoveBg:       {},
+	FeatureSlugFaceSwap:       {},
+	FeatureSlugStyleFusion:    {},
+	FeatureSlugFabricOnBody:   {},
+	FeatureSlugMultiAngle:     {},
+	FeatureSlugVirtual3D:      {},
+	FeatureSlugPatternGen:     {},
+	FeatureSlugHDUpscale:      {},
+	FeatureSlugCanvasExtend:   {},
 }
 
 func normalizeWorkflowFeatureSlug(raw string) string {

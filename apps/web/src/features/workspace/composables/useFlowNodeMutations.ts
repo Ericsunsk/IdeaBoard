@@ -1,8 +1,6 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, Node } from '@vue-flow/core'
-import { normalizeHexColor } from '../components/nodes/utils/colorPopoverUtils'
 import {
-  createColorNodeAt,
   createEditNodeAt,
   createEnhanceNodeAt,
   createFusionNodeAt,
@@ -17,12 +15,7 @@ import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowC
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { patchFlowSnapshotParam } from '../utils/flowSnapshotParamMutations'
 import { useFlowConnectionMutations } from './useFlowConnectionMutations'
-import {
-  MAX_COLOR_NODE_SWATCHES,
-  getDefaultCanvasNodeTitle,
-  isColorNodePlaceholderState,
-  normalizeColorNodeColors,
-} from '../types/canvasNodes'
+import { getDefaultCanvasNodeTitle } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransactions'
 
@@ -31,7 +24,6 @@ export type FlowCreatableNodeKind =
   | 'image'
   | 'edit'
   | 'enhance'
-  | 'color'
   | 'fusion'
   | 'wear'
   | 'mask'
@@ -78,8 +70,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         return createEditNodeAt(point)
       case 'enhance':
         return createEnhanceNodeAt(point)
-      case 'color':
-        return createColorNodeAt(point)
       case 'fusion':
         return createFusionNodeAt(point)
       case 'wear':
@@ -276,61 +266,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     updateSnapshotNode(nodeId, (snapshotNode) => patchFlowSnapshotParam(snapshotNode, payload))
   }
 
-  function onFlowColorApplyPreset(nodeId: string, value: string[]) {
-    updateSnapshotNode(nodeId, (snapshotNode) => {
-      const baseColors = isColorNodePlaceholderState(snapshotNode)
-        ? []
-        : Array.isArray(snapshotNode.colors)
-          ? snapshotNode.colors
-          : []
-      const normalizedPreset = value.map((color) => normalizeHexColor(color))
-      if (normalizedPreset.length === 0) return snapshotNode
-      const nextColors = normalizeColorNodeColors([...baseColors, ...normalizedPreset])
-      if (
-        nextColors.length === baseColors.length &&
-        nextColors.every((color: string, index: number) => color === baseColors[index])
-      ) {
-        return snapshotNode
-      }
-      return {
-        ...snapshotNode,
-        colors: nextColors,
-      }
-    })
-  }
-
-  function onFlowColorRemove(nodeId: string, index: number) {
-    updateSnapshotNode(nodeId, (snapshotNode) => {
-      const colors = Array.isArray(snapshotNode.colors) ? snapshotNode.colors : []
-      if (index < 0 || index >= colors.length) return snapshotNode
-      const nextColors = [...colors]
-      nextColors.splice(index, 1)
-      return { ...snapshotNode, colors: normalizeColorNodeColors(nextColors) }
-    })
-  }
-
-  function onFlowColorAdd(nodeId: string, value: string) {
-    updateSnapshotNode(nodeId, (snapshotNode) => {
-      const baseColors = isColorNodePlaceholderState(snapshotNode)
-        ? []
-        : Array.isArray(snapshotNode.colors)
-          ? snapshotNode.colors
-          : []
-      if (baseColors.length >= MAX_COLOR_NODE_SWATCHES) return snapshotNode
-      const nextColors = normalizeColorNodeColors([...baseColors, normalizeHexColor(value)])
-      if (
-        nextColors.length === baseColors.length &&
-        nextColors.every((color: string, index: number) => color === baseColors[index])
-      ) {
-        return snapshotNode
-      }
-      return {
-        ...snapshotNode,
-        colors: nextColors,
-      }
-    })
-  }
-
   function onFlowMaskToggleInvert(nodeId: string) {
     updateSnapshotNode(nodeId, (snapshotNode) => {
       const nextInvertMask = !snapshotNode.invertMask
@@ -345,7 +280,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   const EXECUTION_NODE_KINDS = new Set([
     'edit',
     'enhance',
-    'color',
     'fusion',
     'wear',
     'model',
@@ -417,9 +351,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     deleteSelectedFlowElements,
     onFlowPromptTextUpdate,
     onFlowNodeParamUpdate,
-    onFlowColorApplyPreset,
-    onFlowColorRemove,
-    onFlowColorAdd,
     onFlowMaskToggleInvert,
     markFlowExecutionNodeDirty,
   }

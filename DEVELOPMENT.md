@@ -110,8 +110,6 @@ graph LR
 | `remove-bg` | 抠图 |
 | `face-swap` | 换脸 |
 | `style-fusion` | 双图融合 |
-| `series-color` | 多色配色 |
-| `directed-recolor` | 定向换色 |
 | `fabric-on-body` | 面料上身 |
 | `multi-angle` | 单图单视角展示 |
 | `virtual-3d` | 虚拟 3D 展示 |
@@ -216,8 +214,6 @@ sequenceDiagram
 | 变量 | 说明 |
 |------|------|
 | `{{user_prompt}}` | 用户输入文本 |
-| `{{colors}}` | 颜色列表 |
-| `{{target_color}}` | 定向换色目标色 |
 | `{{blend_ratio}}` | 融合比例 |
 | `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 画布延伸参数 |
 | `{{tile_mode}}` | Wear 贴图模式 |

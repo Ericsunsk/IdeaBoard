@@ -37,7 +37,6 @@ const canvasConnectionNodeTypeSchema = z.enum([
   'image',
   'prompt',
   'mask',
-  'color',
   'model',
   'viewpoint',
   'edit',
@@ -145,19 +144,6 @@ const imageNodeItemSchema = z.object({
   outputImages: z.array(imageNodeOutputItemSchema),
 }).strict()
 
-const colorNodeItemSchema = z.object({
-  id: finiteNumberSchema,
-  type: z.literal('color'),
-  x: finiteNumberSchema,
-  y: finiteNumberSchema,
-  width: finiteNumberSchema,
-  title: z.string().optional(),
-  colors: z.array(z.string()),
-  strength: finiteNumberSchema.min(0).max(100),
-  outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: z.array(imageNodeOutputItemSchema),
-}).strict()
-
 const editNodeItemSchema = z.object({
   id: finiteNumberSchema,
   type: z.literal('edit'),
@@ -250,7 +236,6 @@ export const canvasBoardSnapshotSchema = z
     modelNodes: z.array(modelNodeItemSchema),
     viewpointNodes: z.array(viewpointNodeItemSchema),
     maskNodes: z.array(maskNodeItemSchema),
-    colorNodes: z.array(colorNodeItemSchema),
     editNodes: z.array(editNodeItemSchema),
     fusionNodes: z.array(fusionNodeItemSchema),
     enhanceNodes: z.array(enhanceNodeItemSchema),

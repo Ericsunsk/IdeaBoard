@@ -357,7 +357,6 @@ function testFusionBlendPointRoundTripPreserved() {
     modelNodes: [],
     viewpointNodes: [],
     maskNodes: [],
-    colorNodes: [],
     editNodes: [],
     fusionNodes: [
       {

@@ -1,6 +1,4 @@
 import {
-  DEFAULT_COLOR_NODE_COLOR,
-  DEFAULT_COLOR_STRENGTH,
   DEFAULT_FUSION_NODE_OUTPUT_COUNT,
   DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
@@ -18,7 +16,6 @@ import {
 } from '../types/canvasNodes'
 import type {
   CanvasPoint,
-  ColorNodeItem,
   EnhanceNodeItem,
   EditNodeItem,
   FusionNodeItem,
@@ -182,21 +179,6 @@ export function createWearNodeAt(point: CanvasPoint): WearNodeItem {
     rotation: WEAR_ROTATION_DEFAULT,
     scale: WEAR_SCALE_DEFAULT,
     opacity: WEAR_OPACITY_DEFAULT,
-    outputStatus: 'idle',
-    outputImages: [],
-  }
-}
-
-export function createColorNodeAt(point: CanvasPoint): ColorNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'color',
-    x: point.x,
-    y: point.y,
-    width: 286,
-    title: getDefaultCanvasNodeTitle('color'),
-    colors: [DEFAULT_COLOR_NODE_COLOR],
-    strength: DEFAULT_COLOR_STRENGTH,
     outputStatus: 'idle',
     outputImages: [],
   }

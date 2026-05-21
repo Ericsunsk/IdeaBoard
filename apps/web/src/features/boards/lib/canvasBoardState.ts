@@ -2,7 +2,6 @@ import type {
   CanvasBoardSnapshot,
   CanvasConnection,
   CanvasViewportState,
-  ColorNodeItem,
   EnhanceNodeItem,
   EditNodeItem,
   FusionNodeItem,
@@ -23,7 +22,6 @@ export type CanvasBoardStateViewpointNode = ViewpointNodeItem
 export type CanvasBoardStateMaskNode = MaskNodeItem
 export type CanvasBoardStateImageNodeOutput = ImageNodeOutputItem
 export type CanvasBoardStateImageNode = ImageNodeItem
-export type CanvasBoardStateColorNode = ColorNodeItem
 export type CanvasBoardStateEditNode = EditNodeItem
 export type CanvasBoardStateFusionNode = FusionNodeItem
 export type CanvasBoardStateEnhanceNode = EnhanceNodeItem
@@ -143,7 +141,6 @@ export function collectCanvasBoardImageUrls(
   appendOutputNodeImageUrls(urls, snapshot.imageNodes)
   appendOutputNodeImageUrls(urls, snapshot.modelNodes)
   appendOutputNodeImageUrls(urls, snapshot.viewpointNodes)
-  appendOutputNodeImageUrls(urls, snapshot.colorNodes)
   appendOutputNodeImageUrls(urls, snapshot.enhanceNodes)
   appendOutputNodeImageUrls(urls, snapshot.editNodes)
   appendOutputNodeImageUrls(urls, snapshot.fusionNodes)

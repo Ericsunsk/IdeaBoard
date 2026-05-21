@@ -145,14 +145,10 @@
             :set-style-strength-track-ref="setFlowStyleStrengthTrackRef"
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
-            @color-apply-preset="(value) => onFlowColorApplyPreset(nodeProps.id, value)"
-            @color-remove="(index) => onFlowColorRemove(nodeProps.id, index)"
-            @color-add="(value) => onFlowColorAdd(nodeProps.id, value)"
             @mask-toggle-invert="() => onFlowMaskToggleInvert(nodeProps.id)"
             @delete-node="() => onFlowDeleteNode(nodeProps.id)"
             @generate-edit="() => onFlowEditGenerate(nodeProps.id)"
             @generate-enhance="() => onFlowEnhanceGenerate(nodeProps.id)"
-            @generate-color="() => onFlowColorGenerate(nodeProps.id)"
             @generate-wear="() => onFlowWearGenerate(nodeProps.id)"
             @generate-model="() => onFlowModelGenerate(nodeProps.id)"
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
@@ -290,7 +286,6 @@ const createNodeOptions: readonly { key: string; label: string; value: FlowCreat
   { key: 'image', label: 'Image', value: 'image' },
   { key: 'edit', label: 'Edit', value: 'edit' },
   { key: 'enhance', label: 'Enhance', value: 'enhance' },
-  { key: 'color', label: 'Color', value: 'color' },
   { key: 'fusion', label: 'Fusion', value: 'fusion' },
   { key: 'wear', label: 'Wear', value: 'wear' },
   { key: 'mask', label: 'Mask', value: 'mask' },
@@ -575,26 +570,8 @@ function onFlowNodeParamUpdate(nodeId: string, payload: { key: string; value: un
   _onFlowNodeParamUpdate(nodeId, payload)
   markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
 }
-const _onFlowColorApplyPreset = flowNodeMutations.onFlowColorApplyPreset
-const _onFlowColorRemove = flowNodeMutations.onFlowColorRemove
-const _onFlowColorAdd = flowNodeMutations.onFlowColorAdd
 const _onFlowMaskToggleInvert = flowNodeMutations.onFlowMaskToggleInvert
 const markFlowExecutionNodeDirty = flowNodeMutations.markFlowExecutionNodeDirty
-
-function onFlowColorApplyPreset(nodeId: string, value: string[]) {
-  _onFlowColorApplyPreset(nodeId, value)
-  markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
-}
-
-function onFlowColorRemove(nodeId: string, index: number) {
-  _onFlowColorRemove(nodeId, index)
-  markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
-}
-
-function onFlowColorAdd(nodeId: string, value: string) {
-  _onFlowColorAdd(nodeId, value)
-  markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
-}
 
 function onFlowMaskToggleInvert(nodeId: string) {
   _onFlowMaskToggleInvert(nodeId)
@@ -904,7 +881,6 @@ clearMaskCanvasRef = clearMaskCanvas
 const {
   onFlowEnhanceGenerate,
   onFlowEditGenerate,
-  onFlowColorGenerate,
   onFlowFusionGenerate,
   onFlowWearGenerate,
   onFlowModelGenerate,

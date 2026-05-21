@@ -59,33 +59,10 @@
           :class="{ 'is-readonly': props.inputLocked, 'is-loading': props.directGenerating }"
           @click="onEmptyStateClick"
         >
-          <svg
-            v-if="props.directGenerating"
-            class="image-node-stage-loader-logo"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-          >
-            <rect x="4" y="4" width="16" height="16" rx="3" />
-            <circle cx="15.5" cy="8.5" r="1.5" />
-            <path d="M5 16l4.5-4.5 4 4 2-2L19 17" />
-          </svg>
-          <svg
-            v-else
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-          >
-            <rect x="4" y="4" width="16" height="16" rx="3" />
-            <circle cx="15.5" cy="8.5" r="1.5" />
-            <path d="M5 16l4.5-4.5 4 4 2-2L19 17" />
-          </svg>
+          <NodeEmptyStateIcon
+            :variant="emptyIconVariant"
+            :class="{ 'image-node-stage-loader-logo': props.directGenerating }"
+          />
           <span v-if="!props.directGenerating">{{ emptyStateLabel }}</span>
         </div>
       </div>
@@ -126,6 +103,7 @@ import {
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
+import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
@@ -137,6 +115,7 @@ const props = defineProps<{
   stageHeight: number
   displayImage: { url: string } | null
   displayMode?: 'source' | 'node-output' | 'linked-output' | 'mask' | 'pending'
+  emptyIconVariant?: 'image' | 'fusion'
   inputLocked?: boolean
   uiState?: NodeUiState
   actionMenuVisible?: boolean
@@ -171,6 +150,7 @@ const emptyStateLabel = computed(() => {
   if (props.inputLocked) return 'Waiting...'
   return '上传或拖拽图片作为输入'
 })
+const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
 
 const showImageActionMenu = computed(() => !!props.actionMenuVisible && !!props.displayImage)
 const showPromptComposer = computed(() => !!props.promptComposerVisible && !!props.displayImage)
@@ -292,10 +272,15 @@ function selectOutputCount(value: number) {
   color: #8894a5;
 }
 
-.image-node-stage-empty svg {
+.image-node-stage-empty .node-empty-state-icon--image {
   width: 84px;
   height: 84px;
   stroke-width: 0.85;
+}
+
+.image-node-stage-empty .node-empty-state-icon--fusion {
+  width: 126px;
+  height: 126px;
 }
 
 .image-node-stage-empty span {
@@ -313,9 +298,6 @@ function selectOutputCount(value: number) {
 }
 
 .image-node-stage-loader-logo {
-  width: 84px;
-  height: 84px;
-  stroke-width: 0.85;
   animation: image-node-logo-spin-cycle 2s linear infinite;
 }
 
