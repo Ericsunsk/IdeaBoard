@@ -1,5 +1,4 @@
 import { taskApi } from '../../../shared/api/task'
-import { vectorizeApi } from '../../../shared/api/vectorize'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   buildExecutionTaskRequest,
@@ -179,23 +178,6 @@ export async function submitCanvasExtendTask(
     throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
   }
   return submitRes.data.task_id
-}
-
-export async function runToVector(source: ImageDirectActionSource): Promise<string[]> {
-  const res = await vectorizeApi.vectorize({
-    image_url: source.url,
-    threshold: 0.45,
-    turd_size: 2,
-    alpha_max: 1.0,
-    opt_tolerance: 0.2,
-    turn_policy: 'minority',
-    invert: false,
-    color_count: 0,
-  })
-  if (res.code !== 0 || !res.data?.svg_url) {
-    throw new Error(sanitizeApiErrorMessage(res.msg, 'Vectorize failed'))
-  }
-  return [res.data.svg_url]
 }
 
 export async function waitExistingOrLiveTaskResult(taskId: string): Promise<string[]> {

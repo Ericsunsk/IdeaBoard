@@ -73,31 +73,6 @@
         type="button"
         class="image-action-icon-btn node-tool-button"
         :disabled="directGenerating"
-        title="转矢量图"
-        @click="emit('action-to-vector')"
-      >
-        <span class="action-logo">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="5" cy="19" r="2" />
-            <circle cx="19" cy="5" r="2" />
-            <path d="M5 17C5 10 10 5 19 5" />
-          </svg>
-        </span>
-        <span class="action-tooltip">转矢量图</span>
-      </button>
-      <button
-        type="button"
-        class="image-action-icon-btn node-tool-button"
-        :disabled="directGenerating"
         title="线稿成款"
         @click="emit('action-sketch-to-design')"
       >
@@ -233,7 +208,6 @@ const emit = defineEmits<{
   (event: 'style-innovate-mousedown', value: MouseEvent): void
   (event: 'style-innovate-click'): void
   (event: 'action-remove-bg'): void
-  (event: 'action-to-vector'): void
   (event: 'action-sketch-to-design'): void
   (event: 'action-canvas-extend'): void
   (event: 'style-strength-track-mousedown', value: MouseEvent): void

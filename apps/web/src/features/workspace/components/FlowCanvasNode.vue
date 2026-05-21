@@ -261,7 +261,7 @@ import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import { resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
 
-type ImageAction = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design' | 'canvas-extend'
+type ImageAction = 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'canvas-extend'
 
 const props = withDefaults(
   defineProps<{

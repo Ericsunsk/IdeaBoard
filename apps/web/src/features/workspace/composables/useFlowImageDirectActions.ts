@@ -21,7 +21,6 @@ import {
   assertCanvasExtendSubmitReady,
   assertDirectActionSubmitReady,
   assertPromptImageSubmitReady,
-  runToVector,
   submitCanvasExtendTask,
   submitDirectActionTask,
   submitPromptImageGenerationTask,
@@ -48,7 +47,7 @@ import {
   resolveConnectedPromptText,
 } from '../services/flowTaskExecutorUtils'
 
-type DirectActionKey = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
+type DirectActionKey = 'remove-bg' | 'style-innovate' | 'sketch-to-design'
 type RunImageDirectActionOptions = {
   strength?: number
 }
@@ -158,22 +157,16 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
 
     let resultNodeId: string | null = null
     try {
-      if (action !== 'to-vector') {
-        await assertDirectActionSubmitReady(action)
-      }
+      await assertDirectActionSubmitReady(action)
       resultNodeId = appendPendingImageResultNode(source, nodeId)
       setNodeRunning(resultNodeId, true)
-      const taskId =
-        action === 'to-vector'
-          ? ''
-          : await submitDirectActionTask(
-              source,
-              action,
-              loadImageSizeFromUrl,
-              runOptions?.strength,
-            )
-      const urls =
-        action === 'to-vector' ? await runToVector(source) : await waitExistingOrLiveTaskResult(taskId)
+      const taskId = await submitDirectActionTask(
+        source,
+        action,
+        loadImageSizeFromUrl,
+        runOptions?.strength,
+      )
+      const urls = await waitExistingOrLiveTaskResult(taskId)
       const firstUrl = pickFirstValidUrl(urls)
       if (!firstUrl) throw new Error('任务完成但未返回图片')
       const ratio = await resolveTaskImageRatio(firstUrl, source.ratio, loadImageSizeFromUrl)

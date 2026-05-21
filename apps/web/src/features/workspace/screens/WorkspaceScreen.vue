@@ -1017,7 +1017,7 @@ const {
 
 function onFlowImageDirectAction(
   nodeId: string,
-  action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design' | 'canvas-extend',
+  action: 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'canvas-extend',
 ) {
   if (action === 'canvas-extend') {
     const entered = enterFlowExpandMode(nodeId)

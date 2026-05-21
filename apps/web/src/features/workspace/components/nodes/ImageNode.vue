@@ -97,7 +97,6 @@
         @action-remove-bg="emit('action', 'remove-bg')"
         @style-innovate-mousedown="emit('style-innovate-mousedown', $event)"
         @style-innovate-click="emit('action', 'style-innovate')"
-        @action-to-vector="emit('action', 'to-vector')"
         @action-sketch-to-design="emit('action', 'sketch-to-design')"
         @action-canvas-extend="emit('action', 'canvas-extend')"
         @style-strength-track-mousedown="emit('style-strength-track-mousedown', $event)"
@@ -168,7 +167,7 @@ const emit = defineEmits<{
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'prompt-generate', prompt: string, outputCount: number): void
   (e: 'expand-submit', prompt: string, outputCount: number): void
-  (e: 'action', action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design' | 'canvas-extend'): void
+  (e: 'action', action: 'remove-bg' | 'style-innovate' | 'sketch-to-design' | 'canvas-extend'): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
   (e: 'expand-handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
