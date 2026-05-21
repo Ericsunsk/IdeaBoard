@@ -246,6 +246,7 @@ export interface FusionNodeItem {
   title?: string
   prompt: string
   outputCount: number
+  aspectRatio: PromptAspectRatio
   blendPoint: FusionBlendPoint
   inputImages: FusionNodeInputImage[]
   outputStatus: WorkflowNodeOutputStatus

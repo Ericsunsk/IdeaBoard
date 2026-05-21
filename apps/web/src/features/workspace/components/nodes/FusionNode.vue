@@ -3,7 +3,7 @@
     class="workflow-node fusion-node"
     data-node-kind="fusion"
     :data-node-id="node.id"
-    :class="{ active, dragging, 'copy-mode': copyMode, running: uiState?.isRunning }"
+    :class="{ active, dragging, 'copy-mode': copyMode }"
     :style="nodeStyle"
   >
     <NodeHeader
@@ -39,9 +39,10 @@
         allow-empty
         offset="8px"
         placeholder="输入融合提示词"
-        :disabled="isGenerating"
+        :aspect-ratio="aspectRatio"
         :output-count="outputCountValue"
         :submit-disabled="!canGenerate"
+        @update:aspect-ratio="emit('update:aspect-ratio', $event)"
         @update:output-count="selectOutputCount"
         @submit="submitPrompt"
       />
@@ -55,6 +56,10 @@ import {
   clampImageNodeOutputCount,
   type FusionNodeItem,
 } from '../../types/canvasNodes'
+import {
+  normalizePromptAspectRatio,
+  type PromptAspectRatio,
+} from '../../config/promptAspectRatio'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import type { FusionBlendPoint } from '../../utils/fusionBlend'
 import FusionStage from './FusionStage.vue'
@@ -75,13 +80,13 @@ const emit = defineEmits<{
   (e: 'update:title', value: string): void
   (e: 'delete'): void
   (e: 'update:output-count', value: number): void
-  (e: 'update:prompt', value: string): void
+  (e: 'update:aspect-ratio', value: PromptAspectRatio): void
   (e: 'update:blend-point', value: FusionBlendPoint): void
   (e: 'update:input-images', value: FusionNodeItem['inputImages']): void
   (e: 'input-image-drop', event: DragEvent): void
   (e: 'input-image-remove', value: FusionNodeItem['inputImages'][number]): void
   (e: 'contextmenu', event: MouseEvent): void
-  (e: 'prompt-generate', prompt: string, outputCount: number): void
+  (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -89,7 +94,7 @@ const promptDraft = ref('')
 const visibleInputImages = computed(() => props.node.inputImages)
 const canGenerate = computed(() => visibleInputImages.value.length >= 2)
 const showPromptComposer = computed(() => !!props.promptComposerVisible)
-const isGenerating = computed(() => !!props.uiState?.isRunning)
+const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 
 watch(
@@ -100,10 +105,9 @@ watch(
   { immediate: true },
 )
 
-function submitPrompt(prompt: string, outputCount: number) {
-  if (isGenerating.value || !canGenerate.value) return
-  emit('update:prompt', prompt)
-  emit('prompt-generate', prompt, outputCount)
+function submitPrompt(prompt: string, outputCount: number, aspectRatio: PromptAspectRatio) {
+  if (!canGenerate.value) return
+  emit('prompt-generate', prompt, outputCount, aspectRatio)
   promptDraft.value = ''
 }
 

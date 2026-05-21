@@ -137,6 +137,7 @@ export function createFusionNodeAt(point: CanvasPoint): FusionNodeItem {
     title: getDefaultCanvasNodeTitle('fusion'),
     prompt: '',
     outputCount: DEFAULT_FUSION_NODE_OUTPUT_COUNT,
+    aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
     blendPoint: { ...DEFAULT_FUSION_BLEND_POINT },
     inputImages: [],
     outputStatus: 'idle',

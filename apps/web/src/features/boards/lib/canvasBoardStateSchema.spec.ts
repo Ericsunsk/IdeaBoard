@@ -99,6 +99,7 @@ function createValidState() {
         width: 240,
         prompt: 'fusion prompt',
         outputCount: 1,
+        aspectRatio: 'auto' as const,
         blendPoint: { x: 0.5, y: 0.5 },
         inputImages: [],
         outputStatus: 'idle' as const,
@@ -199,11 +200,13 @@ function testFusionBlendPointDefaultApplied() {
   const state = createValidState() as Record<string, any>
   state.fusionNodes = [{ ...state.fusionNodes[0] }]
   delete state.fusionNodes[0].blendPoint
+  delete state.fusionNodes[0].aspectRatio
   const parsed = canvasBoardStateSchema.safeParse(state)
-  expect(parsed.success === true, 'expected fusion node without blendPoint to stay valid')
+  expect(parsed.success === true, 'expected fusion node without defaulted fields to stay valid')
   if (parsed.success) {
     expect(parsed.data.fusionNodes[0]?.blendPoint.x === 0.5, 'expected blendPoint x default to 0.5')
     expect(parsed.data.fusionNodes[0]?.blendPoint.y === 0.5, 'expected blendPoint y default to 0.5')
+    expect(parsed.data.fusionNodes[0]?.aspectRatio === 'auto', 'expected aspectRatio default to auto')
   }
 }
 

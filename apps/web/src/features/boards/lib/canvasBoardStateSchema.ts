@@ -167,6 +167,7 @@ const fusionNodeItemSchema = z.object({
     .min(MIN_IMAGE_NODE_OUTPUT_COUNT)
     .max(MAX_IMAGE_NODE_OUTPUT_COUNT)
     .default(DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
+  aspectRatio: z.enum(PROMPT_ASPECT_RATIO_OPTIONS).default(DEFAULT_PROMPT_ASPECT_RATIO),
   blendPoint: z.object({
     x: finiteNumberSchema.min(0).max(1),
     y: finiteNumberSchema.min(0).max(1),

@@ -132,7 +132,7 @@
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
           @update:output-count="emitNodeParam('outputCount', $event)"
-          @update:prompt="emitNodeParam('prompt', $event)"
+          @update:aspect-ratio="emitNodeParam('aspectRatio', $event)"
           @update:blend-point="emitNodeParam('blendPoint', $event)"
           @delete="onDeleteRequest"
           @update:input-images="emitNodeParam('inputImages', $event)"
@@ -340,7 +340,7 @@ const emit = defineEmits<{
   (e: 'fusion-contextmenu', event: MouseEvent): void
   (e: 'image-prompt-generate', prompt: string, outputCount: number): void
   (e: 'image-expand-submit', prompt: string, outputCount: number): void
-  (e: 'fusion-prompt-generate', prompt: string, outputCount: number): void
+  (e: 'fusion-prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
   (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
   (e: 'image-action', action: ImageAction): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
@@ -727,8 +727,8 @@ function onImagePromptGenerate(prompt: string, outputCount: number) {
 function onImageExpandSubmit(prompt: string, outputCount: number) {
   emit('image-expand-submit', prompt, outputCount)
 }
-function onFusionPromptGenerate(prompt: string, outputCount: number) {
-  emit('fusion-prompt-generate', prompt, outputCount)
+function onFusionPromptGenerate(prompt: string, outputCount: number, aspectRatio: string) {
+  emit('fusion-prompt-generate', prompt, outputCount, aspectRatio)
 }
 function onPromptGenerate() {
   if (!promptSnapshot.value) return

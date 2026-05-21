@@ -5,7 +5,6 @@ import {
   EXECUTION_EDIT_MODE_META,
   EXECUTION_ENHANCE_META,
   EXECUTION_FACE_SWAP_META,
-  EXECUTION_FUSION_META,
   EXECUTION_MODEL_META,
   EXECUTION_VIEWPOINT_META,
   EXECUTION_WEAR_META,
@@ -17,7 +16,6 @@ import {
   validateFlowEnhanceNodeInputs,
 } from '../services/flowEnhanceExecutor'
 import { executeFlowEditNode, validateFlowEditNodeInputs } from '../services/flowEditExecutor'
-import { executeFlowFusionNode, validateFlowFusionNodeInputs } from '../services/flowFusionExecutor'
 import { executeFlowWearNode, validateFlowWearNodeInputs } from '../services/flowWearExecutor'
 import { executeFlowModelNode, validateFlowModelNodeInputs } from '../services/flowModelExecutor'
 import {
@@ -28,7 +26,6 @@ import type {
   CanvasExecutionOutputNodeType,
   EditNodeItem,
   EnhanceNodeItem,
-  FusionNodeItem,
   ModelNodeItem,
   ViewpointNodeItem,
   WearNodeItem,
@@ -87,7 +84,6 @@ export function loadImageSizeFromUrl(
 export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOptions) {
   const runningEnhanceNodeIds = ref(new Set<string>())
   const runningEditNodeIds = ref(new Set<string>())
-  const runningFusionNodeIds = ref(new Set<string>())
   const runningWearNodeIds = ref(new Set<string>())
   const runningModelNodeIds = ref(new Set<string>())
   const runningViewpointNodeIds = ref(new Set<string>())
@@ -102,7 +98,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       case 'edit':
         return runningEditNodeIds.value.has(nodeId)
       case 'fusion':
-        return runningFusionNodeIds.value.has(nodeId)
+        return false
       case 'wear':
         return runningWearNodeIds.value.has(nodeId)
       case 'model':
@@ -336,31 +332,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-  async function onFlowFusionGenerate(nodeId: string) {
-    await runFlowGenerationNode(nodeId, {
-      nodeType: 'fusion',
-      runningSet: runningFusionNodeIds,
-      runningMessage: 'Fusion 任务正在执行中',
-      missingNodeMessage: 'Fusion 节点不存在',
-      successMessage: 'Fusion 生成完成',
-      failureMessage: 'Fusion 生成失败',
-      errorMessage: 'Fusion 生成失败',
-      buildContext: (target, nodeId) => ({
-        nodeId,
-        snapshotNode: target.data.snapshotNode as FusionNodeItem,
-      }),
-      buildOptions: () => ({
-        nodes: options.nodes.value as FlowRuntimeNode[],
-        edges: options.edges.value as FlowRuntimeEdge[],
-        loadImageSizeFromUrl,
-        boardId: options.currentBoardId.value || undefined,
-      }),
-      validate: (ctx, opts) => validateFlowFusionNodeInputs(ctx, opts),
-      preflight: () => assertExecutionSubmitReady(EXECUTION_FUSION_META.feature),
-      execute: (ctx, opts) => executeFlowFusionNode(ctx, opts),
-    })
-  }
-
   async function onFlowWearGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'wear',
@@ -442,7 +413,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
   return {
     onFlowEnhanceGenerate,
     onFlowEditGenerate,
-    onFlowFusionGenerate,
     onFlowWearGenerate,
     onFlowModelGenerate,
     onFlowViewpointGenerate,

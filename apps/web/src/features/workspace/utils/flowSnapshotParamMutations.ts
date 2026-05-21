@@ -99,6 +99,7 @@ export function patchFlowSnapshotParam(
     }
     case 'prompt': {
       const nextPrompt = String(value ?? '').trim()
+      if (snapshotNode.type !== 'fusion' && !nextPrompt) return snapshotNode
       if (snapshotNode.prompt === nextPrompt) return snapshotNode
       return { ...snapshotNode, prompt: nextPrompt }
     }

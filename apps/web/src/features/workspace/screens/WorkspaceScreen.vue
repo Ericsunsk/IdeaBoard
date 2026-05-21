@@ -178,7 +178,10 @@
             @image-prompt-generate="(prompt, outputCount) => onFlowImagePromptGenerate(nodeProps.id, prompt, outputCount)"
             @image-expand-submit="(prompt, outputCount) => onFlowImageExpandSubmit(nodeProps.id, prompt, outputCount)"
             @fusion-contextmenu="(event) => onFlowFusionContextMenu(nodeProps.id, event)"
-            @fusion-prompt-generate="(prompt, outputCount) => onFlowFusionPromptGenerate(nodeProps.id, prompt, outputCount)"
+            @fusion-prompt-generate="
+              (prompt, outputCount, aspectRatio) =>
+                onFlowFusionPromptGenerate(nodeProps.id, prompt, outputCount, aspectRatio)
+            "
             @prompt-generate="(prompt, outputCount, aspectRatio) => onFlowPromptGenerate(nodeProps.id, prompt, outputCount, aspectRatio)"
             @image-action="(action) => onFlowImageDirectAction(nodeProps.id, action)"
             @style-innovate-mousedown="onFlowStyleInnovateMouseDown"
@@ -918,7 +921,6 @@ clearMaskCanvasRef = clearMaskCanvas
 const {
   onFlowEnhanceGenerate,
   onFlowEditGenerate,
-  onFlowFusionGenerate,
   onFlowWearGenerate,
   onFlowModelGenerate,
   onFlowViewpointGenerate,
@@ -949,6 +951,7 @@ const {
   runCanvasExtendAction,
   runImagePromptGeneration,
   runImagePromptGenerationFromSource,
+  runFusionPromptGeneration,
   runTextPromptGeneration,
 } = useFlowImageDirectActions({
   nodes: nodes as Ref<Node[]>,
@@ -1058,7 +1061,12 @@ function onFlowImageExpandSubmit(nodeId: string, prompt: string, outputCount: nu
   void commitFlowExpandMode(prompt, outputCount)
 }
 
-function onFlowFusionPromptGenerate(nodeId: string, prompt: string, outputCount: number) {
+function onFlowFusionPromptGenerate(
+  nodeId: string,
+  prompt: string,
+  outputCount: number,
+  aspectRatio: string,
+) {
   cancelFlowExpandMode()
   activeImageActionNodeId.value = null
   activeImagePromptNodeId.value = null
@@ -1066,7 +1074,8 @@ function onFlowFusionPromptGenerate(nodeId: string, prompt: string, outputCount:
   hideFlowStyleStrengthControl()
   onFlowNodeParamUpdate(nodeId, { key: 'prompt', value: prompt })
   onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: outputCount })
-  void onFlowFusionGenerate(nodeId)
+  onFlowNodeParamUpdate(nodeId, { key: 'aspectRatio', value: aspectRatio })
+  void runFusionPromptGeneration(nodeId, prompt, outputCount, aspectRatio)
 }
 
 function isImageInputHandle(handle: string | null | undefined) {

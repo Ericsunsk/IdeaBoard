@@ -16,6 +16,23 @@ export function normalizePromptAspectRatio(value: unknown): PromptAspectRatio {
   return PROMPT_ASPECT_RATIO_OPTIONS.find((option) => option === value) ?? DEFAULT_PROMPT_ASPECT_RATIO
 }
 
+export function resolvePromptAspectRatioValue(ratio: PromptAspectRatio): number | null {
+  switch (ratio) {
+    case '1:1':
+      return 1
+    case '3:4':
+      return 4 / 3
+    case '4:3':
+      return 3 / 4
+    case '9:16':
+      return 16 / 9
+    case '16:9':
+      return 9 / 16
+    default:
+      return null
+  }
+}
+
 export function buildPromptAspectRatioTaskParams(
   ratio: PromptAspectRatio,
 ): Record<string, string> {

@@ -1,8 +1,22 @@
 import { ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { clampImageNodeOutputCount, type ImageNodeItem } from '../types/canvasNodes'
-import { normalizePromptAspectRatio, type PromptAspectRatio } from '../config/promptAspectRatio'
+import {
+  clampImageNodeOutputCount,
+  type FusionNodeItem,
+  type ImageNodeItem,
+} from '../types/canvasNodes'
+import {
+  buildPromptAspectRatioTaskParams,
+  normalizePromptAspectRatio,
+  type PromptAspectRatio,
+} from '../config/promptAspectRatio'
 import type { FlowNodeData } from '../types/flowTypes'
+import { taskApi } from '../../../shared/api/task'
+import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
+import { buildExecutionTaskRequest, EXECUTION_FUSION_META } from '../config/executionContract'
+import { buildExecutionSizeParams } from '../utils/executionSizeParams'
+import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
+import { resolveFusionOutputSize } from '../utils/fusionOutputSizing'
 import {
   assertCanvasExtendSubmitReady,
   assertDirectActionSubmitReady,
@@ -27,6 +41,12 @@ import {
 } from '../utils/flowImageDirectActionSource'
 import type { FlowTransactions } from './useFlowTransactions'
 import { resolveCanvasExtendIntent, type CanvasExtendRect } from '../utils/canvasExtendGeometry'
+import {
+  assertTaskSubmitReady,
+  resolveConnectedImageInputs,
+  resolveConnectedInput,
+  resolveConnectedPromptText,
+} from '../services/flowTaskExecutorUtils'
 
 type DirectActionKey = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
 type RunImageDirectActionOptions = {
@@ -108,6 +128,12 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   function getDirectActionNodeById(nodeId: string): Node<FlowNodeData> | null {
     const target = options.nodes.value.find((node) => node.id === nodeId)
     if (!target || target.data?.kind !== 'image') return null
+    return target as Node<FlowNodeData>
+  }
+
+  function getFusionNodeById(nodeId: string): Node<FlowNodeData> | null {
+    const target = options.nodes.value.find((node) => node.id === nodeId)
+    if (!target || target.data?.kind !== 'fusion') return null
     return target as Node<FlowNodeData>
   }
 
@@ -362,6 +388,131 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
   }
 
+  async function runFusionPromptGeneration(
+    nodeId: string,
+    prompt: string,
+    outputCount: number,
+    aspectRatio: string,
+  ) {
+    const fusionNode = getFusionNodeById(nodeId)
+    if (!fusionNode?.data?.snapshotNode || typeof fusionNode.data.snapshotNode !== 'object') {
+      options.onWarning('Fusion 节点不存在')
+      return
+    }
+    const snapshot = fusionNode.data.snapshotNode as FusionNodeItem
+    const taskGraph = {
+      nodes: options.nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>,
+      edges: options.edges.value as Array<{
+        source: string
+        sourceHandle?: string | null
+        target: string
+        targetHandle?: string | null
+      }>,
+    }
+    const inputImages = resolveConnectedImageInputs(taskGraph, nodeId, snapshot.inputImages, 4)
+    if (inputImages.length < 2) {
+      options.onWarning('Fusion 节点至少需要 2 张图片')
+      return
+    }
+    if (inputImages.length > 4) {
+      options.onWarning('Fusion 节点最多支持 4 张图片')
+      return
+    }
+    const fusionInputs = inputImages
+      .map((item) => ({ ...item, url: item.url.trim() }))
+      .filter((item) => item.url)
+      .slice(0, 4)
+    const imageUrls = fusionInputs.map((item) => item.url)
+    if (imageUrls.length < 2) {
+      options.onWarning('Fusion 输入图片无效')
+      return
+    }
+    const firstInput = fusionInputs[0]
+    const normalizedPrompt = `${prompt ?? ''}`.trim()
+    const normalizedAspectRatio = normalizePromptAspectRatio(aspectRatio)
+    const promptInput = resolveConnectedInput(taskGraph, nodeId, 'prompt')
+    const connectedPromptText = promptInput ? resolveConnectedPromptText(taskGraph, nodeId) : ''
+    const promptText = normalizedPrompt || connectedPromptText
+    const taskPrompt = promptText
+      ? `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`
+      : EXECUTION_FUSION_META.promptPrefix
+    const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
+    let resultNodeIds: string[] = []
+    try {
+      await assertTaskSubmitReady(
+        buildExecutionTaskRequest({
+          prompt: 'submit readiness',
+          feature: EXECUTION_FUSION_META.feature,
+        }),
+        '提交任务失败',
+      )
+      const imageSizes = await Promise.all(
+        fusionInputs.map((input) => loadImageSizeFromUrl(input.url)),
+      )
+      const outputSize = resolveFusionOutputSize({
+        inputImages: fusionInputs,
+        imageSizes,
+        blendPoint: snapshot.blendPoint,
+        stageWidth: snapshot.width,
+        aspectRatio: normalizedAspectRatio,
+      })
+      const imageWeights = outputSize.weights.slice(0, imageUrls.length)
+      const targetRatio = outputSize.targetRatio
+      const sizeSource = outputSize.sourceSize ?? outputSize.targetSize
+      const source: ImageDirectActionSource = {
+        url: firstInput.url,
+        ratio: targetRatio,
+        x: Number(fusionNode.position?.x ?? 0),
+        y: Number(fusionNode.position?.y ?? 0),
+        width: Number(snapshot.width) > 0 ? Number(snapshot.width) : 280,
+      }
+      resultNodeIds = appendPendingImageResultNodes(source, nodeId, resolvedOutputCount, {
+        outputAnchorNodeId: nodeId,
+        targetRatio,
+        targetWidth: resolveImageNodeFrameSize(targetRatio, true).width,
+      })
+      resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
+      await runPendingImageBatchGeneration({
+        resultNodeIds,
+        totalCount: resolvedOutputCount,
+        submitTask: async () => {
+          const submitRes = await taskApi.submit(
+            buildExecutionTaskRequest({
+              prompt: taskPrompt,
+              feature: EXECUTION_FUSION_META.feature,
+              imageUrls,
+              params: {
+                ...buildExecutionSizeParams(sizeSource, outputSize.targetSize),
+                ...buildPromptAspectRatioTaskParams(normalizedAspectRatio),
+                image_weights: imageWeights,
+              },
+            }),
+          )
+          if (submitRes.code !== 0 || !submitRes.data?.task_id) {
+            throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交 Fusion 任务失败'))
+          }
+          return { taskId: submitRes.data.task_id }
+        },
+        resolveResult: async (taskId) => {
+          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
+          const url = urls[0]
+          if (!url) throw new Error('任务完成但未返回图片')
+          const ratio = await resolveTaskImageRatio(url, targetRatio, loadImageSizeFromUrl)
+          return { url, ratio }
+        },
+      })
+    } catch (error) {
+      for (const resultNodeId of resultNodeIds) removePendingImageResultNode(resultNodeId)
+      const msg =
+        error instanceof Error
+          ? sanitizeApiErrorMessage(error.message, 'Fusion 生成失败')
+          : 'Fusion 生成失败'
+      options.onWarning(msg)
+    } finally {
+      for (const resultNodeId of resultNodeIds) setNodeRunning(resultNodeId, false)
+    }
+  }
+
   function isNodeDirectActionRunning(nodeId: string): boolean {
     return runningNodeIds.value.has(nodeId)
   }
@@ -372,6 +523,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     runCanvasExtendAction,
     runImagePromptGeneration,
     runImagePromptGenerationFromSource,
+    runFusionPromptGeneration,
     runTextPromptGeneration,
   }
 }

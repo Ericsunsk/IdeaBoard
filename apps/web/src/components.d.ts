@@ -44,6 +44,7 @@ declare module 'vue' {
     NModal: typeof import('naive-ui')['NModal']
     NNotificationProvider: typeof import('naive-ui')['NNotificationProvider']
     NodeActionButton: typeof import('./features/workspace/components/nodes/NodeActionButton.vue')['default']
+    NodeAspectRatioPicker: typeof import('./features/workspace/components/nodes/NodeAspectRatioPicker.vue')['default']
     NodeEmptyStateIcon: typeof import('./features/workspace/components/nodes/NodeEmptyStateIcon.vue')['default']
     NodeExecutionFooter: typeof import('./features/workspace/components/nodes/NodeExecutionFooter.vue')['default']
     NodeHeader: typeof import('./features/workspace/components/nodes/NodeHeader.vue')['default']

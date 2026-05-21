@@ -81,44 +81,12 @@
           @contextmenu.stop
         />
         <div ref="actionsRef" class="prompt-node-actions node-tool-surface">
-          <div class="image-node-output-count-wrap node-tool-output-count-wrap">
-            <button
-              class="image-node-output-count node-tool-output-count node-tool-button node-tool-tooltip-trigger prompt-node-aspect-trigger"
-              type="button"
-              :class="{ active: aspectRatioPickerVisible }"
-              title="选择尺寸比例"
-              aria-label="尺寸比例"
-              @click.stop="toggleAspectRatioPicker"
-            >
-              <span class="prompt-node-aspect-icon" :data-ratio="aspectRatio">
-                <span aria-hidden="true"></span>
-              </span>
-              <span class="node-tool-tooltip">
-                {{ aspectRatio === 'auto' ? 'Auto' : aspectRatio }}
-              </span>
-            </button>
-            <NodeToolPopover
-              :visible="aspectRatioPickerVisible"
-              layout="row"
-              class="prompt-node-aspect-popover"
-            >
-              <button
-                v-for="option in PROMPT_ASPECT_RATIO_OPTIONS"
-                :key="option"
-                type="button"
-                class="prompt-node-aspect-option node-tool-tooltip-trigger"
-                :class="{ active: option === aspectRatio }"
-                @click.stop="selectAspectRatio(option)"
-              >
-                <span class="prompt-node-aspect-icon" :data-ratio="option">
-                  <span aria-hidden="true"></span>
-                </span>
-                <span class="node-tool-tooltip">
-                  {{ option === 'auto' ? 'Auto' : option }}
-                </span>
-              </button>
-            </NodeToolPopover>
-          </div>
+          <NodeAspectRatioPicker
+            :model-value="aspectRatio"
+            :visible="aspectRatioPickerVisible"
+            @toggle="toggleAspectRatioPicker"
+            @select="selectAspectRatio"
+          />
           <NodeOutputCountPicker
             :model-value="outputCount"
             :visible="outputCountPickerVisible"
@@ -158,15 +126,14 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
+import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
-import NodeToolPopover from './NodeToolPopover.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 import { useAutoResizeTextarea } from './composables/useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
 import { useSortableMediaInputs } from './composables/useSortableMediaInputs'
 import {
-  PROMPT_ASPECT_RATIO_OPTIONS,
   normalizePromptAspectRatio,
   type PromptAspectRatio,
 } from '../../config/promptAspectRatio'
@@ -360,72 +327,5 @@ function onAddSlotDrop(event: DragEvent) {
 }
 .prompt-node-actions.node-tool-surface {
   --node-tool-button-border: #e2e8f0;
-}
-.prompt-node-aspect-trigger {
-  flex: 0 0 var(--node-tool-button-size);
-  position: relative;
-}
-.prompt-node-aspect-icon {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-}
-.prompt-node-aspect-icon > span {
-  display: grid;
-  place-items: center;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  color: #94a3b8;
-  width: 20px;
-  height: 20px;
-  transition:
-    border-color 0.16s ease,
-    color 0.16s ease;
-}
-.prompt-node-aspect-icon[data-ratio='3:4'] > span {
-  width: 17px;
-  height: 22px;
-}
-.prompt-node-aspect-icon[data-ratio='9:16'] > span {
-  width: 13px;
-  height: 22px;
-}
-.prompt-node-aspect-icon[data-ratio='4:3'] > span {
-  width: 22px;
-  height: 17px;
-}
-.prompt-node-aspect-icon[data-ratio='16:9'] > span {
-  width: 22px;
-  height: 13px;
-}
-.prompt-node-aspect-popover {
-  right: 0;
-}
-.prompt-node-aspect-option {
-  position: relative;
-  width: var(--node-tool-button-size);
-  height: var(--node-tool-popover-option-height);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #5f6878;
-  cursor: pointer;
-  padding: 0;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
-}
-.prompt-node-aspect-option:hover,
-.prompt-node-aspect-option.active {
-  color: var(--node-tool-button-accent);
-}
-.prompt-node-aspect-option:hover .prompt-node-aspect-icon > span,
-.prompt-node-aspect-option.active .prompt-node-aspect-icon > span,
-.prompt-node-aspect-trigger:hover .prompt-node-aspect-icon > span,
-.prompt-node-aspect-trigger.active .prompt-node-aspect-icon > span {
-  border-color: var(--node-tool-button-accent);
-  color: var(--node-tool-button-accent);
 }
 </style>
