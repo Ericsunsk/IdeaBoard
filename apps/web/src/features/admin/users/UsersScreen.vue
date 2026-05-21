@@ -44,7 +44,7 @@
           trigger="click"
           placement="bottom-end"
           :show-arrow="false"
-          class="admin-popover-panel"
+          :theme-overrides="adminPopoverPanelThemeOverrides"
         >
           <template #trigger>
             <n-button secondary class="admin-icon-btn">
@@ -99,20 +99,13 @@
     </div>
 
     <div class="table-card users-table-card">
-      <AdminCardHeader
-        title="用户目录"
-        subtitle="管理平台所有注册用户的权限、状态及会话"
-        status="全部用户"
-      >
-        <template #prefix>
-          <n-icon size="18" class="admin-card-title-icon"><PeopleOutline /></n-icon>
-        </template>
+      <AdminCardHeader title="用户目录">
         <template #extra>
           <n-popover
             placement="bottom-end"
             trigger="click"
             :show-arrow="false"
-            class="admin-popover-panel"
+            :theme-overrides="adminPopoverPanelThemeOverrides"
           >
             <template #trigger>
               <n-button quaternary size="small" class="sort-btn">
@@ -120,19 +113,12 @@
                   ><n-icon><FilterOutline /></n-icon
                 ></template>
                 Sort
-                <span v-if="currentSorts.length > 0" style="margin-left: 4px; opacity: 0.8"
+                <span v-if="currentSorts.length > 0" class="sort-count"
                   >({{ currentSorts.length }})</span
                 >
               </n-button>
             </template>
-            <div
-              style="
-                padding: 12px;
-                background: var(--admin-card);
-                min-width: 130px;
-                border-radius: 8px;
-              "
-            >
+            <div class="sort-panel">
               <n-checkbox-group v-model:value="currentSorts">
                 <n-space vertical :size="12">
                   <n-checkbox value="role" class="minimal-checkbox">管理员优先</n-checkbox>
@@ -271,12 +257,13 @@ import {
   RefreshOutline,
   EllipsisHorizontal,
   SettingsOutline,
-  PeopleOutline,
   FilterOutline,
 } from '@vicons/ionicons5'
+import { adminPopoverPanelThemeOverrides } from '../shared/adminThemeOverrides'
 
 const message = useMessage()
 const dialog = useDialog()
+
 const queryClient = useQueryClient()
 const userListParams = { page: 1, page_size: 100 } as const
 const searchKeyword = ref('')
@@ -406,7 +393,9 @@ const columns: DataTableColumns<User> = [
             src: row.avatar || undefined,
             fallbackSrc: 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg',
           }),
-          h('div', { class: ['admin-status-dot', row.status === 1 ? 'is-normal' : 'is-banned'] }),
+          h('span', {
+            class: ['user-avatar-status', row.status === 1 ? 'is-normal' : 'is-banned'],
+          }),
         ]),
         h('div', { style: 'display: flex; flex-direction: column; gap: 0px;' }, [
           h('span', { class: 'user-name' }, row.username),
@@ -756,8 +745,34 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 
 .admin-compact-table :deep(.avatar-wrapper) {
   position: relative;
-  display: flex;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  overflow: visible;
   flex-shrink: 0;
+}
+
+.admin-compact-table :deep(.user-avatar-status) {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--admin-card-strong);
+  border-radius: 50%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.admin-compact-table :deep(.user-avatar-status.is-normal) {
+  background: #10b981;
+}
+
+.admin-compact-table :deep(.user-avatar-status.is-banned) {
+  background: #ef4444;
 }
 
 .admin-compact-table :deep(.user-name) {
@@ -843,9 +858,14 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
   color: var(--admin-text-2);
 }
 
-.sort-btn:hover {
-  background-color: rgba(255, 255, 255, 0.04) !important;
-  color: var(--admin-text-1) !important;
+.sort-count {
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.sort-panel {
+  min-width: 130px;
+  padding: 12px;
 }
 
 .minimal-checkbox {
@@ -859,6 +879,10 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 
 .table-container {
   padding: 0;
+}
+
+.users-table-card :deep(.n-data-table-thead) {
+  display: none;
 }
 
 @media (max-width: 820px) {

@@ -160,7 +160,7 @@
             placement="bottom-end"
             :show-arrow="false"
             raw
-            class="admin-popover-panel"
+            :theme-overrides="adminPopoverPanelThemeOverrides"
           >
             <template #trigger>
               <n-button quaternary circle size="small">
@@ -699,6 +699,7 @@ import {
   CodeWorkingOutline,
 } from '@vicons/ionicons5'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
+import { adminPopoverPanelThemeOverrides } from '../shared/adminThemeOverrides'
 import { taskStatusOptions, getTaskStatusConfig } from '../shared/monitorShared'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { useTaskMonitor } from './useTaskMonitor'

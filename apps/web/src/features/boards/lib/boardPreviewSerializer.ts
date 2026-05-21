@@ -2,6 +2,13 @@ import type {
   CanvasBoardSnapshot,
   CanvasConnectionNodeType,
 } from '../../workspace/types/canvasNodes'
+import {
+  DEFAULT_FUSION_BLEND_POINT,
+  FUSION_SLOT_LAYOUT,
+  getFusionLineAnchors,
+  getFusionSlotAnchors,
+  normalizeFusionBlendPoint,
+} from '../../workspace/utils/fusionBlend'
 import { resolveImageNodeStageHeight } from '../../workspace/utils/imageNodeSizing'
 
 export interface BoardPreviewFrame {
@@ -14,6 +21,8 @@ export interface BoardPreviewFrame {
   bodyOffsetY: number
   bodyHeight: number
   imageUrl?: string
+  inputImageUrls?: string[]
+  blendPoint?: { x: number; y: number }
   nodeType?: CanvasConnectionNodeType
   nodeId?: number
 }
@@ -42,6 +51,8 @@ interface NodeLike {
   sourceImageRatio?: unknown
   executionMaskDataUrl?: unknown
   maskDataUrl?: unknown
+  inputImages?: unknown
+  blendPoint?: unknown
 }
 
 interface BoardPreviewBounds {
@@ -185,6 +196,17 @@ function resolveNodePreview(
   return getLatestOutputPreview(node) ?? getSourcePreview(node)
 }
 
+function getFusionInputPreviewUrls(node: NodeLike): string[] {
+  if (!Array.isArray(node.inputImages)) return []
+  return node.inputImages
+    .map((raw) => {
+      if (!isRecord(raw)) return null
+      const url = typeof raw.url === 'string' ? raw.url.trim() : ''
+      return url || null
+    })
+    .filter((url): url is string => !!url)
+}
+
 function resolveNodeBodyHeight(
   nodeType: CanvasConnectionNodeType,
   width: number,
@@ -195,6 +217,7 @@ function resolveNodeBodyHeight(
     return resolveImageNodeStageHeight(width, preview?.ratio ?? 1, !!preview)
   }
   if (nodeType === 'prompt') return width
+  if (nodeType === 'fusion') return width
   if (nodeType === 'mask') {
     return preview ? Math.max(120, Math.min(360, Math.round(width * preview.ratio))) : 172
   }
@@ -260,6 +283,7 @@ function collectNodeFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
       if (!isFiniteNumber(node.id) || !isFiniteNumber(node.x) || !isFiniteNumber(node.y)) return
       const width = isFiniteNumber(node.width) && node.width > 0 ? node.width : 280
       const preview = resolveNodePreview(nodeType, node)
+      const fusionInputUrls = nodeType === 'fusion' ? getFusionInputPreviewUrls(node) : []
       frames.push({
         key: `node-${nodeType}-${node.id}-${index}`,
         kind: 'node',
@@ -269,7 +293,9 @@ function collectNodeFrames(state: CanvasBoardSnapshot): BoardPreviewFrame[] {
         height: resolveNodeHeight(nodeType, width, node),
         bodyOffsetY: 0,
         bodyHeight: resolveNodeBodyHeight(nodeType, width, node),
-        imageUrl: preview?.url,
+        imageUrl: nodeType === 'fusion' ? undefined : preview?.url,
+        inputImageUrls: fusionInputUrls,
+        blendPoint: nodeType === 'fusion' ? normalizeFusionBlendPoint(node.blendPoint) : undefined,
         nodeType,
         nodeId: node.id,
       })
@@ -408,7 +434,14 @@ async function buildPreviewImageMap(frames: readonly BoardPreviewFrame[]): Promi
   revoke: () => void
 }> {
   const uniqueUrls = Array.from(
-    new Set(frames.map((frame) => frame.imageUrl?.trim() || '').filter(Boolean)),
+    new Set(
+      frames
+        .flatMap((frame) => [
+          frame.imageUrl?.trim() || '',
+          ...(frame.inputImageUrls?.map((url) => url.trim()) ?? []),
+        ])
+        .filter(Boolean),
+    ),
   )
   const revokeUrls: string[] = []
   const imageEntries = await Promise.all(
@@ -600,6 +633,100 @@ function drawExecutionPreviewBody(
   ctx.fill()
 }
 
+function drawFusionNodePreview(
+  ctx: CanvasRenderingContext2D,
+  frame: BoardPreviewFrame,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  scale: number,
+  imageMap: Map<string, HTMLImageElement>,
+) {
+  const stageInset = Math.max(7, Math.min(14, Math.min(width, height) * 0.08))
+  const stageX = x + stageInset
+  const stageY = y + stageInset
+  const stageWidth = Math.max(0, width - stageInset * 2)
+  const stageHeight = Math.max(0, height - stageInset * 2)
+
+  const inputUrls = frame.inputImageUrls ?? []
+  const visualCount = Math.max(2, Math.min(FUSION_SLOT_LAYOUT.maxSlots, inputUrls.length || 0))
+  const anchors = getFusionSlotAnchors(visualCount, FUSION_SLOT_LAYOUT.fallbackStageWidth)
+  const lineAnchors = getFusionLineAnchors(visualCount, FUSION_SLOT_LAYOUT.fallbackStageWidth)
+  const blendPoint = frame.blendPoint ?? DEFAULT_FUSION_BLEND_POINT
+
+  const slotSize = Math.max(
+    18,
+    Math.min(stageWidth, stageHeight) * (visualCount >= 4 ? 0.24 : visualCount === 3 ? 0.27 : 0.3),
+  )
+  const slotRadius = Math.max(4, slotSize * 0.16)
+
+  lineAnchors.forEach((anchor) => {
+    const startX = stageX + blendPoint.x * stageWidth
+    const startY = stageY + blendPoint.y * stageHeight
+    const endX = stageX + anchor.x * stageWidth
+    const endY = stageY + anchor.y * stageHeight
+    ctx.beginPath()
+    ctx.moveTo(startX, startY)
+    ctx.lineTo(endX, endY)
+    ctx.strokeStyle = '#b9a8f7'
+    ctx.lineWidth = Math.max(1, scale * 1.2)
+    ctx.setLineDash([Math.max(3, scale * 4), Math.max(3, scale * 3)])
+    ctx.lineCap = 'round'
+    ctx.stroke()
+  })
+  ctx.setLineDash([])
+
+  anchors.forEach((anchor, index) => {
+    const slotCenterX = stageX + anchor.x * stageWidth
+    const slotCenterY = stageY + anchor.y * stageHeight
+    const slotX = slotCenterX - slotSize / 2
+    const slotY = slotCenterY - slotSize / 2
+    const inputImage = inputUrls[index] ? imageMap.get(inputUrls[index]!) : null
+    ctx.fillStyle = '#ffffff'
+    roundedRectPath(ctx, slotX, slotY, slotSize, slotSize, slotRadius)
+    ctx.fill()
+    ctx.strokeStyle = '#e3e8f4'
+    ctx.lineWidth = Math.max(0.8, scale)
+    roundedRectPath(ctx, slotX, slotY, slotSize, slotSize, slotRadius)
+    ctx.stroke()
+    if (inputImage) {
+      ctx.save()
+      roundedRectPath(
+        ctx,
+        slotX + 1.5,
+        slotY + 1.5,
+        Math.max(0, slotSize - 3),
+        Math.max(0, slotSize - 3),
+        Math.max(3, slotRadius - 2),
+      )
+      ctx.clip()
+      drawImageContain(
+        ctx,
+        inputImage,
+        slotX + 1.5,
+        slotY + 1.5,
+        Math.max(0, slotSize - 3),
+        Math.max(0, slotSize - 3),
+      )
+      ctx.restore()
+      return
+    }
+    drawEmptyImageGlyph(ctx, slotCenterX, slotCenterY, slotSize * 0.7)
+  })
+
+  const centerX = stageX + blendPoint.x * stageWidth
+  const centerY = stageY + blendPoint.y * stageHeight
+  const centerRadius = Math.max(3.5, Math.min(8, Math.min(stageWidth, stageHeight) * 0.045))
+  ctx.fillStyle = '#9278e6'
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, centerRadius, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = Math.max(0.9, scale)
+  ctx.stroke()
+}
+
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   frame: BoardPreviewFrame,
@@ -635,6 +762,8 @@ function drawFrame(
     }
   } else if (frame.nodeType === 'prompt') {
     drawPromptPreviewLines(ctx, x, bodyY, width, bodyHeight, scale)
+  } else if (frame.nodeType === 'fusion') {
+    drawFusionNodePreview(ctx, frame, x, bodyY, width, bodyHeight, scale, imageMap)
   } else if (image) {
     const inset = Math.max(7, Math.min(13, bodyHeight * 0.11))
     drawNodeImageStage(

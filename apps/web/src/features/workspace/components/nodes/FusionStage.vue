@@ -4,7 +4,11 @@
     class="fusion-node-stage node-tool-surface"
     data-flow-handle-frame
     :style="fusionStageStyle"
-    :class="{ 'is-active': active, 'is-drop-target': addSlotDragOver }"
+    :class="{
+      'is-active': active,
+      'is-drop-target': addSlotDragOver,
+      'is-blend-dragging': blendDragging,
+    }"
     @dragenter.stop.prevent="onAddSlotDragOver"
     @dragover.stop.prevent="onAddSlotDragOver"
     @dragleave.stop="onAddSlotDragLeave"
@@ -525,6 +529,20 @@ function onAddSlotDrop(event: DragEvent) {
     left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
     top 0.24s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: left, top, translate;
+}
+
+.fusion-node-stage.is-blend-dragging .fusion-node-ray {
+  transition: background-image 0.16s ease;
+}
+
+.fusion-node-stage.is-blend-dragging .fusion-blend-handle {
+  transition:
+    scale 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.fusion-node-stage.is-blend-dragging .fusion-blend-weight-badge {
+  transition: none;
 }
 
 @keyframes fusion-node-ray-flow {

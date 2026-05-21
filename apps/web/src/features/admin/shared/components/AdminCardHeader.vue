@@ -8,7 +8,9 @@
           <AdminChip v-if="status" :label="status" :variant="statusVariant" />
         </div>
         <h3 class="admin-card-title">{{ title }}</h3>
-        <p class="admin-card-subtitle" :title="subtitle">{{ subtitle }}</p>
+        <p v-if="trimmedSubtitle" class="admin-card-subtitle" :title="trimmedSubtitle">
+          {{ trimmedSubtitle }}
+        </p>
       </div>
     </div>
     <div v-if="$slots.extra" class="admin-card-header-side">
@@ -18,21 +20,28 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(
+import { computed } from 'vue'
+
+const props = withDefaults(
   defineProps<{
     provider?: string
     status?: string
     statusVariant?: 'neutral' | 'current' | 'enabled' | 'empty'
     title: string
-    subtitle: string
+    subtitle?: string
     size?: 'default' | 'small'
   }>(),
   {
     provider: '',
     status: '',
     statusVariant: 'neutral',
+    subtitle: '',
     size: 'default',
   },
+)
+
+const trimmedSubtitle = computed(() =>
+  typeof props.subtitle === 'string' ? props.subtitle.trim() : '',
 )
 </script>
 

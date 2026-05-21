@@ -170,15 +170,6 @@
   padding: 0;
 }
 
-.admin-popover-panel {
-  border-radius: 16px !important;
-  padding: 0 !important;
-  border: 1px solid var(--admin-border) !important;
-  background: var(--admin-card) !important;
-  box-shadow: none !important;
-  overflow: hidden;
-}
-
 .admin-compact-table .n-data-table-thead,
 .admin-compact-table thead {
   display: none !important;
