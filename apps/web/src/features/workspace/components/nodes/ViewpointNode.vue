@@ -76,7 +76,6 @@
       </div>
 
       <NodeExecutionFooter
-        :items="connectionChips"
         :disabled="uiState?.primaryAction?.disabled"
         :label="uiState?.primaryAction?.label || '生成'"
         @generate="emit('generate')"
@@ -89,7 +88,6 @@
 import type { ViewpointNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, VIEWPOINT_NODE_IO_SLOTS } from './config/nodeIoConfig'
 import {
   VIEWPOINT_CATEGORY_OPTIONS,
   VIEWPOINT_LIGHTING_OPTIONS,
@@ -103,7 +101,6 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   uiState?: NodeUiState
-  errorPortKeys: string[]
 }>()
 
 const emit = defineEmits<{
@@ -122,20 +119,6 @@ const lightingOptions = VIEWPOINT_LIGHTING_OPTIONS
 const currentViewOptions = computed(
   () => VIEWPOINT_OPTIONS_BY_CATEGORY[props.node.activeCategory] ?? [],
 )
-const io = computed(() =>
-  buildNodeIoFromSlots(VIEWPOINT_NODE_IO_SLOTS, null, {
-    connected: {
-      image: props.uiState?.connection?.connected?.image,
-      prompt: props.uiState?.connection?.connected?.prompt,
-      output: props.uiState?.connection?.connected?.output,
-    },
-    pending: {
-      image: props.uiState?.connection?.pending?.image,
-    },
-    errorPortKeys: props.errorPortKeys,
-  }),
-)
-const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>

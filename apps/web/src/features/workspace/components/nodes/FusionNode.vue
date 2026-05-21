@@ -68,7 +68,6 @@ const props = defineProps<{
   copyMode: boolean
   promptComposerVisible?: boolean
   uiState?: NodeUiState
-  errorPortKeys: string[]
 }>()
 
 const emit = defineEmits<{

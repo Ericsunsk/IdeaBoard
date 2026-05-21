@@ -154,7 +154,6 @@
       </div>
 
       <NodeExecutionFooter
-        :items="connectionChips"
         :disabled="uiState?.primaryAction?.disabled"
         :label="uiState?.primaryAction?.label || '增强'"
         @generate="emit('generate')"
@@ -171,7 +170,6 @@ import {
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, ENHANCE_NODE_IO_SLOTS } from './config/nodeIoConfig'
 import {
   ENHANCE_MODE_OPTIONS,
   ENHANCE_OUTPUT_FORMAT_OPTIONS,
@@ -186,7 +184,6 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   uiState?: NodeUiState
-  errorPortKeys: string[]
 }>()
 
 const emit = defineEmits<{
@@ -215,28 +212,6 @@ const nodeStyle = useCanvasNodeStyle(() => props.node)
 const extendMin = ENHANCE_EXTEND_PERCENT_MIN
 const extendMax = ENHANCE_EXTEND_PERCENT_MAX
 const isUpscaleMode = computed(() => props.node.mode === 'hd-upscale')
-const supportsPrompt = computed(() => props.node.mode === 'canvas-extend')
-const supportsMask = computed(() => props.node.mode === 'hd-upscale')
-const io = computed(() =>
-  buildNodeIoFromSlots(
-    ENHANCE_NODE_IO_SLOTS,
-    { supportsPrompt: supportsPrompt.value, supportsMask: supportsMask.value },
-    {
-      connected: {
-        image: props.uiState?.connection?.connected?.image,
-        mask: props.uiState?.connection?.connected?.mask,
-        prompt: props.uiState?.connection?.connected?.prompt,
-        output: props.uiState?.connection?.connected?.output,
-      },
-      pending: {
-        image: props.uiState?.connection?.pending?.image,
-        mask: props.uiState?.connection?.pending?.mask,
-      },
-      errorPortKeys: props.errorPortKeys,
-    },
-  ),
-)
-const connectionChips = computed(() => io.value.connectionChips)
 
 function toExtendSliderPct(value: number): number {
   return ((value - extendMin) / (extendMax - extendMin)) * 100

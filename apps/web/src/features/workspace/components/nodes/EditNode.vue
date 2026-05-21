@@ -55,7 +55,6 @@
       </div>
 
       <NodeExecutionFooter
-        :items="connectionChips"
         :disabled="uiState?.primaryAction?.disabled"
         :label="uiState?.primaryAction?.label || '编辑'"
         @generate="emit('generate')"
@@ -68,7 +67,6 @@
 import type { EditNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildEditNodeIoContext, buildNodeIoFromSlots, EDIT_NODE_IO_SLOTS } from './config/nodeIoConfig'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -77,7 +75,6 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   uiState?: NodeUiState
-  errorPortKeys: string[]
 }>()
 
 const emit = defineEmits<{
@@ -89,24 +86,6 @@ const emit = defineEmits<{
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-const io = computed(() =>
-  buildNodeIoFromSlots(EDIT_NODE_IO_SLOTS, buildEditNodeIoContext(props.node), {
-    connected: {
-      image: props.uiState?.connection?.connected?.image,
-      imageB: props.uiState?.connection?.connected?.imageB,
-      mask: props.uiState?.connection?.connected?.mask,
-      prompt: props.uiState?.connection?.connected?.prompt,
-      output: props.uiState?.connection?.connected?.output,
-    },
-    pending: {
-      image: props.uiState?.connection?.pending?.image,
-      imageB: props.uiState?.connection?.pending?.imageB,
-      mask: props.uiState?.connection?.pending?.mask,
-    },
-    errorPortKeys: props.errorPortKeys,
-  }),
-)
-const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>

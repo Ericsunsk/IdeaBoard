@@ -124,7 +124,6 @@
       </div>
 
       <NodeExecutionFooter
-        :items="connectionChips"
         :disabled="uiState?.primaryAction?.disabled"
         :label="uiState?.primaryAction?.label || '生成'"
         @generate="emit('generate')"
@@ -138,7 +137,6 @@ import { MODEL_ANGLE_FRAMING_OPTIONS, describeModelAngleSpec } from './config/no
 import type { ModelAngleFraming, ModelNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, MODEL_NODE_IO_SLOTS } from './config/nodeIoConfig'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -147,7 +145,6 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   uiState?: NodeUiState
-  errorPortKeys: string[]
   backgroundOptions: Array<{ key: string; label: string }>
 }>()
 
@@ -164,24 +161,6 @@ const emit = defineEmits<{
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-const io = computed(() =>
-  buildNodeIoFromSlots(MODEL_NODE_IO_SLOTS, null, {
-    connected: {
-      image: props.uiState?.connection?.connected?.image,
-      modelImage: props.uiState?.connection?.connected?.imageA,
-      poseImage: props.uiState?.connection?.connected?.imageB,
-      prompt: props.uiState?.connection?.connected?.prompt,
-      output: props.uiState?.connection?.connected?.output,
-    },
-    pending: {
-      image: props.uiState?.connection?.pending?.image,
-      modelImage: props.uiState?.connection?.pending?.imageA,
-      poseImage: props.uiState?.connection?.pending?.imageB,
-    },
-    errorPortKeys: props.errorPortKeys,
-  }),
-)
-const connectionChips = computed(() => io.value.connectionChips)
 const showModelStrength = computed(
   () =>
     !!(props.uiState?.connection?.connected?.imageA || props.uiState?.connection?.pending?.imageA),

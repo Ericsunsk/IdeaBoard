@@ -85,7 +85,6 @@
       </div>
 
       <NodeExecutionFooter
-        :items="connectionChips"
         :disabled="uiState?.primaryAction?.disabled"
         :label="uiState?.primaryAction?.label || '上身'"
         @generate="emit('generate')"
@@ -98,7 +97,6 @@
 import type { WearNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 
-import { buildNodeIoFromSlots, WEAR_NODE_IO_SLOTS } from './config/nodeIoConfig'
 import { WEAR_TILE_MODE_OPTIONS } from './config/nodeOptionConfig'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
@@ -108,7 +106,6 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   uiState?: NodeUiState
-  errorPortKeys: string[]
 }>()
 
 const emit = defineEmits<{
@@ -125,24 +122,6 @@ const emit = defineEmits<{
 const wearTileModeOptions = WEAR_TILE_MODE_OPTIONS
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-
-const io = computed(() =>
-  buildNodeIoFromSlots(WEAR_NODE_IO_SLOTS, null, {
-    connected: {
-      imageA: props.uiState?.connection?.connected?.imageA,
-      imageB: props.uiState?.connection?.connected?.imageB,
-      mask: props.uiState?.connection?.connected?.mask,
-      output: props.uiState?.connection?.connected?.output,
-    },
-    pending: {
-      imageA: props.uiState?.connection?.pending?.imageA,
-      imageB: props.uiState?.connection?.pending?.imageB,
-      mask: props.uiState?.connection?.pending?.mask,
-    },
-    errorPortKeys: props.errorPortKeys,
-  }),
-)
-const connectionChips = computed(() => io.value.connectionChips)
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>
