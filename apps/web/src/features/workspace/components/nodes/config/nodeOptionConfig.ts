@@ -4,6 +4,12 @@ import type {
   WearNodeItem,
   ViewpointNodeItem,
 } from '../../../types/canvasNodes'
+import { describeWearTileMode as describeSharedWearTileMode } from '../../../../../shared/domain/wearTileModes'
+
+export {
+  WEAR_TILE_MODE_DESCRIPTIONS,
+  WEAR_TILE_MODE_TEMPLATE_DESC,
+} from '../../../../../shared/domain/wearTileModes'
 
 type OptionItem<T extends string | number> = { label: string; value: T }
 type ModelOptionItem = { key: string; label: string }
@@ -18,15 +24,8 @@ export const WEAR_TILE_MODE_OPTIONS: OptionItem<WearNodeItem['tileMode']>[] = [
   { label: 'Placement', value: 'single' },
 ]
 
-export const WEAR_TILE_MODE_DESCRIPTIONS: Record<WearNodeItem['tileMode'], string> = {
-  seamless: '平铺重复',
-  single: '单张贴合',
-}
-
-export const WEAR_TILE_MODE_TEMPLATE_DESC = '贴合法（平铺重复 / 单张贴合）'
-
 export function describeWearTileMode(mode: WearNodeItem['tileMode']): string {
-  return WEAR_TILE_MODE_DESCRIPTIONS[mode]
+  return describeSharedWearTileMode(mode)
 }
 
 export const MODEL_BACKGROUND_OPTIONS: ModelOptionItem[] = [

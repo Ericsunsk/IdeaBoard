@@ -1,29 +1,16 @@
 import type { SubmitTaskData } from '../../../shared/api/task'
+import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../shared/domain/workflowFeatures'
 
-export const EXECUTION_FEATURE = {
-  partialEdit: 'partial-edit',
-  bgSwap: 'bg-swap',
-  removeBg: 'remove-bg',
-  fabricOnBody: 'fabric-on-body',
-  styleFusion: 'style-fusion',
-  patternGen: 'pattern-gen',
-  sketchToImage: 'sketch-to-image',
-  styleVariation: 'style-variation',
-  multiAngle: 'multi-angle',
-  virtual3d: 'virtual-3d',
-  faceSwap: 'face-swap',
-  hdUpscale: 'hd-upscale',
-  imageExtend: 'image-extend',
-} as const
+export const EXECUTION_FEATURE = WORKFLOW_FEATURE
 
-export type ExecutionFeature = (typeof EXECUTION_FEATURE)[keyof typeof EXECUTION_FEATURE]
+export type ExecutionFeature = WorkflowFeature
 
 export const EXECUTION_EDIT_MODE_META = {
-  'partial-edit': {
+  [EXECUTION_FEATURE.partialEdit]: {
     feature: EXECUTION_FEATURE.partialEdit,
     promptPrefix: '[partial-edit]',
   },
-  'bg-swap': {
+  [EXECUTION_FEATURE.bgSwap]: {
     feature: EXECUTION_FEATURE.bgSwap,
     promptPrefix: '[bg-swap]',
   },

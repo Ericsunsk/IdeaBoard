@@ -1,5 +1,6 @@
-import { WEAR_TILE_MODE_TEMPLATE_DESC } from '../../workspace/components/nodes/config/nodeOptionConfig'
 import { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
+import { WEAR_TILE_MODE_TEMPLATE_DESC } from '../../../shared/domain/wearTileModes'
+import { WORKFLOW_FEATURE } from '../../../shared/domain/workflowFeatures'
 
 export interface VarDef {
   key: string
@@ -12,16 +13,16 @@ const noVars: VarDef[] = []
 
 export const featureList = [
   { slug: IMAGE_NODE_ACTION.sketchToImage, title: 'Quick · 草图成图' },
-  { slug: 'partial-edit', title: 'Edit · 局部改款' },
+  { slug: WORKFLOW_FEATURE.partialEdit, title: 'Edit · 局部改款' },
   { slug: IMAGE_NODE_ACTION.styleVariation, title: 'Quick · 风格延展' },
-  { slug: 'style-fusion', title: 'Fusion · 双图融合' },
-  { slug: 'fabric-on-body', title: 'Wear · 上身贴合' },
-  { slug: 'multi-angle', title: 'Model · 单视角控制' },
-  { slug: 'virtual-3d', title: 'Display · 商品展示' },
-  { slug: 'face-swap', title: 'Edit · 定向换脸' },
-  { slug: 'bg-swap', title: 'Edit · 换背景' },
+  { slug: WORKFLOW_FEATURE.styleFusion, title: 'Fusion · 双图融合' },
+  { slug: WORKFLOW_FEATURE.fabricOnBody, title: 'Wear · 上身贴合' },
+  { slug: WORKFLOW_FEATURE.multiAngle, title: 'Model · 单视角控制' },
+  { slug: WORKFLOW_FEATURE.virtual3d, title: 'Display · 商品展示' },
+  { slug: WORKFLOW_FEATURE.faceSwap, title: 'Edit · 定向换脸' },
+  { slug: WORKFLOW_FEATURE.bgSwap, title: 'Edit · 换背景' },
   { slug: IMAGE_NODE_ACTION.removeBg, title: 'Quick · 抠图' },
-  { slug: 'pattern-gen', title: 'Pattern · 图案生成' },
+  { slug: WORKFLOW_FEATURE.patternGen, title: 'Pattern · 图案生成' },
   { slug: IMAGE_NODE_ACTION.hdUpscale, title: 'Image Tools · 高清放大' },
   { slug: IMAGE_NODE_ACTION.imageExtend, title: 'Image Tools · 图片延伸' },
 ] as const
@@ -43,38 +44,38 @@ const featureGroupDefs: Array<{ key: string; title: string; desc: string; slugs:
         IMAGE_NODE_ACTION.sketchToImage,
         IMAGE_NODE_ACTION.styleVariation,
         IMAGE_NODE_ACTION.removeBg,
-        'pattern-gen',
+        WORKFLOW_FEATURE.patternGen,
       ],
     },
     {
       key: 'wear',
       title: 'Wear',
       desc: '面料贴合、上身效果和蒙版结合逻辑。',
-      slugs: ['fabric-on-body'],
+      slugs: [WORKFLOW_FEATURE.fabricOnBody],
     },
     {
       key: 'model',
       title: 'Model',
       desc: '视角、姿态与主体跟随控制。',
-      slugs: ['multi-angle'],
+      slugs: [WORKFLOW_FEATURE.multiAngle],
     },
     {
       key: 'display',
       title: 'Display',
       desc: '商品展示视角、光影和陈列表达。',
-      slugs: ['virtual-3d'],
+      slugs: [WORKFLOW_FEATURE.virtual3d],
     },
     {
       key: 'fusion',
       title: 'Fusion',
       desc: '双图融合时的主次、比例和修饰语义。',
-      slugs: ['style-fusion'],
+      slugs: [WORKFLOW_FEATURE.styleFusion],
     },
     {
       key: 'edit',
       title: 'Edit',
       desc: '局部改款、换背景和定向换脸。',
-      slugs: ['partial-edit', 'bg-swap', 'face-swap'],
+      slugs: [WORKFLOW_FEATURE.partialEdit, WORKFLOW_FEATURE.bgSwap, WORKFLOW_FEATURE.faceSwap],
     },
     {
       key: 'image-tools',
@@ -93,9 +94,9 @@ export type FeatureGroup = (typeof groupedFeatureGroups)[number]
 
 const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   [IMAGE_NODE_ACTION.sketchToImage]: noVars,
-  'partial-edit': promptVars,
+  [WORKFLOW_FEATURE.partialEdit]: promptVars,
   [IMAGE_NODE_ACTION.styleVariation]: [{ key: '{{strength}}', desc: '风格延展强度百分比（0-100）' }],
-  'fabric-on-body': [
+  [WORKFLOW_FEATURE.fabricOnBody]: [
     { key: '{{tile_mode}}', desc: WEAR_TILE_MODE_TEMPLATE_DESC },
     { key: '{{fabric_rotation}}', desc: 'Texture 方向角度（0-360）' },
     { key: '{{fabric_scale}}', desc: 'Texture 大小百分比（10-300）' },
@@ -110,7 +111,7 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     },
     { key: '{{use_mask}}', desc: '是否启用蒙版（连接 Mask 时自动为 true，未连接时自动为 false）' },
   ],
-  'multi-angle': [
+  [WORKFLOW_FEATURE.multiAngle]: [
     { key: '{{angle_spec}}', desc: '视角控制参数（JSON，系统按它决定 yaw 与景别）' },
     { key: '{{model_url}}', desc: '画布里接到 Model 输入口的参考图（系统自动传值）' },
     { key: '{{model_strength}}', desc: 'Model 输入口权重（0-100，越高越贴近参考图主体）' },
@@ -119,7 +120,7 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{background}}', desc: 'Model 节点背景参数（original / studio）' },
     { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本（弱修饰，用于氛围和细节）' },
   ],
-  'virtual-3d': [
+  [WORKFLOW_FEATURE.virtual3d]: [
     {
       key: '{{viewpoint}}',
       desc: 'Display 节点所选展示视角，系统会自动转换成中文描述（如：45° 侧视）',
@@ -130,16 +131,16 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
       desc: 'Prompt 节点输入口文本；未连接时系统会用当前视角/光影摘要兜底',
     },
   ],
-  'face-swap': noVars,
-  'bg-swap': [
+  [WORKFLOW_FEATURE.faceSwap]: noVars,
+  [WORKFLOW_FEATURE.bgSwap]: [
     {
       key: '{{user_prompt}}',
       desc: 'Prompt 节点输入口文本（可选，未连接时系统会用默认背景切换描述）',
     },
   ],
   [IMAGE_NODE_ACTION.removeBg]: noVars,
-  'pattern-gen': noVars,
-  'style-fusion': [
+  [WORKFLOW_FEATURE.patternGen]: noVars,
+  [WORKFLOW_FEATURE.styleFusion]: [
     {
       key: '{{user_prompt}}',
       desc: '用于弱修饰/辅助修饰融合方式、质感、细节、氛围；Image A / Image B 主次建议通过滑块控制',
@@ -167,7 +168,8 @@ const featureNotes: Partial<Record<FeatureSlug, string>> = {
     '画布右键「风格延展」仍需要配置固定 system prompt，只使用 {{strength}} 控制延展幅度百分比（0-100），不使用 {{user_prompt}} 模板变量。',
   [IMAGE_NODE_ACTION.removeBg]:
     '画布右键「抠图」是快捷工具，不接收用户输入；必须配置固定 system prompt，并且不要使用 {{user_prompt}} 模板变量。',
-  'pattern-gen': '底部输入栏「图案生成」建议保持后台 system prompt 为空，让用户输入自由发挥。',
+  [WORKFLOW_FEATURE.patternGen]:
+    '底部输入栏「图案生成」建议保持后台 system prompt 为空，让用户输入自由发挥。',
   [IMAGE_NODE_ACTION.hdUpscale]:
     'Image Tools · HD 无论是否连接 Mask 都统一走任务链并使用这里的系统提示词；连接 Mask 时 use_mask=true（并自动带入 mask 相关参数），未连接时 use_mask=false。',
 }

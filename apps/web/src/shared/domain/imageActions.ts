@@ -1,7 +1,9 @@
+import { WORKFLOW_FEATURE } from './workflowFeatures'
+
 export const IMAGE_NODE_ACTION = {
-  removeBg: 'remove-bg',
-  styleVariation: 'style-variation',
-  sketchToImage: 'sketch-to-image',
-  hdUpscale: 'hd-upscale',
-  imageExtend: 'image-extend',
+  removeBg: WORKFLOW_FEATURE.removeBg,
+  styleVariation: WORKFLOW_FEATURE.styleVariation,
+  sketchToImage: WORKFLOW_FEATURE.sketchToImage,
+  hdUpscale: WORKFLOW_FEATURE.hdUpscale,
+  imageExtend: WORKFLOW_FEATURE.imageExtend,
 } as const
