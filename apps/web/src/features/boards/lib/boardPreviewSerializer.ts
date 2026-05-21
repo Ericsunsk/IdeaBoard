@@ -531,7 +531,7 @@ function drawConnection(
   ctx.beginPath()
   ctx.moveTo(startX, startY)
   ctx.bezierCurveTo(startX + curve, startY, endX - curve, endY, endX, endY)
-  ctx.strokeStyle = withAlpha(PREVIEW_EDGE_STROKE, 0.82)
+  ctx.strokeStyle = withAlpha(PREVIEW_EDGE_STROKE, 0.5)
   ctx.lineWidth = 1.1
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -669,7 +669,7 @@ function drawFusionNodePreview(
     ctx.beginPath()
     ctx.moveTo(startX, startY)
     ctx.lineTo(endX, endY)
-    ctx.strokeStyle = '#b9a8f7'
+    ctx.strokeStyle = withAlpha('#b9a8f7', 0.5)
     ctx.lineWidth = Math.max(1, scale * 1.2)
     ctx.setLineDash([Math.max(3, scale * 4), Math.max(3, scale * 3)])
     ctx.lineCap = 'round'

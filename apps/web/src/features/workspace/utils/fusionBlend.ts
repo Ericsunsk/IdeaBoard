@@ -7,9 +7,7 @@ export const DEFAULT_FUSION_BLEND_POINT: FusionBlendPoint = { x: 0.5, y: 0.5 }
 export const FUSION_SLOT_LAYOUT = {
   maxSlots: 4,
   inset: 20,
-  gap: 6,
-  minSize: 46,
-  maxSize: 58,
+  slotSize: 52,
   fallbackStageWidth: 286,
 } as const
 
@@ -47,17 +45,9 @@ function resolveStageWidth(stageWidth?: number): number {
   return Number.isFinite(value) && value > 0 ? value : FUSION_SLOT_LAYOUT.fallbackStageWidth
 }
 
-function resolveSlotSize(stageWidth?: number): number {
-  const width = resolveStageWidth(stageWidth)
-  const rawSize =
-    (width - FUSION_SLOT_LAYOUT.inset * 2 - FUSION_SLOT_LAYOUT.gap * (FUSION_SLOT_LAYOUT.maxSlots - 1)) /
-    FUSION_SLOT_LAYOUT.maxSlots
-  return Math.max(FUSION_SLOT_LAYOUT.minSize, Math.min(rawSize, FUSION_SLOT_LAYOUT.maxSize))
-}
-
 function getFusionSlotGeometry(stageWidth?: number) {
   const width = resolveStageWidth(stageWidth)
-  const slotSize = resolveSlotSize(width)
+  const slotSize = FUSION_SLOT_LAYOUT.slotSize
   const centerNear = (FUSION_SLOT_LAYOUT.inset + slotSize / 2) / width
   const innerNear = (FUSION_SLOT_LAYOUT.inset + slotSize) / width
   return {

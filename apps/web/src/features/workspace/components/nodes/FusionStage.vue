@@ -1,9 +1,8 @@
 <template>
   <div
     ref="stageRef"
-    class="fusion-node-stage node-tool-surface"
+    class="fusion-node-stage node-tool-surface node-input-thumbnail-contract variant-standard"
     data-flow-handle-frame
-    :style="fusionStageStyle"
     :class="{
       'is-active': active,
       'is-drop-target': addSlotDragOver,
@@ -26,40 +25,17 @@
     </div>
     <div ref="thumbsRef" class="fusion-node-slots">
       <template v-for="(slot, index) in fusionSlotItems" :key="slot.key">
-        <div
+        <NodeInputThumbnail
           v-if="slot.image"
           v-motion="fusionSlotMotion"
           class="fusion-node-slot fusion-node-slot-item"
+          :src="slot.image.url"
+          removable
           :style="getSlotStyle(index)"
-          role="button"
-          tabindex="0"
           :data-image-id="slot.image.id"
           @mousedown.stop
-        >
-          <img :src="slot.image.url" alt="" draggable="false" />
-          <button
-            class="fusion-node-slot-remove"
-            type="button"
-            title="移除图片输入"
-            aria-label="移除图片输入"
-            @mousedown.stop
-            @pointerdown.stop
-            @click.stop="removeInputImage(slot.image.id)"
-          >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.4"
-              stroke-linecap="round"
-            >
-              <path d="M6 6l12 12" />
-              <path d="M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
+          @remove="removeInputImage(slot.image.id)"
+        />
         <div
           v-else
           class="fusion-node-slot fusion-node-slot-placeholder"
@@ -111,6 +87,7 @@ import {
   type FusionBlendPoint,
 } from '../../utils/fusionBlend'
 import { useFusionBlendControl } from './composables/useFusionBlendControl'
+import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import { useSortableMediaInputs } from './composables/useSortableMediaInputs'
 
 const props = defineProps<{
@@ -133,11 +110,10 @@ const stageRef = ref<HTMLElement | null>(null)
 const addSlotDragOver = ref(false)
 const maxInputImages = FUSION_SLOT_LAYOUT.maxSlots
 const fusionSlotMotion = {
-  initial: { opacity: 0, scale: 0.9 },
+  initial: { opacity: 0 },
   enter: {
     opacity: 1,
-    scale: 1,
-    transition: { type: 'spring', stiffness: 420, damping: 30 },
+    transition: { duration: 140, easing: 'ease-out' },
   },
 }
 const fusionRayMotion = {
@@ -172,8 +148,8 @@ const sourceBlendPoint = computed(() => props.blendPoint)
 const { sortableItems: sortableInputImages } = useSortableMediaInputs({
   containerRef: thumbsRef,
   sourceItems: visibleInputImages,
-  draggableSelector: '.fusion-node-slot-item',
-  filterSelector: '.fusion-node-slot-remove',
+  draggableSelector: '.node-input-thumbnail-item',
+  filterSelector: '.node-input-thumbnail-remove',
   fallbackClass: 'fusion-node-sortable-fallback',
   onUpdate: (next) => emit('update:input-images', next),
 })
@@ -208,12 +184,6 @@ const blendWeights = computed(() =>
   computeFusionBlendWeights(imageCount.value, activeBlendPoint.value, props.width),
 )
 const blendWeightPercents = computed(() => buildFusionDisplayPercentages(blendWeights.value))
-const fusionStageStyle = computed(() => ({
-  '--fusion-slot-inset': `${FUSION_SLOT_LAYOUT.inset}px`,
-  '--fusion-slot-gap': `${FUSION_SLOT_LAYOUT.gap}px`,
-  '--fusion-slot-min-size': `${FUSION_SLOT_LAYOUT.minSize}px`,
-  '--fusion-slot-max-size': `${FUSION_SLOT_LAYOUT.maxSize}px`,
-}))
 const visualSlotAnchors = computed(() => getFusionSlotAnchors(imageCount.value, props.width))
 const lineSlotAnchors = computed(() => getFusionLineAnchors(imageCount.value, props.width))
 const blendWeightBadges = computed(() =>
@@ -256,8 +226,8 @@ const fusionRays = computed(() => {
 function getSlotStyle(index: number) {
   const anchor = getFusionSlotAnchor(imageCount.value || maxInputImages, index, props.width)
   return {
-    left: `${anchor.x * 100}%`,
-    top: `${anchor.y * 100}%`,
+    left: `calc(${anchor.x * 100}% - (var(--fusion-slot-size) / 2))`,
+    top: `calc(${anchor.y * 100}% - (var(--fusion-slot-size) / 2))`,
   }
 }
 
@@ -301,15 +271,7 @@ function onAddSlotDrop(event: DragEvent) {
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .fusion-node-stage {
-  --fusion-slot-inset: 20px;
-  --fusion-slot-gap: 6px;
-  --fusion-slot-min-size: 46px;
-  --fusion-slot-max-size: 58px;
-  --fusion-slot-size: clamp(
-    var(--fusion-slot-min-size),
-    calc((100% - (var(--fusion-slot-inset) * 2) - (var(--fusion-slot-gap) * 3)) / 4),
-    var(--fusion-slot-max-size)
-  );
+  --fusion-slot-size: var(--node-input-thumbnail-size);
   position: relative;
   width: 100%;
   aspect-ratio: 1;
@@ -373,79 +335,20 @@ function onAddSlotDrop(event: DragEvent) {
   width: var(--fusion-slot-size);
   height: auto;
   aspect-ratio: 1 / 1;
-  border: 1px solid var(--node-tool-button-border);
+  border: 0;
   border-radius: 8px;
-  background: #ffffff;
+  background: transparent;
   overflow: hidden;
   padding: 0;
-  translate: -50% -50%;
   transition:
     left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
     top 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease,
     opacity 0.16s ease;
-  will-change: left, top, transform;
+  will-change: left, top;
 }
 
 .fusion-node-slot-item {
   cursor: grab;
-}
-
-.fusion-node-slot:hover,
-.fusion-node-slot:focus-visible,
-.fusion-node-slot.is-sortable-chosen {
-  border-color: var(--node-tool-button-accent);
-  background: #f8f7ff;
-  color: #272932;
-}
-
-.fusion-node-slot.is-sortable-chosen,
-.fusion-node-slot.is-sortable-drag {
-  cursor: grabbing;
-}
-
-.fusion-node-slot.is-sortable-ghost {
-  opacity: 0.45;
-}
-
-.fusion-node-slot img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  border-radius: calc(8px - 1px);
-  object-fit: cover;
-  pointer-events: none;
-}
-
-.fusion-node-slot-remove {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 16px;
-  height: 16px;
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  opacity: 0;
-  transform: scale(0.92);
-  transition:
-    opacity 0.14s ease,
-    transform 0.14s ease,
-    color 0.14s ease,
-    border-color 0.14s ease;
-}
-
-.fusion-node-slot:hover .fusion-node-slot-remove,
-.fusion-node-slot:focus-within .fusion-node-slot-remove {
-  opacity: 1;
-  transform: scale(1);
 }
 
 :global(.fusion-node-sortable-fallback) {

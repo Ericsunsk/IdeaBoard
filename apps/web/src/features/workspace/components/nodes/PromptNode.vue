@@ -29,42 +29,19 @@
       <div class="prompt-node-content">
         <div
           ref="thumbsRef"
-          class="prompt-node-thumbs node-tool-surface"
+          class="prompt-node-thumbs node-tool-surface node-input-thumbnail-contract variant-standard"
         >
-          <div
+          <NodeInputThumbnail
             v-for="item in sortableInputImages"
             :key="item.id"
-            class="prompt-node-thumb prompt-node-thumb-item node-tool-output-count node-tool-button"
-            role="button"
-            tabindex="0"
+            class="prompt-node-thumb prompt-node-thumb-item"
+            :src="item.url"
+            removable
             :data-image-id="item.id"
             @mousedown.stop
             @contextmenu.stop.prevent="emit('input-image-preview', item)"
-          >
-            <img :src="item.url" alt="" draggable="false" />
-            <button
-              class="prompt-node-thumb-remove"
-              type="button"
-              title="移除图片输入"
-              aria-label="移除图片输入"
-              @mousedown.stop
-              @pointerdown.stop
-              @click.stop="removeInputImage(item.id)"
-            >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.4"
-                stroke-linecap="round"
-              >
-                <path d="M6 6l12 12" />
-                <path d="M18 6L6 18" />
-              </svg>
-            </button>
-          </div>
+            @remove="removeInputImage(item.id)"
+          />
           <button
             v-if="canAcceptMoreImages"
             class="prompt-node-thumb prompt-node-thumb-add node-tool-output-count node-tool-button"
@@ -181,6 +158,7 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
+import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
 import NodeToolPopover from './NodeToolPopover.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
@@ -245,8 +223,8 @@ useAutoResizeTextarea(textInputRef, {
 const { sortableItems: sortableInputImages } = useSortableMediaInputs({
   containerRef: thumbsRef,
   sourceItems: visibleInputImages,
-  draggableSelector: '.prompt-node-thumb-item',
-  filterSelector: '.prompt-node-thumb-add, .prompt-node-thumb-remove',
+  draggableSelector: '.node-input-thumbnail-item',
+  filterSelector: '.prompt-node-thumb-add, .node-input-thumbnail-remove',
   fallbackClass: 'prompt-node-sortable-fallback',
   onUpdate: (next) => emit('update:input-images', next),
 })
@@ -340,82 +318,25 @@ function onAddSlotDrop(event: DragEvent) {
   color: #94a3b8;
 }
 .prompt-node-thumbs {
-  --node-tool-button-size: 46px;
+  --node-tool-button-size: var(--node-input-thumbnail-size);
   --node-tool-button-radius: 8px;
   --prompt-thumb-gap: 6px;
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, minmax(46px, 1fr));
+  grid-template-columns: repeat(4, var(--node-input-thumbnail-size));
   gap: var(--prompt-thumb-gap);
+  justify-content: space-between;
   overflow: visible;
   z-index: 3;
 }
 .prompt-node-thumb {
-  position: relative;
-  flex: 0 0 var(--node-tool-button-size);
+  width: var(--node-input-thumbnail-size);
+  height: var(--node-input-thumbnail-size);
+  flex: 0 0 var(--node-input-thumbnail-size);
   cursor: grab;
-  overflow: hidden;
-  padding: 0;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease,
-    opacity 0.16s ease;
 }
 .prompt-node-thumbs .prompt-node-thumb {
-  width: 100%;
-  height: auto;
   aspect-ratio: 1 / 1;
-}
-.prompt-node-thumb:hover,
-.prompt-node-thumb:focus-visible,
-.prompt-node-thumb.is-drop-target,
-.prompt-node-thumb.is-sortable-chosen {
-  border-color: var(--node-tool-button-accent);
-  background: #f8f7ff;
-  color: #272932;
-}
-.prompt-node-thumb.is-sortable-chosen,
-.prompt-node-thumb.is-sortable-drag {
-  cursor: grabbing;
-}
-.prompt-node-thumb.is-sortable-ghost {
-  opacity: 0.45;
-}
-.prompt-node-thumb img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  border-radius: calc(var(--node-tool-button-radius) - 1px);
-  object-fit: cover;
-  pointer-events: none;
-}
-.prompt-node-thumb-remove {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 16px;
-  height: 16px;
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  opacity: 0;
-  transform: scale(0.92);
-  transition:
-    opacity 0.14s ease,
-    transform 0.14s ease,
-    color 0.14s ease,
-    border-color 0.14s ease;
-}
-.prompt-node-thumb:hover .prompt-node-thumb-remove,
-.prompt-node-thumb:focus-within .prompt-node-thumb-remove {
-  opacity: 1;
-  transform: scale(1);
 }
 :global(.prompt-node-sortable-fallback) {
   opacity: 0 !important;

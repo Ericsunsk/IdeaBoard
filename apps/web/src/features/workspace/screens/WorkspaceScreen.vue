@@ -1218,9 +1218,9 @@ onMounted(async () => {
 
 <style scoped>
 .canvas-layout {
-  --flow-edge-color: #b1b1b7;
-  --flow-edge-active-color: #9278e6;
-  --flow-edge-selected-color: #7b8798;
+  --flow-edge-color: rgb(177 177 183 / 50%);
+  --flow-edge-active-color: rgb(146 120 230 / 50%);
+  --flow-edge-selected-color: rgb(123 135 152 / 50%);
   --flow-edge-width: 2;
   --flow-edge-dasharray: 5;
   --flow-edge-running-duration: 0.5s;

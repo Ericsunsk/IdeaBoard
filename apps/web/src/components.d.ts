@@ -51,6 +51,7 @@ declare module 'vue' {
     NodeExecutionFooter: typeof import('./features/workspace/components/nodes/NodeExecutionFooter.vue')['default']
     NodeHeader: typeof import('./features/workspace/components/nodes/NodeHeader.vue')['default']
     NodeIconButton: typeof import('./features/workspace/components/nodes/NodeIconButton.vue')['default']
+    NodeInputThumbnail: typeof import('./features/workspace/components/nodes/NodeInputThumbnail.vue')['default']
     NodeOutputCountPicker: typeof import('./features/workspace/components/nodes/NodeOutputCountPicker.vue')['default']
     NodePromptComposer: typeof import('./features/workspace/components/nodes/NodePromptComposer.vue')['default']
     NodeToolPopover: typeof import('./features/workspace/components/nodes/NodeToolPopover.vue')['default']
