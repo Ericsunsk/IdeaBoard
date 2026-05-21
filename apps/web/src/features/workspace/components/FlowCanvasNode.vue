@@ -41,6 +41,9 @@
       >
         <ImageNode
           :node="imageSnapshot"
+          :flow-node-id="props.nodeId"
+          :set-image-stage-ref="props.setImageStageRef"
+          :clear-image-stage-ref="props.clearImageStageRef"
           :active="selected"
           :dragging="props.dragging"
           :copy-mode="props.copyMode"
@@ -56,6 +59,9 @@
           :show-style-strength-control="!!props.showStyleStrengthControl"
           :style-innovate-strength-pct="props.styleInnovateStrengthPct ?? 50"
           :set-style-strength-track-ref="props.setStyleStrengthTrackRef ?? (() => {})"
+          :expand-mode-active="!!props.expandModeActive"
+          :expand-overlay-style="props.expandOverlayStyle ?? null"
+          :expand-handle-radius="props.expandHandleRadius ?? 4"
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
           @update:output-count="emitNodeParam('outputCount', $event)"
@@ -67,9 +73,14 @@
           @reset="onImageReset"
           @contextmenu="onImageContextMenu"
           @prompt-generate="onImagePromptGenerate"
+          @expand-submit="onImageExpandSubmit"
           @action="onImageAction"
           @style-innovate-mousedown="onStyleInnovateMouseDown"
           @style-strength-track-mousedown="onStyleStrengthTrackMouseDown"
+          @expand-handle-pointerdown="onImageExpandHandlePointerDown"
+          @expand-handle-pointermove="onImageExpandHandlePointerMove"
+          @expand-handle-pointerup="onImageExpandHandlePointerUp"
+          @expand-frame-pointerdown="onImageExpandFramePointerDown"
         />
       </div>
     </template>
@@ -97,15 +108,10 @@
         @node-mousedown="noopMouse"
         @update:title="emitNodeParam('title', $event)"
         @delete="onDeleteRequest"
-        @update:mode="emitNodeParam('mode', $event)"
         @update:upscale-mode="emitNodeParam('upscaleMode', $event)"
         @update:upscale-factor="emitNodeParam('upscaleFactor', $event)"
         @update:output-format="emitNodeParam('outputFormat', $event)"
         @update:output-quality="emitNodeParam('outputQuality', $event)"
-        @update:extend-top="emitNodeParam('extendTop', $event)"
-        @update:extend-right="emitNodeParam('extendRight', $event)"
-        @update:extend-bottom="emitNodeParam('extendBottom', $event)"
-        @update:extend-left="emitNodeParam('extendLeft', $event)"
         @generate="onEnhanceGenerate"
       />
     </template>
@@ -220,15 +226,15 @@
     </template>
 
     <div
-      v-if="showHandleRail"
       class="flow-canvas-node__handle-rail"
+      :class="{ 'is-disabled': disableHandleRailInteraction }"
       :style="handleRailStyle"
     >
       <FlowNodeHandles
         :kind="data.kind"
         :snapshot-node="data.snapshotNode"
         :ui-state="props.uiState"
-        :show-handles="isPointerOverNode"
+        :show-handles="isPointerOverNode && !disableHandleRailInteraction"
         @request-internals-update="emit('request-internals-update')"
       />
     </div>
@@ -252,9 +258,10 @@ import type {
 } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
+import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import { resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
 
-type ImageAction = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
+type ImageAction = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design' | 'canvas-extend'
 
 const props = withDefaults(
   defineProps<{
@@ -274,6 +281,11 @@ const props = withDefaults(
     showStyleStrengthControl?: boolean
     styleInnovateStrengthPct?: number
     setStyleStrengthTrackRef?: (el: Element | ComponentPublicInstance | null) => void
+    setImageStageRef?: (nodeId: string, element: Element | null) => void
+    clearImageStageRef?: (nodeId: string, element?: Element | null) => void
+    expandModeActive?: boolean
+    expandOverlayStyle?: Record<string, string> | null
+    expandHandleRadius?: number
   }>(),
   {
     selected: false,
@@ -290,6 +302,11 @@ const props = withDefaults(
     showStyleStrengthControl: false,
     styleInnovateStrengthPct: 50,
     setStyleStrengthTrackRef: () => undefined,
+    setImageStageRef: () => undefined,
+    clearImageStageRef: () => undefined,
+    expandModeActive: false,
+    expandOverlayStyle: null,
+    expandHandleRadius: 4,
   },
 )
 
@@ -322,11 +339,16 @@ const emit = defineEmits<{
   (e: 'image-contextmenu', event: MouseEvent): void
   (e: 'fusion-contextmenu', event: MouseEvent): void
   (e: 'image-prompt-generate', prompt: string, outputCount: number): void
+  (e: 'image-expand-submit', prompt: string, outputCount: number): void
   (e: 'fusion-prompt-generate', prompt: string, outputCount: number): void
   (e: 'prompt-generate', prompt: string, outputCount: number, aspectRatio: string): void
   (e: 'image-action', action: ImageAction): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
+  (e: 'expand-handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
+  (e: 'expand-handle-pointermove', event: PointerEvent): void
+  (e: 'expand-handle-pointerup', event: PointerEvent): void
+  (e: 'expand-frame-pointerdown', event: PointerEvent): void
   (e: 'request-internals-update'): void
 }>()
 
@@ -340,7 +362,7 @@ const isMaskNode = computed(() => props.data.kind === 'mask')
 const isModelNode = computed(() => props.data.kind === 'model')
 const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const showDefaultDragZone = false
-const showHandleRail = true
+const disableHandleRailInteraction = computed(() => isImageNode.value && !!props.expandModeActive)
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
@@ -450,13 +472,15 @@ const stageHeight = computed(() => {
   const latestOutput = outputs.length > 0 ? outputs[outputs.length - 1] : null
   const outputRatio = Number(latestOutput?.ratio)
   const sourceRatio = Number(imageSnapshot.value.sourceImageRatio)
+  const hasRunningOutput = imageSnapshot.value.outputStatus === 'running'
+  const hasImageFrame = !!displayImage.value || hasRunningOutput
   const ratio =
-    displayImage.value && Number.isFinite(outputRatio) && outputRatio > 0
+    Number.isFinite(outputRatio) && outputRatio > 0
       ? outputRatio
-      : displayImage.value && Number.isFinite(sourceRatio) && sourceRatio > 0
+      : Number.isFinite(sourceRatio) && sourceRatio > 0
         ? sourceRatio
         : 1
-  return resolveImageNodeStageHeight(imageSnapshot.value.width, ratio, !!displayImage.value)
+  return resolveImageNodeStageHeight(imageSnapshot.value.width, ratio, hasImageFrame)
 })
 
 function getNodeHandleFrameElement(): HTMLElement | null {
@@ -700,6 +724,9 @@ function onNodeMouseDown(event: MouseEvent) {
 function onImagePromptGenerate(prompt: string, outputCount: number) {
   emit('image-prompt-generate', prompt, outputCount)
 }
+function onImageExpandSubmit(prompt: string, outputCount: number) {
+  emit('image-expand-submit', prompt, outputCount)
+}
 function onFusionPromptGenerate(prompt: string, outputCount: number) {
   emit('fusion-prompt-generate', prompt, outputCount)
 }
@@ -722,6 +749,25 @@ function onStyleInnovateMouseDown(event: MouseEvent) {
 
 function onStyleStrengthTrackMouseDown(event: MouseEvent) {
   emit('style-strength-track-mousedown', event)
+}
+
+function onImageExpandHandlePointerDown(payload: {
+  anchor: CanvasExtendDragAnchor
+  event: PointerEvent
+}) {
+  emit('expand-handle-pointerdown', payload)
+}
+
+function onImageExpandHandlePointerMove(event: PointerEvent) {
+  emit('expand-handle-pointermove', event)
+}
+
+function onImageExpandHandlePointerUp(event: PointerEvent) {
+  emit('expand-handle-pointerup', event)
+}
+
+function onImageExpandFramePointerDown(event: PointerEvent) {
+  emit('expand-frame-pointerdown', event)
 }
 
 function noop() {}
@@ -788,6 +834,13 @@ function noopMouse() {}
   z-index: 24;
   pointer-events: none;
   overflow: visible;
+}
+
+.flow-canvas-node__handle-rail.is-disabled :deep(.flow-canvas-node__handle-aggregate),
+.flow-canvas-node__handle-rail.is-disabled :deep(.flow-canvas-node__handle-plus),
+.flow-canvas-node__handle-rail.is-disabled :deep(.flow-canvas-node__handle-aggregate::before) {
+  pointer-events: none;
+  opacity: 0;
 }
 
 .flow-canvas-node :deep(.workflow-node) {

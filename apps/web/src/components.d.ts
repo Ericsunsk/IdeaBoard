@@ -25,6 +25,7 @@ declare module 'vue' {
     FusionStage: typeof import('./features/workspace/components/nodes/FusionStage.vue')['default']
     HomeCanvasHeader: typeof import('./features/workspace/components/home/HomeCanvasHeader.vue')['default']
     HomeCanvasImageActionMenu: typeof import('./features/workspace/components/home/HomeCanvasImageActionMenu.vue')['default']
+    ImageCanvasExtendOverlay: typeof import('./features/workspace/components/nodes/ImageCanvasExtendOverlay.vue')['default']
     ImageNode: typeof import('./features/workspace/components/nodes/ImageNode.vue')['default']
     LoginModal: typeof import('./features/auth/components/LoginModal.vue')['default']
     MaskNode: typeof import('./features/workspace/components/nodes/MaskNode.vue')['default']

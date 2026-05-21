@@ -7,6 +7,6 @@ export interface FlowNodeData {
   nodeType?: CanvasConnectionNodeType
   title: string
   summary?: string
-  mode?: 'partial-edit' | 'bg-swap' | 'face-swap' | 'hd-upscale' | 'canvas-extend'
+  mode?: 'partial-edit' | 'bg-swap' | 'face-swap'
   snapshotNode?: unknown
 }

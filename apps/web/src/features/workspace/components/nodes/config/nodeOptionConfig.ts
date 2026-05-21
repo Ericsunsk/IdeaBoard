@@ -1,5 +1,4 @@
 import type {
-  EnhanceNodeItem,
   ModelAngleFraming,
   ModelAngleSpec,
   WearNodeItem,
@@ -15,19 +14,14 @@ export const GENERATE_RATIO_OPTIONS = ['1:1', '3:4', '4:3', '2:3', '3:2'] as con
 export const GENERATE_COUNT_OPTIONS = [1, 2, 4] as const
 
 
-export const ENHANCE_MODE_OPTIONS: OptionItem<EnhanceNodeItem['mode']>[] = [
-  { label: 'HD', value: 'hd-upscale' },
-  { label: 'Extend', value: 'canvas-extend' },
-]
-
-export const ENHANCE_UPSCALE_MODE_OPTIONS: OptionItem<EnhanceNodeItem['upscaleMode']>[] = [
+export const ENHANCE_UPSCALE_MODE_OPTIONS: OptionItem<'base' | 'enhancement'>[] = [
   { label: 'Base', value: 'base' },
   { label: 'Enhance', value: 'enhancement' },
 ]
 
-export const ENHANCE_UPSCALE_FACTOR_OPTIONS: EnhanceNodeItem['upscaleFactor'][] = [2, 3, 4]
+export const ENHANCE_UPSCALE_FACTOR_OPTIONS: Array<2 | 3 | 4> = [2, 3, 4]
 
-export const ENHANCE_OUTPUT_FORMAT_OPTIONS: OptionItem<EnhanceNodeItem['outputFormat']>[] = [
+export const ENHANCE_OUTPUT_FORMAT_OPTIONS: OptionItem<'jpg' | 'png'>[] = [
   { label: 'JPG', value: 'jpg' },
   { label: 'PNG', value: 'png' },
 ]

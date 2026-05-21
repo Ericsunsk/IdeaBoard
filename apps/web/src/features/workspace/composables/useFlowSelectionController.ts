@@ -6,6 +6,7 @@ type UseFlowSelectionControllerOptions = {
   activeImageActionNodeId: Ref<string | null>
   activeImagePromptNodeId?: Ref<string | null>
   activeFusionPromptNodeId?: Ref<string | null>
+  cancelFlowExpandMode?: () => void
   hideFlowStyleStrengthControl: () => void
   closeBoardHeaderEditing: () => void
   closeNodeContextMenu: () => void
@@ -48,6 +49,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
   }
 
   function onPaneClick() {
+    options.cancelFlowExpandMode?.()
     options.closeBoardHeaderEditing()
     options.closeNodeContextMenu()
     options.activeImageActionNodeId.value = null
@@ -58,6 +60,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
 
   function onFlowNodeClick() {
     if (options.activeTool.value === 'hand') return
+    options.cancelFlowExpandMode?.()
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
@@ -71,6 +74,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
       if (options.activeTool.value !== 'hand') {
         selectFlowNode(nodeId, { keepExisting: event.shiftKey })
       }
+      options.cancelFlowExpandMode?.()
       options.activeImageActionNodeId.value = null
       if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
       if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
@@ -79,6 +83,7 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
   }
 
   function deleteSelectedFlowElements() {
+    options.cancelFlowExpandMode?.()
     options.activeImageActionNodeId.value = null
     if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null

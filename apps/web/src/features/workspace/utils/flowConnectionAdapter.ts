@@ -79,7 +79,7 @@ function buildContractNode(
   return {
     id: nodeId,
     type: nodeType,
-    mode: data?.mode ?? (nodeType === 'edit' ? 'partial-edit' : 'hd-upscale'),
+    mode: data?.mode ?? (nodeType === 'edit' ? 'partial-edit' : undefined),
   } as CanvasConnectionContractNode
 }
 

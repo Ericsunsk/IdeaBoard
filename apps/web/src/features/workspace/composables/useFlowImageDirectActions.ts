@@ -4,9 +4,11 @@ import { clampImageNodeOutputCount, type ImageNodeItem } from '../types/canvasNo
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../config/promptAspectRatio'
 import type { FlowNodeData } from '../types/flowTypes'
 import {
+  assertCanvasExtendSubmitReady,
   assertDirectActionSubmitReady,
   assertPromptImageSubmitReady,
   runToVector,
+  submitCanvasExtendTask,
   submitDirectActionTask,
   submitPromptImageGenerationTask,
   submitPromptTextGenerationTask,
@@ -24,6 +26,7 @@ import {
   type ImageDirectActionSource,
 } from '../utils/flowImageDirectActionSource'
 import type { FlowTransactions } from './useFlowTransactions'
+import { resolveCanvasExtendIntent, type CanvasExtendRect } from '../utils/canvasExtendGeometry'
 
 type DirectActionKey = 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'
 type RunImageDirectActionOptions = {
@@ -40,6 +43,13 @@ type UseFlowImageDirectActionsOptions = {
   refreshNodeInternals?: (nodeIds: string[]) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
+}
+
+type CanvasExtendRectIntent = {
+  frameRect: CanvasExtendRect
+  originalImageRect: CanvasExtendRect
+  prompt?: string
+  outputCount?: number
 }
 
 export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOptions) {
@@ -153,6 +163,59 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       if (resultNodeId) {
         setNodeRunning(resultNodeId, false)
       }
+    }
+  }
+
+  async function runCanvasExtendAction(nodeId: string, intent: CanvasExtendRectIntent) {
+    const source = readImageSnapshot(nodeId)
+    if (!source?.url) {
+      options.onWarning('图片节点不存在或缺少 URL')
+      return
+    }
+
+    const { extendPercent, targetRatio, hasExtension } = resolveCanvasExtendIntent(
+      intent.frameRect,
+      intent.originalImageRect,
+    )
+    if (!hasExtension) {
+      options.onWarning('请先拖动扩图框')
+      return
+    }
+
+    const normalizedPrompt = `${intent.prompt ?? ''}`.trim()
+    const resolvedOutputCount = clampImageNodeOutputCount(intent.outputCount ?? 1)
+    let resultNodeIds: string[] = []
+    try {
+      await assertCanvasExtendSubmitReady()
+      resultNodeIds = appendPendingImageResultNodes(source, nodeId, resolvedOutputCount, {
+        targetRatio,
+      })
+      resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
+      await runPendingImageBatchGeneration({
+        resultNodeIds,
+        totalCount: resolvedOutputCount,
+        submitTask: async () => {
+          const taskId = await submitCanvasExtendTask({
+            source,
+            loadImageSize: loadImageSizeFromUrl,
+            extendPercent,
+            prompt: normalizedPrompt,
+          })
+          return { taskId }
+        },
+        resolveResult: async (taskId) => {
+          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
+          const url = urls[0]
+          if (!url) throw new Error('任务完成但未返回图片')
+          return { url, ratio: targetRatio }
+        },
+      })
+    } catch (error) {
+      for (const resultNodeId of resultNodeIds) removePendingImageResultNode(resultNodeId)
+      const msg = error instanceof Error ? error.message : '扩图失败'
+      options.onWarning(msg)
+    } finally {
+      for (const resultNodeId of resultNodeIds) setNodeRunning(resultNodeId, false)
     }
   }
 
@@ -306,6 +369,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   return {
     isNodeDirectActionRunning,
     runImageDirectAction,
+    runCanvasExtendAction,
     runImagePromptGeneration,
     runImagePromptGenerationFromSource,
     runTextPromptGeneration,

@@ -147,9 +147,10 @@
       </button>
       <button
         type="button"
-        class="image-action-icon-btn image-action-icon-btn--placeholder node-tool-button"
-        disabled
-        title="扩图（占位）"
+        class="image-action-icon-btn node-tool-button"
+        :disabled="directGenerating"
+        title="扩图"
+        @click="emit('action-canvas-extend')"
       >
         <span class="action-logo">
           <svg
@@ -234,6 +235,7 @@ const emit = defineEmits<{
   (event: 'action-remove-bg'): void
   (event: 'action-to-vector'): void
   (event: 'action-sketch-to-design'): void
+  (event: 'action-canvas-extend'): void
   (event: 'style-strength-track-mousedown', value: MouseEvent): void
 }>()
 </script>

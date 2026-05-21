@@ -23,9 +23,6 @@ export const MODEL_REFERENCE_STRENGTH_DEFAULT = 80
 export const MODEL_ANGLE_YAW_MIN = -180
 export const MODEL_ANGLE_YAW_MAX = 180
 export const MODEL_ANGLE_YAW_DEFAULT = 0
-export const ENHANCE_EXTEND_PERCENT_MIN = 0
-export const ENHANCE_EXTEND_PERCENT_MAX = 50
-export const ENHANCE_EXTEND_PERCENT_DEFAULT = 15
 export const WEAR_ROTATION_MIN = 0
 export const WEAR_ROTATION_MAX = 360
 export const WEAR_ROTATION_DEFAULT = 0
@@ -132,12 +129,6 @@ export function clampModelAngleYaw(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.max(MODEL_ANGLE_YAW_MIN, Math.min(MODEL_ANGLE_YAW_MAX, Math.round(value)))
     : MODEL_ANGLE_YAW_DEFAULT
-}
-
-export function clampEnhanceExtendPercent(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(ENHANCE_EXTEND_PERCENT_MIN, Math.min(ENHANCE_EXTEND_PERCENT_MAX, Math.round(value)))
-    : ENHANCE_EXTEND_PERCENT_DEFAULT
 }
 
 export function createDefaultModelAngleSpec(): ModelAngleSpec {
@@ -268,15 +259,10 @@ export interface EnhanceNodeItem {
   y: number
   width: number
   title?: string
-  mode: 'hd-upscale' | 'canvas-extend'
   upscaleMode: 'base' | 'enhancement'
   upscaleFactor: 2 | 3 | 4
   outputFormat: 'jpg' | 'png'
   outputQuality: number
-  extendTop: number
-  extendRight: number
-  extendBottom: number
-  extendLeft: number
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }

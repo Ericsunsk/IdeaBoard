@@ -1,0 +1,170 @@
+export type CanvasExtendRect = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+export type CanvasExtendPercent = {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+export type CanvasExtendResolvedIntent = {
+  frameRect: CanvasExtendRect
+  originalImageRect: CanvasExtendRect
+  extendPercent: CanvasExtendPercent
+  targetRatio: number
+  hasExtension: boolean
+}
+
+export type CanvasExtendDragAnchor = 'n' | 'e' | 's' | 'w' | 'nw' | 'ne' | 'sw' | 'se'
+
+const DEFAULT_EXPAND_PADDING_MIN = 24
+const DEFAULT_EXPAND_PADDING_RATIO = 0.1
+const DEFAULT_EXPAND_PADDING_MAX = 96
+
+export function createCanvasExtendRect(
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+): CanvasExtendRect {
+  return { left, top, width, height }
+}
+
+export function containImageRect(
+  containerWidth: number,
+  containerHeight: number,
+  imageRatio: number,
+): CanvasExtendRect | null {
+  if (containerWidth <= 0 || containerHeight <= 0) return null
+  const ratio = Number.isFinite(imageRatio) && imageRatio > 0 ? imageRatio : 1
+  const containerRatio = containerHeight / containerWidth
+  if (ratio >= containerRatio) {
+    const height = containerHeight
+    const width = height / ratio
+    const left = (containerWidth - width) / 2
+    return createCanvasExtendRect(left, 0, width, height)
+  }
+  const width = containerWidth
+  const height = width * ratio
+  const top = (containerHeight - height) / 2
+  return createCanvasExtendRect(0, top, width, height)
+}
+
+export function clampFrameToImageRect(frame: CanvasExtendRect, imageRect: CanvasExtendRect): CanvasExtendRect {
+  const originalLeft = imageRect.left
+  const originalTop = imageRect.top
+  const originalRight = imageRect.left + imageRect.width
+  const originalBottom = imageRect.top + imageRect.height
+  const left = Math.min(frame.left, originalLeft)
+  const top = Math.min(frame.top, originalTop)
+  const right = Math.max(frame.left + frame.width, originalRight)
+  const bottom = Math.max(frame.top + frame.height, originalBottom)
+  return createCanvasExtendRect(left, top, right - left, bottom - top)
+}
+
+export function resizeCanvasExtendFrameFromDrag(
+  initialFrame: CanvasExtendRect,
+  imageRect: CanvasExtendRect,
+  anchor: CanvasExtendDragAnchor,
+  deltaX: number,
+  deltaY: number,
+): CanvasExtendRect {
+  const originalLeft = imageRect.left
+  const originalTop = imageRect.top
+  const originalRight = imageRect.left + imageRect.width
+  const originalBottom = imageRect.top + imageRect.height
+
+  const initialLeft = initialFrame.left
+  const initialTop = initialFrame.top
+  const initialRight = initialFrame.left + initialFrame.width
+  const initialBottom = initialFrame.top + initialFrame.height
+
+  let nextLeft = initialLeft
+  let nextTop = initialTop
+  let nextRight = initialRight
+  let nextBottom = initialBottom
+
+  if (anchor.includes('w')) {
+    nextLeft = Math.min(initialLeft + deltaX, originalLeft)
+  }
+  if (anchor.includes('e')) {
+    nextRight = Math.max(initialRight + deltaX, originalRight)
+  }
+  if (anchor.includes('n')) {
+    nextTop = Math.min(initialTop + deltaY, originalTop)
+  }
+  if (anchor.includes('s')) {
+    nextBottom = Math.max(initialBottom + deltaY, originalBottom)
+  }
+
+  return clampFrameToImageRect(
+    createCanvasExtendRect(
+      nextLeft,
+      nextTop,
+      Math.max(1, nextRight - nextLeft),
+      Math.max(1, nextBottom - nextTop),
+    ),
+    imageRect,
+  )
+}
+
+export function resolveDefaultCanvasExtendFrame(imageRect: CanvasExtendRect): CanvasExtendRect {
+  const shortEdge = Math.min(imageRect.width, imageRect.height)
+  const expandPadding = Math.max(
+    DEFAULT_EXPAND_PADDING_MIN,
+    Math.min(DEFAULT_EXPAND_PADDING_MAX, Math.round(shortEdge * DEFAULT_EXPAND_PADDING_RATIO)),
+  )
+  return createCanvasExtendRect(
+    imageRect.left - expandPadding,
+    imageRect.top - expandPadding,
+    imageRect.width + expandPadding * 2,
+    imageRect.height + expandPadding * 2,
+  )
+}
+
+export function resolveCanvasExtendIntent(
+  frameRect: CanvasExtendRect,
+  originalImageRect: CanvasExtendRect,
+): CanvasExtendResolvedIntent {
+  const originalLeft = originalImageRect.left
+  const originalTop = originalImageRect.top
+  const originalWidth = Math.max(1, originalImageRect.width)
+  const originalHeight = Math.max(1, originalImageRect.height)
+  const originalRight = originalLeft + originalWidth
+  const originalBottom = originalTop + originalHeight
+  const frameLeft = Math.min(frameRect.left, originalLeft)
+  const frameTop = Math.min(frameRect.top, originalTop)
+  const frameRight = Math.max(frameRect.left + frameRect.width, originalRight)
+  const frameBottom = Math.max(frameRect.top + frameRect.height, originalBottom)
+  const normalizedFrameRect = createCanvasExtendRect(
+    frameLeft,
+    frameTop,
+    Math.max(1, frameRight - frameLeft),
+    Math.max(1, frameBottom - frameTop),
+  )
+  const extendLeftPx = Math.max(0, originalLeft - frameLeft)
+  const extendTopPx = Math.max(0, originalTop - frameTop)
+  const extendRightPx = Math.max(0, frameRight - originalRight)
+  const extendBottomPx = Math.max(0, frameBottom - originalBottom)
+  const toPercent = (px: number, base: number) => Math.max(0, Math.round((px / base) * 100))
+  const extendPercent = {
+    top: toPercent(extendTopPx, originalHeight),
+    right: toPercent(extendRightPx, originalWidth),
+    bottom: toPercent(extendBottomPx, originalHeight),
+    left: toPercent(extendLeftPx, originalWidth),
+  }
+  const hasExtension =
+    extendPercent.top > 0 || extendPercent.right > 0 || extendPercent.bottom > 0 || extendPercent.left > 0
+  return {
+    frameRect: normalizedFrameRect,
+    originalImageRect: createCanvasExtendRect(originalLeft, originalTop, originalWidth, originalHeight),
+    extendPercent,
+    targetRatio: normalizedFrameRect.height / normalizedFrameRect.width,
+    hasExtension,
+  }
+}

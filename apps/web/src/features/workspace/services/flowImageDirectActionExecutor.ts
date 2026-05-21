@@ -5,8 +5,9 @@ import {
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
   EXECUTION_EDIT_MODE_META,
+  EXECUTION_ENHANCE_META,
 } from '../config/executionContract'
-import { buildExecutionSizeParams } from '../utils/executionSizeParams'
+import { buildExecutionSizeParams, extendExecutionImageSize } from '../utils/executionSizeParams'
 import { buildPromptAspectRatioTaskParams, type PromptAspectRatio } from '../config/promptAspectRatio'
 import { extractTaskImageUrls } from '../utils/flowImageDirectActionTaskResult'
 import { assertTaskSubmitReady, waitTaskResult } from './flowTaskExecutorUtils'
@@ -17,6 +18,20 @@ export type ImageDirectActionTaskKey = 'remove-bg' | 'style-innovate' | 'sketch-
 type ImageSizeLoader = (
   url: string,
 ) => Promise<{ width: number; height: number } | null>
+
+type CanvasExtendPercent = {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+type SubmitCanvasExtendTaskInput = {
+  source: ImageDirectActionSource
+  loadImageSize: ImageSizeLoader
+  extendPercent: CanvasExtendPercent
+  prompt?: string
+}
 
 const STYLE_INNOVATE_DEFAULT_STRENGTH = 50
 
@@ -43,6 +58,16 @@ export async function assertPromptImageSubmitReady(): Promise<void> {
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
       feature: EXECUTION_EDIT_MODE_META['partial-edit'].feature,
+    }),
+    '提交任务失败',
+  )
+}
+
+export async function assertCanvasExtendSubmitReady(): Promise<void> {
+  await assertTaskSubmitReady(
+    buildExecutionTaskRequest({
+      prompt: 'submit readiness',
+      feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
     }),
     '提交任务失败',
   )
@@ -118,6 +143,34 @@ export async function submitPromptImageGenerationTask(
       original_image_url: source.url,
       ...buildExecutionSizeParams(imageSize),
       ...buildPromptAspectRatioTaskParams(aspectRatio),
+    },
+  })
+
+  const submitRes = await taskApi.submit(request)
+  if (submitRes.code !== 0 || !submitRes.data?.task_id) {
+    throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
+  }
+  return submitRes.data.task_id
+}
+
+export async function submitCanvasExtendTask(
+  input: SubmitCanvasExtendTaskInput,
+): Promise<string> {
+  const imageSize = await input.loadImageSize(input.source.url)
+  const prompt = `${input.prompt ?? ''}`.trim()
+  const request = buildExecutionTaskRequest({
+    prompt: prompt ? `${EXECUTION_ENHANCE_META.canvasExtend.promptPrefix} ${prompt}` : '',
+    feature: EXECUTION_ENHANCE_META.canvasExtend.feature,
+    imageUrls: [input.source.url],
+    params: {
+      ...buildExecutionSizeParams(
+        imageSize,
+        extendExecutionImageSize(imageSize, input.extendPercent),
+      ),
+      extend_top: input.extendPercent.top,
+      extend_right: input.extendPercent.right,
+      extend_bottom: input.extendPercent.bottom,
+      extend_left: input.extendPercent.left,
     },
   })
 

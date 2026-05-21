@@ -131,7 +131,7 @@ function toFlowDataFromCanvasNode(
     title: resolveNodeTitle(nodeType, node),
     summary: `Canvas ${nodeType} node`,
     mode:
-      nodeType === 'edit' || nodeType === 'enhance'
+      nodeType === 'edit'
         ? (node as { mode?: FlowNodeData['mode'] }).mode
         : undefined,
     snapshotNode: clone(node),

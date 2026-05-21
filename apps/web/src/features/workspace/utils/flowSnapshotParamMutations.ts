@@ -11,7 +11,6 @@ import type {
 } from '../types/canvasNodes'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import {
-  clampEnhanceExtendPercent,
   clampImageNodeOutputCount,
   clampModelAngleYaw,
   clampModelPoseStrength,
@@ -87,6 +86,10 @@ export function patchFlowSnapshotParam(
       return { ...snapshotNode, title: nextTitle }
     }
     case 'mode':
+      if (snapshotNode.type !== 'edit') return snapshotNode
+      if (value !== 'partial-edit' && value !== 'bg-swap' && value !== 'face-swap') {
+        return snapshotNode
+      }
       if (snapshotNode.mode === value) return snapshotNode
       return { ...snapshotNode, mode: value }
     case 'outputCount': {
@@ -153,26 +156,6 @@ export function patchFlowSnapshotParam(
       const nextOutputQuality = Math.max(30, Math.min(100, Math.round(Number(value) || 0)))
       if (snapshotNode.outputQuality === nextOutputQuality) return snapshotNode
       return { ...snapshotNode, outputQuality: nextOutputQuality }
-    }
-    case 'extendTop': {
-      const nextExtendTop = clampEnhanceExtendPercent(value)
-      if (snapshotNode.extendTop === nextExtendTop) return snapshotNode
-      return { ...snapshotNode, extendTop: nextExtendTop }
-    }
-    case 'extendRight': {
-      const nextExtendRight = clampEnhanceExtendPercent(value)
-      if (snapshotNode.extendRight === nextExtendRight) return snapshotNode
-      return { ...snapshotNode, extendRight: nextExtendRight }
-    }
-    case 'extendBottom': {
-      const nextExtendBottom = clampEnhanceExtendPercent(value)
-      if (snapshotNode.extendBottom === nextExtendBottom) return snapshotNode
-      return { ...snapshotNode, extendBottom: nextExtendBottom }
-    }
-    case 'extendLeft': {
-      const nextExtendLeft = clampEnhanceExtendPercent(value)
-      if (snapshotNode.extendLeft === nextExtendLeft) return snapshotNode
-      return { ...snapshotNode, extendLeft: nextExtendLeft }
     }
     case 'strength': {
       const nextStrength = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))

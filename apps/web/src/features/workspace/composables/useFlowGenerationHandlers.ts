@@ -301,12 +301,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         boardId: options.currentBoardId.value || undefined,
       }),
       validate: (ctx, opts) => validateFlowEnhanceNodeInputs(ctx, opts),
-      preflight: (ctx) =>
-        assertExecutionSubmitReady(
-          ctx.snapshotNode.mode === 'hd-upscale'
-            ? EXECUTION_ENHANCE_META.hdUpscale.feature
-            : EXECUTION_ENHANCE_META.canvasExtend.feature,
-        ),
+      preflight: (_ctx) => assertExecutionSubmitReady(EXECUTION_ENHANCE_META.hdUpscale.feature),
       execute: (ctx, opts) => executeFlowEnhanceNode(ctx, opts),
     })
   }

@@ -22,6 +22,8 @@ type UsePendingImageResultNodesOptions = {
 
 type PendingImageResultOptions = {
   outputAnchorNodeId?: string
+  targetRatio?: number
+  targetWidth?: number
 }
 
 const IMAGE_RESULT_NODE_X_GAP = 100
@@ -218,16 +220,26 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
   function appendPendingImageResultNode(
     source: ImageDirectActionSource,
     anchorNodeId: string,
-    optionsOverride?: { recordHistory?: boolean },
+    optionsOverride?: { recordHistory?: boolean; targetRatio?: number; targetWidth?: number },
     preferredNodeId?: string | null,
   ): string {
     pruneResultNodeLayouts()
     const anchor = readOutputAnchorLayout(anchorNodeId, source)
     const position = resolvePendingImageResultPosition(anchor, anchorNodeId)
     const imageNode = createImageNodeAt(position)
+    const resolvedRatio =
+      Number.isFinite(optionsOverride?.targetRatio) && (optionsOverride?.targetRatio as number) > 0
+        ? (optionsOverride?.targetRatio as number)
+        : source.ratio > 0
+          ? source.ratio
+          : 1
+    const resolvedWidth =
+      Number.isFinite(optionsOverride?.targetWidth) && (optionsOverride?.targetWidth as number) > 0
+        ? Math.max(1, Math.round(optionsOverride?.targetWidth as number))
+        : resolveImageNodeFrameSize(resolvedRatio, true).width
     imageNode.sourceImageUrl = ''
-    imageNode.sourceImageRatio = source.ratio > 0 ? source.ratio : 1
-    imageNode.width = resolveImageNodeFrameSize(imageNode.sourceImageRatio, true).width
+    imageNode.sourceImageRatio = resolvedRatio
+    imageNode.width = resolvedWidth
     imageNode.outputStatus = 'running'
     imageNode.outputImages = []
 
@@ -311,6 +323,8 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
         anchorNodeId,
         {
           recordHistory: index === 0,
+          targetRatio: resultOptions.targetRatio,
+          targetWidth: resultOptions.targetWidth,
         },
         index === 0 ? reusableNodeId : null,
       ),

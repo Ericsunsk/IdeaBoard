@@ -34,14 +34,6 @@ export interface CanvasNodePortContract {
   visible: boolean
 }
 
-export function enhanceModeSupportsPrompt(mode: EnhanceNodeItem['mode']) {
-  return mode === 'canvas-extend'
-}
-
-export function enhanceModeSupportsMask(mode: EnhanceNodeItem['mode']) {
-  return mode === 'hd-upscale'
-}
-
 export function editModeSupportsPrompt(mode: EditNodeItem['mode']) {
   return mode !== 'face-swap'
 }
@@ -136,13 +128,10 @@ export function getCanvasNodePortContracts(
         output('image', 'image'),
       ]
     case 'enhance': {
-      const enhanceNode = node as EnhanceNodeItem
-      const promptVisible = enhanceModeSupportsPrompt(enhanceNode.mode)
-      const maskVisible = enhanceModeSupportsMask(enhanceNode.mode)
       return [
         input('image', 'image', true),
-        input('mask', 'mask', false, maskVisible),
-        input('prompt', 'prompt', false, promptVisible),
+        input('mask', 'mask', false, true),
+        input('prompt', 'prompt', false, false),
         output('image', 'image'),
       ]
     }

@@ -3,10 +3,12 @@
     class="workflow-node image-node"
     data-node-kind="image"
     :data-node-id="node.id"
-    :class="{ active, dragging, 'copy-mode': copyMode }"
+    :class="{ active, dragging, 'copy-mode': copyMode, 'is-expand-mode': !!expandModeActive }"
     :style="nodeStyle"
   >
     <NodeHeader
+      class="image-node-header-shell"
+      :class="{ 'is-hidden': !!expandModeActive }"
       :title="node.title || 'IMAGE'"
       rounded
       @node-mousedown="emit('node-mousedown', $event)"
@@ -30,10 +32,15 @@
     </NodeHeader>
     <div class="image-node-body" @contextmenu.stop>
       <div
+        ref="imageStageRef"
         class="image-node-stage"
         data-flow-handle-frame
         :data-image-node-id="node.id"
-        :class="{ 'is-loading': props.directGenerating && !displayImage }"
+        :data-flow-node-id="flowNodeId || undefined"
+        :class="{
+          'is-loading': props.directGenerating && !displayImage,
+          'is-expand-mode': !!expandModeActive,
+        }"
         :style="{ height: `${stageHeight}px` }"
         @dragover.stop="onStageDragOver"
         @drop.stop="onStageDrop"
@@ -45,6 +52,19 @@
             class="image-node-stage-image"
             draggable="false"
             @dblclick="emit('append-to-canvas')"
+          />
+          <ImageCanvasExtendOverlay
+            v-if="expandModeActive && expandOverlayStyle"
+            :overlay-style="expandOverlayStyle"
+            :handle-radius="expandHandleRadius ?? 4"
+            :direct-generating="!!directGenerating"
+            :output-count="outputCountValue"
+            @submit="submitExpand"
+            @update:output-count="selectOutputCount"
+            @handle-pointerdown="emit('expand-handle-pointerdown', $event)"
+            @handle-pointermove="emit('expand-handle-pointermove', $event)"
+            @handle-pointerup="emit('expand-handle-pointerup', $event)"
+            @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
           />
           <div class="image-node-stage-actions">
             <NodeActionButton variant="stage-ghost" @click="emit('open-preview')">预览</NodeActionButton>
@@ -79,6 +99,7 @@
         @style-innovate-click="emit('action', 'style-innovate')"
         @action-to-vector="emit('action', 'to-vector')"
         @action-sketch-to-design="emit('action', 'sketch-to-design')"
+        @action-canvas-extend="emit('action', 'canvas-extend')"
         @style-strength-track-mousedown="emit('style-strength-track-mousedown', $event)"
       />
       <NodePromptComposer
@@ -96,19 +117,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type ComponentPublicInstance } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
 import {
   clampImageNodeOutputCount,
   type ImageNodeItem,
 } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
+import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
+import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
   node: ImageNodeItem
+  flowNodeId?: string
+  setImageStageRef?: (nodeId: string, element: Element | null) => void
+  clearImageStageRef?: (nodeId: string, element?: Element | null) => void
   active: boolean
   dragging: boolean
   copyMode: boolean
@@ -124,6 +150,9 @@ const props = defineProps<{
   showStyleStrengthControl?: boolean
   styleInnovateStrengthPct?: number
   setStyleStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
+  expandModeActive?: boolean
+  expandOverlayStyle?: Record<string, string> | null
+  expandHandleRadius?: number
 }>()
 
 const emit = defineEmits<{
@@ -138,9 +167,14 @@ const emit = defineEmits<{
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'prompt-generate', prompt: string, outputCount: number): void
-  (e: 'action', action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design'): void
+  (e: 'expand-submit', prompt: string, outputCount: number): void
+  (e: 'action', action: 'remove-bg' | 'style-innovate' | 'to-vector' | 'sketch-to-design' | 'canvas-extend'): void
   (e: 'style-innovate-mousedown', event: MouseEvent): void
   (e: 'style-strength-track-mousedown', event: MouseEvent): void
+  (e: 'expand-handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
+  (e: 'expand-handle-pointermove', event: PointerEvent): void
+  (e: 'expand-handle-pointerup', event: PointerEvent): void
+  (e: 'expand-frame-pointerdown', event: PointerEvent): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -153,9 +187,34 @@ const emptyStateLabel = computed(() => {
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
 
 const showImageActionMenu = computed(() => !!props.actionMenuVisible && !!props.displayImage)
-const showPromptComposer = computed(() => !!props.promptComposerVisible && !!props.displayImage)
+const showPromptComposer = computed(
+  () => !!props.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
+)
+const imageStageRef = ref<HTMLElement | null>(null)
 const promptDraft = ref('')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
+
+watch(
+  [() => props.flowNodeId, imageStageRef, () => props.setImageStageRef, () => props.clearImageStageRef],
+  ([flowNodeId, stageElement, setImageStageRef, clearImageStageRef], oldValues, onCleanup) => {
+    const [prevFlowNodeId, prevStageElement] = oldValues ?? []
+    if (prevFlowNodeId && prevFlowNodeId !== flowNodeId) {
+      clearImageStageRef?.(prevFlowNodeId, prevStageElement)
+    }
+    if (flowNodeId) {
+      setImageStageRef?.(flowNodeId, stageElement)
+    }
+    onCleanup(() => {
+      if (flowNodeId) clearImageStageRef?.(flowNodeId, stageElement)
+    })
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  if (!props.flowNodeId) return
+  props.clearImageStageRef?.(props.flowNodeId, imageStageRef.value)
+})
 
 function onStageDragOver(event: DragEvent) {
   event.preventDefault()
@@ -183,6 +242,11 @@ function submitPrompt(prompt: string, outputCount: number) {
   promptDraft.value = ''
 }
 
+function submitExpand(prompt: string, outputCount: number) {
+  if (props.directGenerating) return
+  emit('expand-submit', prompt, outputCount)
+}
+
 function selectOutputCount(value: number) {
   emit('update:output-count', clampImageNodeOutputCount(value))
 }
@@ -206,6 +270,11 @@ function selectOutputCount(value: number) {
   overflow: visible;
 }
 
+.image-node-header-shell.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .image-node-stage-image {
   width: 100%;
   height: 100%;
@@ -217,6 +286,10 @@ function selectOutputCount(value: number) {
 
 .workflow-node.image-node.dragging .image-node-stage-image {
   cursor: grabbing;
+}
+
+.image-node-stage.is-expand-mode .image-node-stage-image {
+  pointer-events: none;
 }
 
 .image-node-stage-image.preview {
@@ -236,8 +309,22 @@ function selectOutputCount(value: number) {
   justify-content: center;
 }
 
+.image-node-stage.is-expand-mode {
+  overflow: visible;
+  border-color: transparent;
+}
+
+.workflow-node.image-node.is-expand-mode .image-node-body {
+  background: transparent;
+}
+
 .workflow-node.image-node.active .image-node-stage {
   border-color: #9278e6;
+}
+
+.workflow-node.image-node.is-expand-mode .image-node-stage,
+.workflow-node.image-node.is-expand-mode.active .image-node-stage {
+  border-color: transparent;
 }
 
 .image-node-stage.is-loading {
@@ -315,6 +402,11 @@ function selectOutputCount(value: number) {
 .image-node-stage:hover .image-node-stage-actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+.image-node-stage.is-expand-mode .image-node-stage-actions {
+  opacity: 0;
+  pointer-events: none;
 }
 
 @keyframes image-node-logo-spin-cycle {
