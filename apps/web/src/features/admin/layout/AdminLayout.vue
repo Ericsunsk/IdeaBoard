@@ -1,74 +1,80 @@
 <template>
   <n-config-provider :theme="darkTheme" :theme-overrides="adminThemeOverrides">
-    <router-view v-if="isLoginRoute" />
-    <template v-else>
-      <div class="admin-layout-shell">
-        <div class="admin-shell-frame">
-          <aside v-if="!isMobile" class="admin-shell-sider" :class="{ collapsed }">
-            <div class="brand-area" @click="collapsed = !collapsed">
-              <div class="brand-mark">I</div>
-              <div v-if="!collapsed" class="brand-copy">
-                <p class="brand-title">IdeaBoard</p>
+    <n-dialog-provider>
+      <n-notification-provider>
+        <n-message-provider>
+          <router-view v-if="isLoginRoute" />
+          <template v-else>
+            <div class="admin-layout-shell">
+              <div class="admin-shell-frame">
+                <aside v-if="!isMobile" class="admin-shell-sider" :class="{ collapsed }">
+                  <div class="brand-area" @click="collapsed = !collapsed">
+                    <div class="brand-mark">I</div>
+                    <div v-if="!collapsed" class="brand-copy">
+                      <p class="brand-title">IdeaBoard</p>
+                    </div>
+                  </div>
+                  <n-menu
+                    v-model:value="activeKey"
+                    :collapsed="collapsed"
+                    :collapsed-width="76"
+                    :collapsed-icon-size="18"
+                    :options="menuOptions"
+                    @update:value="handleMenuUpdate"
+                  />
+                </aside>
+
+                <main class="admin-shell-main">
+                  <header class="admin-shell-header">
+                    <div class="header-left">
+                      <n-button quaternary circle class="shell-action-btn" @click="handleToggleMenu">
+                        <template #icon>
+                          <span>{{ isMobile ? '☰' : collapsed ? '☰' : '⟨' }}</span>
+                        </template>
+                      </n-button>
+                      <div class="title-wrap">
+                        <h1 class="page-title">
+                          {{ currentMeta.title }}
+                        </h1>
+                      </div>
+                    </div>
+                    <div class="header-right">
+                      <n-dropdown :options="userOptions" @select="handleUserAction">
+                        <div class="user-badge">
+                          <n-avatar size="small" round class="user-avatar">
+                            {{ userStore.user?.username?.charAt(0).toUpperCase() }}
+                          </n-avatar>
+                          <span>{{ userStore.user?.username }}</span>
+                        </div>
+                      </n-dropdown>
+                    </div>
+                  </header>
+
+                  <section class="admin-shell-content">
+                    <router-view />
+                  </section>
+                </main>
               </div>
             </div>
-            <n-menu
-              v-model:value="activeKey"
-              :collapsed="collapsed"
-              :collapsed-width="76"
-              :collapsed-icon-size="18"
-              :options="menuOptions"
-              @update:value="handleMenuUpdate"
-            />
-          </aside>
 
-          <main class="admin-shell-main">
-            <header class="admin-shell-header">
-              <div class="header-left">
-                <n-button quaternary circle class="shell-action-btn" @click="handleToggleMenu">
-                  <template #icon>
-                    <span>{{ isMobile ? '☰' : collapsed ? '☰' : '⟨' }}</span>
-                  </template>
-                </n-button>
-                <div class="title-wrap">
-                  <h1 class="page-title">
-                    {{ currentMeta.title }}
-                  </h1>
-                </div>
-              </div>
-              <div class="header-right">
-                <n-dropdown :options="userOptions" @select="handleUserAction">
-                  <div class="user-badge">
-                    <n-avatar size="small" round class="user-avatar">
-                      {{ userStore.user?.username?.charAt(0).toUpperCase() }}
-                    </n-avatar>
-                    <span>{{ userStore.user?.username }}</span>
-                  </div>
-                </n-dropdown>
-              </div>
-            </header>
-
-            <section class="admin-shell-content">
-              <router-view />
-            </section>
-          </main>
-        </div>
-      </div>
-
-      <n-drawer
-        v-model:show="mobileMenuOpen"
-        :width="268"
-        placement="left"
-        class="admin-mobile-drawer"
-      >
-        <n-drawer-content title="IdeaBoard" closable>
-          <n-menu
-            v-model:value="activeKey"
-            :options="menuOptions"
-            @update:value="handleMobileMenuSelect"
-          />
-        </n-drawer-content>
-      </n-drawer>
-    </template>
+            <n-drawer
+              v-model:show="mobileMenuOpen"
+              :width="268"
+              placement="left"
+              class="admin-mobile-drawer"
+            >
+              <n-drawer-content title="IdeaBoard" closable>
+                <n-menu
+                  v-model:value="activeKey"
+                  :options="menuOptions"
+                  @update:value="handleMobileMenuSelect"
+                />
+              </n-drawer-content>
+            </n-drawer>
+          </template>
+        </n-message-provider>
+      </n-notification-provider>
+    </n-dialog-provider>
   </n-config-provider>
 </template>
 
@@ -83,6 +89,9 @@ import {
   NIcon,
   NDrawer,
   NDrawerContent,
+  NDialogProvider,
+  NNotificationProvider,
+  NMessageProvider,
   darkTheme,
   type GlobalThemeOverrides,
 } from 'naive-ui'

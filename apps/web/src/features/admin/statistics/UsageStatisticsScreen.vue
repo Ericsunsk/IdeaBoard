@@ -171,30 +171,31 @@
             </template>
             <div class="price-card-popover">
               <div class="popover-body">
-                <n-form
-                  size="small"
-                  :show-feedback="false"
-                  label-placement="left"
-                  label-width="150"
-                  label-align="left"
-                >
-                  <n-form-item
-                    v-for="m in modelSettingCandidates"
-                    :key="m.name"
-                    :label="m.name"
-                    class="modal-style-item"
+                <n-config-provider :theme-overrides="popoverFormThemeOverrides">
+                  <n-form
+                    size="small"
+                    :show-feedback="false"
+                    label-placement="left"
+                    label-width="150"
+                    label-align="left"
                   >
-                    <n-input-number
-                      placeholder="0.00"
-                      :precision="4"
-                      :min="0"
-                      style="width: 100%"
-                      class="pill-input"
+                    <n-form-item
+                      v-for="m in modelSettingCandidates"
+                      :key="m.name"
+                      :label="m.name"
+                      class="modal-style-item"
                     >
-                      <template #prefix>$</template>
-                    </n-input-number>
-                  </n-form-item>
-                </n-form>
+                      <n-input-number
+                        placeholder="0.00"
+                        :precision="4"
+                        :min="0"
+                        style="width: 100%"
+                      >
+                        <template #prefix>$</template>
+                      </n-input-number>
+                    </n-form-item>
+                  </n-form>
+                </n-config-provider>
               </div>
             </div>
           </n-popover>
@@ -263,7 +264,7 @@
             trigger="hover"
             placement="top"
             :show-arrow="true"
-            class="health-tooltip"
+            :theme-overrides="tooltipThemeOverrides"
           >
             <template #trigger>
               <div
@@ -677,7 +678,9 @@ import {
   NImage,
   NInput,
   NCollapseTransition,
+  NConfigProvider,
   useMessage,
+  type GlobalThemeOverrides,
 } from 'naive-ui'
 import {
   SettingsOutline,
@@ -704,6 +707,33 @@ import { useUsageStatisticsCharts } from './useUsageStatisticsCharts'
 import './UsageStatisticsScreen.css'
 
 const message = useMessage()
+
+const tooltipThemeOverrides: NonNullable<GlobalThemeOverrides['Tooltip']> = {
+  borderRadius: '12px',
+  color: '#ffffff',
+  textColor: '#1f1f1f',
+  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+  padding: '8px 12px',
+}
+
+const popoverFormThemeOverrides: GlobalThemeOverrides = {
+  Form: {
+    labelFontSizeLeftSmall: '13px',
+    labelTextColor: '#94a3b8',
+    labelFontWeight: '400',
+    labelHeightSmall: '32px',
+  },
+  Input: {
+    borderRadius: '10px',
+    color: '#1a1a1c',
+    colorFocus: '#1a1a1c',
+    heightSmall: '32px',
+    border: '1px solid #2e3034',
+    borderHover: '1px solid #2e3034',
+    borderFocus: '1px solid #2e3034',
+    boxShadowFocus: 'none',
+  },
+}
 const {
   detailModalVisible,
   detailTask,

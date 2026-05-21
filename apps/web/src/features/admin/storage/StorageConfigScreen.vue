@@ -104,6 +104,7 @@
             :render-label="renderVendorLabel"
             :menu-props="{ class: 'admin-storage-vendor-menu' }"
             :show-checkmark="false"
+            :theme-overrides="selectThemeOverrides"
             placeholder="选择供应商"
             @update:value="handleVendorSelect"
           />
@@ -241,6 +242,7 @@
 </template>
 
 <script setup lang="ts">
+import { type GlobalThemeOverrides } from 'naive-ui'
 import { useStorageManager } from './useStorageManager'
 
 const {
@@ -286,6 +288,28 @@ const {
   fetchBucketDomains,
   removeProfile,
 } = useStorageManager()
+
+const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
+  peers: {
+    InternalSelection: {
+      heightMedium: '60px',
+      borderRadius: '12px',
+      color: '#151618',
+      colorActive: '#151618',
+      border: '1px solid var(--admin-border)',
+      borderHover: '1px solid var(--admin-border)',
+      borderActive: '1px solid var(--admin-border)',
+      borderFocus: '1px solid var(--admin-border)',
+      boxShadowHover: 'none',
+      boxShadowActive: 'none',
+      boxShadowFocus: 'none',
+      textColor: 'var(--admin-text-1)',
+      placeholderColor: 'var(--admin-text-3)',
+      arrowColor: 'var(--admin-text-3)',
+      paddingSingle: '0 14px',
+    },
+  },
+}
 </script>
 
 <style scoped>
@@ -442,47 +466,6 @@ const {
   margin-top: 4px;
   font-size: 13px;
   line-height: 1.55;
-}
-
-:deep(.n-base-selection) {
-  min-height: 60px;
-}
-
-:deep(.n-base-selection-label) {
-  min-height: 60px;
-}
-
-:deep(.n-base-selection-input) {
-  height: 100%;
-  padding: 0 14px;
-  display: flex;
-  align-items: center;
-}
-
-:deep(.n-base-selection-input__content) {
-  width: 100%;
-}
-
-:deep(.n-base-selection-overlay) {
-  padding: 0 14px;
-}
-
-:deep(.n-base-selection-placeholder) {
-  height: 100%;
-  display: inline-flex;
-  align-items: center;
-}
-
-:deep(.n-base-selection-placeholder__inner) {
-  color: var(--admin-text-3);
-}
-
-:deep(.n-base-suffix) {
-  right: 14px;
-}
-
-:deep(.n-base-suffix__arrow) {
-  color: var(--admin-text-3);
 }
 
 :deep(.vendor-select-entry) {

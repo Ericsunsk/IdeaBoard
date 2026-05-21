@@ -175,48 +175,46 @@
             <div v-else-if="activeTab === 'security'" key="security" class="tab-content">
               <div class="content-card">
                 <h2 class="section-title">账号安全设置</h2>
-                <n-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-placement="top">
-                  <div class="security-grid">
-                    <n-form-item label="当前原密码" path="oldPassword">
-                      <n-input
-                        v-model:value="pwdForm.oldPassword"
-                        type="password"
-                        placeholder="请输入当前使用的密码"
-                        show-password-on="click"
-                        class="profile-input"
-                      />
-                    </n-form-item>
-                    <div class="new-password-row">
-                      <n-form-item label="设置新密码" path="newPassword">
+                <n-config-provider :theme-overrides="profileThemeOverrides">
+                  <n-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-placement="top">
+                    <div class="security-grid">
+                      <n-form-item label="当前原密码" path="oldPassword">
                         <n-input
-                          v-model:value="pwdForm.newPassword"
+                          v-model:value="pwdForm.oldPassword"
                           type="password"
-                          placeholder="不少于6位字符"
+                          placeholder="请输入当前使用的密码"
                           show-password-on="click"
-                          class="profile-input"
                         />
                       </n-form-item>
-                      <n-form-item label="重复新密码" path="confirmPassword">
-                        <n-input
-                          v-model:value="pwdForm.confirmPassword"
-                          type="password"
-                          placeholder="请再次输入新密码"
-                          show-password-on="click"
-                          class="profile-input"
-                        />
-                      </n-form-item>
+                      <div class="new-password-row">
+                        <n-form-item label="设置新密码" path="newPassword">
+                          <n-input
+                            v-model:value="pwdForm.newPassword"
+                            type="password"
+                            placeholder="不少于6位字符"
+                            show-password-on="click"
+                          />
+                        </n-form-item>
+                        <n-form-item label="重复新密码" path="confirmPassword">
+                          <n-input
+                            v-model:value="pwdForm.confirmPassword"
+                            type="password"
+                            placeholder="请再次输入新密码"
+                            show-password-on="click"
+                          />
+                        </n-form-item>
+                      </div>
                     </div>
-                  </div>
-                  <n-button
-                    type="primary"
-                    block
-                    :loading="pwdLoading"
-                    class="profile-btn"
-                    @click="handleUpdatePassword"
-                  >
-                    确认更新密码
-                  </n-button>
-                </n-form>
+                    <n-button
+                      type="primary"
+                      block
+                      :loading="pwdLoading"
+                      @click="handleUpdatePassword"
+                    >
+                      确认更新密码
+                    </n-button>
+                  </n-form>
+                </n-config-provider>
               </div>
             </div>
           </Transition>
@@ -230,7 +228,7 @@
 import { useUserStore } from '../../../app/stores/user'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { uploadApi } from '../../../shared/api/upload'
-import { NTag } from 'naive-ui'
+import { NTag, NConfigProvider, type GlobalThemeOverrides } from 'naive-ui'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 
 const router = useRouter()
@@ -238,6 +236,31 @@ const userStore = useUserStore()
 const appToast = useAppToast()
 
 const activeTab = ref('profile')
+
+const profileThemeOverrides: GlobalThemeOverrides = {
+  Input: {
+    border: '1px solid #d2d2d7',
+    borderHover: '1px solid #9278e6',
+    borderFocus: '1px solid #9278e6',
+    color: '#f5f5f7',
+    colorFocus: '#ffffff',
+    textColor: '#1d1d1f',
+    placeholderColor: '#86868b',
+    caretColor: '#9278e6',
+    borderRadius: '12px',
+    heightMedium: '48px',
+  },
+  Button: {
+    colorPressedPrimary: '#7a6bd5',
+    colorHoverPrimary: '#a38df2',
+    colorPrimary: '#9278e6',
+    textColorPrimary: '#ffffff',
+    borderRadiusMedium: '14px',
+    heightMedium: '48px',
+    fontWeight: '600',
+    fontSizeMedium: '15px',
+  },
+}
 
 type NavShape = {
   tag: 'circle' | 'path' | 'polyline' | 'line' | 'rect'
@@ -731,62 +754,11 @@ onMounted(() => {
 }
 
 /* Custom Naive UI Styles */
-:deep(.n-input.profile-input) {
-  --n-border: 1px solid #d2d2d7 !important;
-  --n-border-hover: 1px solid #9278e6 !important;
-  --n-border-focus: 1px solid #9278e6 !important;
-  --n-color: #f5f5f7 !important;
-  --n-color-focus: #fff !important;
-  --n-text-color: #1d1d1f !important;
-  --n-placeholder-color: #86868b !important;
-  --n-caret-color: #9278e6 !important;
-  border-radius: 12px;
-  height: 48px;
-}
-
-:deep(.n-input.profile-input input) {
-  color: #1d1d1f !important;
-  height: 48px !important;
-}
-
-:deep(.n-form-item-label__text) {
+:deep(.n-form-item-label) {
   font-size: 14px;
   font-weight: 500;
-  color: #1d1d1f !important;
+  color: #1d1d1f;
   margin-left: 4px;
-}
-
-.profile-btn {
-  background: #9278e6 !important;
-  color: #fff !important;
-  height: 48px !important;
-  border-radius: 14px !important;
-  font-weight: 600 !important;
-  font-size: 15px !important;
-  border: none !important;
-}
-
-.profile-table :deep(.n-data-table-th) {
-  background: transparent;
-  color: #86868b;
-  font-size: 13px;
-  font-weight: 500;
-  border-bottom: 1px solid #f5f5f7;
-}
-
-.profile-table :deep(.n-data-table-td) {
-  padding: 16px 12px;
-  color: #1d1d1f !important;
-  border-bottom: 1px solid #f5f5f7;
-}
-
-.profile-table :deep(.n-pagination-item) {
-  color: #1d1d1f !important;
-}
-.profile-table :deep(.n-pagination-item--active) {
-  color: #fff !important;
-  background-color: #7a6bd5 !important;
-  border-color: #7a6bd5 !important;
 }
 
 /* Transitions */

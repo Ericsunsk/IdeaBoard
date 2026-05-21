@@ -831,29 +831,7 @@
   gap: 8px;
 }
 
-.price-card-popover .n-form-item-label {
-  font-size: 13px !important;
-  color: #94a3b8 !important;
-  margin-bottom: 0 !important;
-  padding-right: 12px !important;
-  font-weight: 400 !important;
-  display: flex !important;
-  align-items: center !important;
-  height: 32px !important;
-  white-space: nowrap !important;
-}
 
-.price-card-popover .pill-input .n-input {
-  border-radius: 10px !important;
-  background-color: #1a1a1c !important;
-  height: 32px !important;
-  line-height: 32px !important;
-}
-
-.price-card-popover .n-input__border,
-.price-card-popover .n-input__state-border {
-  border: 1px solid #2e3034 !important;
-}
 
 .modal-style-item {
   margin-bottom: 8px !important;
@@ -1026,14 +1004,7 @@
   flex: 1;
 }
 
-.statistics-page .health-tooltip {
-  --n-bezier: cubic-bezier(0.4, 0, 0.2, 1);
-  --n-border-radius: 12px !important;
-  --n-color: #ffffff !important;
-  --n-text-color: #1f1f1f !important;
-  --n-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
-  padding: 8px 12px !important;
-}
+
 
 .tooltip-content {
   display: flex;
