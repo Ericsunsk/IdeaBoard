@@ -1,10 +1,5 @@
-export const IMAGE_NODE_ACTION = {
-  removeBg: 'remove-bg',
-  styleVariation: 'style-variation',
-  sketchToImage: 'sketch-to-image',
-  hdUpscale: 'hd-upscale',
-  imageExtend: 'image-extend',
-} as const
+export { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
+import { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
 
 export const IMAGE_DIRECT_TASK_ACTIONS = [
   IMAGE_NODE_ACTION.removeBg,

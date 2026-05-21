@@ -19,147 +19,20 @@
       class="image-action-menu-inner"
     >
       <template v-if="!showStrengthControl">
-      <button
-        type="button"
-        class="image-action-icon-btn node-tool-button"
-        :disabled="directGenerating"
-        title="抠图"
-        @click="emit('action', IMAGE_NODE_ACTION.removeBg)"
-      >
-        <span class="action-logo">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M4 5h10v10H4z" />
-            <path d="M10 9h10v10H10z" />
-          </svg>
-        </span>
-        <span class="action-tooltip">抠图</span>
-      </button>
-      <button
-        type="button"
-        class="image-action-icon-btn node-tool-button"
-        :disabled="directGenerating"
-        title="风格延展"
-        @mousedown.stop="emit('strength-action-mousedown', IMAGE_NODE_ACTION.styleVariation, $event)"
-        @click="emit('action', IMAGE_NODE_ACTION.styleVariation)"
-      >
-        <span class="action-logo">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path
-              d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"
-            />
-          </svg>
-        </span>
-        <span class="action-tooltip">风格延展</span>
-      </button>
-      <button
-        type="button"
-        class="image-action-icon-btn node-tool-button"
-        :disabled="directGenerating"
-        title="草图成图"
-        @click="emit('action', IMAGE_NODE_ACTION.sketchToImage)"
-      >
-        <span class="action-logo">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M18 2l-6.3 6.3M12 14l-4 4" />
-            <path d="M3 21l3.5-3.5" />
-            <path d="M15 6l4 4" />
-            <path d="M20 7l-2-2" />
-          </svg>
-        </span>
-        <span class="action-tooltip">草图成图</span>
-      </button>
-      <button
-        type="button"
-        class="image-action-icon-btn node-tool-button"
-        :disabled="directGenerating"
-        title="HD"
-        @mousedown.stop="emit('strength-action-mousedown', IMAGE_NODE_ACTION.hdUpscale, $event)"
-        @click="emit('action', IMAGE_NODE_ACTION.hdUpscale)"
-      >
-        <span class="action-logo action-logo--text">HD</span>
-        <span class="action-tooltip">HD</span>
-      </button>
-      <button
-        type="button"
-        class="image-action-icon-btn node-tool-button"
-        :disabled="directGenerating"
-        title="扩图"
-        @click="emit('action', IMAGE_NODE_ACTION.imageExtend)"
-      >
-        <span class="action-logo">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M9 4H5a1 1 0 0 0-1 1v4" />
-            <path d="M15 4h4a1 1 0 0 1 1 1v4" />
-            <path d="M9 20H5a1 1 0 0 1-1-1v-4" />
-            <path d="M15 20h4a1 1 0 0 0 1-1v-4" />
-            <path d="M8 12h8" />
-            <path d="M12 8v8" />
-          </svg>
-        </span>
-        <span class="action-tooltip">扩图</span>
-      </button>
-      <button
-        type="button"
-        class="image-action-icon-btn image-action-icon-btn--placeholder node-tool-button"
-        disabled
-        title="调色（占位）"
-      >
-        <span class="action-logo">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="12" cy="12" r="8" />
-            <path d="M12 4v16" />
-            <path d="M4 12h16" />
-            <path d="M7.5 7.5l9 9" />
-            <path d="M16.5 7.5l-9 9" />
-          </svg>
-        </span>
-        <span class="action-tooltip">调色</span>
-      </button>
+        <button
+          v-for="item in IMAGE_ACTION_MENU_ITEMS"
+          :key="item.title"
+          type="button"
+          class="image-action-icon-btn node-tool-button"
+          :class="{ 'image-action-icon-btn--placeholder': item.placeholder }"
+          :disabled="item.placeholder || directGenerating"
+          :title="item.title"
+          @mousedown.stop="onActionMouseDown(item, $event)"
+          @click="onActionClick(item)"
+        >
+          <ImageActionMenuIcon :icon="item.icon" />
+          <span class="action-tooltip">{{ item.label }}</span>
+        </button>
       </template>
       <div
         v-else
@@ -180,17 +53,14 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import {
-  IMAGE_NODE_ACTION,
-  type ImageNodeAction,
-  type ImageStrengthAction,
-} from '../../types/imageActions'
+import { IMAGE_ACTION_MENU_ITEMS, type ImageActionMenuItem } from '../../config/imageActionMenu'
+import { type ImageNodeAction, type ImageStrengthAction } from '../../types/imageActions'
+import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 
 defineProps<{
   showStrengthControl: boolean
   strengthMenuStyle?: string | Record<string, string>
   directGenerating: boolean
-  displayHeight: number
   strengthPct: number
   setStrengthTrackRef: (el: Element | ComponentPublicInstance | null) => void
 }>()
@@ -200,6 +70,16 @@ const emit = defineEmits<{
   (event: 'strength-action-mousedown', action: ImageStrengthAction, value: MouseEvent): void
   (event: 'strength-track-mousedown', value: MouseEvent): void
 }>()
+
+function onActionMouseDown(item: ImageActionMenuItem, event: MouseEvent) {
+  if (item.placeholder || !('strengthAction' in item) || !item.strengthAction) return
+  emit('strength-action-mousedown', item.strengthAction, event)
+}
+
+function onActionClick(item: ImageActionMenuItem) {
+  if (item.placeholder || !item.action) return
+  emit('action', item.action)
+}
 </script>
 
 <style scoped src="../nodes/styles/node-tool-buttons.css"></style>
@@ -274,24 +154,6 @@ const emit = defineEmits<{
 .image-action-icon-btn--placeholder:disabled {
   cursor: default;
   opacity: 0.58;
-}
-
-.action-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-logo svg {
-  width: 21px;
-  height: 21px;
-}
-
-.action-logo--text {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1;
 }
 
 .action-tooltip {

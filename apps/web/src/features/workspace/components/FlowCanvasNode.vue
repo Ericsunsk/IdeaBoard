@@ -47,10 +47,8 @@
           :active="selected"
           :dragging="props.dragging"
           :copy-mode="props.copyMode"
-          :ui-state="props.uiState"
           :stage-height="stageHeight"
           :display-image="displayImage"
-          :display-mode="displayMode"
           :empty-icon-variant="imageEmptyIconVariant"
           :input-locked="imageInputLocked"
           :action-menu-visible="!!props.imageActionVisible"
@@ -424,11 +422,6 @@ const maskStageHeight = computed(() => {
         ? maskSnapshot.value.sourceImageRatio
         : 1
   return Math.max(120, Math.min(360, Math.round(maskCanvasWidth.value * ratio)))
-})
-
-const displayMode = computed<'source' | 'node-output'>(() => {
-  if (!imageSnapshot.value) return 'source'
-  return (imageSnapshot.value.outputImages?.length ?? 0) > 0 ? 'node-output' : 'source'
 })
 
 const imageGenerating = computed(

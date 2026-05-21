@@ -31,67 +31,39 @@
       </template>
     </NodeHeader>
     <div class="image-node-body" @contextmenu.stop>
-      <div
+      <ImageNodeStage
         ref="imageStageRef"
-        class="image-node-stage"
-        data-flow-handle-frame
-        :data-image-node-id="node.id"
-        :data-flow-node-id="flowNodeId || undefined"
-        :class="{
-          'is-loading': props.directGenerating && !displayImage,
-          'is-expand-mode': !!expandModeActive,
-        }"
-        :style="{ height: `${stageHeight}px` }"
-        @dragover.stop="onStageDragOver"
-        @drop.stop="onStageDrop"
-        @contextmenu.prevent.stop="onStageContextMenu"
-      >
-        <template v-if="displayImage">
-          <img
-            :src="stageDisplayUrl"
-            class="image-node-stage-image"
-            draggable="false"
-            @dblclick="emit('append-to-canvas')"
-          />
-          <ImageCanvasExtendOverlay
-            v-if="expandModeActive && expandOverlayStyle"
-            :overlay-style="expandOverlayStyle"
-            :handle-radius="expandHandleRadius ?? 4"
-            :direct-generating="!!directGenerating"
-            :output-count="outputCountValue"
-            @submit="submitExpand"
-            @update:output-count="selectOutputCount"
-            @handle-pointerdown="emit('expand-handle-pointerdown', $event)"
-            @handle-pointermove="emit('expand-handle-pointermove', $event)"
-            @handle-pointerup="emit('expand-handle-pointerup', $event)"
-            @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
-          />
-          <div class="image-node-stage-actions">
-            <NodeActionButton variant="stage-ghost" @click="emit('open-preview')">预览</NodeActionButton>
-            <NodeActionButton v-if="!props.inputLocked" variant="stage-ghost" @click="emit('reset')">
-              清空
-            </NodeActionButton>
-          </div>
-        </template>
-        <div
-          v-if="!displayImage"
-          class="image-node-stage-empty"
-          :class="{ 'is-readonly': props.inputLocked, 'is-loading': props.directGenerating }"
-          @click="onEmptyStateClick"
-        >
-          <NodeEmptyStateIcon
-            :variant="emptyIconVariant"
-            :class="{ 'image-node-stage-loader-logo': props.directGenerating }"
-          />
-          <span v-if="!props.directGenerating">{{ emptyStateLabel }}</span>
-        </div>
-      </div>
+        :node-id="node.id"
+        :flow-node-id="flowNodeId"
+        :stage-height="stageHeight"
+        :display-image="displayImage"
+        :input-locked="inputLocked"
+        :empty-icon-variant="emptyIconVariant"
+        :direct-generating="directGenerating"
+        :expand-mode-active="expandModeActive"
+        :expand-overlay-style="expandOverlayStyle"
+        :expand-handle-radius="expandHandleRadius"
+        :output-count="node.outputCount"
+        :active="active"
+        :dragging="dragging"
+        @stage-drop="emit('stage-drop', $event)"
+        @open-file="emit('open-file')"
+        @open-preview="emit('open-preview')"
+        @append-to-canvas="emit('append-to-canvas')"
+        @reset="emit('reset')"
+        @contextmenu="emit('contextmenu', $event)"
+        @expand-submit="submitExpand"
+        @update:output-count="selectOutputCount"
+        @expand-handle-pointerdown="emit('expand-handle-pointerdown', $event)"
+        @expand-handle-pointermove="emit('expand-handle-pointermove', $event)"
+        @expand-handle-pointerup="emit('expand-handle-pointerup', $event)"
+        @expand-frame-pointerdown="emit('expand-frame-pointerdown', $event)"
+      />
 
       <HomeCanvasImageActionMenu
         v-if="showImageActionMenu"
         :show-strength-control="!!showStrengthControl"
         :direct-generating="!!directGenerating"
-        :display-height="stageHeight"
         :strength-pct="strengthPct ?? 50"
         :set-strength-track-ref="setStrengthTrackRef"
         @action="emit('action', $event)"
@@ -118,13 +90,10 @@ import {
   clampImageNodeOutputCount,
   type ImageNodeItem,
 } from '../../types/canvasNodes'
-import type { NodeUiState } from '../../types/canvasNodeUi'
 import type { ImageNodeAction, ImageStrengthAction } from '../../types/imageActions'
-import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
-import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
+import ImageNodeStage from './ImageNodeStage.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{
@@ -137,10 +106,8 @@ const props = defineProps<{
   copyMode: boolean
   stageHeight: number
   displayImage: { url: string } | null
-  displayMode?: 'source' | 'node-output' | 'linked-output' | 'mask' | 'pending'
   emptyIconVariant?: 'image' | 'fusion'
   inputLocked?: boolean
-  uiState?: NodeUiState
   actionMenuVisible?: boolean
   promptComposerVisible?: boolean
   directGenerating?: boolean
@@ -175,26 +142,23 @@ const emit = defineEmits<{
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
-const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
-const emptyStateLabel = computed(() => {
-  if (props.inputLocked) return 'Waiting...'
-  return '上传或拖拽图片作为输入'
-})
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
 
 const showImageActionMenu = computed(() => !!props.actionMenuVisible && !!props.displayImage)
 const showPromptComposer = computed(
   () => !!props.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
 )
-const imageStageRef = ref<HTMLElement | null>(null)
+type StageExpose = { stageElement: HTMLElement | null }
+const imageStageRef = ref<StageExpose | null>(null)
 const promptDraft = ref('')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 
 watch(
   [() => props.flowNodeId, imageStageRef, () => props.setImageStageRef, () => props.clearImageStageRef],
-  ([flowNodeId, stageElement, setImageStageRef, clearImageStageRef], oldValues, onCleanup) => {
-    const [prevFlowNodeId, prevStageElement] = oldValues ?? []
+  ([flowNodeId, stageVm, setImageStageRef, clearImageStageRef], oldValues, onCleanup) => {
+    const stageElement = stageVm?.stageElement ?? null
+    const [prevFlowNodeId, prevStageVm] = oldValues ?? []
+    const prevStageElement = prevStageVm?.stageElement ?? null
     if (prevFlowNodeId && prevFlowNodeId !== flowNodeId) {
       clearImageStageRef?.(prevFlowNodeId, prevStageElement)
     }
@@ -210,28 +174,8 @@ watch(
 
 onBeforeUnmount(() => {
   if (!props.flowNodeId) return
-  props.clearImageStageRef?.(props.flowNodeId, imageStageRef.value)
+  props.clearImageStageRef?.(props.flowNodeId, imageStageRef.value?.stageElement ?? null)
 })
-
-function onStageDragOver(event: DragEvent) {
-  event.preventDefault()
-}
-
-function onStageDrop(event: DragEvent) {
-  event.preventDefault()
-  if (props.inputLocked) return
-  emit('stage-drop', event)
-}
-
-function onEmptyStateClick() {
-  if (props.inputLocked) return
-  emit('open-file')
-}
-
-function onStageContextMenu(event: MouseEvent) {
-  if (!props.displayImage) return
-  emit('contextmenu', event)
-}
 
 function submitPrompt(prompt: string, outputCount: number) {
   if (!prompt || props.directGenerating) return
@@ -272,150 +216,13 @@ function selectOutputCount(value: number) {
   pointer-events: none;
 }
 
-.image-node-stage-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #fff;
-  cursor: grab;
-  user-select: none;
-}
-
-.workflow-node.image-node.dragging .image-node-stage-image {
-  cursor: grabbing;
-}
-
-.image-node-stage.is-expand-mode .image-node-stage-image {
-  pointer-events: none;
-}
-
-.image-node-stage-image.preview {
-  pointer-events: none;
-}
-
-.image-node-stage {
-  position: relative;
-  width: 100%;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 11px;
-  background: #ffffff;
-  box-sizing: border-box;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.image-node-stage.is-expand-mode {
-  overflow: visible;
-  border-color: transparent;
-}
-
 .workflow-node.image-node.is-expand-mode .image-node-body {
   background: transparent;
-}
-
-.workflow-node.image-node.active .image-node-stage {
-  border-color: #9278e6;
 }
 
 .workflow-node.image-node.is-expand-mode .image-node-stage,
 .workflow-node.image-node.is-expand-mode.active .image-node-stage {
   border-color: transparent;
-}
-
-.image-node-stage.is-loading {
-  border-color: #e2e8f0;
-  box-shadow:
-    0 0 30px rgba(239, 68, 68, 0.2),
-    0 0 48px rgba(146, 120, 230, 0.18);
-}
-
-.image-node-stage-empty {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  border-radius: 11px;
-  background: #ffffff;
-  color: #a8b3be;
-  gap: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-
-.image-node-stage-empty:hover {
-  background: #ffffff;
-  color: #8894a5;
-}
-
-.image-node-stage-empty .node-empty-state-icon--image {
-  width: 84px;
-  height: 84px;
-  stroke-width: 0.85;
-}
-
-.image-node-stage-empty .node-empty-state-icon--fusion {
-  width: 126px;
-  height: 126px;
-}
-
-.image-node-stage-empty span {
-  display: none;
-}
-
-.image-node-stage-empty.is-readonly {
-  cursor: default;
-}
-
-.image-node-stage-empty.is-loading {
-  background: rgba(255, 255, 255, 0.56);
-  color: #a8b3be;
-  cursor: wait;
-}
-
-.image-node-stage-loader-logo {
-  animation: image-node-logo-spin-cycle 2s linear infinite;
-}
-
-.image-node-stage-actions {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  display: flex;
-  gap: 6px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.16s ease;
-}
-
-.image-node-stage:hover .image-node-stage-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.image-node-stage.is-expand-mode .image-node-stage-actions {
-  opacity: 0;
-  pointer-events: none;
-}
-
-@keyframes image-node-logo-spin-cycle {
-  0% {
-    transform: rotate(0deg);
-  }
-  50% {
-    transform: rotate(1turn);
-  }
-  100% {
-    transform: rotate(1turn);
-  }
 }
 
 </style>
