@@ -22,6 +22,7 @@ import {
   resolveSourceImageFromNode,
   waitTaskResult,
 } from './flowTaskExecutorUtils'
+import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 interface FlowEditNodeContext {
   nodeId: string
@@ -118,7 +119,7 @@ export function validateFlowEditNodeInputs(
     if (!rawMaskImageUrl) return 'Edit 节点等待上游 Mask 输出'
   }
 
-  if (node.mode === 'face-swap') {
+  if (node.mode === EDIT_NODE_MODE.faceSwap) {
     const imageBInput = resolveConnectedInput(options, context.nodeId, 'imageB')
     if (!imageBInput) return 'Edit 节点缺少 Face(ImageB) 连线'
     const imageBUrl = resolveSourceImageFromNode(imageBInput.sourceType, imageBInput.snapshotNode)
@@ -150,7 +151,7 @@ export async function executeFlowEditNode(
   const imageSize = await options.loadImageSizeFromUrl(imageUrl)
 
   try {
-    if (node.mode === 'face-swap') {
+    if (node.mode === EDIT_NODE_MODE.faceSwap) {
       const imageBInput = resolveConnectedInput(options, context.nodeId, 'imageB')!
       const imageBUrl = resolveSourceImageFromNode(imageBInput.sourceType, imageBInput.snapshotNode)
       const maskInput = resolveConnectedInput(options, context.nodeId, 'mask')
@@ -220,7 +221,7 @@ export async function executeFlowEditNode(
         if (!maskImageUrl) {
           throw new Error('Edit 节点等待上游 Mask 输出')
         }
-        if (node.mode === 'partial-edit' || node.mode === 'bg-swap') {
+        if (node.mode === EDIT_NODE_MODE.partialEdit || node.mode === EDIT_NODE_MODE.bgSwap) {
           localInpaint = await prepareFlowLocalInpaint({
             originalImageUrl: imageUrl,
             maskUrl: maskImageUrl,

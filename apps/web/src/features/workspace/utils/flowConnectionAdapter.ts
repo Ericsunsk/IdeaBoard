@@ -8,6 +8,7 @@ import {
 } from '../config/canvasNodeConnectionContract'
 import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
+import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 const AUTO_HANDLE_PORT = '__auto'
 
@@ -78,7 +79,7 @@ function buildContractNode(
   return {
     id: nodeId,
     type: nodeType,
-    mode: data?.mode ?? (nodeType === 'edit' ? 'partial-edit' : undefined),
+    mode: data?.mode ?? (nodeType === 'edit' ? EDIT_NODE_MODE.partialEdit : undefined),
   } as CanvasConnectionContractNode
 }
 

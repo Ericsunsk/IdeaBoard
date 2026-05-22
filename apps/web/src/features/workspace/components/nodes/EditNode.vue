@@ -31,25 +31,13 @@
       <div class="edit-mode-card node-mode-card">
         <div class="edit-mode-row node-option-row">
           <NodeActionButton
+            v-for="option in EDIT_NODE_MODE_OPTIONS"
+            :key="option.value"
             variant="chip"
-            :active="node.mode === 'partial-edit'"
-            @click="emit('update:mode', 'partial-edit')"
+            :active="node.mode === option.value"
+            @click="emit('update:mode', option.value)"
           >
-            Detail
-          </NodeActionButton>
-          <NodeActionButton
-            variant="chip"
-            :active="node.mode === 'bg-swap'"
-            @click="emit('update:mode', 'bg-swap')"
-          >
-            Background
-          </NodeActionButton>
-          <NodeActionButton
-            variant="chip"
-            :active="node.mode === 'face-swap'"
-            @click="emit('update:mode', 'face-swap')"
-          >
-            Face
+            {{ option.label }}
           </NodeActionButton>
         </div>
       </div>
@@ -66,6 +54,7 @@
 <script setup lang="ts">
 import type { EditNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
+import { EDIT_NODE_MODE_OPTIONS, type EditNodeMode } from '../../types/editNodeModes'
 
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
@@ -81,7 +70,7 @@ const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'update:title', value: string): void
   (e: 'delete'): void
-  (e: 'update:mode', value: 'partial-edit' | 'bg-swap' | 'face-swap'): void
+  (e: 'update:mode', value: EditNodeMode): void
   (e: 'generate'): void
 }>()
 

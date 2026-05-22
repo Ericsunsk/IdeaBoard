@@ -1,4 +1,5 @@
 import type { CanvasConnectionNodeType } from '../types/canvasNodes'
+import type { EditNodeMode } from './editNodeModes'
 
 export type FlowNodeKind = CanvasConnectionNodeType
 
@@ -7,6 +8,6 @@ export interface FlowNodeData {
   nodeType?: CanvasConnectionNodeType
   title: string
   summary?: string
-  mode?: 'partial-edit' | 'bg-swap' | 'face-swap'
+  mode?: EditNodeMode
   snapshotNode?: unknown
 }

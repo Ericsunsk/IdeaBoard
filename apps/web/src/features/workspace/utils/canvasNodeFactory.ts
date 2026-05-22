@@ -24,6 +24,7 @@ import type {
   WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
+import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 function createCanvasEntityId(): number {
   return Date.now() + Math.random()
@@ -120,7 +121,7 @@ export function createEditNodeAt(point: CanvasPoint): EditNodeItem {
     y: point.y,
     width: 280,
     title: getDefaultCanvasNodeTitle('edit'),
-    mode: 'partial-edit',
+    mode: EDIT_NODE_MODE.partialEdit,
     outputStatus: 'idle',
     outputImages: [],
   }

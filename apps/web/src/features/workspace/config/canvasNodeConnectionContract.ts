@@ -10,6 +10,7 @@ import type {
   WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
+import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 export type CanvasConnectionKind = 'image' | 'mask' | 'prompt'
 export type CanvasConnectionDirection = 'input' | 'output'
@@ -33,11 +34,11 @@ export interface CanvasNodePortContract {
 }
 
 export function editModeSupportsPrompt(mode: EditNodeItem['mode']) {
-  return mode !== 'face-swap'
+  return mode !== EDIT_NODE_MODE.faceSwap
 }
 
 export function editModeSupportsSourceImage(mode: EditNodeItem['mode']) {
-  return mode === 'face-swap'
+  return mode === EDIT_NODE_MODE.faceSwap
 }
 
 export function editModeRequiresMask(mode: EditNodeItem['mode']) {
@@ -51,11 +52,11 @@ export function getEditNodePortLabel(
 ) {
   switch (port) {
     case 'image':
-      return mode === 'face-swap' ? 'Target' : 'Image'
+      return mode === EDIT_NODE_MODE.faceSwap ? 'Target' : 'Image'
     case 'imageB':
       return 'Face'
     case 'mask':
-      return mode === 'face-swap' ? 'Face Mask' : 'Mask'
+      return mode === EDIT_NODE_MODE.faceSwap ? 'Face Mask' : 'Mask'
     case 'prompt':
       return 'Prompt'
   }

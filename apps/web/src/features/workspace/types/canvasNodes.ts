@@ -7,6 +7,7 @@ import {
   normalizeFusionBlendPoint,
   type FusionBlendPoint,
 } from '../utils/fusionBlend'
+import type { EditNodeMode } from './editNodeModes'
 
 export interface CanvasPoint {
   x: number
@@ -232,7 +233,7 @@ export interface EditNodeItem {
   y: number
   width: number
   title?: string
-  mode: 'partial-edit' | 'bg-swap' | 'face-swap'
+  mode: EditNodeMode
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }

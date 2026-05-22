@@ -26,6 +26,7 @@ import type {
 } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/task'
 import type { FlowHistorySnapshot } from './useFlowTransactions'
+import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 type FlowRuntimeNode = { id: string; data?: { kind?: string; snapshotNode?: unknown } }
 type FlowRuntimeEdge = {
@@ -290,7 +291,7 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
       validate: (ctx, opts) => validateFlowEditNodeInputs(ctx, opts),
       preflight: (ctx) =>
         assertExecutionSubmitReady(
-          ctx.snapshotNode.mode === 'face-swap'
+          ctx.snapshotNode.mode === EDIT_NODE_MODE.faceSwap
             ? EXECUTION_FACE_SWAP_META.feature
             : EXECUTION_EDIT_MODE_META[ctx.snapshotNode.mode].feature,
         ),
