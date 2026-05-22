@@ -4,7 +4,6 @@ import {
   createEditNodeAt,
   createFusionNodeAt,
   createImageNodeAt,
-  createMaskNodeAt,
   createModelNodeAt,
   createPromptNodeAt,
   createViewpointNodeAt,
@@ -24,7 +23,6 @@ export type FlowCreatableNodeKind =
   | 'edit'
   | 'fusion'
   | 'wear'
-  | 'mask'
   | 'model'
   | 'viewpoint'
 
@@ -36,7 +34,6 @@ type UseFlowNodeMutationsOptions = {
   commitNodeMutation: FlowTransactions['commitNodeMutation']
   commitEdgeMutation: FlowTransactions['commitEdgeMutation']
   onWarning: (message: string) => void
-  onNodeDeleted?: (nodeId: string, kind: string) => void
 }
 
 type UpdateSnapshotNodeOptions = {
@@ -70,8 +67,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         return createFusionNodeAt(point)
       case 'wear':
         return createWearNodeAt(point)
-      case 'mask':
-        return createMaskNodeAt(point)
       case 'model':
         return createModelNodeAt(point)
       case 'viewpoint':
@@ -169,9 +164,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const flowNodes = options.nodes.value as Array<{ id: string; data?: unknown }>
     const target = flowNodes.find((node) => node.id === nodeId)
     if (!target) return
-    const targetKind = (target.data as { kind?: string } | undefined)?.kind
-    if (!targetKind) return
-    options.onNodeDeleted?.(nodeId, targetKind)
     options.commitGraphMutation((items, currentEdges) => ({
       nodes: items.filter((node) => node.id !== nodeId),
       edges: currentEdges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
@@ -219,11 +211,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   function deleteSelectedFlowElements() {
     const flowNodes = options.nodes.value as Array<{ id: string; selected?: boolean }>
-    const selectedNodeKinds = new Map(
-      (options.nodes.value as Array<{ id: string; selected?: boolean; data?: { kind?: string } }>)
-        .filter((node) => !!node.selected && typeof node.data?.kind === 'string')
-        .map((node) => [node.id, node.data!.kind as string] as const),
-    )
     const flowEdges = options.edges.value as Array<{
       id: string
       selected?: boolean
@@ -237,9 +224,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       flowEdges.filter((edge) => !!edge.selected).map((edge) => edge.id),
     )
     if (selectedNodeIds.size === 0 && selectedEdgeIds.size === 0) return
-    selectedNodeKinds.forEach((kind, nodeId) => {
-      options.onNodeDeleted?.(nodeId, kind)
-    })
     options.commitGraphMutation((items, currentEdges) => ({
       nodes: items.filter((node) => !selectedNodeIds.has(node.id)),
       edges: currentEdges.filter(
@@ -260,17 +244,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   function onFlowNodeParamUpdate(nodeId: string, payload: { key: string; value: unknown }) {
     updateSnapshotNode(nodeId, (snapshotNode) => patchFlowSnapshotParam(snapshotNode, payload))
-  }
-
-  function onFlowMaskToggleInvert(nodeId: string) {
-    updateSnapshotNode(nodeId, (snapshotNode) => {
-      const nextInvertMask = !snapshotNode.invertMask
-      if (snapshotNode.invertMask === nextInvertMask) return snapshotNode
-      return {
-        ...snapshotNode,
-        invertMask: nextInvertMask,
-      }
-    })
   }
 
   const EXECUTION_NODE_KINDS = new Set([
@@ -346,7 +319,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     deleteSelectedFlowElements,
     onFlowPromptTextUpdate,
     onFlowNodeParamUpdate,
-    onFlowMaskToggleInvert,
     markFlowExecutionNodeDirty,
   }
 }

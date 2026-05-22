@@ -67,11 +67,6 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
       key: '{{original_image_url}}',
       desc: 'Body 原图 URL（由 Wear 节点 Image 输入自动传入，无需手填）',
     },
-    {
-      key: '{{mask_image_url}}',
-      desc: 'Mask 节点输出上传后的 URL（连接 Mask 时自动传入；未连接时为空）',
-    },
-    { key: '{{use_mask}}', desc: '是否启用蒙版（连接 Mask 时自动为 true，未连接时自动为 false）' },
   ],
   [WORKFLOW_FEATURE.multiAngle]: [
     { key: '{{angle_spec}}', desc: '视角控制参数（JSON，系统按它决定 yaw 与景别）' },
@@ -112,9 +107,7 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
     { key: '{{image_b_weight}}', desc: 'Image B 实际融合百分比' },
   ],
   [IMAGE_NODE_ACTION.hdUpscale]: [
-    { key: '{{use_mask}}', desc: '是否启用局部增强（连接 Mask 时自动为 true，否则为 false）' },
     { key: '{{original_image_url}}', desc: '当前 Image 工具输入的原图 URL（自动传入）' },
-    { key: '{{mask_image_url}}', desc: 'Mask 节点输出上传后的 URL（仅连接 Mask 时自动传入）' },
     { key: '{{upscale_mode}}', desc: 'HD 模式（base / enhancement）' },
     { key: '{{upscale_factor}}', desc: '放大倍数（2 / 3 / 4）' },
     { key: '{{output_format}}', desc: '输出格式（jpg / png）' },
@@ -133,7 +126,7 @@ const featureNotes: Partial<Record<FeatureSlug, string>> = {
   [WORKFLOW_FEATURE.patternGen]:
     '底部输入栏「图案生成」建议保持后台 system prompt 为空，让用户输入自由发挥。',
   [IMAGE_NODE_ACTION.hdUpscale]:
-    'Image Tools · HD 无论是否连接 Mask 都统一走任务链并使用这里的系统提示词；连接 Mask 时 use_mask=true（并自动带入 mask 相关参数），未连接时 use_mask=false。',
+    'Image Tools · HD 走 Image 右键工具链，使用这里的固定系统提示词与放大参数。',
 }
 
 const CONTROL_VAR_KEYS = new Set([
@@ -152,10 +145,8 @@ const CONTROL_VAR_KEYS = new Set([
 
 const ASSET_VAR_KEYS = new Set([
   '{{original_image_url}}',
-  '{{mask_image_url}}',
   '{{model_url}}',
   '{{pose_url}}',
-  '{{use_mask}}',
 ])
 
 export function getVarsForSlug(slug: FeatureSlug): VarDef[] {

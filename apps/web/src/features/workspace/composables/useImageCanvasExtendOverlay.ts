@@ -8,6 +8,7 @@ import {
   resolveDefaultCanvasExtendFrame,
   type CanvasExtendRect,
 } from '../utils/canvasExtendGeometry'
+import { isEditableEventTarget } from '../utils/domEventTargets'
 
 type ImageDisplayPayload = {
   url: string
@@ -204,18 +205,6 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     }
     cancelExpandMode()
     await options.onCommit(payload)
-  }
-
-  function isEditableEventTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false
-    if (target.isContentEditable) return true
-    const tagName = target.tagName.toLowerCase()
-    if (tagName === 'textarea') return true
-    if (tagName === 'input') {
-      const input = target as HTMLInputElement
-      return input.type !== 'button' && input.type !== 'submit' && input.type !== 'reset'
-    }
-    return !!target.closest('textarea,input,[contenteditable=""],[contenteditable="true"]')
   }
 
   function onGlobalKeydown(event: KeyboardEvent) {

@@ -1,4 +1,5 @@
 import { onMounted, onUnmounted } from 'vue'
+import { isEditableEventTarget } from '../utils/domEventTargets'
 
 type UseFlowKeyboardShortcutsOptions = {
   onSave: () => void | Promise<void>
@@ -17,14 +18,6 @@ type UseFlowKeyboardShortcutsOptions = {
 
 const KEYBOARD_PAN_STEP = 48
 const KEYBOARD_PAN_FAST_STEP = 120
-
-function isEditableEventTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  const tag = target.tagName.toLowerCase()
-  if (tag === 'input' || tag === 'textarea') return true
-  if (target.isContentEditable) return true
-  return !!target.closest('[contenteditable="true"]')
-}
 
 function getKeyboardPanDelta(key: string, step: number): { x: number; y: number } | null {
   switch (key) {

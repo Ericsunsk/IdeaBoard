@@ -12,11 +12,20 @@ import {
 } from '../config/promptAspectRatio'
 import type { FlowNodeData } from '../types/flowTypes'
 import { taskApi } from '../../../shared/api/task'
+import { uploadApi } from '../../../shared/api/upload'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { buildExecutionTaskRequest, EXECUTION_FUSION_META } from '../config/executionContract'
 import { buildExecutionSizeParams } from '../utils/executionSizeParams'
 import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
 import { resolveFusionOutputSize } from '../utils/fusionOutputSizing'
+import {
+  cleanupFlowLocalInpaintAssets,
+  composeFlowLocalInpaint,
+  prepareFlowLocalInpaint,
+  type FlowLocalInpaintCropResult,
+} from '../services/flowLocalInpaint'
+import { ensureFlowMaskImageUrl } from '../services/flowMediaUpload'
+import { isDataUrl } from '../services/flowMediaIO'
 import {
   assertCanvasExtendSubmitReady,
   assertDirectActionSubmitReady,
@@ -25,6 +34,7 @@ import {
   submitCanvasExtendTask,
   submitDirectActionTask,
   submitHdUpscaleTask,
+  submitImageInpaintTask,
   submitPromptImageGenerationTask,
   submitPromptTextGenerationTask,
   waitExistingOrLiveTaskResult,
@@ -58,6 +68,11 @@ type DirectActionKey = ImageDirectTaskAction | ImageStrengthAction
 type RunImageDirectActionOptions = {
   strength?: number
 }
+type RunImageInpaintActionOptions = {
+  prompt: string
+  maskDataUrl: string
+  outputCount: number
+}
 
 type UseFlowImageDirectActionsOptions = {
   nodes: Ref<Node[]>
@@ -69,6 +84,7 @@ type UseFlowImageDirectActionsOptions = {
   refreshNodeInternals?: (nodeIds: string[]) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
+  getCurrentBoardId?: () => string
 }
 
 type CanvasExtendRectIntent = {
@@ -248,6 +264,77 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       const msg = error instanceof Error ? error.message : '扩图失败'
       options.onWarning(msg)
     } finally {
+      for (const resultNodeId of resultNodeIds) setNodeRunning(resultNodeId, false)
+    }
+  }
+
+  async function runImageInpaintAction(nodeId: string, inpaint: RunImageInpaintActionOptions) {
+    const normalizedPrompt = `${inpaint.prompt ?? ''}`.trim()
+    if (!normalizedPrompt) {
+      options.onWarning('请输入 Prompt')
+      return
+    }
+    const source = readImageSnapshot(nodeId)
+    if (!source?.url) {
+      options.onWarning('图片节点不存在或缺少 URL')
+      return
+    }
+    const rawMaskDataUrl = `${inpaint.maskDataUrl ?? ''}`.trim()
+    if (!rawMaskDataUrl) {
+      options.onWarning('请先标记局部重绘区域')
+      return
+    }
+    const resolvedOutputCount = clampImageNodeOutputCount(inpaint.outputCount)
+    let resultNodeIds: string[] = []
+    let localInpaint: FlowLocalInpaintCropResult | null = null
+    let temporaryMaskUrl = ''
+    const boardId = `${options.getCurrentBoardId?.() ?? ''}`.trim()
+    try {
+      await assertPromptImageSubmitReady()
+      const normalizedMaskUrl = await ensureFlowMaskImageUrl(rawMaskDataUrl, { boardId })
+      if (isDataUrl(rawMaskDataUrl)) temporaryMaskUrl = normalizedMaskUrl
+      localInpaint = await prepareFlowLocalInpaint({
+        originalImageUrl: source.url,
+        maskUrl: normalizedMaskUrl,
+        boardId,
+      })
+      resultNodeIds = appendPendingImageResultNodes(source, nodeId, resolvedOutputCount)
+      resultNodeIds.forEach((resultNodeId) => setNodeRunning(resultNodeId, true))
+      await runPendingImageBatchGeneration({
+        resultNodeIds,
+        totalCount: resolvedOutputCount,
+        submitTask: async () => {
+          const taskId = await submitImageInpaintTask({
+            prompt: normalizedPrompt,
+            croppedImageUrl: localInpaint!.croppedImageUrl,
+            croppedMaskUrl: localInpaint!.croppedMaskUrl,
+            cropSize: localInpaint!.cropSize,
+          })
+          return { taskId }
+        },
+        resolveResult: async (taskId) => {
+          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
+          const croppedResultUrl = urls[0]
+          if (!croppedResultUrl) throw new Error('任务完成但未返回图片')
+          const finalUrl = await composeFlowLocalInpaint({
+            originalImageUrl: source.url,
+            croppedResultUrl,
+            croppedMaskUrl: localInpaint!.croppedMaskUrl,
+            bbox: localInpaint!.bbox,
+            boardId,
+          })
+          const ratio = await resolveTaskImageRatio(finalUrl, source.ratio, loadImageSizeFromUrl)
+          return { url: finalUrl, ratio }
+        },
+      })
+    } catch (error) {
+      for (const resultNodeId of resultNodeIds) removePendingImageResultNode(resultNodeId)
+      options.onWarning(error instanceof Error ? error.message : '局部重绘失败')
+    } finally {
+      await cleanupFlowLocalInpaintAssets(localInpaint, boardId)
+      if (temporaryMaskUrl && boardId) {
+        await Promise.allSettled([uploadApi.recycle(temporaryMaskUrl, boardId)])
+      }
       for (const resultNodeId of resultNodeIds) setNodeRunning(resultNodeId, false)
     }
   }
@@ -530,6 +617,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     runCanvasExtendAction,
     runImagePromptGeneration,
     runImagePromptGenerationFromSource,
+    runImageInpaintAction,
     runFusionPromptGeneration,
     runTextPromptGeneration,
   }

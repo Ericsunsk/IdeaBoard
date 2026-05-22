@@ -61,23 +61,6 @@ function createValidState() {
         outputImages: [],
       },
     ],
-    maskNodes: [
-      {
-        id: 6,
-        type: 'mask' as const,
-        x: 0,
-        y: 0,
-        width: 300,
-        sourceImageUrl: 'https://example.com/c.png',
-        sourceImageRatio: 1,
-        executionMaskDataUrl: 'data:image/png;base64,aaa',
-        maskDataUrl: 'data:image/png;base64,bbb',
-        brushSize: 8,
-        drawMode: 'paint' as const,
-        refineAmount: 0,
-        invertMask: false,
-      },
-    ],
     editNodes: [
       {
         id: 7,
@@ -150,7 +133,6 @@ function testValidEmptySnapshot() {
     promptNodes: [],
     modelNodes: [],
     viewpointNodes: [],
-    maskNodes: [],
     editNodes: [],
     fusionNodes: [],
     wearNodes: [],

@@ -26,7 +26,7 @@ export interface ResolvedFlowInputImage {
   ratio: number
 }
 
-type FlowConnectedInputPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
+type FlowConnectedInputPort = 'image' | 'prompt' | 'imageA' | 'imageB'
 type FlowGraphNode = FlowTaskExecutorGraphOptions['nodes'][number]
 type FlowSourceTypeResolver = (sourceNode: FlowGraphNode) => CanvasConnectionNodeType | null
 
@@ -92,7 +92,6 @@ export function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null
   if (
     head === 'prompt' ||
     head === 'image' ||
-    head === 'mask' ||
     head === 'model' ||
     head === 'viewpoint' ||
     head === 'edit' ||

@@ -35,10 +35,6 @@ function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-const HISTORY_BLOB_TOKEN_PREFIX = '__FLOW_HISTORY_BLOB__:'
-const HISTORY_BLOB_DATA_KEYS = new Set(['maskDataUrl', 'executionMaskDataUrl'])
-const HISTORY_BLOB_MIN_LENGTH = 2048
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object'
 }
@@ -75,85 +71,9 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
   const flowHistoryPast = ref<FlowHistoryEntry[]>([])
   const flowHistoryFuture = ref<FlowHistoryEntry[]>([])
   const dragBeforeSnapshot = ref<FlowHistorySnapshot | null>(null)
-  const blobStore = new Map<string, string>()
-  const blobTokenByValue = new Map<string, string>()
-  let nextBlobId = 1
-
-  function encodeHistoryBlob(value: string): string {
-    const existingToken = blobTokenByValue.get(value)
-    if (existingToken) return existingToken
-    const token = `${HISTORY_BLOB_TOKEN_PREFIX}${nextBlobId}`
-    nextBlobId += 1
-    blobStore.set(token, value)
-    blobTokenByValue.set(value, token)
-    return token
-  }
-
-  function decodeHistoryBlobsInPlace(value: unknown): void {
-    if (Array.isArray(value)) {
-      for (let i = 0; i < value.length; i += 1) {
-        const item = value[i]
-        if (typeof item === 'string' && item.startsWith(HISTORY_BLOB_TOKEN_PREFIX)) {
-          value[i] = blobStore.get(item) ?? item
-          continue
-        }
-        decodeHistoryBlobsInPlace(item)
-      }
-      return
-    }
-    if (!isRecord(value)) return
-    for (const key of Object.keys(value)) {
-      const field = value[key]
-      if (typeof field === 'string' && field.startsWith(HISTORY_BLOB_TOKEN_PREFIX)) {
-        value[key] = blobStore.get(field) ?? field
-        continue
-      }
-      decodeHistoryBlobsInPlace(field)
-    }
-  }
-
-  function collectHistoryBlobTokens(value: unknown, tokens: Set<string>): void {
-    if (Array.isArray(value)) {
-      value.forEach((item) => collectHistoryBlobTokens(item, tokens))
-      return
-    }
-    if (typeof value === 'string') {
-      if (value.startsWith(HISTORY_BLOB_TOKEN_PREFIX)) tokens.add(value)
-      return
-    }
-    if (!isRecord(value)) return
-    Object.values(value).forEach((field) => collectHistoryBlobTokens(field, tokens))
-  }
-
-  function pruneBlobStore() {
-    const retainedTokens = new Set<string>()
-    for (const snapshot of flowHistoryPast.value) collectHistoryBlobTokens(snapshot, retainedTokens)
-    for (const snapshot of flowHistoryFuture.value)
-      collectHistoryBlobTokens(snapshot, retainedTokens)
-    if (dragBeforeSnapshot.value) collectHistoryBlobTokens(dragBeforeSnapshot.value, retainedTokens)
-    for (const [token, value] of blobStore.entries()) {
-      if (retainedTokens.has(token)) continue
-      blobStore.delete(token)
-      blobTokenByValue.delete(value)
-    }
-  }
-
-  function serializeForHistory(value: unknown): string {
-    return JSON.stringify(value, (key, currentValue) => {
-      if (
-        typeof currentValue === 'string' &&
-        HISTORY_BLOB_DATA_KEYS.has(key) &&
-        currentValue.startsWith('data:') &&
-        currentValue.length >= HISTORY_BLOB_MIN_LENGTH
-      ) {
-        return encodeHistoryBlob(currentValue)
-      }
-      return currentValue
-    })
-  }
 
   function capture(): FlowHistorySnapshot {
-    const serialized = serializeForHistory({
+    const serialized = JSON.stringify({
       nodes: options.nodes.value as unknown[],
       edges: options.edges.value as unknown[],
     })
@@ -222,18 +142,13 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
     flowHistoryPast.value = []
     flowHistoryFuture.value = []
     dragBeforeSnapshot.value = null
-    pruneBlobStore()
   }
 
   function push(before: FlowHistorySnapshot, after = capture()): boolean {
     const entry = createHistoryPatches(before, after)
-    if (!entry) {
-      pruneBlobStore()
-      return false
-    }
+    if (!entry) return false
     flowHistoryPast.value = pushBoundedStack(flowHistoryPast.value, entry)
     flowHistoryFuture.value = []
-    pruneBlobStore()
     return true
   }
 
@@ -275,8 +190,6 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
       direction === 'forward' ? entry.afterEdgeOrder : entry.beforeEdgeOrder,
       direction,
     )
-    decodeHistoryBlobsInPlace(nextNodes)
-    decodeHistoryBlobsInPlace(nextEdges)
     options.commitNodes(nextNodes)
     options.commitEdges(nextEdges)
     options.onRestore?.()
@@ -288,7 +201,6 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
     flowHistoryPast.value = flowHistoryPast.value.slice(0, -1)
     flowHistoryFuture.value = pushBoundedStack(flowHistoryFuture.value, entry)
     applyHistoryEntry(entry, 'backward')
-    pruneBlobStore()
   }
 
   function redo() {
@@ -297,7 +209,6 @@ export function useFlowHistory(options: UseFlowHistoryOptions) {
     flowHistoryFuture.value = flowHistoryFuture.value.slice(0, -1)
     flowHistoryPast.value = pushBoundedStack(flowHistoryPast.value, entry)
     applyHistoryEntry(entry, 'forward')
-    pruneBlobStore()
   }
 
   function onNodeDragStart() {

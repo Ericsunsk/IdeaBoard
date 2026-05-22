@@ -1,7 +1,14 @@
 import { IMAGE_NODE_ACTION, type ImageNodeAction, type ImageStrengthAction } from '../types/imageActions'
 import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../shared/domain/workflowFeatureRegistry'
 
-export type ImageActionMenuIcon = 'remove-bg' | 'style-variation' | 'sketch-to-image' | 'hd-text' | 'image-extend' | 'color-placeholder'
+export type ImageActionMenuIcon =
+  | 'remove-bg'
+  | 'style-variation'
+  | 'sketch-to-image'
+  | 'hd-text'
+  | 'image-extend'
+  | 'image-inpaint'
+  | 'color-placeholder'
 
 type ImageActionMenuBase = {
   action: ImageNodeAction
@@ -22,7 +29,14 @@ type ImageActionMenuPlaceholderItem = Omit<ImageActionMenuBase, 'action'> & {
 
 export type ImageActionMenuItem = ImageActionMenuActionItem | ImageActionMenuPlaceholderItem
 
-function getImageActionText(action: ImageNodeAction): { label: string; title: string } {
+type WorkflowRegistryImageAction =
+  | typeof IMAGE_NODE_ACTION.removeBg
+  | typeof IMAGE_NODE_ACTION.styleVariation
+  | typeof IMAGE_NODE_ACTION.sketchToImage
+  | typeof IMAGE_NODE_ACTION.hdUpscale
+  | typeof IMAGE_NODE_ACTION.imageExtend
+
+function getImageActionText(action: WorkflowRegistryImageAction): { label: string; title: string } {
   const meta = WORKFLOW_FEATURE_REGISTRY_MAP[action]
   return {
     label: meta.imageActionLabel ?? meta.adminTitle,
@@ -68,6 +82,12 @@ export const IMAGE_ACTION_MENU_ITEMS: readonly ImageActionMenuItem[] = [
     label: imageExtendText.label,
     title: imageExtendText.title,
     icon: 'image-extend',
+  },
+  {
+    action: IMAGE_NODE_ACTION.imageInpaint,
+    label: '局部重绘',
+    title: '局部重绘',
+    icon: 'image-inpaint',
   },
   {
     action: null,

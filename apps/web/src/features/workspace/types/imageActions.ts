@@ -1,5 +1,9 @@
-export { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
-import { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
+import { IMAGE_NODE_ACTION as WORKFLOW_IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
+
+export const IMAGE_NODE_ACTION = {
+  ...WORKFLOW_IMAGE_NODE_ACTION,
+  imageInpaint: 'image-inpaint',
+} as const
 
 export const IMAGE_DIRECT_TASK_ACTIONS = [
   IMAGE_NODE_ACTION.removeBg,
@@ -18,6 +22,7 @@ export type ImageNodeAction =
   | ImageDirectTaskAction
   | ImageStrengthAction
   | typeof IMAGE_NODE_ACTION.imageExtend
+  | typeof IMAGE_NODE_ACTION.imageInpaint
 
 export const DEFAULT_IMAGE_ACTION_STRENGTH = 50
 

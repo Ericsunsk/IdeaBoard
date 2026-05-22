@@ -2,7 +2,6 @@ import {
   normalizeViewpointSelectionByCategory,
   VIEWPOINT_LIGHTING_OPTIONS,
 } from '../components/nodes/config/nodeOptionConfig'
-import { clampMaskRefineAmount } from '../services/flowMaskProcessing'
 import type { PromptNodeInputImage, ViewpointNodeItem } from '../types/canvasNodes'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import {
@@ -213,22 +212,6 @@ export function patchFlowSnapshotParam(
         return { ...snapshotNode, lighting: value }
       }
       return snapshotNode
-    }
-    case 'drawMode':
-      if (value === 'paint' || value === 'erase') {
-        if (snapshotNode.drawMode === value) return snapshotNode
-        return { ...snapshotNode, drawMode: value }
-      }
-      return snapshotNode
-    case 'brushSize': {
-      const nextBrushSize = Math.max(4, Math.min(48, Math.round(Number(value) || 0)))
-      if (snapshotNode.brushSize === nextBrushSize) return snapshotNode
-      return { ...snapshotNode, brushSize: nextBrushSize }
-    }
-    case 'refineAmount': {
-      const nextRefineAmount = clampMaskRefineAmount(Number(value) || 0)
-      if (snapshotNode.refineAmount === nextRefineAmount) return snapshotNode
-      return { ...snapshotNode, refineAmount: nextRefineAmount }
     }
     default:
       return snapshotNode

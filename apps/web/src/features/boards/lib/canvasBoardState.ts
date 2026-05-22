@@ -6,7 +6,6 @@ import type {
   FusionNodeItem,
   ImageNodeItem,
   ImageNodeOutputItem,
-  MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
   WearNodeItem,
@@ -18,7 +17,6 @@ import { canvasBoardStateSchema } from './canvasBoardStateSchema'
 export type CanvasBoardStatePromptNode = PromptNodeItem
 export type CanvasBoardStateModelNode = ModelNodeItem
 export type CanvasBoardStateViewpointNode = ViewpointNodeItem
-export type CanvasBoardStateMaskNode = MaskNodeItem
 export type CanvasBoardStateImageNodeOutput = ImageNodeOutputItem
 export type CanvasBoardStateImageNode = ImageNodeItem
 export type CanvasBoardStateEditNode = EditNodeItem
@@ -118,21 +116,6 @@ export function collectCanvasBoardImageUrls(
     const normalized = `${node.sourceImageUrl ?? ''}`.trim()
     if (normalized) {
       urls.add(normalized)
-    }
-  })
-
-  snapshot.maskNodes.forEach((node) => {
-    const sourceImageUrl = `${node.sourceImageUrl ?? ''}`.trim()
-    if (sourceImageUrl) {
-      urls.add(sourceImageUrl)
-    }
-    const executionMaskDataUrl = `${node.executionMaskDataUrl ?? ''}`.trim()
-    if (executionMaskDataUrl) {
-      urls.add(executionMaskDataUrl)
-    }
-    const maskDataUrl = `${node.maskDataUrl ?? ''}`.trim()
-    if (maskDataUrl) {
-      urls.add(maskDataUrl)
     }
   })
 

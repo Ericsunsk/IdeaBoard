@@ -43,6 +43,13 @@ type SubmitCanvasExtendTaskInput = {
   prompt?: string
 }
 
+type SubmitImageInpaintTaskInput = {
+  prompt: string
+  croppedImageUrl: string
+  croppedMaskUrl: string
+  cropSize: { width: number; height: number } | null
+}
+
 const DIRECT_ACTION_FEATURES = {
   [IMAGE_NODE_ACTION.removeBg]: EXECUTION_DIRECT_ACTION_META.removeBg.feature,
   [IMAGE_NODE_ACTION.styleVariation]: EXECUTION_DIRECT_ACTION_META.styleVariation.feature,
@@ -183,6 +190,28 @@ export async function submitPromptImageGenerationTask(
   const submitRes = await taskApi.submit(request)
   if (submitRes.code !== 0 || !submitRes.data?.task_id) {
     throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交任务失败'))
+  }
+  return submitRes.data.task_id
+}
+
+export async function submitImageInpaintTask(
+  input: SubmitImageInpaintTaskInput,
+): Promise<string> {
+  const request = buildExecutionTaskRequest({
+    prompt: `${EXECUTION_EDIT_MODE_META[EDIT_NODE_MODE.partialEdit].promptPrefix} ${input.prompt}`,
+    feature: EXECUTION_EDIT_MODE_META[EDIT_NODE_MODE.partialEdit].feature,
+    imageUrls: [input.croppedImageUrl],
+    params: {
+      original_image_url: input.croppedImageUrl,
+      mask_image_url: input.croppedMaskUrl,
+      use_mask: true,
+      ...buildExecutionSizeParams(input.cropSize),
+    },
+  })
+
+  const submitRes = await taskApi.submit(request)
+  if (submitRes.code !== 0 || !submitRes.data?.task_id) {
+    throw new Error(sanitizeApiErrorMessage(submitRes.msg, '提交局部重绘任务失败'))
   }
   return submitRes.data.task_id
 }

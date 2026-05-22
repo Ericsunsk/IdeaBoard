@@ -46,7 +46,6 @@ function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNo
   return (
     value === 'image' ||
     value === 'prompt' ||
-    value === 'mask' ||
     value === 'model' ||
     value === 'viewpoint' ||
     value === 'edit' ||
@@ -57,7 +56,6 @@ function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNo
 
 function getNodeOutputPort(nodeType: CanvasConnectionNodeType): CanvasConnectionPort {
   if (nodeType === 'prompt') return 'prompt'
-  if (nodeType === 'mask') return 'mask'
   return 'image'
 }
 
@@ -86,7 +84,7 @@ function formatNodePortLabel(
     nodeType === 'edit' &&
     node &&
     node.type === 'edit' &&
-    (port === 'image' || port === 'imageB' || port === 'mask' || port === 'prompt')
+    (port === 'image' || port === 'imageB' || port === 'prompt')
   ) {
     return getEditNodePortLabel(node.mode, port)
   }
@@ -96,7 +94,6 @@ function formatNodePortLabel(
     if (port === 'imageB') return 'Pose'
   }
   if (port === 'image') return 'Image'
-  if (port === 'mask') return 'Mask'
   if (port === 'prompt') return 'Prompt'
   if (port === 'imageA') return nodeType === 'wear' ? 'Body' : 'Image A'
   if (port === 'imageB') return nodeType === 'wear' ? 'Texture' : 'Image B'

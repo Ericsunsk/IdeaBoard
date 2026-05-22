@@ -4,7 +4,6 @@ import type {
   EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
-  MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
   WearNodeItem,
@@ -12,13 +11,12 @@ import type {
 } from '../types/canvasNodes'
 import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
-export type CanvasConnectionKind = 'image' | 'mask' | 'prompt'
+export type CanvasConnectionKind = 'image' | 'prompt'
 export type CanvasConnectionDirection = 'input' | 'output'
 
 export type CanvasConnectionContractNode =
   | PromptNodeItem
   | ImageNodeItem
-  | MaskNodeItem
   | ModelNodeItem
   | ViewpointNodeItem
   | EditNodeItem
@@ -41,22 +39,15 @@ export function editModeSupportsSourceImage(mode: EditNodeItem['mode']) {
   return mode === EDIT_NODE_MODE.faceSwap
 }
 
-export function editModeRequiresMask(mode: EditNodeItem['mode']) {
-  void mode
-  return false
-}
-
 export function getEditNodePortLabel(
   mode: EditNodeItem['mode'],
-  port: Extract<CanvasConnectionPort, 'image' | 'imageB' | 'mask' | 'prompt'>,
+  port: Extract<CanvasConnectionPort, 'image' | 'imageB' | 'prompt'>,
 ) {
   switch (port) {
     case 'image':
       return mode === EDIT_NODE_MODE.faceSwap ? 'Target' : 'Image'
     case 'imageB':
       return 'Face'
-    case 'mask':
-      return mode === EDIT_NODE_MODE.faceSwap ? 'Face Mask' : 'Mask'
     case 'prompt':
       return 'Prompt'
   }
@@ -88,8 +79,6 @@ export function getCanvasNodePortContracts(
       return [input('image', 'image'), output('image', 'image'), output('prompt', 'prompt')]
     case 'image':
       return [input('image', 'image'), output('image', 'image')]
-    case 'mask':
-      return [input('image', 'image', true), output('mask', 'mask')]
     case 'model':
       return [
         input('image', 'image', true),
@@ -110,7 +99,6 @@ export function getCanvasNodePortContracts(
           editModeSupportsSourceImage(editNode.mode),
           editModeSupportsSourceImage(editNode.mode),
         ),
-        input('mask', 'mask', editModeRequiresMask(editNode.mode), true),
         input(
           'prompt',
           'prompt',
@@ -130,7 +118,6 @@ export function getCanvasNodePortContracts(
       return [
         input('imageA', 'image', true),
         input('imageB', 'image', true),
-        input('mask', 'mask', false),
         output('image', 'image'),
       ]
     default:

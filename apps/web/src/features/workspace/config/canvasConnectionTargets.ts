@@ -3,7 +3,6 @@ import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/ca
 export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNodeType[] = [
   'image',
   'prompt',
-  'mask',
   'model',
   'viewpoint',
   'edit',
@@ -13,7 +12,6 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
 
 export const CANVAS_CONNECTION_PORT_WHITELIST: readonly CanvasConnectionPort[] = [
   'image',
-  'mask',
   'prompt',
   'imageA',
   'imageB',

@@ -90,22 +90,6 @@ function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
       },
     })
   })
-  snapshot.maskNodes.forEach((node, index) => {
-    refs.push({
-      path: `maskNodes[${index}].sourceImageUrl`,
-      get: () => node.sourceImageUrl,
-      set: (url) => {
-        node.sourceImageUrl = url
-      },
-    })
-    refs.push({
-      path: `maskNodes[${index}].executionMaskDataUrl`,
-      get: () => node.executionMaskDataUrl,
-      set: (url) => {
-        node.executionMaskDataUrl = url
-      },
-    })
-  })
   appendOutputImageRefs(refs, 'imageNodes', snapshot.imageNodes)
   appendOutputImageRefs(refs, 'modelNodes', snapshot.modelNodes)
   appendOutputImageRefs(refs, 'viewpointNodes', snapshot.viewpointNodes)
@@ -129,10 +113,7 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
     return isBoardWorkspaceUploadPath(path, normalizedUserUid, normalizedBoardId)
   }
 
-  async function fetchAndUploadStable(
-    raw: string,
-    options?: { keepPng?: boolean },
-  ): Promise<string> {
+  async function fetchAndUploadStable(raw: string): Promise<string> {
     const blob = await fetchImageBlob(raw)
     if (!blob.size) {
       throw new Error('下载图片失败：响应为空')
@@ -140,9 +121,7 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
     const file = new File([blob], filenameFromImageUrl(raw, blob.type || 'image/jpeg'), {
       type: blob.type || 'image/jpeg',
     })
-    const prepared = await prepareImageAssetForUpload(file, {
-      compressionPolicy: options?.keepPng ? 'none' : 'default',
-    })
+    const prepared = await prepareImageAssetForUpload(file)
     prepared.warnings.forEach((message) => warning(message))
     const uploadRes = await uploadApi.upload(prepared.uploadFile, normalizedBoardId)
     if (uploadRes.code !== 0 || !uploadRes.data?.url) {
@@ -160,11 +139,11 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
       try {
         const dataUrlResponse = await fetch(raw)
         if (!dataUrlResponse.ok) {
-          throw new Error(`读取 mask 失败：HTTP ${dataUrlResponse.status}`)
+          throw new Error(`读取图片失败：HTTP ${dataUrlResponse.status}`)
         }
         return await dataUrlResponse.blob()
       } catch (error) {
-        throw new Error(`读取 mask 失败：${error instanceof Error ? error.message : '未知错误'}`, {
+        throw new Error(`读取图片失败：${error instanceof Error ? error.message : '未知错误'}`, {
           cause: error,
         })
       }
@@ -183,64 +162,10 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
     return await response.blob()
   }
 
-  async function previewMaskToExecutionMaskDataUrl(rawMaskUrl: string): Promise<string> {
-    const blob = await fetchImageBlob(rawMaskUrl)
-    const objectUrl = URL.createObjectURL(blob)
-    try {
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const el = new Image()
-        el.onload = () => resolve(el)
-        el.onerror = () => reject(new Error('解析 mask 图片失败'))
-        el.src = objectUrl
-      })
-      const width = Math.max(1, Math.round(image.naturalWidth || image.width || 0))
-      const height = Math.max(1, Math.round(image.naturalHeight || image.height || 0))
-      const sourceCanvas = document.createElement('canvas')
-      sourceCanvas.width = width
-      sourceCanvas.height = height
-      const sourceCtx = sourceCanvas.getContext('2d')
-      if (!sourceCtx) return rawMaskUrl
-      sourceCtx.drawImage(image, 0, 0, width, height)
-      const sourceData = sourceCtx.getImageData(0, 0, width, height)
-
-      const outputCanvas = document.createElement('canvas')
-      outputCanvas.width = width
-      outputCanvas.height = height
-      const outputCtx = outputCanvas.getContext('2d')
-      if (!outputCtx) return rawMaskUrl
-      const outputData = outputCtx.createImageData(width, height)
-
-      for (let i = 0; i < sourceData.data.length; i += 4) {
-        const alpha = sourceData.data[i + 3]
-        outputData.data[i] = 255
-        outputData.data[i + 1] = 255
-        outputData.data[i + 2] = 255
-        outputData.data[i + 3] = alpha > 0 ? 255 : 0
-      }
-      outputCtx.putImageData(outputData, 0, 0)
-      return outputCanvas.toDataURL('image/png')
-    } finally {
-      URL.revokeObjectURL(objectUrl)
-    }
-  }
-
   async function stabilizeSnapshotForSave(
     snapshot: CanvasBoardSnapshot,
   ): Promise<CanvasBoardSnapshot> {
     const next = JSON.parse(JSON.stringify(snapshot)) as CanvasBoardSnapshot
-    for (const node of next.maskNodes) {
-      const executionMaskDataUrl = `${node.executionMaskDataUrl ?? ''}`.trim()
-      const maskDataUrl = `${node.maskDataUrl ?? ''}`.trim()
-      node.executionMaskDataUrl = executionMaskDataUrl
-      node.maskDataUrl = ''
-      if (executionMaskDataUrl || !maskDataUrl) continue
-      try {
-        node.executionMaskDataUrl = await previewMaskToExecutionMaskDataUrl(maskDataUrl)
-      } catch {
-        // Fallback: keep original mask source as execution mask to avoid data loss.
-        node.executionMaskDataUrl = maskDataUrl
-      }
-    }
     const refs = collectStableRefs(next)
     const tasks = new Map<string, Promise<string>>()
     for (const ref of refs) {
@@ -249,11 +174,10 @@ export function createFlowWorkspaceUploadLifecycle(options: FlowWorkspaceUploadL
       if (!normalized) continue
       if (normalized !== current) ref.set(normalized)
       if (isStableWorkspaceUrl(normalized)) continue
-      const keepPng = ref.path.includes('executionMaskDataUrl')
-      const taskKey = `${keepPng ? 'png' : 'default'}::${normalized}`
+      const taskKey = `default::${normalized}`
       let task = tasks.get(taskKey)
       if (!task) {
-        task = fetchAndUploadStable(normalized, { keepPng })
+        task = fetchAndUploadStable(normalized)
         tasks.set(taskKey, task)
       }
       try {

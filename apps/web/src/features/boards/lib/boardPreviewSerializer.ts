@@ -49,8 +49,6 @@ interface NodeLike {
   outputImages?: unknown
   sourceImageUrl?: unknown
   sourceImageRatio?: unknown
-  executionMaskDataUrl?: unknown
-  maskDataUrl?: unknown
   inputImages?: unknown
   blendPoint?: unknown
 }
@@ -69,7 +67,6 @@ const BOARD_NODE_COLLECTIONS = [
   { key: 'promptNodes', nodeType: 'prompt' },
   { key: 'modelNodes', nodeType: 'model' },
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
-  { key: 'maskNodes', nodeType: 'mask' },
   { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
   { key: 'wearNodes', nodeType: 'wear' },
@@ -164,33 +161,10 @@ function getSourcePreview(node: NodeLike): NodeImagePreview | null {
   }
 }
 
-function getMaskPreview(node: NodeLike): NodeImagePreview | null {
-  if (typeof node.executionMaskDataUrl === 'string' && node.executionMaskDataUrl) {
-    return {
-      url: node.executionMaskDataUrl,
-      ratio:
-        isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0
-          ? node.sourceImageRatio
-          : 1,
-    }
-  }
-  if (typeof node.maskDataUrl === 'string' && node.maskDataUrl) {
-    return {
-      url: node.maskDataUrl,
-      ratio:
-        isFiniteNumber(node.sourceImageRatio) && node.sourceImageRatio > 0
-          ? node.sourceImageRatio
-          : 1,
-    }
-  }
-  return getSourcePreview(node)
-}
-
 function resolveNodePreview(
   nodeType: CanvasConnectionNodeType,
   node: NodeLike,
 ): NodeImagePreview | null {
-  if (nodeType === 'mask') return getMaskPreview(node)
   return getLatestOutputPreview(node) ?? getSourcePreview(node)
 }
 
@@ -216,9 +190,6 @@ function resolveNodeBodyHeight(
   }
   if (nodeType === 'prompt') return width
   if (nodeType === 'fusion') return width
-  if (nodeType === 'mask') {
-    return preview ? Math.max(120, Math.min(360, Math.round(width * preview.ratio))) : 172
-  }
   return preview ? Math.max(112, Math.min(180, Math.round(width * 0.56))) : 132
 }
 

@@ -190,23 +190,6 @@ export interface ViewpointNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export interface MaskNodeItem {
-  id: number
-  type: 'mask'
-  x: number
-  y: number
-  width: number
-  title?: string
-  sourceImageUrl: string
-  sourceImageRatio: number
-  executionMaskDataUrl: string
-  maskDataUrl: string
-  brushSize: number
-  drawMode: 'paint' | 'erase'
-  refineAmount: number
-  invertMask: boolean
-}
-
 export interface ImageNodeOutputItem {
   url: string
   ratio: number
@@ -307,7 +290,6 @@ export type CanvasImageOutputNodeItem = ImageNodeItem | CanvasExecutionOutputNod
 export type CanvasConnectionNodeType =
   | 'image'
   | 'prompt'
-  | 'mask'
   | 'model'
   | 'viewpoint'
   | 'edit'
@@ -320,8 +302,6 @@ export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): s
       return 'IMAGE'
     case 'prompt':
       return 'PROMPT'
-    case 'mask':
-      return 'MASK'
     case 'model':
       return 'MODEL'
     case 'viewpoint':
@@ -334,7 +314,7 @@ export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): s
       return 'WEAR'
   }
 }
-export type CanvasConnectionPort = 'image' | 'mask' | 'prompt' | 'imageA' | 'imageB'
+export type CanvasConnectionPort = 'image' | 'prompt' | 'imageA' | 'imageB'
 
 export interface CanvasConnection {
   id: number
@@ -350,7 +330,6 @@ export type CanvasNodeItem =
   | PromptNodeItem
   | ModelNodeItem
   | ViewpointNodeItem
-  | MaskNodeItem
   | ImageNodeItem
   | EditNodeItem
   | FusionNodeItem
@@ -367,7 +346,6 @@ export interface CanvasBoardSnapshot {
   promptNodes: PromptNodeItem[]
   modelNodes: ModelNodeItem[]
   viewpointNodes: ViewpointNodeItem[]
-  maskNodes: MaskNodeItem[]
   editNodes: EditNodeItem[]
   fusionNodes: FusionNodeItem[]
   wearNodes: WearNodeItem[]

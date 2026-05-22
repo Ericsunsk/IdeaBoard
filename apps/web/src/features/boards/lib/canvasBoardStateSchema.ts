@@ -34,14 +34,13 @@ const workflowNodeOutputStatusSchema = z.enum(['idle', 'running', 'ready', 'stal
 const canvasConnectionNodeTypeSchema = z.enum([
   'image',
   'prompt',
-  'mask',
   'model',
   'viewpoint',
   'edit',
   'fusion',
   'wear',
 ])
-const canvasConnectionPortSchema = z.enum(['image', 'mask', 'prompt', 'imageA', 'imageB'])
+const canvasConnectionPortSchema = z.enum(['image', 'prompt', 'imageA', 'imageB'])
 
 const imageNodeOutputItemSchema = z.object({
   url: z.string().min(1),
@@ -104,23 +103,6 @@ const viewpointNodeItemSchema = z.object({
   lighting: z.enum(['warm_white', 'afternoon', 'hard_light']),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: z.array(imageNodeOutputItemSchema),
-}).strict()
-
-const maskNodeItemSchema = z.object({
-  id: finiteNumberSchema,
-  type: z.literal('mask'),
-  x: finiteNumberSchema,
-  y: finiteNumberSchema,
-  width: finiteNumberSchema,
-  title: z.string().optional(),
-  sourceImageUrl: z.string(),
-  sourceImageRatio: finiteNumberSchema.positive(),
-  executionMaskDataUrl: z.string(),
-  maskDataUrl: z.string(),
-  brushSize: finiteNumberSchema.min(2).max(64),
-  drawMode: z.enum(['paint', 'erase']),
-  refineAmount: finiteNumberSchema.min(-100).max(100),
-  invertMask: z.boolean(),
 }).strict()
 
 const imageNodeItemSchema = z.object({
@@ -213,7 +195,6 @@ export const canvasBoardSnapshotSchema = z
     promptNodes: z.array(promptNodeItemSchema),
     modelNodes: z.array(modelNodeItemSchema),
     viewpointNodes: z.array(viewpointNodeItemSchema),
-    maskNodes: z.array(maskNodeItemSchema),
     editNodes: z.array(editNodeItemSchema),
     fusionNodes: z.array(fusionNodeItemSchema),
     wearNodes: z.array(wearNodeItemSchema),

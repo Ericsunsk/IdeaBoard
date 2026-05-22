@@ -35,7 +35,6 @@ type SnapshotNodeCollectionKey =
   | 'promptNodes'
   | 'modelNodes'
   | 'viewpointNodes'
-  | 'maskNodes'
   | 'editNodes'
   | 'fusionNodes'
   | 'wearNodes'
@@ -48,7 +47,6 @@ const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
   { key: 'promptNodes', nodeType: 'prompt' },
   { key: 'modelNodes', nodeType: 'model' },
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
-  { key: 'maskNodes', nodeType: 'mask' },
   { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
   { key: 'wearNodes', nodeType: 'wear' },
@@ -68,7 +66,6 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
     promptNodes: [],
     modelNodes: [],
     viewpointNodes: [],
-    maskNodes: [],
     editNodes: [],
     fusionNodes: [],
     wearNodes: [],
@@ -183,8 +180,6 @@ function resolveCollectionKeyByNodeType(
       return 'modelNodes'
     case 'viewpoint':
       return 'viewpointNodes'
-    case 'mask':
-      return 'maskNodes'
     case 'edit':
       return 'editNodes'
     case 'fusion':

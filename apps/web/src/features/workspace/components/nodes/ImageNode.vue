@@ -3,12 +3,18 @@
     class="workflow-node image-node"
     data-node-kind="image"
     :data-node-id="node.id"
-    :class="{ active, dragging, 'copy-mode': copyMode, 'is-expand-mode': !!expandModeActive }"
+    :class="{
+      active,
+      dragging,
+      'copy-mode': copyMode,
+      'is-expand-mode': !!expandModeActive,
+      'is-mask-editor-mode': !!maskEditorModeActive,
+    }"
     :style="nodeStyle"
   >
     <NodeHeader
       class="image-node-header-shell"
-      :class="{ 'is-hidden': !!expandModeActive }"
+      :class="{ 'is-hidden': !!expandModeActive || !!maskEditorModeActive }"
       :title="node.title || 'IMAGE'"
       rounded
       @node-mousedown="emit('node-mousedown', $event)"
@@ -43,6 +49,13 @@
         :expand-mode-active="expandModeActive"
         :expand-overlay-style="expandOverlayStyle"
         :expand-handle-radius="expandHandleRadius"
+        :mask-editor-mode-active="maskEditorModeActive"
+        :mask-editor-overlay-style="maskEditorOverlayStyle"
+        :mask-editor-canvas-width="maskEditorCanvasWidth"
+        :mask-editor-canvas-height="maskEditorCanvasHeight"
+        :mask-editor-draw-mode="maskEditorDrawMode"
+        :mask-editor-brush-size="maskEditorBrushSize"
+        :set-mask-canvas-ref="setMaskCanvasRef"
         :output-count="node.outputCount"
         :active="active"
         :dragging="dragging"
@@ -58,6 +71,12 @@
         @expand-handle-pointermove="emit('expand-handle-pointermove', $event)"
         @expand-handle-pointerup="emit('expand-handle-pointerup', $event)"
         @expand-frame-pointerdown="emit('expand-frame-pointerdown', $event)"
+        @mask-canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
+        @mask-set-draw-mode="emit('mask-set-draw-mode', $event)"
+        @mask-set-brush-size="emit('mask-set-brush-size', $event)"
+        @mask-clear="emit('mask-clear')"
+        @mask-cancel="emit('mask-cancel')"
+        @mask-done="emit('mask-done', $event)"
       />
 
       <HomeCanvasImageActionMenu
@@ -92,6 +111,7 @@ import {
 } from '../../types/canvasNodes'
 import type { ImageNodeAction, ImageStrengthAction } from '../../types/imageActions'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
+import type { ImageMaskDrawMode } from '../../composables/useImageMaskEditorOverlay'
 import NodePromptComposer from './NodePromptComposer.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
@@ -117,6 +137,13 @@ const props = defineProps<{
   expandModeActive?: boolean
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
+  maskEditorModeActive?: boolean
+  maskEditorOverlayStyle?: Record<string, string> | null
+  maskEditorCanvasWidth?: number
+  maskEditorCanvasHeight?: number
+  maskEditorDrawMode?: ImageMaskDrawMode
+  maskEditorBrushSize?: number
+  setMaskCanvasRef?: (element: Element | null) => void
 }>()
 
 const emit = defineEmits<{
@@ -139,6 +166,12 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
+  (e: 'mask-canvas-pointerdown', event: PointerEvent): void
+  (e: 'mask-set-draw-mode', mode: ImageMaskDrawMode): void
+  (e: 'mask-set-brush-size', value: number): void
+  (e: 'mask-clear'): void
+  (e: 'mask-cancel'): void
+  (e: 'mask-done', payload: { prompt: string; outputCount: number }): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
@@ -216,12 +249,15 @@ function selectOutputCount(value: number) {
   pointer-events: none;
 }
 
-.workflow-node.image-node.is-expand-mode .image-node-body {
+.workflow-node.image-node.is-expand-mode .image-node-body,
+.workflow-node.image-node.is-mask-editor-mode .image-node-body {
   background: transparent;
 }
 
 .workflow-node.image-node.is-expand-mode .image-node-stage,
-.workflow-node.image-node.is-expand-mode.active .image-node-stage {
+.workflow-node.image-node.is-expand-mode.active .image-node-stage,
+.workflow-node.image-node.is-mask-editor-mode .image-node-stage,
+.workflow-node.image-node.is-mask-editor-mode.active .image-node-stage {
   border-color: transparent;
 }
 

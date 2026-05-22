@@ -18,7 +18,6 @@ import type {
   EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
-  MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
   WearNodeItem,
@@ -75,25 +74,6 @@ export function createViewpointNodeAt(point: CanvasPoint): ViewpointNodeItem {
     lighting: 'warm_white',
     outputStatus: 'idle',
     outputImages: [],
-  }
-}
-
-export function createMaskNodeAt(point: CanvasPoint): MaskNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'mask',
-    x: point.x,
-    y: point.y,
-    width: 280,
-    title: getDefaultCanvasNodeTitle('mask'),
-    sourceImageUrl: '',
-    sourceImageRatio: 1,
-    executionMaskDataUrl: '',
-    maskDataUrl: '',
-    brushSize: 18,
-    drawMode: 'paint',
-    refineAmount: 0,
-    invertMask: false,
   }
 }
 

@@ -1,5 +1,5 @@
 import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
-import type { ImageNodeItem, MaskNodeItem } from '../types/canvasNodes'
+import type { ImageNodeItem } from '../types/canvasNodes'
 import {
   isSupportedUploadImageFile,
   unsupportedUploadImageMessage,
@@ -32,7 +32,6 @@ type UseFlowCanvasDropOptions = {
     patcher: (prev: Record<string, unknown>) => Record<string, unknown>,
   ) => void
   getImageNodeSnapshot: (nodeId: string) => ImageNodeItem | null
-  getMaskNodeSnapshot: (nodeId: string) => MaskNodeItem | null
   uploadApi: {
     upload: (
       file: File,
@@ -40,8 +39,6 @@ type UseFlowCanvasDropOptions = {
     ) => Promise<{ code: number; msg?: string; data?: UploadImageResponseData }>
   }
   sanitizeApiErrorMessage: (msg: string | null | undefined, fallback: string) => string
-  renderMaskNodeMask: (nodeId: string) => void
-  clearMaskCanvas: (nodeId: string) => void
   onWarning: (msg: string) => void
   onSuccess: (msg: string) => void
   onNodeMutated?: (nodeId: string) => void
@@ -122,30 +119,6 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     }
   }
 
-  async function applyImageFileToMaskNode(nodeId: string, file: File): Promise<void> {
-    const snapshotNode = options.getMaskNodeSnapshot(nodeId)
-    if (!snapshotNode) {
-      options.onWarning('Mask 节点不存在')
-      return
-    }
-    try {
-      const uploaded = await uploadImageToBoard(file)
-      options.updateSnapshotNode(nodeId, (prev) => ({
-        ...prev,
-        sourceImageUrl: uploaded.url,
-        sourceImageRatio: uploaded.ratio,
-        executionMaskDataUrl: '',
-        maskDataUrl: '',
-      }))
-      options.onNodeMutated?.(nodeId)
-      void nextTick(() => options.renderMaskNodeMask(nodeId))
-      options.onSuccess('Mask 节点输入已更新')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : '上传失败'
-      options.onWarning(msg)
-    }
-  }
-
   function onCanvasDragOver(event: DragEvent) {
     if (!event.dataTransfer) return
     event.dataTransfer.dropEffect = 'copy'
@@ -211,7 +184,6 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     uploadImageToBoard,
     createImageNodeFromFile,
     applyImageFileToImageNode,
-    applyImageFileToMaskNode,
   }
 }
 

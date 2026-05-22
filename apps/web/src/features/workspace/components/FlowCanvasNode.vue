@@ -60,6 +60,13 @@
           :expand-mode-active="!!props.expandModeActive"
           :expand-overlay-style="props.expandOverlayStyle ?? null"
           :expand-handle-radius="props.expandHandleRadius ?? 4"
+          :mask-editor-mode-active="!!props.maskEditorModeActive"
+          :mask-editor-overlay-style="props.maskEditorOverlayStyle ?? null"
+          :mask-editor-canvas-width="props.maskEditorCanvasWidth ?? 0"
+          :mask-editor-canvas-height="props.maskEditorCanvasHeight ?? 0"
+          :mask-editor-draw-mode="props.maskEditorDrawMode ?? 'paint'"
+          :mask-editor-brush-size="props.maskEditorBrushSize ?? 18"
+          :set-mask-canvas-ref="(element) => (props.setMaskCanvasRef ?? (() => {}))(props.nodeId, element)"
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
           @update:output-count="emitNodeParam('outputCount', $event)"
@@ -79,6 +86,12 @@
           @expand-handle-pointermove="onImageExpandHandlePointerMove"
           @expand-handle-pointerup="onImageExpandHandlePointerUp"
           @expand-frame-pointerdown="onImageExpandFramePointerDown"
+          @mask-canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
+          @mask-set-draw-mode="emit('mask-set-draw-mode', $event)"
+          @mask-set-brush-size="emit('mask-set-brush-size', $event)"
+          @mask-clear="emit('mask-clear')"
+          @mask-cancel="emit('mask-cancel')"
+          @mask-done="emit('mask-done', $event)"
         />
       </div>
     </template>
@@ -139,32 +152,6 @@
         @update:scale="emitNodeParam('scale', $event)"
         @update:opacity="emitNodeParam('opacity', $event)"
         @generate="onWearGenerate"
-      />
-    </template>
-    <template v-else-if="isMaskNode && maskSnapshot">
-      <MaskNode
-        :node="maskSnapshot"
-        :active="selected"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
-        :ui-state="props.uiState"
-        :stage-height="maskStageHeight"
-        :canvas-width="maskCanvasWidth"
-        :source-image-url="props.maskSourceImageUrl"
-        :has-connected-image-input="props.maskHasConnectedImageInput"
-        @node-mousedown="noopMouse"
-        @update:title="emitNodeParam('title', $event)"
-        @delete="onDeleteRequest"
-        @open-file-picker="onMaskOpenFile"
-        @clear-image="onMaskClearImage"
-        @stage-drop="onMaskStageDrop"
-        @canvas-mousedown="onMaskCanvasMouseDown"
-        @set-draw-mode="emitNodeParam('drawMode', $event)"
-        @update:brush-size="emitNodeParam('brushSize', $event)"
-        @update:refine-amount="emitNodeParam('refineAmount', $event)"
-        @toggle-invert="onMaskToggleInvert"
-        @clear-mask="onMaskClearMask"
-        @set-canvas-ref="onMaskSetCanvasRef"
       />
     </template>
     <template v-else-if="isModelNode && modelSnapshot">
@@ -230,7 +217,6 @@ import type {
   EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
-  MaskNodeItem,
   ModelNodeItem,
   PromptNodeItem,
   ViewpointNodeItem,
@@ -240,6 +226,7 @@ import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction, ImageStrengthAction } from '../types/imageActions'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
+import type { ImageMaskDrawMode } from '../composables/useImageMaskEditorOverlay'
 import { resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
 
 const props = withDefaults(
@@ -250,9 +237,6 @@ const props = withDefaults(
     dragging?: boolean
     copyMode?: boolean
     uiState?: NodeUiState | PromptNodeUiState
-    maskSourceImageUrl?: string
-    maskSourceImageRatio?: number
-    maskHasConnectedImageInput?: boolean
     imageActionVisible?: boolean
     imagePromptComposerVisible?: boolean
     fusionPromptComposerVisible?: boolean
@@ -265,15 +249,19 @@ const props = withDefaults(
     expandModeActive?: boolean
     expandOverlayStyle?: Record<string, string> | null
     expandHandleRadius?: number
+    maskEditorModeActive?: boolean
+    maskEditorOverlayStyle?: Record<string, string> | null
+    maskEditorCanvasWidth?: number
+    maskEditorCanvasHeight?: number
+    maskEditorDrawMode?: ImageMaskDrawMode
+    maskEditorBrushSize?: number
+    setMaskCanvasRef?: (nodeId: string, element: Element | null) => void
   }>(),
   {
     selected: false,
     dragging: false,
     copyMode: false,
     uiState: undefined,
-    maskSourceImageUrl: '',
-    maskSourceImageRatio: 1,
-    maskHasConnectedImageInput: false,
     imageActionVisible: false,
     imagePromptComposerVisible: false,
     fusionPromptComposerVisible: false,
@@ -286,13 +274,19 @@ const props = withDefaults(
     expandModeActive: false,
     expandOverlayStyle: null,
     expandHandleRadius: 4,
+    maskEditorModeActive: false,
+    maskEditorOverlayStyle: null,
+    maskEditorCanvasWidth: 0,
+    maskEditorCanvasHeight: 0,
+    maskEditorDrawMode: 'paint',
+    maskEditorBrushSize: 18,
+    setMaskCanvasRef: () => undefined,
   },
 )
 
 const emit = defineEmits<{
   (e: 'update-prompt-text', value: string): void
   (e: 'update-node-param', payload: { key: string; value: unknown }): void
-  (e: 'mask-toggle-invert'): void
   (e: 'delete-node'): void
   (e: 'generate-edit'): void
   (e: 'generate-wear'): void
@@ -307,12 +301,6 @@ const emit = defineEmits<{
   (e: 'image-open-preview'): void
   (e: 'image-append-to-canvas'): void
   (e: 'image-reset'): void
-  (e: 'mask-open-file'): void
-  (e: 'mask-clear-image'): void
-  (e: 'mask-stage-drop', event: DragEvent): void
-  (e: 'mask-canvas-mousedown', event: MouseEvent): void
-  (e: 'mask-clear-mask'): void
-  (e: 'mask-set-canvas-ref', element: Element | null): void
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'image-contextmenu', event: MouseEvent): void
   (e: 'fusion-contextmenu', event: MouseEvent): void
@@ -327,6 +315,12 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
+  (e: 'mask-canvas-pointerdown', event: PointerEvent): void
+  (e: 'mask-set-draw-mode', mode: ImageMaskDrawMode): void
+  (e: 'mask-set-brush-size', value: number): void
+  (e: 'mask-clear'): void
+  (e: 'mask-cancel'): void
+  (e: 'mask-done', payload: { prompt: string; outputCount: number }): void
   (e: 'request-internals-update'): void
 }>()
 
@@ -335,11 +329,12 @@ const isImageNode = computed(() => props.data.kind === 'image')
 const isEditNode = computed(() => props.data.kind === 'edit')
 const isFusionNode = computed(() => props.data.kind === 'fusion')
 const isWearNode = computed(() => props.data.kind === 'wear')
-const isMaskNode = computed(() => props.data.kind === 'mask')
 const isModelNode = computed(() => props.data.kind === 'model')
 const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const showDefaultDragZone = false
-const disableHandleRailInteraction = computed(() => isImageNode.value && !!props.expandModeActive)
+const disableHandleRailInteraction = computed(
+  () => isImageNode.value && (!!props.expandModeActive || !!props.maskEditorModeActive),
+)
 const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
@@ -388,9 +383,6 @@ const fusionSnapshot = computed<FusionNodeItem | null>(() =>
 const wearSnapshot = computed<WearNodeItem | null>(() =>
   isWearNode.value ? resolveSnapshotNode<WearNodeItem>() : null,
 )
-const maskSnapshot = computed<MaskNodeItem | null>(() =>
-  isMaskNode.value ? resolveSnapshotNode<MaskNodeItem>() : null,
-)
 const modelSnapshot = computed<ModelNodeItem | null>(() =>
   isModelNode.value ? resolveSnapshotNode<ModelNodeItem>() : null,
 )
@@ -408,21 +400,6 @@ const displayImage = computed<{ url: string } | null>(() => {
   return url ? { url } : null
 })
 
-const maskCanvasWidth = computed(() => {
-  if (!maskSnapshot.value) return 280
-  return Math.max(120, Math.round(maskSnapshot.value.width - 24))
-})
-
-const maskStageHeight = computed(() => {
-  if (!maskSnapshot.value) return 180
-  const ratio =
-    props.maskSourceImageRatio > 0
-      ? props.maskSourceImageRatio
-      : maskSnapshot.value.sourceImageRatio > 0
-        ? maskSnapshot.value.sourceImageRatio
-        : 1
-  return Math.max(120, Math.min(360, Math.round(maskCanvasWidth.value * ratio)))
-})
 
 const imageGenerating = computed(
   () => !!props.imageDirectGenerating || imageSnapshot.value?.outputStatus === 'running',
@@ -591,10 +568,6 @@ function emitNodeParam(key: string, value: unknown) {
   emit('update-node-param', { key, value })
 }
 
-function onMaskToggleInvert() {
-  emit('mask-toggle-invert')
-}
-
 function onDeleteRequest() {
   emit('delete-node')
 }
@@ -633,30 +606,6 @@ function onImageAppendToCanvas() {
 
 function onImageReset() {
   emit('image-reset')
-}
-
-function onMaskOpenFile() {
-  emit('mask-open-file')
-}
-
-function onMaskClearImage() {
-  emit('mask-clear-image')
-}
-
-function onMaskStageDrop(event: DragEvent) {
-  emit('mask-stage-drop', event)
-}
-
-function onMaskCanvasMouseDown(event: MouseEvent) {
-  emit('mask-canvas-mousedown', event)
-}
-
-function onMaskClearMask() {
-  emit('mask-clear-mask')
-}
-
-function onMaskSetCanvasRef(element: Element | null) {
-  emit('mask-set-canvas-ref', element)
 }
 
 function onImageContextMenu(event: MouseEvent) {

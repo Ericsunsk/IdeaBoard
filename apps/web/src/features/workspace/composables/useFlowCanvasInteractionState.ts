@@ -1,15 +1,15 @@
-export type CanvasInteractionKey = 'mask-painting'
+export type CanvasInteractionKey = 'image-mask-editor'
 
 export function useFlowCanvasInteractionState() {
-  const isMaskPainting = ref(false)
-  const isCanvasInteractionActive = computed(() => isMaskPainting.value)
+  const isImageMaskEditor = ref(false)
+  const isCanvasInteractionActive = computed(() => isImageMaskEditor.value)
 
   function startCanvasInteraction(_key: CanvasInteractionKey) {
-    isMaskPainting.value = true
+    isImageMaskEditor.value = true
   }
 
   function stopCanvasInteraction(_key: CanvasInteractionKey) {
-    isMaskPainting.value = false
+    isImageMaskEditor.value = false
   }
 
   return {

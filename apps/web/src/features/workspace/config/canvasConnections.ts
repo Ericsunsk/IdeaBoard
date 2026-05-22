@@ -5,7 +5,7 @@ import {
 } from './canvasNodeConnectionContract'
 import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
 
-export type CanvasConnectionTone = 'image' | 'mask' | 'prompt'
+export type CanvasConnectionTone = 'image' | 'prompt'
 
 export interface CanvasConnectionEndpointLike {
   nodeType: CanvasConnectionNodeType
@@ -27,7 +27,6 @@ const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>([
 ])
 
 export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasConnectionTone {
-  if (port === 'mask') return 'mask'
   if (port === 'prompt') return 'prompt'
   return 'image'
 }
@@ -53,11 +52,6 @@ export function isCanvasConnectionAllowed(
 
   if (from.nodeType === 'prompt') {
     return fromPort.kind === toPort.kind
-  }
-
-  if (from.nodeType === 'mask') {
-    if (fromPort.kind !== 'mask') return false
-    return toPort.kind === 'mask' || (to.nodeType === 'image' && to.port === 'image')
   }
 
   if (from.nodeType === 'image') {

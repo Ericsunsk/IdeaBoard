@@ -57,6 +57,20 @@
       <path d="M12 8v8" />
     </svg>
     <svg
+      v-else-if="icon === 'image-inpaint'"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <rect x="4" y="4" width="12" height="12" rx="2" />
+      <path d="M16 8l4 4" />
+      <path d="M13 11l4 4" />
+      <path d="M10 14l4 4" />
+    </svg>
+    <svg
       v-else
       viewBox="0 0 24 24"
       fill="none"

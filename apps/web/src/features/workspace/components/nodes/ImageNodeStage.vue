@@ -8,6 +8,7 @@
     :class="{
       'is-loading': directGenerating && !displayImage,
       'is-expand-mode': !!expandModeActive,
+      'is-mask-editor-mode': !!maskEditorModeActive,
       'is-active': active && !expandModeActive,
     }"
     :style="{ height: `${stageHeight}px` }"
@@ -36,6 +37,23 @@
         @handle-pointerup="emit('expand-handle-pointerup', $event)"
         @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
       />
+      <ImageMaskEditorOverlay
+        v-if="maskEditorModeActive && maskEditorOverlayStyle"
+        :style="maskEditorOverlayStyle"
+        :canvas-width="maskEditorCanvasWidth ?? 0"
+        :canvas-height="maskEditorCanvasHeight ?? 0"
+        :draw-mode="maskEditorDrawMode ?? 'paint'"
+        :brush-size="maskEditorBrushSize ?? 18"
+        :output-count="outputCountValue"
+        :set-canvas-ref="setMaskCanvasRef ?? (() => {})"
+        @canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
+        @set-draw-mode="emit('mask-set-draw-mode', $event)"
+        @set-brush-size="emit('mask-set-brush-size', $event)"
+        @update:output-count="selectOutputCount"
+        @clear="emit('mask-clear')"
+        @cancel="emit('mask-cancel')"
+        @done="emit('mask-done', $event)"
+      />
       <div class="image-node-stage-actions">
         <NodeActionButton variant="stage-ghost" @click="emit('open-preview')">预览</NodeActionButton>
         <NodeActionButton v-if="!inputLocked" variant="stage-ghost" @click="emit('reset')">
@@ -62,8 +80,10 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount } from '../../types/canvasNodes'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
+import type { ImageMaskDrawMode } from '../../composables/useImageMaskEditorOverlay'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
+import ImageMaskEditorOverlay from './ImageMaskEditorOverlay.vue'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 
@@ -78,6 +98,13 @@ const props = defineProps<{
   expandModeActive?: boolean
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
+  maskEditorModeActive?: boolean
+  maskEditorOverlayStyle?: Record<string, string> | null
+  maskEditorCanvasWidth?: number
+  maskEditorCanvasHeight?: number
+  maskEditorDrawMode?: ImageMaskDrawMode
+  maskEditorBrushSize?: number
+  setMaskCanvasRef?: (element: Element | null) => void
   outputCount?: number
   active: boolean
   dragging: boolean
@@ -96,6 +123,12 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
+  (e: 'mask-canvas-pointerdown', event: PointerEvent): void
+  (e: 'mask-set-draw-mode', mode: ImageMaskDrawMode): void
+  (e: 'mask-set-brush-size', value: number): void
+  (e: 'mask-clear'): void
+  (e: 'mask-cancel'): void
+  (e: 'mask-done', payload: { prompt: string; outputCount: number }): void
 }>()
 
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
@@ -151,7 +184,8 @@ function selectOutputCount(value: number) {
   cursor: grabbing;
 }
 
-.image-node-stage.is-expand-mode .image-node-stage-image {
+.image-node-stage.is-expand-mode .image-node-stage-image,
+.image-node-stage.is-mask-editor-mode .image-node-stage-image {
   pointer-events: none;
 }
 
@@ -168,13 +202,18 @@ function selectOutputCount(value: number) {
   justify-content: center;
 }
 
-.image-node-stage.is-expand-mode {
+.image-node-stage.is-expand-mode,
+.image-node-stage.is-mask-editor-mode {
   overflow: visible;
   border-color: transparent;
 }
 
 .image-node-stage.is-active {
   border-color: #9278e6;
+}
+
+.image-node-stage.is-mask-editor-mode.is-active {
+  border-color: transparent;
 }
 
 .image-node-stage.is-loading {
@@ -255,6 +294,11 @@ function selectOutputCount(value: number) {
 }
 
 .image-node-stage.is-expand-mode .image-node-stage-actions {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.image-node-stage.is-mask-editor-mode .image-node-stage-actions {
   opacity: 0;
   pointer-events: none;
 }
