@@ -1,6 +1,10 @@
 import { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
 import { WEAR_TILE_MODE_TEMPLATE_DESC } from '../../../shared/domain/wearTileModes'
 import { WORKFLOW_FEATURE } from '../../../shared/domain/workflowFeatures'
+import {
+  WORKFLOW_FEATURE_GROUP_LIST,
+  WORKFLOW_FEATURE_REGISTRY,
+} from '../../../shared/domain/workflowFeatureRegistry'
 
 export interface VarDef {
   key: string
@@ -11,82 +15,40 @@ const promptVars: VarDef[] = [{ key: '{{user_prompt}}', desc: '当前请求拼�
 
 const noVars: VarDef[] = []
 
-export const featureList = [
-  { slug: IMAGE_NODE_ACTION.sketchToImage, title: 'Quick · 草图成图' },
-  { slug: WORKFLOW_FEATURE.partialEdit, title: 'Edit · 局部改款' },
-  { slug: IMAGE_NODE_ACTION.styleVariation, title: 'Quick · 风格延展' },
-  { slug: WORKFLOW_FEATURE.styleFusion, title: 'Fusion · 双图融合' },
-  { slug: WORKFLOW_FEATURE.fabricOnBody, title: 'Wear · 上身贴合' },
-  { slug: WORKFLOW_FEATURE.multiAngle, title: 'Model · 单视角控制' },
-  { slug: WORKFLOW_FEATURE.virtual3d, title: 'Display · 商品展示' },
-  { slug: WORKFLOW_FEATURE.faceSwap, title: 'Edit · 定向换脸' },
-  { slug: WORKFLOW_FEATURE.bgSwap, title: 'Edit · 换背景' },
-  { slug: IMAGE_NODE_ACTION.removeBg, title: 'Quick · 抠图' },
-  { slug: WORKFLOW_FEATURE.patternGen, title: 'Pattern · 图案生成' },
-  { slug: IMAGE_NODE_ACTION.hdUpscale, title: 'Image Tools · 高清放大' },
-  { slug: IMAGE_NODE_ACTION.imageExtend, title: 'Image Tools · 图片延伸' },
-] as const
+type RegistryFeatureItem = {
+  slug: (typeof WORKFLOW_FEATURE_REGISTRY)[number]['slug']
+  title: string
+}
 
-export type FeatureSlug = (typeof featureList)[number]['slug']
-export type FeatureItem = (typeof featureList)[number]
+export const featureList: readonly RegistryFeatureItem[] = WORKFLOW_FEATURE_REGISTRY.map((item) => ({
+  slug: item.slug,
+  title: item.adminTitle,
+}))
+
+export type FeatureSlug = RegistryFeatureItem['slug']
+export type FeatureItem = RegistryFeatureItem
 
 export const featureMap = Object.fromEntries(
   featureList.map((item) => [item.slug, item]),
 ) as Record<FeatureSlug, FeatureItem>
 
-const featureGroupDefs: Array<{ key: string; title: string; desc: string; slugs: FeatureSlug[] }> =
-  [
-    {
-      key: 'prompt',
-      title: 'Prompt',
-      desc: '草图成图、风格延展、抠图和图案生成类右键/生成工作流。',
-      slugs: [
-        IMAGE_NODE_ACTION.sketchToImage,
-        IMAGE_NODE_ACTION.styleVariation,
-        IMAGE_NODE_ACTION.removeBg,
-        WORKFLOW_FEATURE.patternGen,
-      ],
-    },
-    {
-      key: 'wear',
-      title: 'Wear',
-      desc: '面料贴合、上身效果和蒙版结合逻辑。',
-      slugs: [WORKFLOW_FEATURE.fabricOnBody],
-    },
-    {
-      key: 'model',
-      title: 'Model',
-      desc: '视角、姿态与主体跟随控制。',
-      slugs: [WORKFLOW_FEATURE.multiAngle],
-    },
-    {
-      key: 'display',
-      title: 'Display',
-      desc: '商品展示视角、光影和陈列表达。',
-      slugs: [WORKFLOW_FEATURE.virtual3d],
-    },
-    {
-      key: 'fusion',
-      title: 'Fusion',
-      desc: '双图融合时的主次、比例和修饰语义。',
-      slugs: [WORKFLOW_FEATURE.styleFusion],
-    },
-    {
-      key: 'edit',
-      title: 'Edit',
-      desc: '局部改款、换背景和定向换脸。',
-      slugs: [WORKFLOW_FEATURE.partialEdit, WORKFLOW_FEATURE.bgSwap, WORKFLOW_FEATURE.faceSwap],
-    },
-    {
-      key: 'image-tools',
-      title: 'Image Tools',
-      desc: '图片右键工具里的高清放大和图片延伸。',
-      slugs: [IMAGE_NODE_ACTION.hdUpscale, IMAGE_NODE_ACTION.imageExtend],
-    },
-  ]
+const featureGroupDefs = WORKFLOW_FEATURE_GROUP_LIST
+  .map((group) => ({
+    key: group.key,
+    title: group.title,
+    desc: group.desc,
+    order: group.order,
+    slugs: WORKFLOW_FEATURE_REGISTRY.filter((item) => item.groupKey === group.key).map(
+      (item) => item.slug as FeatureSlug,
+    ),
+  }))
+  .filter((group) => group.slugs.length > 0)
+  .sort((a, b) => a.order - b.order)
 
 export const groupedFeatureGroups = featureGroupDefs.map((group) => ({
-  ...group,
+  key: group.key,
+  title: group.title,
+  desc: group.desc,
   items: group.slugs.map((slug) => featureMap[slug]),
 }))
 

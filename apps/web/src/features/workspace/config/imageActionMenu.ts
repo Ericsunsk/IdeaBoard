@@ -1,4 +1,5 @@
 import { IMAGE_NODE_ACTION, type ImageNodeAction, type ImageStrengthAction } from '../types/imageActions'
+import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../shared/domain/workflowFeatureRegistry'
 
 export type ImageActionMenuIcon = 'remove-bg' | 'style-variation' | 'sketch-to-image' | 'hd-text' | 'image-extend' | 'color-placeholder'
 
@@ -21,37 +22,51 @@ type ImageActionMenuPlaceholderItem = Omit<ImageActionMenuBase, 'action'> & {
 
 export type ImageActionMenuItem = ImageActionMenuActionItem | ImageActionMenuPlaceholderItem
 
+function getImageActionText(action: ImageNodeAction): { label: string; title: string } {
+  const meta = WORKFLOW_FEATURE_REGISTRY_MAP[action]
+  return {
+    label: meta.imageActionLabel ?? meta.adminTitle,
+    title: meta.imageActionTitle ?? meta.imageActionLabel ?? meta.adminTitle,
+  }
+}
+
+const removeBgText = getImageActionText(IMAGE_NODE_ACTION.removeBg)
+const styleVariationText = getImageActionText(IMAGE_NODE_ACTION.styleVariation)
+const sketchToImageText = getImageActionText(IMAGE_NODE_ACTION.sketchToImage)
+const hdUpscaleText = getImageActionText(IMAGE_NODE_ACTION.hdUpscale)
+const imageExtendText = getImageActionText(IMAGE_NODE_ACTION.imageExtend)
+
 export const IMAGE_ACTION_MENU_ITEMS: readonly ImageActionMenuItem[] = [
   {
     action: IMAGE_NODE_ACTION.removeBg,
-    label: '抠图',
-    title: '抠图',
+    label: removeBgText.label,
+    title: removeBgText.title,
     icon: 'remove-bg',
   },
   {
     action: IMAGE_NODE_ACTION.styleVariation,
-    label: '风格延展',
-    title: '风格延展',
+    label: styleVariationText.label,
+    title: styleVariationText.title,
     icon: 'style-variation',
     strengthAction: IMAGE_NODE_ACTION.styleVariation,
   },
   {
     action: IMAGE_NODE_ACTION.sketchToImage,
-    label: '草图成图',
-    title: '草图成图',
+    label: sketchToImageText.label,
+    title: sketchToImageText.title,
     icon: 'sketch-to-image',
   },
   {
     action: IMAGE_NODE_ACTION.hdUpscale,
-    label: 'HD',
-    title: 'HD',
+    label: hdUpscaleText.label,
+    title: hdUpscaleText.title,
     icon: 'hd-text',
     strengthAction: IMAGE_NODE_ACTION.hdUpscale,
   },
   {
     action: IMAGE_NODE_ACTION.imageExtend,
-    label: '扩图',
-    title: '扩图',
+    label: imageExtendText.label,
+    title: imageExtendText.title,
     icon: 'image-extend',
   },
   {
