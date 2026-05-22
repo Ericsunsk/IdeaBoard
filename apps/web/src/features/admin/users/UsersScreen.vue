@@ -18,13 +18,13 @@
             @keyup.enter="loadUsers"
           >
             <template #prefix>
-              <n-icon><SearchOutline /></n-icon>
+              <n-icon><Search /></n-icon>
             </template>
           </n-input>
         </div>
         <n-button secondary class="admin-icon-btn" @click="loadUsers">
           <template #icon
-            ><n-icon><RefreshOutline /></n-icon
+            ><n-icon><Refresh /></n-icon
           ></template>
         </n-button>
       </div>
@@ -49,7 +49,7 @@
           <template #trigger>
             <n-button secondary class="admin-icon-btn">
               <template #icon
-                ><n-icon><SettingsOutline /></n-icon
+                ><n-icon><Settings /></n-icon
               ></template>
             </n-button>
           </template>
@@ -110,7 +110,7 @@
             <template #trigger>
               <n-button quaternary size="small" class="sort-btn">
                 <template #icon
-                  ><n-icon><FilterOutline /></n-icon
+                  ><n-icon><Filter /></n-icon
                 ></template>
                 Sort
                 <span v-if="currentSorts.length > 0" class="sort-count"
@@ -253,12 +253,12 @@ import {
   updateRegistrationSetting,
 } from '../../../shared/query/adminQueries'
 import {
-  SearchOutline,
-  RefreshOutline,
-  EllipsisHorizontal,
-  SettingsOutline,
-  FilterOutline,
-} from '@vicons/ionicons5'
+  Filter,
+  MoreHoriz,
+  Refresh,
+  Search,
+  Settings,
+} from '@iconoir/vue'
 import { adminPopoverPanelThemeOverrides } from '../shared/adminThemeOverrides'
 
 const message = useMessage()
@@ -480,7 +480,7 @@ const columns: DataTableColumns<User> = [
               NButton,
               { quaternary: true, circle: true, size: 'small' },
               {
-                icon: () => h(NIcon, null, { default: () => h(EllipsisHorizontal) }),
+                icon: () => h(NIcon, null, { default: () => h(MoreHoriz) }),
               },
             ),
         },

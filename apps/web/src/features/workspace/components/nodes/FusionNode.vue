@@ -14,10 +14,7 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1">
-          <path d="M7 7h4l2 2h4a2 2 0 0 1 2 2v6H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z" />
-          <path d="M9 15c1.4-1.4 4.6-1.4 6 0" />
-        </svg>
+        <FrameAlt />
       </template>
     </NodeHeader>
 
@@ -52,6 +49,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { FrameAlt } from '@iconoir/vue'
 import {
   clampImageNodeOutputCount,
   type FusionNodeItem,

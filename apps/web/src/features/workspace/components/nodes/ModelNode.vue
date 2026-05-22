@@ -14,17 +14,7 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-        >
-          <circle cx="12" cy="6" r="2.5" />
-          <path d="M12 9.5v5M8.5 13.5h7M10 20l2-5 2 5" />
-        </svg>
+        <Planet />
       </template>
     </NodeHeader>
 
@@ -133,6 +123,7 @@
 </template>
 
 <script setup lang="ts">
+import { Planet } from '@iconoir/vue'
 import { MODEL_ANGLE_FRAMING_OPTIONS, describeModelAngleSpec } from './config/nodeOptionConfig'
 import type { ModelAngleFraming, ModelNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'

@@ -8,7 +8,6 @@ export type ImageActionMenuIcon =
   | 'hd-text'
   | 'image-extend'
   | 'image-inpaint'
-  | 'color-placeholder'
 
 type ImageActionMenuBase = {
   action: ImageNodeAction
@@ -18,16 +17,10 @@ type ImageActionMenuBase = {
 }
 
 type ImageActionMenuActionItem = ImageActionMenuBase & {
-  placeholder?: false
   strengthAction?: ImageStrengthAction
 }
 
-type ImageActionMenuPlaceholderItem = Omit<ImageActionMenuBase, 'action'> & {
-  action: null
-  placeholder: true
-}
-
-export type ImageActionMenuItem = ImageActionMenuActionItem | ImageActionMenuPlaceholderItem
+export type ImageActionMenuItem = ImageActionMenuActionItem
 
 type WorkflowRegistryImageAction =
   | typeof IMAGE_NODE_ACTION.removeBg
@@ -88,12 +81,5 @@ export const IMAGE_ACTION_MENU_ITEMS: readonly ImageActionMenuItem[] = [
     label: '局部重绘',
     title: '局部重绘',
     icon: 'image-inpaint',
-  },
-  {
-    action: null,
-    label: '调色',
-    title: '调色（占位）',
-    icon: 'color-placeholder',
-    placeholder: true,
   },
 ] as const

@@ -14,19 +14,7 @@
           }"
           class="register-modal-content"
         >
-          <button class="close-btn" :disabled="loading" @click="handleClose">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+          <AuthModalCloseButton :disabled="loading" @click="handleClose" />
 
           <div class="modal-header">
             <h2 class="heading-text">创建账号</h2>
@@ -96,6 +84,7 @@
 import { useUserStore } from '../../../app/stores/user'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import type { FormInst } from 'naive-ui'
+import AuthModalCloseButton from './AuthModalCloseButton.vue'
 
 const props = defineProps<{
   show: boolean
@@ -237,33 +226,6 @@ async function handleRegister() {
   box-shadow: 0 24px 40px rgba(34, 45, 76, 0.16);
   position: relative;
   border: 1px solid #d9dfec;
-}
-
-.close-btn {
-  position: absolute;
-  top: 24px;
-  right: 24px;
-  background: rgba(0, 0, 0, 0.05);
-  border: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #1d1d1f;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.close-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.close-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
-  transform: scale(1.1);
 }
 
 .modal-header {

@@ -7,19 +7,7 @@
         title="返回画布列表"
         @click.stop="emit('navigate-back')"
       >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M19 12H7" />
-          <path d="M12 17l-5-5 5-5" />
-        </svg>
+        <ArrowLeft class="header-icon header-icon-back" />
       </button>
 
       <div class="header-title-slot">
@@ -48,20 +36,7 @@
           title="选择画布"
           @click.stop="emit('toggle-board-menu')"
         >
-          <svg
-            class="board-switch-icon"
-            width="15"
-            height="15"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M9 3h4v4" />
-            <path d="M7 13H3V9" />
-          </svg>
+          <FrameAlt class="board-switch-icon header-icon" />
         </button>
         <div
           v-if="isBoardMenuOpen"
@@ -94,19 +69,7 @@
     </div>
     <div class="header-right">
       <button class="header-icon-btn share-btn" title="分享" @mousedown.stop>
-        <svg
-          width="19"
-          height="19"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L10.9 5.03" />
-          <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07l1.22-1.22" />
-        </svg>
+        <Link class="header-icon" />
       </button>
       <button
         class="header-icon-btn export-btn"
@@ -115,36 +78,13 @@
         @mousedown.stop
         @click="emit('export')"
       >
-        <svg
-          width="19"
-          height="19"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <path d="M7 10l5 5 5-5" />
-          <path d="M12 15V3" />
-        </svg>
+        <Download class="header-icon" />
       </button>
       <div class="user-menu-wrap" @pointerdown.stop @mousedown.stop @click.stop>
         <button class="user-avatar-wrap" title="账户菜单" @click="toggleUserMenu">
           <img v-if="avatarUrl" :src="avatarUrl" class="user-avatar" />
           <div v-else class="user-avatar-placeholder">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
+            <User class="header-icon header-icon-avatar" />
           </div>
         </button>
         <div
@@ -170,6 +110,7 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
+import { ArrowLeft, Download, FrameAlt, Link, User } from '@iconoir/vue'
 
 const props = defineProps<{
   currentBoardName: string
@@ -244,6 +185,16 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+.header-icon {
+  width: 19px;
+  height: 19px;
+  stroke-width: 2.1;
+}
+.header-icon-back,
+.header-icon-avatar {
+  width: 20px;
+  height: 20px;
 }
 .header-shell {
   position: relative;

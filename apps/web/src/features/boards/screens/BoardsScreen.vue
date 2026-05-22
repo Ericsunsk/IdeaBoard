@@ -10,17 +10,7 @@
         <button class="user-avatar-wrap" type="button" title="账户菜单" @click="toggleUserMenu">
           <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="user-avatar" />
           <div v-else class="user-avatar-placeholder">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
+            <User class="boards-icon boards-icon-avatar" />
           </div>
         </button>
         <div
@@ -52,16 +42,7 @@
           + New Canvas
         </button>
         <label class="search-wrap">
-          <svg
-            class="search-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle cx="11" cy="11" r="7"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
+          <Search class="search-icon boards-icon" />
           <input v-model.trim="searchKeyword" type="text" placeholder="Search canvases..." />
         </label>
         <select v-model="sortMode" class="sort-select">
@@ -133,6 +114,7 @@ import {
 } from '../lib/boardSync'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useUserStore } from '../../../app/stores/user'
+import { Search, User } from '@iconoir/vue'
 
 const router = useRouter()
 const appToast = useAppToast()
@@ -698,6 +680,13 @@ onUnmounted(() => {
   border: 1px solid #d9dfec;
   background: rgba(255, 255, 255, 0.9);
   padding: 0 12px;
+}
+.boards-icon {
+  stroke-width: 2;
+}
+.boards-icon-avatar {
+  width: 20px;
+  height: 20px;
 }
 
 .search-icon {

@@ -13,17 +13,7 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.1"
-        >
-          <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16v4z" />
-          <path d="M13.5 6.5l4 4" />
-        </svg>
+        <EditPencil />
       </template>
     </NodeHeader>
 
@@ -52,6 +42,7 @@
 </template>
 
 <script setup lang="ts">
+import { EditPencil } from '@iconoir/vue'
 import type { EditNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import { EDIT_NODE_MODE_OPTIONS, type EditNodeMode } from '../../types/editNodeModes'

@@ -14,16 +14,7 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.1"
-        >
-          <path d="M7 4h10l2 4-2.2 2.2-1.8-1.4V20H9V8.8L7.2 10.2 5 8l2-4z" />
-        </svg>
+        <Shirt />
       </template>
     </NodeHeader>
 
@@ -94,6 +85,7 @@
 </template>
 
 <script setup lang="ts">
+import { Shirt } from '@iconoir/vue'
 import type { WearNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 

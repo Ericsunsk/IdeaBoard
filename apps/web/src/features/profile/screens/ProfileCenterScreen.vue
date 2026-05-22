@@ -20,21 +20,7 @@
             @click="activeTab = item.key"
           >
             <div class="nav-icon">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <component
-                  :is="shape.tag"
-                  v-for="(shape, shapeIndex) in item.shapes"
-                  :key="`${item.key}-${shapeIndex}`"
-                  v-bind="shape.attrs"
-                />
-              </svg>
+              <component :is="item.icon" class="profile-nav-icon" />
             </div>
             <span>{{ item.label }}</span>
           </div>
@@ -46,46 +32,17 @@
             class="action-btn admin-btn"
             @click="router.push('/admin/users')"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
+            <Shield class="profile-action-icon" />
             管理后台
           </button>
 
           <button class="action-btn back-btn" @click="router.back()">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+            <NavArrowLeft class="profile-action-icon profile-action-icon-back" />
             返回上级
           </button>
 
           <button class="action-btn logout-btn" @click="handleLogout">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
+            <LogOut class="profile-action-icon" />
             退出登录
           </button>
         </div>
@@ -107,15 +64,7 @@
                 title="更换头像"
                 @click="openAvatarPicker"
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path
-                    d="M14.5 4h-5L8 6H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3l-1.5-2z"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                  <circle cx="12" cy="13" r="3.2" stroke-width="2" />
-                </svg>
+                <Camera class="profile-camera-icon" />
               </button>
               <input
                 ref="avatarInputRef"
@@ -230,6 +179,8 @@ import { useAppToast } from '../../../shared/composables/useAppToast'
 import { uploadApi } from '../../../shared/api/upload'
 import { NTag, NConfigProvider, type GlobalThemeOverrides } from 'naive-ui'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
+import type { Component } from 'vue'
+import { Camera, Lock, LogOut, NavArrowLeft, Shield, User } from '@iconoir/vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -262,34 +213,22 @@ const profileThemeOverrides: GlobalThemeOverrides = {
   },
 }
 
-type NavShape = {
-  tag: 'circle' | 'path' | 'polyline' | 'line' | 'rect'
-  attrs: Record<string, string | number>
-}
-
 type NavItem = {
   key: 'profile' | 'security'
   label: string
-  shapes: NavShape[]
+  icon: Component
 }
 
 const navItems = [
   {
     key: 'profile',
     label: '个人资料',
-    shapes: [
-      { tag: 'circle', attrs: { cx: 12, cy: 12, r: 10 } },
-      { tag: 'circle', attrs: { cx: 12, cy: 10, r: 3 } },
-      { tag: 'path', attrs: { d: 'M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662' } },
-    ],
+    icon: User,
   },
   {
     key: 'security',
     label: '账号安全',
-    shapes: [
-      { tag: 'rect', attrs: { x: 3, y: 11, width: 18, height: 11, rx: 2, ry: 2 } },
-      { tag: 'path', attrs: { d: 'M7 11V7a5 5 0 0 1 10 0v4' } },
-    ],
+    icon: Lock,
   },
 ] satisfies NavItem[]
 const avatarInputRef = ref<HTMLInputElement | null>(null)
@@ -474,6 +413,11 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
 }
+.profile-nav-icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
 
 .sidebar-footer {
   margin-top: auto;
@@ -494,6 +438,14 @@ onMounted(() => {
   cursor: pointer;
   border-radius: 12px;
   transition: all 0.2s;
+}
+.profile-action-icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.1;
+}
+.profile-action-icon-back {
+  stroke-width: 2.4;
 }
 
 .back-btn {
@@ -606,6 +558,11 @@ onMounted(() => {
 .avatar-edit-btn:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+.profile-camera-icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
 }
 .hidden-file-input {
   display: none;

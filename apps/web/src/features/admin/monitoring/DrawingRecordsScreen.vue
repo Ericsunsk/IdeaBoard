@@ -24,7 +24,7 @@
         />
         <n-button secondary class="icon-btn" @click="loadRecords">
           <template #icon
-            ><n-icon><RefreshOutline /></n-icon
+            ><n-icon><Refresh /></n-icon
           ></template>
         </n-button>
       </div>
@@ -33,7 +33,7 @@
     <div class="table-card admin-table-card">
       <div class="admin-card-header">
         <div class="admin-card-title-wrapper">
-          <n-icon size="18" class="admin-card-title-icon"><ListOutline /></n-icon>
+          <n-icon size="18" class="admin-card-title-icon"><List /></n-icon>
           <h3 class="admin-card-title">近期任务记录</h3>
         </div>
       </div>
@@ -138,7 +138,7 @@ import {
   NImage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { RefreshOutline, EyeOutline, ListOutline } from '@vicons/ionicons5'
+import { Eye, List, Refresh } from '@iconoir/vue'
 import {
   sanitizeApiErrorMessage,
   sanitizeTaskErrorMessage,
@@ -453,7 +453,7 @@ const columns: DataTableColumns<Task> = [
         NButton,
         { size: 'tiny', quaternary: true, onClick: () => showDetail(row) },
         {
-          icon: () => h(NIcon, null, () => h(EyeOutline)),
+          icon: () => h(NIcon, null, () => h(Eye)),
           default: () => '详情',
         },
       ),

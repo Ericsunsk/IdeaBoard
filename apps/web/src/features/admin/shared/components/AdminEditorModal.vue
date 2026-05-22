@@ -4,17 +4,7 @@
       <div v-if="show" class="admin-editor-overlay" @click.self="$emit('close')">
         <div class="admin-editor-modal" :style="modalStyle">
           <button class="admin-editor-close" type="button" @click="$emit('close')">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+            <Xmark class="admin-close-icon" />
           </button>
 
           <div class="admin-editor-header">
@@ -47,6 +37,8 @@
 </template>
 
 <script setup lang="ts">
+import { Xmark } from '@iconoir/vue'
+
 const props = defineProps<{
   show: boolean
   eyebrow: string
@@ -157,6 +149,11 @@ const modalStyle = computed(() => {
 .admin-editor-close:hover {
   background: rgba(255, 255, 255, 0.14);
   transform: scale(1.03);
+}
+.admin-close-icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
 }
 
 .admin-editor-header {

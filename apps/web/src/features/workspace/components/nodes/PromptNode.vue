@@ -13,16 +13,7 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
+        <MessageText />
       </template>
     </NodeHeader>
     <div class="prompt-node-shell" data-flow-handle-frame>
@@ -57,18 +48,7 @@
             @dragleave.stop="onAddSlotDragLeave"
             @drop.stop.prevent="onAddSlotDrop"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-            >
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
+            <Plus class="node-action-icon" />
           </button>
         </div>
         <textarea
@@ -102,19 +82,7 @@
             title="发送"
             @click="emit('generate')"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.1"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M5 12h13" />
-              <path d="m13 6 6 6-6 6" />
-            </svg>
+            <Send class="node-action-icon node-send-icon" />
           </button>
         </div>
       </div>
@@ -124,6 +92,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { MessageText, Plus, Send } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
@@ -261,6 +230,14 @@ function onAddSlotDrop(event: DragEvent) {
 
 .workflow-node.prompt-node.active .prompt-node-shell {
   border-color: #9278e6;
+}
+.node-action-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.1;
+}
+.node-send-icon {
+  transform: translateX(0.5px);
 }
 
 .workflow-node-input {

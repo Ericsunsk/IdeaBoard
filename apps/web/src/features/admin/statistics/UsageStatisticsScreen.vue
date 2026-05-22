@@ -9,7 +9,7 @@
 
     <div v-if="needsBackfill" class="backfill-banner">
       <div class="backfill-banner-content">
-        <n-icon size="18" class="backfill-banner-icon"><WarningOutline /></n-icon>
+        <n-icon size="18" class="backfill-banner-icon"><WarningTriangle /></n-icon>
         <span
           >缺失
           <strong>{{ backfillStatus?.missing_days }}</strong> 天统计数据，部分历史数据不完整</span
@@ -165,7 +165,7 @@
             <template #trigger>
               <n-button quaternary circle size="small">
                 <template #icon
-                  ><n-icon><SettingsOutline /></n-icon
+                  ><n-icon><Settings /></n-icon
                 ></template>
               </n-button>
             </template>
@@ -434,7 +434,7 @@
     <div class="chart-card admin-table-card tasks-audit-log">
       <div class="admin-card-header">
         <div class="admin-card-title-wrapper">
-          <n-icon size="18" class="admin-card-title-icon"><ListOutline /></n-icon>
+          <n-icon size="18" class="admin-card-title-icon"><List /></n-icon>
           <h3 class="admin-card-title">任务监控</h3>
         </div>
         <div class="admin-card-actions">
@@ -447,7 +447,7 @@
             @clear="handleSearch"
           >
             <template #prefix>
-              <n-icon><SearchOutline /></n-icon>
+              <n-icon><Search /></n-icon>
             </template>
           </n-input>
           <n-select
@@ -459,7 +459,7 @@
           />
           <n-button secondary class="admin-icon-btn" @click="loadTasks">
             <template #icon
-              ><n-icon><RefreshOutline /></n-icon
+              ><n-icon><Refresh /></n-icon
             ></template>
           </n-button>
         </div>
@@ -496,9 +496,9 @@
               class="h-icon"
               :color="getTaskStatusConfig(detailTask?.status || '').color"
             >
-              <CheckmarkCircleOutline v-if="detailTask?.status === 'completed'" />
-              <CloseCircleOutline v-else-if="detailTask?.status === 'failed'" />
-              <TimeOutline v-else />
+              <CheckCircle v-if="detailTask?.status === 'completed'" />
+              <XmarkCircle v-else-if="detailTask?.status === 'failed'" />
+              <Clock v-else />
             </n-icon>
             <div class="h-info">
               <span class="h-title">任务详情控制台</span>
@@ -513,7 +513,7 @@
               @click="copyToClipboard(detailTask?.task_id || '')"
             >
               <template #icon
-                ><n-icon><CopyOutline /></n-icon
+                ><n-icon><Copy /></n-icon
               ></template>
             </n-button>
           </div>
@@ -528,7 +528,7 @@
             <span class="status-value">{{ getTaskStatusConfig(detailTask.status).text }}</span>
           </div>
           <div v-if="detailTask.status === 'failed'" class="banner-error">
-            <n-icon class="err-icon"><WarningOutline /></n-icon>
+            <n-icon class="err-icon"><WarningTriangle /></n-icon>
             <span>{{ getErrorReason(detailTask) || '处理过程中发生未知错误' }}</span>
           </div>
           <div v-else class="banner-metrics">
@@ -546,7 +546,7 @@
         <!-- 核心元数据卡片 -->
         <div class="detail-section">
           <div class="section-title">
-            <n-icon><FingerPrintOutline /></n-icon>
+            <n-icon><Fingerprint /></n-icon>
             <span>身份与归属</span>
           </div>
           <div class="metadata-grid">
@@ -561,7 +561,7 @@
                   @click="copyToClipboard(String(detailTask.user_id))"
                 >
                   <template #icon
-                    ><n-icon><CopyOutline /></n-icon
+                    ><n-icon><Copy /></n-icon
                   ></template>
                 </n-button>
               </div>
@@ -584,7 +584,7 @@
         <!-- 提示词与内容 -->
         <div class="detail-section">
           <div class="section-title">
-            <n-icon><ChatbubbleEllipsesOutline /></n-icon>
+            <n-icon><ChatBubble /></n-icon>
             <span>任务指令 (Prompt)</span>
             <n-button
               quaternary
@@ -603,7 +603,7 @@
         <!-- 产出物预览 -->
         <div v-if="resultImageUrl" class="detail-section">
           <div class="section-title">
-            <n-icon><ImageOutline /></n-icon>
+            <n-icon><MediaImage /></n-icon>
             <span>生成结果</span>
           </div>
           <div class="result-image-box">
@@ -624,7 +624,7 @@
         <!-- API 调用摘要 -->
         <div class="detail-section">
           <div class="section-title">
-            <n-icon><CodeWorkingOutline /></n-icon>
+            <n-icon><CodeBrackets /></n-icon>
             <span>API 响应摘要</span>
             <n-button
               quaternary
@@ -642,7 +642,7 @@
           <div v-if="resultDebugText" class="debug-wrapper">
             <div class="debug-header" @click="showDebugResult = !showDebugResult">
               <div class="header-left">
-                <n-icon><TerminalOutline /></n-icon>
+                <n-icon><Terminal /></n-icon>
                 <span>原始调试详情 (脱敏)</span>
               </div>
               <n-button text size="tiny">{{ showDebugResult ? '隐藏' : '展开' }}</n-button>
@@ -683,21 +683,21 @@ import {
   type GlobalThemeOverrides,
 } from 'naive-ui'
 import {
-  SettingsOutline,
-  ListOutline,
-  RefreshOutline,
-  SearchOutline,
-  ChatbubbleEllipsesOutline,
-  ImageOutline,
-  WarningOutline,
-  TerminalOutline,
-  CopyOutline,
-  CheckmarkCircleOutline,
-  CloseCircleOutline,
-  TimeOutline,
-  FingerPrintOutline,
-  CodeWorkingOutline,
-} from '@vicons/ionicons5'
+  ChatBubble,
+  CheckCircle,
+  Clock,
+  CodeBrackets,
+  Copy,
+  Fingerprint,
+  List,
+  MediaImage,
+  Refresh,
+  Search,
+  Settings,
+  Terminal,
+  WarningTriangle,
+  XmarkCircle,
+} from '@iconoir/vue'
 import AdminSummaryCard from '../shared/components/AdminSummaryCard.vue'
 import { adminPopoverPanelThemeOverrides } from '../shared/adminThemeOverrides'
 import { taskStatusOptions, getTaskStatusConfig } from '../shared/monitorShared'

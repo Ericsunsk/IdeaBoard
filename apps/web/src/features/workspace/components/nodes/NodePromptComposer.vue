@@ -41,19 +41,7 @@
         :disabled="submitButtonDisabled"
         title="发送"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.1"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M5 12h13" />
-          <path d="m13 6 6 6-6 6" />
-        </svg>
+        <Send class="node-send-icon" />
       </button>
     </div>
   </form>
@@ -61,6 +49,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
+import { Send } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../config/promptAspectRatio'
 import { normalizePromptAspectRatio } from '../../config/promptAspectRatio'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
@@ -224,6 +213,12 @@ function selectAspectRatio(value: PromptAspectRatio) {
   display: flex;
   align-items: center;
   gap: var(--node-tool-button-gap);
+}
+.node-send-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.1;
+  transform: translateX(0.5px);
 }
 
 .image-node-prompt-composer.count-stacked .image-node-prompt-actions {

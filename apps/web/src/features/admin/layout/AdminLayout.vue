@@ -96,12 +96,12 @@ import {
   type GlobalThemeOverrides,
 } from 'naive-ui'
 import {
-  PeopleOutline,
-  LinkOutline,
-  ChatbubbleEllipsesOutline,
-  CloudOutline,
-  SpeedometerOutline,
-} from '@vicons/ionicons5'
+  ChatBubble,
+  Cloud,
+  DashboardSpeed,
+  Group,
+  Link,
+} from '@iconoir/vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -225,31 +225,31 @@ const adminMenuItems: AdminMenuItem[] = [
     key: 'users',
     label: '用户管理',
     title: '用户管理',
-    icon: PeopleOutline,
+    icon: Group,
   },
   {
     key: 'channels',
     label: '渠道商管理',
     title: '渠道商管理',
-    icon: LinkOutline,
+    icon: Link,
   },
   {
     key: 'statistics',
     label: '数据仪表盘',
     title: '数据仪表盘',
-    icon: SpeedometerOutline,
+    icon: DashboardSpeed,
   },
   {
     key: 'feature-prompts',
     label: '系统提示词',
     title: '系统提示词',
-    icon: ChatbubbleEllipsesOutline,
+    icon: ChatBubble,
   },
   {
     key: 'oss-config',
     label: '系统存储',
     title: '系统存储',
-    icon: CloudOutline,
+    icon: Cloud,
   },
 ] as const
 

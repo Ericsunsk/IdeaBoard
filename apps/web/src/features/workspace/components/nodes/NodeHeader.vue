@@ -112,8 +112,9 @@ function onTitleInput() {
 
 .node-header-icon :deep(svg) {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.1;
 }
 
 .node-header-title-text {

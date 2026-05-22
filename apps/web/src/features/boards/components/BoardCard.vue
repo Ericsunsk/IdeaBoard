@@ -57,11 +57,7 @@
         aria-label="More actions"
         @click.stop="emit('toggle-menu')"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="5" r="1.8" fill="currentColor" />
-          <circle cx="12" cy="12" r="1.8" fill="currentColor" />
-          <circle cx="12" cy="19" r="1.8" fill="currentColor" />
-        </svg>
+        <MoreHoriz class="board-menu-icon" />
       </button>
       <div v-if="isMenuOpen" class="board-action-menu" @click.stop>
         <button type="button" class="board-action-item" @click.stop="emit('rename-action')">
@@ -79,6 +75,7 @@
 </template>
 
 <script setup lang="ts">
+import { MoreHoriz } from '@iconoir/vue'
 import type { CanvasBoardMeta } from '../lib/canvasBoards'
 
 const props = defineProps<{
@@ -221,6 +218,11 @@ function onRenameInput(event: Event) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+.board-menu-icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.2;
 }
 
 .board-menu-btn:hover {

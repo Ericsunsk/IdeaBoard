@@ -24,8 +24,7 @@
           :key="item.title"
           type="button"
           class="image-action-icon-btn node-tool-button"
-          :class="{ 'image-action-icon-btn--placeholder': item.placeholder }"
-          :disabled="item.placeholder || directGenerating"
+          :disabled="directGenerating"
           :title="item.title"
           @mousedown.stop="onActionMouseDown(item, $event)"
           @click="onActionClick(item)"
@@ -72,12 +71,11 @@ const emit = defineEmits<{
 }>()
 
 function onActionMouseDown(item: ImageActionMenuItem, event: MouseEvent) {
-  if (item.placeholder || !('strengthAction' in item) || !item.strengthAction) return
+  if (!('strengthAction' in item) || !item.strengthAction) return
   emit('strength-action-mousedown', item.strengthAction, event)
 }
 
 function onActionClick(item: ImageActionMenuItem) {
-  if (item.placeholder || !item.action) return
   emit('action', item.action)
 }
 </script>
@@ -149,11 +147,6 @@ function onActionClick(item: ImageActionMenuItem) {
 .image-action-icon-btn:disabled {
   cursor: not-allowed;
   opacity: 0.45;
-}
-
-.image-action-icon-btn--placeholder:disabled {
-  cursor: default;
-  opacity: 0.58;
 }
 
 .action-tooltip {

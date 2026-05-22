@@ -16,23 +16,13 @@
       @pointerdown.stop
       @click.stop="emit('remove')"
     >
-      <svg
-        width="10"
-        height="10"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.4"
-        stroke-linecap="round"
-      >
-        <path d="M6 6l12 12" />
-        <path d="M18 6L6 18" />
-      </svg>
+      <Xmark class="node-input-remove-icon" />
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { Xmark } from '@iconoir/vue'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 
 const props = withDefaults(
@@ -67,5 +57,13 @@ defineOptions({
   inheritAttrs: false,
 })
 </script>
+
+<style scoped>
+.node-input-remove-icon {
+  width: 10px;
+  height: 10px;
+  stroke-width: 2.4;
+}
+</style>
 
 <style src="./styles/node-input-thumbnails.css"></style>

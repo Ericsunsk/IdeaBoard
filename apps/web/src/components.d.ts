@@ -16,6 +16,7 @@ declare module 'vue' {
     AdminEditorModal: typeof import('./features/admin/shared/components/AdminEditorModal.vue')['default']
     AdminSectionHeader: typeof import('./features/admin/shared/components/AdminSectionHeader.vue')['default']
     AdminSummaryCard: typeof import('./features/admin/shared/components/AdminSummaryCard.vue')['default']
+    AuthModalCloseButton: typeof import('./features/auth/components/AuthModalCloseButton.vue')['default']
     BoardCard: typeof import('./features/boards/components/BoardCard.vue')['default']
     EditNode: typeof import('./features/workspace/components/nodes/EditNode.vue')['default']
     FlowCanvasNode: typeof import('./features/workspace/components/FlowCanvasNode.vue')['default']

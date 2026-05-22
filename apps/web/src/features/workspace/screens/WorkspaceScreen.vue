@@ -41,17 +41,7 @@
         title="Select (V)"
         @click="setActiveTool('select')"
       >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
-          <path d="M13 13l6 6" />
-        </svg>
+        <CursorPointer class="toolbar-icon" />
       </div>
       <div
         class="tool-item"
@@ -59,21 +49,7 @@
         title="Hand (H)"
         @click="setActiveTool('hand')"
       >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-          <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v10" />
-          <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-          <path
-            d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"
-          />
-        </svg>
+        <SpockHandGesture class="toolbar-icon" />
       </div>
       <div
         class="tool-item"
@@ -81,18 +57,7 @@
         title="Text (T)"
         @click="setActiveTool('text')"
       >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-        >
-          <polyline points="4 7 4 4 20 4 20 7" />
-          <line x1="9" y1="20" x2="15" y2="20" />
-          <line x1="12" y1="4" x2="12" y2="20" />
-        </svg>
+        <Text class="toolbar-icon" />
       </div>
     </aside>
 
@@ -238,6 +203,7 @@ import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import type { Edge, Node } from '@vue-flow/core'
+import { CursorPointer, SpockHandGesture, Text } from '@iconoir/vue'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -1508,6 +1474,11 @@ onMounted(async () => {
 .tool-item.active {
   background: #f1f3f9;
   color: #9278e6;
+}
+.toolbar-icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.1;
 }
 .toolbar-divider {
   width: 24px;

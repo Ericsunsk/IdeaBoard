@@ -15,8 +15,8 @@
     "test:schema": "tsx src/features/boards/lib/canvasBoardStateSchema.spec.ts && tsx src/features/workspace/utils/flowSnapshotAdapter.schema.spec.ts && tsx src/features/workspace/composables/useFlowHistory.spec.ts"
   },
   "dependencies": {
+    "@iconoir/vue": "^7.11.0",
     "@tanstack/vue-query": "^5.100.9",
-    "@vicons/ionicons5": "^0.13.0",
     "@vue-flow/core": "^1.48.2",
     "@vueuse/core": "^14.3.0",
     "@vueuse/integrations": "^14.3.0",

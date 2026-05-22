@@ -9,12 +9,12 @@
           class="admin-search-input"
         >
           <template #prefix
-            ><n-icon><SearchOutline /></n-icon
+            ><n-icon><Search /></n-icon
           ></template>
         </n-input>
         <n-button secondary class="admin-icon-btn" @click="loadData">
           <template #icon
-            ><n-icon><RefreshOutline /></n-icon
+            ><n-icon><Refresh /></n-icon
           ></template>
         </n-button>
       </div>
@@ -22,7 +22,7 @@
       <div class="toolbar-right">
         <n-button type="primary" @click="openAddChannelModal">
           <template #icon
-            ><n-icon><AddOutline /></n-icon
+            ><n-icon><Plus /></n-icon
           ></template>
           新增渠道商
         </n-button>
@@ -80,7 +80,7 @@
             >
             <n-button size="tiny" quaternary circle @click="openAddAccountModal(channel)">
               <template #icon
-                ><n-icon><AddOutline /></n-icon
+                ><n-icon><Plus /></n-icon
               ></template>
             </n-button>
           </div>
@@ -269,7 +269,7 @@
 import channelApi from '../../../shared/api/channel'
 import type { Channel, ChannelFormData } from '../../../shared/api/channel'
 import { NButton, NIcon } from 'naive-ui'
-import { AddOutline, RefreshOutline, SearchOutline } from '@vicons/ionicons5'
+import { Plus, Refresh, Search } from '@iconoir/vue'
 import { extractApiErrorMessage, getModelCategoryClass } from '../shared/assetLibraryShared'
 import { useChannelAccounts } from './useChannelAccounts'
 

@@ -22,18 +22,7 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <path d="M3 14l4-4 5 5 5-5 4 4" />
-        </svg>
+        <MediaImage />
       </template>
     </NodeHeader>
     <div class="image-node-body" @contextmenu.stop>
@@ -105,6 +94,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
+import { MediaImage } from '@iconoir/vue'
 import {
   clampImageNodeOutputCount,
   type ImageNodeItem,
@@ -232,7 +222,6 @@ function selectOutputCount(value: number) {
 .workflow-node.image-node {
   overflow: visible;
 }
-
 .image-node-body {
   position: relative;
   padding: 0;

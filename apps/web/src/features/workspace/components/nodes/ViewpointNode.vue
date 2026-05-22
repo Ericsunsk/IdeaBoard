@@ -14,18 +14,7 @@
       @delete="emit('delete')"
     >
       <template #icon>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.1"
-        >
-          <path d="M4.5 7.5h7l2 2.4h6V17a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2z" />
-          <path d="M10 12.2h4" />
-          <path d="M12 10.2v4" />
-        </svg>
+        <ViewGrid />
       </template>
     </NodeHeader>
 
@@ -85,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import { ViewGrid } from '@iconoir/vue'
 import type { ViewpointNodeItem } from '../../types/canvasNodes'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 

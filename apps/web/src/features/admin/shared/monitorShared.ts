@@ -1,6 +1,6 @@
 import { h } from 'vue'
 import { NTag, NImage, NPopover, NButton, NIcon } from 'naive-ui'
-import { EyeOutline } from '@vicons/ionicons5'
+import { Eye } from '@iconoir/vue'
 import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../shared/api/task'
 import { sanitizeTaskErrorMessage } from '../../../shared/utils/errorMessages'
@@ -294,7 +294,7 @@ export function createMonitorTaskColumns(options?: {
             onClick: () => options?.onShowDetail?.(row),
           },
           {
-            icon: () => h(NIcon, null, () => h(EyeOutline)),
+            icon: () => h(NIcon, null, () => h(Eye)),
             default: () => '详情',
           },
         ),

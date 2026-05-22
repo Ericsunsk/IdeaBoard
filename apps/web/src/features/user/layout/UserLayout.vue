@@ -4,7 +4,7 @@
       <div class="impersonation-copy">
         <span class="impersonation-icon-wrap">
           <n-icon size="14">
-            <ShieldHalfOutline />
+            <Shield />
           </n-icon>
         </span>
         <span class="impersonation-title">伪装预览中</span>
@@ -19,7 +19,7 @@
       >
         <template #icon>
           <n-icon>
-            <CloseOutline />
+            <Xmark />
           </n-icon>
         </template>
       </n-button>
@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { CloseOutline, ShieldHalfOutline } from '@vicons/ionicons5'
+import { Shield, Xmark } from '@iconoir/vue'
 import { useUserStore } from '../../../app/stores/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
 import { useAppToast } from '../../../shared/composables/useAppToast'
