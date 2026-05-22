@@ -67,18 +67,18 @@
         </div>
       </div>
     </div>
-    <div class="header-right">
-      <button class="header-icon-btn share-btn" title="分享" @mousedown.stop>
-        <Link class="header-icon" />
+    <div class="header-right canvas-control-group">
+      <button class="canvas-icon-button share-btn" title="分享" @mousedown.stop>
+        <Link class="canvas-control-icon" />
       </button>
       <button
-        class="header-icon-btn export-btn"
+        class="canvas-icon-button export-btn"
         title="导出"
         :disabled="exportDisabled"
         @mousedown.stop
         @click="emit('export')"
       >
-        <Download class="header-icon" />
+        <Download class="canvas-control-icon" />
       </button>
       <div class="user-menu-wrap" @pointerdown.stop @mousedown.stop @click.stop>
         <button class="user-avatar-wrap" title="账户菜单" @click="toggleUserMenu">
@@ -174,6 +174,8 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 </script>
 
 <style scoped>
+@import '../styles/canvas-controls.css';
+
 .floating-header {
   position: absolute;
   top: 16px;
@@ -211,8 +213,6 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   pointer-events: auto;
 }
 .header-right {
-  display: flex;
-  gap: 12px;
   pointer-events: auto;
 }
 .header-title-slot {
@@ -336,28 +336,6 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   font-size: 12px;
   color: #8a91a3;
 }
-.header-icon-btn {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid #e2e4e8;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--ib-control-icon);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
-}
-.header-icon-btn:hover:not(:disabled) {
-  border-color: #d8ddea;
-  background: var(--ib-control-bg-hover);
-  color: var(--ib-control-icon-hover);
-}
 .export-btn:not(:disabled) {
   border-color: #9278e6;
   background: #9278e6;
@@ -367,11 +345,6 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   border-color: #8067d8;
   background: #8067d8;
   color: #fff;
-}
-.header-icon-btn:disabled {
-  background: #e2e4e8;
-  color: #a8adb7;
-  cursor: not-allowed;
 }
 .user-avatar-wrap {
   width: 40px;

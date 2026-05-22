@@ -31,33 +31,33 @@
     />
 
     <aside
-      class="floating-toolbar canvas-chrome canvas-chrome-left"
+      class="floating-toolbar canvas-chrome canvas-chrome-left canvas-control-group canvas-control-group--vertical"
       :inert="isMaskEditorChromeHidden"
       @wheel.prevent.stop
     >
       <div
-        class="tool-item"
-        :class="{ active: activeTool === 'select' }"
+        class="canvas-icon-button"
+        :class="{ 'is-active': activeTool === 'select' }"
         title="Select (V)"
         @click="setActiveTool('select')"
       >
-        <CursorPointer class="toolbar-icon" />
+        <CursorPointer class="canvas-control-icon" />
       </div>
       <div
-        class="tool-item"
-        :class="{ active: activeTool === 'hand' }"
+        class="canvas-icon-button"
+        :class="{ 'is-active': activeTool === 'hand' }"
         title="Hand (H)"
         @click="setActiveTool('hand')"
       >
-        <SpockHandGesture class="toolbar-icon" />
+        <SpockHandGesture class="canvas-control-icon" />
       </div>
       <div
-        class="tool-item"
-        :class="{ active: activeTool === 'text' }"
+        class="canvas-icon-button"
+        :class="{ 'is-active': activeTool === 'text' }"
         title="Text (T)"
         @click="setActiveTool('text')"
       >
-        <Text class="toolbar-icon" />
+        <Text class="canvas-control-icon" />
       </div>
     </aside>
 
@@ -1378,6 +1378,8 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+@import '../components/styles/canvas-controls.css';
+
 .canvas-layout {
   --canvas-chrome-slide-duration: 0.2s;
   --canvas-chrome-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -1443,42 +1445,11 @@ onMounted(async () => {
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.94);
-  padding: 4px;
-  border-radius: 999px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid #d8ddea;
-  z-index: 100;
-}
-.tool-item {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ib-control-icon);
-  cursor: pointer;
-  border: none;
   background: transparent;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-.tool-item:hover {
-  background: var(--ib-control-bg-hover);
-  color: var(--ib-control-icon-hover);
-}
-.tool-item.active {
-  background: #f1f3f9;
-  color: #9278e6;
-}
-.toolbar-icon {
-  width: 20px;
-  height: 20px;
-  stroke-width: 2.1;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  z-index: 100;
 }
 .toolbar-divider {
   width: 24px;

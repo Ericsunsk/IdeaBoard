@@ -1,0 +1,55 @@
+.canvas-control-group {
+  --canvas-control-size: 40px;
+  --canvas-control-gap: 12px;
+  --canvas-control-icon-size: 19px;
+  --canvas-control-icon-stroke: 2.1;
+  --canvas-control-active-color: #9278e6;
+  display: flex;
+  gap: var(--canvas-control-gap);
+}
+
+.canvas-control-group--vertical {
+  flex-direction: column;
+}
+
+.canvas-icon-button {
+  width: var(--canvas-control-size);
+  height: var(--canvas-control-size);
+  padding: 0;
+  border: 1px solid #e2e4e8;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--ib-control-icon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.canvas-icon-button:hover:not(:disabled) {
+  border-color: #d8ddea;
+  background: var(--ib-control-bg-hover);
+  color: var(--ib-control-icon-hover);
+}
+
+.canvas-icon-button.is-active {
+  border-color: #d8ddea;
+  background: #f1f3f9;
+  color: var(--canvas-control-active-color);
+}
+
+.canvas-icon-button:disabled {
+  background: #e2e4e8;
+  color: #a8adb7;
+  cursor: not-allowed;
+}
+
+.canvas-control-icon {
+  width: var(--canvas-control-icon-size);
+  height: var(--canvas-control-icon-size);
+  stroke-width: var(--canvas-control-icon-stroke);
+}
