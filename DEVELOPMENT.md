@@ -111,7 +111,7 @@ graph LR
 | `multi-angle` | 单图单视角展示 |
 | `virtual-3d` | 虚拟 3D 展示 |
 | `pattern-gen` | 图案生成 |
-| `hd-upscale` | 高清增强 |
+| `hd-upscale` | HD |
 | `image-extend` | 图片延伸 |
 
 ### 契约规则

@@ -18,106 +18,108 @@
       </template>
     </NodeHeader>
 
-    <div class="model-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
-      <div class="model-mode-card node-mode-card">
-        <div class="model-summary-row">
-          <span class="model-summary-value">{{ describeModelAngleSpec(node.angleSpec) }}</span>
+    <div class="model-node-shell" data-flow-handle-frame>
+      <div class="model-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
+        <div class="model-mode-card node-mode-card">
+          <div class="model-summary-row">
+            <span class="model-summary-value">{{ describeModelAngleSpec(node.angleSpec) }}</span>
+          </div>
+
+          <div class="model-angle-row">
+            <span class="model-angle-anchor">L</span>
+            <input
+              class="model-angle-range node-inline-range"
+              :style="{ '--slider-pct': `${((node.angleSpec.yaw + 180) / 360) * 100}%` }"
+              :value="node.angleSpec.yaw"
+              type="range"
+              min="-180"
+              max="180"
+              step="1"
+              @input="
+                emit(
+                  'update-angle-yaw',
+                  Number(($event.target as HTMLInputElement).value || node.angleSpec.yaw),
+                )
+              "
+            />
+            <span class="model-angle-anchor">R</span>
+          </div>
+
+          <div class="node-option-row">
+            <NodeActionButton
+              v-for="opt in framingOptions"
+              :key="`${node.id}-framing-${opt.key}`"
+              variant="chip"
+              :active="node.angleSpec.framing === opt.key"
+              @click="emit('update-angle-framing', opt.key)"
+            >
+              {{ opt.label }}
+            </NodeActionButton>
+          </div>
+
+          <div class="node-option-row">
+            <NodeActionButton
+              v-for="opt in backgroundOptions"
+              :key="`${node.id}-bg-${opt.key}`"
+              variant="chip"
+              :active="node.background === opt.key"
+              @click="emit('select-background', opt.key)"
+            >
+              {{ opt.label }}
+            </NodeActionButton>
+          </div>
         </div>
 
-        <div class="model-angle-row">
-          <span class="model-angle-anchor">L</span>
+        <div v-if="showModelStrength" class="model-control-group node-control-group">
+          <div class="node-control-head">
+            <span class="model-control-label node-control-label">Model</span>
+            <span class="model-strength-value">{{ node.modelStrength }}%</span>
+          </div>
           <input
-            class="model-angle-range node-inline-range"
-            :style="{ '--slider-pct': `${((node.angleSpec.yaw + 180) / 360) * 100}%` }"
-            :value="node.angleSpec.yaw"
+            class="model-strength-range node-inline-range"
+            :value="node.modelStrength"
+            :style="{ '--slider-pct': `${node.modelStrength}%` }"
             type="range"
-            min="-180"
-            max="180"
+            min="0"
+            max="100"
             step="1"
             @input="
               emit(
-                'update-angle-yaw',
-                Number(($event.target as HTMLInputElement).value || node.angleSpec.yaw),
+                'update-model-strength',
+                Number(($event.target as HTMLInputElement).value || node.modelStrength),
               )
             "
           />
-          <span class="model-angle-anchor">R</span>
         </div>
 
-        <div class="node-option-row">
-          <NodeActionButton
-            v-for="opt in framingOptions"
-            :key="`${node.id}-framing-${opt.key}`"
-            variant="chip"
-            :active="node.angleSpec.framing === opt.key"
-            @click="emit('update-angle-framing', opt.key)"
-          >
-            {{ opt.label }}
-          </NodeActionButton>
+        <div v-if="showPoseStrength" class="model-control-group node-control-group">
+          <div class="node-control-head">
+            <span class="model-control-label node-control-label">Pose</span>
+            <span class="model-strength-value">{{ node.poseStrength }}%</span>
+          </div>
+          <input
+            class="model-strength-range node-inline-range"
+            :value="node.poseStrength"
+            :style="{ '--slider-pct': `${node.poseStrength}%` }"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            @input="
+              emit(
+                'update-pose-strength',
+                Number(($event.target as HTMLInputElement).value || node.poseStrength),
+              )
+            "
+          />
         </div>
 
-        <div class="node-option-row">
-          <NodeActionButton
-            v-for="opt in backgroundOptions"
-            :key="`${node.id}-bg-${opt.key}`"
-            variant="chip"
-            :active="node.background === opt.key"
-            @click="emit('select-background', opt.key)"
-          >
-            {{ opt.label }}
-          </NodeActionButton>
-        </div>
-      </div>
-
-      <div v-if="showModelStrength" class="model-control-group node-control-group">
-        <div class="node-control-head">
-          <span class="model-control-label node-control-label">Model</span>
-          <span class="model-strength-value">{{ node.modelStrength }}%</span>
-        </div>
-        <input
-          class="model-strength-range node-inline-range"
-          :value="node.modelStrength"
-          :style="{ '--slider-pct': `${node.modelStrength}%` }"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          @input="
-            emit(
-              'update-model-strength',
-              Number(($event.target as HTMLInputElement).value || node.modelStrength),
-            )
-          "
+        <NodeExecutionFooter
+          :disabled="uiState?.primaryAction?.disabled"
+          :label="uiState?.primaryAction?.label || '生成'"
+          @generate="emit('generate')"
         />
       </div>
-
-      <div v-if="showPoseStrength" class="model-control-group node-control-group">
-        <div class="node-control-head">
-          <span class="model-control-label node-control-label">Pose</span>
-          <span class="model-strength-value">{{ node.poseStrength }}%</span>
-        </div>
-        <input
-          class="model-strength-range node-inline-range"
-          :value="node.poseStrength"
-          :style="{ '--slider-pct': `${node.poseStrength}%` }"
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          @input="
-            emit(
-              'update-pose-strength',
-              Number(($event.target as HTMLInputElement).value || node.poseStrength),
-            )
-          "
-        />
-      </div>
-
-      <NodeExecutionFooter
-        :disabled="uiState?.primaryAction?.disabled"
-        :label="uiState?.primaryAction?.label || '生成'"
-        @generate="emit('generate')"
-      />
     </div>
   </div>
 </template>
@@ -164,13 +166,37 @@ const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>
+<style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
+.workflow-node.model-node {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-node-shell {
+  position: relative;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: visible;
+  transition: border-color 0.2s ease;
+}
+
+.workflow-node.model-node.active .model-node-shell {
+  border-color: #9278e6;
+}
+
 .model-node-body {
-  gap: 8px;
+  gap: 6px;
+  padding: 10px;
 }
 
 .model-mode-card {
-  gap: 8px;
+  gap: 6px;
 }
 
 .model-summary-row,
@@ -185,9 +211,9 @@ const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
 }
 
 .model-summary-value {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: #475569;
+  color: #64748b;
 }
 
 .model-angle-anchor {
@@ -196,7 +222,7 @@ const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
   text-align: center;
   font-size: 10px;
   font-weight: 700;
-  color: #9aa4b2;
+  color: #94a3b8;
   letter-spacing: 0.06em;
 }
 
@@ -206,7 +232,7 @@ const framingOptions = MODEL_ANGLE_FRAMING_OPTIONS
 
 .model-strength-value {
   font-size: 11px;
-  color: #667085;
+  color: #64748b;
   font-weight: 700;
 }
 

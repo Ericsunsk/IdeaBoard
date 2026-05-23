@@ -136,8 +136,8 @@ flowchart TB
       局部改款、局部重绘、双图融合
     </td>
     <td valign="top" width="33%">
-      <strong>色彩与材质</strong><br/>
-      上身贴合
+      <strong>图片工具</strong><br/>
+      局部重绘、图片延伸、HD
     </td>
   </tr>
   <tr>
@@ -146,19 +146,15 @@ flowchart TB
       单视角展示、商品展示
     </td>
     <td valign="top">
-      <strong>后处理</strong><br/>
-      高清增强、图片延伸
-    </td>
-    <td valign="top">
       <strong>运营统计</strong><br/>
       调用聚合、模型占比、健康热力图
     </td>
-  </tr>
-  <tr>
     <td valign="top">
       <strong>存储接入</strong><br/>
       本地存储、Kodo、S3-compatible
     </td>
+  </tr>
+  <tr>
     <td valign="top">
       <strong>身份认证</strong><br/>
       登录、注册、会话、角色、封禁
@@ -167,6 +163,7 @@ flowchart TB
       <strong>任务调度</strong><br/>
       队列、账号池、失败重试、模型解析
     </td>
+    <td valign="top"></td>
   </tr>
 </table>
 

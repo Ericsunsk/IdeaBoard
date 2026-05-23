@@ -59,8 +59,8 @@
 
 1. `Prompt` 组
 2. `Inpaint` 组
-3. `Fusion` 与 `Color` 组
-4. `Model`、`Display`、`Enhance` 组
+3. `Fusion` 组
+4. `Model`、`Display`、`Image Tools` 组
 
 ## 节点与 Feature 对照
 
@@ -77,7 +77,7 @@
   - `multi-angle`
 - `Display` 组
   - `virtual-3d`
-- `Enhance` 组
+- `Image Tools` 组
   - `hd-upscale`
   - `image-extend`
 
@@ -302,9 +302,9 @@
 - 推荐模板：
 
 ```text
-你是图像局部高清增强助手。
+你是图像 HD 助手。
 
-任务：对目标图像执行高清增强与细节恢复，提高图像的清晰度、边缘质量、纹理层次和可用度；当存在局部限制区域时，只增强目标区域。
+任务：对目标图像执行 HD 与细节恢复，提高图像的清晰度、边缘质量、纹理层次和可用度；当存在局部限制区域时，只增强目标区域。
 
 执行原则：
 1. 保持原图主体、款式、结构、颜色关系和视觉语义不变，不要借增强之名重做内容。
