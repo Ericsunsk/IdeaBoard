@@ -4,7 +4,7 @@ import {
   type ExecutionFeature,
   buildExecutionTaskRequest,
   EXECUTION_DIRECT_ACTION_META,
-  EXECUTION_EDIT_MODE_META,
+  EXECUTION_PARTIAL_EDIT_META,
   EXECUTION_IMAGE_TOOL_META,
 } from '../config/executionContract'
 import {
@@ -21,7 +21,6 @@ import {
   IMAGE_NODE_ACTION,
   type ImageDirectTaskAction,
 } from '../types/imageActions'
-import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 export type ImageHdUpscaleFactor = 2 | 3 | 4
 
@@ -91,7 +90,7 @@ export async function assertPromptImageSubmitReady(): Promise<void> {
   await assertTaskSubmitReady(
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
-      feature: EXECUTION_EDIT_MODE_META[EDIT_NODE_MODE.partialEdit].feature,
+      feature: EXECUTION_PARTIAL_EDIT_META.feature,
     }),
     '提交任务失败',
   )
@@ -177,8 +176,8 @@ export async function submitPromptImageGenerationTask(
 ): Promise<string> {
   const imageSize = await loadImageSize(source.url)
   const request = buildExecutionTaskRequest({
-    prompt: `${EXECUTION_EDIT_MODE_META[EDIT_NODE_MODE.partialEdit].promptPrefix} ${prompt}`,
-    feature: EXECUTION_EDIT_MODE_META[EDIT_NODE_MODE.partialEdit].feature,
+    prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${prompt}`,
+    feature: EXECUTION_PARTIAL_EDIT_META.feature,
     imageUrls: [source.url],
     params: {
       original_image_url: source.url,
@@ -198,8 +197,8 @@ export async function submitImageInpaintTask(
   input: SubmitImageInpaintTaskInput,
 ): Promise<string> {
   const request = buildExecutionTaskRequest({
-    prompt: `${EXECUTION_EDIT_MODE_META[EDIT_NODE_MODE.partialEdit].promptPrefix} ${input.prompt}`,
-    feature: EXECUTION_EDIT_MODE_META[EDIT_NODE_MODE.partialEdit].feature,
+    prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${input.prompt}`,
+    feature: EXECUTION_PARTIAL_EDIT_META.feature,
     imageUrls: [input.croppedImageUrl],
     params: {
       original_image_url: input.croppedImageUrl,

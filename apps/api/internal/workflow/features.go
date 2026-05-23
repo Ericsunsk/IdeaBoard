@@ -12,9 +12,7 @@ const (
 	FeatureSlugSketchToImage  = "sketch-to-image"
 	FeatureSlugStyleVariation = "style-variation"
 	FeatureSlugPartialEdit    = "partial-edit"
-	FeatureSlugBgSwap         = "bg-swap"
 	FeatureSlugRemoveBg       = "remove-bg"
-	FeatureSlugFaceSwap       = "face-swap"
 	FeatureSlugStyleFusion    = "style-fusion"
 	FeatureSlugMultiAngle     = "multi-angle"
 	FeatureSlugVirtual3D      = "virtual-3d"
@@ -27,9 +25,7 @@ var supportedTaskFeatureSlugs = map[string]struct{}{
 	FeatureSlugSketchToImage:  {},
 	FeatureSlugStyleVariation: {},
 	FeatureSlugPartialEdit:    {},
-	FeatureSlugBgSwap:         {},
 	FeatureSlugRemoveBg:       {},
-	FeatureSlugFaceSwap:       {},
 	FeatureSlugStyleFusion:    {},
 	FeatureSlugMultiAngle:     {},
 	FeatureSlugVirtual3D:      {},

@@ -1,14 +1,12 @@
 import type {
   CanvasConnectionNodeType,
   CanvasConnectionPort,
-  EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
   ModelNodeItem,
   PromptNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
-import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 export type CanvasConnectionKind = 'image' | 'prompt'
 export type CanvasConnectionDirection = 'input' | 'output'
@@ -18,7 +16,6 @@ export type CanvasConnectionContractNode =
   | ImageNodeItem
   | ModelNodeItem
   | ViewpointNodeItem
-  | EditNodeItem
   | FusionNodeItem
 
 export interface CanvasNodePortContract {
@@ -27,28 +24,6 @@ export interface CanvasNodePortContract {
   direction: CanvasConnectionDirection
   required: boolean
   visible: boolean
-}
-
-export function editModeSupportsPrompt(mode: EditNodeItem['mode']) {
-  return mode !== EDIT_NODE_MODE.faceSwap
-}
-
-export function editModeSupportsSourceImage(mode: EditNodeItem['mode']) {
-  return mode === EDIT_NODE_MODE.faceSwap
-}
-
-export function getEditNodePortLabel(
-  mode: EditNodeItem['mode'],
-  port: Extract<CanvasConnectionPort, 'image' | 'imageB' | 'prompt'>,
-) {
-  switch (port) {
-    case 'image':
-      return mode === EDIT_NODE_MODE.faceSwap ? 'Target' : 'Image'
-    case 'imageB':
-      return 'Face'
-    case 'prompt':
-      return 'Prompt'
-  }
 }
 
 function input(
@@ -70,7 +45,6 @@ function output(
 
 export function getCanvasNodePortContracts(
   nodeType: CanvasConnectionNodeType,
-  node: CanvasConnectionContractNode | { id: number },
 ): CanvasNodePortContract[] {
   switch (nodeType) {
     case 'prompt':
@@ -87,25 +61,6 @@ export function getCanvasNodePortContracts(
       ]
     case 'viewpoint':
       return [input('image', 'image', true), input('prompt', 'prompt'), output('image', 'image')]
-    case 'edit': {
-      const editNode = node as EditNodeItem
-      return [
-        input('image', 'image', true),
-        input(
-          'imageB',
-          'image',
-          editModeSupportsSourceImage(editNode.mode),
-          editModeSupportsSourceImage(editNode.mode),
-        ),
-        input(
-          'prompt',
-          'prompt',
-          editModeSupportsPrompt(editNode.mode),
-          editModeSupportsPrompt(editNode.mode),
-        ),
-        output('image', 'image'),
-      ]
-    }
     case 'fusion':
       return [
         input('image', 'image', true),
@@ -119,25 +74,22 @@ export function getCanvasNodePortContracts(
 
 export function getCanvasNodeVisibleInputPorts(
   nodeType: CanvasConnectionNodeType,
-  node: CanvasConnectionContractNode | { id: number },
 ): CanvasNodePortContract[] {
-  return getCanvasNodePortContracts(nodeType, node).filter(
+  return getCanvasNodePortContracts(nodeType).filter(
     (port) => port.direction === 'input' && port.visible,
   )
 }
 
 export function getCanvasNodeVisibleOutputPorts(
   nodeType: CanvasConnectionNodeType,
-  node: CanvasConnectionContractNode | { id: number },
 ): CanvasNodePortContract[] {
-  return getCanvasNodePortContracts(nodeType, node).filter(
+  return getCanvasNodePortContracts(nodeType).filter(
     (port) => port.direction === 'output' && port.visible,
   )
 }
 
 export function getCanvasNodeRequiredInputPorts(
   nodeType: CanvasConnectionNodeType,
-  node: CanvasConnectionContractNode | { id: number },
 ): CanvasNodePortContract[] {
-  return getCanvasNodeVisibleInputPorts(nodeType, node).filter((port) => port.required)
+  return getCanvasNodeVisibleInputPorts(nodeType).filter((port) => port.required)
 }

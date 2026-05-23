@@ -170,15 +170,11 @@ func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {
 	if !ok {
 		return false
 	}
-	if featureSlug == workflow.FeatureSlugFaceSwap {
-		return false
-	}
 	if !hasOpenAIMaskInput(params) {
 		return false
 	}
 	switch featureSlug {
 	case workflow.FeatureSlugPartialEdit,
-		workflow.FeatureSlugBgSwap,
 		workflow.FeatureSlugHDUpscale:
 		return true
 	default:

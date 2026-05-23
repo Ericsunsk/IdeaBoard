@@ -41,7 +41,7 @@
         :disabled="submitButtonDisabled"
         title="发送"
       >
-        <Send class="node-send-icon" />
+        <SendDiagonalSolid class="node-send-icon" />
       </button>
     </div>
   </form>
@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { Send } from '@iconoir/vue'
+import { SendDiagonalSolid } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../config/promptAspectRatio'
 import { normalizePromptAspectRatio } from '../../config/promptAspectRatio'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
@@ -162,7 +162,7 @@ function selectAspectRatio(value: PromptAspectRatio) {
   align-items: end;
   gap: var(--node-tool-button-gap);
   padding: 5px 5px 5px 13px;
-  border: 1px solid rgba(122, 107, 213, 0.28);
+  border: var(--node-tool-border-width) solid rgba(122, 107, 213, 0.28);
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
@@ -217,7 +217,7 @@ function selectAspectRatio(value: PromptAspectRatio) {
 .node-send-icon {
   width: 16px;
   height: 16px;
-  stroke-width: 2.1;
+  stroke-width: var(--node-tool-icon-stroke);
   transform: translateX(0.5px);
 }
 

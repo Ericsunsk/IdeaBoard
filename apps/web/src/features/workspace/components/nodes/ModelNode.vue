@@ -8,7 +8,7 @@
     @mousedown.stop
   >
     <NodeHeader
-      :title="node.title || 'MODEL'"
+      :title="node.title || 'Model'"
       @node-mousedown="emit('node-mousedown', $event)"
       @update:title="emit('update:title', $event)"
       @delete="emit('delete')"

@@ -2,14 +2,11 @@ import { ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import {
   buildExecutionTaskRequest,
-  EXECUTION_EDIT_MODE_META,
-  EXECUTION_FACE_SWAP_META,
   EXECUTION_MODEL_META,
   EXECUTION_VIEWPOINT_META,
   type ExecutionFeature,
 } from '../config/executionContract'
 import { assertTaskSubmitReady } from '../services/flowTaskExecutorUtils'
-import { executeFlowEditNode, validateFlowEditNodeInputs } from '../services/flowEditExecutor'
 import { executeFlowModelNode, validateFlowModelNodeInputs } from '../services/flowModelExecutor'
 import {
   executeFlowViewpointNode,
@@ -17,13 +14,11 @@ import {
 } from '../services/flowViewpointExecutor'
 import type {
   CanvasExecutionOutputNodeType,
-  EditNodeItem,
   ModelNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/task'
 import type { FlowHistorySnapshot } from './useFlowTransactions'
-import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 type FlowRuntimeNode = { id: string; data?: { kind?: string; snapshotNode?: unknown } }
 type FlowRuntimeEdge = {
@@ -74,7 +69,6 @@ export function loadImageSizeFromUrl(
 }
 
 export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOptions) {
-  const runningEditNodeIds = ref(new Set<string>())
   const runningModelNodeIds = ref(new Set<string>())
   const runningViewpointNodeIds = ref(new Set<string>())
 
@@ -83,8 +77,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     nodeId: string,
   ): boolean {
     switch (nodeType) {
-      case 'edit':
-        return runningEditNodeIds.value.has(nodeId)
       case 'fusion':
         return false
       case 'model':
@@ -263,36 +255,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     options.updateSnapshotNode(nodeId, patcher, { history: false })
   }
 
-  async function onFlowEditGenerate(nodeId: string) {
-    await runFlowGenerationNode(nodeId, {
-      nodeType: 'edit',
-      runningSet: runningEditNodeIds,
-      runningMessage: 'Edit 任务正在执行中',
-      missingNodeMessage: 'Edit 节点不存在',
-      successMessage: 'Edit 生成完成',
-      failureMessage: 'Edit 生成失败',
-      errorMessage: 'Edit 生成失败',
-      buildContext: (target, nodeId) => ({
-        nodeId,
-        snapshotNode: target.data.snapshotNode as EditNodeItem,
-      }),
-      buildOptions: () => ({
-        nodes: options.nodes.value as FlowRuntimeNode[],
-        edges: options.edges.value as FlowRuntimeEdge[],
-        loadImageSizeFromUrl,
-        boardId: options.currentBoardId.value || undefined,
-      }),
-      validate: (ctx, opts) => validateFlowEditNodeInputs(ctx, opts),
-      preflight: (ctx) =>
-        assertExecutionSubmitReady(
-          ctx.snapshotNode.mode === EDIT_NODE_MODE.faceSwap
-            ? EXECUTION_FACE_SWAP_META.feature
-            : EXECUTION_EDIT_MODE_META[ctx.snapshotNode.mode].feature,
-        ),
-      execute: (ctx, opts) => executeFlowEditNode(ctx, opts),
-    })
-  }
-
   async function onFlowModelGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'model',
@@ -346,7 +308,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
   }
 
   return {
-    onFlowEditGenerate,
     onFlowModelGenerate,
     onFlowViewpointGenerate,
     isFlowExecutionNodeRunning,

@@ -5,7 +5,7 @@ export type ImageActionMenuIcon =
   | 'remove-bg'
   | 'style-variation'
   | 'sketch-to-image'
-  | 'hd-text'
+  | 'hd'
   | 'image-extend'
   | 'image-inpaint'
 
@@ -67,7 +67,7 @@ export const IMAGE_ACTION_MENU_ITEMS: readonly ImageActionMenuItem[] = [
     action: IMAGE_NODE_ACTION.hdUpscale,
     label: hdUpscaleText.label,
     title: hdUpscaleText.title,
-    icon: 'hd-text',
+    icon: 'hd',
     strengthAction: IMAGE_NODE_ACTION.hdUpscale,
   },
   {

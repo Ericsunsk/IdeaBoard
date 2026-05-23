@@ -36,7 +36,7 @@
           title="选择画布"
           @click.stop="emit('toggle-board-menu')"
         >
-          <FrameAlt class="board-switch-icon header-icon" />
+          <SquareCursor class="board-switch-icon header-icon" />
         </button>
         <div
           v-if="isBoardMenuOpen"
@@ -69,7 +69,10 @@
     </div>
     <div class="header-right canvas-control-group">
       <button class="canvas-icon-button share-btn" title="分享" @mousedown.stop>
-        <Link class="canvas-control-icon" />
+        <span class="canvas-icon-swap" aria-hidden="true">
+          <ShareAndroid class="canvas-control-icon canvas-icon-swap-default" />
+          <ShareAndroidSolid class="canvas-control-icon canvas-icon-swap-hover" />
+        </span>
       </button>
       <button
         class="canvas-icon-button export-btn"
@@ -110,7 +113,7 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { ArrowLeft, Download, FrameAlt, Link, User } from '@iconoir/vue'
+import { ArrowLeft, Download, ShareAndroid, ShareAndroidSolid, SquareCursor, User } from '@iconoir/vue'
 
 const props = defineProps<{
   currentBoardName: string
@@ -177,6 +180,8 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 @import '../styles/canvas-controls.css';
 
 .floating-header {
+  --canvas-control-border-width: 1.2px;
+  --canvas-control-icon-stroke: 1.5;
   position: absolute;
   top: 16px;
   left: 16px;
@@ -189,11 +194,18 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   gap: 16px;
 }
 .header-icon {
-  width: 19px;
-  height: 19px;
-  stroke-width: 2.1;
+  width: 16px;
+  height: 16px;
+  stroke-width: var(--canvas-control-icon-stroke);
 }
+
 .header-icon-back,
+.board-switch-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: var(--canvas-control-icon-stroke);
+}
+
 .header-icon-avatar {
   width: 20px;
   height: 20px;
@@ -205,7 +217,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   height: 39px;
   padding: 4px;
   border-radius: 999px;
-  border: 1px solid #d8ddea;
+  border: var(--canvas-control-border-width) solid #d8ddea;
   background: rgba(255, 255, 255, 0.94);
   display: flex;
   align-items: center;
@@ -299,7 +311,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   overflow-y: auto;
   padding: 6px;
   border-radius: 10px;
-  border: 1px solid #d8ddea;
+  border: var(--canvas-control-border-width) solid #d8ddea;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(10px);
   z-index: 140;
@@ -352,7 +364,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   border-radius: 50%;
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid #e2e4e8;
+  border: var(--canvas-control-border-width) solid #e2e4e8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -377,7 +389,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   top: calc(100% + 8px);
   right: 0;
   width: 128px;
-  border: 1px solid #d8ddea;
+  border: var(--canvas-control-border-width) solid #d8ddea;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(10px);

@@ -133,7 +133,7 @@ flowchart TB
     </td>
     <td valign="top" width="33%">
       <strong>编辑调整</strong><br/>
-      局部改款、换背景、换脸、双图融合
+      局部改款、局部重绘、双图融合
     </td>
     <td valign="top" width="33%">
       <strong>色彩与材质</strong><br/>

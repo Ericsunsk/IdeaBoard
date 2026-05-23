@@ -41,7 +41,7 @@
         title="Select (V)"
         @click="setActiveTool('select')"
       >
-        <CursorPointer class="canvas-control-icon" />
+        <OneFingerSelectHandGesture class="canvas-control-icon" />
       </div>
       <div
         class="canvas-icon-button"
@@ -128,7 +128,6 @@
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
             @delete-node="() => onFlowDeleteNode(nodeProps.id)"
-            @generate-edit="() => onFlowEditGenerate(nodeProps.id)"
             @generate-model="() => onFlowModelGenerate(nodeProps.id)"
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
             @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
@@ -186,9 +185,13 @@
       @wheel.prevent.stop
     >
       <div class="zoom-controls">
-        <button type="button" class="zoom-btn" title="缩小" @click="onZoomOut">−</button>
+        <button type="button" class="zoom-btn" title="缩小" @click="onZoomOut">
+          <Minus class="zoom-btn-icon" />
+        </button>
         <span class="zoom-level">{{ zoomLevel }}%</span>
-        <button type="button" class="zoom-btn" title="放大" @click="onZoomIn">+</button>
+        <button type="button" class="zoom-btn" title="放大" @click="onZoomIn">
+          <Plus class="zoom-btn-icon" />
+        </button>
       </div>
     </div>
 
@@ -202,7 +205,7 @@ import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import type { Edge, Node } from '@vue-flow/core'
-import { CursorPointer, SpockHandGesture, Text } from '@iconoir/vue'
+import { Minus, OneFingerSelectHandGesture, Plus, SpockHandGesture, Text } from '@iconoir/vue'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -353,7 +356,6 @@ const boardBaseSnapshot = ref<CanvasBoardSnapshot>(createEmptyCanvasBoardSnapsho
 const createNodeOptions: readonly { key: string; label: string; value: FlowCreatableNodeKind }[] = [
   { key: 'prompt', label: 'Prompt', value: 'prompt' },
   { key: 'image', label: 'Image', value: 'image' },
-  { key: 'edit', label: 'Edit', value: 'edit' },
   { key: 'fusion', label: 'Fusion', value: 'fusion' },
   { key: 'model', label: 'Model', value: 'model' },
   { key: 'viewpoint', label: 'Viewpoint', value: 'viewpoint' },
@@ -914,7 +916,6 @@ function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
 }
 
 const {
-  onFlowEditGenerate,
   onFlowModelGenerate,
   onFlowViewpointGenerate,
   isFlowExecutionNodeRunning,
@@ -1378,6 +1379,8 @@ onMounted(async () => {
 @import '../components/styles/canvas-controls.css';
 
 .canvas-layout {
+  --canvas-control-border-width: 1.2px;
+  --canvas-control-icon-stroke: 1.5;
   --canvas-chrome-slide-duration: 0.2s;
   --canvas-chrome-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --flow-edge-color: rgb(177 177 183 / 50%);
@@ -1546,7 +1549,7 @@ onMounted(async () => {
   gap: 9px;
   height: 33px;
   padding: 4px;
-  border: 1px solid #d8ddea;
+  border: var(--canvas-control-border-width) solid #d8ddea;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
   color: #202124;
@@ -1561,14 +1564,17 @@ onMounted(async () => {
   background: transparent;
   cursor: pointer;
   color: var(--ib-control-icon);
-  font-size: 18px;
-  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   transition:
     background-color 0.2s ease,
     color 0.2s ease;
+}
+.zoom-btn-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: var(--canvas-control-icon-stroke);
 }
 .zoom-btn:hover {
   background: #f1f3f9;

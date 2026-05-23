@@ -102,19 +102,20 @@ function onTitleInput() {
 <style scoped src="./styles/node-shared.css"></style>
 <style scoped>
 .node-header-icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   opacity: 0.95;
 }
 
 .node-header-icon :deep(svg) {
   display: block;
-  width: 12px;
-  height: 12px;
-  stroke-width: 2.1;
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
 }
 
 .node-header-title-text {

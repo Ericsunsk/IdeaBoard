@@ -369,57 +369,6 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIFaceSwapUsesEditEndpointAndTwoImageParts(t *testing.T) {
-	var gotPath string
-	var gotMultipart multipartRequestCapture
-	imageA := []byte("face-swap-image-a")
-	imageB := []byte("face-swap-image-b")
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/a.png":
-			w.Header().Set("Content-Type", "image/png")
-			_, _ = w.Write(imageA)
-			return
-		case "/b.png":
-			w.Header().Set("Content-Type", "image/png")
-			_, _ = w.Write(imageB)
-			return
-		}
-		gotPath = r.URL.Path
-		gotMultipart = readMultipartRequest(t, r)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/out.png"}]}`))
-	}))
-	defer server.Close()
-	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
-
-	c := &ProviderExecutor{}
-	account := &accounts.ApiAccount{
-		ProxyURL: server.URL,
-		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
-	}
-	params := map[string]interface{}{
-		"feature":    "face-swap",
-		"image_urls": []interface{}{server.URL + "/a.png", server.URL + "/b.png"},
-	}
-
-	if _, err := c.callOpenAI(context.Background(), account, "face swap prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
-		t.Fatalf("callOpenAI returned error: %v", err)
-	}
-	if gotPath != "/v1/images/edits" {
-		t.Fatalf("expected edit endpoint, got %s", gotPath)
-	}
-	images := gotMultipart.Files["image"]
-	if len(images) != 2 {
-		t.Fatalf("expected two image files, got %#v", images)
-	}
-	if string(images[0].Data) != string(imageA) || string(images[1].Data) != string(imageB) {
-		t.Fatalf("unexpected image part payload order")
-	}
-}
-
 func TestCallOpenAIMultiAngleUsesEditEndpointAndIncludesSourceModelPose(t *testing.T) {
 	var gotPath string
 	var gotMultipart multipartRequestCapture
@@ -802,7 +751,7 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 		t.Fatalf("expected masked hd-upscale to use edit endpoint")
 	}
 
-	for _, feature := range []string{"style-fusion", "face-swap", "multi-angle", "remove-bg"} {
+	for _, feature := range []string{"style-fusion", "multi-angle", "remove-bg"} {
 		if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
 			"feature":    feature,
 			"image_urls": []interface{}{"https://img.example/source.png", "https://img.example/ref.png"},

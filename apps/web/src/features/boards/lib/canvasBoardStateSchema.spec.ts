@@ -61,18 +61,6 @@ function createValidState() {
         outputImages: [],
       },
     ],
-    editNodes: [
-      {
-        id: 7,
-        type: 'edit' as const,
-        x: 0,
-        y: 0,
-        width: 240,
-        mode: 'partial-edit' as const,
-        outputStatus: 'idle' as const,
-        outputImages: [],
-      },
-    ],
     fusionNodes: [
       {
         id: 8,
@@ -118,7 +106,6 @@ function testValidEmptySnapshot() {
     promptNodes: [],
     modelNodes: [],
     viewpointNodes: [],
-    editNodes: [],
     fusionNodes: [],
     connections: [],
     viewport: { canvasX: 0, canvasY: 0, zoomLevel: 1 },

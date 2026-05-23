@@ -7,7 +7,7 @@ import type {
   ImageNodeItem,
 } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
-import { getDefaultCanvasNodeTitle } from '../types/canvasNodes'
+import { getDefaultCanvasNodeTitle, isCanvasConnectionNodeType } from '../types/canvasNodes'
 import { normalizeFlowConnection } from './flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from './flowNodeDragHandle'
 
@@ -35,7 +35,6 @@ type SnapshotNodeCollectionKey =
   | 'promptNodes'
   | 'modelNodes'
   | 'viewpointNodes'
-  | 'editNodes'
   | 'fusionNodes'
 
 const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
@@ -46,7 +45,6 @@ const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
   { key: 'promptNodes', nodeType: 'prompt' },
   { key: 'modelNodes', nodeType: 'model' },
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
-  { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
 ]
 
@@ -64,7 +62,6 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
     promptNodes: [],
     modelNodes: [],
     viewpointNodes: [],
-    editNodes: [],
     fusionNodes: [],
     connections: [],
     viewport: {
@@ -77,10 +74,6 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
 
 function toFlowNodeId(nodeType: CanvasConnectionNodeType, id: number) {
   return `${nodeType}-${id}`
-}
-
-function isCanvasConnectionNodeType(value: string): value is CanvasConnectionNodeType {
-  return SNAPSHOT_NODE_COLLECTIONS.some((item) => item.nodeType === value)
 }
 
 function parseFlowNodeId(
@@ -121,10 +114,6 @@ function toFlowDataFromCanvasNode(
     nodeType,
     title: resolveNodeTitle(nodeType, node),
     summary: `Canvas ${nodeType} node`,
-    mode:
-      nodeType === 'edit'
-        ? (node as { mode?: FlowNodeData['mode'] }).mode
-        : undefined,
     snapshotNode: clone(node),
   }
 }
@@ -177,8 +166,6 @@ function resolveCollectionKeyByNodeType(
       return 'modelNodes'
     case 'viewpoint':
       return 'viewpointNodes'
-    case 'edit':
-      return 'editNodes'
     case 'fusion':
       return 'fusionNodes'
   }

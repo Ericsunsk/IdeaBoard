@@ -30,7 +30,6 @@ const canvasConnectionNodeTypeSchema = z.enum([
   'prompt',
   'model',
   'viewpoint',
-  'edit',
   'fusion',
 ])
 const canvasConnectionPortSchema = z.enum(['image', 'prompt', 'imageA', 'imageB'])
@@ -116,18 +115,6 @@ const imageNodeItemSchema = z.object({
   outputImages: z.array(imageNodeOutputItemSchema),
 }).strict()
 
-const editNodeItemSchema = z.object({
-  id: finiteNumberSchema,
-  type: z.literal('edit'),
-  x: finiteNumberSchema,
-  y: finiteNumberSchema,
-  width: finiteNumberSchema,
-  title: z.string().optional(),
-  mode: z.enum(['partial-edit', 'bg-swap', 'face-swap']),
-  outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: z.array(imageNodeOutputItemSchema),
-}).strict()
-
 const fusionNodeItemSchema = z.object({
   id: finiteNumberSchema,
   type: z.literal('fusion'),
@@ -173,7 +160,6 @@ export const canvasBoardSnapshotSchema = z
     promptNodes: z.array(promptNodeItemSchema),
     modelNodes: z.array(modelNodeItemSchema),
     viewpointNodes: z.array(viewpointNodeItemSchema),
-    editNodes: z.array(editNodeItemSchema),
     fusionNodes: z.array(fusionNodeItemSchema),
     connections: z.array(canvasConnectionSchema),
     viewport: canvasViewportStateSchema,

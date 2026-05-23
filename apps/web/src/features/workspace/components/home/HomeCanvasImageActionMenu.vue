@@ -124,7 +124,7 @@ function onActionClick(item: ImageActionMenuItem) {
 
 .image-action-icon-btn {
   flex: 0 0 var(--node-tool-button-size);
-  border: 1px solid var(--node-tool-button-border);
+  border: var(--node-tool-border-width) solid var(--node-tool-button-border);
   background: #ffffff;
   position: relative;
   overflow: visible;
@@ -157,7 +157,7 @@ function onActionClick(item: ImageActionMenuItem) {
   white-space: nowrap;
   background: rgba(24, 24, 27, 0.94);
   color: #f4f4f5;
-  border: 1px solid rgba(122, 107, 213, 0.26);
+  border: var(--node-tool-border-width) solid rgba(122, 107, 213, 0.26);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;

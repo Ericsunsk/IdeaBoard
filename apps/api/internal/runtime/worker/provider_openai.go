@@ -418,10 +418,8 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 	}
 	if featureSlug == workflow.FeatureSlugImageExtend ||
 		featureSlug == workflow.FeatureSlugPartialEdit ||
-		featureSlug == workflow.FeatureSlugBgSwap ||
 		featureSlug == workflow.FeatureSlugRemoveBg ||
 		featureSlug == workflow.FeatureSlugStyleFusion ||
-		featureSlug == workflow.FeatureSlugFaceSwap ||
 		featureSlug == workflow.FeatureSlugMultiAngle {
 		return true
 	}

@@ -1,14 +1,17 @@
 import type { Connection } from '@vue-flow/core'
 import { isCanvasConnectionAllowed } from '../config/canvasConnections'
 import {
+  isCanvasConnectionNodeType,
+  type CanvasConnectionNodeType,
+  type CanvasConnectionPort,
+} from '../types/canvasNodes'
+import type { FlowNodeData } from '../types/flowTypes'
+import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
   type CanvasConnectionContractNode,
   type CanvasNodePortContract,
 } from '../config/canvasNodeConnectionContract'
-import type { CanvasConnectionNodeType, CanvasConnectionPort } from '../types/canvasNodes'
-import type { FlowNodeData } from '../types/flowTypes'
-import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 const AUTO_HANDLE_PORT = '__auto'
 
@@ -41,17 +44,6 @@ function parseNodeRef(
   return { nodeType, nodeId: parsedId }
 }
 
-function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNodeType {
-  return (
-    value === 'image' ||
-    value === 'prompt' ||
-    value === 'model' ||
-    value === 'viewpoint' ||
-    value === 'edit' ||
-    value === 'fusion'
-  )
-}
-
 function parseHandleRef(handleId: string | null | undefined): ParsedHandleRef | null {
   if (!handleId) return null
   const [direction, rawPort] = handleId.split(':')
@@ -77,7 +69,6 @@ function buildContractNode(
   return {
     id: nodeId,
     type: nodeType,
-    mode: data?.mode ?? (nodeType === 'edit' ? EDIT_NODE_MODE.partialEdit : undefined),
   } as CanvasConnectionContractNode
 }
 
@@ -96,22 +87,18 @@ function createNodeLookup(lookupData: (nodeId: string) => FlowNodeData | undefin
 function getVisiblePorts(
   ref: ParsedNodeRef,
   direction: 'input' | 'output',
-  lookupData: (nodeId: string) => FlowNodeData | undefined,
 ): CanvasNodePortContract[] {
-  const data = lookupData(`${ref.nodeType}-${ref.nodeId}`)
-  const node = buildContractNode(ref.nodeType, ref.nodeId, data)
   return direction === 'input'
-    ? getCanvasNodeVisibleInputPorts(ref.nodeType, node)
-    : getCanvasNodeVisibleOutputPorts(ref.nodeType, node)
+    ? getCanvasNodeVisibleInputPorts(ref.nodeType)
+    : getCanvasNodeVisibleOutputPorts(ref.nodeType)
 }
 
 function resolveSourcePort(
   sourceRef: ParsedNodeRef,
   sourceHandle: ParsedHandleRef,
-  lookupData: (nodeId: string) => FlowNodeData | undefined,
 ): CanvasConnectionPort | null {
   if (sourceHandle.port) return sourceHandle.port
-  const visibleOutputPortContracts = getVisiblePorts(sourceRef, 'output', lookupData)
+  const visibleOutputPortContracts = getVisiblePorts(sourceRef, 'output')
   return visibleOutputPortContracts.length === 1 ? visibleOutputPortContracts[0].port : null
 }
 
@@ -137,7 +124,7 @@ function resolveTargetPort(
 ): CanvasConnectionPort | null {
   if (targetHandle.port) return targetHandle.port
   const lookupNode = createNodeLookup(lookupData)
-  const targetPorts = getVisiblePorts(targetRef, 'input', lookupData)
+  const targetPorts = getVisiblePorts(targetRef, 'input')
   const allowedPorts = targetPorts.filter((targetPort) =>
     isCanvasConnectionAllowed(
       { ...sourceRef, port: sourcePort },
@@ -172,7 +159,7 @@ export function normalizeFlowConnection(
   if (!sourceNodeRef || !targetNodeRef || !sourceHandle || !targetHandle) return null
   if (sourceHandle.direction !== 'out' || targetHandle.direction !== 'in') return null
 
-  const sourcePort = resolveSourcePort(sourceNodeRef, sourceHandle, lookupData)
+  const sourcePort = resolveSourcePort(sourceNodeRef, sourceHandle)
   if (!sourcePort || !connection.target) return null
   const targetPort = resolveTargetPort(
     sourceNodeRef,

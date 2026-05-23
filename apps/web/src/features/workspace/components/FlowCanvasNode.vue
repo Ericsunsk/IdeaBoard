@@ -95,20 +95,6 @@
         />
       </div>
     </template>
-    <template v-else-if="isEditNode && editSnapshot">
-      <EditNode
-        :node="editSnapshot"
-        :active="selected"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
-        :ui-state="props.uiState"
-        @node-mousedown="noopMouse"
-        @update:title="emitNodeParam('title', $event)"
-        @delete="onDeleteRequest"
-        @update:mode="emitNodeParam('mode', $event)"
-        @generate="onEditGenerate"
-      />
-    </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
       <div
         class="flow-canvas-node__fusion-wrap flow-canvas-node__drag-surface"
@@ -197,7 +183,6 @@ import type { ComponentPublicInstance } from 'vue'
 import { computed, reactive, ref } from 'vue'
 import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/config/nodeOptionConfig'
 import type {
-  EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
   ModelNodeItem,
@@ -270,7 +255,6 @@ const emit = defineEmits<{
   (e: 'update-prompt-text', value: string): void
   (e: 'update-node-param', payload: { key: string; value: unknown }): void
   (e: 'delete-node'): void
-  (e: 'generate-edit'): void
   (e: 'generate-model'): void
   (e: 'generate-viewpoint'): void
   (e: 'image-stage-drop', event: DragEvent): void
@@ -307,7 +291,6 @@ const emit = defineEmits<{
 
 const isPromptNode = computed(() => props.data.kind === 'prompt')
 const isImageNode = computed(() => props.data.kind === 'image')
-const isEditNode = computed(() => props.data.kind === 'edit')
 const isFusionNode = computed(() => props.data.kind === 'fusion')
 const isModelNode = computed(() => props.data.kind === 'model')
 const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
@@ -354,9 +337,6 @@ const imageSnapshot = computed<ImageNodeItem | null>(() => {
   if (!isImageNode.value) return null
   return resolveSnapshotNode<ImageNodeItem>()
 })
-const editSnapshot = computed<EditNodeItem | null>(() =>
-  isEditNode.value ? resolveSnapshotNode<EditNodeItem>() : null,
-)
 const fusionSnapshot = computed<FusionNodeItem | null>(() =>
   isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null,
 )
@@ -547,10 +527,6 @@ function emitNodeParam(key: string, value: unknown) {
 
 function onDeleteRequest() {
   emit('delete-node')
-}
-
-function onEditGenerate() {
-  emit('generate-edit')
 }
 
 function onModelGenerate() {
@@ -751,7 +727,7 @@ function noopMouse() {}
     .workflow-node:not(.prompt-node):not(.image-node):not(.fusion-node)
       > :not(.workflow-node-header):first-of-type
   ) {
-  border: 1.5px solid #e2e8f0;
+  border: var(--node-tool-border-width, 1.2px) solid #e2e8f0;
   border-radius: 14px;
   background: #ffffff;
   transition: border-color 0.2s ease;

@@ -106,9 +106,7 @@ graph LR
 | `sketch-to-image` | 草图成图 |
 | `style-variation` | 风格延展 |
 | `partial-edit` | 局部改款 |
-| `bg-swap` | 换背景 |
 | `remove-bg` | 抠图 |
-| `face-swap` | 换脸 |
 | `style-fusion` | 双图融合 |
 | `multi-angle` | 单图单视角展示 |
 | `virtual-3d` | 虚拟 3D 展示 |

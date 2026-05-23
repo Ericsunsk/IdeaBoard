@@ -357,7 +357,6 @@ function testFusionBlendPointRoundTripPreserved() {
     promptNodes: [],
     modelNodes: [],
     viewpointNodes: [],
-    editNodes: [],
     fusionNodes: [
       {
         id: 31,

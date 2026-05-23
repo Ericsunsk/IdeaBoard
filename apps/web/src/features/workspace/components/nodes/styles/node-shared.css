@@ -1,10 +1,10 @@
 .workflow-node-header {
-  min-height: 26px;
+  min-height: 20px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   text-transform: none;
   letter-spacing: 0.04em;
@@ -87,30 +87,36 @@
 }
 
 .node-execution-body {
-  padding: 10px 12px 12px;
+  --node-tool-border-width: 1.2px;
+  --node-tool-button-accent: #9278e6;
+  --node-tool-button-brand: #7a6bd5;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .node-primary-action-slot {
-  padding-top: 2px;
+  padding-top: 0;
 }
 
 .node-mode-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid #e8ebf3;
-  background: linear-gradient(180deg, #fbfcff 0%, #f7f8fc 100%);
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .node-control-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 7px 8px;
+  border: var(--node-tool-border-width) solid #e8ecf4;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .node-control-head {
@@ -123,14 +129,14 @@
 .node-option-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
 }
 
 .node-control-label {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: #7b8798;
-  letter-spacing: 0.03em;
+  letter-spacing: 0;
 }
 
 .node-inline-range {

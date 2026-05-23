@@ -53,7 +53,7 @@ void props
   max-width: 160px;
   padding: 6px;
   border-radius: 10px;
-  border: 1px solid #d8ddea;
+  border: var(--canvas-control-border-width, 1.2px) solid #d8ddea;
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
 }

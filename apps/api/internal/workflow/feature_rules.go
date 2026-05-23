@@ -44,7 +44,6 @@ func IsGoogleNativeAPIType(apiType string) bool {
 func IsReferenceImageFeature(featureSlug string) bool {
 	switch featureSlug {
 	case FeatureSlugStyleFusion,
-		FeatureSlugFaceSwap,
 		FeatureSlugMultiAngle:
 		return true
 	default:

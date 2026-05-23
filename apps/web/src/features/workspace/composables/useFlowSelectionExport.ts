@@ -159,7 +159,6 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       const kind = data.kind
       if (
         kind !== 'image' &&
-        kind !== 'edit' &&
         kind !== 'fusion' &&
         kind !== 'model' &&
         kind !== 'viewpoint'

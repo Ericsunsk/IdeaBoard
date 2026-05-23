@@ -3,9 +3,9 @@ import type { Edge, Node } from '@vue-flow/core'
 import {
   getCanvasNodeRequiredInputPorts,
   getCanvasNodeVisibleInputPorts,
-  getEditNodePortLabel,
 } from '../config/canvasNodeConnectionContract'
 import {
+  isCanvasConnectionNodeType,
   isCanvasExecutionOutputNodeType,
   resolveWorkflowNodeOutputStatus,
   type CanvasConnectionNodeType,
@@ -42,17 +42,6 @@ type FlowNodeConnectionStatus = {
 
 type ExecutionActionLabels = { ready: string; running: string }
 
-function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNodeType {
-  return (
-    value === 'image' ||
-    value === 'prompt' ||
-    value === 'model' ||
-    value === 'viewpoint' ||
-    value === 'edit' ||
-    value === 'fusion'
-  )
-}
-
 function getNodeOutputPort(nodeType: CanvasConnectionNodeType): CanvasConnectionPort {
   if (nodeType === 'prompt') return 'prompt'
   return 'image'
@@ -65,8 +54,6 @@ function resolveExecutionActionLabels(
     case 'model':
     case 'viewpoint':
       return { ready: '生成', running: '生成中...' }
-    case 'edit':
-      return { ready: '编辑', running: '编辑中...' }
     case 'fusion':
       return { ready: '融合', running: '融合中...' }
   }
@@ -75,16 +62,7 @@ function resolveExecutionActionLabels(
 function formatNodePortLabel(
   nodeType: CanvasConnectionNodeType,
   port: CanvasConnectionPort,
-  node?: CanvasNodeItem | null,
 ): string {
-  if (
-    nodeType === 'edit' &&
-    node &&
-    node.type === 'edit' &&
-    (port === 'image' || port === 'imageB' || port === 'prompt')
-  ) {
-    return getEditNodePortLabel(node.mode, port)
-  }
   if (nodeType === 'model') {
     if (port === 'image') return 'Image'
     if (port === 'imageA') return 'Model'
@@ -137,21 +115,12 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       nodeType: CanvasConnectionNodeType,
       nodeId: string,
     ): FlowNodeConnectionStatus {
-      const node = getSnapshotNode(nodeId)
-      if (!node)
-        return {
-          hasAnyConnection: false,
-          incoming: {},
-          pendingIncoming: {},
-          incomingSourceKind: {},
-          outgoing: {},
-        }
       const incoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
       const pendingIncoming: Partial<Record<CanvasConnectionPort, boolean>> = {}
       const incomingSourceKind: Partial<Record<CanvasConnectionPort, CanvasConnectionNodeType>> = {}
       const outgoing: Partial<Record<CanvasConnectionPort, boolean>> = {}
 
-      getCanvasNodeVisibleInputPorts(nodeType, node).forEach((portContract) => {
+      getCanvasNodeVisibleInputPorts(nodeType).forEach((portContract) => {
         const matchedEdge = flowEdges.find(
           (edge) =>
             edge.target === nodeId && parseHandlePort(edge.targetHandle) === portContract.port,
@@ -217,13 +186,13 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         }
       }
 
-      const requiredPorts = getCanvasNodeRequiredInputPorts(nodeType, executionNode).map(
+      const requiredPorts = getCanvasNodeRequiredInputPorts(nodeType).map(
         (port) => port.port as CanvasConnectionPort,
       )
       const disconnectedPorts = requiredPorts.filter((port) => !status.incoming[port])
       if (disconnectedPorts.length > 0) {
         const missingLabels = disconnectedPorts.map((port) =>
-          formatNodePortLabel(nodeType, port, executionNode),
+          formatNodePortLabel(nodeType, port),
         )
         return {
           label:
@@ -234,12 +203,12 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         }
       }
 
-      const pendingPorts = getCanvasNodeVisibleInputPorts(nodeType, executionNode)
+      const pendingPorts = getCanvasNodeVisibleInputPorts(nodeType)
         .map((port) => port.port)
         .filter((port) => !!status.incoming[port] && !!status.pendingIncoming[port])
       if (pendingPorts.length > 0) {
         const pendingLabels = pendingPorts.map((port) =>
-          formatNodePortLabel(nodeType, port, executionNode),
+          formatNodePortLabel(nodeType, port),
         )
         return {
           label:

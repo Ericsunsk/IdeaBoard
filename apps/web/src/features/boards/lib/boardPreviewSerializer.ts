@@ -67,7 +67,6 @@ const BOARD_NODE_COLLECTIONS = [
   { key: 'promptNodes', nodeType: 'prompt' },
   { key: 'modelNodes', nodeType: 'model' },
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
-  { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
 ] as const satisfies ReadonlyArray<{
   key: keyof CanvasBoardSnapshot

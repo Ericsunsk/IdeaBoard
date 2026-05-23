@@ -7,13 +7,13 @@
     :style="nodeStyle"
   >
     <NodeHeader
-      :title="node.title || 'PROMPT'"
+      :title="node.title || 'Prompt'"
       @node-mousedown="emit('node-mousedown', $event)"
       @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
-        <MessageText />
+        <ChatLines />
       </template>
     </NodeHeader>
     <div class="prompt-node-shell" data-flow-handle-frame>
@@ -82,7 +82,7 @@
             title="发送"
             @click="emit('generate')"
           >
-            <Send class="node-action-icon node-send-icon" />
+            <SendDiagonalSolid class="node-action-icon node-send-icon" />
           </button>
         </div>
       </div>
@@ -92,7 +92,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { MessageText, Plus, Send } from '@iconoir/vue'
+import { ChatLines, Plus, SendDiagonalSolid } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
@@ -234,7 +234,7 @@ function onAddSlotDrop(event: DragEvent) {
 .node-action-icon {
   width: 16px;
   height: 16px;
-  stroke-width: 2.1;
+  stroke-width: var(--node-tool-icon-stroke);
 }
 .node-send-icon {
   transform: translateX(0.5px);

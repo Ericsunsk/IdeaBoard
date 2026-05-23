@@ -11,14 +11,12 @@ import {
 } from '../types/canvasNodes'
 import type {
   CanvasPoint,
-  EditNodeItem,
   FusionNodeItem,
   ImageNodeItem,
   ModelNodeItem,
   PromptNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
-import { EDIT_NODE_MODE } from '../types/editNodeModes'
 
 function createCanvasEntityId(): number {
   return Date.now() + Math.random()
@@ -83,20 +81,6 @@ export function createImageNodeAt(point: CanvasPoint): ImageNodeItem {
     sourceImageUrl: '',
     sourceImageRatio: 1,
     outputCount: DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
-    outputStatus: 'idle',
-    outputImages: [],
-  }
-}
-
-export function createEditNodeAt(point: CanvasPoint): EditNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'edit',
-    x: point.x,
-    y: point.y,
-    width: 280,
-    title: getDefaultCanvasNodeTitle('edit'),
-    mode: EDIT_NODE_MODE.partialEdit,
     outputStatus: 'idle',
     outputImages: [],
   }

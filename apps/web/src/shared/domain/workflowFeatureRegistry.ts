@@ -5,7 +5,7 @@ export const WORKFLOW_FEATURE_GROUP = {
   model: 'model',
   display: 'display',
   fusion: 'fusion',
-  edit: 'edit',
+  inpaint: 'inpaint',
   imageTools: 'image-tools',
 } as const
 
@@ -45,9 +45,9 @@ export const WORKFLOW_FEATURE_GROUP_LIST: readonly WorkflowFeatureGroupMeta[] = 
     order: 40,
   },
   {
-    key: WORKFLOW_FEATURE_GROUP.edit,
-    title: 'Edit',
-    desc: '局部改款、换背景和定向换脸。',
+    key: WORKFLOW_FEATURE_GROUP.inpaint,
+    title: 'Inpaint',
+    desc: '局部重绘与局部改款能力。',
     order: 50,
   },
   {
@@ -76,8 +76,8 @@ export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] =
   },
   {
     slug: WORKFLOW_FEATURE.partialEdit,
-    adminTitle: 'Edit · 局部改款',
-    groupKey: WORKFLOW_FEATURE_GROUP.edit,
+    adminTitle: 'Inpaint · 局部改款',
+    groupKey: WORKFLOW_FEATURE_GROUP.inpaint,
   },
   {
     slug: WORKFLOW_FEATURE.styleVariation,
@@ -100,16 +100,6 @@ export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] =
     slug: WORKFLOW_FEATURE.virtual3d,
     adminTitle: 'Display · 商品展示',
     groupKey: WORKFLOW_FEATURE_GROUP.display,
-  },
-  {
-    slug: WORKFLOW_FEATURE.faceSwap,
-    adminTitle: 'Edit · 定向换脸',
-    groupKey: WORKFLOW_FEATURE_GROUP.edit,
-  },
-  {
-    slug: WORKFLOW_FEATURE.bgSwap,
-    adminTitle: 'Edit · 换背景',
-    groupKey: WORKFLOW_FEATURE_GROUP.edit,
   },
   {
     slug: WORKFLOW_FEATURE.removeBg,

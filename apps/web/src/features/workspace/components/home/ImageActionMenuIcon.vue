@@ -1,7 +1,6 @@
 <template>
   <span class="action-logo">
-    <span v-if="icon === 'hd-text'" class="action-logo--text">HD</span>
-    <component :is="resolvedIcon" v-else class="action-logo-icon" />
+    <component :is="resolvedIcon" class="action-logo-icon" />
   </span>
 </template>
 
@@ -9,26 +8,28 @@
 import type { ImageActionMenuIcon } from '../../config/imageActionMenu'
 import type { Component } from 'vue'
 import {
-  FrameTool,
-  MagicWand,
-  Scissor,
-  Sparks,
-  XmarkCircle,
+  BorderInner,
+  DesignPencil,
+  EditPencil,
+  Expand,
+  Hd,
+  Spark,
 } from '@iconoir/vue'
 
 const props = defineProps<{
   icon: ImageActionMenuIcon
 }>()
 
-const iconMap: Record<Exclude<ImageActionMenuIcon, 'hd-text'>, Component> = {
-  'remove-bg': Scissor,
-  'style-variation': Sparks,
-  'sketch-to-image': MagicWand,
-  'image-extend': FrameTool,
-  'image-inpaint': XmarkCircle,
+const iconMap: Record<ImageActionMenuIcon, Component> = {
+  'remove-bg': BorderInner,
+  'style-variation': Spark,
+  'sketch-to-image': EditPencil,
+  hd: Hd,
+  'image-extend': Expand,
+  'image-inpaint': DesignPencil,
 }
 
-const resolvedIcon = computed<Component>(() => (props.icon === 'hd-text' ? MagicWand : iconMap[props.icon]))
+const resolvedIcon = computed<Component>(() => iconMap[props.icon])
 </script>
 
 <style scoped>
@@ -41,13 +42,7 @@ const resolvedIcon = computed<Component>(() => (props.icon === 'hd-text' ? Magic
 .action-logo-icon {
   width: 21px;
   height: 21px;
-  stroke-width: 1.8;
+  stroke-width: var(--node-tool-icon-stroke, 1.5);
 }
 
-.action-logo--text {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1;
-}
 </style>

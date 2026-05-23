@@ -72,14 +72,10 @@ function getNodePortsByKind(
   kind: CanvasConnectionNodeType,
   direction: 'input' | 'output',
 ): CanvasConnectionPort[] {
-  const node =
-    props.snapshotNode && typeof props.snapshotNode === 'object'
-      ? (props.snapshotNode as Record<string, unknown>)
-      : { id: 0 }
   const list =
     direction === 'input'
-      ? getCanvasNodeVisibleInputPorts(kind, node as never)
-      : getCanvasNodeVisibleOutputPorts(kind, node as never)
+      ? getCanvasNodeVisibleInputPorts(kind)
+      : getCanvasNodeVisibleOutputPorts(kind)
   return list.map((port) => port.port)
 }
 

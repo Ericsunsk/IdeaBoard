@@ -21,7 +21,6 @@ export type CanvasConnectionNodeLookup = (
 const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>([
   'model',
   'viewpoint',
-  'edit',
   'fusion',
 ])
 
@@ -37,14 +36,12 @@ export function isCanvasConnectionAllowed(
 ): boolean {
   if (from.nodeType === to.nodeType && from.nodeId === to.nodeId) return false
 
-  const fromNode = lookupNode(from.nodeType, from.nodeId)
-  const toNode = lookupNode(to.nodeType, to.nodeId)
-  if (!fromNode || !toNode) return false
+  if (!lookupNode(from.nodeType, from.nodeId) || !lookupNode(to.nodeType, to.nodeId)) return false
 
-  const fromPort = getCanvasNodeVisibleOutputPorts(from.nodeType, fromNode).find(
+  const fromPort = getCanvasNodeVisibleOutputPorts(from.nodeType).find(
     (port) => port.port === from.port,
   )
-  const toPort = getCanvasNodeVisibleInputPorts(to.nodeType, toNode).find(
+  const toPort = getCanvasNodeVisibleInputPorts(to.nodeType).find(
     (port) => port.port === to.port,
   )
   if (!fromPort || !toPort) return false

@@ -1,7 +1,6 @@
 import type { Ref } from 'vue'
 import type { Connection, Edge, Node } from '@vue-flow/core'
 import {
-  createEditNodeAt,
   createFusionNodeAt,
   createImageNodeAt,
   createModelNodeAt,
@@ -19,7 +18,6 @@ import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransaction
 export type FlowCreatableNodeKind =
   | 'prompt'
   | 'image'
-  | 'edit'
   | 'fusion'
   | 'model'
   | 'viewpoint'
@@ -59,8 +57,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         return createPromptNodeAt(point)
       case 'image':
         return createImageNodeAt(point)
-      case 'edit':
-        return createEditNodeAt(point)
       case 'fusion':
         return createFusionNodeAt(point)
       case 'model':
@@ -243,7 +239,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   }
 
   const EXECUTION_NODE_KINDS = new Set([
-    'edit',
     'fusion',
     'model',
     'viewpoint',

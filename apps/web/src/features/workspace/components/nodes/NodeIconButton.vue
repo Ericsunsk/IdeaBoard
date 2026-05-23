@@ -37,7 +37,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .node-icon-btn {
-  border: 1px solid #d6dcec;
+  border: var(--node-tool-border-width, 1.2px) solid #d6dcec;
   background: #ffffff;
   color: #5f6877;
   border-radius: 8px;

@@ -1,8 +1,9 @@
 .canvas-control-group {
+  --canvas-control-border-width: 1.2px;
   --canvas-control-size: 40px;
   --canvas-control-gap: 12px;
   --canvas-control-icon-size: 19px;
-  --canvas-control-icon-stroke: 2.1;
+  --canvas-control-icon-stroke: 1.5;
   --canvas-control-active-color: #9278e6;
   display: flex;
   gap: var(--canvas-control-gap);
@@ -16,7 +17,7 @@
   width: var(--canvas-control-size);
   height: var(--canvas-control-size);
   padding: 0;
-  border: 1px solid #e2e4e8;
+  border: var(--canvas-control-border-width) solid #e2e4e8;
   border-radius: 50%;
   background: #fff;
   color: var(--ib-control-icon);
@@ -52,4 +53,35 @@
   width: var(--canvas-control-icon-size);
   height: var(--canvas-control-icon-size);
   stroke-width: var(--canvas-control-icon-stroke);
+}
+
+.canvas-icon-swap {
+  position: relative;
+  width: var(--canvas-control-icon-size);
+  height: var(--canvas-control-icon-size);
+  display: block;
+}
+
+.canvas-icon-swap .canvas-control-icon {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.16s ease;
+}
+
+.canvas-icon-swap-default {
+  opacity: 1;
+}
+
+.canvas-icon-swap-hover {
+  opacity: 0;
+}
+
+.canvas-icon-button:hover .canvas-icon-swap-default,
+.canvas-icon-button:focus-visible .canvas-icon-swap-default {
+  opacity: 0;
+}
+
+.canvas-icon-button:hover .canvas-icon-swap-hover,
+.canvas-icon-button:focus-visible .canvas-icon-swap-hover {
+  opacity: 1;
 }

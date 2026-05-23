@@ -7,14 +7,14 @@
     :style="nodeStyle"
   >
     <NodeHeader
-      :title="node.title || 'FUSION'"
+      :title="node.title || 'Fusion'"
       rounded
       @node-mousedown="emit('node-mousedown', $event)"
       @update:title="emit('update:title', $event)"
       @delete="emit('delete')"
     >
       <template #icon>
-        <FrameAlt />
+        <Keyframes />
       </template>
     </NodeHeader>
 
@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { FrameAlt } from '@iconoir/vue'
+import { Keyframes } from '@iconoir/vue'
 import {
   clampImageNodeOutputCount,
   type FusionNodeItem,

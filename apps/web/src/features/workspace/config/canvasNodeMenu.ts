@@ -3,7 +3,6 @@ export type CanvasNodeCreateActionKey =
   | 'createPromptNode'
   | 'createModelNode'
   | 'createViewpointNode'
-  | 'createEditNode'
   | 'createFusionNode'
 
 export interface CanvasNodeMenuItem {
@@ -24,7 +23,6 @@ export const CANVAS_NODE_MENU_ITEMS: readonly CanvasNodeMenuItem[] = [
     order: 20,
   },
   { key: 'model', label: '+ 模特节点', actionKey: 'createModelNode', group: 'source', order: 30 },
-  { key: 'edit', label: '+ Edit 节点', actionKey: 'createEditNode', group: 'process', order: 50 },
   {
     key: 'fusion',
     label: '+ Fusion 节点',

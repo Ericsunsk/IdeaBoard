@@ -1,6 +1,5 @@
 export const WORKFLOW_FEATURE = {
   partialEdit: 'partial-edit',
-  bgSwap: 'bg-swap',
   removeBg: 'remove-bg',
   styleFusion: 'style-fusion',
   patternGen: 'pattern-gen',
@@ -8,7 +7,6 @@ export const WORKFLOW_FEATURE = {
   styleVariation: 'style-variation',
   multiAngle: 'multi-angle',
   virtual3d: 'virtual-3d',
-  faceSwap: 'face-swap',
   hdUpscale: 'hd-upscale',
   imageExtend: 'image-extend',
 } as const

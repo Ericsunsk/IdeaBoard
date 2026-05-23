@@ -15,7 +15,7 @@
     <NodeHeader
       class="image-node-header-shell"
       :class="{ 'is-hidden': !!expandModeActive || !!maskEditorModeActive }"
-      :title="node.title || 'IMAGE'"
+      :title="node.title || 'Image'"
       rounded
       @node-mousedown="emit('node-mousedown', $event)"
       @update:title="emit('update:title', $event)"

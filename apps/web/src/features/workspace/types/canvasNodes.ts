@@ -7,7 +7,6 @@ import {
   normalizeFusionBlendPoint,
   type FusionBlendPoint,
 } from '../utils/fusionBlend'
-import type { EditNodeMode } from './editNodeModes'
 
 export interface CanvasPoint {
   x: number
@@ -177,18 +176,6 @@ export interface ImageNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export interface EditNodeItem {
-  id: number
-  type: 'edit'
-  x: number
-  y: number
-  width: number
-  title?: string
-  mode: EditNodeMode
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
 export interface FusionNodeItem {
   id: number
   type: 'fusion'
@@ -208,13 +195,11 @@ export interface FusionNodeItem {
 export type CanvasExecutionOutputNodeType =
   | 'model'
   | 'viewpoint'
-  | 'edit'
   | 'fusion'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
   'model',
   'viewpoint',
-  'edit',
   'fusion',
 ]
 
@@ -230,7 +215,6 @@ export function isCanvasExecutionOutputNodeType(
 export type CanvasExecutionOutputNodeItem =
   | ModelNodeItem
   | ViewpointNodeItem
-  | EditNodeItem
   | FusionNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
@@ -242,23 +226,35 @@ export type CanvasConnectionNodeType =
   | 'prompt'
   | 'model'
   | 'viewpoint'
-  | 'edit'
   | 'fusion'
+
+export const CANVAS_CONNECTION_NODE_TYPES: readonly CanvasConnectionNodeType[] = [
+  'image',
+  'prompt',
+  'model',
+  'viewpoint',
+  'fusion',
+] as const
+
+export function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNodeType {
+  return (
+    typeof value === 'string' &&
+    CANVAS_CONNECTION_NODE_TYPES.includes(value as CanvasConnectionNodeType)
+  )
+}
 
 export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): string {
   switch (nodeType) {
     case 'image':
-      return 'IMAGE'
+      return 'Image'
     case 'prompt':
-      return 'PROMPT'
+      return 'Prompt'
     case 'model':
-      return 'MODEL'
+      return 'Model'
     case 'viewpoint':
-      return 'DISPLAY'
-    case 'edit':
-      return 'EDIT'
+      return 'Display'
     case 'fusion':
-      return 'FUSION'
+      return 'Fusion'
   }
 }
 export type CanvasConnectionPort = 'image' | 'prompt' | 'imageA' | 'imageB'
@@ -278,7 +274,6 @@ export type CanvasNodeItem =
   | ModelNodeItem
   | ViewpointNodeItem
   | ImageNodeItem
-  | EditNodeItem
   | FusionNodeItem
 
 export interface CanvasViewportState {
@@ -292,7 +287,6 @@ export interface CanvasBoardSnapshot {
   promptNodes: PromptNodeItem[]
   modelNodes: ModelNodeItem[]
   viewpointNodes: ViewpointNodeItem[]
-  editNodes: EditNodeItem[]
   fusionNodes: FusionNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState

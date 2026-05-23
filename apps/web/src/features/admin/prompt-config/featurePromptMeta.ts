@@ -77,13 +77,6 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
       desc: 'Prompt 节点输入口文本；未连接时系统会用当前视角/光影摘要兜底',
     },
   ],
-  [WORKFLOW_FEATURE.faceSwap]: noVars,
-  [WORKFLOW_FEATURE.bgSwap]: [
-    {
-      key: '{{user_prompt}}',
-      desc: 'Prompt 节点输入口文本（可选，未连接时系统会用默认背景切换描述）',
-    },
-  ],
   [IMAGE_NODE_ACTION.removeBg]: noVars,
   [WORKFLOW_FEATURE.patternGen]: noVars,
   [WORKFLOW_FEATURE.styleFusion]: [

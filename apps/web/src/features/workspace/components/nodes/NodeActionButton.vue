@@ -35,18 +35,18 @@ const emit = defineEmits<{
 
 <style scoped>
 .node-action-btn {
-  border: 1px solid #d6dcec;
+  border: var(--node-tool-border-width, 1.2px) solid #d6dcec;
   background: #ffffff;
   color: #5f6877;
-  border-radius: 8px;
+  border-radius: 999px;
   min-height: 28px;
-  padding: 0 9px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   line-height: 1;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -89,45 +89,45 @@ const emit = defineEmits<{
 }
 
 .node-action-btn.variant-tool:hover:not(:disabled) {
-  border-color: #c4b7f4;
-  color: #6757c8;
+  border-color: var(--node-tool-button-accent, #9278e6);
+  color: #272932;
 }
 
 .node-action-btn.variant-tool.active {
-  border-color: rgba(122, 107, 213, 0.4);
-  background: rgba(122, 107, 213, 0.12);
-  color: #6757c8;
+  border-color: var(--node-tool-button-accent, #9278e6);
+  background: #f8f7ff;
+  color: #272932;
 }
 
 .node-action-btn.variant-chip {
   height: 24px;
   min-height: 24px;
-  padding: 0 8px;
+  padding: 0 9px;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .node-action-btn.variant-chip:hover:not(:disabled) {
-  border-color: #c4b7f4;
-  color: #6757c8;
+  border-color: var(--node-tool-button-accent, #9278e6);
+  color: #272932;
 }
 
 .node-action-btn.variant-chip.active {
-  border-color: rgba(122, 107, 213, 0.4);
-  background: rgba(122, 107, 213, 0.12);
-  color: #6757c8;
+  border-color: var(--node-tool-button-accent, #9278e6);
+  background: #f8f7ff;
+  color: #272932;
 }
 
 .node-action-btn.variant-primary {
-  min-height: 34px;
-  border-color: #9278e6;
-  border-radius: 10px;
-  background: #9278e6;
+  min-height: 32px;
+  border-color: var(--node-tool-button-brand, #7a6bd5);
+  border-radius: 999px;
+  background: var(--node-tool-button-brand, #7a6bd5);
   color: #ffffff;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-weight: 600;
+  letter-spacing: 0;
   padding: 0 12px;
 }
 

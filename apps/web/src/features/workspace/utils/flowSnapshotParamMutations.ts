@@ -15,7 +15,6 @@ import {
   constrainFusionBlendPoint,
   normalizeFusionBlendPoint,
 } from './fusionBlend'
-import { isEditNodeMode } from '../types/editNodeModes'
 
 function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
   if (!value || typeof value !== 'object') return false
@@ -76,11 +75,6 @@ export function patchFlowSnapshotParam(
       if (!nextTitle || snapshotNode.title === nextTitle) return snapshotNode
       return { ...snapshotNode, title: nextTitle }
     }
-    case 'mode':
-      if (snapshotNode.type !== 'edit') return snapshotNode
-      if (!isEditNodeMode(value)) return snapshotNode
-      if (snapshotNode.mode === value) return snapshotNode
-      return { ...snapshotNode, mode: value }
     case 'outputCount': {
       const nextOutputCount = clampImageNodeOutputCount(value)
       if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
