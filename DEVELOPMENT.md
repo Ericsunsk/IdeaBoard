@@ -110,7 +110,6 @@ graph LR
 | `remove-bg` | 抠图 |
 | `face-swap` | 换脸 |
 | `style-fusion` | 双图融合 |
-| `fabric-on-body` | 面料上身 |
 | `multi-angle` | 单图单视角展示 |
 | `virtual-3d` | 虚拟 3D 展示 |
 | `pattern-gen` | 图案生成 |
@@ -216,7 +215,6 @@ sequenceDiagram
 | `{{user_prompt}}` | 用户输入文本 |
 | `{{blend_ratio}}` | 融合比例 |
 | `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 图片延伸参数 |
-| `{{tile_mode}}` | Wear 贴图模式 |
 | `{{viewpoint}}` | 展示视角描述 |
 | `{{lighting}}` | 打光描述 |
 | `{{use_mask}}` | 是否启用 mask |

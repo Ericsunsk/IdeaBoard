@@ -137,23 +137,6 @@
         />
       </div>
     </template>
-    <template v-else-if="isWearNode && wearSnapshot">
-      <WearNode
-        :node="wearSnapshot"
-        :active="selected"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
-        :ui-state="props.uiState"
-        @node-mousedown="noopMouse"
-        @update:title="emitNodeParam('title', $event)"
-        @delete="onDeleteRequest"
-        @update:tile-mode="emitNodeParam('tileMode', $event)"
-        @update:rotation="emitNodeParam('rotation', $event)"
-        @update:scale="emitNodeParam('scale', $event)"
-        @update:opacity="emitNodeParam('opacity', $event)"
-        @generate="onWearGenerate"
-      />
-    </template>
     <template v-else-if="isModelNode && modelSnapshot">
       <ModelNode
         :node="modelSnapshot"
@@ -220,7 +203,6 @@ import type {
   ModelNodeItem,
   PromptNodeItem,
   ViewpointNodeItem,
-  WearNodeItem,
 } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -289,7 +271,6 @@ const emit = defineEmits<{
   (e: 'update-node-param', payload: { key: string; value: unknown }): void
   (e: 'delete-node'): void
   (e: 'generate-edit'): void
-  (e: 'generate-wear'): void
   (e: 'generate-model'): void
   (e: 'generate-viewpoint'): void
   (e: 'image-stage-drop', event: DragEvent): void
@@ -328,7 +309,6 @@ const isPromptNode = computed(() => props.data.kind === 'prompt')
 const isImageNode = computed(() => props.data.kind === 'image')
 const isEditNode = computed(() => props.data.kind === 'edit')
 const isFusionNode = computed(() => props.data.kind === 'fusion')
-const isWearNode = computed(() => props.data.kind === 'wear')
 const isModelNode = computed(() => props.data.kind === 'model')
 const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const showDefaultDragZone = false
@@ -379,9 +359,6 @@ const editSnapshot = computed<EditNodeItem | null>(() =>
 )
 const fusionSnapshot = computed<FusionNodeItem | null>(() =>
   isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null,
-)
-const wearSnapshot = computed<WearNodeItem | null>(() =>
-  isWearNode.value ? resolveSnapshotNode<WearNodeItem>() : null,
 )
 const modelSnapshot = computed<ModelNodeItem | null>(() =>
   isModelNode.value ? resolveSnapshotNode<ModelNodeItem>() : null,
@@ -574,10 +551,6 @@ function onDeleteRequest() {
 
 function onEditGenerate() {
   emit('generate-edit')
-}
-
-function onWearGenerate() {
-  emit('generate-wear')
 }
 
 function onModelGenerate() {

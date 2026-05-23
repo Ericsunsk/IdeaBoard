@@ -8,13 +8,6 @@ import (
 	"api/internal/workflow"
 )
 
-const (
-	fabricOnBodyFeatureSlug = workflow.FeatureSlugFabricOnBody
-	styleFusionFeatureSlug  = workflow.FeatureSlugStyleFusion
-	imageExtendFeatureSlug  = workflow.FeatureSlugImageExtend
-	hdUpscaleFeatureSlug    = workflow.FeatureSlugHDUpscale
-)
-
 var viewpointTemplateLabels = map[string]string{
 	"top_front":      "正面平视",
 	"top_side":       "微侧展示",
@@ -36,21 +29,12 @@ var viewpointLightingTemplateLabels = map[string]string{
 	"hard_light": "质感硬光",
 }
 
-var wearTileModeTemplateLabels = map[string]string{
-	"seamless": "平铺重复",
-	"single":   "单张贴合",
-}
-
 func DescribeViewpointTemplateValue(value string) string {
 	return describeTemplateLabel(value, viewpointTemplateLabels)
 }
 
 func DescribeViewpointLightingTemplateValue(value string) string {
 	return describeTemplateLabel(value, viewpointLightingTemplateLabels)
-}
-
-func DescribeWearTileModeTemplateValue(value string) string {
-	return describeTemplateLabel(value, wearTileModeTemplateLabels)
 }
 
 func describeTemplateLabel(value string, labels map[string]string) string {
@@ -163,34 +147,6 @@ func IsMaskedHDUpscaleRequest(params map[string]interface{}) bool {
 	return hasNonEmptyString(params["original_image_url"]) && hasNonEmptyStringList(params["image_urls"])
 }
 
-func IsMaskedFabricOnBodyRequest(params map[string]interface{}) bool {
-	if params == nil {
-		return false
-	}
-	if enabled, parsed := readMaskEnabledFlag(params); parsed && enabled {
-		return true
-	}
-	if rawMaskURL, ok := workflow.ReadWorkflowParam(params, "mask_image_url"); ok && hasNonEmptyString(rawMaskURL) {
-		return true
-	}
-	if rawMaskURLs, ok := workflow.ReadWorkflowParam(params, "mask_image_urls"); ok && hasNonEmptyStringList(rawMaskURLs) {
-		return true
-	}
-	return false
-}
-
-func applyFabricOnBodyOptionalMaskTemplateDefaults(
-	featureSlug string,
-	params map[string]interface{},
-	varMap map[string]string,
-) {
-	if featureSlug != fabricOnBodyFeatureSlug || IsMaskedFabricOnBodyRequest(params) {
-		return
-	}
-	varMap["{{mask_image_url}}"] = ""
-	varMap["{{use_mask}}"] = "false"
-}
-
 func ApplyFeatureSystemPrompt(
 	basePrompt string,
 	userPrompt string,
@@ -236,18 +192,6 @@ func ApplyFeatureSystemPrompt(
 		}
 		if v, ok := params["image_b_weight"]; ok {
 			varMap["{{image_b_weight}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["fabric_rotation"]; ok {
-			varMap["{{fabric_rotation}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["fabric_opacity"]; ok {
-			varMap["{{fabric_opacity}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["fabric_scale"]; ok {
-			varMap["{{fabric_scale}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["tile_mode"]; ok {
-			varMap["{{tile_mode}}"] = DescribeWearTileModeTemplateValue(fmt.Sprintf("%v", v))
 		}
 		if v, ok := params["original_image_url"]; ok {
 			varMap["{{original_image_url}}"] = fmt.Sprintf("%v", v)
@@ -300,8 +244,6 @@ func ApplyFeatureSystemPrompt(
 			varMap["{{model_strength}}"] = fmt.Sprintf("%v", v)
 		}
 	}
-	applyFabricOnBodyOptionalMaskTemplateDefaults(featureSlug, params, varMap)
-
 	if strings.Contains(sysPrompt, "{{") {
 		result := sysPrompt
 		for k, v := range varMap {

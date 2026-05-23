@@ -45,7 +45,6 @@ func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 		"multi-angle",
 		"image-extend",
 		"hd-upscale",
-		"fabric-on-body",
 	}
 
 	for _, feature := range features {

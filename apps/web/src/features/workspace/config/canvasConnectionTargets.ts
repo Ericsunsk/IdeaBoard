@@ -7,7 +7,6 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST: readonly CanvasConnectionNod
   'viewpoint',
   'edit',
   'fusion',
-  'wear',
 ] as const
 
 export const CANVAS_CONNECTION_PORT_WHITELIST: readonly CanvasConnectionPort[] = [

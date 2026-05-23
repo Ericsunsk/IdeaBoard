@@ -49,8 +49,7 @@ function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNo
     value === 'model' ||
     value === 'viewpoint' ||
     value === 'edit' ||
-    value === 'fusion' ||
-    value === 'wear'
+    value === 'fusion'
   )
 }
 
@@ -70,8 +69,6 @@ function resolveExecutionActionLabels(
       return { ready: '编辑', running: '编辑中...' }
     case 'fusion':
       return { ready: '融合', running: '融合中...' }
-    case 'wear':
-      return { ready: '上身', running: '上身中...' }
   }
 }
 
@@ -95,8 +92,8 @@ function formatNodePortLabel(
   }
   if (port === 'image') return 'Image'
   if (port === 'prompt') return 'Prompt'
-  if (port === 'imageA') return nodeType === 'wear' ? 'Body' : 'Image A'
-  if (port === 'imageB') return nodeType === 'wear' ? 'Texture' : 'Image B'
+  if (port === 'imageA') return 'Image A'
+  if (port === 'imageB') return 'Image B'
   return port
 }
 

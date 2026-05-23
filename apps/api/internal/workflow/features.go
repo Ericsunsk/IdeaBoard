@@ -16,7 +16,6 @@ const (
 	FeatureSlugRemoveBg       = "remove-bg"
 	FeatureSlugFaceSwap       = "face-swap"
 	FeatureSlugStyleFusion    = "style-fusion"
-	FeatureSlugFabricOnBody   = "fabric-on-body"
 	FeatureSlugMultiAngle     = "multi-angle"
 	FeatureSlugVirtual3D      = "virtual-3d"
 	FeatureSlugPatternGen     = "pattern-gen"
@@ -32,7 +31,6 @@ var supportedTaskFeatureSlugs = map[string]struct{}{
 	FeatureSlugRemoveBg:       {},
 	FeatureSlugFaceSwap:       {},
 	FeatureSlugStyleFusion:    {},
-	FeatureSlugFabricOnBody:   {},
 	FeatureSlugMultiAngle:     {},
 	FeatureSlugVirtual3D:      {},
 	FeatureSlugPatternGen:     {},

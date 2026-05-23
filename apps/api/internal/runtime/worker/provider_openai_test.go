@@ -802,7 +802,7 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 		t.Fatalf("expected masked hd-upscale to use edit endpoint")
 	}
 
-	for _, feature := range []string{"style-fusion", "face-swap", "fabric-on-body", "multi-angle", "remove-bg"} {
+	for _, feature := range []string{"style-fusion", "face-swap", "multi-angle", "remove-bg"} {
 		if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
 			"feature":    feature,
 			"image_urls": []interface{}{"https://img.example/source.png", "https://img.example/ref.png"},

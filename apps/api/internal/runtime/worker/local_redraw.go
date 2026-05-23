@@ -179,7 +179,6 @@ func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {
 	switch featureSlug {
 	case workflow.FeatureSlugPartialEdit,
 		workflow.FeatureSlugBgSwap,
-		workflow.FeatureSlugFabricOnBody,
 		workflow.FeatureSlugHDUpscale:
 		return true
 	default:
@@ -240,16 +239,7 @@ func readLocalRedrawMaskRef(params map[string]interface{}) (string, bool) {
 }
 
 func rewriteLocalRedrawUpstreamInputs(params map[string]interface{}, featureSlug, roiDataURL string, roi image.Rectangle) error {
-	imageURLs := mediarefs.CollectStringList(params["image_urls"])
-	switch featureSlug {
-	case workflow.FeatureSlugFabricOnBody:
-		if len(imageURLs) == 0 {
-			return fmt.Errorf("local redraw 缺少 body 图输入: feature=%s", featureSlug)
-		}
-		imageURLs[0] = roiDataURL
-	default:
-		imageURLs = []string{roiDataURL}
-	}
+	imageURLs := []string{roiDataURL}
 	params["image_urls"] = toInterfaceSlice(imageURLs)
 	params["image_url"] = roiDataURL
 	params["original_image_url"] = roiDataURL

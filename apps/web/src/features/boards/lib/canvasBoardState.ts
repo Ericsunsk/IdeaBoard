@@ -8,7 +8,6 @@ import type {
   ImageNodeOutputItem,
   ModelNodeItem,
   PromptNodeItem,
-  WearNodeItem,
   ViewpointNodeItem,
 } from '../../workspace/types/canvasNodes'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
@@ -21,7 +20,6 @@ export type CanvasBoardStateImageNodeOutput = ImageNodeOutputItem
 export type CanvasBoardStateImageNode = ImageNodeItem
 export type CanvasBoardStateEditNode = EditNodeItem
 export type CanvasBoardStateFusionNode = FusionNodeItem
-export type CanvasBoardStateWearNode = WearNodeItem
 export type CanvasBoardStateConnection = CanvasConnection
 export type CanvasBoardStateViewport = CanvasViewportState
 
@@ -124,7 +122,6 @@ export function collectCanvasBoardImageUrls(
   appendOutputNodeImageUrls(urls, snapshot.viewpointNodes)
   appendOutputNodeImageUrls(urls, snapshot.editNodes)
   appendOutputNodeImageUrls(urls, snapshot.fusionNodes)
-  appendOutputNodeImageUrls(urls, snapshot.wearNodes)
 
   return urls
 }

@@ -5,7 +5,6 @@ export type CanvasNodeCreateActionKey =
   | 'createViewpointNode'
   | 'createEditNode'
   | 'createFusionNode'
-  | 'createWearNode'
 
 export interface CanvasNodeMenuItem {
   key: string
@@ -33,7 +32,6 @@ export const CANVAS_NODE_MENU_ITEMS: readonly CanvasNodeMenuItem[] = [
     group: 'process',
     order: 60,
   },
-  { key: 'wear', label: '+ Wear 节点', actionKey: 'createWearNode', group: 'process', order: 70 },
   {
     key: 'viewpoint',
     label: '+ Display 节点',

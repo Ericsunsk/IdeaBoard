@@ -24,16 +24,6 @@ export const MODEL_REFERENCE_STRENGTH_DEFAULT = 80
 export const MODEL_ANGLE_YAW_MIN = -180
 export const MODEL_ANGLE_YAW_MAX = 180
 export const MODEL_ANGLE_YAW_DEFAULT = 0
-export const WEAR_ROTATION_MIN = 0
-export const WEAR_ROTATION_MAX = 360
-export const WEAR_ROTATION_DEFAULT = 0
-export const WEAR_SCALE_MIN = 10
-export const WEAR_SCALE_MAX = 300
-export const WEAR_SCALE_DEFAULT = 88
-export const WEAR_OPACITY_MIN = 0
-export const WEAR_OPACITY_MAX = 100
-export const WEAR_OPACITY_DEFAULT = 82
-export const WEAR_TILE_MODE_DEFAULT = 'single'
 
 export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = [
   'idle',
@@ -139,28 +129,6 @@ export function createDefaultModelAngleSpec(): ModelAngleSpec {
   }
 }
 
-export function normalizeWearTileMode(value: unknown): WearNodeItem['tileMode'] {
-  return value === 'seamless' ? 'seamless' : WEAR_TILE_MODE_DEFAULT
-}
-
-export function clampWearRotation(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(WEAR_ROTATION_MIN, Math.min(WEAR_ROTATION_MAX, Math.round(value)))
-    : WEAR_ROTATION_DEFAULT
-}
-
-export function clampWearScale(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(WEAR_SCALE_MIN, Math.min(WEAR_SCALE_MAX, Math.round(value)))
-    : WEAR_SCALE_DEFAULT
-}
-
-export function clampWearOpacity(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(WEAR_OPACITY_MIN, Math.min(WEAR_OPACITY_MAX, Math.round(value)))
-    : WEAR_OPACITY_DEFAULT
-}
-
 export interface ModelNodeItem {
   id: number
   type: 'model'
@@ -237,34 +205,17 @@ export interface FusionNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export interface WearNodeItem {
-  id: number
-  type: 'wear'
-  x: number
-  y: number
-  width: number
-  title?: string
-  tileMode: 'seamless' | 'single'
-  rotation: number
-  scale: number
-  opacity: number
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
 export type CanvasExecutionOutputNodeType =
   | 'model'
   | 'viewpoint'
   | 'edit'
   | 'fusion'
-  | 'wear'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
   'model',
   'viewpoint',
   'edit',
   'fusion',
-  'wear',
 ]
 
 export function isCanvasExecutionOutputNodeType(
@@ -281,7 +232,6 @@ export type CanvasExecutionOutputNodeItem =
   | ViewpointNodeItem
   | EditNodeItem
   | FusionNodeItem
-  | WearNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
 
@@ -294,7 +244,6 @@ export type CanvasConnectionNodeType =
   | 'viewpoint'
   | 'edit'
   | 'fusion'
-  | 'wear'
 
 export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): string {
   switch (nodeType) {
@@ -310,8 +259,6 @@ export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): s
       return 'EDIT'
     case 'fusion':
       return 'FUSION'
-    case 'wear':
-      return 'WEAR'
   }
 }
 export type CanvasConnectionPort = 'image' | 'prompt' | 'imageA' | 'imageB'
@@ -333,7 +280,6 @@ export type CanvasNodeItem =
   | ImageNodeItem
   | EditNodeItem
   | FusionNodeItem
-  | WearNodeItem
 
 export interface CanvasViewportState {
   canvasX: number
@@ -348,7 +294,6 @@ export interface CanvasBoardSnapshot {
   viewpointNodes: ViewpointNodeItem[]
   editNodes: EditNodeItem[]
   fusionNodes: FusionNodeItem[]
-  wearNodes: WearNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState
 }

@@ -2,7 +2,6 @@ import { WORKFLOW_FEATURE, type WorkflowFeature } from './workflowFeatures'
 
 export const WORKFLOW_FEATURE_GROUP = {
   prompt: 'prompt',
-  wear: 'wear',
   model: 'model',
   display: 'display',
   fusion: 'fusion',
@@ -28,40 +27,34 @@ export const WORKFLOW_FEATURE_GROUP_LIST: readonly WorkflowFeatureGroupMeta[] = 
     order: 10,
   },
   {
-    key: WORKFLOW_FEATURE_GROUP.wear,
-    title: 'Wear',
-    desc: '面料贴合、上身效果和蒙版结合逻辑。',
-    order: 20,
-  },
-  {
     key: WORKFLOW_FEATURE_GROUP.model,
     title: 'Model',
     desc: '视角、姿态与主体跟随控制。',
-    order: 30,
+    order: 20,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.display,
     title: 'Display',
     desc: '商品展示视角、光影和陈列表达。',
-    order: 40,
+    order: 30,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.fusion,
     title: 'Fusion',
     desc: '双图融合时的主次、比例和修饰语义。',
-    order: 50,
+    order: 40,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.edit,
     title: 'Edit',
     desc: '局部改款、换背景和定向换脸。',
-    order: 60,
+    order: 50,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.imageTools,
     title: 'Image Tools',
     desc: '图片右键工具里的高清放大和图片延伸。',
-    order: 70,
+    order: 60,
   },
 ] as const
 
@@ -97,11 +90,6 @@ export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] =
     slug: WORKFLOW_FEATURE.styleFusion,
     adminTitle: 'Fusion · 双图融合',
     groupKey: WORKFLOW_FEATURE_GROUP.fusion,
-  },
-  {
-    slug: WORKFLOW_FEATURE.fabricOnBody,
-    adminTitle: 'Wear · 上身贴合',
-    groupKey: WORKFLOW_FEATURE_GROUP.wear,
   },
   {
     slug: WORKFLOW_FEATURE.multiAngle,

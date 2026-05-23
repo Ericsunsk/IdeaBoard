@@ -6,12 +6,10 @@ import {
   EXECUTION_FACE_SWAP_META,
   EXECUTION_MODEL_META,
   EXECUTION_VIEWPOINT_META,
-  EXECUTION_WEAR_META,
   type ExecutionFeature,
 } from '../config/executionContract'
 import { assertTaskSubmitReady } from '../services/flowTaskExecutorUtils'
 import { executeFlowEditNode, validateFlowEditNodeInputs } from '../services/flowEditExecutor'
-import { executeFlowWearNode, validateFlowWearNodeInputs } from '../services/flowWearExecutor'
 import { executeFlowModelNode, validateFlowModelNodeInputs } from '../services/flowModelExecutor'
 import {
   executeFlowViewpointNode,
@@ -22,7 +20,6 @@ import type {
   EditNodeItem,
   ModelNodeItem,
   ViewpointNodeItem,
-  WearNodeItem,
 } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/task'
 import type { FlowHistorySnapshot } from './useFlowTransactions'
@@ -78,7 +75,6 @@ export function loadImageSizeFromUrl(
 
 export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOptions) {
   const runningEditNodeIds = ref(new Set<string>())
-  const runningWearNodeIds = ref(new Set<string>())
   const runningModelNodeIds = ref(new Set<string>())
   const runningViewpointNodeIds = ref(new Set<string>())
 
@@ -91,8 +87,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
         return runningEditNodeIds.value.has(nodeId)
       case 'fusion':
         return false
-      case 'wear':
-        return runningWearNodeIds.value.has(nodeId)
       case 'model':
         return runningModelNodeIds.value.has(nodeId)
       case 'viewpoint':
@@ -299,32 +293,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     })
   }
 
-  async function onFlowWearGenerate(nodeId: string) {
-    await runFlowGenerationNode(nodeId, {
-      nodeType: 'wear',
-      runningSet: runningWearNodeIds,
-      runningMessage: 'Wear 任务正在执行中',
-      missingNodeMessage: 'Wear 节点不存在',
-      successMessage: 'Wear 生成完成',
-      failureMessage: 'Wear 生成失败',
-      errorMessage: 'Wear 生成失败',
-      preserveOutputImagesOnFailure: true,
-      buildContext: (target, nodeId) => ({
-        nodeId,
-        snapshotNode: target.data.snapshotNode as WearNodeItem,
-      }),
-      buildOptions: () => ({
-        nodes: options.nodes.value as FlowRuntimeNode[],
-        edges: options.edges.value as FlowRuntimeEdge[],
-        loadImageSizeFromUrl,
-        boardId: options.currentBoardId.value || undefined,
-      }),
-      validate: (ctx, opts) => validateFlowWearNodeInputs(ctx, opts),
-      preflight: () => assertExecutionSubmitReady(EXECUTION_WEAR_META.feature),
-      execute: (ctx, opts) => executeFlowWearNode(ctx, opts),
-    })
-  }
-
   async function onFlowModelGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'model',
@@ -379,7 +347,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
 
   return {
     onFlowEditGenerate,
-    onFlowWearGenerate,
     onFlowModelGenerate,
     onFlowViewpointGenerate,
     isFlowExecutionNodeRunning,

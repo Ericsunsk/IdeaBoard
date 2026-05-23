@@ -48,8 +48,7 @@ function isCanvasConnectionNodeType(value: unknown): value is CanvasConnectionNo
     value === 'model' ||
     value === 'viewpoint' ||
     value === 'edit' ||
-    value === 'fusion' ||
-    value === 'wear'
+    value === 'fusion'
   )
 }
 

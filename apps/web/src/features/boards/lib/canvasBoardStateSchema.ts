@@ -11,12 +11,6 @@ import {
   MODEL_POSE_STRENGTH_MIN,
   MODEL_REFERENCE_STRENGTH_MAX,
   MODEL_REFERENCE_STRENGTH_MIN,
-  WEAR_OPACITY_MAX,
-  WEAR_OPACITY_MIN,
-  WEAR_ROTATION_MAX,
-  WEAR_ROTATION_MIN,
-  WEAR_SCALE_MAX,
-  WEAR_SCALE_MIN,
   type CanvasBoardSnapshot,
 } from '../../workspace/types/canvasNodes'
 import { PROMPT_ASPECT_RATIO_OPTIONS } from '../../workspace/config/promptAspectRatio'
@@ -38,7 +32,6 @@ const canvasConnectionNodeTypeSchema = z.enum([
   'viewpoint',
   'edit',
   'fusion',
-  'wear',
 ])
 const canvasConnectionPortSchema = z.enum(['image', 'prompt', 'imageA', 'imageB'])
 
@@ -158,21 +151,6 @@ const fusionNodeItemSchema = z.object({
   outputImages: z.array(imageNodeOutputItemSchema),
 }).strict()
 
-const wearNodeItemSchema = z.object({
-  id: finiteNumberSchema,
-  type: z.literal('wear'),
-  x: finiteNumberSchema,
-  y: finiteNumberSchema,
-  width: finiteNumberSchema,
-  title: z.string().optional(),
-  tileMode: z.enum(['seamless', 'single']),
-  rotation: finiteNumberSchema.min(WEAR_ROTATION_MIN).max(WEAR_ROTATION_MAX),
-  scale: finiteNumberSchema.min(WEAR_SCALE_MIN).max(WEAR_SCALE_MAX),
-  opacity: finiteNumberSchema.min(WEAR_OPACITY_MIN).max(WEAR_OPACITY_MAX),
-  outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: z.array(imageNodeOutputItemSchema),
-}).strict()
-
 const canvasConnectionSchema = z.object({
   id: finiteNumberSchema,
   fromNodeType: canvasConnectionNodeTypeSchema,
@@ -197,7 +175,6 @@ export const canvasBoardSnapshotSchema = z
     viewpointNodes: z.array(viewpointNodeItemSchema),
     editNodes: z.array(editNodeItemSchema),
     fusionNodes: z.array(fusionNodeItemSchema),
-    wearNodes: z.array(wearNodeItemSchema),
     connections: z.array(canvasConnectionSchema),
     viewport: canvasViewportStateSchema,
   })

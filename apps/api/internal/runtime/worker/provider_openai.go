@@ -368,10 +368,6 @@ func openAISharedAllowedParamKeys() []string {
 		"original_image_url",
 		"mask_image_urls",
 		"use_mask",
-		"fabric_rotation",
-		"fabric_scale",
-		"fabric_opacity",
-		"tile_mode",
 		"upscale_mode",
 		"upscale_factor",
 		"output_format",
@@ -426,7 +422,6 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 		featureSlug == workflow.FeatureSlugRemoveBg ||
 		featureSlug == workflow.FeatureSlugStyleFusion ||
 		featureSlug == workflow.FeatureSlugFaceSwap ||
-		featureSlug == workflow.FeatureSlugFabricOnBody ||
 		featureSlug == workflow.FeatureSlugMultiAngle {
 		return true
 	}

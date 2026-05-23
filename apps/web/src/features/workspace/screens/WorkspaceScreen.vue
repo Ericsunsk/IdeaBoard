@@ -129,7 +129,6 @@
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
             @delete-node="() => onFlowDeleteNode(nodeProps.id)"
             @generate-edit="() => onFlowEditGenerate(nodeProps.id)"
-            @generate-wear="() => onFlowWearGenerate(nodeProps.id)"
             @generate-model="() => onFlowModelGenerate(nodeProps.id)"
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
             @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
@@ -356,7 +355,6 @@ const createNodeOptions: readonly { key: string; label: string; value: FlowCreat
   { key: 'image', label: 'Image', value: 'image' },
   { key: 'edit', label: 'Edit', value: 'edit' },
   { key: 'fusion', label: 'Fusion', value: 'fusion' },
-  { key: 'wear', label: 'Wear', value: 'wear' },
   { key: 'model', label: 'Model', value: 'model' },
   { key: 'viewpoint', label: 'Viewpoint', value: 'viewpoint' },
 ]
@@ -917,7 +915,6 @@ function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
 
 const {
   onFlowEditGenerate,
-  onFlowWearGenerate,
   onFlowModelGenerate,
   onFlowViewpointGenerate,
   isFlowExecutionNodeRunning,

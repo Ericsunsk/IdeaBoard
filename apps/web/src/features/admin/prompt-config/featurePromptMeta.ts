@@ -1,5 +1,4 @@
 import { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
-import { WEAR_TILE_MODE_TEMPLATE_DESC } from '../../../shared/domain/wearTileModes'
 import { WORKFLOW_FEATURE } from '../../../shared/domain/workflowFeatures'
 import {
   WORKFLOW_FEATURE_GROUP_LIST,
@@ -58,16 +57,6 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   [IMAGE_NODE_ACTION.sketchToImage]: noVars,
   [WORKFLOW_FEATURE.partialEdit]: promptVars,
   [IMAGE_NODE_ACTION.styleVariation]: [{ key: '{{strength}}', desc: '风格延展强度百分比（0-100）' }],
-  [WORKFLOW_FEATURE.fabricOnBody]: [
-    { key: '{{tile_mode}}', desc: WEAR_TILE_MODE_TEMPLATE_DESC },
-    { key: '{{fabric_rotation}}', desc: 'Texture 方向角度（0-360）' },
-    { key: '{{fabric_scale}}', desc: 'Texture 大小百分比（10-300）' },
-    { key: '{{fabric_opacity}}', desc: 'Texture 融合强度百分比（0-100）' },
-    {
-      key: '{{original_image_url}}',
-      desc: 'Body 原图 URL（由 Wear 节点 Image 输入自动传入，无需手填）',
-    },
-  ],
   [WORKFLOW_FEATURE.multiAngle]: [
     { key: '{{angle_spec}}', desc: '视角控制参数（JSON，系统按它决定 yaw 与景别）' },
     { key: '{{model_url}}', desc: '画布里接到 Model 输入口的参考图（系统自动传值）' },
@@ -134,9 +123,6 @@ const CONTROL_VAR_KEYS = new Set([
   '{{blend_ratio}}',
   '{{image_a_weight}}',
   '{{image_b_weight}}',
-  '{{fabric_rotation}}',
-  '{{fabric_scale}}',
-  '{{fabric_opacity}}',
   '{{model_strength}}',
   '{{pose_strength}}',
   '{{upscale_factor}}',

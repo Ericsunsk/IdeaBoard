@@ -89,21 +89,6 @@ function createValidState() {
         outputImages: [],
       },
     ],
-    wearNodes: [
-      {
-        id: 10,
-        type: 'wear' as const,
-        x: 0,
-        y: 0,
-        width: 240,
-        tileMode: 'single' as const,
-        rotation: 0,
-        scale: 88,
-        opacity: 82,
-        outputStatus: 'idle' as const,
-        outputImages: [],
-      },
-    ],
     connections: [
       {
         id: 12,
@@ -135,7 +120,6 @@ function testValidEmptySnapshot() {
     viewpointNodes: [],
     editNodes: [],
     fusionNodes: [],
-    wearNodes: [],
     connections: [],
     viewport: { canvasX: 0, canvasY: 0, zoomLevel: 1 },
     updatedAt: 1,

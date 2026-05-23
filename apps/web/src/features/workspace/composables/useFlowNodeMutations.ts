@@ -7,7 +7,6 @@ import {
   createModelNodeAt,
   createPromptNodeAt,
   createViewpointNodeAt,
-  createWearNodeAt,
 } from '../utils/canvasNodeFactory'
 import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
@@ -22,7 +21,6 @@ export type FlowCreatableNodeKind =
   | 'image'
   | 'edit'
   | 'fusion'
-  | 'wear'
   | 'model'
   | 'viewpoint'
 
@@ -65,8 +63,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         return createEditNodeAt(point)
       case 'fusion':
         return createFusionNodeAt(point)
-      case 'wear':
-        return createWearNodeAt(point)
       case 'model':
         return createModelNodeAt(point)
       case 'viewpoint':
@@ -249,7 +245,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   const EXECUTION_NODE_KINDS = new Set([
     'edit',
     'fusion',
-    'wear',
     'model',
     'viewpoint',
   ])

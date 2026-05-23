@@ -24,16 +24,6 @@ func TestTemplateValueDescriptions(t *testing.T) {
 			got:  prompts.DescribeViewpointLightingTemplateValue("hard_light"),
 			want: "质感硬光",
 		},
-		{
-			name: "wear tile mode uses readable label",
-			got:  prompts.DescribeWearTileModeTemplateValue("seamless"),
-			want: "平铺重复",
-		},
-		{
-			name: "unknown values are preserved after trim",
-			got:  prompts.DescribeWearTileModeTemplateValue(" custom-mode "),
-			want: "custom-mode",
-		},
 	}
 
 	for _, tt := range tests {
@@ -100,12 +90,6 @@ func TestMaskedRequestDetectionUsesCanonicalAliases(t *testing.T) {
 		t.Fatalf("expected hd-upscale masked request to be detected by canonical mask_image_url")
 	}
 
-	fabricParams := map[string]interface{}{
-		"mask_image_urls": []interface{}{"https://mask.example/2.png"},
-	}
-	if !prompts.IsMaskedFabricOnBodyRequest(fabricParams) {
-		t.Fatalf("expected fabric-on-body masked request to be detected by canonical mask_image_urls")
-	}
 }
 
 func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) {
@@ -194,20 +178,6 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			},
 			template: "SYS original={{original_image_url}} mask={{mask_image_url}} use_mask={{use_mask}} mode={{upscale_mode}}",
 			want:     "SYS original=https://example.com/original.png mask=https://example.com/mask.png use_mask=true mode=enhancement",
-		},
-		{
-			name:       "masked fabric-on-body",
-			feature:    workflow.FeatureSlugFabricOnBody,
-			basePrompt: "user prompt",
-			userPrompt: "把面料贴到主体上",
-			params: map[string]interface{}{
-				"original_image_url": "https://example.com/body.png",
-				"mask_image_url":     "https://example.com/wear-mask.png",
-				"use_mask":           true,
-				"tile_mode":          "seamless",
-			},
-			template: "SYS {{user_prompt}} original={{original_image_url}} mask={{mask_image_url}} use_mask={{use_mask}} tile={{tile_mode}}",
-			want:     "SYS 把面料贴到主体上 original=https://example.com/body.png mask=https://example.com/wear-mask.png use_mask=true tile=平铺重复",
 		},
 	}
 

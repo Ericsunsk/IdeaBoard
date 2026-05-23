@@ -7,10 +7,6 @@ import {
   DEFAULT_FUSION_BLEND_POINT,
   MODEL_REFERENCE_STRENGTH_DEFAULT,
   MODEL_POSE_STRENGTH_DEFAULT,
-  WEAR_OPACITY_DEFAULT,
-  WEAR_ROTATION_DEFAULT,
-  WEAR_SCALE_DEFAULT,
-  WEAR_TILE_MODE_DEFAULT,
   getDefaultCanvasNodeTitle,
 } from '../types/canvasNodes'
 import type {
@@ -20,7 +16,6 @@ import type {
   ImageNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 import { EDIT_NODE_MODE } from '../types/editNodeModes'
@@ -120,23 +115,6 @@ export function createFusionNodeAt(point: CanvasPoint): FusionNodeItem {
     aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
     blendPoint: { ...DEFAULT_FUSION_BLEND_POINT },
     inputImages: [],
-    outputStatus: 'idle',
-    outputImages: [],
-  }
-}
-
-export function createWearNodeAt(point: CanvasPoint): WearNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'wear',
-    x: point.x,
-    y: point.y,
-    width: 286,
-    title: getDefaultCanvasNodeTitle('wear'),
-    tileMode: WEAR_TILE_MODE_DEFAULT,
-    rotation: WEAR_ROTATION_DEFAULT,
-    scale: WEAR_SCALE_DEFAULT,
-    opacity: WEAR_OPACITY_DEFAULT,
     outputStatus: 'idle',
     outputImages: [],
   }

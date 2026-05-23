@@ -69,7 +69,6 @@ const BOARD_NODE_COLLECTIONS = [
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
   { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
-  { key: 'wearNodes', nodeType: 'wear' },
 ] as const satisfies ReadonlyArray<{
   key: keyof CanvasBoardSnapshot
   nodeType: CanvasConnectionNodeType

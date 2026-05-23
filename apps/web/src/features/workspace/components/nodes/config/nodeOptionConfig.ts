@@ -1,15 +1,8 @@
 import type {
   ModelAngleFraming,
   ModelAngleSpec,
-  WearNodeItem,
   ViewpointNodeItem,
 } from '../../../types/canvasNodes'
-import { describeWearTileMode as describeSharedWearTileMode } from '../../../../../shared/domain/wearTileModes'
-
-export {
-  WEAR_TILE_MODE_DESCRIPTIONS,
-  WEAR_TILE_MODE_TEMPLATE_DESC,
-} from '../../../../../shared/domain/wearTileModes'
 
 type OptionItem<T extends string | number> = { label: string; value: T }
 type ModelOptionItem = { key: string; label: string }
@@ -18,15 +11,6 @@ type ViewpointOptionItem = { key: string; label: string }
 
 export const GENERATE_RATIO_OPTIONS = ['1:1', '3:4', '4:3', '2:3', '3:2'] as const
 export const GENERATE_COUNT_OPTIONS = [1, 2, 4] as const
-
-export const WEAR_TILE_MODE_OPTIONS: OptionItem<WearNodeItem['tileMode']>[] = [
-  { label: 'Repeat', value: 'seamless' },
-  { label: 'Placement', value: 'single' },
-]
-
-export function describeWearTileMode(mode: WearNodeItem['tileMode']): string {
-  return describeSharedWearTileMode(mode)
-}
 
 export const MODEL_BACKGROUND_OPTIONS: ModelOptionItem[] = [
   { key: 'original', label: '原图背景' },

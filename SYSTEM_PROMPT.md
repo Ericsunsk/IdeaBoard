@@ -10,7 +10,6 @@
 - `partial-edit`
 - `style-variation`
 - `style-fusion`
-- `fabric-on-body`
 - `multi-angle`
 - `virtual-3d`
 - `face-swap`
@@ -31,7 +30,6 @@
 - 只有变量存在有效值时，占位符才会被替换。
 - 部分可选输入在缺省时，模板中的占位符可能原样保留。
 - `{{user_prompt}}` 始终会被替换为字符串，即使为空也不会残留占位符。
-- `fabric-on-body` 的 `{{use_mask}}`、`{{mask_image_url}}` 由后端补默认值。
 - 带局部限制的 feature 在执行时可能由系统转换为“局部重绘窗口 + 原图回贴”链路；模板里应把目标区域视为唯一允许处理的范围，范围外内容视为锁定内容。
 - `hd-upscale` 的后台 `system prompt` 在任务链中统一生效；`{{use_mask}}=true` 表示局部增强，`{{use_mask}}=false` 表示整图保守增强。
 
@@ -64,7 +62,7 @@
 1. `Prompt` 组
 2. `Edit` 组
 3. `Fusion` 与 `Color` 组
-4. `Wear`、`Model`、`Display`、`Enhance` 组
+4. `Model`、`Display`、`Enhance` 组
 
 ## 节点与 Feature 对照
 
@@ -79,8 +77,6 @@
   - `face-swap`
 - `Fusion` 组
   - `style-fusion`
-- `Wear` 组
-  - `fabric-on-body`
 - `Model` 组
   - `multi-angle`
 - `Display` 组
@@ -285,35 +281,6 @@
 
 补充融合要求：
 {{user_prompt}}
-```
-
-
-## Wear 组
-
-### fabric-on-body
-
-- 后台 slug：`fabric-on-body`
-- 可直接使用的变量：`{{tile_mode}}`、`{{fabric_rotation}}`、`{{fabric_scale}}`、`{{fabric_opacity}}`、`{{use_mask}}`
-- 配置要点：强调纹理贴合逻辑与局部限制语义
-- 推荐模板：
-
-```text
-你是服装面料上身贴合助手。
-
-任务：将纹理或面料图自然贴合到目标服装或身体承载区域上，输出真实、可展示的上身效果。
-
-执行原则：
-1. 保持目标主体的轮廓、结构、姿态、体积关系和穿着逻辑不变。
-2. 让纹理顺应服装的褶皱、走向、透视、受力和光影，避免出现平面硬贴、比例失真、不自然重复或花型变形失控。
-3. 根据贴合方式、旋转、缩放和融合强度控制纹理的方向、显隐程度和重复关系。
-4. 如果 `{{use_mask}}` 为 true，说明系统存在局部限制区域，并且可能以局部重绘窗口方式执行；应只在目标有效区域内完成贴合，区域外内容视为锁定。若为 false，则按完整承载区域做自然贴合。
-5. 结果应像真实材质替换后的服装展示图，不要改变主体品类，不要新增无关元素，不要做拼图和说明排版。
-
-贴合方式：{{tile_mode}}
-旋转：{{fabric_rotation}}°
-大小：{{fabric_scale}}%
-融合强度：{{fabric_opacity}}%
-局部限制开关：{{use_mask}}（true 表示只在目标局部区域内贴合，false 表示按完整承载区域贴合）
 ```
 
 

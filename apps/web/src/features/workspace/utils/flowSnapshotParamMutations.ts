@@ -9,10 +9,6 @@ import {
   clampModelAngleYaw,
   clampModelPoseStrength,
   clampModelReferenceStrength,
-  clampWearOpacity,
-  clampWearRotation,
-  clampWearScale,
-  normalizeWearTileMode,
 } from '../types/canvasNodes'
 import {
   areFusionBlendPointsEqual,
@@ -138,26 +134,6 @@ export function patchFlowSnapshotParam(
       const nextStrength = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
       if (snapshotNode.strength === nextStrength) return snapshotNode
       return { ...snapshotNode, strength: nextStrength }
-    }
-    case 'tileMode': {
-      const nextTileMode = normalizeWearTileMode(value)
-      if (snapshotNode.tileMode === nextTileMode) return snapshotNode
-      return { ...snapshotNode, tileMode: nextTileMode }
-    }
-    case 'rotation': {
-      const nextRotation = clampWearRotation(value)
-      if (snapshotNode.rotation === nextRotation) return snapshotNode
-      return { ...snapshotNode, rotation: nextRotation }
-    }
-    case 'scale': {
-      const nextScale = clampWearScale(value)
-      if (snapshotNode.scale === nextScale) return snapshotNode
-      return { ...snapshotNode, scale: nextScale }
-    }
-    case 'opacity': {
-      const nextOpacity = clampWearOpacity(value)
-      if (snapshotNode.opacity === nextOpacity) return snapshotNode
-      return { ...snapshotNode, opacity: nextOpacity }
     }
     case 'angleSpec.yaw': {
       const nextYaw = clampModelAngleYaw(value)

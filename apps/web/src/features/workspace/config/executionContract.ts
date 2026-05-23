@@ -21,11 +21,6 @@ export const EXECUTION_META = {
     feature: EXECUTION_FEATURE.bgSwap,
     promptPrefix: '[bg-swap]',
   },
-  [EXECUTION_FEATURE.fabricOnBody]: {
-    feature: EXECUTION_FEATURE.fabricOnBody,
-    promptPrefix: '[fabric-on-body]',
-    successLabel: 'Wear',
-  },
   [EXECUTION_FEATURE.styleFusion]: {
     feature: EXECUTION_FEATURE.styleFusion,
     promptPrefix: '[style-fusion]',
@@ -70,8 +65,6 @@ export const EXECUTION_EDIT_MODE_META = {
   [EXECUTION_FEATURE.partialEdit]: EXECUTION_META[EXECUTION_FEATURE.partialEdit],
   [EXECUTION_FEATURE.bgSwap]: EXECUTION_META[EXECUTION_FEATURE.bgSwap],
 } as const
-
-export const EXECUTION_WEAR_META = EXECUTION_META[EXECUTION_FEATURE.fabricOnBody]
 
 export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.styleFusion]
 

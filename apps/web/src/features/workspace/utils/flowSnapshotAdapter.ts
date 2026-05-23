@@ -37,7 +37,6 @@ type SnapshotNodeCollectionKey =
   | 'viewpointNodes'
   | 'editNodes'
   | 'fusionNodes'
-  | 'wearNodes'
 
 const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
   key: SnapshotNodeCollectionKey
@@ -49,7 +48,6 @@ const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
   { key: 'editNodes', nodeType: 'edit' },
   { key: 'fusionNodes', nodeType: 'fusion' },
-  { key: 'wearNodes', nodeType: 'wear' },
 ]
 
 function clone<T>(value: T): T {
@@ -68,7 +66,6 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
     viewpointNodes: [],
     editNodes: [],
     fusionNodes: [],
-    wearNodes: [],
     connections: [],
     viewport: {
       canvasX: 0,
@@ -184,8 +181,6 @@ function resolveCollectionKeyByNodeType(
       return 'editNodes'
     case 'fusion':
       return 'fusionNodes'
-    case 'wear':
-      return 'wearNodes'
   }
 }
 

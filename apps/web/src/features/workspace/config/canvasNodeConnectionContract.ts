@@ -6,7 +6,6 @@ import type {
   ImageNodeItem,
   ModelNodeItem,
   PromptNodeItem,
-  WearNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 import { EDIT_NODE_MODE } from '../types/editNodeModes'
@@ -21,7 +20,6 @@ export type CanvasConnectionContractNode =
   | ViewpointNodeItem
   | EditNodeItem
   | FusionNodeItem
-  | WearNodeItem
 
 export interface CanvasNodePortContract {
   port: CanvasConnectionPort
@@ -112,12 +110,6 @@ export function getCanvasNodePortContracts(
       return [
         input('image', 'image', true),
         input('prompt', 'prompt'),
-        output('image', 'image'),
-      ]
-    case 'wear':
-      return [
-        input('imageA', 'image', true),
-        input('imageB', 'image', true),
         output('image', 'image'),
       ]
     default:

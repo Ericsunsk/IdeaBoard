@@ -45,7 +45,6 @@ func IsReferenceImageFeature(featureSlug string) bool {
 	switch featureSlug {
 	case FeatureSlugStyleFusion,
 		FeatureSlugFaceSwap,
-		FeatureSlugFabricOnBody,
 		FeatureSlugMultiAngle:
 		return true
 	default:

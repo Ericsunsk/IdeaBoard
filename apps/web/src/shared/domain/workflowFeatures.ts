@@ -2,7 +2,6 @@ export const WORKFLOW_FEATURE = {
   partialEdit: 'partial-edit',
   bgSwap: 'bg-swap',
   removeBg: 'remove-bg',
-  fabricOnBody: 'fabric-on-body',
   styleFusion: 'style-fusion',
   patternGen: 'pattern-gen',
   sketchToImage: 'sketch-to-image',
