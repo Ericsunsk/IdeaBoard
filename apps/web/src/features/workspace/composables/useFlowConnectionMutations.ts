@@ -5,7 +5,10 @@ import type { FlowTransactions } from './useFlowTransactions'
 type UseFlowConnectionMutationsOptions = {
   edges: Ref<Array<Record<string, any>>>
   isValidConnection: (connection: Connection) => boolean
-  normalizeConnection?: (connection: Connection, existingEdges: readonly Edge[]) => Connection | null
+  normalizeConnection?: (
+    connection: Connection,
+    existingEdges: readonly Edge[],
+  ) => Connection | null
   allowsMultipleTargetConnections?: (connection: Connection) => boolean
   validateConnectionMutation?: (
     connection: Connection,
@@ -17,22 +20,31 @@ type UseFlowConnectionMutationsOptions = {
 }
 
 export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOptions) {
-  function onConnect(connection: Connection) {
-    const existingEdges = options.edges.value as unknown as Edge[]
+  function resolveValidatedConnection(
+    connection: Connection,
+    existingEdges: readonly Edge[],
+  ): Connection | null {
     const resolvedConnection = options.normalizeConnection
       ? options.normalizeConnection(connection, existingEdges)
       : connection
     if (!resolvedConnection || !options.isValidConnection(resolvedConnection)) {
       options.onWarning('该连线不符合当前连接语义')
-      return
+      return null
     }
-    if (!resolvedConnection.source || !resolvedConnection.target) return
+    if (!resolvedConnection.source || !resolvedConnection.target) return null
     const validationMessage =
       options.validateConnectionMutation?.(resolvedConnection, existingEdges) ?? null
     if (validationMessage) {
       options.onWarning(validationMessage)
-      return
+      return null
     }
+    return resolvedConnection
+  }
+
+  function onConnect(connection: Connection) {
+    const existingEdges = options.edges.value as unknown as Edge[]
+    const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
+    if (!resolvedConnection) return
     const nextEdge = {
       ...resolvedConnection,
       id: `edge-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -69,20 +81,8 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     const existingEdges = (options.edges.value as unknown as Edge[]).filter(
       (item) => item.id !== edge.id,
     )
-    const resolvedConnection = options.normalizeConnection
-      ? options.normalizeConnection(connection, existingEdges)
-      : connection
-    if (!resolvedConnection || !options.isValidConnection(resolvedConnection)) {
-      options.onWarning('该连线不符合当前连接语义')
-      return
-    }
-    if (!resolvedConnection.source || !resolvedConnection.target) return
-    const validationMessage =
-      options.validateConnectionMutation?.(resolvedConnection, existingEdges) ?? null
-    if (validationMessage) {
-      options.onWarning(validationMessage)
-      return
-    }
+    const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
+    if (!resolvedConnection) return
     options.commitEdgeMutation((currentEdges) =>
       currentEdges
         .filter((item) => {
@@ -90,7 +90,10 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
           const isSameTargetHandle =
             item.target === resolvedConnection.target &&
             (item.targetHandle ?? null) === (resolvedConnection.targetHandle ?? null)
-          if (isSameTargetHandle && !options.allowsMultipleTargetConnections?.(resolvedConnection)) {
+          if (
+            isSameTargetHandle &&
+            !options.allowsMultipleTargetConnections?.(resolvedConnection)
+          ) {
             return false
           }
           const isSameConnection =

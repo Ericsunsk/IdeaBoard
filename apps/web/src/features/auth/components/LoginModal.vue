@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="show" class="login-modal-overlay" @click.self="handleClose">
+      <div v-if="show" class="auth-modal-overlay" @click.self="handleClose">
         <div
           v-motion="{
             initial: { opacity: 0, y: 20, scale: 0.96 },
@@ -12,12 +12,12 @@
               transition: { duration: 260, easing: 'ease-out' },
             },
           }"
-          class="login-modal-content"
+          class="auth-modal-content login-modal-content"
         >
           <AuthModalCloseButton :disabled="loading" @click="handleClose" />
 
-          <div class="modal-header">
-            <h2 class="heading-text">欢迎回来</h2>
+          <div class="auth-modal-header login-modal-header">
+            <h2 class="auth-modal-title">欢迎回来</h2>
             <p>登录 IdeaBoard，继续你的创作</p>
           </div>
 
@@ -53,11 +53,11 @@
             {{ loading ? '登录中...' : '登录' }}
           </n-button>
 
-          <div class="modal-footer">
+          <div class="auth-modal-footer login-modal-footer">
             <span>还没有账号？</span>
             <button
               type="button"
-              class="signup-link"
+              class="auth-modal-switch-link"
               :disabled="loading"
               @click="handleSwitchToRegister"
             >
@@ -146,49 +146,15 @@ async function handleLogin() {
 }
 </script>
 
+<style scoped src="./auth-modal.css"></style>
+
 <style scoped>
-.login-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(21, 27, 43, 0.24);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
 .login-modal-content {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(14px);
-  width: 100%;
-  max-width: 440px;
   padding: 48px;
-  border-radius: 22px;
-  box-shadow: 0 24px 40px rgba(34, 45, 76, 0.16);
-  position: relative;
-  border: 1px solid #d9dfec;
 }
 
-.modal-header {
-  text-align: center;
+.login-modal-header {
   margin-bottom: 32px;
-}
-
-.heading-text {
-  font-size: 32px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  background: linear-gradient(135deg, #2b3142 0%, #4f5a76 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -0.02em;
-}
-
-.modal-header p {
-  color: #86868b;
-  font-size: 16px;
 }
 
 .auth-input :deep(.n-input-wrapper) {
@@ -196,90 +162,7 @@ async function handleLogin() {
   padding-right: 12px;
 }
 
-.auth-input :deep(.n-input) {
-  --n-border: 1px solid #d2d2d7;
-  --n-border-hover: 1px solid #7a6bd5;
-  --n-border-focus: 1px solid #7a6bd5;
-  --n-color: rgba(255, 255, 255, 0.8);
-  --n-color-focus: #ffffff;
-  --n-text-color: #1d1d1f !important;
-  --n-placeholder-color: #86868b;
-  --n-caret-color: #7a6bd5;
-  border-radius: 14px;
-  font-size: 16px;
-  height: 52px;
-}
-
-.auth-input :deep(input) {
-  color: #1d1d1f !important;
-}
-
-:deep(.n-form-item-label__text) {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1d1d1f;
-  margin-left: 4px;
-}
-
-.auth-primary-btn {
-  background: #7a6bd5 !important;
-  color: #ffffff !important;
-  height: 52px !important;
-  border-radius: 16px !important;
-  font-size: 17px !important;
-  font-weight: 600 !important;
-  margin-top: 12px !important;
-  border: none !important;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  box-shadow: 0 8px 24px rgba(122, 107, 213, 0.28) !important;
-}
-
-.auth-primary-btn:hover {
-  background: #6d5fd0 !important;
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(122, 107, 213, 0.36) !important;
-}
-
-.auth-primary-btn:active {
-  transform: translateY(0);
-}
-
-.modal-footer {
+.login-modal-footer {
   margin-top: 32px;
-  text-align: center;
-  font-size: 15px;
-  color: #86868b;
-}
-
-.signup-link {
-  background: none;
-  border: none;
-  color: #7a6bd5;
-  font-weight: 600;
-  margin-left: 8px;
-  text-decoration: none;
-  cursor: pointer;
-  font-size: inherit;
-  padding: 0;
-}
-
-.signup-link:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.signup-link:hover {
-  text-decoration: underline;
-}
-
-/* Transitions */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>

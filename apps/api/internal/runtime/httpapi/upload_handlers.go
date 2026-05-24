@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"path"
 	"strings"
 
@@ -59,13 +60,7 @@ func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		payload := gin.H{"avatar": url}
-		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
-			for k, v := range meta {
-				payload[k] = v
-			}
-		}
-		response.Success(c, payload)
+		response.Success(c, uploadImageResponsePayload("avatar", url, file, ext))
 	}
 }
 
@@ -126,13 +121,7 @@ func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		payload := gin.H{"url": url}
-		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
-			for k, v := range meta {
-				payload[k] = v
-			}
-		}
-		response.Success(c, payload)
+		response.Success(c, uploadImageResponsePayload("url", url, file, ext))
 	}
 }
 
@@ -199,12 +188,16 @@ func adminUploadHandler(h Dependencies) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		payload := gin.H{"url": url}
-		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
-			for k, v := range meta {
-				payload[k] = v
-			}
-		}
-		response.Success(c, payload)
+		response.Success(c, uploadImageResponsePayload("url", url, file, ext))
 	}
+}
+
+func uploadImageResponsePayload(urlKey string, url string, file *multipart.FileHeader, ext string) gin.H {
+	payload := gin.H{urlKey: url}
+	if meta, ok := decodeUploadImageMetadata(file, ext); ok {
+		for k, v := range meta {
+			payload[k] = v
+		}
+	}
+	return payload
 }
