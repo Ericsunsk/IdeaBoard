@@ -228,12 +228,12 @@ import { useFlowViewportControls } from '../composables/useFlowViewportControls'
 import { useFlowActiveNodePanels } from '../composables/useFlowActiveNodePanels'
 import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
 import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
+import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
 import { useFlowMaskEditorChromeActions } from '../composables/useFlowMaskEditorChromeActions'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
-import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import { useFlowAutosave } from '../composables/useFlowAutosave'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import ImageMaskEditorChrome from '../components/nodes/ImageMaskEditorChrome.vue'
@@ -756,44 +756,15 @@ const { onMaskEditorChromeSubmit, onMaskEditorChromeOutputCountUpdate } =
     onWarning: (message) => appToast.warning(message),
   })
 
-function onFlowPromptGenerate(
-  promptNodeId: string,
-  prompt: string,
-  outputCount: number,
-  aspectRatio: string,
-) {
-  cancelFlowExpandMode()
-  cancelFlowMaskEditorMode()
-  const normalizedAspectRatio = normalizePromptAspectRatio(aspectRatio)
-  const inputImages = getMediaInputImages(promptNodeId)
-  if (inputImages.length === 0) {
-    void runTextPromptGeneration(promptNodeId, prompt, outputCount, normalizedAspectRatio)
-    return
-  }
-  const linkedSourceNodeIds = new Set(resolvePromptInputImageNodeIds(promptNodeId))
-  inputImages.forEach((item) => {
-    if (item.sourceType === 'node' && linkedSourceNodeIds.has(item.sourceId)) {
-      void runImagePromptGeneration(item.sourceId, prompt, outputCount, normalizedAspectRatio, {
-        outputAnchorNodeId: promptNodeId,
-      })
-      return
-    }
-    void runImagePromptGenerationFromSource(
-      {
-        url: item.url,
-        ratio: item.ratio,
-        x: 0,
-        y: 0,
-        width: 280,
-      },
-      item.id,
-      prompt,
-      outputCount,
-      normalizedAspectRatio,
-      { outputAnchorNodeId: promptNodeId },
-    )
-  })
-}
+const { onFlowPromptGenerate } = useFlowPromptGenerationOrchestrator({
+  cancelFlowExpandMode,
+  cancelFlowMaskEditorMode,
+  getMediaInputImages,
+  resolvePromptInputImageNodeIds,
+  runTextPromptGeneration,
+  runImagePromptGeneration,
+  runImagePromptGenerationFromSource,
+})
 
 const {
   clearFlowSelection,
