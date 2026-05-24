@@ -99,6 +99,20 @@ export function drawMaskRasterPreviewToCanvas(
   targetCtx.putImageData(imageData, 0, 0)
 }
 
+export function invertMaskPreviewCanvas(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data = imageData.data
+  for (let idx = 0; idx < data.length; idx += 4) {
+    data[idx] = MASK_PAINT_RGB.r
+    data[idx + 1] = MASK_PAINT_RGB.g
+    data[idx + 2] = MASK_PAINT_RGB.b
+    data[idx + 3] = 255 - data[idx + 3]
+  }
+  ctx.putImageData(imageData, 0, 0)
+}
+
 function extractMaskIntensity(
   data: Uint8ClampedArray,
   width: number,

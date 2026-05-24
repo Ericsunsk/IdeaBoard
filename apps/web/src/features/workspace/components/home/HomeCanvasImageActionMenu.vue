@@ -19,11 +19,11 @@
       class="image-action-menu-inner"
     >
       <template v-if="!showStrengthControl">
-        <button
+        <NodeToolIconButton
           v-for="item in IMAGE_ACTION_MENU_ITEMS"
           :key="item.title"
-          type="button"
-          class="image-action-icon-btn node-tool-button"
+          class="image-action-icon-btn"
+          :aria-label-value="item.title"
           :disabled="directGenerating"
           :title="item.title"
           @mousedown.stop="onActionMouseDown(item, $event)"
@@ -31,7 +31,7 @@
         >
           <ImageActionMenuIcon :icon="item.icon" />
           <span class="action-tooltip">{{ item.label }}</span>
-        </button>
+        </NodeToolIconButton>
       </template>
       <div
         v-else
@@ -55,6 +55,7 @@ import type { ComponentPublicInstance } from 'vue'
 import { IMAGE_ACTION_MENU_ITEMS, type ImageActionMenuItem } from '../../config/imageActionMenu'
 import { type ImageNodeAction, type ImageStrengthAction } from '../../types/imageActions'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
+import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
 
 defineProps<{
   showStrengthControl: boolean
@@ -124,17 +125,15 @@ function onActionClick(item: ImageActionMenuItem) {
 
 .image-action-icon-btn {
   flex: 0 0 var(--node-tool-button-size);
-  border: var(--node-tool-border-width) solid var(--node-tool-button-border);
-  background: #ffffff;
+  --node-tool-icon-button-size: var(--node-tool-button-size);
+  --node-tool-icon-button-radius: var(--node-tool-button-radius);
+  --node-tool-icon-button-border: var(--node-tool-button-border);
+  --node-tool-icon-button-color: #6f61c6;
+  --node-tool-icon-button-active-border: #7a6bd5;
+  --node-tool-icon-button-active-color: #7a6bd5;
+  --node-tool-icon-button-active-bg: #ffffff;
   position: relative;
   overflow: visible;
-  transition:
-    transform 0.18s ease,
-    color 0.18s ease,
-    opacity 0.18s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
-  color: #6f61c6;
 }
 
 .image-action-icon-btn:hover:not(:disabled) {

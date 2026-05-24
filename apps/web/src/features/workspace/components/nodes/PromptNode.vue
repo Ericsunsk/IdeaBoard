@@ -51,40 +51,18 @@
             <Plus class="node-action-icon" />
           </button>
         </div>
-        <textarea
-          ref="textInputRef"
-          :value="node.text"
-          class="workflow-node-input"
-          placeholder="type your idea..."
-          @input="onInput"
+        <PromptTextComposer
+          :model-value="node.text"
+          :output-count="outputCount"
+          :aspect-ratio="aspectRatio"
+          :submit-disabled="!canGenerate"
+          class="prompt-node-composer"
+          @update:model-value="emit('update:text', $event)"
+          @update:output-count="emit('update:output-count', $event)"
+          @update:aspect-ratio="emit('update:aspect-ratio', $event)"
           @focus="emit('focus')"
-          @contextmenu.stop
+          @submit="emit('generate')"
         />
-        <div ref="actionsRef" class="prompt-node-actions node-tool-surface">
-          <NodeAspectRatioPicker
-            :model-value="aspectRatio"
-            :visible="aspectRatioPickerVisible"
-            @toggle="toggleAspectRatioPicker"
-            @select="selectAspectRatio"
-          />
-          <NodeOutputCountPicker
-            :model-value="outputCount"
-            :visible="outputCountPickerVisible"
-            title="选择张数"
-            aria-label="输出张数"
-            @toggle="toggleOutputCountPicker"
-            @select="selectOutputCount"
-          />
-          <button
-            class="image-node-prompt-send node-tool-send node-tool-button"
-            type="button"
-            :disabled="!canGenerate"
-            title="发送"
-            @click="emit('generate')"
-          >
-            <SendDiagonalSolid class="node-action-icon node-send-icon" />
-          </button>
-        </div>
       </div>
     </div>
   </div>
@@ -92,15 +70,12 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChatLines, Plus, SendDiagonalSolid } from '@iconoir/vue'
+import { ChatLines, Plus } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type PromptNodeItem } from '../../types/canvasNodes'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
-import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
-import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
+import PromptTextComposer from './PromptTextComposer.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
-import { useAutoResizeTextarea } from './composables/useAutoResizeTextarea'
-import { useNodeToolPopoverGroup } from './composables/useNodeToolPopoverGroup'
 import { useSortableMediaInputs } from './composables/useSortableMediaInputs'
 import {
   normalizePromptAspectRatio,
@@ -132,14 +107,7 @@ const emit = defineEmits<{
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
-
-function onInput(event: Event) {
-  const input = event.target as HTMLTextAreaElement
-  emit('update:text', input.value)
-}
 const thumbsRef = ref<HTMLElement | null>(null)
-const textInputRef = ref<HTMLTextAreaElement | null>(null)
-const actionsRef = ref<HTMLElement | null>(null)
 const addSlotDragOver = ref(false)
 const maxInputImages = 4
 const outputCount = computed(() => clampImageNodeOutputCount(props.node.outputCount))
@@ -147,15 +115,6 @@ const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectR
 const visibleInputImages = computed(() => props.node.inputImages.slice(0, maxInputImages))
 const canAcceptMoreImages = computed(() => visibleInputImages.value.length < maxInputImages)
 const canGenerate = computed(() => props.node.text.trim().length > 0)
-const toolPopovers = useNodeToolPopoverGroup({
-  keys: ['aspect-ratio', 'output-count'] as const,
-  rootRefs: [actionsRef],
-})
-const outputCountPickerVisible = toolPopovers.isOpen('output-count')
-const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
-useAutoResizeTextarea(textInputRef, {
-  watchSource: [() => props.node.text, () => props.node.width],
-})
 const { sortableItems: sortableInputImages } = useSortableMediaInputs({
   containerRef: thumbsRef,
   sourceItems: visibleInputImages,
@@ -164,20 +123,6 @@ const { sortableItems: sortableInputImages } = useSortableMediaInputs({
   fallbackClass: 'prompt-node-sortable-fallback',
   onUpdate: (next) => emit('update:input-images', next),
 })
-function toggleOutputCountPicker() {
-  toolPopovers.toggle('output-count')
-}
-function selectOutputCount(value: number) {
-  toolPopovers.close('output-count')
-  emit('update:output-count', clampImageNodeOutputCount(value))
-}
-function toggleAspectRatioPicker() {
-  toolPopovers.toggle('aspect-ratio')
-}
-function selectAspectRatio(value: PromptAspectRatio) {
-  toolPopovers.close('aspect-ratio')
-  emit('update:aspect-ratio', value)
-}
 function removeInputImage(imageId: string) {
   const item = visibleInputImages.value.find((inputImage) => inputImage.id === imageId)
   if (!item) return
@@ -236,31 +181,6 @@ function onAddSlotDrop(event: DragEvent) {
   height: 16px;
   stroke-width: var(--node-tool-icon-stroke);
 }
-.node-send-icon {
-  transform: translateX(0.5px);
-}
-
-.workflow-node-input {
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 0;
-  cursor: text;
-  border: none;
-  resize: none;
-  outline: none;
-  padding: 0;
-  box-sizing: border-box;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #334155;
-  background: transparent;
-  font-family: inherit;
-  overflow: hidden;
-}
-
-.workflow-node-input::placeholder {
-  color: #94a3b8;
-}
 .prompt-node-thumbs {
   --node-tool-button-size: var(--node-input-thumbnail-size);
   --node-tool-button-radius: 8px;
@@ -297,12 +217,7 @@ function onAddSlotDrop(event: DragEvent) {
   border-color: var(--node-tool-button-accent);
   background: #f8f7ff;
 }
-.prompt-node-actions {
-  align-self: flex-end;
-  display: flex;
-  gap: var(--node-tool-button-gap);
-}
-.prompt-node-actions.node-tool-surface {
-  --node-tool-button-border: #e2e8f0;
+.prompt-node-composer {
+  flex: 1 1 auto;
 }
 </style>

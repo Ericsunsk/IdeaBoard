@@ -72,6 +72,7 @@ type RunImageInpaintActionOptions = {
   prompt: string
   maskDataUrl: string
   outputCount: number
+  referenceImageUrls?: string[]
 }
 
 type UseFlowImageDirectActionsOptions = {
@@ -284,6 +285,10 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       options.onWarning('请先标记局部重绘区域')
       return
     }
+    const referenceImageUrls = (inpaint.referenceImageUrls ?? [])
+      .map((url) => `${url ?? ''}`.trim())
+      .filter(Boolean)
+      .slice(0, 4)
     const resolvedOutputCount = clampImageNodeOutputCount(inpaint.outputCount)
     let resultNodeIds: string[] = []
     let localInpaint: FlowLocalInpaintCropResult | null = null
@@ -308,6 +313,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
             prompt: normalizedPrompt,
             croppedImageUrl: localInpaint!.croppedImageUrl,
             croppedMaskUrl: localInpaint!.croppedMaskUrl,
+            referenceImageUrls,
             cropSize: localInpaint!.cropSize,
           })
           return { taskId }

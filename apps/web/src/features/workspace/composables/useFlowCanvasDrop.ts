@@ -94,11 +94,11 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
     return uploadTask
   }
 
-  async function applyImageFileToImageNode(nodeId: string, file: File): Promise<void> {
+  async function applyImageFileToImageNode(nodeId: string, file: File): Promise<boolean> {
     const snapshotNode = options.getImageNodeSnapshot(nodeId)
     if (!snapshotNode) {
       options.onWarning('Image 节点不存在')
-      return
+      return false
     }
     try {
       const uploaded = await uploadImageToBoard(file)
@@ -113,9 +113,11 @@ export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
       }))
       options.onNodeMutated?.(nodeId)
       options.onSuccess('Image 节点输入已更新')
+      return true
     } catch (error) {
       const msg = error instanceof Error ? error.message : '上传失败'
       options.onWarning(msg)
+      return false
     }
   }
 

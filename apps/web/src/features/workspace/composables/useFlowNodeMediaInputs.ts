@@ -7,7 +7,7 @@ import { IMAGE_NODE_EMPTY_SIZE } from '../utils/imageNodeSizing'
 type UseFlowNodeMediaInputsOptions = {
   nodes: Ref<Node[]>
   canvasDrop: {
-    applyImageFileToImageNode: (nodeId: string, file: File) => Promise<void>
+    applyImageFileToImageNode: (nodeId: string, file: File) => Promise<boolean>
   }
   updateSnapshotNode: (
     nodeId: string,

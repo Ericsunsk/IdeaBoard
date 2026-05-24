@@ -42,8 +42,8 @@
         :mask-editor-overlay-style="maskEditorOverlayStyle"
         :mask-editor-canvas-width="maskEditorCanvasWidth"
         :mask-editor-canvas-height="maskEditorCanvasHeight"
-        :mask-editor-draw-mode="maskEditorDrawMode"
-        :mask-editor-brush-size="maskEditorBrushSize"
+        :mask-layer-opacity="maskLayerOpacity"
+        :image-layer-visible="imageLayerVisible"
         :set-mask-canvas-ref="setMaskCanvasRef"
         :output-count="node.outputCount"
         :active="active"
@@ -53,7 +53,7 @@
         @open-preview="emit('open-preview')"
         @append-to-canvas="emit('append-to-canvas')"
         @reset="emit('reset')"
-        @contextmenu="emit('contextmenu', $event)"
+        @contextmenu="onImageStageContextMenu"
         @expand-submit="submitExpand"
         @update:output-count="selectOutputCount"
         @expand-handle-pointerdown="emit('expand-handle-pointerdown', $event)"
@@ -61,11 +61,6 @@
         @expand-handle-pointerup="emit('expand-handle-pointerup', $event)"
         @expand-frame-pointerdown="emit('expand-frame-pointerdown', $event)"
         @mask-canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
-        @mask-set-draw-mode="emit('mask-set-draw-mode', $event)"
-        @mask-set-brush-size="emit('mask-set-brush-size', $event)"
-        @mask-clear="emit('mask-clear')"
-        @mask-cancel="emit('mask-cancel')"
-        @mask-done="emit('mask-done', $event)"
       />
 
       <HomeCanvasImageActionMenu
@@ -82,7 +77,7 @@
         v-if="showPromptComposer"
         v-model="promptDraft"
         offset="52px"
-        placeholder="输入提示词改造这张图"
+        :placeholder="props.promptPlaceholder ?? ''"
         :disabled="!!directGenerating"
         :output-count="outputCountValue"
         @update:output-count="selectOutputCount"
@@ -101,7 +96,6 @@ import {
 } from '../../types/canvasNodes'
 import type { ImageNodeAction, ImageStrengthAction } from '../../types/imageActions'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import type { ImageMaskDrawMode } from '../../composables/useImageMaskEditorOverlay'
 import NodePromptComposer from './NodePromptComposer.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
@@ -120,6 +114,7 @@ const props = defineProps<{
   inputLocked?: boolean
   actionMenuVisible?: boolean
   promptComposerVisible?: boolean
+  promptPlaceholder?: string
   directGenerating?: boolean
   showStrengthControl?: boolean
   strengthPct?: number
@@ -131,8 +126,8 @@ const props = defineProps<{
   maskEditorOverlayStyle?: Record<string, string> | null
   maskEditorCanvasWidth?: number
   maskEditorCanvasHeight?: number
-  maskEditorDrawMode?: ImageMaskDrawMode
-  maskEditorBrushSize?: number
+  maskLayerOpacity?: number
+  imageLayerVisible?: boolean
   setMaskCanvasRef?: (element: Element | null) => void
 }>()
 
@@ -157,17 +152,14 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
   (e: 'mask-canvas-pointerdown', event: PointerEvent): void
-  (e: 'mask-set-draw-mode', mode: ImageMaskDrawMode): void
-  (e: 'mask-set-brush-size', value: number): void
-  (e: 'mask-clear'): void
-  (e: 'mask-cancel'): void
-  (e: 'mask-done', payload: { prompt: string; outputCount: number }): void
 }>()
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
 
-const showImageActionMenu = computed(() => !!props.actionMenuVisible && !!props.displayImage)
+const showImageActionMenu = computed(
+  () => !!props.actionMenuVisible && !!props.displayImage && !props.maskEditorModeActive,
+)
 const showPromptComposer = computed(
   () => !!props.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
 )
@@ -213,6 +205,15 @@ function submitExpand(prompt: string, outputCount: number) {
 
 function selectOutputCount(value: number) {
   emit('update:output-count', clampImageNodeOutputCount(value))
+}
+
+function onImageStageContextMenu(event: MouseEvent) {
+  if (props.maskEditorModeActive) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+  emit('contextmenu', event)
 }
 
 </script>

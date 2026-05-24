@@ -42,17 +42,10 @@
         :style="maskEditorOverlayStyle"
         :canvas-width="maskEditorCanvasWidth ?? 0"
         :canvas-height="maskEditorCanvasHeight ?? 0"
-        :draw-mode="maskEditorDrawMode ?? 'paint'"
-        :brush-size="maskEditorBrushSize ?? 18"
-        :output-count="outputCountValue"
+        :mask-layer-opacity="maskLayerOpacity ?? 72"
+        :image-layer-visible="imageLayerVisible ?? true"
         :set-canvas-ref="setMaskCanvasRef ?? (() => {})"
         @canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
-        @set-draw-mode="emit('mask-set-draw-mode', $event)"
-        @set-brush-size="emit('mask-set-brush-size', $event)"
-        @update:output-count="selectOutputCount"
-        @clear="emit('mask-clear')"
-        @cancel="emit('mask-cancel')"
-        @done="emit('mask-done', $event)"
       />
       <div class="image-node-stage-actions">
         <NodeActionButton variant="stage-ghost" @click="emit('open-preview')">预览</NodeActionButton>
@@ -80,7 +73,6 @@
 import { computed, ref } from 'vue'
 import { clampImageNodeOutputCount } from '../../types/canvasNodes'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
-import type { ImageMaskDrawMode } from '../../composables/useImageMaskEditorOverlay'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 import ImageMaskEditorOverlay from './ImageMaskEditorOverlay.vue'
@@ -102,8 +94,8 @@ const props = defineProps<{
   maskEditorOverlayStyle?: Record<string, string> | null
   maskEditorCanvasWidth?: number
   maskEditorCanvasHeight?: number
-  maskEditorDrawMode?: ImageMaskDrawMode
-  maskEditorBrushSize?: number
+  maskLayerOpacity?: number
+  imageLayerVisible?: boolean
   setMaskCanvasRef?: (element: Element | null) => void
   outputCount?: number
   active: boolean
@@ -124,11 +116,6 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
   (e: 'mask-canvas-pointerdown', event: PointerEvent): void
-  (e: 'mask-set-draw-mode', mode: ImageMaskDrawMode): void
-  (e: 'mask-set-brush-size', value: number): void
-  (e: 'mask-clear'): void
-  (e: 'mask-cancel'): void
-  (e: 'mask-done', payload: { prompt: string; outputCount: number }): void
 }>()
 
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
@@ -136,7 +123,6 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
 const emptyStateLabel = computed(() => (props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入'))
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.outputCount))
-
 const stageElement = ref<HTMLElement | null>(null)
 defineExpose({ stageElement })
 
@@ -168,6 +154,7 @@ function submitExpand(prompt: string, outputCount: number) {
 function selectOutputCount(value: number) {
   emit('update:output-count', clampImageNodeOutputCount(value))
 }
+
 </script>
 
 <style scoped>

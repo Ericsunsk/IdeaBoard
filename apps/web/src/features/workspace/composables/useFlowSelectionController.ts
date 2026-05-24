@@ -6,6 +6,7 @@ type UseFlowSelectionControllerOptions = {
   activeImageActionNodeId: Ref<string | null>
   activeImagePromptNodeId?: Ref<string | null>
   activeFusionPromptNodeId?: Ref<string | null>
+  closeImagePromptComposer?: () => void
   cancelFlowExpandMode?: () => void
   hideStrengthControl: () => void
   closeBoardHeaderEditing: () => void
@@ -53,7 +54,8 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     options.closeBoardHeaderEditing()
     options.closeNodeContextMenu()
     options.activeImageActionNodeId.value = null
-    if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+    if (options.closeImagePromptComposer) options.closeImagePromptComposer()
+    else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
     options.hideStrengthControl()
   }
@@ -62,7 +64,8 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
     if (options.activeTool.value === 'hand') return
     options.cancelFlowExpandMode?.()
     options.activeImageActionNodeId.value = null
-    if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+    if (options.closeImagePromptComposer) options.closeImagePromptComposer()
+    else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
     options.hideStrengthControl()
   }
@@ -76,7 +79,8 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
       }
       options.cancelFlowExpandMode?.()
       options.activeImageActionNodeId.value = null
-      if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+      if (options.closeImagePromptComposer) options.closeImagePromptComposer()
+      else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
       if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
       options.hideStrengthControl()
     }
@@ -85,7 +89,8 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
   function deleteSelectedFlowElements() {
     options.cancelFlowExpandMode?.()
     options.activeImageActionNodeId.value = null
-    if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+    if (options.closeImagePromptComposer) options.closeImagePromptComposer()
+    else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
     options.hideStrengthControl()
     options.closeNodeContextMenu()

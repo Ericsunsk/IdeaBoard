@@ -9,6 +9,7 @@ type UseFlowNodeDragInteractionsOptions = {
   activeImageActionNodeId: { value: string | null }
   activeImagePromptNodeId?: { value: string | null }
   activeFusionPromptNodeId?: { value: string | null }
+  closeImagePromptComposer?: () => void
   cancelFlowExpandMode?: () => void
   hideStrengthControl: () => void
 }
@@ -17,7 +18,8 @@ export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractions
   function onNodeDragStart() {
     options.cancelFlowExpandMode?.()
     options.activeImageActionNodeId.value = null
-    if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
+    if (options.closeImagePromptComposer) options.closeImagePromptComposer()
+    else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
     if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
     options.hideStrengthControl()
     options.beginNodeDragTransaction()

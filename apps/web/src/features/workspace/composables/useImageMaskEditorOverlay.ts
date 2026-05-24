@@ -6,6 +6,7 @@ import {
   drawMaskRasterPreviewToCanvas,
   drawMaskStrokeSegment,
   getMaskCanvasPoint,
+  invertMaskPreviewCanvas,
 } from './useMaskPaintingCanvas'
 import { containImageRect } from '../utils/canvasExtendGeometry'
 import { isEditableEventTarget } from '../utils/domEventTargets'
@@ -33,7 +34,6 @@ type UseImageMaskEditorOverlayOptions = {
   getImageNodeDisplayPayload: (nodeId: string) => ImageDisplayPayload | null
   getImageStageElement: (nodeId: string) => HTMLElement | null
   onBeforePointerCancel?: () => void
-  onCommit?: (payload: { nodeId: string; committed: ImageMaskEditorCommittedData }) => void
   startCanvasInteraction?: (key: CanvasInteractionKey) => void
   stopCanvasInteraction?: (key: CanvasInteractionKey) => void
 }
@@ -119,8 +119,23 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingPointerId = null
   }
 
-  function cancelMaskEditorMode() {
+  function saveMaskDraft(): boolean {
+    const nodeId = state.value?.nodeId
+    if (!nodeId) return false
     stopPainting()
+    const canvas = canvasRefs.get(nodeId)
+    if (!canvas) return false
+    const committed = buildMaskCommitResult(canvas)
+    if (!committed) {
+      committedMaskDataMap.delete(nodeId)
+      return false
+    }
+    committedMaskDataMap.set(nodeId, committed)
+    return true
+  }
+
+  function cancelMaskEditorMode() {
+    saveMaskDraft()
     state.value = null
   }
 
@@ -224,21 +239,22 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     ctx.clearRect(0, 0, canvas.width, canvas.height)
   }
 
-  function commitMaskEditorMode(): boolean {
+  function invertMask() {
     const nodeId = state.value?.nodeId
-    if (!nodeId) return false
-    stopPainting()
+    if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
-    if (!canvas) return false
-    const committed = buildMaskCommitResult(canvas)
-    if (!committed) {
-      committedMaskDataMap.delete(nodeId)
-      return false
-    }
-    committedMaskDataMap.set(nodeId, committed)
-    options.onCommit?.({ nodeId, committed })
-    cancelMaskEditorMode()
-    return true
+    if (!canvas) return
+    invertMaskPreviewCanvas(canvas)
+  }
+
+  function commitMaskEditorMode(): boolean {
+    const saved = saveMaskDraft()
+    state.value = null
+    return saved
+  }
+
+  function clearCommittedMaskData(nodeId: string) {
+    committedMaskDataMap.delete(nodeId)
   }
 
   function updateBrushSize(value: number) {
@@ -302,6 +318,8 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     cancelMaskEditorMode,
     commitMaskEditorMode,
     clearMask,
+    invertMask,
+    clearCommittedMaskData,
     setMaskCanvasRef,
     onCanvasPointerDown,
     setDrawMode: (mode: ImageMaskDrawMode) => {

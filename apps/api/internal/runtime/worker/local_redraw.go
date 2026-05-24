@@ -236,6 +236,11 @@ func readLocalRedrawMaskRef(params map[string]interface{}) (string, bool) {
 
 func rewriteLocalRedrawUpstreamInputs(params map[string]interface{}, featureSlug, roiDataURL string, roi image.Rectangle) error {
 	imageURLs := []string{roiDataURL}
+	for _, ref := range mediarefs.CollectStringList(params["reference_image_urls"]) {
+		if trimmed := strings.TrimSpace(ref); trimmed != "" {
+			imageURLs = append(imageURLs, trimmed)
+		}
+	}
 	params["image_urls"] = toInterfaceSlice(imageURLs)
 	params["image_url"] = roiDataURL
 	params["original_image_url"] = roiDataURL

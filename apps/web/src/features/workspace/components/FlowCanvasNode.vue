@@ -53,6 +53,7 @@
           :input-locked="imageInputLocked"
           :action-menu-visible="!!props.imageActionVisible"
           :prompt-composer-visible="!!props.imagePromptComposerVisible"
+          :prompt-placeholder="props.imagePromptPlaceholder"
           :direct-generating="imageGenerating"
           :show-strength-control="!!props.showStrengthControl"
           :strength-pct="props.strengthPct ?? 50"
@@ -64,8 +65,8 @@
           :mask-editor-overlay-style="props.maskEditorOverlayStyle ?? null"
           :mask-editor-canvas-width="props.maskEditorCanvasWidth ?? 0"
           :mask-editor-canvas-height="props.maskEditorCanvasHeight ?? 0"
-          :mask-editor-draw-mode="props.maskEditorDrawMode ?? 'paint'"
-          :mask-editor-brush-size="props.maskEditorBrushSize ?? 18"
+          :mask-layer-opacity="props.maskLayerOpacity ?? 72"
+          :image-layer-visible="props.imageLayerVisible ?? true"
           :set-mask-canvas-ref="(element) => (props.setMaskCanvasRef ?? (() => {}))(props.nodeId, element)"
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
@@ -87,11 +88,6 @@
           @expand-handle-pointerup="onImageExpandHandlePointerUp"
           @expand-frame-pointerdown="onImageExpandFramePointerDown"
           @mask-canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
-          @mask-set-draw-mode="emit('mask-set-draw-mode', $event)"
-          @mask-set-brush-size="emit('mask-set-brush-size', $event)"
-          @mask-clear="emit('mask-clear')"
-          @mask-cancel="emit('mask-cancel')"
-          @mask-done="emit('mask-done', $event)"
         />
       </div>
     </template>
@@ -193,7 +189,6 @@ import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction, ImageStrengthAction } from '../types/imageActions'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
-import type { ImageMaskDrawMode } from '../composables/useImageMaskEditorOverlay'
 import { resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
 
 const props = withDefaults(
@@ -206,6 +201,7 @@ const props = withDefaults(
     uiState?: NodeUiState | PromptNodeUiState
     imageActionVisible?: boolean
     imagePromptComposerVisible?: boolean
+    imagePromptPlaceholder?: string
     fusionPromptComposerVisible?: boolean
     imageDirectGenerating?: boolean
     showStrengthControl?: boolean
@@ -220,8 +216,8 @@ const props = withDefaults(
     maskEditorOverlayStyle?: Record<string, string> | null
     maskEditorCanvasWidth?: number
     maskEditorCanvasHeight?: number
-    maskEditorDrawMode?: ImageMaskDrawMode
-    maskEditorBrushSize?: number
+    maskLayerOpacity?: number
+    imageLayerVisible?: boolean
     setMaskCanvasRef?: (nodeId: string, element: Element | null) => void
   }>(),
   {
@@ -231,6 +227,7 @@ const props = withDefaults(
     uiState: undefined,
     imageActionVisible: false,
     imagePromptComposerVisible: false,
+    imagePromptPlaceholder: '输入提示词改造这张图',
     fusionPromptComposerVisible: false,
     imageDirectGenerating: false,
     showStrengthControl: false,
@@ -245,8 +242,8 @@ const props = withDefaults(
     maskEditorOverlayStyle: null,
     maskEditorCanvasWidth: 0,
     maskEditorCanvasHeight: 0,
-    maskEditorDrawMode: 'paint',
-    maskEditorBrushSize: 18,
+    maskLayerOpacity: 72,
+    imageLayerVisible: true,
     setMaskCanvasRef: () => undefined,
   },
 )
@@ -281,11 +278,6 @@ const emit = defineEmits<{
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
   (e: 'mask-canvas-pointerdown', event: PointerEvent): void
-  (e: 'mask-set-draw-mode', mode: ImageMaskDrawMode): void
-  (e: 'mask-set-brush-size', value: number): void
-  (e: 'mask-clear'): void
-  (e: 'mask-cancel'): void
-  (e: 'mask-done', payload: { prompt: string; outputCount: number }): void
   (e: 'request-internals-update'): void
 }>()
 
