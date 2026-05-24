@@ -2,7 +2,6 @@ import { WORKFLOW_FEATURE, type WorkflowFeature } from './workflowFeatures'
 
 export const WORKFLOW_FEATURE_GROUP = {
   prompt: 'prompt',
-  model: 'model',
   display: 'display',
   fusion: 'fusion',
   inpaint: 'inpaint',
@@ -25,12 +24,6 @@ export const WORKFLOW_FEATURE_GROUP_LIST: readonly WorkflowFeatureGroupMeta[] = 
     title: 'Prompt',
     desc: '草图成图、风格延展、抠图和图案生成类右键/生成工作流。',
     order: 10,
-  },
-  {
-    key: WORKFLOW_FEATURE_GROUP.model,
-    title: 'Model',
-    desc: '视角、姿态与主体跟随控制。',
-    order: 20,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.display,
@@ -90,11 +83,6 @@ export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] =
     slug: WORKFLOW_FEATURE.styleFusion,
     adminTitle: 'Fusion · 双图融合',
     groupKey: WORKFLOW_FEATURE_GROUP.fusion,
-  },
-  {
-    slug: WORKFLOW_FEATURE.multiAngle,
-    adminTitle: 'Model · 单视角控制',
-    groupKey: WORKFLOW_FEATURE_GROUP.model,
   },
   {
     slug: WORKFLOW_FEATURE.virtual3d,

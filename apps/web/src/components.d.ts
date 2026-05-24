@@ -31,7 +31,6 @@ declare module 'vue' {
     ImageNode: typeof import('./features/workspace/components/nodes/ImageNode.vue')['default']
     ImageNodeStage: typeof import('./features/workspace/components/nodes/ImageNodeStage.vue')['default']
     LoginModal: typeof import('./features/auth/components/LoginModal.vue')['default']
-    ModelNode: typeof import('./features/workspace/components/nodes/ModelNode.vue')['default']
     NButton: typeof import('naive-ui')['NButton']
     NConfigProvider: typeof import('naive-ui')['NConfigProvider']
     NDialogProvider: typeof import('naive-ui')['NDialogProvider']

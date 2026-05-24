@@ -35,7 +35,6 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 		FeatureSlugPartialEdit,
 		FeatureSlugRemoveBg,
 		FeatureSlugStyleFusion,
-		FeatureSlugMultiAngle,
 		FeatureSlugVirtual3D,
 		FeatureSlugPatternGen,
 		FeatureSlugHDUpscale,
@@ -112,7 +111,6 @@ func TestIsReferenceImageFeature(t *testing.T) {
 		want    bool
 	}{
 		{feature: FeatureSlugStyleFusion, want: true},
-		{feature: FeatureSlugMultiAngle, want: true},
 		{feature: FeatureSlugRemoveBg, want: false},
 		{feature: FeatureSlugImageExtend, want: false},
 	}

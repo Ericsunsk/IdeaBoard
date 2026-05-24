@@ -34,10 +34,6 @@ export const EXECUTION_META = {
   [EXECUTION_FEATURE.removeBg]: {
     feature: EXECUTION_FEATURE.removeBg,
   },
-  [EXECUTION_FEATURE.multiAngle]: {
-    feature: EXECUTION_FEATURE.multiAngle,
-    promptPrefix: '[multi-angle]',
-  },
   [EXECUTION_FEATURE.virtual3d]: {
     feature: EXECUTION_FEATURE.virtual3d,
     promptPrefix: '[virtual-3d]',
@@ -63,8 +59,6 @@ export const EXECUTION_DIRECT_ACTION_META = {
   styleVariation: EXECUTION_META[EXECUTION_FEATURE.styleVariation],
   removeBg: EXECUTION_META[EXECUTION_FEATURE.removeBg],
 } as const
-
-export const EXECUTION_MODEL_META = EXECUTION_META[EXECUTION_FEATURE.multiAngle]
 
 export const EXECUTION_VIEWPOINT_META = EXECUTION_META[EXECUTION_FEATURE.virtual3d]
 

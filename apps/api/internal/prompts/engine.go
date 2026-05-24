@@ -1,7 +1,6 @@
 package prompts
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -217,31 +216,11 @@ func ApplyFeatureSystemPrompt(
 		if v, ok := params["pattern_mode"]; ok {
 			varMap["{{pattern_mode}}"] = fmt.Sprintf("%v", v)
 		}
-		if v, ok := params["angle_spec"]; ok {
-			if encoded, err := json.Marshal(v); err == nil {
-				varMap["{{angle_spec}}"] = string(encoded)
-			}
-		}
-		if v, ok := params["background"]; ok {
-			varMap["{{background}}"] = fmt.Sprintf("%v", v)
-		}
 		if v, ok := params["viewpoint"]; ok {
 			varMap["{{viewpoint}}"] = DescribeViewpointTemplateValue(fmt.Sprintf("%v", v))
 		}
 		if v, ok := params["lighting"]; ok {
 			varMap["{{lighting}}"] = DescribeViewpointLightingTemplateValue(fmt.Sprintf("%v", v))
-		}
-		if v, ok := params["model_url"]; ok {
-			varMap["{{model_url}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["pose_url"]; ok {
-			varMap["{{pose_url}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["pose_strength"]; ok {
-			varMap["{{pose_strength}}"] = fmt.Sprintf("%v", v)
-		}
-		if v, ok := params["model_strength"]; ok {
-			varMap["{{model_strength}}"] = fmt.Sprintf("%v", v)
 		}
 	}
 	if strings.Contains(sysPrompt, "{{") {

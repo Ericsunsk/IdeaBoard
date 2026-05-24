@@ -42,7 +42,6 @@ func TestApplyFeatureSystemPromptNonStyleVariationStillAppendsBasePrompt(t *test
 func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 	features := []string{
 		"style-fusion",
-		"multi-angle",
 		"image-extend",
 		"hd-upscale",
 	}
@@ -56,7 +55,6 @@ func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 				map[string]interface{}{
 					"mask_image_url": "https://mask.example/a.png",
 					"use_mask":       true,
-					"model_url":      "https://img.example/model.png",
 				},
 				func(string) (string, error) {
 					return "SYS-CONFIG", nil

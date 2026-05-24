@@ -57,15 +57,6 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   [IMAGE_NODE_ACTION.sketchToImage]: noVars,
   [WORKFLOW_FEATURE.partialEdit]: promptVars,
   [IMAGE_NODE_ACTION.styleVariation]: [{ key: '{{strength}}', desc: '风格延展强度百分比（0-100）' }],
-  [WORKFLOW_FEATURE.multiAngle]: [
-    { key: '{{angle_spec}}', desc: '视角控制参数（JSON，系统按它决定 yaw 与景别）' },
-    { key: '{{model_url}}', desc: '画布里接到 Model 输入口的参考图（系统自动传值）' },
-    { key: '{{model_strength}}', desc: 'Model 输入口权重（0-100，越高越贴近参考图主体）' },
-    { key: '{{pose_url}}', desc: '画布里接到 Pose 输入口的姿态参考图（系统自动传值）' },
-    { key: '{{pose_strength}}', desc: 'Pose 输入口权重（0-100，越高越跟随姿态）' },
-    { key: '{{background}}', desc: 'Model 节点背景参数（original / studio）' },
-    { key: '{{user_prompt}}', desc: 'Prompt 节点输入口文本（弱修饰，用于氛围和细节）' },
-  ],
   [WORKFLOW_FEATURE.virtual3d]: [
     {
       key: '{{viewpoint}}',
@@ -116,16 +107,12 @@ const CONTROL_VAR_KEYS = new Set([
   '{{blend_ratio}}',
   '{{image_a_weight}}',
   '{{image_b_weight}}',
-  '{{model_strength}}',
-  '{{pose_strength}}',
   '{{upscale_factor}}',
   '{{output_quality}}',
 ])
 
 const ASSET_VAR_KEYS = new Set([
   '{{original_image_url}}',
-  '{{model_url}}',
-  '{{pose_url}}',
 ])
 
 export function getVarsForSlug(slug: FeatureSlug): VarDef[] {

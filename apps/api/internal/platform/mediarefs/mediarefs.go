@@ -10,7 +10,7 @@ import (
 	"api/internal/platform/outbound"
 )
 
-var stringKeys = []string{"image_url", "original_image_url", "mask_image_url", "model_url", "pose_url"}
+var stringKeys = []string{"image_url", "original_image_url", "mask_image_url"}
 var listKeys = []string{"image_urls", "mask_image_urls"}
 
 type DataImage struct {

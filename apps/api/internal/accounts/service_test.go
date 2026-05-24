@@ -137,21 +137,6 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			want:     "SYS 融合但不要太夸张 ratio=55 a=60 b=40",
 		},
 		{
-			name:       "multi angle",
-			feature:    workflow.FeatureSlugMultiAngle,
-			basePrompt: "user prompt",
-			userPrompt: "输出右前45度",
-			params: map[string]interface{}{
-				"model_url":      "https://example.com/model.png",
-				"pose_url":       "https://example.com/pose.png",
-				"model_strength": 0.8,
-				"pose_strength":  0.6,
-				"angle_spec":     "front-right-45",
-			},
-			template: "SYS {{user_prompt}} model={{model_url}} pose={{pose_url}} ms={{model_strength}} ps={{pose_strength}} angle={{angle_spec}}",
-			want:     `SYS 输出右前45度 model=https://example.com/model.png pose=https://example.com/pose.png ms=0.8 ps=0.6 angle="front-right-45"`,
-		},
-		{
 			name:       "canvas extend",
 			feature:    workflow.FeatureSlugImageExtend,
 			basePrompt: "user prompt",

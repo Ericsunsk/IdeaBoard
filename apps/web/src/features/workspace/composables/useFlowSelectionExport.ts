@@ -160,7 +160,6 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       if (
         kind !== 'image' &&
         kind !== 'fusion' &&
-        kind !== 'model' &&
         kind !== 'viewpoint'
       ) {
         continue

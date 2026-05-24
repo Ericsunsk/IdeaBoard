@@ -14,15 +14,6 @@ export interface CanvasPoint {
 }
 
 export type WorkflowNodeOutputStatus = 'idle' | 'running' | 'ready' | 'stale'
-export const MODEL_POSE_STRENGTH_MIN = 0
-export const MODEL_POSE_STRENGTH_MAX = 100
-export const MODEL_POSE_STRENGTH_DEFAULT = 70
-export const MODEL_REFERENCE_STRENGTH_MIN = 0
-export const MODEL_REFERENCE_STRENGTH_MAX = 100
-export const MODEL_REFERENCE_STRENGTH_DEFAULT = 80
-export const MODEL_ANGLE_YAW_MIN = -180
-export const MODEL_ANGLE_YAW_MAX = 180
-export const MODEL_ANGLE_YAW_DEFAULT = 0
 
 export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] = [
   'idle',
@@ -93,56 +84,6 @@ export interface PromptNodeInputImage extends ImageNodeOutputItem {
 }
 export type FusionNodeInputImage = PromptNodeInputImage
 
-export type ModelAngleFraming = 'full' | 'half' | 'portrait'
-
-export interface ModelAngleSpec {
-  yaw: number
-  framing: ModelAngleFraming
-}
-
-export function clampModelPoseStrength(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(MODEL_POSE_STRENGTH_MIN, Math.min(MODEL_POSE_STRENGTH_MAX, Math.round(value)))
-    : MODEL_POSE_STRENGTH_DEFAULT
-}
-
-export function clampModelReferenceStrength(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(
-        MODEL_REFERENCE_STRENGTH_MIN,
-        Math.min(MODEL_REFERENCE_STRENGTH_MAX, Math.round(value)),
-      )
-    : MODEL_REFERENCE_STRENGTH_DEFAULT
-}
-
-export function clampModelAngleYaw(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(MODEL_ANGLE_YAW_MIN, Math.min(MODEL_ANGLE_YAW_MAX, Math.round(value)))
-    : MODEL_ANGLE_YAW_DEFAULT
-}
-
-export function createDefaultModelAngleSpec(): ModelAngleSpec {
-  return {
-    yaw: MODEL_ANGLE_YAW_DEFAULT,
-    framing: 'full',
-  }
-}
-
-export interface ModelNodeItem {
-  id: number
-  type: 'model'
-  x: number
-  y: number
-  width: number
-  title?: string
-  angleSpec: ModelAngleSpec
-  modelStrength: number
-  poseStrength: number
-  background: string
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
 export interface ViewpointNodeItem {
   id: number
   type: 'viewpoint'
@@ -193,12 +134,10 @@ export interface FusionNodeItem {
 }
 
 export type CanvasExecutionOutputNodeType =
-  | 'model'
   | 'viewpoint'
   | 'fusion'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
-  'model',
   'viewpoint',
   'fusion',
 ]
@@ -213,7 +152,6 @@ export function isCanvasExecutionOutputNodeType(
 }
 
 export type CanvasExecutionOutputNodeItem =
-  | ModelNodeItem
   | ViewpointNodeItem
   | FusionNodeItem
 
@@ -224,14 +162,12 @@ export type CanvasImageOutputNodeItem = ImageNodeItem | CanvasExecutionOutputNod
 export type CanvasConnectionNodeType =
   | 'image'
   | 'prompt'
-  | 'model'
   | 'viewpoint'
   | 'fusion'
 
 export const CANVAS_CONNECTION_NODE_TYPES: readonly CanvasConnectionNodeType[] = [
   'image',
   'prompt',
-  'model',
   'viewpoint',
   'fusion',
 ] as const
@@ -249,15 +185,13 @@ export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): s
       return 'Image'
     case 'prompt':
       return 'Prompt'
-    case 'model':
-      return 'Model'
     case 'viewpoint':
       return 'Display'
     case 'fusion':
       return 'Fusion'
   }
 }
-export type CanvasConnectionPort = 'image' | 'prompt' | 'imageA' | 'imageB'
+export type CanvasConnectionPort = 'image' | 'prompt'
 
 export interface CanvasConnection {
   id: number
@@ -271,7 +205,6 @@ export interface CanvasConnection {
 
 export type CanvasNodeItem =
   | PromptNodeItem
-  | ModelNodeItem
   | ViewpointNodeItem
   | ImageNodeItem
   | FusionNodeItem
@@ -285,7 +218,6 @@ export interface CanvasViewportState {
 export interface CanvasBoardSnapshot {
   imageNodes: ImageNodeItem[]
   promptNodes: PromptNodeItem[]
-  modelNodes: ModelNodeItem[]
   viewpointNodes: ViewpointNodeItem[]
   fusionNodes: FusionNodeItem[]
   connections: CanvasConnection[]

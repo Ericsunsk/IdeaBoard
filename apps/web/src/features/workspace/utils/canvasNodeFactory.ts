@@ -3,17 +3,13 @@ import {
   DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   DEFAULT_PROMPT_ASPECT_RATIO,
-  createDefaultModelAngleSpec,
   DEFAULT_FUSION_BLEND_POINT,
-  MODEL_REFERENCE_STRENGTH_DEFAULT,
-  MODEL_POSE_STRENGTH_DEFAULT,
   getDefaultCanvasNodeTitle,
 } from '../types/canvasNodes'
 import type {
   CanvasPoint,
   FusionNodeItem,
   ImageNodeItem,
-  ModelNodeItem,
   PromptNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
@@ -34,23 +30,6 @@ export function createPromptNodeAt(point: CanvasPoint): PromptNodeItem {
     outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
     aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
     inputImages: [],
-  }
-}
-
-export function createModelNodeAt(point: CanvasPoint): ModelNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'model',
-    x: point.x,
-    y: point.y,
-    width: 280,
-    title: getDefaultCanvasNodeTitle('model'),
-    angleSpec: createDefaultModelAngleSpec(),
-    modelStrength: MODEL_REFERENCE_STRENGTH_DEFAULT,
-    poseStrength: MODEL_POSE_STRENGTH_DEFAULT,
-    background: 'original',
-    outputStatus: 'idle',
-    outputImages: [],
   }
 }
 

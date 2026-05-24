@@ -8,8 +8,6 @@ export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST = CANVAS_CONNECTION_NODE_TYPE
 export const CANVAS_CONNECTION_PORT_WHITELIST: readonly CanvasConnectionPort[] = [
   'image',
   'prompt',
-  'imageA',
-  'imageB',
 ] as const
 
 export const CANVAS_CONNECTION_PORT_DIRECTIONS = ['input', 'output'] as const

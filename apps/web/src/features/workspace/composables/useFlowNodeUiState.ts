@@ -51,7 +51,6 @@ function resolveExecutionActionLabels(
   nodeType: CanvasExecutionOutputNodeType,
 ): ExecutionActionLabels {
   switch (nodeType) {
-    case 'model':
     case 'viewpoint':
       return { ready: '生成', running: '生成中...' }
     case 'fusion':
@@ -63,15 +62,9 @@ function formatNodePortLabel(
   nodeType: CanvasConnectionNodeType,
   port: CanvasConnectionPort,
 ): string {
-  if (nodeType === 'model') {
-    if (port === 'image') return 'Image'
-    if (port === 'imageA') return 'Model'
-    if (port === 'imageB') return 'Pose'
-  }
+  void nodeType
   if (port === 'image') return 'Image'
   if (port === 'prompt') return 'Prompt'
-  if (port === 'imageA') return 'Image A'
-  if (port === 'imageB') return 'Image B'
   return port
 }
 
@@ -133,11 +126,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         }
         const sourceType = getNodeType(matchedEdge.source)
         if (sourceType) incomingSourceKind[portContract.port] = sourceType
-        if (
-          portContract.port === 'image' ||
-          portContract.port === 'imageA' ||
-          portContract.port === 'imageB'
-        ) {
+        if (portContract.port === 'image') {
           pendingIncoming[portContract.port] = !resolveConnectedImageReady(matchedEdge.source)
           return
         }

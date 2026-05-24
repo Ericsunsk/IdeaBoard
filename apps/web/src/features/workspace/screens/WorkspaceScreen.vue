@@ -112,7 +112,6 @@
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
             @delete-node="() => onFlowDeleteNode(nodeProps.id)"
-            @generate-model="() => onFlowModelGenerate(nodeProps.id)"
             @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
             @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
             @media-input-image-drop="onFlowMediaInputImageDrop"
@@ -512,7 +511,6 @@ function onFlowImageOpenPreview(nodeId: string) {
 }
 
 const {
-  onFlowModelGenerate,
   onFlowViewpointGenerate,
   isFlowExecutionNodeRunning,
 } = useFlowGenerationHandlers({

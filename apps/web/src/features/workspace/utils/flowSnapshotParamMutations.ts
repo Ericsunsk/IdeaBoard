@@ -6,9 +6,6 @@ import type { PromptNodeInputImage, ViewpointNodeItem } from '../types/canvasNod
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import {
   clampImageNodeOutputCount,
-  clampModelAngleYaw,
-  clampModelPoseStrength,
-  clampModelReferenceStrength,
 } from '../types/canvasNodes'
 import {
   areFusionBlendPointsEqual,
@@ -129,31 +126,6 @@ export function patchFlowSnapshotParam(
       if (snapshotNode.strength === nextStrength) return snapshotNode
       return { ...snapshotNode, strength: nextStrength }
     }
-    case 'angleSpec.yaw': {
-      const nextYaw = clampModelAngleYaw(value)
-      const nextAngleSpec = { ...(snapshotNode.angleSpec ?? {}), yaw: nextYaw }
-      const prevAngleSpec = snapshotNode.angleSpec ?? {}
-      if (prevAngleSpec.yaw === nextYaw) return snapshotNode
-      return { ...snapshotNode, angleSpec: nextAngleSpec }
-    }
-    case 'angleSpec.framing': {
-      const prevAngleSpec = snapshotNode.angleSpec ?? {}
-      if (prevAngleSpec.framing === value) return snapshotNode
-      return { ...snapshotNode, angleSpec: { ...prevAngleSpec, framing: value } }
-    }
-    case 'modelStrength': {
-      const nextModelStrength = clampModelReferenceStrength(value)
-      if (snapshotNode.modelStrength === nextModelStrength) return snapshotNode
-      return { ...snapshotNode, modelStrength: nextModelStrength }
-    }
-    case 'poseStrength': {
-      const nextPoseStrength = clampModelPoseStrength(value)
-      if (snapshotNode.poseStrength === nextPoseStrength) return snapshotNode
-      return { ...snapshotNode, poseStrength: nextPoseStrength }
-    }
-    case 'background':
-      if (snapshotNode.background === value) return snapshotNode
-      return { ...snapshotNode, background: value }
     case 'activeCategory': {
       const category = value as ViewpointNodeItem['activeCategory']
       const nextSelectedViewpoint = normalizeViewpointSelectionByCategory(

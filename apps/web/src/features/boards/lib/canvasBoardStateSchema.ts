@@ -5,12 +5,6 @@ import {
   DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
   MAX_IMAGE_NODE_OUTPUT_COUNT,
   MIN_IMAGE_NODE_OUTPUT_COUNT,
-  MODEL_ANGLE_YAW_MAX,
-  MODEL_ANGLE_YAW_MIN,
-  MODEL_POSE_STRENGTH_MAX,
-  MODEL_POSE_STRENGTH_MIN,
-  MODEL_REFERENCE_STRENGTH_MAX,
-  MODEL_REFERENCE_STRENGTH_MIN,
   type CanvasBoardSnapshot,
 } from '../../workspace/types/canvasNodes'
 import { PROMPT_ASPECT_RATIO_OPTIONS } from '../../workspace/config/promptAspectRatio'
@@ -28,11 +22,10 @@ const workflowNodeOutputStatusSchema = z.enum(['idle', 'running', 'ready', 'stal
 const canvasConnectionNodeTypeSchema = z.enum([
   'image',
   'prompt',
-  'model',
   'viewpoint',
   'fusion',
 ])
-const canvasConnectionPortSchema = z.enum(['image', 'prompt', 'imageA', 'imageB'])
+const canvasConnectionPortSchema = z.enum(['image', 'prompt'])
 
 const imageNodeOutputItemSchema = z.object({
   url: z.string().min(1),
@@ -61,26 +54,6 @@ const promptNodeItemSchema = z.object({
     .default(DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
   aspectRatio: z.enum(PROMPT_ASPECT_RATIO_OPTIONS).default(DEFAULT_PROMPT_ASPECT_RATIO),
   inputImages: z.array(promptNodeInputImageSchema).default([]),
-}).strict()
-
-const modelNodeItemSchema = z.object({
-  id: finiteNumberSchema,
-  type: z.literal('model'),
-  x: finiteNumberSchema,
-  y: finiteNumberSchema,
-  width: finiteNumberSchema,
-  title: z.string().optional(),
-  angleSpec: z.object({
-    yaw: finiteNumberSchema.min(MODEL_ANGLE_YAW_MIN).max(MODEL_ANGLE_YAW_MAX),
-    framing: z.enum(['full', 'half', 'portrait']),
-  }),
-  modelStrength: finiteNumberSchema
-    .min(MODEL_REFERENCE_STRENGTH_MIN)
-    .max(MODEL_REFERENCE_STRENGTH_MAX),
-  poseStrength: finiteNumberSchema.min(MODEL_POSE_STRENGTH_MIN).max(MODEL_POSE_STRENGTH_MAX),
-  background: z.string(),
-  outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: z.array(imageNodeOutputItemSchema),
 }).strict()
 
 const viewpointNodeItemSchema = z.object({
@@ -154,23 +127,26 @@ const canvasViewportStateSchema = z.object({
   zoomLevel: finiteNumberSchema,
 }).strict()
 
-export const canvasBoardSnapshotSchema = z
+const canvasBoardSnapshotShape = z
   .object({
     imageNodes: z.array(imageNodeItemSchema),
     promptNodes: z.array(promptNodeItemSchema),
-    modelNodes: z.array(modelNodeItemSchema),
     viewpointNodes: z.array(viewpointNodeItemSchema),
     fusionNodes: z.array(fusionNodeItemSchema),
     connections: z.array(canvasConnectionSchema),
     viewport: canvasViewportStateSchema,
   })
-  .strict() satisfies z.ZodType<CanvasBoardSnapshot>
+  .strict()
 
-export const canvasBoardStateSchema = canvasBoardSnapshotSchema
+export const canvasBoardSnapshotSchema = canvasBoardSnapshotShape satisfies z.ZodType<CanvasBoardSnapshot>
+
+const canvasBoardStateShape = canvasBoardSnapshotShape
   .extend({
     previewSnapshotDataUrl: z.string().min(1).optional(),
     previewSnapshotUpdatedAt: finiteNumberSchema.optional(),
     previewSnapshotVersion: finiteNumberSchema.int().positive().optional(),
     updatedAt: finiteNumberSchema,
   })
-  .strict() satisfies z.ZodType<PersistedCanvasBoardState>
+  .strict()
+
+export const canvasBoardStateSchema = canvasBoardStateShape satisfies z.ZodType<PersistedCanvasBoardState>

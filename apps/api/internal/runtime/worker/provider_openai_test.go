@@ -369,66 +369,6 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIMultiAngleUsesEditEndpointAndIncludesSourceModelPose(t *testing.T) {
-	var gotPath string
-	var gotMultipart multipartRequestCapture
-	sourceImage := []byte("multi-angle-source")
-	modelImage := []byte("multi-angle-model")
-	poseImage := []byte("multi-angle-pose")
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/source.png":
-			w.Header().Set("Content-Type", "image/png")
-			_, _ = w.Write(sourceImage)
-			return
-		case "/model.png":
-			w.Header().Set("Content-Type", "image/png")
-			_, _ = w.Write(modelImage)
-			return
-		case "/pose.png":
-			w.Header().Set("Content-Type", "image/png")
-			_, _ = w.Write(poseImage)
-			return
-		}
-		gotPath = r.URL.Path
-		gotMultipart = readMultipartRequest(t, r)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/multi-angle.png"}]}`))
-	}))
-	defer server.Close()
-	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
-
-	c := &ProviderExecutor{}
-	account := &accounts.ApiAccount{
-		ProxyURL: server.URL,
-		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
-	}
-	params := map[string]interface{}{
-		"feature":    "multi-angle",
-		"image_urls": []interface{}{server.URL + "/source.png", server.URL + "/model.png"},
-		"model_url":  server.URL + "/model.png",
-		"pose_url":   server.URL + "/pose.png",
-	}
-
-	if _, err := c.callOpenAI(context.Background(), account, "multi angle prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
-		t.Fatalf("callOpenAI returned error: %v", err)
-	}
-	if gotPath != "/v1/images/edits" {
-		t.Fatalf("expected edit endpoint, got %s", gotPath)
-	}
-	images := gotMultipart.Files["image"]
-	if len(images) != 3 {
-		t.Fatalf("expected three image files (source/model/pose), got %#v", images)
-	}
-	if string(images[0].Data) != string(sourceImage) ||
-		string(images[1].Data) != string(modelImage) ||
-		string(images[2].Data) != string(poseImage) {
-		t.Fatalf("unexpected multi-angle image part payload order")
-	}
-}
-
 func TestCallOpenAIStyleVariationDataURLDropsRedundantImageCopies(t *testing.T) {
 	var gotBody map[string]interface{}
 
@@ -751,7 +691,7 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 		t.Fatalf("expected masked hd-upscale to use edit endpoint")
 	}
 
-	for _, feature := range []string{"style-fusion", "multi-angle", "remove-bg"} {
+	for _, feature := range []string{"style-fusion", "remove-bg"} {
 		if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
 			"feature":    feature,
 			"image_urls": []interface{}{"https://img.example/source.png", "https://img.example/ref.png"},

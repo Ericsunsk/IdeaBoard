@@ -1,43 +1,11 @@
-import type {
-  ModelAngleFraming,
-  ModelAngleSpec,
-  ViewpointNodeItem,
-} from '../../../types/canvasNodes'
+import type { ViewpointNodeItem } from '../../../types/canvasNodes'
 
 type OptionItem<T extends string | number> = { label: string; value: T }
-type ModelOptionItem = { key: string; label: string }
 type ViewpointCategory = ViewpointNodeItem['activeCategory']
 type ViewpointOptionItem = { key: string; label: string }
 
 export const GENERATE_RATIO_OPTIONS = ['1:1', '3:4', '4:3', '2:3', '3:2'] as const
 export const GENERATE_COUNT_OPTIONS = [1, 2, 4] as const
-
-export const MODEL_BACKGROUND_OPTIONS: ModelOptionItem[] = [
-  { key: 'original', label: '原图背景' },
-  { key: 'studio', label: '影棚白底' },
-]
-
-export const MODEL_ANGLE_FRAMING_OPTIONS: Array<{ key: ModelAngleFraming; label: string }> = [
-  { key: 'full', label: 'Full' },
-  { key: 'half', label: 'Half' },
-  { key: 'portrait', label: 'Portrait' },
-]
-
-export function describeModelAngleYaw(yaw: number): string {
-  const normalizedYaw = Math.round(yaw)
-  const absYaw = Math.abs(normalizedYaw)
-  if (absYaw === 0) return 'Front 0°'
-  if (absYaw === 180) return 'Back 180°'
-  if (absYaw < 90) return `${normalizedYaw < 0 ? 'Left' : 'Right'} ${absYaw}°`
-  if (absYaw === 90) return `${normalizedYaw < 0 ? 'Left' : 'Right'} 90°`
-  return `Back ${normalizedYaw < 0 ? 'Left' : 'Right'} ${absYaw}°`
-}
-
-export function describeModelAngleSpec(spec: Pick<ModelAngleSpec, 'yaw' | 'framing'>): string {
-  const framingLabel =
-    MODEL_ANGLE_FRAMING_OPTIONS.find((option) => option.key === spec.framing)?.label || spec.framing
-  return `${describeModelAngleYaw(spec.yaw)} · ${framingLabel}`
-}
 
 export const VIEWPOINT_CATEGORY_OPTIONS: OptionItem<ViewpointCategory>[] = [
   { label: 'Top', value: 'top' },

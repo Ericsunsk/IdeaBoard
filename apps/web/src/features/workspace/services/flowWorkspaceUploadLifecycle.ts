@@ -91,7 +91,6 @@ function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
     })
   })
   appendOutputImageRefs(refs, 'imageNodes', snapshot.imageNodes)
-  appendOutputImageRefs(refs, 'modelNodes', snapshot.modelNodes)
   appendOutputImageRefs(refs, 'viewpointNodes', snapshot.viewpointNodes)
   appendOutputImageRefs(refs, 'fusionNodes', snapshot.fusionNodes)
   return refs

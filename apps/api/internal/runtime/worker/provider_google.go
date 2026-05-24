@@ -170,7 +170,7 @@ func collectGoogleImageRefs(params map[string]interface{}) []string {
 	for _, ref := range mediarefs.CollectStringList(params["mask_image_urls"]) {
 		appendRef(ref)
 	}
-	for _, key := range []string{"original_image_url", "mask_image_url", "model_url", "pose_url"} {
+	for _, key := range []string{"original_image_url", "mask_image_url"} {
 		if ref, ok := workflow.ReadWorkflowStringParam(params, key); ok {
 			appendRef(ref)
 		}

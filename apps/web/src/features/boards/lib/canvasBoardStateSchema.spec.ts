@@ -32,21 +32,6 @@ function createValidState() {
         text: 'prompt',
       },
     ],
-    modelNodes: [
-      {
-        id: 4,
-        type: 'model' as const,
-        x: 0,
-        y: 0,
-        width: 240,
-        angleSpec: { yaw: 0, framing: 'full' as const },
-        modelStrength: 80,
-        poseStrength: 70,
-        background: 'white',
-        outputStatus: 'idle' as const,
-        outputImages: [],
-      },
-    ],
     viewpointNodes: [
       {
         id: 5,
@@ -83,8 +68,8 @@ function createValidState() {
         fromNodeType: 'image' as const,
         fromNodeId: 2,
         fromPort: 'image' as const,
-        toNodeType: 'model' as const,
-        toNodeId: 4,
+        toNodeType: 'viewpoint' as const,
+        toNodeId: 5,
         toPort: 'image' as const,
       },
     ],
@@ -104,7 +89,6 @@ function testValidEmptySnapshot() {
   const parsed = canvasBoardStateSchema.safeParse({
     imageNodes: [],
     promptNodes: [],
-    modelNodes: [],
     viewpointNodes: [],
     fusionNodes: [],
     connections: [],
@@ -128,7 +112,7 @@ function testValidAllNodeMinimumShape() {
 
 function testInvalidStateRejected() {
   const invalid = createValidState()
-  invalid.modelNodes[0]!.angleSpec.yaw = 999
+  invalid.connections[0]!.toNodeType = 'unknown' as any
   const parsed = canvasBoardStateSchema.safeParse(invalid)
   expect(parsed.success === false, 'expected invalid state to be rejected')
 }
@@ -156,9 +140,9 @@ function testUnknownFieldsAreRejected() {
 
   const nestedParsed = canvasBoardStateSchema.safeParse({
     ...createValidState(),
-    modelNodes: [
+    fusionNodes: [
       {
-        ...createValidState().modelNodes[0],
+        ...createValidState().fusionNodes[0],
         futureNestedField: 'unexpected',
       },
     ],

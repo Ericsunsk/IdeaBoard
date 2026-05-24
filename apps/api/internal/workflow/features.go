@@ -14,7 +14,6 @@ const (
 	FeatureSlugPartialEdit    = "partial-edit"
 	FeatureSlugRemoveBg       = "remove-bg"
 	FeatureSlugStyleFusion    = "style-fusion"
-	FeatureSlugMultiAngle     = "multi-angle"
 	FeatureSlugVirtual3D      = "virtual-3d"
 	FeatureSlugPatternGen     = "pattern-gen"
 	FeatureSlugHDUpscale      = "hd-upscale"
@@ -27,7 +26,6 @@ var supportedTaskFeatureSlugs = map[string]struct{}{
 	FeatureSlugPartialEdit:    {},
 	FeatureSlugRemoveBg:       {},
 	FeatureSlugStyleFusion:    {},
-	FeatureSlugMultiAngle:     {},
 	FeatureSlugVirtual3D:      {},
 	FeatureSlugPatternGen:     {},
 	FeatureSlugHDUpscale:      {},

@@ -62,33 +62,6 @@ function makePromptFlowNode(params: { flowId: string; id: number; text: string }
   }
 }
 
-function makeModelFlowNode(params: { flowId: string; id: number }): FlowAdapterNode {
-  return {
-    id: params.flowId,
-    type: 'canvas',
-    position: { x: 460, y: 120 },
-    data: {
-      kind: 'model',
-      nodeType: 'model',
-      title: `Model #${params.id}`,
-      summary: 'Canvas model node',
-      snapshotNode: {
-        id: params.id,
-        type: 'model',
-        x: 460,
-        y: 120,
-        width: 260,
-        angleSpec: { yaw: 0, framing: 'full' },
-        modelStrength: 80,
-        poseStrength: 70,
-        background: 'white',
-        outputStatus: 'idle',
-        outputImages: [],
-      },
-    },
-  }
-}
-
 function makeFusionFlowNode(params: { flowId: string; id: number; prompt?: string }): FlowAdapterNode {
   return {
     id: params.flowId,
@@ -195,21 +168,21 @@ function testAggregateInputHandlesAreResolvedBeforePersistence() {
       sourceImageUrl: 'https://example.com/source.png',
     }),
     makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
-    makeModelFlowNode({ flowId: 'model-4', id: 4 }),
+    makeFusionFlowNode({ flowId: 'fusion-4', id: 4 }),
   ]
   const edges: FlowAdapterEdge[] = [
     {
-      id: 'edge-image-model',
+      id: 'edge-image-fusion',
       source: 'image-1',
       sourceHandle: 'out:image',
-      target: 'model-4',
+      target: 'fusion-4',
       targetHandle: 'in:__auto',
     },
     {
-      id: 'edge-prompt-model',
+      id: 'edge-prompt-fusion',
       source: 'prompt-3',
       sourceHandle: 'out:prompt',
-      target: 'model-4',
+      target: 'fusion-4',
       targetHandle: 'in:__auto',
     },
   ]
@@ -355,7 +328,6 @@ function testFusionBlendPointRoundTripPreserved() {
   const flow = canvasBoardSnapshotToFlow({
     imageNodes: [],
     promptNodes: [],
-    modelNodes: [],
     viewpointNodes: [],
     fusionNodes: [
       {

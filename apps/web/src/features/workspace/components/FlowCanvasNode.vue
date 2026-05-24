@@ -121,25 +121,6 @@
         />
       </div>
     </template>
-    <template v-else-if="isModelNode && modelSnapshot">
-      <ModelNode
-        :node="modelSnapshot"
-        :active="selected"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
-        :ui-state="props.uiState"
-        :background-options="modelBackgroundOptions"
-        @node-mousedown="noopMouse"
-        @update:title="emitNodeParam('title', $event)"
-        @delete="onDeleteRequest"
-        @update-angle-yaw="emitNodeParam('angleSpec.yaw', $event)"
-        @update-angle-framing="emitNodeParam('angleSpec.framing', $event)"
-        @update-model-strength="emitNodeParam('modelStrength', $event)"
-        @update-pose-strength="emitNodeParam('poseStrength', $event)"
-        @select-background="emitNodeParam('background', $event)"
-        @generate="onModelGenerate"
-      />
-    </template>
     <template v-else-if="isViewpointNode && viewpointSnapshot">
       <ViewpointNode
         :node="viewpointSnapshot"
@@ -179,11 +160,9 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
 import { computed, reactive, ref } from 'vue'
-import { MODEL_BACKGROUND_OPTIONS } from '../components/nodes/config/nodeOptionConfig'
 import type {
   FusionNodeItem,
   ImageNodeItem,
-  ModelNodeItem,
   PromptNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
@@ -258,7 +237,6 @@ const emit = defineEmits<{
   (e: 'update-prompt-text', value: string): void
   (e: 'update-node-param', payload: { key: string; value: unknown }): void
   (e: 'delete-node'): void
-  (e: 'generate-model'): void
   (e: 'generate-viewpoint'): void
   (e: 'image-stage-drop', event: DragEvent): void
   (e: 'media-input-image-drop', nodeId: string, event: DragEvent): void
@@ -290,13 +268,11 @@ const emit = defineEmits<{
 const isPromptNode = computed(() => props.data.kind === 'prompt')
 const isImageNode = computed(() => props.data.kind === 'image')
 const isFusionNode = computed(() => props.data.kind === 'fusion')
-const isModelNode = computed(() => props.data.kind === 'model')
 const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const showDefaultDragZone = false
 const disableHandleRailInteraction = computed(
   () => isImageNode.value && (!!props.expandModeActive || !!props.maskEditorModeActive),
 )
-const modelBackgroundOptions = MODEL_BACKGROUND_OPTIONS
 const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
 )
@@ -337,9 +313,6 @@ const imageSnapshot = computed<ImageNodeItem | null>(() => {
 })
 const fusionSnapshot = computed<FusionNodeItem | null>(() =>
   isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null,
-)
-const modelSnapshot = computed<ModelNodeItem | null>(() =>
-  isModelNode.value ? resolveSnapshotNode<ModelNodeItem>() : null,
 )
 const viewpointSnapshot = computed<ViewpointNodeItem | null>(() =>
   isViewpointNode.value ? resolveSnapshotNode<ViewpointNodeItem>() : null,
@@ -525,10 +498,6 @@ function emitNodeParam(key: string, value: unknown) {
 
 function onDeleteRequest() {
   emit('delete-node')
-}
-
-function onModelGenerate() {
-  emit('generate-model')
 }
 
 function onViewpointGenerate() {

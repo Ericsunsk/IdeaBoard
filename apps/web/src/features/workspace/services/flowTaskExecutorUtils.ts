@@ -26,7 +26,7 @@ export interface ResolvedFlowInputImage {
   ratio: number
 }
 
-type FlowConnectedInputPort = 'image' | 'prompt' | 'imageA' | 'imageB'
+type FlowConnectedInputPort = 'image' | 'prompt'
 type FlowGraphNode = FlowTaskExecutorGraphOptions['nodes'][number]
 type FlowSourceTypeResolver = (sourceNode: FlowGraphNode) => CanvasConnectionNodeType | null
 
@@ -92,7 +92,6 @@ export function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null
   if (
     head === 'prompt' ||
     head === 'image' ||
-    head === 'model' ||
     head === 'viewpoint' ||
     head === 'fusion'
   ) {
@@ -191,7 +190,6 @@ export async function assertTaskSubmitReady(
 export const FLOW_EXECUTION_SOURCE_KINDS = new Set<CanvasConnectionNodeType>([
   'image',
   'fusion',
-  'model',
   'viewpoint',
 ])
 

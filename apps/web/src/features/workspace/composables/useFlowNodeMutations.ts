@@ -3,7 +3,6 @@ import type { Connection, Edge, Node } from '@vue-flow/core'
 import {
   createFusionNodeAt,
   createImageNodeAt,
-  createModelNodeAt,
   createPromptNodeAt,
   createViewpointNodeAt,
 } from '../utils/canvasNodeFactory'
@@ -19,7 +18,6 @@ export type FlowCreatableNodeKind =
   | 'prompt'
   | 'image'
   | 'fusion'
-  | 'model'
   | 'viewpoint'
 
 type UseFlowNodeMutationsOptions = {
@@ -59,8 +57,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         return createImageNodeAt(point)
       case 'fusion':
         return createFusionNodeAt(point)
-      case 'model':
-        return createModelNodeAt(point)
       case 'viewpoint':
         return createViewpointNodeAt(point)
     }
@@ -240,7 +236,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   const EXECUTION_NODE_KINDS = new Set([
     'fusion',
-    'model',
     'viewpoint',
   ])
 

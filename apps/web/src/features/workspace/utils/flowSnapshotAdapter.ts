@@ -33,7 +33,6 @@ export interface FlowAdapterEdge {
 type SnapshotNodeCollectionKey =
   | 'imageNodes'
   | 'promptNodes'
-  | 'modelNodes'
   | 'viewpointNodes'
   | 'fusionNodes'
 
@@ -43,7 +42,6 @@ const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
 }> = [
   { key: 'imageNodes', nodeType: 'image' },
   { key: 'promptNodes', nodeType: 'prompt' },
-  { key: 'modelNodes', nodeType: 'model' },
   { key: 'viewpointNodes', nodeType: 'viewpoint' },
   { key: 'fusionNodes', nodeType: 'fusion' },
 ]
@@ -60,7 +58,6 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
   return {
     imageNodes: [],
     promptNodes: [],
-    modelNodes: [],
     viewpointNodes: [],
     fusionNodes: [],
     connections: [],
@@ -162,8 +159,6 @@ function resolveCollectionKeyByNodeType(
       return 'imageNodes'
     case 'prompt':
       return 'promptNodes'
-    case 'model':
-      return 'modelNodes'
     case 'viewpoint':
       return 'viewpointNodes'
     case 'fusion':

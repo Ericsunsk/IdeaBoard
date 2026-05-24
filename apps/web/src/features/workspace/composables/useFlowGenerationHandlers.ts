@@ -2,19 +2,16 @@ import { ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import {
   buildExecutionTaskRequest,
-  EXECUTION_MODEL_META,
   EXECUTION_VIEWPOINT_META,
   type ExecutionFeature,
 } from '../config/executionContract'
 import { assertTaskSubmitReady } from '../services/flowTaskExecutorUtils'
-import { executeFlowModelNode, validateFlowModelNodeInputs } from '../services/flowModelExecutor'
 import {
   executeFlowViewpointNode,
   validateFlowViewpointNodeInputs,
 } from '../services/flowViewpointExecutor'
 import type {
   CanvasExecutionOutputNodeType,
-  ModelNodeItem,
   ViewpointNodeItem,
 } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/task'
@@ -69,7 +66,6 @@ export function loadImageSizeFromUrl(
 }
 
 export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOptions) {
-  const runningModelNodeIds = ref(new Set<string>())
   const runningViewpointNodeIds = ref(new Set<string>())
 
   function isFlowExecutionNodeRunning(
@@ -79,8 +75,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     switch (nodeType) {
       case 'fusion':
         return false
-      case 'model':
-        return runningModelNodeIds.value.has(nodeId)
       case 'viewpoint':
         return runningViewpointNodeIds.value.has(nodeId)
       default:
@@ -255,32 +249,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
     options.updateSnapshotNode(nodeId, patcher, { history: false })
   }
 
-  async function onFlowModelGenerate(nodeId: string) {
-    await runFlowGenerationNode(nodeId, {
-      nodeType: 'model',
-      runningSet: runningModelNodeIds,
-      runningMessage: 'Model 任务正在执行中',
-      missingNodeMessage: 'Model 节点不存在',
-      successMessage: 'Model 生成完成',
-      failureMessage: 'Model 生成失败',
-      errorMessage: 'Model 生成失败',
-      preserveOutputImagesOnFailure: true,
-      buildContext: (target, nodeId) => ({
-        nodeId,
-        snapshotNode: target.data.snapshotNode as ModelNodeItem,
-      }),
-      buildOptions: () => ({
-        nodes: options.nodes.value as FlowRuntimeNode[],
-        edges: options.edges.value as FlowRuntimeEdge[],
-        loadImageSizeFromUrl,
-        boardId: options.currentBoardId.value || undefined,
-      }),
-      validate: (ctx, opts) => validateFlowModelNodeInputs(ctx, opts),
-      preflight: () => assertExecutionSubmitReady(EXECUTION_MODEL_META.feature),
-      execute: (ctx, opts) => executeFlowModelNode(ctx, opts),
-    })
-  }
-
   async function onFlowViewpointGenerate(nodeId: string) {
     await runFlowGenerationNode(nodeId, {
       nodeType: 'viewpoint',
@@ -308,7 +276,6 @@ export function useFlowGenerationHandlers(options: UseFlowGenerationHandlersOpti
   }
 
   return {
-    onFlowModelGenerate,
     onFlowViewpointGenerate,
     isFlowExecutionNodeRunning,
   }

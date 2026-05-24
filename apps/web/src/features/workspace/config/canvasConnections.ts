@@ -19,7 +19,6 @@ export type CanvasConnectionNodeLookup = (
 ) => CanvasConnectionContractNode | null
 
 const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>([
-  'model',
   'viewpoint',
   'fusion',
 ])

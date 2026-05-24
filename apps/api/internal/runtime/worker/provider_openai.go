@@ -351,13 +351,7 @@ func appendOpenAIAllowedParams(reqBody map[string]interface{}, params map[string
 func openAISharedAllowedParamKeys() []string {
 	return []string{
 		"variation_strength",
-		"angle_spec",
-		"background",
 		"viewpoint",
-		"model_url",
-		"model_strength",
-		"pose_url",
-		"pose_strength",
 		"blend_ratio",
 		"extend_top",
 		"extend_right",
@@ -419,8 +413,7 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 	if featureSlug == workflow.FeatureSlugImageExtend ||
 		featureSlug == workflow.FeatureSlugPartialEdit ||
 		featureSlug == workflow.FeatureSlugRemoveBg ||
-		featureSlug == workflow.FeatureSlugStyleFusion ||
-		featureSlug == workflow.FeatureSlugMultiAngle {
+		featureSlug == workflow.FeatureSlugStyleFusion {
 		return true
 	}
 	return featureSlug == workflow.FeatureSlugHDUpscale && (hasOpenAIMaskInput(params) || isLocalRedrawEnabled(params))
@@ -547,8 +540,7 @@ func collectOpenAIEditImageInputs(params map[string]interface{}) []map[string]st
 		return baseRefs
 	}
 
-	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
-	refs := make([]map[string]string, 0, len(baseRefs)+2)
+	refs := make([]map[string]string, 0, len(baseRefs))
 	seen := make(map[string]struct{}, len(baseRefs)+2)
 
 	appendUniqueRef := func(raw string) {
@@ -565,14 +557,6 @@ func collectOpenAIEditImageInputs(params map[string]interface{}) []map[string]st
 
 	for _, ref := range baseRefs {
 		appendUniqueRef(ref["image_url"])
-	}
-
-	if featureSlug == workflow.FeatureSlugMultiAngle {
-		for _, key := range []string{"model_url", "pose_url"} {
-			if ref, ok := workflow.ReadWorkflowStringParam(params, key); ok {
-				appendUniqueRef(ref)
-			}
-		}
 	}
 
 	return refs

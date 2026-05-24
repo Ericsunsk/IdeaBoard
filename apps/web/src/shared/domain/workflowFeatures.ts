@@ -5,7 +5,6 @@ export const WORKFLOW_FEATURE = {
   patternGen: 'pattern-gen',
   sketchToImage: 'sketch-to-image',
   styleVariation: 'style-variation',
-  multiAngle: 'multi-angle',
   virtual3d: 'virtual-3d',
   hdUpscale: 'hd-upscale',
   imageExtend: 'image-extend',
