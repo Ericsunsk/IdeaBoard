@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+### 画布与任务运行时
+
+- 任务结果等待链路改为 SSE 状态推送，前端通过任务事件流接收终态结果。
+- 画布工作台移除独立 Model 节点，模型与功能语义收敛到 workflow feature 和节点工具参数。
+- 画布 chrome 控件移除悬停提示，仅保留可访问名称；节点内部工具按钮保留统一延迟提示。
+
 ### 安全与部署
 
 - Better Auth 生产环境强制配置 `BETTER_AUTH_SECRET` 与 `BETTER_AUTH_URL`。

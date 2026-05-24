@@ -88,7 +88,7 @@ graph LR
 后端主要负责：
 
 - 用户鉴权与管理员权限控制
-- 任务提交、任务记录与状态轮询
+- 任务提交、任务记录与 SSE 状态推送
 - 账号池、渠道商与任务调度
 - 系统提示词模板读取与变量替换
 - 分割、超分、向量化、上传与对象存储
@@ -157,6 +157,7 @@ graph LR
 
 - [useNodeExecutors.ts](./apps/web/src/features/workspace/composables/useNodeExecutors.ts)
 - [useCanvasDirectActions.ts](./apps/web/src/features/workspace/composables/useCanvasDirectActions.ts)
+- [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts)
 - [WorkspaceScreen.vue](./apps/web/src/features/workspace/screens/WorkspaceScreen.vue)
 
 ### 后端流程
@@ -172,7 +173,7 @@ sequenceDiagram
     FE->>API: 提交任务 (feature + prompt)
     API->>API: 标准化参数 & 模板装配
     API->>DB: 写入任务表 & 推入队列
-    API-->>FE: 返回任务 ID (开始轮询)
+    API-->>FE: 返回任务 ID (建立 SSE 事件流)
     
     DB->>WK: 消费任务
     WK->>WK: 调度可用账号
@@ -181,9 +182,8 @@ sequenceDiagram
     WK->>WK: 持久化存储 (OSS/Local)
     WK->>DB: 更新状态为 Success/Failed
     
-    FE->>API: 轮询状态
-    API->>DB: 查询
-    DB-->>FE: 返回最终结果
+    WK-->>API: 发布任务状态事件
+    API-->>FE: SSE 推送任务状态与最终结果
 ```
 
 
