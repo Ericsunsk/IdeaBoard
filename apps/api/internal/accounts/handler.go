@@ -270,7 +270,11 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 		return
 	}
 
-	events, unsubscribe := hub.Subscribe(taskID)
+	events, unsubscribe, ok := hub.Subscribe(taskID, userID)
+	if !ok {
+		response.Error(c, http.StatusTooManyRequests, "SSE 连接数已达上限，请稍后重试")
+		return
+	}
 	defer unsubscribe()
 
 	// Re-read after subscribing to close the race between initial load and status publish.
@@ -287,9 +291,14 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 
 	heartbeat := time.NewTicker(15 * time.Second)
 	defer heartbeat.Stop()
+	maxConnTimer := time.NewTimer(defaultSSEMaxConnPeriod)
+	defer maxConnTimer.Stop()
 
 	for {
 		select {
+		case <-maxConnTimer.C:
+			_ = writeSSEvent(c, "close", gin.H{"reason": "max_connection_duration_reached"})
+			return
 		case <-c.Request.Context().Done():
 			return
 		case <-heartbeat.C:

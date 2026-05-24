@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"mime/multipart"
+	"os"
 	"path"
+	"strconv"
 	"strings"
+	"sync"
 
 	"api/internal/boards"
 	"api/internal/platform/media"
@@ -16,8 +19,40 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const defaultUploadMaxConcurrent = 8
+
+var (
+	uploadLimiterOnce sync.Once
+	uploadLimiter     chan struct{}
+)
+
+func acquireUploadSlot() (func(), bool) {
+	uploadLimiterOnce.Do(func() {
+		limit := defaultUploadMaxConcurrent
+		if raw := strings.TrimSpace(os.Getenv("UPLOAD_MAX_CONCURRENT")); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+				limit = parsed
+			}
+		}
+		uploadLimiter = make(chan struct{}, limit)
+	})
+	select {
+	case uploadLimiter <- struct{}{}:
+		return func() { <-uploadLimiter }, true
+	default:
+		return nil, false
+	}
+}
+
 func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		release, ok := acquireUploadSlot()
+		if !ok {
+			response.Error(c, 429, "当前上传请求过多，请稍后重试")
+			return
+		}
+		defer release()
+
 		file, err := c.FormFile("file")
 		if err != nil {
 			response.Error(c, 400, "请选择文件")
@@ -66,6 +101,13 @@ func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
 
 func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		release, ok := acquireUploadSlot()
+		if !ok {
+			response.Error(c, 429, "当前上传请求过多，请稍后重试")
+			return
+		}
+		defer release()
+
 		file, err := c.FormFile("file")
 		if err != nil {
 			response.Error(c, 400, "请选择文件")
@@ -173,6 +215,13 @@ func deleteBoardUploadHandler(h Dependencies) gin.HandlerFunc {
 
 func adminUploadHandler(h Dependencies) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		release, ok := acquireUploadSlot()
+		if !ok {
+			response.Error(c, 429, "当前上传请求过多，请稍后重试")
+			return
+		}
+		defer release()
+
 		file, err := c.FormFile("file")
 		if err != nil {
 			response.Error(c, 400, "请选择文件")

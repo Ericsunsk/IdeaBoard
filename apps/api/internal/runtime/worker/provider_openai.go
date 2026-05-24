@@ -512,6 +512,9 @@ func normalizeOpenAIImageInputs(params map[string]interface{}) []map[string]stri
 	for _, url := range mediarefs.CollectStringList(params["image_urls"]) {
 		appendRef(url)
 	}
+	for _, url := range mediarefs.CollectStringList(params["reference_image_urls"]) {
+		appendRef(url)
+	}
 	return refs
 }
 

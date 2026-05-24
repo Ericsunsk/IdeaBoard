@@ -71,6 +71,28 @@ func TestCallGoogleGeminiGenerateContent(t *testing.T) {
 	}
 }
 
+func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
+	refs := collectGoogleImageRefs(map[string]interface{}{
+		"image_urls": []interface{}{
+			"data:image/png;base64,aGVsbG8=",
+		},
+		"reference_image_urls": []interface{}{
+			"https://img.example/ref-a.png",
+			"data:image/png;base64,aGVsbG8=",
+			"",
+			"https://img.example/ref-b.png",
+		},
+	})
+	want := []string{
+		"data:image/png;base64,aGVsbG8=",
+		"https://img.example/ref-a.png",
+		"https://img.example/ref-b.png",
+	}
+	if strings.Join(refs, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("unexpected refs: got=%#v want=%#v", refs, want)
+	}
+}
+
 func TestCallGoogleImagenPredict(t *testing.T) {
 	var gotPath string
 	var gotAPIKey string

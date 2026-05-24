@@ -197,18 +197,18 @@ export async function submitPromptImageGenerationTask(
 export async function submitImageInpaintTask(
   input: SubmitImageInpaintTaskInput,
 ): Promise<string> {
-  const imageUrls = [
-    input.croppedImageUrl,
-    ...(input.referenceImageUrls ?? []).map((url) => url.trim()).filter(Boolean),
-  ].slice(0, 5)
+  const referenceImageUrls = (input.referenceImageUrls ?? [])
+    .map((url) => url.trim())
+    .filter(Boolean)
+    .slice(0, 4)
   const request = buildExecutionTaskRequest({
     prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${input.prompt}`,
     feature: EXECUTION_PARTIAL_EDIT_META.feature,
-    imageUrls,
+    imageUrls: [input.croppedImageUrl],
     params: {
       original_image_url: input.croppedImageUrl,
       mask_image_url: input.croppedMaskUrl,
-      reference_image_urls: imageUrls.slice(1),
+      reference_image_urls: referenceImageUrls,
       use_mask: true,
       ...buildExecutionSizeParams(input.cropSize),
     },

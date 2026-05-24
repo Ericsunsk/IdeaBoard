@@ -95,7 +95,7 @@ func TestShouldUseOpenAIEditEndpointForLocalRedrawHDUpscale(t *testing.T) {
 	}
 }
 
-func TestRewriteLocalRedrawUpstreamInputsPreservesReferenceImages(t *testing.T) {
+func TestRewriteLocalRedrawUpstreamInputsKeepsSingleImageURLSemantic(t *testing.T) {
 	params := map[string]interface{}{
 		"image_urls": []interface{}{
 			"data:image/png;base64,original",
@@ -123,11 +123,21 @@ func TestRewriteLocalRedrawUpstreamInputsPreservesReferenceImages(t *testing.T) 
 	}
 	want := []interface{}{
 		"data:image/png;base64,roi",
-		"https://cdn.example/ref-a.png",
-		"https://cdn.example/ref-b.png",
 	}
 	if !reflect.DeepEqual(imageURLs, want) {
 		t.Fatalf("unexpected image_urls: got=%#v want=%#v", imageURLs, want)
+	}
+	referenceURLs, ok := params["reference_image_urls"].([]interface{})
+	if !ok {
+		t.Fatalf("expected reference_image_urls list, got %#v", params["reference_image_urls"])
+	}
+	wantRefs := []interface{}{
+		"https://cdn.example/ref-a.png",
+		" ",
+		"https://cdn.example/ref-b.png",
+	}
+	if !reflect.DeepEqual(referenceURLs, wantRefs) {
+		t.Fatalf("unexpected reference_image_urls: got=%#v want=%#v", referenceURLs, wantRefs)
 	}
 	if got := params["original_image_url"]; got != "data:image/png;base64,roi" {
 		t.Fatalf("unexpected original_image_url: %#v", got)

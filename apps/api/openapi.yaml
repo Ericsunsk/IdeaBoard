@@ -71,6 +71,117 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseDeleted'
+  /user/boards/{board_id}/members:
+    get:
+      tags: [Boards]
+      operationId: listBoardMembers
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBoardMemberList'
+  /user/boards/{board_id}/members/invite:
+    post:
+      tags: [Boards]
+      operationId: inviteBoardMember
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteBoardMemberRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBoardMember'
+  /user/boards/{board_id}/members/{member_uid}/role:
+    put:
+      tags: [Boards]
+      operationId: updateBoardMemberRole
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/MemberUid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBoardMemberRoleRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBoardMember'
+  /user/boards/{board_id}/members/{member_uid}:
+    delete:
+      tags: [Boards]
+      operationId: removeBoardMember
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/MemberUid'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDeleted'
+  /user/boards/{board_id}/share-tokens:
+    get:
+      tags: [Boards]
+      operationId: listBoardShareTokens
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBoardShareTokenList'
+    post:
+      tags: [Boards]
+      operationId: createBoardShareToken
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBoardShareTokenRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseBoardShareToken'
+  /user/boards/{board_id}/share-tokens/{token}/revoke:
+    post:
+      tags: [Boards]
+      operationId: revokeBoardShareToken
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+        - $ref: '#/components/parameters/ShareToken'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseRevoked'
   /user/boards/share-tokens/join:
     post:
       tags: [Boards]
@@ -80,11 +191,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [token]
-              properties:
-                token:
-                  type: string
+              $ref: '#/components/schemas/JoinBoardByShareTokenBody'
       responses:
         '200':
           description: OK
@@ -165,6 +272,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseMessage'
+  /user/drawing/{task_id}/events:
+    get:
+      tags: [Tasks]
+      operationId: streamUserTaskEvents
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Server-Sent Events stream for task updates
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                event: ping
+                data: {}
+
+                event: task
+                data: {"task_id":"task_123","status":"running"}
 
   /admin/settings/registration:
     get:
@@ -742,6 +868,16 @@ components:
       in: path
       required: true
       schema: { type: string }
+    MemberUid:
+      name: member_uid
+      in: path
+      required: true
+      schema: { type: string }
+    ShareToken:
+      name: token
+      in: path
+      required: true
+      schema: { type: string }
     Page:
       name: page
       in: query
@@ -800,6 +936,67 @@ components:
           additionalProperties: true
         created_at: { type: number }
         updated_at: { type: number }
+
+    BoardMemberItem:
+      type: object
+      required: [user_id, member_uid, username, role]
+      properties:
+        user_id: { type: integer }
+        member_uid: { type: string }
+        username: { type: string }
+        role:
+          type: string
+          enum: [owner, editor, viewer]
+
+    BoardShareTokenItem:
+      type: object
+      required: [token, role, revoked, created_at, updated_at, share_url]
+      properties:
+        token: { type: string }
+        role:
+          type: string
+          enum: [editor, viewer]
+        revoked: { type: boolean }
+        expires_at:
+          type: number
+          nullable: true
+        created_at: { type: number }
+        updated_at: { type: number }
+        share_url: { type: string }
+
+    InviteBoardMemberRequest:
+      type: object
+      required: [member_uid, role]
+      properties:
+        member_uid: { type: string }
+        role:
+          type: string
+          enum: [editor, viewer]
+
+    UpdateBoardMemberRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [editor, viewer]
+
+    CreateBoardShareTokenRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [editor, viewer]
+        expires_at:
+          type: number
+          nullable: true
+
+    JoinBoardByShareTokenBody:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
 
     Task:
       type: object
@@ -1180,6 +1377,58 @@ components:
                 board:
                   $ref: '#/components/schemas/UserBoardItem'
 
+    ApiResponseBoardMemberList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BoardMemberItem'
+
+    ApiResponseBoardMember:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [member]
+              properties:
+                member:
+                  $ref: '#/components/schemas/BoardMemberItem'
+
+    ApiResponseBoardShareTokenList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BoardShareTokenItem'
+
+    ApiResponseBoardShareToken:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  $ref: '#/components/schemas/BoardShareTokenItem'
+
     ApiResponseDeleted:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
@@ -1190,6 +1439,18 @@ components:
               required: [deleted]
               properties:
                 deleted:
+                  type: boolean
+
+    ApiResponseRevoked:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [revoked]
+              properties:
+                revoked:
                   type: boolean
 
     ApiResponseTaskId:

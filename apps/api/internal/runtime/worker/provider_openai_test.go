@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -698,6 +699,28 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 		}) {
 			t.Fatalf("expected %s to use edit endpoint", feature)
 		}
+	}
+}
+
+func TestCollectOpenAIEditImageInputsIncludesReferenceImageURLs(t *testing.T) {
+	refs := collectOpenAIEditImageInputs(map[string]interface{}{
+		"image_urls": []interface{}{
+			"https://img.example/source.png",
+		},
+		"reference_image_urls": []interface{}{
+			"https://img.example/ref-a.png",
+			"https://img.example/source.png",
+			" ",
+			"https://img.example/ref-b.png",
+		},
+	})
+	want := []map[string]string{
+		{"image_url": "https://img.example/source.png"},
+		{"image_url": "https://img.example/ref-a.png"},
+		{"image_url": "https://img.example/ref-b.png"},
+	}
+	if !reflect.DeepEqual(refs, want) {
+		t.Fatalf("unexpected refs: got=%#v want=%#v", refs, want)
 	}
 }
 

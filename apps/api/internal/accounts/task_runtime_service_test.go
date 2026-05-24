@@ -145,7 +145,10 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
 	hub := NewTaskEventHub()
 	service.SetEventHub(hub)
-	events, unsubscribe := hub.Subscribe("task-publish")
+	events, unsubscribe, ok := hub.Subscribe("task-publish", 1)
+	if !ok {
+		t.Fatal("subscribe rejected unexpectedly")
+	}
 	defer unsubscribe()
 
 	task := &tasks.Task{
@@ -247,7 +250,10 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	if err := taskRepo.Create(requeueTask); err != nil {
 		t.Fatalf("seed requeue task failed: %v", err)
 	}
-	pendingEvents, unsubPending := hub.Subscribe(requeueTask.TaskID)
+	pendingEvents, unsubPending, ok := hub.Subscribe(requeueTask.TaskID, 1)
+	if !ok {
+		t.Fatal("subscribe pending rejected unexpectedly")
+	}
 	defer unsubPending()
 	requeued, err := service.RequeueTaskForFailover(requeueTask.TaskID, requeueTask.AccountID, "retry")
 	if err != nil {
@@ -276,7 +282,10 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	if err := taskRepo.Create(finalTask); err != nil {
 		t.Fatalf("seed final requeue task failed: %v", err)
 	}
-	failedEvents, unsubFailed := hub.Subscribe(finalTask.TaskID)
+	failedEvents, unsubFailed, ok := hub.Subscribe(finalTask.TaskID, 1)
+	if !ok {
+		t.Fatal("subscribe failed rejected unexpectedly")
+	}
 	defer unsubFailed()
 	requeued, err = service.RequeueTaskForFailover(finalTask.TaskID, finalTask.AccountID, "stop retry")
 	if err != nil {

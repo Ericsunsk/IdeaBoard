@@ -10,6 +10,24 @@ import (
 	"api/internal/platform/outbound"
 )
 
+func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
+	if params == nil {
+		return
+	}
+	imageURLs := mediarefs.CollectStringList(params["image_urls"])
+	if len(imageURLs) > 0 {
+		params["image_urls"] = imageURLs
+	} else {
+		delete(params, "image_urls")
+	}
+	referenceImageURLs := mediarefs.CollectStringList(params["reference_image_urls"])
+	if len(referenceImageURLs) > 0 {
+		params["reference_image_urls"] = referenceImageURLs
+	} else {
+		delete(params, "reference_image_urls")
+	}
+}
+
 func validateSubmitTaskPrompt(prompt string, maxBytes int, label string) error {
 	if len([]byte(prompt)) > maxBytes {
 		return fmt.Errorf("%s长度不能超过 %dKB", label, maxBytes/1024)

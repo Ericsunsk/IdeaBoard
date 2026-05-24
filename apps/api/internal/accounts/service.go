@@ -448,6 +448,7 @@ func (s *AccountService) prepareSubmitTask(req *tasks.SubmitTaskRequest) ([]*Api
 	if len(req.ImageURLs) > 0 {
 		params["image_urls"] = req.ImageURLs
 	}
+	normalizeSubmitTaskMediaParams(params)
 	req.Params = params
 	if err := validateSubmitTaskMediaParams(req.Params); err != nil {
 		return nil, nil, "", "", err

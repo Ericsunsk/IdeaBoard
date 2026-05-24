@@ -72,9 +72,6 @@ func Run(args []string) {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	if err := ensureUserStorageUIDsBeforeMigration(db); err != nil {
-		log.Fatalf("Failed to prepare user storage uid before migration: %v", err)
-	}
 	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
 		log.Fatalf("Failed to cleanup duplicate board names: %v", err)
 	}
@@ -236,9 +233,6 @@ func runInitAdmin() {
 	db, err := database.NewMySQL(cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	if err := ensureUserStorageUIDsBeforeMigration(db); err != nil {
-		log.Fatalf("Failed to prepare user storage uid before migration: %v", err)
 	}
 	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
 		log.Fatalf("Failed to cleanup duplicate board names: %v", err)
@@ -420,66 +414,6 @@ func migrateModels(db *gorm.DB) error {
 		}
 	}
 	return nil
-}
-
-type bootstrapUserStorageUIDRow struct {
-	ID         uint64 `gorm:"column:id"`
-	StorageUID string `gorm:"column:storage_uid"`
-}
-
-func ensureUserStorageUIDsBeforeMigration(db *gorm.DB) error {
-	if db == nil {
-		return nil
-	}
-	if !db.Migrator().HasTable(&users.User{}) {
-		return nil
-	}
-	if !db.Migrator().HasColumn(&users.User{}, "storage_uid") {
-		return nil
-	}
-
-	var rows []bootstrapUserStorageUIDRow
-	if err := db.Table("users").Select("id, storage_uid").Order("id ASC").Find(&rows).Error; err != nil {
-		return err
-	}
-
-	seen := make(map[string]struct{}, len(rows))
-	for _, row := range rows {
-		if row.ID == 0 {
-			continue
-		}
-		uid := strings.TrimSpace(row.StorageUID)
-		if users.IsValidStorageUID(uid) {
-			if _, duplicated := seen[uid]; !duplicated {
-				seen[uid] = struct{}{}
-				continue
-			}
-		}
-
-		newUID, err := generateBootstrapUniqueStorageUID(seen)
-		if err != nil {
-			return err
-		}
-		if err := db.Table("users").Where("id = ?", row.ID).Update("storage_uid", newUID).Error; err != nil {
-			return err
-		}
-		seen[newUID] = struct{}{}
-	}
-	return nil
-}
-
-func generateBootstrapUniqueStorageUID(seen map[string]struct{}) (string, error) {
-	for i := 0; i < 256; i++ {
-		uid, err := users.NewStorageUID()
-		if err != nil {
-			return "", err
-		}
-		if _, exists := seen[uid]; exists {
-			continue
-		}
-		return uid, nil
-	}
-	return "", fmt.Errorf("生成迁移前唯一用户存储标识失败")
 }
 
 func isIgnorableDuplicateIndexError(err error) bool {

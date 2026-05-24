@@ -167,6 +167,9 @@ func collectGoogleImageRefs(params map[string]interface{}) []string {
 	for _, ref := range mediarefs.CollectStringList(params["image_urls"]) {
 		appendRef(ref)
 	}
+	for _, ref := range mediarefs.CollectStringList(params["reference_image_urls"]) {
+		appendRef(ref)
+	}
 	for _, ref := range mediarefs.CollectStringList(params["mask_image_urls"]) {
 		appendRef(ref)
 	}

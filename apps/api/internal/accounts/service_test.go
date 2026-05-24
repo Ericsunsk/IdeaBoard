@@ -333,4 +333,40 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 			t.Fatal("expected oversized data url to fail")
 		}
 	})
+
+	t.Run("normalize image and reference urls keeps semantic split", func(t *testing.T) {
+		params := map[string]interface{}{
+			"image_urls": []interface{}{
+				"https://example.com/original.png",
+				" ",
+			},
+			"reference_image_urls": []interface{}{
+				"https://example.com/ref-a.png",
+				"",
+				"https://example.com/ref-b.png",
+			},
+		}
+		normalizeSubmitTaskMediaParams(params)
+
+		imageURLs, ok := params["image_urls"].([]string)
+		if !ok {
+			t.Fatalf("expected normalized image_urls []string, got %#v", params["image_urls"])
+		}
+		wantImageURLs := []string{"https://example.com/original.png"}
+		if strings.Join(imageURLs, ",") != strings.Join(wantImageURLs, ",") {
+			t.Fatalf("unexpected image_urls: got=%#v want=%#v", imageURLs, wantImageURLs)
+		}
+
+		referenceURLs, ok := params["reference_image_urls"].([]string)
+		if !ok {
+			t.Fatalf("expected normalized reference_image_urls []string, got %#v", params["reference_image_urls"])
+		}
+		wantReferenceURLs := []string{
+			"https://example.com/ref-a.png",
+			"https://example.com/ref-b.png",
+		}
+		if strings.Join(referenceURLs, ",") != strings.Join(wantReferenceURLs, ",") {
+			t.Fatalf("unexpected reference_image_urls: got=%#v want=%#v", referenceURLs, wantReferenceURLs)
+		}
+	})
 }

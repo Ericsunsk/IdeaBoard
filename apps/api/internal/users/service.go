@@ -4,7 +4,10 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"unicode/utf8"
 )
+
+const maxUserKeywordLength = 64
 
 type UserService struct {
 	repo             *UserRepository
@@ -33,6 +36,10 @@ func (s *UserService) GetByID(id uint64) (*User, error) {
 
 // ListUsers 获取用户列表
 func (s *UserService) ListUsers(req *UserListRequest) (*UserListResponse, error) {
+	req.Keyword = strings.TrimSpace(req.Keyword)
+	if utf8.RuneCountInString(req.Keyword) > maxUserKeywordLength {
+		return nil, errors.New("keyword 长度不能超过 64 个字符")
+	}
 	if req.Page < 1 {
 		req.Page = 1
 	}
