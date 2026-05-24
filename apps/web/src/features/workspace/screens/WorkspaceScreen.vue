@@ -231,6 +231,7 @@ import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActio
 import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
 import { useFlowMaskEditorChromeActions } from '../composables/useFlowMaskEditorChromeActions'
+import { useFlowWorkspaceNodeHandlers } from '../composables/useFlowWorkspaceNodeHandlers'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
@@ -463,34 +464,25 @@ const onConnect = flowNodeMutations.onConnect
 const onEdgeUpdate = flowNodeMutations.onEdgeUpdate
 const createNodeAtPosition = flowNodeMutations.createNodeAtPosition
 const _onFlowDeleteNode = flowNodeMutations.onFlowDeleteNode
-function onFlowDeleteNode(nodeId: string) {
-  clearActiveNodePanels()
-  clearFlowMaskEditorCommittedData(nodeId)
-  hideStrengthControl()
-  closeNodeContextMenu()
-  _onFlowDeleteNode(nodeId)
-}
 const updateSnapshotNodeBase = flowNodeMutations.updateSnapshotNode
 const _onFlowPromptTextUpdate = flowNodeMutations.onFlowPromptTextUpdate
 const _onFlowNodeParamUpdate = flowNodeMutations.onFlowNodeParamUpdate
-function onFlowPromptTextUpdate(nodeId: string, value: string) {
-  _onFlowPromptTextUpdate(nodeId, value)
-  markFlowExecutionNodeDirty(nodeId)
-}
-function onFlowNodeParamUpdate(nodeId: string, payload: { key: string; value: unknown }) {
-  _onFlowNodeParamUpdate(nodeId, payload)
-  markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
-}
 const markFlowExecutionNodeDirty = flowNodeMutations.markFlowExecutionNodeDirty
-
-function updateSnapshotNode(
-  nodeId: string,
-  mutate: (snapshotNode: Record<string, unknown>) => Record<string, unknown>,
-  options?: { history?: boolean },
-) {
-  updateSnapshotNodeBase(nodeId, mutate, options)
-  scheduleFlowNodeInternalsRefresh([nodeId])
-}
+let _onFlowImageReset: (nodeId: string) => void = () => {}
+const { onFlowDeleteNode, onFlowPromptTextUpdate, onFlowNodeParamUpdate, updateSnapshotNode, onFlowImageReset } =
+  useFlowWorkspaceNodeHandlers({
+    clearActiveNodePanels: () => clearActiveNodePanels(),
+    hideStrengthControl: () => hideStrengthControl(),
+    closeNodeContextMenu: () => closeNodeContextMenu(),
+    clearFlowMaskEditorCommittedData: (nodeId) => clearFlowMaskEditorCommittedData(nodeId),
+    _onFlowDeleteNode,
+    _onFlowPromptTextUpdate,
+    _onFlowNodeParamUpdate,
+    updateSnapshotNodeBase,
+    _onFlowImageReset: (nodeId) => _onFlowImageReset(nodeId),
+    markFlowExecutionNodeDirty,
+    scheduleFlowNodeInternalsRefresh,
+  })
 
 const selectionExport = useFlowSelectionExport({ nodes, message: appToast })
 const hasSelectedFlowNodes = computed(() => selectionExport.hasSelectedNodes())
@@ -513,7 +505,7 @@ const {
   getImageNodeSnapshot,
   getImageNodeDisplayPayload,
   onFlowImageOpenFile,
-  onFlowImageReset: _onFlowImageReset,
+  onFlowImageReset: onFlowImageResetBase,
   onFlowImageStageDrop,
 } = useFlowNodeMediaInputs({
   nodes: nodes as Ref<Node[]>,
@@ -528,11 +520,7 @@ const {
   updateSnapshotNode,
   markFlowExecutionNodeDirty,
 })
-
-function onFlowImageReset(nodeId: string) {
-  clearFlowMaskEditorCommittedData(nodeId)
-  _onFlowImageReset(nodeId)
-}
+_onFlowImageReset = onFlowImageResetBase
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 const {
   onFlowMediaInputImageDrop,
