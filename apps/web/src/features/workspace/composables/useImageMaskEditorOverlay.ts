@@ -4,11 +4,11 @@ import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 import {
   buildMaskCommitResult,
   drawMaskRasterPreviewToCanvas,
-  drawMaskStrokeSegment,
-  getMaskCanvasPoint,
   invertMaskPreviewCanvas,
 } from './useMaskPaintingCanvas'
+import { drawMaskStrokeSegment } from './maskBrushEngine'
 import { containImageRect } from '../utils/canvasExtendGeometry'
+import { getMaskCanvasPoint } from '../utils/maskCanvasGeometry'
 import { isEditableEventTarget } from '../utils/domEventTargets'
 
 type ImageDisplayPayload = {
@@ -28,6 +28,12 @@ type ImageMaskEditorState = {
   imageRect: { left: number; top: number; width: number; height: number }
 }
 
+type MaskHistoryEntry = {
+  width: number
+  height: number
+  imageData: ImageData
+}
+
 type UseImageMaskEditorOverlayOptions = {
   nodes: Ref<Node[]>
   activeTool: Ref<string>
@@ -42,15 +48,23 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   const state = ref<ImageMaskEditorState | null>(null)
   const drawMode = ref<ImageMaskDrawMode>('paint')
   const brushSize = ref(18)
+  const brushHardness = ref(70)
+  const canUndoMask = ref(false)
+  const canRedoMask = ref(false)
   const canvasRefs = new Map<string, HTMLCanvasElement>()
   const committedMaskDataMap = new Map<string, ImageMaskEditorCommittedData>()
+  const undoStacksByNodeId = new Map<string, MaskHistoryEntry[]>()
+  const redoStacksByNodeId = new Map<string, MaskHistoryEntry[]>()
 
   let paintingNodeId: string | null = null
   let paintingCanvas: HTMLCanvasElement | null = null
   let paintingPointerId: number | null = null
   let paintingLastX = 0
   let paintingLastY = 0
+  let paintingBeforeEntry: MaskHistoryEntry | null = null
   let interactionActive = false
+
+  const MASK_HISTORY_LIMIT = 40
 
   const isMaskEditorMode = computed(() => !!state.value)
   const maskEditorNodeId = computed(() => state.value?.nodeId ?? null)
@@ -82,6 +96,81 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     options.stopCanvasInteraction?.('image-mask-editor')
   }
 
+  function captureMaskHistoryEntry(canvas: HTMLCanvasElement): MaskHistoryEntry | null {
+    const ctx = canvas.getContext('2d')
+    if (!ctx || !canvas.width || !canvas.height) return null
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+    }
+  }
+
+  function restoreMaskHistoryEntry(canvas: HTMLCanvasElement, entry: MaskHistoryEntry) {
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    if (canvas.width === entry.width && canvas.height === entry.height) {
+      ctx.putImageData(entry.imageData, 0, 0)
+      return
+    }
+    const sourceCanvas = document.createElement('canvas')
+    sourceCanvas.width = entry.width
+    sourceCanvas.height = entry.height
+    const sourceCtx = sourceCanvas.getContext('2d')
+    if (!sourceCtx) return
+    sourceCtx.putImageData(entry.imageData, 0, 0)
+    ctx.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height)
+  }
+
+  function readUndoStack(nodeId: string) {
+    return undoStacksByNodeId.get(nodeId) ?? []
+  }
+
+  function readRedoStack(nodeId: string) {
+    return redoStacksByNodeId.get(nodeId) ?? []
+  }
+
+  function areMaskHistoryEntriesEqual(a: MaskHistoryEntry | null, b: MaskHistoryEntry | null) {
+    if (!a || !b) return false
+    if (a.width !== b.width || a.height !== b.height) return false
+    const aData = a.imageData.data
+    const bData = b.imageData.data
+    if (aData.length !== bData.length) return false
+    for (let idx = 0; idx < aData.length; idx += 1) {
+      if (aData[idx] !== bData[idx]) return false
+    }
+    return true
+  }
+
+  function updateHistoryAvailability(nodeId = state.value?.nodeId ?? null) {
+    canUndoMask.value = nodeId ? readUndoStack(nodeId).length > 0 : false
+    canRedoMask.value = nodeId ? readRedoStack(nodeId).length > 0 : false
+  }
+
+  function pushUndoHistory(nodeId: string, entry: MaskHistoryEntry | null) {
+    if (!entry) return false
+    const undoStack = readUndoStack(nodeId).slice()
+    undoStack.push(entry)
+    undoStacksByNodeId.set(nodeId, undoStack.slice(-MASK_HISTORY_LIMIT))
+    redoStacksByNodeId.set(nodeId, [])
+    updateHistoryAvailability(nodeId)
+    return true
+  }
+
+  function commitUndoHistoryIfChanged(
+    nodeId: string,
+    before: MaskHistoryEntry | null,
+    canvas: HTMLCanvasElement,
+  ) {
+    const after = captureMaskHistoryEntry(canvas)
+    if (areMaskHistoryEntriesEqual(before, after)) {
+      updateHistoryAvailability(nodeId)
+      return false
+    }
+    return pushUndoHistory(nodeId, before)
+  }
+
   function getCommittedMaskData(nodeId: string) {
     return committedMaskDataMap.get(nodeId) ?? null
   }
@@ -99,24 +188,33 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
       const latest = canvasRefs.get(nodeId)
       if (!latest) return
       drawMaskRasterPreviewToCanvas(image, latest)
+      updateHistoryAvailability(nodeId)
     }
     image.src = committed.maskDataUrl
   }
 
   function stopPainting() {
+    const nodeId = paintingNodeId
+    const canvas = paintingCanvas
     window.removeEventListener('pointermove', onPointerMove, true)
     window.removeEventListener('pointerup', onPointerUp, true)
     window.removeEventListener('pointercancel', onPointerCancel, true)
-    if (paintingCanvas) {
-      paintingCanvas.removeEventListener('lostpointercapture', onLostPointerCapture)
+    if (canvas) {
+      canvas.removeEventListener('lostpointercapture', onLostPointerCapture)
     }
-    if (paintingCanvas && paintingPointerId != null && paintingCanvas.hasPointerCapture(paintingPointerId)) {
-      paintingCanvas.releasePointerCapture(paintingPointerId)
+    if (canvas && paintingPointerId != null && canvas.hasPointerCapture(paintingPointerId)) {
+      canvas.releasePointerCapture(paintingPointerId)
     }
     stopInteraction()
+    if (nodeId && canvas && paintingBeforeEntry) {
+      commitUndoHistoryIfChanged(nodeId, paintingBeforeEntry, canvas)
+    } else if (nodeId) {
+      updateHistoryAvailability(nodeId)
+    }
     paintingNodeId = null
     paintingCanvas = null
     paintingPointerId = null
+    paintingBeforeEntry = null
   }
 
   function saveMaskDraft(): boolean {
@@ -153,6 +251,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     }
     drawMode.value = 'paint'
     drawCommittedMask(nodeId)
+    updateHistoryAvailability(nodeId)
     return true
   }
 
@@ -161,7 +260,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
     const point = getMaskCanvasPoint(event.clientX, event.clientY, paintingCanvas)
     drawMaskStrokeSegment(
-      { brushSize: brushSize.value, drawMode: drawMode.value },
+      { brushSize: brushSize.value, brushHardness: brushHardness.value, drawMode: drawMode.value },
       paintingCanvas,
       paintingLastX,
       paintingLastY,
@@ -199,6 +298,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingNodeId = state.value.nodeId
     paintingCanvas = canvas
     paintingPointerId = event.pointerId
+    paintingBeforeEntry = captureMaskHistoryEntry(canvas)
     startInteraction()
     if (!canvas.hasPointerCapture(event.pointerId)) {
       canvas.setPointerCapture(event.pointerId)
@@ -206,7 +306,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingLastX = point.x
     paintingLastY = point.y
     drawMaskStrokeSegment(
-      { brushSize: brushSize.value, drawMode: drawMode.value },
+      { brushSize: brushSize.value, brushHardness: brushHardness.value, drawMode: drawMode.value },
       canvas,
       point.x,
       point.y,
@@ -228,6 +328,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     }
     canvasRefs.set(nodeId, canvas)
     drawCommittedMask(nodeId)
+    updateHistoryAvailability(nodeId)
   }
 
   function clearMask() {
@@ -236,7 +337,9 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     const canvas = canvasRefs.get(nodeId)
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
+    const before = captureMaskHistoryEntry(canvas)
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    commitUndoHistoryIfChanged(nodeId, before, canvas)
   }
 
   function invertMask() {
@@ -244,21 +347,69 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
     if (!canvas) return
+    const before = captureMaskHistoryEntry(canvas)
     invertMaskPreviewCanvas(canvas)
+    commitUndoHistoryIfChanged(nodeId, before, canvas)
+  }
+
+  function undoMask() {
+    const nodeId = state.value?.nodeId
+    if (!nodeId) return
+    const canvas = canvasRefs.get(nodeId)
+    if (!canvas) return
+    const undoStack = readUndoStack(nodeId).slice()
+    const previous = undoStack.pop()
+    if (!previous) return
+    const current = captureMaskHistoryEntry(canvas)
+    if (current) {
+      const redoStack = readRedoStack(nodeId).slice()
+      redoStack.push(current)
+      redoStacksByNodeId.set(nodeId, redoStack.slice(-MASK_HISTORY_LIMIT))
+    }
+    undoStacksByNodeId.set(nodeId, undoStack)
+    restoreMaskHistoryEntry(canvas, previous)
+    updateHistoryAvailability(nodeId)
+  }
+
+  function redoMask() {
+    const nodeId = state.value?.nodeId
+    if (!nodeId) return
+    const canvas = canvasRefs.get(nodeId)
+    if (!canvas) return
+    const redoStack = readRedoStack(nodeId).slice()
+    const next = redoStack.pop()
+    if (!next) return
+    const current = captureMaskHistoryEntry(canvas)
+    if (current) {
+      const undoStack = readUndoStack(nodeId).slice()
+      undoStack.push(current)
+      undoStacksByNodeId.set(nodeId, undoStack.slice(-MASK_HISTORY_LIMIT))
+    }
+    redoStacksByNodeId.set(nodeId, redoStack)
+    restoreMaskHistoryEntry(canvas, next)
+    updateHistoryAvailability(nodeId)
   }
 
   function commitMaskEditorMode(): boolean {
     const saved = saveMaskDraft()
     state.value = null
+    updateHistoryAvailability(null)
     return saved
   }
 
   function clearCommittedMaskData(nodeId: string) {
     committedMaskDataMap.delete(nodeId)
+    undoStacksByNodeId.delete(nodeId)
+    redoStacksByNodeId.delete(nodeId)
+    updateHistoryAvailability()
   }
 
   function updateBrushSize(value: number) {
     brushSize.value = Math.max(4, Math.min(48, Number(value) || 18))
+  }
+
+  function updateBrushHardness(value: number) {
+    brushHardness.value = Math.max(0, Math.min(100, Number(value) || 0))
   }
 
   function onGlobalPointerDown(event: PointerEvent) {
@@ -277,6 +428,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (event.key === 'Escape') {
       event.preventDefault()
       cancelMaskEditorMode()
+      updateHistoryAvailability(null)
     }
   }
 
@@ -302,6 +454,8 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   onBeforeUnmount(() => {
     stopPainting()
     canvasRefs.clear()
+    undoStacksByNodeId.clear()
+    redoStacksByNodeId.clear()
     if (typeof window !== 'undefined') {
       window.removeEventListener('pointerdown', onGlobalPointerDown, true)
       window.removeEventListener('keydown', onGlobalKeydown, true)
@@ -314,11 +468,16 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     maskEditorOverlayStyle,
     drawMode,
     brushSize,
+    brushHardness,
+    canUndoMask,
+    canRedoMask,
     enterMaskEditorMode,
     cancelMaskEditorMode,
     commitMaskEditorMode,
     clearMask,
     invertMask,
+    undoMask,
+    redoMask,
     clearCommittedMaskData,
     setMaskCanvasRef,
     onCanvasPointerDown,
@@ -326,6 +485,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
       drawMode.value = mode
     },
     setBrushSize: updateBrushSize,
+    setBrushHardness: updateBrushHardness,
     getCommittedMaskData,
   }
 }

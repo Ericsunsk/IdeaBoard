@@ -105,6 +105,7 @@
             :mask-editor-canvas-height="Math.max(1, Math.round(flowMaskEditorOverlayStyle?.height ? parseFloat(flowMaskEditorOverlayStyle.height) : 0))"
             :mask-layer-opacity="maskEditorLayerOpacity"
             :image-layer-visible="true"
+            :mask-editor-brush-size="flowMaskEditorBrushSize"
             :set-mask-canvas-ref="setFlowMaskEditorCanvasRef"
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
@@ -151,15 +152,21 @@
         :anchor-rect="maskEditorChromeAnchorRect"
         :draw-mode="flowMaskEditorDrawMode"
         :brush-size="flowMaskEditorBrushSize"
+        :brush-hardness="flowMaskEditorBrushHardness"
         :mask-layer-opacity="maskEditorLayerOpacity"
         :output-count="activeMaskEditorOutputCount"
         :reference-images="maskEditorReferenceImages"
         :direct-generating="isNodeDirectActionRunning(flowMaskEditorNodeId)"
+        :can-undo="canUndoFlowMaskEditor"
+        :can-redo="canRedoFlowMaskEditor"
         @set-draw-mode="setFlowMaskEditorDrawMode"
         @set-brush-size="setFlowMaskEditorBrushSize"
+        @set-brush-hardness="setFlowMaskEditorBrushHardness"
         @set-mask-layer-opacity="setMaskEditorLayerOpacity"
         @clear-mask="clearFlowMaskEditorMask"
         @invert-mask="invertFlowMaskEditorMask"
+        @undo-mask="undoFlowMaskEditorMask"
+        @redo-mask="redoFlowMaskEditorMask"
         @update:output-count="onMaskEditorChromeOutputCountUpdate"
         @image-input-open="onMaskEditorReferenceImageOpen"
         @reference-image-remove="onMaskEditorReferenceImageRemove"
@@ -585,16 +592,22 @@ const {
   maskEditorOverlayStyle: flowMaskEditorOverlayStyle,
   drawMode: flowMaskEditorDrawMode,
   brushSize: flowMaskEditorBrushSize,
+  brushHardness: flowMaskEditorBrushHardness,
+  canUndoMask: canUndoFlowMaskEditor,
+  canRedoMask: canRedoFlowMaskEditor,
   enterMaskEditorMode: enterFlowMaskEditorMode,
   cancelMaskEditorMode: cancelFlowMaskEditorMode,
   commitMaskEditorMode: commitFlowMaskEditorMode,
   clearMask: clearFlowMaskEditorMask,
   invertMask: invertFlowMaskEditorMask,
+  undoMask: undoFlowMaskEditorMask,
+  redoMask: redoFlowMaskEditorMask,
   clearCommittedMaskData: clearFlowMaskEditorCommittedData,
   setMaskCanvasRef: setFlowMaskEditorCanvasRef,
   onCanvasPointerDown: onFlowMaskEditorCanvasPointerDown,
   setDrawMode: setFlowMaskEditorDrawMode,
   setBrushSize: setFlowMaskEditorBrushSize,
+  setBrushHardness: setFlowMaskEditorBrushHardness,
   getCommittedMaskData: getFlowMaskEditorCommittedData,
 } = useImageMaskEditorOverlay({
   nodes: nodes as Ref<Node[]>,

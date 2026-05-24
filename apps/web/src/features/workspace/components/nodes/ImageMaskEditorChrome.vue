@@ -93,11 +93,22 @@
               </div>
             </div>
           </label>
-          <label class="image-mask-editor-field image-mask-editor-field-disabled">
-            <span class="image-mask-editor-field-label image-mask-editor-field-label-muted">硬度</span>
+          <label class="image-mask-editor-field">
+            <span class="image-mask-editor-field-label">硬度</span>
             <div class="image-mask-editor-size-input-row">
-              <div class="image-mask-editor-range-wrap">
-                <input type="range" min="0" max="100" step="1" :value="70" disabled />
+              <div
+                class="image-mask-editor-range-wrap"
+                :style="rangeTooltipStyle(brushHardness, 0, 100)"
+              >
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  :value="brushHardness"
+                  @input="onBrushHardnessInput"
+                />
+                <span class="image-mask-editor-range-tooltip">{{ brushHardness }}</span>
               </div>
             </div>
           </label>
@@ -151,17 +162,19 @@
         </NodeToolIconButton>
         <NodeToolIconButton
           class="image-mask-editor-tool-btn"
-          disabled
-          aria-label-value="回退（待支持）"
-          title="回退（待支持）"
+          :disabled="!canUndo"
+          aria-label-value="回退"
+          title="回退"
+          @click="emit('undo-mask')"
         >
           <Undo />
         </NodeToolIconButton>
         <NodeToolIconButton
           class="image-mask-editor-tool-btn"
-          disabled
-          aria-label-value="前进（待支持）"
-          title="前进（待支持）"
+          :disabled="!canRedo"
+          aria-label-value="前进"
+          title="前进"
+          @click="emit('redo-mask')"
         >
           <Redo />
         </NodeToolIconButton>
@@ -218,10 +231,13 @@ type MaskEditorReferenceImage = {
 const props = defineProps<{
   drawMode: ImageMaskDrawMode
   brushSize: number
+  brushHardness: number
   maskLayerOpacity: number
   outputCount: number
   referenceImages: MaskEditorReferenceImage[]
   directGenerating?: boolean
+  canUndo?: boolean
+  canRedo?: boolean
   anchorRect: {
     top: number
     left: number
@@ -233,9 +249,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'set-draw-mode', mode: ImageMaskDrawMode): void
   (e: 'set-brush-size', value: number): void
+  (e: 'set-brush-hardness', value: number): void
   (e: 'set-mask-layer-opacity', value: number): void
   (e: 'clear-mask'): void
   (e: 'invert-mask'): void
+  (e: 'undo-mask'): void
+  (e: 'redo-mask'): void
   (e: 'update:output-count', value: number): void
   (e: 'image-input-open'): void
   (e: 'reference-image-remove', imageId: string): void
@@ -259,6 +278,11 @@ const chromeStyle = computed(() => ({
 function onBrushSizeInput(event: Event) {
   const target = event.target as HTMLInputElement | null
   emit('set-brush-size', Number(target?.value) || 18)
+}
+
+function onBrushHardnessInput(event: Event) {
+  const target = event.target as HTMLInputElement | null
+  emit('set-brush-hardness', Number(target?.value) || 0)
 }
 
 function onMaskOpacityInput(event: Event) {
@@ -292,7 +316,7 @@ function onSubmit(prompt: string, outputCount: number) {
   --mask-editor-tool-icon-size: 21px;
   --mask-editor-tool-icon-stroke: 1.5;
   position: absolute;
-  pointer-events: auto;
+  pointer-events: none;
   z-index: 21;
   overflow: visible;
 }
@@ -316,6 +340,7 @@ function onSubmit(prompt: string, outputCount: number) {
   gap: var(--node-tool-button-gap);
   justify-content: flex-start;
   animation: mask-editor-slide-left-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  pointer-events: auto;
 }
 
 .image-mask-editor-right-dock {
@@ -327,6 +352,7 @@ function onSubmit(prompt: string, outputCount: number) {
   flex-direction: column;
   gap: var(--mask-editor-stack-gap);
   animation: mask-editor-slide-right-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  pointer-events: auto;
 }
 
 .image-mask-editor-panel {

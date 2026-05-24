@@ -1,69 +1,11 @@
-const MASK_PAINT_RGB = {
-  r: 122,
-  g: 107,
-  b: 213,
-} as const
+import { MASK_PAINT_RGB } from './maskBrushEngine'
 
-const MASK_PAINT_COLOR = `rgba(${MASK_PAINT_RGB.r}, ${MASK_PAINT_RGB.g}, ${MASK_PAINT_RGB.b}, 1)`
 const MASK_PAINT_ALPHA = 0.5
 const MASK_EMPTY_ALPHA_THRESHOLD = 0
-
-export type MaskCanvasPoint = {
-  x: number
-  y: number
-}
-
-export type MaskPaintBrushState = {
-  brushSize: number
-  drawMode: 'paint' | 'erase'
-}
 
 export type MaskCommitResult = {
   executionMaskDataUrl: string
   maskDataUrl: string
-}
-
-export function getMaskCanvasPoint(
-  clientX: number,
-  clientY: number,
-  canvas: HTMLCanvasElement,
-): MaskCanvasPoint {
-  const rect = canvas.getBoundingClientRect()
-  if (!rect.width || !rect.height) return { x: 0, y: 0 }
-  const x = ((clientX - rect.left) / rect.width) * canvas.width
-  const y = ((clientY - rect.top) / rect.height) * canvas.height
-  return {
-    x: Math.max(0, Math.min(canvas.width, x)),
-    y: Math.max(0, Math.min(canvas.height, y)),
-  }
-}
-
-export function drawMaskStrokeSegment(
-  node: MaskPaintBrushState,
-  canvas: HTMLCanvasElement,
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number,
-) {
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-  ctx.save()
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  ctx.lineWidth = Math.max(4, Math.min(48, Number(node.brushSize) || 18))
-  if (node.drawMode === 'erase') {
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.strokeStyle = '#000000'
-  } else {
-    ctx.globalCompositeOperation = 'source-over'
-    ctx.strokeStyle = MASK_PAINT_COLOR
-  }
-  ctx.beginPath()
-  ctx.moveTo(fromX, fromY)
-  ctx.lineTo(toX, toY)
-  ctx.stroke()
-  ctx.restore()
 }
 
 export function drawMaskRasterPreviewToCanvas(
@@ -115,10 +57,8 @@ export function invertMaskPreviewCanvas(canvas: HTMLCanvasElement) {
 
 function extractMaskIntensity(
   data: Uint8ClampedArray,
-  width: number,
-  height: number,
 ): Float32Array {
-  const total = width * height
+  const total = data.length / 4
   const values = new Float32Array(total)
   for (let i = 0; i < total; i += 1) {
     const base = i * 4
@@ -181,7 +121,7 @@ export function buildMaskCommitResult(canvas: HTMLCanvasElement): MaskCommitResu
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
   const source = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const values = extractMaskIntensity(source.data, canvas.width, canvas.height)
+  const values = extractMaskIntensity(source.data)
   if (!hasMaskPaint(values)) return null
   const executionCanvas = document.createElement('canvas')
   executionCanvas.width = canvas.width

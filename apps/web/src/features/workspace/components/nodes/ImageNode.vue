@@ -44,6 +44,7 @@
         :mask-editor-canvas-height="maskEditorCanvasHeight"
         :mask-layer-opacity="maskLayerOpacity"
         :image-layer-visible="imageLayerVisible"
+        :mask-editor-brush-size="maskEditorBrushSize"
         :set-mask-canvas-ref="setMaskCanvasRef"
         :output-count="node.outputCount"
         :active="active"
@@ -128,6 +129,7 @@ const props = defineProps<{
   maskEditorCanvasHeight?: number
   maskLayerOpacity?: number
   imageLayerVisible?: boolean
+  maskEditorBrushSize?: number
   setMaskCanvasRef?: (element: Element | null) => void
 }>()
 
