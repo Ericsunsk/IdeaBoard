@@ -30,36 +30,11 @@
       @navigate-back="onNavigateRequest('/user/boards')"
     />
 
-    <aside
-      class="floating-toolbar canvas-chrome canvas-chrome-left canvas-control-group canvas-control-group--vertical"
+    <WorkspaceToolPalette
+      :active-tool="activeTool"
       :inert="isMaskEditorChromeHidden"
-      @wheel.prevent.stop
-    >
-      <div
-        class="canvas-icon-button"
-        :class="{ 'is-active': activeTool === 'select' }"
-        title="Select (V)"
-        @click="setActiveTool('select')"
-      >
-        <OneFingerSelectHandGesture class="canvas-control-icon" />
-      </div>
-      <div
-        class="canvas-icon-button"
-        :class="{ 'is-active': activeTool === 'hand' }"
-        title="Hand (H)"
-        @click="setActiveTool('hand')"
-      >
-        <SpockHandGesture class="canvas-control-icon" />
-      </div>
-      <div
-        class="canvas-icon-button"
-        :class="{ 'is-active': activeTool === 'text' }"
-        title="Text (T)"
-        @click="setActiveTool('text')"
-      >
-        <Text class="canvas-control-icon" />
-      </div>
-    </aside>
+      @select-tool="setActiveTool"
+    />
 
     <div
       ref="canvasWrapRef"
@@ -200,21 +175,12 @@
       />
     </div>
 
-    <div
-      class="floating-status canvas-chrome canvas-chrome-status"
+    <WorkspaceZoomControls
+      :zoom-level="zoomLevel"
       :inert="isMaskEditorChromeHidden"
-      @wheel.prevent.stop
-    >
-      <div class="zoom-controls">
-        <button type="button" class="zoom-btn" title="缩小" @click="onZoomOut">
-          <Minus class="zoom-btn-icon" />
-        </button>
-        <span class="zoom-level">{{ zoomLevel }}%</span>
-        <button type="button" class="zoom-btn" title="放大" @click="onZoomIn">
-          <Plus class="zoom-btn-icon" />
-        </button>
-      </div>
-    </div>
+      @zoom-out="onZoomOut"
+      @zoom-in="onZoomIn"
+    />
 
   </div>
 </template>
@@ -224,9 +190,7 @@ import type { Ref } from 'vue'
 import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
-import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import type { Edge, Node } from '@vue-flow/core'
-import { Minus, OneFingerSelectHandGesture, Plus, SpockHandGesture, Text } from '@iconoir/vue'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -261,6 +225,10 @@ import { useFlowSelectionController } from '../composables/useFlowSelectionContr
 import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
+import { useFlowMediaInputImages } from '../composables/useFlowMediaInputImages'
+import { useFlowNodeInternalsRefreshQueue } from '../composables/useFlowNodeInternalsRefreshQueue'
+import { useFlowViewportControls } from '../composables/useFlowViewportControls'
+import { useFlowActiveNodePanels } from '../composables/useFlowActiveNodePanels'
 import {
   useImageCanvasExtendOverlay,
   type CanvasExtendDragAnchor,
@@ -274,6 +242,8 @@ import ImageMaskEditorChrome from '../components/nodes/ImageMaskEditorChrome.vue
 import {
   useMaskEditorViewportController,
 } from '../composables/useMaskEditorViewportController'
+import WorkspaceToolPalette from '../components/WorkspaceToolPalette.vue'
+import WorkspaceZoomControls from '../components/WorkspaceZoomControls.vue'
 
 const appToast = useAppToast()
 const route = useRoute()
@@ -292,26 +262,13 @@ const {
   getSelectedElements,
   removeSelectedElements,
 } = useVueFlow()
-const zoomLevel = ref(100)
-let lastFlowZoom = 100
-
-function onZoomIn() {
-  zoomIn()
-}
-function onZoomOut() {
-  zoomOut()
-}
-
-function applyFlowTransform(transform: { x?: number; y?: number; zoom?: number }): boolean {
-  let zoomChanged = false
-  if (Number.isFinite(transform.zoom)) {
-    const nextZoom = Math.max(10, Math.round((transform.zoom as number) * 100))
-    if (lastFlowZoom !== nextZoom) zoomChanged = true
-    zoomLevel.value = nextZoom
-    lastFlowZoom = nextZoom
-  }
-  return zoomChanged
-}
+const { zoomLevel, onZoomIn, onZoomOut, applyFlowTransform, onPanViewport } =
+  useFlowViewportControls({
+    zoomIn,
+    zoomOut,
+    getViewport,
+    setViewport: (viewport) => setViewport(viewport),
+  })
 
 function clearSelectedFlowElementsSync() {
   const selectedElements = [...getSelectedElements.value]
@@ -342,53 +299,24 @@ const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 const FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING =
   import.meta.env.VITE_WORKSPACE_FLOW_ENABLE_CULLING === 'true'
 
-let pendingNodeInternalsRefresh = false
-let queuedNodeInternalsIds: Set<string> | null = null
-const activeImageActionNodeId = ref<string | null>(null)
-const activeImagePromptNodeId = ref<string | null>(null)
-const activeFusionPromptNodeId = ref<string | null>(null)
+const {
+  activeImageActionNodeId,
+  activeImagePromptNodeId,
+  activeFusionPromptNodeId,
+  closeActiveImagePromptComposer,
+  clearActiveNodePanels,
+} = useFlowActiveNodePanels()
 const duplicateModifierPressed = ref(false)
 const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageStageRegistry()
-
-function closeActiveImagePromptComposer() {
-  activeImagePromptNodeId.value = null
-}
-
-function scheduleFlowNodeInternalsRefresh(nodeIds: string[]) {
-  const nextIds = nodeIds.filter((id) => typeof id === 'string' && id.length > 0)
-  if (nextIds.length === 0) return
-  if (!queuedNodeInternalsIds) queuedNodeInternalsIds = new Set()
-  nextIds.forEach((id) => queuedNodeInternalsIds?.add(id))
-  if (pendingNodeInternalsRefresh) return
-  pendingNodeInternalsRefresh = true
-  void nextTick(() => {
-    requestAnimationFrame(() => {
-      const ids = readQueuedNodeInternalsRefreshIds()
-      if (ids.length > 0) {
-        updateNodeInternals(ids)
-      }
-      const pendingIds = readQueuedNodeInternalsRefreshIds()
-      pendingNodeInternalsRefresh = false
-      if (pendingIds.length > 0) {
-        scheduleFlowNodeInternalsRefresh(pendingIds)
-      }
-    })
-  })
-}
-
-function readQueuedNodeInternalsRefreshIds(): string[] {
-  const ids = queuedNodeInternalsIds ? Array.from(queuedNodeInternalsIds) : []
-  queuedNodeInternalsIds = null
-  return ids
-}
+const { scheduleFlowNodeInternalsRefresh } = useFlowNodeInternalsRefreshQueue({
+  updateNodeInternals,
+})
 
 function onPaneContextMenu(event: MouseEvent) {
   event.preventDefault()
   cancelFlowExpandMode()
   closeBoardHeaderEditing()
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
   clearFlowSelection()
   const flowPoint = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
@@ -402,18 +330,14 @@ function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
   createNodeAtPosition(kind, nodeContextMenu.value.flowX, nodeContextMenu.value.flowY)
   cancelFlowExpandMode()
   closeNodeContextMenu()
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
 }
 
 function setActiveTool(tool: 'select' | 'hand' | 'text') {
   cancelFlowExpandMode()
   closeBoardHeaderEditing()
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
   activeTool.value = tool
   if (tool === 'text') {
@@ -430,20 +354,9 @@ function onEscapeShortcut() {
     closeBoardHeaderEditing()
     return true
   }
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
   return clearFlowSelection()
-}
-
-function onPanViewport(delta: { x: number; y: number }) {
-  const viewport = getViewport()
-  setViewport({
-    x: viewport.x + delta.x,
-    y: viewport.y + delta.y,
-    zoom: viewport.zoom,
-  })
 }
 
 async function onNavigateRequest(path: string) {
@@ -600,9 +513,7 @@ const onEdgeUpdate = flowNodeMutations.onEdgeUpdate
 const createNodeAtPosition = flowNodeMutations.createNodeAtPosition
 const _onFlowDeleteNode = flowNodeMutations.onFlowDeleteNode
 function onFlowDeleteNode(nodeId: string) {
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   clearFlowMaskEditorCommittedData(nodeId)
   hideStrengthControl()
   closeNodeContextMenu()
@@ -672,221 +583,38 @@ function onFlowImageReset(nodeId: string) {
   _onFlowImageReset(nodeId)
 }
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
-
-watch(
-  [nodes, edges],
-  () => {
-    const flowNodes = nodes.value as Node[]
-    const flowEdges = edges.value as Edge[]
-    flowNodes
-      .filter((node) => node.data?.kind === 'prompt' || node.data?.kind === 'fusion')
-      .forEach((mediaInputNode) => {
-        const linkedImages = flowEdges
-          .filter((edge) => edge.target === mediaInputNode.id && edge.targetHandle === 'in:image')
-          .map((edge) => resolveNodePreviewImageById(edge.source))
-          .filter(
-            (item): item is { id: string; sourceType: 'node'; sourceId: string; sourceNodeId: string; url: string; ratio: number } =>
-              !!item && !!item.url,
-          )
-        const linkedBySourceId = new Map(linkedImages.map((item) => [item.sourceId, item]))
-        updateSnapshotNodeBase(
-          mediaInputNode.id,
-          (snapshotNode) => {
-            const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
-            const nextImages = current
-              .map((item) => {
-                const sourceType = (item as { sourceType?: unknown })?.sourceType
-                if (sourceType === 'external') return item
-                const sourceId =
-                  typeof (item as { sourceId?: unknown })?.sourceId === 'string'
-                    ? (item as { sourceId: string }).sourceId
-                    : ''
-                return sourceId ? linkedBySourceId.get(sourceId) : null
-              })
-              .filter((item): item is { id: string; sourceType: 'node' | 'external'; sourceId: string; sourceNodeId?: string; url: string; ratio: number } => !!item)
-            const nextNodeSourceIds = new Set(
-              nextImages
-                .filter((item) => item.sourceType === 'node')
-                .map((item) => item.sourceId),
-            )
-            nextImages.push(
-              ...linkedImages.filter((item) => !nextNodeSourceIds.has(item.sourceId)),
-            )
-            const limitedNextImages = nextImages.slice(0, 4)
-            const same =
-              current.length === limitedNextImages.length &&
-              current.every(
-                (item, idx) =>
-                  (item as { id?: unknown })?.id === limitedNextImages[idx]?.id &&
-                  (item as { sourceType?: unknown })?.sourceType === limitedNextImages[idx]?.sourceType &&
-                  (item as { sourceId?: unknown })?.sourceId === limitedNextImages[idx]?.sourceId &&
-                  item?.url === limitedNextImages[idx]?.url &&
-                  item?.ratio === limitedNextImages[idx]?.ratio,
-              )
-            return same ? snapshotNode : { ...snapshotNode, inputImages: limitedNextImages }
-          },
-          { history: false, dirty: true },
-        )
-      })
+const {
+  onFlowMediaInputImageDrop,
+  onFlowMediaInputImageOpen,
+  onFlowMediaInputImagePreview,
+  onFlowMediaInputImageRemove,
+  getMediaInputImages,
+  resolvePromptInputImageNodeIds,
+} = useFlowMediaInputImages({
+  nodes: nodes as Ref<Node[]>,
+  edges: edges as Ref<Edge[]>,
+  uploadImageToBoard: async (file) => {
+    if (!canvasDropRef) throw new Error('上传能力暂不可用')
+    return canvasDropRef.uploadImageToBoard(file)
   },
-  { deep: true },
-)
-
-function resolveNodePreviewImageById(nodeId: string): {
-  id: string
-  sourceType: 'node'
-  sourceId: string
-  sourceNodeId: string
-  url: string
-  ratio: number
-} | null {
-  const node = (nodes.value as Node[]).find((item) => item.id === nodeId)
-  const kind = node?.data?.kind
-  const snapshot = node?.data?.snapshotNode as Record<string, unknown> | undefined
-  if (!kind || !snapshot) return null
-
-  if (kind === 'image') {
-    const display = getImageNodeDisplayPayload(nodeId)
-    if (!display?.url) return null
-    return {
-      id: `node:${nodeId}`,
-      sourceType: 'node',
-      sourceId: nodeId,
-      sourceNodeId: nodeId,
-      url: display.url,
-      ratio: Number.isFinite(display.ratio) && display.ratio > 0 ? display.ratio : 1,
-    }
-  }
-
-  const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-  const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
-  const url = typeof latest?.url === 'string' ? latest.url.trim() : ''
-  if (!url) return null
-  const ratio = Number(latest?.ratio)
-  return {
-    id: `node:${nodeId}`,
-    sourceType: 'node',
-    sourceId: nodeId,
-    sourceNodeId: nodeId,
-    url,
-    ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
-  }
-}
+  updateSnapshotNodeBase,
+  commitGraphMutation: flowTransactions.commitGraphMutation,
+  markFlowExecutionNodeDirty,
+  getImageNodeDisplayPayload,
+  openImageUrlPreview,
+  onWarning: (message) => {
+    appToast.warning(message)
+  },
+})
 
 function onCanvasDragOver(event: DragEvent) {
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
   canvasDrop.onCanvasDragOver(event)
 }
 
 async function onCanvasDrop(event: DragEvent) {
   await canvasDrop.onCanvasDrop(event)
-}
-
-function resolveMediaInputNodeLabel(nodeId: string) {
-  const kind = (nodes.value as Node[]).find((node) => node.id === nodeId)?.data?.kind
-  return kind === 'prompt' ? 'Prompt' : '节点'
-}
-
-async function onFlowMediaInputImageDrop(nodeId: string, event: DragEvent) {
-  const currentInputCount = getMediaInputImages(nodeId).length
-  const label = resolveMediaInputNodeLabel(nodeId)
-  if (currentInputCount >= 4) {
-    appToast.warning(`${label} 最多接入 4 张图片`)
-    return
-  }
-  const file = event.dataTransfer?.files?.[0]
-  if (!file) return
-  try {
-    const uploaded = await canvasDrop.uploadImageToBoard(file)
-    updateSnapshotNodeBase(nodeId, (snapshotNode) => {
-      const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
-      return {
-        ...snapshotNode,
-        inputImages: [
-          ...current,
-          {
-            id: `external:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
-            sourceType: 'external',
-            sourceId: uploaded.url,
-            url: uploaded.url,
-            ratio: uploaded.ratio,
-          },
-        ].slice(0, 4),
-      }
-    })
-    markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : '上传失败'
-    appToast.warning(msg)
-  }
-}
-
-function onFlowMediaInputImageOpen(nodeId: string) {
-  const kind = (nodes.value as Node[]).find((node) => node.id === nodeId)?.data?.kind
-  if (kind !== 'prompt') return
-  const currentInputCount = getMediaInputImages(nodeId).length
-  const label = resolveMediaInputNodeLabel(nodeId)
-  if (currentInputCount >= 4) {
-    appToast.warning(`${label} 最多接入 4 张图片`)
-    return
-  }
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = IMAGE_UPLOAD_ACCEPT
-  input.onchange = () => {
-    const file = input.files?.[0]
-    if (!file) return
-    const syntheticDrop = {
-      dataTransfer: { files: [file] },
-      clientX: window.innerWidth / 2,
-      clientY: window.innerHeight / 2,
-    } as unknown as DragEvent
-    void onFlowMediaInputImageDrop(nodeId, syntheticDrop)
-  }
-  input.click()
-}
-
-function onFlowMediaInputImagePreview(image: { url: string; ratio: number }) {
-  void openImageUrlPreview(image.url, image.ratio)
-}
-
-function onFlowMediaInputImageRemove(nodeId: string, imageId: string) {
-  const currentInputImages = getMediaInputImages(nodeId)
-  const removed = currentInputImages.find((item) => item.id === imageId)
-  if (!removed) return
-  flowTransactions.commitGraphMutation((currentNodes, currentEdges) => {
-    const nextNodes = currentNodes.map((node) => {
-      if (node.id !== nodeId || (node.data?.kind !== 'prompt' && node.data?.kind !== 'fusion')) return node
-      const snapshotNode = node.data.snapshotNode
-      if (!snapshotNode || typeof snapshotNode !== 'object') return node
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          snapshotNode: {
-            ...(snapshotNode as Record<string, unknown>),
-            inputImages: currentInputImages.filter((item) => item.id !== imageId),
-          },
-        },
-      }
-    })
-    const nextEdges =
-      removed.sourceType === 'node'
-        ? currentEdges.filter(
-            (edge) =>
-              !(
-                edge.source === removed.sourceId &&
-                edge.target === nodeId &&
-                isImageInputHandle(edge.targetHandle)
-              ),
-          )
-        : currentEdges
-    return { nodes: nextNodes, edges: nextEdges }
-  })
-  markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
 }
 
 function onFlowImageOpenPreview(nodeId: string) {
@@ -910,8 +638,7 @@ function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
   event.preventDefault()
   cancelFlowExpandMode()
   selectFlowNodeForContextMenu(nodeId)
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
+  clearActiveNodePanels({ keepFusionPrompt: true })
   activeFusionPromptNodeId.value = nodeId
   hideStrengthControl()
 }
@@ -979,9 +706,7 @@ const {
   onCommit: (action, strength) => {
     const targetNodeId = activeImageActionNodeId.value
     if (!targetNodeId) return
-    activeImageActionNodeId.value = null
-    closeActiveImagePromptComposer()
-    activeFusionPromptNodeId.value = null
+    clearActiveNodePanels()
     void runImageDirectAction(targetNodeId, action, { strength })
   },
 })
@@ -1088,9 +813,7 @@ function onMaskEditorChromeSubmit(prompt: string, outputCount: number) {
     appToast.warning('请先标记局部重绘区域')
     return
   }
-  activeImagePromptNodeId.value = null
-  activeImageActionNodeId.value = null
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
   void runImageInpaintAction(nodeId, {
     prompt,
@@ -1113,9 +836,7 @@ function onFlowImageDirectAction(
   if (action === IMAGE_NODE_ACTION.imageExtend) {
     cancelFlowMaskEditorMode()
     const entered = enterFlowExpandMode(nodeId)
-    activeImageActionNodeId.value = null
-    closeActiveImagePromptComposer()
-    activeFusionPromptNodeId.value = null
+    clearActiveNodePanels()
     hideStrengthControl()
     if (!entered) appToast.warning('当前图片不可扩图')
     return
@@ -1136,9 +857,7 @@ function onFlowImageDirectAction(
   }
   cancelFlowExpandMode()
   cancelFlowMaskEditorMode()
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
   void runImageDirectAction(
     nodeId,
@@ -1150,9 +869,7 @@ function onFlowImageDirectAction(
 function onFlowImagePromptGenerate(nodeId: string, prompt: string, outputCount: number) {
   cancelFlowExpandMode()
   cancelFlowMaskEditorMode()
-  activeImagePromptNodeId.value = null
-  activeImageActionNodeId.value = null
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
   const committedMaskData = getFlowMaskEditorCommittedData(nodeId)
   if (committedMaskData?.executionMaskDataUrl) {
@@ -1183,66 +900,12 @@ function onFlowFusionPromptGenerate(
 ) {
   cancelFlowExpandMode()
   cancelFlowMaskEditorMode()
-  activeImageActionNodeId.value = null
-  closeActiveImagePromptComposer()
-  activeFusionPromptNodeId.value = null
+  clearActiveNodePanels()
   hideStrengthControl()
   onFlowNodeParamUpdate(nodeId, { key: 'prompt', value: prompt })
   onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: outputCount })
   onFlowNodeParamUpdate(nodeId, { key: 'aspectRatio', value: aspectRatio })
   void runFusionPromptGeneration(nodeId, prompt, outputCount, aspectRatio)
-}
-
-function isImageInputHandle(handle: string | null | undefined) {
-  return String(handle ?? '') === 'in:image'
-}
-
-function getMediaInputImages(nodeId: string): Array<{
-  id: string
-  sourceType: 'node' | 'external'
-  sourceId: string
-  sourceNodeId?: string
-  url: string
-  ratio: number
-}> {
-  const mediaInputNode = (nodes.value as Node[]).find((node) => node.id === nodeId)
-  const snapshot = mediaInputNode?.data?.snapshotNode as
-    | { inputImages?: Array<{ id?: unknown; sourceType?: unknown; sourceId?: unknown; sourceNodeId?: unknown; url?: unknown; ratio?: unknown }> }
-    | undefined
-  if (!Array.isArray(snapshot?.inputImages)) return []
-  const normalized: Array<{
-    id: string
-    sourceType: 'node' | 'external'
-    sourceId: string
-    sourceNodeId?: string
-    url: string
-    ratio: number
-  }> = []
-  snapshot.inputImages.forEach((item) => {
-    const id = typeof item.id === 'string' ? item.id : ''
-    const sourceType = item.sourceType === 'node' || item.sourceType === 'external' ? item.sourceType : null
-    const sourceId = typeof item.sourceId === 'string' ? item.sourceId : ''
-    const sourceNodeId = typeof item.sourceNodeId === 'string' ? item.sourceNodeId : undefined
-    const url = typeof item.url === 'string' ? item.url.trim() : ''
-    const ratio = Number(item.ratio)
-    if (!id || !sourceType || !sourceId || !url || !Number.isFinite(ratio) || ratio <= 0) return
-    normalized.push({ id, sourceType, sourceId, sourceNodeId, url, ratio })
-  })
-  return normalized
-}
-
-function resolvePromptInputImageNodeIds(promptNodeId: string): string[] {
-  const ordered = getMediaInputImages(promptNodeId)
-    .filter((item) => item.sourceType === 'node')
-    .map((item) => item.sourceId)
-  const linked = new Set(
-    (edges.value as Edge[])
-      .filter((edge) => edge.target === promptNodeId && isImageInputHandle(edge.targetHandle))
-      .map((edge) => edge.source),
-  )
-  return ordered.length
-    ? ordered.filter((sourceNodeId) => linked.has(sourceNodeId))
-    : Array.from(linked)
 }
 
 function onFlowPromptGenerate(
@@ -1492,17 +1155,6 @@ onMounted(async () => {
   background-position: 0 0;
 }
 
-.floating-toolbar {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: transparent;
-  padding: 0;
-  border-radius: 0;
-  border: none;
-  z-index: 100;
-}
 .toolbar-divider {
   width: 24px;
   height: 1px;
@@ -1589,59 +1241,6 @@ onMounted(async () => {
   cursor: text;
 }
 
-.floating-status {
-  position: absolute;
-  right: 24px;
-  bottom: 24px;
-  z-index: 100;
-  pointer-events: auto;
-}
-.zoom-controls {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  height: 33px;
-  padding: 4px;
-  border: var(--canvas-control-border-width) solid #d8ddea;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #202124;
-}
-.zoom-btn {
-  width: 23px;
-  height: 23px;
-  margin: 0;
-  padding: 0;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--ib-control-icon);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-.zoom-btn-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: var(--canvas-control-icon-stroke);
-}
-.zoom-btn:hover {
-  background: #f1f3f9;
-  color: var(--ib-control-icon-hover);
-}
-.zoom-level {
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.2;
-  color: #202124;
-  min-width: 33px;
-  text-align: center;
-}
 </style>
 
 <style>
