@@ -233,6 +233,8 @@ import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandIn
 import { useFlowMaskEditorChromeActions } from '../composables/useFlowMaskEditorChromeActions'
 import { useFlowWorkspaceNodeHandlers } from '../composables/useFlowWorkspaceNodeHandlers'
 import { useFlowSnapshotNodeUpdater } from '../composables/useFlowSnapshotNodeUpdater'
+import { useFlowImageNodeSnapshots } from '../composables/useFlowImageNodeSnapshots'
+import { useFlowImageUploadActions } from '../composables/useFlowImageUploadActions'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
@@ -490,26 +492,24 @@ const {
 const { nodeContextMenu, canvasNodeMenuItems, closeNodeContextMenu, openNodeContextMenu } =
   useFlowNodeContextMenu()
 
-let canvasDropRef: ReturnType<typeof useFlowCanvasDrop> | null = null
 const {
   getImageNodeSnapshot,
   getImageNodeDisplayPayload,
-  onFlowImageOpenFile,
-  onFlowImageReset: onFlowImageResetBase,
-  onFlowImageStageDrop,
-} = useFlowNodeMediaInputs({
+} = useFlowImageNodeSnapshots({
   nodes: nodes as Ref<Node[]>,
-  canvasDrop: {
-    applyImageFileToImageNode: async (nodeId, file): Promise<boolean> => {
-      if (!canvasDropRef) return false
-      const updated = await canvasDropRef.applyImageFileToImageNode(nodeId, file)
-      if (updated) clearFlowMaskEditorCommittedData(nodeId)
-      return updated
-    },
-  },
-  updateSnapshotNode,
-  markFlowExecutionNodeDirty,
 })
+const { uploadImageToBoard, applyImageFileToImageNode, createImageNodeFromFile } =
+  useFlowImageUploadActions({
+    currentBoardId,
+    createNodeAtPosition,
+    updateSnapshotNode,
+    getImageNodeSnapshot,
+    uploadApi,
+    sanitizeApiErrorMessage,
+    onWarning: (msg) => appToast.warning(msg),
+    onSuccess: (msg) => appToast.success(msg),
+    onNodeMutated: (nodeId) => markFlowExecutionNodeDirty(nodeId),
+  })
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 const {
   onFlowMediaInputImageDrop,
@@ -521,10 +521,7 @@ const {
 } = useFlowMediaInputImages({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
-  uploadImageToBoard: async (file) => {
-    if (!canvasDropRef) throw new Error('上传能力暂不可用')
-    return canvasDropRef.uploadImageToBoard(file)
-  },
+  uploadImageToBoard,
   updateSnapshotNodeBase,
   commitGraphMutation: flowTransactions.commitGraphMutation,
   markFlowExecutionNodeDirty,
@@ -666,6 +663,20 @@ const {
   stopCanvasInteraction: stopFlowInteraction,
 })
 
+const {
+  onFlowImageOpenFile,
+  onFlowImageReset: onFlowImageResetBase,
+  onFlowImageStageDrop,
+} = useFlowNodeMediaInputs({
+  applyImageFileToImageNode: async (nodeId, file): Promise<boolean> => {
+    const updated = await applyImageFileToImageNode(nodeId, file)
+    if (updated) clearFlowMaskEditorCommittedData(nodeId)
+    return updated
+  },
+  updateSnapshotNode,
+  markFlowExecutionNodeDirty,
+})
+
 const { onFlowDeleteNode, onFlowPromptTextUpdate, onFlowNodeParamUpdate, onFlowImageReset } =
   useFlowWorkspaceNodeHandlers({
     clearActiveNodePanels,
@@ -716,10 +727,7 @@ const {
   getViewport,
   setViewport: (viewport, options) => setViewport(viewport, options),
   setCenter: (x, y, options) => setCenter(x, y, options),
-  uploadImageToBoard: async (file: File) => {
-    const uploaded = await canvasDrop.uploadImageToBoard(file)
-    return { url: uploaded.url, ratio: uploaded.ratio }
-  },
+  uploadImageToBoard,
   onWarning: (msg) => appToast.warning(msg),
   onReferenceImagePreview: (image) => {
     void openImageUrlPreview(image.url, image.ratio)
@@ -813,19 +821,12 @@ const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
 })
 
 const canvasDrop = useFlowCanvasDrop({
-  currentBoardId,
   screenToFlowCoordinate,
   createNodeAtPosition,
-  updateSnapshotNode,
-  getImageNodeSnapshot,
-  uploadApi,
-  sanitizeApiErrorMessage,
   onWarning: (msg) => appToast.warning(msg),
-  onSuccess: (msg) => appToast.success(msg),
-  onNodeMutated: (nodeId) => markFlowExecutionNodeDirty(nodeId),
+  createImageNodeFromFile,
   createNodeOptions: createNodeOptions as unknown as ReadonlyArray<{ value?: unknown }>,
 })
-canvasDropRef = canvasDrop
 
 const {
   onPaneContextMenu,
