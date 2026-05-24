@@ -18,6 +18,9 @@ export function useFlowViewportControls({
   setViewport,
 }: UseFlowViewportControlsParams) {
   const zoomLevel = ref(100)
+  const VIEWPORT_POSITION_EPSILON = 0.5
+  let lastFlowX = 0
+  let lastFlowY = 0
   let lastFlowZoom = 100
 
   function onZoomIn() {
@@ -29,14 +32,24 @@ export function useFlowViewportControls({
   }
 
   function applyFlowTransform(transform: FlowTransform): boolean {
-    let zoomChanged = false
+    let viewportChanged = false
+    if (Number.isFinite(transform.x)) {
+      const nextX = transform.x as number
+      if (Math.abs(lastFlowX - nextX) > VIEWPORT_POSITION_EPSILON) viewportChanged = true
+      lastFlowX = nextX
+    }
+    if (Number.isFinite(transform.y)) {
+      const nextY = transform.y as number
+      if (Math.abs(lastFlowY - nextY) > VIEWPORT_POSITION_EPSILON) viewportChanged = true
+      lastFlowY = nextY
+    }
     if (Number.isFinite(transform.zoom)) {
       const nextZoom = Math.max(10, Math.round((transform.zoom as number) * 100))
-      if (lastFlowZoom !== nextZoom) zoomChanged = true
+      if (lastFlowZoom !== nextZoom) viewportChanged = true
       zoomLevel.value = nextZoom
       lastFlowZoom = nextZoom
     }
-    return zoomChanged
+    return viewportChanged
   }
 
   function onPanViewport(delta: PanDelta) {

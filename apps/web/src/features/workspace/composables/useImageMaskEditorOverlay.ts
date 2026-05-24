@@ -4,6 +4,7 @@ import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 import {
   buildMaskCommitResult,
   drawMaskRasterPreviewToCanvas,
+  featherMaskPreviewCanvas,
   invertMaskPreviewCanvas,
 } from './useMaskPaintingCanvas'
 import type { MaskPaintBrushShape } from './maskBrushEngine'
@@ -23,6 +24,14 @@ export type ImageMaskBrushShape = MaskPaintBrushShape
 export type ImageMaskEditorCommittedData = {
   executionMaskDataUrl: string
   maskDataUrl: string
+}
+
+const MAX_FEATHER_RADIUS = 16
+
+function strengthToFeatherRadius(strength: number) {
+  const clamped = Math.max(0, Math.min(100, Math.round(strength)))
+  if (clamped <= 0) return 0
+  return Math.max(1, Math.round((clamped / 100) * MAX_FEATHER_RADIUS))
 }
 
 type ImageMaskEditorState = {
@@ -365,6 +374,20 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     commitUndoHistoryIfChanged(nodeId, before, canvas)
   }
 
+  function featherMask(strength = 35) {
+    const nodeId = state.value?.nodeId
+    if (!nodeId) return
+    const canvas = canvasRefs.get(nodeId)
+    if (!canvas) return
+    const before = captureMaskHistoryEntry(canvas)
+    const changed = featherMaskPreviewCanvas(canvas, strengthToFeatherRadius(strength))
+    if (!changed) {
+      updateHistoryAvailability(nodeId)
+      return
+    }
+    commitUndoHistoryIfChanged(nodeId, before, canvas)
+  }
+
   function undoMask() {
     const nodeId = state.value?.nodeId
     if (!nodeId) return
@@ -494,6 +517,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     commitMaskEditorMode,
     clearMask,
     invertMask,
+    featherMask,
     undoMask,
     redoMask,
     clearCommittedMaskData,

@@ -66,6 +66,7 @@
         @edge-update="onEdgeUpdate"
         @move-start="closeBoardHeaderEditing"
         @move="onFlowMove"
+        @move-end="onFlowMoveEnd"
         @node-click="onFlowNodeClick"
         @node-drag-start="onNodeDragStart"
         @node-drag-stop="onNodeDragStop"
@@ -168,6 +169,7 @@
         @set-mask-layer-opacity="setMaskEditorLayerOpacity"
         @clear-mask="clearFlowMaskEditorMask"
         @invert-mask="invertFlowMaskEditorMask"
+        @feather-mask="featherFlowMaskEditorMask"
         @undo-mask="undoFlowMaskEditorMask"
         @redo-mask="redoFlowMaskEditorMask"
         @update:output-count="onMaskEditorChromeOutputCountUpdate"
@@ -222,7 +224,6 @@ import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInter
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
 import { type CanvasBoardSnapshot } from '../../workspace/types/canvasNodes'
-import { type ImageNodeAction } from '../types/imageActions'
 import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActions'
@@ -291,18 +292,13 @@ const edges = ref<Edge[]>([])
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const boardBaseSnapshot = ref<CanvasBoardSnapshot>(createEmptyCanvasBoardSnapshot())
 
-const createNodeOptions: readonly { key: string; label: string; value: FlowCreatableNodeKind }[] = [
-  { key: 'prompt', label: 'Prompt', value: 'prompt' },
-  { key: 'image', label: 'Image', value: 'image' },
-  { key: 'fusion', label: 'Fusion', value: 'fusion' },
-  { key: 'model', label: 'Model', value: 'model' },
-  { key: 'viewpoint', label: 'Viewpoint', value: 'viewpoint' },
-]
 const isLoadingBoardSnapshot = ref(false)
 const isSavingBoard = ref(false)
 const isDirty = ref(false)
 const saveStatus = ref<'idle' | 'saved' | 'failed'>('idle')
 const activeTool = ref<'select' | 'hand' | 'text'>('select')
+let hasPendingViewportChange = false
+let isApplyingBoardViewport = false
 
 const createNodeKind = ref<FlowCreatableNodeKind>('prompt')
 
@@ -336,9 +332,29 @@ function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: 
   closeBoardHeaderEditing()
   const transform = payload.flowTransform
   if (!transform) return
-  applyFlowTransform(transform)
+  if (applyFlowTransform(transform)) hasPendingViewportChange = true
   if (!isMaskEditorChromeReady.value) return
   scheduleMaskEditorChromeAnchorUpdate()
+}
+
+function onFlowMoveEnd(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {
+  const transform = payload.flowTransform
+  if (transform && applyFlowTransform(transform)) hasPendingViewportChange = true
+  const shouldPersistViewport = hasPendingViewportChange
+  hasPendingViewportChange = false
+  if (!shouldPersistViewport || isApplyingBoardViewport || isLoadingBoardSnapshot.value) return
+  flowTransactions.commitDirty()
+}
+
+function setBoardViewport(viewport: { x: number; y: number; zoom: number }) {
+  isApplyingBoardViewport = true
+  const result = setViewport(viewport)
+  const clearApplyingFlag = () => {
+    window.requestAnimationFrame(() => {
+      isApplyingBoardViewport = false
+    })
+  }
+  void Promise.resolve(result).then(clearApplyingFlag, clearApplyingFlag)
 }
 
 const {
@@ -362,7 +378,7 @@ const {
     userUid: `${userStore.user?.uid ?? ''}`.trim(),
   }),
   getViewport,
-  setViewport,
+  setViewport: setBoardViewport,
   setNodes,
   setEdges,
   onWarning: (msg) => {
@@ -604,6 +620,7 @@ const {
   commitMaskEditorMode: commitFlowMaskEditorMode,
   clearMask: clearFlowMaskEditorMask,
   invertMask: invertFlowMaskEditorMask,
+  featherMask: featherFlowMaskEditorMask,
   undoMask: undoFlowMaskEditorMask,
   redoMask: redoFlowMaskEditorMask,
   clearCommittedMaskData: clearFlowMaskEditorCommittedData,

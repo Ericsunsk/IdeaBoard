@@ -55,6 +55,96 @@ export function invertMaskPreviewCanvas(canvas: HTMLCanvasElement) {
   ctx.putImageData(imageData, 0, 0)
 }
 
+function blurAlphaHorizontal(
+  source: Uint8ClampedArray,
+  target: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const windowSize = radius * 2 + 1
+  for (let y = 0; y < height; y += 1) {
+    const rowOffset = y * width
+    let sum = 0
+    for (let k = -radius; k <= radius; k += 1) {
+      const x = Math.min(width - 1, Math.max(0, k))
+      sum += source[rowOffset + x]
+    }
+    for (let x = 0; x < width; x += 1) {
+      target[rowOffset + x] = Math.round(sum / windowSize)
+      const removeX = Math.max(0, x - radius)
+      const addX = Math.min(width - 1, x + radius + 1)
+      sum += source[rowOffset + addX] - source[rowOffset + removeX]
+    }
+  }
+}
+
+function blurAlphaVertical(
+  source: Uint8ClampedArray,
+  target: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const windowSize = radius * 2 + 1
+  for (let x = 0; x < width; x += 1) {
+    let sum = 0
+    for (let k = -radius; k <= radius; k += 1) {
+      const y = Math.min(height - 1, Math.max(0, k))
+      sum += source[y * width + x]
+    }
+    for (let y = 0; y < height; y += 1) {
+      target[y * width + x] = Math.round(sum / windowSize)
+      const removeY = Math.max(0, y - radius)
+      const addY = Math.min(height - 1, y + radius + 1)
+      sum += source[addY * width + x] - source[removeY * width + x]
+    }
+  }
+}
+
+export function featherMaskPreviewCanvas(
+  canvas: HTMLCanvasElement,
+  radius = 6,
+): boolean {
+  const width = canvas.width
+  const height = canvas.height
+  if (!width || !height) return false
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return false
+  const blurRadius = Math.floor(radius)
+  if (blurRadius <= 0) return false
+  const imageData = ctx.getImageData(0, 0, width, height)
+  const source = imageData.data
+  const total = width * height
+  const alphaSource = new Uint8ClampedArray(total)
+  let hasMask = false
+  for (let i = 0; i < total; i += 1) {
+    const alpha = source[i * 4 + 3]
+    alphaSource[i] = alpha
+    if (alpha > 0) hasMask = true
+  }
+  if (!hasMask) return false
+
+  const alphaTemp = new Uint8ClampedArray(total)
+  const alphaBlurred = new Uint8ClampedArray(total)
+  blurAlphaHorizontal(alphaSource, alphaTemp, width, height, blurRadius)
+  blurAlphaVertical(alphaTemp, alphaBlurred, width, height, blurRadius)
+
+  let changed = false
+  for (let i = 0; i < total; i += 1) {
+    const base = i * 4
+    source[base] = MASK_PAINT_RGB.r
+    source[base + 1] = MASK_PAINT_RGB.g
+    source[base + 2] = MASK_PAINT_RGB.b
+    const nextAlpha = alphaBlurred[i]
+    if (source[base + 3] !== nextAlpha) changed = true
+    source[base + 3] = nextAlpha
+  }
+  if (!changed) return false
+  ctx.putImageData(imageData, 0, 0)
+  return true
+}
+
 function extractMaskIntensity(
   data: Uint8ClampedArray,
 ): Float32Array {

@@ -137,49 +137,76 @@
           </label>
         </section>
       </div>
-      <div class="image-mask-editor-right-actions node-tool-surface">
-        <NodeToolIconButton
-          class="image-mask-editor-tool-btn"
-          aria-label-value="清空蒙版"
-          title="清空蒙版"
-          @click="emit('clear-mask')"
+      <div
+        class="image-mask-editor-right-actions node-tool-surface"
+        :class="{ 'is-feather-strength-mode': featherStrengthVisible }"
+      >
+        <template v-if="!featherStrengthVisible">
+          <NodeToolIconButton
+            class="image-mask-editor-tool-btn"
+            aria-label-value="清空蒙版"
+            title="清空蒙版"
+            @click="emit('clear-mask')"
+          >
+            <XmarkCircle />
+          </NodeToolIconButton>
+          <NodeToolIconButton
+            class="image-mask-editor-tool-btn"
+            aria-label-value="反选蒙版"
+            title="反选蒙版"
+            @click="emit('invert-mask')"
+          >
+            <PlusSquareDashed />
+          </NodeToolIconButton>
+          <NodeToolIconButton
+            class="image-mask-editor-tool-btn"
+            aria-label-value="羽化边缘"
+            title="羽化边缘"
+            @mousedown.stop="onFeatherButtonMouseDown"
+            @click="onFeatherButtonClick"
+          >
+            <CenterAlign />
+          </NodeToolIconButton>
+          <NodeToolIconButton
+            class="image-mask-editor-tool-btn"
+            :disabled="!canUndo"
+            aria-label-value="回退"
+            title="回退"
+            @click="emit('undo-mask')"
+          >
+            <Undo />
+          </NodeToolIconButton>
+          <NodeToolIconButton
+            class="image-mask-editor-tool-btn"
+            :disabled="!canRedo"
+            aria-label-value="前进"
+            title="前进"
+            @click="emit('redo-mask')"
+          >
+            <Redo />
+          </NodeToolIconButton>
+        </template>
+        <div
+          v-else
+          class="image-mask-editor-feather-pop"
+          @mousedown.stop
         >
-          <XmarkCircle />
-        </NodeToolIconButton>
-        <NodeToolIconButton
-          class="image-mask-editor-tool-btn"
-          aria-label-value="反选蒙版"
-          title="反选蒙版"
-          @click="emit('invert-mask')"
-        >
-          <PlusSquareDashed />
-        </NodeToolIconButton>
-        <NodeToolIconButton
-          class="image-mask-editor-tool-btn"
-          disabled
-          aria-label-value="羽化边缘（待支持）"
-          title="羽化边缘（待支持）"
-        >
-          <CenterAlign />
-        </NodeToolIconButton>
-        <NodeToolIconButton
-          class="image-mask-editor-tool-btn"
-          :disabled="!canUndo"
-          aria-label-value="回退"
-          title="回退"
-          @click="emit('undo-mask')"
-        >
-          <Undo />
-        </NodeToolIconButton>
-        <NodeToolIconButton
-          class="image-mask-editor-tool-btn"
-          :disabled="!canRedo"
-          aria-label-value="前进"
-          title="前进"
-          @click="emit('redo-mask')"
-        >
-          <Redo />
-        </NodeToolIconButton>
+          <div
+            ref="featherStrengthTrackRef"
+            class="image-mask-editor-feather-track"
+            role="slider"
+            aria-label="羽化强度"
+            :aria-valuenow="featherStrength"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            @mousedown.stop.prevent="onFeatherTrackMouseDown"
+          >
+            <div
+              class="image-mask-editor-feather-fill"
+              :style="{ width: `${featherStrength}%` }"
+            />
+          </div>
+        </div>
       </div>
       <PromptTextComposer
         v-model="promptDraft"
@@ -203,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import {
   Circle,
   CircleSpark,
@@ -260,6 +287,7 @@ const emit = defineEmits<{
   (e: 'set-mask-layer-opacity', value: number): void
   (e: 'clear-mask'): void
   (e: 'invert-mask'): void
+  (e: 'feather-mask', strength: number): void
   (e: 'undo-mask'): void
   (e: 'redo-mask'): void
   (e: 'update:output-count', value: number): void
@@ -270,6 +298,15 @@ const emit = defineEmits<{
 }>()
 
 const promptDraft = ref('')
+const FEATHER_LONG_PRESS_MS = 260
+const FEATHER_STRENGTH_DEFAULT = 35
+const featherStrength = ref(FEATHER_STRENGTH_DEFAULT)
+const featherStrengthVisible = ref(false)
+const featherStrengthTrackRef = ref<HTMLElement | null>(null)
+let featherLongPressTimer: number | null = null
+let featherDragging = false
+let featherPointerX = 0
+let suppressNextFeatherClick = false
 const chromeStyle = computed(() => ({
   top: `${props.anchorRect.top}px`,
   left: `${props.anchorRect.left}px`,
@@ -297,6 +334,86 @@ function onMaskOpacityInput(event: Event) {
   emit('set-mask-layer-opacity', Number(target?.value) || 72)
 }
 
+function clearFeatherLongPressTimer() {
+  if (!featherLongPressTimer) return
+  clearTimeout(featherLongPressTimer)
+  featherLongPressTimer = null
+}
+
+function clampFeatherStrength(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function updateFeatherStrengthFromClientX(clientX: number) {
+  const track = featherStrengthTrackRef.value
+  if (!track) return
+  const rect = track.getBoundingClientRect()
+  if (rect.width <= 0) return
+  const ratio = (clientX - rect.left) / rect.width
+  featherStrength.value = clampFeatherStrength(ratio * 100)
+}
+
+function addFeatherGlobalListeners() {
+  window.addEventListener('mousemove', onFeatherGlobalMouseMove, true)
+  window.addEventListener('mouseup', onFeatherGlobalMouseUp, true)
+}
+
+function removeFeatherGlobalListeners() {
+  window.removeEventListener('mousemove', onFeatherGlobalMouseMove, true)
+  window.removeEventListener('mouseup', onFeatherGlobalMouseUp, true)
+}
+
+function beginFeatherDragging(clientX: number) {
+  featherStrengthVisible.value = true
+  featherDragging = true
+  featherPointerX = clientX
+  addFeatherGlobalListeners()
+  void nextTick(() => updateFeatherStrengthFromClientX(featherPointerX))
+}
+
+function onFeatherButtonMouseDown(event: MouseEvent) {
+  if (event.button !== 0) return
+  clearFeatherLongPressTimer()
+  removeFeatherGlobalListeners()
+  featherDragging = false
+  suppressNextFeatherClick = false
+  featherPointerX = event.clientX
+  featherLongPressTimer = window.setTimeout(() => {
+    suppressNextFeatherClick = true
+    beginFeatherDragging(featherPointerX)
+  }, FEATHER_LONG_PRESS_MS)
+  addFeatherGlobalListeners()
+}
+
+function onFeatherButtonClick() {
+  if (suppressNextFeatherClick) {
+    suppressNextFeatherClick = false
+    return
+  }
+  emit('feather-mask', featherStrength.value)
+}
+
+function onFeatherTrackMouseDown(event: MouseEvent) {
+  clearFeatherLongPressTimer()
+  suppressNextFeatherClick = true
+  beginFeatherDragging(event.clientX)
+}
+
+function onFeatherGlobalMouseMove(event: MouseEvent) {
+  featherPointerX = event.clientX
+  if (!featherDragging) return
+  updateFeatherStrengthFromClientX(event.clientX)
+}
+
+function onFeatherGlobalMouseUp() {
+  clearFeatherLongPressTimer()
+  removeFeatherGlobalListeners()
+  if (!featherDragging) return
+  featherDragging = false
+  featherStrengthVisible.value = false
+  emit('feather-mask', featherStrength.value)
+}
+
 function rangeTooltipStyle(value: number, min: number, max: number) {
   const ratio = max === min ? 0 : (value - min) / (max - min)
   const percent = Math.min(1, Math.max(0, ratio)) * 100
@@ -307,6 +424,11 @@ function onSubmit(prompt: string, outputCount: number) {
   emit('submit', prompt, clampImageNodeOutputCount(outputCount))
   promptDraft.value = ''
 }
+
+onBeforeUnmount(() => {
+  clearFeatherLongPressTimer()
+  removeFeatherGlobalListeners()
+})
 </script>
 
 <style scoped>
@@ -405,6 +527,42 @@ function onSubmit(prompt: string, outputCount: number) {
 .image-mask-editor-right-actions .image-mask-editor-tool-btn {
   width: var(--node-tool-button-size);
   flex: 0 0 var(--node-tool-button-size);
+}
+
+.image-mask-editor-right-actions.is-feather-strength-mode {
+  width: 100%;
+  height: var(--node-tool-button-size);
+  gap: 0;
+}
+
+.image-mask-editor-feather-pop {
+  position: relative;
+  width: 100%;
+  height: var(--node-tool-button-size);
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.image-mask-editor-feather-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border: none;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(122, 107, 213, 0.2);
+  cursor: ew-resize;
+}
+
+.image-mask-editor-feather-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: #7a6bd5;
+  transition: width 0.06s linear;
 }
 
 .image-mask-editor-composer {
