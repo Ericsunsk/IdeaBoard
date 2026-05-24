@@ -10,7 +10,6 @@
 - `partial-edit`
 - `style-variation`
 - `style-fusion`
-- `multi-angle`
 - `virtual-3d`
 - `image-extend`
 - `hd-upscale`
@@ -44,8 +43,6 @@
 
 - `{{original_image_url}}`
 - `{{mask_image_url}}`
-- `{{model_url}}`
-- `{{pose_url}}`
 
 ## 推荐配置策略
 
@@ -60,7 +57,7 @@
 1. `Prompt` 组
 2. `Inpaint` 组
 3. `Fusion` 组
-4. `Model`、`Display`、`Image Tools` 组
+4. `Display`、`Image Tools` 组
 
 ## 节点与 Feature 对照
 
@@ -73,8 +70,6 @@
   - `partial-edit`
 - `Fusion` 组
   - `style-fusion`
-- `Model` 组
-  - `multi-angle`
 - `Display` 组
   - `virtual-3d`
 - `Image Tools` 组
@@ -234,35 +229,6 @@
 
 补充融合要求：
 {{user_prompt}}
-```
-
-
-## Model 组
-
-### multi-angle
-
-- 后台 slug：`multi-angle`
-- 可直接使用的变量：`{{angle_spec}}`、`{{background}}`、`{{model_strength}}`、`{{user_prompt}}`
-- 配置要点：单视角输出，主控参数必须直接写明
-- 推荐模板：
-
-```text
-你是服装或商品单视角生成助手。
-
-任务：基于输入图，将主体稳定转换到目标单一视角，输出单张结果。
-
-执行原则：
-1. 必须输出单张、单视角结果，不要生成多视图拼接或多张组合图。
-2. 保持主体身份、品类、结构、关键设计元素和主要材质特征稳定。
-3. 必须严格遵循系统提供的视角控制参数与主体参考约束，不要为了追求风格化而破坏主体一致性。
-4. 若系统额外提供姿态参考，应将其视为附加姿态约束；若未提供，则只按已有主体与视角约束执行。
-5. 用户补充要求只用于风格、氛围、材质细节和弱修饰，不要覆盖系统控制参数。
-6. 输出结果应适合服装或商品展示，不要文字说明、不要水印、不要无关拼贴。
-
-系统视角控制参数：{{angle_spec}}（这是目标视角与景别的强约束，请遵循其语义，而不是逐字复述）
-主体参考强度：{{model_strength}}（数值越高，越应优先保持参考主体的一致性）
-背景策略：{{background}}（用于约束背景保留或重建方向）
-补充要求：{{user_prompt}}
 ```
 
 

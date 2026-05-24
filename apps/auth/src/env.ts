@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import { isProductionRuntime } from './runtime-env.js'
 
 dotenv.config()
 
@@ -14,11 +15,6 @@ function getEnvInt(name: string, fallback: number): number {
   const value = Number.parseInt(raw, 10)
   if (!Number.isFinite(value) || value <= 0) return fallback
   return value
-}
-
-function isProductionRuntime(): boolean {
-  const value = getEnv('NODE_ENV', getEnv('APP_ENV', '')).toLowerCase()
-  return value === 'production' || value === 'prod' || value === 'release'
 }
 
 function isUnsafeProductionSecret(value: string): boolean {

@@ -250,6 +250,45 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 		}
 	})
 
+	t.Run("params image_urls count limit", func(t *testing.T) {
+		urls := make([]interface{}, maxSubmitTaskImageURLs+1)
+		for i := range urls {
+			urls[i] = "https://example.com/image.png"
+		}
+		err := validateSubmitTaskMediaParams(map[string]interface{}{
+			"image_urls": urls,
+		})
+		if err == nil {
+			t.Fatalf("expected params image_urls count error")
+		}
+	})
+
+	t.Run("params mask_image_urls count limit", func(t *testing.T) {
+		urls := make([]interface{}, maxSubmitTaskImageURLs+1)
+		for i := range urls {
+			urls[i] = "https://example.com/image.png"
+		}
+		err := validateSubmitTaskMediaParams(map[string]interface{}{
+			"mask_image_urls": urls,
+		})
+		if err == nil {
+			t.Fatalf("expected params mask_image_urls count error")
+		}
+	})
+
+	t.Run("params reference_image_urls count limit", func(t *testing.T) {
+		urls := make([]interface{}, maxSubmitTaskImageURLs+1)
+		for i := range urls {
+			urls[i] = "https://example.com/image.png"
+		}
+		err := validateSubmitTaskMediaParams(map[string]interface{}{
+			"reference_image_urls": urls,
+		})
+		if err == nil {
+			t.Fatalf("expected params reference_image_urls count error")
+		}
+	})
+
 	t.Run("params byte limit", func(t *testing.T) {
 		_, err := marshalSubmitTaskParams(map[string]interface{}{
 			"payload": strings.Repeat("x", maxSubmitTaskParamsBytes+1),

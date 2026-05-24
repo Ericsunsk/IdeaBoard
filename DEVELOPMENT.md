@@ -108,7 +108,6 @@ graph LR
 | `partial-edit` | 局部改款 |
 | `remove-bg` | 抠图 |
 | `style-fusion` | 双图融合 |
-| `multi-angle` | 单图单视角展示 |
 | `virtual-3d` | 虚拟 3D 展示 |
 | `pattern-gen` | 图案生成 |
 | `hd-upscale` | HD |

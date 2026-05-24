@@ -70,3 +70,55 @@ func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyFeatureSystemPromptTemplateWithoutUserPromptStillKeepsBasePrompt(t *testing.T) {
+	got := ApplyFeatureSystemPrompt(
+		"user prompt",
+		"user prompt",
+		"style-fusion",
+		map[string]interface{}{
+			"blend_ratio": 30,
+		},
+		func(string) (string, error) {
+			return "SYS ratio={{blend_ratio}}", nil
+		},
+	)
+
+	if got != "SYS ratio=30 user prompt" {
+		t.Fatalf("got %q, want template result + base prompt", got)
+	}
+}
+
+func TestApplyFeatureSystemPromptTemplateWithUserPromptDoesNotAppendBasePromptTwice(t *testing.T) {
+	got := ApplyFeatureSystemPrompt(
+		"user prompt",
+		"user prompt",
+		"style-fusion",
+		nil,
+		func(string) (string, error) {
+			return "SYS {{user_prompt}}", nil
+		},
+	)
+
+	if got != "SYS user prompt" {
+		t.Fatalf("got %q, want user prompt injected once", got)
+	}
+}
+
+func TestApplyFeatureSystemPromptTemplateWithoutUserPromptDoesNotAppendBasePrompt(t *testing.T) {
+	got := ApplyFeatureSystemPrompt(
+		"user prompt",
+		"",
+		"hd-upscale",
+		map[string]interface{}{
+			"upscale_mode": "enhancement",
+		},
+		func(string) (string, error) {
+			return "SYS mode={{upscale_mode}}", nil
+		},
+	)
+
+	if got != "SYS mode=enhancement" {
+		t.Fatalf("got %q, want template result without base prompt fallback", got)
+	}
+}

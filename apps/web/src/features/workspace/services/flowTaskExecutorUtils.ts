@@ -158,17 +158,6 @@ export function resolveConnectedInput(
   )
 }
 
-export function resolveConnectedExecutionInput(
-  options: FlowTaskExecutorGraphOptions,
-  targetNodeId: string,
-  targetPort: FlowConnectedInputPort,
-): FlowConnectedInput | null {
-  return resolveConnectedNodeInput(options, targetNodeId, targetPort, (sourceNode) => {
-    const sourceKind = sourceNode.data?.kind
-    return sourceKind && isFlowExecutionSourceKind(sourceKind) ? sourceKind : null
-  })
-}
-
 export async function waitTaskResult(taskId: string): Promise<string[]> {
   return waitTaskResultWithSse(taskId)
 }

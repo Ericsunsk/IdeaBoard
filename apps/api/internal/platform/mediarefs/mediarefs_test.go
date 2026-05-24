@@ -40,9 +40,10 @@ func TestParseDataImageURL(t *testing.T) {
 
 func TestForEachParamMediaRef(t *testing.T) {
 	params := map[string]interface{}{
-		"image_url":       "https://a.example/1.png",
-		"image_urls":      []interface{}{"https://a.example/2.png", "https://a.example/3.png"},
-		"mask_image_urls": []string{"https://a.example/m.png"},
+		"image_url":            "https://a.example/1.png",
+		"image_urls":           []interface{}{"https://a.example/2.png", "https://a.example/3.png"},
+		"mask_image_urls":      []string{"https://a.example/m.png"},
+		"reference_image_urls": []string{"https://a.example/r1.png", "https://a.example/r2.png"},
 	}
 	count := 0
 	if err := ForEachParamMediaRef(params, func(key string, ref string) error {
@@ -51,12 +52,17 @@ func TestForEachParamMediaRef(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if count != 4 {
-		t.Fatalf("count=%d want=4", count)
+	if count != 6 {
+		t.Fatalf("count=%d want=6", count)
 	}
 
 	bad := map[string]interface{}{"image_urls": []interface{}{"ok", 1}}
 	if err := ForEachParamMediaRef(bad, func(key string, ref string) error { return nil }); err == nil {
 		t.Fatalf("expected type error")
+	}
+
+	badReference := map[string]interface{}{"reference_image_urls": []interface{}{"ok", 1}}
+	if err := ForEachParamMediaRef(badReference, func(key string, ref string) error { return nil }); err == nil {
+		t.Fatalf("expected reference_image_urls type error")
 	}
 }

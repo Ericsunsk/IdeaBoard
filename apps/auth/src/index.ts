@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { toNodeHandler } from 'better-auth/node'
 import { auth, authDB } from './auth.js'
 import { env } from './env.js'
+import { isProductionRuntime } from './runtime-env.js'
 
 type InternalUserShape = {
   id: string
@@ -248,11 +249,6 @@ function gracefulShutdown(signal: string) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
-
-function isProductionRuntime(): boolean {
-  const value = String(process.env.NODE_ENV || process.env.APP_ENV || '').trim().toLowerCase()
-  return value === 'production' || value === 'prod' || value === 'release'
-}
 
 async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
   const nowMs = Date.now()

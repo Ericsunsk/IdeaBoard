@@ -224,9 +224,15 @@ func ApplyFeatureSystemPrompt(
 		}
 	}
 	if strings.Contains(sysPrompt, "{{") {
+		hasUserPromptPlaceholder := strings.Contains(sysPrompt, "{{user_prompt}}")
 		result := sysPrompt
 		for k, v := range varMap {
 			result = strings.ReplaceAll(result, k, v)
+		}
+		if featureSlug != workflow.FeatureSlugStyleVariation &&
+			!hasUserPromptPlaceholder &&
+			strings.TrimSpace(userPrompt) != "" {
+			result += " " + userPrompt
 		}
 		if featureSlug == workflow.FeatureSlugStyleVariation {
 			return result

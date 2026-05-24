@@ -40,6 +40,12 @@ func validateSubmitTaskMediaParams(params map[string]interface{}) error {
 	if params == nil {
 		return nil
 	}
+	for _, key := range mediarefs.CanonicalListKeys() {
+		values := mediarefs.CollectStringList(params[key])
+		if len(values) > maxSubmitTaskImageURLs {
+			return fmt.Errorf("%s 数量不能超过 %d 张", key, maxSubmitTaskImageURLs)
+		}
+	}
 	return mediarefs.ForEachParamMediaRef(params, func(key string, ref string) error {
 		if err := validateSubmitTaskMediaRef(ref); err != nil {
 			return fmt.Errorf("%s 无效: %w", key, err)

@@ -11,7 +11,7 @@ import (
 )
 
 var stringKeys = []string{"image_url", "original_image_url", "mask_image_url"}
-var listKeys = []string{"image_urls", "mask_image_urls"}
+var listKeys = []string{"image_urls", "mask_image_urls", "reference_image_urls"}
 
 type DataImage struct {
 	MIMEType string
