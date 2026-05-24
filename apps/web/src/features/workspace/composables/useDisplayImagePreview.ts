@@ -163,6 +163,5 @@ export function useDisplayImagePreview(
 
   return {
     displayUrl,
-    previewUrl,
   }
 }

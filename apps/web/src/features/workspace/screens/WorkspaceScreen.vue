@@ -765,10 +765,8 @@ const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
 
 const canvasDrop = useFlowCanvasDrop({
   screenToFlowCoordinate,
-  createNodeAtPosition,
   onWarning: (msg) => appToast.warning(msg),
   createImageNodeFromFile,
-  createNodeOptions: createNodeOptions as unknown as ReadonlyArray<{ value?: unknown }>,
 })
 
 const {

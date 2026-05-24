@@ -7,7 +7,7 @@ import {
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import { resolveImageNodeFrameSize } from '../utils/imageNodeSizing'
 
-export type FlowImageUploadResult = { url: string; ratio: number }
+type FlowImageUploadResult = { url: string; ratio: number }
 
 type UploadImageResponseData = {
   url?: string

@@ -287,6 +287,5 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     onFlowMediaInputImageRemove,
     getMediaInputImages,
     resolvePromptInputImageNodeIds,
-    isImageInputHandle,
   }
 }

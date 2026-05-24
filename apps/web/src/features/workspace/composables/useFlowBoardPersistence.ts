@@ -254,10 +254,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
 
   return {
     currentBoardId,
-    currentBoardExists,
     canSaveBoard,
-    importEmptyBoardSnapshot,
-    importBoardSnapshot,
     loadInitialOrRouteBoard,
     saveCurrentBoardSnapshot,
   }
