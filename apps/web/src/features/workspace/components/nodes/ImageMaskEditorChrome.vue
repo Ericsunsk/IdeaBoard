@@ -53,25 +53,27 @@
       <div class="image-mask-editor-panel image-mask-editor-right-panel">
         <section class="image-mask-editor-section">
           <div class="image-mask-editor-field">
-            <span class="image-mask-editor-field-label image-mask-editor-field-label-muted">笔刷</span>
+            <span class="image-mask-editor-field-label">笔刷</span>
             <div class="image-mask-editor-segmented">
               <button
                 type="button"
                 class="image-mask-editor-segmented-btn"
-                disabled
-                aria-disabled="true"
-                aria-label="圆形笔尖（待支持）"
-                title="圆形笔尖（待支持）"
+                :class="{ active: brushShape === 'round' }"
+                :aria-pressed="brushShape === 'round'"
+                aria-label="圆形笔尖"
+                title="圆形笔尖"
+                @click="emit('set-brush-shape', 'round')"
               >
                 <Circle class="image-mask-editor-segmented-icon" />
               </button>
               <button
                 type="button"
                 class="image-mask-editor-segmented-btn"
-                disabled
-                aria-disabled="true"
-                aria-label="方形笔尖（待支持）"
-                title="方形笔尖（待支持）"
+                :class="{ active: brushShape === 'square' }"
+                :aria-pressed="brushShape === 'square'"
+                aria-label="方形笔尖"
+                title="方形笔尖"
+                @click="emit('set-brush-shape', 'square')"
               >
                 <Square class="image-mask-editor-segmented-icon" />
               </button>
@@ -216,7 +218,10 @@ import {
   Square,
   Undo,
 } from '@iconoir/vue'
-import type { ImageMaskDrawMode } from '../../composables/useImageMaskEditorOverlay'
+import type {
+  ImageMaskBrushShape,
+  ImageMaskDrawMode,
+} from '../../composables/useImageMaskEditorOverlay'
 import { clampImageNodeOutputCount } from '../../types/canvasNodes'
 import { MASK_EDITOR_CHROME_LAYOUT } from '../../config/maskEditorChrome'
 import NodeToolIconButton from './NodeToolIconButton.vue'
@@ -230,6 +235,7 @@ type MaskEditorReferenceImage = {
 
 const props = defineProps<{
   drawMode: ImageMaskDrawMode
+  brushShape: ImageMaskBrushShape
   brushSize: number
   brushHardness: number
   maskLayerOpacity: number
@@ -248,6 +254,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'set-draw-mode', mode: ImageMaskDrawMode): void
+  (e: 'set-brush-shape', value: ImageMaskBrushShape): void
   (e: 'set-brush-size', value: number): void
   (e: 'set-brush-hardness', value: number): void
   (e: 'set-mask-layer-opacity', value: number): void

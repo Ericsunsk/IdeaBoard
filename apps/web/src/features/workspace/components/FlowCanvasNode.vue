@@ -68,6 +68,7 @@
           :mask-layer-opacity="props.maskLayerOpacity ?? 72"
           :image-layer-visible="props.imageLayerVisible ?? true"
           :mask-editor-brush-size="props.maskEditorBrushSize ?? 18"
+          :mask-editor-brush-shape="props.maskEditorBrushShape ?? 'round'"
           :set-mask-canvas-ref="(element) => (props.setMaskCanvasRef ?? (() => {}))(props.nodeId, element)"
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
@@ -220,6 +221,7 @@ const props = withDefaults(
     maskLayerOpacity?: number
     imageLayerVisible?: boolean
     maskEditorBrushSize?: number
+    maskEditorBrushShape?: 'round' | 'square'
     setMaskCanvasRef?: (nodeId: string, element: Element | null) => void
   }>(),
   {
@@ -247,6 +249,7 @@ const props = withDefaults(
     maskLayerOpacity: 72,
     imageLayerVisible: true,
     maskEditorBrushSize: 18,
+    maskEditorBrushShape: 'round',
     setMaskCanvasRef: () => undefined,
   },
 )

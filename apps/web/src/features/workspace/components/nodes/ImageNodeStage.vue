@@ -45,6 +45,7 @@
         :mask-layer-opacity="maskLayerOpacity ?? 72"
         :image-layer-visible="imageLayerVisible ?? true"
         :brush-size="maskEditorBrushSize ?? 18"
+        :brush-shape="maskEditorBrushShape ?? 'round'"
         :set-canvas-ref="setMaskCanvasRef ?? (() => {})"
         @canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
       />
@@ -98,6 +99,7 @@ const props = defineProps<{
   maskLayerOpacity?: number
   imageLayerVisible?: boolean
   maskEditorBrushSize?: number
+  maskEditorBrushShape?: 'round' | 'square'
   setMaskCanvasRef?: (element: Element | null) => void
   outputCount?: number
   active: boolean

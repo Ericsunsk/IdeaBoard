@@ -6,6 +6,7 @@ import {
   drawMaskRasterPreviewToCanvas,
   invertMaskPreviewCanvas,
 } from './useMaskPaintingCanvas'
+import type { MaskPaintBrushShape } from './maskBrushEngine'
 import { drawMaskStrokeSegment } from './maskBrushEngine'
 import { containImageRect } from '../utils/canvasExtendGeometry'
 import { getMaskCanvasPoint } from '../utils/maskCanvasGeometry'
@@ -17,6 +18,7 @@ type ImageDisplayPayload = {
 }
 
 export type ImageMaskDrawMode = 'paint' | 'erase'
+export type ImageMaskBrushShape = MaskPaintBrushShape
 
 export type ImageMaskEditorCommittedData = {
   executionMaskDataUrl: string
@@ -49,6 +51,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   const drawMode = ref<ImageMaskDrawMode>('paint')
   const brushSize = ref(18)
   const brushHardness = ref(70)
+  const brushShape = ref<ImageMaskBrushShape>('round')
   const canUndoMask = ref(false)
   const canRedoMask = ref(false)
   const canvasRefs = new Map<string, HTMLCanvasElement>()
@@ -260,7 +263,12 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
     const point = getMaskCanvasPoint(event.clientX, event.clientY, paintingCanvas)
     drawMaskStrokeSegment(
-      { brushSize: brushSize.value, brushHardness: brushHardness.value, drawMode: drawMode.value },
+      {
+        brushSize: brushSize.value,
+        brushHardness: brushHardness.value,
+        brushShape: brushShape.value,
+        drawMode: drawMode.value,
+      },
       paintingCanvas,
       paintingLastX,
       paintingLastY,
@@ -306,7 +314,12 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingLastX = point.x
     paintingLastY = point.y
     drawMaskStrokeSegment(
-      { brushSize: brushSize.value, brushHardness: brushHardness.value, drawMode: drawMode.value },
+      {
+        brushSize: brushSize.value,
+        brushHardness: brushHardness.value,
+        brushShape: brushShape.value,
+        drawMode: drawMode.value,
+      },
       canvas,
       point.x,
       point.y,
@@ -412,6 +425,10 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     brushHardness.value = Math.max(0, Math.min(100, Number(value) || 0))
   }
 
+  function updateBrushShape(value: ImageMaskBrushShape) {
+    brushShape.value = value === 'square' ? 'square' : 'round'
+  }
+
   function onGlobalPointerDown(event: PointerEvent) {
     if (!state.value || event.button !== 0) return
     const target = event.target as HTMLElement | null
@@ -469,6 +486,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     drawMode,
     brushSize,
     brushHardness,
+    brushShape,
     canUndoMask,
     canRedoMask,
     enterMaskEditorMode,
@@ -486,6 +504,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     },
     setBrushSize: updateBrushSize,
     setBrushHardness: updateBrushHardness,
+    setBrushShape: updateBrushShape,
     getCommittedMaskData,
   }
 }

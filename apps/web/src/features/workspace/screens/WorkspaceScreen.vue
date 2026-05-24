@@ -106,6 +106,7 @@
             :mask-layer-opacity="maskEditorLayerOpacity"
             :image-layer-visible="true"
             :mask-editor-brush-size="flowMaskEditorBrushSize"
+            :mask-editor-brush-shape="flowMaskEditorBrushShape"
             :set-mask-canvas-ref="setFlowMaskEditorCanvasRef"
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
@@ -151,6 +152,7 @@
         v-if="flowMaskEditorNodeId && maskEditorChromeAnchorRect && isMaskEditorChromeReady"
         :anchor-rect="maskEditorChromeAnchorRect"
         :draw-mode="flowMaskEditorDrawMode"
+        :brush-shape="flowMaskEditorBrushShape"
         :brush-size="flowMaskEditorBrushSize"
         :brush-hardness="flowMaskEditorBrushHardness"
         :mask-layer-opacity="maskEditorLayerOpacity"
@@ -160,6 +162,7 @@
         :can-undo="canUndoFlowMaskEditor"
         :can-redo="canRedoFlowMaskEditor"
         @set-draw-mode="setFlowMaskEditorDrawMode"
+        @set-brush-shape="setFlowMaskEditorBrushShape"
         @set-brush-size="setFlowMaskEditorBrushSize"
         @set-brush-hardness="setFlowMaskEditorBrushHardness"
         @set-mask-layer-opacity="setMaskEditorLayerOpacity"
@@ -593,6 +596,7 @@ const {
   drawMode: flowMaskEditorDrawMode,
   brushSize: flowMaskEditorBrushSize,
   brushHardness: flowMaskEditorBrushHardness,
+  brushShape: flowMaskEditorBrushShape,
   canUndoMask: canUndoFlowMaskEditor,
   canRedoMask: canRedoFlowMaskEditor,
   enterMaskEditorMode: enterFlowMaskEditorMode,
@@ -608,6 +612,7 @@ const {
   setDrawMode: setFlowMaskEditorDrawMode,
   setBrushSize: setFlowMaskEditorBrushSize,
   setBrushHardness: setFlowMaskEditorBrushHardness,
+  setBrushShape: setFlowMaskEditorBrushShape,
   getCommittedMaskData: getFlowMaskEditorCommittedData,
 } = useImageMaskEditorOverlay({
   nodes: nodes as Ref<Node[]>,

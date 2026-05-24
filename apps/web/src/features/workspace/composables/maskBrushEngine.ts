@@ -16,9 +16,12 @@ type CachedBrushStamp = {
   spacing: number
 }
 
+export type MaskPaintBrushShape = 'round' | 'square'
+
 export type MaskPaintBrushState = {
   brushSize: number
   brushHardness: number
+  brushShape: MaskPaintBrushShape
   drawMode: 'paint' | 'erase'
 }
 
@@ -36,7 +39,8 @@ export function drawMaskStrokeSegment(
   if (!ctx) return
   const brushSize = resolveMaskBrushSize(node.brushSize)
   const hardness = resolveMaskBrushHardness(node.brushHardness)
-  drawMaskStrokeWithStamp(ctx, node, fromX, fromY, toX, toY, brushSize, hardness)
+  const brushShape = resolveMaskBrushShape(node.brushShape)
+  drawMaskStrokeWithStamp(ctx, node, fromX, fromY, toX, toY, brushSize, hardness, brushShape)
 }
 
 function resolveMaskBrushSize(value: number) {
@@ -45,6 +49,10 @@ function resolveMaskBrushSize(value: number) {
 
 function resolveMaskBrushHardness(value: number) {
   return Math.max(0, Math.min(100, Number(value) || 0))
+}
+
+function resolveMaskBrushShape(value: MaskPaintBrushShape | undefined): MaskPaintBrushShape {
+  return value === 'square' ? 'square' : 'round'
 }
 
 function drawMaskStrokeWithStamp(
@@ -56,8 +64,9 @@ function drawMaskStrokeWithStamp(
   toY: number,
   brushSize: number,
   hardness: number,
+  brushShape: MaskPaintBrushShape,
 ) {
-  const stamp = getOrCreateBrushStamp(brushSize, hardness, node.drawMode)
+  const stamp = getOrCreateBrushStamp(brushSize, hardness, brushShape, node.drawMode)
   const distance = Math.hypot(toX - fromX, toY - fromY)
   const steps = distance > 0 ? Math.max(1, Math.ceil(distance / stamp.spacing)) : 0
 
@@ -75,9 +84,10 @@ function drawMaskStrokeWithStamp(
 function getOrCreateBrushStamp(
   brushSize: number,
   hardness: number,
+  brushShape: MaskPaintBrushShape,
   drawMode: MaskPaintBrushState['drawMode'],
 ): CachedBrushStamp {
-  const key = `${brushSize}:${hardness}:${drawMode}`
+  const key = `${brushSize}:${hardness}:${brushShape}:${drawMode}`
   const cached = brushStampCache.get(key)
   if (cached) return cached
 
@@ -105,6 +115,14 @@ function getOrCreateBrushStamp(
   const cy = offset
 
   ctx.clearRect(0, 0, canvas.width, canvas.height)
+  if (brushShape === 'square') {
+    paintSquareBrushStamp(ctx, radius, offset, clampedHardness, drawMode)
+    const spacing = Math.max(MIN_BRUSH_STAMP_SPACING, radius * (0.18 + (1 - hardnessRatio) * 0.22))
+    const created = { canvas, radius, offset, spacing }
+    brushStampCache.set(key, created)
+    return created
+  }
+
   if (clampedHardness >= 100) {
     ctx.fillStyle = drawMode === 'erase' ? '#000000' : MASK_PAINT_COLOR
   } else {
@@ -126,6 +144,58 @@ function getOrCreateBrushStamp(
   const created = { canvas, radius, offset, spacing }
   brushStampCache.set(key, created)
   return created
+}
+
+function paintSquareBrushStamp(
+  ctx: CanvasRenderingContext2D,
+  radius: number,
+  offset: number,
+  hardness: number,
+  drawMode: MaskPaintBrushState['drawMode'],
+) {
+  const imageData = ctx.createImageData(ctx.canvas.width, ctx.canvas.height)
+  const data = imageData.data
+  const hardnessRatio = hardness / 100
+  const innerHalfSize = radius * hardnessRatio
+  const fadeDistance = Math.max(0.001, radius - innerHalfSize)
+  const red = drawMode === 'erase' ? 0 : MASK_PAINT_RGB.r
+  const green = drawMode === 'erase' ? 0 : MASK_PAINT_RGB.g
+  const blue = drawMode === 'erase' ? 0 : MASK_PAINT_RGB.b
+
+  for (let y = 0; y < ctx.canvas.height; y += 1) {
+    for (let x = 0; x < ctx.canvas.width; x += 1) {
+      const dx = Math.abs(x + 0.5 - offset)
+      const dy = Math.abs(y + 0.5 - offset)
+      const edgeDistance = radius - Math.max(dx, dy)
+      const base = (y * ctx.canvas.width + x) * 4
+      if (edgeDistance <= 0) continue
+      const alpha =
+        hardness >= 100
+          ? Math.min(1, edgeDistance)
+          : Math.max(0, Math.min(1, (radius - Math.max(dx, dy)) / fadeDistance))
+      data[base] = red
+      data[base + 1] = green
+      data[base + 2] = blue
+      data[base + 3] = Math.round(alpha * 255)
+    }
+  }
+
+  if (hardness < 100 && innerHalfSize > 0) {
+    for (let y = 0; y < ctx.canvas.height; y += 1) {
+      for (let x = 0; x < ctx.canvas.width; x += 1) {
+        const dx = Math.abs(x + 0.5 - offset)
+        const dy = Math.abs(y + 0.5 - offset)
+        if (Math.max(dx, dy) > innerHalfSize) continue
+        const base = (y * ctx.canvas.width + x) * 4
+        data[base] = red
+        data[base + 1] = green
+        data[base + 2] = blue
+        data[base + 3] = 255
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0)
 }
 
 function drawBrushStamp(
