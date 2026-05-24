@@ -267,14 +267,13 @@ import {
 } from '../composables/useImageCanvasExtendOverlay'
 import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
-import {
-  MASK_EDITOR_CHROME_LAYOUT,
-  getMaskEditorChromeOutset,
-} from '../config/maskEditorChrome'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import { useFlowAutosave } from '../composables/useFlowAutosave'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import ImageMaskEditorChrome from '../components/nodes/ImageMaskEditorChrome.vue'
+import {
+  useMaskEditorViewportController,
+} from '../composables/useMaskEditorViewportController'
 
 const appToast = useAppToast()
 const route = useRoute()
@@ -293,35 +292,14 @@ const {
   getSelectedElements,
   removeSelectedElements,
 } = useVueFlow()
-
-type MaskEditorAnchorRect = {
-  top: number
-  left: number
-  width: number
-  height: number
-}
-
-type MaskEditorReferenceImage = {
-  id: string
-  url: string
-  ratio: number
-}
-
 const zoomLevel = ref(100)
 let lastFlowZoom = 100
-let maskEditorReturnViewport: { x: number; y: number; zoom: number } | null = null
-let maskEditorFocusRequestId = 0
-let maskEditorChromeAnchorFrame = 0
-const MASK_EDITOR_OVERLAY_SELECTOR = '[data-image-mask-editor]'
-const MASK_EDITOR_CANVAS_SELECTOR = '.image-mask-editor-canvas'
-const MASK_EDITOR_FOCUS_MAX_ZOOM = 2
-const MASK_EDITOR_FOCUS_MIN_ZOOM = 0.1
-const WORKSPACE_OVERSCROLL_GUARD_CLASS = 'workspace-overscroll-guard'
 
-function setWorkspaceOverscrollGuard(enabled: boolean) {
-  if (typeof document === 'undefined') return
-  document.documentElement.classList.toggle(WORKSPACE_OVERSCROLL_GUARD_CLASS, enabled)
-  document.body.classList.toggle(WORKSPACE_OVERSCROLL_GUARD_CLASS, enabled)
+function onZoomIn() {
+  zoomIn()
+}
+function onZoomOut() {
+  zoomOut()
 }
 
 function applyFlowTransform(transform: { x?: number; y?: number; zoom?: number }): boolean {
@@ -335,186 +313,6 @@ function applyFlowTransform(transform: { x?: number; y?: number; zoom?: number }
   return zoomChanged
 }
 
-function onZoomIn() {
-  zoomIn()
-}
-function onZoomOut() {
-  zoomOut()
-}
-
-function resolveFlowNodeCenter(nodeId: string): { x: number; y: number } | null {
-  const stage = getImageStageElement(nodeId)
-  if (stage) {
-    const rect = stage.getBoundingClientRect()
-    return screenToFlowCoordinate({
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
-    })
-  }
-
-  const node = (
-    nodes.value as Array<{
-      id: string
-      position: { x: number; y: number }
-      data?: { snapshotNode?: unknown }
-    }>
-  ).find((item) => item.id === nodeId)
-  if (!node) return null
-  const snapshot = node.data?.snapshotNode as { width?: unknown } | undefined
-  const width = Number(snapshot?.width)
-  return {
-    x: Number(node.position.x) + (Number.isFinite(width) && width > 0 ? width / 2 : 140),
-    y: Number(node.position.y) + 140,
-  }
-}
-
-function getViewportRect() {
-  const viewportRect = canvasWrapRef.value?.getBoundingClientRect()
-  return {
-    width: viewportRect?.width ?? window.innerWidth,
-    height: viewportRect?.height ?? window.innerHeight,
-  }
-}
-
-function resolveMaskEditorFocusTarget(nodeId: string): { x: number; y: number; zoom: number } | null {
-  const stage = getImageStageElement(nodeId)
-  if (!stage) {
-    const center = resolveFlowNodeCenter(nodeId)
-    return center ? { ...center, zoom: MASK_EDITOR_FOCUS_MAX_ZOOM } : null
-  }
-
-  const overlay = stage.querySelector<HTMLElement>(MASK_EDITOR_OVERLAY_SELECTOR)
-  if (!overlay) {
-    const center = resolveFlowNodeCenter(nodeId)
-    return center ? { ...center, zoom: MASK_EDITOR_FOCUS_MAX_ZOOM } : null
-  }
-
-  const overlayCanvas = overlay.querySelector<HTMLElement>(MASK_EDITOR_CANVAS_SELECTOR)
-
-  const rect = overlayCanvas?.getBoundingClientRect()
-  if (!rect || rect.width <= 0 || rect.height <= 0) {
-    const center = resolveFlowNodeCenter(nodeId)
-    return center ? { ...center, zoom: MASK_EDITOR_FOCUS_MAX_ZOOM } : null
-  }
-
-  const chromeOutset = getMaskEditorChromeOutset()
-  const viewport = getViewport()
-  const currentZoom = Number.isFinite(viewport.zoom) && viewport.zoom > 0 ? viewport.zoom : 1
-  const flowImageWidth = rect.width / currentZoom
-  const flowImageHeight = rect.height / currentZoom
-  const viewportRect = getViewportRect()
-  const availableWidth = Math.max(
-    1,
-    viewportRect.width - MASK_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
-  )
-  const availableHeight = Math.max(
-    1,
-    viewportRect.height - MASK_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
-  )
-  const availableImageWidth = Math.max(1, availableWidth - chromeOutset.left - chromeOutset.right)
-  const fitZoom = Math.min(availableImageWidth / flowImageWidth, availableHeight / flowImageHeight)
-  const zoom = Math.max(
-    MASK_EDITOR_FOCUS_MIN_ZOOM,
-    Math.min(
-      MASK_EDITOR_FOCUS_MAX_ZOOM,
-      Number.isFinite(fitZoom) && fitZoom > 0 ? fitZoom : MASK_EDITOR_FOCUS_MAX_ZOOM,
-    ),
-  )
-  const imageCenter = screenToFlowCoordinate({
-    x: rect.left + rect.width / 2,
-    y: rect.top + rect.height / 2,
-  })
-
-  return {
-    x: imageCenter.x + (chromeOutset.right - chromeOutset.left) / (2 * zoom),
-    y: imageCenter.y,
-    zoom,
-  }
-}
-
-function isMaskEditorFocusRequestCurrent(nodeId: string, requestId: number) {
-  return requestId === maskEditorFocusRequestId && flowMaskEditorNodeId.value === nodeId
-}
-
-function waitForAnimationFrame(): Promise<void> {
-  if (typeof requestAnimationFrame === 'undefined') return Promise.resolve()
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => resolve())
-  })
-}
-
-async function focusImageStageForMaskEditor(nodeId: string, requestId: number) {
-  await nextTick()
-  if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
-  const target = resolveMaskEditorFocusTarget(nodeId)
-  if (!target) return
-  if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
-  await setCenter(target.x, target.y, {
-    zoom: target.zoom,
-    duration: 220,
-    interpolate: 'smooth',
-  })
-  if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
-  applyFlowTransform(getViewport())
-}
-
-async function focusMaskEditorAndShowChrome(nodeId: string, requestId: number) {
-  isMaskEditorChromeReady.value = false
-  maskEditorChromeAnchorRect.value = null
-  await focusImageStageForMaskEditor(nodeId, requestId)
-  if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
-  await waitForAnimationFrame()
-  if (!isMaskEditorFocusRequestCurrent(nodeId, requestId)) return
-  updateMaskEditorChromeAnchorRect()
-  if (maskEditorChromeAnchorRect.value) {
-    isMaskEditorChromeReady.value = true
-  }
-}
-
-function restoreMaskEditorReturnViewport() {
-  maskEditorFocusRequestId += 1
-  const viewport = maskEditorReturnViewport
-  if (!viewport) return
-  maskEditorReturnViewport = null
-  void setViewport({ ...viewport }, { duration: 220, interpolate: 'smooth' })
-  applyFlowTransform(viewport)
-  scheduleMaskEditorChromeAnchorUpdate()
-}
-
-function resolveMaskEditorChromeAnchorRect(nodeId: string): MaskEditorAnchorRect | null {
-  const wrap = canvasWrapRef.value
-  const stage = getImageStageElement(nodeId)
-  if (!wrap || !stage) return null
-  const overlay = stage.querySelector<HTMLElement>(MASK_EDITOR_OVERLAY_SELECTOR)
-  const target = overlay?.querySelector<HTMLElement>(MASK_EDITOR_CANVAS_SELECTOR) ?? overlay
-  if (!target) return null
-
-  const wrapRect = wrap.getBoundingClientRect()
-  const targetRect = target.getBoundingClientRect()
-  if (targetRect.width <= 0 || targetRect.height <= 0) return null
-  return {
-    top: targetRect.top - wrapRect.top,
-    left: targetRect.left - wrapRect.left,
-    width: targetRect.width,
-    height: targetRect.height,
-  }
-}
-
-function updateMaskEditorChromeAnchorRect() {
-  maskEditorChromeAnchorFrame = 0
-  const nodeId = flowMaskEditorNodeId.value
-  maskEditorChromeAnchorRect.value = nodeId ? resolveMaskEditorChromeAnchorRect(nodeId) : null
-}
-
-function scheduleMaskEditorChromeAnchorUpdate() {
-  if (typeof requestAnimationFrame === 'undefined') {
-    updateMaskEditorChromeAnchorRect()
-    return
-  }
-  if (maskEditorChromeAnchorFrame) cancelAnimationFrame(maskEditorChromeAnchorFrame)
-  maskEditorChromeAnchorFrame = requestAnimationFrame(updateMaskEditorChromeAnchorRect)
-}
-
 function clearSelectedFlowElementsSync() {
   const selectedElements = [...getSelectedElements.value]
   if (selectedElements.length === 0) return
@@ -524,10 +322,6 @@ function clearSelectedFlowElementsSync() {
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 const canvasWrapRef = ref<HTMLElement | null>(null)
-const maskEditorChromeAnchorRect = ref<MaskEditorAnchorRect | null>(null)
-const isMaskEditorChromeReady = ref(false)
-const maskEditorLayerOpacity = ref(72)
-const maskEditorReferenceImages = ref<MaskEditorReferenceImage[]>([])
 const boardBaseSnapshot = ref<CanvasBoardSnapshot>(createEmptyCanvasBoardSnapshot())
 
 const createNodeOptions: readonly { key: string; label: string; value: FlowCreatableNodeKind }[] = [
@@ -879,32 +673,6 @@ function onFlowImageReset(nodeId: string) {
 }
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 
-function resolveNodePreviewImageById(
-  nodeId: string,
-): { id: string; sourceType: 'node'; sourceId: string; sourceNodeId: string; url: string; ratio: number } | null {
-  const node = (nodes.value as Node[]).find((item) => item.id === nodeId)
-  const kind = node?.data?.kind
-  const snapshot = node?.data?.snapshotNode as Record<string, unknown> | undefined
-  if (!kind || !snapshot) return null
-  if (kind === 'image') {
-    const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-    const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
-    const outputUrl = typeof latest?.url === 'string' ? latest.url.trim() : ''
-    if (outputUrl) {
-      return { id: `node:${nodeId}`, sourceType: 'node', sourceId: nodeId, sourceNodeId: nodeId, url: outputUrl, ratio: Number(latest?.ratio) || 1 }
-    }
-    const sourceUrl = String(snapshot.sourceImageUrl ?? '').trim()
-    if (!sourceUrl) return null
-    return { id: `node:${nodeId}`, sourceType: 'node', sourceId: nodeId, sourceNodeId: nodeId, url: sourceUrl, ratio: Number(snapshot.sourceImageRatio) || 1 }
-  }
-  const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-  const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
-  const outputUrl = typeof latest?.url === 'string' ? latest.url.trim() : ''
-  return outputUrl
-    ? { id: `node:${nodeId}`, sourceType: 'node', sourceId: nodeId, sourceNodeId: nodeId, url: outputUrl, ratio: Number(latest?.ratio) || 1 }
-    : null
-}
-
 watch(
   [nodes, edges],
   () => {
@@ -963,6 +731,47 @@ watch(
   },
   { deep: true },
 )
+
+function resolveNodePreviewImageById(nodeId: string): {
+  id: string
+  sourceType: 'node'
+  sourceId: string
+  sourceNodeId: string
+  url: string
+  ratio: number
+} | null {
+  const node = (nodes.value as Node[]).find((item) => item.id === nodeId)
+  const kind = node?.data?.kind
+  const snapshot = node?.data?.snapshotNode as Record<string, unknown> | undefined
+  if (!kind || !snapshot) return null
+
+  if (kind === 'image') {
+    const display = getImageNodeDisplayPayload(nodeId)
+    if (!display?.url) return null
+    return {
+      id: `node:${nodeId}`,
+      sourceType: 'node',
+      sourceId: nodeId,
+      sourceNodeId: nodeId,
+      url: display.url,
+      ratio: Number.isFinite(display.ratio) && display.ratio > 0 ? display.ratio : 1,
+    }
+  }
+
+  const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
+  const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
+  const url = typeof latest?.url === 'string' ? latest.url.trim() : ''
+  if (!url) return null
+  const ratio = Number(latest?.ratio)
+  return {
+    id: `node:${nodeId}`,
+    sourceType: 'node',
+    sourceId: nodeId,
+    sourceNodeId: nodeId,
+    url,
+    ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
+  }
+}
 
 function onCanvasDragOver(event: DragEvent) {
   activeImageActionNodeId.value = null
@@ -1230,107 +1039,49 @@ const {
   stopCanvasInteraction: stopFlowInteraction,
 })
 
+const {
+  maskEditorChromeAnchorRect,
+  isMaskEditorChromeReady,
+  maskEditorLayerOpacity,
+  maskEditorReferenceImages,
+  activeMaskEditorOutputCount,
+  setMaskEditorLayerOpacity,
+  onMaskEditorReferenceImageOpen,
+  onMaskEditorReferenceImageRemove,
+  onMaskEditorReferenceImagePreview,
+  onCanvasWheel,
+  focusMaskEditorAndShowChrome,
+  scheduleMaskEditorChromeAnchorUpdate,
+} = useMaskEditorViewportController({
+  nodes: nodes as Ref<Node[]>,
+  canvasWrapRef,
+  flowMaskEditorNodeId,
+  getImageNodeSnapshot,
+  getImageStageElement,
+  screenToFlowCoordinate,
+  getViewport,
+  setViewport: (viewport, options) => setViewport(viewport, options),
+  setCenter: (x, y, options) => setCenter(x, y, options),
+  uploadImageToBoard: async (file: File) => {
+    const uploaded = await canvasDrop.uploadImageToBoard(file)
+    return { url: uploaded.url, ratio: uploaded.ratio }
+  },
+  onWarning: (msg) => appToast.warning(msg),
+  onReferenceImagePreview: (image) => {
+    void openImageUrlPreview(image.url, image.ratio)
+  },
+  onViewportTransform: (viewport) => {
+    applyFlowTransform(viewport)
+  },
+})
+const isMaskEditorChromeHidden = computed(() => !!flowMaskEditorNodeId.value)
 const isFlowCanvasLocked = computed(
   () => isFlowInteractionActive.value || !!flowMaskEditorNodeId.value,
 )
-const isMaskEditorChromeHidden = computed(() => !!flowMaskEditorNodeId.value)
-const activeMaskEditorOutputCount = computed(() => {
-  const nodeId = flowMaskEditorNodeId.value
-  if (!nodeId) return 1
-  const snapshot = getImageNodeSnapshot(nodeId)
-  return snapshot ? clampImageNodeOutputCount(snapshot.outputCount) : 1
-})
-
-function setMaskEditorLayerOpacity(value: number) {
-  const next = Math.max(15, Math.min(100, Number(value) || 72))
-  maskEditorLayerOpacity.value = next
-}
-
-function onMaskEditorChromeOutputCountUpdate(value: number) {
-  const nodeId = flowMaskEditorNodeId.value
-  if (!nodeId) return
-  onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value })
-}
 
 function onMaskEditorChromeSubmit(prompt: string, outputCount: number) {
   const nodeId = flowMaskEditorNodeId.value
   if (!nodeId) return
-  onFlowMaskEditorSubmit(nodeId, prompt, outputCount)
-}
-
-function onMaskEditorReferenceImageOpen() {
-  if (maskEditorReferenceImages.value.length >= 4) {
-    appToast.warning('局部重绘最多添加 4 张参考图')
-    return
-  }
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = IMAGE_UPLOAD_ACCEPT
-  input.onchange = () => {
-    const file = input.files?.[0]
-    if (!file) return
-    void addMaskEditorReferenceImage(file)
-  }
-  input.click()
-}
-
-async function addMaskEditorReferenceImage(file: File) {
-  if (maskEditorReferenceImages.value.length >= 4) {
-    appToast.warning('局部重绘最多添加 4 张参考图')
-    return
-  }
-  try {
-    const uploaded = await canvasDrop.uploadImageToBoard(file)
-    maskEditorReferenceImages.value = [
-      ...maskEditorReferenceImages.value,
-      {
-        id: `mask-ref:${Date.now()}:${Math.random().toString(16).slice(2, 8)}`,
-        url: uploaded.url,
-        ratio: uploaded.ratio,
-      },
-    ].slice(0, 4)
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : '上传失败'
-    appToast.warning(msg)
-  }
-}
-
-function onMaskEditorReferenceImageRemove(imageId: string) {
-  maskEditorReferenceImages.value = maskEditorReferenceImages.value.filter(
-    (image) => image.id !== imageId,
-  )
-}
-
-function onMaskEditorReferenceImagePreview(image: { url: string; ratio?: number }) {
-  void openImageUrlPreview(image.url, Number(image.ratio) || 1)
-}
-
-function onCanvasWheel(event: WheelEvent) {
-  const isMaskEditing = !!flowMaskEditorNodeId.value
-  const isBrowserGestureCandidate = event.ctrlKey || Math.abs(event.deltaX) > 0
-  if (!isMaskEditing && !isBrowserGestureCandidate) return
-  event.preventDefault()
-  if (isMaskEditing) event.stopPropagation()
-}
-
-watch(
-  () => flowMaskEditorNodeId.value,
-  (nextNodeId, prevNodeId) => {
-    if (nextNodeId) {
-      isMaskEditorChromeReady.value = false
-      maskEditorLayerOpacity.value = 72
-      maskEditorReferenceImages.value = []
-      return
-    }
-    isMaskEditorChromeReady.value = false
-    maskEditorChromeAnchorRect.value = null
-    maskEditorReferenceImages.value = []
-    if (prevNodeId) restoreMaskEditorReturnViewport()
-  },
-)
-
-function onFlowMaskEditorSubmit(nodeId: string, prompt: string, outputCount: number) {
-  if (flowMaskEditorNodeId.value !== nodeId) return
   const didCommitMask = commitFlowMaskEditorMode()
   const committed = getFlowMaskEditorCommittedData(nodeId)
   if (!didCommitMask || !committed?.executionMaskDataUrl) {
@@ -1347,6 +1098,12 @@ function onFlowMaskEditorSubmit(nodeId: string, prompt: string, outputCount: num
     maskDataUrl: committed.executionMaskDataUrl,
     referenceImageUrls: maskEditorReferenceImages.value.map((image) => image.url),
   })
+}
+
+function onMaskEditorChromeOutputCountUpdate(value: number) {
+  const nodeId = flowMaskEditorNodeId.value
+  if (!nodeId) return
+  onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: clampImageNodeOutputCount(value) })
 }
 
 function onFlowImageDirectAction(
@@ -1371,12 +1128,7 @@ function onFlowImageDirectAction(
     activeFusionPromptNodeId.value = null
     hideStrengthControl()
     if (!entered) appToast.warning('当前图片不可局部重绘')
-    else {
-      const viewport = getViewport()
-      maskEditorReturnViewport = { x: viewport.x, y: viewport.y, zoom: viewport.zoom }
-      maskEditorFocusRequestId += 1
-      void focusMaskEditorAndShowChrome(nodeId, maskEditorFocusRequestId)
-    }
+    else void focusMaskEditorAndShowChrome(nodeId)
     return
   }
   if (isImageStrengthAction(action) && suppressClickAction.value === action) {
@@ -1661,17 +1413,9 @@ useFlowLeaveGuard({
 })
 
 onMounted(async () => {
-  setWorkspaceOverscrollGuard(true)
-  window.addEventListener('resize', scheduleMaskEditorChromeAnchorUpdate)
   await loadInitialOrRouteBoard()
   refreshBoardMetas()
   refreshSnapshot()
-})
-
-onBeforeUnmount(() => {
-  if (maskEditorChromeAnchorFrame) cancelAnimationFrame(maskEditorChromeAnchorFrame)
-  window.removeEventListener('resize', scheduleMaskEditorChromeAnchorUpdate)
-  setWorkspaceOverscrollGuard(false)
 })
 </script>
 
