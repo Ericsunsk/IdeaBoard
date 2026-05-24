@@ -194,9 +194,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
-import { useFlowHistory } from '../composables/useFlowHistory'
-import { useFlowTransactions, type FlowHistorySnapshot } from '../composables/useFlowTransactions'
-import { useFlowBoardPersistence } from '../composables/useFlowBoardPersistence'
+import type { FlowHistorySnapshot } from '../composables/useFlowTransactions'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
@@ -238,7 +236,7 @@ import { useFlowImageUploadActions } from '../composables/useFlowImageUploadActi
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
-import { useFlowAutosave } from '../composables/useFlowAutosave'
+import { useFlowWorkspaceRuntime } from '../composables/useFlowWorkspaceRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import ImageMaskEditorChrome from '../components/nodes/ImageMaskEditorChrome.vue'
 import {
@@ -333,30 +331,14 @@ function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: 
   scheduleMaskEditorChromeAnchorUpdate()
 }
 
-function markDirty() {
-  if (canSaveBoard.value) {
-    isDirty.value = true
-    if (saveStatus.value !== 'failed') saveStatus.value = 'idle'
-    markDirtyAndSchedule()
-  }
-}
-
-const flowHistory = useFlowHistory({
-  nodes,
-  edges,
-  maxSteps: 10,
-  onRestore: () => {
-    markDirty()
-  },
-  commitNodes: (nodes) => commitFlowNodes(nodes as Node[]),
-  commitEdges: (edges) => commitFlowEdges(edges as Edge[]),
-})
-
-function refreshSnapshot() {
-  // Snapshot preview UI has been removed; callers keep this hook for flow parity.
-}
-
-const boardPersistence = useFlowBoardPersistence({
+const {
+  currentBoardId,
+  loadInitialOrRouteBoard,
+  flushAutosave,
+  flowHistory,
+  flowTransactions,
+  refreshSnapshot,
+} = useFlowWorkspaceRuntime({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
   boardBaseSnapshot,
@@ -365,6 +347,14 @@ const boardPersistence = useFlowBoardPersistence({
   isLoadingBoardSnapshot,
   isSavingBoard,
   getBoardIdQuery: () => route.query.boardId,
+  getUserIdentity: () => ({
+    userId: Number(userStore.user?.id),
+    userUid: `${userStore.user?.uid ?? ''}`.trim(),
+  }),
+  getViewport,
+  setViewport,
+  setNodes,
+  setEdges,
   onWarning: (msg) => {
     appToast.warning(msg)
   },
@@ -374,26 +364,6 @@ const boardPersistence = useFlowBoardPersistence({
   onError: (msg) => {
     appToast.error(msg)
   },
-  refreshSnapshot,
-  clearFlowHistoryBaseline: flowHistory.clearBaseline,
-  getUserIdentity: () => ({
-    userId: Number(userStore.user?.id),
-    userUid: `${userStore.user?.uid ?? ''}`.trim(),
-  }),
-  getViewport,
-  setViewport,
-  commitNodes: (nodes) => commitFlowNodes(nodes as Node[]),
-  commitEdges: (edges) => commitFlowEdges(edges as Edge[]),
-})
-
-const currentBoardId = boardPersistence.currentBoardId
-const canSaveBoard = boardPersistence.canSaveBoard
-const loadInitialOrRouteBoard = boardPersistence.loadInitialOrRouteBoard
-const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
-const { markDirtyAndSchedule, flushAutosave } = useFlowAutosave({
-  isDirty,
-  isSaving: isSavingBoard,
-  save: (options) => saveCurrentBoardSnapshot({ waitForPreview: false, silent: options?.silent }),
 })
 
 const {
@@ -420,33 +390,6 @@ const {
   route,
   flushAutosave: () => {
     void flushAutosave()
-  },
-})
-
-function commitFlowNodes(nextNodes: Node[]) {
-  nodes.value = nextNodes
-  setNodes(nextNodes)
-}
-
-function commitFlowEdges(nextEdges: Edge[]) {
-  edges.value = nextEdges
-  setEdges(nextEdges)
-}
-
-const flowTransactions = useFlowTransactions({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
-  captureHistory: flowHistory.capture,
-  pushHistory: flowHistory.push,
-  beginDragHistory: flowHistory.onNodeDragStart,
-  commitDragHistory: flowHistory.onNodeDragStop,
-  markDirty,
-  refreshSnapshot,
-  commitNodes: (nextNodes) => {
-    commitFlowNodes(nextNodes)
-  },
-  commitEdges: (nextEdges) => {
-    commitFlowEdges(nextEdges)
   },
 })
 
