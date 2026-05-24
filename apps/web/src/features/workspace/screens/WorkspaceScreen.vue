@@ -217,7 +217,7 @@ import {
   clampImageNodeOutputCount,
   type CanvasBoardSnapshot,
 } from '../../workspace/types/canvasNodes'
-import { IMAGE_NODE_ACTION, isImageStrengthAction, type ImageNodeAction } from '../types/imageActions'
+import { type ImageNodeAction } from '../types/imageActions'
 import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowBoardHeaderActions } from '../composables/useFlowBoardHeaderActions'
@@ -229,6 +229,8 @@ import { useFlowMediaInputImages } from '../composables/useFlowMediaInputImages'
 import { useFlowNodeInternalsRefreshQueue } from '../composables/useFlowNodeInternalsRefreshQueue'
 import { useFlowViewportControls } from '../composables/useFlowViewportControls'
 import { useFlowActiveNodePanels } from '../composables/useFlowActiveNodePanels'
+import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
+import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
 import {
   useImageCanvasExtendOverlay,
   type CanvasExtendDragAnchor,
@@ -311,53 +313,6 @@ const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageS
 const { scheduleFlowNodeInternalsRefresh } = useFlowNodeInternalsRefreshQueue({
   updateNodeInternals,
 })
-
-function onPaneContextMenu(event: MouseEvent) {
-  event.preventDefault()
-  cancelFlowExpandMode()
-  closeBoardHeaderEditing()
-  clearActiveNodePanels()
-  hideStrengthControl()
-  clearFlowSelection()
-  const flowPoint = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
-  const rect = canvasWrapRef.value?.getBoundingClientRect()
-  const x = rect ? event.clientX - rect.left : event.clientX
-  const y = rect ? event.clientY - rect.top : event.clientY
-  openNodeContextMenu(x, y, flowPoint.x, flowPoint.y)
-}
-
-function handleNodeContextMenuCreate(kind: FlowCreatableNodeKind) {
-  createNodeAtPosition(kind, nodeContextMenu.value.flowX, nodeContextMenu.value.flowY)
-  cancelFlowExpandMode()
-  closeNodeContextMenu()
-  clearActiveNodePanels()
-  hideStrengthControl()
-}
-
-function setActiveTool(tool: 'select' | 'hand' | 'text') {
-  cancelFlowExpandMode()
-  closeBoardHeaderEditing()
-  clearActiveNodePanels()
-  hideStrengthControl()
-  activeTool.value = tool
-  if (tool === 'text') {
-    appToast.info('文本工具稍后接入')
-  }
-}
-
-function onEscapeShortcut() {
-  if (flowExpandNodeId.value) {
-    cancelFlowExpandMode()
-    return true
-  }
-  if (isBoardMenuOpen.value || isRenamingBoard.value) {
-    closeBoardHeaderEditing()
-    return true
-  }
-  clearActiveNodePanels()
-  hideStrengthControl()
-  return clearFlowSelection()
-}
 
 async function onNavigateRequest(path: string) {
   void flushAutosave()
@@ -607,12 +562,6 @@ const {
   },
 })
 
-function onCanvasDragOver(event: DragEvent) {
-  clearActiveNodePanels()
-  hideStrengthControl()
-  canvasDrop.onCanvasDragOver(event)
-}
-
 async function onCanvasDrop(event: DragEvent) {
   await canvasDrop.onCanvasDrop(event)
 }
@@ -621,26 +570,6 @@ function onFlowImageOpenPreview(nodeId: string) {
   const snapshot = getImageNodeSnapshot(nodeId)
   if (!snapshot) return
   void openNodeImagePreview(snapshot, 'latest-output')
-}
-
-function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
-  event.preventDefault()
-  if (flowMaskEditorNodeId.value === nodeId) return
-  cancelFlowExpandMode()
-  selectFlowNodeForContextMenu(nodeId)
-  activeImageActionNodeId.value = nodeId
-  activeImagePromptNodeId.value = nodeId
-  activeFusionPromptNodeId.value = null
-  hideStrengthControl()
-}
-
-function onFlowFusionContextMenu(nodeId: string, event: MouseEvent) {
-  event.preventDefault()
-  cancelFlowExpandMode()
-  selectFlowNodeForContextMenu(nodeId)
-  clearActiveNodePanels({ keepFusionPrompt: true })
-  activeFusionPromptNodeId.value = nodeId
-  hideStrengthControl()
 }
 
 const {
@@ -829,60 +758,6 @@ function onMaskEditorChromeOutputCountUpdate(value: number) {
   onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: clampImageNodeOutputCount(value) })
 }
 
-function onFlowImageDirectAction(
-  nodeId: string,
-  action: ImageNodeAction,
-) {
-  if (action === IMAGE_NODE_ACTION.imageExtend) {
-    cancelFlowMaskEditorMode()
-    const entered = enterFlowExpandMode(nodeId)
-    clearActiveNodePanels()
-    hideStrengthControl()
-    if (!entered) appToast.warning('当前图片不可扩图')
-    return
-  }
-  if (action === IMAGE_NODE_ACTION.imageInpaint) {
-    cancelFlowExpandMode()
-    closeActiveImagePromptComposer()
-    const entered = enterFlowMaskEditorMode(nodeId)
-    activeImageActionNodeId.value = null
-    activeFusionPromptNodeId.value = null
-    hideStrengthControl()
-    if (!entered) appToast.warning('当前图片不可局部重绘')
-    else void focusMaskEditorAndShowChrome(nodeId)
-    return
-  }
-  if (isImageStrengthAction(action) && suppressClickAction.value === action) {
-    return
-  }
-  cancelFlowExpandMode()
-  cancelFlowMaskEditorMode()
-  clearActiveNodePanels()
-  hideStrengthControl()
-  void runImageDirectAction(
-    nodeId,
-    action,
-    isImageStrengthAction(action) ? { strength: getActionStrength(action) } : undefined,
-  )
-}
-
-function onFlowImagePromptGenerate(nodeId: string, prompt: string, outputCount: number) {
-  cancelFlowExpandMode()
-  cancelFlowMaskEditorMode()
-  clearActiveNodePanels()
-  hideStrengthControl()
-  const committedMaskData = getFlowMaskEditorCommittedData(nodeId)
-  if (committedMaskData?.executionMaskDataUrl) {
-    void runImageInpaintAction(nodeId, {
-      prompt,
-      outputCount,
-      maskDataUrl: committedMaskData.executionMaskDataUrl,
-    })
-    return
-  }
-  void runImagePromptGeneration(nodeId, prompt, outputCount)
-}
-
 function onFlowImageExpandSubmit(nodeId: string, prompt: string, outputCount: number) {
   if (flowExpandNodeId.value !== nodeId) return
   closeActiveImagePromptComposer()
@@ -890,22 +765,6 @@ function onFlowImageExpandSubmit(nodeId: string, prompt: string, outputCount: nu
   activeFusionPromptNodeId.value = null
   hideStrengthControl()
   void commitFlowExpandMode(prompt, outputCount)
-}
-
-function onFlowFusionPromptGenerate(
-  nodeId: string,
-  prompt: string,
-  outputCount: number,
-  aspectRatio: string,
-) {
-  cancelFlowExpandMode()
-  cancelFlowMaskEditorMode()
-  clearActiveNodePanels()
-  hideStrengthControl()
-  onFlowNodeParamUpdate(nodeId, { key: 'prompt', value: prompt })
-  onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: outputCount })
-  onFlowNodeParamUpdate(nodeId, { key: 'aspectRatio', value: aspectRatio })
-  void runFusionPromptGeneration(nodeId, prompt, outputCount, aspectRatio)
 }
 
 function onFlowPromptGenerate(
@@ -1031,6 +890,62 @@ const canvasDrop = useFlowCanvasDrop({
   createNodeOptions: createNodeOptions as unknown as ReadonlyArray<{ value?: unknown }>,
 })
 canvasDropRef = canvasDrop
+
+const {
+  onPaneContextMenu,
+  handleNodeContextMenuCreate,
+  setActiveTool,
+  onEscapeShortcut,
+  onCanvasDragOver,
+} = useFlowCanvasShellInteractions({
+  canvasWrapRef,
+  nodeContextMenu,
+  activeTool,
+  screenToFlowCoordinate,
+  openNodeContextMenu,
+  closeNodeContextMenu,
+  createNodeAtPosition,
+  cancelFlowExpandMode,
+  closeBoardHeaderEditing,
+  clearActiveNodePanels,
+  hideStrengthControl,
+  clearFlowSelection,
+  toastInfo: (message) => appToast.info(message),
+  onCanvasDropDragOver: (event) => canvasDrop.onCanvasDragOver(event),
+  isFlowExpandActive: () => !!flowExpandNodeId.value,
+  isBoardHeaderEditingActive: () => isBoardMenuOpen.value || isRenamingBoard.value,
+})
+
+const {
+  onFlowImageContextMenu,
+  onFlowFusionContextMenu,
+  onFlowImageDirectAction,
+  onFlowImagePromptGenerate,
+  onFlowFusionPromptGenerate,
+} = useFlowImageActionOrchestrator({
+  flowMaskEditorNodeId,
+  activeImageActionNodeId,
+  activeImagePromptNodeId,
+  activeFusionPromptNodeId,
+  suppressClickAction,
+  clearActiveNodePanels,
+  closeActiveImagePromptComposer,
+  hideStrengthControl,
+  selectFlowNodeForContextMenu,
+  cancelFlowExpandMode,
+  cancelFlowMaskEditorMode,
+  enterFlowExpandMode,
+  enterFlowMaskEditorMode,
+  focusMaskEditorAndShowChrome,
+  runImageDirectAction,
+  runImagePromptGeneration,
+  runImageInpaintAction,
+  runFusionPromptGeneration,
+  getFlowMaskEditorCommittedData,
+  onFlowNodeParamUpdate,
+  onWarning: (message) => appToast.warning(message),
+  getActionStrength,
+})
 
 const { getFlowNodeUiStateCached } = useFlowNodeUiState({
   nodes: nodes as Ref<Node[]>,
