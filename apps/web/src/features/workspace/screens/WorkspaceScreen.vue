@@ -213,10 +213,7 @@ import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInt
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
 import { createEmptyCanvasBoardSnapshot } from '../utils/flowSnapshotAdapter'
-import {
-  clampImageNodeOutputCount,
-  type CanvasBoardSnapshot,
-} from '../../workspace/types/canvasNodes'
+import { type CanvasBoardSnapshot } from '../../workspace/types/canvasNodes'
 import { type ImageNodeAction } from '../types/imageActions'
 import { useFlowNodeContextMenu } from '../composables/useFlowNodeContextMenu'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
@@ -231,10 +228,9 @@ import { useFlowViewportControls } from '../composables/useFlowViewportControls'
 import { useFlowActiveNodePanels } from '../composables/useFlowActiveNodePanels'
 import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
 import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
-import {
-  useImageCanvasExtendOverlay,
-  type CanvasExtendDragAnchor,
-} from '../composables/useImageCanvasExtendOverlay'
+import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
+import { useFlowMaskEditorChromeActions } from '../composables/useFlowMaskEditorChromeActions'
+import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOverlay'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
@@ -694,6 +690,20 @@ const {
 })
 
 const {
+  onFlowImageExpandSubmit,
+  onFlowExpandHandlePointerDown,
+  onFlowExpandFramePointerDown,
+} = useFlowExpandInteractionHandlers({
+  flowExpandNodeId,
+  closeActiveImagePromptComposer,
+  clearActiveNodePanels,
+  hideStrengthControl,
+  commitFlowExpandMode,
+  beginFlowExpandHandleResize,
+  beginFlowExpandFrameDrag,
+})
+
+const {
   maskEditorChromeAnchorRect,
   isMaskEditorChromeReady,
   maskEditorLayerOpacity,
@@ -733,39 +743,18 @@ const isFlowCanvasLocked = computed(
   () => isFlowInteractionActive.value || !!flowMaskEditorNodeId.value,
 )
 
-function onMaskEditorChromeSubmit(prompt: string, outputCount: number) {
-  const nodeId = flowMaskEditorNodeId.value
-  if (!nodeId) return
-  const didCommitMask = commitFlowMaskEditorMode()
-  const committed = getFlowMaskEditorCommittedData(nodeId)
-  if (!didCommitMask || !committed?.executionMaskDataUrl) {
-    appToast.warning('请先标记局部重绘区域')
-    return
-  }
-  clearActiveNodePanels()
-  hideStrengthControl()
-  void runImageInpaintAction(nodeId, {
-    prompt,
-    outputCount,
-    maskDataUrl: committed.executionMaskDataUrl,
-    referenceImageUrls: maskEditorReferenceImages.value.map((image) => image.url),
+const { onMaskEditorChromeSubmit, onMaskEditorChromeOutputCountUpdate } =
+  useFlowMaskEditorChromeActions({
+    flowMaskEditorNodeId,
+    maskEditorReferenceImages,
+    commitFlowMaskEditorMode,
+    getFlowMaskEditorCommittedData,
+    clearActiveNodePanels,
+    hideStrengthControl,
+    runImageInpaintAction,
+    onFlowNodeParamUpdate,
+    onWarning: (message) => appToast.warning(message),
   })
-}
-
-function onMaskEditorChromeOutputCountUpdate(value: number) {
-  const nodeId = flowMaskEditorNodeId.value
-  if (!nodeId) return
-  onFlowNodeParamUpdate(nodeId, { key: 'outputCount', value: clampImageNodeOutputCount(value) })
-}
-
-function onFlowImageExpandSubmit(nodeId: string, prompt: string, outputCount: number) {
-  if (flowExpandNodeId.value !== nodeId) return
-  closeActiveImagePromptComposer()
-  activeImageActionNodeId.value = null
-  activeFusionPromptNodeId.value = null
-  hideStrengthControl()
-  void commitFlowExpandMode(prompt, outputCount)
-}
 
 function onFlowPromptGenerate(
   promptNodeId: string,
@@ -804,20 +793,6 @@ function onFlowPromptGenerate(
       { outputAnchorNodeId: promptNodeId },
     )
   })
-}
-
-function onFlowExpandHandlePointerDown(
-  nodeId: string,
-  anchor: CanvasExtendDragAnchor,
-  event: PointerEvent,
-) {
-  if (flowExpandNodeId.value !== nodeId) return
-  beginFlowExpandHandleResize(event, anchor)
-}
-
-function onFlowExpandFramePointerDown(nodeId: string, event: PointerEvent) {
-  if (flowExpandNodeId.value !== nodeId) return
-  beginFlowExpandFrameDrag(event)
 }
 
 const {
