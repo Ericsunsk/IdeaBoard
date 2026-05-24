@@ -2,22 +2,33 @@
   <button
     type="button"
     class="node-action-btn"
-    :class="[`variant-${variant}`, { active, full, 'push-right': pushRight }]"
+    :class="[
+      `variant-${variant}`,
+      { active, full, 'push-right': pushRight, 'node-tool-tooltip-trigger': !!resolvedTooltip },
+    ]"
     :disabled="disabled"
+    :aria-label="resolvedAriaLabel"
     @click="emit('click', $event)"
   >
     <slot />
+    <span v-if="resolvedTooltip" class="node-tool-tooltip" aria-hidden="true">
+      {{ resolvedTooltip }}
+    </span>
   </button>
 </template>
 
 <script setup lang="ts">
-withDefaults(
+import { computed } from 'vue'
+
+const props = withDefaults(
   defineProps<{
     variant?: 'stage' | 'stage-ghost' | 'tool' | 'chip' | 'primary'
     active?: boolean
     disabled?: boolean
     full?: boolean
     pushRight?: boolean
+    ariaLabel?: string
+    tooltip?: string
   }>(),
   {
     variant: 'tool',
@@ -25,14 +36,20 @@ withDefaults(
     disabled: false,
     full: false,
     pushRight: false,
+    ariaLabel: undefined,
+    tooltip: undefined,
   },
 )
 
 const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void
 }>()
+
+const resolvedTooltip = computed(() => props.tooltip ?? '')
+const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.value) || undefined)
 </script>
 
+<style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .node-action-btn {
   border: var(--node-tool-border-width, 1.2px) solid #d6dcec;

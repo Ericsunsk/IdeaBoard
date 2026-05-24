@@ -10,7 +10,7 @@
         class="image-mask-editor-tool-btn"
         :active="drawMode === 'paint'"
         aria-label-value="画笔"
-        title="画笔"
+        tooltip="画笔"
         @click="emit('set-draw-mode', 'paint')"
       >
         <EditPencil />
@@ -19,7 +19,7 @@
         class="image-mask-editor-tool-btn"
         :active="drawMode === 'erase'"
         aria-label-value="橡皮擦"
-        title="橡皮擦"
+        tooltip="橡皮擦"
         @click="emit('set-draw-mode', 'erase')"
       >
         <Erase />
@@ -28,7 +28,7 @@
         class="image-mask-editor-tool-btn"
         disabled
         aria-label-value="填充（待支持）"
-        title="填充（待支持）"
+        tooltip="填充（待支持）"
       >
         <FillColor />
       </NodeToolIconButton>
@@ -36,7 +36,7 @@
         class="image-mask-editor-tool-btn"
         disabled
         aria-label-value="魔棒（待支持）"
-        title="魔棒（待支持）"
+        tooltip="魔棒（待支持）"
       >
         <CircleSpark />
       </NodeToolIconButton>
@@ -44,7 +44,7 @@
         class="image-mask-editor-tool-btn"
         disabled
         aria-label-value="智能蒙版（待支持）"
-        title="智能蒙版（待支持）"
+        tooltip="智能蒙版（待支持）"
       >
         <Sparks />
       </NodeToolIconButton>
@@ -57,25 +57,25 @@
             <div class="image-mask-editor-segmented">
               <button
                 type="button"
-                class="image-mask-editor-segmented-btn"
+                class="image-mask-editor-segmented-btn node-tool-tooltip-trigger"
                 :class="{ active: brushShape === 'round' }"
                 :aria-pressed="brushShape === 'round'"
                 aria-label="圆形笔尖"
-                title="圆形笔尖"
                 @click="emit('set-brush-shape', 'round')"
               >
                 <Circle class="image-mask-editor-segmented-icon" />
+                <span class="node-tool-tooltip" aria-hidden="true">圆形笔尖</span>
               </button>
               <button
                 type="button"
-                class="image-mask-editor-segmented-btn"
+                class="image-mask-editor-segmented-btn node-tool-tooltip-trigger"
                 :class="{ active: brushShape === 'square' }"
                 :aria-pressed="brushShape === 'square'"
                 aria-label="方形笔尖"
-                title="方形笔尖"
                 @click="emit('set-brush-shape', 'square')"
               >
                 <Square class="image-mask-editor-segmented-icon" />
+                <span class="node-tool-tooltip" aria-hidden="true">方形笔尖</span>
               </button>
             </div>
           </div>
@@ -145,7 +145,7 @@
           <NodeToolIconButton
             class="image-mask-editor-tool-btn"
             aria-label-value="清空蒙版"
-            title="清空蒙版"
+            tooltip="清空蒙版"
             @click="emit('clear-mask')"
           >
             <XmarkCircle />
@@ -153,7 +153,7 @@
           <NodeToolIconButton
             class="image-mask-editor-tool-btn"
             aria-label-value="反选蒙版"
-            title="反选蒙版"
+            tooltip="反选蒙版"
             @click="emit('invert-mask')"
           >
             <PlusSquareDashed />
@@ -161,7 +161,7 @@
           <NodeToolIconButton
             class="image-mask-editor-tool-btn"
             aria-label-value="羽化边缘"
-            title="羽化边缘"
+            tooltip="羽化边缘"
             @mousedown.stop="onFeatherButtonMouseDown"
             @click="onFeatherButtonClick"
           >
@@ -171,7 +171,7 @@
             class="image-mask-editor-tool-btn"
             :disabled="!canUndo"
             aria-label-value="回退"
-            title="回退"
+            tooltip="回退"
             @click="emit('undo-mask')"
           >
             <Undo />
@@ -180,7 +180,7 @@
             class="image-mask-editor-tool-btn"
             :disabled="!canRedo"
             aria-label-value="前进"
-            title="前进"
+            tooltip="前进"
             @click="emit('redo-mask')"
           >
             <Redo />

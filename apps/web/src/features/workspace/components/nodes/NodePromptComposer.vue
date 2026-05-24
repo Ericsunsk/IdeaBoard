@@ -30,18 +30,19 @@
         :model-value="outputCount"
         :visible="outputCountPickerVisible"
         :disabled="disabled"
-        title="选择张数"
+        tooltip="选择张数"
         aria-label="输出张数"
         @toggle="toggleOutputCountPicker"
         @select="selectOutputCount"
       />
       <button
-        class="image-node-prompt-send node-tool-send node-tool-button"
+        class="image-node-prompt-send node-tool-send node-tool-button node-tool-tooltip-trigger"
         type="submit"
         :disabled="submitButtonDisabled"
-        title="发送"
+        aria-label="发送"
       >
         <SendDiagonalSolid class="node-send-icon" />
+        <span class="node-tool-tooltip" aria-hidden="true">发送</span>
       </button>
     </div>
   </form>

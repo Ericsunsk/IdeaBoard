@@ -24,14 +24,14 @@
       />
       <button
         v-if="canAddImageInput"
-        class="prompt-text-composer-image-add node-tool-output-count node-tool-button"
+        class="prompt-text-composer-image-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
         type="button"
         :disabled="disabled"
-        title="添加图片输入"
         aria-label="添加图片输入"
         @click="emit('image-input-open')"
       >
         <Plus class="prompt-text-composer-image-add-icon" />
+        <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
       </button>
     </div>
     <textarea
@@ -57,19 +57,20 @@
         :model-value="outputCountValue"
         :visible="outputCountPickerVisible"
         :disabled="disabled"
-        title="选择张数"
+        tooltip="选择张数"
         aria-label="输出张数"
         @toggle="toggleOutputCountPicker"
         @select="selectOutputCount"
       />
       <button
-        class="prompt-text-composer-send node-tool-send node-tool-button"
+        class="prompt-text-composer-send node-tool-send node-tool-button node-tool-tooltip-trigger"
         type="button"
         :disabled="!canSubmit"
-        title="发送"
+        aria-label="发送"
         @click="submit"
       >
         <SendDiagonalSolid class="prompt-text-composer-send-icon" />
+        <span class="node-tool-tooltip" aria-hidden="true">发送</span>
       </button>
     </div>
   </div>

@@ -25,12 +25,11 @@
           class="image-action-icon-btn"
           :aria-label-value="item.title"
           :disabled="directGenerating"
-          :title="item.title"
+          :tooltip="item.label"
           @mousedown.stop="onActionMouseDown(item, $event)"
           @click="onActionClick(item)"
         >
           <ImageActionMenuIcon :icon="item.icon" />
-          <span class="action-tooltip">{{ item.label }}</span>
         </NodeToolIconButton>
       </template>
       <div
@@ -146,32 +145,6 @@ function onActionClick(item: ImageActionMenuItem) {
 .image-action-icon-btn:disabled {
   cursor: not-allowed;
   opacity: 0.45;
-}
-
-.action-tooltip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translate(-50%, 2px);
-  white-space: nowrap;
-  background: rgba(24, 24, 27, 0.94);
-  color: #f4f4f5;
-  border: var(--node-tool-border-width) solid rgba(122, 107, 213, 0.26);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
-}
-
-.image-action-icon-btn:hover:not(:disabled) .action-tooltip {
-  opacity: 1;
-  transform: translate(-50%, 0);
 }
 
 .style-strength-pop {

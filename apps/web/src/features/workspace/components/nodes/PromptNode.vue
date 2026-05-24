@@ -35,10 +35,9 @@
           />
           <button
             v-if="canAcceptMoreImages"
-            class="prompt-node-thumb prompt-node-thumb-add node-tool-output-count node-tool-button"
+            class="prompt-node-thumb prompt-node-thumb-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
             :class="{ 'is-drop-target': addSlotDragOver }"
             type="button"
-            title="添加图片输入"
             aria-label="添加图片输入"
             @mousedown.stop
             @pointerdown.stop
@@ -49,6 +48,7 @@
             @drop.stop.prevent="onAddSlotDrop"
           >
             <Plus class="node-action-icon" />
+            <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
           </button>
         </div>
         <PromptTextComposer

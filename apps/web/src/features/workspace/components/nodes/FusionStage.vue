@@ -52,7 +52,7 @@
         :class="{ 'is-hover': blendHandleHover, 'is-dragging': blendDragging }"
         type="button"
         :style="blendHandleStyle"
-        title="拖动调整融合权重，双击重置"
+        aria-label="拖动调整融合权重，双击重置"
         @pointerdown.stop.prevent="onBlendHandlePointerDown"
         @pointerenter="onBlendHandlePointerEnter"
         @pointerleave="onBlendHandlePointerLeave"

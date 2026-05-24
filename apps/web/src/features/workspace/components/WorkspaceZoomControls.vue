@@ -4,12 +4,22 @@
     :inert="inert"
     @wheel.prevent.stop
   >
-    <div class="zoom-controls">
-      <button type="button" class="zoom-btn" title="缩小" @click="emit('zoom-out')">
+    <div class="zoom-controls canvas-control-group">
+      <button
+        type="button"
+        class="zoom-btn canvas-icon-button"
+        aria-label="缩小"
+        @click="emit('zoom-out')"
+      >
         <Minus class="zoom-btn-icon" />
       </button>
       <span class="zoom-level">{{ zoomLevel }}%</span>
-      <button type="button" class="zoom-btn" title="放大" @click="emit('zoom-in')">
+      <button
+        type="button"
+        class="zoom-btn canvas-icon-button"
+        aria-label="放大"
+        @click="emit('zoom-in')"
+      >
         <Plus class="zoom-btn-icon" />
       </button>
     </div>
@@ -31,6 +41,8 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
+@import './styles/canvas-controls.css';
+
 .floating-status {
   position: absolute;
   right: 24px;
@@ -41,7 +53,6 @@ const emit = defineEmits<{
 
 .zoom-controls {
   box-sizing: border-box;
-  display: flex;
   align-items: center;
   gap: 9px;
   height: 33px;

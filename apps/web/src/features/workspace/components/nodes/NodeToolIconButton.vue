@@ -5,16 +5,19 @@
     :class="{
       active,
       primary,
+      'node-tool-tooltip-trigger': !!resolvedTooltip,
     }"
     :style="buttonStyle"
     :disabled="disabled"
     :aria-pressed="active ? 'true' : undefined"
     :aria-label="resolvedAriaLabel"
-    :title="title"
     @click="emit('click', $event)"
   >
     <span class="node-tool-icon-button__icon">
       <slot />
+    </span>
+    <span v-if="resolvedTooltip" class="node-tool-tooltip" aria-hidden="true">
+      {{ resolvedTooltip }}
     </span>
   </button>
 </template>
@@ -30,7 +33,7 @@ const props = withDefaults(
     disabled?: boolean
     primary?: boolean
     ariaLabelValue?: string
-    title?: string
+    tooltip?: string
   }>(),
   {
     size: undefined,
@@ -39,7 +42,7 @@ const props = withDefaults(
     disabled: false,
     primary: false,
     ariaLabelValue: undefined,
-    title: undefined,
+    tooltip: undefined,
   },
 )
 
@@ -58,7 +61,8 @@ const buttonStyle = computed(() => ({
     ? {}
     : { '--node-tool-icon-button-icon-size': toCssSize(props.iconSize) }),
 }))
-const resolvedAriaLabel = computed(() => props.ariaLabelValue ?? props.title)
+const resolvedTooltip = computed(() => props.tooltip ?? '')
+const resolvedAriaLabel = computed(() => (props.ariaLabelValue ?? resolvedTooltip.value) || undefined)
 </script>
 
 <style scoped>
@@ -134,3 +138,4 @@ const resolvedAriaLabel = computed(() => props.ariaLabelValue ?? props.title)
   stroke-width: var(--node-tool-icon-stroke, 1.5);
 }
 </style>
+<style scoped src="./styles/node-tool-buttons.css"></style>

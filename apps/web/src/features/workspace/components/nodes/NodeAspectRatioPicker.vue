@@ -5,16 +5,13 @@
       type="button"
       :class="{ active: visible }"
       :disabled="disabled"
-      :title="title"
       :aria-label="ariaLabel"
       @click.stop="emit('toggle')"
     >
       <span class="node-aspect-ratio-icon" :data-ratio="ratio">
         <span aria-hidden="true"></span>
       </span>
-      <span class="node-tool-tooltip">
-        {{ ratio === 'auto' ? 'Auto' : ratio }}
-      </span>
+      <span class="node-tool-tooltip" aria-hidden="true">{{ resolvedTooltip }}</span>
     </button>
     <NodeToolPopover :visible="visible" layout="row" class="node-aspect-ratio-popover">
       <button
@@ -24,14 +21,13 @@
         class="node-aspect-ratio-option node-tool-tooltip-trigger"
         :class="{ active: option === ratio }"
         :disabled="disabled"
+        :aria-label="option"
         @click.stop="emit('select', option)"
       >
         <span class="node-aspect-ratio-icon" :data-ratio="option">
           <span aria-hidden="true"></span>
         </span>
-        <span class="node-tool-tooltip">
-          {{ option === 'auto' ? 'Auto' : option }}
-        </span>
+        <span class="node-tool-tooltip" aria-hidden="true">{{ option }}</span>
       </button>
     </NodeToolPopover>
   </div>
@@ -51,13 +47,13 @@ const props = withDefaults(
     modelValue: PromptAspectRatio
     visible: boolean
     disabled?: boolean
-    title?: string
     ariaLabel?: string
+    tooltip?: string
   }>(),
   {
     disabled: false,
-    title: '选择尺寸比例',
     ariaLabel: '尺寸比例',
+    tooltip: undefined,
   },
 )
 
@@ -67,6 +63,7 @@ const emit = defineEmits<{
 }>()
 
 const ratio = computed(() => normalizePromptAspectRatio(props.modelValue))
+const resolvedTooltip = computed(() => props.tooltip || '选择尺寸比例')
 </script>
 
 <style scoped src="./styles/node-tool-buttons.css"></style>

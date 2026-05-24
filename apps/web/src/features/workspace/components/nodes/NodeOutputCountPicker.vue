@@ -2,15 +2,16 @@
   <div class="image-node-output-count-wrap node-tool-output-count-wrap">
     <button
       class="image-node-output-count node-tool-output-count node-tool-button"
-      :class="{ active: visible, 'node-tool-tooltip-trigger': !!tooltip }"
+      :class="{ active: visible, 'node-tool-tooltip-trigger': !!resolvedTooltip }"
       type="button"
       :disabled="disabled"
-      :title="title"
       :aria-label="ariaLabel"
       @click.stop="emit('toggle')"
     >
       {{ modelValue }}
-      <span v-if="tooltip" class="node-tool-tooltip">{{ tooltip }}</span>
+      <span v-if="resolvedTooltip" class="node-tool-tooltip" aria-hidden="true">
+        {{ resolvedTooltip }}
+      </span>
     </button>
     <NodeToolPopover :visible="visible">
       <button
@@ -29,21 +30,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { IMAGE_OUTPUT_COUNT_PRESET_OPTIONS } from '../../types/canvasNodes'
 import NodeToolPopover from './NodeToolPopover.vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     modelValue: number
     visible: boolean
     disabled?: boolean
-    title?: string
     ariaLabel?: string
     tooltip?: string
   }>(),
   {
     disabled: false,
-    title: '选择张数',
     ariaLabel: '输出张数',
     tooltip: '',
   },
@@ -55,6 +55,7 @@ const emit = defineEmits<{
 }>()
 
 const outputCountPresetOptions = IMAGE_OUTPUT_COUNT_PRESET_OPTIONS
+const resolvedTooltip = computed(() => props.tooltip || '选择张数')
 </script>
 
 <style scoped src="./styles/node-tool-buttons.css"></style>

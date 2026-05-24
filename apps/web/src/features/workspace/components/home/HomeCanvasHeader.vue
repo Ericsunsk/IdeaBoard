@@ -3,8 +3,8 @@
     <div class="header-shell" @mousedown.stop>
       <button
         type="button"
-        class="header-back-btn"
-        title="返回画布列表"
+        class="header-back-btn canvas-icon-button"
+        aria-label="返回画布列表"
         @click.stop="emit('navigate-back')"
       >
         <ArrowLeft class="header-icon header-icon-back" />
@@ -32,8 +32,8 @@
       <div class="header-actions">
         <button
           type="button"
-          class="board-switch-btn"
-          title="选择画布"
+          class="board-switch-btn canvas-icon-button"
+          aria-label="选择画布"
           @click.stop="emit('toggle-board-menu')"
         >
           <SquareCursor class="board-switch-icon header-icon" />
@@ -68,7 +68,7 @@
       </div>
     </div>
     <div class="header-right canvas-control-group">
-      <button class="canvas-icon-button share-btn" title="分享" @mousedown.stop>
+      <button type="button" class="canvas-icon-button share-btn" aria-label="分享" @mousedown.stop>
         <span class="canvas-icon-swap" aria-hidden="true">
           <ShareAndroid class="canvas-control-icon canvas-icon-swap-default" />
           <ShareAndroidSolid class="canvas-control-icon canvas-icon-swap-hover" />
@@ -76,7 +76,8 @@
       </button>
       <button
         class="canvas-icon-button export-btn"
-        title="导出"
+        type="button"
+        aria-label="导出"
         :disabled="exportDisabled"
         @mousedown.stop
         @click="emit('export')"
@@ -84,7 +85,12 @@
         <Download class="canvas-control-icon" />
       </button>
       <div class="user-menu-wrap" @pointerdown.stop @mousedown.stop @click.stop>
-        <button class="user-avatar-wrap" title="账户菜单" @click="toggleUserMenu">
+        <button
+          type="button"
+          class="user-avatar-wrap canvas-icon-button"
+          aria-label="账户菜单"
+          @click="toggleUserMenu"
+        >
           <img v-if="avatarUrl" :src="avatarUrl" class="user-avatar" />
           <div v-else class="user-avatar-placeholder">
             <User class="header-icon header-icon-avatar" />
@@ -362,7 +368,7 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
   border: var(--canvas-control-border-width) solid #e2e4e8;
   display: flex;
@@ -425,11 +431,14 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 .user-avatar {
   width: 100%;
   height: 100%;
+  border-radius: inherit;
   object-fit: cover;
 }
 .user-avatar-placeholder {
   width: 100%;
   height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;

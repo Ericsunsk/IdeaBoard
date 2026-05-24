@@ -4,30 +4,36 @@
     :inert="inert"
     @wheel.prevent.stop
   >
-    <div
+    <button
+      type="button"
       class="canvas-icon-button"
       :class="{ 'is-active': activeTool === 'select' }"
-      title="Select (V)"
+      aria-label="选择 (V)"
+      :aria-pressed="activeTool === 'select'"
       @click="emit('select-tool', 'select')"
     >
       <OneFingerSelectHandGesture class="canvas-control-icon" />
-    </div>
-    <div
+    </button>
+    <button
+      type="button"
       class="canvas-icon-button"
       :class="{ 'is-active': activeTool === 'hand' }"
-      title="Hand (H)"
+      aria-label="抓手 (H)"
+      :aria-pressed="activeTool === 'hand'"
       @click="emit('select-tool', 'hand')"
     >
       <SpockHandGesture class="canvas-control-icon" />
-    </div>
-    <div
+    </button>
+    <button
+      type="button"
       class="canvas-icon-button"
       :class="{ 'is-active': activeTool === 'text' }"
-      title="Text (T)"
+      aria-label="文本 (T)"
+      :aria-pressed="activeTool === 'text'"
       @click="emit('select-tool', 'text')"
     >
       <Text class="canvas-control-icon" />
-    </div>
+    </button>
   </aside>
 </template>
 

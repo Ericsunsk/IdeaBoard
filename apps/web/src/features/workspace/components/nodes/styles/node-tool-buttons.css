@@ -6,6 +6,7 @@
   --node-tool-icon-size: 21px;
   --node-tool-icon-stroke: 1.5;
   --node-tool-popover-option-height: 33px;
+  --node-tool-tooltip-delay: 200ms;
   --node-tool-button-border: rgba(122, 107, 213, 0.28);
   --node-tool-button-accent: #9278e6;
   --node-tool-button-brand: #7a6bd5;
@@ -76,9 +77,16 @@
     transform 0.16s ease;
 }
 
-.node-tool-tooltip-trigger:hover .node-tool-tooltip {
+.node-tool-tooltip-trigger {
+  position: relative;
+}
+
+.node-tool-tooltip-trigger:not(:disabled):hover .node-tool-tooltip,
+.node-tool-tooltip-trigger:not(:disabled):focus-visible .node-tool-tooltip,
+.node-tool-tooltip-trigger:not(:disabled):focus-within .node-tool-tooltip {
   opacity: 1;
   transform: translate(-50%, 0);
+  transition-delay: var(--node-tool-tooltip-delay, 200ms);
 }
 
 .node-tool-send {
