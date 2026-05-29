@@ -8,10 +8,18 @@ BRANCH="${IDEABOARD_BRANCH:-main}"
 EDITOR_BIN="${EDITOR:-nano}"
 BIN_PATH="${IDEABOARD_BIN_PATH:-/usr/local/bin/ideaboard}"
 GIT_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+ASKPASS_FILE=""
+
+cleanup() {
+  if [[ -n "$ASKPASS_FILE" && -f "$ASKPASS_FILE" ]]; then
+    rm -f "$ASKPASS_FILE"
+  fi
+}
+trap cleanup EXIT
 
 git_with_auth() {
   if [[ -n "$GIT_TOKEN" ]]; then
-    git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer $GIT_TOKEN" "$@"
+    GIT_ASKPASS="$ASKPASS_FILE" GIT_TERMINAL_PROMPT=0 git "$@"
     return
   fi
   git "$@"
@@ -30,6 +38,20 @@ need_command docker
 if ! docker compose version >/dev/null 2>&1; then
   echo "Missing command: docker compose" >&2
   exit 1
+fi
+
+if [[ -n "$GIT_TOKEN" ]]; then
+  export GITHUB_TOKEN="$GIT_TOKEN"
+  ASKPASS_FILE="$(mktemp)"
+  chmod 700 "$ASKPASS_FILE"
+  cat > "$ASKPASS_FILE" <<'EOF'
+#!/usr/bin/env sh
+case "$1" in
+  *Username*) printf '%s\n' x-access-token ;;
+  *Password*) printf '%s\n' "$GITHUB_TOKEN" ;;
+  *) printf '\n' ;;
+esac
+EOF
 fi
 
 mkdir -p "$(dirname "$STACK_DIR")"
