@@ -321,7 +321,7 @@ IdeaBoard/
 首次 VPS 初始化 + 部署：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Ericsunsk/IdeaBoard/main/scripts/bootstrap-vps.sh | bash
+GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh?ref=main | bash'
 ```
 
 后续部署 / 升级：

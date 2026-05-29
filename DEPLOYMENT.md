@@ -175,7 +175,7 @@ ghcr.io/<github-owner>/<github-repo>/ideaboard-auth:<tag>
 ### 2. 首次 VPS 初始化 + 部署
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Ericsunsk/IdeaBoard/main/scripts/bootstrap-vps.sh | bash
+GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh?ref=main | bash'
 ```
 
 至少修改：
