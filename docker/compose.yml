@@ -104,7 +104,6 @@ services:
       - ideaboard-network
 
   mysql:
-    platform: linux/amd64
     image: mysql:8.0
     container_name: ideaboard-mysql
     restart: unless-stopped
@@ -123,8 +122,8 @@ services:
         - mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 20
+      start_period: 90s
     networks:
       - ideaboard-network
 

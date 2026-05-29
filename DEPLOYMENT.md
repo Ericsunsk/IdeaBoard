@@ -32,7 +32,7 @@
 <a id="deployment-profile"></a>
 ## 部署概览
 
-本文档适用于 `Linux amd64` 服务器。当前优先推荐 `Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel`，保留 `Nginx + systemd + MySQL + Redis + Better Auth Node Service` 作为传统部署方式。
+本文档适用于 `Linux amd64/arm64` 服务器。当前优先推荐 `Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel`，保留 `Nginx + systemd + MySQL + Redis + Better Auth Node Service` 作为传统部署方式。
 
 ### 推荐拓扑
 
