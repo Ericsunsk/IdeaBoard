@@ -111,20 +111,12 @@ Pages 项目建议配置：
 
 前端默认从 `VITE_API_BASE_URL` 派生 `/uploads/*` 的访问域名；如需独立素材域名，可额外设置 `VITE_PUBLIC_ASSET_BASE_URL=https://assets.example.com`。
 
-VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、MySQL、Redis 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。后端生产环境至少同步：
+VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、MySQL、Redis 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。Docker 生产环境至少同步：
 
 ```bash
-# /opt/ideaboard/apps/api/.env
-APP_ENV=production
-APP_HOST=127.0.0.1
-APP_CORS_ALLOWED_ORIGINS=https://你的前端域名
-APP_PUBLIC_BASE_URL=https://你的前端域名
-APP_PUBLIC_ASSET_BASE_URL=https://api.example.com
-AUTH_SERVICE_BASE_URL=http://127.0.0.1:6001
-
-# /opt/ideaboard/apps/auth/.env
-AUTH_TRUSTED_ORIGINS=https://你的前端域名
-BETTER_AUTH_URL=https://api.example.com
+# /opt/stacks/ideaboard/docker/.env.production
+APP_BASE_URL=https://你的前端域名
+API_BASE_URL=https://api.example.com
 ```
 
 Cloudflare Tunnel ingress 示例：
@@ -180,11 +172,8 @@ GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $G
 
 至少修改：
 
-- `APP_PUBLIC_BASE_URL`
-- `APP_PUBLIC_ASSET_BASE_URL`
-- `APP_CORS_ALLOWED_ORIGINS`
-- `AUTH_TRUSTED_ORIGINS`
-- `BETTER_AUTH_URL`
+- `APP_BASE_URL`
+- `API_BASE_URL`
 
 可选：
 

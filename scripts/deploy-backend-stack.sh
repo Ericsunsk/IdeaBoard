@@ -123,11 +123,8 @@ validate_env_file() {
   local key
 
   for key in \
-    APP_PUBLIC_BASE_URL \
-    APP_PUBLIC_ASSET_BASE_URL \
-    APP_CORS_ALLOWED_ORIGINS \
-    AUTH_TRUSTED_ORIGINS \
-    BETTER_AUTH_URL \
+    APP_BASE_URL \
+    API_BASE_URL \
     MYSQL_ROOT_PASSWORD \
     MYSQL_PASSWORD \
     AUTH_INTERNAL_KEY \

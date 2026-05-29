@@ -45,11 +45,8 @@ VITE_PUBLIC_ASSET_BASE_URL=https://assets.example.com
 后端生产环境需要同步配置：
 
 ```text
-BETTER_AUTH_URL=https://api.example.com
-AUTH_TRUSTED_ORIGINS=https://你的前端域名
-APP_CORS_ALLOWED_ORIGINS=https://你的前端域名
-APP_PUBLIC_BASE_URL=https://你的前端域名
-APP_PUBLIC_ASSET_BASE_URL=https://api.example.com
+APP_BASE_URL=https://你的前端域名
+API_BASE_URL=https://api.example.com
 ```
 
 ## 开发说明

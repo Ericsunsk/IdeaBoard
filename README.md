@@ -362,7 +362,7 @@ Pages 配置：
 | Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
 | Environment variable | `VITE_AUTH_BASE_URL=https://api.example.com` |
 
-VPS 侧设置 `APP_PUBLIC_BASE_URL=https://app.example.com` 与 `APP_PUBLIC_ASSET_BASE_URL=https://api.example.com`；Cloudflare Tunnel 将 `api.example.com` 转发到 VPS 本机 Gateway，例如 `http://127.0.0.1:8080`。
+VPS 侧设置 `APP_BASE_URL=https://app.example.com` 与 `API_BASE_URL=https://api.example.com`；Cloudflare Tunnel 将 `api.example.com` 转发到 VPS 本机 Gateway，例如 `http://127.0.0.1:8080`。
 
 ### 传统 Linux 部署
 
