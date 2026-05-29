@@ -172,57 +172,37 @@ ghcr.io/<github-owner>/<github-repo>/ideaboard-api:<tag>
 ghcr.io/<github-owner>/<github-repo>/ideaboard-auth:<tag>
 ```
 
-GHCR package 为 private 时：
+### 2. 首次 VPS 初始化 + 部署
 
 ```bash
-echo "$GHCR_TOKEN" | docker login ghcr.io -u "你的 GitHub 用户名" --password-stdin
-```
-
-### 2. 准备 VPS 配置
-
-VPS 目录：
-
-```text
-/opt/stacks/ideaboard/
-├── docker/
-└── scripts/
-    └── deploy-backend-stack.sh
-```
-
-初始化环境变量：
-
-```bash
-/opt/stacks/ideaboard/scripts/deploy-backend-stack.sh init-env
-nano /opt/stacks/ideaboard/docker/.env.production
+curl -fsSL https://raw.githubusercontent.com/Ericsunsk/IdeaBoard/main/scripts/bootstrap-vps.sh | bash
 ```
 
 至少修改：
 
 - `IMAGE_NAMESPACE`
 - `IMAGE_TAG`
-- `APP_PUBLIC_BASE_URL=https://app.example.com`
-- `APP_PUBLIC_ASSET_BASE_URL=https://api.example.com`
-- `APP_CORS_ALLOWED_ORIGINS=https://app.example.com`
-- `AUTH_TRUSTED_ORIGINS=https://app.example.com`
-- `BETTER_AUTH_URL=https://api.example.com`
+- `APP_PUBLIC_BASE_URL`
+- `APP_PUBLIC_ASSET_BASE_URL`
+- `APP_CORS_ALLOWED_ORIGINS`
+- `AUTH_TRUSTED_ORIGINS`
+- `BETTER_AUTH_URL`
 
-### 3. 首次启动
-
-部署 / 升级：
+### 3. 后续部署 / 升级
 
 ```bash
-/opt/stacks/ideaboard/scripts/deploy-backend-stack.sh
+ideaboard update
 ```
 
-初始化管理员账号：
+### 4. 初始化管理员
 
 ```bash
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production run --rm \
+docker compose -f /opt/stacks/ideaboard/docker/compose.prod.yml --env-file /opt/stacks/ideaboard/docker/.env.production run --rm \
   -e INIT_ADMIN_PASSWORD='your-strong-password' \
   api init-admin
 ```
 
-### 4. Cloudflare Tunnel
+### 5. Cloudflare Tunnel
 
 Tunnel ingress 指向 VPS 本机 Gateway：
 
@@ -236,32 +216,29 @@ ingress:
   - service: http_status:404
 ```
 
-### 5. 验证
+### 6. 验证
 
 ```bash
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production ps
+docker compose -f /opt/stacks/ideaboard/docker/compose.prod.yml --env-file /opt/stacks/ideaboard/docker/.env.production ps
 curl http://127.0.0.1:8080/api/health
 curl http://127.0.0.1:8080/api/auth/get-session
 ```
 
 `/api/auth/get-session` 未登录时返回未认证是正常的；关键是 Gateway 能转发到 Auth Service，不应出现连接失败。
 
-### 6. 升级与回滚
+### 7. 升级与回滚
 
 升级到新镜像：
 
 ```bash
-nano docker/.env.production
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production run --rm auth npm run migrate:dist
+nano /opt/stacks/ideaboard/docker/.env.production
+ideaboard update
 ```
 
 回滚时把 `IMAGE_TAG` 改回上一版，再执行：
 
 ```bash
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
+ideaboard update
 ```
 
 数据保存在 Docker volumes：`mysql-data`、`redis-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。

@@ -33,6 +33,9 @@ ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env.production}"
 ENV_EXAMPLE="$ROOT_DIR/docker/.env.production.example"
 
 command="${1:-deploy}"
+if [[ "$command" == "update" ]]; then
+  command="deploy"
+fi
 
 die() {
   echo "Error: $*" >&2

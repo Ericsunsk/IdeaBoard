@@ -318,25 +318,16 @@ IdeaBoard/
 
 ### 推荐部署：Cloudflare Pages + GHCR + Docker Compose
 
-后端栈一键部署 / 升级：
+首次 VPS 初始化 + 部署：
 
 ```bash
-/opt/stacks/ideaboard/scripts/deploy-backend-stack.sh
+curl -fsSL https://raw.githubusercontent.com/Ericsunsk/IdeaBoard/main/scripts/bootstrap-vps.sh | bash
 ```
 
-默认 stack 目录：`/opt/stacks/ideaboard`。
-
-首次配置：
+后续部署 / 升级：
 
 ```bash
-/opt/stacks/ideaboard/scripts/deploy-backend-stack.sh init-env
-nano /opt/stacks/ideaboard/docker/.env.production
-```
-
-GHCR private package：
-
-```bash
-docker login ghcr.io
+ideaboard update
 ```
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
