@@ -320,10 +320,13 @@ IdeaBoard/
 
 适用于前端部署到 Cloudflare Pages，后端 stack 在 VPS 通过 Docker Compose 运行，并从 GHCR 拉取 CI 构建好的镜像。
 
+后端栈一键部署 / 升级：
+
 ```bash
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
+dc() { docker compose -f docker/compose.prod.yml --env-file docker/.env.production "$@"; }; dc pull && dc up -d mysql redis && dc run --rm auth npm run migrate:dist && dc up -d
 ```
+
+首次运行前先从 `docker/.env.production.example` 创建并填写 `docker/.env.production`；如果 GHCR package 是 private，VPS 还需要先执行 `docker login ghcr.io`。
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
