@@ -172,32 +172,34 @@ ghcr.io/<github-owner>/<github-repo>/ideaboard-api:<tag>
 ghcr.io/<github-owner>/<github-repo>/ideaboard-auth:<tag>
 ```
 
-如果 GHCR package 是 private，VPS 需要先登录 GHCR：
+GHCR package 为 private 时：
 
 ```bash
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "你的 GitHub 用户名" --password-stdin
 ```
 
-`GHCR_TOKEN` 至少需要 `read:packages` 权限；如果 package 设为 public，可以跳过登录。
-
 ### 2. 准备 VPS 配置
 
-将仓库中的 `docker/` 目录放到 VPS，例如 `/opt/ideaboard/docker`，然后准备生产环境变量：
+VPS 目录：
+
+```text
+/opt/stacks/ideaboard/
+├── docker/
+└── scripts/
+    └── deploy-backend-stack.sh
+```
+
+初始化环境变量：
 
 ```bash
-cd /opt/ideaboard
-cp docker/.env.production.example docker/.env.production
-nano docker/.env.production
+/opt/stacks/ideaboard/scripts/deploy-backend-stack.sh init-env
+nano /opt/stacks/ideaboard/docker/.env.production
 ```
 
 至少修改：
 
-- `IMAGE_NAMESPACE`：小写 GitHub owner/repo，例如 `2837123/feng-ai`
-- `IMAGE_TAG`：建议使用明确版本 tag，例如 `v0.1.0`；也可先用 `latest`
-- `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD`
-- `AUTH_INTERNAL_KEY`
-- `AUTH_TRUST_PROXY`：Docker Compose 默认信任 Docker 私网 CIDR，通常无需修改
-- `BETTER_AUTH_SECRET`
+- `IMAGE_NAMESPACE`
+- `IMAGE_TAG`
 - `APP_PUBLIC_BASE_URL=https://app.example.com`
 - `APP_PUBLIC_ASSET_BASE_URL=https://api.example.com`
 - `APP_CORS_ALLOWED_ORIGINS=https://app.example.com`
@@ -206,23 +208,10 @@ nano docker/.env.production
 
 ### 3. 首次启动
 
-先拉取镜像并启动数据库依赖：
+部署 / 升级：
 
 ```bash
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d mysql redis
-```
-
-执行 Better Auth 数据库迁移：
-
-```bash
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production run --rm auth npm run migrate:dist
-```
-
-启动完整后端 stack：
-
-```bash
-docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
+/opt/stacks/ideaboard/scripts/deploy-backend-stack.sh
 ```
 
 初始化管理员账号：
