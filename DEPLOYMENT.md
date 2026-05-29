@@ -114,7 +114,7 @@ Pages 项目建议配置：
 VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、MySQL、Redis 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。Docker 生产环境至少同步：
 
 ```bash
-# /opt/stacks/ideaboard/docker/.env.production
+# /opt/stacks/ideaboard/docker/.env
 APP_BASE_URL=https://你的前端域名
 API_BASE_URL=https://api.example.com
 ```
@@ -170,6 +170,8 @@ ghcr.io/<github-owner>/<github-repo>/ideaboard-auth:<tag>
 GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh?ref=main | bash'
 ```
 
+强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。
+
 至少修改：
 
 - `APP_BASE_URL`
@@ -193,12 +195,15 @@ ideaboard restart
 ideaboard stop
 ideaboard status
 ideaboard logs
+ideaboard delete --yes
 ```
+
+`delete` 默认保留 Docker volumes；同时删除数据加 `--volumes`。
 
 ### 4. 初始化管理员
 
 ```bash
-docker compose -f /opt/stacks/ideaboard/docker/compose.prod.yml --env-file /opt/stacks/ideaboard/docker/.env.production run --rm \
+docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env run --rm \
   -e INIT_ADMIN_PASSWORD='your-strong-password' \
   api init-admin
 ```
@@ -220,7 +225,7 @@ ingress:
 ### 6. 验证
 
 ```bash
-docker compose -f /opt/stacks/ideaboard/docker/compose.prod.yml --env-file /opt/stacks/ideaboard/docker/.env.production ps
+docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env ps
 curl http://127.0.0.1:8080/api/health
 curl http://127.0.0.1:8080/api/auth/get-session
 ```
@@ -232,7 +237,7 @@ curl http://127.0.0.1:8080/api/auth/get-session
 升级到新镜像：
 
 ```bash
-nano /opt/stacks/ideaboard/docker/.env.production
+nano /opt/stacks/ideaboard/docker/.env
 ideaboard update
 ```
 

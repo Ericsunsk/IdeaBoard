@@ -324,6 +324,8 @@ IdeaBoard/
 GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh?ref=main | bash'
 ```
 
+强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。
+
 后续部署 / 升级：
 
 ```bash
@@ -337,7 +339,10 @@ ideaboard restart
 ideaboard stop
 ideaboard status
 ideaboard logs
+ideaboard delete --yes
 ```
+
+`delete` 默认保留 Docker volumes；同时删除数据加 `--volumes`。
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 

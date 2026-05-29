@@ -17,7 +17,7 @@ find_stack_root() {
     "$PWD" \
     "/opt/stacks/ideaboard" \
     "/opt/ideaboard"; do
-    if [[ -f "$dir/docker/compose.prod.yml" ]]; then
+    if [[ -f "$dir/docker/compose.yml" ]]; then
       cd "$dir" && pwd
       return
     fi
@@ -28,13 +28,18 @@ find_stack_root() {
 }
 
 ROOT_DIR="$(find_stack_root)"
-COMPOSE_FILE="$ROOT_DIR/docker/compose.prod.yml"
-ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env.production}"
+COMPOSE_FILE="$ROOT_DIR/docker/compose.yml"
+ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env}"
 ENV_EXAMPLE="$ROOT_DIR/docker/.env.example"
 
 command="${1:-deploy}"
 if [[ "$command" == "update" ]]; then
   command="deploy"
+fi
+
+if [[ "$command" == "delete" || "$command" == "uninstall" ]]; then
+  shift || true
+  IDEABOARD_STACK_DIR="$ROOT_DIR" exec "$ROOT_DIR/scripts/uninstall-vps.sh" "$@"
 fi
 
 die() {
@@ -225,7 +230,7 @@ case "$command" in
     ;;
   *)
     cat >&2 <<EOF
-Usage: ideaboard [update|restart|stop|status|logs|init-env|pull|up|migrate|ps]
+Usage: ideaboard [update|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|ps]
 
 Default command: update
 Environment file: $ENV_FILE
