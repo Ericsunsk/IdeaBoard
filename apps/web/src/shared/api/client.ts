@@ -1,5 +1,6 @@
 import axios, { type AxiosRequestConfig } from 'axios'
 import { handleAuthFailure } from '../utils/auth'
+import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
 
 export type ApiClientError = Error & {
   code?: number
@@ -9,7 +10,7 @@ export type ApiClientError = Error & {
 }
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   timeout: 10000,
   headers: {
@@ -37,7 +38,7 @@ export function createApiError(payload?: unknown, status?: number): ApiClientErr
 
 api.interceptors.response.use(
   (response) => {
-    const data = response.data
+    const data = normalizeRuntimeMediaRefs(response.data)
     if (data && typeof data.code === 'number' && data.code !== 0) {
       const requestUrl = response.config?.url || ''
       handleAuthFailure({ status: response.status, payload: data, requestUrl })

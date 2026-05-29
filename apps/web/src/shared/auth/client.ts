@@ -1,12 +1,9 @@
 import { createAuthClient } from 'better-auth/vue'
 import { adminClient, usernameClient } from 'better-auth/client/plugins'
-
-const authBaseURL =
-  (import.meta.env.VITE_AUTH_BASE_URL || '').trim() ||
-  (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173')
+import { AUTH_BASE_URL } from '../config/runtimeUrls'
 
 export const authClient = createAuthClient({
-  baseURL: authBaseURL,
+  baseURL: AUTH_BASE_URL,
   plugins: [usernameClient(), adminClient()],
   fetchOptions: {
     credentials: 'include',

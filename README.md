@@ -42,6 +42,12 @@
   <img src="https://img.shields.io/badge/queue-Asynq-00add8?style=flat-square" alt="Queue: Asynq" />
 </p>
 
+<p align="center">
+  <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create/pages">
+    <img src="https://img.shields.io/badge/Deploy_frontend-Cloudflare_Pages-f38020?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Deploy frontend to Cloudflare Pages" />
+  </a>
+</p>
+
 <a id="product-preview"></a>
 ## 产品预览
 
@@ -321,6 +327,32 @@ IdeaBoard/
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
 运行拓扑见上方"系统架构"图。
+
+### Cloudflare Pages + Tunnel + VPS
+
+适用于前端部署到 Cloudflare Pages，后端、认证服务、MySQL 与 Redis 继续运行在 VPS，并通过 Cloudflare Tunnel 暴露 `api.example.com` 的混合部署。
+
+<p>
+  <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create/pages">
+    <img src="https://img.shields.io/badge/Deploy_frontend-Cloudflare_Pages-f38020?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Deploy frontend to Cloudflare Pages" />
+  </a>
+</p>
+
+Pages 配置：
+
+| 项目 | 值 |
+|------|----|
+| Root directory | `apps/web` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Environment variable | `NODE_VERSION=20` |
+| Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
+| Environment variable | `VITE_AUTH_BASE_URL=https://api.example.com` |
+
+VPS 侧设置 `APP_PUBLIC_BASE_URL=https://app.example.com` 与 `APP_PUBLIC_ASSET_BASE_URL=https://api.example.com`；Cloudflare Tunnel 将 `api.example.com` 转发到 VPS 本机 Nginx。
+
+> [!NOTE]
+> Cloudflare 官方 `Deploy to Cloudflare` 一键按钮目前面向 Workers 应用；本项目此形态使用 Pages 托管 Vue 前端，因此 README 按钮跳转到 Pages 创建入口。
 
 <a id="docs"></a>
 ## 相关文档

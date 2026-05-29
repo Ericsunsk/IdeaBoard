@@ -10,6 +10,7 @@ import {
   hasValidStoredAuth,
 } from '../../shared/utils/auth'
 import type { ErrorType } from '../../shared/api/orvalMutator'
+import { resolveAuthUrl } from '../../shared/config/runtimeUrls'
 
 const SESSION_CACHE_TTL_MS = 30_000
 
@@ -120,7 +121,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function updatePassword(oldPassword: string, newPassword: string) {
-    const response = await fetch('/api/auth/change-password', {
+    const response = await fetch(resolveAuthUrl('/api/auth/change-password'), {
       method: 'POST',
       credentials: 'include',
       headers: {

@@ -1,5 +1,6 @@
 /** Shared media URL/Blob/Canvas utilities used across workspace services. */
 import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
+import { resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 import { uploadApi } from '../../../shared/api/upload'
 
 /**
@@ -15,9 +16,10 @@ export function isDataUrl(value: string): boolean {
  * Returns null for invalid or empty input.
  */
 export function toAbsoluteUrl(raw: string): URL | null {
-  if (!raw.trim()) return null
+  const normalized = resolveAssetUrl(raw.trim())
+  if (!normalized) return null
   try {
-    return new URL(raw, window.location.origin)
+    return new URL(normalized, window.location.origin)
   } catch {
     return null
   }
@@ -35,24 +37,25 @@ export function resolveFetchUrl(
   raw: string,
   options?: { allowSameOriginUploads?: boolean; blockExternal?: boolean },
 ): string {
-  const trimmed = raw.trim()
+  const trimmed = resolveAssetUrl(raw.trim())
   if (!trimmed) return ''
   if (/^data:/i.test(trimmed)) return trimmed
   const url = toAbsoluteUrl(trimmed)
   if (!url) return ''
   const endpoint = new URL(USER_DOWNLOAD_ENDPOINT, window.location.origin)
   const isSameOrigin = url.origin === window.location.origin
-  if (isSameOrigin && url.pathname === endpoint.pathname) {
+  const isApiOrigin = url.origin === endpoint.origin
+  if ((isSameOrigin || isApiOrigin) && url.pathname === endpoint.pathname) {
     const target = (url.searchParams.get('url') || '').trim()
     if (!target) return ''
     return `${USER_DOWNLOAD_ENDPOINT}?url=${encodeURIComponent(target)}`
   }
   if (
-    isSameOrigin &&
+    (isSameOrigin || isApiOrigin) &&
     (options?.allowSameOriginUploads ?? true) &&
     url.pathname.startsWith('/uploads')
   ) {
-    return trimmed
+    return url.toString()
   }
   if (isSameOrigin) return trimmed
   if (url.protocol === 'http:' || url.protocol === 'https:') {

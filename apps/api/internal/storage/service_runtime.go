@@ -347,7 +347,35 @@ func (s *StorageService) saveBytesLocal(filename string, data []byte, opts Stora
 	if err := os.WriteFile(dst, data, 0644); err != nil {
 		return "", fmt.Errorf("保存文件失败: %v", err)
 	}
-	return "/" + strings.ReplaceAll(dst, "\\", "/"), nil
+	return publicUploadURL(strings.ReplaceAll(dst, "\\", "/")), nil
+}
+
+func publicUploadURL(objectKey string) string {
+	normalized := "/" + strings.TrimLeft(filepath.ToSlash(objectKey), "/")
+	base := resolvePublicUploadBaseURL()
+	if base == nil {
+		return normalized
+	}
+	rel, err := url.Parse(normalized)
+	if err != nil {
+		return normalized
+	}
+	return base.ResolveReference(rel).String()
+}
+
+func resolvePublicUploadBaseURL() *url.URL {
+	for _, key := range []string{"APP_PUBLIC_ASSET_BASE_URL", "APP_ASSET_BASE_URL", "PUBLIC_ASSET_BASE_URL", "APP_PUBLIC_BASE_URL", "APP_BASE_URL", "PUBLIC_BASE_URL"} {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			continue
+		}
+		return parsed
+	}
+	return nil
 }
 
 func (s *StorageService) deleteLocalByObjectKey(objectKey string) error {

@@ -48,6 +48,25 @@ func TestDeleteLocalByObjectKeyRemovesFile(t *testing.T) {
 	}
 }
 
+func TestPublicUploadURLUsesAssetBaseURL(t *testing.T) {
+	t.Setenv("APP_PUBLIC_ASSET_BASE_URL", "https://api.example.com")
+	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
+
+	got := publicUploadURL("uploads/workspace/U123/board/content/demo.png")
+	want := "https://api.example.com/uploads/workspace/U123/board/content/demo.png"
+	if got != want {
+		t.Fatalf("publicUploadURL = %q, want %q", got, want)
+	}
+}
+
+func TestPublicUploadURLFallsBackToRelativePath(t *testing.T) {
+	got := publicUploadURL("uploads/workspace/U123/board/content/demo.png")
+	want := "/uploads/workspace/U123/board/content/demo.png"
+	if got != want {
+		t.Fatalf("publicUploadURL = %q, want %q", got, want)
+	}
+}
+
 func TestDeleteLocalByPrefixRemovesWorkspaceTree(t *testing.T) {
 	withTempWorkingDir(t)
 

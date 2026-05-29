@@ -1,5 +1,7 @@
-export const ADMIN_UPLOAD_ENDPOINT = '/api/admin/upload'
-export const USER_DOWNLOAD_ENDPOINT = '/api/user/download'
+import { resolveApiUrl } from '../config/runtimeUrls'
+
+export const ADMIN_UPLOAD_ENDPOINT = resolveApiUrl('/admin/upload')
+export const USER_DOWNLOAD_ENDPOINT = resolveApiUrl('/user/download')
 
 export const SUPPORTED_IMAGE_UPLOAD_MIME_TYPES = [
   'image/jpeg',

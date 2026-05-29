@@ -19,12 +19,45 @@ npm run build
 
 构建产物输出到 `dist/`。
 
+## Cloudflare Pages 部署
+
+用于“前端在 Cloudflare Pages，后端与数据库在 VPS，并通过 Cloudflare Tunnel 暴露 API 域名”的部署方式。
+
+Pages 构建配置：
+
+```text
+Root directory: apps/web
+Build command: npm run build
+Build output directory: dist
+Environment variable: NODE_VERSION=20
+Environment variable: VITE_API_BASE_URL=https://api.example.com/api
+Environment variable: VITE_AUTH_BASE_URL=https://api.example.com
+```
+
+可选素材域名变量：
+
+```text
+VITE_PUBLIC_ASSET_BASE_URL=https://assets.example.com
+```
+
+如果不设置 `VITE_PUBLIC_ASSET_BASE_URL`，前端会从 `VITE_API_BASE_URL` 自动派生素材域名，例如 `https://api.example.com/uploads/...`。
+
+后端生产环境需要同步配置：
+
+```text
+BETTER_AUTH_URL=https://api.example.com
+AUTH_TRUSTED_ORIGINS=https://你的前端域名
+APP_CORS_ALLOWED_ORIGINS=https://你的前端域名
+APP_PUBLIC_BASE_URL=https://你的前端域名
+APP_PUBLIC_ASSET_BASE_URL=https://api.example.com
+```
+
 ## 开发说明
 
-- 当前业务 API 客户端的 `baseURL` 固定为 `/api`
+- 当前业务 API 客户端默认 `baseURL` 为 `/api`，生产可通过 `VITE_API_BASE_URL` 改为独立 API 域名
 - 开发环境通过 `vite.config.ts` 将 `/api/auth` 代理到 `http://localhost:6001`
 - 开发环境通过 `vite.config.ts` 将其余 `/api` 和 `/uploads` 代理到 `http://localhost:6000`
-- 如果需要切换本地后端地址，请修改 `vite.config.ts`
+- 如果需要切换本地后端地址，请修改 `vite.config.ts` 或设置对应 `VITE_*` 环境变量
 
 ## 主要目录
 

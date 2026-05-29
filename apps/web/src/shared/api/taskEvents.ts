@@ -4,6 +4,7 @@ import type { ApiResponseTask } from './generated-query/model'
 import { extractImageUrlsFromTaskResult } from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import type { Task } from './task'
+import { resolveApiUrl } from '../config/runtimeUrls'
 
 type TaskEventPayload = Pick<Task, 'task_id' | 'status' | 'result' | 'error_msg' | 'outputs'>
 
@@ -22,7 +23,7 @@ export function waitTaskResultWithSse(
 
 function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    const es = new EventSource(`/api/user/drawing/${encodeURIComponent(taskId)}/events`, {
+    const es = new EventSource(resolveApiUrl(`/user/drawing/${encodeURIComponent(taskId)}/events`), {
       withCredentials: true,
     })
     let settled = false

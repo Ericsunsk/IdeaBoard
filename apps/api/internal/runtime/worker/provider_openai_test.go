@@ -756,6 +756,23 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesRelativeUploadPaths(t *testing.T
 	}
 }
 
+func TestNormalizeUpstreamMediaParamsPrefersAssetBaseURL(t *testing.T) {
+	t.Setenv("APP_PUBLIC_ASSET_BASE_URL", "https://api.example.com")
+	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
+
+	params := map[string]interface{}{
+		"feature":            "style-variation",
+		"original_image_url": "/uploads/2026/04/23/source.png",
+	}
+
+	c := &ProviderExecutor{}
+	c.normalizeUpstreamMediaParams(params)
+
+	if got := params["original_image_url"]; got != "https://api.example.com/uploads/2026/04/23/source.png" {
+		t.Fatalf("unexpected normalized original_image_url: %#v", got)
+	}
+}
+
 func TestNormalizeUpstreamMediaParamsInlinesRelativeUploadPathsWithoutPublicBaseURL(t *testing.T) {
 	tempDir := t.TempDir()
 	previousWD, err := os.Getwd()

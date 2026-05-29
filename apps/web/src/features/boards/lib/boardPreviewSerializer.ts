@@ -10,6 +10,7 @@ import {
   normalizeFusionBlendPoint,
 } from '../../workspace/utils/fusionBlend'
 import { resolveImageNodeStageHeight } from '../../workspace/utils/imageNodeSizing'
+import { resolveApiUrl, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 
 export interface BoardPreviewFrame {
   key: string
@@ -82,7 +83,7 @@ const PREVIEW_DOT_COLOR = 'rgba(226, 228, 232, 0.86)'
 const PREVIEW_NODE_BORDER = '#e2e8f0'
 const PREVIEW_NODE_TEXT = '#334155'
 const PREVIEW_EDGE_STROKE = '#9aa4b2'
-const USER_DOWNLOAD_ENDPOINT = '/api/user/download'
+const USER_DOWNLOAD_ENDPOINT = resolveApiUrl('/user/download')
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -107,7 +108,7 @@ function withAlpha(hex: string, alpha: number): string {
 }
 
 function toAbsolutePreviewUrl(url: string): string {
-  const normalized = url.trim()
+  const normalized = resolveAssetUrl(url.trim())
   if (!normalized) return ''
   if (
     normalized.startsWith('http://') ||

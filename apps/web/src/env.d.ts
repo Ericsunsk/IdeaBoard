@@ -8,7 +8,10 @@ declare module '*.vue' {
 
 declare global {
   interface ImportMetaEnv {
+    readonly VITE_API_BASE_URL?: string
     readonly VITE_AUTH_BASE_URL?: string
+    readonly VITE_PUBLIC_ASSET_BASE_URL?: string
+    readonly VITE_WORKSPACE_FLOW_ENABLE_CULLING?: string
   }
 
   interface Window {

@@ -64,6 +64,67 @@ graph LR
 | API 可执行文件 | `apps/api/ideaboard-server` |
 | Auth 入口文件 | `apps/auth/dist/index.js` |
 
+### Cloudflare Pages + Cloudflare Tunnel + VPS 拓扑
+
+推荐的混合部署方式：Cloudflare Pages 托管前端，Cloudflare Tunnel 暴露后端 API 域名，VPS 只在本机运行后端、认证服务、MySQL 与 Redis。
+
+```mermaid
+graph LR
+    Internet((互联网)) --> Pages["Cloudflare Pages"]
+    Pages --> Web["apps/web/dist"]
+    Internet --> ApiDomain["api.example.com"]
+    ApiDomain --> Tunnel["Cloudflare Tunnel"]
+    Tunnel --> Nginx["VPS Nginx (:80 local)"]
+    Nginx -- "/api/auth" --> Auth["ideaboard-auth (:6001)"]
+    Nginx -- "/api /uploads" --> Server["ideaboard-server (:6000)"]
+    Auth --> MySQL[("MySQL")]
+    Server --> MySQL
+    Server --> Redis[("Redis")]
+```
+
+Pages 项目建议配置：
+
+| 项目 | 值 |
+|------|----|
+| Root directory | `apps/web` |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Environment variable | `NODE_VERSION=20` |
+| Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
+| Environment variable | `VITE_AUTH_BASE_URL=https://api.example.com` |
+
+前端默认从 `VITE_API_BASE_URL` 派生 `/uploads/*` 的访问域名；如需独立素材域名，可额外设置 `VITE_PUBLIC_ASSET_BASE_URL=https://assets.example.com`。
+
+VPS 侧仍按本文后续步骤部署 API、Auth、MySQL、Redis 与 Nginx，但不再依赖 VPS Nginx 托管 `apps/web/dist`。后端生产环境至少同步：
+
+```bash
+# /opt/ideaboard/apps/api/.env
+APP_ENV=production
+APP_HOST=127.0.0.1
+APP_CORS_ALLOWED_ORIGINS=https://你的前端域名
+APP_PUBLIC_BASE_URL=https://你的前端域名
+APP_PUBLIC_ASSET_BASE_URL=https://api.example.com
+AUTH_SERVICE_BASE_URL=http://127.0.0.1:6001
+
+# /opt/ideaboard/apps/auth/.env
+AUTH_TRUSTED_ORIGINS=https://你的前端域名
+BETTER_AUTH_URL=https://api.example.com
+```
+
+Cloudflare Tunnel ingress 示例：
+
+```yaml
+tunnel: ideaboard
+credentials-file: /etc/cloudflared/ideaboard.json
+
+ingress:
+  - hostname: api.example.com
+    service: http://127.0.0.1:80
+  - service: http_status:404
+```
+
+VPS 防火墙建议只开放 SSH；API 域名通过 Tunnel 到达本机 Nginx，无需把 `6000/6001/MySQL/Redis` 暴露到公网。
+
 <a id="release-artifact"></a>
 
 ## 发布产物
@@ -236,7 +297,9 @@ nano /opt/ideaboard/apps/api/.env
 - `APP_ENV=production`（生产环境必须显式设置）
 - `APP_PORT=6000`
 - `APP_HOST=127.0.0.1`（建议反向代理场景启用）
-- `APP_CORS_ALLOWED_ORIGINS`（如需跨源直连 API，填写正式浏览器源；生产经 Nginx 同源访问可留空）
+- `APP_CORS_ALLOWED_ORIGINS`（Pages + API 独立域名时填写正式前端源，例如 `https://app.example.com`）
+- `APP_PUBLIC_BASE_URL`（正式前端地址，用于生成分享链接，例如 `https://app.example.com`）
+- `APP_PUBLIC_ASSET_BASE_URL`（正式素材/API 地址，用于 `/uploads/*` 与上游模型可访问图片，例如 `https://api.example.com`）
 - `AUTH_SERVICE_BASE_URL=http://127.0.0.1:6001`
 - `AUTH_SERVICE_INTERNAL_KEY`（必须与认证服务的 `AUTH_INTERNAL_KEY` 完全一致，且不能使用 `replace-with-*` 占位值）
 
@@ -269,9 +332,9 @@ npm prune --omit=dev
 - `AUTH_HOST=127.0.0.1`
 - `AUTH_PORT=6001`
 - `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的 `AUTH_SERVICE_INTERNAL_KEY` 一致，且不能使用 `replace-with-*` 占位值
-- `AUTH_TRUSTED_ORIGINS` 包含你的正式访问源，例如 `https://example.com`
+- `AUTH_TRUSTED_ORIGINS` 包含你的正式前端访问源，例如 `https://app.example.com`
 - `BETTER_AUTH_SECRET` 至少 32 字符高熵随机值，例如 `openssl rand -base64 32`；不能使用 `replace-with-*` 或本地开发 fallback
-- `BETTER_AUTH_URL` 设置为正式访问地址，例如 `https://example.com`
+- `BETTER_AUTH_URL` 设置为 Auth 对外访问地址；Pages + Tunnel 部署时通常是 `https://api.example.com`
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
 
 > [!IMPORTANT]

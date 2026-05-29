@@ -15,7 +15,7 @@ import (
 )
 
 func resolvePublicAssetBaseURL() *url.URL {
-	for _, key := range []string{"APP_PUBLIC_BASE_URL", "APP_BASE_URL", "PUBLIC_BASE_URL"} {
+	for _, key := range []string{"APP_PUBLIC_ASSET_BASE_URL", "APP_ASSET_BASE_URL", "PUBLIC_ASSET_BASE_URL", "APP_PUBLIC_BASE_URL", "APP_BASE_URL", "PUBLIC_BASE_URL"} {
 		raw := strings.TrimSpace(os.Getenv(key))
 		if raw == "" {
 			continue
