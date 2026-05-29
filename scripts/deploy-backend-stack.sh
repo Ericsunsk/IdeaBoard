@@ -185,6 +185,20 @@ case "$command" in
     docker_compose up -d
     docker_compose ps
     ;;
+  restart)
+    docker_compose restart
+    docker_compose ps
+    ;;
+  stop)
+    docker_compose stop
+    ;;
+  status)
+    docker_compose ps
+    ;;
+  logs)
+    shift || true
+    docker_compose logs -f "$@"
+    ;;
   pull)
     login_ghcr_if_configured
     docker_compose pull
@@ -200,9 +214,9 @@ case "$command" in
     ;;
   *)
     cat >&2 <<EOF
-Usage: $0 [deploy|init-env|pull|up|migrate|ps]
+Usage: ideaboard [update|restart|stop|status|logs|init-env|pull|up|migrate|ps]
 
-Default command: deploy
+Default command: update
 Environment file: $ENV_FILE
 EOF
     exit 1

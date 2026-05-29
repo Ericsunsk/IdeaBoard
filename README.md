@@ -330,6 +330,15 @@ curl -fsSL https://raw.githubusercontent.com/Ericsunsk/IdeaBoard/main/scripts/bo
 ideaboard update
 ```
 
+常用运维：
+
+```bash
+ideaboard restart
+ideaboard stop
+ideaboard status
+ideaboard logs
+```
+
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
 ### Cloudflare Pages + Tunnel + VPS
