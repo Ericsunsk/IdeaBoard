@@ -15,6 +15,21 @@ services:
     networks:
       - ideaboard-network
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ideaboard-cloudflared
+    restart: unless-stopped
+    depends_on:
+      - gateway
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - ideaboard-network
+
   api:
     image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:?Set IMAGE_NAMESPACE in docker/.env}/ideaboard-api:${IMAGE_TAG:-latest}
     container_name: ideaboard-api

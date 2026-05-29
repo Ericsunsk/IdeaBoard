@@ -3,7 +3,7 @@
 `docker/` 目录同时包含本地开发依赖和生产 Docker Compose stack：
 
 - `docker-compose.yml`：本地开发用 `MySQL + Redis`
-- `compose.yml`：生产 VPS 用 `Gateway + API + Auth + MySQL + Redis`
+- `compose.yml`：生产 VPS 用 `Cloudflared + Gateway + API + Auth + MySQL + Redis`
 
 生产环境请优先使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的 GHCR + Docker Compose 部署方式。
 

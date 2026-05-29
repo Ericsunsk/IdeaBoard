@@ -130,6 +130,7 @@ validate_env_file() {
   for key in \
     APP_BASE_URL \
     API_BASE_URL \
+    CLOUDFLARE_TUNNEL_TOKEN \
     MYSQL_ROOT_PASSWORD \
     MYSQL_PASSWORD \
     AUTH_INTERNAL_KEY \

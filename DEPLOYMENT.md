@@ -41,7 +41,8 @@ graph LR
     Browser((浏览器)) --> Pages["Cloudflare Pages<br>app.example.com"]
     Browser --> ApiDomain["api.example.com"]
     ApiDomain --> Tunnel["Cloudflare Tunnel"]
-    Tunnel --> Gateway["VPS Gateway<br>127.0.0.1:8080"]
+    Tunnel --> Cloudflared["cloudflared<br>Docker container"]
+    Cloudflared --> Gateway["Gateway<br>http://gateway:80"]
     Gateway -- "/api/auth" --> Auth["ideaboard-auth<br>GHCR image"]
     Gateway -- "/api /uploads" --> API["ideaboard-api<br>GHCR image"]
     Auth --> MySQL[("MySQL volume")]
@@ -117,21 +118,17 @@ VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、MySQL、Re
 # /opt/stacks/ideaboard/docker/.env
 APP_BASE_URL=https://你的前端域名
 API_BASE_URL=https://api.example.com
+CLOUDFLARE_TUNNEL_TOKEN=Cloudflare Tunnel Docker token
 ```
 
-Cloudflare Tunnel ingress 示例：
+Cloudflare Tunnel 使用 Docker connector。Cloudflare Public Hostname 配置：
 
-```yaml
-tunnel: ideaboard
-credentials-file: /etc/cloudflared/ideaboard.json
-
-ingress:
-  - hostname: api.example.com
-    service: http://127.0.0.1:8080
-  - service: http_status:404
+```text
+Hostname: api.example.com
+Service: http://gateway:80
 ```
 
-VPS 防火墙建议只开放 SSH；API 域名通过 Tunnel 到达本机 Gateway，无需把 `6000/6001/MySQL/Redis` 暴露到公网。
+VPS 防火墙建议只开放 SSH；API 域名通过 compose 内的 `cloudflared` 到达 Gateway，无需把 `6000/6001/MySQL/Redis` 暴露到公网。
 
 <a id="recommended-docker"></a>
 
@@ -176,6 +173,7 @@ GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $G
 
 - `APP_BASE_URL`
 - `API_BASE_URL`
+- `CLOUDFLARE_TUNNEL_TOKEN`
 
 可选：
 
@@ -210,16 +208,11 @@ docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stack
 
 ### 5. Cloudflare Tunnel
 
-Tunnel ingress 指向 VPS 本机 Gateway：
+Cloudflare Public Hostname 指向 compose 内部 Gateway：
 
-```yaml
-tunnel: ideaboard
-credentials-file: /etc/cloudflared/ideaboard.json
-
-ingress:
-  - hostname: api.example.com
-    service: http://127.0.0.1:8080
-  - service: http_status:404
+```text
+Hostname: api.example.com
+Service: http://gateway:80
 ```
 
 ### 6. 验证
