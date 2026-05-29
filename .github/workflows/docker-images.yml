@@ -93,7 +93,7 @@ jobs:
         with:
           context: ./apps/api
           file: ./apps/api/Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.api-meta.outputs.tags }}
           labels: ${{ steps.api-meta.outputs.labels }}
@@ -117,7 +117,7 @@ jobs:
         with:
           context: ./apps/auth
           file: ./apps/auth/Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.auth-meta.outputs.tags }}
           labels: ${{ steps.auth-meta.outputs.labels }}
