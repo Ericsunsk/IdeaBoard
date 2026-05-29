@@ -111,12 +111,25 @@ export const useUserStore = defineStore('user', () => {
     return user.value
   }
 
+  async function hasAuthSession() {
+    try {
+      const result = await authClient.getSession()
+      return Boolean(result?.data?.session)
+    } catch {
+      return false
+    }
+  }
+
   async function ensureSession(options: { fresh?: boolean } = {}) {
     const cacheValid =
       userInfoLoaded.value &&
       !options.fresh &&
       Date.now() - sessionValidatedAt.value < SESSION_CACHE_TTL_MS
     if (cacheValid) return user.value
+    if (!(await hasAuthSession())) {
+      resetAuth()
+      return null
+    }
     return await fetchUserInfo(true)
   }
 
