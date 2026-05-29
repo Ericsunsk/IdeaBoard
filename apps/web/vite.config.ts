@@ -38,6 +38,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('/node_modules/vue-router/')) {
+            return 'vue-router'
+          }
           if (id.includes('/node_modules/@vue-flow/core/')) {
             return 'vue-flow'
           }
