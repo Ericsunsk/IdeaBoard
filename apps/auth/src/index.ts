@@ -40,12 +40,14 @@ const DEFAULT_AUTH_GUARD_SETTINGS: AuthGuardSettings = {
   windowSeconds: 60,
   maxRequests: 30,
 }
+const allowedAuthOrigins = new Set(env.auth.trustedOrigins.map(normalizeCORSOrigin).filter(Boolean))
 let authGuardSettingsCache: AuthGuardSettingsCache | null = null
 
 app.get('/api/health', (_req, res) => {
   sendSuccess(res, { status: 'ok' })
 })
 
+app.use('/api/auth', authCORSMiddleware)
 app.use('/api/auth', (req, res, next) => {
   authEntryGuardMiddleware(req, res, next).catch(next)
 })
@@ -248,6 +250,52 @@ function gracefulShutdown(signal: string) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+
+function authCORSMiddleware(req: Request, res: Response, next: NextFunction) {
+  const origin = String(req.header('origin') || '').trim()
+  if (!origin) {
+    next()
+    return
+  }
+
+  const isAllowed = allowedAuthOrigins.has(normalizeCORSOrigin(origin))
+  if (!isAllowed) {
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(403)
+      return
+    }
+    next()
+    return
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', origin)
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    req.header('access-control-request-headers') || 'Content-Type, Authorization, Cookie, X-Requested-With',
+  )
+  res.vary('Origin')
+
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204)
+    return
+  }
+  next()
+}
+
+function normalizeCORSOrigin(raw: string): string {
+  try {
+    const parsed = new URL(raw.trim())
+    const protocol = parsed.protocol.toLowerCase()
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      return ''
+    }
+    return `${protocol}//${parsed.host.toLowerCase()}`
+  } catch {
+    return ''
+  }
+}
 
 async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
   const nowMs = Date.now()
