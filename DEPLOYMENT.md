@@ -180,13 +180,16 @@ curl -fsSL https://raw.githubusercontent.com/Ericsunsk/IdeaBoard/main/scripts/bo
 
 至少修改：
 
-- `IMAGE_NAMESPACE`
-- `IMAGE_TAG`
 - `APP_PUBLIC_BASE_URL`
 - `APP_PUBLIC_ASSET_BASE_URL`
 - `APP_CORS_ALLOWED_ORIGINS`
 - `AUTH_TRUSTED_ORIGINS`
 - `BETTER_AUTH_URL`
+
+可选：
+
+- `IMAGE_NAMESPACE`（通常自动推断）
+- `IMAGE_TAG`（默认 `latest`）
 
 ### 3. 后续部署 / 升级
 

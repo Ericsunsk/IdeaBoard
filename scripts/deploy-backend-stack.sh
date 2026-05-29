@@ -123,7 +123,6 @@ validate_env_file() {
   local key
 
   for key in \
-    IMAGE_NAMESPACE \
     APP_PUBLIC_BASE_URL \
     APP_PUBLIC_ASSET_BASE_URL \
     APP_CORS_ALLOWED_ORIGINS \
@@ -144,6 +143,20 @@ validate_env_file() {
     return 1
   fi
   return 0
+}
+
+ensure_image_namespace_for_deploy() {
+  local namespace
+  namespace="$(env_value IMAGE_NAMESPACE)"
+  if [[ "$namespace" == "your-github-owner/your-repo" || -z "$namespace" ]]; then
+    namespace="$(infer_image_namespace)"
+    if [[ -n "$namespace" ]]; then
+      set_env_value IMAGE_NAMESPACE "$namespace"
+      echo "Inferred IMAGE_NAMESPACE=$namespace"
+      return
+    fi
+    die "cannot infer IMAGE_NAMESPACE. Set IMAGE_NAMESPACE in $ENV_FILE"
+  fi
 }
 
 docker_compose() {
@@ -174,6 +187,7 @@ if [[ "$command" == "init-env" ]]; then
 fi
 
 validate_env_file || exit 1
+ensure_image_namespace_for_deploy
 IMAGE_NAMESPACE="$(env_value IMAGE_NAMESPACE)"
 
 case "$command" in
