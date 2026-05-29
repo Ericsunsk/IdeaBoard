@@ -69,7 +69,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 | 维度 | 当前配置 |
 |------|----------|
 | 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
-| 运行方式 | 本地开发、标准 Linux 部署（Nginx + systemd + 双服务） |
+| 运行方式 | 本地开发、Cloudflare Pages + VPS Docker Compose、标准 Linux 部署 |
 | 核心界面 | 用户画布工作台、画板管理、管理后台 |
 
 ### 系统架构
@@ -98,7 +98,7 @@ flowchart TB
     style Storage fill:#f5f5f5,stroke:#616161,stroke-width:1px
 ```
 
-生产环境由 Nginx 统一转发 `/api/auth/*`、`/api/*` 与 `/uploads/*`，Go API 与 Better Auth Node Service 双服务拓扑运行。
+生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth、MySQL 与 Redis，并由 Cloudflare Tunnel 暴露 API 域名。
 
 <a id="highlights"></a>
 ## 核心亮点
@@ -182,7 +182,7 @@ flowchart TB
 
 | 组件 | 版本 |
 |------|------|
-| Node.js | `20+` |
+| Node.js | `22.18+` |
 | Go | `1.25+` |
 | MySQL | `8.0+` |
 | Redis | `8.6+` |
@@ -308,7 +308,7 @@ IdeaBoard/
 │   └── api/                  # Go API、任务、Worker、服务逻辑
 │       └── internal/         # 领域包（accounts、channels、users、workflow 等）
 ├── docs/                     # 架构约束与补充文档
-├── docker/                   # 本地 MySQL / Redis 依赖
+├── docker/                   # 本地依赖与生产 Docker Compose
 ├── scripts/                  # 打包与部署脚本
 └── *.md                      # README、DEVELOPMENT、DEPLOYMENT、CHANGELOG
 ```
@@ -316,17 +316,16 @@ IdeaBoard/
 <a id="deployment"></a>
 ## 部署说明
 
-### 标准 Linux 部署
+### 推荐部署：Cloudflare Pages + GHCR + Docker Compose
 
-适用于 `systemd + Nginx` 的常规服务器环境。
+适用于前端部署到 Cloudflare Pages，后端 stack 在 VPS 通过 Docker Compose 运行，并从 GHCR 拉取 CI 构建好的镜像。
 
 ```bash
-./scripts/package-deploy.sh
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
 ```
 
 详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
-
-运行拓扑见上方"系统架构"图。
 
 ### Cloudflare Pages + Tunnel + VPS
 
@@ -345,11 +344,19 @@ Pages 配置：
 | Root directory | `apps/web` |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Environment variable | `NODE_VERSION=20` |
+| Environment variable | `NODE_VERSION=22.18.0` |
 | Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
 | Environment variable | `VITE_AUTH_BASE_URL=https://api.example.com` |
 
-VPS 侧设置 `APP_PUBLIC_BASE_URL=https://app.example.com` 与 `APP_PUBLIC_ASSET_BASE_URL=https://api.example.com`；Cloudflare Tunnel 将 `api.example.com` 转发到 VPS 本机 Nginx。
+VPS 侧设置 `APP_PUBLIC_BASE_URL=https://app.example.com` 与 `APP_PUBLIC_ASSET_BASE_URL=https://api.example.com`；Cloudflare Tunnel 将 `api.example.com` 转发到 VPS 本机 Gateway，例如 `http://127.0.0.1:8080`。
+
+### 传统 Linux 部署
+
+仍保留 `systemd + Nginx` 发布包方式，适合不使用 Docker 的服务器环境。
+
+```bash
+./scripts/package-deploy.sh
+```
 
 > [!NOTE]
 > Cloudflare 官方 `Deploy to Cloudflare` 一键按钮目前面向 Workers 应用；本项目此形态使用 Pages 托管 Vue 前端，因此 README 按钮跳转到 Pages 创建入口。
@@ -361,10 +368,10 @@ VPS 侧设置 `APP_PUBLIC_BASE_URL=https://app.example.com` 与 `APP_PUBLIC_ASSE
 |------|------|
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 架构、contract、本地开发与目录边界 |
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) | Feature System Prompt 配置手册与推荐模板 |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | 标准 Linux 部署、升级与回滚 |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Cloudflare + Docker Compose、传统 Linux 部署、升级与回滚 |
 | [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md) | Auth 运维边界与应急流程 |
 | [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 目录边界与命名约束 |
-| [docker/README.md](./docker/README.md) | 本地依赖说明 |
+| [docker/README.md](./docker/README.md) | Docker 本地依赖与生产 stack 说明 |
 | [CHANGELOG.md](./CHANGELOG.md) | 发布记录 |
 
 ## 验证建议

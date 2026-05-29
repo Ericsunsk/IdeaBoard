@@ -1,6 +1,11 @@
 # IdeaBoard 本地依赖手册
 
-`docker/` 目录用于本地开发时快速启动 `MySQL + Redis`。生产环境请使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的部署方式。
+`docker/` 目录同时包含本地开发依赖和生产 Docker Compose stack：
+
+- `docker-compose.yml`：本地开发用 `MySQL + Redis`
+- `compose.prod.yml`：生产 VPS 用 `Gateway + API + Auth + MySQL + Redis`
+
+生产环境请优先使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的 GHCR + Docker Compose 部署方式。
 
 
 ## 快速启动
@@ -102,6 +107,27 @@ docker compose restart
 
 > [!CAUTION]
 > `docker compose down -v` 会删除容器和数据卷，清空本地开发数据。仅在明确要重置环境时使用。
+
+
+## 生产 Stack
+
+生产配置文件：
+
+```text
+docker/compose.prod.yml
+docker/.env.production.example
+docker/nginx/ideaboard.prod.conf
+```
+
+基础命令：
+
+```bash
+cp docker/.env.production.example docker/.env.production
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
+```
+
+生产数据在 Docker volumes 中持久化：`mysql-data`、`redis-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
 
 
 ## 常见问题

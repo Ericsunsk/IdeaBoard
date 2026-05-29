@@ -41,6 +41,7 @@ Thumbs.db
 !apps/api/.env.example
 !apps/auth/.env.example
 !apps/web/.env.example
+!docker/.env.production.example
 
 # ===== Release Artifacts =====
 release/

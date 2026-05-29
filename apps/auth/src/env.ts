@@ -71,6 +71,7 @@ export const env = {
   auth: {
     port: getEnvInt('AUTH_PORT', 6001),
     host: getEnv('AUTH_HOST', '127.0.0.1'),
+    trustProxy: getEnv('AUTH_TRUST_PROXY', 'loopback'),
     internalKey: authInternalKey,
     secret: authSecret,
     baseURL: authBaseURL,

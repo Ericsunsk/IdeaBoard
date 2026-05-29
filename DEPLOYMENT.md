@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  目标运行形态：<code>Nginx + systemd + MySQL + Redis + Better Auth</code>
+  目标运行形态：<code>Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel</code>
 </p>
 
 <p align="center">
@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="#deployment-profile">部署概览</a> ·
+  <a href="#recommended-docker">推荐 Docker 部署</a> ·
   <a href="#release-artifact">发布产物</a> ·
   <a href="#install-flow">安装流程</a> ·
   <a href="#runtime-config">运行配置</a> ·
@@ -31,9 +32,24 @@
 <a id="deployment-profile"></a>
 ## 部署概览
 
-本文档适用于 `Linux amd64` 服务器，以 `Nginx + systemd + MySQL + Redis + Better Auth Node Service` 为基础运行方式。
+本文档适用于 `Linux amd64` 服务器。当前优先推荐 `Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel`，保留 `Nginx + systemd + MySQL + Redis + Better Auth Node Service` 作为传统部署方式。
 
-### 目标拓扑
+### 推荐拓扑
+
+```mermaid
+graph LR
+    Browser((浏览器)) --> Pages["Cloudflare Pages<br>app.example.com"]
+    Browser --> ApiDomain["api.example.com"]
+    ApiDomain --> Tunnel["Cloudflare Tunnel"]
+    Tunnel --> Gateway["VPS Gateway<br>127.0.0.1:8080"]
+    Gateway -- "/api/auth" --> Auth["ideaboard-auth<br>GHCR image"]
+    Gateway -- "/api /uploads" --> API["ideaboard-api<br>GHCR image"]
+    Auth --> MySQL[("MySQL volume")]
+    API --> MySQL
+    API --> Redis[("Redis volume")]
+```
+
+### 传统拓扑
 
 ```mermaid
 graph LR
@@ -51,7 +67,7 @@ graph LR
 
 
 
-### 当前约定
+### 传统发布包约定
 
 | 项目 | 当前约定 |
 |------|----------|
@@ -89,13 +105,13 @@ Pages 项目建议配置：
 | Root directory | `apps/web` |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Environment variable | `NODE_VERSION=20` |
+| Environment variable | `NODE_VERSION=22.18.0` |
 | Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
 | Environment variable | `VITE_AUTH_BASE_URL=https://api.example.com` |
 
 前端默认从 `VITE_API_BASE_URL` 派生 `/uploads/*` 的访问域名；如需独立素材域名，可额外设置 `VITE_PUBLIC_ASSET_BASE_URL=https://assets.example.com`。
 
-VPS 侧仍按本文后续步骤部署 API、Auth、MySQL、Redis 与 Nginx，但不再依赖 VPS Nginx 托管 `apps/web/dist`。后端生产环境至少同步：
+VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、MySQL、Redis 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。后端生产环境至少同步：
 
 ```bash
 # /opt/ideaboard/apps/api/.env
@@ -119,11 +135,147 @@ credentials-file: /etc/cloudflared/ideaboard.json
 
 ingress:
   - hostname: api.example.com
-    service: http://127.0.0.1:80
+    service: http://127.0.0.1:8080
   - service: http_status:404
 ```
 
-VPS 防火墙建议只开放 SSH；API 域名通过 Tunnel 到达本机 Nginx，无需把 `6000/6001/MySQL/Redis` 暴露到公网。
+VPS 防火墙建议只开放 SSH；API 域名通过 Tunnel 到达本机 Gateway，无需把 `6000/6001/MySQL/Redis` 暴露到公网。
+
+<a id="recommended-docker"></a>
+
+## 推荐 Docker 部署
+
+推荐方式是 CI 构建镜像并推送到 GHCR，VPS 只拉取镜像和启动容器：
+
+```text
+GitHub Actions
+  -> ghcr.io/<owner>/<repo>/ideaboard-api:<tag>
+  -> ghcr.io/<owner>/<repo>/ideaboard-auth:<tag>
+
+VPS
+  -> docker compose pull
+  -> docker compose up -d
+```
+
+### 1. 构建并发布镜像
+
+仓库已内置 [docker-images.yml](./.github/workflows/docker-images.yml)。触发方式：
+
+- push 到 `main` / `master`
+- push `v*` tag
+- 在 GitHub Actions 手动运行 workflow，并可填写额外 `image_tag`
+
+镜像命名约定：
+
+```text
+ghcr.io/<github-owner>/<github-repo>/ideaboard-api:<tag>
+ghcr.io/<github-owner>/<github-repo>/ideaboard-auth:<tag>
+```
+
+如果 GHCR package 是 private，VPS 需要先登录 GHCR：
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u "你的 GitHub 用户名" --password-stdin
+```
+
+`GHCR_TOKEN` 至少需要 `read:packages` 权限；如果 package 设为 public，可以跳过登录。
+
+### 2. 准备 VPS 配置
+
+将仓库中的 `docker/` 目录放到 VPS，例如 `/opt/ideaboard/docker`，然后准备生产环境变量：
+
+```bash
+cd /opt/ideaboard
+cp docker/.env.production.example docker/.env.production
+nano docker/.env.production
+```
+
+至少修改：
+
+- `IMAGE_NAMESPACE`：小写 GitHub owner/repo，例如 `2837123/feng-ai`
+- `IMAGE_TAG`：建议使用明确版本 tag，例如 `v0.1.0`；也可先用 `latest`
+- `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD`
+- `AUTH_INTERNAL_KEY`
+- `AUTH_TRUST_PROXY`：Docker Compose 默认信任 Docker 私网 CIDR，通常无需修改
+- `BETTER_AUTH_SECRET`
+- `APP_PUBLIC_BASE_URL=https://app.example.com`
+- `APP_PUBLIC_ASSET_BASE_URL=https://api.example.com`
+- `APP_CORS_ALLOWED_ORIGINS=https://app.example.com`
+- `AUTH_TRUSTED_ORIGINS=https://app.example.com`
+- `BETTER_AUTH_URL=https://api.example.com`
+
+### 3. 首次启动
+
+先拉取镜像并启动数据库依赖：
+
+```bash
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d mysql redis
+```
+
+执行 Better Auth 数据库迁移：
+
+```bash
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production run --rm auth npm run migrate:dist
+```
+
+启动完整后端 stack：
+
+```bash
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
+```
+
+初始化管理员账号：
+
+```bash
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production run --rm \
+  -e INIT_ADMIN_PASSWORD='your-strong-password' \
+  api init-admin
+```
+
+### 4. Cloudflare Tunnel
+
+Tunnel ingress 指向 VPS 本机 Gateway：
+
+```yaml
+tunnel: ideaboard
+credentials-file: /etc/cloudflared/ideaboard.json
+
+ingress:
+  - hostname: api.example.com
+    service: http://127.0.0.1:8080
+  - service: http_status:404
+```
+
+### 5. 验证
+
+```bash
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production ps
+curl http://127.0.0.1:8080/api/health
+curl http://127.0.0.1:8080/api/auth/get-session
+```
+
+`/api/auth/get-session` 未登录时返回未认证是正常的；关键是 Gateway 能转发到 Auth Service，不应出现连接失败。
+
+### 6. 升级与回滚
+
+升级到新镜像：
+
+```bash
+nano docker/.env.production
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production run --rm auth npm run migrate:dist
+```
+
+回滚时把 `IMAGE_TAG` 改回上一版，再执行：
+
+```bash
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
+docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
+```
+
+数据保存在 Docker volumes：`mysql-data`、`redis-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
 
 <a id="release-artifact"></a>
 
@@ -177,7 +329,7 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 
 - 系统：`Linux amd64`
 - 端口：`80`
-- 软件：`nginx`、`mysql`、`redis-server`、`nodejs >= 20`、`npm`、`tar`
+- 软件：`nginx`、`mysql`、`redis-server`、`nodejs >= 22.18`、`npm`、`tar`
 - 可选依赖：`potrace`，用于转矢量能力
 
 Ubuntu / Debian 参考安装命令：
@@ -189,7 +341,7 @@ sudo apt install -y potrace
 ```
 
 > [!NOTE]
-> 如果发行版仓库里的 Node.js 版本低于 20，请通过 NodeSource、nvm 或你的标准运维镜像安装 Node.js 20+。
+> 如果发行版仓库里的 Node.js 版本低于 22.18，请通过 NodeSource、nvm 或你的标准运维镜像安装 Node.js 22.18+。
 
 <a id="install-flow"></a>
 

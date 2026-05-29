@@ -1,0 +1,16 @@
+.env
+.env.*
+*.log
+*.exe
+*.exe~
+ideaboard-server*
+bin/
+coverage.out
+debug
+debug.test
+test_upload.png
+uploads/*
+!uploads/.placeholder
+web/dist/*
+!web/dist/.placeholder
+.DS_Store
