@@ -115,14 +115,14 @@ docker compose restart
 
 ```text
 docker/compose.prod.yml
-docker/.env.production.example
+docker/.env.example
 docker/nginx/ideaboard.prod.conf
 ```
 
 基础命令：
 
 ```bash
-cp docker/.env.production.example docker/.env.production
+cp docker/.env.example docker/.env.production
 docker compose -f docker/compose.prod.yml --env-file docker/.env.production pull
 docker compose -f docker/compose.prod.yml --env-file docker/.env.production up -d
 ```

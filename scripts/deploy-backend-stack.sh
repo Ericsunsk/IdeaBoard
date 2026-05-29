@@ -30,7 +30,7 @@ find_stack_root() {
 ROOT_DIR="$(find_stack_root)"
 COMPOSE_FILE="$ROOT_DIR/docker/compose.prod.yml"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env.production}"
-ENV_EXAMPLE="$ROOT_DIR/docker/.env.production.example"
+ENV_EXAMPLE="$ROOT_DIR/docker/.env.example"
 
 command="${1:-deploy}"
 if [[ "$command" == "update" ]]; then
