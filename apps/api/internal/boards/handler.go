@@ -44,7 +44,7 @@ func (h *BoardHandler) ListBoards(c *gin.Context) {
 		response.Error(c, 401, "未登录")
 		return
 	}
-	list, err := h.service.ListBoards(userID)
+	list, err := h.service.ListBoards(c.Request.Context(), userID)
 	if err != nil {
 		response.InternalError(c, 500, "获取画布失败", err)
 		return
@@ -72,7 +72,7 @@ func (h *BoardHandler) UpsertBoard(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	board, err := h.service.UpsertBoard(userID, boardID, &req)
+	board, err := h.service.UpsertBoard(c.Request.Context(), userID, boardID, &req)
 	if err != nil {
 		if errors.Is(err, ErrInvalidBoardInput) {
 			response.Error(c, 400, "参数错误")
@@ -103,7 +103,7 @@ func (h *BoardHandler) DeleteBoard(c *gin.Context) {
 		response.Error(c, 400, "缺少画布ID")
 		return
 	}
-	if err := h.service.DeleteBoard(userID, boardID); err != nil {
+	if err := h.service.DeleteBoard(c.Request.Context(), userID, boardID); err != nil {
 		if errors.Is(err, ErrInvalidBoardInput) {
 			response.Error(c, 400, "参数错误")
 			return
@@ -133,7 +133,7 @@ func (h *BoardHandler) ListMembers(c *gin.Context) {
 		response.Error(c, 401, "未登录")
 		return
 	}
-	members, err := h.service.ListMembers(userID, boardID)
+	members, err := h.service.ListMembers(c.Request.Context(), userID, boardID)
 	if err != nil {
 		h.respondBoardMemberError(c, err, "获取成员列表失败")
 		return
@@ -153,7 +153,7 @@ func (h *BoardHandler) InviteMember(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	member, err := h.service.InviteMember(userID, boardID, req.MemberUID, req.Role)
+	member, err := h.service.InviteMember(c.Request.Context(), userID, boardID, req.MemberUID, req.Role)
 	if err != nil {
 		h.respondBoardMemberError(c, err, "邀请成员失败")
 		return
@@ -178,7 +178,7 @@ func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	member, err := h.service.UpdateMemberRole(userID, boardID, memberUID, req.Role)
+	member, err := h.service.UpdateMemberRole(c.Request.Context(), userID, boardID, memberUID, req.Role)
 	if err != nil {
 		h.respondBoardMemberError(c, err, "更新成员角色失败")
 		return
@@ -198,7 +198,7 @@ func (h *BoardHandler) RemoveMember(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	if err := h.service.RemoveMember(userID, boardID, memberUID); err != nil {
+	if err := h.service.RemoveMember(c.Request.Context(), userID, boardID, memberUID); err != nil {
 		h.respondBoardMemberError(c, err, "移除成员失败")
 		return
 	}
@@ -217,7 +217,7 @@ func (h *BoardHandler) CreateShareToken(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	shareToken, err := h.service.CreateShareToken(userID, boardID, req.Role, req.ExpiresAt)
+	shareToken, err := h.service.CreateShareToken(c.Request.Context(), userID, boardID, req.Role, req.ExpiresAt)
 	if err != nil {
 		h.respondShareTokenError(c, err, "创建分享链接失败")
 		return
@@ -235,7 +235,7 @@ func (h *BoardHandler) ListShareTokens(c *gin.Context) {
 		response.Error(c, 401, "未登录")
 		return
 	}
-	list, err := h.service.ListShareTokens(userID, boardID)
+	list, err := h.service.ListShareTokens(c.Request.Context(), userID, boardID)
 	if err != nil {
 		h.respondShareTokenError(c, err, "获取分享链接失败")
 		return
@@ -260,7 +260,7 @@ func (h *BoardHandler) RevokeShareToken(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	if err := h.service.RevokeShareToken(userID, boardID, token); err != nil {
+	if err := h.service.RevokeShareToken(c.Request.Context(), userID, boardID, token); err != nil {
 		h.respondShareTokenError(c, err, "撤销分享链接失败")
 		return
 	}
@@ -278,7 +278,7 @@ func (h *BoardHandler) JoinByShareToken(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	board, err := h.service.JoinBoardByShareToken(userID, req.Token)
+	board, err := h.service.JoinBoardByShareToken(c.Request.Context(), userID, req.Token)
 	if err != nil {
 		h.respondShareTokenError(c, err, "加入画布失败")
 		return

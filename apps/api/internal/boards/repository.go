@@ -1,6 +1,7 @@
 package boards
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -30,9 +31,9 @@ func NewBoardRepository(db *gorm.DB) *BoardRepository {
 	return &BoardRepository{db: db}
 }
 
-func (r *BoardRepository) ListAccessibleByUserID(userID uint64) ([]BoardWithRole, error) {
+func (r *BoardRepository) ListAccessibleByUserID(ctx context.Context, userID uint64) ([]BoardWithRole, error) {
 	var rows []boardWithRoleRow
-	err := r.db.Table("user_boards AS b").
+	err := r.db.WithContext(ctx).Table("user_boards AS b").
 		Select(
 			"b.id, b.board_id, b.user_id, b.name, b.state, b.created_at, b.updated_at, "+
 				"CASE WHEN b.user_id = ? THEN ? ELSE m.role END AS access_role",
@@ -61,9 +62,9 @@ func (r *BoardRepository) ListAccessibleByUserID(userID uint64) ([]BoardWithRole
 	return result, nil
 }
 
-func (r *BoardRepository) GetByBoardID(boardID string) (*UserBoard, error) {
+func (r *BoardRepository) GetByBoardID(ctx context.Context, boardID string) (*UserBoard, error) {
 	var board UserBoard
-	tx := r.db.Where("board_id = ?", boardID).Limit(1).Find(&board)
+	tx := r.db.WithContext(ctx).Where("board_id = ?", boardID).Limit(1).Find(&board)
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
@@ -73,8 +74,8 @@ func (r *BoardRepository) GetByBoardID(boardID string) (*UserBoard, error) {
 	return &board, nil
 }
 
-func (r *BoardRepository) Upsert(board *UserBoard) error {
-	return r.db.Clauses(clause.OnConflict{
+func (r *BoardRepository) Upsert(ctx context.Context, board *UserBoard) error {
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{
 			{Name: "board_id"},
 		},
@@ -86,8 +87,8 @@ func (r *BoardRepository) Upsert(board *UserBoard) error {
 	}).Create(board).Error
 }
 
-func (r *BoardRepository) HasNameConflict(userID uint64, boardID, name string) (bool, error) {
-	query := r.db.Model(&UserBoard{}).Where("user_id = ? AND LOWER(name) = LOWER(?)", userID, name)
+func (r *BoardRepository) HasNameConflict(ctx context.Context, userID uint64, boardID, name string) (bool, error) {
+	query := r.db.WithContext(ctx).Model(&UserBoard{}).Where("user_id = ? AND LOWER(name) = LOWER(?)", userID, name)
 	if strings.TrimSpace(boardID) != "" {
 		query = query.Where("board_id <> ?", boardID)
 	}
@@ -98,9 +99,9 @@ func (r *BoardRepository) HasNameConflict(userID uint64, boardID, name string) (
 	return count > 0, nil
 }
 
-func (r *BoardRepository) GetMemberRole(boardID string, userID uint64) (BoardAccessRole, error) {
+func (r *BoardRepository) GetMemberRole(ctx context.Context, boardID string, userID uint64) (BoardAccessRole, error) {
 	var member BoardMember
-	if err := r.db.Select("role").Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error; err != nil {
+	if err := r.db.WithContext(ctx).Select("role").Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error; err != nil {
 		return "", err
 	}
 	role := normalizeBoardAccessRole(member.Role)
@@ -110,21 +111,21 @@ func (r *BoardRepository) GetMemberRole(boardID string, userID uint64) (BoardAcc
 	return role, nil
 }
 
-func (r *BoardRepository) DeleteByBoardID(boardID string) error {
-	return r.db.Where("board_id = ?", boardID).Delete(&UserBoard{}).Error
+func (r *BoardRepository) DeleteByBoardID(ctx context.Context, boardID string) error {
+	return r.db.WithContext(ctx).Where("board_id = ?", boardID).Delete(&UserBoard{}).Error
 }
 
-func (r *BoardRepository) DeleteMembersByBoardID(boardID string) error {
-	return r.db.Where("board_id = ?", boardID).Delete(&BoardMember{}).Error
+func (r *BoardRepository) DeleteMembersByBoardID(ctx context.Context, boardID string) error {
+	return r.db.WithContext(ctx).Where("board_id = ?", boardID).Delete(&BoardMember{}).Error
 }
 
-func (r *BoardRepository) DeleteShareTokensByBoardID(boardID string) error {
-	return r.db.Where("board_id = ?", boardID).Delete(&BoardShareToken{}).Error
+func (r *BoardRepository) DeleteShareTokensByBoardID(ctx context.Context, boardID string) error {
+	return r.db.WithContext(ctx).Where("board_id = ?", boardID).Delete(&BoardShareToken{}).Error
 }
 
-func (r *BoardRepository) ListMembers(boardID string) ([]BoardMemberWithUser, error) {
+func (r *BoardRepository) ListMembers(ctx context.Context, boardID string) ([]BoardMemberWithUser, error) {
 	var rows []boardMemberWithUserRow
-	err := r.db.Table("board_members AS m").
+	err := r.db.WithContext(ctx).Table("board_members AS m").
 		Select("m.user_id, u.storage_uid AS member_uid, u.username, m.role").
 		Joins("INNER JOIN users AS u ON u.id = m.user_id").
 		Where("m.board_id = ?", boardID).
@@ -149,8 +150,8 @@ func (r *BoardRepository) ListMembers(boardID string) ([]BoardMemberWithUser, er
 	return result, nil
 }
 
-func (r *BoardRepository) UpsertMember(boardID string, userID uint64, role BoardAccessRole) error {
-	return r.db.Clauses(clause.OnConflict{
+func (r *BoardRepository) UpsertMember(ctx context.Context, boardID string, userID uint64, role BoardAccessRole) error {
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{
 			{Name: "board_id"},
 			{Name: "user_id"},
@@ -166,47 +167,47 @@ func (r *BoardRepository) UpsertMember(boardID string, userID uint64, role Board
 	}).Error
 }
 
-func (r *BoardRepository) DeleteMember(boardID string, userID uint64) error {
-	return r.db.Where("board_id = ? AND user_id = ?", boardID, userID).Delete(&BoardMember{}).Error
+func (r *BoardRepository) DeleteMember(ctx context.Context, boardID string, userID uint64) error {
+	return r.db.WithContext(ctx).Where("board_id = ? AND user_id = ?", boardID, userID).Delete(&BoardMember{}).Error
 }
 
-func (r *BoardRepository) GetMemberByUserID(boardID string, userID uint64) (*BoardMember, error) {
+func (r *BoardRepository) GetMemberByUserID(ctx context.Context, boardID string, userID uint64) (*BoardMember, error) {
 	var member BoardMember
-	if err := r.db.Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error; err != nil {
 		return nil, err
 	}
 	return &member, nil
 }
 
-func (r *BoardRepository) CreateShareToken(token *BoardShareToken) error {
-	return r.db.Create(token).Error
+func (r *BoardRepository) CreateShareToken(ctx context.Context, token *BoardShareToken) error {
+	return r.db.WithContext(ctx).Create(token).Error
 }
 
-func (r *BoardRepository) ListShareTokens(boardID string) ([]BoardShareToken, error) {
+func (r *BoardRepository) ListShareTokens(ctx context.Context, boardID string) ([]BoardShareToken, error) {
 	var list []BoardShareToken
-	if err := r.db.Where("board_id = ?", boardID).Order("created_at DESC").Find(&list).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("board_id = ?", boardID).Order("created_at DESC").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
 }
 
-func (r *BoardRepository) GetShareTokenByToken(token string) (*BoardShareToken, error) {
+func (r *BoardRepository) GetShareTokenByToken(ctx context.Context, token string) (*BoardShareToken, error) {
 	var shareToken BoardShareToken
-	if err := r.db.Where("token = ?", token).First(&shareToken).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("token = ?", token).First(&shareToken).Error; err != nil {
 		return nil, err
 	}
 	return &shareToken, nil
 }
 
-func (r *BoardRepository) RevokeShareToken(boardID, token string) error {
-	return r.db.Model(&BoardShareToken{}).
+func (r *BoardRepository) RevokeShareToken(ctx context.Context, boardID, token string) error {
+	return r.db.WithContext(ctx).Model(&BoardShareToken{}).
 		Where("board_id = ? AND token = ?", boardID, token).
 		Update("revoked", true).Error
 }
 
-func (r *BoardRepository) ShareTokenExists(token string) (bool, error) {
+func (r *BoardRepository) ShareTokenExists(ctx context.Context, token string) (bool, error) {
 	var count int64
-	if err := r.db.Model(&BoardShareToken{}).Where("token = ?", token).Count(&count).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(&BoardShareToken{}).Where("token = ?", token).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil

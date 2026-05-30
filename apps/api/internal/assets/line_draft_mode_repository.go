@@ -1,7 +1,8 @@
 package assets
 
 import (
-	
+	"context"
+
 	"gorm.io/gorm"
 )
 
@@ -13,35 +14,35 @@ func NewLineDraftModeRepository(db *gorm.DB) *LineDraftModeRepository {
 	return &LineDraftModeRepository{db: db}
 }
 
-func (r *LineDraftModeRepository) Create(mode *LineDraftMode) error {
-	return r.db.Create(mode).Error
+func (r *LineDraftModeRepository) Create(ctx context.Context, mode *LineDraftMode) error {
+	return r.db.WithContext(ctx).Create(mode).Error
 }
 
-func (r *LineDraftModeRepository) GetByID(id uint64) (*LineDraftMode, error) {
+func (r *LineDraftModeRepository) GetByID(ctx context.Context, id uint64) (*LineDraftMode, error) {
 	var mode LineDraftMode
-	err := findByID(r.db, id, &mode)
+	err := findByID(r.db.WithContext(ctx), id, &mode)
 	if err != nil {
 		return nil, err
 	}
 	return &mode, nil
 }
 
-func (r *LineDraftModeRepository) List() ([]*LineDraftMode, error) {
+func (r *LineDraftModeRepository) List(ctx context.Context) ([]*LineDraftMode, error) {
 	var modes []*LineDraftMode
-	err := listAllOrdered(r.db, &modes)
+	err := listAllOrdered(r.db.WithContext(ctx), &modes)
 	return modes, err
 }
 
-func (r *LineDraftModeRepository) ListEnabled() ([]*LineDraftMode, error) {
+func (r *LineDraftModeRepository) ListEnabled(ctx context.Context) ([]*LineDraftMode, error) {
 	var modes []*LineDraftMode
-	err := listEnabledOrdered(r.db, &modes)
+	err := listEnabledOrdered(r.db.WithContext(ctx), &modes)
 	return modes, err
 }
 
-func (r *LineDraftModeRepository) Update(mode *LineDraftMode) error {
-	return r.db.Save(mode).Error
+func (r *LineDraftModeRepository) Update(ctx context.Context, mode *LineDraftMode) error {
+	return r.db.WithContext(ctx).Save(mode).Error
 }
 
-func (r *LineDraftModeRepository) Delete(id uint64) error {
-	return deleteByID[LineDraftMode](r.db, id)
+func (r *LineDraftModeRepository) Delete(ctx context.Context, id uint64) error {
+	return deleteByID[LineDraftMode](r.db.WithContext(ctx), id)
 }

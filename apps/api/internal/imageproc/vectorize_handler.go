@@ -64,6 +64,7 @@ func NewVectorizeHandler(taskRepo *accounts.TaskRepository, storageService *stor
 
 // Vectorize 执行位图转矢量图（用户端调用）
 func (h *VectorizeHandler) Vectorize(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint64("user_id")
 	if userID == 0 {
 		response.Error(c, 401, "未登录")
@@ -197,7 +198,7 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 	}
 
 	// 持久化 SVG 文件
-	persistedURL, err := h.persistSVG(svgData)
+	persistedURL, err := h.persistSVG(ctx, svgData)
 	if err != nil {
 		log.Printf("[Vectorize] persist svg failed: err=%v", err)
 		response.Error(c, 500, "保存SVG失败")
@@ -228,7 +229,7 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 		Result:      string(resultJSON),
 		CompletedAt: &now,
 	}
-	if err := h.taskRepo.Create(task); err != nil {
+	if err := h.taskRepo.Create(ctx, task); err != nil {
 		// 不影响返回结果
 	}
 
@@ -414,12 +415,12 @@ func mergeSVGLayers(layerPaths []string, outputPath string, w, h, colorCount int
 }
 
 // persistSVG 将 SVG 数据保存到存储
-func (h *VectorizeHandler) persistSVG(svgData []byte) (string, error) {
+func (h *VectorizeHandler) persistSVG(ctx context.Context, svgData []byte) (string, error) {
 	if h.storageService == nil {
 		return "", fmt.Errorf("存储服务不可用")
 	}
 
-	return h.storageService.StoreBytes("vector.svg", svgData, storage.StorageStoreOptions{
+	return h.storageService.StoreBytes(ctx, "vector.svg", svgData, storage.StorageStoreOptions{
 		DirPrefix: "vector",
 	})
 }

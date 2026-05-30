@@ -35,7 +35,7 @@ func NewAdminHandler(userService *UserService, configRepo *settings.SystemConfig
 
 // GetRegistrationSetting 获取注册开关状态
 func (h *AdminHandler) GetRegistrationSetting(c *gin.Context) {
-	val, err := h.configRepo.Get("auth_registration_enabled")
+	val, err := h.configRepo.Get(c.Request.Context(), "auth_registration_enabled")
 	if err != nil {
 		response.Success(c, gin.H{"enabled": false})
 		return
@@ -58,7 +58,7 @@ func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
 		val = "true"
 	}
 
-	if err := h.configRepo.Set("auth_registration_enabled", val); err != nil {
+	if err := h.configRepo.Set(c.Request.Context(), "auth_registration_enabled", val); err != nil {
 		response.InternalError(c, 500, "保存设置失败", err)
 		return
 	}
@@ -68,8 +68,8 @@ func (h *AdminHandler) UpdateRegistrationSetting(c *gin.Context) {
 
 // GetRateLimitSettings 获取频率限制设置
 func (h *AdminHandler) GetRateLimitSettings(c *gin.Context) {
-	windowStr, err1 := h.configRepo.Get("auth_rate_limit_window")
-	maxReqStr, err2 := h.configRepo.Get("auth_rate_limit_max_requests")
+	windowStr, err1 := h.configRepo.Get(c.Request.Context(), "auth_rate_limit_window")
+	maxReqStr, err2 := h.configRepo.Get(c.Request.Context(), "auth_rate_limit_max_requests")
 
 	window := 60
 	maxReq := 30
@@ -111,11 +111,11 @@ func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
 		return
 	}
 
-	if err := h.configRepo.Set("auth_rate_limit_window", strconv.Itoa(req.WindowSeconds)); err != nil {
+	if err := h.configRepo.Set(c.Request.Context(), "auth_rate_limit_window", strconv.Itoa(req.WindowSeconds)); err != nil {
 		response.InternalError(c, 500, "保存设置失败", err)
 		return
 	}
-	if err := h.configRepo.Set("auth_rate_limit_max_requests", strconv.Itoa(req.MaxRequests)); err != nil {
+	if err := h.configRepo.Set(c.Request.Context(), "auth_rate_limit_max_requests", strconv.Itoa(req.MaxRequests)); err != nil {
 		response.InternalError(c, 500, "保存设置失败", err)
 		return
 	}
@@ -131,7 +131,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
-	result, err := h.userService.ListUsers(&req)
+	result, err := h.userService.ListUsers(c.Request.Context(), &req)
 	if err != nil {
 		response.InternalError(c, 500, "获取用户列表失败", err)
 		return
@@ -161,7 +161,7 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.UpdateStatus(targetUser.ID, *req.Status); err != nil {
+	if err := h.userService.UpdateStatus(c.Request.Context(), targetUser.ID, *req.Status); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -219,7 +219,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 			response.InternalError(c, 502, "同步 Auth 管理员角色失败", err)
 			return
 		}
-		if err := h.userService.UpdateRole(targetUser.ID, nextRole); err != nil {
+		if err := h.userService.UpdateRole(c.Request.Context(), targetUser.ID, nextRole); err != nil {
 			_ = h.authService.SetUserRole(c.Request.Context(), authUserID, currentRole)
 			response.InternalError(c, 500, "业务侧角色更新失败", err)
 			return
@@ -228,7 +228,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.UpdateRole(targetUser.ID, nextRole); err != nil {
+	if err := h.userService.UpdateRole(c.Request.Context(), targetUser.ID, nextRole); err != nil {
 		response.InternalError(c, 500, "业务侧角色更新失败", err)
 		return
 	}
@@ -276,7 +276,7 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 		log.Printf("[users] auth user already missing during admin delete, continue local cleanup user_id=%d auth_user_id=%s", targetUser.ID, authUserID)
 	}
 
-	if err := h.userService.DeleteUser(targetUser.ID); err != nil {
+	if err := h.userService.DeleteUser(c.Request.Context(), targetUser.ID); err != nil {
 		response.InternalError(c, 500, "业务侧数据清理失败（Auth 已删除，请按运维流程补偿处理）", err)
 		return
 	}
@@ -292,7 +292,7 @@ func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*User, bool) {
 		return nil, false
 	}
 
-	user, err := h.userService.GetByID(userIDUint)
+	user, err := h.userService.GetByID(c.Request.Context(), userIDUint)
 	if err != nil {
 		response.Error(c, 400, "用户不存在")
 		return nil, false

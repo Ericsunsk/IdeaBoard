@@ -123,7 +123,7 @@ func createAsynqTestAccount(t *testing.T, repo *accounts.AccountRepository, name
 		Weight:        1,
 		Status:        1,
 	}
-	if err := repo.Create(acc); err != nil {
+	if err := repo.Create(context.Background(), acc); err != nil {
 		t.Fatalf("create account failed: %v", err)
 	}
 	return acc
@@ -265,7 +265,7 @@ func TestAsynqHandlerTerminalTaskDoesNotCallProvider(t *testing.T) {
 	acc := createAsynqTestAccount(t, accountRepo, "terminal-account")
 
 	taskID := "terminal-1"
-	if err := taskRepo.Create(&tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusCompleted}); err != nil {
+	if err := taskRepo.Create(context.Background(), &tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusCompleted}); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -294,7 +294,7 @@ func TestAsynqHandlerCancelledTaskClearsCancelAndSkipsProvider(t *testing.T) {
 	acc := createAsynqTestAccount(t, accountRepo, "cancel-account")
 
 	taskID := "cancel-1"
-	if err := taskRepo.Create(&tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
+	if err := taskRepo.Create(context.Background(), &tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -327,7 +327,7 @@ func TestAsynqHandlerPropagatesContextToProvider(t *testing.T) {
 	acc := createAsynqTestAccount(t, accountRepo, "ctx-account")
 
 	taskID := "ctx-1"
-	if err := taskRepo.Create(&tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
+	if err := taskRepo.Create(context.Background(), &tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -367,7 +367,7 @@ func TestAsynqHandlerParentContextCanceledResetsTaskAndPropagatesError(t *testin
 	acc := createAsynqTestAccount(t, accountRepo, "ctx-cancel-account")
 
 	taskID := "ctx-cancel-1"
-	if err := taskRepo.Create(&tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
+	if err := taskRepo.Create(context.Background(), &tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -376,14 +376,15 @@ func TestAsynqHandlerParentContextCanceledResetsTaskAndPropagatesError(t *testin
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 
 	providerCalled := false
+	ctx, cancel := context.WithCancel(context.Background())
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, _ *queuetypes.TaskPayload) (string, error) {
 		providerCalled = true
+		cancel()
+		<-ctx.Done()
 		return "", ctx.Err()
 	})
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	defer cancel()
 
 	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []uint64{acc.ID}}))
 	if !errors.Is(err, context.Canceled) {
@@ -402,7 +403,7 @@ func TestAsynqHandlerParentContextCanceledResetsTaskAndPropagatesError(t *testin
 		t.Fatalf("release should use cleanup context, got ctx err %v", assigner.lastReleaseCtxErr)
 	}
 
-	updated, getErr := taskRepo.GetByTaskID(taskID)
+	updated, getErr := taskRepo.GetByTaskID(context.Background(), taskID)
 	if getErr != nil {
 		t.Fatalf("reload task failed: %v", getErr)
 	}
@@ -422,7 +423,7 @@ func TestAsynqHandlerParentContextDeadlineExceededResetsTaskAndPropagatesError(t
 	acc := createAsynqTestAccount(t, accountRepo, "ctx-deadline-account")
 
 	taskID := "ctx-deadline-1"
-	if err := taskRepo.Create(&tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
+	if err := taskRepo.Create(context.Background(), &tasks.Task{TaskID: taskID, UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -433,11 +434,12 @@ func TestAsynqHandlerParentContextDeadlineExceededResetsTaskAndPropagatesError(t
 	providerCalled := false
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, _ *queuetypes.TaskPayload) (string, error) {
 		providerCalled = true
+		<-ctx.Done()
 		return "", ctx.Err()
 	})
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
 
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(20*time.Millisecond))
 	defer cancel()
 
 	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []uint64{acc.ID}}))
@@ -457,7 +459,7 @@ func TestAsynqHandlerParentContextDeadlineExceededResetsTaskAndPropagatesError(t
 		t.Fatalf("release should use cleanup context, got ctx err %v", assigner.lastReleaseCtxErr)
 	}
 
-	updated, getErr := taskRepo.GetByTaskID(taskID)
+	updated, getErr := taskRepo.GetByTaskID(context.Background(), taskID)
 	if getErr != nil {
 		t.Fatalf("reload task failed: %v", getErr)
 	}

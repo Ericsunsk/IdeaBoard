@@ -43,7 +43,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	log.Printf("[Worker] 执行任务: %s, 账号: %d", task.TaskID, accountID)
 	startTime := time.Now()
 
-	account, err := o.accountRepo.GetByID(accountID)
+	account, err := o.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		if requeueErr := o.requeueTask(ctx, task, accountID, "账号不存在，重新调度"); requeueErr != nil {
 			return requeueErr

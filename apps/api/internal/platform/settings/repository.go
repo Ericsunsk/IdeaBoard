@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"context"
+
 	"gorm.io/gorm"
 )
 
@@ -12,18 +14,18 @@ func NewSystemConfigRepository(db *gorm.DB) *SystemConfigRepository {
 	return &SystemConfigRepository{db: db}
 }
 
-func (r *SystemConfigRepository) Get(key string) (string, error) {
+func (r *SystemConfigRepository) Get(ctx context.Context, key string) (string, error) {
 	var cfg SystemConfig
-	err := r.db.Where("`key` = ?", key).First(&cfg).Error
+	err := r.db.WithContext(ctx).Where("`key` = ?", key).First(&cfg).Error
 	if err != nil {
 		return "", err
 	}
 	return cfg.Value, nil
 }
 
-func (r *SystemConfigRepository) GetByPrefix(prefix string) (map[string]string, error) {
+func (r *SystemConfigRepository) GetByPrefix(ctx context.Context, prefix string) (map[string]string, error) {
 	var cfgs []SystemConfig
-	err := r.db.Where("`key` LIKE ?", prefix+"%").Find(&cfgs).Error
+	err := r.db.WithContext(ctx).Where("`key` LIKE ?", prefix+"%").Find(&cfgs).Error
 	if err != nil {
 		return nil, err
 	}
@@ -36,14 +38,15 @@ func (r *SystemConfigRepository) GetByPrefix(prefix string) (map[string]string, 
 	return result, nil
 }
 
-func (r *SystemConfigRepository) Set(key, value string) error {
+func (r *SystemConfigRepository) Set(ctx context.Context, key, value string) error {
+	db := r.db.WithContext(ctx)
 	var cfg SystemConfig
-	err := r.db.Where("`key` = ?", key).First(&cfg).Error
+	err := db.Where("`key` = ?", key).First(&cfg).Error
 	if err != nil {
 		// 不存在则创建
 		cfg = SystemConfig{Key: key, Value: value}
-		return r.db.Create(&cfg).Error
+		return db.Create(&cfg).Error
 	}
 	cfg.Value = value
-	return r.db.Save(&cfg).Error
+	return db.Save(&cfg).Error
 }

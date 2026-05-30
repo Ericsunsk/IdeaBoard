@@ -18,7 +18,7 @@ func NewLineDraftHandler(repo *LineDraftModeRepository) *LineDraftHandler {
 
 // ListEnabled 获取已启用的线稿模式
 func (h *LineDraftHandler) ListEnabled(c *gin.Context) {
-	modes, err := h.repo.ListEnabled()
+	modes, err := h.repo.ListEnabled(c.Request.Context())
 	if err != nil {
 		response.Error(c, 500, "获取线稿模式失败")
 		return
@@ -40,7 +40,7 @@ func (h *LineDraftHandler) ListEnabled(c *gin.Context) {
 
 // List 获取所有线稿模式
 func (h *LineDraftHandler) List(c *gin.Context) {
-	modes, err := h.repo.List()
+	modes, err := h.repo.List(c.Request.Context())
 	if err != nil {
 		response.Error(c, 500, "获取列表失败")
 		return
@@ -61,7 +61,7 @@ func (h *LineDraftHandler) Create(c *gin.Context) {
 		SortOrder:  req.SortOrder,
 		IsEnabled:  req.IsEnabled,
 	}
-	if err := h.repo.Create(mode); err != nil {
+	if err := h.repo.Create(c.Request.Context(), mode); err != nil {
 		response.InternalError(c, 500, "创建失败", err)
 		return
 	}
@@ -78,7 +78,7 @@ func (h *LineDraftHandler) Update(c *gin.Context) {
 	if !bindJSON(c, &req) {
 		return
 	}
-	mode, err := h.repo.GetByID(id)
+	mode, err := h.repo.GetByID(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, 404, "模式不存在")
 		return
@@ -88,7 +88,7 @@ func (h *LineDraftHandler) Update(c *gin.Context) {
 	mode.Prompt = req.Prompt
 	mode.SortOrder = req.SortOrder
 	mode.IsEnabled = req.IsEnabled
-	if err := h.repo.Update(mode); err != nil {
+	if err := h.repo.Update(c.Request.Context(), mode); err != nil {
 		response.InternalError(c, 500, "更新失败", err)
 		return
 	}
@@ -101,7 +101,7 @@ func (h *LineDraftHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.repo.Delete(id); err != nil {
+	if err := h.repo.Delete(c.Request.Context(), id); err != nil {
 		response.InternalError(c, 500, "删除失败", err)
 		return
 	}

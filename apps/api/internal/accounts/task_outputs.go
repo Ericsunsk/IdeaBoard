@@ -1,13 +1,14 @@
 package accounts
 
 import (
+	"context"
 	"log"
 	"strings"
 
 	"api/internal/tasks"
 )
 
-func (s *AccountService) attachOutputsForTasks(items []*tasks.Task) {
+func (s *AccountService) attachOutputsForTasks(ctx context.Context, items []*tasks.Task) {
 	if len(items) == 0 || s == nil || s.taskRepo == nil {
 		return
 	}
@@ -23,7 +24,7 @@ func (s *AccountService) attachOutputsForTasks(items []*tasks.Task) {
 		return
 	}
 
-	outputsByTaskID, err := s.taskRepo.ListOutputsByTaskIDs(taskIDs)
+	outputsByTaskID, err := s.taskRepo.ListOutputsByTaskIDs(ctx, taskIDs)
 	if err != nil {
 		log.Printf("[AccountService] load task outputs failed: %v", err)
 		return

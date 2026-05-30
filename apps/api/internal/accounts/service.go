@@ -31,11 +31,6 @@ type AccountService struct {
 	assigner         taskqueue.TaskAssigner
 	taskEventHub     *TaskEventHub
 	systemConfigRepo *settings.SystemConfigRepository
-	previewResolver  previewURLResolver
-}
-
-type previewURLResolver interface {
-	PreviewURLTransformer() func(string) string
 }
 
 const defaultAccountMaxConcurrent = 3
@@ -63,7 +58,6 @@ func NewAccountServiceWithQueue(
 	cancelStore taskqueue.TaskCancellationStore,
 	monitorStore taskqueue.TaskMonitorStore,
 	systemConfigRepo *settings.SystemConfigRepository,
-	previewResolver previewURLResolver,
 ) *AccountService {
 	return &AccountService{
 		accountRepo:      accountRepo,
@@ -75,7 +69,6 @@ func NewAccountServiceWithQueue(
 		cancelStore:      cancelStore,
 		monitorStore:     monitorStore,
 		systemConfigRepo: systemConfigRepo,
-		previewResolver:  previewResolver,
 	}
 }
 
@@ -89,7 +82,7 @@ func (s *AccountService) TaskEventHub() *TaskEventHub {
 
 // ============ 账号池管理 ============
 
-func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, error) {
+func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRequest) (*ApiAccount, error) {
 	proxyURL, err := outbound.ValidateConfiguredEndpoint(req.ProxyURL, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		return nil, fmt.Errorf("proxy_url 不可用，仅支持可达的公网 http(s) 地址")
@@ -126,23 +119,22 @@ func (s *AccountService) CreateAccount(req *CreateAccountRequest) (*ApiAccount, 
 		Status:        1,
 	}
 
-	if err := s.accountRepo.Create(account); err != nil {
+	if err := s.accountRepo.Create(ctx, account); err != nil {
 		return nil, err
 	}
 
 	if s.assigner != nil {
-		ctx := context.Background()
 		s.assigner.EnsureAccountConcurrent(ctx, account.ID, account.MaxConcurrent)
 	}
 
 	return account, nil
 }
 
-func (s *AccountService) GetAccount(id uint64) (*ApiAccount, error) {
-	return s.accountRepo.GetByID(id)
+func (s *AccountService) GetAccount(ctx context.Context, id uint64) (*ApiAccount, error) {
+	return s.accountRepo.GetByID(ctx, id)
 }
 
-func (s *AccountService) ListAccounts(req *AccountListRequest) ([]*AccountWithLoad, int64, error) {
+func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListRequest) ([]*AccountWithLoad, int64, error) {
 	if req.Page < 1 {
 		req.Page = 1
 	}
@@ -150,12 +142,11 @@ func (s *AccountService) ListAccounts(req *AccountListRequest) ([]*AccountWithLo
 		req.PageSize = 20
 	}
 
-	accounts, total, err := s.accountRepo.List(req.Keyword, req.Platform, req.Page, req.PageSize)
+	accounts, total, err := s.accountRepo.List(ctx, req.Keyword, req.Platform, req.Page, req.PageSize)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	ctx := context.Background()
 	accountIDs := make([]uint64, len(accounts))
 	for i := range accounts {
 		accountIDs[i] = accounts[i].ID
@@ -204,12 +195,12 @@ func (s *AccountService) ListAccounts(req *AccountListRequest) ([]*AccountWithLo
 	return result, total, nil
 }
 
-func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) error {
+func (s *AccountService) UpdateAccount(ctx context.Context, id uint64, req *UpdateAccountRequest) error {
 	proxyURL, err := outbound.ValidateConfiguredEndpoint(req.ProxyURL, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		return fmt.Errorf("proxy_url 不可用，仅支持可达的公网 http(s) 地址")
 	}
-	account, err := s.accountRepo.GetByID(id)
+	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("账号不存在")
 	}
@@ -243,54 +234,49 @@ func (s *AccountService) UpdateAccount(id uint64, req *UpdateAccountRequest) err
 		account.ApiKey = req.ApiKey
 	}
 
-	if err := s.accountRepo.Update(account); err != nil {
+	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return err
 	}
 
 	if s.assigner != nil {
-		ctx := context.Background()
 		s.assigner.SetAccountMaxConcurrent(ctx, account.ID, account.MaxConcurrent)
 	}
 
 	return nil
 }
 
-func (s *AccountService) DeleteAccount(id uint64) error {
-	account, err := s.accountRepo.GetByID(id)
+func (s *AccountService) DeleteAccount(ctx context.Context, id uint64) error {
+	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("账号不存在")
 	}
 	if account.Status != 0 {
 		return fmt.Errorf("请先停用账号后再删除")
 	}
-	ctx := context.Background()
 	if s.concurrencyStore != nil {
 		if err := s.concurrencyStore.DeleteAccountConcurrent(ctx, id); err != nil {
 			log.Printf("[DeleteAccount] 删除账号并发计数失败: account=%d err=%v", id, err)
 		}
 	}
-	return s.accountRepo.Delete(id)
+	return s.accountRepo.Delete(ctx, id)
 }
 
-func (s *AccountService) StartAccount(id uint64) error {
-	account, err := s.accountRepo.GetByID(id)
+func (s *AccountService) StartAccount(ctx context.Context, id uint64) error {
+	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("账号不存在")
 	}
 
 	account.MaxConcurrent = normalizeMaxConcurrent(account.MaxConcurrent)
-	if err := s.accountRepo.UpdateStatus(id, 1); err != nil {
+	if err := s.accountRepo.UpdateStatus(ctx, id, 1); err != nil {
 		return err
 	}
 
-	ctx := context.Background()
 	return s.assigner.EnsureAccountConcurrent(ctx, id, account.MaxConcurrent)
 }
 
-func (s *AccountService) StopAccount(id uint64) error {
-	ctx := context.Background()
-
-	taskIDs, err := s.taskRepo.ListTaskIDsByAccountIDAndStatuses(id, tasks.StatusPending, tasks.StatusRunning)
+func (s *AccountService) StopAccount(ctx context.Context, id uint64) error {
+	taskIDs, err := s.taskRepo.ListTaskIDsByAccountIDAndStatuses(ctx, id, tasks.StatusPending, tasks.StatusRunning)
 	if err != nil {
 		log.Printf("[StopAccount] 查询账号 %d 进行中任务失败: %v", id, err)
 	} else {
@@ -305,7 +291,7 @@ func (s *AccountService) StopAccount(id uint64) error {
 	}
 
 	// 1. 将该账号下所有 running/pending 的任务标记为 failed
-	affected, err := s.taskRepo.FailRunningByAccountID(id, "账号已停用")
+	affected, err := s.taskRepo.FailRunningByAccountID(ctx, id, "账号已停用")
 	if err != nil {
 		log.Printf("[StopAccount] 标记账号 %d 任务失败: %v", id, err)
 	} else if affected > 0 {
@@ -320,14 +306,13 @@ func (s *AccountService) StopAccount(id uint64) error {
 	}
 
 	// 3. 停用账号
-	return s.accountRepo.UpdateStatus(id, 0)
+	return s.accountRepo.UpdateStatus(ctx, id, 0)
 }
 
-func (s *AccountService) GetAccountQueueInfo(id uint64) (concurrent int, maxConcurrent int, err error) {
+func (s *AccountService) GetAccountQueueInfo(ctx context.Context, id uint64) (concurrent int, maxConcurrent int, err error) {
 	if s.concurrencyStore == nil {
 		return 0, 0, fmt.Errorf("account concurrency store not configured")
 	}
-	ctx := context.Background()
 	concurrent, err = s.concurrencyStore.GetAccountConcurrent(ctx, id)
 	if err != nil {
 		return 0, 0, err
@@ -341,11 +326,11 @@ func (s *AccountService) GetAccountQueueInfo(id uint64) (concurrent int, maxConc
 
 // ============ 任务管理 ============
 
-func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest) (string, error) {
+func (s *AccountService) SubmitTask(ctx context.Context, userID uint64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	accounts, params, _, fullPrompt, err := s.prepareSubmitTask(req)
+	accounts, params, _, fullPrompt, err := s.prepareSubmitTask(ctx, req)
 	if err != nil {
 		return "", err
 	}
@@ -370,7 +355,7 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		Status:     tasks.StatusPending,
 	}
 
-	if err := s.taskRepo.Create(task); err != nil {
+	if err := s.taskRepo.Create(ctx, task); err != nil {
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
@@ -391,10 +376,10 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 		CreatedAt:  time.Now().Unix(),
 	}
 
-	if err := s.queue.Enqueue(context.Background(), queueTask); err != nil {
-		_ = s.taskRepo.MarkQueueFailed(taskID, "任务入队失败: "+err.Error())
-		if failedTask, loadErr := s.taskRepo.GetByTaskID(taskID); loadErr == nil {
-			if statErr := s.taskRepo.UpsertDailyStatByTask(failedTask); statErr != nil {
+	if err := s.queue.Enqueue(ctx, queueTask); err != nil {
+		_ = s.taskRepo.MarkQueueFailed(ctx, taskID, "任务入队失败: "+err.Error())
+		if failedTask, loadErr := s.taskRepo.GetByTaskID(ctx, taskID); loadErr == nil {
+			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, failedTask); statErr != nil {
 				log.Printf("[AccountService] upsert daily stat failed after queue fail, task_id=%s err=%v", taskID, statErr)
 			}
 		} else {
@@ -406,18 +391,18 @@ func (s *AccountService) SubmitTask(userID uint64, req *tasks.SubmitTaskRequest)
 	return taskID, nil
 }
 
-func (s *AccountService) CheckSubmitTaskReadiness(req *tasks.SubmitTaskRequest) (string, error) {
+func (s *AccountService) CheckSubmitTaskReadiness(ctx context.Context, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	_, _, featureSlug, _, err := s.prepareSubmitTask(req)
+	_, _, featureSlug, _, err := s.prepareSubmitTask(ctx, req)
 	if err != nil {
 		return "", err
 	}
 	return featureSlug, nil
 }
 
-func (s *AccountService) prepareSubmitTask(req *tasks.SubmitTaskRequest) ([]*ApiAccount, map[string]interface{}, string, string, error) {
+func (s *AccountService) prepareSubmitTask(ctx context.Context, req *tasks.SubmitTaskRequest) ([]*ApiAccount, map[string]interface{}, string, string, error) {
 	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
 		return nil, nil, "", "", err
 	}
@@ -425,7 +410,7 @@ func (s *AccountService) prepareSubmitTask(req *tasks.SubmitTaskRequest) ([]*Api
 		return nil, nil, "", "", err
 	}
 
-	accounts, err := s.accountRepo.GetAllEnabled()
+	accounts, err := s.accountRepo.GetAllEnabled(ctx)
 	if err != nil {
 		return nil, nil, "", "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
@@ -468,7 +453,7 @@ func (s *AccountService) prepareSubmitTask(req *tasks.SubmitTaskRequest) ([]*Api
 		if s.systemConfigRepo == nil {
 			return "", fmt.Errorf("system config repo 未配置")
 		}
-		return s.systemConfigRepo.Get(prompts.FeaturePromptConfigKey(slug))
+		return s.systemConfigRepo.Get(ctx, prompts.FeaturePromptConfigKey(slug))
 	})
 	if err := validateExecutablePrompt(fullPrompt); err != nil {
 		return nil, nil, "", "", err
@@ -480,27 +465,25 @@ func (s *AccountService) prepareSubmitTask(req *tasks.SubmitTaskRequest) ([]*Api
 	return accounts, req.Params, featureSlug, fullPrompt, nil
 }
 
-func (s *AccountService) GetTask(taskID string) (*tasks.Task, error) {
-	task, err := s.taskRepo.GetByTaskID(taskID)
+func (s *AccountService) GetTask(ctx context.Context, taskID string) (*tasks.Task, error) {
+	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
-	s.attachOutputsForTasks([]*tasks.Task{task})
-	s.applyPreviewForTasks([]*tasks.Task{task})
+	s.attachOutputsForTasks(ctx, []*tasks.Task{task})
 	return task, nil
 }
 
-func (s *AccountService) GetUserTask(taskID string, userID uint64) (*tasks.Task, error) {
-	task, err := s.taskRepo.GetByTaskIDAndUserID(taskID, userID)
+func (s *AccountService) GetUserTask(ctx context.Context, taskID string, userID uint64) (*tasks.Task, error) {
+	task, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID)
 	if err != nil {
 		return nil, err
 	}
-	s.attachOutputsForTasks([]*tasks.Task{task})
-	s.applyPreviewForTasks([]*tasks.Task{task})
+	s.attachOutputsForTasks(ctx, []*tasks.Task{task})
 	return task, nil
 }
 
-func (s *AccountService) ListTasks(req *tasks.TaskListRequest) ([]*tasks.Task, int64, error) {
+func (s *AccountService) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]*tasks.Task, int64, error) {
 	if req.Page < 1 {
 		req.Page = 1
 	}
@@ -511,49 +494,46 @@ func (s *AccountService) ListTasks(req *tasks.TaskListRequest) ([]*tasks.Task, i
 	if len(req.Keyword) > maxTaskKeywordLength {
 		req.Keyword = req.Keyword[:maxTaskKeywordLength]
 	}
-	items, total, err := s.taskRepo.List(req.UserID, req.AccountID, req.Status, req.Keyword, req.Page, req.PageSize)
+	items, total, err := s.taskRepo.List(ctx, req.UserID, req.AccountID, req.Status, req.Keyword, req.Page, req.PageSize)
 	if err != nil {
 		return nil, 0, err
 	}
-	s.attachOutputsForTasks(items)
-	s.applyPreviewForTasks(items)
+	s.attachOutputsForTasks(ctx, items)
 	return items, total, nil
 }
 
-func (s *AccountService) DeleteUserTask(taskID string, userID uint64) error {
-	if _, err := s.taskRepo.GetByTaskIDAndUserID(taskID, userID); err != nil {
+func (s *AccountService) DeleteUserTask(ctx context.Context, taskID string, userID uint64) error {
+	if _, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID); err != nil {
 		return err
 	}
-	if err := s.cancelStore.MarkCancelled(context.Background(), taskID, taskCancelTTL); err != nil {
+	if err := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); err != nil {
 		return err
 	}
-	return s.taskRepo.DeleteByTaskIDAndUserID(taskID, userID)
+	return s.taskRepo.DeleteByTaskIDAndUserID(ctx, taskID, userID)
 }
 
-func (s *AccountService) GetUserTasks(userID uint64, page, pageSize int) ([]*tasks.Task, int64, error) {
+func (s *AccountService) GetUserTasks(ctx context.Context, userID uint64, page, pageSize int) ([]*tasks.Task, int64, error) {
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
-	items, total, err := s.taskRepo.GetByUserID(userID, page, pageSize)
+	items, total, err := s.taskRepo.GetByUserID(ctx, userID, page, pageSize)
 	if err != nil {
 		return nil, 0, err
 	}
-	s.attachOutputsForTasks(items)
-	s.applyPreviewForTasks(items)
+	s.attachOutputsForTasks(ctx, items)
 	return items, total, nil
 }
 
 // ============ 监控 ============
 
-func (s *AccountService) GetMonitorInfo() (*queuetypes.MonitorInfo, error) {
-	ctx := context.Background()
+func (s *AccountService) GetMonitorInfo(ctx context.Context) (*queuetypes.MonitorInfo, error) {
 	if s.monitorStore == nil {
 		return nil, fmt.Errorf("monitor store not configured")
 	}
-	accounts, err := s.accountRepo.GetAllEnabled()
+	accounts, err := s.accountRepo.GetAllEnabled(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -564,11 +544,11 @@ func (s *AccountService) GetMonitorInfo() (*queuetypes.MonitorInfo, error) {
 	return s.monitorStore.MonitorInfo(ctx, accountIDs)
 }
 
-func (s *AccountService) GetTaskStats() (map[string]int64, error) {
-	pending, _ := s.taskRepo.CountByStatus(tasks.StatusPending)
-	running, _ := s.taskRepo.CountByStatus(tasks.StatusRunning)
-	completed, _ := s.taskRepo.CountByStatus(tasks.StatusCompleted)
-	failed, _ := s.taskRepo.CountByStatus(tasks.StatusFailed)
+func (s *AccountService) GetTaskStats(ctx context.Context) (map[string]int64, error) {
+	pending, _ := s.taskRepo.CountByStatus(ctx, tasks.StatusPending)
+	running, _ := s.taskRepo.CountByStatus(ctx, tasks.StatusRunning)
+	completed, _ := s.taskRepo.CountByStatus(ctx, tasks.StatusCompleted)
+	failed, _ := s.taskRepo.CountByStatus(ctx, tasks.StatusFailed)
 
 	return map[string]int64{
 		tasks.StatusPending:   pending,
@@ -589,7 +569,7 @@ func normalizeStatisticsRange(raw string) (StatisticsRange, int) {
 	}
 }
 
-func (s *AccountService) GetStatistics(rawRange string) (*AdminStatisticsResponse, error) {
+func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*AdminStatisticsResponse, error) {
 	_, days := normalizeStatisticsRange(rawRange)
 	now := time.Now()
 	loc := now.Location()
@@ -598,19 +578,19 @@ func (s *AccountService) GetStatistics(rawRange string) (*AdminStatisticsRespons
 	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
 	rangeStart := todayStart.AddDate(0, 0, -(days - 1))
 
-	totalCalls, err := s.taskRepo.CountAllTasks()
+	totalCalls, err := s.taskRepo.CountAllTasks(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	stats, err := s.GetTaskStats()
+	stats, err := s.GetTaskStats(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	rangeStartDate := rangeStart.Format("2006-01-02")
 	rangeEndDate := todayStart.Format("2006-01-02")
-	backfilledDates, err := s.taskRepo.ListBackfilledDatesByRange(rangeStartDate, rangeEndDate)
+	backfilledDates, err := s.taskRepo.ListBackfilledDatesByRange(ctx, rangeStartDate, rangeEndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -622,7 +602,7 @@ func (s *AccountService) GetStatistics(rawRange string) (*AdminStatisticsRespons
 	if rangeStart.Before(monthStart) {
 		queryStart = rangeStart
 	}
-	allDailyRows, err := s.taskRepo.ListDailyStatsByDateRange(queryStart.Format("2006-01-02"), rangeEndDate)
+	allDailyRows, err := s.taskRepo.ListDailyStatsByDateRange(ctx, queryStart.Format("2006-01-02"), rangeEndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -842,7 +822,7 @@ func (s *AccountService) GetStatistics(rawRange string) (*AdminStatisticsRespons
 	}, nil
 }
 
-func (s *AccountService) BackfillStatistics(rawRange string) (*AdminStatisticsBackfillResult, error) {
+func (s *AccountService) BackfillStatistics(ctx context.Context, rawRange string) (*AdminStatisticsBackfillResult, error) {
 	normalizedRange, days := normalizeStatisticsRange(rawRange)
 	now := time.Now()
 	loc := now.Location()
@@ -851,12 +831,12 @@ func (s *AccountService) BackfillStatistics(rawRange string) (*AdminStatisticsBa
 	rangeStartDate := rangeStart.Format("2006-01-02")
 	rangeEndDate := todayStart.Format("2006-01-02")
 
-	backfilledDates, err := s.taskRepo.ListBackfilledDatesByRange(rangeStartDate, rangeEndDate)
+	backfilledDates, err := s.taskRepo.ListBackfilledDatesByRange(ctx, rangeStartDate, rangeEndDate)
 	if err != nil {
 		return nil, fmt.Errorf("list backfilled dates: %w", err)
 	}
 	missingDays := buildMissingStatisticsDaysByMarker(rangeStart, todayStart, days, backfilledDates)
-	backfilledCount, err := s.backfillDailyStatsByMissingDays(missingDays)
+	backfilledCount, err := s.backfillDailyStatsByMissingDays(ctx, missingDays)
 	if err != nil {
 		return nil, fmt.Errorf("backfill daily stats: %w", err)
 	}
@@ -910,7 +890,7 @@ func buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart time.Time, da
 	return missing
 }
 
-func (s *AccountService) backfillDailyStatsByMissingDays(days []time.Time) (int, error) {
+func (s *AccountService) backfillDailyStatsByMissingDays(ctx context.Context, days []time.Time) (int, error) {
 	if len(days) == 0 {
 		return 0, nil
 	}
@@ -919,7 +899,7 @@ func (s *AccountService) backfillDailyStatsByMissingDays(days []time.Time) (int,
 	backfilledCount := 0
 	for _, dayStart := range days {
 		dayEnd := dayStart.AddDate(0, 0, 1)
-		rows, err := s.taskRepo.ListStatisticsByCreatedAtRange(dayStart, dayEnd)
+		rows, err := s.taskRepo.ListStatisticsByCreatedAtRange(ctx, dayStart, dayEnd)
 		if err != nil {
 			return backfilledCount, err
 		}
@@ -929,7 +909,7 @@ func (s *AccountService) backfillDailyStatsByMissingDays(days []time.Time) (int,
 				accountIDs = append(accountIDs, row.AccountID)
 			}
 		}
-		modelSetMap, err := s.taskRepo.listSingleModelSetByAccountIDs(accountIDs)
+		modelSetMap, err := s.taskRepo.listSingleModelSetByAccountIDs(ctx, accountIDs)
 		if err != nil {
 			return backfilledCount, err
 		}
@@ -946,13 +926,13 @@ func (s *AccountService) backfillDailyStatsByMissingDays(days []time.Time) (int,
 				CreatedAt:   row.CreatedAt.In(loc),
 				CompletedAt: row.CompletedAt,
 			}
-			if err := s.taskRepo.UpsertDailyStatByTaskWithFallbackModel(task, modelSetMap[row.AccountID]); err != nil {
+			if err := s.taskRepo.UpsertDailyStatByTaskWithFallbackModel(ctx, task, modelSetMap[row.AccountID]); err != nil {
 				return backfilledCount, err
 			}
 		}
 		dayDate := dayStart.In(loc).Format("2006-01-02")
 		if dayDate != todayDate {
-			if err := s.taskRepo.MarkDailyBackfillDone(dayDate); err != nil {
+			if err := s.taskRepo.MarkDailyBackfillDone(ctx, dayDate); err != nil {
 				return backfilledCount, err
 			}
 			backfilledCount++

@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"context"
 	"testing"
 
 	"gorm.io/driver/sqlite"
@@ -21,6 +22,7 @@ func newAccountServiceTestDB(t *testing.T) *gorm.DB {
 }
 
 func TestUpdateAccountNormalizesTimeout(t *testing.T) {
+	ctx := context.Background()
 	db := newAccountServiceTestDB(t)
 	repo := NewAccountRepository(db)
 	service := &AccountService{
@@ -39,11 +41,11 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 		Weight:        1,
 		Status:        1,
 	}
-	if err := repo.Create(account); err != nil {
+	if err := repo.Create(ctx, account); err != nil {
 		t.Fatalf("seed account failed: %v", err)
 	}
 
-	err := service.UpdateAccount(account.ID, &UpdateAccountRequest{
+	err := service.UpdateAccount(ctx, account.ID, &UpdateAccountRequest{
 		Name:          account.Name,
 		ChannelID:     account.ChannelID,
 		Platform:      account.Platform,
@@ -60,7 +62,7 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 		t.Fatalf("update account failed: %v", err)
 	}
 
-	updated, err := repo.GetByID(account.ID)
+	updated, err := repo.GetByID(ctx, account.ID)
 	if err != nil {
 		t.Fatalf("reload account failed: %v", err)
 	}

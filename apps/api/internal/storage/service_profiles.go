@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,16 +11,16 @@ import (
 	"gorm.io/gorm"
 )
 
-func (s *StorageService) ListProfiles() ([]StorageProfile, error) {
-	profiles, err := s.loadProfiles()
+func (s *StorageService) ListProfiles(ctx context.Context) ([]StorageProfile, error) {
+	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return s.maskProfiles(profiles), nil
 }
 
-func (s *StorageService) GetProfile(id string) (*StorageProfile, error) {
-	profiles, err := s.loadProfiles()
+func (s *StorageService) GetProfile(ctx context.Context, id string) (*StorageProfile, error) {
+	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -32,12 +33,12 @@ func (s *StorageService) GetProfile(id string) (*StorageProfile, error) {
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (s *StorageService) SaveProfile(profile *StorageProfile) (*StorageProfile, error) {
+func (s *StorageService) SaveProfile(ctx context.Context, profile *StorageProfile) (*StorageProfile, error) {
 	if profile == nil {
 		return nil, fmt.Errorf("存储配置不能为空")
 	}
 
-	profiles, err := s.loadProfiles()
+	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +87,7 @@ func (s *StorageService) SaveProfile(profile *StorageProfile) (*StorageProfile, 
 		profiles = append(profiles, next)
 	}
 
-	if err := s.persistProfiles(profiles); err != nil {
+	if err := s.persistProfiles(ctx, profiles); err != nil {
 		return nil, err
 	}
 
@@ -94,8 +95,8 @@ func (s *StorageService) SaveProfile(profile *StorageProfile) (*StorageProfile, 
 	return &masked, nil
 }
 
-func (s *StorageService) DeleteProfile(id string) error {
-	profiles, err := s.loadProfiles()
+func (s *StorageService) DeleteProfile(ctx context.Context, id string) error {
+	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return err
 	}
@@ -118,11 +119,11 @@ func (s *StorageService) DeleteProfile(id string) error {
 	if !removed {
 		return gorm.ErrRecordNotFound
 	}
-	return s.persistProfiles(next)
+	return s.persistProfiles(ctx, next)
 }
 
-func (s *StorageService) ApplyProfile(id string) (*StorageProfile, error) {
-	profiles, err := s.loadProfiles()
+func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*StorageProfile, error) {
+	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +147,7 @@ func (s *StorageService) ApplyProfile(id string) (*StorageProfile, error) {
 		profiles[i].IsCurrent = profiles[i].ID == id
 	}
 
-	if err := s.persistProfiles(profiles); err != nil {
+	if err := s.persistProfiles(ctx, profiles); err != nil {
 		return nil, err
 	}
 
@@ -154,11 +155,11 @@ func (s *StorageService) ApplyProfile(id string) (*StorageProfile, error) {
 	return &masked, nil
 }
 
-func (s *StorageService) loadProfiles() ([]StorageProfile, error) {
-	val, err := s.configRepo.Get(StorageProfilesConfigKey)
+func (s *StorageService) loadProfiles(ctx context.Context) ([]StorageProfile, error) {
+	val, err := s.configRepo.Get(ctx, StorageProfilesConfigKey)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return s.initializeProfilesConfig()
+			return s.initializeProfilesConfig(ctx)
 		}
 		return nil, err
 	}
@@ -170,28 +171,27 @@ func (s *StorageService) loadProfiles() ([]StorageProfile, error) {
 
 	profiles, changed := s.ensureBuiltinProfiles(cfg.Profiles)
 	if changed {
-		if err := s.persistProfiles(profiles); err != nil {
+		if err := s.persistProfiles(ctx, profiles); err != nil {
 			return nil, err
 		}
 	}
 	return profiles, nil
 }
 
-func (s *StorageService) persistProfiles(profiles []StorageProfile) error {
+func (s *StorageService) persistProfiles(ctx context.Context, profiles []StorageProfile) error {
 	normalizedProfiles, _ := s.ensureBuiltinProfiles(profiles)
 	cfg := StorageProfilesConfig{Profiles: normalizedProfiles}
 	b, err := json.Marshal(cfg)
 	if err != nil {
 		return err
 	}
-	if err := s.configRepo.Set(StorageProfilesConfigKey, string(b)); err != nil {
+	if err := s.configRepo.Set(ctx, StorageProfilesConfigKey, string(b)); err != nil {
 		return err
 	}
-	s.invalidatePreviewURLTransformerCache()
 	return nil
 }
 
-func (s *StorageService) initializeProfilesConfig() ([]StorageProfile, error) {
+func (s *StorageService) initializeProfilesConfig(ctx context.Context) ([]StorageProfile, error) {
 	profiles := []StorageProfile{
 		{
 			ID:        builtinLocalProfileID(),
@@ -204,7 +204,7 @@ func (s *StorageService) initializeProfilesConfig() ([]StorageProfile, error) {
 		},
 	}
 
-	if err := s.persistProfiles(profiles); err != nil {
+	if err := s.persistProfiles(ctx, profiles); err != nil {
 		return nil, err
 	}
 	return profiles, nil

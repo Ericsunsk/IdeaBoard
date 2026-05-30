@@ -70,7 +70,7 @@ func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
 			response.InternalError(c, 500, "头像上传失败", fmt.Errorf("profile upload dependencies not configured"))
 			return
 		}
-		user, err := h.UserRepo.GetByID(userID)
+		user, err := h.UserRepo.GetByID(c.Request.Context(), userID)
 		if err != nil {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
@@ -80,15 +80,15 @@ func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
+		url, err := h.StorageService.UploadWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
 			DirPrefix: dirPrefix,
 		})
 		if err != nil {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		if err := h.UserRepo.UpdateAvatarByID(userID, url); err != nil {
-			if cleanupErr := h.StorageService.DeleteProfileAvatarByURL(user.StorageUID, url); cleanupErr != nil {
+		if err := h.UserRepo.UpdateAvatarByID(c.Request.Context(), userID, url); err != nil {
+			if cleanupErr := h.StorageService.DeleteProfileAvatarByURL(c.Request.Context(), user.StorageUID, url); cleanupErr != nil {
 				log.Printf("[profile] cleanup uploaded avatar failed user_id=%d url=%s: %v", userID, url, cleanupErr)
 			}
 			response.InternalError(c, 500, "头像上传失败", err)
@@ -126,7 +126,7 @@ func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", fmt.Errorf("board service not configured"))
 			return
 		}
-		board, _, err := h.BoardService.ResolveBoardWriteAccess(userID, boardID)
+		board, _, err := h.BoardService.ResolveBoardWriteAccess(c.Request.Context(), userID, boardID)
 		if err != nil {
 			switch {
 			case errors.Is(err, boards.ErrInvalidBoardInput):
@@ -140,7 +140,7 @@ func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
 			}
 			return
 		}
-		owner, err := h.UserRepo.GetByID(board.UserID)
+		owner, err := h.UserRepo.GetByID(c.Request.Context(), board.UserID)
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return
@@ -150,7 +150,7 @@ func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
 			response.Error(c, 400, err.Error())
 			return
 		}
-		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
+		url, err := h.StorageService.UploadWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
 			DirPrefix: dirPrefix,
 		})
 		if err != nil {
@@ -180,7 +180,7 @@ func deleteBoardUploadHandler(h Dependencies) gin.HandlerFunc {
 			return
 		}
 		boardID := strings.TrimSpace(c.Param("board_id"))
-		board, _, err := h.BoardService.ResolveBoardWriteAccess(userID, boardID)
+		board, _, err := h.BoardService.ResolveBoardWriteAccess(c.Request.Context(), userID, boardID)
 		if err != nil {
 			switch {
 			case errors.Is(err, boards.ErrInvalidBoardInput):
@@ -194,12 +194,12 @@ func deleteBoardUploadHandler(h Dependencies) gin.HandlerFunc {
 			}
 			return
 		}
-		owner, err := h.UserRepo.GetByID(board.UserID)
+		owner, err := h.UserRepo.GetByID(c.Request.Context(), board.UserID)
 		if err != nil {
 			response.InternalError(c, 500, "删除失败", err)
 			return
 		}
-		if err := h.StorageService.DeleteWorkspaceUploadByURL(owner.StorageUID, board.BoardID, req.URL); err != nil {
+		if err := h.StorageService.DeleteWorkspaceUploadByURL(c.Request.Context(), owner.StorageUID, board.BoardID, req.URL); err != nil {
 			response.Error(c, 400, err.Error())
 			return
 		}
@@ -226,7 +226,7 @@ func adminUploadHandler(h Dependencies) gin.HandlerFunc {
 			return
 		}
 
-		url, err := h.StorageService.Upload(file)
+		url, err := h.StorageService.Upload(c.Request.Context(), file)
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return

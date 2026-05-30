@@ -24,8 +24,8 @@ const (
 	maxRemoteFileSize = 100 * 1024 * 1024 // 100 MB
 )
 
-func (s *StorageService) TestProfile(id string) error {
-	profiles, err := s.loadProfiles()
+func (s *StorageService) TestProfile(ctx context.Context, id string) error {
+	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return err
 	}
@@ -42,8 +42,8 @@ func (s *StorageService) TestProfile(id string) error {
 	return adapter.TestProfile(profile)
 }
 
-func (s *StorageService) GetBucketInfo(id string) (map[string]interface{}, error) {
-	profiles, err := s.loadProfiles()
+func (s *StorageService) GetBucketInfo(ctx context.Context, id string) (map[string]interface{}, error) {
+	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -60,12 +60,12 @@ func (s *StorageService) GetBucketInfo(id string) (map[string]interface{}, error
 	return adapter.GetBucketInfo(profile)
 }
 
-func (s *StorageService) Upload(file *multipart.FileHeader) (string, error) {
-	return s.UploadWithOptions(file, StorageStoreOptions{})
+func (s *StorageService) Upload(ctx context.Context, file *multipart.FileHeader) (string, error) {
+	return s.UploadWithOptions(ctx, file, StorageStoreOptions{})
 }
 
-func (s *StorageService) UploadWithOptions(file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
-	profile, err := s.resolveActiveProfile()
+func (s *StorageService) UploadWithOptions(ctx context.Context, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
+	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -73,15 +73,15 @@ func (s *StorageService) UploadWithOptions(file *multipart.FileHeader, opts Stor
 }
 
 func (s *StorageService) StoreRemote(ctx context.Context, remoteURL string, opts StorageStoreOptions) (string, error) {
-	profile, err := s.resolveActiveProfile()
+	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return "", err
 	}
 	return s.storeRemoteWithProfile(ctx, *profile, remoteURL, opts)
 }
 
-func (s *StorageService) StoreBytes(filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	profile, err := s.resolveActiveProfile()
+func (s *StorageService) StoreBytes(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (string, error) {
+	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -92,13 +92,13 @@ func (s *StorageService) StoreBytes(filename string, data []byte, opts StorageSt
 	return adapter.StoreBytes(profile, filename, data, opts)
 }
 
-func (s *StorageService) DeleteWorkspaceUploadByURL(storageUID string, boardID string, rawURL string) error {
+func (s *StorageService) DeleteWorkspaceUploadByURL(ctx context.Context, storageUID string, boardID string, rawURL string) error {
 	expectedPrefix, err := WorkspaceBoardUploadObjectPrefix(storageUID, boardID)
 	if err != nil {
 		return err
 	}
 
-	profile, err := s.resolveActiveProfile()
+	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return err
 	}
@@ -121,13 +121,13 @@ func (s *StorageService) DeleteWorkspaceUploadByURL(storageUID string, boardID s
 	return adapter.Delete(profile, key)
 }
 
-func (s *StorageService) DeleteProfileAvatarByURL(storageUID string, rawURL string) error {
+func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
 	expectedPrefix, err := ProfileAvatarUploadObjectPrefix(storageUID)
 	if err != nil {
 		return err
 	}
 
-	profile, err := s.resolveActiveProfile()
+	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return err
 	}
@@ -150,12 +150,12 @@ func (s *StorageService) DeleteProfileAvatarByURL(storageUID string, rawURL stri
 	return adapter.Delete(profile, key)
 }
 
-func (s *StorageService) DeleteWorkspaceByStorageUID(storageUID string) error {
+func (s *StorageService) DeleteWorkspaceByStorageUID(ctx context.Context, storageUID string) error {
 	prefix, err := WorkspaceUserUploadObjectPrefix(storageUID)
 	if err != nil {
 		return err
 	}
-	profile, err := s.resolveActiveProfile()
+	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return err
 	}
@@ -171,13 +171,13 @@ func (s *StorageService) DeleteWorkspaceByStorageUID(storageUID string) error {
 	return adapter.DeleteByPrefix(profile, normalizedPrefix)
 }
 
-func (s *StorageService) DeleteWorkspaceBoardByStorageUID(storageUID string, boardID string) error {
+func (s *StorageService) DeleteWorkspaceBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
 	prefix, err := WorkspaceBoardUploadObjectPrefix(storageUID, boardID)
 	if err != nil {
 		return err
 	}
 
-	profile, err := s.resolveActiveProfile()
+	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (s *StorageService) DeleteWorkspaceBoardByStorageUID(storageUID string, boa
 }
 
 func (s *StorageService) UsesObjectStorage() bool {
-	profile, err := s.resolveActiveProfile()
+	profile, err := s.resolveActiveProfile(context.Background())
 	if err != nil || profile == nil {
 		return false
 	}
@@ -204,18 +204,6 @@ func (s *StorageService) UsesObjectStorage() bool {
 		return false
 	}
 	return adapter.UsesObjectStorage()
-}
-
-func (s *StorageService) IsDirectFetchEnabled() bool {
-	profile, err := s.resolveActiveProfile()
-	if err != nil || profile == nil {
-		return false
-	}
-	adapter, err := s.adapterRegistry.get(profile.Provider)
-	if err != nil {
-		return false
-	}
-	return adapter.IsDirectFetchEnabled(profile)
 }
 
 func (s *StorageService) ensureProfileReadyForRuntime(profile StorageProfile) error {
@@ -233,8 +221,8 @@ func (s *StorageService) ensureProfileReadyForRuntime(profile StorageProfile) er
 	}
 }
 
-func (s *StorageService) resolveActiveProfile() (*StorageProfile, error) {
-	profiles, err := s.loadProfiles()
+func (s *StorageService) resolveActiveProfile(ctx context.Context) (*StorageProfile, error) {
+	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return nil, err
 	}

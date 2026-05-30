@@ -19,7 +19,8 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newAccountsTestDB(t)
 	taskRepo := NewTaskRepository(db)
-	service := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil, nil)
+	ctx := context.Background()
+	service := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil)
 	service.SetTaskEventHub(NewTaskEventHub())
 
 	task := &tasks.Task{
@@ -32,7 +33,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 		Status:     tasks.StatusCompleted,
 		Result:     `{"status":"success","image_url":"https://example.com/out.png","account_id":11,"channel_id":9}`,
 	}
-	if err := taskRepo.Create(task); err != nil {
+	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -69,7 +70,8 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newAccountsTestDB(t)
 	taskRepo := NewTaskRepository(db)
-	service := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil, nil)
+	ctx := context.Background()
+	service := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil)
 	hub := NewTaskEventHub()
 	service.SetTaskEventHub(hub)
 
@@ -82,7 +84,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 		UserPrompt: "user prompt",
 		Status:     tasks.StatusPending,
 	}
-	if err := taskRepo.Create(task); err != nil {
+	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
@@ -114,7 +116,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	go func() {
 		time.Sleep(80 * time.Millisecond)
 		now := time.Now()
-		rows, updateErr := taskRepo.UpdateByTaskIDAndStatuses(task.TaskID, []string{tasks.StatusPending}, map[string]interface{}{
+		rows, updateErr := taskRepo.UpdateByTaskIDAndStatuses(ctx, task.TaskID, []string{tasks.StatusPending}, map[string]interface{}{
 			"status":       tasks.StatusCompleted,
 			"result":       `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`,
 			"completed_at": now,
@@ -131,13 +133,13 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 		done <- nil
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	waitCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	reader := bufio.NewReader(resp.Body)
 	var payload strings.Builder
 	for {
 		select {
-		case <-ctx.Done():
+		case <-waitCtx.Done():
 			t.Fatalf("timeout waiting sse payload: %s", payload.String())
 		default:
 		}

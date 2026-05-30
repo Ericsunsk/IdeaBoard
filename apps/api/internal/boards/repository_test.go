@@ -1,6 +1,7 @@
 package boards
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -36,7 +37,7 @@ func TestBoardRepositoryGetByBoardID(t *testing.T) {
 	repo := NewBoardRepository(db)
 
 	t.Run("missing board returns record not found", func(t *testing.T) {
-		board, err := repo.GetByBoardID("missing-board")
+		board, err := repo.GetByBoardID(context.Background(), "missing-board")
 		if board != nil {
 			t.Fatalf("board = %#v, want nil", board)
 		}
@@ -57,7 +58,7 @@ func TestBoardRepositoryGetByBoardID(t *testing.T) {
 			t.Fatalf("seed board failed: %v", err)
 		}
 
-		board, err := repo.GetByBoardID(boardID)
+		board, err := repo.GetByBoardID(context.Background(), boardID)
 		if err != nil {
 			t.Fatalf("GetByBoardID returned error: %v", err)
 		}

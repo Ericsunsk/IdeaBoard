@@ -10,7 +10,6 @@ type storageProviderAdapter interface {
 	Provider() StorageProvider
 	UsesObjectStorage() bool
 	IsProfileReady(profile StorageProfile) bool
-	IsDirectFetchEnabled(profile *StorageProfile) bool
 	TestProfile(profile *StorageProfile) error
 	GetBucketInfo(profile *StorageProfile) (map[string]interface{}, error)
 	Upload(profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error)

@@ -25,10 +25,6 @@ func (a *s3CompatibleStorageAdapter) IsProfileReady(profile StorageProfile) bool
 	return a.service.s3CompatibleService.IsConfigEnabled(a.service.s3CompatibleConfigFromProfile(&profile))
 }
 
-func (a *s3CompatibleStorageAdapter) IsDirectFetchEnabled(profile *StorageProfile) bool {
-	return false
-}
-
 func (a *s3CompatibleStorageAdapter) TestProfile(profile *StorageProfile) error {
 	return a.service.s3CompatibleService.TestConnectionWithConfig(a.service.s3CompatibleConfigFromProfile(profile))
 }

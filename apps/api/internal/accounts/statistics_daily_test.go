@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -22,11 +23,12 @@ func newStatisticsTestService(t *testing.T) (*AccountService, *TaskRepository, *
 		t.Fatalf("auto migrate failed: %v", err)
 	}
 	taskRepo := NewTaskRepository(db)
-	svc := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil, nil)
+	svc := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil)
 	return svc, taskRepo, db
 }
 
 func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
+	ctx := context.Background()
 	svc, taskRepo, _ := newStatisticsTestService(t)
 	now := time.Now()
 	today := now.Format("2006-01-02")
@@ -42,14 +44,14 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 			t.Fatalf("seed daily stat failed: %v", err)
 		}
 	}
-	if err := taskRepo.Create(&tasks.Task{TaskID: "p1", UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
+	if err := taskRepo.Create(ctx, &tasks.Task{TaskID: "p1", UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("seed pending task failed: %v", err)
 	}
-	if err := taskRepo.Create(&tasks.Task{TaskID: "r1", UserID: 1, ChannelID: 1, Status: tasks.StatusRunning}); err != nil {
+	if err := taskRepo.Create(ctx, &tasks.Task{TaskID: "r1", UserID: 1, ChannelID: 1, Status: tasks.StatusRunning}); err != nil {
 		t.Fatalf("seed running task failed: %v", err)
 	}
 
-	stats, err := svc.GetStatistics("7d")
+	stats, err := svc.GetStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
@@ -83,6 +85,7 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 }
 
 func TestGetStatisticsHealthCellsAggregatedByDate(t *testing.T) {
+	ctx := context.Background()
 	svc, taskRepo, _ := newStatisticsTestService(t)
 	now := time.Now()
 	today := now.Format("2006-01-02")
@@ -99,7 +102,7 @@ func TestGetStatisticsHealthCellsAggregatedByDate(t *testing.T) {
 		}
 	}
 
-	stats, err := svc.GetStatistics("7d")
+	stats, err := svc.GetStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
@@ -122,13 +125,14 @@ func TestGetStatisticsHealthCellsAggregatedByDate(t *testing.T) {
 }
 
 func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
+	ctx := context.Background()
 	svc, taskRepo, _ := newStatisticsTestService(t)
 	now := time.Now()
 	created := now.Add(-2 * time.Hour)
 	completed := created.Add(40 * time.Second)
 	failedAt := created.Add(20 * time.Second)
 
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "c1",
 		UserID:      99,
 		ChannelID:   1,
@@ -139,7 +143,7 @@ func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed completed task failed: %v", err)
 	}
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "f1",
 		UserID:      99,
 		ChannelID:   1,
@@ -151,7 +155,7 @@ func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
 		t.Fatalf("seed failed task failed: %v", err)
 	}
 
-	stats, err := svc.GetStatistics("7d")
+	stats, err := svc.GetStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
@@ -159,7 +163,7 @@ func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
 		t.Fatalf("today_calls = %d, want 0 before explicit backfill", stats.Summary.TodayCalls)
 	}
 	day := created.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -169,6 +173,7 @@ func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
 }
 
 func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
+	ctx := context.Background()
 	svc, taskRepo, _ := newStatisticsTestService(t)
 	loc := time.Now().Location()
 	todayStart := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, loc)
@@ -184,15 +189,15 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 		CreatedAt:   missingDayStart.Add(20 * time.Second),
 		CompletedAt: &alreadyCountedCompletedAt,
 	}
-	if err := taskRepo.Create(alreadyCounted); err != nil {
+	if err := taskRepo.Create(ctx, alreadyCounted); err != nil {
 		t.Fatalf("seed already-counted task failed: %v", err)
 	}
-	if err := taskRepo.UpsertDailyStatByTask(alreadyCounted); err != nil {
+	if err := taskRepo.UpsertDailyStatByTask(ctx, alreadyCounted); err != nil {
 		t.Fatalf("seed already-counted stat event failed: %v", err)
 	}
 
 	missingCompletedAt := missingDayStart.Add(120 * time.Second)
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "same-day-missing",
 		UserID:      88,
 		ChannelID:   1,
@@ -205,7 +210,7 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 	}
 
 	day := missingDayStart.Format("2006-01-02")
-	beforeRows, err := taskRepo.ListDailyStatsByDateRange(day, day)
+	beforeRows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list day before failed: %v", err)
 	}
@@ -213,7 +218,7 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 		t.Fatalf("unexpected day rows before: %+v", beforeRows)
 	}
 
-	result, err := svc.BackfillStatistics("7d")
+	result, err := svc.BackfillStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("BackfillStatistics failed: %v", err)
 	}
@@ -221,7 +226,7 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 		t.Fatalf("expected scanned_days >= 1, got %+v", result)
 	}
 
-	afterRows, err := taskRepo.ListDailyStatsByDateRange(day, day)
+	afterRows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list day after failed: %v", err)
 	}
@@ -231,13 +236,14 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 }
 
 func TestBackfillStatisticsMarkerSkipsPastDateOnSecondRun(t *testing.T) {
+	ctx := context.Background()
 	svc, taskRepo, _ := newStatisticsTestService(t)
 	loc := time.Now().Location()
 	todayStart := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, loc)
 	pastDay := todayStart.AddDate(0, 0, -2)
 	completedAt := pastDay.Add(60 * time.Second)
 
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "marker-task-1",
 		UserID:      90,
 		ChannelID:   1,
@@ -249,11 +255,11 @@ func TestBackfillStatisticsMarkerSkipsPastDateOnSecondRun(t *testing.T) {
 		t.Fatalf("seed marker task failed: %v", err)
 	}
 
-	first, err := svc.BackfillStatistics("7d")
+	first, err := svc.BackfillStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("first BackfillStatistics failed: %v", err)
 	}
-	second, err := svc.BackfillStatistics("7d")
+	second, err := svc.BackfillStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("second BackfillStatistics failed: %v", err)
 	}
@@ -265,7 +271,7 @@ func TestBackfillStatisticsMarkerSkipsPastDateOnSecondRun(t *testing.T) {
 	}
 
 	day := pastDay.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list marker day rows failed: %v", err)
 	}
@@ -273,7 +279,7 @@ func TestBackfillStatisticsMarkerSkipsPastDateOnSecondRun(t *testing.T) {
 		t.Fatalf("marker day should remain stable after second run, rows=%+v", rows)
 	}
 
-	markers, err := taskRepo.ListBackfilledDatesByRange(day, day)
+	markers, err := taskRepo.ListBackfilledDatesByRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list backfill markers failed: %v", err)
 	}
@@ -283,11 +289,12 @@ func TestBackfillStatisticsMarkerSkipsPastDateOnSecondRun(t *testing.T) {
 }
 
 func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
+	ctx := context.Background()
 	svc, taskRepo, _ := newStatisticsTestService(t)
 	now := time.Now()
 	created := now.Add(-2 * time.Hour)
 	completed := created.Add(20 * time.Second)
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "status-task-1",
 		UserID:      101,
 		ChannelID:   1,
@@ -299,7 +306,7 @@ func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	before, err := svc.GetStatistics("7d")
+	before, err := svc.GetStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("GetStatistics before backfill failed: %v", err)
 	}
@@ -307,11 +314,11 @@ func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
 		t.Fatalf("expected missing days before backfill, got %+v", before.Backfill)
 	}
 
-	if _, err := svc.BackfillStatistics("7d"); err != nil {
+	if _, err := svc.BackfillStatistics(ctx, "7d"); err != nil {
 		t.Fatalf("BackfillStatistics failed: %v", err)
 	}
 
-	after, err := svc.GetStatistics("7d")
+	after, err := svc.GetStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("GetStatistics after backfill failed: %v", err)
 	}
@@ -342,6 +349,7 @@ func TestExtractTaskModelPrefersModelAndAvoidsMixedModelSet(t *testing.T) {
 }
 
 func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
+	ctx := context.Background()
 	svc, taskRepo, db := newStatisticsTestService(t)
 	accountRepo := NewAccountRepository(db)
 	svc.accountRepo = accountRepo
@@ -355,7 +363,7 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 		ApiKey:    "test",
 		Status:    1,
 	}
-	if err := accountRepo.Create(account); err != nil {
+	if err := accountRepo.Create(ctx, account); err != nil {
 		t.Fatalf("create account failed: %v", err)
 	}
 
@@ -371,7 +379,7 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 		CreatedAt:   created,
 		CompletedAt: &completed,
 	}
-	if err := taskRepo.Create(task); err != nil {
+	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
@@ -387,11 +395,11 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 		t.Fatalf("seed unknown daily stat failed: %v", err)
 	}
 
-	if _, err := svc.GetStatistics("7d"); err != nil {
+	if _, err := svc.GetStatistics(ctx, "7d"); err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
 
-	rows, err := taskRepo.ListDailyStatsByDateRange(day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}

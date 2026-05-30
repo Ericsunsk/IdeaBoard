@@ -65,7 +65,7 @@ func authorizeWorkspaceUploadRead(c *gin.Context, deps Dependencies, uploadPath 
 		return false
 	}
 
-	board, _, err := deps.BoardService.ResolveBoardAccess(userID, uploadPath.BoardSegment)
+	board, _, err := deps.BoardService.ResolveBoardAccess(c.Request.Context(), userID, uploadPath.BoardSegment)
 	if err != nil {
 		switch {
 		case errors.Is(err, boards.ErrInvalidBoardInput):
@@ -80,7 +80,7 @@ func authorizeWorkspaceUploadRead(c *gin.Context, deps Dependencies, uploadPath 
 		return false
 	}
 
-	owner, err := deps.UserRepo.GetByID(board.UserID)
+	owner, err := deps.UserRepo.GetByID(c.Request.Context(), board.UserID)
 	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
 		return false

@@ -87,7 +87,8 @@ func runInitAdmin() {
 	}
 
 	userRepo := users.NewUserRepository(db)
-	if err := userRepo.EnsureStorageUIDs(); err != nil {
+	ctx := context.Background()
+	if err := userRepo.EnsureStorageUIDs(ctx); err != nil {
 		log.Fatalf("Failed to ensure user storage uid: %v", err)
 	}
 	adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
@@ -96,7 +97,7 @@ func runInitAdmin() {
 	}
 
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
-	provisioned, err := authServiceClient.EnsureUser(context.Background(), "admin", adminPassword, true, "admin")
+	provisioned, err := authServiceClient.EnsureUser(ctx, "admin", adminPassword, true, "admin")
 	if err != nil {
 		log.Fatalf("Failed to ensure Better Auth admin user: %v", err)
 	}
@@ -119,12 +120,12 @@ func runInitAdmin() {
 			changed = true
 		}
 		if changed {
-			return userRepo.Update(user)
+			return userRepo.Update(ctx, user)
 		}
 		return nil
 	}
 
-	localAdmin, err := userRepo.GetByAuthUserID(provisioned.AuthUserID)
+	localAdmin, err := userRepo.GetByAuthUserID(ctx, provisioned.AuthUserID)
 	if err == nil {
 		if err := ensureLocalAdminRole(localAdmin); err != nil {
 			log.Fatalf("Failed to update local admin profile by auth_user_id: %v", err)
@@ -136,7 +137,7 @@ func runInitAdmin() {
 		log.Fatalf("Failed to query local admin by auth_user_id: %v", err)
 	}
 
-	localAdminByName, err := userRepo.GetByUsername("admin")
+	localAdminByName, err := userRepo.GetByUsername(ctx, "admin")
 	if err == nil {
 		log.Fatalf("Local username 'admin' already exists without matching Better Auth user (%s)", strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)))
 	}
@@ -150,7 +151,7 @@ func runInitAdmin() {
 		Role:       "admin",
 		Status:     1,
 	}
-	if err := userRepo.Create(localAdmin); err != nil {
+	if err := userRepo.Create(ctx, localAdmin); err != nil {
 		log.Fatalf("Failed to create local admin profile: %v", err)
 	}
 

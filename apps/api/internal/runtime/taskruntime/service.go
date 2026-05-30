@@ -58,7 +58,7 @@ func (s *Service) SetEventHub(hub EventHub) {
 }
 
 func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error {
-	enabledAccounts, err := s.accountRepo.GetAllEnabled()
+	enabledAccounts, err := s.accountRepo.GetAllEnabled(ctx)
 	if err != nil {
 		return err
 	}
@@ -136,11 +136,10 @@ func (s *Service) publishTaskStatusEvent(taskID, status string) {
 }
 
 func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID uint64) error {
-	_ = ctx
 	if accountID == 0 {
 		return ErrTaskStateConflict
 	}
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusPending}, map[string]interface{}{
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusPending}, map[string]interface{}{
 		"status":     tasks.StatusRunning,
 		"account_id": accountID,
 	})
@@ -152,7 +151,7 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 		return nil
 	}
 
-	task, err := s.taskRepo.GetByTaskID(taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrTaskNotFound
@@ -169,13 +168,12 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 }
 
 func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, result string) error {
-	_ = ctx
 	now := time.Now()
 	outputs, err := taskOutputsFromResult(taskID, result)
 	if err != nil {
 		return err
 	}
-	rows, err := s.taskRepo.CompleteWithOutputs(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+	rows, err := s.taskRepo.CompleteWithOutputs(ctx, taskID, []string{tasks.StatusRunning}, map[string]interface{}{
 		"status":       tasks.StatusCompleted,
 		"result":       result,
 		"error_msg":    "",
@@ -185,8 +183,8 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, result s
 		return err
 	}
 	if rows > 0 {
-		if task, getErr := s.taskRepo.GetByTaskID(taskID); getErr == nil {
-			if statErr := s.taskRepo.UpsertDailyStatByTask(task); statErr != nil {
+		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
+			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
 				log.Printf("[TaskRuntime] upsert daily stat failed after complete, task_id=%s err=%v", taskID, statErr)
 			}
 		} else {
@@ -196,7 +194,7 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, result s
 		return nil
 	}
 
-	task, err := s.taskRepo.GetByTaskID(taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrTaskNotFound
@@ -210,9 +208,8 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, result s
 }
 
 func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason string) error {
-	_ = ctx
 	now := time.Now()
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusPending, tasks.StatusRunning}, map[string]interface{}{
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusPending, tasks.StatusRunning}, map[string]interface{}{
 		"status":       tasks.StatusFailed,
 		"error_msg":    reason,
 		"result":       formatTaskFailureResult(taskID, reason),
@@ -222,8 +219,8 @@ func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason stri
 		return err
 	}
 	if rows > 0 {
-		if task, getErr := s.taskRepo.GetByTaskID(taskID); getErr == nil {
-			if statErr := s.taskRepo.UpsertDailyStatByTask(task); statErr != nil {
+		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
+			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
 				log.Printf("[TaskRuntime] upsert daily stat failed after fail, task_id=%s err=%v", taskID, statErr)
 			}
 		} else {
@@ -233,7 +230,7 @@ func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason stri
 		return nil
 	}
 
-	task, err := s.taskRepo.GetByTaskID(taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrTaskNotFound
@@ -250,7 +247,6 @@ func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason stri
 }
 
 func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, accountID uint64, reason string) error {
-	_ = ctx
 	if accountID == 0 {
 		return ErrTaskStateConflict
 	}
@@ -263,7 +259,7 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 		updates["error_msg"] = reason
 	}
 
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, updates)
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusRunning}, updates)
 	if err != nil {
 		return err
 	}
@@ -272,7 +268,7 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 		return nil
 	}
 
-	task, err := s.taskRepo.GetByTaskID(taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrTaskNotFound
@@ -289,11 +285,10 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 }
 
 func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, accountID uint64, errMsg string) (bool, error) {
-	_ = ctx
 	if accountID == 0 {
 		return false, ErrTaskStateConflict
 	}
-	task, err := s.taskRepo.GetByTaskID(taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, ErrTaskNotFound
@@ -311,7 +306,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+		rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusRunning}, map[string]interface{}{
 			"status":      tasks.StatusPending,
 			"account_id":  0,
 			"error_msg":   errMsg,
@@ -328,7 +323,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 	}
 
 	now := time.Now()
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusRunning}, map[string]interface{}{
 		"status":       tasks.StatusFailed,
 		"account_id":   0,
 		"error_msg":    errMsg,
@@ -340,8 +335,8 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 		return false, err
 	}
 	if rows > 0 {
-		if task, getErr := s.taskRepo.GetByTaskID(taskID); getErr == nil {
-			if statErr := s.taskRepo.UpsertDailyStatByTask(task); statErr != nil {
+		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
+			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
 				log.Printf("[TaskRuntime] upsert daily stat failed after failover-final-fail, task_id=%s err=%v", taskID, statErr)
 			}
 		} else {
@@ -351,7 +346,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 		return false, nil
 	}
 
-	latest, err := s.taskRepo.GetByTaskID(taskID)
+	latest, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, ErrTaskNotFound
@@ -368,22 +363,21 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 }
 
 func (s *Service) RecordAccountFailure(ctx context.Context, accountID uint64) (disabled bool, failCount int, err error) {
-	_ = ctx
 	if accountID == 0 {
 		return false, 0, nil
 	}
 
-	if err := s.accountRepo.IncrementFailCount(accountID); err != nil {
+	if err := s.accountRepo.IncrementFailCount(ctx, accountID); err != nil {
 		return false, 0, err
 	}
 
-	account, err := s.accountRepo.GetByID(accountID)
+	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		return false, 0, err
 	}
 
 	if account.FailCount >= accounts.MaxFailCount && account.Status != 0 {
-		if err := s.accountRepo.UpdateStatus(accountID, 0); err != nil {
+		if err := s.accountRepo.UpdateStatus(ctx, accountID, 0); err != nil {
 			return false, account.FailCount, err
 		}
 		return true, account.FailCount, nil
@@ -393,11 +387,10 @@ func (s *Service) RecordAccountFailure(ctx context.Context, accountID uint64) (d
 }
 
 func (s *Service) ResetAccountFailure(ctx context.Context, accountID uint64) error {
-	_ = ctx
 	if accountID == 0 {
 		return nil
 	}
-	return s.accountRepo.ResetFailCount(accountID)
+	return s.accountRepo.ResetFailCount(ctx, accountID)
 }
 
 func taskOutputsFromResult(taskID string, rawResult string) ([]tasks.TaskOutput, error) {

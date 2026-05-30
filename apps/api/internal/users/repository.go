@@ -1,6 +1,7 @@
 package users
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -54,11 +55,11 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 }
 
 // Create 创建用户
-func (r *UserRepository) Create(user *User) error {
+func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	if user == nil {
 		return fmt.Errorf("用户不能为空")
 	}
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		uid, err := allocateStorageUID(tx, strings.TrimSpace(user.StorageUID), 0)
 		if err != nil {
 			return err
@@ -69,9 +70,9 @@ func (r *UserRepository) Create(user *User) error {
 }
 
 // GetByID 根据ID获取用户
-func (r *UserRepository) GetByID(id uint64) (*User, error) {
+func (r *UserRepository) GetByID(ctx context.Context, id uint64) (*User, error) {
 	var user User
-	err := r.db.Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("id = ?", id).First(&user).Error
+	err := r.db.WithContext(ctx).Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("id = ?", id).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -79,9 +80,9 @@ func (r *UserRepository) GetByID(id uint64) (*User, error) {
 }
 
 // GetByUsername 根据用户名获取用户
-func (r *UserRepository) GetByUsername(username string) (*User, error) {
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
 	var user User
-	err := r.db.Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("username = ?", username).First(&user).Error
+	err := r.db.WithContext(ctx).Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("username = ?", username).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -89,9 +90,9 @@ func (r *UserRepository) GetByUsername(username string) (*User, error) {
 }
 
 // GetByAuthUserID 根据 Better Auth user id 获取用户
-func (r *UserRepository) GetByAuthUserID(authUserID string) (*User, error) {
+func (r *UserRepository) GetByAuthUserID(ctx context.Context, authUserID string) (*User, error) {
 	var user User
-	err := r.db.Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").
+	err := r.db.WithContext(ctx).Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").
 		Where("auth_user_id = ?", strings.TrimSpace(authUserID)).
 		First(&user).Error
 	if err != nil {
@@ -101,13 +102,13 @@ func (r *UserRepository) GetByAuthUserID(authUserID string) (*User, error) {
 }
 
 // GetByStorageUID 根据 storage uid 获取用户
-func (r *UserRepository) GetByStorageUID(storageUID string) (*User, error) {
+func (r *UserRepository) GetByStorageUID(ctx context.Context, storageUID string) (*User, error) {
 	normalized := strings.TrimSpace(storageUID)
 	if !IsValidStorageUID(normalized) {
 		return nil, gorm.ErrRecordNotFound
 	}
 	var user User
-	err := r.db.Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("storage_uid = ?", normalized).First(&user).Error
+	err := r.db.WithContext(ctx).Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("storage_uid = ?", normalized).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -115,13 +116,13 @@ func (r *UserRepository) GetByStorageUID(storageUID string) (*User, error) {
 }
 
 // Update 更新用户
-func (r *UserRepository) Update(user *User) error {
-	return r.db.Save(user).Error
+func (r *UserRepository) Update(ctx context.Context, user *User) error {
+	return r.db.WithContext(ctx).Save(user).Error
 }
 
 // Delete 删除用户及关联资产
-func (r *UserRepository) Delete(id uint64) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *UserRepository) Delete(ctx context.Context, id uint64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var user User
 		if err := tx.Select("id").Where("id = ?", id).First(&user).Error; err != nil {
 			return err
@@ -158,11 +159,11 @@ func (r *UserRepository) Delete(id uint64) error {
 }
 
 // List 获取用户列表
-func (r *UserRepository) List(keyword string, page, pageSize int) ([]*User, int64, error) {
+func (r *UserRepository) List(ctx context.Context, keyword string, page, pageSize int) ([]*User, int64, error) {
 	var users []*User
 	var total int64
 
-	query := r.db.Model(&User{})
+	query := r.db.WithContext(ctx).Model(&User{})
 
 	if keyword != "" {
 		query = query.Where("username LIKE ?", "%"+keyword+"%")
@@ -181,20 +182,20 @@ func (r *UserRepository) List(keyword string, page, pageSize int) ([]*User, int6
 }
 
 // UpdateStatus 更新用户状态
-func (r *UserRepository) UpdateStatus(id uint64, status int8) error {
-	return r.db.Model(&User{}).Where("id = ?", id).Update("status", status).Error
+func (r *UserRepository) UpdateStatus(ctx context.Context, id uint64, status int8) error {
+	return r.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Update("status", status).Error
 }
 
-func (r *UserRepository) UpdateRoleByID(id uint64, role string) error {
-	return r.db.Model(&User{}).Where("id = ?", id).Update("role", role).Error
+func (r *UserRepository) UpdateRoleByID(ctx context.Context, id uint64, role string) error {
+	return r.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Update("role", role).Error
 }
 
-func (r *UserRepository) UpdateAvatarByID(id uint64, avatar string) error {
-	return r.db.Model(&User{}).Where("id = ?", id).Update("avatar", strings.TrimSpace(avatar)).Error
+func (r *UserRepository) UpdateAvatarByID(ctx context.Context, id uint64, avatar string) error {
+	return r.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Update("avatar", strings.TrimSpace(avatar)).Error
 }
 
-func (r *UserRepository) EnsureStorageUIDs() error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var users []User
 		if err := tx.Select("id, storage_uid").Order("id ASC").Find(&users).Error; err != nil {
 			return err

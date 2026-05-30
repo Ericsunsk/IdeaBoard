@@ -1,6 +1,7 @@
 package users
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -54,7 +55,7 @@ func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
 		Status:     1,
 		StorageUID: "ABC123",
 	}
-	if err := repo.Create(user); err != nil {
+	if err := repo.Create(context.Background(), user); err != nil {
 		t.Fatalf("create user failed: %v", err)
 	}
 
@@ -84,7 +85,7 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 		Status:     1,
 		StorageUID: originalUID,
 	}
-	if err := repo.Create(first); err != nil {
+	if err := repo.Create(context.Background(), first); err != nil {
 		t.Fatalf("create first user failed: %v", err)
 	}
 
@@ -108,7 +109,7 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 		t.Fatalf("seed tasks failed: %v", err)
 	}
 
-	if err := repo.Delete(first.ID); err != nil {
+	if err := repo.Delete(context.Background(), first.ID); err != nil {
 		t.Fatalf("delete user failed: %v", err)
 	}
 
@@ -141,7 +142,7 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 		Status:     1,
 		StorageUID: originalUID,
 	}
-	if err := repo.Create(second); err != nil {
+	if err := repo.Create(context.Background(), second); err != nil {
 		t.Fatalf("create second user failed: %v", err)
 	}
 

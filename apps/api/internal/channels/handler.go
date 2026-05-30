@@ -39,7 +39,7 @@ func NewChannelHandler(channelRepo *ChannelRepository, appEnv ...string) *Channe
 }
 
 func (h *ChannelHandler) List(c *gin.Context) {
-	channels, err := h.channelRepo.List()
+	channels, err := h.channelRepo.List(c.Request.Context())
 	if err != nil {
 		response.Error(c, 500, "获取渠道商列表失败")
 		return
@@ -73,7 +73,7 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 		Status: 1,
 	}
 
-	if err := h.channelRepo.Create(channel); err != nil {
+	if err := h.channelRepo.Create(c.Request.Context(), channel); err != nil {
 		response.InternalError(c, 500, "创建渠道商失败", err)
 		return
 	}
@@ -100,7 +100,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 		return
 	}
 
-	channel, err := h.channelRepo.GetByID(id)
+	channel, err := h.channelRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
 		response.Error(c, 404, "渠道商不存在")
 		return
@@ -116,7 +116,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 	channel.Name = req.Name
 	channel.ApiURL = apiURL
 
-	if err := h.channelRepo.Update(channel); err != nil {
+	if err := h.channelRepo.Update(c.Request.Context(), channel); err != nil {
 		response.InternalError(c, 500, "更新渠道商失败", err)
 		return
 	}
@@ -131,7 +131,7 @@ func (h *ChannelHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.channelRepo.Delete(id); err != nil {
+	if err := h.channelRepo.Delete(c.Request.Context(), id); err != nil {
 		response.InternalError(c, 500, "删除渠道商失败", err)
 		return
 	}

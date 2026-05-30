@@ -29,7 +29,7 @@ func (h *FeaturePromptHandler) GetPrompt(c *gin.Context) {
 		return
 	}
 
-	prompt, err := h.configRepo.Get(FeaturePromptConfigKey(slug))
+	prompt, err := h.configRepo.Get(c.Request.Context(), FeaturePromptConfigKey(slug))
 	if err != nil {
 		// 不存在则返回空
 		response.Success(c, gin.H{"slug": slug, "prompt": ""})
@@ -59,7 +59,7 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 		return
 	}
 
-	if err := h.configRepo.Set(FeaturePromptConfigKey(slug), req.Prompt); err != nil {
+	if err := h.configRepo.Set(c.Request.Context(), FeaturePromptConfigKey(slug), req.Prompt); err != nil {
 		response.InternalError(c, 500, "保存失败", err)
 		return
 	}
@@ -69,7 +69,7 @@ func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
 
 // ListPrompts 获取所有功能的系统提示词
 func (h *FeaturePromptHandler) ListPrompts(c *gin.Context) {
-	prompts, err := h.configRepo.GetByPrefix(FeaturePromptConfigKeyPrefix)
+	prompts, err := h.configRepo.GetByPrefix(c.Request.Context(), FeaturePromptConfigKeyPrefix)
 	if err != nil {
 		response.InternalError(c, 500, "获取失败", err)
 		return

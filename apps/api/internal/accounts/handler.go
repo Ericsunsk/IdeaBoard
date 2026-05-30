@@ -31,7 +31,8 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	accounts, total, err := h.accountService.ListAccounts(&req)
+	ctx := c.Request.Context()
+	accounts, total, err := h.accountService.ListAccounts(ctx, &req)
 	if err != nil {
 		response.InternalError(c, 500, "获取账号列表失败", err)
 		return
@@ -46,12 +47,13 @@ func (h *AccountHandler) GetAccount(c *gin.Context) {
 		response.Error(c, 400, "无效的账号ID")
 		return
 	}
-	account, err := h.accountService.GetAccount(id)
+	ctx := c.Request.Context()
+	account, err := h.accountService.GetAccount(ctx, id)
 	if err != nil {
 		response.Error(c, 404, "账号不存在")
 		return
 	}
-	concurrent, maxConcurrent, _ := h.accountService.GetAccountQueueInfo(id)
+	concurrent, maxConcurrent, _ := h.accountService.GetAccountQueueInfo(ctx, id)
 	response.Success(c, gin.H{"account": account, "current_concurrent": concurrent, "max_concurrent": maxConcurrent})
 }
 
@@ -61,7 +63,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	account, err := h.accountService.CreateAccount(&req)
+	account, err := h.accountService.CreateAccount(c.Request.Context(), &req)
 	if err != nil {
 		response.InternalError(c, 500, "创建失败", err)
 		return
@@ -81,7 +83,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	if err := h.accountService.UpdateAccount(id, &req); err != nil {
+	if err := h.accountService.UpdateAccount(c.Request.Context(), id, &req); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -95,7 +97,7 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 		response.Error(c, 400, "无效的账号ID")
 		return
 	}
-	if err := h.accountService.DeleteAccount(id); err != nil {
+	if err := h.accountService.DeleteAccount(c.Request.Context(), id); err != nil {
 		response.InternalError(c, 500, "删除失败", err)
 		return
 	}
@@ -109,7 +111,7 @@ func (h *AccountHandler) StartAccount(c *gin.Context) {
 		response.Error(c, 400, "无效的账号ID")
 		return
 	}
-	if err := h.accountService.StartAccount(id); err != nil {
+	if err := h.accountService.StartAccount(c.Request.Context(), id); err != nil {
 		response.InternalError(c, 500, "启动失败", err)
 		return
 	}
@@ -123,7 +125,7 @@ func (h *AccountHandler) StopAccount(c *gin.Context) {
 		response.Error(c, 400, "无效的账号ID")
 		return
 	}
-	if err := h.accountService.StopAccount(id); err != nil {
+	if err := h.accountService.StopAccount(c.Request.Context(), id); err != nil {
 		response.InternalError(c, 500, "停止失败", err)
 		return
 	}
@@ -137,7 +139,7 @@ func (h *AccountHandler) GetAccountQueue(c *gin.Context) {
 		response.Error(c, 400, "无效的账号ID")
 		return
 	}
-	concurrent, maxConcurrent, err := h.accountService.GetAccountQueueInfo(id)
+	concurrent, maxConcurrent, err := h.accountService.GetAccountQueueInfo(c.Request.Context(), id)
 	if err != nil {
 		response.InternalError(c, 500, "获取失败", err)
 		return
@@ -158,7 +160,7 @@ func (h *AccountHandler) SubmitTask(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	taskID, err := h.accountService.SubmitTask(userID, &req)
+	taskID, err := h.accountService.SubmitTask(c.Request.Context(), userID, &req)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return
@@ -177,7 +179,7 @@ func (h *AccountHandler) CheckSubmitTaskReadiness(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	featureSlug, err := h.accountService.CheckSubmitTaskReadiness(&req)
+	featureSlug, err := h.accountService.CheckSubmitTaskReadiness(c.Request.Context(), &req)
 	if err != nil {
 		response.Success(c, gin.H{"ready": false, "message": err.Error()})
 		return
@@ -187,7 +189,7 @@ func (h *AccountHandler) CheckSubmitTaskReadiness(c *gin.Context) {
 
 func (h *AccountHandler) GetTask(c *gin.Context) {
 	taskID := c.Param("task_id")
-	task, err := h.accountService.GetTask(taskID)
+	task, err := h.accountService.GetTask(c.Request.Context(), taskID)
 	if err != nil {
 		response.Error(c, 404, "任务不存在")
 		return
@@ -201,7 +203,7 @@ func (h *AccountHandler) ListTasks(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	tasks, total, err := h.accountService.ListTasks(&req)
+	tasks, total, err := h.accountService.ListTasks(c.Request.Context(), &req)
 	if err != nil {
 		response.InternalError(c, 500, "获取任务列表失败", err)
 		return
@@ -213,7 +215,7 @@ func (h *AccountHandler) GetUserTasks(c *gin.Context) {
 	userID := c.GetUint64("user_id")
 	var req tasks.TaskListRequest
 	c.ShouldBindQuery(&req)
-	tasks, total, _ := h.accountService.GetUserTasks(userID, req.Page, req.PageSize)
+	tasks, total, _ := h.accountService.GetUserTasks(c.Request.Context(), userID, req.Page, req.PageSize)
 	// 返回用户安全视图，隐藏内部关键词
 	safeList := make([]map[string]interface{}, len(tasks))
 	for i, t := range tasks {
@@ -226,7 +228,7 @@ func (h *AccountHandler) GetUserTasks(c *gin.Context) {
 func (h *AccountHandler) GetUserTask(c *gin.Context) {
 	userID := c.GetUint64("user_id")
 	taskID := c.Param("task_id")
-	task, err := h.accountService.GetUserTask(taskID, userID)
+	task, err := h.accountService.GetUserTask(c.Request.Context(), taskID, userID)
 	if err != nil {
 		response.Error(c, 404, "任务不存在")
 		return
@@ -242,7 +244,8 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 		response.Error(c, http.StatusUnauthorized, "未登录")
 		return
 	}
-	task, err := h.accountService.GetUserTask(taskID, userID)
+	ctx := c.Request.Context()
+	task, err := h.accountService.GetUserTask(ctx, taskID, userID)
 	if err != nil {
 		response.Error(c, http.StatusNotFound, "任务不存在")
 		return
@@ -278,7 +281,7 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 	defer unsubscribe()
 
 	// Re-read after subscribing to close the race between initial load and status publish.
-	task, err = h.accountService.GetUserTask(taskID, userID)
+	task, err = h.accountService.GetUserTask(ctx, taskID, userID)
 	if err != nil {
 		return
 	}
@@ -306,7 +309,7 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 				return
 			}
 		case <-events:
-			latest, err := h.accountService.GetUserTask(taskID, userID)
+			latest, err := h.accountService.GetUserTask(ctx, taskID, userID)
 			if err != nil {
 				return
 			}
@@ -340,7 +343,7 @@ func writeSSEvent(c *gin.Context, event string, data interface{}) bool {
 func (h *AccountHandler) DeleteUserTask(c *gin.Context) {
 	userID := c.GetUint64("user_id")
 	taskID := c.Param("task_id")
-	if err := h.accountService.DeleteUserTask(taskID, userID); err != nil {
+	if err := h.accountService.DeleteUserTask(c.Request.Context(), taskID, userID); err != nil {
 		response.Error(c, 500, "删除失败")
 		return
 	}
@@ -350,17 +353,18 @@ func (h *AccountHandler) DeleteUserTask(c *gin.Context) {
 // ============ 监控 API ============
 
 func (h *AccountHandler) GetMonitor(c *gin.Context) {
-	info, err := h.accountService.GetMonitorInfo()
+	ctx := c.Request.Context()
+	info, err := h.accountService.GetMonitorInfo(ctx)
 	if err != nil {
 		response.InternalError(c, 500, "获取监控数据失败", err)
 		return
 	}
-	stats, _ := h.accountService.GetTaskStats()
+	stats, _ := h.accountService.GetTaskStats(ctx)
 	response.Success(c, gin.H{"monitor": info, "stats": stats})
 }
 
 func (h *AccountHandler) GetStatistics(c *gin.Context) {
-	stats, err := h.accountService.GetStatistics(c.Query("range"))
+	stats, err := h.accountService.GetStatistics(c.Request.Context(), c.Query("range"))
 	if err != nil {
 		response.InternalError(c, 500, "获取统计数据失败", err)
 		return
@@ -383,7 +387,7 @@ func (h *AccountHandler) BackfillStatistics(c *gin.Context) {
 		req.Range = string(StatisticsRange7D)
 	}
 
-	result, err := h.accountService.BackfillStatistics(req.Range)
+	result, err := h.accountService.BackfillStatistics(c.Request.Context(), req.Range)
 	if err != nil {
 		response.InternalError(c, 500, "补录统计失败", err)
 		return

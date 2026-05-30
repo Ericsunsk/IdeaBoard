@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -33,7 +34,7 @@ func writeStorageProfilesConfig(t *testing.T, repo *settings.SystemConfigReposit
 	if err != nil {
 		t.Fatalf("marshal profiles failed: %v", err)
 	}
-	if err := repo.Set(StorageProfilesConfigKey, string(raw)); err != nil {
+	if err := repo.Set(context.Background(), StorageProfilesConfigKey, string(raw)); err != nil {
 		t.Fatalf("write profiles config failed: %v", err)
 	}
 }
@@ -41,7 +42,7 @@ func writeStorageProfilesConfig(t *testing.T, repo *settings.SystemConfigReposit
 func TestListProfilesStartsWithLocalProfile(t *testing.T) {
 	service, _ := newStorageServiceTest(t)
 
-	profiles, err := service.ListProfiles()
+	profiles, err := service.ListProfiles(context.Background())
 	if err != nil {
 		t.Fatalf("ListProfiles returned error: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestListProfilesDropsUnsupportedCurrentProvider(t *testing.T) {
 		},
 	})
 
-	profiles, err := service.ListProfiles()
+	profiles, err := service.ListProfiles(context.Background())
 	if err != nil {
 		t.Fatalf("ListProfiles returned error: %v", err)
 	}
@@ -114,7 +115,7 @@ func TestListProfilesDropsUnsupportedNonCurrentProvider(t *testing.T) {
 		},
 	})
 
-	profiles, err := service.ListProfiles()
+	profiles, err := service.ListProfiles(context.Background())
 	if err != nil {
 		t.Fatalf("ListProfiles returned error: %v", err)
 	}
@@ -129,7 +130,7 @@ func TestListProfilesDropsUnsupportedNonCurrentProvider(t *testing.T) {
 func TestCreatedStorageProfileCanBecomeRuntimeActiveProfile(t *testing.T) {
 	service, _ := newStorageServiceTest(t)
 
-	saved, err := service.SaveProfile(&StorageProfile{
+	saved, err := service.SaveProfile(context.Background(), &StorageProfile{
 		Name:     "OSS 存储",
 		Provider: StorageProviderS3Compatible,
 		Enabled:  true,
@@ -147,11 +148,11 @@ func TestCreatedStorageProfileCanBecomeRuntimeActiveProfile(t *testing.T) {
 		t.Fatalf("SaveProfile returned error: %v", err)
 	}
 
-	if _, err := service.ApplyProfile(saved.ID); err != nil {
+	if _, err := service.ApplyProfile(context.Background(), saved.ID); err != nil {
 		t.Fatalf("ApplyProfile returned error: %v", err)
 	}
 
-	active, err := service.resolveActiveProfile()
+	active, err := service.resolveActiveProfile(context.Background())
 	if err != nil {
 		t.Fatalf("resolveActiveProfile returned error: %v", err)
 	}
@@ -166,7 +167,7 @@ func TestCreatedStorageProfileCanBecomeRuntimeActiveProfile(t *testing.T) {
 func TestSaveProfileAllowsMultipleProfilesForSameProvider(t *testing.T) {
 	service, _ := newStorageServiceTest(t)
 
-	first, err := service.SaveProfile(&StorageProfile{
+	first, err := service.SaveProfile(context.Background(), &StorageProfile{
 		ID:       "s3-account-a",
 		Name:     "OSS 主账号",
 		Provider: StorageProviderS3Compatible,
@@ -185,7 +186,7 @@ func TestSaveProfileAllowsMultipleProfilesForSameProvider(t *testing.T) {
 		t.Fatalf("SaveProfile first returned error: %v", err)
 	}
 
-	second, err := service.SaveProfile(&StorageProfile{
+	second, err := service.SaveProfile(context.Background(), &StorageProfile{
 		ID:       "s3-account-b",
 		Name:     "OSS 备用账号",
 		Provider: StorageProviderS3Compatible,
@@ -207,7 +208,7 @@ func TestSaveProfileAllowsMultipleProfilesForSameProvider(t *testing.T) {
 		t.Fatalf("profiles for the same provider should have distinct ids")
 	}
 
-	profiles, err := service.ListProfiles()
+	profiles, err := service.ListProfiles(context.Background())
 	if err != nil {
 		t.Fatalf("ListProfiles returned error: %v", err)
 	}

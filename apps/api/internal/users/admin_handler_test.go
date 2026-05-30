@@ -40,7 +40,7 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 		Role:       "user",
 		Status:     1,
 	}
-	if err := repo.Create(targetUser); err != nil {
+	if err := repo.Create(context.Background(), targetUser); err != nil {
 		t.Fatalf("create target user failed: %v", err)
 	}
 	if err := db.Exec(`INSERT INTO tasks (user_id) VALUES (?)`, targetUser.ID).Error; err != nil {
@@ -66,7 +66,7 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 		t.Fatalf("deleted auth user id = %q, want %q", authManager.deletedAuthUserID, authUserID)
 	}
 
-	if _, err := repo.GetByID(targetUser.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+	if _, err := repo.GetByID(context.Background(), targetUser.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("target user lookup err = %v, want record not found", err)
 	}
 	var taskCount int64

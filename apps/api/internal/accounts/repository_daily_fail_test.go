@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -24,11 +25,12 @@ func newTaskRepositoryTestDB(t *testing.T) *TaskRepository {
 }
 
 func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
+	ctx := context.Background()
 	taskRepo := newTaskRepositoryTestDB(t)
 	accountID := uint64(66)
 	createdAt := time.Now().Add(-10 * time.Minute)
 
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:    "acc-fail-1",
 		UserID:    10,
 		ChannelID: 1,
@@ -39,7 +41,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed task1 failed: %v", err)
 	}
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:    "acc-fail-2",
 		UserID:    10,
 		ChannelID: 1,
@@ -51,7 +53,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("seed task2 failed: %v", err)
 	}
 
-	affected, err := taskRepo.FailRunningByAccountID(accountID, "stopped")
+	affected, err := taskRepo.FailRunningByAccountID(ctx, accountID, "stopped")
 	if err != nil {
 		t.Fatalf("FailRunningByAccountID failed: %v", err)
 	}
@@ -60,7 +62,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	}
 
 	day := createdAt.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -81,6 +83,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 }
 
 func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
+	ctx := context.Background()
 	taskRepo := newTaskRepositoryTestDB(t)
 	createdAt := time.Now().Add(-1 * time.Minute)
 	completedAt := createdAt.Add(10 * time.Second)
@@ -93,15 +96,15 @@ func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 		CompletedAt: &completedAt,
 	}
 
-	if err := taskRepo.UpsertDailyStatByTask(task); err != nil {
+	if err := taskRepo.UpsertDailyStatByTask(ctx, task); err != nil {
 		t.Fatalf("first upsert failed: %v", err)
 	}
-	if err := taskRepo.UpsertDailyStatByTask(task); err != nil {
+	if err := taskRepo.UpsertDailyStatByTask(ctx, task); err != nil {
 		t.Fatalf("second upsert failed: %v", err)
 	}
 
 	day := createdAt.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -111,6 +114,7 @@ func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 }
 
 func TestUpsertDailyStatByTaskWithFallbackModelUsesProvidedSingleModel(t *testing.T) {
+	ctx := context.Background()
 	taskRepo := newTaskRepositoryTestDB(t)
 	createdAt := time.Now().Add(-2 * time.Minute)
 	completedAt := createdAt.Add(15 * time.Second)
@@ -124,12 +128,12 @@ func TestUpsertDailyStatByTaskWithFallbackModelUsesProvidedSingleModel(t *testin
 		CompletedAt: &completedAt,
 	}
 
-	if err := taskRepo.UpsertDailyStatByTaskWithFallbackModel(task, "model-fallback"); err != nil {
+	if err := taskRepo.UpsertDailyStatByTaskWithFallbackModel(ctx, task, "model-fallback"); err != nil {
 		t.Fatalf("upsert with fallback failed: %v", err)
 	}
 
 	day := createdAt.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}

@@ -66,7 +66,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	// 如果账号绑定了渠道商，使用渠道商的 API URL 作为 ProxyURL
 	channelName := ""
 	if account.ChannelID > 0 && c.channelRepo != nil {
-		channel, err := c.channelRepo.GetByID(account.ChannelID)
+		channel, err := c.channelRepo.GetByID(ctx, account.ChannelID)
 		if err != nil {
 			return "", fmt.Errorf("渠道商(ID=%d)不存在: %v", account.ChannelID, err)
 		}
@@ -184,7 +184,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 	}
 
 	usesObjectStorage := c.storageService.UsesObjectStorage()
-	log.Printf("[Worker] 存储检查: service=true, objectStorage=%v, directFetch=%v, imageCount=%d", usesObjectStorage, c.storageService.IsDirectFetchEnabled(), len(imageURLs))
+	log.Printf("[Worker] 存储检查: service=true, objectStorage=%v, imageCount=%d", usesObjectStorage, len(imageURLs))
 
 	next := append([]string(nil), imageURLs...)
 	for index, currentURL := range next {

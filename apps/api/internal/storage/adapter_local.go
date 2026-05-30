@@ -26,10 +26,6 @@ func (a *localStorageAdapter) IsProfileReady(profile StorageProfile) bool {
 	return true
 }
 
-func (a *localStorageAdapter) IsDirectFetchEnabled(profile *StorageProfile) bool {
-	return false
-}
-
 func (a *localStorageAdapter) TestProfile(profile *StorageProfile) error {
 	return nil
 }

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -41,7 +42,7 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) 
 			return
 		}
 
-		user, err := resolveLocalUserByAuthIdentity(userRepo, identity)
+		user, err := resolveLocalUserByAuthIdentity(c.Request.Context(), userRepo, identity)
 		if err != nil {
 			response.InternalError(c, http.StatusUnauthorized, "用户不存在或已停用", err)
 			c.Abort()
@@ -61,7 +62,7 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) 
 	}
 }
 
-func resolveLocalUserByAuthIdentity(userRepo *users.UserRepository, identity *SessionIdentity) (*users.User, error) {
+func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRepository, identity *SessionIdentity) (*users.User, error) {
 	if userRepo == nil || identity == nil {
 		return nil, fmt.Errorf("invalid auth identity mapping input")
 	}
@@ -70,7 +71,7 @@ func resolveLocalUserByAuthIdentity(userRepo *users.UserRepository, identity *Se
 		return nil, fmt.Errorf("auth user id is empty")
 	}
 
-	user, err := userRepo.GetByAuthUserID(authUserID)
+	user, err := userRepo.GetByAuthUserID(ctx, authUserID)
 	if err == nil {
 		return user, nil
 	}
@@ -80,7 +81,7 @@ func resolveLocalUserByAuthIdentity(userRepo *users.UserRepository, identity *Se
 
 	preferredUsername := users.NormalizeAuthUsername(identity.Username, identity.Email, authUserID)
 	if preferredUsername != "" {
-		existing, lookupErr := userRepo.GetByUsername(preferredUsername)
+		existing, lookupErr := userRepo.GetByUsername(ctx, preferredUsername)
 		if lookupErr == nil {
 			existingAuthUserID := strings.TrimSpace(derefString(existing.AuthUserID))
 			if strings.EqualFold(existingAuthUserID, authUserID) {
@@ -99,7 +100,7 @@ func resolveLocalUserByAuthIdentity(userRepo *users.UserRepository, identity *Se
 			Status:     1,
 			Role:       "user",
 		}
-		createErr := userRepo.Create(localUser)
+		createErr := userRepo.Create(ctx, localUser)
 		if createErr == nil {
 			return localUser, nil
 		}
@@ -108,7 +109,7 @@ func resolveLocalUserByAuthIdentity(userRepo *users.UserRepository, identity *Se
 		}
 	}
 
-	user, err = userRepo.GetByAuthUserID(authUserID)
+	user, err = userRepo.GetByAuthUserID(ctx, authUserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve user profile for auth user %s: %w", authUserID, err)
 	}

@@ -41,7 +41,7 @@ func TestExecuteDropsDuplicateTaskWhenAlreadyRunningOnSameAccount(t *testing.T) 
 	taskRepo := accounts.NewTaskRepository(db)
 	account := createAsynqTestAccount(t, accountRepo, "dup-running-account")
 
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(context.Background(), &tasks.Task{
 		TaskID:    "dup-running-task",
 		UserID:    1,
 		ChannelID: 1,
@@ -77,7 +77,7 @@ func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 	taskRepo := accounts.NewTaskRepository(db)
 	account := createAsynqTestAccount(t, accountRepo, "complete-fail-account")
 
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(context.Background(), &tasks.Task{
 		TaskID:    "complete-fail-task",
 		UserID:    1,
 		ChannelID: 1,
@@ -117,7 +117,7 @@ func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	taskRepo := accounts.NewTaskRepository(db)
 	account := createAsynqTestAccount(t, accountRepo, "failed-fail-account")
 
-	if err := taskRepo.Create(&tasks.Task{
+	if err := taskRepo.Create(context.Background(), &tasks.Task{
 		TaskID:    "failed-fail-task",
 		UserID:    1,
 		ChannelID: 1,

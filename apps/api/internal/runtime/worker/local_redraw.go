@@ -155,7 +155,7 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, redraw
 		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(composedBytes), false, nil
 	}
 	filename := fmt.Sprintf("local-redraw-%s-%d.png", sanitizeFeatureSlug(redraw.featureSlug), time.Now().UnixNano())
-	storedURL, err := c.storageService.StoreBytes(filename, composedBytes, storage.StorageStoreOptions{})
+	storedURL, err := c.storageService.StoreBytes(ctx, filename, composedBytes, storage.StorageStoreOptions{})
 	if err != nil {
 		return "", false, fmt.Errorf("local redraw 持久化失败: feature=%s err=%w", redraw.featureSlug, err)
 	}

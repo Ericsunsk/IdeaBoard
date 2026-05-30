@@ -67,7 +67,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	)
 
 	userRepo := users.NewUserRepository(db)
-	if err := userRepo.EnsureStorageUIDs(); err != nil {
+	if err := userRepo.EnsureStorageUIDs(context.Background()); err != nil {
 		return nil, fmt.Errorf("Failed to ensure user storage uid: %w", err)
 	}
 	accountRepo := accounts.NewAccountRepository(db)
@@ -90,7 +90,6 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		redisAsynqAssigner,
 		asynqQueue,
 		systemConfigRepo,
-		storageService,
 	)
 	accountService.SetTaskEventHub(taskEventHub)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"testing"
 
 	"api/internal/users"
@@ -35,11 +36,11 @@ func TestResolveLocalUserByAuthIdentityDoesNotBindExistingUsername(t *testing.T)
 
 	userRepo := users.NewUserRepository(db)
 	existing := &users.User{Username: "alice", Status: 1, Role: "user"}
-	if err := userRepo.Create(existing); err != nil {
+	if err := userRepo.Create(context.Background(), existing); err != nil {
 		t.Fatalf("seed existing user failed: %v", err)
 	}
 
-	resolved, err := resolveLocalUserByAuthIdentity(userRepo, &SessionIdentity{
+	resolved, err := resolveLocalUserByAuthIdentity(context.Background(), userRepo, &SessionIdentity{
 		AuthUserID: "auth-1234567890",
 		Username:   "alice",
 	})
@@ -56,7 +57,7 @@ func TestResolveLocalUserByAuthIdentityDoesNotBindExistingUsername(t *testing.T)
 		t.Fatalf("resolved auth_user_id = %#v, want auth-1234567890", resolved.AuthUserID)
 	}
 
-	unchanged, err := userRepo.GetByID(existing.ID)
+	unchanged, err := userRepo.GetByID(context.Background(), existing.ID)
 	if err != nil {
 		t.Fatalf("reload existing user failed: %v", err)
 	}

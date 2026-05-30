@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -227,7 +228,7 @@ func mustCreateUploadStaticUser(t *testing.T, repo *users.UserRepository, userna
 		Role:       "user",
 		Status:     1,
 	}
-	if err := repo.Create(user); err != nil {
+	if err := repo.Create(context.Background(), user); err != nil {
 		t.Fatalf("create user %s failed: %v", username, err)
 	}
 	return user

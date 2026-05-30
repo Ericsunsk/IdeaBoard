@@ -19,7 +19,7 @@ func (h *StorageHandler) ListProviders(c *gin.Context) {
 }
 
 func (h *StorageHandler) ListProfiles(c *gin.Context) {
-	profiles, err := h.storageService.ListProfiles()
+	profiles, err := h.storageService.ListProfiles(c.Request.Context())
 	if err != nil {
 		response.Error(c, 500, "获取存储列表失败")
 		return
@@ -34,7 +34,7 @@ func (h *StorageHandler) CreateProfile(c *gin.Context) {
 		return
 	}
 
-	profile, err := h.storageService.SaveProfile(&req)
+	profile, err := h.storageService.SaveProfile(c.Request.Context(), &req)
 	if err != nil {
 		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
 		return
@@ -50,7 +50,7 @@ func (h *StorageHandler) UpdateProfile(c *gin.Context) {
 	}
 	req.ID = c.Param("id")
 
-	profile, err := h.storageService.SaveProfile(&req)
+	profile, err := h.storageService.SaveProfile(c.Request.Context(), &req)
 	if err != nil {
 		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
 		return
@@ -59,7 +59,7 @@ func (h *StorageHandler) UpdateProfile(c *gin.Context) {
 }
 
 func (h *StorageHandler) DeleteProfile(c *gin.Context) {
-	if err := h.storageService.DeleteProfile(c.Param("id")); err != nil {
+	if err := h.storageService.DeleteProfile(c.Request.Context(), c.Param("id")); err != nil {
 		response.InternalError(c, 400, "删除失败，请检查配置或稍后重试", err)
 		return
 	}
@@ -67,7 +67,7 @@ func (h *StorageHandler) DeleteProfile(c *gin.Context) {
 }
 
 func (h *StorageHandler) ApplyProfile(c *gin.Context) {
-	profile, err := h.storageService.ApplyProfile(c.Param("id"))
+	profile, err := h.storageService.ApplyProfile(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		response.InternalError(c, 400, "设为当前失败，请检查配置或稍后重试", err)
 		return
@@ -76,7 +76,7 @@ func (h *StorageHandler) ApplyProfile(c *gin.Context) {
 }
 
 func (h *StorageHandler) TestProfile(c *gin.Context) {
-	if err := h.storageService.TestProfile(c.Param("id")); err != nil {
+	if err := h.storageService.TestProfile(c.Request.Context(), c.Param("id")); err != nil {
 		response.InternalError(c, 400, "连接测试失败，请检查配置或稍后重试", err)
 		return
 	}
@@ -84,7 +84,7 @@ func (h *StorageHandler) TestProfile(c *gin.Context) {
 }
 
 func (h *StorageHandler) GetBucketInfo(c *gin.Context) {
-	info, err := h.storageService.GetBucketInfo(c.Param("id"))
+	info, err := h.storageService.GetBucketInfo(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		response.InternalError(c, 400, "获取 Bucket 信息失败，请检查配置或稍后重试", err)
 		return

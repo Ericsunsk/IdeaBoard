@@ -1,6 +1,7 @@
 package users
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -10,7 +11,7 @@ func TestListUsersRejectsOverlongKeyword(t *testing.T) {
 	repo := NewUserRepository(db)
 	service := NewUserService(repo)
 
-	_, err := service.ListUsers(&UserListRequest{
+	_, err := service.ListUsers(context.Background(), &UserListRequest{
 		Keyword:  strings.Repeat("a", maxUserKeywordLength+1),
 		Page:     1,
 		PageSize: 10,
