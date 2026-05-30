@@ -111,7 +111,9 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
 	})
 
 	os.MkdirAll("uploads", 0755)
-	r.Static("/uploads", "./uploads")
+	uploadsHandler := uploadStaticHandler(deps)
+	r.GET("/uploads/*filepath", uploadsHandler)
+	r.HEAD("/uploads/*filepath", uploadsHandler)
 
 	userAPI := r.Group("/api/user")
 	userAPI.Use(auth.AuthMiddleware(deps.AuthServiceClient, deps.UserRepo))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"api/internal/runtime/queuetypes"
@@ -14,6 +15,7 @@ import (
 const (
 	KeyAccountConcurrent = "drawing:api:concurrent"
 	KeyRunningTasks      = "drawing:task:running"
+	KeyTaskLeases        = "drawing:task:leases"
 	KeyTaskCancelPrefix  = "drawing:task:cancelled"
 
 	AssignTaskStatusAssigned   = "assigned"
@@ -24,6 +26,13 @@ const (
 const luaTryAssignTask = `
 local account_ids = cjson.decode(ARGV[1])
 local max_concurrent_key = ARGV[2]
+local task_id = ARGV[3]
+local lease_key = ARGV[4]
+local running_key = ARGV[5]
+
+if redis.call("HEXISTS", lease_key, task_id) == 1 then
+    return "-1"
+end
 
 local best_account = -1
 local best_load = 999999
@@ -48,7 +57,8 @@ end
 
 local concurrent_key = max_concurrent_key .. ":" .. best_account
 redis.call("HINCRBY", concurrent_key, "count", 1)
-redis.call("SADD", "drawing:task:running", ARGV[3])
+redis.call("HSET", lease_key, task_id, best_account)
+redis.call("SADD", running_key, task_id)
 return tostring(best_account)
 `
 
@@ -57,16 +67,36 @@ const luaReleaseTask = `
 local account_id = ARGV[1]
 local task_id = ARGV[2]
 local concurrent_key = ARGV[3]
+local lease_key = ARGV[4]
+local running_key = ARGV[5]
 
-local current = redis.call("HINCRBY", concurrent_key, "count", -1)
-if tonumber(current) < 0 then
+local leased_account = redis.call("HGET", lease_key, task_id)
+if leased_account then
+    if tostring(leased_account) ~= tostring(account_id) then
+        return "wrong_account"
+    end
+
+    redis.call("HDEL", lease_key, task_id)
+    redis.call("SREM", running_key, task_id)
+    local current = redis.call("HINCRBY", concurrent_key, "count", -1)
+    if tonumber(current) < 0 then
+        redis.call("HSET", concurrent_key, "count", 0)
+    end
+    return "released"
+end
+
+local current = tonumber(redis.call("HGET", concurrent_key, "count")) or 0
+if current < 0 then
     redis.call("HSET", concurrent_key, "count", 0)
 end
 
-redis.call("SREM", "drawing:task:running", task_id)
-
-return "ok"
+return "no_lease"
 `
+
+type TaskLease struct {
+	TaskID    string
+	AccountID uint64
+}
 
 type RedisManager struct {
 	rdb *redis.Client
@@ -130,6 +160,8 @@ func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, t
 		string(idsJSON),
 		KeyAccountConcurrent,
 		taskID,
+		KeyTaskLeases,
+		KeyRunningTasks,
 	).Result()
 	if err != nil {
 		return 0, "", err
@@ -143,8 +175,10 @@ func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, t
 		return 0, AssignTaskStatusNoCapacity, nil
 	}
 
-	var accountID uint64
-	fmt.Sscanf(resultStr, "%d", &accountID)
+	accountID, parseErr := strconv.ParseUint(resultStr, 10, 64)
+	if parseErr != nil {
+		return 0, "", fmt.Errorf("parse assigned account id %q: %w", resultStr, parseErr)
+	}
 	return accountID, AssignTaskStatusAssigned, nil
 }
 
@@ -155,7 +189,74 @@ func (r *RedisManager) ReleaseTask(ctx context.Context, accountID uint64, taskID
 		fmt.Sprintf("%d", accountID),
 		taskID,
 		key,
+		KeyTaskLeases,
+		KeyRunningTasks,
 	).Result()
+	return err
+}
+
+func (r *RedisManager) GetTaskLease(ctx context.Context, taskID string) (uint64, bool, error) {
+	if taskID == "" {
+		return 0, false, fmt.Errorf("task id is empty")
+	}
+	accountID, err := r.rdb.HGet(ctx, KeyTaskLeases, taskID).Uint64()
+	if err == redis.Nil {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return accountID, true, nil
+}
+
+func (r *RedisManager) HasActiveLease(ctx context.Context, taskID string, accountID uint64) (bool, error) {
+	leasedAccountID, ok, err := r.GetTaskLease(ctx, taskID)
+	if err != nil || !ok {
+		return false, err
+	}
+	return leasedAccountID == accountID, nil
+}
+
+func (r *RedisManager) ListTaskLeases(ctx context.Context) ([]TaskLease, error) {
+	values, err := r.rdb.HGetAll(ctx, KeyTaskLeases).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	leases := make([]TaskLease, 0, len(values))
+	for taskID, accountIDStr := range values {
+		accountID, scanErr := strconv.ParseUint(accountIDStr, 10, 64)
+		if scanErr != nil {
+			return nil, fmt.Errorf("parse task lease %s=%q: %w", taskID, accountIDStr, scanErr)
+		}
+		leases = append(leases, TaskLease{TaskID: taskID, AccountID: accountID})
+	}
+	return leases, nil
+}
+
+func (r *RedisManager) RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error {
+	counts := make(map[uint64]int, len(accountIDs))
+	for _, accountID := range accountIDs {
+		counts[accountID] = 0
+	}
+	for _, lease := range leases {
+		if lease.TaskID == "" || lease.AccountID == 0 {
+			return fmt.Errorf("invalid task lease: task_id=%q account_id=%d", lease.TaskID, lease.AccountID)
+		}
+		counts[lease.AccountID]++
+	}
+
+	pipe := r.rdb.TxPipeline()
+	pipe.Del(ctx, KeyTaskLeases, KeyRunningTasks)
+	for accountID, count := range counts {
+		key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
+		pipe.HSet(ctx, key, "count", count)
+	}
+	for _, lease := range leases {
+		pipe.HSet(ctx, KeyTaskLeases, lease.TaskID, lease.AccountID)
+		pipe.SAdd(ctx, KeyRunningTasks, lease.TaskID)
+	}
+	_, err := pipe.Exec(ctx)
 	return err
 }
 

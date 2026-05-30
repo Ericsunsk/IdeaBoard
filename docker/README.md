@@ -12,6 +12,8 @@
 
 ```bash
 cd docker
+cp .env.example .env
+# 至少修改 MYSQL_ROOT_PASSWORD 和 MYSQL_PASSWORD；不要使用弱默认密码。
 docker compose -f docker-compose.yml up -d
 ```
 
@@ -38,10 +40,10 @@ docker compose -f docker-compose.yml logs -f redis
 | 镜像 | `mysql:8.0` |
 | 容器名 | `ideaboard-mysql` |
 | 宿主机端口 | `127.0.0.1:${MYSQL_PORT:-3306}` |
-| Root 密码 | `${MYSQL_ROOT_PASSWORD:-root123}` |
+| Root 密码 | `${MYSQL_ROOT_PASSWORD}`，必填 |
 | 默认数据库 | `${MYSQL_DATABASE:-ideaboard}` |
 | 默认业务用户 | `${MYSQL_USER:-ideaboard}` |
-| 默认业务密码 | `${MYSQL_PASSWORD:-ideaboard123}` |
+| 默认业务密码 | `${MYSQL_PASSWORD}`，必填 |
 
 > [!NOTE]
 > compose 已显式固定 `platform: linux/amd64`，便于 Apple Silicon 环境直接运行。
@@ -67,7 +69,7 @@ docker compose -f docker-compose.yml logs -f redis
 命令行：
 
 ```bash
-mysql -h localhost -P 3306 -u ideaboard -pideaboard123 ideaboard
+mysql -h localhost -P 3306 -u ideaboard -p"$MYSQL_PASSWORD" ideaboard
 ```
 
 GUI 客户端：
@@ -75,7 +77,7 @@ GUI 客户端：
 - Host：`localhost`
 - Port：`3306`
 - User：`ideaboard`
-- Password：`ideaboard123`，或你通过 compose 环境变量覆盖后的值
+- Password：你在 `docker/.env` 中设置的 `MYSQL_PASSWORD`
 
 ### Redis
 
@@ -126,6 +128,8 @@ cp docker/.env.example docker/.env
 docker compose -f docker/compose.yml --env-file docker/.env pull
 docker compose -f docker/compose.yml --env-file docker/.env up -d
 ```
+
+推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 MySQL dump 写入 `backups/mysql/`，并在启动后检查 `api` 和 `auth` 的 `/api/health`。如果 health gate 失败，请先查看 `gateway/api/auth/mysql` 日志，再决定是否把 `IMAGE_TAG` 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
 
 生产数据在 Docker volumes 中持久化：`mysql-data`、`redis-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
 

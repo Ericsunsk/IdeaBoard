@@ -33,6 +33,22 @@ func (a *RedisAsynqAssigner) Release(ctx context.Context, accountID uint64, task
 	return a.mgr.ReleaseTask(ctx, accountID, taskID)
 }
 
+func (a *RedisAsynqAssigner) GetTaskLease(ctx context.Context, taskID string) (uint64, bool, error) {
+	return a.mgr.GetTaskLease(ctx, taskID)
+}
+
+func (a *RedisAsynqAssigner) HasActiveLease(ctx context.Context, taskID string, accountID uint64) (bool, error) {
+	return a.mgr.HasActiveLease(ctx, taskID, accountID)
+}
+
+func (a *RedisAsynqAssigner) ListTaskLeases(ctx context.Context) ([]redis.TaskLease, error) {
+	return a.mgr.ListTaskLeases(ctx)
+}
+
+func (a *RedisAsynqAssigner) RebuildRunningTaskLeases(ctx context.Context, leases []redis.TaskLease, accountIDs []uint64) error {
+	return a.mgr.RebuildRunningTaskLeases(ctx, leases, accountIDs)
+}
+
 func (a *RedisAsynqAssigner) EnsureAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {
 	return a.mgr.EnsureAccountConcurrent(ctx, accountID, maxConcurrent)
 }

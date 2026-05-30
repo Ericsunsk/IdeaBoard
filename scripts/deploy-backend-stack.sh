@@ -31,6 +31,8 @@ ROOT_DIR="$(find_stack_root)"
 COMPOSE_FILE="$ROOT_DIR/docker/compose.yml"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env}"
 ENV_EXAMPLE="$ROOT_DIR/docker/.env.example"
+BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups/mysql}"
+BACKUP_RETAIN="${BACKUP_RETAIN:-5}"
 
 command="${1:-deploy}"
 if [[ "$command" == "update" ]]; then
@@ -166,6 +168,106 @@ docker_compose() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
+wait_for_mysql() {
+  local timeout="${MYSQL_WAIT_TIMEOUT_SECONDS:-120}"
+  local elapsed=0
+
+  echo "Waiting for MySQL to become ready..."
+  while (( elapsed < timeout )); do
+    if docker_compose exec -T mysql sh -c 'mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+
+  docker_compose logs --tail=120 mysql >&2 || true
+  die "MySQL did not become ready within ${timeout}s"
+}
+
+prune_mysql_backups() {
+  local retain="$BACKUP_RETAIN"
+  local backups=()
+  local backup
+  local delete_count
+  local i
+
+  [[ "$retain" =~ ^[0-9]+$ ]] || retain=5
+  (( retain > 0 )) || retain=5
+
+  while IFS= read -r backup; do
+    backups+=("$backup")
+  done < <(find "$BACKUP_DIR" -type f -name 'mysql-*.sql' | sort)
+
+  delete_count=$(( ${#backups[@]} - retain ))
+  if (( delete_count <= 0 )); then
+    return
+  fi
+
+  for (( i = 0; i < delete_count; i++ )); do
+    rm -f -- "${backups[$i]}"
+  done
+}
+
+backup_mysql() {
+  local timestamp
+  local database
+  local backup_file
+  local tmp_file
+
+  mkdir -p "$BACKUP_DIR"
+  timestamp="$(date +%Y%m%d-%H%M%S)"
+  database="$(env_value MYSQL_DATABASE)"
+  database="${database:-ideaboard}"
+  backup_file="$BACKUP_DIR/mysql-${database}-${timestamp}.sql"
+  tmp_file="${backup_file}.tmp"
+
+  echo "Creating MySQL backup: $backup_file"
+  if docker_compose exec -T mysql sh -c 'mysqldump --single-transaction --routines --triggers --default-character-set=utf8mb4 -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > "$tmp_file"; then
+    if ! mv "$tmp_file" "$backup_file"; then
+      rm -f -- "$tmp_file"
+      die "MySQL backup finalize failed; deployment aborted before migration"
+    fi
+    prune_mysql_backups
+    echo "MySQL backup completed: $backup_file"
+    return 0
+  fi
+
+  rm -f -- "$tmp_file"
+  die "MySQL backup failed; deployment aborted before migration"
+}
+
+print_backend_health_logs() {
+  echo "Recent service logs for health gate failure:" >&2
+  docker_compose ps >&2 || true
+  docker_compose logs --tail=120 gateway api auth >&2 || true
+}
+
+wait_for_http_from_gateway() {
+  local name="$1"
+  local url="$2"
+  local timeout="${HEALTH_WAIT_TIMEOUT_SECONDS:-120}"
+  local elapsed=0
+
+  echo "Waiting for $name health: $url"
+  while (( elapsed < timeout )); do
+    if docker_compose exec -T gateway sh -c 'wget -q -T 3 -O /dev/null "$1"' sh "$url" >/dev/null 2>&1; then
+      echo "$name health is OK"
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+
+  print_backend_health_logs
+  die "$name health gate failed after ${timeout}s: $url"
+}
+
+wait_for_backend_health() {
+  wait_for_http_from_gateway "api" "http://api:6000/api/health"
+  wait_for_http_from_gateway "auth" "http://auth:6001/api/health"
+}
+
 login_ghcr_if_configured() {
   if [[ -z "${GHCR_TOKEN:-}" ]]; then
     return
@@ -198,8 +300,11 @@ case "$command" in
     login_ghcr_if_configured
     docker_compose pull
     docker_compose up -d mysql redis
+    wait_for_mysql
+    backup_mysql
     docker_compose run --rm auth npm run migrate:dist
     docker_compose up -d
+    wait_for_backend_health
     docker_compose ps
     ;;
   restart)

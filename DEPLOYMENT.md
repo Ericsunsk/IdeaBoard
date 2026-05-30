@@ -186,6 +186,8 @@ GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $G
 ideaboard update
 ```
 
+`ideaboard update` 会在执行 Auth migration 前自动导出 MySQL backup 到 `/opt/stacks/ideaboard/backups/mysql/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 `api`、`auth` 的 `/api/health` health gate 失败都会中止部署并打印相关容器日志。
+
 常用运维：
 
 ```bash
@@ -239,6 +241,15 @@ ideaboard update
 ```bash
 ideaboard update
 ```
+
+若新版本已执行 migration，先保留故障现场并确认最近 backup：
+
+```bash
+ls -lh /opt/stacks/ideaboard/backups/mysql/
+docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 gateway api auth mysql
+```
+
+当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。
 
 数据保存在 Docker volumes：`mysql-data`、`redis-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
 
@@ -635,3 +646,5 @@ nginx -t && systemctl reload nginx
 3. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && npm run migrate:dist && npm prune --omit=dev`。
 4. 执行 `systemctl restart ideaboard-auth ideaboard`。
 5. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
+
+Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IMAGE_TAG` 改回上一版并执行 `ideaboard update`。脚本会先创建新的 MySQL backup，再运行 migration 和 health gate；历史 backup 位于 `/opt/stacks/ideaboard/backups/mysql/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。

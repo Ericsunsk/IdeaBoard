@@ -5,10 +5,10 @@ services:
     container_name: ideaboard-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in docker/.env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-ideaboard}
       MYSQL_USER: ${MYSQL_USER:-ideaboard}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-ideaboard123}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in docker/.env}
     ports:
       - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
