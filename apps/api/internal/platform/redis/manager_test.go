@@ -73,6 +73,62 @@ func TestTryAssignTaskCreatesLeaseAndReleaseClearsIt(t *testing.T) {
 	}
 }
 
+func TestTaskLeaseReconcileLockBlocksAssignment(t *testing.T) {
+	mgr := newTestRedisManager(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := mgr.EnsureAccountConcurrent(ctx, 151, 1); err != nil {
+		t.Fatalf("init account: %v", err)
+	}
+
+	locked := make(chan struct{})
+	release := make(chan struct{})
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- mgr.WithTaskLeaseReconcileLock(ctx, func(lockCtx context.Context) error {
+			close(locked)
+			select {
+			case <-release:
+				return nil
+			case <-lockCtx.Done():
+				return lockCtx.Err()
+			}
+		})
+	}()
+
+	select {
+	case <-locked:
+	case <-ctx.Done():
+		t.Fatalf("timeout waiting for reconcile lock: %v", ctx.Err())
+	}
+
+	accountID, status, err := mgr.TryAssignTask(ctx, []uint64{151}, "blocked-by-reconcile")
+	if err != nil {
+		t.Fatalf("try assign during reconcile lock: %v", err)
+	}
+	if accountID != 0 || status != AssignTaskStatusReconcileLocked {
+		t.Fatalf("assign during lock account=%d status=%s, want account=0 status=%s", accountID, status, AssignTaskStatusReconcileLocked)
+	}
+
+	close(release)
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("reconcile lock returned error: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatalf("timeout waiting for reconcile lock release: %v", ctx.Err())
+	}
+
+	accountID, status, err = mgr.TryAssignTask(ctx, []uint64{151}, "assigned-after-reconcile")
+	if err != nil {
+		t.Fatalf("try assign after reconcile lock: %v", err)
+	}
+	if accountID != 151 || status != AssignTaskStatusAssigned {
+		t.Fatalf("assign after lock account=%d status=%s, want account=151 status=%s", accountID, status, AssignTaskStatusAssigned)
+	}
+}
+
 func TestReleaseTaskIsIdempotent(t *testing.T) {
 	mgr := newTestRedisManager(t)
 	ctx := context.Background()

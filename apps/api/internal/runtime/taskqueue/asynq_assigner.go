@@ -24,6 +24,8 @@ func (a *RedisAsynqAssigner) Assign(ctx context.Context, accountIDs []uint64, ta
 	switch status {
 	case redis.AssignTaskStatusNoCapacity:
 		return 0, AssignStatusNoCapacity, nil
+	case redis.AssignTaskStatusReconcileLocked:
+		return 0, AssignStatusNoCapacity, nil
 	default:
 		return accountID, AssignStatusAssigned, nil
 	}
@@ -59,6 +61,10 @@ func (a *RedisAsynqAssigner) RebuildRunningTaskLeases(ctx context.Context, lease
 		redisLeases = append(redisLeases, redis.TaskLease{TaskID: lease.TaskID, AccountID: lease.AccountID})
 	}
 	return a.mgr.RebuildRunningTaskLeases(ctx, redisLeases, accountIDs)
+}
+
+func (a *RedisAsynqAssigner) WithTaskLeaseReconcileLock(ctx context.Context, fn func(context.Context) error) error {
+	return a.mgr.WithTaskLeaseReconcileLock(ctx, fn)
 }
 
 func (a *RedisAsynqAssigner) EnsureAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {

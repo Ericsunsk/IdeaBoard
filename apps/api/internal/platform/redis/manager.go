@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -13,13 +14,15 @@ import (
 )
 
 const (
-	KeyAccountConcurrent = "drawing:api:concurrent"
-	KeyRunningTasks      = "drawing:task:running"
-	KeyTaskLeases        = "drawing:task:leases"
-	KeyTaskCancelPrefix  = "drawing:task:cancelled"
+	KeyAccountConcurrent      = "drawing:api:concurrent"
+	KeyRunningTasks           = "drawing:task:running"
+	KeyTaskLeases             = "drawing:task:leases"
+	KeyTaskLeaseReconcileLock = "drawing:task:lease_reconcile_lock"
+	KeyTaskCancelPrefix       = "drawing:task:cancelled"
 
-	AssignTaskStatusAssigned   = "assigned"
-	AssignTaskStatusNoCapacity = "no_capacity"
+	AssignTaskStatusAssigned        = "assigned"
+	AssignTaskStatusNoCapacity      = "no_capacity"
+	AssignTaskStatusReconcileLocked = "reconcile_locked"
 )
 
 // Lua 脚本：原子分配任务（无等待队列副作用）
@@ -29,6 +32,11 @@ local max_concurrent_key = ARGV[2]
 local task_id = ARGV[3]
 local lease_key = ARGV[4]
 local running_key = ARGV[5]
+local reconcile_lock_key = ARGV[6]
+
+if redis.call("EXISTS", reconcile_lock_key) == 1 then
+    return "-2"
+end
 
 if redis.call("HEXISTS", lease_key, task_id) == 1 then
     return "-1"
@@ -92,6 +100,19 @@ end
 
 return "no_lease"
 `
+
+const luaReleaseTaskLeaseReconcileLock = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+end
+return 0
+`
+
+const (
+	defaultTaskLeaseReconcileLockTTL     = time.Minute
+	taskLeaseReconcileLockRetryDelay     = 100 * time.Millisecond
+	taskLeaseReconcileLockReleaseTimeout = 2 * time.Second
+)
 
 type TaskLease struct {
 	TaskID    string
@@ -162,6 +183,7 @@ func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, t
 		taskID,
 		KeyTaskLeases,
 		KeyRunningTasks,
+		KeyTaskLeaseReconcileLock,
 	).Result()
 	if err != nil {
 		return 0, "", err
@@ -174,12 +196,50 @@ func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, t
 	if resultStr == "-1" {
 		return 0, AssignTaskStatusNoCapacity, nil
 	}
+	if resultStr == "-2" {
+		return 0, AssignTaskStatusReconcileLocked, nil
+	}
 
 	accountID, parseErr := strconv.ParseUint(resultStr, 10, 64)
 	if parseErr != nil {
 		return 0, "", fmt.Errorf("parse assigned account id %q: %w", resultStr, parseErr)
 	}
 	return accountID, AssignTaskStatusAssigned, nil
+}
+
+func (r *RedisManager) WithTaskLeaseReconcileLock(ctx context.Context, fn func(context.Context) error) error {
+	if fn == nil {
+		return fmt.Errorf("task lease reconcile callback is nil")
+	}
+	token := fmt.Sprintf("%d-%p", time.Now().UnixNano(), r)
+	for {
+		locked, err := r.rdb.SetNX(ctx, KeyTaskLeaseReconcileLock, token, defaultTaskLeaseReconcileLockTTL).Result()
+		if err != nil {
+			return err
+		}
+		if locked {
+			defer func() {
+				if err := r.releaseTaskLeaseReconcileLock(ctx, token); err != nil {
+					log.Printf("[Redis] release task lease reconcile lock failed: %v", err)
+				}
+			}()
+			return fn(ctx)
+		}
+
+		timer := time.NewTimer(taskLeaseReconcileLockRetryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func (r *RedisManager) releaseTaskLeaseReconcileLock(parent context.Context, token string) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), taskLeaseReconcileLockReleaseTimeout)
+	defer cancel()
+	return r.rdb.Eval(ctx, luaReleaseTaskLeaseReconcileLock, []string{KeyTaskLeaseReconcileLock}, token).Err()
 }
 
 // ReleaseTask 释放任务

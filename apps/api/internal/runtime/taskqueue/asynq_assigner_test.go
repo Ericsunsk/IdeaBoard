@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"api/internal/platform/redis"
+	"api/internal/runtime/queuetypes"
 
 	miniredis "github.com/alicebob/miniredis/v2"
 	goredis "github.com/redis/go-redis/v9"
@@ -105,5 +106,27 @@ func TestRedisAsynqAssignerListTaskLeasesRejectsMalformedAccountID(t *testing.T)
 
 	if _, err := assigner.ListTaskLeases(ctx); err == nil {
 		t.Fatal("expected malformed lease account id error")
+	}
+}
+
+func TestRedisAsynqAssignerMapsReconcileLockToNoCapacity(t *testing.T) {
+	assigner, mgr := newTestRedisAsynqAssigner(t)
+	ctx := context.Background()
+	if err := mgr.EnsureAccountConcurrent(ctx, 9201, 1); err != nil {
+		t.Fatalf("ensure account: %v", err)
+	}
+
+	err := assigner.WithTaskLeaseReconcileLock(ctx, func(lockCtx context.Context) error {
+		accountID, status, err := assigner.Assign(lockCtx, []uint64{9201}, &queuetypes.TaskPayload{TaskID: "locked-task"})
+		if err != nil {
+			return err
+		}
+		if accountID != 0 || status != AssignStatusNoCapacity {
+			t.Fatalf("assign during reconcile account=%d status=%s, want no capacity", accountID, status)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("with reconcile lock: %v", err)
 	}
 }

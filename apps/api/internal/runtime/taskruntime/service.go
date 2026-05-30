@@ -42,6 +42,7 @@ type Service struct {
 	taskRepo    *accounts.TaskRepository
 	queue       taskqueue.TaskAssigner
 	rebuilder   taskqueue.TaskLeaseRebuilder
+	leaseLocker taskqueue.TaskLeaseReconcileLocker
 	cancelStore taskqueue.TaskCancellationStore
 	hub         EventHub
 }
@@ -60,6 +61,9 @@ func NewService(
 	}
 	if rebuilder, ok := assigner.(taskqueue.TaskLeaseRebuilder); ok {
 		service.rebuilder = rebuilder
+	}
+	if leaseLocker, ok := assigner.(taskqueue.TaskLeaseReconcileLocker); ok {
+		service.leaseLocker = leaseLocker
 	}
 	return service
 }
@@ -108,7 +112,8 @@ func (s *Service) ReleaseTask(ctx context.Context, accountID uint64, taskID stri
 }
 
 type RunningTaskLeaseReconcileOptions struct {
-	MaxRunningTasks int
+	MaxRunningTasks      int
+	AssignmentDrainDelay time.Duration
 }
 
 type RunningTaskLeaseReconcileResult struct {
@@ -118,6 +123,19 @@ type RunningTaskLeaseReconcileResult struct {
 }
 
 func (s *Service) ReconcileRunningTaskLeases(ctx context.Context, opts RunningTaskLeaseReconcileOptions) (RunningTaskLeaseReconcileResult, error) {
+	if s.leaseLocker != nil {
+		var result RunningTaskLeaseReconcileResult
+		err := s.leaseLocker.WithTaskLeaseReconcileLock(ctx, func(lockCtx context.Context) error {
+			var reconcileErr error
+			result, reconcileErr = s.reconcileRunningTaskLeasesLocked(lockCtx, opts)
+			return reconcileErr
+		})
+		return result, err
+	}
+	return s.reconcileRunningTaskLeasesLocked(ctx, opts)
+}
+
+func (s *Service) reconcileRunningTaskLeasesLocked(ctx context.Context, opts RunningTaskLeaseReconcileOptions) (RunningTaskLeaseReconcileResult, error) {
 	var result RunningTaskLeaseReconcileResult
 	if s.taskRepo == nil {
 		return result, ErrTaskRepositoryUnavailable
@@ -129,6 +147,15 @@ func (s *Service) ReconcileRunningTaskLeases(ctx context.Context, opts RunningTa
 	limit := opts.MaxRunningTasks
 	if limit <= 0 {
 		limit = defaultRunningTaskLeaseReconcileMax
+	}
+	if opts.AssignmentDrainDelay > 0 {
+		timer := time.NewTimer(opts.AssignmentDrainDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return result, ctx.Err()
+		case <-timer.C:
+		}
 	}
 	running, err := s.taskRepo.ListRunningTaskLeases(ctx, limit+1)
 	if err != nil {

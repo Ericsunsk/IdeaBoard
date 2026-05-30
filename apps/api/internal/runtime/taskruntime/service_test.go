@@ -114,6 +114,15 @@ func (f *fakeTaskLeaseRebuilder) RebuildRunningTaskLeases(ctx context.Context, l
 	return nil
 }
 
+type fakeTaskLeaseReconcileLocker struct {
+	calls int
+}
+
+func (f *fakeTaskLeaseReconcileLocker) WithTaskLeaseReconcileLock(ctx context.Context, fn func(context.Context) error) error {
+	f.calls++
+	return fn(ctx)
+}
+
 func TestReconcileRunningTaskLeasesRebuildsFromDBRunningTasks(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
@@ -172,6 +181,32 @@ func TestReconcileRunningTaskLeasesRebuildsFromDBRunningTasks(t *testing.T) {
 	}
 	if pending.Status != tasks.StatusPending || pending.AccountID != 10 {
 		t.Fatalf("pending task changed unexpectedly: %+v", pending)
+	}
+}
+
+func TestReconcileRunningTaskLeasesUsesLeaseLock(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := accounts.NewTaskRepository(db)
+	rebuilder := &fakeTaskLeaseRebuilder{}
+	locker := &fakeTaskLeaseReconcileLocker{}
+	service := NewService(nil, taskRepo, nil, nil)
+	service.rebuilder = rebuilder
+	service.leaseLocker = locker
+
+	task := &tasks.Task{TaskID: "task-lock-reconcile", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if _, err := service.ReconcileRunningTaskLeases(ctx, RunningTaskLeaseReconcileOptions{MaxRunningTasks: 10}); err != nil {
+		t.Fatalf("ReconcileRunningTaskLeases returned error: %v", err)
+	}
+	if locker.calls != 1 {
+		t.Fatalf("lock calls=%d, want 1", locker.calls)
+	}
+	if rebuilder.calls != 1 {
+		t.Fatalf("rebuild calls=%d, want 1", rebuilder.calls)
 	}
 }
 

@@ -40,6 +40,10 @@ type TaskLeaseRebuilder interface {
 	RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error
 }
 
+type TaskLeaseReconcileLocker interface {
+	WithTaskLeaseReconcileLock(ctx context.Context, fn func(context.Context) error) error
+}
+
 type AccountConcurrencyStore interface {
 	DeleteAccountConcurrent(ctx context.Context, accountID uint64) error
 	GetAccountConcurrent(ctx context.Context, accountID uint64) (int, error)

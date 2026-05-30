@@ -80,7 +80,9 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 
 	reconcileRuntime := taskruntime.NewService(accountRepo, taskRepo, redisAsynqAssigner, redisAsynqAssigner)
 	reconcileCtx, reconcileCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	reconcileResult, err := reconcileRuntime.ReconcileRunningTaskLeases(reconcileCtx, taskruntime.RunningTaskLeaseReconcileOptions{})
+	reconcileResult, err := reconcileRuntime.ReconcileRunningTaskLeases(reconcileCtx, taskruntime.RunningTaskLeaseReconcileOptions{
+		AssignmentDrainDelay: 2 * time.Second,
+	})
 	reconcileCancel()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to reconcile running task leases: %w", err)
