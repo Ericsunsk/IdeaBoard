@@ -175,6 +175,31 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 	}
 }
 
+func TestMarkTaskRunningReturnsAlreadyRunningForSameAccount(t *testing.T) {
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+
+	task := &tasks.Task{
+		TaskID:    "task-running-dup-same-account",
+		UserID:    1,
+		ChannelID: 1,
+		Status:    tasks.StatusPending,
+	}
+	if err := taskRepo.Create(task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if err := service.MarkTaskRunning(task.TaskID, 42); err != nil {
+		t.Fatalf("first MarkTaskRunning returned error: %v", err)
+	}
+
+	err := service.MarkTaskRunning(task.TaskID, 42)
+	if !errors.Is(err, ErrTaskAlreadyRunning) {
+		t.Fatalf("expected ErrTaskAlreadyRunning, got %v", err)
+	}
+}
+
 func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := NewTaskRepository(db)

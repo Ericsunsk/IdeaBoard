@@ -35,13 +35,23 @@ function goRegister() {
   void router.replace('/user/register')
 }
 
+const SAFE_REDIRECT_PREFIXES = ['/user', '/admin', '/share'] as const
+
+function isSafeInternalRedirectPath(path: string) {
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) {
+    return false
+  }
+  return SAFE_REDIRECT_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+}
+
 function resolveLoginRedirectPath() {
   const redirect = route.query.redirect
-  const redirectPath = Array.isArray(redirect) ? redirect[0] : redirect
+  const rawRedirectPath = Array.isArray(redirect) ? redirect[0] : redirect
+  const redirectPath = typeof rawRedirectPath === 'string' ? rawRedirectPath.trim() : rawRedirectPath
   if (!redirectPath || typeof redirectPath !== 'string') {
     return '/user/home'
   }
-  if (!redirectPath.startsWith('/')) {
+  if (!isSafeInternalRedirectPath(redirectPath)) {
     return '/user/home'
   }
   if (redirectPath.startsWith('/user/login') || redirectPath.startsWith('/user/register')) {

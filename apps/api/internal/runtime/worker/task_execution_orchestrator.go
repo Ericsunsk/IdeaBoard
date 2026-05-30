@@ -42,18 +42,24 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 
 	account, err := o.accountRepo.GetByID(accountID)
 	if err != nil {
-		o.requeueTask(task, accountID, "账号不存在，重新调度")
+		if requeueErr := o.requeueTask(task, accountID, "账号不存在，重新调度"); requeueErr != nil {
+			return requeueErr
+		}
 		return nil
 	}
 	if account.Status != 1 {
-		o.requeueTask(task, accountID, "账号已停用，重新调度")
+		if requeueErr := o.requeueTask(task, accountID, "账号已停用，重新调度"); requeueErr != nil {
+			return requeueErr
+		}
 		return nil
 	}
 
 	cancelled, err := o.taskRuntime.IsTaskCancelled(task.TaskID)
 	if err != nil {
 		log.Printf("[Worker] 检查任务取消状态失败: task=%s err=%v", task.TaskID, err)
-		o.requeueTask(task, accountID, "检查任务取消状态失败")
+		if requeueErr := o.requeueTask(task, accountID, "检查任务取消状态失败"); requeueErr != nil {
+			return requeueErr
+		}
 		return nil
 	}
 	if cancelled {
@@ -65,6 +71,10 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	defer stop()
 
 	if err := o.taskRuntime.MarkTaskRunning(task.TaskID, accountID); err != nil {
+		if errors.Is(err, accounts.ErrTaskAlreadyRunning) {
+			o.dropTask(task, accountID, "任务已由同账号执行，丢弃重复队列任务")
+			return nil
+		}
 		if errors.Is(err, accounts.ErrTaskNotFound) || errors.Is(err, accounts.ErrTaskTerminal) || errors.Is(err, accounts.ErrTaskStateConflict) {
 			o.dropTask(task, accountID, "任务状态已收敛，丢弃脏队列任务")
 			return nil
@@ -78,7 +88,9 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 			return nil
 		}
 		log.Printf("[Worker] 标记任务运行中失败: %v", err)
-		o.requeueTask(task, accountID, "标记任务运行中失败")
+		if requeueErr := o.requeueTask(task, accountID, "标记任务运行中失败"); requeueErr != nil {
+			return requeueErr
+		}
 		return nil
 	}
 
@@ -99,7 +111,9 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		elapsed := time.Since(startTime).Seconds()
 		reason := userFacingProviderError(err)
 		if !shouldFailoverProviderError(err) {
-			o.completeFailedTask(task, accountID, reason, elapsed)
+			if markErr := o.completeFailedTask(task, accountID, reason, elapsed); markErr != nil {
+				return markErr
+			}
 			return nil
 		}
 		if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
@@ -112,7 +126,9 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 				return nil
 			}
 			log.Printf("[Worker] 重置任务为待重试失败: task=%s err=%v", task.TaskID, requeueErr)
-			o.completeFailedTask(task, 0, reason, elapsed)
+			if markErr := o.completeFailedTask(task, 0, reason, elapsed); markErr != nil {
+				return markErr
+			}
 			return nil
 		}
 		if !requeued {
@@ -128,17 +144,23 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		}
 		task.AccountIDs = removeAccountCandidate(task.AccountIDs, accountID)
 		if len(task.AccountIDs) == 0 {
-			o.completeFailedTask(task, 0, reason, elapsed)
+			if markErr := o.completeFailedTask(task, 0, reason, elapsed); markErr != nil {
+				return markErr
+			}
 			return nil
 		}
-		o.requeueTask(task, 0, reason)
+		if requeueErr := o.requeueTask(task, 0, reason); requeueErr != nil {
+			return requeueErr
+		}
 		return nil
 	}
 
 	cancelled, err = o.taskRuntime.IsTaskCancelled(task.TaskID)
 	if err != nil {
 		log.Printf("[Worker] 检查任务取消状态失败: task=%s err=%v", task.TaskID, err)
-		o.requeueTask(task, accountID, "检查任务取消状态失败")
+		if requeueErr := o.requeueTask(task, accountID, "检查任务取消状态失败"); requeueErr != nil {
+			return requeueErr
+		}
 		return nil
 	}
 	if cancelled {
@@ -147,7 +169,11 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	}
 
 	elapsed := time.Since(startTime).Seconds()
-	if o.completeTask(task, accountID, result, elapsed) {
+	completed, completeErr := o.completeTask(task, accountID, result, elapsed)
+	if completeErr != nil {
+		return completeErr
+	}
+	if completed {
 		if err := o.taskRuntime.ResetAccountFailure(accountID); err != nil {
 			log.Printf("[Worker] 重置账号失败计数异常: account=%d err=%v", accountID, err)
 		}
@@ -155,7 +181,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) requeueTask(task *queuetypes.TaskPayload, accountID uint64, reason string) {
+func (o *taskExecutionOrchestrator) requeueTask(task *queuetypes.TaskPayload, accountID uint64, reason string) error {
 	ctx := context.Background()
 	if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
 		log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
@@ -165,57 +191,57 @@ func (o *taskExecutionOrchestrator) requeueTask(task *queuetypes.TaskPayload, ac
 		log.Printf("[Worker] 检查任务取消状态失败: task=%s err=%v", task.TaskID, err)
 	} else if cancelled {
 		o.skipCancelledTask(task, 0)
-		return
+		return nil
 	}
 	if err := o.taskRuntime.RefreshTaskAccounts(task); err != nil {
-		o.failTask(task, reason)
-		return
+		return o.failTask(task, reason)
 	}
 	if len(task.AccountIDs) == 0 {
-		o.failTask(task, reason)
-		return
+		return o.failTask(task, reason)
 	}
 	if err := o.enqueuer.Enqueue(ctx, task); err != nil {
-		o.failTask(task, reason)
+		return o.failTask(task, reason)
 	}
+	return nil
 }
 
-func (o *taskExecutionOrchestrator) completeTask(task *queuetypes.TaskPayload, accountID uint64, result string, elapsedSec float64) bool {
+func (o *taskExecutionOrchestrator) completeTask(task *queuetypes.TaskPayload, accountID uint64, result string, elapsedSec float64) (bool, error) {
 	if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
 		log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 	}
 	if err := o.taskRuntime.MarkTaskCompleted(task.TaskID, result); err != nil {
-		if errors.Is(err, accounts.ErrTaskNotFound) || errors.Is(err, accounts.ErrTaskTerminal) || errors.Is(err, accounts.ErrTaskStateConflict) {
+		if isTaskConvergedError(err) {
 			log.Printf("[Worker] 任务状态已收敛，跳过完成回写: task=%s err=%v", task.TaskID, err)
-			return false
+			return false, nil
 		}
 		log.Printf("[Worker] 标记任务完成失败: task=%s err=%v", task.TaskID, err)
 		if failErr := o.taskRuntime.MarkTaskFailed(task.TaskID, "任务结果保存失败，请稍后重试"); failErr != nil {
 			log.Printf("[Worker] 完成回写失败后标记任务失败也失败: task=%s err=%v", task.TaskID, failErr)
 		}
-		return false
+		return false, err
 	}
 	log.Printf("[Worker] 任务 %s 完成, 状态: completed, 耗时: %.1fs", task.TaskID, elapsedSec)
-	return true
+	return true, nil
 }
 
-func (o *taskExecutionOrchestrator) completeFailedTask(task *queuetypes.TaskPayload, accountID uint64, reason string, elapsedSec float64) {
+func (o *taskExecutionOrchestrator) completeFailedTask(task *queuetypes.TaskPayload, accountID uint64, reason string, elapsedSec float64) error {
 	if err := o.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
 		log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 	}
 	if err := o.taskRuntime.MarkTaskFailed(task.TaskID, reason); err != nil {
-		if errors.Is(err, accounts.ErrTaskNotFound) || errors.Is(err, accounts.ErrTaskTerminal) || errors.Is(err, accounts.ErrTaskStateConflict) {
+		if isTaskConvergedError(err) {
 			log.Printf("[Worker] 任务状态已收敛，跳过失败回写: task=%s err=%v", task.TaskID, err)
-			return
+			return nil
 		}
 		log.Printf("[Worker] 标记任务失败失败: task=%s err=%v", task.TaskID, err)
-		return
+		return err
 	}
 	log.Printf("[Worker] 任务 %s 失败, 耗时: %.1fs, 原因: %s", task.TaskID, elapsedSec, reason)
+	return nil
 }
 
-func (o *taskExecutionOrchestrator) failTask(task *queuetypes.TaskPayload, reason string) {
-	o.completeFailedTask(task, 0, reason, 0)
+func (o *taskExecutionOrchestrator) failTask(task *queuetypes.TaskPayload, reason string) error {
+	return o.completeFailedTask(task, 0, reason, 0)
 }
 
 func (o *taskExecutionOrchestrator) skipCancelledTask(task *queuetypes.TaskPayload, accountID uint64) {
@@ -254,6 +280,10 @@ func (o *taskExecutionOrchestrator) handleExecutionInterrupted(task *queuetypes.
 
 func isContextInterrupted(err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+func isTaskConvergedError(err error) bool {
+	return errors.Is(err, accounts.ErrTaskNotFound) || errors.Is(err, accounts.ErrTaskTerminal) || errors.Is(err, accounts.ErrTaskStateConflict)
 }
 
 func userFacingProviderError(err error) string {

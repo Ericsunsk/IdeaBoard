@@ -76,19 +76,24 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function logout(redirectPath = '/user/login') {
-    let logoutSuccess = true
     try {
       const result = await authClient.signOut()
       if (result?.error) {
-        logoutSuccess = false
+        console.warn(
+          '[auth] signOut failed',
+          extractBetterAuthErrorMessage(result.error, '退出登录失败，请稍后重试'),
+        )
+        return false
       }
-    } catch {
-      logoutSuccess = false
+    } catch (error) {
+      console.warn('[auth] signOut failed', error)
+      return false
     }
+
     resetAuth()
     const { default: router } = await import('../router')
     await router.push(redirectPath)
-    return logoutSuccess
+    return true
   }
 
   async function fetchUserInfo(force = false) {

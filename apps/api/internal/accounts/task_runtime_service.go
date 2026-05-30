@@ -17,9 +17,10 @@ import (
 const defaultTaskRetryLimit = 3
 
 var (
-	ErrTaskNotFound      = errors.New("task not found")
-	ErrTaskTerminal      = errors.New("task already in terminal state")
-	ErrTaskStateConflict = errors.New("task state conflict")
+	ErrTaskNotFound       = errors.New("task not found")
+	ErrTaskTerminal       = errors.New("task already in terminal state")
+	ErrTaskStateConflict  = errors.New("task state conflict")
+	ErrTaskAlreadyRunning = errors.New("task already running on same account")
 )
 
 type TaskRuntimeService struct {
@@ -152,7 +153,7 @@ func (s *TaskRuntimeService) MarkTaskRunning(taskID string, accountID uint64) er
 		return err
 	}
 	if task.Status == tasks.StatusRunning && task.AccountID == accountID {
-		return nil
+		return ErrTaskAlreadyRunning
 	}
 	if isTaskTerminalStatus(task.Status) {
 		return ErrTaskTerminal
