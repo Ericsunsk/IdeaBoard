@@ -20,8 +20,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	db := newAccountsTestDB(t)
 	taskRepo := NewTaskRepository(db)
 	ctx := context.Background()
-	service := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil)
-	service.SetTaskEventHub(NewTaskEventHub())
+	service := NewAccountService(AccountServiceDeps{TaskRepo: taskRepo}, AccountServiceOptions{TaskEventHub: NewTaskEventHub()})
 
 	task := &tasks.Task{
 		TaskID:     "task-sse-terminal",
@@ -71,9 +70,8 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	db := newAccountsTestDB(t)
 	taskRepo := NewTaskRepository(db)
 	ctx := context.Background()
-	service := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil)
 	hub := NewTaskEventHub()
-	service.SetTaskEventHub(hub)
+	service := NewAccountService(AccountServiceDeps{TaskRepo: taskRepo}, AccountServiceOptions{TaskEventHub: hub})
 
 	task := &tasks.Task{
 		TaskID:     "task-sse-live",

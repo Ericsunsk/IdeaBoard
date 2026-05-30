@@ -43,7 +43,7 @@ func acquireUploadSlot() (func(), bool) {
 	}
 }
 
-func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
+func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		release, ok := acquireUploadSlot()
 		if !ok {
@@ -98,7 +98,7 @@ func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
 	}
 }
 
-func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
+func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		release, ok := acquireUploadSlot()
 		if !ok {
@@ -161,7 +161,7 @@ func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
 	}
 }
 
-func deleteBoardUploadHandler(h Dependencies) gin.HandlerFunc {
+func deleteBoardUploadHandler(h UploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			URL string `json:"url"`
@@ -207,7 +207,7 @@ func deleteBoardUploadHandler(h Dependencies) gin.HandlerFunc {
 	}
 }
 
-func adminUploadHandler(h Dependencies) gin.HandlerFunc {
+func adminUploadHandler(storageService *storage.StorageService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		release, ok := acquireUploadSlot()
 		if !ok {
@@ -226,7 +226,11 @@ func adminUploadHandler(h Dependencies) gin.HandlerFunc {
 			return
 		}
 
-		url, err := h.StorageService.Upload(c.Request.Context(), file)
+		if storageService == nil {
+			response.InternalError(c, 500, "上传失败", fmt.Errorf("storage service not configured"))
+			return
+		}
+		url, err := storageService.Upload(c.Request.Context(), file)
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return

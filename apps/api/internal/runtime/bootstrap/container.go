@@ -80,35 +80,55 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
 	taskEventHub := accounts.NewTaskEventHub()
-	accountService := accounts.NewAccountServiceWithQueue(
-		accountRepo,
-		taskRepo,
-		asynqQueue,
-		asynqQueue,
-		redisAsynqAssigner,
-		redisAsynqAssigner,
-		redisAsynqAssigner,
-		asynqQueue,
-		systemConfigRepo,
-	)
-	accountService.SetTaskEventHub(taskEventHub)
+	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
+		AccountRepo:      accountRepo,
+		TaskRepo:         taskRepo,
+		Queue:            asynqQueue,
+		QueueStats:       asynqQueue,
+		Assigner:         redisAsynqAssigner,
+		ConcurrencyStore: redisAsynqAssigner,
+		CancelStore:      redisAsynqAssigner,
+		MonitorStore:     asynqQueue,
+		SystemConfigRepo: systemConfigRepo,
+	}, accounts.AccountServiceOptions{
+		TaskEventHub: taskEventHub,
+	})
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
+	authDeps := httpapi.AuthDeps{
+		AuthServiceClient: authServiceClient,
+		UserRepo:          userRepo,
+	}
+	uploadDeps := httpapi.UploadDeps{
+		StorageService: storageService,
+		UserRepo:       userRepo,
+		BoardService:   boardService,
+	}
 	router := gin.Default()
-	registerHTTPRoutes(router, cfg, routeDependencies{
-		authHandler:          auth.NewAuthHandler(userService),
-		adminHandler:         users.NewAdminHandler(userService, systemConfigRepo, authServiceClient),
-		accountHandler:       accounts.NewAccountHandler(accountService),
-		boardHandler:         boards.NewBoardHandler(boardService),
-		boardService:         boardService,
-		channelHandler:       channels.NewChannelHandler(channelRepo, cfg.App.Env),
-		storageHandler:       storage.NewStorageHandler(storageService),
-		lineDraftHandler:     assets.NewLineDraftHandler(lineDraftModeRepo),
-		featurePromptHandler: prompts.NewFeaturePromptHandler(systemConfigRepo),
-		vectorizeHandler:     imageproc.NewVectorizeHandler(taskRepo, storageService),
-		storageService:       storageService,
-		userRepo:             userRepo,
-		authServiceClient:    authServiceClient,
+	registerHTTPRoutes(router, httpapi.Dependencies{
+		Auth: authDeps,
+		UserRoutes: httpapi.UserRouteDeps{
+			AuthHandler:      auth.NewAuthHandler(userService),
+			AccountHandler:   accounts.NewAccountHandler(accountService),
+			BoardHandler:     boards.NewBoardHandler(boardService),
+			LineDraftHandler: assets.NewLineDraftHandler(lineDraftModeRepo),
+			VectorizeHandler: imageproc.NewVectorizeHandler(taskRepo, storageService),
+			Uploads:          uploadDeps,
+		},
+		AdminRoutes: httpapi.AdminRouteDeps{
+			AdminHandler:         users.NewAdminHandler(userService, systemConfigRepo, authServiceClient),
+			AccountHandler:       accounts.NewAccountHandler(accountService),
+			ChannelHandler:       channels.NewChannelHandler(channelRepo, cfg.App.Env),
+			StorageHandler:       storage.NewStorageHandler(storageService),
+			LineDraftHandler:     assets.NewLineDraftHandler(lineDraftModeRepo),
+			FeaturePromptHandler: prompts.NewFeaturePromptHandler(systemConfigRepo),
+			StorageService:       storageService,
+		},
+		StaticUploads: httpapi.StaticUploadDeps{
+			Auth:         authDeps,
+			BoardService: boardService,
+		},
+		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 	})
 
 	asynqHandler := worker.NewAsynqTaskHandler(
@@ -144,42 +164,11 @@ func (c *appContainer) close() error {
 	return c.asynqQueue.Close()
 }
 
-type routeDependencies struct {
-	authHandler          *auth.AuthHandler
-	adminHandler         *users.AdminHandler
-	accountHandler       *accounts.AccountHandler
-	boardHandler         *boards.BoardHandler
-	boardService         *boards.BoardService
-	channelHandler       *channels.ChannelHandler
-	storageHandler       *storage.StorageHandler
-	lineDraftHandler     *assets.LineDraftHandler
-	featurePromptHandler *prompts.FeaturePromptHandler
-	vectorizeHandler     *imageproc.VectorizeHandler
-	storageService       *storage.StorageService
-	userRepo             *users.UserRepository
-	authServiceClient    *auth.ServiceClient
-}
-
-func registerHTTPRoutes(r *gin.Engine, cfg *config.Config, deps routeDependencies) {
+func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies) {
 	frontendFS, err := web.DistFS()
 	if err != nil {
 		log.Printf("[Main] Failed to load embedded frontend dist: %v", err)
 	}
 
-	httpapi.RegisterRoutes(r, httpapi.Dependencies{
-		AuthHandler:          deps.authHandler,
-		AdminHandler:         deps.adminHandler,
-		AccountHandler:       deps.accountHandler,
-		BoardHandler:         deps.boardHandler,
-		BoardService:         deps.boardService,
-		ChannelHandler:       deps.channelHandler,
-		StorageHandler:       deps.storageHandler,
-		LineDraftHandler:     deps.lineDraftHandler,
-		FeaturePromptHandler: deps.featurePromptHandler,
-		VectorizeHandler:     deps.vectorizeHandler,
-		StorageService:       deps.storageService,
-		UserRepo:             deps.userRepo,
-		AuthServiceClient:    deps.authServiceClient,
-		CORSMiddleware:       buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
-	}, frontendFS)
+	httpapi.RegisterRoutes(r, deps, frontendFS)
 }

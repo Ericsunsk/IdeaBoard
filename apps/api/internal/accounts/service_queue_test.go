@@ -119,21 +119,20 @@ func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 	taskRepo := NewTaskRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 
-	svc := NewAccountServiceWithQueue(
-		accountRepo,
-		taskRepo,
-		&fakeQueueForService{waitLen: 7},
-		&fakeQueueForService{waitLen: 7},
-		&fakeAssignerForService{
+	svc := NewAccountService(AccountServiceDeps{
+		AccountRepo: accountRepo,
+		TaskRepo:    taskRepo,
+		Queue:       &fakeQueueForService{waitLen: 7},
+		QueueStats:  &fakeQueueForService{waitLen: 7},
+		Assigner: &fakeAssignerForService{
 			loadInfo: map[uint64]*queuetypes.AccountLoad{
 				acc.ID: {CurrentConcurrent: 2, MaxConcurrent: 3},
 			},
 		},
-		&fakeConcurrencyStore{},
-		&fakeCancelStore{},
-		&fakeMonitorStore{},
-		nil,
-	)
+		ConcurrencyStore: &fakeConcurrencyStore{},
+		CancelStore:      &fakeCancelStore{},
+		MonitorStore:     &fakeMonitorStore{},
+	}, AccountServiceOptions{})
 
 	items, total, err := svc.ListAccounts(context.Background(), &AccountListRequest{Page: 1, PageSize: 20})
 	if err != nil {
@@ -159,7 +158,16 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 		concurrent: map[uint64]int{acc.ID: 1},
 		max:        map[uint64]int{acc.ID: 4},
 	}
-	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, &fakeCancelStore{}, &fakeMonitorStore{}, nil)
+	svc := NewAccountService(AccountServiceDeps{
+		AccountRepo:      accountRepo,
+		TaskRepo:         taskRepo,
+		Queue:            &fakeQueueForService{},
+		QueueStats:       &fakeQueueForService{},
+		Assigner:         &fakeAssignerForService{},
+		ConcurrencyStore: concurrency,
+		CancelStore:      &fakeCancelStore{},
+		MonitorStore:     &fakeMonitorStore{},
+	}, AccountServiceOptions{})
 
 	current, max, err := svc.GetAccountQueueInfo(context.Background(), acc.ID)
 	if err != nil {
@@ -176,7 +184,16 @@ func TestDeleteAccountCallsDeleteAccountConcurrent(t *testing.T) {
 	taskRepo := NewTaskRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 0)
 	concurrency := &fakeConcurrencyStore{}
-	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, &fakeCancelStore{}, &fakeMonitorStore{}, nil)
+	svc := NewAccountService(AccountServiceDeps{
+		AccountRepo:      accountRepo,
+		TaskRepo:         taskRepo,
+		Queue:            &fakeQueueForService{},
+		QueueStats:       &fakeQueueForService{},
+		Assigner:         &fakeAssignerForService{},
+		ConcurrencyStore: concurrency,
+		CancelStore:      &fakeCancelStore{},
+		MonitorStore:     &fakeMonitorStore{},
+	}, AccountServiceOptions{})
 
 	if err := svc.DeleteAccount(context.Background(), acc.ID); err != nil {
 		t.Fatalf("DeleteAccount failed: %v", err)
@@ -191,7 +208,16 @@ func TestDeleteAccountRequiresStoppedAccount(t *testing.T) {
 	accountRepo := NewAccountRepository(db)
 	taskRepo := NewTaskRepository(db)
 	acc := createTestAccount(t, accountRepo, "running", 1)
-	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, &fakeConcurrencyStore{}, &fakeCancelStore{}, &fakeMonitorStore{}, nil)
+	svc := NewAccountService(AccountServiceDeps{
+		AccountRepo:      accountRepo,
+		TaskRepo:         taskRepo,
+		Queue:            &fakeQueueForService{},
+		QueueStats:       &fakeQueueForService{},
+		Assigner:         &fakeAssignerForService{},
+		ConcurrencyStore: &fakeConcurrencyStore{},
+		CancelStore:      &fakeCancelStore{},
+		MonitorStore:     &fakeMonitorStore{},
+	}, AccountServiceOptions{})
 
 	if err := svc.DeleteAccount(context.Background(), acc.ID); err == nil {
 		t.Fatal("expected delete to fail for running account")
@@ -215,7 +241,16 @@ func TestStopAccountMarksCancelAndDeleteConcurrent(t *testing.T) {
 
 	concurrency := &fakeConcurrencyStore{}
 	cancelStore := &fakeCancelStore{}
-	svc := NewAccountServiceWithQueue(accountRepo, taskRepo, &fakeQueueForService{}, &fakeQueueForService{}, &fakeAssignerForService{}, concurrency, cancelStore, &fakeMonitorStore{}, nil)
+	svc := NewAccountService(AccountServiceDeps{
+		AccountRepo:      accountRepo,
+		TaskRepo:         taskRepo,
+		Queue:            &fakeQueueForService{},
+		QueueStats:       &fakeQueueForService{},
+		Assigner:         &fakeAssignerForService{},
+		ConcurrencyStore: concurrency,
+		CancelStore:      cancelStore,
+		MonitorStore:     &fakeMonitorStore{},
+	}, AccountServiceOptions{})
 
 	if err := svc.StopAccount(context.Background(), acc.ID); err != nil {
 		t.Fatalf("StopAccount failed: %v", err)

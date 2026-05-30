@@ -33,23 +33,46 @@ import (
 )
 
 type Dependencies struct {
-	AuthHandler          *auth.AuthHandler
+	Auth           AuthDeps
+	UserRoutes     UserRouteDeps
+	AdminRoutes    AdminRouteDeps
+	StaticUploads  StaticUploadDeps
+	CORSMiddleware gin.HandlerFunc
+}
+
+type AuthDeps struct {
+	AuthServiceClient *auth.ServiceClient
+	UserRepo          *users.UserRepository
+}
+
+type UploadDeps struct {
+	StorageService *storage.StorageService
+	UserRepo       *users.UserRepository
+	BoardService   *boards.BoardService
+}
+
+type StaticUploadDeps struct {
+	Auth         AuthDeps
+	BoardService *boards.BoardService
+}
+
+type UserRouteDeps struct {
+	AuthHandler      *auth.AuthHandler
+	AccountHandler   *accounts.AccountHandler
+	BoardHandler     *boards.BoardHandler
+	LineDraftHandler *assets.LineDraftHandler
+	VectorizeHandler *imageproc.VectorizeHandler
+	Uploads          UploadDeps
+}
+
+type AdminRouteDeps struct {
 	AdminHandler         *users.AdminHandler
 	AccountHandler       *accounts.AccountHandler
-	BoardHandler         *boards.BoardHandler
-	BoardService         *boards.BoardService
 	ChannelHandler       *channels.ChannelHandler
 	StorageHandler       *storage.StorageHandler
 	LineDraftHandler     *assets.LineDraftHandler
 	FeaturePromptHandler *prompts.FeaturePromptHandler
-	VectorizeHandler     *imageproc.VectorizeHandler
 	StorageService       *storage.StorageService
-	UserRepo             *users.UserRepository
-	AuthServiceClient    *auth.ServiceClient
-	// CORSMiddleware is a gin middleware for CORS. In production this should be
-	// a no-op since Nginx handles the headers; in development it should allow
-	// the Vite dev server origin.
-	CORSMiddleware gin.HandlerFunc
 }
 
 const globalRequestBodyLimitBytes int64 = 64 * 1024 * 1024
@@ -111,17 +134,17 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
 	})
 
 	os.MkdirAll("uploads", 0755)
-	uploadsHandler := uploadStaticHandler(deps)
+	uploadsHandler := uploadStaticHandler(deps.StaticUploads)
 	r.GET("/uploads/*filepath", uploadsHandler)
 	r.HEAD("/uploads/*filepath", uploadsHandler)
 
 	userAPI := r.Group("/api/user")
-	userAPI.Use(auth.AuthMiddleware(deps.AuthServiceClient, deps.UserRepo))
-	registerUserRoutes(userAPI, deps)
+	userAPI.Use(auth.AuthMiddleware(deps.Auth.AuthServiceClient, deps.Auth.UserRepo))
+	registerUserRoutes(userAPI, deps.UserRoutes)
 
 	adminAPI := r.Group("/api/admin")
-	adminAPI.Use(auth.AuthMiddleware(deps.AuthServiceClient, deps.UserRepo), auth.AdminMiddleware())
-	registerAdminRoutes(adminAPI, deps)
+	adminAPI.Use(auth.AuthMiddleware(deps.Auth.AuthServiceClient, deps.Auth.UserRepo), auth.AdminMiddleware())
+	registerAdminRoutes(adminAPI, deps.AdminRoutes)
 
 	RegisterFrontendRoutes(r, frontendFS)
 }
@@ -196,7 +219,7 @@ func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 	})
 }
 
-func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
+func registerUserRoutes(userApi *gin.RouterGroup, h UserRouteDeps) {
 	userApi.GET("/info", h.AuthHandler.GetCurrentUser)
 	userApi.POST("/drawing/submit/readiness", h.AccountHandler.CheckSubmitTaskReadiness)
 	userApi.POST("/drawing/submit", h.AccountHandler.SubmitTask)
@@ -218,16 +241,16 @@ func registerUserRoutes(userApi *gin.RouterGroup, h Dependencies) {
 
 	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
 
-	userApi.POST("/profile/avatar", uploadProfileAvatarHandler(h))
-	userApi.POST("/boards/:board_id/uploads", uploadBoardAssetHandler(h))
-	userApi.DELETE("/boards/:board_id/uploads", deleteBoardUploadHandler(h))
+	userApi.POST("/profile/avatar", uploadProfileAvatarHandler(h.Uploads))
+	userApi.POST("/boards/:board_id/uploads", uploadBoardAssetHandler(h.Uploads))
+	userApi.DELETE("/boards/:board_id/uploads", deleteBoardUploadHandler(h.Uploads))
 	userApi.GET("/download", downloadImageHandler())
 
 	userApi.POST("/vectorize", h.VectorizeHandler.Vectorize)
 	userApi.GET("/vectorize/check", h.VectorizeHandler.CheckPotrace)
 }
 
-func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
+func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.GET("/settings/registration", h.AdminHandler.GetRegistrationSetting)
 	adminApi.PUT("/settings/registration", h.AdminHandler.UpdateRegistrationSetting)
 	adminApi.GET("/settings/rate-limit", h.AdminHandler.GetRateLimitSettings)
@@ -254,7 +277,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h Dependencies) {
 	adminApi.GET("/statistics", h.AccountHandler.GetStatistics)
 	adminApi.POST("/statistics/backfill", h.AccountHandler.BackfillStatistics)
 
-	adminApi.POST("/upload", adminUploadHandler(h))
+	adminApi.POST("/upload", adminUploadHandler(h.StorageService))
 
 	adminApi.GET("/storage/providers", h.StorageHandler.ListProviders)
 	adminApi.GET("/storage/profiles", h.StorageHandler.ListProfiles)

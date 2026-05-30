@@ -16,7 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func uploadStaticHandler(deps Dependencies) gin.HandlerFunc {
+func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		resource, err := storage.ParseUploadResource("/uploads/" + strings.TrimPrefix(c.Param("filepath"), "/"))
 		if err != nil {
@@ -24,7 +24,7 @@ func uploadStaticHandler(deps Dependencies) gin.HandlerFunc {
 			return
 		}
 
-		if !authorizeUploadRead(c, deps) {
+		if !authorizeUploadRead(c, deps.Auth) {
 			return
 		}
 
@@ -44,7 +44,7 @@ func uploadStaticHandler(deps Dependencies) gin.HandlerFunc {
 	}
 }
 
-func authorizeUploadRead(c *gin.Context, deps Dependencies) bool {
+func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {
 	auth.AuthMiddleware(deps.AuthServiceClient, deps.UserRepo)(c)
 	if c.IsAborted() {
 		return false
@@ -58,9 +58,9 @@ func authorizeUploadRead(c *gin.Context, deps Dependencies) bool {
 	return true
 }
 
-func authorizeWorkspaceUploadRead(c *gin.Context, deps Dependencies, uploadPath storage.UploadWorkspaceResource) bool {
+func authorizeWorkspaceUploadRead(c *gin.Context, deps StaticUploadDeps, uploadPath storage.UploadWorkspaceResource) bool {
 	userID := c.GetUint64("user_id")
-	if deps.BoardService == nil || deps.UserRepo == nil {
+	if deps.BoardService == nil || deps.Auth.UserRepo == nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("workspace upload dependencies not configured"))
 		return false
 	}
@@ -80,7 +80,7 @@ func authorizeWorkspaceUploadRead(c *gin.Context, deps Dependencies, uploadPath 
 		return false
 	}
 
-	owner, err := deps.UserRepo.GetByID(c.Request.Context(), board.UserID)
+	owner, err := deps.Auth.UserRepo.GetByID(c.Request.Context(), board.UserID)
 	if err != nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
 		return false

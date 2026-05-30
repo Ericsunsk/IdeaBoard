@@ -164,12 +164,14 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	t.Cleanup(authServer.Close)
 
 	router := gin.New()
-	deps := Dependencies{
-		AuthServiceClient: auth.NewServiceClient(config.AuthServiceConfig{
-			BaseURL:        authServer.URL,
-			TimeoutSeconds: 2,
-		}),
-		UserRepo:     userRepo,
+	deps := StaticUploadDeps{
+		Auth: AuthDeps{
+			AuthServiceClient: auth.NewServiceClient(config.AuthServiceConfig{
+				BaseURL:        authServer.URL,
+				TimeoutSeconds: 2,
+			}),
+			UserRepo: userRepo,
+		},
 		BoardService: boards.NewBoardService(boards.NewBoardRepository(db), userRepo),
 	}
 	handler := uploadStaticHandler(deps)
