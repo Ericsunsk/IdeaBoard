@@ -73,6 +73,14 @@ func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, e
 	return accounts, nil
 }
 
+func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]uint64, error) {
+	var ids []uint64
+	if err := r.dbWithContext(ctx).Model(&ApiAccount{}).Order("id ASC").Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
 func (r *AccountRepository) Update(ctx context.Context, account *ApiAccount) error {
 	return r.dbWithContext(ctx).Save(account).Error
 }
@@ -106,6 +114,11 @@ type TaskStatisticLite struct {
 	Result      string
 	CreatedAt   time.Time
 	CompletedAt *time.Time
+}
+
+type RunningTaskLease struct {
+	TaskID    string
+	AccountID uint64
 }
 
 type DailyStatAggregate struct {
@@ -283,6 +296,23 @@ func (r *TaskRepository) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, 
 	}
 
 	return taskIDs, nil
+}
+
+func (r *TaskRepository) ListRunningTaskLeases(ctx context.Context, limit int) ([]RunningTaskLease, error) {
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive")
+	}
+
+	var leases []RunningTaskLease
+	if err := r.dbWithContext(ctx).Model(&tasks.Task{}).
+		Select("task_id", "account_id").
+		Where("status = ?", tasks.StatusRunning).
+		Order("id ASC").
+		Limit(limit).
+		Find(&leases).Error; err != nil {
+		return nil, err
+	}
+	return leases, nil
 }
 
 func (r *TaskRepository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID uint64) error {

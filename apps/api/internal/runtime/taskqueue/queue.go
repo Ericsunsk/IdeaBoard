@@ -31,6 +31,15 @@ type TaskAssigner interface {
 	GetAccountLoadInfo(ctx context.Context, accountIDs []uint64) (map[uint64]*queuetypes.AccountLoad, error)
 }
 
+type TaskLease struct {
+	TaskID    string
+	AccountID uint64
+}
+
+type TaskLeaseRebuilder interface {
+	RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error
+}
+
 type AccountConcurrencyStore interface {
 	DeleteAccountConcurrent(ctx context.Context, accountID uint64) error
 	GetAccountConcurrent(ctx context.Context, accountID uint64) (int, error)

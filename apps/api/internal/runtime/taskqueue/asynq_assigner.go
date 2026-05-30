@@ -41,12 +41,24 @@ func (a *RedisAsynqAssigner) HasActiveLease(ctx context.Context, taskID string, 
 	return a.mgr.HasActiveLease(ctx, taskID, accountID)
 }
 
-func (a *RedisAsynqAssigner) ListTaskLeases(ctx context.Context) ([]redis.TaskLease, error) {
-	return a.mgr.ListTaskLeases(ctx)
+func (a *RedisAsynqAssigner) ListTaskLeases(ctx context.Context) ([]TaskLease, error) {
+	leases, err := a.mgr.ListTaskLeases(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]TaskLease, 0, len(leases))
+	for _, lease := range leases {
+		result = append(result, TaskLease{TaskID: lease.TaskID, AccountID: lease.AccountID})
+	}
+	return result, nil
 }
 
-func (a *RedisAsynqAssigner) RebuildRunningTaskLeases(ctx context.Context, leases []redis.TaskLease, accountIDs []uint64) error {
-	return a.mgr.RebuildRunningTaskLeases(ctx, leases, accountIDs)
+func (a *RedisAsynqAssigner) RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error {
+	redisLeases := make([]redis.TaskLease, 0, len(leases))
+	for _, lease := range leases {
+		redisLeases = append(redisLeases, redis.TaskLease{TaskID: lease.TaskID, AccountID: lease.AccountID})
+	}
+	return a.mgr.RebuildRunningTaskLeases(ctx, redisLeases, accountIDs)
 }
 
 func (a *RedisAsynqAssigner) EnsureAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {

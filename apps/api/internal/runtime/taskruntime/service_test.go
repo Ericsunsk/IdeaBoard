@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/runtime/taskqueue"
 	"api/internal/tasks"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -88,7 +89,7 @@ func newTaskRuntimeServiceTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db failed: %v", err)
 	}
-	if err := db.AutoMigrate(&tasks.Task{}, &tasks.TaskOutput{}); err != nil {
+	if err := db.AutoMigrate(&accounts.ApiAccount{}, &tasks.Task{}, &tasks.TaskOutput{}); err != nil {
 		t.Fatalf("auto migrate task failed: %v", err)
 	}
 	if err := db.AutoMigrate(&accounts.TaskDailyStat{}); err != nil {
@@ -98,6 +99,106 @@ func newTaskRuntimeServiceTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("auto migrate stat event/backfill failed: %v", err)
 	}
 	return db
+}
+
+type fakeTaskLeaseRebuilder struct {
+	calls      int
+	leases     []taskqueue.TaskLease
+	accountIDs []uint64
+}
+
+func (f *fakeTaskLeaseRebuilder) RebuildRunningTaskLeases(ctx context.Context, leases []taskqueue.TaskLease, accountIDs []uint64) error {
+	f.calls++
+	f.leases = append([]taskqueue.TaskLease(nil), leases...)
+	f.accountIDs = append([]uint64(nil), accountIDs...)
+	return nil
+}
+
+func TestReconcileRunningTaskLeasesRebuildsFromDBRunningTasks(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	accountRepo := accounts.NewAccountRepository(db)
+	taskRepo := accounts.NewTaskRepository(db)
+	rebuilder := &fakeTaskLeaseRebuilder{}
+	service := NewService(accountRepo, taskRepo, nil, nil)
+	service.rebuilder = rebuilder
+
+	for _, account := range []*accounts.ApiAccount{
+		{ID: 10, Name: "a10", Platform: "openai", ApiType: "image", ApiKey: "k", Status: 1},
+		{ID: 20, Name: "a20", Platform: "openai", ApiType: "image", ApiKey: "k", Status: 1},
+		{ID: 30, Name: "a30", Platform: "openai", ApiType: "image", ApiKey: "k", Status: 0},
+	} {
+		if err := accountRepo.Create(ctx, account); err != nil {
+			t.Fatalf("seed account failed: %v", err)
+		}
+	}
+
+	for _, task := range []*tasks.Task{
+		{TaskID: "task-running-b", UserID: 1, ChannelID: 1, AccountID: 20, Status: tasks.StatusRunning},
+		{TaskID: "task-pending", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusPending},
+		{TaskID: "task-running-a", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning},
+		{TaskID: "task-completed", UserID: 1, ChannelID: 1, AccountID: 20, Status: tasks.StatusCompleted, CompletedAt: ptrTime(time.Now())},
+	} {
+		if err := taskRepo.Create(ctx, task); err != nil {
+			t.Fatalf("seed task failed: %v", err)
+		}
+	}
+
+	result, err := service.ReconcileRunningTaskLeases(ctx, RunningTaskLeaseReconcileOptions{MaxRunningTasks: 10})
+	if err != nil {
+		t.Fatalf("ReconcileRunningTaskLeases returned error: %v", err)
+	}
+	if rebuilder.calls != 1 {
+		t.Fatalf("rebuild calls=%d, want 1", rebuilder.calls)
+	}
+	wantLeases := []taskqueue.TaskLease{
+		{TaskID: "task-running-a", AccountID: 10},
+		{TaskID: "task-running-b", AccountID: 20},
+	}
+	if fmt.Sprintf("%v", rebuilder.leases) != fmt.Sprintf("%v", wantLeases) {
+		t.Fatalf("leases=%v, want %v", rebuilder.leases, wantLeases)
+	}
+	wantAccountIDs := []uint64{10, 20, 30}
+	if fmt.Sprintf("%v", rebuilder.accountIDs) != fmt.Sprintf("%v", wantAccountIDs) {
+		t.Fatalf("accountIDs=%v, want %v", rebuilder.accountIDs, wantAccountIDs)
+	}
+	if result.RunningTasks != 2 || result.RebuiltLeases != 2 || result.AccountCountsRebuilt != 3 {
+		t.Fatalf("result=%+v, want running=2 leases=2 accounts=3", result)
+	}
+
+	pending, err := taskRepo.GetByTaskID(ctx, "task-pending")
+	if err != nil {
+		t.Fatalf("reload pending task failed: %v", err)
+	}
+	if pending.Status != tasks.StatusPending || pending.AccountID != 10 {
+		t.Fatalf("pending task changed unexpectedly: %+v", pending)
+	}
+}
+
+func TestReconcileRunningTaskLeasesHonorsBoundWithoutRebuild(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := accounts.NewTaskRepository(db)
+	rebuilder := &fakeTaskLeaseRebuilder{}
+	service := NewService(nil, taskRepo, nil, nil)
+	service.rebuilder = rebuilder
+
+	for _, task := range []*tasks.Task{
+		{TaskID: "task-bound-a", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning},
+		{TaskID: "task-bound-b", UserID: 1, ChannelID: 1, AccountID: 20, Status: tasks.StatusRunning},
+	} {
+		if err := taskRepo.Create(ctx, task); err != nil {
+			t.Fatalf("seed task failed: %v", err)
+		}
+	}
+
+	_, err := service.ReconcileRunningTaskLeases(ctx, RunningTaskLeaseReconcileOptions{MaxRunningTasks: 1})
+	if !errors.Is(err, ErrTaskLeaseReconcileLimitReached) {
+		t.Fatalf("expected ErrTaskLeaseReconcileLimitReached, got %v", err)
+	}
+	if rebuilder.calls != 0 {
+		t.Fatalf("rebuild calls=%d, want 0", rebuilder.calls)
+	}
 }
 
 func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {

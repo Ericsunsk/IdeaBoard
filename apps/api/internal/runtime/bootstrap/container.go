@@ -19,6 +19,7 @@ import (
 	"api/internal/prompts"
 	"api/internal/runtime/httpapi"
 	"api/internal/runtime/taskqueue"
+	"api/internal/runtime/taskruntime"
 	"api/internal/runtime/worker"
 	"api/internal/storage"
 	"api/internal/users"
@@ -76,6 +77,19 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	systemConfigRepo := settings.NewSystemConfigRepository(db)
 	lineDraftModeRepo := assets.NewLineDraftModeRepository(db)
 	boardRepo := boards.NewBoardRepository(db)
+
+	reconcileRuntime := taskruntime.NewService(accountRepo, taskRepo, redisAsynqAssigner, redisAsynqAssigner)
+	reconcileCtx, reconcileCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	reconcileResult, err := reconcileRuntime.ReconcileRunningTaskLeases(reconcileCtx, taskruntime.RunningTaskLeaseReconcileOptions{})
+	reconcileCancel()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to reconcile running task leases: %w", err)
+	}
+	log.Printf("[Main] Reconciled running task leases: running=%d rebuilt_leases=%d rebuilt_account_counts=%d",
+		reconcileResult.RunningTasks,
+		reconcileResult.RebuiltLeases,
+		reconcileResult.AccountCountsRebuilt,
+	)
 
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
