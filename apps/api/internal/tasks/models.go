@@ -15,6 +15,7 @@ type Task struct {
 	UserPrompt  string       `gorm:"type:text" json:"user_prompt"`
 	Params      string       `gorm:"type:mediumtext" json:"params"`
 	Status      string       `gorm:"type:varchar(20);default:'pending';index" json:"status"`
+	LeaseToken  string       `gorm:"type:varchar(128);index" json:"lease_token"`
 	RetryCount  int          `gorm:"type:int;default:0" json:"retry_count"`
 	ErrorMsg    string       `gorm:"type:text" json:"error_msg"`
 	Result      string       `gorm:"type:mediumtext" json:"result"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,17 +22,18 @@ func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
-		TaskID:    "task-reset-pending",
-		UserID:    1,
-		ChannelID: 1,
-		AccountID: 77,
-		Status:    tasks.StatusRunning,
+		TaskID:     "task-reset-pending",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  77,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-reset",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.ResetTaskRunningToPending(ctx, task.TaskID, task.AccountID, "worker context interrupted"); err != nil {
+	if err := service.ResetTaskRunningToPending(ctx, task.TaskID, task.AccountID, task.LeaseToken, "worker context interrupted"); err != nil {
 		t.Fatalf("ResetTaskRunningToPending returned error: %v", err)
 	}
 
@@ -65,13 +67,14 @@ func TestResetTaskRunningToPendingRejectsTerminalTask(t *testing.T) {
 		ChannelID:   1,
 		AccountID:   77,
 		Status:      tasks.StatusCompleted,
+		LeaseToken:  "lease-terminal",
 		CompletedAt: ptrTime(time.Now()),
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.ResetTaskRunningToPending(ctx, task.TaskID, task.AccountID, "worker context interrupted")
+	err := service.ResetTaskRunningToPending(ctx, task.TaskID, task.AccountID, task.LeaseToken, "worker context interrupted")
 	if !errors.Is(err, ErrTaskTerminal) {
 		t.Fatalf("expected ErrTaskTerminal, got %v", err)
 	}
@@ -143,9 +146,9 @@ func TestReconcileRunningTaskLeasesRebuildsFromDBRunningTasks(t *testing.T) {
 	}
 
 	for _, task := range []*tasks.Task{
-		{TaskID: "task-running-b", UserID: 1, ChannelID: 1, AccountID: 20, Status: tasks.StatusRunning},
+		{TaskID: "task-running-b", UserID: 1, ChannelID: 1, AccountID: 20, Status: tasks.StatusRunning, LeaseToken: "lease-running-b"},
 		{TaskID: "task-pending", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusPending},
-		{TaskID: "task-running-a", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning},
+		{TaskID: "task-running-a", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning, LeaseToken: "lease-running-a"},
 		{TaskID: "task-completed", UserID: 1, ChannelID: 1, AccountID: 20, Status: tasks.StatusCompleted, CompletedAt: ptrTime(time.Now())},
 	} {
 		if err := taskRepo.Create(ctx, task); err != nil {
@@ -161,8 +164,8 @@ func TestReconcileRunningTaskLeasesRebuildsFromDBRunningTasks(t *testing.T) {
 		t.Fatalf("rebuild calls=%d, want 1", rebuilder.calls)
 	}
 	wantLeases := []taskqueue.TaskLease{
-		{TaskID: "task-running-a", AccountID: 10},
-		{TaskID: "task-running-b", AccountID: 20},
+		{TaskID: "task-running-a", AccountID: 10, LeaseToken: "lease-running-a"},
+		{TaskID: "task-running-b", AccountID: 20, LeaseToken: "lease-running-b"},
 	}
 	if fmt.Sprintf("%v", rebuilder.leases) != fmt.Sprintf("%v", wantLeases) {
 		t.Fatalf("leases=%v, want %v", rebuilder.leases, wantLeases)
@@ -184,6 +187,28 @@ func TestReconcileRunningTaskLeasesRebuildsFromDBRunningTasks(t *testing.T) {
 	}
 }
 
+func TestReconcileRunningTaskLeasesRejectsRunningTaskWithoutLeaseToken(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := accounts.NewTaskRepository(db)
+	rebuilder := &fakeTaskLeaseRebuilder{}
+	service := NewService(nil, taskRepo, nil, nil)
+	service.rebuilder = rebuilder
+
+	task := &tasks.Task{TaskID: "task-missing-token", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	_, err := service.ReconcileRunningTaskLeases(ctx, RunningTaskLeaseReconcileOptions{MaxRunningTasks: 10})
+	if err == nil || !strings.Contains(err.Error(), "missing token") {
+		t.Fatalf("expected missing token error, got %v", err)
+	}
+	if rebuilder.calls != 0 {
+		t.Fatalf("rebuild calls=%d, want 0", rebuilder.calls)
+	}
+}
+
 func TestReconcileRunningTaskLeasesUsesLeaseLock(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
@@ -194,7 +219,7 @@ func TestReconcileRunningTaskLeasesUsesLeaseLock(t *testing.T) {
 	service.rebuilder = rebuilder
 	service.leaseLocker = locker
 
-	task := &tasks.Task{TaskID: "task-lock-reconcile", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning}
+	task := &tasks.Task{TaskID: "task-lock-reconcile", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning, LeaseToken: "lease-lock"}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
@@ -219,8 +244,8 @@ func TestReconcileRunningTaskLeasesHonorsBoundWithoutRebuild(t *testing.T) {
 	service.rebuilder = rebuilder
 
 	for _, task := range []*tasks.Task{
-		{TaskID: "task-bound-a", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning},
-		{TaskID: "task-bound-b", UserID: 1, ChannelID: 1, AccountID: 20, Status: tasks.StatusRunning},
+		{TaskID: "task-bound-a", UserID: 1, ChannelID: 1, AccountID: 10, Status: tasks.StatusRunning, LeaseToken: "lease-bound-a"},
+		{TaskID: "task-bound-b", UserID: 1, ChannelID: 1, AccountID: 20, Status: tasks.StatusRunning, LeaseToken: "lease-bound-b"},
 	} {
 		if err := taskRepo.Create(ctx, task); err != nil {
 			t.Fatalf("seed task failed: %v", err)
@@ -248,13 +273,14 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 		ChannelID:  1,
 		AccountID:  99,
 		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-requeue",
 		RetryCount: defaultTaskRetryLimit - 2,
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	requeued, err := service.RequeueTaskForFailover(ctx, task.TaskID, task.AccountID, "retryable error")
+	requeued, err := service.RequeueTaskForFailover(ctx, task.TaskID, task.AccountID, task.LeaseToken, "retryable error")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
 	}
@@ -303,7 +329,7 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.MarkTaskRunning(ctx, task.TaskID, 42); err != nil {
+	if err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-publish"); err != nil {
 		t.Fatalf("MarkTaskRunning returned error: %v", err)
 	}
 
@@ -333,13 +359,45 @@ func TestMarkTaskRunningReturnsAlreadyRunningForSameAccount(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.MarkTaskRunning(ctx, task.TaskID, 42); err != nil {
+	if err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-running-dup"); err != nil {
 		t.Fatalf("first MarkTaskRunning returned error: %v", err)
 	}
 
-	err := service.MarkTaskRunning(ctx, task.TaskID, 42)
+	err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-running-dup")
 	if !errors.Is(err, ErrTaskAlreadyRunning) {
 		t.Fatalf("expected ErrTaskAlreadyRunning, got %v", err)
+	}
+}
+
+func TestMarkTaskCompletedRejectsLeaseTokenMismatch(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+
+	task := &tasks.Task{
+		TaskID:     "task-complete-token-mismatch",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  42,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "current-lease-token",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	err := service.MarkTaskCompleted(ctx, task.TaskID, "stale-lease-token", `{"status":"success"}`)
+	if !errors.Is(err, ErrTaskStateConflict) {
+		t.Fatalf("expected ErrTaskStateConflict, got %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusRunning || updated.LeaseToken != task.LeaseToken {
+		t.Fatalf("task changed on token mismatch: status=%s lease=%s", updated.Status, updated.LeaseToken)
 	}
 }
 
@@ -355,13 +413,14 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 		ChannelID:  1,
 		AccountID:  100,
 		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-retry-limit",
 		RetryCount: defaultTaskRetryLimit - 1,
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	requeued, err := service.RequeueTaskForFailover(ctx, task.TaskID, task.AccountID, "retry limit reached")
+	requeued, err := service.RequeueTaskForFailover(ctx, task.TaskID, task.AccountID, task.LeaseToken, "retry limit reached")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
 	}
@@ -415,6 +474,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		ChannelID:  1,
 		AccountID:  13,
 		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-publish-pending",
 		RetryCount: 0,
 	}
 	if err := taskRepo.Create(ctx, requeueTask); err != nil {
@@ -425,7 +485,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		t.Fatal("subscribe pending rejected unexpectedly")
 	}
 	defer unsubPending()
-	requeued, err := service.RequeueTaskForFailover(ctx, requeueTask.TaskID, requeueTask.AccountID, "retry")
+	requeued, err := service.RequeueTaskForFailover(ctx, requeueTask.TaskID, requeueTask.AccountID, requeueTask.LeaseToken, "retry")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover pending returned error: %v", err)
 	}
@@ -447,6 +507,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		ChannelID:  1,
 		AccountID:  14,
 		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-publish-failed",
 		RetryCount: defaultTaskRetryLimit - 1,
 	}
 	if err := taskRepo.Create(ctx, finalTask); err != nil {
@@ -457,7 +518,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		t.Fatal("subscribe failed rejected unexpectedly")
 	}
 	defer unsubFailed()
-	requeued, err = service.RequeueTaskForFailover(ctx, finalTask.TaskID, finalTask.AccountID, "stop retry")
+	requeued, err = service.RequeueTaskForFailover(ctx, finalTask.TaskID, finalTask.AccountID, finalTask.LeaseToken, "stop retry")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover failed returned error: %v", err)
 	}
@@ -481,18 +542,19 @@ func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
-		TaskID:    "task-completed-daily",
-		UserID:    7,
-		ChannelID: 1,
-		Status:    tasks.StatusRunning,
-		CreatedAt: time.Now().Add(-90 * time.Second),
+		TaskID:     "task-completed-daily",
+		UserID:     7,
+		ChannelID:  1,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-completed-daily",
+		CreatedAt:  time.Now().Add(-90 * time.Second),
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
 	result := `{"model":"gpt-image-1","username":"alice"}`
-	if err := service.MarkTaskCompleted(ctx, task.TaskID, result); err != nil {
+	if err := service.MarkTaskCompleted(ctx, task.TaskID, task.LeaseToken, result); err != nil {
 		t.Fatalf("MarkTaskCompleted returned error: %v", err)
 	}
 
@@ -529,17 +591,18 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
-		TaskID:    "task-completed-outputs",
-		UserID:    7,
-		ChannelID: 1,
-		Status:    tasks.StatusRunning,
+		TaskID:     "task-completed-outputs",
+		UserID:     7,
+		ChannelID:  1,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-completed-outputs",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
 	result := `{"status":"success","image_url":"/uploads/2026/05/15/out-a.png","image_urls":["/uploads/2026/05/15/out-a.png","https://cdn.example.com/uploads/2026/05/15/out-b.png"]}`
-	if err := service.MarkTaskCompleted(ctx, task.TaskID, result); err != nil {
+	if err := service.MarkTaskCompleted(ctx, task.TaskID, task.LeaseToken, result); err != nil {
 		t.Fatalf("MarkTaskCompleted returned error: %v", err)
 	}
 
@@ -566,16 +629,17 @@ func TestMarkTaskCompletedRejectsInlineImageResult(t *testing.T) {
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
-		TaskID:    "task-inline-result",
-		UserID:    7,
-		ChannelID: 1,
-		Status:    tasks.StatusRunning,
+		TaskID:     "task-inline-result",
+		UserID:     7,
+		ChannelID:  1,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-inline-result",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.MarkTaskCompleted(ctx, task.TaskID, `{"status":"success","image_url":"data:image/png;base64,aGVsbG8="}`)
+	err := service.MarkTaskCompleted(ctx, task.TaskID, task.LeaseToken, `{"status":"success","image_url":"data:image/png;base64,aGVsbG8="}`)
 	if err == nil {
 		t.Fatal("expected inline image result to be rejected")
 	}

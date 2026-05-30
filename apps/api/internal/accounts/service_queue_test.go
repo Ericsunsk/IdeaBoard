@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"api/internal/runtime/queuetypes"
+	"api/internal/runtime/taskqueue"
 	"context"
 	"testing"
 	"time"
@@ -25,10 +26,13 @@ type fakeAssignerForService struct {
 	loadInfo map[uint64]*queuetypes.AccountLoad
 }
 
-func (f *fakeAssignerForService) Assign(context.Context, []uint64, *queuetypes.TaskPayload) (uint64, string, error) {
-	return 0, "", nil
+func (f *fakeAssignerForService) Assign(context.Context, []uint64, *queuetypes.TaskPayload) (taskqueue.TaskAssignment, error) {
+	return taskqueue.TaskAssignment{}, nil
 }
-func (f *fakeAssignerForService) Release(context.Context, uint64, string) error { return nil }
+func (f *fakeAssignerForService) ConfirmTaskRunning(context.Context, taskqueue.TaskAssignment) error {
+	return nil
+}
+func (f *fakeAssignerForService) Release(context.Context, string, uint64, string) error { return nil }
 func (f *fakeAssignerForService) EnsureAccountConcurrent(context.Context, uint64, int) error {
 	return nil
 }

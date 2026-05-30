@@ -117,8 +117,9 @@ type TaskStatisticLite struct {
 }
 
 type RunningTaskLease struct {
-	TaskID    string
-	AccountID uint64
+	TaskID     string
+	AccountID  uint64
+	LeaseToken string
 }
 
 type DailyStatAggregate struct {
@@ -182,12 +183,29 @@ func (r *TaskRepository) UpdateByTaskIDAndStatuses(ctx context.Context, taskID s
 	return result.RowsAffected, result.Error
 }
 
+func (r *TaskRepository) UpdateByTaskIDStatusesAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, updates map[string]interface{}) (int64, error) {
+	result := r.dbWithContext(ctx).Model(&tasks.Task{}).
+		Where("task_id = ? AND status IN ? AND lease_token = ?", taskID, statuses, leaseToken).
+		Updates(updates)
+	return result.RowsAffected, result.Error
+}
+
 func (r *TaskRepository) CompleteWithOutputs(ctx context.Context, taskID string, statuses []string, updates map[string]interface{}, outputs []tasks.TaskOutput) (int64, error) {
+	return r.completeWithOutputs(ctx, taskID, statuses, "", false, updates, outputs)
+}
+
+func (r *TaskRepository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, updates map[string]interface{}, outputs []tasks.TaskOutput) (int64, error) {
+	return r.completeWithOutputs(ctx, taskID, statuses, leaseToken, true, updates, outputs)
+}
+
+func (r *TaskRepository) completeWithOutputs(ctx context.Context, taskID string, statuses []string, leaseToken string, requireLeaseToken bool, updates map[string]interface{}, outputs []tasks.TaskOutput) (int64, error) {
 	var rowsAffected int64
 	err := r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		result := tx.Model(&tasks.Task{}).
-			Where("task_id = ? AND status IN ?", taskID, statuses).
-			Updates(updates)
+		query := tx.Model(&tasks.Task{}).Where("task_id = ? AND status IN ?", taskID, statuses)
+		if requireLeaseToken {
+			query = query.Where("lease_token = ?", leaseToken)
+		}
+		result := query.Updates(updates)
 		if result.Error != nil {
 			return result.Error
 		}
@@ -305,7 +323,7 @@ func (r *TaskRepository) ListRunningTaskLeases(ctx context.Context, limit int) (
 
 	var leases []RunningTaskLease
 	if err := r.dbWithContext(ctx).Model(&tasks.Task{}).
-		Select("task_id", "account_id").
+		Select("task_id", "account_id", "lease_token").
 		Where("status = ?", tasks.StatusRunning).
 		Order("id ASC").
 		Limit(limit).

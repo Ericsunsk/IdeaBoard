@@ -2,6 +2,8 @@ package redis
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -23,6 +25,10 @@ const (
 	AssignTaskStatusAssigned        = "assigned"
 	AssignTaskStatusNoCapacity      = "no_capacity"
 	AssignTaskStatusReconcileLocked = "reconcile_locked"
+	AssignTaskStatusActiveLease     = "active_lease"
+
+	TaskLeaseStateAssigning = "assigning"
+	TaskLeaseStateRunning   = "running"
 )
 
 // Lua 脚本：原子分配任务（无等待队列副作用）
@@ -33,13 +39,15 @@ local task_id = ARGV[3]
 local lease_key = ARGV[4]
 local running_key = ARGV[5]
 local reconcile_lock_key = ARGV[6]
+local lease_token = ARGV[7]
+local now_ms = tonumber(ARGV[8])
 
 if redis.call("EXISTS", reconcile_lock_key) == 1 then
-    return "-2"
+    return cjson.encode({status = "reconcile_locked"})
 end
 
 if redis.call("HEXISTS", lease_key, task_id) == 1 then
-    return "-1"
+    return cjson.encode({status = "active_lease"})
 end
 
 local best_account = -1
@@ -60,45 +68,88 @@ for _, aid in ipairs(account_ids) do
 end
 
 if best_account == -1 then
-    return "-1"
+    return cjson.encode({status = "no_capacity"})
 end
 
 local concurrent_key = max_concurrent_key .. ":" .. best_account
+local lease = {
+    account_id = tostring(best_account),
+    lease_token = lease_token,
+    state = "assigning",
+    assigned_at_unix_milli = now_ms,
+    updated_at_unix_milli = now_ms
+}
 redis.call("HINCRBY", concurrent_key, "count", 1)
-redis.call("HSET", lease_key, task_id, best_account)
+redis.call("HSET", lease_key, task_id, cjson.encode(lease))
 redis.call("SADD", running_key, task_id)
-return tostring(best_account)
+return cjson.encode({status = "assigned", account_id = tostring(best_account), lease_token = lease_token})
+`
+
+const luaConfirmTaskRunning = `
+local account_id = ARGV[1]
+local task_id = ARGV[2]
+local lease_token = ARGV[3]
+local lease_key = ARGV[4]
+local running_key = ARGV[5]
+local now_ms = tonumber(ARGV[6])
+
+local raw = redis.call("HGET", lease_key, task_id)
+if not raw then
+    return "no_lease"
+end
+
+local ok, lease = pcall(cjson.decode, raw)
+if not ok or type(lease) ~= "table" then
+    return "malformed_lease"
+end
+if tostring(lease["account_id"]) ~= tostring(account_id) then
+    return "wrong_account"
+end
+if tostring(lease["lease_token"]) ~= tostring(lease_token) then
+    return "token_mismatch"
+end
+
+lease["state"] = "running"
+lease["running_at_unix_milli"] = lease["running_at_unix_milli"] or now_ms
+lease["updated_at_unix_milli"] = now_ms
+redis.call("HSET", lease_key, task_id, cjson.encode(lease))
+redis.call("SADD", running_key, task_id)
+return "running"
 `
 
 // Lua 脚本：释放任务
 const luaReleaseTask = `
 local account_id = ARGV[1]
 local task_id = ARGV[2]
-local concurrent_key = ARGV[3]
-local lease_key = ARGV[4]
-local running_key = ARGV[5]
+local lease_token = ARGV[3]
+local concurrent_key = ARGV[4]
+local lease_key = ARGV[5]
+local running_key = ARGV[6]
 
-local leased_account = redis.call("HGET", lease_key, task_id)
-if leased_account then
-    if tostring(leased_account) ~= tostring(account_id) then
-        return "wrong_account"
-    end
-
-    redis.call("HDEL", lease_key, task_id)
-    redis.call("SREM", running_key, task_id)
-    local current = redis.call("HINCRBY", concurrent_key, "count", -1)
-    if tonumber(current) < 0 then
-        redis.call("HSET", concurrent_key, "count", 0)
-    end
-    return "released"
+local raw = redis.call("HGET", lease_key, task_id)
+if not raw then
+    return "no_lease"
 end
 
-local current = tonumber(redis.call("HGET", concurrent_key, "count")) or 0
-if current < 0 then
+local ok, lease = pcall(cjson.decode, raw)
+if not ok or type(lease) ~= "table" then
+    return "malformed_lease"
+end
+if tostring(lease["account_id"]) ~= tostring(account_id) then
+    return "wrong_account"
+end
+if tostring(lease["lease_token"]) ~= tostring(lease_token) then
+    return "token_mismatch"
+end
+
+redis.call("HDEL", lease_key, task_id)
+redis.call("SREM", running_key, task_id)
+local current = redis.call("HINCRBY", concurrent_key, "count", -1)
+if tonumber(current) < 0 then
     redis.call("HSET", concurrent_key, "count", 0)
 end
 
-return "no_lease"
+return "released"
 `
 
 const luaReleaseTaskLeaseReconcileLock = `
@@ -112,11 +163,17 @@ const (
 	defaultTaskLeaseReconcileLockTTL     = time.Minute
 	taskLeaseReconcileLockRetryDelay     = 100 * time.Millisecond
 	taskLeaseReconcileLockReleaseTimeout = 2 * time.Second
+	taskAssigningLeaseRebuildGrace       = 5 * time.Minute
 )
 
 type TaskLease struct {
-	TaskID    string
-	AccountID uint64
+	TaskID              string `json:"-"`
+	AccountID           uint64 `json:"account_id,string"`
+	LeaseToken          string `json:"lease_token"`
+	State               string `json:"state"`
+	AssignedAtUnixMilli int64  `json:"assigned_at_unix_milli,omitempty"`
+	RunningAtUnixMilli  int64  `json:"running_at_unix_milli,omitempty"`
+	UpdatedAtUnixMilli  int64  `json:"updated_at_unix_milli,omitempty"`
 }
 
 type RedisManager struct {
@@ -167,13 +224,19 @@ func (r *RedisManager) GetAccountMaxConcurrent(ctx context.Context, accountID ui
 	return max, err
 }
 
-// TryAssignTask 分配任务给账号（Lua脚本原子操作，无等待队列副作用）
-func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, taskID string) (uint64, string, error) {
+// TryAssignTask 分配任务给账号（Lua脚本原子操作，无等待队列副作用）。
+// KeyRunningTasks 在 stateful lease 中作为 active marker 使用：assigning/running 都会占用容量。
+func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, taskID string) (uint64, string, string, error) {
 	if len(accountIDs) == 0 {
-		return 0, "", fmt.Errorf("没有可用的账号")
+		return 0, "", "", fmt.Errorf("没有可用的账号")
 	}
 	if taskID == "" {
-		return 0, "", fmt.Errorf("task id is empty")
+		return 0, "", "", fmt.Errorf("task id is empty")
+	}
+
+	leaseToken, err := generateLeaseToken()
+	if err != nil {
+		return 0, "", "", err
 	}
 
 	idsJSON, _ := json.Marshal(accountIDs)
@@ -184,27 +247,41 @@ func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, t
 		KeyTaskLeases,
 		KeyRunningTasks,
 		KeyTaskLeaseReconcileLock,
+		leaseToken,
+		time.Now().UnixMilli(),
 	).Result()
 	if err != nil {
-		return 0, "", err
+		return 0, "", "", err
 	}
 
 	resultStr, ok := result.(string)
 	if !ok {
-		return 0, "", fmt.Errorf("Lua脚本返回类型错误")
+		return 0, "", "", fmt.Errorf("Lua脚本返回类型错误")
 	}
-	if resultStr == "-1" {
-		return 0, AssignTaskStatusNoCapacity, nil
+	var assignResult struct {
+		Status     string `json:"status"`
+		AccountID  string `json:"account_id"`
+		LeaseToken string `json:"lease_token"`
 	}
-	if resultStr == "-2" {
-		return 0, AssignTaskStatusReconcileLocked, nil
+	if err := json.Unmarshal([]byte(resultStr), &assignResult); err != nil {
+		return 0, "", "", fmt.Errorf("parse assign result %q: %w", resultStr, err)
+	}
+	switch assignResult.Status {
+	case AssignTaskStatusNoCapacity, AssignTaskStatusReconcileLocked, AssignTaskStatusActiveLease:
+		return 0, "", assignResult.Status, nil
+	case AssignTaskStatusAssigned:
+	default:
+		return 0, "", "", fmt.Errorf("unknown assign status %q", assignResult.Status)
 	}
 
-	accountID, parseErr := strconv.ParseUint(resultStr, 10, 64)
+	accountID, parseErr := strconv.ParseUint(assignResult.AccountID, 10, 64)
 	if parseErr != nil {
-		return 0, "", fmt.Errorf("parse assigned account id %q: %w", resultStr, parseErr)
+		return 0, "", "", fmt.Errorf("parse assigned account id %q: %w", assignResult.AccountID, parseErr)
 	}
-	return accountID, AssignTaskStatusAssigned, nil
+	if assignResult.LeaseToken == "" {
+		return 0, "", "", fmt.Errorf("assigned task %q without lease token", taskID)
+	}
+	return accountID, assignResult.LeaseToken, AssignTaskStatusAssigned, nil
 }
 
 func (r *RedisManager) WithTaskLeaseReconcileLock(ctx context.Context, fn func(context.Context) error) error {
@@ -242,31 +319,74 @@ func (r *RedisManager) releaseTaskLeaseReconcileLock(parent context.Context, tok
 	return r.rdb.Eval(ctx, luaReleaseTaskLeaseReconcileLock, []string{KeyTaskLeaseReconcileLock}, token).Err()
 }
 
-// ReleaseTask 释放任务
-func (r *RedisManager) ReleaseTask(ctx context.Context, accountID uint64, taskID string) error {
-	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
-	_, err := r.rdb.Eval(ctx, luaReleaseTask, []string{},
+func (r *RedisManager) ConfirmTaskRunning(ctx context.Context, accountID uint64, taskID, leaseToken string) error {
+	if taskID == "" {
+		return fmt.Errorf("task id is empty")
+	}
+	if leaseToken == "" {
+		return fmt.Errorf("lease token is empty")
+	}
+	result, err := r.rdb.Eval(ctx, luaConfirmTaskRunning, []string{},
 		fmt.Sprintf("%d", accountID),
 		taskID,
+		leaseToken,
+		KeyTaskLeases,
+		KeyRunningTasks,
+		time.Now().UnixMilli(),
+	).Result()
+	if err != nil {
+		return err
+	}
+	if result == "running" {
+		return nil
+	}
+	return fmt.Errorf("confirm task lease %s: %s", taskID, result)
+}
+
+// ReleaseTask 释放任务；只有 account_id 与 lease_token 都匹配时才会删除 lease 并扣减并发。
+func (r *RedisManager) ReleaseTask(ctx context.Context, accountID uint64, taskID, leaseToken string) error {
+	if taskID == "" {
+		return fmt.Errorf("task id is empty")
+	}
+	if leaseToken == "" {
+		return fmt.Errorf("lease token is empty")
+	}
+	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
+	result, err := r.rdb.Eval(ctx, luaReleaseTask, []string{},
+		fmt.Sprintf("%d", accountID),
+		taskID,
+		leaseToken,
 		key,
 		KeyTaskLeases,
 		KeyRunningTasks,
 	).Result()
-	return err
+	if err != nil {
+		return err
+	}
+	switch result {
+	case "released", "no_lease":
+		return nil
+	default:
+		return fmt.Errorf("release task lease %s: %s", taskID, result)
+	}
 }
 
 func (r *RedisManager) GetTaskLease(ctx context.Context, taskID string) (uint64, bool, error) {
 	if taskID == "" {
 		return 0, false, fmt.Errorf("task id is empty")
 	}
-	accountID, err := r.rdb.HGet(ctx, KeyTaskLeases, taskID).Uint64()
+	raw, err := r.rdb.HGet(ctx, KeyTaskLeases, taskID).Result()
 	if err == redis.Nil {
 		return 0, false, nil
 	}
 	if err != nil {
 		return 0, false, err
 	}
-	return accountID, true, nil
+	lease, err := parseTaskLease(taskID, raw)
+	if err != nil {
+		return 0, false, err
+	}
+	return lease.AccountID, true, nil
 }
 
 func (r *RedisManager) HasActiveLease(ctx context.Context, taskID string, accountID uint64) (bool, error) {
@@ -284,17 +404,19 @@ func (r *RedisManager) ListTaskLeases(ctx context.Context) ([]TaskLease, error) 
 	}
 
 	leases := make([]TaskLease, 0, len(values))
-	for taskID, accountIDStr := range values {
-		accountID, scanErr := strconv.ParseUint(accountIDStr, 10, 64)
+	for taskID, raw := range values {
+		lease, scanErr := parseTaskLease(taskID, raw)
 		if scanErr != nil {
-			return nil, fmt.Errorf("parse task lease %s=%q: %w", taskID, accountIDStr, scanErr)
+			return nil, scanErr
 		}
-		leases = append(leases, TaskLease{TaskID: taskID, AccountID: accountID})
+		leases = append(leases, lease)
 	}
 	return leases, nil
 }
 
 func (r *RedisManager) RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error {
+	now := time.Now()
+	rebuildLeases := make([]TaskLease, 0, len(leases))
 	counts := make(map[uint64]int, len(accountIDs))
 	for _, accountID := range accountIDs {
 		counts[accountID] = 0
@@ -303,6 +425,30 @@ func (r *RedisManager) RebuildRunningTaskLeases(ctx context.Context, leases []Ta
 		if lease.TaskID == "" || lease.AccountID == 0 {
 			return fmt.Errorf("invalid task lease: task_id=%q account_id=%d", lease.TaskID, lease.AccountID)
 		}
+		if lease.LeaseToken == "" {
+			return fmt.Errorf("invalid task lease: task_id=%q lease token is empty", lease.TaskID)
+		}
+		normalized := normalizeRebuildLease(lease, TaskLeaseStateRunning, now)
+		rebuildLeases = append(rebuildLeases, normalized)
+		counts[normalized.AccountID]++
+	}
+
+	existing, err := r.ListTaskLeases(ctx)
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]struct{}, len(rebuildLeases))
+	for _, lease := range rebuildLeases {
+		seen[lease.TaskID] = struct{}{}
+	}
+	for _, lease := range existing {
+		if _, ok := seen[lease.TaskID]; ok {
+			continue
+		}
+		if !isRecentAssigningLease(lease, now) {
+			continue
+		}
+		rebuildLeases = append(rebuildLeases, lease)
 		counts[lease.AccountID]++
 	}
 
@@ -312,12 +458,67 @@ func (r *RedisManager) RebuildRunningTaskLeases(ctx context.Context, leases []Ta
 		key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
 		pipe.HSet(ctx, key, "count", count)
 	}
-	for _, lease := range leases {
-		pipe.HSet(ctx, KeyTaskLeases, lease.TaskID, lease.AccountID)
+	for _, lease := range rebuildLeases {
+		raw, err := json.Marshal(lease)
+		if err != nil {
+			return fmt.Errorf("marshal task lease %s: %w", lease.TaskID, err)
+		}
+		pipe.HSet(ctx, KeyTaskLeases, lease.TaskID, raw)
 		pipe.SAdd(ctx, KeyRunningTasks, lease.TaskID)
 	}
-	_, err := pipe.Exec(ctx)
+	_, err = pipe.Exec(ctx)
 	return err
+}
+
+func parseTaskLease(taskID, raw string) (TaskLease, error) {
+	var lease TaskLease
+	if err := json.Unmarshal([]byte(raw), &lease); err != nil {
+		return TaskLease{}, fmt.Errorf("parse task lease %s=%q: %w", taskID, raw, err)
+	}
+	lease.TaskID = taskID
+	if lease.AccountID == 0 {
+		return TaskLease{}, fmt.Errorf("task lease %s has empty account id", taskID)
+	}
+	if lease.LeaseToken == "" {
+		return TaskLease{}, fmt.Errorf("task lease %s has empty lease token", taskID)
+	}
+	if lease.State != TaskLeaseStateAssigning && lease.State != TaskLeaseStateRunning {
+		return TaskLease{}, fmt.Errorf("task lease %s has invalid state %q", taskID, lease.State)
+	}
+	return lease, nil
+}
+
+func normalizeRebuildLease(lease TaskLease, defaultState string, now time.Time) TaskLease {
+	if lease.State == "" {
+		lease.State = defaultState
+	}
+	if lease.AssignedAtUnixMilli == 0 {
+		lease.AssignedAtUnixMilli = now.UnixMilli()
+	}
+	if lease.State == TaskLeaseStateRunning && lease.RunningAtUnixMilli == 0 {
+		lease.RunningAtUnixMilli = now.UnixMilli()
+	}
+	lease.UpdatedAtUnixMilli = now.UnixMilli()
+	return lease
+}
+
+func isRecentAssigningLease(lease TaskLease, now time.Time) bool {
+	if lease.State != TaskLeaseStateAssigning {
+		return false
+	}
+	if lease.AssignedAtUnixMilli == 0 {
+		return false
+	}
+	assignedAt := time.UnixMilli(lease.AssignedAtUnixMilli)
+	return now.Sub(assignedAt) <= taskAssigningLeaseRebuildGrace
+}
+
+func generateLeaseToken() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", fmt.Errorf("generate lease token: %w", err)
+	}
+	return hex.EncodeToString(b[:]), nil
 }
 
 // GetAccountLoadInfo 获取所有账号的负载信息

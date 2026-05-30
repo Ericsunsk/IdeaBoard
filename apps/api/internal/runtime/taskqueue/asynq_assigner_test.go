@@ -40,7 +40,7 @@ func TestRedisAsynqAssignerRebuildAndInspectLeases(t *testing.T) {
 			t.Fatalf("seed count for %d: %v", accountID, err)
 		}
 	}
-	if err := mgr.GetClient().HSet(ctx, redis.KeyTaskLeases, "stale-lease", 9103).Err(); err != nil {
+	if err := mgr.GetClient().HSet(ctx, redis.KeyTaskLeases, "stale-lease", `{"account_id":"9103","lease_token":"stale-token","state":"running"}`).Err(); err != nil {
 		t.Fatalf("seed stale lease: %v", err)
 	}
 	if err := mgr.GetClient().SAdd(ctx, redis.KeyRunningTasks, "stale-lease").Err(); err != nil {
@@ -48,9 +48,9 @@ func TestRedisAsynqAssignerRebuildAndInspectLeases(t *testing.T) {
 	}
 
 	leases := []TaskLease{
-		{TaskID: "task-1", AccountID: 9101},
-		{TaskID: "task-2", AccountID: 9101},
-		{TaskID: "task-3", AccountID: 9102},
+		{TaskID: "task-1", AccountID: 9101, LeaseToken: "lease-token-1"},
+		{TaskID: "task-2", AccountID: 9101, LeaseToken: "lease-token-2"},
+		{TaskID: "task-3", AccountID: 9102, LeaseToken: "lease-token-3"},
 	}
 	if err := assigner.RebuildRunningTaskLeases(ctx, leases, []uint64{9101, 9102, 9103}); err != nil {
 		t.Fatalf("rebuild leases: %v", err)
@@ -97,6 +97,32 @@ func TestRedisAsynqAssignerRebuildAndInspectLeases(t *testing.T) {
 	}
 }
 
+func TestRedisAsynqAssignerAssignConfirmReleaseWithLeaseToken(t *testing.T) {
+	assigner, mgr := newTestRedisAsynqAssigner(t)
+	ctx := context.Background()
+	if err := mgr.EnsureAccountConcurrent(ctx, 9151, 1); err != nil {
+		t.Fatalf("ensure account: %v", err)
+	}
+
+	assignment, err := assigner.Assign(ctx, []uint64{9151}, &queuetypes.TaskPayload{TaskID: "assigned-task"})
+	if err != nil {
+		t.Fatalf("assign: %v", err)
+	}
+	if assignment.Status != AssignStatusAssigned || assignment.AccountID != 9151 || assignment.LeaseToken == "" {
+		t.Fatalf("assignment=%+v, want assigned account with token", assignment)
+	}
+	if err := assigner.ConfirmTaskRunning(ctx, assignment); err != nil {
+		t.Fatalf("confirm running: %v", err)
+	}
+	if err := assigner.Release(ctx, assignment.TaskID, assignment.AccountID, assignment.LeaseToken); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+	count, err := mgr.GetAccountConcurrent(ctx, assignment.AccountID)
+	if err != nil || count != 0 {
+		t.Fatalf("count=%d want 0 err=%v", count, err)
+	}
+}
+
 func TestRedisAsynqAssignerListTaskLeasesRejectsMalformedAccountID(t *testing.T) {
 	assigner, mgr := newTestRedisAsynqAssigner(t)
 	ctx := context.Background()
@@ -117,12 +143,12 @@ func TestRedisAsynqAssignerMapsReconcileLockToNoCapacity(t *testing.T) {
 	}
 
 	err := assigner.WithTaskLeaseReconcileLock(ctx, func(lockCtx context.Context) error {
-		accountID, status, err := assigner.Assign(lockCtx, []uint64{9201}, &queuetypes.TaskPayload{TaskID: "locked-task"})
+		assignment, err := assigner.Assign(lockCtx, []uint64{9201}, &queuetypes.TaskPayload{TaskID: "locked-task"})
 		if err != nil {
 			return err
 		}
-		if accountID != 0 || status != AssignStatusNoCapacity {
-			t.Fatalf("assign during reconcile account=%d status=%s, want no capacity", accountID, status)
+		if assignment.AccountID != 0 || assignment.Status != AssignStatusNoCapacity {
+			t.Fatalf("assign during reconcile account=%d status=%s, want no capacity", assignment.AccountID, assignment.Status)
 		}
 		return nil
 	})

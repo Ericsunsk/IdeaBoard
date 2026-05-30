@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"testing"
@@ -23,7 +24,7 @@ func newTestRedisManager(t *testing.T) *RedisManager {
 	return NewRedisManager(client)
 }
 
-func TestTryAssignTaskCreatesLeaseAndReleaseClearsIt(t *testing.T) {
+func TestTaskLeaseAssigningConfirmRunningRelease(t *testing.T) {
 	mgr := newTestRedisManager(t)
 	ctx := context.Background()
 	if err := mgr.EnsureAccountConcurrent(ctx, 101, 1); err != nil {
@@ -31,45 +32,151 @@ func TestTryAssignTaskCreatesLeaseAndReleaseClearsIt(t *testing.T) {
 	}
 
 	taskID := "a1"
-	accountID, status, err := mgr.TryAssignTask(ctx, []uint64{101}, taskID)
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{101}, taskID)
 	if err != nil {
 		t.Fatalf("try assign: %v", err)
 	}
-	if status != AssignTaskStatusAssigned || accountID != 101 {
-		t.Fatalf("unexpected assign result: account=%d status=%s", accountID, status)
+	if status != AssignTaskStatusAssigned || accountID != 101 || leaseToken == "" {
+		t.Fatalf("unexpected assign result: account=%d token=%q status=%s", accountID, leaseToken, status)
 	}
 	count, err := mgr.GetAccountConcurrent(ctx, 101)
 	if err != nil || count != 1 {
 		t.Fatalf("concurrent count=%d err=%v", count, err)
 	}
-	leasedAccountID, ok, err := mgr.GetTaskLease(ctx, taskID)
-	if err != nil || !ok || leasedAccountID != 101 {
-		t.Fatalf("lease account=%d ok=%v err=%v", leasedAccountID, ok, err)
-	}
+	assertSingleLease(t, mgr, ctx, TaskLease{
+		TaskID:     taskID,
+		AccountID:  101,
+		LeaseToken: leaseToken,
+		State:      TaskLeaseStateAssigning,
+	})
 	active, err := mgr.HasActiveLease(ctx, taskID, 101)
 	if err != nil || !active {
 		t.Fatalf("active lease=%v err=%v", active, err)
 	}
+	assertSetMembers(t, mgr, ctx, KeyRunningTasks, []string{taskID})
 
-	running, err := mgr.GetClient().SMembers(ctx, KeyRunningTasks).Result()
-	if err != nil || len(running) != 1 || running[0] != taskID {
-		t.Fatalf("running set=%v err=%v", running, err)
+	if err := mgr.ConfirmTaskRunning(ctx, 101, taskID, leaseToken); err != nil {
+		t.Fatalf("confirm running: %v", err)
+	}
+	lease := assertSingleLease(t, mgr, ctx, TaskLease{
+		TaskID:     taskID,
+		AccountID:  101,
+		LeaseToken: leaseToken,
+		State:      TaskLeaseStateRunning,
+	})
+	if lease.RunningAtUnixMilli == 0 || lease.UpdatedAtUnixMilli == 0 {
+		t.Fatalf("running lease should include timestamps: %+v", lease)
 	}
 
-	if err := mgr.ReleaseTask(ctx, 101, taskID); err != nil {
+	if err := mgr.ReleaseTask(ctx, 101, taskID, leaseToken); err != nil {
 		t.Fatalf("release: %v", err)
 	}
 	count, err = mgr.GetAccountConcurrent(ctx, 101)
 	if err != nil || count != 0 {
 		t.Fatalf("count should be 0, got %d err=%v", count, err)
 	}
-	running, err = mgr.GetClient().SMembers(ctx, KeyRunningTasks).Result()
-	if err != nil || len(running) != 0 {
-		t.Fatalf("running should be empty, got=%v err=%v", running, err)
-	}
-	leasedAccountID, ok, err = mgr.GetTaskLease(ctx, taskID)
+	assertSetMembers(t, mgr, ctx, KeyRunningTasks, nil)
+	leasedAccountID, ok, err := mgr.GetTaskLease(ctx, taskID)
 	if err != nil || ok || leasedAccountID != 0 {
 		t.Fatalf("lease should be cleared, account=%d ok=%v err=%v", leasedAccountID, ok, err)
+	}
+}
+
+func TestReleaseTaskTokenMismatchDoesNotReleaseOrDecrement(t *testing.T) {
+	mgr := newTestRedisManager(t)
+	ctx := context.Background()
+	if err := mgr.EnsureAccountConcurrent(ctx, 201, 1); err != nil {
+		t.Fatalf("init account: %v", err)
+	}
+
+	taskID := "token-mismatch-1"
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{201}, taskID)
+	if err != nil || status != AssignTaskStatusAssigned {
+		t.Fatalf("assign account=%d token=%q status=%s err=%v", accountID, leaseToken, status, err)
+	}
+	if err := mgr.ReleaseTask(ctx, 201, taskID, "wrong-token"); err == nil {
+		t.Fatal("expected token mismatch release to fail")
+	}
+
+	count, err := mgr.GetAccountConcurrent(ctx, 201)
+	if err != nil || count != 1 {
+		t.Fatalf("count should stay 1, got %d err=%v", count, err)
+	}
+	assertSingleLease(t, mgr, ctx, TaskLease{
+		TaskID:     taskID,
+		AccountID:  201,
+		LeaseToken: leaseToken,
+		State:      TaskLeaseStateAssigning,
+	})
+	assertSetMembers(t, mgr, ctx, KeyRunningTasks, []string{taskID})
+
+	if err := mgr.ReleaseTask(ctx, 201, taskID, leaseToken); err != nil {
+		t.Fatalf("release with correct token: %v", err)
+	}
+	count, err = mgr.GetAccountConcurrent(ctx, 201)
+	if err != nil || count != 0 {
+		t.Fatalf("count should be 0 after correct release, got %d err=%v", count, err)
+	}
+}
+
+func TestReleaseTaskWrongAccountDoesNotDecrement(t *testing.T) {
+	mgr := newTestRedisManager(t)
+	ctx := context.Background()
+	if err := mgr.EnsureAccountConcurrent(ctx, 401, 1); err != nil {
+		t.Fatalf("init account 401: %v", err)
+	}
+	if err := mgr.EnsureAccountConcurrent(ctx, 402, 1); err != nil {
+		t.Fatalf("init account 402: %v", err)
+	}
+
+	taskID := "wrong-account-1"
+	_, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{401}, taskID)
+	if err != nil || status != AssignTaskStatusAssigned {
+		t.Fatalf("assign status=%s err=%v", status, err)
+	}
+	if err := mgr.ReleaseTask(ctx, 402, taskID, leaseToken); err == nil {
+		t.Fatal("expected wrong account release to fail")
+	}
+
+	count401, err := mgr.GetAccountConcurrent(ctx, 401)
+	if err != nil || count401 != 1 {
+		t.Fatalf("account 401 count=%d err=%v", count401, err)
+	}
+	count402, err := mgr.GetAccountConcurrent(ctx, 402)
+	if err != nil || count402 != 0 {
+		t.Fatalf("account 402 count=%d err=%v", count402, err)
+	}
+	assertSingleLease(t, mgr, ctx, TaskLease{
+		TaskID:     taskID,
+		AccountID:  401,
+		LeaseToken: leaseToken,
+		State:      TaskLeaseStateAssigning,
+	})
+	assertSetMembers(t, mgr, ctx, KeyRunningTasks, []string{taskID})
+}
+
+func TestReleaseTaskIsIdempotentAfterLeaseRemoved(t *testing.T) {
+	mgr := newTestRedisManager(t)
+	ctx := context.Background()
+	if err := mgr.EnsureAccountConcurrent(ctx, 501, 1); err != nil {
+		t.Fatalf("init account: %v", err)
+	}
+
+	taskID := "idempotent-1"
+	_, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{501}, taskID)
+	if err != nil || status != AssignTaskStatusAssigned {
+		t.Fatalf("assign status=%s err=%v", status, err)
+	}
+	if err := mgr.ReleaseTask(ctx, 501, taskID, leaseToken); err != nil {
+		t.Fatalf("release: %v", err)
+	}
+	if err := mgr.ReleaseTask(ctx, 501, taskID, leaseToken); err != nil {
+		t.Fatalf("release second time: %v", err)
+	}
+
+	count, err := mgr.GetAccountConcurrent(ctx, 501)
+	if err != nil || count != 0 {
+		t.Fatalf("count should stay 0, got %d err=%v", count, err)
 	}
 }
 
@@ -102,12 +209,12 @@ func TestTaskLeaseReconcileLockBlocksAssignment(t *testing.T) {
 		t.Fatalf("timeout waiting for reconcile lock: %v", ctx.Err())
 	}
 
-	accountID, status, err := mgr.TryAssignTask(ctx, []uint64{151}, "blocked-by-reconcile")
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{151}, "blocked-by-reconcile")
 	if err != nil {
 		t.Fatalf("try assign during reconcile lock: %v", err)
 	}
-	if accountID != 0 || status != AssignTaskStatusReconcileLocked {
-		t.Fatalf("assign during lock account=%d status=%s, want account=0 status=%s", accountID, status, AssignTaskStatusReconcileLocked)
+	if accountID != 0 || leaseToken != "" || status != AssignTaskStatusReconcileLocked {
+		t.Fatalf("assign during lock account=%d token=%q status=%s", accountID, leaseToken, status)
 	}
 
 	close(release)
@@ -120,101 +227,12 @@ func TestTaskLeaseReconcileLockBlocksAssignment(t *testing.T) {
 		t.Fatalf("timeout waiting for reconcile lock release: %v", ctx.Err())
 	}
 
-	accountID, status, err = mgr.TryAssignTask(ctx, []uint64{151}, "assigned-after-reconcile")
+	accountID, leaseToken, status, err = mgr.TryAssignTask(ctx, []uint64{151}, "assigned-after-reconcile")
 	if err != nil {
 		t.Fatalf("try assign after reconcile lock: %v", err)
 	}
-	if accountID != 151 || status != AssignTaskStatusAssigned {
-		t.Fatalf("assign after lock account=%d status=%s, want account=151 status=%s", accountID, status, AssignTaskStatusAssigned)
-	}
-}
-
-func TestReleaseTaskIsIdempotent(t *testing.T) {
-	mgr := newTestRedisManager(t)
-	ctx := context.Background()
-	if err := mgr.EnsureAccountConcurrent(ctx, 201, 1); err != nil {
-		t.Fatalf("init account: %v", err)
-	}
-
-	taskID := "idempotent-1"
-	if _, status, err := mgr.TryAssignTask(ctx, []uint64{201}, taskID); err != nil || status != AssignTaskStatusAssigned {
-		t.Fatalf("assign status=%s err=%v", status, err)
-	}
-	if err := mgr.ReleaseTask(ctx, 201, taskID); err != nil {
-		t.Fatalf("release: %v", err)
-	}
-	if err := mgr.ReleaseTask(ctx, 201, taskID); err != nil {
-		t.Fatalf("release second time: %v", err)
-	}
-
-	count, err := mgr.GetAccountConcurrent(ctx, 201)
-	if err != nil || count != 0 {
-		t.Fatalf("count should stay 0, got %d err=%v", count, err)
-	}
-}
-
-func TestReleaseTaskWrongAccountDoesNotDecrement(t *testing.T) {
-	mgr := newTestRedisManager(t)
-	ctx := context.Background()
-	if err := mgr.EnsureAccountConcurrent(ctx, 401, 1); err != nil {
-		t.Fatalf("init account 401: %v", err)
-	}
-	if err := mgr.EnsureAccountConcurrent(ctx, 402, 1); err != nil {
-		t.Fatalf("init account 402: %v", err)
-	}
-
-	taskID := "wrong-account-1"
-	if _, status, err := mgr.TryAssignTask(ctx, []uint64{401}, taskID); err != nil || status != AssignTaskStatusAssigned {
-		t.Fatalf("assign status=%s err=%v", status, err)
-	}
-	if err := mgr.ReleaseTask(ctx, 402, taskID); err != nil {
-		t.Fatalf("wrong account release: %v", err)
-	}
-
-	count401, err := mgr.GetAccountConcurrent(ctx, 401)
-	if err != nil || count401 != 1 {
-		t.Fatalf("account 401 count=%d err=%v", count401, err)
-	}
-	count402, err := mgr.GetAccountConcurrent(ctx, 402)
-	if err != nil || count402 != 0 {
-		t.Fatalf("account 402 count=%d err=%v", count402, err)
-	}
-	leasedAccountID, ok, err := mgr.GetTaskLease(ctx, taskID)
-	if err != nil || !ok || leasedAccountID != 401 {
-		t.Fatalf("lease account=%d ok=%v err=%v", leasedAccountID, ok, err)
-	}
-	running, err := mgr.GetClient().SIsMember(ctx, KeyRunningTasks, taskID).Result()
-	if err != nil || !running {
-		t.Fatalf("running=%v err=%v", running, err)
-	}
-}
-
-func TestReleaseTaskWithoutLeaseDoesNotDecrementOrRemoveRunning(t *testing.T) {
-	mgr := newTestRedisManager(t)
-	ctx := context.Background()
-	if err := mgr.EnsureAccountConcurrent(ctx, 501, 1); err != nil {
-		t.Fatalf("init account: %v", err)
-	}
-	if err := mgr.GetClient().HSet(ctx, KeyAccountConcurrent+":501", "count", 1).Err(); err != nil {
-		t.Fatalf("seed count: %v", err)
-	}
-	if err := mgr.GetClient().SAdd(ctx, KeyRunningTasks, "orphan-1").Err(); err != nil {
-		t.Fatalf("seed running: %v", err)
-	}
-
-	if err := mgr.ReleaseTask(ctx, 501, "orphan-1"); err != nil {
-		t.Fatalf("release without lease: %v", err)
-	}
-	if err := mgr.ReleaseTask(ctx, 501, "orphan-1"); err != nil {
-		t.Fatalf("release without lease second time: %v", err)
-	}
-	count, err := mgr.GetAccountConcurrent(ctx, 501)
-	if err != nil || count != 1 {
-		t.Fatalf("count should stay unchanged without lease, got %d err=%v", count, err)
-	}
-	running, err := mgr.GetClient().SIsMember(ctx, KeyRunningTasks, "orphan-1").Result()
-	if err != nil || !running {
-		t.Fatalf("running marker should stay without lease, running=%v err=%v", running, err)
+	if accountID != 151 || leaseToken == "" || status != AssignTaskStatusAssigned {
+		t.Fatalf("assign after lock account=%d token=%q status=%s", accountID, leaseToken, status)
 	}
 }
 
@@ -226,12 +244,12 @@ func TestTryAssignTaskNoCapacity(t *testing.T) {
 	}
 	_ = mgr.GetClient().HSet(ctx, KeyAccountConcurrent+":301", "count", 1).Err()
 
-	accountID, status, err := mgr.TryAssignTask(ctx, []uint64{301}, "cap-1")
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{301}, "cap-1")
 	if err != nil {
 		t.Fatalf("try assign: %v", err)
 	}
-	if accountID != 0 || status != AssignTaskStatusNoCapacity {
-		t.Fatalf("expected no capacity, got account=%d status=%s", accountID, status)
+	if accountID != 0 || leaseToken != "" || status != AssignTaskStatusNoCapacity {
+		t.Fatalf("expected no capacity, got account=%d token=%q status=%s", accountID, leaseToken, status)
 	}
 }
 
@@ -243,15 +261,15 @@ func TestTryAssignTaskExistingLeaseDoesNotIncrement(t *testing.T) {
 	}
 
 	taskID := "duplicate-lease-1"
-	if _, status, err := mgr.TryAssignTask(ctx, []uint64{701}, taskID); err != nil || status != AssignTaskStatusAssigned {
+	if _, _, status, err := mgr.TryAssignTask(ctx, []uint64{701}, taskID); err != nil || status != AssignTaskStatusAssigned {
 		t.Fatalf("first assign status=%s err=%v", status, err)
 	}
-	accountID, status, err := mgr.TryAssignTask(ctx, []uint64{701}, taskID)
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{701}, taskID)
 	if err != nil {
 		t.Fatalf("second assign: %v", err)
 	}
-	if accountID != 0 || status != AssignTaskStatusNoCapacity {
-		t.Fatalf("second assign should be no capacity, got account=%d status=%s", accountID, status)
+	if accountID != 0 || leaseToken != "" || status != AssignTaskStatusActiveLease {
+		t.Fatalf("second assign should be active lease, got account=%d token=%q status=%s", accountID, leaseToken, status)
 	}
 	count, err := mgr.GetAccountConcurrent(ctx, 701)
 	if err != nil || count != 1 {
@@ -261,13 +279,13 @@ func TestTryAssignTaskExistingLeaseDoesNotIncrement(t *testing.T) {
 
 func TestTryAssignTaskNoAccountsError(t *testing.T) {
 	mgr := newTestRedisManager(t)
-	_, _, err := mgr.TryAssignTask(context.Background(), nil, "none")
+	_, _, _, err := mgr.TryAssignTask(context.Background(), nil, "none")
 	if err == nil {
 		t.Fatal("expected error when no account ids")
 	}
 }
 
-func TestRebuildRunningTaskLeases(t *testing.T) {
+func TestRebuildRunningTaskLeasesRebuildsRunningAndPreservesRecentAssigning(t *testing.T) {
 	mgr := newTestRedisManager(t)
 	ctx := context.Background()
 	for _, accountID := range []uint64{601, 602, 603} {
@@ -278,19 +296,31 @@ func TestRebuildRunningTaskLeases(t *testing.T) {
 			t.Fatalf("seed account %d count: %v", accountID, err)
 		}
 	}
-	if err := mgr.GetClient().HSet(ctx, KeyTaskLeases, "stale", 603).Err(); err != nil {
-		t.Fatalf("seed stale lease: %v", err)
-	}
-	if err := mgr.GetClient().SAdd(ctx, KeyRunningTasks, "stale").Err(); err != nil {
-		t.Fatalf("seed stale running: %v", err)
-	}
 
-	leases := []TaskLease{
-		{TaskID: "task-a", AccountID: 601},
-		{TaskID: "task-b", AccountID: 601},
-		{TaskID: "task-c", AccountID: 602},
+	now := time.Now()
+	seedLease(t, mgr, ctx, TaskLease{
+		TaskID:              "stale-assigning",
+		AccountID:           603,
+		LeaseToken:          "stale-token",
+		State:               TaskLeaseStateAssigning,
+		AssignedAtUnixMilli: now.Add(-taskAssigningLeaseRebuildGrace - time.Second).UnixMilli(),
+		UpdatedAtUnixMilli:  now.Add(-taskAssigningLeaseRebuildGrace - time.Second).UnixMilli(),
+	})
+	seedLease(t, mgr, ctx, TaskLease{
+		TaskID:              "recent-assigning",
+		AccountID:           603,
+		LeaseToken:          "recent-token",
+		State:               TaskLeaseStateAssigning,
+		AssignedAtUnixMilli: now.UnixMilli(),
+		UpdatedAtUnixMilli:  now.UnixMilli(),
+	})
+
+	runningLeases := []TaskLease{
+		{TaskID: "task-a", AccountID: 601, LeaseToken: "lease-token-a"},
+		{TaskID: "task-b", AccountID: 601, LeaseToken: "lease-token-b"},
+		{TaskID: "task-c", AccountID: 602, LeaseToken: "known-token"},
 	}
-	if err := mgr.RebuildRunningTaskLeases(ctx, leases, []uint64{601, 602, 603}); err != nil {
+	if err := mgr.RebuildRunningTaskLeases(ctx, runningLeases, []uint64{601, 602, 603}); err != nil {
 		t.Fatalf("rebuild leases: %v", err)
 	}
 
@@ -301,31 +331,37 @@ func TestRebuildRunningTaskLeases(t *testing.T) {
 	sort.Slice(gotLeases, func(i, j int) bool {
 		return gotLeases[i].TaskID < gotLeases[j].TaskID
 	})
-	if len(gotLeases) != len(leases) {
-		t.Fatalf("leases len=%d want=%d leases=%v", len(gotLeases), len(leases), gotLeases)
+	gotByTask := make(map[string]TaskLease, len(gotLeases))
+	for _, lease := range gotLeases {
+		gotByTask[lease.TaskID] = lease
 	}
-	for i, want := range leases {
-		if gotLeases[i] != want {
-			t.Fatalf("lease[%d]=%+v want=%+v", i, gotLeases[i], want)
+	for _, taskID := range []string{"recent-assigning", "task-a", "task-b", "task-c"} {
+		if _, ok := gotByTask[taskID]; !ok {
+			t.Fatalf("missing rebuilt lease %s in %+v", taskID, gotLeases)
 		}
 	}
-	for accountID, want := range map[uint64]int{601: 2, 602: 1, 603: 0} {
+	if _, ok := gotByTask["stale-assigning"]; ok {
+		t.Fatalf("stale assigning lease should be dropped: %+v", gotLeases)
+	}
+	if gotByTask["recent-assigning"].State != TaskLeaseStateAssigning {
+		t.Fatalf("recent assigning state=%s", gotByTask["recent-assigning"].State)
+	}
+	for _, taskID := range []string{"task-a", "task-b", "task-c"} {
+		lease := gotByTask[taskID]
+		if lease.State != TaskLeaseStateRunning || lease.LeaseToken == "" || lease.RunningAtUnixMilli == 0 {
+			t.Fatalf("running lease %s not normalized: %+v", taskID, lease)
+		}
+	}
+	for accountID, want := range map[uint64]int{601: 2, 602: 1, 603: 1} {
 		count, err := mgr.GetAccountConcurrent(ctx, accountID)
 		if err != nil || count != want {
 			t.Fatalf("account %d count=%d want=%d err=%v", accountID, count, want, err)
 		}
 	}
-	running, err := mgr.GetClient().SMembers(ctx, KeyRunningTasks).Result()
-	if err != nil {
-		t.Fatalf("running members: %v", err)
-	}
-	sort.Strings(running)
-	if got, want := running, []string{"task-a", "task-b", "task-c"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
-		t.Fatalf("running=%v want=%v", got, want)
-	}
+	assertSetMembers(t, mgr, ctx, KeyRunningTasks, []string{"recent-assigning", "task-a", "task-b", "task-c"})
 }
 
-func TestListTaskLeasesRejectsMalformedAccountID(t *testing.T) {
+func TestListTaskLeasesRejectsMalformedJSON(t *testing.T) {
 	mgr := newTestRedisManager(t)
 	ctx := context.Background()
 
@@ -334,11 +370,11 @@ func TestListTaskLeasesRejectsMalformedAccountID(t *testing.T) {
 	}
 
 	if _, err := mgr.ListTaskLeases(ctx); err == nil {
-		t.Fatal("expected malformed lease account id to fail")
+		t.Fatal("expected malformed lease JSON to fail")
 	}
 }
 
-func TestGetTaskLeaseRejectsMalformedAccountID(t *testing.T) {
+func TestGetTaskLeaseRejectsMalformedJSON(t *testing.T) {
 	mgr := newTestRedisManager(t)
 	ctx := context.Background()
 
@@ -347,7 +383,7 @@ func TestGetTaskLeaseRejectsMalformedAccountID(t *testing.T) {
 	}
 
 	if _, _, err := mgr.GetTaskLease(ctx, "bad-task"); err == nil {
-		t.Fatal("expected malformed lease account id to fail")
+		t.Fatal("expected malformed lease JSON to fail")
 	}
 }
 
@@ -367,8 +403,8 @@ func TestReleaseTaskMalformedLeaseDoesNotDecrement(t *testing.T) {
 		t.Fatalf("seed running: %v", err)
 	}
 
-	if err := mgr.ReleaseTask(ctx, 801, "malformed-lease-1"); err != nil {
-		t.Fatalf("release with malformed lease: %v", err)
+	if err := mgr.ReleaseTask(ctx, 801, "malformed-lease-1", "token"); err == nil {
+		t.Fatal("expected malformed release to fail")
 	}
 
 	count, err := mgr.GetAccountConcurrent(ctx, 801)
@@ -400,4 +436,57 @@ func TestCancelMarkCheckClear(t *testing.T) {
 	if err != nil || cancelled {
 		t.Fatalf("is cancelled after clear=%v err=%v", cancelled, err)
 	}
+}
+
+func assertSingleLease(t *testing.T, mgr *RedisManager, ctx context.Context, want TaskLease) TaskLease {
+	t.Helper()
+	leases, err := mgr.ListTaskLeases(ctx)
+	if err != nil {
+		t.Fatalf("list leases: %v", err)
+	}
+	if len(leases) != 1 {
+		t.Fatalf("leases len=%d want=1 leases=%+v", len(leases), leases)
+	}
+	got := leases[0]
+	if got.TaskID != want.TaskID || got.AccountID != want.AccountID || got.LeaseToken != want.LeaseToken || got.State != want.State {
+		t.Fatalf("lease=%+v want task=%s account=%d token=%q state=%s", got, want.TaskID, want.AccountID, want.LeaseToken, want.State)
+	}
+	return got
+}
+
+func assertSetMembers(t *testing.T, mgr *RedisManager, ctx context.Context, key string, want []string) {
+	t.Helper()
+	got, err := mgr.GetClient().SMembers(ctx, key).Result()
+	if err != nil {
+		t.Fatalf("set members %s: %v", key, err)
+	}
+	sort.Strings(got)
+	sort.Strings(want)
+	if len(got) != len(want) {
+		t.Fatalf("%s members=%v want=%v", key, got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("%s members=%v want=%v", key, got, want)
+		}
+	}
+}
+
+func seedLease(t *testing.T, mgr *RedisManager, ctx context.Context, lease TaskLease) {
+	t.Helper()
+	raw, err := jsonMarshalTaskLease(lease)
+	if err != nil {
+		t.Fatalf("marshal seed lease: %v", err)
+	}
+	if err := mgr.GetClient().HSet(ctx, KeyTaskLeases, lease.TaskID, raw).Err(); err != nil {
+		t.Fatalf("seed lease: %v", err)
+	}
+	if err := mgr.GetClient().SAdd(ctx, KeyRunningTasks, lease.TaskID).Err(); err != nil {
+		t.Fatalf("seed active marker: %v", err)
+	}
+}
+
+func jsonMarshalTaskLease(lease TaskLease) ([]byte, error) {
+	type leaseJSON TaskLease
+	return json.Marshal(leaseJSON(lease))
 }

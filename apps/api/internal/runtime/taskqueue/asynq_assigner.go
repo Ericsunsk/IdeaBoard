@@ -2,6 +2,7 @@ package taskqueue
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"api/internal/platform/redis"
@@ -16,23 +17,35 @@ func NewRedisAsynqAssigner(mgr *redis.RedisManager) *RedisAsynqAssigner {
 	return &RedisAsynqAssigner{mgr: mgr}
 }
 
-func (a *RedisAsynqAssigner) Assign(ctx context.Context, accountIDs []uint64, task *queuetypes.TaskPayload) (uint64, string, error) {
-	accountID, status, err := a.mgr.TryAssignTask(ctx, accountIDs, task.TaskID)
+func (a *RedisAsynqAssigner) Assign(ctx context.Context, accountIDs []uint64, task *queuetypes.TaskPayload) (TaskAssignment, error) {
+	accountID, leaseToken, status, err := a.mgr.TryAssignTask(ctx, accountIDs, task.TaskID)
 	if err != nil {
-		return 0, "", err
+		return TaskAssignment{}, err
 	}
 	switch status {
-	case redis.AssignTaskStatusNoCapacity:
-		return 0, AssignStatusNoCapacity, nil
-	case redis.AssignTaskStatusReconcileLocked:
-		return 0, AssignStatusNoCapacity, nil
+	case redis.AssignTaskStatusNoCapacity, redis.AssignTaskStatusReconcileLocked, redis.AssignTaskStatusActiveLease:
+		return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusNoCapacity}, nil
+	case redis.AssignTaskStatusAssigned:
+		return TaskAssignment{
+			TaskID:     task.TaskID,
+			AccountID:  accountID,
+			Status:     AssignStatusAssigned,
+			LeaseToken: leaseToken,
+		}, nil
 	default:
-		return accountID, AssignStatusAssigned, nil
+		return TaskAssignment{}, fmt.Errorf("unexpected assign status %q for task=%s", status, task.TaskID)
 	}
 }
 
-func (a *RedisAsynqAssigner) Release(ctx context.Context, accountID uint64, taskID string) error {
-	return a.mgr.ReleaseTask(ctx, accountID, taskID)
+func (a *RedisAsynqAssigner) ConfirmTaskRunning(ctx context.Context, assignment TaskAssignment) error {
+	return a.mgr.ConfirmTaskRunning(ctx, assignment.AccountID, assignment.TaskID, assignment.LeaseToken)
+}
+
+func (a *RedisAsynqAssigner) Release(ctx context.Context, taskID string, accountID uint64, leaseToken string) error {
+	if accountID == 0 || taskID == "" || leaseToken == "" {
+		return nil
+	}
+	return a.mgr.ReleaseTask(ctx, accountID, taskID, leaseToken)
 }
 
 func (a *RedisAsynqAssigner) GetTaskLease(ctx context.Context, taskID string) (uint64, bool, error) {
@@ -50,7 +63,7 @@ func (a *RedisAsynqAssigner) ListTaskLeases(ctx context.Context) ([]TaskLease, e
 	}
 	result := make([]TaskLease, 0, len(leases))
 	for _, lease := range leases {
-		result = append(result, TaskLease{TaskID: lease.TaskID, AccountID: lease.AccountID})
+		result = append(result, TaskLease{TaskID: lease.TaskID, AccountID: lease.AccountID, LeaseToken: lease.LeaseToken})
 	}
 	return result, nil
 }
@@ -58,7 +71,12 @@ func (a *RedisAsynqAssigner) ListTaskLeases(ctx context.Context) ([]TaskLease, e
 func (a *RedisAsynqAssigner) RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error {
 	redisLeases := make([]redis.TaskLease, 0, len(leases))
 	for _, lease := range leases {
-		redisLeases = append(redisLeases, redis.TaskLease{TaskID: lease.TaskID, AccountID: lease.AccountID})
+		redisLeases = append(redisLeases, redis.TaskLease{
+			TaskID:     lease.TaskID,
+			AccountID:  lease.AccountID,
+			LeaseToken: lease.LeaseToken,
+			State:      redis.TaskLeaseStateRunning,
+		})
 	}
 	return a.mgr.RebuildRunningTaskLeases(ctx, redisLeases, accountIDs)
 }

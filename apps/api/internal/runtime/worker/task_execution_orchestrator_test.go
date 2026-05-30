@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"api/internal/runtime/taskqueue"
 	"api/internal/runtime/taskruntime"
 	"api/internal/tasks"
 	"gorm.io/driver/sqlite"
@@ -62,7 +63,7 @@ func TestExecuteDropsDuplicateTaskWhenAlreadyRunningOnSameAccount(t *testing.T) 
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
 		TaskID:     "dup-running-task",
 		AccountIDs: []uint64{account.ID},
-	}, account.ID)
+	}, taskqueue.TaskAssignment{TaskID: "dup-running-task", AccountID: account.ID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-direct-dup"})
 	if err != nil {
 		t.Fatalf("execute returned error: %v", err)
 	}
@@ -102,7 +103,7 @@ END;`).Error; err != nil {
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
 		TaskID:     "complete-fail-task",
 		AccountIDs: []uint64{account.ID},
-	}, account.ID)
+	}, taskqueue.TaskAssignment{TaskID: "complete-fail-task", AccountID: account.ID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-direct-complete"})
 	if err == nil {
 		t.Fatal("expected execute to return error when mark completed persistence fails")
 	}
@@ -142,7 +143,7 @@ END;`).Error; err != nil {
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
 		TaskID:     "failed-fail-task",
 		AccountIDs: []uint64{account.ID},
-	}, account.ID)
+	}, taskqueue.TaskAssignment{TaskID: "failed-fail-task", AccountID: account.ID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-direct-failed"})
 	if err == nil {
 		t.Fatal("expected execute to return error when mark failed persistence fails")
 	}

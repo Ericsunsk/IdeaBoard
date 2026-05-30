@@ -104,11 +104,18 @@ func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.Task
 	return nil
 }
 
-func (s *Service) ReleaseTask(ctx context.Context, accountID uint64, taskID string) error {
-	if accountID == 0 {
+func (s *Service) ReleaseTask(ctx context.Context, assignment taskqueue.TaskAssignment) error {
+	if assignment.AccountID == 0 {
 		return nil
 	}
-	return s.queue.Release(ctx, accountID, taskID)
+	if strings.TrimSpace(assignment.LeaseToken) == "" {
+		return ErrTaskStateConflict
+	}
+	return s.queue.Release(ctx, assignment.TaskID, assignment.AccountID, assignment.LeaseToken)
+}
+
+func (s *Service) ConfirmTaskRunning(ctx context.Context, assignment taskqueue.TaskAssignment) error {
+	return s.queue.ConfirmTaskRunning(ctx, assignment)
 }
 
 type RunningTaskLeaseReconcileOptions struct {
@@ -171,7 +178,11 @@ func (s *Service) reconcileRunningTaskLeasesLocked(ctx context.Context, opts Run
 		if row.TaskID == "" || row.AccountID == 0 {
 			return result, fmt.Errorf("invalid running task lease: task_id=%q account_id=%d", row.TaskID, row.AccountID)
 		}
-		leases = append(leases, taskqueue.TaskLease{TaskID: row.TaskID, AccountID: row.AccountID})
+		leaseToken := strings.TrimSpace(row.LeaseToken)
+		if leaseToken == "" {
+			return result, fmt.Errorf("running task lease missing token: task_id=%q account_id=%d", row.TaskID, row.AccountID)
+		}
+		leases = append(leases, taskqueue.TaskLease{TaskID: row.TaskID, AccountID: row.AccountID, LeaseToken: leaseToken})
 		accountIDSet[row.AccountID] = struct{}{}
 	}
 
@@ -242,13 +253,17 @@ func (s *Service) publishTaskStatusEvent(taskID, status string) {
 	s.hub.Publish(taskID, accounts.TaskEvent{TaskID: taskID, Status: status})
 }
 
-func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID uint64) error {
+func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID uint64, leaseToken string) error {
 	if accountID == 0 {
 		return ErrTaskStateConflict
 	}
+	if strings.TrimSpace(leaseToken) == "" {
+		return ErrTaskStateConflict
+	}
 	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusPending}, map[string]interface{}{
-		"status":     tasks.StatusRunning,
-		"account_id": accountID,
+		"status":      tasks.StatusRunning,
+		"account_id":  accountID,
+		"lease_token": leaseToken,
 	})
 	if err != nil {
 		return err
@@ -265,7 +280,7 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 		}
 		return err
 	}
-	if task.Status == tasks.StatusRunning && task.AccountID == accountID {
+	if task.Status == tasks.StatusRunning && task.AccountID == accountID && task.LeaseToken == leaseToken {
 		return ErrTaskAlreadyRunning
 	}
 	if tasks.IsTerminalStatus(task.Status) {
@@ -274,14 +289,18 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 	return ErrTaskStateConflict
 }
 
-func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, result string) error {
+func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseToken string, result string) error {
+	if strings.TrimSpace(leaseToken) == "" {
+		return ErrTaskStateConflict
+	}
 	now := time.Now()
 	outputs, err := taskOutputsFromResult(taskID, result)
 	if err != nil {
 		return err
 	}
-	rows, err := s.taskRepo.CompleteWithOutputs(ctx, taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, map[string]interface{}{
 		"status":       tasks.StatusCompleted,
+		"lease_token":  "",
 		"result":       result,
 		"error_msg":    "",
 		"completed_at": now,
@@ -315,13 +334,32 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, result s
 }
 
 func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason string) error {
+	return s.markTaskFailed(ctx, taskID, "", false, reason)
+}
+
+func (s *Service) MarkTaskFailedWithLease(ctx context.Context, taskID string, leaseToken string, reason string) error {
+	if strings.TrimSpace(leaseToken) == "" {
+		return ErrTaskStateConflict
+	}
+	return s.markTaskFailed(ctx, taskID, leaseToken, true, reason)
+}
+
+func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken string, requireLeaseToken bool, reason string) error {
 	now := time.Now()
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusPending, tasks.StatusRunning}, map[string]interface{}{
+	updates := map[string]interface{}{
 		"status":       tasks.StatusFailed,
+		"lease_token":  "",
 		"error_msg":    reason,
 		"result":       formatTaskFailureResult(taskID, reason),
 		"completed_at": now,
-	})
+	}
+	var rows int64
+	var err error
+	if requireLeaseToken {
+		rows, err = s.taskRepo.UpdateByTaskIDStatusesAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, updates)
+	} else {
+		rows, err = s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusPending}, updates)
+	}
 	if err != nil {
 		return err
 	}
@@ -353,8 +391,11 @@ func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason stri
 	return ErrTaskStateConflict
 }
 
-func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, accountID uint64, reason string) error {
+func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, accountID uint64, leaseToken string, reason string) error {
 	if accountID == 0 {
+		return ErrTaskStateConflict
+	}
+	if strings.TrimSpace(leaseToken) == "" {
 		return ErrTaskStateConflict
 	}
 
@@ -366,7 +407,9 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 		updates["error_msg"] = reason
 	}
 
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusRunning}, updates)
+	updates["lease_token"] = ""
+
+	rows, err := s.taskRepo.UpdateByTaskIDStatusesAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, updates)
 	if err != nil {
 		return err
 	}
@@ -391,8 +434,11 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 	return ErrTaskStateConflict
 }
 
-func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, accountID uint64, errMsg string) (bool, error) {
+func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, accountID uint64, leaseToken string, errMsg string) (bool, error) {
 	if accountID == 0 {
+		return false, ErrTaskStateConflict
+	}
+	if strings.TrimSpace(leaseToken) == "" {
 		return false, ErrTaskStateConflict
 	}
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
@@ -411,11 +457,15 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 		}
 		return false, ErrTaskStateConflict
 	}
+	if task.LeaseToken != leaseToken {
+		return false, ErrTaskStateConflict
+	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+		rows, err := s.taskRepo.UpdateByTaskIDStatusesAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, map[string]interface{}{
 			"status":      tasks.StatusPending,
 			"account_id":  0,
+			"lease_token": "",
 			"error_msg":   errMsg,
 			"retry_count": gorm.Expr("retry_count + 1"),
 		})
@@ -430,9 +480,10 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 	}
 
 	now := time.Now()
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusRunning}, map[string]interface{}{
+	rows, err := s.taskRepo.UpdateByTaskIDStatusesAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, map[string]interface{}{
 		"status":       tasks.StatusFailed,
 		"account_id":   0,
+		"lease_token":  "",
 		"error_msg":    errMsg,
 		"result":       formatTaskFailureResult(taskID, errMsg),
 		"retry_count":  gorm.Expr("retry_count + 1"),

@@ -24,18 +24,43 @@ func (f *fakeRequeuer) Enqueue(context.Context, *queuetypes.TaskPayload) error {
 type fakeAssigner struct {
 	assignAccount     uint64
 	assignStatus      string
+	assignToken       string
 	assignErr         error
 	releaseCalls      int
+	confirmCalls      int
 	lastReleaseCtxErr error
+	lastRelease       taskqueue.TaskAssignment
 }
 
-func (f *fakeAssigner) Assign(_ context.Context, _ []uint64, _ *queuetypes.TaskPayload) (uint64, string, error) {
-	return f.assignAccount, f.assignStatus, f.assignErr
+func (f *fakeAssigner) Assign(_ context.Context, _ []uint64, task *queuetypes.TaskPayload) (taskqueue.TaskAssignment, error) {
+	if f.assignErr != nil {
+		return taskqueue.TaskAssignment{}, f.assignErr
+	}
+	return taskqueue.TaskAssignment{
+		TaskID:     task.TaskID,
+		AccountID:  f.assignAccount,
+		Status:     f.assignStatus,
+		LeaseToken: f.leaseToken(),
+	}, nil
 }
-func (f *fakeAssigner) Release(ctx context.Context, _ uint64, _ string) error {
+func (f *fakeAssigner) ConfirmTaskRunning(_ context.Context, _ taskqueue.TaskAssignment) error {
+	f.confirmCalls++
+	return nil
+}
+func (f *fakeAssigner) Release(ctx context.Context, taskID string, accountID uint64, leaseToken string) error {
 	f.releaseCalls++
 	f.lastReleaseCtxErr = ctx.Err()
+	f.lastRelease = taskqueue.TaskAssignment{TaskID: taskID, AccountID: accountID, LeaseToken: leaseToken}
 	return nil
+}
+func (f *fakeAssigner) leaseToken() string {
+	if f.assignToken != "" {
+		return f.assignToken
+	}
+	if f.assignStatus == taskqueue.AssignStatusAssigned {
+		return "fake-lease-token"
+	}
+	return ""
 }
 func (f *fakeAssigner) EnsureAccountConcurrent(context.Context, uint64, int) error {
 	return nil
@@ -59,7 +84,7 @@ func (f *fakeRuntime) RefreshTaskAccounts(ctx context.Context, task *queuetypes.
 	}
 	return nil
 }
-func (f *fakeRuntime) ReleaseTask(context.Context, uint64, string) error {
+func (f *fakeRuntime) ReleaseTask(context.Context, taskqueue.TaskAssignment) error {
 	f.releaseCalls++
 	return nil
 }
@@ -135,7 +160,7 @@ func enqueueAsynqTask(task *queuetypes.TaskPayload) *asynq.Task {
 }
 
 func TestAsynqHandlerInvalidPayloadSkipRetry(t *testing.T) {
-	processor := newTaskProcessor(&fakeAssigner{}, &fakeRuntime{}, func(context.Context, *queuetypes.TaskPayload, uint64) error { return nil }, false)
+	processor := newTaskProcessor(&fakeAssigner{}, &fakeRuntime{}, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error { return nil }, false)
 	handler := newAsynqTaskHandlerWithProcessor(processor)
 
 	err := handler.HandleTask(context.Background(), asynq.NewTask(taskqueue.AsynqTaskTypeDrawingGenerate, []byte("{invalid")))
@@ -150,7 +175,7 @@ func TestAsynqHandlerInvalidPayloadSkipRetry(t *testing.T) {
 func TestAsynqHandlerNoCapacityDoesNotMarkFailed(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusNoCapacity}
 	runtime := &fakeRuntime{}
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, uint64) error { return nil }, false))
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error { return nil }, false))
 
 	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "cap-1", AccountIDs: []uint64{1}}))
 	if !errors.Is(err, taskqueue.ErrNoAccountCapacity) {
@@ -167,7 +192,7 @@ func TestAsynqHandlerRefreshAccountsErrorRetriesWithoutMarkingFailed(t *testing.
 	runtime := &fakeRuntime{refreshFn: func(ctx context.Context, task *queuetypes.TaskPayload) error {
 		return refreshErr
 	}}
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, uint64) error {
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called when account refresh fails")
 		return nil
 	}, false))
@@ -185,7 +210,7 @@ func TestAsynqHandlerAssignInfrastructureErrorRetriesWithoutMarkingFailed(t *tes
 	assignErr := errors.New("redis unavailable")
 	assigner := &fakeAssigner{assignErr: assignErr}
 	runtime := &fakeRuntime{}
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, uint64) error {
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called when assign fails")
 		return nil
 	}, false))
@@ -202,7 +227,7 @@ func TestAsynqHandlerAssignInfrastructureErrorRetriesWithoutMarkingFailed(t *tes
 func TestAsynqHandlerAssignContextCanceledDoesNotMarkFailed(t *testing.T) {
 	assigner := &fakeAssigner{assignErr: context.Canceled}
 	runtime := &fakeRuntime{}
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, uint64) error {
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called when assign is canceled")
 		return nil
 	}, false))
@@ -221,7 +246,7 @@ func TestAsynqHandlerAssignContextCanceledDoesNotMarkFailed(t *testing.T) {
 func TestAsynqHandlerAssignContextDeadlineDoesNotMarkFailed(t *testing.T) {
 	assigner := &fakeAssigner{assignErr: context.DeadlineExceeded}
 	runtime := &fakeRuntime{}
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, uint64) error {
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called when assign deadline is exceeded")
 		return nil
 	}, false))
@@ -241,7 +266,7 @@ func TestAsynqHandlerProcessesSynchronously(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
 	runtime := &fakeRuntime{}
 	executed := false
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, uint64) error {
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		time.Sleep(80 * time.Millisecond)
 		executed = true
 		return nil

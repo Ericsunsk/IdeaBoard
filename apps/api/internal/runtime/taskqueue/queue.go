@@ -24,16 +24,25 @@ type QueueStatsStore interface {
 }
 
 type TaskAssigner interface {
-	Assign(ctx context.Context, accountIDs []uint64, task *queuetypes.TaskPayload) (uint64, string, error)
-	Release(ctx context.Context, accountID uint64, taskID string) error
+	Assign(ctx context.Context, accountIDs []uint64, task *queuetypes.TaskPayload) (TaskAssignment, error)
+	ConfirmTaskRunning(ctx context.Context, assignment TaskAssignment) error
+	Release(ctx context.Context, taskID string, accountID uint64, leaseToken string) error
 	EnsureAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error
 	SetAccountMaxConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error
 	GetAccountLoadInfo(ctx context.Context, accountIDs []uint64) (map[uint64]*queuetypes.AccountLoad, error)
 }
 
+type TaskAssignment struct {
+	TaskID     string
+	AccountID  uint64
+	Status     string
+	LeaseToken string
+}
+
 type TaskLease struct {
-	TaskID    string
-	AccountID uint64
+	TaskID     string
+	AccountID  uint64
+	LeaseToken string
 }
 
 type TaskLeaseRebuilder interface {
