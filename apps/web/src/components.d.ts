@@ -66,7 +66,9 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     UserAuthModals: typeof import('./features/auth/components/UserAuthModals.vue')['default']
     ViewpointNode: typeof import('./features/workspace/components/nodes/ViewpointNode.vue')['default']
+    WorkspaceCanvasOverlays: typeof import('./features/workspace/components/WorkspaceCanvasOverlays.vue')['default']
     WorkspaceNodeContextMenu: typeof import('./features/workspace/components/WorkspaceNodeContextMenu.vue')['default']
+    WorkspaceScreenChrome: typeof import('./features/workspace/components/WorkspaceScreenChrome.vue')['default']
     WorkspaceToolPalette: typeof import('./features/workspace/components/WorkspaceToolPalette.vue')['default']
     WorkspaceZoomControls: typeof import('./features/workspace/components/WorkspaceZoomControls.vue')['default']
   }

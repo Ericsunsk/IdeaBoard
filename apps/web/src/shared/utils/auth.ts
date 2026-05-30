@@ -1,11 +1,6 @@
 import type { User } from '../types'
 
-const LEGACY_TOKEN_KEY = 'token'
 const USER_KEY = 'user'
-
-function clearLegacyToken() {
-  localStorage.removeItem(LEGACY_TOKEN_KEY)
-}
 
 export function getStoredUser(): User | null {
   const raw = localStorage.getItem(USER_KEY)
@@ -20,12 +15,10 @@ export function getStoredUser(): User | null {
 }
 
 export function setStoredAuth(user: User) {
-  clearLegacyToken()
   localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
 export function clearStoredAuth() {
-  clearLegacyToken()
   localStorage.removeItem(USER_KEY)
 }
 

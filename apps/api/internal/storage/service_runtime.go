@@ -93,11 +93,7 @@ func (s *StorageService) StoreBytes(filename string, data []byte, opts StorageSt
 }
 
 func (s *StorageService) DeleteWorkspaceUploadByURL(storageUID string, boardID string, rawURL string) error {
-	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
-	if err != nil {
-		return err
-	}
-	boardSegment, err := NormalizeWorkspaceBoardSegment(boardID)
+	expectedPrefix, err := WorkspaceBoardUploadObjectPrefix(storageUID, boardID)
 	if err != nil {
 		return err
 	}
@@ -110,9 +106,11 @@ func (s *StorageService) DeleteWorkspaceUploadByURL(storageUID string, boardID s
 	if err != nil {
 		return err
 	}
-
-	prefix := workspaceUploadPrefix(userSegment, boardSegment)
-	if !strings.HasPrefix(key, prefix) {
+	resource, err := ParseUploadResource(key)
+	if err != nil {
+		return err
+	}
+	if resource.Kind != UploadResourceKindWorkspace || resource.Workspace == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
 		return fmt.Errorf("仅允许删除当前画布工作区上传文件")
 	}
 
@@ -124,7 +122,7 @@ func (s *StorageService) DeleteWorkspaceUploadByURL(storageUID string, boardID s
 }
 
 func (s *StorageService) DeleteProfileAvatarByURL(storageUID string, rawURL string) error {
-	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	expectedPrefix, err := ProfileAvatarUploadObjectPrefix(storageUID)
 	if err != nil {
 		return err
 	}
@@ -137,13 +135,11 @@ func (s *StorageService) DeleteProfileAvatarByURL(storageUID string, rawURL stri
 	if err != nil {
 		return err
 	}
-
-	prefix := path.Join("uploads", "profile", userSegment, "avatar") + "/"
-	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
+	resource, err := ParseUploadResource(key)
 	if err != nil {
 		return err
 	}
-	if !strings.HasPrefix(key, normalizedPrefix) {
+	if resource.Kind != UploadResourceKindProfileAvatar || resource.ProfileAvatar == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
 		return fmt.Errorf("仅允许删除当前用户头像文件")
 	}
 
@@ -155,7 +151,7 @@ func (s *StorageService) DeleteProfileAvatarByURL(storageUID string, rawURL stri
 }
 
 func (s *StorageService) DeleteWorkspaceByStorageUID(storageUID string) error {
-	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	prefix, err := WorkspaceUserUploadObjectPrefix(storageUID)
 	if err != nil {
 		return err
 	}
@@ -163,8 +159,6 @@ func (s *StorageService) DeleteWorkspaceByStorageUID(storageUID string) error {
 	if err != nil {
 		return err
 	}
-
-	prefix := path.Join("uploads", "workspace", userSegment) + "/"
 	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
 	if err != nil {
 		return err
@@ -178,11 +172,7 @@ func (s *StorageService) DeleteWorkspaceByStorageUID(storageUID string) error {
 }
 
 func (s *StorageService) DeleteWorkspaceBoardByStorageUID(storageUID string, boardID string) error {
-	userSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
-	if err != nil {
-		return err
-	}
-	boardSegment, err := NormalizeWorkspaceBoardSegment(boardID)
+	prefix, err := WorkspaceBoardUploadObjectPrefix(storageUID, boardID)
 	if err != nil {
 		return err
 	}
@@ -192,7 +182,6 @@ func (s *StorageService) DeleteWorkspaceBoardByStorageUID(storageUID string, boa
 		return err
 	}
 
-	prefix := path.Join("uploads", "workspace", userSegment, boardSegment) + "/"
 	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
 	if err != nil {
 		return err
@@ -328,26 +317,19 @@ func (s *StorageService) saveUploadedFileLocal(file *multipart.FileHeader, opts 
 }
 
 func (s *StorageService) saveBytesLocal(filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	dirParts := []string{"uploads"}
-	if opts.DirPrefix != "" {
-		dirParts = append(dirParts, opts.DirPrefix)
-	}
-	dirParts = append(dirParts, time.Now().Format("2006/01/02"))
-	dir := filepath.Join(dirParts...)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", fmt.Errorf("创建目录失败: %v", err)
-	}
-
 	ext := strings.ToLower(filepath.Ext(filename))
 	if ext == "" {
 		ext = ".png"
 	}
-	name := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
-	dst := filepath.Join(dir, name)
+	objectKey := buildObjectKey(opts.DirPrefix, ext)
+	dst := filepath.FromSlash(objectKey)
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return "", fmt.Errorf("创建目录失败: %v", err)
+	}
 	if err := os.WriteFile(dst, data, 0644); err != nil {
 		return "", fmt.Errorf("保存文件失败: %v", err)
 	}
-	return publicUploadURL(strings.ReplaceAll(dst, "\\", "/")), nil
+	return publicUploadURL(objectKey), nil
 }
 
 func publicUploadURL(objectKey string) string {
@@ -437,34 +419,6 @@ func (s *StorageService) extractObjectKeyFromUserUploadURL(profile StorageProfil
 	default:
 		return "", fmt.Errorf("不支持的存储类型")
 	}
-}
-
-func workspaceUploadPrefix(userSegment string, boardSegment string) string {
-	return path.Join("uploads", "workspace", userSegment, boardSegment, "content") + "/"
-}
-
-func normalizeUploadObjectKey(raw string) (string, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return "", fmt.Errorf("文件路径不能为空")
-	}
-	cleaned := path.Clean("/" + strings.TrimPrefix(trimmed, "/"))
-	if !strings.HasPrefix(cleaned, "/uploads/") {
-		return "", fmt.Errorf("仅允许删除 uploads 目录下的文件")
-	}
-	return strings.TrimPrefix(cleaned, "/"), nil
-}
-
-func normalizeUploadObjectPrefix(raw string) (string, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return "", fmt.Errorf("文件前缀不能为空")
-	}
-	normalized, err := normalizeUploadObjectKey(strings.TrimSuffix(trimmed, "/"))
-	if err != nil {
-		return "", err
-	}
-	return normalized + "/", nil
 }
 
 func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL, bucketName string, forcePathStyle bool) (string, error) {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"api/internal/platform/response"
@@ -13,8 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
-
-const legacyUsernameBindingEnvKey = "AUTH_ENABLE_LEGACY_USERNAME_BINDING"
 
 // AuthMiddleware 认证中间件：通过 Better Auth session 校验并映射本地业务用户。
 func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) gin.HandlerFunc {
@@ -86,12 +83,6 @@ func resolveLocalUserByAuthIdentity(userRepo *users.UserRepository, identity *Se
 		existing, lookupErr := userRepo.GetByUsername(preferredUsername)
 		if lookupErr == nil {
 			existingAuthUserID := strings.TrimSpace(derefString(existing.AuthUserID))
-			if shouldAutoBindLegacyUsername(existingAuthUserID) {
-				if bindErr := userRepo.UpdateAuthUserID(existing.ID, authUserID); bindErr != nil {
-					return nil, bindErr
-				}
-				return userRepo.GetByID(existing.ID)
-			}
 			if strings.EqualFold(existingAuthUserID, authUserID) {
 				return existing, nil
 			}
@@ -137,18 +128,6 @@ func derefString(value *string) string {
 		return ""
 	}
 	return *value
-}
-
-func shouldAutoBindLegacyUsername(existingAuthUserID string) bool {
-	if strings.TrimSpace(existingAuthUserID) != "" {
-		return false
-	}
-	return isLegacyUsernameBindingEnabled()
-}
-
-func isLegacyUsernameBindingEnabled() bool {
-	value := strings.TrimSpace(os.Getenv(legacyUsernameBindingEnvKey))
-	return value == "1" || strings.EqualFold(value, "true")
 }
 
 // AdminMiddleware 管理员中间件 - 通过角色判断是否为管理员

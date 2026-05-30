@@ -99,7 +99,7 @@ func TestRewriteLocalRedrawUpstreamInputsKeepsSingleImageURLSemantic(t *testing.
 	params := map[string]interface{}{
 		"image_urls": []interface{}{
 			"data:image/png;base64,original",
-			"https://cdn.example/legacy-ref.png",
+			"https://cdn.example/reference-input.png",
 		},
 		"reference_image_urls": []interface{}{
 			"https://cdn.example/ref-a.png",

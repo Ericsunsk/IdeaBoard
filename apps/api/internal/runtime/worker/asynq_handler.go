@@ -9,6 +9,7 @@ import (
 	"api/internal/accounts"
 	"api/internal/channels"
 	"api/internal/runtime/taskqueue"
+	"api/internal/runtime/taskruntime"
 	"api/internal/storage"
 
 	"github.com/hibiken/asynq"
@@ -38,7 +39,7 @@ func NewAsynqTaskHandler(
 		channelRepo:    channelRepo,
 		storageService: storageService,
 	}
-	taskRuntime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore)
+	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 	taskRuntime.SetEventHub(taskEventHub)
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, enqueuer, taskRuntime, executor.callDrawingAPI)
 	return newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute, false))

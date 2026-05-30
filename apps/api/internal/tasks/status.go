@@ -8,3 +8,7 @@ const (
 )
 
 const ResultStatusSuccess = "success"
+
+func IsTerminalStatus(status string) bool {
+	return status == StatusCompleted || status == StatusFailed
+}

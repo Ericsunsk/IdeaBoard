@@ -9,6 +9,7 @@ import (
 
 	"api/internal/accounts"
 	"api/internal/runtime/taskqueue"
+	"api/internal/runtime/taskruntime"
 	"api/internal/tasks"
 
 	"github.com/hibiken/asynq"
@@ -21,17 +22,19 @@ type fakeRequeuer struct{}
 func (f *fakeRequeuer) Enqueue(context.Context, *queuetypes.TaskPayload) error { return nil }
 
 type fakeAssigner struct {
-	assignAccount uint64
-	assignStatus  string
-	assignErr     error
-	releaseCalls  int
+	assignAccount     uint64
+	assignStatus      string
+	assignErr         error
+	releaseCalls      int
+	lastReleaseCtxErr error
 }
 
 func (f *fakeAssigner) Assign(_ context.Context, _ []uint64, _ *queuetypes.TaskPayload) (uint64, string, error) {
 	return f.assignAccount, f.assignStatus, f.assignErr
 }
-func (f *fakeAssigner) Release(context.Context, uint64, string) error {
+func (f *fakeAssigner) Release(ctx context.Context, _ uint64, _ string) error {
 	f.releaseCalls++
+	f.lastReleaseCtxErr = ctx.Err()
 	return nil
 }
 func (f *fakeAssigner) EnsureAccountConcurrent(context.Context, uint64, int) error {
@@ -43,24 +46,24 @@ func (f *fakeAssigner) GetAccountLoadInfo(context.Context, []uint64) (map[uint64
 }
 
 type fakeRuntime struct {
-	refreshFn       func(task *queuetypes.TaskPayload) error
+	refreshFn       func(ctx context.Context, task *queuetypes.TaskPayload) error
 	releaseCalls    int
 	failedCalls     int
 	lastFailedTask  string
 	lastFailedCause string
 }
 
-func (f *fakeRuntime) RefreshTaskAccounts(task *queuetypes.TaskPayload) error {
+func (f *fakeRuntime) RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error {
 	if f.refreshFn != nil {
-		return f.refreshFn(task)
+		return f.refreshFn(ctx, task)
 	}
 	return nil
 }
-func (f *fakeRuntime) ReleaseTask(uint64, string) error {
+func (f *fakeRuntime) ReleaseTask(context.Context, uint64, string) error {
 	f.releaseCalls++
 	return nil
 }
-func (f *fakeRuntime) MarkTaskFailed(taskID string, reason string) error {
+func (f *fakeRuntime) MarkTaskFailed(_ context.Context, taskID string, reason string) error {
 	f.failedCalls++
 	f.lastFailedTask = taskID
 	f.lastFailedCause = reason
@@ -161,7 +164,7 @@ func TestAsynqHandlerNoCapacityDoesNotMarkFailed(t *testing.T) {
 func TestAsynqHandlerRefreshAccountsErrorRetriesWithoutMarkingFailed(t *testing.T) {
 	refreshErr := errors.New("db unavailable")
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 1}
-	runtime := &fakeRuntime{refreshFn: func(task *queuetypes.TaskPayload) error {
+	runtime := &fakeRuntime{refreshFn: func(ctx context.Context, task *queuetypes.TaskPayload) error {
 		return refreshErr
 	}}
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, uint64) error {
@@ -268,7 +271,7 @@ func TestAsynqHandlerTerminalTaskDoesNotCallProvider(t *testing.T) {
 
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: acc.ID}
 	cancelStore := newFakeCancelStoreForAsynq()
-	runtime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore)
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 
 	providerCalled := false
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
@@ -298,7 +301,7 @@ func TestAsynqHandlerCancelledTaskClearsCancelAndSkipsProvider(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: acc.ID}
 	cancelStore := newFakeCancelStoreForAsynq()
 	cancelStore.cancelled[taskID] = true
-	runtime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore)
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 
 	providerCalled := false
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
@@ -330,7 +333,7 @@ func TestAsynqHandlerPropagatesContextToProvider(t *testing.T) {
 
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: acc.ID}
 	cancelStore := newFakeCancelStoreForAsynq()
-	runtime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore)
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 
 	ctxKey := struct{}{}
 	providerCalled := false
@@ -370,7 +373,7 @@ func TestAsynqHandlerParentContextCanceledResetsTaskAndPropagatesError(t *testin
 
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: acc.ID}
 	cancelStore := newFakeCancelStoreForAsynq()
-	runtime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore)
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 
 	providerCalled := false
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, _ *queuetypes.TaskPayload) (string, error) {
@@ -394,6 +397,9 @@ func TestAsynqHandlerParentContextCanceledResetsTaskAndPropagatesError(t *testin
 	}
 	if assigner.releaseCalls == 0 {
 		t.Fatal("expected task slot to be released before returning error")
+	}
+	if assigner.lastReleaseCtxErr != nil {
+		t.Fatalf("release should use cleanup context, got ctx err %v", assigner.lastReleaseCtxErr)
 	}
 
 	updated, getErr := taskRepo.GetByTaskID(taskID)
@@ -422,7 +428,7 @@ func TestAsynqHandlerParentContextDeadlineExceededResetsTaskAndPropagatesError(t
 
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: acc.ID}
 	cancelStore := newFakeCancelStoreForAsynq()
-	runtime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore)
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 
 	providerCalled := false
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, _ *queuetypes.TaskPayload) (string, error) {
@@ -446,6 +452,9 @@ func TestAsynqHandlerParentContextDeadlineExceededResetsTaskAndPropagatesError(t
 	}
 	if assigner.releaseCalls == 0 {
 		t.Fatal("expected task slot to be released before returning error")
+	}
+	if assigner.lastReleaseCtxErr != nil {
+		t.Fatalf("release should use cleanup context, got ctx err %v", assigner.lastReleaseCtxErr)
 	}
 
 	updated, getErr := taskRepo.GetByTaskID(taskID)

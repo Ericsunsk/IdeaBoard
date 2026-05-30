@@ -189,14 +189,6 @@ func (r *UserRepository) UpdateRoleByID(id uint64, role string) error {
 	return r.db.Model(&User{}).Where("id = ?", id).Update("role", role).Error
 }
 
-func (r *UserRepository) UpdateAuthUserID(id uint64, authUserID string) error {
-	normalized := strings.TrimSpace(authUserID)
-	if normalized == "" {
-		return fmt.Errorf("auth_user_id 不能为空")
-	}
-	return r.db.Model(&User{}).Where("id = ?", id).Update("auth_user_id", normalized).Error
-}
-
 func (r *UserRepository) UpdateAvatarByID(id uint64, avatar string) error {
 	return r.db.Model(&User{}).Where("id = ?", id).Update("avatar", strings.TrimSpace(avatar)).Error
 }

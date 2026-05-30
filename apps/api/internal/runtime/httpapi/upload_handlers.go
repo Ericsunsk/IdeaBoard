@@ -6,7 +6,6 @@ import (
 	"log"
 	"mime/multipart"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -76,13 +75,13 @@ func uploadProfileAvatarHandler(h Dependencies) gin.HandlerFunc {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
-		userSegment, err := storage.NormalizeWorkspaceStorageUserSegment(user.StorageUID)
+		dirPrefix, err := storage.ProfileAvatarUploadDirPrefix(user.StorageUID)
 		if err != nil {
 			response.InternalError(c, 500, "头像上传失败", err)
 			return
 		}
 		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
-			DirPrefix: path.Join("profile", userSegment, "avatar"),
+			DirPrefix: dirPrefix,
 		})
 		if err != nil {
 			response.InternalError(c, 500, "头像上传失败", err)
@@ -146,18 +145,13 @@ func uploadBoardAssetHandler(h Dependencies) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		userSegment, err := storage.NormalizeWorkspaceStorageUserSegment(owner.StorageUID)
-		if err != nil {
-			response.InternalError(c, 500, "上传失败", err)
-			return
-		}
-		boardSegment, err := storage.NormalizeWorkspaceBoardSegment(board.BoardID)
+		dirPrefix, err := storage.WorkspaceContentUploadDirPrefix(owner.StorageUID, board.BoardID)
 		if err != nil {
 			response.Error(c, 400, err.Error())
 			return
 		}
 		url, err := h.StorageService.UploadWithOptions(file, storage.StorageStoreOptions{
-			DirPrefix: path.Join("workspace", userSegment, boardSegment, "content"),
+			DirPrefix: dirPrefix,
 		})
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)

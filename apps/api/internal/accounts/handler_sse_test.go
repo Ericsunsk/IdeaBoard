@@ -17,7 +17,7 @@ import (
 
 func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db := newTaskRuntimeServiceTestDB(t)
+	db := newAccountsTestDB(t)
 	taskRepo := NewTaskRepository(db)
 	service := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil, nil)
 	service.SetTaskEventHub(NewTaskEventHub())
@@ -67,7 +67,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 
 func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db := newTaskRuntimeServiceTestDB(t)
+	db := newAccountsTestDB(t)
 	taskRepo := NewTaskRepository(db)
 	service := NewAccountServiceWithQueue(nil, taskRepo, nil, nil, nil, nil, nil, nil, nil, nil)
 	hub := NewTaskEventHub()

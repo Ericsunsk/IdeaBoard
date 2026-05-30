@@ -1,11 +1,13 @@
-package accounts
+package taskruntime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
+	"api/internal/accounts"
 	"api/internal/tasks"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -13,8 +15,8 @@ import (
 
 func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:    "task-reset-pending",
@@ -27,7 +29,7 @@ func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.ResetTaskRunningToPending(task.TaskID, task.AccountID, "worker context interrupted"); err != nil {
+	if err := service.ResetTaskRunningToPending(context.Background(), task.TaskID, task.AccountID, "worker context interrupted"); err != nil {
 		t.Fatalf("ResetTaskRunningToPending returned error: %v", err)
 	}
 
@@ -51,8 +53,8 @@ func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 
 func TestResetTaskRunningToPendingRejectsTerminalTask(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:      "task-reset-terminal",
@@ -66,7 +68,7 @@ func TestResetTaskRunningToPendingRejectsTerminalTask(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.ResetTaskRunningToPending(task.TaskID, task.AccountID, "worker context interrupted")
+	err := service.ResetTaskRunningToPending(context.Background(), task.TaskID, task.AccountID, "worker context interrupted")
 	if !errors.Is(err, ErrTaskTerminal) {
 		t.Fatalf("expected ErrTaskTerminal, got %v", err)
 	}
@@ -87,10 +89,10 @@ func newTaskRuntimeServiceTestDB(t *testing.T) *gorm.DB {
 	if err := db.AutoMigrate(&tasks.Task{}, &tasks.TaskOutput{}); err != nil {
 		t.Fatalf("auto migrate task failed: %v", err)
 	}
-	if err := db.AutoMigrate(&TaskDailyStat{}); err != nil {
+	if err := db.AutoMigrate(&accounts.TaskDailyStat{}); err != nil {
 		t.Fatalf("auto migrate task_daily_stats failed: %v", err)
 	}
-	if err := db.AutoMigrate(&TaskStatEvent{}, &TaskDailyStatBackfill{}); err != nil {
+	if err := db.AutoMigrate(&accounts.TaskStatEvent{}, &accounts.TaskDailyStatBackfill{}); err != nil {
 		t.Fatalf("auto migrate stat event/backfill failed: %v", err)
 	}
 	return db
@@ -98,8 +100,8 @@ func newTaskRuntimeServiceTestDB(t *testing.T) *gorm.DB {
 
 func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:     "task-requeue",
@@ -113,7 +115,7 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	requeued, err := service.RequeueTaskForFailover(task.TaskID, task.AccountID, "retryable error")
+	requeued, err := service.RequeueTaskForFailover(context.Background(), task.TaskID, task.AccountID, "retryable error")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
 	}
@@ -141,9 +143,9 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 
 func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
-	hub := NewTaskEventHub()
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	hub := accounts.NewTaskEventHub()
 	service.SetEventHub(hub)
 	events, unsubscribe, ok := hub.Subscribe("task-publish", 1)
 	if !ok {
@@ -161,7 +163,7 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.MarkTaskRunning(task.TaskID, 42); err != nil {
+	if err := service.MarkTaskRunning(context.Background(), task.TaskID, 42); err != nil {
 		t.Fatalf("MarkTaskRunning returned error: %v", err)
 	}
 
@@ -177,8 +179,8 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 
 func TestMarkTaskRunningReturnsAlreadyRunningForSameAccount(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:    "task-running-dup-same-account",
@@ -190,11 +192,11 @@ func TestMarkTaskRunningReturnsAlreadyRunningForSameAccount(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.MarkTaskRunning(task.TaskID, 42); err != nil {
+	if err := service.MarkTaskRunning(context.Background(), task.TaskID, 42); err != nil {
 		t.Fatalf("first MarkTaskRunning returned error: %v", err)
 	}
 
-	err := service.MarkTaskRunning(task.TaskID, 42)
+	err := service.MarkTaskRunning(context.Background(), task.TaskID, 42)
 	if !errors.Is(err, ErrTaskAlreadyRunning) {
 		t.Fatalf("expected ErrTaskAlreadyRunning, got %v", err)
 	}
@@ -202,8 +204,8 @@ func TestMarkTaskRunningReturnsAlreadyRunningForSameAccount(t *testing.T) {
 
 func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:     "task-retry-limit",
@@ -217,7 +219,7 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	requeued, err := service.RequeueTaskForFailover(task.TaskID, task.AccountID, "retry limit reached")
+	requeued, err := service.RequeueTaskForFailover(context.Background(), task.TaskID, task.AccountID, "retry limit reached")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover returned error: %v", err)
 	}
@@ -259,9 +261,9 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 
 func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
-	hub := NewTaskEventHub()
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	hub := accounts.NewTaskEventHub()
 	service.SetEventHub(hub)
 
 	requeueTask := &tasks.Task{
@@ -280,7 +282,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		t.Fatal("subscribe pending rejected unexpectedly")
 	}
 	defer unsubPending()
-	requeued, err := service.RequeueTaskForFailover(requeueTask.TaskID, requeueTask.AccountID, "retry")
+	requeued, err := service.RequeueTaskForFailover(context.Background(), requeueTask.TaskID, requeueTask.AccountID, "retry")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover pending returned error: %v", err)
 	}
@@ -312,7 +314,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		t.Fatal("subscribe failed rejected unexpectedly")
 	}
 	defer unsubFailed()
-	requeued, err = service.RequeueTaskForFailover(finalTask.TaskID, finalTask.AccountID, "stop retry")
+	requeued, err = service.RequeueTaskForFailover(context.Background(), finalTask.TaskID, finalTask.AccountID, "stop retry")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover failed returned error: %v", err)
 	}
@@ -331,8 +333,8 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 
 func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:    "task-completed-daily",
@@ -346,7 +348,7 @@ func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 	}
 
 	result := `{"model":"gpt-image-1","username":"alice"}`
-	if err := service.MarkTaskCompleted(task.TaskID, result); err != nil {
+	if err := service.MarkTaskCompleted(context.Background(), task.TaskID, result); err != nil {
 		t.Fatalf("MarkTaskCompleted returned error: %v", err)
 	}
 
@@ -378,8 +380,8 @@ func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 
 func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:    "task-completed-outputs",
@@ -392,7 +394,7 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 	}
 
 	result := `{"status":"success","image_url":"/uploads/2026/05/15/out-a.png","image_urls":["/uploads/2026/05/15/out-a.png","https://cdn.example.com/uploads/2026/05/15/out-b.png"]}`
-	if err := service.MarkTaskCompleted(task.TaskID, result); err != nil {
+	if err := service.MarkTaskCompleted(context.Background(), task.TaskID, result); err != nil {
 		t.Fatalf("MarkTaskCompleted returned error: %v", err)
 	}
 
@@ -414,8 +416,8 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 
 func TestMarkTaskCompletedRejectsInlineImageResult(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	service := NewTaskRuntimeServiceWithQueue(nil, taskRepo, nil, nil)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
 		TaskID:    "task-inline-result",
@@ -427,7 +429,7 @@ func TestMarkTaskCompletedRejectsInlineImageResult(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	err := service.MarkTaskCompleted(task.TaskID, `{"status":"success","image_url":"data:image/png;base64,aGVsbG8="}`)
+	err := service.MarkTaskCompleted(context.Background(), task.TaskID, `{"status":"success","image_url":"data:image/png;base64,aGVsbG8="}`)
 	if err == nil {
 		t.Fatal("expected inline image result to be rejected")
 	}

@@ -263,7 +263,7 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 		log.Printf("[SSE] clear write deadline failed task_id=%s err=%v", taskID, err)
 	}
 
-	if isTaskTerminalStatus(task.Status) {
+	if tasks.IsTerminalStatus(task.Status) {
 		if !writeTaskSSEvent(c, task) {
 			return
 		}
@@ -285,7 +285,7 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 	if !writeTaskSSEvent(c, task) {
 		return
 	}
-	if isTaskTerminalStatus(task.Status) {
+	if tasks.IsTerminalStatus(task.Status) {
 		return
 	}
 
@@ -313,7 +313,7 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 			if !writeTaskSSEvent(c, latest) {
 				return
 			}
-			if isTaskTerminalStatus(latest.Status) {
+			if tasks.IsTerminalStatus(latest.Status) {
 				return
 			}
 		}

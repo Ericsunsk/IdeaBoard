@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -17,15 +16,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type workspaceUploadPath struct {
-	ownerUID string
-	boardID  string
-}
-
 func uploadStaticHandler(deps Dependencies) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uploadPath, ok := cleanUploadStaticPath(c.Param("filepath"))
-		if !ok {
+		resource, err := storage.ParseUploadResource("/uploads/" + strings.TrimPrefix(c.Param("filepath"), "/"))
+		if err != nil {
 			c.Status(http.StatusNotFound)
 			return
 		}
@@ -34,14 +28,13 @@ func uploadStaticHandler(deps Dependencies) gin.HandlerFunc {
 			return
 		}
 
-		workspacePath, isWorkspaceUpload := parseWorkspaceUploadPath(uploadPath)
-		if isWorkspaceUpload {
-			if !authorizeWorkspaceUploadRead(c, deps, workspacePath) {
+		if resource.Kind == storage.UploadResourceKindWorkspace && resource.Workspace != nil {
+			if !authorizeWorkspaceUploadRead(c, deps, *resource.Workspace) {
 				return
 			}
 		}
 
-		localPath := filepath.FromSlash(uploadPath)
+		localPath := filepath.FromSlash(resource.ObjectKey)
 		info, err := os.Stat(localPath)
 		if err != nil || info.IsDir() {
 			c.Status(http.StatusNotFound)
@@ -49,31 +42,6 @@ func uploadStaticHandler(deps Dependencies) gin.HandlerFunc {
 		}
 		c.File(localPath)
 	}
-}
-
-func cleanUploadStaticPath(raw string) (string, bool) {
-	cleaned := path.Clean("/uploads/" + strings.TrimPrefix(raw, "/"))
-	if !strings.HasPrefix(cleaned, "/uploads/") {
-		return "", false
-	}
-	return strings.TrimPrefix(cleaned, "/"), true
-}
-
-func parseWorkspaceUploadPath(uploadPath string) (workspaceUploadPath, bool) {
-	parts := strings.Split(uploadPath, "/")
-	if len(parts) < 5 {
-		return workspaceUploadPath{}, false
-	}
-	if parts[0] != "uploads" || parts[1] != "workspace" {
-		return workspaceUploadPath{}, false
-	}
-	if parts[2] == "" || parts[3] == "" || strings.Join(parts[4:], "") == "" {
-		return workspaceUploadPath{}, false
-	}
-	return workspaceUploadPath{
-		ownerUID: parts[2],
-		boardID:  parts[3],
-	}, true
 }
 
 func authorizeUploadRead(c *gin.Context, deps Dependencies) bool {
@@ -90,14 +58,14 @@ func authorizeUploadRead(c *gin.Context, deps Dependencies) bool {
 	return true
 }
 
-func authorizeWorkspaceUploadRead(c *gin.Context, deps Dependencies, uploadPath workspaceUploadPath) bool {
+func authorizeWorkspaceUploadRead(c *gin.Context, deps Dependencies, uploadPath storage.UploadWorkspaceResource) bool {
 	userID := c.GetUint64("user_id")
 	if deps.BoardService == nil || deps.UserRepo == nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("workspace upload dependencies not configured"))
 		return false
 	}
 
-	board, _, err := deps.BoardService.ResolveBoardAccess(userID, uploadPath.boardID)
+	board, _, err := deps.BoardService.ResolveBoardAccess(userID, uploadPath.BoardSegment)
 	if err != nil {
 		switch {
 		case errors.Is(err, boards.ErrInvalidBoardInput):
@@ -122,7 +90,7 @@ func authorizeWorkspaceUploadRead(c *gin.Context, deps Dependencies, uploadPath 
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
 		return false
 	}
-	if ownerSegment != uploadPath.ownerUID {
+	if ownerSegment != uploadPath.OwnerSegment {
 		response.Error(c, http.StatusNotFound, "资源不存在")
 		return false
 	}

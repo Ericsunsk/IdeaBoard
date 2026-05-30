@@ -7,8 +7,8 @@
     ]"
     @mousedown.self="closeBoardHeaderEditing"
   >
-    <HomeCanvasHeader
-      class="canvas-chrome canvas-chrome-header"
+    <WorkspaceScreenChrome
+      :active-tool="activeTool"
       :inert="isMaskEditorChromeHidden"
       :current-board-name="currentBoardName"
       :board-options="boardOptions"
@@ -17,7 +17,8 @@
       :is-renaming-board="isRenamingBoard"
       :set-board-name-input-ref="setBoardNameInputRef"
       :export-disabled="!hasSelectedFlowNodes"
-      :avatar-url="userStore.user?.avatar"
+      :avatar-url="userStore.user?.avatar ?? undefined"
+      :zoom-level="zoomLevel"
       @update:board-name-draft="boardNameDraft = $event"
       @toggle-board-menu="toggleBoardMenu"
       @start-board-rename="startBoardRename"
@@ -28,21 +29,12 @@
       @open-center="onNavigateRequest('/user/center')"
       @logout="onLogoutRequest"
       @navigate-back="onNavigateRequest('/user/boards')"
-    />
-
-    <WorkspaceToolPalette
-      :active-tool="activeTool"
-      :inert="isMaskEditorChromeHidden"
       @select-tool="setActiveTool"
+      @zoom-out="onZoomOut"
+      @zoom-in="onZoomIn"
     />
 
-    <div
-      ref="canvasWrapRef"
-      class="workspace-flow-canvas-wrap"
-      @dragover.prevent="onCanvasDragOver"
-      @drop.prevent="onCanvasDrop"
-      @wheel="onCanvasWheel"
-    >
+    <div ref="canvasWrapRef" class="workspace-flow-canvas-wrap" @dragover.prevent="onCanvasDragOver" @drop.prevent="onCanvasDrop" @wheel="onCanvasWheel">
       <VueFlow
         v-model:nodes="nodes"
         v-model:edges="edges"
@@ -148,19 +140,22 @@
           />
         </template>
       </VueFlow>
-      <ImageMaskEditorChrome
-        v-if="flowMaskEditorNodeId && maskEditorChromeAnchorRect && isMaskEditorChromeReady"
-        :anchor-rect="maskEditorChromeAnchorRect"
-        :draw-mode="flowMaskEditorDrawMode"
-        :brush-shape="flowMaskEditorBrushShape"
-        :brush-size="flowMaskEditorBrushSize"
-        :brush-hardness="flowMaskEditorBrushHardness"
-        :mask-layer-opacity="maskEditorLayerOpacity"
-        :output-count="activeMaskEditorOutputCount"
-        :reference-images="maskEditorReferenceImages"
-        :direct-generating="isNodeDirectActionRunning(flowMaskEditorNodeId)"
-        :can-undo="canUndoFlowMaskEditor"
-        :can-redo="canRedoFlowMaskEditor"
+      <WorkspaceCanvasOverlays
+        :flow-mask-editor-node-id="flowMaskEditorNodeId"
+        :mask-editor-chrome-anchor-rect="maskEditorChromeAnchorRect"
+        :is-mask-editor-chrome-ready="isMaskEditorChromeReady"
+        :flow-mask-editor-draw-mode="flowMaskEditorDrawMode"
+        :flow-mask-editor-brush-shape="flowMaskEditorBrushShape"
+        :flow-mask-editor-brush-size="flowMaskEditorBrushSize"
+        :flow-mask-editor-brush-hardness="flowMaskEditorBrushHardness"
+        :mask-editor-layer-opacity="maskEditorLayerOpacity"
+        :active-mask-editor-output-count="activeMaskEditorOutputCount"
+        :mask-editor-reference-images="maskEditorReferenceImages"
+        :is-node-direct-action-running="isNodeDirectActionRunning"
+        :can-undo-flow-mask-editor="canUndoFlowMaskEditor"
+        :can-redo-flow-mask-editor="canRedoFlowMaskEditor"
+        :node-context-menu="nodeContextMenu"
+        :canvas-node-menu-items="canvasNodeMenuItems"
         @set-draw-mode="setFlowMaskEditorDrawMode"
         @set-brush-shape="setFlowMaskEditorBrushShape"
         @set-brush-size="setFlowMaskEditorBrushSize"
@@ -176,23 +171,9 @@
         @reference-image-remove="onMaskEditorReferenceImageRemove"
         @reference-image-preview="onMaskEditorReferenceImagePreview"
         @submit="onMaskEditorChromeSubmit"
-      />
-      <WorkspaceNodeContextMenu
-        :visible="nodeContextMenu.visible"
-        :x="nodeContextMenu.x"
-        :y="nodeContextMenu.y"
-        :items="canvasNodeMenuItems"
-        @create="handleNodeContextMenuCreate"
+        @create-node="handleNodeContextMenuCreate"
       />
     </div>
-
-    <WorkspaceZoomControls
-      :zoom-level="zoomLevel"
-      :inert="isMaskEditorChromeHidden"
-      @zoom-out="onZoomOut"
-      @zoom-in="onZoomIn"
-    />
-
   </div>
 </template>
 
@@ -248,12 +229,11 @@ import { useImageMaskEditorOverlay } from '../composables/useImageMaskEditorOver
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowWorkspaceRuntime } from '../composables/useFlowWorkspaceRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
-import ImageMaskEditorChrome from '../components/nodes/ImageMaskEditorChrome.vue'
+import WorkspaceCanvasOverlays from '../components/WorkspaceCanvasOverlays.vue'
+import WorkspaceScreenChrome from '../components/WorkspaceScreenChrome.vue'
 import {
   useMaskEditorViewportController,
 } from '../composables/useMaskEditorViewportController'
-import WorkspaceToolPalette from '../components/WorkspaceToolPalette.vue'
-import WorkspaceZoomControls from '../components/WorkspaceZoomControls.vue'
 
 const appToast = useAppToast()
 const route = useRoute()

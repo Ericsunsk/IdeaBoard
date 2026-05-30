@@ -10,9 +10,9 @@ import (
 )
 
 type consumerTaskRuntime interface {
-	RefreshTaskAccounts(task *queuetypes.TaskPayload) error
-	ReleaseTask(accountID uint64, taskID string) error
-	MarkTaskFailed(taskID string, reason string) error
+	RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error
+	ReleaseTask(ctx context.Context, accountID uint64, taskID string) error
+	MarkTaskFailed(ctx context.Context, taskID string, reason string) error
 }
 
 type taskProcessor struct {
@@ -41,14 +41,14 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 		return nil
 	}
 
-	if err := p.taskRuntime.RefreshTaskAccounts(task); err != nil {
+	if err := p.taskRuntime.RefreshTaskAccounts(ctx, task); err != nil {
 		log.Printf("[TaskProcessor] 刷新任务账号失败: task=%s err=%v", task.TaskID, err)
 		return err
 	}
 
 	if len(task.AccountIDs) == 0 {
 		log.Printf("[TaskProcessor] 没有可用账号: task=%s", task.TaskID)
-		p.failTask(task, 0, "没有可用账号")
+		p.failTask(ctx, task, 0, "没有可用账号")
 		return nil
 	}
 
@@ -83,11 +83,11 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 	return p.executeTask(ctx, task, accountID)
 }
 
-func (p *taskProcessor) failTask(task *queuetypes.TaskPayload, accountID uint64, reason string) {
-	if err := p.taskRuntime.ReleaseTask(accountID, task.TaskID); err != nil {
+func (p *taskProcessor) failTask(ctx context.Context, task *queuetypes.TaskPayload, accountID uint64, reason string) {
+	if err := p.taskRuntime.ReleaseTask(ctx, accountID, task.TaskID); err != nil {
 		log.Printf("[TaskProcessor] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 	}
-	if err := p.taskRuntime.MarkTaskFailed(task.TaskID, reason); err != nil {
+	if err := p.taskRuntime.MarkTaskFailed(ctx, task.TaskID, reason); err != nil {
 		log.Printf("[TaskProcessor] 标记任务失败失败: task=%s err=%v", task.TaskID, err)
 	}
 	log.Printf("[TaskProcessor] 任务 %s 失败, 原因: %s", task.TaskID, reason)

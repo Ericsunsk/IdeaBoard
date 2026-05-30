@@ -158,7 +158,7 @@ func (s *StorageService) loadProfiles() ([]StorageProfile, error) {
 	val, err := s.configRepo.Get(StorageProfilesConfigKey)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return s.migrateLegacyConfig()
+			return s.initializeProfilesConfig()
 		}
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (s *StorageService) persistProfiles(profiles []StorageProfile) error {
 	return nil
 }
 
-func (s *StorageService) migrateLegacyConfig() ([]StorageProfile, error) {
+func (s *StorageService) initializeProfilesConfig() ([]StorageProfile, error) {
 	profiles := []StorageProfile{
 		{
 			ID:        builtinLocalProfileID(),
@@ -204,62 +204,10 @@ func (s *StorageService) migrateLegacyConfig() ([]StorageProfile, error) {
 		},
 	}
 
-	cfg, err := s.kodoService.GetConfig()
-	if err == nil && cfg != nil && hasLegacyKodoConfig(cfg) {
-		kodoProfile := StorageProfile{
-			ID:       builtinKodoProfileID(),
-			Name:     "Kodo 存储",
-			Provider: StorageProviderKodo,
-			Enabled:  cfg.Enabled,
-			Builtin:  false,
-			Config: map[string]interface{}{
-				"access_key":     strings.TrimSpace(cfg.AccessKey),
-				"secret_key":     cfg.SecretKey,
-				"bucket_name":    strings.TrimSpace(cfg.BucketName),
-				"upload_domain":  strings.TrimSpace(cfg.UploadDomain),
-				"access_domain":  strings.TrimSpace(cfg.AccessDomain),
-				"thumbnail_mode": cfg.ThumbnailMode,
-				"direct_fetch":   cfg.DirectFetch,
-			},
-		}
-		if s.kodoService.IsConfigEnabled(cfg) {
-			profiles[0].IsCurrent = false
-			kodoProfile.IsCurrent = true
-		}
-		profiles = append(profiles, kodoProfile)
-	}
-
 	if err := s.persistProfiles(profiles); err != nil {
 		return nil, err
 	}
 	return profiles, nil
-}
-
-func hasLegacyKodoConfig(cfg *KodoConfig) bool {
-	if cfg == nil {
-		return false
-	}
-	return cfg.Enabled ||
-		strings.TrimSpace(cfg.AccessKey) != "" ||
-		strings.TrimSpace(cfg.SecretKey) != "" ||
-		strings.TrimSpace(cfg.BucketName) != "" ||
-		strings.TrimSpace(cfg.UploadDomain) != "" ||
-		strings.TrimSpace(cfg.AccessDomain) != "" ||
-		cfg.ThumbnailMode ||
-		cfg.DirectFetch
-}
-
-func isEmptyBuiltinKodoProfile(profile StorageProfile) bool {
-	if profile.ID != builtinKodoProfileID() || profile.Provider != StorageProviderKodo {
-		return false
-	}
-	return !configBool(profile.Config, "thumbnail_mode") &&
-		!configBool(profile.Config, "direct_fetch") &&
-		strings.TrimSpace(configString(profile.Config, "access_key")) == "" &&
-		strings.TrimSpace(configString(profile.Config, "secret_key")) == "" &&
-		strings.TrimSpace(configString(profile.Config, "bucket_name")) == "" &&
-		strings.TrimSpace(configString(profile.Config, "upload_domain")) == "" &&
-		strings.TrimSpace(configString(profile.Config, "access_domain")) == ""
 }
 
 func (s *StorageService) ensureBuiltinProfiles(profiles []StorageProfile) ([]StorageProfile, bool) {
@@ -278,10 +226,6 @@ func (s *StorageService) ensureBuiltinProfiles(profiles []StorageProfile) ([]Sto
 			profiles[i].Provider = canonicalProvider
 			profiles[i].Config = migratedConfig
 			changed = true
-		}
-		if isEmptyBuiltinKodoProfile(profiles[i]) {
-			changed = true
-			continue
 		}
 		switch profiles[i].ID {
 		case builtinLocalProfileID():
@@ -303,19 +247,8 @@ func (s *StorageService) ensureBuiltinProfiles(profiles []StorageProfile) ([]Sto
 			}
 			seenLocal = true
 		case builtinKodoProfileID():
-			if profiles[i].Builtin {
-				// Preserve previously configured legacy Kodo profiles as normal user-editable profiles.
-				profiles[i].Builtin = false
-				changed = true
-			}
-			if profiles[i].Provider != StorageProviderKodo {
-				profiles[i].Provider = StorageProviderKodo
-				changed = true
-			}
-			if strings.TrimSpace(profiles[i].Name) == "" {
-				profiles[i].Name = "Kodo 存储"
-				changed = true
-			}
+			changed = true
+			continue
 		}
 		if profiles[i].IsCurrent {
 			currentID = profiles[i].ID

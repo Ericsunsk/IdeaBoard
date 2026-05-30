@@ -142,21 +142,21 @@ func TestReleaseTaskWithoutLeaseDoesNotDecrementOrRemoveRunning(t *testing.T) {
 	if err := mgr.GetClient().HSet(ctx, KeyAccountConcurrent+":501", "count", 1).Err(); err != nil {
 		t.Fatalf("seed count: %v", err)
 	}
-	if err := mgr.GetClient().SAdd(ctx, KeyRunningTasks, "legacy-1").Err(); err != nil {
+	if err := mgr.GetClient().SAdd(ctx, KeyRunningTasks, "orphan-1").Err(); err != nil {
 		t.Fatalf("seed running: %v", err)
 	}
 
-	if err := mgr.ReleaseTask(ctx, 501, "legacy-1"); err != nil {
+	if err := mgr.ReleaseTask(ctx, 501, "orphan-1"); err != nil {
 		t.Fatalf("release without lease: %v", err)
 	}
-	if err := mgr.ReleaseTask(ctx, 501, "legacy-1"); err != nil {
+	if err := mgr.ReleaseTask(ctx, 501, "orphan-1"); err != nil {
 		t.Fatalf("release without lease second time: %v", err)
 	}
 	count, err := mgr.GetAccountConcurrent(ctx, 501)
 	if err != nil || count != 1 {
 		t.Fatalf("count should stay unchanged without lease, got %d err=%v", count, err)
 	}
-	running, err := mgr.GetClient().SIsMember(ctx, KeyRunningTasks, "legacy-1").Result()
+	running, err := mgr.GetClient().SIsMember(ctx, KeyRunningTasks, "orphan-1").Result()
 	if err != nil || !running {
 		t.Fatalf("running marker should stay without lease, running=%v err=%v", running, err)
 	}

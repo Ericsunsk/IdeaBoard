@@ -54,7 +54,7 @@ func TestListProfilesDoesNotCreateDefaultKodoProfile(t *testing.T) {
 	}
 }
 
-func TestListProfilesRemovesEmptyLegacyBuiltinKodoProfile(t *testing.T) {
+func TestListProfilesDropsBuiltinKodoProfile(t *testing.T) {
 	service, repo := newStorageServiceTest(t)
 	writeStorageProfilesConfig(t, repo, []StorageProfile{
 		{
@@ -92,15 +92,15 @@ func TestListProfilesRemovesEmptyLegacyBuiltinKodoProfile(t *testing.T) {
 
 	for _, profile := range profiles {
 		if profile.ID == builtinKodoProfileID() {
-			t.Fatalf("empty builtin Kodo profile should be removed")
+			t.Fatalf("builtin Kodo profile should be dropped")
 		}
 		if profile.ID == builtinLocalProfileID() && !profile.IsCurrent {
-			t.Fatalf("local profile should become current after empty builtin Kodo is removed")
+			t.Fatalf("local profile should become current after builtin Kodo is removed")
 		}
 	}
 }
 
-func TestListProfilesPreservesConfiguredLegacyKodoAsUserProfile(t *testing.T) {
+func TestListProfilesDropsConfiguredBuiltinKodoProfile(t *testing.T) {
 	service, repo := newStorageServiceTest(t)
 	writeStorageProfilesConfig(t, repo, []StorageProfile{
 		{
@@ -135,21 +135,10 @@ func TestListProfilesPreservesConfiguredLegacyKodoAsUserProfile(t *testing.T) {
 		t.Fatalf("ListProfiles returned error: %v", err)
 	}
 
-	var kodo *StorageProfile
-	for i := range profiles {
-		if profiles[i].ID == builtinKodoProfileID() {
-			kodo = &profiles[i]
-			break
+	for _, profile := range profiles {
+		if profile.ID == builtinKodoProfileID() {
+			t.Fatalf("builtin Kodo profile should be dropped")
 		}
-	}
-	if kodo == nil {
-		t.Fatalf("configured legacy Kodo profile should be preserved")
-	}
-	if kodo.Builtin {
-		t.Fatalf("configured legacy Kodo should become user-editable")
-	}
-	if kodo.Provider != StorageProviderKodo {
-		t.Fatalf("provider = %q, want %q", kodo.Provider, StorageProviderKodo)
 	}
 }
 

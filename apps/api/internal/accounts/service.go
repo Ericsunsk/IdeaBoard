@@ -29,7 +29,6 @@ type AccountService struct {
 	cancelStore      taskqueue.TaskCancellationStore
 	monitorStore     taskqueue.TaskMonitorStore
 	assigner         taskqueue.TaskAssigner
-	taskRuntime      *TaskRuntimeService
 	taskEventHub     *TaskEventHub
 	systemConfigRepo *settings.SystemConfigRepository
 	previewResolver  previewURLResolver
@@ -75,7 +74,6 @@ func NewAccountServiceWithQueue(
 		concurrencyStore: concurrencyStore,
 		cancelStore:      cancelStore,
 		monitorStore:     monitorStore,
-		taskRuntime:      NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, cancelStore),
 		systemConfigRepo: systemConfigRepo,
 		previewResolver:  previewResolver,
 	}
@@ -83,9 +81,6 @@ func NewAccountServiceWithQueue(
 
 func (s *AccountService) SetTaskEventHub(hub *TaskEventHub) {
 	s.taskEventHub = hub
-	if s.taskRuntime != nil {
-		s.taskRuntime.SetEventHub(hub)
-	}
 }
 
 func (s *AccountService) TaskEventHub() *TaskEventHub {

@@ -6,33 +6,21 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
-	"time"
 
 	"api/internal/accounts"
 	"api/internal/assets"
 	"api/internal/auth"
 	"api/internal/boards"
 	"api/internal/channels"
-	"api/internal/imageproc"
 	"api/internal/platform/config"
 	"api/internal/platform/database"
-	"api/internal/platform/redis"
 	"api/internal/platform/settings"
-	"api/internal/prompts"
-	"api/internal/runtime/httpapi"
-	"api/internal/runtime/taskqueue"
-	"api/internal/runtime/worker"
-	"api/internal/storage"
 	"api/internal/tasks"
 	"api/internal/users"
-	"api/web"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -66,165 +54,22 @@ func Run(args []string) {
 	requireAuthInternalKeyForProduction(cfg)
 	gin.SetMode(cfg.App.GinMode)
 	log.Printf("[Main] Gin mode: %s (app env: %s)", gin.Mode(), cfg.App.Env)
-	authServiceClient := auth.NewServiceClient(cfg.Auth)
 
-	db, err := database.NewMySQL(cfg.Database)
+	app, err := newRuntimeApp(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatal(err)
 	}
-	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
-		log.Fatalf("Failed to cleanup duplicate board names: %v", err)
-	}
-	if err := migrateModels(db); err != nil {
-		log.Fatalf("Failed to migrate database schema: %v", err)
-	}
-
-	rdb := redis.NewRedis(cfg.Redis)
-	if err := rdb.Ping(context.Background()); err != nil {
-		log.Fatalf("[Main] Failed to connect to Redis: %v", err)
-	}
-	redisMgr := redis.NewRedisManager(rdb.GetClient())
-	redisAsynqAssigner := taskqueue.NewRedisAsynqAssigner(redisMgr)
-	asynqConnOpt := worker.BuildAsynqRedisConnOpt(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Auth)
-	asynqQueue := taskqueue.NewAsynqQueue(
-		asynqConnOpt,
-		redisMgr,
-		time.Duration(cfg.Queue.AsynqTaskTimeoutSeconds)*time.Second,
-		cfg.Queue.AsynqMaxRetry,
-	)
 	defer func() {
-		if err := asynqQueue.Close(); err != nil {
+		if err := app.close(); err != nil {
 			log.Printf("[Main] Failed to close asynq queue resources: %v", err)
 		}
 	}()
 
-	userRepo := users.NewUserRepository(db)
-	if err := userRepo.EnsureStorageUIDs(); err != nil {
-		log.Fatalf("Failed to ensure user storage uid: %v", err)
-	}
-	accountRepo := accounts.NewAccountRepository(db)
-	taskRepo := accounts.NewTaskRepository(db)
-	channelRepo := channels.NewChannelRepository(db)
-	systemConfigRepo := settings.NewSystemConfigRepository(db)
-	lineDraftModeRepo := assets.NewLineDraftModeRepository(db)
-	boardRepo := boards.NewBoardRepository(db)
-
-	storageService := storage.NewStorageService(systemConfigRepo)
-	userService := users.NewUserService(userRepo, storageService)
-	taskEventHub := accounts.NewTaskEventHub()
-	accountService := accounts.NewAccountServiceWithQueue(
-		accountRepo,
-		taskRepo,
-		asynqQueue,
-		asynqQueue,
-		redisAsynqAssigner,
-		redisAsynqAssigner,
-		redisAsynqAssigner,
-		asynqQueue,
-		systemConfigRepo,
-		storageService,
-	)
-	accountService.SetTaskEventHub(taskEventHub)
-	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
-
-	authHandler := auth.NewAuthHandler(userService)
-	adminHandler := users.NewAdminHandler(userService, systemConfigRepo, authServiceClient)
-	channelHandler := channels.NewChannelHandler(channelRepo, cfg.App.Env)
-	storageHandler := storage.NewStorageHandler(storageService)
-	lineDraftHandler := assets.NewLineDraftHandler(lineDraftModeRepo)
-	accountHandler := accounts.NewAccountHandler(accountService)
-	featurePromptHandler := prompts.NewFeaturePromptHandler(systemConfigRepo)
-	vectorizeHandler := imageproc.NewVectorizeHandler(taskRepo, storageService)
-	boardHandler := boards.NewBoardHandler(boardService)
-
-	r := gin.Default()
-
-	frontendFS, err := web.DistFS()
-	if err != nil {
-		log.Printf("[Main] Failed to load embedded frontend dist: %v", err)
-	}
-
-	httpapi.RegisterRoutes(r, httpapi.Dependencies{
-		AuthHandler:          authHandler,
-		AdminHandler:         adminHandler,
-		AccountHandler:       accountHandler,
-		BoardHandler:         boardHandler,
-		BoardService:         boardService,
-		ChannelHandler:       channelHandler,
-		StorageHandler:       storageHandler,
-		LineDraftHandler:     lineDraftHandler,
-		FeaturePromptHandler: featurePromptHandler,
-		VectorizeHandler:     vectorizeHandler,
-		StorageService:       storageService,
-		UserRepo:             userRepo,
-		AuthServiceClient:    authServiceClient,
-		CORSMiddleware:       buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
-	}, frontendFS)
-
-	asynqHandler := worker.NewAsynqTaskHandler(
-		accountRepo,
-		channelRepo,
-		taskRepo,
-		asynqQueue,
-		redisAsynqAssigner,
-		redisAsynqAssigner,
-		storageService,
-		taskEventHub,
-	)
-	asynqServer, asynqMux := worker.NewAsynqServer(asynqConnOpt, worker.AsynqServerOptions{
-		QueueName:            taskqueue.AsynqQueueDefault,
-		Concurrency:          cfg.Queue.WorkerConcurrency,
-		NoCapacityRetryDelay: time.Duration(cfg.Queue.AsynqNoCapacityDelaySec) * time.Second,
-	}, asynqHandler)
-	go func() {
-		log.Printf("[Main] Asynq worker starting: queue=%s concurrency=%d", taskqueue.AsynqQueueDefault, cfg.Queue.WorkerConcurrency)
-		if err := asynqServer.Run(asynqMux); err != nil {
-			log.Fatalf("[Main] Failed to start asynq worker: %v", err)
-		}
-	}()
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = cfg.App.Port
-	}
-
-	server := &http.Server{
-		Addr:              listenerAddr(cfg.App.Host, port),
-		Handler:           r,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      120 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
-
-	go func() {
-		log.Printf("Server starting on %s", server.Addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
-		}
-	}()
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	log.Println("[Main] Shutting down server...")
-	asynqServer.Shutdown()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	app.start()
+	app.waitForShutdownSignal()
+	if err := app.shutdown(); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
-
-	log.Println("[Main] Server exited")
-}
-
-func listenerAddr(host, port string) string {
-	if strings.TrimSpace(host) == "" {
-		return ":" + port
-	}
-	return net.JoinHostPort(host, port)
 }
 
 func runInitAdmin() {
@@ -293,20 +138,7 @@ func runInitAdmin() {
 
 	localAdminByName, err := userRepo.GetByUsername("admin")
 	if err == nil {
-		if existing := strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)); existing != "" && existing != provisioned.AuthUserID {
-			log.Fatalf("Local username 'admin' already bound to another auth user (%s), expected %s", existing, provisioned.AuthUserID)
-		}
-		if strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)) == "" {
-			if err := userRepo.UpdateAuthUserID(localAdminByName.ID, provisioned.AuthUserID); err != nil {
-				log.Fatalf("Failed to bind local admin to Better Auth user: %v", err)
-			}
-			localAdminByName.AuthUserID = stringPtr(provisioned.AuthUserID)
-		}
-		if err := ensureLocalAdminRole(localAdminByName); err != nil {
-			log.Fatalf("Failed to update local admin profile: %v", err)
-		}
-		log.Println("Bound existing local admin profile to Better Auth admin user")
-		return
+		log.Fatalf("Local username 'admin' already exists without matching Better Auth user (%s)", strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)))
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Fatalf("Failed to query local admin username: %v", err)

@@ -77,7 +77,7 @@ func TestUploadStaticHandlerDoesNotListDirectories(t *testing.T) {
 	}
 }
 
-func TestUploadStaticHandlerLegacyUploadsRequireLogin(t *testing.T) {
+func TestUploadStaticHandlerProfileAvatarRequiresLogin(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
 	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/profile/OWNR1A/avatar/avatar.txt", "")
@@ -87,7 +87,7 @@ func TestUploadStaticHandlerLegacyUploadsRequireLogin(t *testing.T) {
 	}
 }
 
-func TestUploadStaticHandlerLegacyUploadsAllowLoggedInUser(t *testing.T) {
+func TestUploadStaticHandlerProfileAvatarAllowsLoggedInUser(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
 	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/profile/OWNR1A/avatar/avatar.txt", "session=member")
@@ -95,12 +95,12 @@ func TestUploadStaticHandlerLegacyUploadsAllowLoggedInUser(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if strings.TrimSpace(rec.Body.String()) != "legacy avatar" {
-		t.Fatalf("body = %q, want legacy avatar", rec.Body.String())
+	if strings.TrimSpace(rec.Body.String()) != "profile avatar" {
+		t.Fatalf("body = %q, want profile avatar", rec.Body.String())
 	}
 }
 
-func TestUploadStaticHandlerLegacyHeadAllowsLoggedInUser(t *testing.T) {
+func TestUploadStaticHandlerProfileAvatarHeadAllowsLoggedInUser(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
 	rec := performUploadStaticRequest(env.router, http.MethodHead, "/uploads/profile/OWNR1A/avatar/avatar.txt", "session=member")
@@ -128,12 +128,6 @@ func TestUploadStaticHandlerWorkspaceTraversalStillRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestCleanUploadStaticPathRejectsTraversalOutsideUploads(t *testing.T) {
-	if _, ok := cleanUploadStaticPath("/../secret.txt"); ok {
-		t.Fatal("cleanUploadStaticPath accepted traversal outside uploads")
-	}
-}
-
 func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -143,7 +137,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 
 	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "demo.txt"), "workspace content")
 	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "thumb", "demo.txt"), "workspace thumb")
-	mustWriteTestFile(t, filepath.Join("uploads", "profile", "OWNR1A", "avatar", "avatar.txt"), "legacy avatar")
+	mustWriteTestFile(t, filepath.Join("uploads", "profile", "OWNR1A", "avatar", "avatar.txt"), "profile avatar")
 
 	db, err := gorm.Open(sqlite.Open("file:"+strings.ReplaceAll(t.Name(), "/", "_")+"?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {

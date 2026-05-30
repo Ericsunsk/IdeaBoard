@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"api/internal/runtime/taskruntime"
 	"api/internal/tasks"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -51,7 +52,7 @@ func TestExecuteDropsDuplicateTaskWhenAlreadyRunningOnSameAccount(t *testing.T) 
 	}
 
 	assigner := &fakeAssigner{}
-	runtime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
 	providerCalled := false
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
 		providerCalled = true
@@ -93,7 +94,7 @@ END;`).Error; err != nil {
 	}
 
 	assigner := &fakeAssigner{}
-	runtime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
 		return `{"image_url":"https://example.com/image.png"}`, nil
 	})
@@ -133,7 +134,7 @@ END;`).Error; err != nil {
 	}
 
 	assigner := &fakeAssigner{}
-	runtime := accounts.NewTaskRuntimeServiceWithQueue(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
 		return "", errors.New("provider boom")
 	})
