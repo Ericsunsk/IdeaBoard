@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>为服装设计与商品展示场景构建的 AI 画布工作流平台。</strong>
+  <strong>为图像设计与电商展示场景构建的 AI 画布工作流平台。</strong>
 </p>
 
 <p align="center">
@@ -49,6 +49,7 @@
 </p>
 
 <a id="product-preview"></a>
+
 ## 产品预览
 
 <p align="center">
@@ -60,17 +61,18 @@
 </p>
 
 <a id="overview"></a>
+
 ## 项目概览
 
-IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供节点画布、任务入口与管理后台，后端负责鉴权、任务落库、提示词模板装配、账号调度、异步执行、结果持久化，以及 `Local / Kodo / S3-compatible` 存储配置接入。
+IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供节点画布、任务入口与管理后台，后端负责鉴权、任务落库、提示词模板装配、账号调度、异步执行、结果持久化，以及 `Local / S3-compatible` 存储配置接入。
 
 ### 产品快照
 
-| 维度 | 当前配置 |
-|------|----------|
-| 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
-| 运行方式 | 本地开发、Cloudflare Pages + VPS Docker Compose、标准 Linux 部署 |
-| 核心界面 | 用户画布工作台、画板管理、管理后台 |
+| 维度         | 当前配置                                                         |
+| ------------ | ---------------------------------------------------------------- |
+| 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001`                  |
+| 运行方式     | 本地开发、Cloudflare Pages + VPS Docker Compose、标准 Linux 部署 |
+| 核心界面     | 用户画布工作台、画板管理、管理后台                               |
 
 ### 系统架构
 
@@ -82,7 +84,7 @@ flowchart TB
     Nginx -- /uploads/* --> Static["静态资源服务<br>/uploads/*"]
     Auth --> MySQL[("MySQL 8.0")] & Redis[("Redis 8.6")]
     GoAPI --> MySQL & Redis & Worker["Worker 消费者"]
-    Worker --> Queue["Redis Queue"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / Kodo / S3"]
+    Worker --> Queue["Redis Queue"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / S3-compatible"]
     Static --> Storage
 
     style Browser fill:#f9f,stroke:#333,stroke-width:1px
@@ -101,6 +103,7 @@ flowchart TB
 生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth、MySQL 与 Redis，并由 Cloudflare Tunnel 暴露 API 域名。
 
 <a id="highlights"></a>
+
 ## 核心亮点
 
 <table>
@@ -127,6 +130,7 @@ flowchart TB
 </table>
 
 <a id="capabilities"></a>
+
 ## 能力范围
 
 当前产品主链路覆盖以下能力：
@@ -157,7 +161,7 @@ flowchart TB
     </td>
     <td valign="top">
       <strong>存储接入</strong><br/>
-      本地存储、Kodo、S3-compatible
+      本地存储、S3-compatible
     </td>
   </tr>
   <tr>
@@ -176,16 +180,17 @@ flowchart TB
 更细的 workflow feature contract、提示词模板变量与执行链路说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。如需按 feature 配置管理后台系统提示词，可参考 [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)。
 
 <a id="quick-start"></a>
+
 ## 快速开始
 
 ### 环境要求
 
-| 组件 | 版本 |
-|------|------|
+| 组件    | 版本     |
+| ------- | -------- |
 | Node.js | `22.18+` |
-| Go | `1.25+` |
-| MySQL | `8.0+` |
-| Redis | `8.6+` |
+| Go      | `1.25+`  |
+| MySQL   | `8.0+`   |
+| Redis   | `8.6+`   |
 
 ### 1. 启动本地依赖
 
@@ -197,13 +202,13 @@ docker compose up -d
 <details>
 <summary>默认本地依赖配置</summary>
 
-| 项目 | 默认值 |
-|------|--------|
-| MySQL Root 密码 | `root123` |
-| 业务数据库 | `ideaboard` |
-| 业务用户 | `ideaboard` |
-| 业务密码 | `ideaboard123` |
-| Redis | `127.0.0.1:6379` |
+| 项目            | 默认值           |
+| --------------- | ---------------- |
+| MySQL Root 密码 | `root123`        |
+| 业务数据库      | `ideaboard`      |
+| 业务用户        | `ideaboard`      |
+| 业务密码        | `ideaboard123`   |
+| Redis           | `127.0.0.1:6379` |
 
 </details>
 
@@ -290,12 +295,12 @@ INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
 
 ### 本地访问地址
 
-| 地址 | 用途 |
-|------|------|
-| `http://localhost:5173` | 前端开发环境 |
-| `http://localhost:5173/admin/login` | 管理后台登录 |
-| `http://localhost:6000/api/health` | 后端健康检查 |
-| `http://localhost:6001/api/health` | Better Auth 健康检查 |
+| 地址                                | 用途                 |
+| ----------------------------------- | -------------------- |
+| `http://localhost:5173`             | 前端开发环境         |
+| `http://localhost:5173/admin/login` | 管理后台登录         |
+| `http://localhost:6000/api/health`  | 后端健康检查         |
+| `http://localhost:6001/api/health`  | Better Auth 健康检查 |
 
 ## 仓库结构
 
@@ -314,6 +319,7 @@ IdeaBoard/
 ```
 
 <a id="deployment"></a>
+
 ## 部署说明
 
 ### 推荐部署：Cloudflare Pages + GHCR + Docker Compose
@@ -358,14 +364,14 @@ ideaboard delete --yes
 
 Pages 配置：
 
-| 项目 | 值 |
-|------|----|
-| Root directory | `apps/web` |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Environment variable | `NODE_VERSION=22.18.0` |
-| Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
-| Environment variable | `VITE_AUTH_BASE_URL=https://api.example.com` |
+| 项目                   | 值                                              |
+| ---------------------- | ----------------------------------------------- |
+| Root directory         | `apps/web`                                      |
+| Build command          | `npm run build`                                 |
+| Build output directory | `dist`                                          |
+| Environment variable   | `NODE_VERSION=22.18.0`                          |
+| Environment variable   | `VITE_API_BASE_URL=https://api.example.com/api` |
+| Environment variable   | `VITE_AUTH_BASE_URL=https://api.example.com`    |
 
 VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api.example.com` 与 `CLOUDFLARE_TUNNEL_TOKEN`；Cloudflare Tunnel 的 Public Hostname 将 `api.example.com` 转发到 compose 内部 Gateway：`http://gateway:80`。
 
@@ -381,17 +387,18 @@ VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api
 > Cloudflare 官方 `Deploy to Cloudflare` 一键按钮目前面向 Workers 应用；本项目此形态使用 Pages 托管 Vue 前端，因此 README 按钮跳转到 Pages 创建入口。
 
 <a id="docs"></a>
+
 ## 相关文档
 
-| 文档 | 用途 |
-|------|------|
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | 架构、contract、本地开发与目录边界 |
-| [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) | Feature System Prompt 配置手册与推荐模板 |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Cloudflare + Docker Compose、传统 Linux 部署、升级与回滚 |
-| [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md) | Auth 运维边界与应急流程 |
-| [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 目录边界与命名约束 |
-| [docker/README.md](./docker/README.md) | Docker 本地依赖与生产 stack 说明 |
-| [CHANGELOG.md](./CHANGELOG.md) | 发布记录 |
+| 文档                                                                   | 用途                                                     |
+| ---------------------------------------------------------------------- | -------------------------------------------------------- |
+| [DEVELOPMENT.md](./DEVELOPMENT.md)                                     | 架构、contract、本地开发与目录边界                       |
+| [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)                                 | Feature System Prompt 配置手册与推荐模板                 |
+| [DEPLOYMENT.md](./DEPLOYMENT.md)                                       | Cloudflare + Docker Compose、传统 Linux 部署、升级与回滚 |
+| [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)     | Auth 运维边界与应急流程                                  |
+| [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 目录边界与命名约束                                       |
+| [docker/README.md](./docker/README.md)                                 | Docker 本地依赖与生产 stack 说明                         |
+| [CHANGELOG.md](./CHANGELOG.md)                                         | 发布记录                                                 |
 
 ## 验证建议
 

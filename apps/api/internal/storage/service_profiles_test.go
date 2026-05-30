@@ -38,7 +38,7 @@ func writeStorageProfilesConfig(t *testing.T, repo *settings.SystemConfigReposit
 	}
 }
 
-func TestListProfilesDoesNotCreateDefaultKodoProfile(t *testing.T) {
+func TestListProfilesStartsWithLocalProfile(t *testing.T) {
 	service, _ := newStorageServiceTest(t)
 
 	profiles, err := service.ListProfiles()
@@ -54,7 +54,7 @@ func TestListProfilesDoesNotCreateDefaultKodoProfile(t *testing.T) {
 	}
 }
 
-func TestListProfilesDropsBuiltinKodoProfile(t *testing.T) {
+func TestListProfilesDropsUnsupportedCurrentProvider(t *testing.T) {
 	service, repo := newStorageServiceTest(t)
 	writeStorageProfilesConfig(t, repo, []StorageProfile{
 		{
@@ -67,21 +67,13 @@ func TestListProfilesDropsBuiltinKodoProfile(t *testing.T) {
 			Config:    map[string]interface{}{},
 		},
 		{
-			ID:        builtinKodoProfileID(),
-			Name:      "Kodo 存储",
-			Provider:  StorageProviderKodo,
+			ID:        "removed-provider-current",
+			Name:      "Removed Provider",
+			Provider:  StorageProvider("removed-provider"),
 			Enabled:   true,
 			IsCurrent: true,
-			Builtin:   true,
-			Config: map[string]interface{}{
-				"access_key":     "",
-				"secret_key":     "",
-				"bucket_name":    "",
-				"upload_domain":  "",
-				"access_domain":  "",
-				"thumbnail_mode": false,
-				"direct_fetch":   false,
-			},
+			Builtin:   false,
+			Config:    map[string]interface{}{},
 		},
 	})
 
@@ -91,16 +83,16 @@ func TestListProfilesDropsBuiltinKodoProfile(t *testing.T) {
 	}
 
 	for _, profile := range profiles {
-		if profile.ID == builtinKodoProfileID() {
-			t.Fatalf("builtin Kodo profile should be dropped")
+		if profile.ID == "removed-provider-current" {
+			t.Fatalf("unsupported provider profile should be dropped")
 		}
 		if profile.ID == builtinLocalProfileID() && !profile.IsCurrent {
-			t.Fatalf("local profile should become current after builtin Kodo is removed")
+			t.Fatalf("local profile should become current after unsupported provider is removed")
 		}
 	}
 }
 
-func TestListProfilesDropsConfiguredBuiltinKodoProfile(t *testing.T) {
+func TestListProfilesDropsUnsupportedNonCurrentProvider(t *testing.T) {
 	service, repo := newStorageServiceTest(t)
 	writeStorageProfilesConfig(t, repo, []StorageProfile{
 		{
@@ -113,20 +105,12 @@ func TestListProfilesDropsConfiguredBuiltinKodoProfile(t *testing.T) {
 			Config:    map[string]interface{}{},
 		},
 		{
-			ID:       builtinKodoProfileID(),
-			Name:     "Kodo 存储",
-			Provider: StorageProviderKodo,
+			ID:       "removed-provider-draft",
+			Name:     "Removed Provider Draft",
+			Provider: StorageProvider("removed-provider"),
 			Enabled:  false,
-			Builtin:  true,
-			Config: map[string]interface{}{
-				"access_key":     "ak",
-				"secret_key":     "sk",
-				"bucket_name":    "bucket",
-				"upload_domain":  "",
-				"access_domain":  "https://cdn.example.com",
-				"thumbnail_mode": false,
-				"direct_fetch":   false,
-			},
+			Builtin:  false,
+			Config:   map[string]interface{}{},
 		},
 	})
 
@@ -136,8 +120,8 @@ func TestListProfilesDropsConfiguredBuiltinKodoProfile(t *testing.T) {
 	}
 
 	for _, profile := range profiles {
-		if profile.ID == builtinKodoProfileID() {
-			t.Fatalf("builtin Kodo profile should be dropped")
+		if profile.ID == "removed-provider-draft" {
+			t.Fatalf("unsupported provider profile should be dropped")
 		}
 	}
 }

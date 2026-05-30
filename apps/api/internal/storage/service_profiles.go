@@ -227,6 +227,10 @@ func (s *StorageService) ensureBuiltinProfiles(profiles []StorageProfile) ([]Sto
 			profiles[i].Config = migratedConfig
 			changed = true
 		}
+		if _, ok := s.providerMeta[profiles[i].Provider]; !ok {
+			changed = true
+			continue
+		}
 		switch profiles[i].ID {
 		case builtinLocalProfileID():
 			if !profiles[i].Builtin {
@@ -246,9 +250,6 @@ func (s *StorageService) ensureBuiltinProfiles(profiles []StorageProfile) ([]Sto
 				changed = true
 			}
 			seenLocal = true
-		case builtinKodoProfileID():
-			changed = true
-			continue
 		}
 		if profiles[i].IsCurrent {
 			currentID = profiles[i].ID
@@ -300,8 +301,6 @@ func (s *StorageService) normalizeProfile(existing StorageProfile, incoming Stor
 		switch next.Provider {
 		case StorageProviderLocal:
 			next.Name = "本地存储"
-		case StorageProviderKodo:
-			next.Name = "Kodo 存储"
 		case StorageProviderS3Compatible:
 			next.Name = "S3 兼容存储"
 		default:
@@ -325,24 +324,6 @@ func (s *StorageService) normalizeProfile(existing StorageProfile, incoming Stor
 	switch next.Provider {
 	case StorageProviderLocal:
 		next.Config = map[string]interface{}{}
-	case StorageProviderKodo:
-		secret := strings.TrimSpace(configString(incoming.Config, "secret_key"))
-		if secret == "" || strings.Contains(secret, "*") {
-			if oldSecret := configString(existing.Config, "secret_key"); oldSecret != "" {
-				cfg["secret_key"] = oldSecret
-			} else {
-				cfg["secret_key"] = ""
-			}
-		} else {
-			cfg["secret_key"] = secret
-		}
-		cfg["access_key"] = strings.TrimSpace(configString(cfg, "access_key"))
-		cfg["bucket_name"] = strings.TrimSpace(configString(cfg, "bucket_name"))
-		cfg["upload_domain"] = strings.TrimSpace(configString(cfg, "upload_domain"))
-		cfg["access_domain"] = strings.TrimSpace(configString(cfg, "access_domain"))
-		cfg["thumbnail_mode"] = configBool(cfg, "thumbnail_mode")
-		cfg["direct_fetch"] = configBool(cfg, "direct_fetch")
-		next.Config = cfg
 	case StorageProviderS3Compatible:
 		secret := strings.TrimSpace(configString(incoming.Config, "secret_access_key"))
 		if secret == "" || strings.Contains(secret, "*") {
@@ -408,12 +389,6 @@ func (s *StorageService) maskProfile(profile StorageProfile) StorageProfile {
 	masked := profile
 	masked.Config = cloneConfig(profile.Config)
 	switch masked.Provider {
-	case StorageProviderKodo:
-		secret := configString(masked.Config, "secret_key")
-		masked.SecretConfigured = secret != ""
-		if secret != "" {
-			masked.Config["secret_key"] = maskSecret(secret)
-		}
 	case StorageProviderS3Compatible:
 		secret := configString(masked.Config, "secret_access_key")
 		masked.SecretConfigured = secret != ""

@@ -44,7 +44,7 @@ type VendorSelectOption = {
 }
 
 function vendorAccessLabel(vendor: VendorPresetOption) {
-  return vendor.provider === 'kodo' ? '原生接入' : 'S3-compatible'
+  return vendor.provider === 'local' ? '本地目录' : 'S3-compatible'
 }
 
 export function useStorageManager() {
@@ -83,7 +83,7 @@ export function useStorageManager() {
   const editorOpen = ref(false)
   const editorMode = ref<'create' | 'edit'>('create')
   const editingId = ref<string | null>(null)
-  const selectedVendorKey = ref('kodo')
+  const selectedVendorKey = ref('aliyun-oss')
 
   const providers = computed<StorageProviderMeta[]>(
     () => providersQuery.data.value?.data?.providers ?? [],
@@ -99,7 +99,7 @@ export function useStorageManager() {
   const storages = computed<StorageCard[]>(() =>
     (profilesQuery.data.value?.data?.profiles ?? []).map(normalizeProfile),
   )
-  const form = ref<StorageCard>(createEmptyStorageProfile('kodo', providerMap.value))
+  const form = ref<StorageCard>(createEmptyStorageProfile('s3-compatible', providerMap.value))
   const selectedProviderMeta = computed(() => providerMap.value[form.value.provider])
   const textFields = computed(() =>
     (selectedProviderMeta.value?.fields || []).filter((field) => field.type !== 'switch'),
@@ -287,7 +287,7 @@ export function useStorageManager() {
     editorMode.value = 'edit'
     editingId.value = id
     bucketDomains.value = []
-    selectedVendorKey.value = target.provider === 'kodo' ? 'kodo' : 'aws-s3'
+    selectedVendorKey.value = 'aws-s3'
     form.value = {
       ...target,
       config: { ...target.config },

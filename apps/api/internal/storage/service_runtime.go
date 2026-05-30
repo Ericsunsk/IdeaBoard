@@ -222,15 +222,6 @@ func (s *StorageService) ensureProfileReadyForRuntime(profile StorageProfile) er
 	switch profile.Provider {
 	case StorageProviderLocal:
 		return nil
-	case StorageProviderKodo:
-		cfg := s.kodoConfigFromProfile(&profile)
-		if !s.kodoService.IsConfigEnabled(cfg) {
-			return fmt.Errorf("请先完整填写并启用 Kodo 存储")
-		}
-		if strings.TrimSpace(cfg.AccessDomain) == "" {
-			return fmt.Errorf("请先配置访问域名")
-		}
-		return nil
 	case StorageProviderS3Compatible:
 		cfg := s.s3CompatibleConfigFromProfile(&profile)
 		if !s.s3CompatibleService.IsConfigEnabled(cfg) {
@@ -410,9 +401,6 @@ func (s *StorageService) extractObjectKeyFromUserUploadURL(profile StorageProfil
 	switch canonicalizeStorageProvider(profile.Provider) {
 	case StorageProviderLocal:
 		return normalizeUploadObjectKey(strings.TrimPrefix(parsed.Path, "/"))
-	case StorageProviderKodo:
-		cfg := s.kodoConfigFromProfile(&profile)
-		return extractObjectKeyFromAccessDomainURL(cfg.AccessDomain, parsed, "", false)
 	case StorageProviderS3Compatible:
 		cfg := s.s3CompatibleConfigFromProfile(&profile)
 		return extractObjectKeyFromAccessDomainURL(cfg.AccessDomain, parsed, strings.TrimSpace(cfg.BucketName), cfg.ForcePathStyle)

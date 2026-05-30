@@ -9,7 +9,6 @@ require (
 	github.com/hibiken/asynq v0.25.1
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.100
-	github.com/qiniu/go-sdk/v7 v7.26.9
 	github.com/redis/go-redis/v9 v9.18.0
 	golang.org/x/image v0.40.0
 	gorm.io/driver/mysql v1.5.7

@@ -9,22 +9,6 @@ const (
 	StorageProfilesConfigKey = "storage_profiles_v1"
 )
 
-func (s *StorageService) kodoConfigFromProfile(profile *StorageProfile) *KodoConfig {
-	if profile == nil {
-		return &KodoConfig{}
-	}
-	return &KodoConfig{
-		Enabled:       profile.Enabled,
-		AccessKey:     strings.TrimSpace(configString(profile.Config, "access_key")),
-		SecretKey:     configString(profile.Config, "secret_key"),
-		BucketName:    strings.TrimSpace(configString(profile.Config, "bucket_name")),
-		UploadDomain:  strings.TrimSpace(configString(profile.Config, "upload_domain")),
-		AccessDomain:  strings.TrimSpace(configString(profile.Config, "access_domain")),
-		ThumbnailMode: configBool(profile.Config, "thumbnail_mode"),
-		DirectFetch:   configBool(profile.Config, "direct_fetch"),
-	}
-}
-
 func (s *StorageService) s3CompatibleConfigFromProfile(profile *StorageProfile) *S3CompatibleConfig {
 	if profile == nil {
 		return &S3CompatibleConfig{}
@@ -43,10 +27,6 @@ func (s *StorageService) s3CompatibleConfigFromProfile(profile *StorageProfile) 
 
 func builtinLocalProfileID() string {
 	return "builtin-local"
-}
-
-func builtinKodoProfileID() string {
-	return "builtin-kodo"
 }
 
 func canonicalizeStorageProvider(provider StorageProvider) StorageProvider {

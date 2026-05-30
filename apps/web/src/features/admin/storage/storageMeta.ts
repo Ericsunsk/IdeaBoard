@@ -3,7 +3,6 @@ import logoAlibabaCloud from '../../../shared/assets/storage-vendors/alibabaclou
 import logoAmazonS3 from '../../../shared/assets/storage-vendors/amazons3.svg'
 import logoCloudflare from '../../../shared/assets/storage-vendors/cloudflare.svg'
 import logoMinio from '../../../shared/assets/storage-vendors/minio.svg'
-import logoQiniu from '../../../shared/assets/storage-vendors/qiniu.png'
 import logoTencentCloud from '../../../shared/assets/storage-vendors/tencentcloud.ico'
 
 export interface VendorPreset {
@@ -23,7 +22,6 @@ export interface VendorPresetOption extends VendorPreset {
 type ProviderMetaMap = Partial<Record<StorageProvider, StorageProviderMeta>>
 
 export const vendorLogoMap: Partial<Record<StorageProvider, string>> = {
-  kodo: logoQiniu,
   's3-compatible': logoAmazonS3,
   'tencent-cos': logoTencentCloud,
   'aws-s3': logoAmazonS3,
@@ -32,14 +30,6 @@ export const vendorLogoMap: Partial<Record<StorageProvider, string>> = {
 }
 
 export const vendorPresetCatalog: VendorPreset[] = [
-  {
-    key: 'kodo',
-    provider: 'kodo',
-    label: 'Kodo',
-    logoSrc: vendorLogoMap.kodo as string,
-    description: '七牛云对象存储，适合当前已接入的上传链路。',
-    defaultName: 'Kodo 存储',
-  },
   {
     key: 'aliyun-oss',
     provider: 's3-compatible',

@@ -181,11 +181,7 @@ export function storageMetaItems(storage: StorageCard) {
     ]
   }
 
-  return [
-    { label: '访问域名', value: configText(storage, 'access_domain') || '未设置' },
-    { label: '上传域名', value: configText(storage, 'upload_domain') || '自动检测' },
-    { label: '密钥', value: storage.secretConfigured ? '已配置' : '未配置' },
-  ]
+  return [{ label: '类型', value: storage.provider }]
 }
 
 export function storageFeatureChips(storage: StorageCard) {
@@ -202,11 +198,7 @@ export function storageFeatureChips(storage: StorageCard) {
     ]
   }
 
-  return [
-    `状态 ${storage.enabled ? '开启' : '关闭'}`,
-    `直传 ${configBool(storage, 'direct_fetch') ? '开启' : '关闭'}`,
-    `缩略图 ${configBool(storage, 'thumbnail_mode') ? '开启' : '关闭'}`,
-  ]
+  return [`状态 ${storage.enabled ? '开启' : '关闭'}`]
 }
 
 export function buildPayload(
