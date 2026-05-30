@@ -159,7 +159,7 @@ func TestCreatedStorageProfileCanBecomeRuntimeActiveProfile(t *testing.T) {
 	if active.ID != saved.ID {
 		t.Fatalf("active profile id = %q, want %q", active.ID, saved.ID)
 	}
-	if !service.UsesObjectStorage() {
+	if !service.UsesObjectStorage(context.Background()) {
 		t.Fatalf("active object storage profile should affect runtime storage selection")
 	}
 }

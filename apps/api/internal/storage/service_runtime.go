@@ -39,7 +39,7 @@ func (s *StorageService) TestProfile(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	return adapter.TestProfile(profile)
+	return adapter.TestProfile(ctx, profile)
 }
 
 func (s *StorageService) GetBucketInfo(ctx context.Context, id string) (map[string]interface{}, error) {
@@ -57,7 +57,7 @@ func (s *StorageService) GetBucketInfo(ctx context.Context, id string) (map[stri
 	if err != nil {
 		return nil, fmt.Errorf("当前存储类型不支持读取 Bucket 信息")
 	}
-	return adapter.GetBucketInfo(profile)
+	return adapter.GetBucketInfo(ctx, profile)
 }
 
 func (s *StorageService) Upload(ctx context.Context, file *multipart.FileHeader) (string, error) {
@@ -69,7 +69,7 @@ func (s *StorageService) UploadWithOptions(ctx context.Context, file *multipart.
 	if err != nil {
 		return "", err
 	}
-	return s.uploadWithProfile(*profile, file, opts)
+	return s.uploadWithProfile(ctx, *profile, file, opts)
 }
 
 func (s *StorageService) StoreRemote(ctx context.Context, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -89,7 +89,7 @@ func (s *StorageService) StoreBytes(ctx context.Context, filename string, data [
 	if err != nil {
 		return "", err
 	}
-	return adapter.StoreBytes(profile, filename, data, opts)
+	return adapter.StoreBytes(ctx, profile, filename, data, opts)
 }
 
 func (s *StorageService) DeleteWorkspaceUploadByURL(ctx context.Context, storageUID string, boardID string, rawURL string) error {
@@ -118,7 +118,7 @@ func (s *StorageService) DeleteWorkspaceUploadByURL(ctx context.Context, storage
 	if err != nil {
 		return err
 	}
-	return adapter.Delete(profile, key)
+	return adapter.Delete(ctx, profile, key)
 }
 
 func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
@@ -147,7 +147,7 @@ func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUI
 	if err != nil {
 		return err
 	}
-	return adapter.Delete(profile, key)
+	return adapter.Delete(ctx, profile, key)
 }
 
 func (s *StorageService) DeleteWorkspaceByStorageUID(ctx context.Context, storageUID string) error {
@@ -168,7 +168,7 @@ func (s *StorageService) DeleteWorkspaceByStorageUID(ctx context.Context, storag
 	if err != nil {
 		return err
 	}
-	return adapter.DeleteByPrefix(profile, normalizedPrefix)
+	return adapter.DeleteByPrefix(ctx, profile, normalizedPrefix)
 }
 
 func (s *StorageService) DeleteWorkspaceBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {
@@ -191,11 +191,11 @@ func (s *StorageService) DeleteWorkspaceBoardByStorageUID(ctx context.Context, s
 	if err != nil {
 		return err
 	}
-	return adapter.DeleteByPrefix(profile, normalizedPrefix)
+	return adapter.DeleteByPrefix(ctx, profile, normalizedPrefix)
 }
 
-func (s *StorageService) UsesObjectStorage() bool {
-	profile, err := s.resolveActiveProfile(context.Background())
+func (s *StorageService) UsesObjectStorage(ctx context.Context) bool {
+	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil || profile == nil {
 		return false
 	}
@@ -252,12 +252,12 @@ func (s *StorageService) isProfileReady(profile StorageProfile) bool {
 	return adapter.IsProfileReady(profile)
 }
 
-func (s *StorageService) uploadWithProfile(profile StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
+func (s *StorageService) uploadWithProfile(ctx context.Context, profile StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
 	adapter, err := s.adapterRegistry.get(profile.Provider)
 	if err != nil {
 		return "", err
 	}
-	return adapter.Upload(&profile, file, opts)
+	return adapter.Upload(ctx, &profile, file, opts)
 }
 
 func (s *StorageService) storeRemoteWithProfile(ctx context.Context, profile StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -270,7 +270,7 @@ func (s *StorageService) storeRemoteWithProfile(ctx context.Context, profile Sto
 			return "", err
 		}
 		fileHeader := createMemoryFileHeader(filename, data)
-		return s.uploadWithProfile(profile, fileHeader, opts)
+		return s.uploadWithProfile(ctx, profile, fileHeader, opts)
 	}
 
 	adapter, err := s.adapterRegistry.get(profile.Provider)

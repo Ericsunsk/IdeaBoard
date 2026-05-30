@@ -183,7 +183,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		return imageURLs, nil
 	}
 
-	usesObjectStorage := c.storageService.UsesObjectStorage()
+	usesObjectStorage := c.storageService.UsesObjectStorage(ctx)
 	log.Printf("[Worker] 存储检查: service=true, objectStorage=%v, imageCount=%d", usesObjectStorage, len(imageURLs))
 
 	next := append([]string(nil), imageURLs...)

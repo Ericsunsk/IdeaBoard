@@ -7,11 +7,13 @@ import (
 )
 
 type stubS3BucketExistenceChecker struct {
-	exists bool
-	err    error
+	exists  bool
+	err     error
+	seenCtx context.Context
 }
 
-func (s stubS3BucketExistenceChecker) BucketExists(_ context.Context, _ string) (bool, error) {
+func (s *stubS3BucketExistenceChecker) BucketExists(ctx context.Context, _ string) (bool, error) {
+	s.seenCtx = ctx
 	return s.exists, s.err
 }
 
@@ -99,22 +101,34 @@ func TestS3CompatiblePublicObjectURL(t *testing.T) {
 
 func TestEnsureS3BucketAccessible(t *testing.T) {
 	t.Run("returns error when bucket check fails", func(t *testing.T) {
-		err := ensureS3BucketAccessible(stubS3BucketExistenceChecker{err: errors.New("access denied")}, "feng-assets")
+		err := ensureS3BucketAccessible(context.Background(), &stubS3BucketExistenceChecker{err: errors.New("access denied")}, "feng-assets")
 		if err == nil || err.Error() != "验证 Bucket 失败: access denied" {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
 	t.Run("returns error when bucket does not exist", func(t *testing.T) {
-		err := ensureS3BucketAccessible(stubS3BucketExistenceChecker{exists: false}, "feng-assets")
+		err := ensureS3BucketAccessible(context.Background(), &stubS3BucketExistenceChecker{exists: false}, "feng-assets")
 		if err == nil || err.Error() != "Bucket 不存在或当前凭证无权访问" {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
 	t.Run("returns nil when bucket exists", func(t *testing.T) {
-		if err := ensureS3BucketAccessible(stubS3BucketExistenceChecker{exists: true}, "feng-assets"); err != nil {
+		if err := ensureS3BucketAccessible(context.Background(), &stubS3BucketExistenceChecker{exists: true}, "feng-assets"); err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("passes caller context to bucket check", func(t *testing.T) {
+		type ctxKey struct{}
+		ctx := context.WithValue(context.Background(), ctxKey{}, "trace-id")
+		checker := &stubS3BucketExistenceChecker{exists: true}
+		if err := ensureS3BucketAccessible(ctx, checker, "feng-assets"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if checker.seenCtx != ctx {
+			t.Fatalf("BucketExists ctx was not caller ctx")
 		}
 	})
 }

@@ -10,12 +10,12 @@ type storageProviderAdapter interface {
 	Provider() StorageProvider
 	UsesObjectStorage() bool
 	IsProfileReady(profile StorageProfile) bool
-	TestProfile(profile *StorageProfile) error
-	GetBucketInfo(profile *StorageProfile) (map[string]interface{}, error)
-	Upload(profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error)
-	Delete(profile *StorageProfile, objectKey string) error
-	DeleteByPrefix(profile *StorageProfile, objectKeyPrefix string) error
-	StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error)
+	TestProfile(ctx context.Context, profile *StorageProfile) error
+	GetBucketInfo(ctx context.Context, profile *StorageProfile) (map[string]interface{}, error)
+	Upload(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error)
+	Delete(ctx context.Context, profile *StorageProfile, objectKey string) error
+	DeleteByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) error
+	StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error)
 	StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error)
 }
 

@@ -37,7 +37,10 @@ func (s *S3CompatibleService) IsConfigEnabled(cfg *S3CompatibleConfig) bool {
 		strings.TrimSpace(cfg.AccessDomain) != ""
 }
 
-func (s *S3CompatibleService) TestConnectionWithConfig(cfg *S3CompatibleConfig) error {
+func (s *S3CompatibleService) TestConnectionWithConfig(ctx context.Context, cfg *S3CompatibleConfig) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := s.validateBaseConfig(cfg); err != nil {
 		return err
 	}
@@ -45,13 +48,16 @@ func (s *S3CompatibleService) TestConnectionWithConfig(cfg *S3CompatibleConfig) 
 	if err != nil {
 		return err
 	}
-	if err := ensureS3BucketAccessible(client, strings.TrimSpace(cfg.BucketName)); err != nil {
+	if err := ensureS3BucketAccessible(ctx, client, strings.TrimSpace(cfg.BucketName)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *S3CompatibleService) GetBucketInfoWithConfig(cfg *S3CompatibleConfig) (map[string]interface{}, error) {
+func (s *S3CompatibleService) GetBucketInfoWithConfig(ctx context.Context, cfg *S3CompatibleConfig) (map[string]interface{}, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if err := s.validateBaseConfig(cfg); err != nil {
 		return nil, err
 	}
@@ -59,7 +65,7 @@ func (s *S3CompatibleService) GetBucketInfoWithConfig(cfg *S3CompatibleConfig) (
 	if err != nil {
 		return nil, err
 	}
-	if err := ensureS3BucketAccessible(client, strings.TrimSpace(cfg.BucketName)); err != nil {
+	if err := ensureS3BucketAccessible(ctx, client, strings.TrimSpace(cfg.BucketName)); err != nil {
 		return nil, err
 	}
 
@@ -82,8 +88,8 @@ func (s *S3CompatibleService) GetBucketInfoWithConfig(cfg *S3CompatibleConfig) (
 	}, nil
 }
 
-func ensureS3BucketAccessible(client s3BucketExistenceChecker, bucketName string) error {
-	exists, err := client.BucketExists(context.Background(), bucketName)
+func ensureS3BucketAccessible(ctx context.Context, client s3BucketExistenceChecker, bucketName string) error {
+	exists, err := client.BucketExists(ctx, bucketName)
 	if err != nil {
 		return fmt.Errorf("验证 Bucket 失败: %v", err)
 	}
@@ -93,7 +99,10 @@ func ensureS3BucketAccessible(client s3BucketExistenceChecker, bucketName string
 	return nil
 }
 
-func (s *S3CompatibleService) UploadWithConfig(file *multipart.FileHeader, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
+func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multipart.FileHeader, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if !s.IsConfigEnabled(cfg) {
 		return "", fmt.Errorf("S3 兼容存储配置未启用或不完整")
 	}
@@ -113,6 +122,9 @@ func (s *S3CompatibleService) UploadWithConfig(file *multipart.FileHeader, cfg *
 	if err != nil {
 		return "", fmt.Errorf("读取文件失败: %v", err)
 	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 
 	key := buildObjectKey(opts.DirPrefix, filepathExt(file.Filename))
 	contentType := file.Header.Get("Content-Type")
@@ -121,7 +133,7 @@ func (s *S3CompatibleService) UploadWithConfig(file *multipart.FileHeader, cfg *
 	}
 
 	_, err = client.PutObject(
-		context.Background(),
+		ctx,
 		strings.TrimSpace(cfg.BucketName),
 		key,
 		bytes.NewReader(data),
@@ -135,7 +147,10 @@ func (s *S3CompatibleService) UploadWithConfig(file *multipart.FileHeader, cfg *
 	return s.publicObjectURL(cfg, key)
 }
 
-func (s *S3CompatibleService) DeleteWithConfig(objectKey string, cfg *S3CompatibleConfig) error {
+func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey string, cfg *S3CompatibleConfig) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !s.IsConfigEnabled(cfg) {
 		return fmt.Errorf("S3 兼容存储配置未启用或不完整")
 	}
@@ -147,13 +162,16 @@ func (s *S3CompatibleService) DeleteWithConfig(objectKey string, cfg *S3Compatib
 	if err != nil {
 		return err
 	}
-	if err := client.RemoveObject(context.Background(), strings.TrimSpace(cfg.BucketName), key, minio.RemoveObjectOptions{}); err != nil {
+	if err := client.RemoveObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.RemoveObjectOptions{}); err != nil {
 		return fmt.Errorf("删除失败: %v", err)
 	}
 	return nil
 }
 
-func (s *S3CompatibleService) DeletePrefixWithConfig(objectKeyPrefix string, cfg *S3CompatibleConfig) error {
+func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, objectKeyPrefix string, cfg *S3CompatibleConfig) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !s.IsConfigEnabled(cfg) {
 		return fmt.Errorf("S3 兼容存储配置未启用或不完整")
 	}
@@ -168,15 +186,18 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(objectKeyPrefix string, cfg
 	}
 
 	bucketName := strings.TrimSpace(cfg.BucketName)
-	objectCh := client.ListObjects(context.Background(), bucketName, minio.ListObjectsOptions{
+	objectCh := client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{
 		Prefix:    prefix,
 		Recursive: true,
 	})
 	for object := range objectCh {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if object.Err != nil {
 			return fmt.Errorf("列举前缀对象失败: %v", object.Err)
 		}
-		if err := client.RemoveObject(context.Background(), bucketName, object.Key, minio.RemoveObjectOptions{}); err != nil {
+		if err := client.RemoveObject(ctx, bucketName, object.Key, minio.RemoveObjectOptions{}); err != nil {
 			return fmt.Errorf("删除对象失败: %v", err)
 		}
 	}

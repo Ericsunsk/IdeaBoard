@@ -107,8 +107,10 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 		req.ColorCount = 0
 	}
 
-	// 下载图片
-	imgResp, err := safehttp.Get(context.Background(), req.ImageURL, 20*time.Second)
+	// 下载图片：继承请求上下文，避免请求取消后继续外部 I/O
+	downloadCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	imgResp, err := safehttp.Get(downloadCtx, req.ImageURL, 20*time.Second)
 	if err != nil {
 		log.Printf("[Vectorize] download failed: err=%v", err)
 		response.Error(c, 400, "下载图片失败")

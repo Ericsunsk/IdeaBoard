@@ -25,28 +25,28 @@ func (a *s3CompatibleStorageAdapter) IsProfileReady(profile StorageProfile) bool
 	return a.service.s3CompatibleService.IsConfigEnabled(a.service.s3CompatibleConfigFromProfile(&profile))
 }
 
-func (a *s3CompatibleStorageAdapter) TestProfile(profile *StorageProfile) error {
-	return a.service.s3CompatibleService.TestConnectionWithConfig(a.service.s3CompatibleConfigFromProfile(profile))
+func (a *s3CompatibleStorageAdapter) TestProfile(ctx context.Context, profile *StorageProfile) error {
+	return a.service.s3CompatibleService.TestConnectionWithConfig(ctx, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
-func (a *s3CompatibleStorageAdapter) GetBucketInfo(profile *StorageProfile) (map[string]interface{}, error) {
-	return a.service.s3CompatibleService.GetBucketInfoWithConfig(a.service.s3CompatibleConfigFromProfile(profile))
+func (a *s3CompatibleStorageAdapter) GetBucketInfo(ctx context.Context, profile *StorageProfile) (map[string]interface{}, error) {
+	return a.service.s3CompatibleService.GetBucketInfoWithConfig(ctx, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
-func (a *s3CompatibleStorageAdapter) Upload(profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
-	return a.service.s3CompatibleService.UploadWithConfig(file, a.service.s3CompatibleConfigFromProfile(profile), opts)
+func (a *s3CompatibleStorageAdapter) Upload(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
+	return a.service.s3CompatibleService.UploadWithConfig(ctx, file, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
 
-func (a *s3CompatibleStorageAdapter) Delete(profile *StorageProfile, objectKey string) error {
-	return a.service.s3CompatibleService.DeleteWithConfig(objectKey, a.service.s3CompatibleConfigFromProfile(profile))
+func (a *s3CompatibleStorageAdapter) Delete(ctx context.Context, profile *StorageProfile, objectKey string) error {
+	return a.service.s3CompatibleService.DeleteWithConfig(ctx, objectKey, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
-func (a *s3CompatibleStorageAdapter) DeleteByPrefix(profile *StorageProfile, objectKeyPrefix string) error {
-	return a.service.s3CompatibleService.DeletePrefixWithConfig(objectKeyPrefix, a.service.s3CompatibleConfigFromProfile(profile))
+func (a *s3CompatibleStorageAdapter) DeleteByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) error {
+	return a.service.s3CompatibleService.DeletePrefixWithConfig(ctx, objectKeyPrefix, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
-func (a *s3CompatibleStorageAdapter) StoreBytes(profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	return a.service.s3CompatibleService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
+func (a *s3CompatibleStorageAdapter) StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
+	return a.service.s3CompatibleService.UploadWithConfig(ctx, createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
 
 func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -54,5 +54,5 @@ func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *S
 	if err != nil {
 		return "", err
 	}
-	return a.service.s3CompatibleService.UploadWithConfig(createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
+	return a.service.s3CompatibleService.UploadWithConfig(ctx, createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
