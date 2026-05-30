@@ -2,6 +2,7 @@ package safehttp
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -73,6 +74,51 @@ func TestGetRejectsLocalhostWithoutAllowHosts(t *testing.T) {
 
 	if _, err := Get(context.Background(), server.URL, time.Second); err == nil {
 		t.Fatal("expected localhost fetch without allow hosts to fail")
+	}
+}
+
+func TestGetWithAllowHostsUsesCallerContextForPolicyResolve(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	resp, err := GetWithAllowHosts(ctx, "http://example.com/image.png", time.Second)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+}
+
+func TestDoRequestWithAllowHostsUsesCallerContextForPolicyResolve(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "http://example.com/image.png", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	resp, err := DoRequestWithAllowHosts(ctx, req, time.Second)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+}
+
+func TestRedirectValidationRejectsPrivateRedirectTarget(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://10.0.0.8/private", http.StatusFound)
+	}))
+	defer server.Close()
+
+	resp, err := GetWithAllowHosts(context.Background(), server.URL, time.Second, server.URL)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+	if err == nil {
+		t.Fatal("expected private redirect target to be rejected")
 	}
 }
 

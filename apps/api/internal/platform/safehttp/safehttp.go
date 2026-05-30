@@ -24,7 +24,7 @@ func ValidateURL(rawURL string) (*url.URL, error) {
 }
 
 func ValidateURLWithAllowHosts(rawURL string, allowHosts ...string) (*url.URL, error) {
-	policy, err := resolvePolicyWithTimeout(rawURL, defaultTimeout, allowHosts...)
+	policy, err := resolvePolicyWithTimeout(context.Background(), rawURL, defaultTimeout, allowHosts...)
 	if err != nil {
 		return nil, err
 	}
@@ -32,18 +32,23 @@ func ValidateURLWithAllowHosts(rawURL string, allowHosts ...string) (*url.URL, e
 }
 
 func ValidateURLWithAllowHostsAndTimeout(rawURL string, timeout time.Duration, allowHosts ...string) (*url.URL, error) {
-	policy, err := resolvePolicyWithTimeout(rawURL, timeout, allowHosts...)
+	policy, err := resolvePolicyWithTimeout(context.Background(), rawURL, timeout, allowHosts...)
 	if err != nil {
 		return nil, err
 	}
 	return policy.parsed, nil
 }
 
-func resolvePolicy(rawURL string, allowHosts ...string) (*resolvedPolicy, error) {
-	return resolvePolicyWithTimeout(rawURL, defaultTimeout, allowHosts...)
+func resolvePolicy(ctx context.Context, rawURL string, allowHosts ...string) (*resolvedPolicy, error) {
+	return resolvePolicyWithTimeout(ctx, rawURL, defaultTimeout, allowHosts...)
 }
 
-func resolvePolicyWithTimeout(rawURL string, resolveTimeout time.Duration, allowHosts ...string) (*resolvedPolicy, error) {
+func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout time.Duration, allowHosts ...string) (*resolvedPolicy, error) {
+	ctx = nonNilContext(ctx)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("URL 格式错误")
@@ -61,7 +66,7 @@ func resolvePolicyWithTimeout(rawURL string, resolveTimeout time.Duration, allow
 	if resolveTimeout <= 0 {
 		resolveTimeout = defaultTimeout
 	}
-	resolveCtx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
+	resolveCtx, cancel := context.WithTimeout(ctx, resolveTimeout)
 	defer cancel()
 
 	normalizedAllowedHosts := normalizeAllowedHosts(allowHosts)
@@ -69,6 +74,9 @@ func resolvePolicyWithTimeout(rawURL string, resolveTimeout time.Duration, allow
 
 	addrs, err := net.DefaultResolver.LookupIPAddr(resolveCtx, host)
 	if err != nil {
+		if ctxErr := resolveCtx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, fmt.Errorf("解析主机失败")
 	}
 	if len(addrs) == 0 {
@@ -102,7 +110,8 @@ func DoWithAllowHosts(
 	timeout time.Duration,
 	allowHosts ...string,
 ) (*http.Response, error) {
-	policy, err := resolvePolicy(rawURL, allowHosts...)
+	ctx = nonNilContext(ctx)
+	policy, err := resolvePolicy(ctx, rawURL, allowHosts...)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +125,7 @@ func DoWithAllowHosts(
 			if len(via) >= 5 {
 				return fmt.Errorf("重定向次数过多")
 			}
-			_, err := ValidateURLWithAllowHosts(req.URL.String(), allowHosts...)
+			_, err := validateURLWithContext(req.Context(), req.URL.String(), effectiveTimeout(timeout), allowHosts...)
 			return err
 		},
 	}
@@ -143,12 +152,14 @@ func DoRequestWithAllowHosts(
 	if req == nil || req.URL == nil {
 		return nil, fmt.Errorf("请求参数错误")
 	}
-	policy, err := resolvePolicy(req.URL.String(), allowHosts...)
+	ctx = nonNilContext(ctx)
+	policy, err := resolvePolicy(ctx, req.URL.String(), allowHosts...)
 	if err != nil {
 		return nil, err
 	}
 	transport := cloneDefaultTransport()
-	allowRequestProxyDialTarget(req.Context(), transport, req, policy)
+	req = req.WithContext(ctx)
+	allowRequestProxyDialTarget(ctx, transport, req, policy)
 	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedIPs)
 	client := &http.Client{
 		Timeout:   effectiveTimeout(timeout),
@@ -157,11 +168,26 @@ func DoRequestWithAllowHosts(
 			if len(via) >= 5 {
 				return fmt.Errorf("重定向次数过多")
 			}
-			_, err := ValidateURLWithAllowHosts(next.URL.String(), allowHosts...)
+			_, err := validateURLWithContext(next.Context(), next.URL.String(), effectiveTimeout(timeout), allowHosts...)
 			return err
 		},
 	}
-	return client.Do(req.WithContext(ctx))
+	return client.Do(req)
+}
+
+func validateURLWithContext(ctx context.Context, rawURL string, timeout time.Duration, allowHosts ...string) (*url.URL, error) {
+	policy, err := resolvePolicyWithTimeout(ctx, rawURL, timeout, allowHosts...)
+	if err != nil {
+		return nil, err
+	}
+	return policy.parsed, nil
+}
+
+func nonNilContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }
 
 func allowRequestProxyDialTarget(ctx context.Context, transport *http.Transport, req *http.Request, policy *resolvedPolicy) {
