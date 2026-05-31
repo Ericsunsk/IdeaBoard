@@ -23,6 +23,7 @@ type asynqClient interface {
 }
 
 type asynqInspector interface {
+	Queues() ([]string, error)
 	GetQueueInfo(queue string) (*asynq.QueueInfo, error)
 	Close() error
 }
@@ -103,11 +104,8 @@ func (q *AsynqQueue) Enqueue(ctx context.Context, task *queuetypes.TaskPayload) 
 }
 
 func (q *AsynqQueue) QueueLengths(ctx context.Context) (int64, int64, error) {
-	info, err := q.inspector.GetQueueInfo(q.queueName)
+	info, err := q.queueInfoOrEmpty()
 	if err != nil {
-		if errors.Is(err, asynq.ErrQueueNotFound) {
-			return 0, 0, nil
-		}
 		return 0, 0, fmt.Errorf("asynq queue lengths: %w", err)
 	}
 	global := int64(info.Pending + info.Scheduled + info.Retry)
@@ -116,12 +114,9 @@ func (q *AsynqQueue) QueueLengths(ctx context.Context) (int64, int64, error) {
 }
 
 func (q *AsynqQueue) MonitorInfo(ctx context.Context, accountIDs []uint64) (*queuetypes.MonitorInfo, error) {
-	info, err := q.inspector.GetQueueInfo(q.queueName)
+	info, err := q.queueInfoOrEmpty()
 	if err != nil {
-		if !errors.Is(err, asynq.ErrQueueNotFound) {
-			return nil, fmt.Errorf("asynq monitor info: %w", err)
-		}
-		info = &asynq.QueueInfo{}
+		return nil, fmt.Errorf("asynq monitor info: %w", err)
 	}
 	loads := map[uint64]*queuetypes.AccountLoad{}
 	if q.redisMgr != nil {
@@ -136,6 +131,38 @@ func (q *AsynqQueue) MonitorInfo(ctx context.Context, accountIDs []uint64) (*que
 		RunningTasks:   int64(info.Active),
 		AccountLoads:   loads,
 	}, nil
+}
+
+func (q *AsynqQueue) queueInfoOrEmpty() (*asynq.QueueInfo, error) {
+	queues, err := q.inspector.Queues()
+	if err != nil {
+		return nil, err
+	}
+	if !hasQueue(queues, q.queueName) {
+		return &asynq.QueueInfo{Queue: q.queueName}, nil
+	}
+
+	info, err := q.inspector.GetQueueInfo(q.queueName)
+	if err == nil {
+		return info, nil
+	}
+	if errors.Is(err, asynq.ErrQueueNotFound) {
+		return &asynq.QueueInfo{Queue: q.queueName}, nil
+	}
+	queues, listErr := q.inspector.Queues()
+	if listErr == nil && !hasQueue(queues, q.queueName) {
+		return &asynq.QueueInfo{Queue: q.queueName}, nil
+	}
+	return nil, err
+}
+
+func hasQueue(queues []string, queueName string) bool {
+	for _, queue := range queues {
+		if queue == queueName {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *AsynqQueue) Close() error {

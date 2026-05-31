@@ -75,6 +75,19 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
   })
 
   const failedTasks = computed(() => tasks.value.filter((task) => task.status === 'failed'))
+  const activeTasks = computed<SlowTaskRow[]>(() =>
+    tasks.value
+      .map((task) => {
+        if (task.status !== 'running' && task.status !== 'pending') return null
+        if (!task.created_at) return null
+        const seconds = calcDurationSeconds(task.created_at, new Date())
+        if (seconds == null) return null
+        return { task, seconds }
+      })
+      .filter((row): row is SlowTaskRow => !!row)
+      .sort((a, b) => b.seconds - a.seconds)
+      .slice(0, 5),
+  )
   const slowTasks = computed<SlowTaskRow[]>(() =>
     tasks.value
       .map((task) => {
@@ -124,6 +137,7 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
     pageCount,
     pageStats,
     failedTasks,
+    activeTasks,
     slowTasks,
     filterStatus,
     searchKeyword,

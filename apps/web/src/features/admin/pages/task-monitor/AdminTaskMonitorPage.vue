@@ -1,39 +1,19 @@
 <template>
   <div class="admin-page task-monitor-page">
-    <div class="table-card admin-table-card tasks-audit-log">
-      <div class="monitor-summary-chart-panel">
-        <div class="monitor-summary-chart-head">
-          <div class="monitor-summary-chart-copy">
-            <span class="monitor-summary-chart-title">当前页状态构成</span>
-            <div class="monitor-summary-legend">
-              <span class="monitor-summary-legend-item">
-                <span class="monitor-summary-dot is-running"></span>执行中 {{ pageStats.running }}
-              </span>
-              <span class="monitor-summary-legend-item">
-                <span class="monitor-summary-dot is-pending"></span>排队中 {{ pageStats.pending }}
-              </span>
-              <span class="monitor-summary-legend-item">
-                <span class="monitor-summary-dot is-failed"></span>失败 {{ pageStats.failed }}
-              </span>
-              <span class="monitor-summary-legend-item">
-                <span class="monitor-summary-dot is-other"></span>其他 {{ summaryOtherCount }}
-              </span>
-            </div>
-          </div>
-          <div class="monitor-summary-total">
-            <span class="monitor-summary-total-label">查询结果总数</span>
-            <span class="monitor-summary-total-value">{{ total }}</span>
-          </div>
-        </div>
-        <div v-if="tasks.length" class="monitor-summary-chart-host">
-          <VChart class="echart-host" :option="summaryChartOption" autoresize />
-        </div>
-        <div v-else class="monitor-chart-empty">-</div>
-      </div>
+    <div class="summary-grid task-status-grid">
+      <AdminSummaryCard label="执行中" :value="pageStats.running" :foot="runningFoot" />
+      <AdminSummaryCard label="排队中" :value="pageStats.pending" :foot="pendingFoot" />
+      <AdminSummaryCard label="失败" :value="pageStats.failed" :foot="failedFoot" />
+      <AdminSummaryCard label="其他" :value="summaryOtherCount" :foot="otherFoot" />
+    </div>
 
-      <div class="monitor-inline-panels">
-        <div class="inline-panel slow-task-panel">
-          <div class="inline-panel-title">当前页慢任务 (≥60s)</div>
+    <div class="monitor-insight-grid">
+      <div class="table-card monitor-insight-card slow-task-panel">
+        <div class="inline-panel-head">
+          <div class="inline-panel-title">慢任务 Top</div>
+          <span class="inline-panel-stat">{{ slowTasks.length }} 条</span>
+        </div>
+        <div class="monitor-insight-body">
           <div v-if="slowTasks.length" class="slow-task-chart-host">
             <VChart
               class="echart-host"
@@ -42,22 +22,39 @@
               @click="handleSlowTaskChartClick"
             />
           </div>
-          <div v-if="slowTasks.length" class="slow-task-links">
-            <button
-              v-for="row in slowTasks"
-              :key="row.task.task_id"
-              type="button"
-              class="slow-task-link"
-              @click="showDetail(row.task)"
-            >
-              <span>{{ row.task.task_id }}</span>
-              <span>{{ row.seconds }}s</span>
-            </button>
-          </div>
           <div v-else class="inline-panel-empty slow-task-empty">-</div>
         </div>
-        <div class="inline-panel">
-          <div class="inline-panel-title">当前页失败任务</div>
+      </div>
+
+      <div class="table-card monitor-insight-card active-task-panel">
+        <div class="inline-panel-head">
+          <div class="inline-panel-title">活跃任务龄</div>
+          <span class="inline-panel-stat">{{ activeTasks.length }} 条</span>
+        </div>
+        <div class="monitor-insight-body">
+          <div v-if="activeTasks.length" class="inline-panel-list">
+            <button
+              v-for="row in activeTasks"
+              :key="row.task.task_id"
+              type="button"
+              class="inline-task-item"
+              @click="showDetail(row.task)"
+            >
+              <span class="task-id">{{ row.task.task_id }}</span>
+              <span class="task-meta">{{ getTaskStatusConfig(row.task.status).text }}</span>
+              <span class="task-age">{{ formatSeconds(row.seconds) }}</span>
+            </button>
+          </div>
+          <div v-else class="inline-panel-empty">-</div>
+        </div>
+      </div>
+
+      <div class="table-card monitor-insight-card failure-task-panel">
+        <div class="inline-panel-head">
+          <div class="inline-panel-title">失败样本</div>
+          <span class="inline-panel-stat">{{ failedTasks.length }} 条</span>
+        </div>
+        <div class="monitor-insight-body">
           <div v-if="failedTasks.length" class="inline-panel-list">
             <button
               v-for="task in failedTasks.slice(0, 5)"
@@ -73,18 +70,20 @@
           <div v-else class="inline-panel-empty">-</div>
         </div>
       </div>
+    </div>
 
+    <div class="table-card admin-table-card tasks-list-card">
       <div class="admin-card-header">
         <div class="admin-card-title-wrapper">
           <n-icon size="18" class="admin-card-title-icon"><List /></n-icon>
-          <h3 class="admin-card-title">任务监控</h3>
+          <h3 class="admin-card-title">任务列表</h3>
         </div>
         <div class="admin-card-actions">
           <n-input
             v-model:value="searchKeyword"
+            class="task-search-control"
             placeholder="搜索用户ID或提示词..."
             clearable
-            style="width: 240px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           >
@@ -94,12 +93,12 @@
           </n-input>
           <n-select
             v-model:value="filterStatus"
+            class="task-status-control"
             :options="taskStatusOptions"
             placeholder="所有状态"
             clearable
-            style="width: 140px"
           />
-          <n-button secondary class="admin-icon-btn" @click="loadTasks">
+          <n-button secondary class="admin-icon-btn" aria-label="刷新任务列表" @click="loadTasks">
             <template #icon>
               <n-icon><Refresh /></n-icon>
             </template>
@@ -325,6 +324,7 @@ import {
 } from '@iconoir/vue'
 import type { ECElementEvent } from 'echarts/core'
 import { taskStatusOptions, getTaskStatusConfig } from '../../shared/lib/monitorShared'
+import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import { VChart } from '../../shared/components/AdminEChart'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { useTaskMonitor } from './useTaskMonitor'
@@ -355,6 +355,7 @@ const {
   pageCount,
   pageStats,
   failedTasks,
+  activeTasks,
   slowTasks,
   filterStatus,
   searchKeyword,
@@ -370,96 +371,23 @@ const summaryOtherCount = computed(() =>
   ),
 )
 
-const summaryChartOption = computed(() => {
-  return {
-    animation: false,
-    tooltip: {
-      trigger: 'item',
-      formatter: '{a}<br/>{b}: {c}',
-    },
-    grid: {
-      top: 8,
-      left: 8,
-      right: 8,
-      bottom: 8,
-      containLabel: true,
-    },
-    xAxis: {
-      type: 'value',
-      show: false,
-      max: tasks.value.length || 1,
-    },
-    yAxis: {
-      type: 'category',
-      data: ['当前页任务'],
-      axisTick: { show: false },
-      axisLine: { show: false },
-      axisLabel: {
-        color: 'var(--admin-text-3)',
-        fontSize: 11,
-      },
-    },
-    series: [
-      {
-        name: '执行中',
-        type: 'bar',
-        stack: 'task-state',
-        barWidth: 16,
-        itemStyle: { color: '#f5b042', borderRadius: [6, 0, 0, 6] },
-        label: {
-          show: pageStats.value.running > 0,
-          position: 'inside',
-          formatter: String(pageStats.value.running),
-          color: '#2b2f36',
-          fontWeight: 600,
-        },
-        data: [pageStats.value.running],
-      },
-      {
-        name: '排队中',
-        type: 'bar',
-        stack: 'task-state',
-        itemStyle: { color: '#9aa7ba' },
-        label: {
-          show: pageStats.value.pending > 0,
-          position: 'inside',
-          formatter: String(pageStats.value.pending),
-          color: '#2b2f36',
-          fontWeight: 600,
-        },
-        data: [pageStats.value.pending],
-      },
-      {
-        name: '失败',
-        type: 'bar',
-        stack: 'task-state',
-        itemStyle: { color: '#e35d6a' },
-        label: {
-          show: pageStats.value.failed > 0,
-          position: 'inside',
-          formatter: String(pageStats.value.failed),
-          color: '#2b2f36',
-          fontWeight: 600,
-        },
-        data: [pageStats.value.failed],
-      },
-      {
-        name: '其他',
-        type: 'bar',
-        stack: 'task-state',
-        itemStyle: { color: '#dce3ee', borderRadius: [0, 6, 6, 0] },
-        label: {
-          show: summaryOtherCount.value > 0,
-          position: 'inside',
-          formatter: String(summaryOtherCount.value),
-          color: '#2b2f36',
-          fontWeight: 600,
-        },
-        data: [summaryOtherCount.value],
-      },
-    ],
-  }
-})
+const longestRunning = computed(() =>
+  activeTasks.value.find((row) => row.task.status === 'running'),
+)
+const longestPending = computed(() =>
+  activeTasks.value.find((row) => row.task.status === 'pending'),
+)
+const currentPageCount = computed(() => tasks.value.length)
+const runningFoot = computed(() =>
+  longestRunning.value ? `最长 ${formatSeconds(longestRunning.value.seconds)}` : '当前页无执行任务',
+)
+const pendingFoot = computed(() =>
+  longestPending.value ? `最长 ${formatSeconds(longestPending.value.seconds)}` : '当前页无排队任务',
+)
+const failedFoot = computed(
+  () => `当前页失败率 ${formatPercent(pageStats.value.failed, currentPageCount.value)}`,
+)
+const otherFoot = computed(() => `当前页 ${currentPageCount.value} / 查询 ${total.value}`)
 
 const slowTaskChartOption = computed(() => ({
   animation: false,
@@ -520,5 +448,20 @@ function handleSlowTaskChartClick(event: ECElementEvent) {
   const row = slowTasks.value[event.dataIndex]
   if (!row) return
   showDetail(row.task)
+}
+
+function formatSeconds(seconds: number) {
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+  if (minutes < 60) return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`
+  const hours = Math.floor(minutes / 60)
+  const minuteRest = minutes % 60
+  return minuteRest === 0 ? `${hours}h` : `${hours}h ${minuteRest}m`
+}
+
+function formatPercent(value: number, totalValue: number) {
+  if (totalValue <= 0) return '0.0%'
+  return `${((value / totalValue) * 100).toFixed(1)}%`
 }
 </script>

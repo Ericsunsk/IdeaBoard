@@ -3,7 +3,6 @@ package taskqueue
 import (
 	"api/internal/runtime/queuetypes"
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -23,7 +22,12 @@ func (f *fakeAsynqClient) Close() error { return nil }
 
 type fakeAsynqInspector struct {
 	queueInfo *asynq.QueueInfo
+	queues    []string
 	err       error
+}
+
+func (f *fakeAsynqInspector) Queues() ([]string, error) {
+	return f.queues, nil
 }
 
 func (f *fakeAsynqInspector) GetQueueInfo(_ string) (*asynq.QueueInfo, error) {
@@ -61,7 +65,10 @@ func TestAsynqQueueEnqueueUsesDrawingTaskType(t *testing.T) {
 
 func TestAsynqQueueQueueLengthsUsesInspector(t *testing.T) {
 	client := &fakeAsynqClient{}
-	inspector := &fakeAsynqInspector{queueInfo: &asynq.QueueInfo{Pending: 3, Scheduled: 2, Retry: 1, Active: 4}}
+	inspector := &fakeAsynqInspector{
+		queueInfo: &asynq.QueueInfo{Pending: 3, Scheduled: 2, Retry: 1, Active: 4},
+		queues:    []string{AsynqQueueDefault},
+	}
 	q := NewAsynqQueueWithClients(client, inspector, nil, AsynqQueueDefault, 5, 30*time.Second, time.Hour)
 
 	global, wait, err := q.QueueLengths(context.Background())
@@ -75,7 +82,7 @@ func TestAsynqQueueQueueLengthsUsesInspector(t *testing.T) {
 
 func TestAsynqQueueQueueLengthsTreatsMissingQueueAsEmpty(t *testing.T) {
 	client := &fakeAsynqClient{}
-	inspector := &fakeAsynqInspector{err: fmt.Errorf("asynq: %w", asynq.ErrQueueNotFound)}
+	inspector := &fakeAsynqInspector{}
 	q := NewAsynqQueueWithClients(client, inspector, nil, AsynqQueueDefault, 5, 30*time.Second, time.Hour)
 
 	global, wait, err := q.QueueLengths(context.Background())
@@ -89,7 +96,7 @@ func TestAsynqQueueQueueLengthsTreatsMissingQueueAsEmpty(t *testing.T) {
 
 func TestAsynqQueueMonitorInfoTreatsMissingQueueAsEmpty(t *testing.T) {
 	client := &fakeAsynqClient{}
-	inspector := &fakeAsynqInspector{err: fmt.Errorf("asynq: %w", asynq.ErrQueueNotFound)}
+	inspector := &fakeAsynqInspector{}
 	q := NewAsynqQueueWithClients(client, inspector, nil, AsynqQueueDefault, 5, 30*time.Second, time.Hour)
 
 	info, err := q.MonitorInfo(context.Background(), nil)
