@@ -6,7 +6,7 @@
           <div class="node-card-copy">
             <div class="node-title-row">
               <h2 class="node-card-title">{{ group.title }}</h2>
-              <span class="node-card-count">{{ group.items.length }} 项功能</span>
+              <span class="node-card-count">{{ group.items.length }} 项配置</span>
             </div>
           </div>
         </div>
@@ -39,12 +39,12 @@
     :show="Boolean(activeGroup)"
     :eyebrow="activeGroup?.title || ''"
     :title="activeGroup ? `编辑 ${activeGroup.title} 节点提示词` : ''"
-    :description="activeGroup?.desc || ''"
+    :description="activeGroupDescription"
     @close="closeEditor"
   >
     <template #header-aside>
       <div v-if="activeGroup" class="editor-meta">
-        <span class="meta-chip">{{ activeGroup.items.length }} 项功能</span>
+        <span class="meta-chip">{{ activeGroup.items.length }} 项配置</span>
         <span class="meta-chip">{{ getGroupVariableCount(activeGroup) }} 个变量</span>
       </div>
     </template>
@@ -133,6 +133,11 @@ const featureGroups = computed<FeatureGroup[]>(() =>
 )
 const activeGroup = computed<FeatureGroup | null>(() => {
   return featureGroups.value.find((group) => group.key === activeGroupKey.value) || null
+})
+const activeGroupDescription = computed(() => {
+  if (!activeGroup.value) return ''
+  const desc = activeGroup.value.desc?.trim()
+  return desc ? `编辑当前节点的提示词配置。${desc}` : '编辑当前节点的提示词配置。'
 })
 
 function openEditor(groupKey: string) {
@@ -282,8 +287,8 @@ async function savePrompt(slug: FeatureSlug) {
 }
 
 .node-card:hover {
-  border-color: #2e3034;
-  background: #141416;
+  border-color: var(--admin-border);
+  background: var(--admin-card);
 }
 
 .node-card-header {
@@ -312,19 +317,13 @@ async function savePrompt(slug: FeatureSlug) {
 }
 
 .node-card-count {
+  flex-shrink: 0;
   font-size: 11px;
   color: var(--admin-text-3);
-  background: #17181a;
+  background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   padding: 3px 8px;
   border-radius: 6px;
-}
-
-.node-card-desc {
-  margin: 6px 0 0;
-  color: var(--admin-text-2);
-  font-size: 12px;
-  line-height: 1.6;
 }
 
 .node-card-meta {
@@ -340,7 +339,7 @@ async function savePrompt(slug: FeatureSlug) {
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--admin-border);
-  background: #17181a;
+  background: var(--admin-surface-muted);
   color: var(--admin-text-2);
   font-size: 11px;
 }
@@ -358,7 +357,7 @@ async function savePrompt(slug: FeatureSlug) {
   min-height: 28px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #17181a;
+  background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   color: var(--admin-text-2);
   font-size: 11px;
@@ -410,9 +409,11 @@ async function savePrompt(slug: FeatureSlug) {
 }
 
 .feature-slug {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-size: 11px;
   color: var(--admin-text-3);
-  background: #17181a;
+  background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   padding: 2px 8px;
   border-radius: 6px;
@@ -423,6 +424,7 @@ async function savePrompt(slug: FeatureSlug) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
 }
 
 .feature-count {
@@ -435,6 +437,7 @@ async function savePrompt(slug: FeatureSlug) {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .var-buttons-label {
@@ -463,6 +466,7 @@ async function savePrompt(slug: FeatureSlug) {
   cursor: pointer;
   box-shadow: none;
   transition: background 0.15s ease;
+  max-width: 100%;
 }
 
 .var-btn.is-prompt {
@@ -498,6 +502,7 @@ async function savePrompt(slug: FeatureSlug) {
   font-size: 11px;
   font-weight: 600;
   font-family: monospace;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 720px) {

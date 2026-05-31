@@ -133,11 +133,7 @@
           <div v-else class="empty-accounts">点击上方按钮添加 APIKey</div>
         </div>
         <div class="channel-card-footer">
-          <n-button
-            size="small"
-            color="#ffffff"
-            text-color="#000000"
-            @click="openEditChannelModal(channel)"
+          <n-button size="small" secondary @click="openEditChannelModal(channel)"
             >配置详情</n-button
           >
           <n-button size="small" tertiary type="error" @click="handleDeleteChannel(channel)"
@@ -483,8 +479,8 @@ onMounted(() => {
 }
 
 .channel-card:hover {
-  border-color: #2e3034;
-  background: #141416;
+  border-color: var(--admin-border);
+  background: var(--admin-card);
 }
 
 /* Card header styles now handled by AdminCardHeader */
@@ -492,7 +488,7 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: #17181a;
+  background: var(--admin-surface-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -531,7 +527,7 @@ onMounted(() => {
 }
 
 .models-shelf {
-  background: #17181a;
+  background: var(--admin-surface-muted);
   border-radius: 12px;
   padding: 10px;
   border: 1px solid var(--admin-border);
@@ -556,7 +552,7 @@ onMounted(() => {
   height: 24px;
   padding: 0 10px;
   border-radius: 999px;
-  background: #1c1d20;
+  background: var(--admin-card);
   border: 1px solid var(--admin-border);
   color: var(--admin-text-2);
   font-size: 11px;
@@ -607,9 +603,9 @@ onMounted(() => {
 }
 
 .account-row {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--admin-surface-muted);
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--admin-border);
   padding: 8px 10px;
 }
 
@@ -685,8 +681,8 @@ onMounted(() => {
 .model-select-rounded :deep(.n-tag) {
   border-radius: 999px !important;
   padding: 0 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--admin-surface-muted);
+  border: 1px solid var(--admin-border);
 }
 
 .model-select-rounded :deep(.n-tag__close) {
@@ -700,14 +696,14 @@ onMounted(() => {
 }
 
 .accounts-scroller::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--admin-surface-muted);
   border-radius: 10px;
 }
 
 .channel-url-hint {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--admin-surface-muted);
   border-radius: 12px;
-  border: 1px solid #2b2c2f;
+  border: 1px solid var(--admin-border);
   padding: 8px 12px;
   margin-bottom: 16px;
   font-size: 12px;

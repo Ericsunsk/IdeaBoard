@@ -123,6 +123,7 @@ export async function submitPromptTextGenerationTask(
 ): Promise<string> {
   const request = buildExecutionTaskRequest({
     prompt,
+    feature: EXECUTION_DIRECT_ACTION_META.patternGen.feature,
     params: buildPromptAspectRatioTaskParams(aspectRatio),
   })
   const submitRes = await taskApi.submit(request)

@@ -44,6 +44,14 @@ export default defineConfig({
           if (id.includes('/node_modules/@vue-flow/core/')) {
             return 'vue-flow'
           }
+          if (
+            id.includes('/node_modules/echarts/') ||
+            id.includes('/node_modules/zrender/') ||
+            id.includes('/node_modules/vue-echarts/') ||
+            id.includes('/node_modules/vue-demi/')
+          ) {
+            return 'echarts'
+          }
           return undefined
         },
       },

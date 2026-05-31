@@ -91,7 +91,6 @@ const trimmedSubtitle = computed(() =>
   margin: 4px 0 0;
   color: var(--admin-text-2);
   font-size: 12px;
-  opacity: 0.8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

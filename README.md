@@ -196,18 +196,20 @@ flowchart TB
 
 ```bash
 cd docker
-docker compose up -d
+cp .env.example .env
+# 至少修改 MYSQL_ROOT_PASSWORD 和 MYSQL_PASSWORD
+docker compose -f compose.local.yml up -d
 ```
 
 <details>
-<summary>默认本地依赖配置</summary>
+<summary>本地依赖配置</summary>
 
 | 项目            | 默认值           |
 | --------------- | ---------------- |
-| MySQL Root 密码 | `root123`        |
-| 业务数据库      | `ideaboard`      |
-| 业务用户        | `ideaboard`      |
-| 业务密码        | `ideaboard123`   |
+| MySQL Root 密码 | `docker/.env` 中的 `MYSQL_ROOT_PASSWORD` |
+| 业务数据库      | `${MYSQL_DATABASE:-ideaboard}` |
+| 业务用户        | `${MYSQL_USER:-ideaboard}` |
+| 业务密码        | `docker/.env` 中的 `MYSQL_PASSWORD` |
 | Redis           | `127.0.0.1:6379` |
 
 </details>

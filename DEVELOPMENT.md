@@ -265,7 +265,9 @@ sequenceDiagram
 
 ```bash
 cd docker
-docker compose up -d
+cp .env.example .env
+# 至少修改 MYSQL_ROOT_PASSWORD 和 MYSQL_PASSWORD
+docker compose -f compose.local.yml up -d
 ```
 
 2. 配置 auth 服务环境变量：

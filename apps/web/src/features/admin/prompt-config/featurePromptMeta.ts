@@ -1,9 +1,5 @@
 import { IMAGE_NODE_ACTION } from '../../../shared/domain/imageActions'
-import { WORKFLOW_FEATURE } from '../../../shared/domain/workflowFeatures'
-import {
-  WORKFLOW_FEATURE_GROUP_LIST,
-  WORKFLOW_FEATURE_REGISTRY,
-} from '../../../shared/domain/workflowFeatureRegistry'
+import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../shared/domain/workflowFeatures'
 
 export interface VarDef {
   key: string
@@ -15,14 +11,21 @@ const promptVars: VarDef[] = [{ key: '{{user_prompt}}', desc: '当前请求拼�
 const noVars: VarDef[] = []
 
 type RegistryFeatureItem = {
-  slug: (typeof WORKFLOW_FEATURE_REGISTRY)[number]['slug']
+  slug: WorkflowFeature
   title: string
 }
 
-export const featureList: readonly RegistryFeatureItem[] = WORKFLOW_FEATURE_REGISTRY.map((item) => ({
-  slug: item.slug,
-  title: item.adminTitle,
-}))
+export const featureList = [
+  { slug: IMAGE_NODE_ACTION.sketchToImage, title: 'Image · 草图成图' },
+  { slug: IMAGE_NODE_ACTION.styleVariation, title: 'Image · 风格延展' },
+  { slug: IMAGE_NODE_ACTION.removeBg, title: 'Image · 抠图' },
+  { slug: WORKFLOW_FEATURE.partialEdit, title: 'Image · 局部改款 / 局部重绘' },
+  { slug: IMAGE_NODE_ACTION.hdUpscale, title: 'Image · HD 放大' },
+  { slug: IMAGE_NODE_ACTION.imageExtend, title: 'Image · 图片延伸' },
+  { slug: WORKFLOW_FEATURE.patternGen, title: 'Prompt · 纯文本生成（pattern-gen）' },
+  { slug: WORKFLOW_FEATURE.styleFusion, title: 'Fusion · 图片融合' },
+  { slug: WORKFLOW_FEATURE.virtual3d, title: 'Display · 商品展示' },
+] as const satisfies readonly RegistryFeatureItem[]
 
 export type FeatureSlug = RegistryFeatureItem['slug']
 export type FeatureItem = RegistryFeatureItem
@@ -31,20 +34,55 @@ export const featureMap = Object.fromEntries(
   featureList.map((item) => [item.slug, item]),
 ) as Record<FeatureSlug, FeatureItem>
 
-const featureGroupDefs = WORKFLOW_FEATURE_GROUP_LIST
-  .map((group) => ({
-    key: group.key,
-    title: group.title,
-    desc: group.desc,
-    order: group.order,
-    slugs: WORKFLOW_FEATURE_REGISTRY.filter((item) => item.groupKey === group.key).map(
-      (item) => item.slug as FeatureSlug,
-    ),
-  }))
+const featureGroupDefs = [
+  {
+    key: 'image',
+    title: 'Image',
+    desc: 'Image 节点的右键快捷处理、局部重绘、图片延伸和 HD 放大配置。',
+    order: 10,
+    slugs: [
+      IMAGE_NODE_ACTION.sketchToImage,
+      IMAGE_NODE_ACTION.styleVariation,
+      IMAGE_NODE_ACTION.removeBg,
+      WORKFLOW_FEATURE.partialEdit,
+      IMAGE_NODE_ACTION.hdUpscale,
+      IMAGE_NODE_ACTION.imageExtend,
+    ],
+  },
+  {
+    key: 'prompt',
+    title: 'Prompt',
+    desc: 'Prompt 节点负责文本输入与纯文本生成配置。',
+    order: 20,
+    slugs: [WORKFLOW_FEATURE.patternGen],
+  },
+  {
+    key: 'fusion',
+    title: 'Fusion',
+    desc: 'Fusion 节点的多图融合提示词、主次比例和融合语义配置。',
+    order: 30,
+    slugs: [WORKFLOW_FEATURE.styleFusion],
+  },
+  {
+    key: 'display',
+    title: 'Display',
+    desc: 'Display 节点的商品展示视角、光影和陈列语义配置。',
+    order: 40,
+    slugs: [WORKFLOW_FEATURE.virtual3d],
+  },
+] as const satisfies readonly {
+  key: string
+  title: string
+  desc: string
+  order: number
+  slugs: readonly FeatureSlug[]
+}[]
+
+const sortedFeatureGroupDefs = featureGroupDefs
   .filter((group) => group.slugs.length > 0)
   .sort((a, b) => a.order - b.order)
 
-export const groupedFeatureGroups = featureGroupDefs.map((group) => ({
+export const groupedFeatureGroups = sortedFeatureGroupDefs.map((group) => ({
   key: group.key,
   title: group.title,
   desc: group.desc,
@@ -56,7 +94,9 @@ export type FeatureGroup = (typeof groupedFeatureGroups)[number]
 const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   [IMAGE_NODE_ACTION.sketchToImage]: noVars,
   [WORKFLOW_FEATURE.partialEdit]: promptVars,
-  [IMAGE_NODE_ACTION.styleVariation]: [{ key: '{{strength}}', desc: '风格延展强度百分比（0-100）' }],
+  [IMAGE_NODE_ACTION.styleVariation]: [
+    { key: '{{strength}}', desc: '风格延展强度百分比（0-100）' },
+  ],
   [WORKFLOW_FEATURE.virtual3d]: [
     {
       key: '{{viewpoint}}',
@@ -91,15 +131,22 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
 
 const featureNotes: Partial<Record<FeatureSlug, string>> = {
   [IMAGE_NODE_ACTION.sketchToImage]:
-    '画布右键「草图成图」仍需要配置固定 system prompt，只是不使用 {{user_prompt}} 模板变量。',
+    'Image 节点右键「草图成图」使用固定 system prompt，不使用 {{user_prompt}} 模板变量。',
   [IMAGE_NODE_ACTION.styleVariation]:
-    '画布右键「风格延展」仍需要配置固定 system prompt，只使用 {{strength}} 控制延展幅度百分比（0-100），不使用 {{user_prompt}} 模板变量。',
+    'Image 节点右键「风格延展」使用固定 system prompt，只使用 {{strength}} 控制延展幅度百分比（0-100）。',
   [IMAGE_NODE_ACTION.removeBg]:
-    '画布右键「抠图」是快捷工具，不接收用户输入；必须配置固定 system prompt，并且不要使用 {{user_prompt}} 模板变量。',
+    'Image 节点右键「抠图」是快捷工具，不接收用户输入；请配置固定 system prompt，不要使用 {{user_prompt}} 模板变量。',
+  [WORKFLOW_FEATURE.partialEdit]:
+    '归属 Image 节点：覆盖 Image 节点 Prompt 生成、局部重绘/局部改款等以原图为输入的 partial-edit 任务。',
   [WORKFLOW_FEATURE.patternGen]:
-    '底部输入栏「图案生成」建议保持后台 system prompt 为空，让用户输入自由发挥。',
-  [IMAGE_NODE_ACTION.hdUpscale]:
-    'Image Tools · HD 走 Image 右键工具链，使用这里的固定系统提示词与放大参数。',
+    'Prompt 节点纯文本生成会携带 pattern-gen feature slug，并读取这里的 system prompt。',
+  [WORKFLOW_FEATURE.styleFusion]:
+    'Fusion 节点生成时会携带 style-fusion feature slug，可用变量描述辅助修饰、融合比例和主次权重。',
+  [WORKFLOW_FEATURE.virtual3d]:
+    'Display 节点生成时会携带 virtual-3d feature slug，可结合视角、光影和连接的 Prompt 文本做展示约束。',
+  [IMAGE_NODE_ACTION.hdUpscale]: 'Image 节点 HD 工具使用这里的固定 system prompt 与放大参数。',
+  [IMAGE_NODE_ACTION.imageExtend]:
+    'Image 节点图片延伸工具会把扩图输入作为 {{user_prompt}}，未填写扩图 Prompt 时只使用固定 system prompt。',
 }
 
 const CONTROL_VAR_KEYS = new Set([
@@ -111,9 +158,7 @@ const CONTROL_VAR_KEYS = new Set([
   '{{output_quality}}',
 ])
 
-const ASSET_VAR_KEYS = new Set([
-  '{{original_image_url}}',
-])
+const ASSET_VAR_KEYS = new Set(['{{original_image_url}}'])
 
 export function getVarsForSlug(slug: FeatureSlug): VarDef[] {
   return featureVarMap[slug] || noVars

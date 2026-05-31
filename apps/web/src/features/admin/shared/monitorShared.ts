@@ -38,8 +38,8 @@ export const MONITOR_REFRESH_INTERVAL_MS = 5000
 export const GLOBAL_QUEUE_CAPACITY = 10000
 export const GLOBAL_QUEUE_ALERT_THRESHOLD = 1000
 export const RUNNING_TASK_PRESSURE_THRESHOLD = 200
-export const ERROR_TEXT_COLOR = '#ef4444'
-export const DEFAULT_STATUS_COLOR = '#71717a'
+export const ERROR_TEXT_COLOR = 'var(--admin-danger)'
+export const DEFAULT_STATUS_COLOR = 'var(--admin-text-3)'
 
 export const taskStatusOptions = [
   { label: '等待中', value: 'pending' },

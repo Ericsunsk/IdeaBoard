@@ -47,6 +47,6 @@ const headerClass = computed(() =>
 .panel-desc {
   margin: 6px 0 0;
   font-size: 13px;
-  color: var(--admin-text-2);
+  color: var(--admin-text-3);
 }
 </style>

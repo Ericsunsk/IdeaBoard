@@ -294,8 +294,8 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
     InternalSelection: {
       heightMedium: '60px',
       borderRadius: '12px',
-      color: '#151618',
-      colorActive: '#151618',
+      color: 'var(--admin-card)',
+      colorActive: 'var(--admin-card)',
       border: '1px solid var(--admin-border)',
       borderHover: '1px solid var(--admin-border)',
       borderActive: '1px solid var(--admin-border)',
@@ -348,7 +348,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 
 .storage-card:hover {
   border-color: var(--admin-text-3);
-  background: #141416;
+  background: var(--admin-card);
 }
 
 .storage-card.current {
@@ -401,7 +401,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   min-height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  background: #17181a;
+  background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   color: var(--admin-text-2);
   font-size: 11px;
@@ -427,7 +427,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 .editor-vendor-preview {
   border-radius: 16px;
   border: 1px solid var(--admin-border);
-  background: #151618;
+  background: var(--admin-surface-muted);
   min-height: 68px;
   padding: 12px 14px;
   display: flex;
@@ -441,7 +441,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   flex: 0 0 36px;
   object-fit: contain;
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--admin-card);
   padding: 5px;
 }
 
@@ -521,7 +521,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 }
 
 .editor-section {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--admin-divider);
   padding-top: 16px;
   margin-top: 16px;
 }
@@ -538,7 +538,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   padding: 0 12px;
   border-radius: 12px;
   border: 1px solid var(--admin-border);
-  background: #151618;
+  background: var(--admin-surface-muted);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -558,7 +558,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 .toggle-card {
   border-radius: 14px;
   border: 1px solid var(--admin-border);
-  background: #151618;
+  background: var(--admin-surface-muted);
   padding: 14px 16px;
   display: flex;
   align-items: center;
@@ -604,7 +604,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   min-height: 84px;
   border-radius: 14px;
   border: 1px dashed var(--admin-border);
-  background: #151618;
+  background: var(--admin-surface-muted);
   color: var(--admin-text-2);
   display: flex;
   align-items: center;
@@ -631,7 +631,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   color: var(--admin-text-2);
   cursor: pointer;
@@ -677,9 +677,9 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   --n-height: min(360px, calc(100vh - 160px));
   padding: 10px;
   border-radius: 20px;
-  border: 1px solid #2c2d31;
-  background: linear-gradient(180deg, #101113 0%, #151618 100%);
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.46);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
 }
 
 .admin-storage-vendor-menu .n-base-select-option {
@@ -725,8 +725,8 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   gap: 10px;
   padding: 6px 10px;
   border-radius: 14px;
-  border: 1px solid #26282d;
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface-muted);
   transition:
     border-color 0.18s ease,
     background 0.18s ease,
@@ -737,15 +737,15 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   .n-base-select-option:not(.n-base-select-option--disabled):hover
   .vendor-select-entry,
 .admin-storage-vendor-menu .n-base-select-option--pending .vendor-select-entry {
-  border-color: #34363c;
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  border-color: var(--admin-border);
+  background: var(--admin-card);
+  box-shadow: inset 0 0 0 1px var(--admin-border-soft);
 }
 
 .admin-storage-vendor-menu .n-base-select-option--selected .vendor-select-entry {
-  border-color: rgba(244, 244, 245, 0.18);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.03) 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  border-color: var(--admin-border);
+  background: var(--admin-card-strong);
+  box-shadow: inset 0 0 0 1px var(--admin-border-soft);
 }
 
 .admin-storage-vendor-menu .n-base-select-option--disabled .vendor-select-entry {
@@ -782,7 +782,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 }
 
 .admin-storage-vendor-menu .vendor-select-entry-name {
-  color: #f4f4f5;
+  color: var(--admin-text-1);
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
@@ -798,8 +798,8 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #a1a1aa;
+  background: var(--admin-surface-muted);
+  color: var(--admin-text-3);
   font-size: 10px;
   line-height: 1;
   letter-spacing: 0.01em;

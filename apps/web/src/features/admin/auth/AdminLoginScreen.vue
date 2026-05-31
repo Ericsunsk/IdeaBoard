@@ -109,7 +109,7 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #0a0a0b;
+  background: #f8f9fd;
 }
 
 .login-shell {
@@ -121,37 +121,38 @@ async function handleLogin() {
 
 .login-intro,
 .login-card {
-  border: 1px solid #232326;
+  border: 1px solid #d9dfec;
   border-radius: 18px;
   padding: 30px;
+  box-shadow: 0 14px 34px rgba(41, 48, 66, 0.08);
 }
 
 .login-intro {
-  background: #111214;
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .login-intro h1 {
   margin: 0;
   font-size: 28px;
-  color: #f4f4f5;
+  color: #293042;
 }
 
 .login-intro p {
   margin: 14px 0 0;
-  color: #a1a1aa;
+  color: #6e7487;
   line-height: 1.72;
   font-size: 14px;
   max-width: 440px;
 }
 
 .login-card {
-  background: #101113;
+  background: #ffffff;
 }
 
 .login-card h2 {
   margin: 0;
   font-size: 24px;
-  color: #f4f4f5;
+  color: #293042;
 }
 
 :deep(.n-form-item) {
@@ -159,18 +160,18 @@ async function handleLogin() {
 }
 
 :deep(.n-form-item-label__text) {
-  color: #d4d4d8;
+  color: #4e5770;
 }
 
 :deep(.n-input) {
-  --n-border: 1px solid #2b2c2f;
-  --n-border-hover: 1px solid #3a3b40;
-  --n-border-focus: 1px solid #3a3b40;
-  --n-box-shadow-focus: none;
-  --n-color: #151618;
-  --n-color-focus: #151618;
-  --n-text-color: #f4f4f5;
-  --n-placeholder-color: #6b6b71;
+  --n-border: 1px solid #d9dfec;
+  --n-border-hover: 1px solid #c8d0e4;
+  --n-border-focus: 1px solid #7a6bd5;
+  --n-box-shadow-focus: 0 0 0 2px rgba(122, 107, 213, 0.14);
+  --n-color: #ffffff;
+  --n-color-focus: #ffffff;
+  --n-text-color: #293042;
+  --n-placeholder-color: #8a90a3;
   border-radius: 12px;
 }
 
@@ -183,12 +184,12 @@ async function handleLogin() {
 }
 
 :deep(.n-button--primary-type) {
-  --n-color: #f4f4f5;
-  --n-color-hover: #ffffff;
-  --n-color-pressed: #d4d4d8;
-  --n-border: 1px solid #f4f4f5;
+  --n-color: #7a6bd5;
+  --n-color-hover: #6d5fd0;
+  --n-color-pressed: #6355c4;
+  --n-border: 1px solid #7a6bd5;
   --n-ripple-color: transparent;
-  --n-text-color: #111111;
+  --n-text-color: #ffffff;
   border-radius: 12px;
   height: 48px;
   margin-top: 6px;
@@ -208,7 +209,7 @@ async function handleLogin() {
 }
 
 .footer a {
-  color: #f4f4f5;
+  color: #7a6bd5;
 }
 
 @media (max-width: 900px) {

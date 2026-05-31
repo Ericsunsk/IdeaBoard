@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="darkTheme" :theme-overrides="adminThemeOverrides">
+  <n-config-provider :theme-overrides="adminThemeOverrides">
     <n-dialog-provider>
       <n-notification-provider>
         <n-message-provider>
@@ -27,7 +27,12 @@
                 <main class="admin-shell-main">
                   <header class="admin-shell-header">
                     <div class="header-left">
-                      <n-button quaternary circle class="shell-action-btn" @click="handleToggleMenu">
+                      <n-button
+                        quaternary
+                        circle
+                        class="shell-action-btn"
+                        @click="handleToggleMenu"
+                      >
                         <template #icon>
                           <span>{{ isMobile ? '☰' : collapsed ? '☰' : '⟨' }}</span>
                         </template>
@@ -92,16 +97,9 @@ import {
   NDialogProvider,
   NNotificationProvider,
   NMessageProvider,
-  darkTheme,
-  type GlobalThemeOverrides,
 } from 'naive-ui'
-import {
-  ChatBubble,
-  Cloud,
-  DashboardSpeed,
-  Group,
-  Link,
-} from '@iconoir/vue'
+import { ChatBubble, Cloud, DashboardSpeed, Group, Link, List } from '@iconoir/vue'
+import { adminThemeOverrides } from '../shared/adminThemeOverrides'
 
 const router = useRouter()
 const route = useRoute()
@@ -112,92 +110,6 @@ const activeKey = ref('users')
 const mobileMenuOpen = ref(false)
 const isMobile = ref(false)
 const isLoginRoute = computed(() => route.path === '/admin/login')
-
-const adminThemeOverrides: GlobalThemeOverrides = {
-  common: {
-    primaryColor: '#f4f4f5',
-    primaryColorHover: '#ffffff',
-    primaryColorPressed: '#d4d4d8',
-    primaryColorSuppl: '#f4f4f5',
-  },
-  Button: {
-    colorPrimary: '#f4f4f5',
-    colorHoverPrimary: '#ffffff',
-    colorPressedPrimary: '#d4d4d8',
-    colorFocusPrimary: '#ffffff',
-    textColorPrimary: '#111111',
-    textColorHoverPrimary: '#111111',
-    textColorPressedPrimary: '#111111',
-    textColorFocusPrimary: '#111111',
-    borderPrimary: '1px solid #f4f4f5',
-    borderHoverPrimary: '1px solid #ffffff',
-    borderPressedPrimary: '1px solid #d4d4d8',
-    borderFocusPrimary: '1px solid #ffffff',
-    textColorTextPrimary: '#f4f4f5',
-    textColorTextHoverPrimary: '#ffffff',
-    textColorTextPressedPrimary: '#d4d4d8',
-    textColorTextFocusPrimary: '#ffffff',
-    textColorGhostPrimary: '#f4f4f5',
-    textColorGhostHoverPrimary: '#ffffff',
-    textColorGhostPressedPrimary: '#d4d4d8',
-    textColorGhostFocusPrimary: '#ffffff',
-  },
-  Card: {
-    colorModal: '#101113',
-    borderColor: '#232326',
-    titleTextColor: '#f4f4f5',
-    textColor: '#a1a1aa',
-    actionColor: '#151618',
-    borderRadius: '18px',
-    closeIconColor: '#d4d4d8',
-    closeIconColorHover: '#ffffff',
-    closeIconColorPressed: '#f4f4f5',
-    closeColorHover: 'rgba(255, 255, 255, 0.08)',
-    closeColorPressed: 'rgba(255, 255, 255, 0.12)',
-    boxShadow: '0 28px 80px rgba(0, 0, 0, 0.42)',
-  },
-  Dialog: {
-    color: '#101113',
-    titleTextColor: '#f4f4f5',
-    textColor: '#a1a1aa',
-    border: '1px solid #232326',
-    borderRadius: '18px',
-    closeIconColor: '#d4d4d8',
-    closeIconColorHover: '#ffffff',
-    closeIconColorPressed: '#f4f4f5',
-    closeColorHover: 'rgba(255, 255, 255, 0.08)',
-    closeColorPressed: 'rgba(255, 255, 255, 0.12)',
-    iconColor: '#f4f4f5',
-    iconColorInfo: '#f4f4f5',
-    iconColorSuccess: '#4ade80',
-    iconColorWarning: '#fbbf24',
-    iconColorError: '#fb7185',
-  },
-  Input: {
-    boxShadowFocus: 'none',
-    borderFocus: '1px solid #3f3f46',
-    borderHover: '1px solid #27272a',
-  },
-  Select: {
-    boxShadowActive: 'none',
-    boxShadowFocus: 'none',
-    borderActive: '1px solid #3f3f46',
-    borderFocus: '1px solid #3f3f46',
-    borderHover: '1px solid #27272a',
-  },
-  InputNumber: {
-    boxShadowFocus: 'none',
-    borderFocus: '1px solid #3f3f46',
-    borderHover: '1px solid #27272a',
-  },
-  InternalSelectMenu: {
-    color: '#101113',
-    optionTextColor: '#a1a1aa',
-    optionTextColorActive: '#f4f4f5',
-    optionColorActive: 'rgba(255, 255, 255, 0.04)',
-    optionColorPending: 'rgba(255, 255, 255, 0.04)',
-  },
-}
 
 watch(
   () => route.path,
@@ -238,6 +150,12 @@ const adminMenuItems: AdminMenuItem[] = [
     label: '数据仪表盘',
     title: '数据仪表盘',
     icon: DashboardSpeed,
+  },
+  {
+    key: 'task-monitor',
+    label: '任务监控',
+    title: '任务监控',
+    icon: List,
   },
   {
     key: 'feature-prompts',
@@ -326,7 +244,7 @@ onUnmounted(() => {
 .admin-layout-shell {
   min-height: 100vh;
   height: 100vh;
-  background: #0a0a0b;
+  background: #f8f9fd;
   padding: 12px;
   overflow: hidden;
 }
@@ -344,10 +262,11 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid #232326;
+  border: 1px solid #d9dfec;
   border-radius: 16px;
-  background: #111214;
+  background: rgba(255, 255, 255, 0.94);
   transition: width 0.24s ease;
+  box-shadow: 0 12px 30px rgba(41, 48, 66, 0.08);
 }
 
 .admin-shell-sider.collapsed {
@@ -361,11 +280,11 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  border-bottom: 1px solid #232326;
+  border-bottom: 1px solid #e2e4e8;
 }
 
 .brand-area:hover {
-  background: #141517;
+  background: #f4f6fb;
 }
 
 .brand-mark {
@@ -375,28 +294,29 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   font-weight: 700;
-  color: #f4f4f5;
-  background: #18191b;
-  border: 1px solid #2b2c2f;
+  color: #ffffff;
+  background: #7a6bd5;
+  border: 1px solid #7a6bd5;
 }
 
 .brand-title {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: #f4f4f5;
+  color: #293042;
   letter-spacing: 0.02em;
 }
 
 .admin-shell-main {
   min-width: 0;
   min-height: 0;
-  border: 1px solid #232326;
+  border: 1px solid #d9dfec;
   border-radius: 16px;
-  background: #101113;
+  background: rgba(255, 255, 255, 0.96);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 16px 38px rgba(41, 48, 66, 0.08);
 }
 
 .admin-shell-header {
@@ -405,7 +325,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #232326;
+  border-bottom: 1px solid #e2e4e8;
 }
 
 .header-left,
@@ -417,17 +337,19 @@ onUnmounted(() => {
 
 .shell-action-btn {
   font-size: 16px;
-  color: #d4d4d8;
-  border: 1px solid #2b2c2f;
-  background: #17181a;
+  color: #6e7487;
+  border: 1px solid #d9dfec;
+  background: #ffffff;
   transition:
     border-color 0.18s ease,
-    background 0.18s ease;
+    background 0.18s ease,
+    color 0.18s ease;
 }
 
 .shell-action-btn:hover {
-  border-color: #3a3b40;
-  background: #1c1d20;
+  border-color: #c8d0e4;
+  background: #f7f8fc;
+  color: #293042;
 }
 
 .title-wrap {
@@ -438,7 +360,7 @@ onUnmounted(() => {
   margin: 0;
   font-size: 17px;
   font-weight: 700;
-  color: #f4f4f5;
+  color: #293042;
 }
 
 .user-badge {
@@ -448,20 +370,20 @@ onUnmounted(() => {
   cursor: pointer;
   padding: 8px 10px;
   border-radius: 999px;
-  border: 1px solid #2b2c2f;
-  background: #151618;
+  border: 1px solid #d9dfec;
+  background: rgba(255, 255, 255, 0.9);
   transition:
     border-color 0.18s ease,
     background 0.18s ease;
 }
 
 .user-badge:hover {
-  background: #1a1b1e;
-  border-color: #3a3b40;
+  background: #f7f8fc;
+  border-color: #c8d0e4;
 }
 
 .user-badge span {
-  color: #f4f4f5;
+  color: #293042;
   font-size: 13px;
   max-width: 120px;
   white-space: nowrap;
@@ -470,8 +392,8 @@ onUnmounted(() => {
 }
 
 .user-avatar {
-  background: #f4f4f5;
-  color: #111111;
+  background: #7a6bd5;
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -483,7 +405,7 @@ onUnmounted(() => {
   overflow-y: overlay;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: rgba(116, 126, 154, 0.4) transparent;
 }
 
 .admin-shell-content::-webkit-scrollbar {
@@ -498,12 +420,12 @@ onUnmounted(() => {
 .admin-shell-content::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(116, 126, 154, 0.4);
   background-clip: padding-box;
 }
 
 .admin-shell-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.32);
+  background: rgba(116, 126, 154, 0.58);
   background-clip: padding-box;
 }
 
@@ -512,15 +434,15 @@ onUnmounted(() => {
 }
 
 :deep(.n-menu) {
-  --n-item-text-color: #8d8d93;
-  --n-item-text-color-active: #f4f4f5;
-  --n-item-text-color-hover: #f4f4f5;
-  --n-item-color-active: #18191b;
-  --n-item-color-hover: #151618;
-  --n-item-icon-color: #67676d;
-  --n-item-icon-color-active: #f4f4f5;
-  --n-item-icon-color-hover: #d4d4d8;
-  --n-group-header-text-color: #5a5a60;
+  --n-item-text-color: #6e7487;
+  --n-item-text-color-active: #293042;
+  --n-item-text-color-hover: #293042;
+  --n-item-color-active: rgba(122, 107, 213, 0.12);
+  --n-item-color-hover: rgba(122, 107, 213, 0.08);
+  --n-item-icon-color: #8a90a3;
+  --n-item-icon-color-active: #7a6bd5;
+  --n-item-icon-color-hover: #293042;
+  --n-group-header-text-color: #8a90a3;
   padding: 10px 8px;
   gap: 4px;
 }
@@ -575,22 +497,22 @@ onUnmounted(() => {
 }
 
 :deep(.admin-mobile-drawer .n-drawer-content) {
-  --n-color: #101113;
-  --n-border-color: #232326;
+  --n-color: #ffffff;
+  --n-border-color: #d9dfec;
 }
 
 :deep(.admin-mobile-drawer .n-drawer-header) {
-  border-bottom: 1px solid #232326;
+  border-bottom: 1px solid #e2e4e8;
 }
 
 :deep(.admin-mobile-drawer .n-drawer-header__main) {
-  color: #f4f4f5;
+  color: #293042;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 :deep(.admin-mobile-drawer .n-drawer-body-content-wrapper) {
-  background: #111214;
+  background: #f8f9fd;
 }
 
 @media (max-width: 1079px) {

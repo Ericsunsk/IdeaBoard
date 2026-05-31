@@ -69,13 +69,13 @@ const modalStyle = computed(() => {
 
 <style scoped>
 .admin-editor-overlay {
-  --admin-card: #111214;
-  --admin-card-strong: #141416;
-  --admin-border: #232326;
-  --admin-text-1: #f4f4f5;
-  --admin-text-2: #a1a1aa;
-  --admin-text-3: #6b6b71;
-  --admin-divider: rgba(255, 255, 255, 0.06);
+  --admin-card: rgba(255, 255, 255, 0.96);
+  --admin-card-strong: #ffffff;
+  --admin-border: #d9dfec;
+  --admin-text-1: #293042;
+  --admin-text-2: #6e7487;
+  --admin-text-3: #8a90a3;
+  --admin-divider: rgba(41, 48, 66, 0.08);
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -83,7 +83,7 @@ const modalStyle = computed(() => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.56);
+  background: rgba(41, 48, 66, 0.3);
   backdrop-filter: blur(8px);
 }
 
@@ -93,12 +93,12 @@ const modalStyle = computed(() => {
   overflow: auto;
   overflow: overlay;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: rgba(116, 126, 154, 0.38) transparent;
   position: relative;
-  border-radius: 28px;
+  border-radius: 22px;
   border: 1px solid var(--admin-border);
-  background: rgba(18, 18, 20, 0.98);
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+  background: var(--admin-card);
+  box-shadow: 0 24px 56px rgba(41, 48, 66, 0.18);
   padding: 28px 28px 24px;
 }
 
@@ -114,12 +114,12 @@ const modalStyle = computed(() => {
 .admin-editor-modal::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(116, 126, 154, 0.38);
   background-clip: padding-box;
 }
 
 .admin-editor-modal::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.32);
+  background: rgba(116, 126, 154, 0.56);
   background-clip: padding-box;
 }
 
@@ -138,16 +138,21 @@ const modalStyle = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
-  color: #f4f4f5;
+  background: #f4f6fb;
+  border: 1px solid #d9dfec;
+  color: #6e7487;
   cursor: pointer;
   transition:
     background 0.18s ease,
-    transform 0.18s ease;
+    transform 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .admin-editor-close:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(122, 107, 213, 0.1);
+  border-color: #c8d0e4;
+  color: #293042;
   transform: scale(1.03);
 }
 .admin-close-icon {
@@ -183,7 +188,7 @@ const modalStyle = computed(() => {
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--admin-border);
-  background: var(--admin-card-strong);
+  background: #f4f6fb;
   color: var(--admin-text-2);
   font-size: 11px;
 }
@@ -193,7 +198,6 @@ const modalStyle = computed(() => {
   color: var(--admin-text-1);
   font-size: 26px;
   line-height: 1.15;
-  letter-spacing: -0.02em;
 }
 
 .admin-editor-desc {

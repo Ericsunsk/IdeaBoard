@@ -1,3 +1,4 @@
+import type { EChartsOption } from 'echarts'
 import type { Ref } from 'vue'
 import { splitCommaValues } from '../shared/assetLibraryShared'
 
@@ -10,11 +11,6 @@ type StatisticsLike = {
     yesterday_calls?: number
     yesterday_success?: number
     yesterday_failed?: number
-    this_month_calls?: number
-    pending?: number
-    running?: number
-    completed?: number
-    failed?: number
   }
   trend?: Array<{
     date: string
@@ -27,8 +23,6 @@ type StatisticsLike = {
   latency?: Array<{ name: string; avg_seconds: number }>
   health_cells?: Array<{ status: number; success: number; fail: number; total: number }>
 }
-type HealthCellLike = { status: number; success: number; fail: number; total: number }
-
 type MonitorLike = {
   global_queue_len: number
   wait_queue_len: number
@@ -39,6 +33,23 @@ type MonitorLike = {
 type ChannelLike = { id: number; name: string }
 type ConfiguredAccountLike = { model_set: string; platform: string; channel_id: number }
 
+const adminChartTheme = {
+  tooltipBg: '#f8fafc',
+  tooltipBorder: '#d9e2ef',
+  tooltipText: '#0f172a',
+  tooltipMuted: '#64748b',
+  tooltipBody: '#334155',
+  tooltipDivider: '#e2e8f0',
+  axisLine: '#d5deea',
+  axisText: '#6e7487',
+  splitLine: '#edf2f7',
+  emptyText: '#6e7487',
+  emptyStroke: '#c8d0e4',
+  cardBg: '#f8fafc',
+  mainText: '#293042',
+  shadow: 'rgba(41,48,66,0.18)',
+}
+
 export function useUsageStatisticsCharts(options: {
   adminStatistics: Ref<StatisticsLike | null>
   configuredAccounts: Ref<ConfiguredAccountLike[]>
@@ -46,14 +57,7 @@ export function useUsageStatisticsCharts(options: {
   timeRange: Ref<string>
   monitorData: Ref<MonitorLike | null>
 }) {
-  const defaultModelColors = [
-    'var(--admin-model-indigo)',
-    'var(--admin-model-purple)',
-    'var(--admin-model-cyan)',
-    '#14b8a6',
-    '#f59e0b',
-    '#ef4444',
-  ]
+  const defaultModelColors = ['#818cf8', '#c084fc', '#22d3ee', '#14b8a6', '#f59e0b', '#ef4444']
   const HEALTH_COLS = 70
   const HEALTH_ROWS = 6
 
@@ -117,71 +121,151 @@ export function useUsageStatisticsCharts(options: {
           color: match?.color || defaultModelColors[idx % defaultModelColors.length],
         }
       })
-      if (segments.length === 0) segments.push({ label: '无数据', value: 0, color: '#3f3f46' })
+      if (segments.length === 0)
+        segments.push({ label: '无数据', value: 0, color: adminChartTheme.emptyStroke })
       return { date: day.label || day.date, total: day.total, segments }
     })
   })
 
   const totalCallsInRange = computed(() => trendData.value.reduce((sum, d) => sum + d.total, 0))
-  const trendMaxY = computed(() =>
-    Math.max(
-      1,
-      ...trendData.value.map((day) => day.segments.reduce((sum, seg) => sum + seg.value, 0)),
-    ),
-  )
-  const areaSeriesMeta = computed(() => {
-    const maxSegments = Math.max(1, ...trendData.value.map((day) => day.segments.length))
-    return Array.from({ length: maxSegments }, (_, idx) => ({
-      color: defaultModelColors[idx % defaultModelColors.length],
-    }))
+
+  const trendSeriesModelOrder = computed(() => {
+    const byModel = new Map<string, { color: string; total: number }>()
+    trendData.value.forEach((day) => {
+      day.segments.forEach((segment, idx) => {
+        const existing = byModel.get(segment.label)
+        if (existing) {
+          existing.total += segment.value
+          return
+        }
+        byModel.set(segment.label, {
+          color: segment.color || defaultModelColors[idx % defaultModelColors.length],
+          total: segment.value,
+        })
+      })
+    })
+    return Array.from(byModel.entries())
+      .filter(([label, meta]) => label !== '无数据' || meta.total > 0)
+      .map(([label, meta]) => ({ label, color: meta.color }))
   })
 
-  const activeDayIndex = ref<number | null>(null)
-  const handleChartHover = (e: MouseEvent) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const span = Math.max(1, trendData.value.length - 1)
-    const index = Math.round((x / rect.width) * span)
-    if (index >= 0 && index < trendData.value.length) activeDayIndex.value = index
+  function shouldShowTrendLabel(index: number) {
+    const count = trendData.value.length
+    if (count <= 7) return true
+    if (options.timeRange.value === '30d')
+      return index === 0 || index === count - 1 || index % 6 === 0
+    if (options.timeRange.value === '1y') {
+      if (index === 0 || index === count - 1) return true
+      const day = trendData.value[index]
+      if (!day) return false
+      return isMonthStartLabel(day.date)
+    }
+    return true
   }
 
-  const areaPaths = computed(() => {
-    const width = 700
-    const height = 200
-    const count = trendData.value.length
-    const step = count > 1 ? width / (count - 1) : 0
-    const maxY = trendMaxY.value
+  const trendChartOption = computed<EChartsOption>(() => {
+    const categories = trendData.value.map((day) => day.date)
+    const hasAnyCalls = trendData.value.some((day) => day.total > 0)
 
-    return areaSeriesMeta.value.map((meta, mIdx) => {
-      const points: { x: number; y: number }[] = []
-      const bottomPoints: { x: number; y: number }[] = []
-      trendData.value.forEach((day, i) => {
-        let currentStackY = 0
-        for (let j = 0; j <= mIdx; j++) currentStackY += day.segments[j]?.value || 0
-        const prevStackY = currentStackY - (day.segments[mIdx]?.value || 0)
-        points.push({ x: i * step, y: height - (currentStackY / maxY) * height })
-        bottomPoints.unshift({ x: i * step, y: height - (prevStackY / maxY) * height })
-      })
-      const lineD = getSmoothPath(points)
-      const d =
-        lineD +
-        ` L ${bottomPoints[0].x} ${bottomPoints[0].y} ` +
-        getSmoothPath(bottomPoints, true) +
-        ' Z'
-      return { color: meta.color, d, lineD }
-    })
-  })
+    const series = trendSeriesModelOrder.value.map((model) => ({
+      name: model.label,
+      type: 'line' as const,
+      smooth: true,
+      stack: 'usage',
+      symbol: trendData.value.length <= 1 ? 'circle' : 'none',
+      symbolSize: 6,
+      showSymbol: trendData.value.length <= 1,
+      lineStyle: { width: 2, color: model.color },
+      areaStyle: { opacity: 0.16, color: model.color },
+      emphasis: { focus: 'series' as const },
+      data: trendData.value.map((day) => {
+        const segment = day.segments.find((seg) => seg.label === model.label)
+        return segment?.value || 0
+      }),
+    }))
 
-  const activeDayPoints = computed(() => {
-    if (activeDayIndex.value === null) return []
-    const height = 200
-    const maxY = trendMaxY.value
-    const day = trendData.value[activeDayIndex.value]
-    let currentStackY = 0
-    return day.segments.map((seg) => {
-      currentStackY += seg.value
-      return { y: height - (currentStackY / maxY) * height, color: seg.color }
-    })
+    return {
+      animationDuration: 300,
+      color: trendSeriesModelOrder.value.map((m) => m.color),
+      grid: { left: 10, right: 12, top: 10, bottom: 30, containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: adminChartTheme.tooltipBg,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
+        axisPointer: {
+          type: 'line',
+          lineStyle: { color: adminChartTheme.tooltipMuted, type: 'dashed' },
+        },
+        formatter: (rawParams: unknown) => {
+          const rows = (Array.isArray(rawParams) ? rawParams : [rawParams]) as Array<{
+            dataIndex?: number
+          }>
+          const dayIndex = rows[0]?.dataIndex ?? 0
+          const day = trendData.value[dayIndex]
+          if (!day) return ''
+          const visibleSegments = day.segments.filter((segment) => segment.value > 0)
+          const segmentRows = (visibleSegments.length > 0 ? visibleSegments : day.segments)
+            .map(
+              (segment) =>
+                `<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+<span style="width:8px;height:8px;border-radius:50%;background:${segment.color};display:inline-block;"></span>
+<span style="flex:1;color:${adminChartTheme.tooltipBody};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(segment.label)}</span>
+<span style="font-family:ui-monospace,monospace;font-weight:600;">${segment.value.toLocaleString()}</span>
+</div>`,
+            )
+            .join('')
+
+          return `<div style="min-width:170px;">
+<div style="color:${adminChartTheme.tooltipMuted};font-size:11px;font-weight:600;">${escapeHTML(day.date)}</div>
+${segmentRows}
+<div style="height:1px;background:${adminChartTheme.tooltipDivider};margin:8px 0;"></div>
+<div style="display:flex;justify-content:space-between;font-weight:700;">
+<span>总计</span><span>${day.total.toLocaleString()}</span>
+</div>
+</div>`
+        },
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: categories,
+        axisLine: { lineStyle: { color: adminChartTheme.axisLine } },
+        axisTick: { show: false },
+        axisLabel: {
+          color: adminChartTheme.axisText,
+          fontSize: 11,
+          hideOverlap: true,
+          interval: (index: number) => shouldShowTrendLabel(index),
+        },
+      },
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: {
+          color: adminChartTheme.axisText,
+          fontSize: 11,
+          formatter: (value: number) => Math.round(value).toString(),
+        },
+        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
+      },
+      series,
+      graphic: hasAnyCalls
+        ? []
+        : [
+            {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: {
+                text: '暂无调用数据',
+                fill: adminChartTheme.emptyText,
+                fontSize: 12,
+              },
+            },
+          ],
+    } as EChartsOption
   })
 
   const todayCalls = computed(() => options.adminStatistics.value?.summary?.today_calls || 0)
@@ -201,17 +285,23 @@ export function useUsageStatisticsCharts(options: {
   const todayCallsFoot = computed(() =>
     buildDeltaFoot(todayCalls.value, yesterdayCalls.value, '昨日'),
   )
-  const todaySuccessFoot = computed(() =>
-    buildDeltaFoot(todaySuccess.value, yesterdaySuccess.value, '昨日'),
-  )
   const todayFailedFoot = computed(() =>
     buildDeltaFoot(todayFailed.value, yesterdayFailed.value, '昨日'),
   )
-  const totalCallsFoot = computed(() =>
-    options.adminStatistics.value
-      ? `本月 ${options.adminStatistics.value.summary?.this_month_calls || 0}`
-      : '无数据',
+  const todayAttemptedCalls = computed(() => todaySuccess.value + todayFailed.value)
+  const todaySuccessRate = computed(() =>
+    todayAttemptedCalls.value === 0
+      ? '0.0%'
+      : `${((todaySuccess.value / todayAttemptedCalls.value) * 100).toFixed(1)}%`,
   )
+  const yesterdayAttemptedCalls = computed(() => yesterdaySuccess.value + yesterdayFailed.value)
+  const todaySuccessRateFoot = computed(() => {
+    if (yesterdayAttemptedCalls.value === 0) return '昨日无可比数据'
+    const yesterdayRate = yesterdaySuccess.value / yesterdayAttemptedCalls.value
+    const currentRate =
+      todayAttemptedCalls.value === 0 ? 0 : todaySuccess.value / todayAttemptedCalls.value
+    return `${formatSignedPercentPoint((currentRate - yesterdayRate) * 100)} 较昨日`
+  })
 
   const modelRanking = computed(() => {
     const data = options.adminStatistics.value?.model_ranking || []
@@ -246,15 +336,85 @@ export function useUsageStatisticsCharts(options: {
     return result
   })
 
-  const chartSegments = computed(() => {
-    const perimeter = 2 * Math.PI * 40
-    let currentOffset = 0
-    return modelRanking.value.map((item) => {
-      const dashArray = `${(item.percent * perimeter) / 100} ${perimeter}`
-      const dashOffset = -(currentOffset * perimeter) / 100
-      currentOffset += item.percent
-      return { ...item, dashArray, dashOffset }
-    })
+  const consumptionChartOption = computed<EChartsOption>(() => {
+    const hasModelData = modelRanking.value.some((item) => item.value > 0)
+    const pieData = hasModelData
+      ? modelRanking.value.map((item) => ({
+          value: item.value,
+          name: item.name,
+          itemStyle: { color: item.color },
+        }))
+      : [{ value: 1, name: '暂无数据', itemStyle: { color: adminChartTheme.axisLine } }]
+
+    return {
+      animationDuration: 300,
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: adminChartTheme.tooltipBg,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
+        formatter: (rawParams: unknown) => {
+          const params = rawParams as { name?: string; value?: number; percent?: number }
+          if (!hasModelData) return '暂无数据'
+          const name = params.name || '未知模型'
+          const value = Number.isFinite(params.value) ? Number(params.value) : 0
+          const percent = Number.isFinite(params.percent) ? Number(params.percent) : 0
+          return `${escapeHTML(name)}<br/>调用量：${value.toLocaleString()} (${percent}%)`
+        },
+      },
+      series: [
+        {
+          type: 'pie' as const,
+          radius: ['62%', '78%'],
+          center: ['50%', '50%'],
+          minAngle: 5,
+          avoidLabelOverlap: true,
+          label: { show: false },
+          itemStyle: {
+            borderColor: adminChartTheme.cardBg,
+            borderWidth: 2,
+          },
+          emphasis: {
+            scale: false,
+            itemStyle: {
+              shadowBlur: 12,
+              shadowColor: adminChartTheme.shadow,
+            },
+          },
+          data: pieData,
+        },
+      ],
+      graphic: [
+        {
+          type: 'text',
+          left: 'center',
+          top: '42%',
+          z: 10,
+          style: {
+            text: '总调用',
+            fill: adminChartTheme.axisText,
+            fontSize: 12,
+            fontWeight: 500,
+            textAlign: 'center',
+          },
+        },
+        {
+          type: 'text',
+          left: 'center',
+          top: '51%',
+          z: 10,
+          style: {
+            text: totalCalls.value.toLocaleString(),
+            fill: adminChartTheme.mainText,
+            fontSize: 24,
+            fontWeight: 700,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            textAlign: 'center',
+          },
+        },
+      ],
+    } as EChartsOption
   })
 
   const healthGridFlat = computed(() => {
@@ -270,61 +430,202 @@ export function useUsageStatisticsCharts(options: {
       })),
     )
   })
+  const healthSampleTotal = computed(() =>
+    healthGridFlat.value.reduce((sum, cell) => sum + (cell.total || 0), 0),
+  )
+  const healthSuccessTotal = computed(() =>
+    healthGridFlat.value.reduce((sum, cell) => sum + (cell.success || 0), 0),
+  )
+  const healthRangeLabel = computed(() => getRangeLabel(options.timeRange.value))
 
-  const userRank = computed(() => (options.adminStatistics.value?.user_rank || []).slice(0, 6))
-  const latencyList = computed(() => {
-    const rows = (options.adminStatistics.value?.latency || [])
-      .map((item, idx) => {
-        const match = getModelMetaByName(item.name)
-        return {
-          name: item.name,
-          val: item.avg_seconds,
-          idx,
-          color:
-            match?.color ||
-            defaultModelColors[idx % defaultModelColors.length] ||
-            'var(--admin-warning)',
-        }
-      })
-      .slice(0, 5)
-    const maxVal = Math.max(1, ...rows.map((r) => r.val))
-    return rows.map((r) => ({
-      name: r.name,
-      val: r.val.toFixed(2),
-      percent: Math.max(5, Math.round((r.val / maxVal) * 100)),
-      color: r.color,
+  const healthHeatmapOption = computed<EChartsOption>(() => {
+    const hasHealthData = healthGridFlat.value.some((cell) => cell.total > 0)
+    const heatmapData = healthGridFlat.value.map((cell, index) => ({
+      value: [index % HEALTH_COLS, Math.floor(index / HEALTH_COLS), cell.status],
+      itemStyle: { color: getHealthStatusColor(cell.status) },
+      success: cell.success,
+      fail: cell.fail,
+      total: cell.total,
+      index,
     }))
+
+    return {
+      animationDuration: 200,
+      grid: { left: 0, right: 0, top: 6, bottom: 8, containLabel: false },
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: adminChartTheme.tooltipBg,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
+        formatter: (rawParams: unknown) => {
+          const params = rawParams as {
+            data?: { success?: number; fail?: number; total?: number; index?: number }
+          }
+          const data = params.data
+          if (!data) return ''
+          const success = Number(data.success) || 0
+          const fail = Number(data.fail) || 0
+          const total = Number(data.total) || 0
+          const passRate = total === 0 ? '0.0' : ((success / total) * 100).toFixed(1)
+          return `${formatHealthRangeLabel(options.timeRange.value, Number(data.index) || 0)}<br/>成功 ${success} / 失败 ${fail}<br/>成功率 ${passRate}%`
+        },
+      },
+      xAxis: {
+        type: 'category',
+        show: false,
+        data: Array.from({ length: HEALTH_COLS }, (_, i) => i),
+      },
+      yAxis: {
+        type: 'category',
+        show: false,
+        inverse: true,
+        data: Array.from({ length: HEALTH_ROWS }, (_, i) => i),
+      },
+      visualMap: {
+        show: false,
+        min: 0,
+        max: 3,
+        inRange: {
+          color: ['#e2e8f0', '#ef4444', '#f59e0b', '#10b981'],
+        },
+      },
+      series: [
+        {
+          type: 'heatmap' as const,
+          data: heatmapData,
+          progressive: 0,
+          itemStyle: {
+            borderRadius: 1.5,
+            borderWidth: 1,
+            borderColor: 'rgba(148, 163, 184, 0.12)',
+          },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 8,
+              shadowColor: 'rgba(15, 23, 42, 0.24)',
+            },
+          },
+        },
+      ],
+      graphic: hasHealthData
+        ? []
+        : [
+            {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: {
+                text: '暂无健康监测数据',
+                fill: adminChartTheme.emptyText,
+                fontSize: 12,
+              },
+            },
+          ],
+    } as EChartsOption
   })
 
-  const taskSampleTotal = computed(() => {
-    const s = options.adminStatistics.value?.summary
-    if (!s) return 0
-    return (s.pending || 0) + (s.running || 0) + (s.completed || 0) + (s.failed || 0)
+  const latencyRows = computed(() => {
+    const rows: Array<{ name: string; val: number; color: string }> = []
+    const source = options.adminStatistics.value?.latency || []
+    source.forEach((item, idx) => {
+      const latency = Number(item.avg_seconds)
+      if (!Number.isFinite(latency)) return
+      const match = getModelMetaByName(item.name)
+      rows.push({
+        name: item.name || '未知模型',
+        val: Math.max(0, latency),
+        color:
+          match?.color ||
+          defaultModelColors[idx % defaultModelColors.length] ||
+          'var(--admin-warning)',
+      })
+    })
+    return rows.sort((a, b) => b.val - a.val).slice(0, 5)
   })
-  const completedSampleTotal = computed(
-    () => options.adminStatistics.value?.summary?.completed || 0,
-  )
-  const failedSampleTotal = computed(() => options.adminStatistics.value?.summary?.failed || 0)
-  const runningSampleTotal = computed(() => options.adminStatistics.value?.summary?.running || 0)
+  const latencyChartOption = computed<EChartsOption>(() => {
+    const hasLatencyData = latencyRows.value.length > 0
+    return {
+      animationDuration: 260,
+      grid: { left: 10, right: 12, top: 6, bottom: 4, containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        backgroundColor: adminChartTheme.tooltipBg,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
+        formatter: (rawParams: unknown) => {
+          const params = (Array.isArray(rawParams) ? rawParams[0] : rawParams) as {
+            axisValueLabel?: string
+            value?: number
+          }
+          const value = Number(params?.value) || 0
+          return `${escapeHTML(params?.axisValueLabel || '未知模型')}<br/>平均 TTFT：${value.toFixed(2)}s`
+        },
+      },
+      xAxis: {
+        type: 'value',
+        min: 0,
+        splitNumber: 3,
+        axisLabel: {
+          color: adminChartTheme.axisText,
+          fontSize: 10,
+          formatter: (value: number) => `${value.toFixed(1)}s`,
+        },
+        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
+      },
+      yAxis: {
+        type: 'category',
+        inverse: true,
+        axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: {
+          color: adminChartTheme.axisText,
+          fontSize: 11,
+          width: 90,
+          overflow: 'truncate',
+        },
+        data: latencyRows.value.map((row) => row.name),
+      },
+      series: [
+        {
+          type: 'bar' as const,
+          data: latencyRows.value.map((row) => ({
+            value: row.val,
+            itemStyle: { color: row.color, borderRadius: [0, 4, 4, 0] },
+          })),
+          barWidth: 8,
+          label: {
+            show: true,
+            position: 'right',
+            color: adminChartTheme.axisText,
+            fontSize: 10,
+            formatter: ({ value }: { value: number }) => `${Number(value).toFixed(2)}s`,
+          },
+        },
+      ],
+      graphic: hasLatencyData
+        ? []
+        : [
+            {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: {
+                text: '暂无延迟数据',
+                fill: adminChartTheme.emptyText,
+                fontSize: 12,
+              },
+            },
+          ],
+    } as EChartsOption
+  })
+
   const healthRate = computed(() =>
-    taskSampleTotal.value === 0
+    healthSampleTotal.value === 0
       ? '0.0%'
-      : `${((completedSampleTotal.value / taskSampleTotal.value) * 100).toFixed(1)}%`,
-  )
-  const failureRate = computed(() =>
-    taskSampleTotal.value === 0
-      ? '0%'
-      : `${Math.round((failedSampleTotal.value / taskSampleTotal.value) * 100)}%`,
-  )
-  const runningRate = computed(() =>
-    taskSampleTotal.value === 0
-      ? '0%'
-      : `${Math.round((runningSampleTotal.value / taskSampleTotal.value) * 100)}%`,
-  )
-  const successRate = computed(() =>
-    taskSampleTotal.value === 0
-      ? '0%'
-      : `${Math.round((completedSampleTotal.value / taskSampleTotal.value) * 100)}%`,
+      : `${((healthSuccessTotal.value / healthSampleTotal.value) * 100).toFixed(1)}%`,
   )
 
   const monitorQueueTotal = computed(
@@ -333,33 +634,16 @@ export function useUsageStatisticsCharts(options: {
       (options.monitorData.value?.wait_queue_len || 0),
   )
   const monitorRunningTotal = computed(() => options.monitorData.value?.running_tasks || 0)
-  const monitorQueueText = computed(
-    () =>
-      `${options.monitorData.value?.global_queue_len || 0}/${Math.max(1, monitorQueueTotal.value)}`,
-  )
-  const monitorRunningText = computed(
-    () =>
-      `${monitorRunningTotal.value}/${Math.max(1, monitorQueueTotal.value + monitorRunningTotal.value)}`,
-  )
-  const monitorQueuePercent = computed(() =>
-    Math.min(
-      100,
-      Math.round(
-        ((options.monitorData.value?.global_queue_len || 0) /
-          Math.max(1, monitorQueueTotal.value)) *
-          100,
-      ),
-    ),
-  )
-  const monitorRunningPercent = computed(() =>
-    Math.min(
-      100,
-      Math.round(
-        (monitorRunningTotal.value /
-          Math.max(1, monitorQueueTotal.value + monitorRunningTotal.value)) *
-          100,
-      ),
-    ),
+  const queuePressurePercent = computed(() => {
+    const pending = monitorQueueTotal.value
+    const running = monitorRunningTotal.value
+    const total = pending + running
+    if (total === 0) return 0
+    return Math.round((pending / total) * 100)
+  })
+  const queuePressure = computed(() => `${queuePressurePercent.value}%`)
+  const queuePressureFoot = computed(
+    () => `排队 ${monitorQueueTotal.value} / 执行 ${monitorRunningTotal.value}`,
   )
 
   const accountLoadRows = computed(() => {
@@ -369,93 +653,198 @@ export function useUsageStatisticsCharts(options: {
         const current = val.current_concurrent || 0
         const max = Math.max(1, val.max_concurrent || 0)
         const percent = Math.min(100, Math.round((current / max) * 100))
-        const color =
-          percent >= 90
-            ? 'var(--admin-danger)'
-            : percent >= 70
-              ? 'var(--admin-warning)'
-              : 'var(--admin-success)'
+        const color = percent >= 90 ? '#ef4444' : percent >= 70 ? '#f59e0b' : '#10b981'
         return { id, current, max, percent, color }
       })
       .sort((a, b) => b.percent - a.percent)
-      .slice(0, 3)
+      .slice(0, 5)
   })
+  const accountLoadChartOption = computed<EChartsOption>(() => {
+    const hasAccountData = accountLoadRows.value.length > 0
+    return {
+      animationDuration: 260,
+      grid: { left: 4, right: 8, top: 8, bottom: 4, containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        backgroundColor: adminChartTheme.tooltipBg,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
+        formatter: (rawParams: unknown) => {
+          const params = (Array.isArray(rawParams) ? rawParams[0] : rawParams) as {
+            axisValueLabel?: string
+            data?: { current?: number; max?: number; value?: number }
+          }
+          const current = Number(params.data?.current || 0)
+          const max = Number(params.data?.max || 0)
+          const value = Number(params.data?.value || 0)
+          return `${escapeHTML(params.axisValueLabel || '未知账号')}<br/>并发：${current}/${max}<br/>负载：${value}%`
+        },
+      },
+      xAxis: {
+        type: 'value',
+        min: 0,
+        max: 100,
+        splitNumber: 3,
+        axisLabel: { color: adminChartTheme.axisText, fontSize: 10, formatter: '{value}%' },
+        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
+      },
+      yAxis: {
+        type: 'category',
+        inverse: true,
+        axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: { color: adminChartTheme.axisText, fontSize: 11 },
+        data: accountLoadRows.value.map((item) => `#${item.id}`),
+      },
+      series: [
+        {
+          type: 'bar' as const,
+          barWidth: 8,
+          data: accountLoadRows.value.map((item) => ({
+            value: item.percent,
+            current: item.current,
+            max: item.max,
+            itemStyle: { color: item.color, borderRadius: [0, 4, 4, 0] },
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            color: adminChartTheme.axisText,
+            fontSize: 10,
+            formatter: ({ data }: { data: { current: number; max: number } }) =>
+              `${data.current}/${data.max}`,
+          },
+        },
+      ],
+      graphic: hasAccountData
+        ? []
+        : [
+            {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: {
+                text: '暂无渠道并发数据',
+                fill: adminChartTheme.emptyText,
+                fontSize: 12,
+              },
+            },
+          ],
+    } as EChartsOption
+  })
+
+  const userRankRows = computed(() =>
+    (options.adminStatistics.value?.user_rank || [])
+      .slice(0, 6)
+      .map((item, idx) => ({ ...item, rank: idx + 1 })),
+  )
+  const userRankChartOption = computed<EChartsOption>(() => {
+    const hasRankData = userRankRows.value.length > 0
+    return {
+      animationDuration: 260,
+      grid: { left: 10, right: 10, top: 8, bottom: 4, containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        backgroundColor: adminChartTheme.tooltipBg,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
+        formatter: (rawParams: unknown) => {
+          const params = (Array.isArray(rawParams) ? rawParams[0] : rawParams) as {
+            axisValueLabel?: string
+            value?: number
+            dataIndex?: number
+          }
+          const index = Number(params.dataIndex) || 0
+          return `#${index + 1} ${escapeHTML(params.axisValueLabel || '未知用户')}<br/>调用量：${Number(params.value || 0).toLocaleString()}`
+        },
+      },
+      xAxis: {
+        type: 'value',
+        min: 0,
+        splitNumber: 3,
+        axisLabel: { color: adminChartTheme.axisText, fontSize: 10 },
+        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
+      },
+      yAxis: {
+        type: 'category',
+        inverse: true,
+        axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: {
+          color: adminChartTheme.axisText,
+          fontSize: 11,
+          width: 100,
+          overflow: 'truncate',
+        },
+        data: userRankRows.value.map((item) => item.name),
+      },
+      series: [
+        {
+          type: 'bar' as const,
+          barWidth: 8,
+          data: userRankRows.value.map((item) => item.value),
+          itemStyle: { color: '#4f46e5', borderRadius: [0, 4, 4, 0] },
+          label: {
+            show: true,
+            position: 'right',
+            color: adminChartTheme.axisText,
+            fontSize: 10,
+            formatter: ({ value }: { value: number }) => Number(value).toLocaleString(),
+          },
+        },
+      ],
+      graphic: hasRankData
+        ? []
+        : [
+            {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: {
+                text: '暂无用户排行数据',
+                fill: adminChartTheme.emptyText,
+                fontSize: 12,
+              },
+            },
+          ],
+    } as EChartsOption
+  })
+
   const saturatedAccountCount = computed(
     () => accountLoadRows.value.filter((item) => item.percent >= 90).length,
   )
 
-  function calculatePercent(cell: HealthCellLike) {
-    if (cell.total === 0) return '0.0'
-    return ((cell.success / cell.total) * 100).toFixed(1)
-  }
-
-  function getCellTimeRange(index: number) {
-    const rangeLabel =
-      options.timeRange.value === '7d'
-        ? '最近7天'
-        : options.timeRange.value === '30d'
-          ? '最近30天'
-          : '最近1年'
-    return `${rangeLabel} 样本区间 #${index + 1}`
-  }
-
-  function shouldShowLabel(index: number) {
-    const count = trendData.value.length
-    if (count <= 7) return true
-    if (options.timeRange.value === '30d')
-      return index === 0 || index === count - 1 || index % 6 === 0
-    if (options.timeRange.value === '1y') {
-      if (index === 0 || index === count - 1) return true
-      const day = trendData.value[index]
-      if (!day) return false
-      return isMonthStartLabel(day.date)
-    }
-    return true
-  }
-
   return {
-    areaSeriesMeta,
     trendData,
     totalCallsInRange,
-    activeDayIndex,
-    handleChartHover,
-    areaPaths,
-    activeDayPoints,
+    trendChartOption,
     todayCalls,
-    todaySuccess,
     todayFailed,
-    totalCalls,
     todayCallsFoot,
-    todaySuccessFoot,
     todayFailedFoot,
-    totalCallsFoot,
+    todaySuccessRate,
+    todaySuccessRateFoot,
+    queuePressure,
+    queuePressureFoot,
     modelRanking,
     modelSettingCandidates,
-    chartSegments,
-    healthGridFlat,
-    userRank,
-    latencyList,
+    consumptionChartOption,
+    healthHeatmapOption,
+    latencyChartOption,
+    accountLoadChartOption,
+    userRankChartOption,
+    healthRangeLabel,
     healthRate,
-    failureRate,
-    runningRate,
-    successRate,
-    monitorQueueText,
-    monitorRunningText,
-    monitorQueuePercent,
-    monitorRunningPercent,
-    accountLoadRows,
     saturatedAccountCount,
-    calculatePercent,
-    getCellTimeRange,
-    shouldShowLabel,
   }
 }
 
-function getSmoothPath(pts: { x: number; y: number }[], reverse = false) {
-  if (pts.length === 0) return ''
-  let d = reverse ? '' : `M ${pts[0].x} ${pts[0].y}`
-  for (let i = 1; i < pts.length; i++) d += ` L ${pts[i].x} ${pts[i].y}`
-  return d
+function escapeHTML(value: string) {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
 function normalizeModelName(name: string | null | undefined): string {
@@ -466,6 +855,23 @@ function colorForModel(name: string, palette: string[]) {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = (hash << 5) - hash + name.charCodeAt(i)
   return palette[Math.abs(hash) % palette.length]
+}
+
+function getHealthStatusColor(status: number) {
+  if (status === 1) return '#ef4444'
+  if (status === 2) return '#f59e0b'
+  if (status === 3) return '#10b981'
+  return '#e2e8f0'
+}
+
+function formatHealthRangeLabel(timeRange: string, index: number) {
+  return `${getRangeLabel(timeRange)} 样本区间 #${index + 1}`
+}
+
+function getRangeLabel(timeRange: string) {
+  if (timeRange === '7d') return '最近7天'
+  if (timeRange === '30d') return '最近30天'
+  return '最近1年'
 }
 
 function isMonthStartLabel(label: string): boolean {
@@ -484,4 +890,9 @@ function buildDeltaFoot(current: number, previous: number, label: string) {
   const ratio = Math.abs((diff / previous) * 100).toFixed(1)
   if (diff === 0) return `0.0% 持平 ${label}`
   return `${diff > 0 ? '+' : '-'}${ratio}% ${diff > 0 ? '较' : '低于'}${label}`
+}
+
+function formatSignedPercentPoint(value: number) {
+  if (value === 0) return '0.0pp'
+  return `${value > 0 ? '+' : '-'}${Math.abs(value).toFixed(1)}pp`
 }

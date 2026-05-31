@@ -252,13 +252,7 @@ import {
   updateRateLimitSettings,
   updateRegistrationSetting,
 } from '../../../shared/query/adminQueries'
-import {
-  Filter,
-  MoreHoriz,
-  Refresh,
-  Search,
-  Settings,
-} from '@iconoir/vue'
+import { Filter, MoreHoriz, Refresh, Search, Settings } from '@iconoir/vue'
 import { adminPopoverPanelThemeOverrides } from '../shared/adminThemeOverrides'
 
 const message = useMessage()
@@ -420,7 +414,7 @@ const columns: DataTableColumns<User> = [
           style:
             (isAdmin
               ? 'background: rgba(239, 68, 68, 0.1); color: #f87171;'
-              : 'background: rgba(255, 255, 255, 0.05); color: #a1a1aa;') +
+              : 'background: var(--admin-surface-muted); color: var(--admin-text-3);') +
             ' border-radius: 99px !important; padding: 0 10px; font-weight: 600; font-size: 11px;',
         },
         { default: () => (isAdmin ? 'Admin' : 'User') },
@@ -792,7 +786,7 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   border-radius: 999px;
 }

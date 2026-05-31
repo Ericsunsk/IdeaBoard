@@ -82,6 +82,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'task-monitor',
+        name: 'AdminTaskMonitor',
+        component: () => import('../../pages/admin/AdminTaskMonitorPage.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'channels',
         name: 'AdminChannels',
         component: () => import('../../pages/admin/AdminChannelsPage.vue'),

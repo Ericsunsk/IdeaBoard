@@ -1,8 +1,11 @@
 import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../shared/api/task'
 import { createMonitorTaskColumns } from '../shared/monitorShared'
-import { useGetAdminMonitor } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import { useListAdminTasks } from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
+import { calcDurationSeconds } from '../../../shared/utils/dateTime'
+
+const SLOW_TASK_SECONDS = 60
+type SlowTaskRow = { task: Task; seconds: number }
 
 export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
   const page = ref(1)
@@ -41,18 +44,38 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
     },
   })
 
-  const monitorQuery = useGetAdminMonitor({
-    query: {
-      refetchInterval: 10_000,
-    },
+  const tasks = computed(() => tasksQuery.data.value?.data?.list || [])
+  const total = computed(() => tasksQuery.data.value?.data?.total || 0)
+  const loading = computed(() => tasksQuery.isLoading.value)
+  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / TASK_MONITOR_PAGE_SIZE)))
+  const pageStats = computed(() => {
+    const stats = {
+      running: 0,
+      pending: 0,
+      failed: 0,
+    }
+    tasks.value.forEach((task) => {
+      if (task.status === 'running') stats.running += 1
+      else if (task.status === 'pending') stats.pending += 1
+      else if (task.status === 'failed') stats.failed += 1
+    })
+    return stats
   })
 
-  const tasks = computed(() => tasksQuery.data.value?.data?.list || [])
-  const loading = computed(() => tasksQuery.isLoading.value || monitorQuery.isLoading.value)
-  const pageCount = computed(() =>
-    Math.max(1, Math.ceil((tasksQuery.data.value?.data?.total || 0) / TASK_MONITOR_PAGE_SIZE)),
+  const failedTasks = computed(() => tasks.value.filter((task) => task.status === 'failed'))
+  const slowTasks = computed<SlowTaskRow[]>(() =>
+    tasks.value
+      .map((task) => {
+        if (!task.created_at) return null
+        const end = task.completed_at || new Date()
+        const seconds = calcDurationSeconds(task.created_at, end)
+        if (seconds == null || seconds < SLOW_TASK_SECONDS) return null
+        return { task, seconds }
+      })
+      .filter((row): row is SlowTaskRow => !!row)
+      .sort((a, b) => b.seconds - a.seconds)
+      .slice(0, 5),
   )
-  const monitorData = computed(() => monitorQuery.data.value?.data?.monitor || null)
 
   function handleSearch() {
     page.value = 1
@@ -65,17 +88,19 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
 
   function loadTasks() {
     tasksQuery.refetch()
-    monitorQuery.refetch()
   }
 
   return {
     tasks,
+    total,
     loading,
     page,
     pageCount,
+    pageStats,
+    failedTasks,
+    slowTasks,
     filterStatus,
     searchKeyword,
-    monitorData,
     columns,
     loadTasks,
     handleSearch,

@@ -2,7 +2,7 @@
 
 `docker/` 目录同时包含本地开发依赖和生产 Docker Compose stack：
 
-- `docker-compose.yml`：本地开发用 `MySQL + Redis`
+- `compose.local.yml`：本地开发用 `MySQL + Redis`
 - `compose.yml`：生产 VPS 用 `Cloudflared + Gateway + API + Auth + MySQL + Redis`
 
 生产环境请优先使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的 GHCR + Docker Compose 部署方式。
@@ -14,20 +14,20 @@
 cd docker
 cp .env.example .env
 # 至少修改 MYSQL_ROOT_PASSWORD 和 MYSQL_PASSWORD；不要使用弱默认密码。
-docker compose -f docker-compose.yml up -d
+docker compose -f compose.local.yml up -d
 ```
 
 查看状态：
 
 ```bash
-docker compose -f docker-compose.yml ps
+docker compose -f compose.local.yml ps
 ```
 
 查看日志：
 
 ```bash
-docker compose -f docker-compose.yml logs -f mysql
-docker compose -f docker-compose.yml logs -f redis
+docker compose -f compose.local.yml logs -f mysql
+docker compose -f compose.local.yml logs -f redis
 ```
 
 
@@ -98,13 +98,13 @@ GUI 客户端：
 
 ```bash
 # 启动
-docker compose -f docker-compose.yml up -d
+docker compose -f compose.local.yml up -d
 
 # 停止
-docker compose -f docker-compose.yml down
+docker compose -f compose.local.yml down
 
 # 重启
-docker compose -f docker-compose.yml restart
+docker compose -f compose.local.yml restart
 ```
 
 > [!CAUTION]
@@ -141,7 +141,7 @@ docker compose -f docker/compose.yml --env-file docker/.env up -d
 请使用新版命令：
 
 ```bash
-docker compose up -d
+docker compose -f compose.local.yml up -d
 ```
 
 ### Apple Silicon 拉取 MySQL 报错
@@ -152,6 +152,6 @@ docker compose up -d
 
 请检查：
 
-1. `docker compose ps` 中 MySQL 是否为 `Up`。
+1. `docker compose -f compose.local.yml ps` 中 MySQL 是否为 `Up`。
 2. `apps/api/.env` 中 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 是否与 compose 配置一致。
 3. 若你改过 `MYSQL_DATABASE`、`MYSQL_USER` 或 `MYSQL_PASSWORD`，后端也必须同步修改。

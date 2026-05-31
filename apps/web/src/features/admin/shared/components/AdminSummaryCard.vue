@@ -34,6 +34,7 @@ withDefaults(
   border-radius: 14px;
   background: var(--admin-card-strong, var(--admin-card));
   border: 1px solid var(--admin-border-soft, var(--admin-border));
+  box-shadow: var(--admin-shadow-soft, none);
 }
 
 .summary-label {
@@ -45,7 +46,6 @@ withDefaults(
 .summary-value {
   font-size: 28px;
   font-weight: 700;
-  letter-spacing: 0.01em;
   color: var(--admin-text-1);
 }
 
