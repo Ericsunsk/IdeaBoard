@@ -85,7 +85,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	})
 	reconcileCancel()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to reconcile running task leases: %w", err)
+		return nil, fmt.Errorf("Failed to reconcile running task leases: %w", taskLeaseStartupRepairHint(err))
 	}
 	log.Printf("[Main] Reconciled running task leases: running=%d rebuilt_leases=%d rebuilt_account_counts=%d",
 		reconcileResult.RunningTasks,

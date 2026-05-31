@@ -316,21 +316,95 @@ func (r *TaskRepository) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, 
 	return taskIDs, nil
 }
 
+func (r *TaskRepository) runningTasksQuery(ctx context.Context) *gorm.DB {
+	return r.dbWithContext(ctx).Model(&tasks.Task{}).
+		Where("status = ?", tasks.StatusRunning)
+}
+
+func missingLeaseTokenQuery(query *gorm.DB) *gorm.DB {
+	return query.Where("(lease_token IS NULL OR lease_token = ?)", "")
+}
+
+func (r *TaskRepository) runningTaskLeasesQuery(ctx context.Context) *gorm.DB {
+	return r.runningTasksQuery(ctx).
+		Select("task_id", "account_id", "lease_token")
+}
+
 func (r *TaskRepository) ListRunningTaskLeases(ctx context.Context, limit int) ([]RunningTaskLease, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be positive")
 	}
 
 	var leases []RunningTaskLease
-	if err := r.dbWithContext(ctx).Model(&tasks.Task{}).
-		Select("task_id", "account_id", "lease_token").
-		Where("status = ?", tasks.StatusRunning).
+	if err := r.runningTaskLeasesQuery(ctx).
 		Order("id ASC").
 		Limit(limit).
 		Find(&leases).Error; err != nil {
 		return nil, err
 	}
 	return leases, nil
+}
+
+func (r *TaskRepository) CountRunningTasksMissingLeaseToken(ctx context.Context) (int64, error) {
+	var count int64
+	if err := missingLeaseTokenQuery(r.runningTasksQuery(ctx)).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *TaskRepository) ListRunningTasksMissingLeaseToken(ctx context.Context, limit int) ([]RunningTaskLease, error) {
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive")
+	}
+
+	var leases []RunningTaskLease
+	if err := missingLeaseTokenQuery(r.runningTaskLeasesQuery(ctx)).
+		Order("id ASC").
+		Limit(limit).
+		Find(&leases).Error; err != nil {
+		return nil, err
+	}
+	return leases, nil
+}
+
+func (r *TaskRepository) ResetRunningTasksMissingLeaseTokenToPending(ctx context.Context, limit int) (int64, error) {
+	if limit <= 0 {
+		return 0, fmt.Errorf("limit must be positive")
+	}
+
+	var rowsAffected int64
+	err := r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var taskIDs []string
+		if err := missingLeaseTokenQuery(tx.Model(&tasks.Task{}).
+			Select("task_id").
+			Where("status = ?", tasks.StatusRunning)).
+			Order("id ASC").
+			Limit(limit).
+			Pluck("task_id", &taskIDs).Error; err != nil {
+			return err
+		}
+		if len(taskIDs) == 0 {
+			return nil
+		}
+
+		result := missingLeaseTokenQuery(tx.Model(&tasks.Task{}).
+			Where("task_id IN ?", taskIDs).
+			Where("status = ?", tasks.StatusRunning)).
+			Updates(map[string]interface{}{
+				"status":       tasks.StatusPending,
+				"account_id":   0,
+				"lease_token":  "",
+				"error_msg":    "lease_token missing; reset to pending by task lease repair",
+				"completed_at": nil,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		rowsAffected = result.RowsAffected
+		return nil
+	})
+	return rowsAffected, err
 }
 
 func (r *TaskRepository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID uint64) error {

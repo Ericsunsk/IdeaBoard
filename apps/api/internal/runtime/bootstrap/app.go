@@ -42,9 +42,18 @@ func configureLogging(logFilePath string) {
 }
 
 func Run(args []string) {
-	if len(args) > 1 && args[1] == "init-admin" {
-		runInitAdmin()
-		return
+	if len(args) > 1 {
+		switch args[1] {
+		case "init-admin":
+			runInitAdmin()
+			return
+		case "preflight":
+			runPreflight(args[2:])
+			return
+		case "repair":
+			runRepair(args[2:])
+			return
+		}
 	}
 
 	cfg := config.Load()
