@@ -1,19 +1,25 @@
 <template>
-  <div class="admin-card-header" :class="{ 'is-small': size === 'small' }">
-    <div class="admin-card-header-main">
+  <div
+    class="admin-card-heading"
+    :class="{
+      'is-small': size === 'small',
+      'is-table': variant === 'table',
+    }"
+  >
+    <div class="admin-card-heading-main">
       <slot name="prefix" />
-      <div class="admin-card-copy">
-        <div v-if="status || provider" class="admin-card-title-row">
+      <div class="admin-card-heading-copy">
+        <div v-if="status || provider" class="admin-card-heading-title-row">
           <AdminChip v-if="provider" :label="provider" tone="strong" />
           <AdminChip v-if="status" :label="status" :variant="statusVariant" />
         </div>
-        <h3 class="admin-card-title">{{ title }}</h3>
-        <p v-if="trimmedSubtitle" class="admin-card-subtitle" :title="trimmedSubtitle">
+        <h3 class="admin-card-heading-title">{{ title }}</h3>
+        <p v-if="trimmedSubtitle" class="admin-card-heading-subtitle" :title="trimmedSubtitle">
           {{ trimmedSubtitle }}
         </p>
       </div>
     </div>
-    <div v-if="$slots.extra" class="admin-card-header-side">
+    <div v-if="$slots.extra" class="admin-card-heading-side">
       <slot name="extra" />
     </div>
   </div>
@@ -30,6 +36,7 @@ const props = withDefaults(
     title: string
     subtitle?: string
     size?: 'default' | 'small'
+    variant?: 'card' | 'table'
   }>(),
   {
     provider: '',
@@ -37,6 +44,7 @@ const props = withDefaults(
     statusVariant: 'neutral',
     subtitle: '',
     size: 'default',
+    variant: 'card',
   },
 )
 
@@ -46,14 +54,19 @@ const trimmedSubtitle = computed(() =>
 </script>
 
 <style scoped>
-.admin-card-header {
+.admin-card-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
 }
 
-.admin-card-header-main {
+.admin-card-heading.is-table {
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--admin-border-soft);
+}
+
+.admin-card-heading-main {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -61,12 +74,12 @@ const trimmedSubtitle = computed(() =>
   flex: 1;
 }
 
-.admin-card-copy {
+.admin-card-heading-copy {
   min-width: 0;
   flex: 1;
 }
 
-.admin-card-title-row {
+.admin-card-heading-title-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -74,7 +87,7 @@ const trimmedSubtitle = computed(() =>
   margin-bottom: 4px;
 }
 
-.admin-card-title {
+.admin-card-heading-title {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
@@ -82,17 +95,23 @@ const trimmedSubtitle = computed(() =>
   line-height: 1.2;
 }
 
-.admin-card-header.is-small .admin-card-title {
+.admin-card-heading.is-small .admin-card-heading-title {
   font-size: 15px;
   margin-top: 2px;
 }
 
-.admin-card-subtitle {
+.admin-card-heading-subtitle {
   margin: 4px 0 0;
   color: var(--admin-text-2);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+@media (max-width: 720px) {
+  .admin-card-heading.is-table {
+    padding: 12px 14px;
+  }
 }
 </style>

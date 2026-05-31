@@ -1,33 +1,20 @@
 <template>
   <div class="admin-page channels-page">
-    <div class="toolbar">
-      <div class="toolbar-left">
-        <n-input
-          v-model:value="searchKeyword"
-          placeholder="搜索渠道商名称..."
-          clearable
-          class="admin-search-input"
-        >
-          <template #prefix
-            ><n-icon><Search /></n-icon
-          ></template>
-        </n-input>
-        <n-button secondary class="admin-icon-btn" @click="loadData">
-          <template #icon
-            ><n-icon><Refresh /></n-icon
-          ></template>
-        </n-button>
-      </div>
-      <div class="toolbar-spacer" />
-      <div class="toolbar-right">
+    <AdminToolbar
+      v-model:search="searchKeyword"
+      search-placeholder="搜索渠道商名称..."
+      refresh-label="刷新渠道商"
+      @refresh="loadData"
+    >
+      <template #actions>
         <n-button type="primary" @click="openAddChannelModal">
           <template #icon
             ><n-icon><Plus /></n-icon
           ></template>
           新增渠道商
         </n-button>
-      </div>
-    </div>
+      </template>
+    </AdminToolbar>
 
     <div v-if="loading && channels.length === 0" class="loading-state">
       <n-spin size="large" />
@@ -265,7 +252,8 @@
 import channelApi from '../../../../shared/api/channel'
 import type { Channel, ChannelFormData } from '../../../../shared/api/channel'
 import { NButton, NIcon } from 'naive-ui'
-import { Plus, Refresh, Search } from '@iconoir/vue'
+import { Plus } from '@iconoir/vue'
+import AdminToolbar from '../../shared/components/AdminToolbar.vue'
 import { extractApiErrorMessage, getModelCategoryClass } from '../../shared/lib/assetLibraryShared'
 import { useChannelAccounts } from './useChannelAccounts'
 

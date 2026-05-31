@@ -7,29 +7,14 @@
       <AdminSummaryCard label="系统保留" :value="reservedUserCount" />
     </div>
 
-    <div class="toolbar users-toolbar">
-      <div class="toolbar-left">
-        <div class="search-wrapper">
-          <n-input
-            v-model:value="searchKeyword"
-            placeholder="搜索用户..."
-            clearable
-            class="admin-search-input"
-            @keyup.enter="loadUsers"
-          >
-            <template #prefix>
-              <n-icon><Search /></n-icon>
-            </template>
-          </n-input>
-        </div>
-        <n-button secondary class="admin-icon-btn" @click="loadUsers">
-          <template #icon
-            ><n-icon><Refresh /></n-icon
-          ></template>
-        </n-button>
-      </div>
-
-      <div class="toolbar-right">
+    <AdminToolbar
+      v-model:search="searchKeyword"
+      search-placeholder="搜索用户..."
+      refresh-label="刷新用户"
+      @refresh="loadUsers"
+      @search-submit="loadUsers"
+    >
+      <template #actions>
         <div class="control-pill">
           <span class="control-label">开放注册</span>
           <n-switch
@@ -95,11 +80,11 @@
             </div>
           </div>
         </n-popover>
-      </div>
-    </div>
+      </template>
+    </AdminToolbar>
 
     <div class="table-card users-table-card">
-      <AdminCardHeader title="用户目录">
+      <AdminCardHeader title="用户目录" variant="table">
         <template #extra>
           <n-popover
             placement="bottom-end"
@@ -252,7 +237,8 @@ import {
   updateRateLimitSettings,
   updateRegistrationSetting,
 } from '../../../../shared/query/adminQueries'
-import { Filter, MoreHoriz, Refresh, Search, Settings } from '@iconoir/vue'
+import { Filter, MoreHoriz, Settings } from '@iconoir/vue'
+import AdminToolbar from '../../shared/components/AdminToolbar.vue'
 import { adminPopoverPanelThemeOverrides } from '../../shared/theme/adminThemeOverrides'
 
 const message = useMessage()
@@ -797,11 +783,6 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
   color: var(--admin-text-2);
 }
 
-/* align with shared admin toolbar card style */
-.users-toolbar {
-  justify-content: space-between;
-}
-
 .rate-limit-panel {
   width: 280px;
   background: var(--admin-card);
@@ -877,13 +858,5 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 
 .users-table-card :deep(.n-data-table-thead) {
   display: none;
-}
-
-@media (max-width: 820px) {
-  .users-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
 }
 </style>

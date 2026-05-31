@@ -6,25 +6,6 @@ import type { Task } from '../../../../shared/api/task'
 import { sanitizeTaskErrorMessage } from '../../../../shared/utils/errorMessages'
 import { calcDurationSeconds, formatAdminDateTime } from '../../../../shared/utils/dateTime'
 
-export interface AccountLoad {
-  current_concurrent: number
-  max_concurrent: number
-}
-
-export interface MonitorStats {
-  pending: number
-  running: number
-  completed: number
-  failed: number
-}
-
-export interface MonitorState {
-  global_queue_len: number
-  wait_queue_len: number
-  running_tasks: number
-  account_loads: Record<number, AccountLoad>
-}
-
 type TaskStatusTagType = 'default' | 'warning' | 'success' | 'error'
 
 interface TaskStatusConfig {
@@ -33,11 +14,15 @@ interface TaskStatusConfig {
   color: string
 }
 
-export const TASK_PAGE_SIZE = 20
-export const MONITOR_REFRESH_INTERVAL_MS = 5000
-export const GLOBAL_QUEUE_CAPACITY = 10000
-export const GLOBAL_QUEUE_ALERT_THRESHOLD = 1000
-export const RUNNING_TASK_PRESSURE_THRESHOLD = 200
+type MonitorTaskRow = Task & {
+  username?: string
+  email?: string
+  user?: {
+    username?: string
+    email?: string
+  }
+}
+
 export const ERROR_TEXT_COLOR = 'var(--admin-danger)'
 export const DEFAULT_STATUS_COLOR = 'var(--admin-text-3)'
 
@@ -53,20 +38,6 @@ const taskStatusConfigMap: Record<string, TaskStatusConfig> = {
   running: { type: 'warning', text: '执行中', color: '#f59e0b' },
   completed: { type: 'success', text: '已完成', color: '#22c55e' },
   failed: { type: 'error', text: '失败', color: ERROR_TEXT_COLOR },
-}
-
-export const emptyMonitorStats: MonitorStats = {
-  pending: 0,
-  running: 0,
-  completed: 0,
-  failed: 0,
-}
-
-export const emptyMonitorState: MonitorState = {
-  global_queue_len: 0,
-  wait_queue_len: 0,
-  running_tasks: 0,
-  account_loads: {},
 }
 
 function getTaskResultImageUrl(result: string): string {
@@ -90,18 +61,6 @@ export function getTaskStatusConfig(status: string): TaskStatusConfig {
   return (
     taskStatusConfigMap[status] || { type: 'default', text: status, color: DEFAULT_STATUS_COLOR }
   )
-}
-
-export function calculateCappedRate(value: number, threshold: number): number {
-  return Math.min(100, (value / threshold) * 100)
-}
-
-export function calculateAccountLoadRate(load: AccountLoad): number {
-  return (load.current_concurrent / load.max_concurrent) * 100
-}
-
-export function isAccountSaturated(load: AccountLoad): boolean {
-  return load.current_concurrent >= load.max_concurrent
 }
 
 export function createMonitorTaskColumns(options?: {
@@ -146,9 +105,14 @@ export function createMonitorTaskColumns(options?: {
       title: '用户',
       key: 'user',
       width: 100,
-      render: (row: any) => {
+      render: (row) => {
+        const taskRow = row as MonitorTaskRow
         const identifier =
-          row.username || row.email || row.user?.username || row.user?.email || row.user_id
+          taskRow.username ||
+          taskRow.email ||
+          taskRow.user?.username ||
+          taskRow.user?.email ||
+          taskRow.user_id
         return h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
           h(
             'span',

@@ -148,22 +148,31 @@
   line-height: 172px;
 }
 
-.tasks-list-card .admin-card-header {
+.tasks-list-card .admin-card-heading.is-table {
   padding: 16px 20px;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.tasks-list-card .admin-card-title-wrapper {
+.tasks-list-card .admin-card-heading-main {
   flex: 1 1 180px;
 }
 
-.tasks-list-card .admin-card-actions {
+.tasks-list-title-icon {
+  color: var(--admin-text-2);
+  display: flex;
+  flex-shrink: 0;
+}
+
+.tasks-list-card .admin-card-heading-side {
+  flex: 1 1 420px;
+}
+
+.tasks-list-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  flex: 1 1 420px;
   min-width: 0;
 }
 
@@ -512,8 +521,12 @@
     grid-column: 1;
   }
 
-  .tasks-list-card .admin-card-actions {
+  .tasks-list-card .admin-card-heading-side,
+  .tasks-list-actions {
     width: 100%;
+  }
+
+  .tasks-list-actions {
     justify-content: stretch;
   }
 

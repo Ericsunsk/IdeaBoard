@@ -73,38 +73,39 @@
     </div>
 
     <div class="table-card admin-table-card tasks-list-card">
-      <div class="admin-card-header">
-        <div class="admin-card-title-wrapper">
-          <n-icon size="18" class="admin-card-title-icon"><List /></n-icon>
-          <h3 class="admin-card-title">任务列表</h3>
-        </div>
-        <div class="admin-card-actions">
-          <n-input
-            v-model:value="searchKeyword"
-            class="task-search-control"
-            placeholder="搜索用户ID或提示词..."
-            clearable
-            @keyup.enter="handleSearch"
-            @clear="handleSearch"
-          >
-            <template #prefix>
-              <n-icon><Search /></n-icon>
-            </template>
-          </n-input>
-          <n-select
-            v-model:value="filterStatus"
-            class="task-status-control"
-            :options="taskStatusOptions"
-            placeholder="所有状态"
-            clearable
-          />
-          <n-button secondary class="admin-icon-btn" aria-label="刷新任务列表" @click="loadTasks">
-            <template #icon>
-              <n-icon><Refresh /></n-icon>
-            </template>
-          </n-button>
-        </div>
-      </div>
+      <AdminCardHeader title="任务列表" size="small" variant="table">
+        <template #prefix>
+          <n-icon size="18" class="tasks-list-title-icon"><List /></n-icon>
+        </template>
+        <template #extra>
+          <div class="tasks-list-actions">
+            <n-input
+              v-model:value="searchKeyword"
+              class="task-search-control"
+              placeholder="搜索用户ID或提示词..."
+              clearable
+              @keyup.enter="handleSearch"
+              @clear="handleSearch"
+            >
+              <template #prefix>
+                <n-icon><Search /></n-icon>
+              </template>
+            </n-input>
+            <n-select
+              v-model:value="filterStatus"
+              class="task-status-control"
+              :options="taskStatusOptions"
+              placeholder="所有状态"
+              clearable
+            />
+            <n-button secondary class="admin-icon-btn" aria-label="刷新任务列表" @click="loadTasks">
+              <template #icon>
+                <n-icon><Refresh /></n-icon>
+              </template>
+            </n-button>
+          </div>
+        </template>
+      </AdminCardHeader>
       <n-data-table
         :columns="columns"
         :data="tasks"
@@ -324,6 +325,7 @@ import {
 } from '@iconoir/vue'
 import type { ECElementEvent } from 'echarts/core'
 import { taskStatusOptions, getTaskStatusConfig } from '../../shared/lib/monitorShared'
+import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import { VChart } from '../../shared/components/AdminEChart'
 import { useTaskResultDetail } from './useTaskResultDetail'

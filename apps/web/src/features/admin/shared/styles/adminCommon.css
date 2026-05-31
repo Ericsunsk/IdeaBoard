@@ -1,9 +1,4 @@
-.admin-page,
-.users-page,
-.accounts-page,
-.channels-page,
-.monitor-page,
-.records-page {
+.admin-page {
   --admin-bg: #f8f9fd;
   --admin-card: rgba(255, 255, 255, 0.94);
   --admin-card-strong: #ffffff;
@@ -43,44 +38,6 @@
   gap: 14px;
 }
 
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid var(--admin-border-soft);
-  border-radius: 14px;
-  padding: 12px;
-  background: var(--admin-card);
-}
-
-.toolbar-left,
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.toolbar-spacer {
-  flex: 1;
-}
-
-.admin-search-input {
-  width: 260px;
-  max-width: 100%;
-}
-
-.admin-search-input .n-input {
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.icon-btn {
-  border-radius: 12px;
-  min-width: 38px;
-}
-
 .control-pill {
   display: flex;
   align-items: center;
@@ -97,18 +54,8 @@
   font-weight: 500;
 }
 
-.toolbar-group-title {
-  color: var(--admin-text-3);
-  font-size: 12px;
-  margin-right: 2px;
-}
-
 .panel-card,
-.table-card,
-.queue-section,
-.load-section,
-.tasks-section,
-.table-section {
+.table-card {
   border: 1px solid var(--admin-border-soft);
   border-radius: 16px;
   background: var(--admin-card);
@@ -116,58 +63,13 @@
 }
 
 .panel-card:hover,
-.table-card:hover,
-.queue-section:hover,
-.load-section:hover,
-.tasks-section:hover,
-.table-section:hover {
+.table-card:hover {
   border-color: #c8d0e4;
 }
 
 .admin-table-card {
   padding: 0;
   overflow: hidden;
-}
-
-.admin-card-header {
-  padding: 14px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid var(--admin-border-soft);
-}
-
-.admin-card-title-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.admin-card-title-icon {
-  color: var(--admin-text-2);
-  display: flex;
-  flex-shrink: 0;
-}
-
-.admin-card-title {
-  margin: 0;
-  color: var(--admin-text-1);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-
-.admin-card-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.admin-table-container {
-  padding: 0;
 }
 
 .admin-compact-table .n-data-table-thead,
@@ -195,8 +97,7 @@
   padding-bottom: 9px !important;
 }
 
-.panel-header,
-.section-header {
+.panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -204,9 +105,7 @@
   margin-bottom: 12px;
 }
 
-.panel-title,
-.section-header h3,
-h3 {
+.panel-title {
   margin: 0;
   color: var(--admin-text-1);
   font-size: 16px;
@@ -223,49 +122,6 @@ h3 {
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
-}
-
-.admin-helper-text {
-  color: var(--admin-text-3);
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.admin-modal-text {
-  color: var(--admin-text-2);
-  line-height: 1.8;
-}
-
-.admin-preview-surface {
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--admin-preview-bg);
-  border: 1px solid var(--admin-border);
-}
-
-.admin-inline-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.admin-text-muted {
-  color: var(--admin-text-3);
-}
-
-.admin-text-main {
-  color: var(--admin-text-1);
-}
-
-.admin-text-success {
-  color: var(--admin-success);
-}
-
-.admin-text-warning {
-  color: var(--admin-warning);
-}
-
-.admin-text-danger {
-  color: var(--admin-danger);
 }
 
 .field-group {
@@ -602,15 +458,6 @@ h3 {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .toolbar {
-    padding: 10px;
-  }
-
-  .admin-search-input {
-    width: 100%;
-    flex: 1;
-  }
 }
 
 @media (max-width: 720px) {
@@ -619,31 +466,13 @@ h3 {
   }
 
   .panel-card,
-  .table-card,
-  .queue-section,
-  .load-section,
-  .tasks-section,
-  .table-section {
+  .table-card {
     padding: 12px;
     border-radius: 14px;
   }
 
   .field-row {
     flex-direction: column;
-  }
-
-  .toolbar {
-    gap: 12px;
-  }
-
-  .toolbar-left,
-  .toolbar-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .admin-card-header {
-    padding: 12px 14px;
   }
 
   .admin-compact-table .n-data-table-td {

@@ -2,14 +2,11 @@
   <div class="admin-page prompt-config-page">
     <div v-if="featureGroups.length > 0" class="node-grid">
       <section v-for="group in featureGroups" :key="group.key" class="node-card">
-        <div class="node-card-header">
-          <div class="node-card-copy">
-            <div class="node-title-row">
-              <h2 class="node-card-title">{{ group.title }}</h2>
-              <span class="node-card-count">{{ group.items.length }} 项配置</span>
-            </div>
-          </div>
-        </div>
+        <AdminCardHeader :title="group.title" size="small">
+          <template #extra>
+            <span class="node-card-count">{{ group.items.length }} 项配置</span>
+          </template>
+        </AdminCardHeader>
 
         <div class="node-card-meta">
           <span class="meta-chip">{{ getGroupVariableCount(group) }} 个变量</span>
@@ -102,6 +99,7 @@
 <script setup lang="ts">
 import { NButton, NInput } from 'naive-ui'
 import { computed, reactive, ref, watch } from 'vue'
+import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminEditorModal from '../../shared/components/AdminEditorModal.vue'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
 import { saveFeaturePrompt } from '../../../../shared/query/adminQueries'
@@ -289,31 +287,6 @@ async function savePrompt(slug: FeatureSlug) {
 .node-card:hover {
   border-color: var(--admin-border);
   background: var(--admin-card);
-}
-
-.node-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.node-card-copy {
-  min-width: 0;
-}
-
-.node-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.node-card-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 650;
-  color: var(--admin-text-1);
 }
 
 .node-card-count {
