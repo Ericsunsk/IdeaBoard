@@ -5,7 +5,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AdminStatisticsLatencyItem = {
+export type AdminStatisticsSlowModelsItem = {
   name: string;
   avg_seconds: number;
+  p95_seconds: number;
+  samples: number;
 };

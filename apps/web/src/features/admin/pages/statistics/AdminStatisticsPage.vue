@@ -8,7 +8,7 @@
     </div>
 
     <div class="charts-grid">
-      <div class="chart-card">
+      <div class="chart-card trend-card">
         <div class="chart-header-row">
           <div class="chart-header-left">
             <h3 class="chart-title">调用量趋势</h3>
@@ -46,25 +46,30 @@
           <VChart class="echart-host risk-echart" :option="modelRiskChartOption" autoresize />
         </div>
       </div>
-      <div class="chart-card health-card">
-        <div class="health-header">
-          <h3 class="chart-title">服务健康监测</h3>
-          <div class="health-stats">
-            <span class="health-label">{{ healthRangeLabel }}</span>
-            <span class="health-value">{{ healthRate }}</span>
-          </div>
+      <div class="chart-card quality-card">
+        <div class="chart-header-row">
+          <h3 class="chart-title">服务质量趋势</h3>
         </div>
-        <div class="chart-body health-chart-container">
-          <VChart class="echart-host health-echart" :option="healthHeatmapOption" autoresize />
+        <div class="chart-body quality-chart-container">
+          <VChart
+            class="echart-host quality-trend-echart"
+            :option="qualityTrendChartOption"
+            autoresize
+          />
         </div>
       </div>
+
       <div class="metrics-row">
         <div class="chart-card metric-mini-card">
           <div class="metric-header">
-            <span class="metric-title">模型响应延迟 (TTFT)</span>
+            <span class="metric-title">慢模型 P95</span>
           </div>
           <div class="chart-body metric-chart-container">
-            <VChart class="echart-host mini-bar-echart" :option="latencyChartOption" autoresize />
+            <VChart
+              class="echart-host mini-bar-echart"
+              :option="slowModelsChartOption"
+              autoresize
+            />
           </div>
         </div>
 
@@ -86,10 +91,10 @@
 
         <div class="chart-card metric-mini-card">
           <div class="metric-header">
-            <span class="metric-title">高耗用户排行</span>
+            <span class="metric-title">异常用户排行</span>
           </div>
           <div class="chart-body metric-chart-container">
-            <VChart class="echart-host mini-bar-echart" :option="userRankChartOption" autoresize />
+            <VChart class="echart-host mini-bar-echart" :option="userRiskChartOption" autoresize />
           </div>
         </div>
       </div>
@@ -120,12 +125,10 @@ const {
   queuePressure,
   queuePressureFoot,
   modelRiskChartOption,
-  healthHeatmapOption,
-  latencyChartOption,
+  qualityTrendChartOption,
+  slowModelsChartOption,
   accountLoadChartOption,
-  userRankChartOption,
-  healthRangeLabel,
-  healthRate,
+  userRiskChartOption,
   saturatedAccountCount,
 } = useUsageStatisticsCharts({
   adminStatistics,

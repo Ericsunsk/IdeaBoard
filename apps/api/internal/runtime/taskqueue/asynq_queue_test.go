@@ -3,6 +3,7 @@ package taskqueue
 import (
 	"api/internal/runtime/queuetypes"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -69,6 +70,37 @@ func TestAsynqQueueQueueLengthsUsesInspector(t *testing.T) {
 	}
 	if global != 6 || wait != 4 {
 		t.Fatalf("unexpected queue lengths global=%d wait=%d", global, wait)
+	}
+}
+
+func TestAsynqQueueQueueLengthsTreatsMissingQueueAsEmpty(t *testing.T) {
+	client := &fakeAsynqClient{}
+	inspector := &fakeAsynqInspector{err: fmt.Errorf("asynq: %w", asynq.ErrQueueNotFound)}
+	q := NewAsynqQueueWithClients(client, inspector, nil, AsynqQueueDefault, 5, 30*time.Second, time.Hour)
+
+	global, wait, err := q.QueueLengths(context.Background())
+	if err != nil {
+		t.Fatalf("QueueLengths should ignore missing queue: %v", err)
+	}
+	if global != 0 || wait != 0 {
+		t.Fatalf("missing queue should be empty, got global=%d wait=%d", global, wait)
+	}
+}
+
+func TestAsynqQueueMonitorInfoTreatsMissingQueueAsEmpty(t *testing.T) {
+	client := &fakeAsynqClient{}
+	inspector := &fakeAsynqInspector{err: fmt.Errorf("asynq: %w", asynq.ErrQueueNotFound)}
+	q := NewAsynqQueueWithClients(client, inspector, nil, AsynqQueueDefault, 5, 30*time.Second, time.Hour)
+
+	info, err := q.MonitorInfo(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("MonitorInfo should ignore missing queue: %v", err)
+	}
+	if info.GlobalQueueLen != 0 || info.WaitQueueLen != 0 || info.RunningTasks != 0 {
+		t.Fatalf("missing queue should be empty, got %+v", info)
+	}
+	if info.AccountLoads == nil {
+		t.Fatal("missing queue should still return an account_loads map")
 	}
 }
 

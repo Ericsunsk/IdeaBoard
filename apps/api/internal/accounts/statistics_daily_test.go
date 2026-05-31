@@ -44,6 +44,17 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 			t.Fatalf("seed daily stat failed: %v", err)
 		}
 	}
+	events := []TaskStatEvent{
+		{TaskID: "latency-a-1", StatDate: today, ModelName: "model-a", UserKey: "u1", Status: tasks.StatusCompleted, LatencySeconds: 18},
+		{TaskID: "latency-a-2", StatDate: today, ModelName: "model-a", UserKey: "u1", Status: tasks.StatusCompleted, LatencySeconds: 30},
+		{TaskID: "latency-a-3", StatDate: yesterday, ModelName: "model-a", UserKey: "u1", Status: tasks.StatusCompleted, LatencySeconds: 12},
+		{TaskID: "latency-zero", StatDate: today, ModelName: "model-b", UserKey: "u2", Status: tasks.StatusCompleted, LatencySeconds: 0},
+	}
+	for i := range events {
+		if err := taskRepo.db.Create(&events[i]).Error; err != nil {
+			t.Fatalf("seed stat event failed: %v", err)
+		}
+	}
 	if err := taskRepo.Create(ctx, &tasks.Task{TaskID: "p1", UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("seed pending task failed: %v", err)
 	}
@@ -73,24 +84,27 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	if stats.ModelHealth[1].Name != "model-a" || stats.ModelHealth[1].AvgSeconds != 14 {
 		t.Fatalf("model-a health should include avg latency, got %+v", stats.ModelHealth[1])
 	}
-	if len(stats.UserRank) == 0 || stats.UserRank[0].Name != "u1" || stats.UserRank[0].Value != 3 {
-		t.Fatalf("unexpected user ranking: %+v", stats.UserRank)
+	if len(stats.UserRisk) == 0 || stats.UserRisk[0].Name != "u2" || stats.UserRisk[0].Failed != 1 {
+		t.Fatalf("unexpected user risk ranking: %+v", stats.UserRisk)
 	}
-	foundLatency := false
-	for _, item := range stats.Latency {
+	foundSlowModel := false
+	for _, item := range stats.SlowModels {
 		if item.Name == "model-a" {
-			foundLatency = true
+			foundSlowModel = true
 			if item.AvgSeconds <= 0 {
 				t.Fatalf("model-a avg latency should be > 0")
 			}
+			if item.P95Seconds != 30 || item.Samples != 3 {
+				t.Fatalf("model-a p95/samples mismatch: %+v", item)
+			}
 		}
 	}
-	if !foundLatency {
-		t.Fatalf("expected model-a latency in response")
+	if !foundSlowModel {
+		t.Fatalf("expected model-a slow model in response")
 	}
 }
 
-func TestGetStatisticsHealthCellsAggregatedByDate(t *testing.T) {
+func TestGetStatisticsQualityTrendAggregatedByDate(t *testing.T) {
 	ctx := context.Background()
 	svc, taskRepo, _ := newStatisticsTestService(t)
 	now := time.Now()
@@ -112,21 +126,45 @@ func TestGetStatisticsHealthCellsAggregatedByDate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
-	if len(stats.HealthCells) != 7 {
-		t.Fatalf("health cells len=%d, want 7", len(stats.HealthCells))
+	if len(stats.QualityTrend) != 7 {
+		t.Fatalf("quality trend len=%d, want 7", len(stats.QualityTrend))
 	}
 
 	var foundToday bool
-	for _, cell := range stats.HealthCells {
-		if cell.Total == 5 {
+	for _, item := range stats.QualityTrend {
+		if item.Date == today {
 			foundToday = true
-			if cell.Success != 3 || cell.Fail != 2 {
-				t.Fatalf("today health cell mismatch: %+v", cell)
+			if item.Total != 5 || item.Success != 3 || item.Fail != 2 || item.SuccessRate != 60 {
+				t.Fatalf("today quality trend mismatch: %+v", item)
 			}
 		}
 	}
 	if !foundToday {
-		t.Fatalf("expected one aggregated today health cell total=5, got=%+v", stats.HealthCells)
+		t.Fatalf("expected one aggregated today quality trend item, got=%+v", stats.QualityTrend)
+	}
+}
+
+func TestGetStatisticsUserRiskRanksByFailureVolume(t *testing.T) {
+	ctx := context.Background()
+	svc, taskRepo, _ := newStatisticsTestService(t)
+	today := time.Now().Format("2006-01-02")
+
+	seed := []TaskDailyStat{
+		{StatDate: today, ModelName: "m1", UserKey: "low-volume", Total: 1, Completed: 0, Failed: 1},
+		{StatDate: today, ModelName: "m1", UserKey: "high-volume", Total: 100, Completed: 50, Failed: 50},
+	}
+	for i := range seed {
+		if err := taskRepo.db.Create(&seed[i]).Error; err != nil {
+			t.Fatalf("seed daily stat failed: %v", err)
+		}
+	}
+
+	stats, err := svc.GetStatistics(ctx, "7d")
+	if err != nil {
+		t.Fatalf("GetStatistics failed: %v", err)
+	}
+	if len(stats.UserRisk) == 0 || stats.UserRisk[0].Name != "high-volume" {
+		t.Fatalf("user risk should prioritize failure volume, got %+v", stats.UserRisk)
 	}
 }
 

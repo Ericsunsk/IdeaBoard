@@ -16,6 +16,7 @@ export function useUsageStatisticsData() {
   const statisticsQuery = useGetAdminStatistics(statisticsParams, {
     query: {
       placeholderData: (previous) => previous,
+      staleTime: 60_000,
     },
   })
 

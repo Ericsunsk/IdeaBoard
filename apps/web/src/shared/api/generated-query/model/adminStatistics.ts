@@ -5,19 +5,19 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdminStatisticsBackfillStatus } from './adminStatisticsBackfillStatus';
-import type { AdminStatisticsHealthCellsItem } from './adminStatisticsHealthCellsItem';
-import type { AdminStatisticsLatencyItem } from './adminStatisticsLatencyItem';
 import type { AdminStatisticsModelHealthItem } from './adminStatisticsModelHealthItem';
+import type { AdminStatisticsQualityTrendItem } from './adminStatisticsQualityTrendItem';
+import type { AdminStatisticsSlowModelsItem } from './adminStatisticsSlowModelsItem';
 import type { AdminStatisticsSummary } from './adminStatisticsSummary';
 import type { AdminStatisticsTrendItem } from './adminStatisticsTrendItem';
-import type { AdminStatisticsUserRankItem } from './adminStatisticsUserRankItem';
+import type { AdminStatisticsUserRiskItem } from './adminStatisticsUserRiskItem';
 
 export interface AdminStatistics {
   summary: AdminStatisticsSummary;
   trend: AdminStatisticsTrendItem[];
   model_health: AdminStatisticsModelHealthItem[];
-  user_rank: AdminStatisticsUserRankItem[];
-  latency: AdminStatisticsLatencyItem[];
-  health_cells: AdminStatisticsHealthCellsItem[];
+  quality_trend: AdminStatisticsQualityTrendItem[];
+  slow_models: AdminStatisticsSlowModelsItem[];
+  user_risk: AdminStatisticsUserRiskItem[];
   backfill_status: AdminStatisticsBackfillStatus;
 }

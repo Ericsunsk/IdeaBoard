@@ -75,13 +75,13 @@ const (
 )
 
 type AdminStatisticsResponse struct {
-	Summary     AdminStatisticsSummary       `json:"summary"`
-	Trend       []AdminStatisticsTrendItem   `json:"trend"`
-	ModelHealth []AdminStatisticsModelHealth `json:"model_health"`
-	UserRank    []AdminStatisticsUserItem    `json:"user_rank"`
-	Latency     []AdminStatisticsLatencyItem `json:"latency"`
-	HealthCells []AdminStatisticsHealthCell  `json:"health_cells"`
-	Backfill    AdminStatisticsBackfillState `json:"backfill_status,omitempty"`
+	Summary      AdminStatisticsSummary            `json:"summary"`
+	Trend        []AdminStatisticsTrendItem        `json:"trend"`
+	ModelHealth  []AdminStatisticsModelHealth      `json:"model_health"`
+	QualityTrend []AdminStatisticsQualityTrendItem `json:"quality_trend"`
+	SlowModels   []AdminStatisticsSlowModel        `json:"slow_models"`
+	UserRisk     []AdminStatisticsUserRiskItem     `json:"user_risk"`
+	Backfill     AdminStatisticsBackfillState      `json:"backfill_status,omitempty"`
 }
 
 type AdminStatisticsBackfillState struct {
@@ -135,21 +135,28 @@ type AdminStatisticsModelHealth struct {
 	AvgSeconds  float64 `json:"avg_seconds"`
 }
 
-type AdminStatisticsUserItem struct {
-	Name  string `json:"name"`
-	Value int64  `json:"value"`
+type AdminStatisticsQualityTrendItem struct {
+	Date        string  `json:"date"`
+	Label       string  `json:"label"`
+	Total       int64   `json:"total"`
+	Success     int64   `json:"success"`
+	Fail        int64   `json:"fail"`
+	SuccessRate float64 `json:"success_rate"`
 }
 
-type AdminStatisticsLatencyItem struct {
+type AdminStatisticsSlowModel struct {
 	Name       string  `json:"name"`
 	AvgSeconds float64 `json:"avg_seconds"`
+	P95Seconds float64 `json:"p95_seconds"`
+	Samples    int64   `json:"samples"`
 }
 
-type AdminStatisticsHealthCell struct {
-	Status  int   `json:"status"`
-	Success int64 `json:"success"`
-	Fail    int64 `json:"fail"`
-	Total   int64 `json:"total"`
+type AdminStatisticsUserRiskItem struct {
+	Name        string  `json:"name"`
+	Total       int64   `json:"total"`
+	Completed   int64   `json:"completed"`
+	Failed      int64   `json:"failed"`
+	FailureRate float64 `json:"failure_rate"`
 }
 
 // TaskDailyStat 按天+模型+用户的任务终态聚合快照（仅终态任务计入）。

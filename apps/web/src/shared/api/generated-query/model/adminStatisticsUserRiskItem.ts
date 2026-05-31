@@ -5,7 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AdminStatisticsUserRankItem = {
+export type AdminStatisticsUserRiskItem = {
   name: string;
-  value: number;
+  total: number;
+  completed: number;
+  failed: number;
+  failure_rate: number;
 };

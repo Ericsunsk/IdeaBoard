@@ -3,6 +3,7 @@ import type { Task } from '../../../../shared/api/task'
 import { createMonitorTaskColumns } from '../../shared/lib/monitorShared'
 import { useListAdminTasks } from '../../../../shared/api/generated-query/admin-tasks/admin-tasks'
 import { calcDurationSeconds } from '../../../../shared/utils/dateTime'
+import { useAdminQueryPolling } from '../../shared/composables/useAdminQueryPolling'
 
 const SLOW_TASK_SECONDS = 60
 type SlowTaskRow = { task: Task; seconds: number }
@@ -38,9 +39,20 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
     return params
   }
 
+  const hasActiveTasks = ref(true)
+
+  const polling = useAdminQueryPolling({
+    visibleInterval: 4_000,
+    hiddenInterval: false,
+    isEnabled: () => hasActiveTasks.value,
+  })
+
   const tasksQuery = useListAdminTasks(computed(resolveParams), {
     query: {
       placeholderData: (prev) => prev,
+      refetchInterval: polling.refetchInterval,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: false,
     },
   })
 
@@ -77,6 +89,16 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
       .slice(0, 5),
   )
 
+  watch(
+    tasks,
+    (rows) => {
+      hasActiveTasks.value = rows.some(
+        (task) => task.status === 'pending' || task.status === 'running',
+      )
+    },
+    { immediate: true },
+  )
+
   function handleSearch() {
     page.value = 1
     appliedSearchKeyword.value = searchKeyword.value
@@ -84,6 +106,10 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
 
   watch(filterStatus, () => {
     page.value = 1
+  })
+
+  watch(polling.isPageVisible, (isVisible, wasVisible) => {
+    if (isVisible && !wasVisible && hasActiveTasks.value) void tasksQuery.refetch()
   })
 
   function loadTasks() {

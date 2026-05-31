@@ -5,9 +5,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AdminStatisticsHealthCellsItem = {
-  status: number;
+export type AdminStatisticsQualityTrendItem = {
+  date: string;
+  label: string;
+  total: number;
   success: number;
   fail: number;
-  total: number;
+  success_rate: number;
 };

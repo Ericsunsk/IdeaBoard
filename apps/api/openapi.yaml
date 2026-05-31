@@ -1154,7 +1154,7 @@ components:
 
     AdminStatistics:
       type: object
-      required: [summary, trend, model_health, user_rank, latency, health_cells, backfill_status]
+      required: [summary, trend, model_health, quality_trend, slow_models, user_risk, backfill_status]
       properties:
         summary:
           type: object
@@ -1201,32 +1201,39 @@ components:
               failed: { type: integer }
               failure_rate: { type: number }
               avg_seconds: { type: number }
-        user_rank:
+        quality_trend:
           type: array
           items:
             type: object
-            required: [name, value]
+            required: [date, label, total, success, fail, success_rate]
             properties:
-              name: { type: string }
-              value: { type: integer }
-        latency:
+              date: { type: string }
+              label: { type: string }
+              total: { type: integer }
+              success: { type: integer }
+              fail: { type: integer }
+              success_rate: { type: number }
+        slow_models:
           type: array
           items:
             type: object
-            required: [name, avg_seconds]
+            required: [name, avg_seconds, p95_seconds, samples]
             properties:
               name: { type: string }
               avg_seconds: { type: number }
-        health_cells:
+              p95_seconds: { type: number }
+              samples: { type: integer }
+        user_risk:
           type: array
           items:
             type: object
-            required: [status, success, fail, total]
+            required: [name, total, completed, failed, failure_rate]
             properties:
-              status: { type: integer }
-              success: { type: integer }
-              fail: { type: integer }
+              name: { type: string }
               total: { type: integer }
+              completed: { type: integer }
+              failed: { type: integer }
+              failure_rate: { type: number }
         backfill_status:
           type: object
           required: [range_start, range_end, missing_days, backfilled_days]

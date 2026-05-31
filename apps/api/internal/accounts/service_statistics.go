@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -58,6 +59,10 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 	if err != nil {
 		return nil, err
 	}
+	latencySamples, err := s.taskRepo.ListStatEventLatencySamplesByDateRange(ctx, rangeStartDate, rangeEndDate)
+	if err != nil {
+		return nil, err
+	}
 
 	yesterdayDate := yesterdayStart.Format("2006-01-02")
 	monthStartDate := monthStart.Format("2006-01-02")
@@ -75,10 +80,12 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 	}
 
 	type trendBucket struct {
-		date   string
-		label  string
-		total  int64
-		models map[string]int64
+		date    string
+		label   string
+		total   int64
+		success int64
+		fail    int64
+		models  map[string]int64
 	}
 	buckets := make(map[string]*trendBucket, days)
 	orderedDays := make([]string, 0, days)
@@ -94,7 +101,12 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 		orderedDays = append(orderedDays, dateKey)
 	}
 
-	userCounter := map[string]int64{}
+	type userMetricAcc struct {
+		total     int64
+		completed int64
+		failed    int64
+	}
+	userMetrics := map[string]*userMetricAcc{}
 	type modelMetricAcc struct {
 		total        int64
 		completed    int64
@@ -103,14 +115,6 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 		latencyCount int64
 	}
 	modelMetrics := map[string]*modelMetricAcc{}
-	healthCells := make([]AdminStatisticsHealthCell, days)
-	for i := range healthCells {
-		healthCells[i] = AdminStatisticsHealthCell{Status: 0, Success: 0, Fail: 0, Total: 0}
-	}
-	dayIndexByDate := make(map[string]int, len(orderedDays))
-	for i, dayKey := range orderedDays {
-		dayIndexByDate[dayKey] = i
-	}
 
 	var todayCalls, todaySuccess, todayFailed int64
 	for _, row := range rangeDailyRows {
@@ -119,6 +123,8 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 		user := row.UserKey
 		if bucket, ok := buckets[dateKey]; ok {
 			bucket.total += row.Total
+			bucket.success += row.Completed
+			bucket.fail += row.Failed
 			bucket.models[model] += row.Total
 		}
 		modelAcc := modelMetrics[model]
@@ -129,39 +135,24 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 		modelAcc.total += row.Total
 		modelAcc.completed += row.Completed
 		modelAcc.failed += row.Failed
-		userCounter[user] += row.Total
+		userAcc := userMetrics[user]
+		if userAcc == nil {
+			userAcc = &userMetricAcc{}
+			userMetrics[user] = userAcc
+		}
+		userAcc.total += row.Total
+		userAcc.completed += row.Completed
+		userAcc.failed += row.Failed
 
 		if row.LatencyCount > 0 {
 			modelAcc.latencyTotal += row.LatencySecondsSum
 			modelAcc.latencyCount += row.LatencyCount
 		}
 
-		if cellIdx, ok := dayIndexByDate[dateKey]; ok && cellIdx >= 0 && cellIdx < len(healthCells) {
-			healthCells[cellIdx].Total += row.Total
-			healthCells[cellIdx].Success += row.Completed
-			healthCells[cellIdx].Fail += row.Failed
-		}
-
 		if dateKey == todayStart.Format("2006-01-02") {
 			todayCalls += row.Total
 			todaySuccess += row.Completed
 			todayFailed += row.Failed
-		}
-	}
-
-	for i := range healthCells {
-		cell := &healthCells[i]
-		if cell.Total == 0 {
-			cell.Status = 0
-			continue
-		}
-		ratio := float64(cell.Success) / float64(cell.Total)
-		if ratio < 0.5 {
-			cell.Status = 1
-		} else if ratio < 0.9 {
-			cell.Status = 2
-		} else {
-			cell.Status = 3
 		}
 	}
 
@@ -196,29 +187,72 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 		})
 	}
 
-	userRank := make([]AdminStatisticsUserItem, 0, len(userCounter))
-	for name, value := range userCounter {
-		userRank = append(userRank, AdminStatisticsUserItem{Name: name, Value: value})
-	}
-	sort.Slice(userRank, func(i, j int) bool {
-		if userRank[i].Value == userRank[j].Value {
-			return userRank[i].Name < userRank[j].Name
+	qualityTrend := make([]AdminStatisticsQualityTrendItem, 0, len(orderedDays))
+	for _, dayKey := range orderedDays {
+		b := buckets[dayKey]
+		successRate := 0.0
+		if b.total > 0 {
+			successRate = (float64(b.success) / float64(b.total)) * 100
 		}
-		return userRank[i].Value > userRank[j].Value
-	})
-	if len(userRank) > 6 {
-		userRank = userRank[:6]
+		qualityTrend = append(qualityTrend, AdminStatisticsQualityTrendItem{
+			Date:        b.date,
+			Label:       b.label,
+			Total:       b.total,
+			Success:     b.success,
+			Fail:        b.fail,
+			SuccessRate: successRate,
+		})
 	}
 
-	latency := make([]AdminStatisticsLatencyItem, 0, len(modelMetrics))
+	userRisk := make([]AdminStatisticsUserRiskItem, 0, len(userMetrics))
+	for name, acc := range userMetrics {
+		failureRate := 0.0
+		if acc.total > 0 {
+			failureRate = (float64(acc.failed) / float64(acc.total)) * 100
+		}
+		userRisk = append(userRisk, AdminStatisticsUserRiskItem{
+			Name:        name,
+			Total:       acc.total,
+			Completed:   acc.completed,
+			Failed:      acc.failed,
+			FailureRate: failureRate,
+		})
+	}
+	sort.Slice(userRisk, func(i, j int) bool {
+		if userRisk[i].Failed == userRisk[j].Failed {
+			if userRisk[i].FailureRate == userRisk[j].FailureRate {
+				if userRisk[i].Total == userRisk[j].Total {
+					return userRisk[i].Name < userRisk[j].Name
+				}
+				return userRisk[i].Total > userRisk[j].Total
+			}
+			return userRisk[i].FailureRate > userRisk[j].FailureRate
+		}
+		return userRisk[i].Failed > userRisk[j].Failed
+	})
+	if len(userRisk) > 6 {
+		userRisk = userRisk[:6]
+	}
+
+	latencyByModel := make(map[string][]float64)
+	for _, sample := range latencySamples {
+		latencyByModel[sample.ModelName] = append(latencyByModel[sample.ModelName], sample.LatencySeconds)
+	}
+
+	slowModels := make([]AdminStatisticsSlowModel, 0, len(modelMetrics))
 	modelHealth := make([]AdminStatisticsModelHealth, 0, len(modelMetrics))
 	for name, acc := range modelMetrics {
 		avgSeconds := 0.0
 		if acc.latencyCount > 0 {
 			avgSeconds = acc.latencyTotal / float64(acc.latencyCount)
-			latency = append(latency, AdminStatisticsLatencyItem{
+		}
+		samples := latencyByModel[name]
+		if acc.latencyCount > 0 || len(samples) > 0 {
+			slowModels = append(slowModels, AdminStatisticsSlowModel{
 				Name:       name,
 				AvgSeconds: avgSeconds,
+				P95Seconds: percentile95(samples),
+				Samples:    int64(len(samples)),
 			})
 		}
 		if acc.total == 0 {
@@ -233,12 +267,21 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 			AvgSeconds:  avgSeconds,
 		})
 	}
-	sort.Slice(latency, func(i, j int) bool {
-		if latency[i].AvgSeconds == latency[j].AvgSeconds {
-			return latency[i].Name < latency[j].Name
+	sort.Slice(slowModels, func(i, j int) bool {
+		if slowModels[i].P95Seconds == slowModels[j].P95Seconds {
+			if slowModels[i].AvgSeconds == slowModels[j].AvgSeconds {
+				if slowModels[i].Samples == slowModels[j].Samples {
+					return slowModels[i].Name < slowModels[j].Name
+				}
+				return slowModels[i].Samples > slowModels[j].Samples
+			}
+			return slowModels[i].AvgSeconds > slowModels[j].AvgSeconds
 		}
-		return latency[i].AvgSeconds < latency[j].AvgSeconds
+		return slowModels[i].P95Seconds > slowModels[j].P95Seconds
 	})
+	if len(slowModels) > 6 {
+		slowModels = slowModels[:6]
+	}
 	sort.Slice(modelHealth, func(i, j int) bool {
 		if modelHealth[i].FailureRate == modelHealth[j].FailureRate {
 			if modelHealth[i].AvgSeconds == modelHealth[j].AvgSeconds {
@@ -267,11 +310,11 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 			Completed:        stats[tasks.StatusCompleted],
 			Failed:           stats[tasks.StatusFailed],
 		},
-		Trend:       trend,
-		ModelHealth: modelHealth,
-		UserRank:    userRank,
-		Latency:     latency,
-		HealthCells: healthCells,
+		Trend:        trend,
+		ModelHealth:  modelHealth,
+		QualityTrend: qualityTrend,
+		SlowModels:   slowModels,
+		UserRisk:     userRisk,
 		Backfill: AdminStatisticsBackfillState{
 			RangeStart:     rangeStartDate,
 			RangeEnd:       rangeEndDate,
@@ -279,6 +322,21 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 			BackfilledDays: len(backfilledDates),
 		},
 	}, nil
+}
+
+func percentile95(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sort.Float64s(values)
+	idx := int(math.Ceil(float64(len(values))*0.95)) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(values) {
+		idx = len(values) - 1
+	}
+	return values[idx]
 }
 
 func (s *AccountService) BackfillStatistics(ctx context.Context, rawRange string) (*AdminStatisticsBackfillResult, error) {

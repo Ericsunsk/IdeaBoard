@@ -25,9 +25,27 @@ type StatisticsLike = {
     failure_rate: number
     avg_seconds: number
   }>
-  user_rank?: Array<{ name: string; value: number }>
-  latency?: Array<{ name: string; avg_seconds: number }>
-  health_cells?: Array<{ status: number; success: number; fail: number; total: number }>
+  quality_trend?: Array<{
+    date: string
+    label: string
+    total: number
+    success: number
+    fail: number
+    success_rate: number
+  }>
+  slow_models?: Array<{
+    name: string
+    avg_seconds: number
+    p95_seconds: number
+    samples: number
+  }>
+  user_risk?: Array<{
+    name: string
+    total: number
+    completed: number
+    failed: number
+    failure_rate: number
+  }>
 }
 type MonitorLike = {
   global_queue_len: number
@@ -59,8 +77,6 @@ export function useUsageStatisticsCharts(options: {
   monitorData: Ref<MonitorLike | null>
 }) {
   const defaultModelColors = ['#818cf8', '#c084fc', '#22d3ee', '#14b8a6', '#f59e0b', '#ef4444']
-  const HEALTH_COLS = 70
-  const HEALTH_ROWS = 6
 
   function getModelColorByName(name: string) {
     const key = normalizeModelName(name)
@@ -169,7 +185,7 @@ export function useUsageStatisticsCharts(options: {
         pageTextStyle: { color: adminChartTheme.axisText },
         textStyle: { color: adminChartTheme.legendText, fontSize: 11 },
       },
-      grid: { left: 10, right: 12, top: 36, bottom: 30, containLabel: true },
+      grid: { left: 18, right: 24, top: 42, bottom: 34, containLabel: true },
       tooltip: {
         trigger: 'axis',
         backgroundColor: adminChartTheme.tooltipBg,
@@ -275,7 +291,13 @@ export function useUsageStatisticsCharts(options: {
     const maxTotal = Math.max(1, ...modelRiskRows.value.map((item) => item.total))
     return {
       animationDuration: 300,
-      grid: { left: 8, right: 10, top: 54, bottom: 28, containLabel: true },
+      grid: {
+        left: 46,
+        right: 78,
+        top: hasModelRiskData ? 58 : 44,
+        bottom: 52,
+        containLabel: true,
+      },
       tooltip: {
         trigger: 'item',
         backgroundColor: adminChartTheme.tooltipBg,
@@ -288,7 +310,7 @@ export function useUsageStatisticsCharts(options: {
             value?: [number, number, number, number]
           }
           const [avgSeconds = 0, failureRate = 0, total = 0, failed = 0] = params.value || []
-          return `${escapeHTML(params.name || '未知模型')}<br/>失败率：${failureRate.toFixed(1)}%<br/>平均 TTFT：${avgSeconds.toFixed(2)}s<br/>调用量：${total.toLocaleString()}<br/>失败：${failed.toLocaleString()}`
+          return `${escapeHTML(params.name || '未知模型')}<br/>失败率：${failureRate.toFixed(1)}%<br/>平均耗时：${avgSeconds.toFixed(2)}s<br/>调用量：${total.toLocaleString()}<br/>失败：${failed.toLocaleString()}`
         },
       },
       visualMap: {
@@ -296,7 +318,7 @@ export function useUsageStatisticsCharts(options: {
         type: 'piecewise',
         dimension: 1,
         top: 0,
-        right: 0,
+        right: 8,
         orient: 'horizontal',
         itemWidth: 8,
         itemHeight: 8,
@@ -310,8 +332,10 @@ export function useUsageStatisticsCharts(options: {
       },
       xAxis: {
         type: 'value',
-        name: 'TTFT',
+        name: '平均耗时',
+        nameLocation: 'middle',
         min: 0,
+        nameGap: 32,
         splitNumber: 4,
         axisLabel: {
           color: adminChartTheme.axisText,
@@ -326,6 +350,7 @@ export function useUsageStatisticsCharts(options: {
         name: '失败率',
         min: 0,
         max: 100,
+        nameGap: 24,
         axisLabel: {
           color: adminChartTheme.axisText,
           fontSize: 10,
@@ -370,7 +395,7 @@ export function useUsageStatisticsCharts(options: {
             {
               type: 'text',
               left: 'center',
-              top: 'middle',
+              top: '48%',
               style: {
                 text: '暂无模型风险数据',
                 fill: adminChartTheme.emptyText,
@@ -381,109 +406,106 @@ export function useUsageStatisticsCharts(options: {
     } as EChartsOption
   })
 
-  const healthGridFlat = computed(() => {
-    const totalCells = HEALTH_COLS * HEALTH_ROWS
-    const rows = options.adminStatistics.value?.health_cells || []
-    if (rows.length >= totalCells) return rows.slice(0, totalCells)
-    return rows.concat(
-      Array.from({ length: totalCells - rows.length }, () => ({
-        status: 0,
-        success: 0,
-        fail: 0,
-        total: 0,
-      })),
-    )
-  })
-  const healthSampleTotal = computed(() =>
-    healthGridFlat.value.reduce((sum, cell) => sum + (cell.total || 0), 0),
+  const qualityTrendRows = computed(() =>
+    (options.adminStatistics.value?.quality_trend || []).map((item) => ({
+      label: item.label || item.date,
+      total: Math.max(0, Number(item.total) || 0),
+      success: Math.max(0, Number(item.success) || 0),
+      fail: Math.max(0, Number(item.fail) || 0),
+      successRate: normalizePercent(item.success_rate),
+    })),
   )
-  const healthSuccessTotal = computed(() =>
-    healthGridFlat.value.reduce((sum, cell) => sum + (cell.success || 0), 0),
-  )
-  const healthRangeLabel = computed(() => getRangeLabel(options.timeRange.value))
-
-  const healthHeatmapOption = computed<EChartsOption>(() => {
-    const hasHealthData = healthGridFlat.value.some((cell) => cell.total > 0)
-    const heatmapData = healthGridFlat.value.map((cell, index) => ({
-      value: [index % HEALTH_COLS, Math.floor(index / HEALTH_COLS), cell.status],
-      success: cell.success,
-      fail: cell.fail,
-      total: cell.total,
-      index,
-    }))
-
+  const qualityTrendChartOption = computed<EChartsOption>(() => {
+    const hasQualityData = qualityTrendRows.value.some((item) => item.total > 0)
+    const categories = qualityTrendRows.value.map((item) => item.label)
     return {
-      animationDuration: 200,
-      grid: { left: 0, right: 0, top: 6, bottom: 36, containLabel: false },
+      animationDuration: 300,
+      color: ['#ef4444', '#6366f1'],
+      legend: {
+        top: 0,
+        right: 0,
+        itemWidth: 10,
+        itemHeight: 6,
+        icon: 'roundRect',
+        textStyle: { color: adminChartTheme.legendText, fontSize: 11 },
+      },
+      grid: { left: 44, right: 54, top: 42, bottom: 36, containLabel: true },
       tooltip: {
-        trigger: 'item',
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
         backgroundColor: adminChartTheme.tooltipBg,
         borderColor: adminChartTheme.tooltipBorder,
         borderWidth: 1,
         textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
         formatter: (rawParams: unknown) => {
-          const params = rawParams as {
-            data?: { success?: number; fail?: number; total?: number; index?: number }
-          }
-          const data = params.data
-          if (!data) return ''
-          const success = Number(data.success) || 0
-          const fail = Number(data.fail) || 0
-          const total = Number(data.total) || 0
-          const passRate = total === 0 ? '0.0' : ((success / total) * 100).toFixed(1)
-          return `${formatHealthRangeLabel(options.timeRange.value, Number(data.index) || 0)}<br/>成功 ${success} / 失败 ${fail}<br/>成功率 ${passRate}%`
+          const params = Array.isArray(rawParams) ? rawParams : [rawParams]
+          const first = params[0] as { axisValueLabel?: string; dataIndex?: number } | undefined
+          const row = qualityTrendRows.value[first?.dataIndex ?? -1]
+          const axisValue = escapeHTML(String(first?.axisValueLabel || ''))
+          if (!row) return axisValue
+          return `${axisValue}<br/>总调用：${row.total.toLocaleString()}<br/>成功：${row.success.toLocaleString()}<br/>失败：${row.fail.toLocaleString()}<br/>成功率：${row.successRate.toFixed(1)}%`
         },
       },
       xAxis: {
         type: 'category',
-        show: false,
-        data: Array.from({ length: HEALTH_COLS }, (_, i) => i),
+        data: categories,
+        axisLine: { lineStyle: { color: adminChartTheme.axisLine } },
+        axisTick: { show: false },
+        axisLabel: {
+          color: adminChartTheme.axisText,
+          fontSize: 10,
+          hideOverlap: true,
+          interval: (index: number) =>
+            shouldShowAxisLabel(index, qualityTrendRows.value.length, options.timeRange.value),
+        },
       },
-      yAxis: {
-        type: 'category',
-        show: false,
-        inverse: true,
-        data: Array.from({ length: HEALTH_ROWS }, (_, i) => i),
-      },
-      visualMap: {
-        show: true,
-        type: 'piecewise',
-        dimension: 2,
-        min: 0,
-        max: 3,
-        left: 0,
-        bottom: 0,
-        orient: 'horizontal',
-        itemWidth: 8,
-        itemHeight: 8,
-        itemGap: 14,
-        textStyle: { color: adminChartTheme.axisText, fontSize: 11 },
-        pieces: [
-          { value: 3, label: '正常', color: '#10b981' },
-          { value: 2, label: '波动', color: '#f59e0b' },
-          { value: 1, label: '故障', color: '#ef4444' },
-          { value: 0, label: '无数据', color: '#e2e8f0' },
-        ],
-      },
-      series: [
+      yAxis: [
         {
-          type: 'heatmap' as const,
-          data: heatmapData,
-          progressive: 0,
-          itemStyle: {
-            borderRadius: 1.5,
-            borderWidth: 1,
-            borderColor: 'rgba(148, 163, 184, 0.12)',
+          type: 'value',
+          name: '失败数',
+          min: 0,
+          minInterval: 1,
+          nameGap: 20,
+          axisLabel: { color: adminChartTheme.axisText, fontSize: 10 },
+          nameTextStyle: { color: adminChartTheme.axisText, fontSize: 10 },
+          splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
+        },
+        {
+          type: 'value',
+          name: '成功率',
+          min: 0,
+          max: 100,
+          nameGap: 24,
+          axisLabel: {
+            color: adminChartTheme.axisText,
+            fontSize: 10,
+            formatter: '{value}%',
           },
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 8,
-              shadowColor: 'rgba(15, 23, 42, 0.24)',
-            },
-          },
+          nameTextStyle: { color: adminChartTheme.axisText, fontSize: 10 },
+          splitLine: { show: false },
         },
       ],
-      graphic: hasHealthData
+      series: [
+        {
+          name: '失败',
+          type: 'bar' as const,
+          yAxisIndex: 0,
+          barMaxWidth: 18,
+          data: qualityTrendRows.value.map((item) => item.fail),
+          itemStyle: { color: '#ef4444', borderRadius: [3, 3, 0, 0] },
+        },
+        {
+          name: '成功率',
+          type: 'line' as const,
+          yAxisIndex: 1,
+          smooth: true,
+          symbolSize: 5,
+          lineStyle: { width: 2, color: '#6366f1' },
+          itemStyle: { color: '#6366f1' },
+          data: qualityTrendRows.value.map((item) => item.successRate),
+        },
+      ],
+      graphic: hasQualityData
         ? []
         : [
             {
@@ -491,7 +513,7 @@ export function useUsageStatisticsCharts(options: {
               left: 'center',
               top: 'middle',
               style: {
-                text: '暂无健康监测数据',
+                text: '暂无服务质量趋势数据',
                 fill: adminChartTheme.emptyText,
                 fontSize: 12,
               },
@@ -500,27 +522,32 @@ export function useUsageStatisticsCharts(options: {
     } as EChartsOption
   })
 
-  const latencyRows = computed(() => {
-    const rows: Array<{ name: string; val: number; color: string }> = []
-    const source = options.adminStatistics.value?.latency || []
-    source.forEach((item, idx) => {
-      const latency = Number(item.avg_seconds)
-      if (!Number.isFinite(latency)) return
-      const color = getModelColorByName(item.name)
-      rows.push({
-        name: item.name || '未知模型',
-        val: Math.max(0, latency),
-        color:
-          color || defaultModelColors[idx % defaultModelColors.length] || 'var(--admin-warning)',
+  const slowModelRows = computed(() =>
+    (options.adminStatistics.value?.slow_models || [])
+      .map((item, idx) => {
+        const modelName = item.name || '未知模型'
+        const p95Seconds = Math.max(0, Number(item.p95_seconds) || 0)
+        const avgSeconds = Math.max(0, Number(item.avg_seconds) || 0)
+        const samples = Math.max(0, Math.round(Number(item.samples) || 0))
+        return {
+          name: modelName,
+          p95Seconds,
+          avgSeconds,
+          samples,
+          color:
+            getModelColorByName(modelName) ||
+            defaultModelColors[idx % defaultModelColors.length] ||
+            '#6366f1',
+        }
       })
-    })
-    return rows.sort((a, b) => b.val - a.val).slice(0, 5)
-  })
-  const latencyChartOption = computed<EChartsOption>(() => {
-    const hasLatencyData = latencyRows.value.length > 0
+      .sort((a, b) => b.p95Seconds - a.p95Seconds)
+      .slice(0, 6),
+  )
+  const slowModelsChartOption = computed<EChartsOption>(() => {
+    const hasSlowModelData = slowModelRows.value.length > 0
     return {
       animationDuration: 260,
-      grid: { left: 10, right: 12, top: 6, bottom: 4, containLabel: true },
+      grid: { left: 14, right: 76, top: 12, bottom: 12, containLabel: true },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
@@ -531,10 +558,13 @@ export function useUsageStatisticsCharts(options: {
         formatter: (rawParams: unknown) => {
           const params = (Array.isArray(rawParams) ? rawParams[0] : rawParams) as {
             axisValueLabel?: string
-            value?: number
+            data?: { p95Seconds?: number; avgSeconds?: number; samples?: number }
           }
-          const value = Number(params?.value) || 0
-          return `${escapeHTML(params?.axisValueLabel || '未知模型')}<br/>平均 TTFT：${value.toFixed(2)}s`
+          const data = params.data || {}
+          const p95 = Number(data.p95Seconds || 0)
+          const avg = Number(data.avgSeconds || 0)
+          const samples = Number(data.samples || 0)
+          return `${escapeHTML(params.axisValueLabel || '未知模型')}<br/>P95：${p95.toFixed(2)}s<br/>平均：${avg.toFixed(2)}s<br/>样本：${samples.toLocaleString()}`
         },
       },
       xAxis: {
@@ -556,31 +586,34 @@ export function useUsageStatisticsCharts(options: {
         axisLabel: {
           color: adminChartTheme.axisText,
           fontSize: 11,
-          width: 90,
+          width: 110,
           overflow: 'truncate',
         },
-        data: latencyRows.value.map((row) => row.name),
+        data: slowModelRows.value.map((row) => row.name),
       },
       series: [
         {
           type: 'bar' as const,
+          barWidth: 8,
           showBackground: true,
           backgroundStyle: { color: 'rgba(148, 163, 184, 0.1)', borderRadius: [0, 4, 4, 0] },
-          data: latencyRows.value.map((row) => ({
-            value: row.val,
+          data: slowModelRows.value.map((row) => ({
+            value: row.p95Seconds,
+            p95Seconds: row.p95Seconds,
+            avgSeconds: row.avgSeconds,
+            samples: row.samples,
             itemStyle: { color: row.color, borderRadius: [0, 4, 4, 0] },
           })),
-          barWidth: 8,
           label: {
             show: true,
             position: 'right',
             color: adminChartTheme.axisText,
             fontSize: 10,
-            formatter: ({ value }: { value: number }) => `${Number(value).toFixed(2)}s`,
+            formatter: ({ value }: { value: number }) => `${Number(value || 0).toFixed(2)}s`,
           },
         },
       ],
-      graphic: hasLatencyData
+      graphic: hasSlowModelData
         ? []
         : [
             {
@@ -588,7 +621,7 @@ export function useUsageStatisticsCharts(options: {
               left: 'center',
               top: 'middle',
               style: {
-                text: '暂无延迟数据',
+                text: '暂无慢模型数据',
                 fill: adminChartTheme.emptyText,
                 fontSize: 12,
               },
@@ -596,12 +629,6 @@ export function useUsageStatisticsCharts(options: {
           ],
     } as EChartsOption
   })
-
-  const healthRate = computed(() =>
-    healthSampleTotal.value === 0
-      ? '0.0%'
-      : `${((healthSuccessTotal.value / healthSampleTotal.value) * 100).toFixed(1)}%`,
-  )
 
   const monitorQueueTotal = computed(
     () =>
@@ -638,7 +665,7 @@ export function useUsageStatisticsCharts(options: {
     const hasAccountData = accountLoadRows.value.length > 0
     return {
       animationDuration: 260,
-      grid: { left: 4, right: 8, top: 8, bottom: 4, containLabel: true },
+      grid: { left: 10, right: 66, top: 12, bottom: 12, containLabel: true },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
@@ -712,16 +739,23 @@ export function useUsageStatisticsCharts(options: {
     } as EChartsOption
   })
 
-  const userRankRows = computed(() =>
-    (options.adminStatistics.value?.user_rank || [])
-      .slice(0, 6)
-      .map((item, idx) => ({ ...item, rank: idx + 1 })),
+  const userRiskRows = computed(() =>
+    (options.adminStatistics.value?.user_risk || [])
+      .map((item) => ({
+        name: item.name || '未知用户',
+        total: Math.max(0, Number(item.total) || 0),
+        completed: Math.max(0, Number(item.completed) || 0),
+        failed: Math.max(0, Number(item.failed) || 0),
+        failureRate: normalizePercent(item.failure_rate),
+      }))
+      .sort((a, b) => b.failed - a.failed)
+      .slice(0, 6),
   )
-  const userRankChartOption = computed<EChartsOption>(() => {
-    const hasRankData = userRankRows.value.length > 0
+  const userRiskChartOption = computed<EChartsOption>(() => {
+    const hasRiskData = userRiskRows.value.length > 0
     return {
       animationDuration: 260,
-      grid: { left: 10, right: 10, top: 8, bottom: 4, containLabel: true },
+      grid: { left: 14, right: 68, top: 12, bottom: 12, containLabel: true },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
@@ -732,11 +766,19 @@ export function useUsageStatisticsCharts(options: {
         formatter: (rawParams: unknown) => {
           const params = (Array.isArray(rawParams) ? rawParams[0] : rawParams) as {
             axisValueLabel?: string
-            value?: number
-            dataIndex?: number
+            data?: {
+              failed?: number
+              failureRate?: number
+              completed?: number
+              total?: number
+            }
           }
-          const index = Number(params.dataIndex) || 0
-          return `#${index + 1} ${escapeHTML(params.axisValueLabel || '未知用户')}<br/>调用量：${Number(params.value || 0).toLocaleString()}`
+          const data = params.data || {}
+          const total = Number(data.total || 0)
+          const completed = Number(data.completed || 0)
+          const failed = Number(data.failed || 0)
+          const failureRate = Number(data.failureRate || 0)
+          return `${escapeHTML(params.axisValueLabel || '未知用户')}<br/>失败：${failed.toLocaleString()}<br/>成功：${completed.toLocaleString()}<br/>总调用：${total.toLocaleString()}<br/>失败率：${failureRate.toFixed(1)}%`
         },
       },
       xAxis: {
@@ -757,7 +799,7 @@ export function useUsageStatisticsCharts(options: {
           width: 100,
           overflow: 'truncate',
         },
-        data: userRankRows.value.map((item) => item.name),
+        data: userRiskRows.value.map((item) => item.name),
       },
       series: [
         {
@@ -765,18 +807,29 @@ export function useUsageStatisticsCharts(options: {
           barWidth: 8,
           showBackground: true,
           backgroundStyle: { color: 'rgba(148, 163, 184, 0.1)', borderRadius: [0, 4, 4, 0] },
-          data: userRankRows.value.map((item) => item.value),
-          itemStyle: { color: '#4f46e5', borderRadius: [0, 4, 4, 0] },
+          data: userRiskRows.value.map((item) => ({
+            value: item.failed,
+            failed: item.failed,
+            completed: item.completed,
+            total: item.total,
+            failureRate: item.failureRate,
+            itemStyle: {
+              color:
+                item.failureRate >= 20 ? '#ef4444' : item.failureRate >= 8 ? '#f59e0b' : '#6366f1',
+              borderRadius: [0, 4, 4, 0],
+            },
+          })),
           label: {
             show: true,
             position: 'right',
             color: adminChartTheme.axisText,
             fontSize: 10,
-            formatter: ({ value }: { value: number }) => Number(value).toLocaleString(),
+            formatter: ({ data }: { data: { failureRate: number } }) =>
+              `${data.failureRate.toFixed(1)}%`,
           },
         },
       ],
-      graphic: hasRankData
+      graphic: hasRiskData
         ? []
         : [
             {
@@ -784,7 +837,7 @@ export function useUsageStatisticsCharts(options: {
               left: 'center',
               top: 'middle',
               style: {
-                text: '暂无用户排行数据',
+                text: '暂无异常用户数据',
                 fill: adminChartTheme.emptyText,
                 fontSize: 12,
               },
@@ -810,12 +863,10 @@ export function useUsageStatisticsCharts(options: {
     queuePressure,
     queuePressureFoot,
     modelRiskChartOption,
-    healthHeatmapOption,
-    latencyChartOption,
+    qualityTrendChartOption,
+    slowModelsChartOption,
     accountLoadChartOption,
-    userRankChartOption,
-    healthRangeLabel,
-    healthRate,
+    userRiskChartOption,
     saturatedAccountCount,
   }
 }
@@ -832,16 +883,6 @@ function colorForModel(name: string, palette: string[]) {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = (hash << 5) - hash + name.charCodeAt(i)
   return palette[Math.abs(hash) % palette.length]
-}
-
-function formatHealthRangeLabel(timeRange: string, index: number) {
-  return `${getRangeLabel(timeRange)} 样本区间 #${index + 1}`
-}
-
-function getRangeLabel(timeRange: string) {
-  if (timeRange === '7d') return '最近7天'
-  if (timeRange === '30d') return '最近30天'
-  return '最近1年'
 }
 
 function isMonthStartLabel(label: string): boolean {
@@ -865,4 +906,17 @@ function buildDeltaFoot(current: number, previous: number, label: string) {
 function formatSignedPercentPoint(value: number) {
   if (value === 0) return '0.0pp'
   return `${value > 0 ? '+' : '-'}${Math.abs(value).toFixed(1)}pp`
+}
+
+function normalizePercent(value: number): number {
+  const parsed = Number(value) || 0
+  const percent = parsed <= 1 ? parsed * 100 : parsed
+  return Math.max(0, Math.min(100, percent))
+}
+
+function shouldShowAxisLabel(index: number, count: number, timeRange: string) {
+  if (count <= 7) return true
+  if (timeRange === '30d') return index === 0 || index === count - 1 || index % 6 === 0
+  if (timeRange === '1y') return index === 0 || index === count - 1 || index % 30 === 0
+  return true
 }

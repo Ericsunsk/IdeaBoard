@@ -133,6 +133,11 @@ type DailyStatAggregate struct {
 	LatencyCount      int64
 }
 
+type StatEventLatencySample struct {
+	ModelName      string
+	LatencySeconds float64
+}
+
 func NewTaskRepository(db *gorm.DB) *TaskRepository {
 	return &TaskRepository{db: db}
 }
@@ -673,6 +678,19 @@ func (r *TaskRepository) ListDailyStatsByDateRange(ctx context.Context, startDat
 		Select("stat_date", "model_name", "user_key", "total", "completed", "failed", "latency_seconds_sum", "latency_count").
 		Where("stat_date >= ? AND stat_date <= ?", startDate, endDate).
 		Order("stat_date ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (r *TaskRepository) ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate string) ([]StatEventLatencySample, error) {
+	var rows []StatEventLatencySample
+	err := r.dbWithContext(ctx).Model(&TaskStatEvent{}).
+		Select("model_name", "latency_seconds").
+		Where("stat_date >= ? AND stat_date <= ? AND latency_seconds > 0", startDate, endDate).
+		Order("model_name ASC, latency_seconds ASC").
 		Find(&rows).Error
 	if err != nil {
 		return nil, err

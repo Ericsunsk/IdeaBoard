@@ -2,6 +2,7 @@ package taskqueue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -104,6 +105,9 @@ func (q *AsynqQueue) Enqueue(ctx context.Context, task *queuetypes.TaskPayload) 
 func (q *AsynqQueue) QueueLengths(ctx context.Context) (int64, int64, error) {
 	info, err := q.inspector.GetQueueInfo(q.queueName)
 	if err != nil {
+		if errors.Is(err, asynq.ErrQueueNotFound) {
+			return 0, 0, nil
+		}
 		return 0, 0, fmt.Errorf("asynq queue lengths: %w", err)
 	}
 	global := int64(info.Pending + info.Scheduled + info.Retry)
@@ -114,7 +118,10 @@ func (q *AsynqQueue) QueueLengths(ctx context.Context) (int64, int64, error) {
 func (q *AsynqQueue) MonitorInfo(ctx context.Context, accountIDs []uint64) (*queuetypes.MonitorInfo, error) {
 	info, err := q.inspector.GetQueueInfo(q.queueName)
 	if err != nil {
-		return nil, fmt.Errorf("asynq monitor info: %w", err)
+		if !errors.Is(err, asynq.ErrQueueNotFound) {
+			return nil, fmt.Errorf("asynq monitor info: %w", err)
+		}
+		info = &asynq.QueueInfo{}
 	}
 	loads := map[uint64]*queuetypes.AccountLoad{}
 	if q.redisMgr != nil {
