@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { dismissAppToasts } from '../../shared/composables/useAppToast'
+import { adminRoutes } from '../../features/admin/app/adminRoutes'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -55,58 +56,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../../pages/user/UserWorkspacePage.vue'),
     meta: { requiresAuth: true },
   },
-  {
-    path: '/admin',
-    component: () => import('../../pages/admin/AdminLayoutPage.vue'),
-    children: [
-      {
-        path: '',
-        redirect: '/admin/users',
-      },
-      {
-        path: 'login',
-        name: 'AdminLogin',
-        component: () => import('../../pages/admin/AdminLoginPage.vue'),
-        meta: { guest: true },
-      },
-      {
-        path: 'users',
-        name: 'AdminUsers',
-        component: () => import('../../pages/admin/AdminUsersPage.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'statistics',
-        name: 'AdminStatistics',
-        component: () => import('../../pages/admin/AdminUsageStatisticsPage.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'task-monitor',
-        name: 'AdminTaskMonitor',
-        component: () => import('../../pages/admin/AdminTaskMonitorPage.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'channels',
-        name: 'AdminChannels',
-        component: () => import('../../pages/admin/AdminChannelsPage.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'oss-config',
-        name: 'AdminOSSConfig',
-        component: () => import('../../pages/admin/AdminStoragePage.vue'),
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'feature-prompts',
-        name: 'AdminFeaturePrompts',
-        component: () => import('../../pages/admin/AdminFeaturePromptsPage.vue'),
-        meta: { requiresAuth: true },
-      },
-    ],
-  },
+  ...adminRoutes,
 ]
 
 const router = createRouter({
