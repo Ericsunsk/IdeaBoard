@@ -12,7 +12,7 @@ export * from './adminStatistics';
 export * from './adminStatisticsBackfillStatus';
 export * from './adminStatisticsHealthCellsItem';
 export * from './adminStatisticsLatencyItem';
-export * from './adminStatisticsModelRankingItem';
+export * from './adminStatisticsModelHealthItem';
 export * from './adminStatisticsSummary';
 export * from './adminStatisticsTrendItem';
 export * from './adminStatisticsTrendItemSegmentsItem';

@@ -75,13 +75,13 @@ const (
 )
 
 type AdminStatisticsResponse struct {
-	Summary      AdminStatisticsSummary       `json:"summary"`
-	Trend        []AdminStatisticsTrendItem   `json:"trend"`
-	ModelRanking []AdminStatisticsModelItem   `json:"model_ranking"`
-	UserRank     []AdminStatisticsUserItem    `json:"user_rank"`
-	Latency      []AdminStatisticsLatencyItem `json:"latency"`
-	HealthCells  []AdminStatisticsHealthCell  `json:"health_cells"`
-	Backfill     AdminStatisticsBackfillState `json:"backfill_status,omitempty"`
+	Summary     AdminStatisticsSummary       `json:"summary"`
+	Trend       []AdminStatisticsTrendItem   `json:"trend"`
+	ModelHealth []AdminStatisticsModelHealth `json:"model_health"`
+	UserRank    []AdminStatisticsUserItem    `json:"user_rank"`
+	Latency     []AdminStatisticsLatencyItem `json:"latency"`
+	HealthCells []AdminStatisticsHealthCell  `json:"health_cells"`
+	Backfill    AdminStatisticsBackfillState `json:"backfill_status,omitempty"`
 }
 
 type AdminStatisticsBackfillState struct {
@@ -126,10 +126,13 @@ type AdminStatisticsTrendItemModel struct {
 	Value int64  `json:"value"`
 }
 
-type AdminStatisticsModelItem struct {
-	Name    string `json:"name"`
-	Value   int64  `json:"value"`
-	Percent int64  `json:"percent"`
+type AdminStatisticsModelHealth struct {
+	Name        string  `json:"name"`
+	Total       int64   `json:"total"`
+	Completed   int64   `json:"completed"`
+	Failed      int64   `json:"failed"`
+	FailureRate float64 `json:"failure_rate"`
+	AvgSeconds  float64 `json:"avg_seconds"`
 }
 
 type AdminStatisticsUserItem struct {

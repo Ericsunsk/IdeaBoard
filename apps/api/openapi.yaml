@@ -1154,7 +1154,7 @@ components:
 
     AdminStatistics:
       type: object
-      required: [summary, trend, model_ranking, user_rank, latency, health_cells, backfill_status]
+      required: [summary, trend, model_health, user_rank, latency, health_cells, backfill_status]
       properties:
         summary:
           type: object
@@ -1189,15 +1189,18 @@ components:
                   properties:
                     label: { type: string }
                     value: { type: integer }
-        model_ranking:
+        model_health:
           type: array
           items:
             type: object
-            required: [name, value, percent]
+            required: [name, total, completed, failed, failure_rate, avg_seconds]
             properties:
               name: { type: string }
-              value: { type: integer }
-              percent: { type: number }
+              total: { type: integer }
+              completed: { type: integer }
+              failed: { type: integer }
+              failure_rate: { type: number }
+              avg_seconds: { type: number }
         user_rank:
           type: array
           items:

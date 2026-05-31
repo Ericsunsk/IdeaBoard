@@ -64,8 +64,14 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	if stats.Summary.YesterdayCalls != 1 || stats.Summary.YesterdaySuccess != 1 {
 		t.Fatalf("yesterday calls/success = %d/%d", stats.Summary.YesterdayCalls, stats.Summary.YesterdaySuccess)
 	}
-	if len(stats.ModelRanking) == 0 || stats.ModelRanking[0].Name != "model-a" || stats.ModelRanking[0].Value != 3 {
-		t.Fatalf("unexpected model ranking: %+v", stats.ModelRanking)
+	if len(stats.ModelHealth) < 2 {
+		t.Fatalf("expected model health rows, got %+v", stats.ModelHealth)
+	}
+	if stats.ModelHealth[0].Name != "model-b" || stats.ModelHealth[0].FailureRate != 100 {
+		t.Fatalf("highest risk model should be model-b with 100%% failure rate, got %+v", stats.ModelHealth[0])
+	}
+	if stats.ModelHealth[1].Name != "model-a" || stats.ModelHealth[1].AvgSeconds != 14 {
+		t.Fatalf("model-a health should include avg latency, got %+v", stats.ModelHealth[1])
 	}
 	if len(stats.UserRank) == 0 || stats.UserRank[0].Name != "u1" || stats.UserRank[0].Value != 3 {
 		t.Fatalf("unexpected user ranking: %+v", stats.UserRank)

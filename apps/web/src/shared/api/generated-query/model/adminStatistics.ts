@@ -7,7 +7,7 @@
 import type { AdminStatisticsBackfillStatus } from './adminStatisticsBackfillStatus';
 import type { AdminStatisticsHealthCellsItem } from './adminStatisticsHealthCellsItem';
 import type { AdminStatisticsLatencyItem } from './adminStatisticsLatencyItem';
-import type { AdminStatisticsModelRankingItem } from './adminStatisticsModelRankingItem';
+import type { AdminStatisticsModelHealthItem } from './adminStatisticsModelHealthItem';
 import type { AdminStatisticsSummary } from './adminStatisticsSummary';
 import type { AdminStatisticsTrendItem } from './adminStatisticsTrendItem';
 import type { AdminStatisticsUserRankItem } from './adminStatisticsUserRankItem';
@@ -15,7 +15,7 @@ import type { AdminStatisticsUserRankItem } from './adminStatisticsUserRankItem'
 export interface AdminStatistics {
   summary: AdminStatisticsSummary;
   trend: AdminStatisticsTrendItem[];
-  model_ranking: AdminStatisticsModelRankingItem[];
+  model_health: AdminStatisticsModelHealthItem[];
   user_rank: AdminStatisticsUserRankItem[];
   latency: AdminStatisticsLatencyItem[];
   health_cells: AdminStatisticsHealthCellsItem[];

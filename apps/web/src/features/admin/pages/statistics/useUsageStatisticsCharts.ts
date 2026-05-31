@@ -1,6 +1,5 @@
 import type { EChartsOption } from 'echarts'
 import type { Ref } from 'vue'
-import { splitCommaValues } from '../../shared/lib/assetLibraryShared'
 
 type StatisticsLike = {
   summary?: {
@@ -18,7 +17,14 @@ type StatisticsLike = {
     total: number
     segments: Array<{ label: string; value: number }>
   }>
-  model_ranking?: Array<{ name: string; value: number; percent: number }>
+  model_health?: Array<{
+    name: string
+    total: number
+    completed: number
+    failed: number
+    failure_rate: number
+    avg_seconds: number
+  }>
   user_rank?: Array<{ name: string; value: number }>
   latency?: Array<{ name: string; avg_seconds: number }>
   health_cells?: Array<{ status: number; success: number; fail: number; total: number }>
@@ -30,19 +36,16 @@ type MonitorLike = {
   account_loads: Record<number, { current_concurrent: number; max_concurrent: number }>
 }
 
-type ChannelLike = { id: number; name: string }
-type ConfiguredAccountLike = { model_set: string; platform: string; channel_id: number }
-
 const adminChartTheme = {
   tooltipBg: '#f8fafc',
   tooltipBorder: '#d9e2ef',
   tooltipText: '#0f172a',
   tooltipMuted: '#64748b',
-  tooltipBody: '#334155',
-  tooltipDivider: '#e2e8f0',
   axisLine: '#d5deea',
   axisText: '#6e7487',
   splitLine: '#edf2f7',
+  legendText: '#475569',
+  legendInactive: '#cbd5e1',
   emptyText: '#6e7487',
   emptyStroke: '#c8d0e4',
   cardBg: '#f8fafc',
@@ -52,8 +55,6 @@ const adminChartTheme = {
 
 export function useUsageStatisticsCharts(options: {
   adminStatistics: Ref<StatisticsLike | null>
-  configuredAccounts: Ref<ConfiguredAccountLike[]>
-  configuredChannels: Ref<ChannelLike[]>
   timeRange: Ref<string>
   monitorData: Ref<MonitorLike | null>
 }) {
@@ -61,43 +62,10 @@ export function useUsageStatisticsCharts(options: {
   const HEALTH_COLS = 70
   const HEALTH_ROWS = 6
 
-  const configuredModelProviderMap = computed(() => {
-    const map = new Map<string, string>()
-    const channelNameByID = new Map<number, string>()
-    options.configuredChannels.value.forEach((channel) => {
-      channelNameByID.set(channel.id, channel.name || '')
-    })
-    options.configuredAccounts.value.forEach((account) => {
-      const channelName =
-        channelNameByID.get(account.channel_id) || account.platform || '未配置渠道'
-      splitCommaValues(account.model_set).forEach((model) => {
-        const key = normalizeModelName(model)
-        if (!key || map.has(key)) return
-        map.set(key, channelName)
-      })
-    })
-    return map
-  })
-
-  const configuredModelNames = computed(() => {
-    const names: string[] = []
-    const seen = new Set<string>()
-    options.configuredAccounts.value.forEach((account) => {
-      splitCommaValues(account.model_set).forEach((model) => {
-        const key = normalizeModelName(model)
-        if (!key || seen.has(key)) return
-        seen.add(key)
-        names.push(model)
-      })
-    })
-    return names
-  })
-
-  function getModelMetaByName(name: string) {
+  function getModelColorByName(name: string) {
     const key = normalizeModelName(name)
     if (!key) return null
-    const provider = configuredModelProviderMap.value.get(key) || '未配置渠道'
-    return { label: provider, color: colorForModel(key, defaultModelColors) }
+    return colorForModel(key, defaultModelColors)
   }
 
   const trendData = computed(() => {
@@ -114,11 +82,11 @@ export function useUsageStatisticsCharts(options: {
     })
     return fallback.map((day) => {
       const segments = day.segments.map((seg, idx) => {
-        const match = getModelMetaByName(seg.label)
+        const color = getModelColorByName(seg.label)
         return {
           label: seg.label,
           value: seg.value,
-          color: match?.color || defaultModelColors[idx % defaultModelColors.length],
+          color: color || defaultModelColors[idx % defaultModelColors.length],
         }
       })
       if (segments.length === 0)
@@ -187,7 +155,21 @@ export function useUsageStatisticsCharts(options: {
     return {
       animationDuration: 300,
       color: trendSeriesModelOrder.value.map((m) => m.color),
-      grid: { left: 10, right: 12, top: 10, bottom: 30, containLabel: true },
+      legend: {
+        type: 'scroll',
+        top: 0,
+        left: 0,
+        right: 0,
+        icon: 'roundRect',
+        itemWidth: 10,
+        itemHeight: 6,
+        itemGap: 14,
+        pageIconColor: adminChartTheme.legendText,
+        pageIconInactiveColor: adminChartTheme.legendInactive,
+        pageTextStyle: { color: adminChartTheme.axisText },
+        textStyle: { color: adminChartTheme.legendText, fontSize: 11 },
+      },
+      grid: { left: 10, right: 12, top: 36, bottom: 30, containLabel: true },
       tooltip: {
         trigger: 'axis',
         backgroundColor: adminChartTheme.tooltipBg,
@@ -198,34 +180,7 @@ export function useUsageStatisticsCharts(options: {
           type: 'line',
           lineStyle: { color: adminChartTheme.tooltipMuted, type: 'dashed' },
         },
-        formatter: (rawParams: unknown) => {
-          const rows = (Array.isArray(rawParams) ? rawParams : [rawParams]) as Array<{
-            dataIndex?: number
-          }>
-          const dayIndex = rows[0]?.dataIndex ?? 0
-          const day = trendData.value[dayIndex]
-          if (!day) return ''
-          const visibleSegments = day.segments.filter((segment) => segment.value > 0)
-          const segmentRows = (visibleSegments.length > 0 ? visibleSegments : day.segments)
-            .map(
-              (segment) =>
-                `<div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-<span style="width:8px;height:8px;border-radius:50%;background:${segment.color};display:inline-block;"></span>
-<span style="flex:1;color:${adminChartTheme.tooltipBody};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(segment.label)}</span>
-<span style="font-family:ui-monospace,monospace;font-weight:600;">${segment.value.toLocaleString()}</span>
-</div>`,
-            )
-            .join('')
-
-          return `<div style="min-width:170px;">
-<div style="color:${adminChartTheme.tooltipMuted};font-size:11px;font-weight:600;">${escapeHTML(day.date)}</div>
-${segmentRows}
-<div style="height:1px;background:${adminChartTheme.tooltipDivider};margin:8px 0;"></div>
-<div style="display:flex;justify-content:space-between;font-weight:700;">
-<span>总计</span><span>${day.total.toLocaleString()}</span>
-</div>
-</div>`
-        },
+        valueFormatter: (value: number | string) => Number(value || 0).toLocaleString(),
       },
       xAxis: {
         type: 'category',
@@ -271,7 +226,6 @@ ${segmentRows}
   const todayCalls = computed(() => options.adminStatistics.value?.summary?.today_calls || 0)
   const todaySuccess = computed(() => options.adminStatistics.value?.summary?.today_success || 0)
   const todayFailed = computed(() => options.adminStatistics.value?.summary?.today_failed || 0)
-  const totalCalls = computed(() => options.adminStatistics.value?.summary?.total_calls || 0)
   const yesterdayCalls = computed(
     () => options.adminStatistics.value?.summary?.yesterday_calls || 0,
   )
@@ -303,51 +257,25 @@ ${segmentRows}
     return `${formatSignedPercentPoint((currentRate - yesterdayRate) * 100)} 较昨日`
   })
 
-  const modelRanking = computed(() => {
-    const data = options.adminStatistics.value?.model_ranking || []
-    return data.slice(0, 5).map((item, idx) => {
-      const modelName = item.name === 'Unknown' ? '未识别模型' : item.name
-      const match = getModelMetaByName(modelName)
-      return {
-        name: modelName,
-        provider: match?.label || '未配置渠道',
-        value: item.value,
-        percent: item.percent,
-        color: match?.color || defaultModelColors[idx % defaultModelColors.length],
-      }
-    })
-  })
+  const modelRiskRows = computed(() =>
+    (options.adminStatistics.value?.model_health || [])
+      .filter((item) => item.total > 0)
+      .slice(0, 12)
+      .map((item) => ({
+        name: item.name === 'Unknown' ? '未识别模型' : item.name,
+        total: item.total,
+        failed: item.failed,
+        failureRate: Math.max(0, Math.min(100, item.failure_rate || 0)),
+        avgSeconds: Math.max(0, item.avg_seconds || 0),
+      })),
+  )
 
-  const modelSettingCandidates = computed(() => {
-    const result: Array<{ name: string }> = []
-    const seen = new Set<string>()
-    configuredModelNames.value.forEach((name) => {
-      const key = normalizeModelName(name)
-      if (!key || seen.has(key)) return
-      seen.add(key)
-      result.push({ name })
-    })
-    modelRanking.value.forEach((item) => {
-      const key = normalizeModelName(item.name)
-      if (!key || seen.has(key)) return
-      seen.add(key)
-      result.push({ name: item.name })
-    })
-    return result
-  })
-
-  const consumptionChartOption = computed<EChartsOption>(() => {
-    const hasModelData = modelRanking.value.some((item) => item.value > 0)
-    const pieData = hasModelData
-      ? modelRanking.value.map((item) => ({
-          value: item.value,
-          name: item.name,
-          itemStyle: { color: item.color },
-        }))
-      : [{ value: 1, name: '暂无数据', itemStyle: { color: adminChartTheme.axisLine } }]
-
+  const modelRiskChartOption = computed<EChartsOption>(() => {
+    const hasModelRiskData = modelRiskRows.value.length > 0
+    const maxTotal = Math.max(1, ...modelRiskRows.value.map((item) => item.total))
     return {
       animationDuration: 300,
+      grid: { left: 8, right: 10, top: 54, bottom: 28, containLabel: true },
       tooltip: {
         trigger: 'item',
         backgroundColor: adminChartTheme.tooltipBg,
@@ -355,65 +283,101 @@ ${segmentRows}
         borderWidth: 1,
         textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
         formatter: (rawParams: unknown) => {
-          const params = rawParams as { name?: string; value?: number; percent?: number }
-          if (!hasModelData) return '暂无数据'
-          const name = params.name || '未知模型'
-          const value = Number.isFinite(params.value) ? Number(params.value) : 0
-          const percent = Number.isFinite(params.percent) ? Number(params.percent) : 0
-          return `${escapeHTML(name)}<br/>调用量：${value.toLocaleString()} (${percent}%)`
+          const params = rawParams as {
+            name?: string
+            value?: [number, number, number, number]
+          }
+          const [avgSeconds = 0, failureRate = 0, total = 0, failed = 0] = params.value || []
+          return `${escapeHTML(params.name || '未知模型')}<br/>失败率：${failureRate.toFixed(1)}%<br/>平均 TTFT：${avgSeconds.toFixed(2)}s<br/>调用量：${total.toLocaleString()}<br/>失败：${failed.toLocaleString()}`
         },
+      },
+      visualMap: {
+        show: hasModelRiskData,
+        type: 'piecewise',
+        dimension: 1,
+        top: 0,
+        right: 0,
+        orient: 'horizontal',
+        itemWidth: 8,
+        itemHeight: 8,
+        itemGap: 12,
+        textStyle: { color: adminChartTheme.axisText, fontSize: 11 },
+        pieces: [
+          { gt: 20, label: '高风险', color: '#ef4444' },
+          { gt: 5, lte: 20, label: '关注', color: '#f59e0b' },
+          { lte: 5, label: '稳定', color: '#10b981' },
+        ],
+      },
+      xAxis: {
+        type: 'value',
+        name: 'TTFT',
+        min: 0,
+        splitNumber: 4,
+        axisLabel: {
+          color: adminChartTheme.axisText,
+          fontSize: 10,
+          formatter: (value: number) => `${value.toFixed(1)}s`,
+        },
+        nameTextStyle: { color: adminChartTheme.axisText, fontSize: 10 },
+        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
+      },
+      yAxis: {
+        type: 'value',
+        name: '失败率',
+        min: 0,
+        max: 100,
+        axisLabel: {
+          color: adminChartTheme.axisText,
+          fontSize: 10,
+          formatter: '{value}%',
+        },
+        nameTextStyle: { color: adminChartTheme.axisText, fontSize: 10 },
+        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
       },
       series: [
         {
-          type: 'pie' as const,
-          radius: ['62%', '78%'],
-          center: ['50%', '50%'],
-          minAngle: 5,
-          avoidLabelOverlap: true,
-          label: { show: false },
-          itemStyle: {
-            borderColor: adminChartTheme.cardBg,
-            borderWidth: 2,
+          type: 'scatter' as const,
+          data: modelRiskRows.value.map((item) => ({
+            name: item.name,
+            value: [item.avgSeconds, item.failureRate, item.total, item.failed],
+          })),
+          symbolSize: (rawValue: unknown) => {
+            const value = Array.isArray(rawValue) ? Number(rawValue[2] || 0) : 0
+            return 10 + Math.sqrt(value / maxTotal) * 30
           },
           emphasis: {
-            scale: false,
-            itemStyle: {
-              shadowBlur: 12,
-              shadowColor: adminChartTheme.shadow,
+            focus: 'self' as const,
+            scale: true,
+            label: {
+              show: true,
+              formatter: ({ name }: { name?: string }) => name || '',
+              color: adminChartTheme.mainText,
+              fontSize: 11,
             },
           },
-          data: pieData,
-        },
-      ],
-      graphic: [
-        {
-          type: 'text',
-          left: 'center',
-          top: '42%',
-          z: 10,
-          style: {
-            text: '总调用',
-            fill: adminChartTheme.axisText,
-            fontSize: 12,
-            fontWeight: 500,
-            textAlign: 'center',
-          },
-        },
-        {
-          type: 'text',
-          left: 'center',
-          top: '51%',
-          z: 10,
-          style: {
-            text: totalCalls.value.toLocaleString(),
-            fill: adminChartTheme.mainText,
-            fontSize: 24,
-            fontWeight: 700,
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-            textAlign: 'center',
+          itemStyle: {
+            opacity: 0.88,
+            borderColor: adminChartTheme.cardBg,
+            borderWidth: 1,
+            shadowBlur: 8,
+            shadowColor: adminChartTheme.shadow,
           },
         },
       ],
+      graphic: hasModelRiskData
+        ? []
+        : [
+            {
+              type: 'text',
+              left: 'center',
+              top: 'middle',
+              style: {
+                text: '暂无模型风险数据',
+                fill: adminChartTheme.emptyText,
+                fontSize: 12,
+              },
+            },
+          ],
     } as EChartsOption
   })
 
@@ -442,7 +406,6 @@ ${segmentRows}
     const hasHealthData = healthGridFlat.value.some((cell) => cell.total > 0)
     const heatmapData = healthGridFlat.value.map((cell, index) => ({
       value: [index % HEALTH_COLS, Math.floor(index / HEALTH_COLS), cell.status],
-      itemStyle: { color: getHealthStatusColor(cell.status) },
       success: cell.success,
       fail: cell.fail,
       total: cell.total,
@@ -451,7 +414,7 @@ ${segmentRows}
 
     return {
       animationDuration: 200,
-      grid: { left: 0, right: 0, top: 6, bottom: 8, containLabel: false },
+      grid: { left: 0, right: 0, top: 6, bottom: 36, containLabel: false },
       tooltip: {
         trigger: 'item',
         backgroundColor: adminChartTheme.tooltipBg,
@@ -483,12 +446,24 @@ ${segmentRows}
         data: Array.from({ length: HEALTH_ROWS }, (_, i) => i),
       },
       visualMap: {
-        show: false,
+        show: true,
+        type: 'piecewise',
+        dimension: 2,
         min: 0,
         max: 3,
-        inRange: {
-          color: ['#e2e8f0', '#ef4444', '#f59e0b', '#10b981'],
-        },
+        left: 0,
+        bottom: 0,
+        orient: 'horizontal',
+        itemWidth: 8,
+        itemHeight: 8,
+        itemGap: 14,
+        textStyle: { color: adminChartTheme.axisText, fontSize: 11 },
+        pieces: [
+          { value: 3, label: '正常', color: '#10b981' },
+          { value: 2, label: '波动', color: '#f59e0b' },
+          { value: 1, label: '故障', color: '#ef4444' },
+          { value: 0, label: '无数据', color: '#e2e8f0' },
+        ],
       },
       series: [
         {
@@ -531,14 +506,12 @@ ${segmentRows}
     source.forEach((item, idx) => {
       const latency = Number(item.avg_seconds)
       if (!Number.isFinite(latency)) return
-      const match = getModelMetaByName(item.name)
+      const color = getModelColorByName(item.name)
       rows.push({
         name: item.name || '未知模型',
         val: Math.max(0, latency),
         color:
-          match?.color ||
-          defaultModelColors[idx % defaultModelColors.length] ||
-          'var(--admin-warning)',
+          color || defaultModelColors[idx % defaultModelColors.length] || 'var(--admin-warning)',
       })
     })
     return rows.sort((a, b) => b.val - a.val).slice(0, 5)
@@ -591,6 +564,8 @@ ${segmentRows}
       series: [
         {
           type: 'bar' as const,
+          showBackground: true,
+          backgroundStyle: { color: 'rgba(148, 163, 184, 0.1)', borderRadius: [0, 4, 4, 0] },
           data: latencyRows.value.map((row) => ({
             value: row.val,
             itemStyle: { color: row.color, borderRadius: [0, 4, 4, 0] },
@@ -702,6 +677,8 @@ ${segmentRows}
         {
           type: 'bar' as const,
           barWidth: 8,
+          showBackground: true,
+          backgroundStyle: { color: 'rgba(148, 163, 184, 0.1)', borderRadius: [0, 4, 4, 0] },
           data: accountLoadRows.value.map((item) => ({
             value: item.percent,
             current: item.current,
@@ -786,6 +763,8 @@ ${segmentRows}
         {
           type: 'bar' as const,
           barWidth: 8,
+          showBackground: true,
+          backgroundStyle: { color: 'rgba(148, 163, 184, 0.1)', borderRadius: [0, 4, 4, 0] },
           data: userRankRows.value.map((item) => item.value),
           itemStyle: { color: '#4f46e5', borderRadius: [0, 4, 4, 0] },
           label: {
@@ -830,9 +809,7 @@ ${segmentRows}
     todaySuccessRateFoot,
     queuePressure,
     queuePressureFoot,
-    modelRanking,
-    modelSettingCandidates,
-    consumptionChartOption,
+    modelRiskChartOption,
     healthHeatmapOption,
     latencyChartOption,
     accountLoadChartOption,
@@ -855,13 +832,6 @@ function colorForModel(name: string, palette: string[]) {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = (hash << 5) - hash + name.charCodeAt(i)
   return palette[Math.abs(hash) % palette.length]
-}
-
-function getHealthStatusColor(status: number) {
-  if (status === 1) return '#ef4444'
-  if (status === 2) return '#f59e0b'
-  if (status === 3) return '#10b981'
-  return '#e2e8f0'
 }
 
 function formatHealthRangeLabel(timeRange: string, index: number) {
