@@ -176,6 +176,7 @@
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { uploadApi } from '../../../shared/api/upload'
 import { NTag, NConfigProvider, type GlobalThemeOverrides } from 'naive-ui'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
@@ -185,6 +186,7 @@ import { Camera, Lock, LogOut, NavArrowLeft, Shield, User } from '@iconoir/vue'
 const router = useRouter()
 const userStore = useUserStore()
 const appToast = useAppToast()
+const { logoutAndRedirect } = useLogoutRedirect()
 
 const activeTab = ref('profile')
 
@@ -278,7 +280,7 @@ async function handleUpdatePassword() {
 }
 
 async function handleLogout() {
-  await userStore.logout('/user/home')
+  await logoutAndRedirect('/user/home')
 }
 
 function openAvatarPicker() {

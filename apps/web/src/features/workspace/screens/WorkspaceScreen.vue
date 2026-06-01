@@ -182,6 +182,7 @@ import type { Ref } from 'vue'
 import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
+import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import type { Edge, Node } from '@vue-flow/core'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
@@ -239,6 +240,7 @@ const appToast = useAppToast()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const { logoutAndRedirect } = useLogoutRedirect()
 const {
   screenToFlowCoordinate,
   updateNodeInternals,
@@ -304,7 +306,7 @@ async function onNavigateRequest(path: string) {
 
 async function onLogoutRequest() {
   void flushAutosave()
-  await userStore.logout('/user/home')
+  await logoutAndRedirect('/user/home')
 }
 
 function onFlowMove(payload: { flowTransform?: { x?: number; y?: number; zoom?: number } }) {

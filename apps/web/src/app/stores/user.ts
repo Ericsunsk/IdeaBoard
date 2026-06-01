@@ -75,7 +75,7 @@ export const useUserStore = defineStore('user', () => {
     return true
   }
 
-  async function logout(redirectPath = '/user/login') {
+  async function logout() {
     try {
       const result = await authClient.signOut()
       if (result?.error) {
@@ -91,8 +91,6 @@ export const useUserStore = defineStore('user', () => {
     }
 
     resetAuth()
-    const { default: router } = await import('../router')
-    await router.push(redirectPath)
     return true
   }
 

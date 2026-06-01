@@ -51,7 +51,7 @@ app.use('/api/auth', authCORSMiddleware)
 app.use('/api/auth', (req, res, next) => {
   authEntryGuardMiddleware(req, res, next).catch(next)
 })
-app.all('/api/auth/*', toNodeHandler(auth))
+app.all(['/api/auth', '/api/auth/{*authPath}'], toNodeHandler(auth))
 app.use(express.json({ limit: '1mb' }))
 
 const requireInternalKey = (req: Request, res: Response, next: NextFunction) => {

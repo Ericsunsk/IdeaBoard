@@ -113,12 +113,14 @@ import {
   syncDeleteCanvasBoardToServer,
 } from '../lib/boardSync'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useUserStore } from '../../../app/stores/user'
 import { Search, User } from '@iconoir/vue'
 
 const router = useRouter()
 const appToast = useAppToast()
 const userStore = useUserStore()
+const { logoutAndRedirect } = useLogoutRedirect()
 
 const boards = ref<CanvasBoardMeta[]>([])
 const searchKeyword = ref('')
@@ -445,7 +447,7 @@ function goHome() {
 
 async function logout() {
   closeUserMenu()
-  await userStore.logout('/user/home')
+  await logoutAndRedirect('/user/home')
 }
 
 onMounted(async () => {

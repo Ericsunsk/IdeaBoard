@@ -1,4 +1,4 @@
-import { BarChart, HeatmapChart, LineChart, PieChart, ScatterChart } from 'echarts/charts'
+import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
 import {
   GraphicComponent,
   GridComponent,
@@ -13,9 +13,7 @@ import VChart from 'vue-echarts'
 use([
   CanvasRenderer,
   LineChart,
-  PieChart,
   BarChart,
-  HeatmapChart,
   ScatterChart,
   GridComponent,
   LegendComponent,

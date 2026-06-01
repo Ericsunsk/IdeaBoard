@@ -46,10 +46,12 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../../app/stores/user'
+import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { logoutAndRedirect } = useLogoutRedirect()
 const message = useMessage()
 
 const formRef = ref()
@@ -86,7 +88,7 @@ async function handleLogin() {
       message.success('管理员登录成功')
       await router.replace(resolveAdminRedirectPath())
     } else {
-      const logoutSuccess = await userStore.logout('/admin/login')
+      const logoutSuccess = await logoutAndRedirect('/admin/login', { replace: true })
       if (!logoutSuccess) {
         message.warning('会话撤销失败，请稍后重试')
       }

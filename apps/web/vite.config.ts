@@ -37,6 +37,13 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 700,
     rollupOptions: {
+      onwarn(warning, warn) {
+        const id = warning.id || ''
+        if (warning.code === 'INVALID_ANNOTATION' && id.includes('/node_modules/@vueuse/core/')) {
+          return
+        }
+        warn(warning)
+      },
       output: {
         manualChunks(id) {
           if (id.includes('/node_modules/vue-router/')) {

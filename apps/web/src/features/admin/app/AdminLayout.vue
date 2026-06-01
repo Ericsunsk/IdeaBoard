@@ -121,10 +121,12 @@ import {
   findAdminNavigationItemByPath,
 } from './adminNavigation'
 import { adminThemeOverrides, adminThemeTokens } from '../shared/theme/adminThemeOverrides'
+import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { logoutAndRedirect } = useLogoutRedirect()
 
 const collapsed = ref(false)
 const activeKey = ref<AdminNavigationKey>('users')
@@ -216,11 +218,11 @@ const userOptions = [
   { label: '退出登录', key: 'logout' },
 ]
 
-function handleUserAction(key: string) {
+async function handleUserAction(key: string) {
   if (key === 'logout') {
-    userStore.logout('/admin/login')
+    await logoutAndRedirect('/admin/login')
   } else if (key === 'profile') {
-    router.push('/user/center')
+    await router.push('/user/center')
   }
 }
 
