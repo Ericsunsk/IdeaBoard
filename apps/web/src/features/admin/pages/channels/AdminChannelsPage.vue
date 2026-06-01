@@ -20,11 +20,11 @@
       <n-spin size="large" />
     </div>
 
-    <div v-else class="channel-grid">
+    <div v-else class="admin-card-grid is-2">
       <article
         v-for="channel in filteredChannels"
         :key="channel.id"
-        class="channel-card panel-card admin-card-interactive"
+        class="channel-card admin-card-surface admin-card-interactive"
       >
         <AdminCardHeader :title="channel.name" :subtitle="channel.api_url" size="small">
           <template #prefix>
@@ -42,7 +42,7 @@
 
         <div class="api-type-row">
           <span class="api-type-label">接口类型</span>
-          <span class="api-type-pill">{{ getApiTypeLabel(channel.type) }}</span>
+          <span class="admin-pill is-compact is-accent">{{ getApiTypeLabel(channel.type) }}</span>
         </div>
 
         <div class="models-shelf">
@@ -51,7 +51,7 @@
             <span
               v-for="model in getChannelActiveModels(channel.id)"
               :key="model"
-              class="model-pill"
+              class="admin-pill is-compact"
               :class="getModelCategoryClass(model)"
             >
               {{ model }}
@@ -130,7 +130,7 @@
       </article>
 
       <button class="admin-add-card" type="button" @click="openAddChannelModal">
-        <span class="add-mark">+</span>
+        <n-icon class="add-mark"><Plus /></n-icon>
         <span class="add-title">添加渠道商</span>
       </button>
 
@@ -437,14 +437,7 @@ onMounted(() => {
 @import '../../shared/styles/adminCommon.css';
 
 .channels-page {
-  gap: 16px;
   padding-bottom: 24px;
-}
-
-.channel-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
 }
 
 .loading-state,
@@ -454,7 +447,7 @@ onMounted(() => {
   align-items: center;
   padding: 60px 0;
   color: var(--admin-text-3);
-  font-size: 14px;
+  font-size: var(--admin-font-size-content);
 }
 
 .channel-card {
@@ -480,7 +473,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: var(--admin-font-size-body);
   font-weight: 800;
   color: var(--admin-text-1);
   border: 1px solid var(--admin-border);
@@ -497,20 +490,7 @@ onMounted(() => {
 
 .api-type-label {
   color: var(--admin-text-3);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.api-type-pill {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  border: 1px solid rgba(129, 140, 248, 0.35);
-  border-radius: 999px;
-  padding: 0 10px;
-  color: #c4b5fd;
-  background: rgba(129, 140, 248, 0.08);
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   font-weight: 700;
 }
 
@@ -522,7 +502,7 @@ onMounted(() => {
 }
 
 .shelf-label {
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   font-weight: 700;
   color: var(--admin-text-3);
   margin-bottom: 8px;
@@ -532,34 +512,6 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.model-pill {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--admin-card);
-  border: 1px solid var(--admin-border);
-  color: var(--admin-text-2);
-  font-size: 11px;
-}
-
-.model-pill.is-indigo {
-  border-color: var(--admin-model-indigo);
-  color: var(--admin-model-indigo);
-  background: rgba(129, 140, 248, 0.05);
-}
-.model-pill.is-purple {
-  border-color: var(--admin-model-purple);
-  color: var(--admin-model-purple);
-  background: rgba(192, 132, 252, 0.05);
-}
-.model-pill.is-cyan {
-  border-color: var(--admin-model-cyan);
-  color: var(--admin-model-cyan);
-  background: rgba(34, 211, 238, 0.05);
 }
 
 .accounts-grid {
@@ -576,9 +528,9 @@ onMounted(() => {
 }
 
 .grid-title {
-  font-size: 12px;
+  font-size: var(--admin-font-size-meta);
   font-weight: 700;
-  color: var(--admin-text-1);
+  color: var(--admin-title-color);
 }
 
 .accounts-scroller {
@@ -627,13 +579,13 @@ onMounted(() => {
 }
 
 .acc-name {
-  font-size: 12px;
+  font-size: var(--admin-font-size-meta);
   font-weight: 600;
-  color: var(--admin-text-1);
+  color: var(--admin-title-color);
 }
 
 .acc-stat-val {
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   font-weight: 700;
   color: var(--admin-text-3);
   font-family: ui-monospace, monospace;
@@ -694,7 +646,7 @@ onMounted(() => {
   border: 1px solid var(--admin-border);
   padding: 8px 12px;
   margin-bottom: 16px;
-  font-size: 12px;
+  font-size: var(--admin-font-size-meta);
   color: var(--admin-text-2);
   display: flex;
   align-items: center;
@@ -704,11 +656,5 @@ onMounted(() => {
 .channel-url-hint code {
   color: var(--admin-text-1);
   font-weight: 600;
-}
-
-@media (max-width: 980px) {
-  .channel-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

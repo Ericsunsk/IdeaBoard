@@ -36,7 +36,7 @@ const chipClasses = computed(() => ({
   background: var(--admin-surface-muted, #f4f6fb);
   border: 1px solid var(--admin-border);
   color: var(--admin-text-2);
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
 }
 
 .admin-chip.is-strong {

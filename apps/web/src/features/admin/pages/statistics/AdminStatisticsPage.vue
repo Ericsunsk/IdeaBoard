@@ -77,12 +77,12 @@
           <div class="metric-header">
             <span class="metric-title">渠道并发负载</span>
             <span class="metric-value"
-              >{{ saturatedAccountCount }} <span class="unit">个饱和</span></span
+              >{{ peakAccountLoadPercent }}<span class="unit">% 峰值</span></span
             >
           </div>
           <div class="chart-body metric-chart-container">
             <VChart
-              class="echart-host mini-bar-echart"
+              class="echart-host capacity-bar-echart"
               :option="accountLoadChartOption"
               autoresize
             />
@@ -128,8 +128,8 @@ const {
   qualityTrendChartOption,
   slowModelsChartOption,
   accountLoadChartOption,
+  peakAccountLoadPercent,
   userRiskChartOption,
-  saturatedAccountCount,
 } = useUsageStatisticsCharts({
   adminStatistics,
   timeRange,

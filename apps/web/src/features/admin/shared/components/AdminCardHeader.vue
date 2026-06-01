@@ -89,21 +89,21 @@ const trimmedSubtitle = computed(() =>
 
 .admin-card-heading-title {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--admin-font-size-heading);
   font-weight: 700;
-  color: var(--admin-text-1);
+  color: var(--admin-title-color, var(--admin-text-1));
   line-height: 1.2;
 }
 
 .admin-card-heading.is-small .admin-card-heading-title {
-  font-size: 15px;
+  font-size: var(--admin-font-size-title-sm);
   margin-top: 2px;
 }
 
 .admin-card-heading-subtitle {
   margin: 4px 0 0;
-  color: var(--admin-text-2);
-  font-size: 12px;
+  color: var(--admin-subtitle-color, var(--admin-text-3));
+  font-size: var(--admin-font-size-meta);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

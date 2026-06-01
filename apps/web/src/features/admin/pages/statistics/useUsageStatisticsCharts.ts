@@ -462,26 +462,20 @@ export function useUsageStatisticsCharts(options: {
       yAxis: [
         {
           type: 'value',
-          name: '失败数',
           min: 0,
           minInterval: 1,
-          nameGap: 20,
           axisLabel: { color: adminChartTheme.axisText, fontSize: 10 },
-          nameTextStyle: { color: adminChartTheme.axisText, fontSize: 10 },
           splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
         },
         {
           type: 'value',
-          name: '成功率',
           min: 0,
           max: 100,
-          nameGap: 24,
           axisLabel: {
             color: adminChartTheme.axisText,
             fontSize: 10,
             formatter: '{value}%',
           },
-          nameTextStyle: { color: adminChartTheme.axisText, fontSize: 10 },
           splitLine: { show: false },
         },
       ],
@@ -661,11 +655,15 @@ export function useUsageStatisticsCharts(options: {
       .sort((a, b) => b.percent - a.percent)
       .slice(0, 5)
   })
+
+  const peakAccountLoad = computed(() => accountLoadRows.value[0] || null)
+  const peakAccountLoadPercent = computed(() => peakAccountLoad.value?.percent || 0)
+
   const accountLoadChartOption = computed<EChartsOption>(() => {
     const hasAccountData = accountLoadRows.value.length > 0
     return {
       animationDuration: 260,
-      grid: { left: 10, right: 66, top: 12, bottom: 12, containLabel: true },
+      grid: { left: 10, right: 70, top: 8, bottom: 8, containLabel: true },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
@@ -688,7 +686,9 @@ export function useUsageStatisticsCharts(options: {
         type: 'value',
         min: 0,
         max: 100,
-        splitNumber: 3,
+        splitNumber: 4,
+        axisTick: { show: false },
+        axisLine: { show: false },
         axisLabel: { color: adminChartTheme.axisText, fontSize: 10, formatter: '{value}%' },
         splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
       },
@@ -703,14 +703,17 @@ export function useUsageStatisticsCharts(options: {
       series: [
         {
           type: 'bar' as const,
-          barWidth: 8,
+          barWidth: 10,
           showBackground: true,
-          backgroundStyle: { color: 'rgba(148, 163, 184, 0.1)', borderRadius: [0, 4, 4, 0] },
+          backgroundStyle: {
+            color: 'rgba(148, 163, 184, 0.12)',
+            borderRadius: [0, 6, 6, 0],
+          },
           data: accountLoadRows.value.map((item) => ({
             value: item.percent,
             current: item.current,
             max: item.max,
-            itemStyle: { color: item.color, borderRadius: [0, 4, 4, 0] },
+            itemStyle: { color: item.color, borderRadius: [0, 6, 6, 0] },
           })),
           label: {
             show: true,
@@ -846,10 +849,6 @@ export function useUsageStatisticsCharts(options: {
     } as EChartsOption
   })
 
-  const saturatedAccountCount = computed(
-    () => accountLoadRows.value.filter((item) => item.percent >= 90).length,
-  )
-
   return {
     trendData,
     totalCallsInRange,
@@ -866,8 +865,8 @@ export function useUsageStatisticsCharts(options: {
     qualityTrendChartOption,
     slowModelsChartOption,
     accountLoadChartOption,
+    peakAccountLoadPercent,
     userRiskChartOption,
-    saturatedAccountCount,
   }
 }
 

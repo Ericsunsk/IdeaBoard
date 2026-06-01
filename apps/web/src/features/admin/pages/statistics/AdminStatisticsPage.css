@@ -1,7 +1,6 @@
 @import '../../shared/styles/adminCommon.css';
 
 .statistics-page {
-  gap: 14px;
   padding-bottom: 24px;
 }
 
@@ -36,9 +35,9 @@
 }
 
 .metric-title {
-  font-size: 13px;
-  color: var(--admin-text-3);
-  font-weight: 500;
+  font-size: var(--admin-font-size-body);
+  color: var(--admin-title-color);
+  font-weight: 600;
 }
 
 .metric-chart-container {
@@ -49,6 +48,12 @@
 }
 
 .mini-bar-echart {
+  width: 100%;
+  min-height: 164px;
+  height: 164px;
+}
+
+.capacity-bar-echart {
   width: 100%;
   min-height: 164px;
   height: 164px;
@@ -111,7 +116,7 @@
   border: none;
   background: transparent;
   color: var(--admin-text-3);
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -218,6 +223,11 @@
 
   .metric-chart-container,
   .mini-bar-echart {
+    min-height: 178px;
+    height: 178px;
+  }
+
+  .capacity-bar-echart {
     min-height: 178px;
     height: 178px;
   }

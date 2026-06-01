@@ -69,13 +69,42 @@ const modalStyle = computed(() => {
 
 <style scoped>
 .admin-editor-overlay {
+  /* Teleported modals must carry the admin tokens for slotted page content. */
   --admin-card: rgba(255, 255, 255, 0.96);
   --admin-card-strong: #ffffff;
   --admin-border: #d9dfec;
+  --admin-border-soft: #e2e4e8;
+  --admin-border-hover: #c8d0e4;
+  --admin-surface-muted: #f4f6fb;
+  --admin-surface-pressed: #eef1f8;
+  --admin-surface-disabled: #f0f2f8;
+  --admin-control-bg: #f4f6fb;
+  --admin-control-bg-hover: #eef1f8;
+  --admin-control-border: #d9dfec;
+  --admin-control-border-hover: #c8d0e4;
+  --admin-control-border-pressed: #bcc7df;
   --admin-text-1: #293042;
   --admin-text-2: #6e7487;
   --admin-text-3: #8a90a3;
+  --admin-title-color: #293042;
+  --admin-subtitle-color: #8a90a3;
+  --admin-accent: #7a6bd5;
   --admin-divider: rgba(41, 48, 66, 0.08);
+  --admin-success: #16a34a;
+  --admin-warning: #d97706;
+  --admin-danger: #dc2626;
+  --admin-font-size-micro: 10px;
+  --admin-font-size-caption: 11px;
+  --admin-font-size-meta: 12px;
+  --admin-font-size-body: 13px;
+  --admin-font-size-content: 14px;
+  --admin-font-size-title-sm: 15px;
+  --admin-font-size-title: 16px;
+  --admin-font-size-heading: 18px;
+  --admin-font-size-modal-title: 26px;
+  --admin-font-size-modal-title-mobile: 22px;
+  --admin-line-height-tight: 1.2;
+  --admin-line-height-body: 1.5;
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -138,9 +167,9 @@ const modalStyle = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #f4f6fb;
-  border: 1px solid #d9dfec;
-  color: #6e7487;
+  background: var(--admin-surface-muted, #f4f6fb);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-2);
   cursor: pointer;
   transition:
     background 0.18s ease,
@@ -151,8 +180,8 @@ const modalStyle = computed(() => {
 
 .admin-editor-close:hover {
   background: rgba(122, 107, 213, 0.1);
-  border-color: #c8d0e4;
-  color: #293042;
+  border-color: var(--admin-border-hover);
+  color: var(--admin-text-1);
   transform: scale(1.03);
 }
 .admin-close-icon {
@@ -188,22 +217,22 @@ const modalStyle = computed(() => {
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--admin-border);
-  background: #f4f6fb;
+  background: var(--admin-surface-muted, #f4f6fb);
   color: var(--admin-text-2);
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
 }
 
 .admin-editor-title {
   margin: 0;
-  color: var(--admin-text-1);
-  font-size: 26px;
+  color: var(--admin-title-color);
+  font-size: var(--admin-font-size-modal-title);
   line-height: 1.15;
 }
 
 .admin-editor-desc {
   margin: 10px 0 0;
-  color: var(--admin-text-2);
-  font-size: 14px;
+  color: var(--admin-subtitle-color);
+  font-size: var(--admin-font-size-content);
   line-height: 1.7;
 }
 
@@ -219,7 +248,7 @@ const modalStyle = computed(() => {
 
 .admin-editor-note {
   color: var(--admin-text-3);
-  font-size: 12px;
+  font-size: var(--admin-font-size-meta);
   line-height: 1.6;
   max-width: 480px;
 }
@@ -269,7 +298,7 @@ const modalStyle = computed(() => {
   }
 
   .admin-editor-title {
-    font-size: 22px;
+    font-size: var(--admin-font-size-modal-title-mobile);
   }
 }
 </style>

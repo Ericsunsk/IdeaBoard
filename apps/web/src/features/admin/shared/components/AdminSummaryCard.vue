@@ -34,23 +34,23 @@ withDefaults(
   border-radius: 14px;
   background: var(--admin-card-strong, var(--admin-card));
   border: 1px solid var(--admin-border-soft, var(--admin-border));
-  box-shadow: var(--admin-shadow-soft, none);
 }
 
 .summary-label {
-  font-size: 12px;
-  color: var(--admin-text-3);
+  font-size: var(--admin-font-size-meta);
+  color: var(--admin-title-color, var(--admin-text-1));
+  font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .summary-value {
-  font-size: 28px;
+  font-size: var(--admin-font-size-summary-value);
   font-weight: 700;
-  color: var(--admin-text-1);
+  color: var(--admin-title-color, var(--admin-text-1));
 }
 
 .summary-foot {
-  font-size: 12px;
-  color: var(--admin-text-2);
+  font-size: var(--admin-font-size-meta);
+  color: var(--admin-subtitle-color, var(--admin-text-3));
 }
 </style>

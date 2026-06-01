@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
-import { adminNavigationItems, ADMIN_DEFAULT_PATH } from './adminNavigation'
+import { adminNavigationRouteDefs, ADMIN_DEFAULT_PATH } from './adminNavigationMeta'
+import type { AdminNavigationKey } from './adminNavigationMeta'
 
 const adminPageComponents = {
   users: () => import('../pages/users/AdminUsersPage.vue'),
@@ -8,7 +9,7 @@ const adminPageComponents = {
   'task-monitor': () => import('../pages/task-monitor/AdminTaskMonitorPage.vue'),
   'feature-prompts': () => import('../pages/prompt-config/AdminPromptConfigPage.vue'),
   'oss-config': () => import('../pages/storage/AdminStoragePage.vue'),
-} satisfies Record<string, RouteRecordRaw['component']>
+} satisfies Record<AdminNavigationKey, RouteRecordRaw['component']>
 
 export const adminRoutes: RouteRecordRaw[] = [
   {
@@ -25,7 +26,7 @@ export const adminRoutes: RouteRecordRaw[] = [
         component: () => import('../pages/login/AdminLoginPage.vue'),
         meta: { guest: true },
       },
-      ...adminNavigationItems.map((item) => ({
+      ...adminNavigationRouteDefs.map((item) => ({
         path: item.childPath,
         name: item.routeName,
         component: adminPageComponents[item.key],

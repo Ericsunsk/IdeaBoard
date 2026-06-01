@@ -1,11 +1,10 @@
 <template>
   <div class="admin-page storage-page">
-    <div class="storage-grid">
+    <div class="admin-card-grid is-2">
       <article
         v-for="storage in storages"
         :key="storage.id"
-        class="storage-card panel-card admin-card-interactive"
-        :class="{ current: storage.isCurrent }"
+        class="storage-card admin-card-surface admin-card-interactive"
       >
         <AdminCardHeader
           :provider="providerLabel(storage.provider)"
@@ -73,7 +72,7 @@
         :disabled="creatableProviders.length === 0"
         @click="openCreate"
       >
-        <span class="add-mark">+</span>
+        <n-icon class="add-mark"><Plus /></n-icon>
         <span class="add-title">添加存储供应商</span>
       </button>
     </div>
@@ -128,7 +127,7 @@
     </template>
 
     <template #header-aside>
-      <div v-if="editorMode !== 'create'" class="editor-provider">
+      <div v-if="editorMode !== 'create'" class="admin-pill is-compact">
         {{ providerLabel(form.provider) }}
       </div>
     </template>
@@ -193,7 +192,7 @@
               <span
                 v-for="domain in bucketDomains"
                 :key="domain"
-                class="domain-tag"
+                class="admin-pill is-clickable"
                 @click="updateConfigValue(field.key, `https://${domain}`)"
               >
                 {{ domain }}
@@ -242,6 +241,7 @@
 </template>
 
 <script setup lang="ts">
+import { Plus } from '@iconoir/vue'
 import { type GlobalThemeOverrides } from 'naive-ui'
 import { useStorageManager } from './useStorageManager'
 
@@ -315,44 +315,17 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 <style scoped>
 @import '../../shared/styles/adminCommon.css';
 
-.storage-page {
-  gap: 14px;
-}
-
 .header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.storage-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .storage-card {
   min-height: 180px;
-  border-radius: 16px;
-  border: 1px solid var(--admin-border-soft);
-  background: var(--admin-card-strong);
-  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    transform 0.18s ease;
-}
-
-.storage-card:hover {
-  border-color: var(--admin-text-3);
-  background: var(--admin-card);
-}
-
-.storage-card.current {
-  border-color: rgba(244, 244, 245, 0.24);
 }
 
 .storage-meta-grid {
@@ -370,12 +343,12 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 
 .meta-label {
   color: var(--admin-text-3);
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
 }
 
 .meta-value {
   color: var(--admin-text-1);
-  font-size: 13px;
+  font-size: var(--admin-font-size-body);
   line-height: 1.5;
   word-break: break-all;
 }
@@ -395,18 +368,6 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 
 /* Add card styles now global */
 
-.editor-provider {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--admin-surface-muted);
-  border: 1px solid var(--admin-border);
-  color: var(--admin-text-2);
-  font-size: 11px;
-}
-
 .editor-provider-stack {
   margin-top: 14px;
   display: grid;
@@ -421,7 +382,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 
 .field-hint-inline {
   color: var(--admin-text-3);
-  font-size: 12px;
+  font-size: var(--admin-font-size-meta);
 }
 
 .editor-vendor-preview {
@@ -457,14 +418,15 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 }
 
 .editor-vendor-name {
-  color: var(--admin-text-1);
-  font-size: 14px;
+  color: var(--admin-title-color);
+  font-size: var(--admin-font-size-content);
   font-weight: 600;
 }
 
 .editor-desc-tight {
   margin-top: 4px;
-  font-size: 13px;
+  color: var(--admin-subtitle-color);
+  font-size: var(--admin-font-size-body);
   line-height: 1.55;
 }
 
@@ -507,8 +469,8 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 
 :deep(.vendor-select-entry-name) {
   display: block;
-  color: var(--admin-text-1);
-  font-size: 14px;
+  color: var(--admin-title-color);
+  font-size: var(--admin-font-size-content);
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -527,8 +489,8 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 }
 
 .section-title {
-  color: var(--admin-text-1);
-  font-size: 13px;
+  color: var(--admin-title-color);
+  font-size: var(--admin-font-size-body);
   font-weight: 600;
   margin-bottom: 12px;
 }
@@ -546,7 +508,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 
 .switch-text {
   color: var(--admin-text-2);
-  font-size: 13px;
+  font-size: var(--admin-font-size-body);
 }
 
 .toggle-grid {
@@ -567,14 +529,14 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 }
 
 .toggle-title {
-  color: var(--admin-text-1);
-  font-size: 13px;
+  color: var(--admin-title-color);
+  font-size: var(--admin-font-size-body);
   font-weight: 600;
 }
 
 .toggle-desc {
-  color: var(--admin-text-3);
-  font-size: 12px;
+  color: var(--admin-subtitle-color);
+  font-size: var(--admin-font-size-meta);
   line-height: 1.6;
   margin-top: 4px;
 }
@@ -611,7 +573,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   justify-content: center;
   padding: 0 16px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--admin-font-size-body);
   line-height: 1.7;
 }
 
@@ -623,25 +585,11 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 }
 
 .domain-label {
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   color: var(--admin-text-3);
 }
 
-.domain-tag {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--admin-surface-muted);
-  border: 1px solid var(--admin-border);
-  color: var(--admin-text-2);
-  cursor: pointer;
-}
-
 @media (max-width: 980px) {
-  .storage-grid {
-    grid-template-columns: 1fr;
-  }
-
   .storage-meta-grid,
   .toggle-grid {
     grid-template-columns: 1fr;
@@ -782,9 +730,9 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
 }
 
 .admin-storage-vendor-menu .vendor-select-entry-name {
-  color: var(--admin-text-1);
+  color: var(--admin-title-color);
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--admin-font-size-body);
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -800,7 +748,7 @@ const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
   border-radius: 999px;
   background: var(--admin-surface-muted);
   color: var(--admin-text-3);
-  font-size: 10px;
+  font-size: var(--admin-font-size-micro);
   line-height: 1;
   letter-spacing: 0.01em;
   flex: 0 0 auto;

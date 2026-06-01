@@ -1,22 +1,26 @@
 <template>
   <div class="admin-page prompt-config-page">
-    <div v-if="featureGroups.length > 0" class="node-grid">
-      <section v-for="group in featureGroups" :key="group.key" class="node-card">
+    <div v-if="featureGroups.length > 0" class="admin-card-grid is-3">
+      <section
+        v-for="group in featureGroups"
+        :key="group.key"
+        class="node-card admin-card-surface admin-card-interactive"
+      >
         <AdminCardHeader :title="group.title" size="small">
           <template #extra>
-            <span class="node-card-count">{{ group.items.length }} 项配置</span>
+            <span class="admin-pill is-compact">{{ group.items.length }} 项配置</span>
           </template>
         </AdminCardHeader>
 
         <div class="node-card-meta">
-          <span class="meta-chip">{{ getGroupVariableCount(group) }} 个变量</span>
-          <span class="meta-chip"
+          <span class="admin-pill is-compact">{{ getGroupVariableCount(group) }} 个变量</span>
+          <span class="admin-pill is-compact"
             >{{ getGroupFilledCount(group) }}/{{ group.items.length }} 已配置</span
           >
         </div>
 
         <div class="node-feature-preview">
-          <span v-for="item in group.items" :key="item.slug" class="feature-pill">{{
+          <span v-for="item in group.items" :key="item.slug" class="admin-pill">{{
             item.title
           }}</span>
         </div>
@@ -41,8 +45,8 @@
   >
     <template #header-aside>
       <div v-if="activeGroup" class="editor-meta">
-        <span class="meta-chip">{{ activeGroup.items.length }} 项配置</span>
-        <span class="meta-chip">{{ getGroupVariableCount(activeGroup) }} 个变量</span>
+        <span class="admin-pill is-compact">{{ activeGroup.items.length }} 项配置</span>
+        <span class="admin-pill is-compact">{{ getGroupVariableCount(activeGroup) }} 个变量</span>
       </div>
     </template>
 
@@ -240,12 +244,6 @@ async function savePrompt(slug: FeatureSlug) {
   min-width: 0;
 }
 
-.node-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .node-empty-state {
   display: flex;
   min-height: 260px;
@@ -259,44 +257,22 @@ async function savePrompt(slug: FeatureSlug) {
 }
 
 .node-empty-title {
-  color: var(--admin-text-1);
-  font-size: 16px;
+  color: var(--admin-title-color);
+  font-size: var(--admin-font-size-title);
   font-weight: 650;
 }
 
 .node-empty-desc {
   margin-top: 8px;
-  color: var(--admin-text-3);
-  font-size: 12px;
+  color: var(--admin-subtitle-color);
+  font-size: var(--admin-font-size-meta);
 }
 
 .node-card {
-  background: var(--admin-card-strong);
-  border: 1px solid var(--admin-border-soft);
-  border-radius: 16px;
-  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-height: 244px;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease;
-}
-
-.node-card:hover {
-  border-color: var(--admin-border);
-  background: var(--admin-card);
-}
-
-.node-card-count {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--admin-text-3);
-  background: var(--admin-surface-muted);
-  border: 1px solid var(--admin-border);
-  padding: 3px 8px;
-  border-radius: 6px;
 }
 
 .node-card-meta {
@@ -305,36 +281,11 @@ async function savePrompt(slug: FeatureSlug) {
   gap: 8px;
 }
 
-.meta-chip {
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
-  border: 1px solid var(--admin-border);
-  background: var(--admin-surface-muted);
-  color: var(--admin-text-2);
-  font-size: 11px;
-}
-
 .node-feature-preview {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-content: flex-start;
-}
-
-.feature-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--admin-surface-muted);
-  border: 1px solid var(--admin-border);
-  color: var(--admin-text-2);
-  font-size: 11px;
-  line-height: 1.4;
 }
 
 .node-card-actions {
@@ -376,15 +327,15 @@ async function savePrompt(slug: FeatureSlug) {
 }
 
 .feature-title {
-  font-size: 14px;
+  font-size: var(--admin-font-size-content);
   font-weight: 600;
-  color: var(--admin-text-1);
+  color: var(--admin-title-color);
 }
 
 .feature-slug {
   max-width: 100%;
   overflow-wrap: anywhere;
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   color: var(--admin-text-3);
   background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
@@ -401,7 +352,7 @@ async function savePrompt(slug: FeatureSlug) {
 }
 
 .feature-count {
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   color: var(--admin-text-3);
 }
 
@@ -414,13 +365,13 @@ async function savePrompt(slug: FeatureSlug) {
 }
 
 .var-buttons-label {
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   color: var(--admin-text-2);
   flex-shrink: 0;
 }
 
 .var-note {
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   color: var(--admin-text-3);
 }
 
@@ -472,17 +423,13 @@ async function savePrompt(slug: FeatureSlug) {
 
 .var-btn-key {
   color: var(--var-key);
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   font-weight: 600;
   font-family: monospace;
   overflow-wrap: anywhere;
 }
 
 @media (max-width: 720px) {
-  .node-grid {
-    grid-template-columns: 1fr;
-  }
-
   .node-card {
     padding: 14px;
     min-height: unset;
@@ -494,12 +441,6 @@ async function savePrompt(slug: FeatureSlug) {
 
   .feature-count {
     flex-shrink: 0;
-  }
-}
-
-@media (min-width: 721px) and (max-width: 1120px) {
-  .node-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

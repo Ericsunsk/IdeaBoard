@@ -5,20 +5,21 @@
         <n-message-provider>
           <router-view v-if="isLoginRoute" />
           <template v-else>
-            <div class="admin-layout-shell">
+            <div class="admin-layout-shell" :style="adminLayoutStyleVars">
               <div class="admin-shell-frame">
                 <aside v-if="!isMobile" class="admin-shell-sider" :class="{ collapsed }">
-                  <div class="brand-area" @click="collapsed = !collapsed">
-                    <div class="brand-mark">I</div>
-                    <div v-if="!collapsed" class="brand-copy">
-                      <p class="brand-title">IdeaBoard</p>
+                  <div class="brand-area">
+                    <div class="brand-copy">
+                      <p class="brand-title">{{ collapsed ? 'B' : 'Dashboard' }}</p>
                     </div>
                   </div>
                   <n-menu
                     v-model:value="activeKey"
+                    class="admin-nav-menu"
                     :collapsed="collapsed"
-                    :collapsed-width="76"
-                    :collapsed-icon-size="18"
+                    :icon-size="22"
+                    :collapsed-width="60"
+                    :collapsed-icon-size="22"
                     :options="menuOptions"
                     @update:value="handleMenuUpdate"
                   />
@@ -34,7 +35,11 @@
                         @click="handleToggleMenu"
                       >
                         <template #icon>
-                          <span>{{ isMobile ? '☰' : collapsed ? '☰' : '⟨' }}</span>
+                          <n-icon>
+                            <MenuIcon v-if="isMobile" />
+                            <SidebarExpand v-else-if="collapsed" />
+                            <SidebarCollapse v-else />
+                          </n-icon>
                         </template>
                       </n-button>
                       <div class="title-wrap">
@@ -46,10 +51,17 @@
                     <div class="header-right">
                       <n-dropdown :options="userOptions" @select="handleUserAction">
                         <div class="user-badge">
-                          <n-avatar size="small" round class="user-avatar">
-                            {{ userStore.user?.username?.charAt(0).toUpperCase() }}
-                          </n-avatar>
-                          <span>{{ userStore.user?.username }}</span>
+                          <span class="user-avatar" aria-hidden="true">
+                            <img
+                              v-if="userStore.user?.avatar"
+                              :src="userStore.user.avatar"
+                              alt=""
+                            />
+                            <span v-else class="user-avatar-placeholder">
+                              <UserIcon class="user-avatar-icon" />
+                            </span>
+                          </span>
+                          <span class="user-name">{{ userStore.user?.username }}</span>
                         </div>
                       </n-dropdown>
                     </div>
@@ -67,10 +79,13 @@
               :width="268"
               placement="left"
               class="admin-mobile-drawer"
+              :style="adminLayoutStyleVars"
             >
-              <n-drawer-content title="IdeaBoard" closable>
+              <n-drawer-content title="Dashboard" closable>
                 <n-menu
                   v-model:value="activeKey"
+                  class="admin-nav-menu"
+                  :icon-size="22"
                   :options="menuOptions"
                   @update:value="handleMobileMenuSelect"
                 />
@@ -89,7 +104,6 @@ import {
   NConfigProvider,
   NMenu,
   NDropdown,
-  NAvatar,
   NButton,
   NIcon,
   NDrawer,
@@ -99,13 +113,14 @@ import {
   NMessageProvider,
 } from 'naive-ui'
 import type { AdminNavigationKey } from './adminNavigation'
+import { Menu as MenuIcon, SidebarCollapse, SidebarExpand, User as UserIcon } from '@iconoir/vue'
 import {
   adminNavigationByKey,
   adminNavigationItems,
   ADMIN_LOGIN_PATH,
   findAdminNavigationItemByPath,
 } from './adminNavigation'
-import { adminThemeOverrides } from '../shared/theme/adminThemeOverrides'
+import { adminThemeOverrides, adminThemeTokens } from '../shared/theme/adminThemeOverrides'
 
 const router = useRouter()
 const route = useRoute()
@@ -116,6 +131,32 @@ const activeKey = ref<AdminNavigationKey>('users')
 const mobileMenuOpen = ref(false)
 const isMobile = ref(false)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
+
+const adminLayoutStyleVars = {
+  '--admin-bg': adminThemeTokens.bg,
+  '--admin-card': adminThemeTokens.cardTranslucent,
+  '--admin-card-strong': adminThemeTokens.card,
+  '--admin-border': adminThemeTokens.border,
+  '--admin-border-soft': adminThemeTokens.borderSoft,
+  '--admin-border-hover': adminThemeTokens.borderHover,
+  '--admin-text-1': adminThemeTokens.textPrimary,
+  '--admin-text-2': adminThemeTokens.textSecondary,
+  '--admin-text-3': adminThemeTokens.textTertiary,
+  '--admin-text-inverse': adminThemeTokens.textInverse,
+  '--admin-title-color': adminThemeTokens.textPrimary,
+  '--admin-subtitle-color': adminThemeTokens.textTertiary,
+  '--admin-accent': adminThemeTokens.accent,
+  '--admin-accent-soft': adminThemeTokens.accentSoft,
+  '--admin-surface-muted': adminThemeTokens.surfaceMuted,
+  '--admin-surface-hover': adminThemeTokens.surfaceHover,
+  '--admin-surface-pressed': adminThemeTokens.surfacePressed,
+  '--admin-control-bg': adminThemeTokens.controlBg,
+  '--admin-control-bg-hover': adminThemeTokens.controlBgHover,
+  '--admin-control-border': adminThemeTokens.controlBorder,
+  '--admin-control-border-hover': adminThemeTokens.controlBorderHover,
+  '--admin-nav-active-bg': adminThemeTokens.navActiveBg,
+  '--admin-nav-active-bg-hover': adminThemeTokens.navActiveBgHover,
+} as Record<string, string>
 
 watch(
   () => route.path,
@@ -129,7 +170,7 @@ watch(
 )
 
 const renderMenuIcon = (iconComp: any) => () =>
-  h(NIcon, { class: 'menu-icon' }, { default: () => h(iconComp) })
+  h(NIcon, { class: 'menu-icon', size: 22 }, { default: () => h(iconComp) })
 
 const menuOptions = adminNavigationItems.map((item) => ({
   label: item.label,
@@ -144,6 +185,7 @@ const currentMeta = computed(() => {
 function handleMenuUpdate(key: string) {
   const item = adminNavigationByKey[key as AdminNavigationKey]
   if (item) {
+    activeKey.value = item.key
     void router.push(item.path)
   }
 }
@@ -202,7 +244,7 @@ onUnmounted(() => {
 .admin-layout-shell {
   min-height: 100vh;
   height: 100vh;
-  background: #f8f9fd;
+  background: var(--admin-bg);
   padding: 12px;
   overflow: hidden;
 }
@@ -216,13 +258,13 @@ onUnmounted(() => {
 }
 
 .admin-shell-sider {
-  width: 244px;
+  width: 196px;
   height: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid #d9dfec;
+  border: 1px solid var(--admin-border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--admin-card);
   transition: width 0.24s ease;
   box-shadow: 0 12px 30px rgba(41, 48, 66, 0.08);
 }
@@ -236,41 +278,33 @@ onUnmounted(() => {
   padding: 0 18px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  border-bottom: 1px solid #e2e4e8;
+  justify-content: center;
+  border-bottom: 1px solid var(--admin-border-soft);
 }
 
-.brand-area:hover {
-  background: #f4f6fb;
-}
-
-.brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+.brand-copy {
+  min-width: 0;
+  width: 100%;
   display: grid;
   place-items: center;
-  font-weight: 700;
-  color: #ffffff;
-  background: #7a6bd5;
-  border: 1px solid #7a6bd5;
+  text-align: center;
 }
 
 .brand-title {
   margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: #293042;
-  letter-spacing: 0.02em;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--admin-title-color);
+  white-space: nowrap;
 }
 
 .admin-shell-main {
   min-width: 0;
   min-height: 0;
-  border: 1px solid #d9dfec;
+  border: 1px solid var(--admin-border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--admin-card-strong);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -283,7 +317,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #e2e4e8;
+  border-bottom: 1px solid var(--admin-border-soft);
 }
 
 .header-left,
@@ -294,20 +328,24 @@ onUnmounted(() => {
 }
 
 .shell-action-btn {
+  --n-border: none;
+  --n-border-hover: none;
+  --n-border-pressed: none;
+  --n-border-focus: none;
+  --n-color: transparent;
+  --n-color-hover: transparent;
+  --n-color-pressed: transparent;
+  --n-color-focus: transparent;
   font-size: 16px;
-  color: #6e7487;
-  border: 1px solid #d9dfec;
-  background: #ffffff;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    color 0.18s ease;
+  color: var(--admin-text-2);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: color 0.18s ease;
 }
 
 .shell-action-btn:hover {
-  border-color: #c8d0e4;
-  background: #f7f8fc;
-  color: #293042;
+  color: var(--admin-text-1);
 }
 
 .title-wrap {
@@ -318,7 +356,7 @@ onUnmounted(() => {
   margin: 0;
   font-size: 17px;
   font-weight: 700;
-  color: #293042;
+  color: var(--admin-title-color);
 }
 
 .user-badge {
@@ -326,9 +364,9 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  padding: 8px 10px;
+  padding: 4px 10px 4px 4px;
   border-radius: 999px;
-  border: 1px solid #d9dfec;
+  border: 1px solid var(--admin-border);
   background: rgba(255, 255, 255, 0.9);
   transition:
     border-color 0.18s ease,
@@ -336,12 +374,12 @@ onUnmounted(() => {
 }
 
 .user-badge:hover {
-  background: #f7f8fc;
-  border-color: #c8d0e4;
+  background: var(--admin-surface-hover);
+  border-color: var(--admin-border-hover);
 }
 
-.user-badge span {
-  color: #293042;
+.user-name {
+  color: var(--admin-text-1);
   font-size: 13px;
   max-width: 120px;
   white-space: nowrap;
@@ -350,9 +388,51 @@ onUnmounted(() => {
 }
 
 .user-avatar {
-  background: #7a6bd5;
-  color: #ffffff;
-  font-weight: 700;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--admin-border-soft);
+  background: var(--admin-surface-muted);
+  color: var(--admin-text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.user-badge:hover .user-avatar {
+  border-color: var(--admin-border-hover);
+  background: var(--admin-surface-hover);
+  color: var(--admin-text-1);
+}
+
+.user-avatar img,
+.user-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.user-avatar img {
+  display: block;
+  object-fit: cover;
+}
+
+.user-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-avatar-icon {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2;
 }
 
 .admin-shell-content {
@@ -391,86 +471,62 @@ onUnmounted(() => {
   background: transparent;
 }
 
-:deep(.n-menu) {
-  --n-item-text-color: #6e7487;
-  --n-item-text-color-active: #293042;
-  --n-item-text-color-hover: #293042;
-  --n-item-color-active: rgba(122, 107, 213, 0.12);
-  --n-item-color-hover: rgba(122, 107, 213, 0.08);
-  --n-item-icon-color: #8a90a3;
-  --n-item-icon-color-active: #7a6bd5;
-  --n-item-icon-color-hover: #293042;
-  --n-group-header-text-color: #8a90a3;
+:deep(.admin-nav-menu) {
   padding: 10px 8px;
   gap: 4px;
 }
 
-.admin-shell-sider :deep(.n-menu) {
+.admin-shell-sider :deep(.admin-nav-menu) {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.admin-shell-sider.collapsed :deep(.n-menu-item-content) {
-  grid-template-areas: 'icon' !important;
-  grid-template-columns: 1fr !important;
-  justify-items: center;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-}
-
-.admin-shell-sider.collapsed :deep(.n-menu-item-content__icon) {
-  grid-area: icon;
-  justify-self: center;
-  margin-right: 0 !important;
-}
-
-.admin-shell-sider.collapsed :deep(.n-menu-item-content-header),
-.admin-shell-sider.collapsed :deep(.n-menu-item-content__arrow) {
-  display: none;
-}
-
-:deep(.n-menu-item-content) {
-  border-radius: 10px !important;
-  font-size: 13px;
-  height: 36px;
-}
-
-:deep(.n-menu-item-content__icon) {
-  margin-right: 10px !important;
-}
-
-:deep(.n-menu-item-content--selected) {
-  font-weight: 600;
-}
-
-:deep(.n-menu-item-group-title) {
+:deep(.admin-nav-menu .n-menu-item-group-title) {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: 11px;
 }
 
+:deep(
+  .admin-nav-menu
+    :is(
+      .n-menu-item-content,
+      .n-menu-item-content-header,
+      .n-menu-item-content-header a,
+      .n-menu-item-group-title
+    )
+) {
+  color: var(--admin-text-1);
+  font-weight: 400;
+}
+
 .menu-icon {
-  font-size: 17px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
 }
 
 :deep(.admin-mobile-drawer .n-drawer-content) {
-  --n-color: #ffffff;
-  --n-border-color: #d9dfec;
+  --n-color: var(--admin-card-strong);
+  --n-border-color: var(--admin-border);
 }
 
 :deep(.admin-mobile-drawer .n-drawer-header) {
-  border-bottom: 1px solid #e2e4e8;
+  border-bottom: 1px solid var(--admin-border-soft);
 }
 
 :deep(.admin-mobile-drawer .n-drawer-header__main) {
-  color: #293042;
+  color: var(--admin-text-1);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 :deep(.admin-mobile-drawer .n-drawer-body-content-wrapper) {
-  background: #f8f9fd;
+  background: var(--admin-bg);
 }
 
 @media (max-width: 1079px) {
@@ -503,4 +559,5 @@ onUnmounted(() => {
     min-height: calc(100vh - 90px);
   }
 }
+
 </style>

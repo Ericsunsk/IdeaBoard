@@ -153,7 +153,14 @@
       border: 1px solid var(--admin-border);
     "
   >
-    <div style="color: var(--admin-text-2); margin-bottom: 24px; font-size: 14px; line-height: 1.6">
+    <div
+      style="
+        color: var(--admin-text-2);
+        margin-bottom: 24px;
+        font-size: var(--admin-font-size-content);
+        line-height: 1.6;
+      "
+    >
       您即将对用户
       <strong style="color: var(--admin-text-1)">{{ banUserContext?.username }}</strong>
       实施强制访问限制。该用户将立即断开所有连接，并且在封禁期间无法重新登录。
@@ -399,9 +406,9 @@ const columns: DataTableColumns<User> = [
           bordered: false,
           style:
             (isAdmin
-              ? 'background: rgba(239, 68, 68, 0.1); color: #f87171;'
+              ? 'background: rgba(239, 68, 68, 0.1); color: var(--admin-danger);'
               : 'background: var(--admin-surface-muted); color: var(--admin-text-3);') +
-            ' border-radius: 99px !important; padding: 0 10px; font-weight: 600; font-size: 11px;',
+            ' border-radius: 99px !important; padding: 0 10px; font-weight: 600; font-size: var(--admin-font-size-caption);',
         },
         { default: () => (isAdmin ? 'Admin' : 'User') },
       )
@@ -414,7 +421,7 @@ const columns: DataTableColumns<User> = [
     render: (row) => {
       return h(
         'span',
-        { style: 'color: var(--admin-text-3); font-size: 13px;' },
+        { style: 'color: var(--admin-text-3); font-size: var(--admin-font-size-body);' },
         row.created_at ? formatDateOnly(row.created_at) : '-',
       )
     },
@@ -435,21 +442,26 @@ const columns: DataTableColumns<User> = [
               label: row.status === 1 ? '用户封禁' : '解除封禁',
               key: 'status',
               disabled: isAdmin,
-              props: { style: row.status === 1 ? 'color: #f87171' : 'color: #34d399' },
+              props: {
+                style:
+                  row.status === 1 ? 'color: var(--admin-danger)' : 'color: var(--admin-success)',
+              },
             },
             { label: '吊销会话', key: 'revoke' },
             { label: '伪装登录', key: 'impersonate' },
             {
               label: isAdmin ? '取消管理' : '设为管理',
               key: 'role',
-              props: { style: isAdmin ? 'color: #fbbf24' : 'color: #60a5fa' },
+              props: {
+                style: isAdmin ? 'color: var(--admin-warning)' : 'color: var(--admin-accent)',
+              },
             },
             { type: 'divider', key: 'd1' },
             {
               label: '注销用户',
               key: 'delete',
               disabled: isAdmin,
-              props: { style: 'color: #f87171' },
+              props: { style: 'color: var(--admin-danger)' },
             },
           ],
           onSelect: (key) => handleAction(key, row),
@@ -713,10 +725,6 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 <style scoped>
 @import '../../shared/styles/adminCommon.css';
 
-.users-page {
-  gap: 14px;
-}
-
 .admin-compact-table :deep(.user-profile-cell) {
   display: flex;
   align-items: center;
@@ -748,21 +756,21 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 }
 
 .admin-compact-table :deep(.user-avatar-status.is-normal) {
-  background: #10b981;
+  background: var(--admin-success);
 }
 
 .admin-compact-table :deep(.user-avatar-status.is-banned) {
-  background: #ef4444;
+  background: var(--admin-danger-hover);
 }
 
 .admin-compact-table :deep(.user-name) {
   font-weight: 600;
   color: var(--admin-text-1);
-  font-size: 14px;
+  font-size: var(--admin-font-size-content);
 }
 
 .admin-compact-table :deep(.user-id) {
-  font-size: 11px;
+  font-size: var(--admin-font-size-caption);
   color: var(--admin-text-3);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
@@ -778,7 +786,7 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 }
 
 .admin-compact-table :deep(.status-text) {
-  font-size: 12px;
+  font-size: var(--admin-font-size-meta);
   font-weight: 500;
   color: var(--admin-text-2);
 }
@@ -794,14 +802,14 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 }
 
 .panel-title {
-  font-size: 14px;
+  font-size: var(--admin-font-size-content);
   font-weight: 600;
-  color: var(--admin-text-1);
+  color: var(--admin-title-color);
 }
 
 .panel-desc {
-  font-size: 12px;
-  color: var(--admin-text-3);
+  font-size: var(--admin-font-size-meta);
+  color: var(--admin-subtitle-color);
   margin-top: 2px;
 }
 
@@ -844,7 +852,7 @@ const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'a
 }
 
 .minimal-checkbox {
-  --n-font-size: 13px !important;
+  --n-font-size: var(--admin-font-size-body) !important;
   color: var(--admin-text-2);
 }
 

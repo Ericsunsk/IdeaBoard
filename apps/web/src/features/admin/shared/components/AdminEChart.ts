@@ -1,11 +1,4 @@
-import {
-  BarChart,
-  GaugeChart,
-  HeatmapChart,
-  LineChart,
-  PieChart,
-  ScatterChart,
-} from 'echarts/charts'
+import { BarChart, HeatmapChart, LineChart, PieChart, ScatterChart } from 'echarts/charts'
 import {
   GraphicComponent,
   GridComponent,
@@ -23,7 +16,6 @@ use([
   PieChart,
   BarChart,
   HeatmapChart,
-  GaugeChart,
   ScatterChart,
   GridComponent,
   LegendComponent,
