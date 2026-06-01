@@ -56,7 +56,7 @@ graph LR
     
     Redis --> Worker["Worker 消费者"]
     Worker --> AI["上游 AI 渠道"]
-    Worker --> Storage["Kodo / 本地 OSS"]
+    Worker --> Storage["Local / S3-compatible 对象存储"]
 ```
 
 
@@ -312,7 +312,7 @@ npm run dev
 
 开发代理约定（`apps/web/vite.config.ts`）：
 
-- `/api/auth/*` -> `http://localhost:6001`
+- `/api/auth/**` -> `http://localhost:6001`
 - `/api/*` 与 `/uploads/*` -> `http://localhost:6000`
 
 7. 初始化管理员：
@@ -413,7 +413,7 @@ apps/web/src/
 │   ├── auth/                 # 登录、注册与会话相关
 │   ├── user/                 # 用户侧 layout 与壳层
 │   └── profile/              # 用户中心
-└── shared/                   # 共享 API、auth、types、utils、assets
+└── shared/                   # 共享 API、auth、composables、types、utils、assets
     └── api/generated-query/  # Orval 生成代码，不手动编辑
 
 apps/api/
@@ -435,7 +435,7 @@ apps/api/
 apps/auth/
 ├── src/auth.ts               # Better Auth 配置
 ├── src/env.ts                # 环境变量与生产校验
-├── src/index.ts              # /api/auth/* 与 /internal/* 路由
+├── src/index.ts              # /api/auth 与子路径、/internal/* 路由
 └── .env.example              # auth 服务环境变量模板
 ```
 

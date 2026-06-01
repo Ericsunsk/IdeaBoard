@@ -79,7 +79,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 ```mermaid
 flowchart TB
     Browser(["浏览器 / Web App"]) --> Nginx["Nginx 反向代理"]
-    Nginx -- /api/auth/* --> Auth["Better Auth Service<br>Node.js :6001"]
+    Nginx -- /api/auth/** --> Auth["Better Auth Service<br>Node.js :6001"]
     Nginx -- /api/* --> GoAPI["Go API<br>Gin :6000"]
     Nginx -- /uploads/* --> Static["静态资源服务<br>/uploads/*"]
     Auth --> MySQL[("MySQL 8.0")] & Redis[("Redis 8.6")]

@@ -65,7 +65,7 @@ apps/web/
 ├── src/features/             # 领域功能模块
 │   ├── user/                 # 用户侧 layout 与壳层
 │   └── workspace/            # 画布、节点与执行链路
-├── src/shared/               # 共享 API、auth、types、utils、assets
+├── src/shared/               # 共享 API、auth、composables、types、utils、assets
 │   └── api/generated-query/  # Orval 生成代码，不手动编辑
 └── vite.config.ts            # 开发代理
 ```

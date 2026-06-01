@@ -580,7 +580,7 @@ curl http://127.0.0.1/api/health
 
 1. 首页可正常访问。
 2. `/api/health` 返回成功。
-3. `ideaboard-auth` 运行正常，登录/注册请求走 `/api/auth/*`。
+3. `ideaboard-auth` 运行正常，登录/注册请求走 `/api/auth/**`。
 4. 管理员可登录。
 5. 图片上传正常。
 6. `/uploads/*` 可以访问。

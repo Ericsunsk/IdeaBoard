@@ -15,11 +15,18 @@
 - Better Auth 生产环境强制配置 `BETTER_AUTH_SECRET` 与 `BETTER_AUTH_URL`。
 - 生产环境拒绝 Auth internal key 与 Better Auth secret 使用占位值。
 - Auth 登录/注册限流改为依赖可信代理解析后的客户端 IP，避免直接信任请求头。
+- Express 5 auth 路由迁移到命名 wildcard，避免 `/api/auth/*` 在新版 path parser 下启动失败。
 - Go API CORS 改为 allowlist；生产配置 `APP_CORS_ALLOWED_ORIGINS` 时同样生效。
 - 任务提交与画布保存增加大小、数量和嵌套层级限制。
 - 任务参数字段调整为 `MEDIUMTEXT`，与 2MB 参数校验上限保持一致。
 - 发布流程增加 Web/Auth 生产依赖审计与 Go API 测试。
 - Nginx 上传上限调整为 `50m`，与后台上传接口保持一致。
+
+### 依赖与构建
+
+- 前端升级到 ECharts 6、vue-echarts 8、Vue Router 5 与 TypeScript 6，图表注册仅保留当前使用的 `line/bar/scatter`。
+- Auth 服务升级到 Express 5、dotenv 17 与 TypeScript 6。
+- 退出登录导航从 user store 移到共享 composable，消除 router 与 store 的循环依赖。
 
 ## v0.2.0 - 2026-05-05
 
@@ -73,7 +80,7 @@
 - 提供用户画布工作台、画板管理、用户中心与管理后台。
 - 支持草图成图、风格延展、局部改款、局部重绘、双图融合、单视角展示、商品展示、图案生成、HD 与图片延伸。
 - 支持任务落库、Redis 队列、Worker 异步执行、账号池调度、状态轮询与结果持久化。
-- 支持 `Local / Kodo / S3-compatible` 存储配置。
+- 支持 `Local / S3-compatible` 存储配置。
 
 ### 认证与后台
 
