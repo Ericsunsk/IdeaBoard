@@ -1,6 +1,11 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.18.0-alpine AS builder
+FROM node:22.18.0-alpine AS node-base
+
+ARG NPM_VERSION=11.16.0
+RUN npm install -g "npm@${NPM_VERSION}"
+
+FROM node-base AS builder
 
 WORKDIR /app
 
@@ -11,7 +16,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-FROM node:22.18.0-alpine AS runtime
+FROM node-base AS runtime
 
 WORKDIR /app
 

@@ -26,6 +26,7 @@
 
 - 前端升级到 ECharts 6、vue-echarts 8、Vue Router 5 与 TypeScript 6，图表注册仅保留当前使用的 `line/bar/scatter`。
 - Auth 服务升级到 Express 5、dotenv 17 与 TypeScript 6。
+- Auth Docker 镜像固定升级到 npm 11.16.0，避免 `ideaboard update` 执行 migration 时由容器内旧 npm 触发 major update notice。
 - 退出登录导航从 user store 移到共享 composable，消除 router 与 store 的循环依赖。
 
 ## v0.2.0 - 2026-05-05
