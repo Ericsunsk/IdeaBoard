@@ -308,14 +308,12 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 - 系统：`Linux amd64`
 - 端口：`80`
 - 软件：`nginx`、`postgresql`、`nodejs >= 22.18`、`npm`、`tar`
-- 可选依赖：`potrace`，用于转矢量能力
 
 Ubuntu / Debian 参考安装命令：
 
 ```bash
 sudo apt update
 sudo apt install -y nginx postgresql postgresql-client nodejs npm
-sudo apt install -y potrace
 ```
 
 > [!NOTE]

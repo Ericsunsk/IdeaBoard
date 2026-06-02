@@ -20,7 +20,6 @@ import (
 	"api/internal/auth"
 	"api/internal/boards"
 	"api/internal/channels"
-	"api/internal/imageproc"
 	"api/internal/platform/media"
 	"api/internal/platform/response"
 	"api/internal/prompts"
@@ -61,7 +60,6 @@ type UserRouteDeps struct {
 	AccountHandler   *accounts.AccountHandler
 	BoardHandler     *boards.BoardHandler
 	LineDraftHandler *assets.LineDraftHandler
-	VectorizeHandler *imageproc.VectorizeHandler
 	Uploads          UploadDeps
 }
 
@@ -245,9 +243,6 @@ func registerUserRoutes(userApi *gin.RouterGroup, h UserRouteDeps) {
 	userApi.POST("/boards/:board_id/uploads", uploadBoardAssetHandler(h.Uploads))
 	userApi.DELETE("/boards/:board_id/uploads", deleteBoardUploadHandler(h.Uploads))
 	userApi.GET("/download", downloadImageHandler())
-
-	userApi.POST("/vectorize", h.VectorizeHandler.Vectorize)
-	userApi.GET("/vectorize/check", h.VectorizeHandler.CheckPotrace)
 }
 
 func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {

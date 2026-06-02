@@ -40,8 +40,6 @@ func AuthorizeUploadResourceRead(
 			return ErrUploadAccessInvalidPath
 		}
 		return nil
-	case UploadResourceKindProfileVector:
-		return authorizeProfileVectorUploadResourceRead(ctx, userID, resource, ownerStorage)
 	case UploadResourceKindTaskOutput:
 		return authorizeTaskOutputUploadResourceRead(userID, resource)
 	default:
@@ -77,32 +75,6 @@ func authorizeWorkspaceUploadResourceRead(
 	}
 	if ownerSegment != resource.Workspace.OwnerSegment {
 		return ErrUploadAccessOwnerMismatch
-	}
-	return nil
-}
-
-func authorizeProfileVectorUploadResourceRead(
-	ctx context.Context,
-	userID int64,
-	resource UploadResource,
-	ownerStorage UploadOwnerStorageUIDResolver,
-) error {
-	if resource.ProfileVector == nil {
-		return ErrUploadAccessInvalidPath
-	}
-	if ownerStorage == nil {
-		return ErrUploadAccessDependencyMissing
-	}
-	storageUID, err := ownerStorage.GetStorageUIDByUserID(ctx, userID)
-	if err != nil {
-		return err
-	}
-	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
-	if err != nil {
-		return err
-	}
-	if ownerSegment != resource.ProfileVector.OwnerSegment {
-		return ErrUploadAccessDenied
 	}
 	return nil
 }

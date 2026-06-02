@@ -415,7 +415,7 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/2026/05/13/demo.png"); err == nil {
 		t.Fatalf("expected legacy generic upload path to be rejected")
 	}
-	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/profile/MEMB1A/vector/demo.svg"); err == nil {
+	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/profile/MEMB1A/avatar/demo.png"); err == nil {
 		t.Fatalf("expected non-workspace upload path to be rejected")
 	}
 }

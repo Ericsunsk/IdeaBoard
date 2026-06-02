@@ -77,19 +77,6 @@ func TestParseUploadResourceProfileAvatar(t *testing.T) {
 	}
 }
 
-func TestParseUploadResourceProfileVector(t *testing.T) {
-	resource, err := ParseUploadResource("/uploads/profile/OWNR1A/vector/demo.svg")
-	if err != nil {
-		t.Fatalf("ParseUploadResource returned error: %v", err)
-	}
-	if resource.Kind != UploadResourceKindProfileVector || resource.ProfileVector == nil {
-		t.Fatalf("kind = %q profileVector=%#v, want profile vector", resource.Kind, resource.ProfileVector)
-	}
-	if resource.ProfileVector.OwnerSegment != "OWNR1A" {
-		t.Fatalf("owner segment = %q", resource.ProfileVector.OwnerSegment)
-	}
-}
-
 func TestParseUploadResourceTaskOutput(t *testing.T) {
 	resource, err := ParseUploadResource("/uploads/tasks/42/task-abc/demo.png")
 	if err != nil {

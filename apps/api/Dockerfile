@@ -13,21 +13,17 @@ RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
-    go build -trimpath -ldflags="-s -w" -o /out/ideaboard-server ./cmd
+    go build -trimpath -ldflags="-s -w" -o /out/ideaboard-server ./cmd && \
+    go build -trimpath -ldflags="-s -w" -o /out/ideaboard-healthcheck ./cmd/healthcheck && \
+    mkdir -p /out/uploads
 
-FROM debian:bookworm-slim AS runtime
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates potrace \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system ideaboard \
-    && useradd --system --gid ideaboard --home-dir /app --shell /usr/sbin/nologin ideaboard \
-    && mkdir -p /app/uploads \
-    && chown -R ideaboard:ideaboard /app
+FROM cgr.dev/chainguard/static:latest-glibc AS runtime
 
 WORKDIR /app
 
-COPY --from=builder --chown=ideaboard:ideaboard /out/ideaboard-server /app/ideaboard-server
+COPY --from=builder --chown=65532:65532 /out/ideaboard-server /app/ideaboard-server
+COPY --from=builder --chown=65532:65532 /out/ideaboard-healthcheck /app/ideaboard-healthcheck
+COPY --from=builder --chown=65532:65532 /out/uploads /app/uploads
 
 ENV APP_ENV=production \
     APP_GIN_MODE=release \
@@ -37,6 +33,6 @@ ENV APP_ENV=production \
 
 EXPOSE 6000
 
-USER ideaboard
+USER 65532:65532
 
 ENTRYPOINT ["/app/ideaboard-server"]

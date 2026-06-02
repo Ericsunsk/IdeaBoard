@@ -15,7 +15,6 @@ type UploadResourceKind string
 const (
 	UploadResourceKindWorkspace     UploadResourceKind = "workspace"
 	UploadResourceKindProfileAvatar UploadResourceKind = "profile_avatar"
-	UploadResourceKindProfileVector UploadResourceKind = "profile_vector"
 	UploadResourceKindTaskOutput    UploadResourceKind = "task_output"
 )
 
@@ -26,11 +25,6 @@ type UploadWorkspaceResource struct {
 }
 
 type UploadProfileAvatarResource struct {
-	OwnerSegment string
-	RelativePath string
-}
-
-type UploadProfileVectorResource struct {
 	OwnerSegment string
 	RelativePath string
 }
@@ -46,7 +40,6 @@ type UploadResource struct {
 	ObjectKey     string
 	Workspace     *UploadWorkspaceResource
 	ProfileAvatar *UploadProfileAvatarResource
-	ProfileVector *UploadProfileVectorResource
 	TaskOutput    *UploadTaskOutputResource
 }
 
@@ -98,14 +91,6 @@ func ProfileAvatarUploadObjectPrefix(storageUID string) (string, error) {
 	return path.Join(uploadObjectRoot, "profile", ownerSegment, "avatar") + "/", nil
 }
 
-func ProfileVectorUploadDirPrefix(storageUID string) (string, error) {
-	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
-	if err != nil {
-		return "", err
-	}
-	return path.Join("profile", ownerSegment, "vector"), nil
-}
-
 func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 	if userID == 0 {
 		return "", fmt.Errorf("用户ID无效")
@@ -146,15 +131,6 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 	if parts[0] == "profile" && len(parts) >= 4 && parts[1] != "" && parts[2] == "avatar" && strings.Join(parts[3:], "") != "" {
 		resource.Kind = UploadResourceKindProfileAvatar
 		resource.ProfileAvatar = &UploadProfileAvatarResource{
-			OwnerSegment: parts[1],
-			RelativePath: strings.Join(parts[3:], "/"),
-		}
-		return resource, nil
-	}
-
-	if parts[0] == "profile" && len(parts) >= 4 && parts[1] != "" && parts[2] == "vector" && strings.Join(parts[3:], "") != "" {
-		resource.Kind = UploadResourceKindProfileVector
-		resource.ProfileVector = &UploadProfileVectorResource{
 			OwnerSegment: parts[1],
 			RelativePath: strings.Join(parts[3:], "/"),
 		}

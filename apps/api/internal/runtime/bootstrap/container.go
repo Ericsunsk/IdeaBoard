@@ -14,7 +14,6 @@ import (
 	"api/internal/channels"
 	"api/internal/db/migrations"
 	"api/internal/events"
-	"api/internal/imageproc"
 	"api/internal/platform/config"
 	"api/internal/platform/database"
 	"api/internal/platform/settings"
@@ -125,11 +124,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 			AccountHandler:   accounts.NewAccountHandler(accountService),
 			BoardHandler:     boards.NewBoardHandler(boardService),
 			LineDraftHandler: assets.NewLineDraftHandler(lineDraftModeRepo),
-			VectorizeHandler: imageproc.NewVectorizeHandler(taskRepo, storageService, imageproc.VectorizeDeps{
-				UploadBoards: uploadBoardAccessResolver{service: boardService},
-				UploadOwners: uploadOwnerStorageUIDResolver{repo: userRepo},
-			}),
-			Uploads: uploadDeps,
+			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler:         users.NewAdminHandler(userService, systemConfigRepo, authServiceClient),

@@ -36,7 +36,7 @@ func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 				return
 			}
 		case storage.UploadResourceKindProfileAvatar:
-		case storage.UploadResourceKindProfileVector, storage.UploadResourceKindTaskOutput:
+		case storage.UploadResourceKindTaskOutput:
 			if !authorizeOwnedUploadRead(c, deps, resource) {
 				return
 			}
