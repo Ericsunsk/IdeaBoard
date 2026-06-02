@@ -39,7 +39,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	handler := NewAccountHandler(service)
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
-		c.Set("user_id", uint64(7))
+		c.Set("user_id", int64(7))
 		handler.StreamUserTask(c)
 	})
 
@@ -89,7 +89,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	handler := NewAccountHandler(service)
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
-		c.Set("user_id", uint64(8))
+		c.Set("user_id", int64(8))
 		handler.StreamUserTask(c)
 	})
 

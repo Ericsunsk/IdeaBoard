@@ -20,7 +20,7 @@ func NewAuthHandler(userService *users.UserService) *AuthHandler {
 // GetCurrentUser 获取当前用户信息
 func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	user, err := h.userService.GetByID(c.Request.Context(), userID.(uint64))
+	user, err := h.userService.GetByID(c.Request.Context(), userID.(int64))
 	if err != nil {
 		response.Error(c, 404, "用户不存在")
 		return

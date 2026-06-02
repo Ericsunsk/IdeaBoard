@@ -10,17 +10,17 @@ import (
 )
 
 const getSystemConfig = `-- name: GetSystemConfig :one
-SELECT id, ` + "`" + `key` + "`" + `, value, created_at, updated_at
+SELECT id, config_key, value, created_at, updated_at
 FROM system_configs
-WHERE ` + "`" + `key` + "`" + ` = ?
+WHERE config_key = $1
 `
 
-func (q *Queries) GetSystemConfig(ctx context.Context, key string) (SystemConfig, error) {
-	row := q.db.QueryRowContext(ctx, getSystemConfig, key)
+func (q *Queries) GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error) {
+	row := q.db.QueryRowContext(ctx, getSystemConfig, configKey)
 	var i SystemConfig
 	err := row.Scan(
 		&i.ID,
-		&i.Key,
+		&i.ConfigKey,
 		&i.Value,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -29,14 +29,14 @@ func (q *Queries) GetSystemConfig(ctx context.Context, key string) (SystemConfig
 }
 
 const listSystemConfigsByPrefix = `-- name: ListSystemConfigsByPrefix :many
-SELECT id, ` + "`" + `key` + "`" + `, value, created_at, updated_at
+SELECT id, config_key, value, created_at, updated_at
 FROM system_configs
-WHERE ` + "`" + `key` + "`" + ` LIKE ?
-ORDER BY ` + "`" + `key` + "`" + ` ASC
+WHERE config_key LIKE $1
+ORDER BY config_key ASC
 `
 
-func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, key string) ([]SystemConfig, error) {
-	rows, err := q.db.QueryContext(ctx, listSystemConfigsByPrefix, key)
+func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error) {
+	rows, err := q.db.QueryContext(ctx, listSystemConfigsByPrefix, configKeyLike)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, key string) ([]
 		var i SystemConfig
 		if err := rows.Scan(
 			&i.ID,
-			&i.Key,
+			&i.ConfigKey,
 			&i.Value,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -65,17 +65,18 @@ func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, key string) ([]
 }
 
 const upsertSystemConfig = `-- name: UpsertSystemConfig :exec
-INSERT INTO system_configs (` + "`" + `key` + "`" + `, value)
-VALUES (?, ?)
-ON DUPLICATE KEY UPDATE value = VALUES(value)
+INSERT INTO system_configs (config_key, value)
+VALUES ($1, $2)
+ON CONFLICT (config_key) DO UPDATE
+SET value = EXCLUDED.value
 `
 
 type UpsertSystemConfigParams struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	ConfigKey string `json:"config_key"`
+	Value     string `json:"value"`
 }
 
 func (q *Queries) UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error {
-	_, err := q.db.ExecContext(ctx, upsertSystemConfig, arg.Key, arg.Value)
+	_, err := q.db.ExecContext(ctx, upsertSystemConfig, arg.ConfigKey, arg.Value)
 	return err
 }

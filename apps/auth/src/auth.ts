@@ -1,17 +1,16 @@
 import { betterAuth } from 'better-auth'
 import { admin, username } from 'better-auth/plugins'
-import { createPool } from 'mysql2/promise'
+import { Pool } from 'pg'
 import { env } from './env.js'
 
-export const authDB = createPool({
+export const authDB = new Pool({
   host: env.database.host,
   port: env.database.port,
   user: env.database.user,
   password: env.database.password,
   database: env.database.database,
-  connectionLimit: 10,
-  waitForConnections: true,
-  queueLimit: 0,
+  ssl: env.database.sslMode === 'disable' ? false : { rejectUnauthorized: env.database.sslMode === 'verify-full' },
+  max: 10,
 })
 
 export const auth = betterAuth({

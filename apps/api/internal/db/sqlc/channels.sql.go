@@ -9,37 +9,37 @@ import (
 	"context"
 )
 
-const createChannel = `-- name: CreateChannel :execlastid
+const createChannel = `-- name: CreateChannel :one
 INSERT INTO channels (type, name, api_url, status)
-VALUES (?, ?, ?, ?)
+VALUES ($1, $2, $3, $4)
+RETURNING id
 `
 
 type CreateChannelParams struct {
 	Type   string `json:"type"`
 	Name   string `json:"name"`
 	ApiUrl string `json:"api_url"`
-	Status int8   `json:"status"`
+	Status int16  `json:"status"`
 }
 
 func (q *Queries) CreateChannel(ctx context.Context, arg CreateChannelParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createChannel,
+	row := q.db.QueryRowContext(ctx, createChannel,
 		arg.Type,
 		arg.Name,
 		arg.ApiUrl,
 		arg.Status,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteChannel = `-- name: DeleteChannel :exec
 DELETE FROM channels
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) DeleteChannel(ctx context.Context, id uint64) error {
+func (q *Queries) DeleteChannel(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteChannel, id)
 	return err
 }
@@ -47,10 +47,10 @@ func (q *Queries) DeleteChannel(ctx context.Context, id uint64) error {
 const getChannelByID = `-- name: GetChannelByID :one
 SELECT id, type, name, api_url, status, created_at, updated_at
 FROM channels
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) GetChannelByID(ctx context.Context, id uint64) (Channel, error) {
+func (q *Queries) GetChannelByID(ctx context.Context, id int64) (Channel, error) {
 	row := q.db.QueryRowContext(ctx, getChannelByID, id)
 	var i Channel
 	err := row.Scan(
@@ -104,19 +104,19 @@ func (q *Queries) ListChannels(ctx context.Context) ([]Channel, error) {
 
 const updateChannel = `-- name: UpdateChannel :exec
 UPDATE channels
-SET type = ?,
-    name = ?,
-    api_url = ?,
-    status = ?
-WHERE id = ?
+SET type = $1,
+    name = $2,
+    api_url = $3,
+    status = $4
+WHERE id = $5
 `
 
 type UpdateChannelParams struct {
 	Type   string `json:"type"`
 	Name   string `json:"name"`
 	ApiUrl string `json:"api_url"`
-	Status int8   `json:"status"`
-	ID     uint64 `json:"id"`
+	Status int16  `json:"status"`
+	ID     int64  `json:"id"`
 }
 
 func (q *Queries) UpdateChannel(ctx context.Context, arg UpdateChannelParams) error {

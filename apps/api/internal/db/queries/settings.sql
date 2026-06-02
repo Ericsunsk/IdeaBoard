@@ -1,15 +1,16 @@
 -- name: GetSystemConfig :one
-SELECT id, `key`, value, created_at, updated_at
+SELECT id, config_key, value, created_at, updated_at
 FROM system_configs
-WHERE `key` = ?;
+WHERE config_key = sqlc.arg(config_key);
 
 -- name: ListSystemConfigsByPrefix :many
-SELECT id, `key`, value, created_at, updated_at
+SELECT id, config_key, value, created_at, updated_at
 FROM system_configs
-WHERE `key` LIKE ?
-ORDER BY `key` ASC;
+WHERE config_key LIKE sqlc.arg(config_key_like)
+ORDER BY config_key ASC;
 
 -- name: UpsertSystemConfig :exec
-INSERT INTO system_configs (`key`, value)
-VALUES (?, ?)
-ON DUPLICATE KEY UPDATE value = VALUES(value);
+INSERT INTO system_configs (config_key, value)
+VALUES (sqlc.arg(config_key), sqlc.arg(value))
+ON CONFLICT (config_key) DO UPDATE
+SET value = EXCLUDED.value;

@@ -19,7 +19,7 @@ type Querier interface {
 	CountRunningTasksMissingLeaseToken(ctx context.Context) (int64, error)
 	CountTasks(ctx context.Context, arg CountTasksParams) (int64, error)
 	CountTasksByStatus(ctx context.Context, status string) (int64, error)
-	CountTasksByUserID(ctx context.Context, userID uint64) (int64, error)
+	CountTasksByUserID(ctx context.Context, userID int64) (int64, error)
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (int64, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
@@ -28,48 +28,48 @@ type Querier interface {
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
 	CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (int64, error)
-	DeleteAccount(ctx context.Context, id uint64) error
+	DeleteAccount(ctx context.Context, id int64) error
 	DeleteBoardByBoardID(ctx context.Context, boardID string) error
 	DeleteBoardMember(ctx context.Context, arg DeleteBoardMemberParams) error
 	DeleteBoardMembersByBoardID(ctx context.Context, boardID string) error
 	DeleteBoardMembersByBoardIDs(ctx context.Context, boardIds []string) error
-	DeleteBoardMembersByUserID(ctx context.Context, userID uint64) error
+	DeleteBoardMembersByUserID(ctx context.Context, userID int64) error
 	DeleteBoardShareTokensByBoardID(ctx context.Context, boardID string) error
 	DeleteBoardShareTokensByBoardIDs(ctx context.Context, boardIds []string) error
-	DeleteBoardShareTokensByCreatedBy(ctx context.Context, createdBy uint64) error
-	DeleteChannel(ctx context.Context, id uint64) error
-	DeleteLineDraftMode(ctx context.Context, id uint64) error
+	DeleteBoardShareTokensByCreatedBy(ctx context.Context, createdBy int64) error
+	DeleteChannel(ctx context.Context, id int64) error
+	DeleteLineDraftMode(ctx context.Context, id int64) error
 	DeleteOutputsByTaskID(ctx context.Context, taskID string) error
 	DeleteTaskByTaskIDAndUserID(ctx context.Context, arg DeleteTaskByTaskIDAndUserIDParams) error
-	DeleteTasksByUserID(ctx context.Context, userID uint64) error
+	DeleteTasksByUserID(ctx context.Context, userID int64) error
 	DeleteUserBoardsByBoardIDs(ctx context.Context, boardIds []string) error
-	DeleteUserByID(ctx context.Context, id uint64) error
+	DeleteUserByID(ctx context.Context, id int64) error
 	FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) (int64, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFailTaskRunningWithLeaseParams) (int64, error)
-	GetAccountByID(ctx context.Context, id uint64) (ApiAccount, error)
-	GetAccountModelSetByID(ctx context.Context, id uint64) (string, error)
+	GetAccountByID(ctx context.Context, id int64) (ApiAccount, error)
+	GetAccountModelSetByID(ctx context.Context, id int64) (string, error)
 	GetBoardByBoardID(ctx context.Context, boardID string) (UserBoard, error)
 	GetBoardMemberByUserID(ctx context.Context, arg GetBoardMemberByUserIDParams) (BoardMember, error)
 	GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error)
 	GetBoardShareTokenByToken(ctx context.Context, token string) (BoardShareToken, error)
-	GetChannelByID(ctx context.Context, id uint64) (Channel, error)
-	GetLineDraftModeByID(ctx context.Context, id uint64) (LineDraftMode, error)
-	GetSystemConfig(ctx context.Context, key string) (SystemConfig, error)
-	GetTaskByID(ctx context.Context, id uint64) (Task, error)
+	GetChannelByID(ctx context.Context, id int64) (Channel, error)
+	GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error)
+	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
+	GetTaskByID(ctx context.Context, id int64) (Task, error)
 	GetTaskByTaskID(ctx context.Context, taskID string) (Task, error)
 	GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTaskIDAndUserIDParams) (Task, error)
 	GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error)
 	GetUserByAuthUserID(ctx context.Context, authUserID sql.NullString) (User, error)
-	GetUserByID(ctx context.Context, id uint64) (User, error)
+	GetUserByID(ctx context.Context, id int64) (User, error)
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
-	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (uint64, error)
-	IncrementAccountFailCount(ctx context.Context, id uint64) error
+	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
+	IncrementAccountFailCount(ctx context.Context, id int64) error
 	InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskStatEventIgnoreParams) (int64, error)
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
-	ListAccessibleBoardsByUserID(ctx context.Context, arg ListAccessibleBoardsByUserIDParams) ([]ListAccessibleBoardsByUserIDRow, error)
-	ListAccountIDs(ctx context.Context) ([]uint64, error)
-	ListAccountModelSetsByIDs(ctx context.Context, ids []uint64) ([]ListAccountModelSetsByIDsRow, error)
+	ListAccessibleBoardsByUserID(ctx context.Context, userID int64) ([]ListAccessibleBoardsByUserIDRow, error)
+	ListAccountIDs(ctx context.Context) ([]int64, error)
+	ListAccountModelSetsByIDs(ctx context.Context, ids []int64) ([]ListAccountModelSetsByIDsRow, error)
 	ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ApiAccount, error)
 	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]string, error)
 	ListBoardMembers(ctx context.Context, boardID string) ([]ListBoardMembersRow, error)
@@ -78,16 +78,16 @@ type Querier interface {
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
 	ListEnabledAccounts(ctx context.Context) ([]ApiAccount, error)
 	ListEnabledLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
-	ListFailRunningCandidatesByAccountID(ctx context.Context, accountID uint64) ([]ListFailRunningCandidatesByAccountIDRow, error)
+	ListFailRunningCandidatesByAccountID(ctx context.Context, accountID int64) ([]ListFailRunningCandidatesByAccountIDRow, error)
 	ListLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskOutput, error)
-	ListOwnedBoardIDsByUserID(ctx context.Context, userID uint64) ([]string, error)
-	ListRunningMissingLeaseTaskIDs(ctx context.Context, limit int32) ([]string, error)
-	ListRunningTaskLeases(ctx context.Context, limit int32) ([]ListRunningTaskLeasesRow, error)
-	ListRunningTasksMissingLeaseToken(ctx context.Context, limit int32) ([]ListRunningTasksMissingLeaseTokenRow, error)
+	ListOwnedBoardIDsByUserID(ctx context.Context, userID int64) ([]string, error)
+	ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error)
+	ListRunningTaskLeases(ctx context.Context, rowLimit int32) ([]ListRunningTaskLeasesRow, error)
+	ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimit int32) ([]ListRunningTasksMissingLeaseTokenRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
-	ListSystemConfigsByPrefix(ctx context.Context, key string) ([]SystemConfig, error)
-	ListTaskIDsByAccountID(ctx context.Context, accountID uint64) ([]string, error)
+	ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error)
+	ListTaskIDsByAccountID(ctx context.Context, accountID int64) ([]string, error)
 	ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg ListTaskIDsByAccountIDAndStatusesParams) ([]string, error)
 	ListTaskStatisticsByCreatedRange(ctx context.Context, arg ListTaskStatisticsByCreatedRangeParams) ([]ListTaskStatisticsByCreatedRangeRow, error)
 	ListTasks(ctx context.Context, arg ListTasksParams) ([]Task, error)
@@ -100,7 +100,7 @@ type Querier interface {
 	MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFailedWithLeaseParams) (int64, error)
 	MarkTaskRunning(ctx context.Context, arg MarkTaskRunningParams) (int64, error)
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
-	ResetAccountFailCount(ctx context.Context, id uint64) error
+	ResetAccountFailCount(ctx context.Context, id int64) error
 	ResetRunningMissingLeaseTasksByIDs(ctx context.Context, taskIds []string) (int64, error)
 	ResetTaskRunningToPendingWithLease(ctx context.Context, arg ResetTaskRunningToPendingWithLeaseParams) (int64, error)
 	RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShareTokenParams) error

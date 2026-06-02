@@ -16,7 +16,7 @@ func (s *AccountService) GetMonitorInfo(ctx context.Context) (*queuetypes.Monito
 	if err != nil {
 		return nil, err
 	}
-	accountIDs := make([]uint64, len(accounts))
+	accountIDs := make([]int64, len(accounts))
 	for i, acc := range accounts {
 		accountIDs[i] = acc.ID
 	}

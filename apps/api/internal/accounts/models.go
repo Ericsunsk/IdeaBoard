@@ -3,9 +3,9 @@ package accounts
 import "time"
 
 type ApiAccount struct {
-	ID            uint64    `json:"id"`
+	ID            int64     `json:"id"`
 	Name          string    `json:"name"`
-	ChannelID     uint64    `json:"channel_id"`
+	ChannelID     int64     `json:"channel_id"`
 	Platform      string    `json:"platform"`
 	ApiType       string    `json:"api_type"`
 	ModelSet      string    `json:"model_set"`
@@ -14,7 +14,7 @@ type ApiAccount struct {
 	MaxConcurrent int       `json:"max_concurrent"`
 	Timeout       int       `json:"timeout"`
 	ExtraConfig   string    `json:"extra_config"`
-	Status        int8      `json:"status"`
+	Status        int16     `json:"status"`
 	FailCount     int       `json:"fail_count"`
 	Weight        int       `json:"weight"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -24,7 +24,7 @@ type ApiAccount struct {
 // 请求结构
 type CreateAccountRequest struct {
 	Name          string `json:"name"`
-	ChannelID     uint64 `json:"channel_id" binding:"required"`
+	ChannelID     int64  `json:"channel_id" binding:"required"`
 	Platform      string `json:"platform"`
 	ApiType       string `json:"api_type"`
 	ModelSet      string `json:"model_set"`
@@ -38,7 +38,7 @@ type CreateAccountRequest struct {
 
 type UpdateAccountRequest struct {
 	Name          string `json:"name"`
-	ChannelID     uint64 `json:"channel_id"`
+	ChannelID     int64  `json:"channel_id"`
 	Platform      string `json:"platform"`
 	ApiType       string `json:"api_type"`
 	ModelSet      string `json:"model_set"`
@@ -48,7 +48,7 @@ type UpdateAccountRequest struct {
 	Timeout       int    `json:"timeout"`
 	ExtraConfig   string `json:"extra_config"`
 	Weight        int    `json:"weight"`
-	Status        int8   `json:"status"`
+	Status        int16  `json:"status"`
 }
 
 // 列表响应
@@ -161,7 +161,7 @@ type AdminStatisticsUserRiskItem struct {
 
 // TaskDailyStat 按天+模型+用户的任务终态聚合快照（仅终态任务计入）。
 type TaskDailyStat struct {
-	ID                uint64    `json:"id"`
+	ID                int64     `json:"id"`
 	StatDate          string    `json:"stat_date"`
 	ModelName         string    `json:"model_name"`
 	UserKey           string    `json:"user_key"`
@@ -176,7 +176,7 @@ type TaskDailyStat struct {
 
 // TaskStatEvent 终态任务统计事件，按 task_id 幂等去重。
 type TaskStatEvent struct {
-	ID             uint64    `json:"id"`
+	ID             int64     `json:"id"`
 	TaskID         string    `json:"task_id"`
 	StatDate       string    `json:"stat_date"`
 	ModelName      string    `json:"model_name"`
@@ -189,7 +189,7 @@ type TaskStatEvent struct {
 
 // TaskDailyStatBackfill 标记某日期已完成历史终态任务回填扫描。
 type TaskDailyStatBackfill struct {
-	ID        uint64    `json:"id"`
+	ID        int64     `json:"id"`
 	StatDate  string    `json:"stat_date"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

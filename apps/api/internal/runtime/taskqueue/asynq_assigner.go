@@ -17,7 +17,7 @@ func NewRedisAsynqAssigner(mgr *redis.RedisManager) *RedisAsynqAssigner {
 	return &RedisAsynqAssigner{mgr: mgr}
 }
 
-func (a *RedisAsynqAssigner) Assign(ctx context.Context, accountIDs []uint64, task *queuetypes.TaskPayload) (TaskAssignment, error) {
+func (a *RedisAsynqAssigner) Assign(ctx context.Context, accountIDs []int64, task *queuetypes.TaskPayload) (TaskAssignment, error) {
 	accountID, leaseToken, status, err := a.mgr.TryAssignTask(ctx, accountIDs, task.TaskID)
 	if err != nil {
 		return TaskAssignment{}, err
@@ -41,18 +41,18 @@ func (a *RedisAsynqAssigner) ConfirmTaskRunning(ctx context.Context, assignment 
 	return a.mgr.ConfirmTaskRunning(ctx, assignment.AccountID, assignment.TaskID, assignment.LeaseToken)
 }
 
-func (a *RedisAsynqAssigner) Release(ctx context.Context, taskID string, accountID uint64, leaseToken string) error {
+func (a *RedisAsynqAssigner) Release(ctx context.Context, taskID string, accountID int64, leaseToken string) error {
 	if accountID == 0 || taskID == "" || leaseToken == "" {
 		return nil
 	}
 	return a.mgr.ReleaseTask(ctx, accountID, taskID, leaseToken)
 }
 
-func (a *RedisAsynqAssigner) GetTaskLease(ctx context.Context, taskID string) (uint64, bool, error) {
+func (a *RedisAsynqAssigner) GetTaskLease(ctx context.Context, taskID string) (int64, bool, error) {
 	return a.mgr.GetTaskLease(ctx, taskID)
 }
 
-func (a *RedisAsynqAssigner) HasActiveLease(ctx context.Context, taskID string, accountID uint64) (bool, error) {
+func (a *RedisAsynqAssigner) HasActiveLease(ctx context.Context, taskID string, accountID int64) (bool, error) {
 	return a.mgr.HasActiveLease(ctx, taskID, accountID)
 }
 
@@ -68,7 +68,7 @@ func (a *RedisAsynqAssigner) ListTaskLeases(ctx context.Context) ([]TaskLease, e
 	return result, nil
 }
 
-func (a *RedisAsynqAssigner) RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error {
+func (a *RedisAsynqAssigner) RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []int64) error {
 	redisLeases := make([]redis.TaskLease, 0, len(leases))
 	for _, lease := range leases {
 		redisLeases = append(redisLeases, redis.TaskLease{
@@ -85,27 +85,27 @@ func (a *RedisAsynqAssigner) WithTaskLeaseReconcileLock(ctx context.Context, fn 
 	return a.mgr.WithTaskLeaseReconcileLock(ctx, fn)
 }
 
-func (a *RedisAsynqAssigner) EnsureAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {
+func (a *RedisAsynqAssigner) EnsureAccountConcurrent(ctx context.Context, accountID int64, maxConcurrent int) error {
 	return a.mgr.EnsureAccountConcurrent(ctx, accountID, maxConcurrent)
 }
 
-func (a *RedisAsynqAssigner) SetAccountMaxConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {
+func (a *RedisAsynqAssigner) SetAccountMaxConcurrent(ctx context.Context, accountID int64, maxConcurrent int) error {
 	return a.mgr.SetAccountMaxConcurrent(ctx, accountID, maxConcurrent)
 }
 
-func (a *RedisAsynqAssigner) GetAccountLoadInfo(ctx context.Context, accountIDs []uint64) (map[uint64]*queuetypes.AccountLoad, error) {
+func (a *RedisAsynqAssigner) GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*queuetypes.AccountLoad, error) {
 	return a.mgr.GetAccountLoadInfo(ctx, accountIDs)
 }
 
-func (a *RedisAsynqAssigner) DeleteAccountConcurrent(ctx context.Context, accountID uint64) error {
+func (a *RedisAsynqAssigner) DeleteAccountConcurrent(ctx context.Context, accountID int64) error {
 	return a.mgr.DeleteAccountConcurrent(ctx, accountID)
 }
 
-func (a *RedisAsynqAssigner) GetAccountConcurrent(ctx context.Context, accountID uint64) (int, error) {
+func (a *RedisAsynqAssigner) GetAccountConcurrent(ctx context.Context, accountID int64) (int, error) {
 	return a.mgr.GetAccountConcurrent(ctx, accountID)
 }
 
-func (a *RedisAsynqAssigner) GetAccountMaxConcurrent(ctx context.Context, accountID uint64) (int, error) {
+func (a *RedisAsynqAssigner) GetAccountMaxConcurrent(ctx context.Context, accountID int64) (int, error) {
 	return a.mgr.GetAccountMaxConcurrent(ctx, accountID)
 }
 

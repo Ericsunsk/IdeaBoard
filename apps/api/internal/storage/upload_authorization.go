@@ -15,16 +15,16 @@ var (
 )
 
 type UploadBoardAccessResolver interface {
-	ResolveUploadBoardAccess(ctx context.Context, userID uint64, boardID string) (ownerUserID uint64, err error)
+	ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (ownerUserID int64, err error)
 }
 
 type UploadOwnerStorageUIDResolver interface {
-	GetStorageUIDByUserID(ctx context.Context, userID uint64) (string, error)
+	GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error)
 }
 
 func AuthorizeUploadResourceRead(
 	ctx context.Context,
-	userID uint64,
+	userID int64,
 	resource UploadResource,
 	boardAccess UploadBoardAccessResolver,
 	ownerStorage UploadOwnerStorageUIDResolver,
@@ -51,7 +51,7 @@ func AuthorizeUploadResourceRead(
 
 func authorizeWorkspaceUploadResourceRead(
 	ctx context.Context,
-	userID uint64,
+	userID int64,
 	resource UploadResource,
 	boardAccess UploadBoardAccessResolver,
 	ownerStorage UploadOwnerStorageUIDResolver,
@@ -83,7 +83,7 @@ func authorizeWorkspaceUploadResourceRead(
 
 func authorizeProfileVectorUploadResourceRead(
 	ctx context.Context,
-	userID uint64,
+	userID int64,
 	resource UploadResource,
 	ownerStorage UploadOwnerStorageUIDResolver,
 ) error {
@@ -107,11 +107,11 @@ func authorizeProfileVectorUploadResourceRead(
 	return nil
 }
 
-func authorizeTaskOutputUploadResourceRead(userID uint64, resource UploadResource) error {
+func authorizeTaskOutputUploadResourceRead(userID int64, resource UploadResource) error {
 	if resource.TaskOutput == nil {
 		return ErrUploadAccessInvalidPath
 	}
-	resourceUserID, err := strconv.ParseUint(resource.TaskOutput.UserSegment, 10, 64)
+	resourceUserID, err := strconv.ParseInt(resource.TaskOutput.UserSegment, 10, 64)
 	if err != nil || resourceUserID == 0 {
 		return ErrUploadAccessInvalidPath
 	}
@@ -123,7 +123,7 @@ func authorizeTaskOutputUploadResourceRead(userID uint64, resource UploadResourc
 
 func AuthorizeUploadPathRead(
 	ctx context.Context,
-	userID uint64,
+	userID int64,
 	rawPath string,
 	boardAccess UploadBoardAccessResolver,
 	ownerStorage UploadOwnerStorageUIDResolver,

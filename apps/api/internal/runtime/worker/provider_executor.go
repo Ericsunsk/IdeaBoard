@@ -175,7 +175,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	return string(resultJSON), nil
 }
 
-func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID uint64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, error) {
+func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, error) {
 	if len(imageURLs) == 0 {
 		return imageURLs, nil
 	}

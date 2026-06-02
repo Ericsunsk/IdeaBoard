@@ -71,7 +71,7 @@ func readResultString(result map[string]interface{}, key string) string {
 	return strings.TrimSpace(s)
 }
 
-func extractTaskUser(rawResult string, fallbackUserID uint64) string {
+func extractTaskUser(rawResult string, fallbackUserID int64) string {
 	result := parseResultMap(rawResult)
 	if result != nil {
 		for _, key := range []string{"username", "email", "user_id"} {

@@ -165,7 +165,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 // UpdateUserStatus 保留兼容入口，内部转发到封禁/解封编排
 func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 	var req struct {
-		Status *int8 `json:"status" binding:"required"`
+		Status *int16 `json:"status" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -276,7 +276,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	currentUserID := c.GetUint64("user_id")
+	currentUserID := c.GetInt64("user_id")
 	if currentUserID != 0 && currentUserID == targetUser.ID {
 		response.Error(c, 400, "不能修改当前登录管理员自己的角色")
 		return
@@ -335,7 +335,7 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	currentUserID := c.GetUint64("user_id")
+	currentUserID := c.GetInt64("user_id")
 	if currentUserID != 0 && currentUserID == targetUser.ID {
 		response.Error(c, 400, "不能彻底注销当前登录管理员自己")
 		return
@@ -373,7 +373,7 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 
 func (h *AdminHandler) getTargetUserByParam(c *gin.Context) (*User, bool) {
 	userID := c.Param("id")
-	userIDUint, err := strconv.ParseUint(userID, 10, 64)
+	userIDUint, err := strconv.ParseInt(userID, 10, 64)
 	if err != nil {
 		response.Error(c, 400, "无效的用户ID")
 		return nil, false
@@ -403,12 +403,12 @@ func normalizeAdminRole(role string) string {
 	return ""
 }
 
-func (h *AdminHandler) prepareManagedAuthUser(c *gin.Context) (*User, string, int8, bool) {
+func (h *AdminHandler) prepareManagedAuthUser(c *gin.Context) (*User, string, int16, bool) {
 	targetUser, ok := h.getTargetUserByParam(c)
 	if !ok {
 		return nil, "", 0, false
 	}
-	currentUserID := c.GetUint64("user_id")
+	currentUserID := c.GetInt64("user_id")
 	if currentUserID != 0 && currentUserID == targetUser.ID {
 		response.Error(c, 400, "不能操作当前登录管理员自己")
 		return nil, "", 0, false
@@ -431,7 +431,7 @@ func (h *AdminHandler) prepareManagedAuthUser(c *gin.Context) (*User, string, in
 	return targetUser, authUserID, targetUser.Status, true
 }
 
-func (h *AdminHandler) performBan(ctx context.Context, targetUser *User, authUserID string, currentStatus int8, req AdminBanUserRequest) error {
+func (h *AdminHandler) performBan(ctx context.Context, targetUser *User, authUserID string, currentStatus int16, req AdminBanUserRequest) error {
 	if currentStatus == 0 {
 		return nil
 	}
@@ -457,7 +457,7 @@ func (h *AdminHandler) performBan(ctx context.Context, targetUser *User, authUse
 	return nil
 }
 
-func (h *AdminHandler) performUnban(ctx context.Context, targetUser *User, authUserID string, currentStatus int8) error {
+func (h *AdminHandler) performUnban(ctx context.Context, targetUser *User, authUserID string, currentStatus int16) error {
 	if currentStatus == 1 {
 		return nil
 	}

@@ -31,7 +31,7 @@ func NewUserService(repo *UserRepository, workspaceCleaner ...UserWorkspaceClean
 }
 
 // GetByID 根据ID获取用户
-func (s *UserService) GetByID(ctx context.Context, id uint64) (*User, error) {
+func (s *UserService) GetByID(ctx context.Context, id int64) (*User, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
@@ -60,7 +60,7 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 }
 
 // UpdateStatus 更新用户状态
-func (s *UserService) UpdateStatus(ctx context.Context, userID uint64, status int8) error {
+func (s *UserService) UpdateStatus(ctx context.Context, userID int64, status int16) error {
 	if status != 0 && status != 1 {
 		return errors.New("状态值无效，仅支持0或1")
 	}
@@ -68,7 +68,7 @@ func (s *UserService) UpdateStatus(ctx context.Context, userID uint64, status in
 	return s.repo.UpdateStatus(ctx, userID, status)
 }
 
-func (s *UserService) UpdateRole(ctx context.Context, userID uint64, role string) error {
+func (s *UserService) UpdateRole(ctx context.Context, userID int64, role string) error {
 	normalizedRole := strings.ToLower(strings.TrimSpace(role))
 	if normalizedRole != "admin" && normalizedRole != "user" {
 		return errors.New("角色值无效，仅支持 admin 或 user")
@@ -78,7 +78,7 @@ func (s *UserService) UpdateRole(ctx context.Context, userID uint64, role string
 }
 
 // DeleteUser 删除用户
-func (s *UserService) DeleteUser(ctx context.Context, userID uint64) error {
+func (s *UserService) DeleteUser(ctx context.Context, userID int64) error {
 	targetUser, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
 		return errors.New("用户不存在")

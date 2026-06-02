@@ -34,10 +34,10 @@
   <br/>
   <img src="https://img.shields.io/badge/api-Go-00add8?style=flat-square&logo=go&logoColor=white" alt="API: Go" />
   <img src="https://img.shields.io/badge/framework-Gin-008ecf?style=flat-square" alt="Framework: Gin" />
-  <img src="https://img.shields.io/badge/orm-GORM-1f6feb?style=flat-square" alt="ORM: GORM" />
+  <img src="https://img.shields.io/badge/sql-sqlc-1f6feb?style=flat-square" alt="SQL: sqlc" />
   <img src="https://img.shields.io/badge/auth-Better_Auth-111827?style=flat-square" alt="Auth: Better Auth" />
   <br/>
-  <img src="https://img.shields.io/badge/database-MySQL_8-4479a1?style=flat-square&logo=mysql&logoColor=white" alt="Database: MySQL 8" />
+  <img src="https://img.shields.io/badge/database-PostgreSQL_17-4169e1?style=flat-square&logo=postgresql&logoColor=white" alt="Database: PostgreSQL 17" />
   <img src="https://img.shields.io/badge/cache-Redis_8.6-dc382d?style=flat-square&logo=redis&logoColor=white" alt="Cache: Redis 8.6" />
   <img src="https://img.shields.io/badge/queue-Asynq-00add8?style=flat-square" alt="Queue: Asynq" />
 </p>
@@ -82,8 +82,8 @@ flowchart TB
     Nginx -- /api/auth/** --> Auth["Better Auth Service<br>Node.js :6001"]
     Nginx -- /api/* --> GoAPI["Go API<br>Gin :6000"]
     Nginx -- /uploads/* --> Static["静态资源服务<br>/uploads/*"]
-    Auth --> MySQL[("MySQL 8.0")] & Redis[("Redis 8.6")]
-    GoAPI --> MySQL & Redis & Worker["Worker 消费者"]
+    Auth --> Postgres[("PostgreSQL 17")] & Redis[("Redis 8.6")]
+    GoAPI --> Postgres & Redis & Worker["Worker 消费者"]
     Worker --> Queue["Redis Queue"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / S3-compatible"]
     Static --> Storage
 
@@ -92,7 +92,7 @@ flowchart TB
     style Auth fill:#e1f5fe,stroke:#01579b,stroke-width:1px
     style GoAPI fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px
     style Static fill:#fff,stroke:#333,stroke-width:1px
-    style MySQL fill:#fff3e0,stroke:#e65100,stroke-width:1px
+    style Postgres fill:#eff6ff,stroke:#1d4ed8,stroke-width:1px
     style Redis fill:#ffebee,stroke:#c62828,stroke-width:1px
     style Worker fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
     style Queue fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
@@ -100,7 +100,7 @@ flowchart TB
     style Storage fill:#f5f5f5,stroke:#616161,stroke-width:1px
 ```
 
-生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth、MySQL 与 Redis，并由 Cloudflare Tunnel 暴露 API 域名。
+生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth、PostgreSQL 与 Redis，并由 Cloudflare Tunnel 暴露 API 域名。
 
 <a id="highlights"></a>
 
@@ -189,7 +189,7 @@ flowchart TB
 | ------- | -------- |
 | Node.js | `22.18+` |
 | Go      | `1.25+`  |
-| MySQL   | `8.0+`   |
+| PostgreSQL | `17+` |
 | Redis   | `8.6+`   |
 
 ### 1. 启动本地依赖
@@ -197,7 +197,7 @@ flowchart TB
 ```bash
 cd docker
 cp .env.example .env
-# 至少修改 MYSQL_ROOT_PASSWORD 和 MYSQL_PASSWORD
+# 至少修改 POSTGRES_PASSWORD
 docker compose -f compose.local.yml up -d
 ```
 
@@ -206,16 +206,15 @@ docker compose -f compose.local.yml up -d
 
 | 项目            | 默认值           |
 | --------------- | ---------------- |
-| MySQL Root 密码 | `docker/.env` 中的 `MYSQL_ROOT_PASSWORD` |
-| 业务数据库      | `${MYSQL_DATABASE:-ideaboard}` |
-| 业务用户        | `${MYSQL_USER:-ideaboard}` |
-| 业务密码        | `docker/.env` 中的 `MYSQL_PASSWORD` |
+| 业务数据库      | `${POSTGRES_DB:-ideaboard}` |
+| 业务用户        | `${POSTGRES_USER:-ideaboard}` |
+| 业务密码        | `docker/.env` 中的 `POSTGRES_PASSWORD` |
 | Redis           | `127.0.0.1:6379` |
 
 </details>
 
 > [!NOTE]
-> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 MySQL / Redis 直接暴露到外网。若你需要 Redis 密码，可在 `docker/.env` 中设置 `REDIS_PASSWORD`，并在 `apps/api/.env` 中同步设置 `REDIS_AUTH`。
+> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 PostgreSQL / Redis 直接暴露到外网。若你需要 Redis 密码，可在 `docker/.env` 中设置 `REDIS_PASSWORD`，并在 `apps/api/.env` 中同步设置 `REDIS_AUTH`。
 
 ### 2. 配置后端环境
 
@@ -356,7 +355,7 @@ ideaboard delete --yes
 
 ### Cloudflare Pages + Tunnel + VPS
 
-适用于前端部署到 Cloudflare Pages，后端、认证服务、MySQL 与 Redis 继续运行在 VPS，并通过 Cloudflare Tunnel 暴露 `api.example.com` 的混合部署。
+适用于前端部署到 Cloudflare Pages，后端、认证服务、PostgreSQL 与 Redis 继续运行在 VPS，并通过 Cloudflare Tunnel 暴露 `api.example.com` 的混合部署。
 
 <p>
   <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create/pages">

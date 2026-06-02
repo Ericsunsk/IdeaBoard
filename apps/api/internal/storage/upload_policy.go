@@ -106,7 +106,7 @@ func ProfileVectorUploadDirPrefix(storageUID string) (string, error) {
 	return path.Join("profile", ownerSegment, "vector"), nil
 }
 
-func TaskOutputUploadDirPrefix(userID uint64, taskID string) (string, error) {
+func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 	if userID == 0 {
 		return "", fmt.Errorf("用户ID无效")
 	}

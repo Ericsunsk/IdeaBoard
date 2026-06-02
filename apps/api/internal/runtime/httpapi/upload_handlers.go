@@ -61,7 +61,7 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		userID := c.GetUint64("user_id")
+		userID := c.GetInt64("user_id")
 		if userID == 0 {
 			response.Error(c, 401, "未登录")
 			return
@@ -116,7 +116,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		userID := c.GetUint64("user_id")
+		userID := c.GetInt64("user_id")
 		if userID == 0 {
 			response.Error(c, 401, "未登录")
 			return
@@ -170,7 +170,7 @@ func deleteBoardUploadHandler(h UploadDeps) gin.HandlerFunc {
 			response.Error(c, 400, "请求参数错误")
 			return
 		}
-		userID := c.GetUint64("user_id")
+		userID := c.GetInt64("user_id")
 		if userID == 0 {
 			response.Error(c, 401, "未登录")
 			return

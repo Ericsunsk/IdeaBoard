@@ -32,7 +32,7 @@
 <a id="deployment-profile"></a>
 ## 部署概览
 
-本文档适用于 `Linux amd64/arm64` 服务器。当前优先推荐 `Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel`，保留 `Nginx + systemd + MySQL + Redis + Better Auth Node Service` 作为传统部署方式。
+本文档适用于 `Linux amd64/arm64` 服务器。当前优先推荐 `Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel`，保留 `Nginx + systemd + PostgreSQL + Redis + Better Auth Node Service` 作为传统部署方式。
 
 ### 推荐拓扑
 
@@ -45,8 +45,8 @@ graph LR
     Cloudflared --> Gateway["Gateway<br>http://gateway:80"]
     Gateway -- "/api/auth" --> Auth["ideaboard-auth<br>GHCR image"]
     Gateway -- "/api /uploads" --> API["ideaboard-api<br>GHCR image"]
-    Auth --> MySQL[("MySQL volume")]
-    API --> MySQL
+    Auth --> Postgres[("PostgreSQL volume")]
+    API --> Postgres
     API --> Redis[("Redis volume")]
 ```
 
@@ -60,8 +60,8 @@ graph LR
     Nginx -- "/api/auth" --> Auth["ideaboard-auth (:6001)"]
     Nginx -- "/api /uploads" --> Server["ideaboard-server (:6000)"]
     
-    Auth --> MySQL[("MySQL")]
-    Server --> MySQL
+    Auth --> Postgres[("PostgreSQL")]
+    Server --> Postgres
     Server --> Redis[("Redis")]
     Server --> AI["OSS / 上游 AI 渠道"]
 ```
@@ -83,7 +83,7 @@ graph LR
 
 ### Cloudflare Pages + Cloudflare Tunnel + VPS 拓扑
 
-推荐的混合部署方式：Cloudflare Pages 托管前端，Cloudflare Tunnel 暴露后端 API 域名，VPS 只在本机运行后端、认证服务、MySQL 与 Redis。
+推荐的混合部署方式：Cloudflare Pages 托管前端，Cloudflare Tunnel 暴露后端 API 域名，VPS 只在本机运行后端、认证服务、PostgreSQL 与 Redis。
 
 ```mermaid
 graph LR
@@ -94,8 +94,8 @@ graph LR
     Tunnel --> Nginx["VPS Nginx (:80 local)"]
     Nginx -- "/api/auth" --> Auth["ideaboard-auth (:6001)"]
     Nginx -- "/api /uploads" --> Server["ideaboard-server (:6000)"]
-    Auth --> MySQL[("MySQL")]
-    Server --> MySQL
+    Auth --> Postgres[("PostgreSQL")]
+    Server --> Postgres
     Server --> Redis[("Redis")]
 ```
 
@@ -112,7 +112,7 @@ Pages 项目建议配置：
 
 前端默认从 `VITE_API_BASE_URL` 派生 `/uploads/*` 的访问域名；如需独立素材域名，可额外设置 `VITE_PUBLIC_ASSET_BASE_URL=https://assets.example.com`。
 
-VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、MySQL、Redis 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。Docker 生产环境至少同步：
+VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、PostgreSQL、Redis 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。Docker 生产环境至少同步：
 
 ```bash
 # /opt/stacks/ideaboard/docker/.env
@@ -128,7 +128,7 @@ Hostname: api.example.com
 Service: http://gateway:80
 ```
 
-VPS 防火墙建议只开放 SSH；API 域名通过 compose 内的 `cloudflared` 到达 Gateway，无需把 `6000/6001/MySQL/Redis` 暴露到公网。
+VPS 防火墙建议只开放 SSH；API 域名通过 compose 内的 `cloudflared` 到达 Gateway，无需把 `6000/6001/PostgreSQL/Redis` 暴露到公网。
 
 <a id="recommended-docker"></a>
 
@@ -186,7 +186,7 @@ GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $G
 ideaboard update
 ```
 
-`ideaboard update` 会在执行 Auth migration 前自动导出 MySQL backup 到 `/opt/stacks/ideaboard/backups/mysql/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 `api`、`auth` 的 `/api/health` health gate 失败都会中止部署并打印相关容器日志。
+`ideaboard update` 会在执行 Auth migration 前自动导出 PostgreSQL backup 到 `/opt/stacks/ideaboard/backups/postgres/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 `api`、`auth` 的 `/api/health` health gate 失败都会中止部署并打印相关容器日志。
 
 常用运维：
 
@@ -245,13 +245,13 @@ ideaboard update
 若新版本已执行 migration，先保留故障现场并确认最近 backup：
 
 ```bash
-ls -lh /opt/stacks/ideaboard/backups/mysql/
-docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 gateway api auth mysql
+ls -lh /opt/stacks/ideaboard/backups/postgres/
+docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 gateway api auth postgres
 ```
 
 当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。
 
-数据保存在 Docker volumes：`mysql-data`、`redis-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
+数据保存在 Docker volumes：`postgres-data`、`redis-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
 
 <a id="release-artifact"></a>
 
@@ -305,14 +305,14 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 
 - 系统：`Linux amd64`
 - 端口：`80`
-- 软件：`nginx`、`mysql`、`redis-server`、`nodejs >= 22.18`、`npm`、`tar`
+- 软件：`nginx`、`postgresql`、`redis-server`、`nodejs >= 22.18`、`npm`、`tar`
 - 可选依赖：`potrace`，用于转矢量能力
 
 Ubuntu / Debian 参考安装命令：
 
 ```bash
 sudo apt update
-sudo apt install -y nginx redis-server mysql-server nodejs npm
+sudo apt install -y nginx redis-server postgresql postgresql-client nodejs npm
 sudo apt install -y potrace
 ```
 
@@ -384,17 +384,17 @@ chown -R ideaboard:ideaboard /opt/ideaboard/apps /opt/ideaboard/deploy /opt/idea
 
 ### 4. 准备数据库与缓存
 
-#### MySQL
+#### PostgreSQL
 
 ```bash
-mysql -uroot -p
+sudo -u postgres psql
 ```
 
 ```sql
-CREATE DATABASE ideaboard DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'ideaboard'@'127.0.0.1' IDENTIFIED BY '请替换为强密码';
-GRANT ALL PRIVILEGES ON ideaboard.* TO 'ideaboard'@'127.0.0.1';
-FLUSH PRIVILEGES;
+CREATE USER ideaboard WITH PASSWORD '请替换为强密码';
+CREATE DATABASE ideaboard OWNER ideaboard;
+\c ideaboard
+GRANT ALL PRIVILEGES ON DATABASE ideaboard TO ideaboard;
 ```
 
 #### Redis
@@ -466,7 +466,7 @@ npm prune --omit=dev
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
 
 > [!IMPORTANT]
-> Better Auth 会在同一个 MySQL 库里维护 `user/session/account/verification` 等认证表。`npm run migrate:dist` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
+> Better Auth 会在同一个 PostgreSQL 库里维护 `user/session/account/verification` 等认证表。`npm run migrate:dist` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
 >
 > 后台 `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销、开放注册开关、防刷限流设置；不开放后台改密。角色升降级与彻底注销均由 Go Admin API 编排，并依赖 `AUTH_SERVICE_INTERNAL_KEY` 调用 Auth Service internal endpoint；限流配置来源于后台设置并写入 `system_configs`，不通过环境变量注入。
 
@@ -515,7 +515,7 @@ export INIT_ADMIN_PASSWORD='your-strong-password'
 - 密码：由 `INIT_ADMIN_PASSWORD` 指定
 
 > [!IMPORTANT]
-> 数据库连接账号和网站管理员账号是两套信息。`/opt/ideaboard/apps/api/.env` 只决定服务如何连接 MySQL；后台登录账号来自 Better Auth 与业务库的关联数据。`init-admin` 如果未设置 `INIT_ADMIN_PASSWORD` 会直接拒绝执行。
+> 数据库连接账号和网站管理员账号是两套信息。`/opt/ideaboard/apps/api/.env` 只决定服务如何连接 PostgreSQL；后台登录账号来自 Better Auth 与业务库的关联数据。`init-admin` 如果未设置 `INIT_ADMIN_PASSWORD` 会直接拒绝执行。
 
 ### 5. 配置 Nginx
 
@@ -647,4 +647,4 @@ nginx -t && systemctl reload nginx
 4. 执行 `systemctl restart ideaboard-auth ideaboard`。
 5. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
 
-Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IMAGE_TAG` 改回上一版并执行 `ideaboard update`。脚本会先创建新的 MySQL backup，再运行 migration 和 health gate；历史 backup 位于 `/opt/stacks/ideaboard/backups/mysql/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IMAGE_TAG` 改回上一版并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup，再运行 migration 和 health gate；历史 backup 位于 `/opt/stacks/ideaboard/backups/postgres/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。

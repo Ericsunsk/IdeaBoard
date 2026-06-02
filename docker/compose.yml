@@ -46,7 +46,7 @@ services:
     container_name: ideaboard-api
     restart: unless-stopped
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -63,11 +63,12 @@ services:
       APP_PUBLIC_ASSET_BASE_URL: ${APP_PUBLIC_ASSET_BASE_URL:-${API_BASE_URL:?Set API_BASE_URL}}
       AUTH_SERVICE_BASE_URL: http://auth:6001
       AUTH_SERVICE_INTERNAL_KEY: ${AUTH_INTERNAL_KEY:?Set AUTH_INTERNAL_KEY}
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: ${MYSQL_USER:-ideaboard}
-      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
-      DB_NAME: ${MYSQL_DATABASE:-ideaboard}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-ideaboard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB:-ideaboard}
+      DB_SSLMODE: disable
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_AUTH: ${REDIS_PASSWORD:-}
@@ -93,7 +94,7 @@ services:
     container_name: ideaboard-auth
     restart: unless-stopped
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     environment:
       NODE_ENV: production
@@ -104,11 +105,12 @@ services:
       AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-${APP_BASE_URL:?Set APP_BASE_URL}}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-${API_BASE_URL:?Set API_BASE_URL}}
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: ${MYSQL_USER:-ideaboard}
-      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
-      DB_NAME: ${MYSQL_DATABASE:-ideaboard}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-ideaboard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB:-ideaboard}
+      DB_SSLMODE: disable
     healthcheck:
       test:
         - CMD
@@ -122,27 +124,24 @@ services:
     networks:
       - ideaboard-network
 
-  mysql:
-    image: mysql:8.0
-    container_name: ideaboard-mysql
+  postgres:
+    image: postgres:17-alpine
+    container_name: ideaboard-postgres
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-ideaboard}
-      MYSQL_USER: ${MYSQL_USER:-ideaboard}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ideaboard}
+      POSTGRES_USER: ${POSTGRES_USER:-ideaboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     volumes:
-      - mysql-data:/var/lib/mysql
-      - ./mysql/init:/docker-entrypoint-initdb.d:ro
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test:
         - CMD-SHELL
-        - mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -h 127.0.0.1
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 90s
+      start_period: 30s
     networks:
       - ideaboard-network
 
@@ -179,7 +178,7 @@ services:
       - ideaboard-network
 
 volumes:
-  mysql-data:
+  postgres-data:
   redis-data:
   api-uploads:
 

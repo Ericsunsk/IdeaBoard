@@ -127,7 +127,7 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 	}, nil
 }
 
-func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID uint64, taskID string, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, bool, error) {
+func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID int64, taskID string, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, bool, error) {
 	if redraw == nil {
 		return upstreamImageRef, false, nil
 	}

@@ -2,8 +2,8 @@
 
 `docker/` 目录同时包含本地开发依赖和生产 Docker Compose stack：
 
-- `compose.local.yml`：本地开发用 `MySQL + Redis`
-- `compose.yml`：生产 VPS 用 `Cloudflared + Gateway + API + Auth + MySQL + Redis`
+- `compose.local.yml`：本地开发用 `PostgreSQL + Redis`
+- `compose.yml`：生产 VPS 用 `Cloudflared + Gateway + API + Auth + PostgreSQL + Redis`
 
 生产环境请优先使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的 GHCR + Docker Compose 部署方式。
 
@@ -13,7 +13,7 @@
 ```bash
 cd docker
 cp .env.example .env
-# 至少修改 MYSQL_ROOT_PASSWORD 和 MYSQL_PASSWORD；不要使用弱默认密码。
+# 至少修改 POSTGRES_PASSWORD；不要使用弱默认密码。
 docker compose -f compose.local.yml up -d
 ```
 
@@ -26,27 +26,23 @@ docker compose -f compose.local.yml ps
 查看日志：
 
 ```bash
-docker compose -f compose.local.yml logs -f mysql
+docker compose -f compose.local.yml logs -f postgres
 docker compose -f compose.local.yml logs -f redis
 ```
 
 
 ## 服务说明
 
-### MySQL
+### PostgreSQL
 
 | 项目 | 说明 |
 |------|------|
-| 镜像 | `mysql:8.0` |
-| 容器名 | `ideaboard-mysql` |
-| 宿主机端口 | `127.0.0.1:${MYSQL_PORT:-3306}` |
-| Root 密码 | `${MYSQL_ROOT_PASSWORD}`，必填 |
-| 默认数据库 | `${MYSQL_DATABASE:-ideaboard}` |
-| 默认业务用户 | `${MYSQL_USER:-ideaboard}` |
-| 默认业务密码 | `${MYSQL_PASSWORD}`，必填 |
-
-> [!NOTE]
-> compose 已显式固定 `platform: linux/amd64`，便于 Apple Silicon 环境直接运行。
+| 镜像 | `postgres:17-alpine` |
+| 容器名 | `ideaboard-postgres` |
+| 宿主机端口 | `127.0.0.1:${POSTGRES_PORT:-5432}` |
+| 默认数据库 | `${POSTGRES_DB:-ideaboard}` |
+| 默认业务用户 | `${POSTGRES_USER:-ideaboard}` |
+| 默认业务密码 | `${POSTGRES_PASSWORD}`，必填 |
 
 > [!TIP]
 > compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
@@ -64,20 +60,20 @@ docker compose -f compose.local.yml logs -f redis
 
 ## 连接信息
 
-### MySQL
+### PostgreSQL
 
 命令行：
 
 ```bash
-mysql -h localhost -P 3306 -u ideaboard -p"$MYSQL_PASSWORD" ideaboard
+psql "postgres://ideaboard:$POSTGRES_PASSWORD@localhost:5432/ideaboard?sslmode=disable"
 ```
 
 GUI 客户端：
 
 - Host：`localhost`
-- Port：`3306`
+- Port：`5432`
 - User：`ideaboard`
-- Password：你在 `docker/.env` 中设置的 `MYSQL_PASSWORD`
+- Password：你在 `docker/.env` 中设置的 `POSTGRES_PASSWORD`
 
 ### Redis
 
@@ -129,9 +125,9 @@ docker compose -f docker/compose.yml --env-file docker/.env pull
 docker compose -f docker/compose.yml --env-file docker/.env up -d
 ```
 
-推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 MySQL dump 写入 `backups/mysql/`，并在启动后检查 `api` 和 `auth` 的 `/api/health`。如果 health gate 失败，请先查看 `gateway/api/auth/mysql` 日志，再决定是否把 `IMAGE_TAG` 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
+推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 PostgreSQL dump 写入 `backups/postgres/`，并在启动后检查 `api` 和 `auth` 的 `/api/health`。如果 health gate 失败，请先查看 `gateway/api/auth/postgres` 日志，再决定是否把 `IMAGE_TAG` 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
 
-生产数据在 Docker volumes 中持久化：`mysql-data`、`redis-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
+生产数据在 Docker volumes 中持久化：`postgres-data`、`redis-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
 
 
 ## 常见问题
@@ -144,14 +140,10 @@ docker compose -f docker/compose.yml --env-file docker/.env up -d
 docker compose -f compose.local.yml up -d
 ```
 
-### Apple Silicon 拉取 MySQL 报错
-
-如果你在 Apple Silicon 上看到类似 `no matching manifest for linux/arm64/v8` 的错误，通常是镜像架构问题。当前仓库已在 compose 中固定 `linux/amd64`，拉取最新配置后重试即可。
-
-### 后端连不上 MySQL
+### 后端连不上 PostgreSQL
 
 请检查：
 
-1. `docker compose -f compose.local.yml ps` 中 MySQL 是否为 `Up`。
+1. `docker compose -f compose.local.yml ps` 中 PostgreSQL 是否为 `Up`。
 2. `apps/api/.env` 中 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 是否与 compose 配置一致。
-3. 若你改过 `MYSQL_DATABASE`、`MYSQL_USER` 或 `MYSQL_PASSWORD`，后端也必须同步修改。
+3. 若你改过 `POSTGRES_DB`、`POSTGRES_USER` 或 `POSTGRES_PASSWORD`，后端也必须同步修改。

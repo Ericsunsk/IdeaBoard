@@ -79,9 +79,10 @@ export const env = {
   },
   database: {
     host: getEnv('DB_HOST', '127.0.0.1'),
-    port: getEnvInt('DB_PORT', 3306),
+    port: getEnvInt('DB_PORT', 5432),
     user: getEnv('DB_USER', 'ideaboard'),
     password: getEnv('DB_PASSWORD', ''),
     database: getEnv('DB_NAME', 'ideaboard'),
+    sslMode: getEnv('DB_SSLMODE', 'disable'),
   },
 }

@@ -6,11 +6,11 @@ import (
 )
 
 type Task struct {
-	ID          uint64       `json:"id"`
+	ID          int64        `json:"id"`
 	TaskID      string       `json:"task_id"`
-	UserID      uint64       `json:"user_id"`
-	ChannelID   uint64       `json:"channel_id"`
-	AccountID   uint64       `json:"account_id"`
+	UserID      int64        `json:"user_id"`
+	ChannelID   int64        `json:"channel_id"`
+	AccountID   int64        `json:"account_id"`
 	Prompt      string       `json:"prompt"`
 	UserPrompt  string       `json:"user_prompt"`
 	Params      string       `json:"params"`
@@ -26,7 +26,7 @@ type Task struct {
 }
 
 type TaskOutput struct {
-	ID         uint64    `json:"id"`
+	ID         int64     `json:"id"`
 	TaskID     string    `json:"task_id"`
 	Role       string    `json:"role"`
 	URL        string    `json:"url"`
@@ -104,8 +104,8 @@ type SubmitTaskRequest struct {
 }
 
 type TaskListRequest struct {
-	UserID    uint64 `form:"user_id"`
-	AccountID uint64 `form:"account_id"`
+	UserID    int64  `form:"user_id"`
+	AccountID int64  `form:"account_id"`
 	Status    string `form:"status"`
 	Keyword   string `form:"keyword"`
 	Page      int    `form:"page,default=1"`

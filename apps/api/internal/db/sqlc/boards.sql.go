@@ -14,15 +14,15 @@ import (
 const countBoardNameConflicts = `-- name: CountBoardNameConflicts :one
 SELECT COUNT(*)
 FROM user_boards
-WHERE user_id = ?
-  AND LOWER(name) = LOWER(?)
-  AND (CAST(? AS SIGNED) = 0 OR board_id <> ?)
+WHERE user_id = $1
+  AND LOWER(name) = LOWER($2)
+  AND (NOT $3::boolean OR board_id <> $4)
 `
 
 type CountBoardNameConflictsParams struct {
-	UserID     uint64 `json:"user_id"`
+	UserID     int64  `json:"user_id"`
 	Name       string `json:"name"`
-	HasBoardID int64  `json:"has_board_id"`
+	HasBoardID bool   `json:"has_board_id"`
 	BoardID    string `json:"board_id"`
 }
 
@@ -41,7 +41,7 @@ func (q *Queries) CountBoardNameConflicts(ctx context.Context, arg CountBoardNam
 const countBoardShareTokenByToken = `-- name: CountBoardShareTokenByToken :one
 SELECT COUNT(*)
 FROM board_share_tokens
-WHERE token = ?
+WHERE token = $1
 `
 
 func (q *Queries) CountBoardShareTokenByToken(ctx context.Context, token string) (int64, error) {
@@ -51,22 +51,26 @@ func (q *Queries) CountBoardShareTokenByToken(ctx context.Context, token string)
 	return count, err
 }
 
-const createBoardShareToken = `-- name: CreateBoardShareToken :execlastid
+const createBoardShareToken = `-- name: CreateBoardShareToken :one
 INSERT INTO board_share_tokens (board_id, token, role, created_by, revoked, expires_at)
-VALUES (?, ?, ?, ?, ?, ?)
+VALUES (
+  $1, $2, $3, $4,
+  $5, $6
+)
+RETURNING id
 `
 
 type CreateBoardShareTokenParams struct {
 	BoardID   string       `json:"board_id"`
 	Token     string       `json:"token"`
 	Role      string       `json:"role"`
-	CreatedBy uint64       `json:"created_by"`
+	CreatedBy int64        `json:"created_by"`
 	Revoked   bool         `json:"revoked"`
 	ExpiresAt sql.NullTime `json:"expires_at"`
 }
 
 func (q *Queries) CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createBoardShareToken,
+	row := q.db.QueryRowContext(ctx, createBoardShareToken,
 		arg.BoardID,
 		arg.Token,
 		arg.Role,
@@ -74,15 +78,14 @@ func (q *Queries) CreateBoardShareToken(ctx context.Context, arg CreateBoardShar
 		arg.Revoked,
 		arg.ExpiresAt,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteBoardByBoardID = `-- name: DeleteBoardByBoardID :exec
 DELETE FROM user_boards
-WHERE board_id = ?
+WHERE board_id = $1
 `
 
 func (q *Queries) DeleteBoardByBoardID(ctx context.Context, boardID string) error {
@@ -92,12 +95,12 @@ func (q *Queries) DeleteBoardByBoardID(ctx context.Context, boardID string) erro
 
 const deleteBoardMember = `-- name: DeleteBoardMember :exec
 DELETE FROM board_members
-WHERE board_id = ? AND user_id = ?
+WHERE board_id = $1 AND user_id = $2
 `
 
 type DeleteBoardMemberParams struct {
 	BoardID string `json:"board_id"`
-	UserID  uint64 `json:"user_id"`
+	UserID  int64  `json:"user_id"`
 }
 
 func (q *Queries) DeleteBoardMember(ctx context.Context, arg DeleteBoardMemberParams) error {
@@ -107,7 +110,7 @@ func (q *Queries) DeleteBoardMember(ctx context.Context, arg DeleteBoardMemberPa
 
 const deleteBoardMembersByBoardID = `-- name: DeleteBoardMembersByBoardID :exec
 DELETE FROM board_members
-WHERE board_id = ?
+WHERE board_id = $1
 `
 
 func (q *Queries) DeleteBoardMembersByBoardID(ctx context.Context, boardID string) error {
@@ -117,7 +120,7 @@ func (q *Queries) DeleteBoardMembersByBoardID(ctx context.Context, boardID strin
 
 const deleteBoardShareTokensByBoardID = `-- name: DeleteBoardShareTokensByBoardID :exec
 DELETE FROM board_share_tokens
-WHERE board_id = ?
+WHERE board_id = $1
 `
 
 func (q *Queries) DeleteBoardShareTokensByBoardID(ctx context.Context, boardID string) error {
@@ -128,7 +131,7 @@ func (q *Queries) DeleteBoardShareTokensByBoardID(ctx context.Context, boardID s
 const getBoardByBoardID = `-- name: GetBoardByBoardID :one
 SELECT id, board_id, user_id, name, state, created_at, updated_at
 FROM user_boards
-WHERE board_id = ?
+WHERE board_id = $1
 LIMIT 1
 `
 
@@ -150,12 +153,12 @@ func (q *Queries) GetBoardByBoardID(ctx context.Context, boardID string) (UserBo
 const getBoardMemberByUserID = `-- name: GetBoardMemberByUserID :one
 SELECT id, board_id, user_id, role, created_at, updated_at
 FROM board_members
-WHERE board_id = ? AND user_id = ?
+WHERE board_id = $1 AND user_id = $2
 `
 
 type GetBoardMemberByUserIDParams struct {
 	BoardID string `json:"board_id"`
-	UserID  uint64 `json:"user_id"`
+	UserID  int64  `json:"user_id"`
 }
 
 func (q *Queries) GetBoardMemberByUserID(ctx context.Context, arg GetBoardMemberByUserIDParams) (BoardMember, error) {
@@ -175,12 +178,12 @@ func (q *Queries) GetBoardMemberByUserID(ctx context.Context, arg GetBoardMember
 const getBoardMemberRole = `-- name: GetBoardMemberRole :one
 SELECT role
 FROM board_members
-WHERE board_id = ? AND user_id = ?
+WHERE board_id = $1 AND user_id = $2
 `
 
 type GetBoardMemberRoleParams struct {
 	BoardID string `json:"board_id"`
-	UserID  uint64 `json:"user_id"`
+	UserID  int64  `json:"user_id"`
 }
 
 func (q *Queries) GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error) {
@@ -193,7 +196,7 @@ func (q *Queries) GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRole
 const getBoardShareTokenByToken = `-- name: GetBoardShareTokenByToken :one
 SELECT id, board_id, token, role, created_by, revoked, expires_at, created_at, updated_at
 FROM board_share_tokens
-WHERE token = ?
+WHERE token = $1
 `
 
 func (q *Queries) GetBoardShareTokenByToken(ctx context.Context, token string) (BoardShareToken, error) {
@@ -216,19 +219,15 @@ func (q *Queries) GetBoardShareTokenByToken(ctx context.Context, token string) (
 const listAccessibleBoardsByUserID = `-- name: ListAccessibleBoardsByUserID :many
 SELECT b.id, b.board_id, b.user_id, b.name, b.state, b.created_at, b.updated_at, m.role AS member_role
 FROM user_boards AS b
-LEFT JOIN board_members AS m ON m.board_id = b.board_id AND m.user_id = ?
-WHERE b.user_id = ? OR m.user_id = ?
+LEFT JOIN board_members AS m ON m.board_id = b.board_id AND m.user_id = $1
+WHERE b.user_id = $1 OR m.user_id = $1
 ORDER BY b.updated_at DESC
 `
 
-type ListAccessibleBoardsByUserIDParams struct {
-	UserID uint64 `json:"user_id"`
-}
-
 type ListAccessibleBoardsByUserIDRow struct {
-	ID         uint64         `json:"id"`
+	ID         int64          `json:"id"`
 	BoardID    string         `json:"board_id"`
-	UserID     uint64         `json:"user_id"`
+	UserID     int64          `json:"user_id"`
 	Name       string         `json:"name"`
 	State      string         `json:"state"`
 	CreatedAt  time.Time      `json:"created_at"`
@@ -236,8 +235,8 @@ type ListAccessibleBoardsByUserIDRow struct {
 	MemberRole sql.NullString `json:"member_role"`
 }
 
-func (q *Queries) ListAccessibleBoardsByUserID(ctx context.Context, arg ListAccessibleBoardsByUserIDParams) ([]ListAccessibleBoardsByUserIDRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAccessibleBoardsByUserID, arg.UserID, arg.UserID, arg.UserID)
+func (q *Queries) ListAccessibleBoardsByUserID(ctx context.Context, userID int64) ([]ListAccessibleBoardsByUserIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAccessibleBoardsByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -272,12 +271,12 @@ const listBoardMembers = `-- name: ListBoardMembers :many
 SELECT m.user_id, u.storage_uid AS member_uid, u.username, m.role
 FROM board_members AS m
 INNER JOIN users AS u ON u.id = m.user_id
-WHERE m.board_id = ?
+WHERE m.board_id = $1
 ORDER BY m.created_at ASC
 `
 
 type ListBoardMembersRow struct {
-	UserID    uint64 `json:"user_id"`
+	UserID    int64  `json:"user_id"`
 	MemberUid string `json:"member_uid"`
 	Username  string `json:"username"`
 	Role      string `json:"role"`
@@ -314,7 +313,7 @@ func (q *Queries) ListBoardMembers(ctx context.Context, boardID string) ([]ListB
 const listBoardShareTokens = `-- name: ListBoardShareTokens :many
 SELECT id, board_id, token, role, created_by, revoked, expires_at, created_at, updated_at
 FROM board_share_tokens
-WHERE board_id = ?
+WHERE board_id = $1
 ORDER BY created_at DESC
 `
 
@@ -353,8 +352,8 @@ func (q *Queries) ListBoardShareTokens(ctx context.Context, boardID string) ([]B
 
 const revokeBoardShareToken = `-- name: RevokeBoardShareToken :exec
 UPDATE board_share_tokens
-SET revoked = 1
-WHERE board_id = ? AND token = ?
+SET revoked = TRUE
+WHERE board_id = $1 AND token = $2
 `
 
 type RevokeBoardShareTokenParams struct {
@@ -369,16 +368,19 @@ func (q *Queries) RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShar
 
 const upsertBoard = `-- name: UpsertBoard :exec
 INSERT INTO user_boards (board_id, user_id, name, state, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE
-  name = VALUES(name),
-  state = VALUES(state),
-  updated_at = VALUES(updated_at)
+VALUES (
+  $1, $2, $3, $4,
+  $5, $6
+)
+ON CONFLICT (board_id) DO UPDATE
+SET name = EXCLUDED.name,
+    state = EXCLUDED.state,
+    updated_at = EXCLUDED.updated_at
 `
 
 type UpsertBoardParams struct {
 	BoardID   string    `json:"board_id"`
-	UserID    uint64    `json:"user_id"`
+	UserID    int64     `json:"user_id"`
 	Name      string    `json:"name"`
 	State     string    `json:"state"`
 	CreatedAt time.Time `json:"created_at"`
@@ -399,14 +401,14 @@ func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) error 
 
 const upsertBoardMember = `-- name: UpsertBoardMember :exec
 INSERT INTO board_members (board_id, user_id, role)
-VALUES (?, ?, ?)
-ON DUPLICATE KEY UPDATE
-  role = VALUES(role)
+VALUES ($1, $2, $3)
+ON CONFLICT (board_id, user_id) DO UPDATE
+SET role = EXCLUDED.role
 `
 
 type UpsertBoardMemberParams struct {
 	BoardID string `json:"board_id"`
-	UserID  uint64 `json:"user_id"`
+	UserID  int64  `json:"user_id"`
 	Role    string `json:"role"`
 }
 

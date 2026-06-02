@@ -24,29 +24,29 @@ type QueueStatsStore interface {
 }
 
 type TaskAssigner interface {
-	Assign(ctx context.Context, accountIDs []uint64, task *queuetypes.TaskPayload) (TaskAssignment, error)
+	Assign(ctx context.Context, accountIDs []int64, task *queuetypes.TaskPayload) (TaskAssignment, error)
 	ConfirmTaskRunning(ctx context.Context, assignment TaskAssignment) error
-	Release(ctx context.Context, taskID string, accountID uint64, leaseToken string) error
-	EnsureAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error
-	SetAccountMaxConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error
-	GetAccountLoadInfo(ctx context.Context, accountIDs []uint64) (map[uint64]*queuetypes.AccountLoad, error)
+	Release(ctx context.Context, taskID string, accountID int64, leaseToken string) error
+	EnsureAccountConcurrent(ctx context.Context, accountID int64, maxConcurrent int) error
+	SetAccountMaxConcurrent(ctx context.Context, accountID int64, maxConcurrent int) error
+	GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*queuetypes.AccountLoad, error)
 }
 
 type TaskAssignment struct {
 	TaskID     string
-	AccountID  uint64
+	AccountID  int64
 	Status     string
 	LeaseToken string
 }
 
 type TaskLease struct {
 	TaskID     string
-	AccountID  uint64
+	AccountID  int64
 	LeaseToken string
 }
 
 type TaskLeaseRebuilder interface {
-	RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error
+	RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []int64) error
 }
 
 type TaskLeaseReconcileLocker interface {
@@ -54,9 +54,9 @@ type TaskLeaseReconcileLocker interface {
 }
 
 type AccountConcurrencyStore interface {
-	DeleteAccountConcurrent(ctx context.Context, accountID uint64) error
-	GetAccountConcurrent(ctx context.Context, accountID uint64) (int, error)
-	GetAccountMaxConcurrent(ctx context.Context, accountID uint64) (int, error)
+	DeleteAccountConcurrent(ctx context.Context, accountID int64) error
+	GetAccountConcurrent(ctx context.Context, accountID int64) (int, error)
+	GetAccountMaxConcurrent(ctx context.Context, accountID int64) (int, error)
 }
 
 type TaskCancellationStore interface {
@@ -66,5 +66,5 @@ type TaskCancellationStore interface {
 }
 
 type TaskMonitorStore interface {
-	MonitorInfo(ctx context.Context, accountIDs []uint64) (*queuetypes.MonitorInfo, error)
+	MonitorInfo(ctx context.Context, accountIDs []int64) (*queuetypes.MonitorInfo, error)
 }

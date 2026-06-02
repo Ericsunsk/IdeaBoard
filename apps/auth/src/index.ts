@@ -486,30 +486,35 @@ async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
     ...DEFAULT_AUTH_GUARD_SETTINGS,
   }
   try {
-    const [rows] = await authDB.query(
-      "SELECT `key`, `value` FROM system_configs WHERE `key` IN ('auth_registration_enabled', 'auth_rate_limit_window', 'auth_rate_limit_max_requests')",
+    const result = await authDB.query(
+      'SELECT config_key, value FROM system_configs WHERE config_key = ANY($1::text[])',
+      [
+        [
+          'auth_registration_enabled',
+          'auth_rate_limit_window',
+          'auth_rate_limit_max_requests',
+        ],
+      ],
     )
-    if (Array.isArray(rows)) {
-      for (const row of rows as any[]) {
-        if (row?.key === 'auth_registration_enabled' && typeof row?.value === 'string') {
-          nextSettings.registrationEnabled = row.value === 'true'
-        }
-        if (row?.key === 'auth_rate_limit_window' && row?.value) {
-          nextSettings.windowSeconds = clampInteger(
-            row.value,
-            1,
-            3600,
-            DEFAULT_AUTH_GUARD_SETTINGS.windowSeconds,
-          )
-        }
-        if (row?.key === 'auth_rate_limit_max_requests' && row?.value) {
-          nextSettings.maxRequests = clampInteger(
-            row.value,
-            1,
-            10000,
-            DEFAULT_AUTH_GUARD_SETTINGS.maxRequests,
-          )
-        }
+    for (const row of result.rows) {
+      if (row?.config_key === 'auth_registration_enabled' && typeof row?.value === 'string') {
+        nextSettings.registrationEnabled = row.value === 'true'
+      }
+      if (row?.config_key === 'auth_rate_limit_window' && row?.value) {
+        nextSettings.windowSeconds = clampInteger(
+          row.value,
+          1,
+          3600,
+          DEFAULT_AUTH_GUARD_SETTINGS.windowSeconds,
+        )
+      }
+      if (row?.config_key === 'auth_rate_limit_max_requests' && row?.value) {
+        nextSettings.maxRequests = clampInteger(
+          row.value,
+          1,
+          10000,
+          DEFAULT_AUTH_GUARD_SETTINGS.maxRequests,
+        )
       }
     }
   } catch (error) {
@@ -797,14 +802,14 @@ async function findUserByUsernameOrEmail(
   username: string,
   email: string,
 ): Promise<InternalUserShape | null> {
-  const [rows] = await authDB.query(
-    'SELECT id, username, email, name, role FROM `user` WHERE username = ? OR email = ? LIMIT 1',
+  const result = await authDB.query(
+    'SELECT id, username, email, name, role FROM "user" WHERE username = $1 OR email = $2 LIMIT 1',
     [username, email],
   )
-  if (!Array.isArray(rows) || rows.length === 0) {
+  if (result.rows.length === 0) {
     return null
   }
-  const row = rows[0] as any
+  const row = result.rows[0] as any
   if (typeof row?.id !== 'string' || !row.id.trim()) {
     return null
   }
@@ -822,11 +827,8 @@ async function syncAuthUserRole(authUserID: string, role: 'admin' | 'user') {
 }
 
 async function updateAuthUserRole(authUserID: string, role: 'admin' | 'user'): Promise<boolean> {
-  const [result] = await authDB.query('UPDATE `user` SET `role` = ? WHERE id = ? LIMIT 1', [
-    role,
-    authUserID,
-  ])
-  return Number((result as any)?.affectedRows || 0) > 0
+  const result = await authDB.query('UPDATE "user" SET role = $1 WHERE id = $2', [role, authUserID])
+  return Number(result.rowCount || 0) > 0
 }
 
 async function updateAuthUserBanState(
@@ -835,8 +837,8 @@ async function updateAuthUserBanState(
   banReason: string | null,
   banExpiresIn: number | null,
 ): Promise<boolean> {
-  const [result] = await authDB.query(
-    'UPDATE `user` SET `banned` = ?, `banReason` = ?, `banExpires` = ?, `updatedAt` = ? WHERE id = ? LIMIT 1',
+  const result = await authDB.query(
+    'UPDATE "user" SET "banned" = $1, "banReason" = $2, "banExpires" = $3, "updatedAt" = $4 WHERE id = $5',
     [
       banned,
       banned ? banReason || 'No reason' : null,
@@ -845,49 +847,49 @@ async function updateAuthUserBanState(
       authUserID,
     ],
   )
-  return Number((result as any)?.affectedRows || 0) > 0
+  return Number(result.rowCount || 0) > 0
 }
 
 async function deleteAuthUserSessions(authUserID: string): Promise<boolean> {
-  const [rows] = await authDB.query('SELECT id FROM `user` WHERE id = ? LIMIT 1', [authUserID])
-  if (!Array.isArray(rows) || rows.length === 0) {
+  const result = await authDB.query('SELECT id FROM "user" WHERE id = $1 LIMIT 1', [authUserID])
+  if (result.rows.length === 0) {
     return false
   }
-  await authDB.query('DELETE FROM `session` WHERE userId = ?', [authUserID])
+  await authDB.query('DELETE FROM "session" WHERE "userId" = $1', [authUserID])
   return true
 }
 
 async function removeAuthUserCascade(authUserID: string): Promise<boolean> {
-  const conn = await authDB.getConnection()
+  const conn = await authDB.connect()
   try {
-    await conn.beginTransaction()
-    const [rows] = await conn.query('SELECT id, email, username FROM `user` WHERE id = ? LIMIT 1', [
+    await conn.query('BEGIN')
+    const result = await conn.query('SELECT id, email, username FROM "user" WHERE id = $1 LIMIT 1', [
       authUserID,
     ])
-    if (!Array.isArray(rows) || rows.length === 0) {
-      await conn.rollback()
+    if (result.rows.length === 0) {
+      await conn.query('ROLLBACK')
       return false
     }
 
-    const row = rows[0] as any
+    const row = result.rows[0] as any
     const email = typeof row?.email === 'string' ? row.email.trim() : ''
     const username = typeof row?.username === 'string' ? row.username.trim() : ''
 
-    await conn.query('DELETE FROM `session` WHERE userId = ?', [authUserID])
-    await conn.query('DELETE FROM `account` WHERE userId = ?', [authUserID])
+    await conn.query('DELETE FROM "session" WHERE "userId" = $1', [authUserID])
+    await conn.query('DELETE FROM "account" WHERE "userId" = $1', [authUserID])
 
     const verificationIdentifiers = [email, username, authUserID].filter(Boolean)
     if (verificationIdentifiers.length > 0) {
-      await conn.query('DELETE FROM `verification` WHERE identifier IN (?)', [
+      await conn.query('DELETE FROM "verification" WHERE identifier = ANY($1::text[])', [
         verificationIdentifiers,
       ])
     }
 
-    await conn.query('DELETE FROM `user` WHERE id = ? LIMIT 1', [authUserID])
-    await conn.commit()
+    await conn.query('DELETE FROM "user" WHERE id = $1', [authUserID])
+    await conn.query('COMMIT')
     return true
   } catch (error) {
-    await conn.rollback()
+    await conn.query('ROLLBACK')
     throw error
   } finally {
     conn.release()

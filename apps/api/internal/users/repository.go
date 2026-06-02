@@ -42,13 +42,13 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		if err != nil {
 			return err
 		}
-		user.ID = uint64(id)
+		user.ID = int64(id)
 		return nil
 	})
 }
 
 // GetByID 根据ID获取用户
-func (r *UserRepository) GetByID(ctx context.Context, id uint64) (*User, error) {
+func (r *UserRepository) GetByID(ctx context.Context, id int64) (*User, error) {
 	row, err := r.q.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (r *UserRepository) Update(ctx context.Context, user *User) error {
 }
 
 // Delete 删除用户及关联资产
-func (r *UserRepository) Delete(ctx context.Context, id uint64) error {
+func (r *UserRepository) Delete(ctx context.Context, id int64) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		if _, err := q.GetUserByID(ctx, id); err != nil {
 			return err
@@ -143,10 +143,7 @@ func (r *UserRepository) Delete(ctx context.Context, id uint64) error {
 // List 获取用户列表
 func (r *UserRepository) List(ctx context.Context, keyword string, page, pageSize int) ([]*User, int64, error) {
 	keyword = strings.TrimSpace(keyword)
-	hasKeyword := int64(0)
-	if keyword != "" {
-		hasKeyword = 1
-	}
+	hasKeyword := keyword != ""
 	keywordLike := "%" + keyword + "%"
 	total, err := r.q.CountUsers(ctx, dbsqlc.CountUsersParams{HasKeyword: hasKeyword, KeywordLike: keywordLike})
 	if err != nil {
@@ -156,8 +153,8 @@ func (r *UserRepository) List(ctx context.Context, keyword string, page, pageSiz
 	rows, err := r.q.ListUsers(ctx, dbsqlc.ListUsersParams{
 		HasKeyword:  hasKeyword,
 		KeywordLike: keywordLike,
-		Limit:       int32(pageSize),
-		Offset:      int32(offset),
+		PageLimit:   int32(pageSize),
+		PageOffset:  int32(offset),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -171,15 +168,15 @@ func (r *UserRepository) List(ctx context.Context, keyword string, page, pageSiz
 }
 
 // UpdateStatus 更新用户状态
-func (r *UserRepository) UpdateStatus(ctx context.Context, id uint64, status int8) error {
+func (r *UserRepository) UpdateStatus(ctx context.Context, id int64, status int16) error {
 	return r.q.UpdateUserStatus(ctx, dbsqlc.UpdateUserStatusParams{Status: status, ID: id})
 }
 
-func (r *UserRepository) UpdateRoleByID(ctx context.Context, id uint64, role string) error {
+func (r *UserRepository) UpdateRoleByID(ctx context.Context, id int64, role string) error {
 	return r.q.UpdateUserRole(ctx, dbsqlc.UpdateUserRoleParams{Role: role, ID: id})
 }
 
-func (r *UserRepository) UpdateAvatarByID(ctx context.Context, id uint64, avatar string) error {
+func (r *UserRepository) UpdateAvatarByID(ctx context.Context, id int64, avatar string) error {
 	return r.q.UpdateUserAvatar(ctx, dbsqlc.UpdateUserAvatarParams{Avatar: strings.TrimSpace(avatar), ID: id})
 }
 
@@ -190,7 +187,7 @@ func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
 			return err
 		}
 
-		seen := make(map[string]uint64, len(rows))
+		seen := make(map[string]int64, len(rows))
 		for _, row := range rows {
 			if row.ID == 0 {
 				continue
@@ -220,7 +217,7 @@ func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
 	})
 }
 
-func allocateStorageUID(ctx context.Context, q *dbsqlc.Queries, preferredUID string, excludeID uint64) (string, error) {
+func allocateStorageUID(ctx context.Context, q *dbsqlc.Queries, preferredUID string, excludeID int64) (string, error) {
 	normalizedPreferred := strings.TrimSpace(preferredUID)
 	if IsValidStorageUID(normalizedPreferred) {
 		reserved, err := reserveStorageUID(ctx, q, normalizedPreferred, excludeID)
@@ -248,7 +245,7 @@ func allocateStorageUID(ctx context.Context, q *dbsqlc.Queries, preferredUID str
 	return "", fmt.Errorf("生成唯一用户存储标识失败")
 }
 
-func reserveStorageUID(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID uint64) (bool, error) {
+func reserveStorageUID(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID int64) (bool, error) {
 	taken, err := storageUIDTaken(ctx, q, storageUID, excludeID)
 	if err != nil {
 		return false, err
@@ -264,7 +261,7 @@ func reserveStorageUID(ctx context.Context, q *dbsqlc.Queries, storageUID string
 	return recorded, nil
 }
 
-func storageUIDTaken(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID uint64) (bool, error) {
+func storageUIDTaken(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID int64) (bool, error) {
 	exists, err := storageUIDExists(ctx, q, storageUID, excludeID)
 	if err != nil {
 		return false, err
@@ -275,7 +272,7 @@ func storageUIDTaken(ctx context.Context, q *dbsqlc.Queries, storageUID string, 
 	return usedUIDExists(ctx, q, storageUID)
 }
 
-func storageUIDExists(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID uint64) (bool, error) {
+func storageUIDExists(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID int64) (bool, error) {
 	_, err := q.GetUserIDByStorageUIDForUpdate(ctx, dbsqlc.GetUserIDByStorageUIDForUpdateParams{StorageUid: storageUID, ID: excludeID})
 	if err == nil {
 		return true, nil

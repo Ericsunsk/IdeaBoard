@@ -113,12 +113,12 @@ func (q *AsynqQueue) QueueLengths(ctx context.Context) (int64, int64, error) {
 	return global, wait, nil
 }
 
-func (q *AsynqQueue) MonitorInfo(ctx context.Context, accountIDs []uint64) (*queuetypes.MonitorInfo, error) {
+func (q *AsynqQueue) MonitorInfo(ctx context.Context, accountIDs []int64) (*queuetypes.MonitorInfo, error) {
 	info, err := q.queueInfoOrEmpty()
 	if err != nil {
 		return nil, fmt.Errorf("asynq monitor info: %w", err)
 	}
-	loads := map[uint64]*queuetypes.AccountLoad{}
+	loads := map[int64]*queuetypes.AccountLoad{}
 	if q.redisMgr != nil {
 		loads, err = q.redisMgr.GetAccountLoadInfo(ctx, accountIDs)
 		if err != nil {

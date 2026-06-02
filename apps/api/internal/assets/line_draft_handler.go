@@ -25,7 +25,7 @@ func (h *LineDraftHandler) ListEnabled(c *gin.Context) {
 	}
 	// 对用户隐藏 prompt
 	type ModeView struct {
-		ID         uint64 `json:"id"`
+		ID         int64  `json:"id"`
 		Name       string `json:"name"`
 		CoverImage string `json:"cover_image"`
 	}

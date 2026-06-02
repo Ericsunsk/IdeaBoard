@@ -43,12 +43,9 @@ type appContainer struct {
 func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
 
-	db, err := database.NewMySQL(cfg.Database)
+	db, err := database.NewPostgres(cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to connect to database: %w", err)
-	}
-	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
-		return nil, fmt.Errorf("Failed to cleanup duplicate board names: %w", err)
 	}
 	if err := migrations.Up(context.Background(), db); err != nil {
 		return nil, fmt.Errorf("Failed to migrate database schema: %w", err)
@@ -199,7 +196,7 @@ type uploadBoardAccessResolver struct {
 	service *boards.BoardService
 }
 
-func (r uploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID uint64, boardID string) (uint64, error) {
+func (r uploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
 	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
 	if err != nil {
 		return 0, err
@@ -211,7 +208,7 @@ type uploadOwnerStorageUIDResolver struct {
 	repo *users.UserRepository
 }
 
-func (r uploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID uint64) (string, error) {
+func (r uploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
 	user, err := r.repo.GetByID(ctx, userID)
 	if err != nil {
 		return "", err

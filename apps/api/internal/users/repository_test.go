@@ -17,7 +17,7 @@ func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
 	db := newUserRepoTestDB(t)
 	repo := NewUserRepository(db)
 
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO users_used_uids (storage_uid) VALUES (?)`, "ABC123"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO users_used_uids (storage_uid) VALUES ($1)`, "ABC123"); err != nil {
 		t.Fatalf("seed used uid failed: %v", err)
 	}
 
@@ -38,7 +38,7 @@ func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
 	}
 
 	var count int64
-	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM users_used_uids WHERE storage_uid = ?`, user.StorageUID).Scan(&count); err != nil {
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM users_used_uids WHERE storage_uid = $1`, user.StorageUID).Scan(&count); err != nil {
 		t.Fatalf("count used uid failed: %v", err)
 	}
 	if count != 1 {
@@ -61,24 +61,24 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 	}
 
 	ownedBoardID := "board-owned"
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO user_boards (board_id, user_id, name, state) VALUES (?, ?, ?, ?)`, ownedBoardID, first.ID, "Owned", "{}"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO user_boards (board_id, user_id, name, state) VALUES ($1, $2, $3, $4)`, ownedBoardID, first.ID, "Owned", "{}"); err != nil {
 		t.Fatalf("seed user_boards failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, ?)`, ownedBoardID, first.ID, "viewer"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, $3)`, ownedBoardID, first.ID, "viewer"); err != nil {
 		t.Fatalf("seed board_members owned failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, ?)`, "board-shared", first.ID, "viewer"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, $3)`, "board-shared", first.ID, "viewer"); err != nil {
 		t.Fatalf("seed board_members shared failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token, role, created_by) VALUES (?, ?, ?, ?)`, ownedBoardID, "owned-token", "viewer", first.ID); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token, role, created_by) VALUES ($1, $2, $3, $4)`, ownedBoardID, "owned-token", "viewer", first.ID); err != nil {
 		t.Fatalf("seed board_share_tokens owned failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token, role, created_by) VALUES (?, ?, ?, ?)`, "board-shared", "shared-token", "viewer", first.ID); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token, role, created_by) VALUES ($1, $2, $3, $4)`, "board-shared", "shared-token", "viewer", first.ID); err != nil {
 		t.Fatalf("seed board_share_tokens shared failed: %v", err)
 	}
 	if _, err := db.ExecContext(
 		context.Background(),
-		`INSERT INTO tasks (task_id, user_id, channel_id, prompt, user_prompt, params, status, error_msg, result) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO tasks (task_id, user_id, channel_id, prompt, user_prompt, params, status, error_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		"delete-user-task", first.ID, 1, "", "", "", "pending", "", "",
 	); err != nil {
 		t.Fatalf("seed tasks failed: %v", err)
@@ -89,11 +89,11 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 	}
 
 	for name, query := range map[string]string{
-		"user":              `SELECT COUNT(*) FROM users WHERE id = ?`,
-		"owned board":       `SELECT COUNT(*) FROM user_boards WHERE user_id = ?`,
-		"board member":      `SELECT COUNT(*) FROM board_members WHERE user_id = ?`,
-		"board share token": `SELECT COUNT(*) FROM board_share_tokens WHERE created_by = ?`,
-		"task":              `SELECT COUNT(*) FROM tasks WHERE user_id = ?`,
+		"user":              `SELECT COUNT(*) FROM users WHERE id = $1`,
+		"owned board":       `SELECT COUNT(*) FROM user_boards WHERE user_id = $1`,
+		"board member":      `SELECT COUNT(*) FROM board_members WHERE user_id = $1`,
+		"board share token": `SELECT COUNT(*) FROM board_share_tokens WHERE created_by = $1`,
+		"task":              `SELECT COUNT(*) FROM tasks WHERE user_id = $1`,
 	} {
 		var count int64
 		if err := db.QueryRowContext(context.Background(), query, first.ID).Scan(&count); err != nil {
@@ -105,7 +105,7 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 	}
 
 	var oldUsedUIDCount int64
-	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM users_used_uids WHERE storage_uid = ?`, originalUID).Scan(&oldUsedUIDCount); err != nil {
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM users_used_uids WHERE storage_uid = $1`, originalUID).Scan(&oldUsedUIDCount); err != nil {
 		t.Fatalf("count old used uid failed: %v", err)
 	}
 	if oldUsedUIDCount != 1 {

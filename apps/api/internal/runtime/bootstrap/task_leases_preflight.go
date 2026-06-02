@@ -170,7 +170,7 @@ func reportTaskLeasePreflight(ctx context.Context, repo taskLeasePreflightReposi
 }
 
 func newTaskLeasePreflightTaskRepo(cfg *config.Config) (taskLeasePreflightRepository, error) {
-	db, err := database.NewMySQL(cfg.Database)
+	db, err := database.NewPostgres(cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}

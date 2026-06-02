@@ -61,7 +61,7 @@ func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {
 		return false
 	}
 
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	if userID == 0 {
 		response.Error(c, http.StatusUnauthorized, "未登录")
 		return false
@@ -73,7 +73,7 @@ type staticUploadBoardAccessResolver struct {
 	service *boards.BoardService
 }
 
-func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID uint64, boardID string) (uint64, error) {
+func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
 	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
 	if err != nil {
 		return 0, err
@@ -82,7 +82,7 @@ func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Co
 }
 
 func authorizeWorkspaceUploadRead(c *gin.Context, deps StaticUploadDeps, uploadPath storage.UploadWorkspaceResource) bool {
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	if deps.BoardService == nil || deps.Auth.UserRepo == nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("workspace upload dependencies not configured"))
 		return false
@@ -122,7 +122,7 @@ func authorizeWorkspaceUploadRead(c *gin.Context, deps StaticUploadDeps, uploadP
 }
 
 func authorizeOwnedUploadRead(c *gin.Context, deps StaticUploadDeps, resource storage.UploadResource) bool {
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	if deps.Auth.UserRepo == nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("upload dependencies not configured"))
 		return false
@@ -152,7 +152,7 @@ type staticUploadOwnerStorageUIDResolver struct {
 	repo *users.UserRepository
 }
 
-func (r staticUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID uint64) (string, error) {
+func (r staticUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
 	user, err := r.repo.GetByID(ctx, userID)
 	if err != nil {
 		return "", err

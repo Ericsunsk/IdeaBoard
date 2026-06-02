@@ -25,11 +25,11 @@ func (r *ChannelRepository) Create(ctx context.Context, channel *Channel) error 
 	if err != nil {
 		return err
 	}
-	channel.ID = uint64(id)
+	channel.ID = int64(id)
 	return nil
 }
 
-func (r *ChannelRepository) GetByID(ctx context.Context, id uint64) (*Channel, error) {
+func (r *ChannelRepository) GetByID(ctx context.Context, id int64) (*Channel, error) {
 	row, err := r.q.GetChannelByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -77,6 +77,6 @@ func (r *ChannelRepository) Update(ctx context.Context, channel *Channel) error 
 	})
 }
 
-func (r *ChannelRepository) Delete(ctx context.Context, id uint64) error {
+func (r *ChannelRepository) Delete(ctx context.Context, id int64) error {
 	return r.q.DeleteChannel(ctx, id)
 }

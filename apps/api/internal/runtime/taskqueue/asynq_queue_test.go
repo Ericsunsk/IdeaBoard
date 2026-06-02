@@ -44,7 +44,7 @@ func TestAsynqQueueEnqueueUsesDrawingTaskType(t *testing.T) {
 	inspector := &fakeAsynqInspector{queueInfo: &asynq.QueueInfo{}}
 	q := NewAsynqQueueWithClients(client, inspector, nil, AsynqQueueDefault, 5, 30*time.Second, time.Hour)
 
-	task := &queuetypes.TaskPayload{TaskID: "t1", UserID: 1, Prompt: "p", Params: "{}", AccountIDs: []uint64{1}, CreatedAt: 1}
+	task := &queuetypes.TaskPayload{TaskID: "t1", UserID: 1, Prompt: "p", Params: "{}", AccountIDs: []int64{1}, CreatedAt: 1}
 	if err := q.Enqueue(context.Background(), task); err != nil {
 		t.Fatalf("enqueue failed: %v", err)
 	}

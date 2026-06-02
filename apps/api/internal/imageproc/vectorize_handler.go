@@ -78,7 +78,7 @@ type VectorizeDeps struct {
 // Vectorize 执行位图转矢量图（用户端调用）
 func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	if userID == 0 {
 		response.Error(c, 401, "未登录")
 		return
@@ -405,7 +405,7 @@ func mergeSVGLayers(layerPaths []string, outputPath string, w, h, colorCount int
 	return nil
 }
 
-func (h *VectorizeHandler) loadVectorizeImage(ctx context.Context, userID uint64, rawImageURL string) ([]byte, error) {
+func (h *VectorizeHandler) loadVectorizeImage(ctx context.Context, userID int64, rawImageURL string) ([]byte, error) {
 	imageURL := strings.TrimSpace(rawImageURL)
 	if imageURL == "" {
 		return nil, fmt.Errorf("图片地址不能为空")
@@ -416,7 +416,7 @@ func (h *VectorizeHandler) loadVectorizeImage(ctx context.Context, userID uint64
 	return downloadVectorizeImage(ctx, imageURL)
 }
 
-func (h *VectorizeHandler) loadLocalUploadImage(ctx context.Context, userID uint64, rawPath string) ([]byte, error) {
+func (h *VectorizeHandler) loadLocalUploadImage(ctx context.Context, userID int64, rawPath string) ([]byte, error) {
 	if h.uploadBoards == nil || h.uploadOwners == nil {
 		return nil, fmt.Errorf("无法校验上传资源权限")
 	}
@@ -481,7 +481,7 @@ func downloadVectorizeImage(ctx context.Context, imageURL string) ([]byte, error
 }
 
 // persistSVG 将 SVG 数据保存到存储
-func (h *VectorizeHandler) persistSVG(ctx context.Context, userID uint64, svgData []byte) (string, error) {
+func (h *VectorizeHandler) persistSVG(ctx context.Context, userID int64, svgData []byte) (string, error) {
 	if h.storageService == nil {
 		return "", fmt.Errorf("存储服务不可用")
 	}

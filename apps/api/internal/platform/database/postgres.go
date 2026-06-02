@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -11,24 +12,17 @@ import (
 
 	"api/internal/platform/config"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func NewMySQL(cfg config.DatabaseConfig) (*sql.DB, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		cfg.User,
-		cfg.Password,
-		cfg.Host,
-		cfg.Port,
-		cfg.Database,
-	)
-
+func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
+	dsn := buildPostgresDSN(cfg)
 	maxRetries := getEnvInt("DB_CONNECT_MAX_RETRIES", 60)
 	retryInterval := time.Duration(getEnvInt("DB_CONNECT_RETRY_INTERVAL_MS", 1000)) * time.Millisecond
 
 	var lastErr error
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		db, err := sql.Open("mysql", dsn)
+		db, err := sql.Open("pgx", dsn)
 		if err == nil {
 			db.SetMaxOpenConns(25)
 			db.SetMaxIdleConns(10)
@@ -45,10 +39,24 @@ func NewMySQL(cfg config.DatabaseConfig) (*sql.DB, error) {
 		if attempt >= maxRetries {
 			break
 		}
-		log.Printf("[Database] MySQL connect attempt %d/%d failed: %v; retrying in %s", attempt, maxRetries, err, retryInterval)
+		log.Printf("[Database] PostgreSQL connect attempt %d/%d failed: %v; retrying in %s", attempt, maxRetries, err, retryInterval)
 		time.Sleep(retryInterval)
 	}
 	return nil, lastErr
+}
+
+func buildPostgresDSN(cfg config.DatabaseConfig) string {
+	values := url.Values{}
+	values.Set("sslmode", cfg.SSLMode)
+
+	dsn := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(cfg.User, cfg.Password),
+		Host:     fmt.Sprintf("%s:%s", cfg.Host, cfg.Port),
+		Path:     cfg.Database,
+		RawQuery: values.Encode(),
+	}
+	return dsn.String()
 }
 
 func getEnvInt(key string, defaultValue int) int {

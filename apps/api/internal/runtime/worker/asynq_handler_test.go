@@ -21,7 +21,7 @@ type fakeRequeuer struct{}
 func (f *fakeRequeuer) Enqueue(context.Context, *queuetypes.TaskPayload) error { return nil }
 
 type fakeAssigner struct {
-	assignAccount     uint64
+	assignAccount     int64
 	assignStatus      string
 	assignToken       string
 	assignErr         error
@@ -31,7 +31,7 @@ type fakeAssigner struct {
 	lastRelease       taskqueue.TaskAssignment
 }
 
-func (f *fakeAssigner) Assign(_ context.Context, _ []uint64, task *queuetypes.TaskPayload) (taskqueue.TaskAssignment, error) {
+func (f *fakeAssigner) Assign(_ context.Context, _ []int64, task *queuetypes.TaskPayload) (taskqueue.TaskAssignment, error) {
 	if f.assignErr != nil {
 		return taskqueue.TaskAssignment{}, f.assignErr
 	}
@@ -46,7 +46,7 @@ func (f *fakeAssigner) ConfirmTaskRunning(_ context.Context, _ taskqueue.TaskAss
 	f.confirmCalls++
 	return nil
 }
-func (f *fakeAssigner) Release(ctx context.Context, taskID string, accountID uint64, leaseToken string) error {
+func (f *fakeAssigner) Release(ctx context.Context, taskID string, accountID int64, leaseToken string) error {
 	f.releaseCalls++
 	f.lastReleaseCtxErr = ctx.Err()
 	f.lastRelease = taskqueue.TaskAssignment{TaskID: taskID, AccountID: accountID, LeaseToken: leaseToken}
@@ -61,12 +61,12 @@ func (f *fakeAssigner) leaseToken() string {
 	}
 	return ""
 }
-func (f *fakeAssigner) EnsureAccountConcurrent(context.Context, uint64, int) error {
+func (f *fakeAssigner) EnsureAccountConcurrent(context.Context, int64, int) error {
 	return nil
 }
-func (f *fakeAssigner) SetAccountMaxConcurrent(context.Context, uint64, int) error { return nil }
-func (f *fakeAssigner) GetAccountLoadInfo(context.Context, []uint64) (map[uint64]*queuetypes.AccountLoad, error) {
-	return map[uint64]*queuetypes.AccountLoad{}, nil
+func (f *fakeAssigner) SetAccountMaxConcurrent(context.Context, int64, int) error { return nil }
+func (f *fakeAssigner) GetAccountLoadInfo(context.Context, []int64) (map[int64]*queuetypes.AccountLoad, error) {
+	return map[int64]*queuetypes.AccountLoad{}, nil
 }
 
 type fakeRuntime struct {
@@ -170,7 +170,7 @@ func TestAsynqHandlerNoCapacityDoesNotMarkFailed(t *testing.T) {
 	runtime := &fakeRuntime{}
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error { return nil }, false))
 
-	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "cap-1", AccountIDs: []uint64{1}}))
+	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "cap-1", AccountIDs: []int64{1}}))
 	if !errors.Is(err, taskqueue.ErrNoAccountCapacity) {
 		t.Fatalf("expected ErrNoAccountCapacity, got %v", err)
 	}
@@ -190,7 +190,7 @@ func TestAsynqHandlerRefreshAccountsErrorRetriesWithoutMarkingFailed(t *testing.
 		return nil
 	}, false))
 
-	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "refresh-error-1", AccountIDs: []uint64{1}}))
+	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "refresh-error-1", AccountIDs: []int64{1}}))
 	if !errors.Is(err, refreshErr) {
 		t.Fatalf("expected refresh error, got %v", err)
 	}
@@ -208,7 +208,7 @@ func TestAsynqHandlerAssignInfrastructureErrorRetriesWithoutMarkingFailed(t *tes
 		return nil
 	}, false))
 
-	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "assign-error-1", AccountIDs: []uint64{1}}))
+	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "assign-error-1", AccountIDs: []int64{1}}))
 	if !errors.Is(err, assignErr) {
 		t.Fatalf("expected assign error, got %v", err)
 	}
@@ -227,7 +227,7 @@ func TestAsynqHandlerAssignContextCanceledDoesNotMarkFailed(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "assign-cancel-1", AccountIDs: []uint64{1}}))
+	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "assign-cancel-1", AccountIDs: []int64{1}}))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got %v", err)
 	}
@@ -246,7 +246,7 @@ func TestAsynqHandlerAssignContextDeadlineDoesNotMarkFailed(t *testing.T) {
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 	defer cancel()
-	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "assign-deadline-1", AccountIDs: []uint64{1}}))
+	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "assign-deadline-1", AccountIDs: []int64{1}}))
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
 	}
@@ -266,7 +266,7 @@ func TestAsynqHandlerProcessesSynchronously(t *testing.T) {
 	}, false))
 
 	start := time.Now()
-	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "sync-1", AccountIDs: []uint64{9}}))
+	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "sync-1", AccountIDs: []int64{9}}))
 	if err != nil {
 		t.Fatalf("handle task failed: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestAsynqHandlerTerminalTaskDoesNotCallProvider(t *testing.T) {
 	})
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
 
-	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []uint64{acc.ID}}))
+	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []int64{acc.ID}}))
 	if err != nil {
 		t.Fatalf("handle terminal task failed: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestAsynqHandlerCancelledTaskClearsCancelAndSkipsProvider(t *testing.T) {
 	})
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
 
-	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []uint64{acc.ID}}))
+	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []int64{acc.ID}}))
 	if err != nil {
 		t.Fatalf("handle cancelled task failed: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestAsynqHandlerPropagatesContextToProvider(t *testing.T) {
 	ctx, cancel := context.WithTimeout(parent, time.Second)
 	defer cancel()
 
-	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []uint64{acc.ID}}))
+	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []int64{acc.ID}}))
 	if err != nil {
 		t.Fatalf("handle task failed: %v", err)
 	}
@@ -404,7 +404,7 @@ func TestAsynqHandlerParentContextCanceledResetsTaskAndPropagatesError(t *testin
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
 	defer cancel()
 
-	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []uint64{acc.ID}}))
+	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []int64{acc.ID}}))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got %v", err)
 	}
@@ -460,7 +460,7 @@ func TestAsynqHandlerParentContextDeadlineExceededResetsTaskAndPropagatesError(t
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(20*time.Millisecond))
 	defer cancel()
 
-	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []uint64{acc.ID}}))
+	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []int64{acc.ID}}))
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
 	}

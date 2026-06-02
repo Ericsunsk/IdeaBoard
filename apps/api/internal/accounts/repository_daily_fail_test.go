@@ -19,7 +19,7 @@ func newTaskRepositoryTestDB(t *testing.T) (*TaskRepository, *sql.DB) {
 func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	ctx := context.Background()
 	taskRepo, _ := newTaskRepositoryTestDB(t)
-	accountID := uint64(66)
+	accountID := int64(66)
 	createdAt := time.Now().Add(-10 * time.Minute)
 
 	if err := taskRepo.Create(ctx, &tasks.Task{

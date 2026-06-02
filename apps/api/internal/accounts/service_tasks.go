@@ -15,7 +15,7 @@ import (
 	"api/internal/workflow"
 )
 
-func (s *AccountService) SubmitTask(ctx context.Context, userID uint64, req *tasks.SubmitTaskRequest) (string, error) {
+func (s *AccountService) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
@@ -49,7 +49,7 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID uint64, req *tas
 	}
 
 	// 获取所有可用账号ID
-	accountIDs := make([]uint64, len(accounts))
+	accountIDs := make([]int64, len(accounts))
 	for i, acc := range accounts {
 		accountIDs[i] = acc.ID
 	}
@@ -80,7 +80,7 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID uint64, req *tas
 	return taskID, nil
 }
 
-func (s *AccountService) CheckSubmitTaskReadiness(ctx context.Context, userID uint64, req *tasks.SubmitTaskRequest) (string, error) {
+func (s *AccountService) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
@@ -91,7 +91,7 @@ func (s *AccountService) CheckSubmitTaskReadiness(ctx context.Context, userID ui
 	return featureSlug, nil
 }
 
-func (s *AccountService) prepareSubmitTask(ctx context.Context, userID uint64, req *tasks.SubmitTaskRequest) ([]*ApiAccount, map[string]interface{}, string, string, error) {
+func (s *AccountService) prepareSubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) ([]*ApiAccount, map[string]interface{}, string, string, error) {
 	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
 		return nil, nil, "", "", err
 	}
@@ -163,7 +163,7 @@ func (s *AccountService) GetTask(ctx context.Context, taskID string) (*tasks.Tas
 	return task, nil
 }
 
-func (s *AccountService) GetUserTask(ctx context.Context, taskID string, userID uint64) (*tasks.Task, error) {
+func (s *AccountService) GetUserTask(ctx context.Context, taskID string, userID int64) (*tasks.Task, error) {
 	task, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID)
 	if err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func (s *AccountService) ListTasks(ctx context.Context, req *tasks.TaskListReque
 	return items, total, nil
 }
 
-func (s *AccountService) DeleteUserTask(ctx context.Context, taskID string, userID uint64) error {
+func (s *AccountService) DeleteUserTask(ctx context.Context, taskID string, userID int64) error {
 	if _, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID); err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func (s *AccountService) DeleteUserTask(ctx context.Context, taskID string, user
 	return s.taskRepo.DeleteByTaskIDAndUserID(ctx, taskID, userID)
 }
 
-func (s *AccountService) GetUserTasks(ctx context.Context, userID uint64, page, pageSize int) ([]*tasks.Task, int64, error) {
+func (s *AccountService) GetUserTasks(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error) {
 	if page < 1 {
 		page = 1
 	}

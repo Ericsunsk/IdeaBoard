@@ -11,7 +11,7 @@ func TestAsynqPayloadEncodeDecodeRoundTrip(t *testing.T) {
 		UserID:     9,
 		Prompt:     "draw",
 		Params:     `{"ratio":"1:1"}`,
-		AccountIDs: []uint64{1, 2},
+		AccountIDs: []int64{1, 2},
 		RetryCount: 1,
 		CreatedAt:  12345,
 	}

@@ -1,73 +1,77 @@
--- name: CreateUser :execlastid
+-- name: CreateUser :one
 INSERT INTO users (
   username, auth_user_id, storage_uid, avatar, role, status
-) VALUES (?, ?, ?, ?, ?, ?);
+) VALUES (
+  sqlc.arg(username), sqlc.arg(auth_user_id), sqlc.arg(storage_uid),
+  sqlc.arg(avatar), sqlc.arg(role), sqlc.arg(status)
+)
+RETURNING id;
 
 -- name: GetUserByID :one
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE id = ?;
+WHERE id = sqlc.arg(id);
 
 -- name: GetUserByUsername :one
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE username = ?;
+WHERE username = sqlc.arg(username);
 
 -- name: GetUserByAuthUserID :one
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE auth_user_id = ?;
+WHERE auth_user_id = sqlc.arg(auth_user_id);
 
 -- name: GetUserByStorageUID :one
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE storage_uid = ?;
+WHERE storage_uid = sqlc.arg(storage_uid);
 
 -- name: UpdateUser :exec
 UPDATE users
-SET username = ?,
-    auth_user_id = ?,
-    storage_uid = ?,
-    avatar = ?,
-    role = ?,
-    status = ?
-WHERE id = ?;
+SET username = sqlc.arg(username),
+    auth_user_id = sqlc.arg(auth_user_id),
+    storage_uid = sqlc.arg(storage_uid),
+    avatar = sqlc.arg(avatar),
+    role = sqlc.arg(role),
+    status = sqlc.arg(status)
+WHERE id = sqlc.arg(id);
 
 -- name: DeleteUserByID :exec
 DELETE FROM users
-WHERE id = ?;
+WHERE id = sqlc.arg(id);
 
 -- name: CountUsers :one
 SELECT COUNT(*)
 FROM users
-WHERE CAST(sqlc.arg(has_keyword) AS SIGNED) = 0 OR username LIKE sqlc.arg(keyword_like);
+WHERE NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_like);
 
 -- name: ListUsers :many
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE CAST(sqlc.arg(has_keyword) AS SIGNED) = 0 OR username LIKE sqlc.arg(keyword_like)
+WHERE NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_like)
 ORDER BY id DESC
-LIMIT ? OFFSET ?;
+LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
 -- name: UpdateUserStatus :exec
 UPDATE users
-SET status = ?
-WHERE id = ?;
+SET status = sqlc.arg(status)
+WHERE id = sqlc.arg(id);
 
 -- name: UpdateUserRole :exec
 UPDATE users
-SET role = ?
-WHERE id = ?;
+SET role = sqlc.arg(role)
+WHERE id = sqlc.arg(id);
 
 -- name: UpdateUserAvatar :exec
 UPDATE users
-SET avatar = ?
-WHERE id = ?;
+SET avatar = sqlc.arg(avatar)
+WHERE id = sqlc.arg(id);
 
 -- name: UpdateUserStorageUID :exec
 UPDATE users
-SET storage_uid = ?
-WHERE id = ?;
+SET storage_uid = sqlc.arg(storage_uid)
+WHERE id = sqlc.arg(id);
 
 -- name: ListUserStorageUIDs :many
 SELECT id, storage_uid
@@ -77,42 +81,43 @@ ORDER BY id ASC;
 -- name: GetUserIDByStorageUIDForUpdate :one
 SELECT id
 FROM users
-WHERE storage_uid = ? AND id <> ?
+WHERE storage_uid = sqlc.arg(storage_uid) AND id <> sqlc.arg(id)
 LIMIT 1
 FOR UPDATE;
 
 -- name: GetUsedUIDForUpdate :one
 SELECT storage_uid
 FROM users_used_uids
-WHERE storage_uid = ?
+WHERE storage_uid = sqlc.arg(storage_uid)
 LIMIT 1
 FOR UPDATE;
 
 -- name: InsertUsedUIDIgnore :execrows
-INSERT IGNORE INTO users_used_uids (storage_uid)
-VALUES (?);
+INSERT INTO users_used_uids (storage_uid)
+VALUES (sqlc.arg(storage_uid))
+ON CONFLICT (storage_uid) DO NOTHING;
 
 -- name: ListOwnedBoardIDsByUserID :many
 SELECT board_id
 FROM user_boards
-WHERE user_id = ?;
+WHERE user_id = sqlc.arg(user_id);
 
 -- name: DeleteBoardShareTokensByBoardIDs :exec
 DELETE FROM board_share_tokens
-WHERE board_id IN (sqlc.slice('board_ids'));
+WHERE board_id = ANY(sqlc.arg(board_ids)::text[]);
 
 -- name: DeleteBoardMembersByBoardIDs :exec
 DELETE FROM board_members
-WHERE board_id IN (sqlc.slice('board_ids'));
+WHERE board_id = ANY(sqlc.arg(board_ids)::text[]);
 
 -- name: DeleteUserBoardsByBoardIDs :exec
 DELETE FROM user_boards
-WHERE board_id IN (sqlc.slice('board_ids'));
+WHERE board_id = ANY(sqlc.arg(board_ids)::text[]);
 
 -- name: DeleteBoardShareTokensByCreatedBy :exec
 DELETE FROM board_share_tokens
-WHERE created_by = ?;
+WHERE created_by = sqlc.arg(created_by);
 
 -- name: DeleteBoardMembersByUserID :exec
 DELETE FROM board_members
-WHERE user_id = ?;
+WHERE user_id = sqlc.arg(user_id);

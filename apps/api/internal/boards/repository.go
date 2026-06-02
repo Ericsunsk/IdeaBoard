@@ -19,8 +19,8 @@ func NewBoardRepository(db *sql.DB) *BoardRepository {
 	return &BoardRepository{db: db, q: dbsqlc.New(db)}
 }
 
-func (r *BoardRepository) ListAccessibleByUserID(ctx context.Context, userID uint64) ([]BoardWithRole, error) {
-	rows, err := r.q.ListAccessibleBoardsByUserID(ctx, dbsqlc.ListAccessibleBoardsByUserIDParams{UserID: userID})
+func (r *BoardRepository) ListAccessibleByUserID(ctx context.Context, userID int64) ([]BoardWithRole, error) {
+	rows, err := r.q.ListAccessibleBoardsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +70,8 @@ func (r *BoardRepository) Upsert(ctx context.Context, board *UserBoard) error {
 	})
 }
 
-func (r *BoardRepository) HasNameConflict(ctx context.Context, userID uint64, boardID, name string) (bool, error) {
-	hasBoardID := int64(0)
-	if strings.TrimSpace(boardID) != "" {
-		hasBoardID = 1
-	}
+func (r *BoardRepository) HasNameConflict(ctx context.Context, userID int64, boardID, name string) (bool, error) {
+	hasBoardID := strings.TrimSpace(boardID) != ""
 	count, err := r.q.CountBoardNameConflicts(ctx, dbsqlc.CountBoardNameConflictsParams{
 		UserID:     userID,
 		Name:       name,
@@ -87,7 +84,7 @@ func (r *BoardRepository) HasNameConflict(ctx context.Context, userID uint64, bo
 	return count > 0, nil
 }
 
-func (r *BoardRepository) GetMemberRole(ctx context.Context, boardID string, userID uint64) (BoardAccessRole, error) {
+func (r *BoardRepository) GetMemberRole(ctx context.Context, boardID string, userID int64) (BoardAccessRole, error) {
 	raw, err := r.q.GetBoardMemberRole(ctx, dbsqlc.GetBoardMemberRoleParams{BoardID: boardID, UserID: userID})
 	if err != nil {
 		return "", err
@@ -144,7 +141,7 @@ func (r *BoardRepository) ListMembers(ctx context.Context, boardID string) ([]Bo
 	return result, nil
 }
 
-func (r *BoardRepository) UpsertMember(ctx context.Context, boardID string, userID uint64, role BoardAccessRole) error {
+func (r *BoardRepository) UpsertMember(ctx context.Context, boardID string, userID int64, role BoardAccessRole) error {
 	return r.q.UpsertBoardMember(ctx, dbsqlc.UpsertBoardMemberParams{
 		BoardID: boardID,
 		UserID:  userID,
@@ -152,11 +149,11 @@ func (r *BoardRepository) UpsertMember(ctx context.Context, boardID string, user
 	})
 }
 
-func (r *BoardRepository) DeleteMember(ctx context.Context, boardID string, userID uint64) error {
+func (r *BoardRepository) DeleteMember(ctx context.Context, boardID string, userID int64) error {
 	return r.q.DeleteBoardMember(ctx, dbsqlc.DeleteBoardMemberParams{BoardID: boardID, UserID: userID})
 }
 
-func (r *BoardRepository) GetMemberByUserID(ctx context.Context, boardID string, userID uint64) (*BoardMember, error) {
+func (r *BoardRepository) GetMemberByUserID(ctx context.Context, boardID string, userID int64) (*BoardMember, error) {
 	row, err := r.q.GetBoardMemberByUserID(ctx, dbsqlc.GetBoardMemberByUserIDParams{BoardID: boardID, UserID: userID})
 	if err != nil {
 		return nil, err
@@ -184,7 +181,7 @@ func (r *BoardRepository) CreateShareToken(ctx context.Context, token *BoardShar
 	if err != nil {
 		return err
 	}
-	token.ID = uint64(id)
+	token.ID = int64(id)
 	return nil
 }
 

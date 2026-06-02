@@ -25,6 +25,7 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	Database string
+	SSLMode  string
 }
 
 type RedisConfig struct {
@@ -71,10 +72,11 @@ func Load() *Config {
 	return &Config{
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "3306"),
+			Port:     getEnv("DB_PORT", "5432"),
 			User:     getEnv("DB_USER", "ideaboard"),
 			Password: dbPassword,
 			Database: getEnv("DB_NAME", "ideaboard"),
+			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		Redis: RedisConfig{
 			Host: getEnv("REDIS_HOST", "localhost"),

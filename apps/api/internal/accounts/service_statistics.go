@@ -420,7 +420,7 @@ func (s *AccountService) backfillDailyStatsByMissingDays(ctx context.Context, da
 		if err != nil {
 			return backfilledCount, err
 		}
-		accountIDs := make([]uint64, 0, len(rows))
+		accountIDs := make([]int64, 0, len(rows))
 		for _, row := range rows {
 			if row.AccountID != 0 {
 				accountIDs = append(accountIDs, row.AccountID)

@@ -168,7 +168,7 @@ const (
 
 type TaskLease struct {
 	TaskID              string `json:"-"`
-	AccountID           uint64 `json:"account_id,string"`
+	AccountID           int64  `json:"account_id,string"`
 	LeaseToken          string `json:"lease_token"`
 	State               string `json:"state"`
 	AssignedAtUnixMilli int64  `json:"assigned_at_unix_milli,omitempty"`
@@ -189,7 +189,7 @@ func (r *RedisManager) GetClient() *redis.Client {
 }
 
 // EnsureAccountConcurrent 确保账号并发配置存在；不会重置已有 count。
-func (r *RedisManager) EnsureAccountConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {
+func (r *RedisManager) EnsureAccountConcurrent(ctx context.Context, accountID int64, maxConcurrent int) error {
 	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
 	pipe := r.rdb.Pipeline()
 	pipe.HSet(ctx, key, "max", maxConcurrent)
@@ -199,13 +199,13 @@ func (r *RedisManager) EnsureAccountConcurrent(ctx context.Context, accountID ui
 }
 
 // SetAccountMaxConcurrent 设置账号最大并发数
-func (r *RedisManager) SetAccountMaxConcurrent(ctx context.Context, accountID uint64, maxConcurrent int) error {
+func (r *RedisManager) SetAccountMaxConcurrent(ctx context.Context, accountID int64, maxConcurrent int) error {
 	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
 	return r.rdb.HSet(ctx, key, "max", maxConcurrent).Err()
 }
 
 // GetAccountConcurrent 获取账号当前并发数
-func (r *RedisManager) GetAccountConcurrent(ctx context.Context, accountID uint64) (int, error) {
+func (r *RedisManager) GetAccountConcurrent(ctx context.Context, accountID int64) (int, error) {
 	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
 	count, err := r.rdb.HGet(ctx, key, "count").Int()
 	if err == redis.Nil {
@@ -215,7 +215,7 @@ func (r *RedisManager) GetAccountConcurrent(ctx context.Context, accountID uint6
 }
 
 // GetAccountMaxConcurrent 获取账号最大并发数
-func (r *RedisManager) GetAccountMaxConcurrent(ctx context.Context, accountID uint64) (int, error) {
+func (r *RedisManager) GetAccountMaxConcurrent(ctx context.Context, accountID int64) (int, error) {
 	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
 	max, err := r.rdb.HGet(ctx, key, "max").Int()
 	if err == redis.Nil {
@@ -226,7 +226,7 @@ func (r *RedisManager) GetAccountMaxConcurrent(ctx context.Context, accountID ui
 
 // TryAssignTask 分配任务给账号（Lua脚本原子操作，无等待队列副作用）。
 // KeyRunningTasks 在 stateful lease 中作为 active marker 使用：assigning/running 都会占用容量。
-func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, taskID string) (uint64, string, string, error) {
+func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []int64, taskID string) (int64, string, string, error) {
 	if len(accountIDs) == 0 {
 		return 0, "", "", fmt.Errorf("没有可用的账号")
 	}
@@ -274,7 +274,7 @@ func (r *RedisManager) TryAssignTask(ctx context.Context, accountIDs []uint64, t
 		return 0, "", "", fmt.Errorf("unknown assign status %q", assignResult.Status)
 	}
 
-	accountID, parseErr := strconv.ParseUint(assignResult.AccountID, 10, 64)
+	accountID, parseErr := strconv.ParseInt(assignResult.AccountID, 10, 64)
 	if parseErr != nil {
 		return 0, "", "", fmt.Errorf("parse assigned account id %q: %w", assignResult.AccountID, parseErr)
 	}
@@ -319,7 +319,7 @@ func (r *RedisManager) releaseTaskLeaseReconcileLock(parent context.Context, tok
 	return r.rdb.Eval(ctx, luaReleaseTaskLeaseReconcileLock, []string{KeyTaskLeaseReconcileLock}, token).Err()
 }
 
-func (r *RedisManager) ConfirmTaskRunning(ctx context.Context, accountID uint64, taskID, leaseToken string) error {
+func (r *RedisManager) ConfirmTaskRunning(ctx context.Context, accountID int64, taskID, leaseToken string) error {
 	if taskID == "" {
 		return fmt.Errorf("task id is empty")
 	}
@@ -344,7 +344,7 @@ func (r *RedisManager) ConfirmTaskRunning(ctx context.Context, accountID uint64,
 }
 
 // ReleaseTask 释放任务；只有 account_id 与 lease_token 都匹配时才会删除 lease 并扣减并发。
-func (r *RedisManager) ReleaseTask(ctx context.Context, accountID uint64, taskID, leaseToken string) error {
+func (r *RedisManager) ReleaseTask(ctx context.Context, accountID int64, taskID, leaseToken string) error {
 	if taskID == "" {
 		return fmt.Errorf("task id is empty")
 	}
@@ -371,7 +371,7 @@ func (r *RedisManager) ReleaseTask(ctx context.Context, accountID uint64, taskID
 	}
 }
 
-func (r *RedisManager) GetTaskLease(ctx context.Context, taskID string) (uint64, bool, error) {
+func (r *RedisManager) GetTaskLease(ctx context.Context, taskID string) (int64, bool, error) {
 	if taskID == "" {
 		return 0, false, fmt.Errorf("task id is empty")
 	}
@@ -389,7 +389,7 @@ func (r *RedisManager) GetTaskLease(ctx context.Context, taskID string) (uint64,
 	return lease.AccountID, true, nil
 }
 
-func (r *RedisManager) HasActiveLease(ctx context.Context, taskID string, accountID uint64) (bool, error) {
+func (r *RedisManager) HasActiveLease(ctx context.Context, taskID string, accountID int64) (bool, error) {
 	leasedAccountID, ok, err := r.GetTaskLease(ctx, taskID)
 	if err != nil || !ok {
 		return false, err
@@ -414,10 +414,10 @@ func (r *RedisManager) ListTaskLeases(ctx context.Context) ([]TaskLease, error) 
 	return leases, nil
 }
 
-func (r *RedisManager) RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []uint64) error {
+func (r *RedisManager) RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []int64) error {
 	now := time.Now()
 	rebuildLeases := make([]TaskLease, 0, len(leases))
-	counts := make(map[uint64]int, len(accountIDs))
+	counts := make(map[int64]int, len(accountIDs))
 	for _, accountID := range accountIDs {
 		counts[accountID] = 0
 	}
@@ -522,8 +522,8 @@ func generateLeaseToken() (string, error) {
 }
 
 // GetAccountLoadInfo 获取所有账号的负载信息
-func (r *RedisManager) GetAccountLoadInfo(ctx context.Context, accountIDs []uint64) (map[uint64]*queuetypes.AccountLoad, error) {
-	result := make(map[uint64]*queuetypes.AccountLoad)
+func (r *RedisManager) GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*queuetypes.AccountLoad, error) {
+	result := make(map[int64]*queuetypes.AccountLoad)
 
 	for _, id := range accountIDs {
 		key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, id)
@@ -542,7 +542,7 @@ func (r *RedisManager) GetAccountLoadInfo(ctx context.Context, accountIDs []uint
 }
 
 // DeleteAccountConcurrent 删除账号并发计数
-func (r *RedisManager) DeleteAccountConcurrent(ctx context.Context, accountID uint64) error {
+func (r *RedisManager) DeleteAccountConcurrent(ctx context.Context, accountID int64) error {
 	key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, accountID)
 	return r.rdb.Del(ctx, key).Err()
 }

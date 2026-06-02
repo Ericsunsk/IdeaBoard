@@ -219,7 +219,7 @@ func seedTasks(t *testing.T, repo *TaskRepository, ctx context.Context, items ..
 	}
 }
 
-func assertTaskState(t *testing.T, repo *TaskRepository, ctx context.Context, taskID string, status string, accountID uint64, leaseToken string) {
+func assertTaskState(t *testing.T, repo *TaskRepository, ctx context.Context, taskID string, status string, accountID int64, leaseToken string) {
 	t.Helper()
 	task, err := repo.GetByTaskID(ctx, taskID)
 	if err != nil {

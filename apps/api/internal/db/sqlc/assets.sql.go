@@ -9,9 +9,10 @@ import (
 	"context"
 )
 
-const createLineDraftMode = `-- name: CreateLineDraftMode :execlastid
+const createLineDraftMode = `-- name: CreateLineDraftMode :one
 INSERT INTO line_draft_modes (name, cover_image, prompt, sort_order, is_enabled)
-VALUES (?, ?, ?, ?, ?)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id
 `
 
 type CreateLineDraftModeParams struct {
@@ -23,25 +24,24 @@ type CreateLineDraftModeParams struct {
 }
 
 func (q *Queries) CreateLineDraftMode(ctx context.Context, arg CreateLineDraftModeParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createLineDraftMode,
+	row := q.db.QueryRowContext(ctx, createLineDraftMode,
 		arg.Name,
 		arg.CoverImage,
 		arg.Prompt,
 		arg.SortOrder,
 		arg.IsEnabled,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteLineDraftMode = `-- name: DeleteLineDraftMode :exec
 DELETE FROM line_draft_modes
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) DeleteLineDraftMode(ctx context.Context, id uint64) error {
+func (q *Queries) DeleteLineDraftMode(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteLineDraftMode, id)
 	return err
 }
@@ -49,10 +49,10 @@ func (q *Queries) DeleteLineDraftMode(ctx context.Context, id uint64) error {
 const getLineDraftModeByID = `-- name: GetLineDraftModeByID :one
 SELECT id, name, cover_image, prompt, sort_order, is_enabled, created_at, updated_at
 FROM line_draft_modes
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) GetLineDraftModeByID(ctx context.Context, id uint64) (LineDraftMode, error) {
+func (q *Queries) GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error) {
 	row := q.db.QueryRowContext(ctx, getLineDraftModeByID, id)
 	var i LineDraftMode
 	err := row.Scan(
@@ -71,7 +71,7 @@ func (q *Queries) GetLineDraftModeByID(ctx context.Context, id uint64) (LineDraf
 const listEnabledLineDraftModes = `-- name: ListEnabledLineDraftModes :many
 SELECT id, name, cover_image, prompt, sort_order, is_enabled, created_at, updated_at
 FROM line_draft_modes
-WHERE is_enabled = 1
+WHERE is_enabled
 ORDER BY sort_order ASC, id ASC
 `
 
@@ -147,12 +147,12 @@ func (q *Queries) ListLineDraftModes(ctx context.Context) ([]LineDraftMode, erro
 
 const updateLineDraftMode = `-- name: UpdateLineDraftMode :exec
 UPDATE line_draft_modes
-SET name = ?,
-    cover_image = ?,
-    prompt = ?,
-    sort_order = ?,
-    is_enabled = ?
-WHERE id = ?
+SET name = $1,
+    cover_image = $2,
+    prompt = $3,
+    sort_order = $4,
+    is_enabled = $5
+WHERE id = $6
 `
 
 type UpdateLineDraftModeParams struct {
@@ -161,7 +161,7 @@ type UpdateLineDraftModeParams struct {
 	Prompt     string `json:"prompt"`
 	SortOrder  int32  `json:"sort_order"`
 	IsEnabled  bool   `json:"is_enabled"`
-	ID         uint64 `json:"id"`
+	ID         int64  `json:"id"`
 }
 
 func (q *Queries) UpdateLineDraftMode(ctx context.Context, arg UpdateLineDraftModeParams) error {

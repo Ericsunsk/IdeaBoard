@@ -16,7 +16,7 @@ Usage: uninstall-vps.sh --yes [--volumes] [--keep-stack]
 
 Options:
   --yes, -y       Confirm uninstall.
-  --volumes       Also remove Docker volumes: mysql-data, redis-data, api-uploads.
+  --volumes       Also remove Docker volumes: postgres-data, redis-data, api-uploads.
   --keep-stack    Keep $STACK_DIR after stopping containers.
 EOF
 }

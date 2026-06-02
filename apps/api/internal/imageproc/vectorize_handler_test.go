@@ -98,7 +98,7 @@ type testVectorizeUploadBoardAccessResolver struct {
 	service *boards.BoardService
 }
 
-func (r testVectorizeUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID uint64, boardID string) (uint64, error) {
+func (r testVectorizeUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID int64, boardID string) (int64, error) {
 	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
 	if err != nil {
 		return 0, err
@@ -110,7 +110,7 @@ type testVectorizeUploadOwnerStorageUIDResolver struct {
 	repo *users.UserRepository
 }
 
-func (r testVectorizeUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID uint64) (string, error) {
+func (r testVectorizeUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID int64) (string, error) {
 	user, err := r.repo.GetByID(ctx, userID)
 	if err != nil {
 		return "", err

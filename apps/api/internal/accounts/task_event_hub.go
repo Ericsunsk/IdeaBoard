@@ -16,7 +16,7 @@ type TaskEvent struct {
 type taskSubscription struct {
 	ch     chan TaskEvent
 	done   chan struct{}
-	userID uint64
+	userID int64
 }
 
 // TaskEventHub manages per-task subscriptions for SSE streaming.
@@ -27,7 +27,7 @@ type TaskEventHub struct {
 	globalLimit    int
 	perUserLimit   int
 	total          int64
-	userConnCounts map[uint64]int
+	userConnCounts map[int64]int
 }
 
 const (
@@ -52,14 +52,14 @@ func NewTaskEventHubWithLimits(globalLimit, perUserLimit int) *TaskEventHub {
 		subs:           make(map[string][]*taskSubscription),
 		globalLimit:    globalLimit,
 		perUserLimit:   perUserLimit,
-		userConnCounts: make(map[uint64]int),
+		userConnCounts: make(map[int64]int),
 	}
 }
 
 // Subscribe returns a channel that receives TaskEvents for the given taskID,
 // and an unsubscribe function. Unsubscribe removes the subscriber from the hub
 // but does not close the channel.
-func (h *TaskEventHub) Subscribe(taskID string, userID uint64) (<-chan TaskEvent, func(), bool) {
+func (h *TaskEventHub) Subscribe(taskID string, userID int64) (<-chan TaskEvent, func(), bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

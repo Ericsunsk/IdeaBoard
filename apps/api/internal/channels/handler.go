@@ -82,7 +82,7 @@ func (h *ChannelHandler) Create(c *gin.Context) {
 }
 
 func (h *ChannelHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, 400, "无效的ID")
 		return
@@ -125,7 +125,7 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 }
 
 func (h *ChannelHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, 400, "无效的ID")
 		return

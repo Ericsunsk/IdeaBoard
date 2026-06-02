@@ -4,11 +4,11 @@ import "time"
 
 // Channel 渠道商
 type Channel struct {
-	ID        uint64    `json:"id"`
+	ID        int64     `json:"id"`
 	Type      string    `json:"type"`
 	Name      string    `json:"name"`
 	ApiURL    string    `json:"api_url"`
-	Status    int8      `json:"status"`
+	Status    int16     `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

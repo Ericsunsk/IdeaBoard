@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"api/internal/auth"
-	"api/internal/boards"
 	"api/internal/db/migrations"
 	"api/internal/platform/config"
 	"api/internal/platform/database"
@@ -77,12 +76,9 @@ func Run(args []string) {
 func runInitAdmin() {
 	cfg := config.Load()
 	requireAuthInternalKeyForProduction(cfg)
-	db, err := database.NewMySQL(cfg.Database)
+	db, err := database.NewPostgres(cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
-		log.Fatalf("Failed to cleanup duplicate board names: %v", err)
 	}
 	if err := migrations.Up(context.Background(), db); err != nil {
 		log.Fatalf("Failed to migrate database schema: %v", err)

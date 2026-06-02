@@ -22,40 +22,40 @@ func (f *fakeQueueForService) QueueLengths(context.Context) (int64, int64, error
 }
 
 type fakeAssignerForService struct {
-	loadInfo map[uint64]*queuetypes.AccountLoad
+	loadInfo map[int64]*queuetypes.AccountLoad
 }
 
-func (f *fakeAssignerForService) Assign(context.Context, []uint64, *queuetypes.TaskPayload) (taskqueue.TaskAssignment, error) {
+func (f *fakeAssignerForService) Assign(context.Context, []int64, *queuetypes.TaskPayload) (taskqueue.TaskAssignment, error) {
 	return taskqueue.TaskAssignment{}, nil
 }
 func (f *fakeAssignerForService) ConfirmTaskRunning(context.Context, taskqueue.TaskAssignment) error {
 	return nil
 }
-func (f *fakeAssignerForService) Release(context.Context, string, uint64, string) error { return nil }
-func (f *fakeAssignerForService) EnsureAccountConcurrent(context.Context, uint64, int) error {
+func (f *fakeAssignerForService) Release(context.Context, string, int64, string) error { return nil }
+func (f *fakeAssignerForService) EnsureAccountConcurrent(context.Context, int64, int) error {
 	return nil
 }
-func (f *fakeAssignerForService) SetAccountMaxConcurrent(context.Context, uint64, int) error {
+func (f *fakeAssignerForService) SetAccountMaxConcurrent(context.Context, int64, int) error {
 	return nil
 }
-func (f *fakeAssignerForService) GetAccountLoadInfo(context.Context, []uint64) (map[uint64]*queuetypes.AccountLoad, error) {
+func (f *fakeAssignerForService) GetAccountLoadInfo(context.Context, []int64) (map[int64]*queuetypes.AccountLoad, error) {
 	return f.loadInfo, nil
 }
 
 type fakeConcurrencyStore struct {
-	concurrent map[uint64]int
-	max        map[uint64]int
-	deleted    []uint64
+	concurrent map[int64]int
+	max        map[int64]int
+	deleted    []int64
 }
 
-func (f *fakeConcurrencyStore) DeleteAccountConcurrent(_ context.Context, accountID uint64) error {
+func (f *fakeConcurrencyStore) DeleteAccountConcurrent(_ context.Context, accountID int64) error {
 	f.deleted = append(f.deleted, accountID)
 	return nil
 }
-func (f *fakeConcurrencyStore) GetAccountConcurrent(_ context.Context, accountID uint64) (int, error) {
+func (f *fakeConcurrencyStore) GetAccountConcurrent(_ context.Context, accountID int64) (int, error) {
 	return f.concurrent[accountID], nil
 }
-func (f *fakeConcurrencyStore) GetAccountMaxConcurrent(_ context.Context, accountID uint64) (int, error) {
+func (f *fakeConcurrencyStore) GetAccountMaxConcurrent(_ context.Context, accountID int64) (int, error) {
 	return f.max[accountID], nil
 }
 
@@ -72,7 +72,7 @@ func (f *fakeCancelStore) ClearCancelled(context.Context, string) error      { r
 
 type fakeMonitorStore struct{}
 
-func (f *fakeMonitorStore) MonitorInfo(context.Context, []uint64) (*queuetypes.MonitorInfo, error) {
+func (f *fakeMonitorStore) MonitorInfo(context.Context, []int64) (*queuetypes.MonitorInfo, error) {
 	return &queuetypes.MonitorInfo{}, nil
 }
 
@@ -81,7 +81,7 @@ func newQueueServiceTestDB(t *testing.T) *sql.DB {
 	return testdb.Open(t)
 }
 
-func createTestAccount(t *testing.T, repo *AccountRepository, name string, status int8) *ApiAccount {
+func createTestAccount(t *testing.T, repo *AccountRepository, name string, status int16) *ApiAccount {
 	t.Helper()
 	ctx := context.Background()
 	acc := &ApiAccount{
@@ -120,7 +120,7 @@ func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 		Queue:       &fakeQueueForService{waitLen: 7},
 		QueueStats:  &fakeQueueForService{waitLen: 7},
 		Assigner: &fakeAssignerForService{
-			loadInfo: map[uint64]*queuetypes.AccountLoad{
+			loadInfo: map[int64]*queuetypes.AccountLoad{
 				acc.ID: {CurrentConcurrent: 2, MaxConcurrent: 3},
 			},
 		},
@@ -150,8 +150,8 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 	taskRepo := NewTaskRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 	concurrency := &fakeConcurrencyStore{
-		concurrent: map[uint64]int{acc.ID: 1},
-		max:        map[uint64]int{acc.ID: 4},
+		concurrent: map[int64]int{acc.ID: 1},
+		max:        map[int64]int{acc.ID: 4},
 	}
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,

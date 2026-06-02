@@ -66,7 +66,7 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	}
 	if _, err := db.ExecContext(
 		context.Background(),
-		`INSERT INTO tasks (task_id, user_id, channel_id, prompt, user_prompt, params, status, error_msg, result) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO tasks (task_id, user_id, channel_id, prompt, user_prompt, params, status, error_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		"admin-delete-task", targetUser.ID, 1, "", "", "", "pending", "", "",
 	); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -76,11 +76,11 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	handler := NewAdminHandler(NewUserService(repo), nil, authManager)
 	router := gin.New()
 	router.DELETE("/admin/users/:id", func(c *gin.Context) {
-		c.Set("user_id", uint64(999))
+		c.Set("user_id", int64(999))
 		handler.DeleteUser(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+strconv.FormatUint(targetUser.ID, 10), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10), nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -95,7 +95,7 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 		t.Fatalf("target user lookup err = %v, want record not found", err)
 	}
 	var taskCount int64
-	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM tasks WHERE user_id = ?`, targetUser.ID).Scan(&taskCount); err != nil {
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, targetUser.ID).Scan(&taskCount); err != nil {
 		t.Fatalf("count tasks failed: %v", err)
 	}
 	if taskCount != 0 {
@@ -123,11 +123,11 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 	handler := NewAdminHandler(NewUserService(repo), nil, authManager)
 	router := gin.New()
 	router.POST("/admin/users/:id/ban", func(c *gin.Context) {
-		c.Set("user_id", uint64(999))
+		c.Set("user_id", int64(999))
 		handler.BanUser(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+strconv.FormatUint(targetUser.ID, 10)+"/ban", strings.NewReader(`{"reason":"abuse","expires_in_days":7}`))
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10)+"/ban", strings.NewReader(`{"reason":"abuse","expires_in_days":7}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -168,11 +168,11 @@ func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
 	handler := NewAdminHandler(NewUserService(repo), nil, authManager)
 	router := gin.New()
 	router.POST("/admin/users/:id/revoke-sessions", func(c *gin.Context) {
-		c.Set("user_id", uint64(999))
+		c.Set("user_id", int64(999))
 		handler.RevokeUserSessions(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+strconv.FormatUint(targetUser.ID, 10)+"/revoke-sessions", nil)
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10)+"/revoke-sessions", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

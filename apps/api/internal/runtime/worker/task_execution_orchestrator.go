@@ -361,11 +361,11 @@ func userFacingProviderError(err error) string {
 	return "上游图像服务调用失败"
 }
 
-func removeAccountCandidate(accountIDs []uint64, accountID uint64) []uint64 {
+func removeAccountCandidate(accountIDs []int64, accountID int64) []int64 {
 	if len(accountIDs) == 0 {
 		return accountIDs
 	}
-	next := make([]uint64, 0, len(accountIDs))
+	next := make([]int64, 0, len(accountIDs))
 	for _, id := range accountIDs {
 		if id == accountID {
 			continue

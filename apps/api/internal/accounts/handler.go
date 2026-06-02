@@ -42,7 +42,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 
 func (h *AccountHandler) GetAccount(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint64
+	var id int64
 	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
 		response.Error(c, 400, "无效的账号ID")
 		return
@@ -73,7 +73,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 
 func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint64
+	var id int64
 	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
 		response.Error(c, 400, "无效的账号ID")
 		return
@@ -92,7 +92,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 
 func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint64
+	var id int64
 	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
 		response.Error(c, 400, "无效的账号ID")
 		return
@@ -106,7 +106,7 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 
 func (h *AccountHandler) StartAccount(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint64
+	var id int64
 	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
 		response.Error(c, 400, "无效的账号ID")
 		return
@@ -120,7 +120,7 @@ func (h *AccountHandler) StartAccount(c *gin.Context) {
 
 func (h *AccountHandler) StopAccount(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint64
+	var id int64
 	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
 		response.Error(c, 400, "无效的账号ID")
 		return
@@ -134,7 +134,7 @@ func (h *AccountHandler) StopAccount(c *gin.Context) {
 
 func (h *AccountHandler) GetAccountQueue(c *gin.Context) {
 	idStr := c.Param("id")
-	var id uint64
+	var id int64
 	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
 		response.Error(c, 400, "无效的账号ID")
 		return
@@ -150,7 +150,7 @@ func (h *AccountHandler) GetAccountQueue(c *gin.Context) {
 // ============ 任务 API ============
 
 func (h *AccountHandler) SubmitTask(c *gin.Context) {
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	if userID == 0 {
 		response.Error(c, 401, "未登录")
 		return
@@ -169,7 +169,7 @@ func (h *AccountHandler) SubmitTask(c *gin.Context) {
 }
 
 func (h *AccountHandler) CheckSubmitTaskReadiness(c *gin.Context) {
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	if userID == 0 {
 		response.Error(c, 401, "未登录")
 		return
@@ -212,7 +212,7 @@ func (h *AccountHandler) ListTasks(c *gin.Context) {
 }
 
 func (h *AccountHandler) GetUserTasks(c *gin.Context) {
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	var req tasks.TaskListRequest
 	c.ShouldBindQuery(&req)
 	tasks, total, _ := h.accountService.GetUserTasks(c.Request.Context(), userID, req.Page, req.PageSize)
@@ -226,7 +226,7 @@ func (h *AccountHandler) GetUserTasks(c *gin.Context) {
 
 // GetUserTask 用户端获取单个任务详情（隐藏内部关键词）
 func (h *AccountHandler) GetUserTask(c *gin.Context) {
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	taskID := c.Param("task_id")
 	task, err := h.accountService.GetUserTask(c.Request.Context(), taskID, userID)
 	if err != nil {
@@ -238,7 +238,7 @@ func (h *AccountHandler) GetUserTask(c *gin.Context) {
 
 // StreamUserTask streams user-safe task updates over Server-Sent Events.
 func (h *AccountHandler) StreamUserTask(c *gin.Context) {
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	taskID := c.Param("task_id")
 	if userID == 0 {
 		response.Error(c, http.StatusUnauthorized, "未登录")
@@ -341,7 +341,7 @@ func writeSSEvent(c *gin.Context, event string, data interface{}) bool {
 
 // DeleteUserTask 用户删除自己的任务
 func (h *AccountHandler) DeleteUserTask(c *gin.Context) {
-	userID := c.GetUint64("user_id")
+	userID := c.GetInt64("user_id")
 	taskID := c.Param("task_id")
 	if err := h.accountService.DeleteUserTask(c.Request.Context(), taskID, userID); err != nil {
 		response.Error(c, 500, "删除失败")

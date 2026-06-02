@@ -8,27 +8,27 @@ import (
 func TestRemoveAccountCandidate(t *testing.T) {
 	tests := []struct {
 		name      string
-		accountID uint64
-		input     []uint64
-		want      []uint64
+		accountID int64
+		input     []int64
+		want      []int64
 	}{
 		{
 			name:      "remove middle account",
 			accountID: 2,
-			input:     []uint64{1, 2, 3},
-			want:      []uint64{1, 3},
+			input:     []int64{1, 2, 3},
+			want:      []int64{1, 3},
 		},
 		{
 			name:      "remove last account leaves exhausted pool",
 			accountID: 1,
-			input:     []uint64{1},
-			want:      []uint64{},
+			input:     []int64{1},
+			want:      []int64{},
 		},
 		{
 			name:      "missing account keeps pool unchanged",
 			accountID: 9,
-			input:     []uint64{1, 2},
-			want:      []uint64{1, 2},
+			input:     []int64{1, 2},
+			want:      []int64{1, 2},
 		},
 	}
 

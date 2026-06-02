@@ -7,13 +7,19 @@ package dbsqlc
 
 import (
 	"context"
-	"strings"
+
+	"github.com/lib/pq"
 )
 
-const createTaskOutput = `-- name: CreateTaskOutput :execlastid
+const createTaskOutput = `-- name: CreateTaskOutput :one
 INSERT INTO task_outputs (
   task_id, role, url, storage_key, mime_type, width, height, size_bytes, sort_index
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (
+  $1, $2, $3, $4,
+  $5, $6, $7, $8,
+  $9
+)
+RETURNING id
 `
 
 type CreateTaskOutputParams struct {
@@ -29,7 +35,7 @@ type CreateTaskOutputParams struct {
 }
 
 func (q *Queries) CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createTaskOutput,
+	row := q.db.QueryRowContext(ctx, createTaskOutput,
 		arg.TaskID,
 		arg.Role,
 		arg.Url,
@@ -40,15 +46,14 @@ func (q *Queries) CreateTaskOutput(ctx context.Context, arg CreateTaskOutputPara
 		arg.SizeBytes,
 		arg.SortIndex,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteOutputsByTaskID = `-- name: DeleteOutputsByTaskID :exec
 DELETE FROM task_outputs
-WHERE task_id = ?
+WHERE task_id = $1
 `
 
 func (q *Queries) DeleteOutputsByTaskID(ctx context.Context, taskID string) error {
@@ -60,22 +65,12 @@ const listOutputsByTaskIDs = `-- name: ListOutputsByTaskIDs :many
 SELECT id, task_id, role, url, storage_key, mime_type, width, height, size_bytes,
        sort_index, created_at, updated_at
 FROM task_outputs
-WHERE task_id IN (/*SLICE:task_ids*/?)
+WHERE task_id = ANY($1::text[])
 ORDER BY task_id ASC, sort_index ASC, id ASC
 `
 
 func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskOutput, error) {
-	query := listOutputsByTaskIDs
-	var queryParams []interface{}
-	if len(taskIds) > 0 {
-		for _, v := range taskIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:task_ids*/?", strings.Repeat(",?", len(taskIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:task_ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, listOutputsByTaskIDs, pq.Array(taskIds))
 	if err != nil {
 		return nil, err
 	}

@@ -31,7 +31,7 @@ ROOT_DIR="$(find_stack_root)"
 COMPOSE_FILE="$ROOT_DIR/docker/compose.yml"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env}"
 ENV_EXAMPLE="$ROOT_DIR/docker/.env.example"
-BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups/mysql}"
+BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups/postgres}"
 BACKUP_RETAIN="${BACKUP_RETAIN:-5}"
 
 command="${1:-deploy}"
@@ -117,7 +117,7 @@ ensure_env_file() {
     fi
   fi
 
-  for key in MYSQL_ROOT_PASSWORD MYSQL_PASSWORD AUTH_INTERNAL_KEY BETTER_AUTH_SECRET; do
+  for key in POSTGRES_PASSWORD AUTH_INTERNAL_KEY BETTER_AUTH_SECRET; do
     if is_placeholder "$(env_value "$key")"; then
       set_env_value "$key" "$(generate_secret)"
       echo "Generated $key"
@@ -133,8 +133,7 @@ validate_env_file() {
     APP_BASE_URL \
     API_BASE_URL \
     CLOUDFLARE_TUNNEL_TOKEN \
-    MYSQL_ROOT_PASSWORD \
-    MYSQL_PASSWORD \
+    POSTGRES_PASSWORD \
     AUTH_INTERNAL_KEY \
     BETTER_AUTH_SECRET; do
     if is_placeholder "$(env_value "$key")"; then
@@ -168,24 +167,24 @@ docker_compose() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
-wait_for_mysql() {
-  local timeout="${MYSQL_WAIT_TIMEOUT_SECONDS:-120}"
+wait_for_postgres() {
+  local timeout="${POSTGRES_WAIT_TIMEOUT_SECONDS:-120}"
   local elapsed=0
 
-  echo "Waiting for MySQL to become ready..."
+  echo "Waiting for PostgreSQL to become ready..."
   while (( elapsed < timeout )); do
-    if docker_compose exec -T mysql sh -c 'mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent' >/dev/null 2>&1; then
+    if docker_compose exec -T postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1' >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
     elapsed=$((elapsed + 2))
   done
 
-  docker_compose logs --tail=120 mysql >&2 || true
-  die "MySQL did not become ready within ${timeout}s"
+  docker_compose logs --tail=120 postgres >&2 || true
+  die "PostgreSQL did not become ready within ${timeout}s"
 }
 
-prune_mysql_backups() {
+prune_postgres_backups() {
   local retain="$BACKUP_RETAIN"
   local backups=()
   local backup
@@ -197,7 +196,7 @@ prune_mysql_backups() {
 
   while IFS= read -r backup; do
     backups+=("$backup")
-  done < <(find "$BACKUP_DIR" -type f -name 'mysql-*.sql' | sort)
+  done < <(find "$BACKUP_DIR" -type f -name 'postgres-*.sql' | sort)
 
   delete_count=$(( ${#backups[@]} - retain ))
   if (( delete_count <= 0 )); then
@@ -209,7 +208,7 @@ prune_mysql_backups() {
   done
 }
 
-backup_mysql() {
+backup_postgres() {
   local timestamp
   local database
   local backup_file
@@ -217,24 +216,24 @@ backup_mysql() {
 
   mkdir -p "$BACKUP_DIR"
   timestamp="$(date +%Y%m%d-%H%M%S)"
-  database="$(env_value MYSQL_DATABASE)"
+  database="$(env_value POSTGRES_DB)"
   database="${database:-ideaboard}"
-  backup_file="$BACKUP_DIR/mysql-${database}-${timestamp}.sql"
+  backup_file="$BACKUP_DIR/postgres-${database}-${timestamp}.sql"
   tmp_file="${backup_file}.tmp"
 
-  echo "Creating MySQL backup: $backup_file"
-  if docker_compose exec -T mysql sh -c 'mysqldump --single-transaction --routines --triggers --default-character-set=utf8mb4 -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > "$tmp_file"; then
+  echo "Creating PostgreSQL backup: $backup_file"
+  if docker_compose exec -T postgres sh -c 'pg_dump --clean --if-exists --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$tmp_file"; then
     if ! mv "$tmp_file" "$backup_file"; then
       rm -f -- "$tmp_file"
-      die "MySQL backup finalize failed; deployment aborted before migration"
+      die "PostgreSQL backup finalize failed; deployment aborted before migration"
     fi
-    prune_mysql_backups
-    echo "MySQL backup completed: $backup_file"
+    prune_postgres_backups
+    echo "PostgreSQL backup completed: $backup_file"
     return 0
   fi
 
   rm -f -- "$tmp_file"
-  die "MySQL backup failed; deployment aborted before migration"
+  die "PostgreSQL backup failed; deployment aborted before migration"
 }
 
 print_backend_health_logs() {
@@ -299,9 +298,9 @@ case "$command" in
   deploy)
     login_ghcr_if_configured
     docker_compose pull
-    docker_compose up -d mysql redis
-    wait_for_mysql
-    backup_mysql
+    docker_compose up -d postgres redis
+    wait_for_postgres
+    backup_postgres
     docker_compose run --rm auth npm run migrate:dist
     docker_compose up -d
     wait_for_backend_health

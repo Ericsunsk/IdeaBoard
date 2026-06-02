@@ -60,7 +60,7 @@ func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRe
 	return account, nil
 }
 
-func (s *AccountService) GetAccount(ctx context.Context, id uint64) (*ApiAccount, error) {
+func (s *AccountService) GetAccount(ctx context.Context, id int64) (*ApiAccount, error) {
 	return s.accountRepo.GetByID(ctx, id)
 }
 
@@ -77,11 +77,11 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 		return nil, 0, err
 	}
 
-	accountIDs := make([]uint64, len(accounts))
+	accountIDs := make([]int64, len(accounts))
 	for i := range accounts {
 		accountIDs[i] = accounts[i].ID
 	}
-	loadInfo := map[uint64]*queuetypes.AccountLoad{}
+	loadInfo := map[int64]*queuetypes.AccountLoad{}
 	if s.assigner != nil {
 		loads, loadErr := s.assigner.GetAccountLoadInfo(ctx, accountIDs)
 		if loadErr != nil {
@@ -125,7 +125,7 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 	return result, total, nil
 }
 
-func (s *AccountService) UpdateAccount(ctx context.Context, id uint64, req *UpdateAccountRequest) error {
+func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *UpdateAccountRequest) error {
 	proxyURL, err := outbound.ValidateConfiguredEndpoint(req.ProxyURL, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		return fmt.Errorf("proxy_url 不可用，仅支持可达的公网 http(s) 地址")
@@ -175,7 +175,7 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id uint64, req *Upda
 	return nil
 }
 
-func (s *AccountService) DeleteAccount(ctx context.Context, id uint64) error {
+func (s *AccountService) DeleteAccount(ctx context.Context, id int64) error {
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("账号不存在")
@@ -191,7 +191,7 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id uint64) error {
 	return s.accountRepo.Delete(ctx, id)
 }
 
-func (s *AccountService) StartAccount(ctx context.Context, id uint64) error {
+func (s *AccountService) StartAccount(ctx context.Context, id int64) error {
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("账号不存在")
@@ -205,7 +205,7 @@ func (s *AccountService) StartAccount(ctx context.Context, id uint64) error {
 	return s.assigner.EnsureAccountConcurrent(ctx, id, account.MaxConcurrent)
 }
 
-func (s *AccountService) StopAccount(ctx context.Context, id uint64) error {
+func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
 	taskIDs, err := s.taskRepo.ListTaskIDsByAccountIDAndStatuses(ctx, id, tasks.StatusPending, tasks.StatusRunning)
 	if err != nil {
 		log.Printf("[StopAccount] 查询账号 %d 进行中任务失败: %v", id, err)
@@ -239,7 +239,7 @@ func (s *AccountService) StopAccount(ctx context.Context, id uint64) error {
 	return s.accountRepo.UpdateStatus(ctx, id, 0)
 }
 
-func (s *AccountService) GetAccountQueueInfo(ctx context.Context, id uint64) (concurrent int, maxConcurrent int, err error) {
+func (s *AccountService) GetAccountQueueInfo(ctx context.Context, id int64) (concurrent int, maxConcurrent int, err error) {
 	if s.concurrencyStore == nil {
 		return 0, 0, fmt.Errorf("account concurrency store not configured")
 	}

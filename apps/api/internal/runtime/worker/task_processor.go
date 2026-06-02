@@ -86,7 +86,7 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 	return p.executeTask(ctx, task, assignment)
 }
 
-func (p *taskProcessor) failTask(ctx context.Context, task *queuetypes.TaskPayload, accountID uint64, reason string) {
+func (p *taskProcessor) failTask(ctx context.Context, task *queuetypes.TaskPayload, accountID int64, reason string) {
 	if err := p.taskRuntime.ReleaseTask(ctx, taskqueue.TaskAssignment{TaskID: task.TaskID, AccountID: accountID}); err != nil {
 		log.Printf("[TaskProcessor] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 	}

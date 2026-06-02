@@ -7,28 +7,27 @@ package dbsqlc
 
 import (
 	"context"
-	"strings"
+
+	"github.com/lib/pq"
 )
 
 const countAccounts = `-- name: CountAccounts :one
 SELECT COUNT(*)
 FROM api_accounts
-WHERE (CAST(? AS SIGNED) = 0 OR name LIKE ? OR platform LIKE ? OR api_type LIKE ?)
-  AND (CAST(? AS SIGNED) = 0 OR platform = ?)
+WHERE (NOT $1::boolean OR name ILIKE $2 OR platform ILIKE $2 OR api_type ILIKE $2)
+  AND (NOT $3::boolean OR platform = $4)
 `
 
 type CountAccountsParams struct {
-	HasKeyword  int64  `json:"has_keyword"`
+	HasKeyword  bool   `json:"has_keyword"`
 	KeywordLike string `json:"keyword_like"`
-	HasPlatform int64  `json:"has_platform"`
+	HasPlatform bool   `json:"has_platform"`
 	Platform    string `json:"platform"`
 }
 
 func (q *Queries) CountAccounts(ctx context.Context, arg CountAccountsParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countAccounts,
 		arg.HasKeyword,
-		arg.KeywordLike,
-		arg.KeywordLike,
 		arg.KeywordLike,
 		arg.HasPlatform,
 		arg.Platform,
@@ -38,16 +37,22 @@ func (q *Queries) CountAccounts(ctx context.Context, arg CountAccountsParams) (i
 	return count, err
 }
 
-const createAccount = `-- name: CreateAccount :execlastid
+const createAccount = `-- name: CreateAccount :one
 INSERT INTO api_accounts (
   name, channel_id, platform, api_type, model_set, api_key, proxy_url,
   max_concurrent, timeout, extra_config, status, fail_count, weight
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (
+  $1, $2, $3, $4,
+  $5, $6, $7,
+  $8, $9, $10,
+  $11, $12, $13
+)
+RETURNING id
 `
 
 type CreateAccountParams struct {
 	Name          string `json:"name"`
-	ChannelID     uint64 `json:"channel_id"`
+	ChannelID     int64  `json:"channel_id"`
 	Platform      string `json:"platform"`
 	ApiType       string `json:"api_type"`
 	ModelSet      string `json:"model_set"`
@@ -56,13 +61,13 @@ type CreateAccountParams struct {
 	MaxConcurrent int32  `json:"max_concurrent"`
 	Timeout       int32  `json:"timeout"`
 	ExtraConfig   string `json:"extra_config"`
-	Status        int8   `json:"status"`
+	Status        int16  `json:"status"`
 	FailCount     int32  `json:"fail_count"`
 	Weight        int32  `json:"weight"`
 }
 
 func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createAccount,
+	row := q.db.QueryRowContext(ctx, createAccount,
 		arg.Name,
 		arg.ChannelID,
 		arg.Platform,
@@ -77,18 +82,17 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (i
 		arg.FailCount,
 		arg.Weight,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteAccount = `-- name: DeleteAccount :exec
 DELETE FROM api_accounts
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) DeleteAccount(ctx context.Context, id uint64) error {
+func (q *Queries) DeleteAccount(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteAccount, id)
 	return err
 }
@@ -98,10 +102,10 @@ SELECT id, name, channel_id, platform, api_type, model_set, api_key, proxy_url,
        max_concurrent, timeout, extra_config, status, fail_count, weight,
        created_at, updated_at
 FROM api_accounts
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) GetAccountByID(ctx context.Context, id uint64) (ApiAccount, error) {
+func (q *Queries) GetAccountByID(ctx context.Context, id int64) (ApiAccount, error) {
 	row := q.db.QueryRowContext(ctx, getAccountByID, id)
 	var i ApiAccount
 	err := row.Scan(
@@ -128,10 +132,10 @@ func (q *Queries) GetAccountByID(ctx context.Context, id uint64) (ApiAccount, er
 const getAccountModelSetByID = `-- name: GetAccountModelSetByID :one
 SELECT model_set
 FROM api_accounts
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) GetAccountModelSetByID(ctx context.Context, id uint64) (string, error) {
+func (q *Queries) GetAccountModelSetByID(ctx context.Context, id int64) (string, error) {
 	row := q.db.QueryRowContext(ctx, getAccountModelSetByID, id)
 	var model_set string
 	err := row.Scan(&model_set)
@@ -141,10 +145,10 @@ func (q *Queries) GetAccountModelSetByID(ctx context.Context, id uint64) (string
 const incrementAccountFailCount = `-- name: IncrementAccountFailCount :exec
 UPDATE api_accounts
 SET fail_count = fail_count + 1
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) IncrementAccountFailCount(ctx context.Context, id uint64) error {
+func (q *Queries) IncrementAccountFailCount(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, incrementAccountFailCount, id)
 	return err
 }
@@ -155,15 +159,15 @@ FROM api_accounts
 ORDER BY id ASC
 `
 
-func (q *Queries) ListAccountIDs(ctx context.Context) ([]uint64, error) {
+func (q *Queries) ListAccountIDs(ctx context.Context) ([]int64, error) {
 	rows, err := q.db.QueryContext(ctx, listAccountIDs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []uint64
+	var items []int64
 	for rows.Next() {
-		var id uint64
+		var id int64
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
@@ -181,27 +185,17 @@ func (q *Queries) ListAccountIDs(ctx context.Context) ([]uint64, error) {
 const listAccountModelSetsByIDs = `-- name: ListAccountModelSetsByIDs :many
 SELECT id, model_set
 FROM api_accounts
-WHERE id IN (/*SLICE:ids*/?)
+WHERE id = ANY($1::bigint[])
 ORDER BY id ASC
 `
 
 type ListAccountModelSetsByIDsRow struct {
-	ID       uint64 `json:"id"`
+	ID       int64  `json:"id"`
 	ModelSet string `json:"model_set"`
 }
 
-func (q *Queries) ListAccountModelSetsByIDs(ctx context.Context, ids []uint64) ([]ListAccountModelSetsByIDsRow, error) {
-	query := listAccountModelSetsByIDs
-	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+func (q *Queries) ListAccountModelSetsByIDs(ctx context.Context, ids []int64) ([]ListAccountModelSetsByIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAccountModelSetsByIDs, pq.Array(ids))
 	if err != nil {
 		return nil, err
 	}
@@ -228,31 +222,29 @@ SELECT id, name, channel_id, platform, api_type, model_set, api_key, proxy_url,
        max_concurrent, timeout, extra_config, status, fail_count, weight,
        created_at, updated_at
 FROM api_accounts
-WHERE (CAST(? AS SIGNED) = 0 OR name LIKE ? OR platform LIKE ? OR api_type LIKE ?)
-  AND (CAST(? AS SIGNED) = 0 OR platform = ?)
+WHERE (NOT $1::boolean OR name ILIKE $2 OR platform ILIKE $2 OR api_type ILIKE $2)
+  AND (NOT $3::boolean OR platform = $4)
 ORDER BY id DESC
-LIMIT ? OFFSET ?
+LIMIT $6 OFFSET $5
 `
 
 type ListAccountsParams struct {
-	HasKeyword  int64  `json:"has_keyword"`
+	HasKeyword  bool   `json:"has_keyword"`
 	KeywordLike string `json:"keyword_like"`
-	HasPlatform int64  `json:"has_platform"`
+	HasPlatform bool   `json:"has_platform"`
 	Platform    string `json:"platform"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+	PageOffset  int32  `json:"page_offset"`
+	PageLimit   int32  `json:"page_limit"`
 }
 
 func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ApiAccount, error) {
 	rows, err := q.db.QueryContext(ctx, listAccounts,
 		arg.HasKeyword,
 		arg.KeywordLike,
-		arg.KeywordLike,
-		arg.KeywordLike,
 		arg.HasPlatform,
 		arg.Platform,
-		arg.Limit,
-		arg.Offset,
+		arg.PageOffset,
+		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err
@@ -344,35 +336,35 @@ func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ApiAccount, error)
 const resetAccountFailCount = `-- name: ResetAccountFailCount :exec
 UPDATE api_accounts
 SET fail_count = 0
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) ResetAccountFailCount(ctx context.Context, id uint64) error {
+func (q *Queries) ResetAccountFailCount(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, resetAccountFailCount, id)
 	return err
 }
 
 const updateAccount = `-- name: UpdateAccount :exec
 UPDATE api_accounts
-SET name = ?,
-    channel_id = ?,
-    platform = ?,
-    api_type = ?,
-    model_set = ?,
-    api_key = ?,
-    proxy_url = ?,
-    max_concurrent = ?,
-    timeout = ?,
-    extra_config = ?,
-    status = ?,
-    fail_count = ?,
-    weight = ?
-WHERE id = ?
+SET name = $1,
+    channel_id = $2,
+    platform = $3,
+    api_type = $4,
+    model_set = $5,
+    api_key = $6,
+    proxy_url = $7,
+    max_concurrent = $8,
+    timeout = $9,
+    extra_config = $10,
+    status = $11,
+    fail_count = $12,
+    weight = $13
+WHERE id = $14
 `
 
 type UpdateAccountParams struct {
 	Name          string `json:"name"`
-	ChannelID     uint64 `json:"channel_id"`
+	ChannelID     int64  `json:"channel_id"`
 	Platform      string `json:"platform"`
 	ApiType       string `json:"api_type"`
 	ModelSet      string `json:"model_set"`
@@ -381,10 +373,10 @@ type UpdateAccountParams struct {
 	MaxConcurrent int32  `json:"max_concurrent"`
 	Timeout       int32  `json:"timeout"`
 	ExtraConfig   string `json:"extra_config"`
-	Status        int8   `json:"status"`
+	Status        int16  `json:"status"`
 	FailCount     int32  `json:"fail_count"`
 	Weight        int32  `json:"weight"`
-	ID            uint64 `json:"id"`
+	ID            int64  `json:"id"`
 }
 
 func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) error {
@@ -409,13 +401,13 @@ func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) er
 
 const updateAccountStatus = `-- name: UpdateAccountStatus :exec
 UPDATE api_accounts
-SET status = ?
-WHERE id = ?
+SET status = $1
+WHERE id = $2
 `
 
 type UpdateAccountStatusParams struct {
-	Status int8   `json:"status"`
-	ID     uint64 `json:"id"`
+	Status int16 `json:"status"`
+	ID     int64 `json:"id"`
 }
 
 func (q *Queries) UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) error {

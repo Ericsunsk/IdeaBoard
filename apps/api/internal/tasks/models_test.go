@@ -9,21 +9,21 @@ import (
 
 func TestTaskParamsColumnSupportsSubmitLimit(t *testing.T) {
 	schema := readDBSchema(t)
-	if !strings.Contains(schema, "params MEDIUMTEXT NOT NULL") {
-		t.Fatalf("tasks.params must use MEDIUMTEXT to support submit params limit")
+	if !strings.Contains(schema, "params TEXT NOT NULL") {
+		t.Fatalf("tasks.params must use TEXT to support submit params limit")
 	}
 }
 
 func TestTaskResultColumnSupportsProviderMetadata(t *testing.T) {
 	schema := readDBSchema(t)
-	if !strings.Contains(schema, "result MEDIUMTEXT NOT NULL") {
-		t.Fatalf("tasks.result must use MEDIUMTEXT to support provider metadata")
+	if !strings.Contains(schema, "result TEXT NOT NULL") {
+		t.Fatalf("tasks.result must use TEXT to support provider metadata")
 	}
 }
 
 func TestTaskOutputUsesTaskSortIndex(t *testing.T) {
 	schema := readDBSchema(t)
-	if !strings.Contains(schema, "KEY idx_task_outputs_task_sort (task_id, sort_index)") {
+	if !strings.Contains(schema, "CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, sort_index)") {
 		t.Fatalf("task_outputs must keep task_id/sort_index index")
 	}
 }

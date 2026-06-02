@@ -32,7 +32,7 @@ func TestRedisAsynqAssignerRebuildAndInspectLeases(t *testing.T) {
 	assigner, mgr := newTestRedisAsynqAssigner(t)
 	ctx := context.Background()
 
-	for _, accountID := range []uint64{9101, 9102, 9103} {
+	for _, accountID := range []int64{9101, 9102, 9103} {
 		if err := mgr.EnsureAccountConcurrent(ctx, accountID, 3); err != nil {
 			t.Fatalf("ensure account %d: %v", accountID, err)
 		}
@@ -52,7 +52,7 @@ func TestRedisAsynqAssignerRebuildAndInspectLeases(t *testing.T) {
 		{TaskID: "task-2", AccountID: 9101, LeaseToken: "lease-token-2"},
 		{TaskID: "task-3", AccountID: 9102, LeaseToken: "lease-token-3"},
 	}
-	if err := assigner.RebuildRunningTaskLeases(ctx, leases, []uint64{9101, 9102, 9103}); err != nil {
+	if err := assigner.RebuildRunningTaskLeases(ctx, leases, []int64{9101, 9102, 9103}); err != nil {
 		t.Fatalf("rebuild leases: %v", err)
 	}
 
@@ -70,7 +70,7 @@ func TestRedisAsynqAssignerRebuildAndInspectLeases(t *testing.T) {
 		}
 	}
 
-	for accountID, want := range map[uint64]int{9101: 2, 9102: 1, 9103: 0} {
+	for accountID, want := range map[int64]int{9101: 2, 9102: 1, 9103: 0} {
 		got, err := mgr.GetAccountConcurrent(ctx, accountID)
 		if err != nil || got != want {
 			t.Fatalf("account %d count=%d want=%d err=%v", accountID, got, want, err)
@@ -104,7 +104,7 @@ func TestRedisAsynqAssignerAssignConfirmReleaseWithLeaseToken(t *testing.T) {
 		t.Fatalf("ensure account: %v", err)
 	}
 
-	assignment, err := assigner.Assign(ctx, []uint64{9151}, &queuetypes.TaskPayload{TaskID: "assigned-task"})
+	assignment, err := assigner.Assign(ctx, []int64{9151}, &queuetypes.TaskPayload{TaskID: "assigned-task"})
 	if err != nil {
 		t.Fatalf("assign: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestRedisAsynqAssignerMapsReconcileLockToNoCapacity(t *testing.T) {
 	}
 
 	err := assigner.WithTaskLeaseReconcileLock(ctx, func(lockCtx context.Context) error {
-		assignment, err := assigner.Assign(lockCtx, []uint64{9201}, &queuetypes.TaskPayload{TaskID: "locked-task"})
+		assignment, err := assigner.Assign(lockCtx, []int64{9201}, &queuetypes.TaskPayload{TaskID: "locked-task"})
 		if err != nil {
 			return err
 		}

@@ -82,12 +82,12 @@ func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.Task
 	enabledAccounts = accounts.FilterAccountsByFeature(enabledAccounts, featureSlug)
 
 	hasScopedCandidates := task.AccountIDs != nil
-	scoped := make(map[uint64]struct{}, len(task.AccountIDs))
+	scoped := make(map[int64]struct{}, len(task.AccountIDs))
 	for _, id := range task.AccountIDs {
 		scoped[id] = struct{}{}
 	}
 
-	next := make([]uint64, 0, len(enabledAccounts))
+	next := make([]int64, 0, len(enabledAccounts))
 	for _, account := range enabledAccounts {
 		if hasScopedCandidates {
 			if _, ok := scoped[account.ID]; !ok {
@@ -173,7 +173,7 @@ func (s *Service) reconcileRunningTaskLeasesLocked(ctx context.Context, opts Run
 	}
 
 	leases := make([]taskqueue.TaskLease, 0, len(running))
-	accountIDSet := make(map[uint64]struct{}, len(running))
+	accountIDSet := make(map[int64]struct{}, len(running))
 	for _, row := range running {
 		if row.TaskID == "" || row.AccountID == 0 {
 			return result, fmt.Errorf("invalid running task lease: task_id=%q account_id=%d", row.TaskID, row.AccountID)
@@ -253,7 +253,7 @@ func (s *Service) publishTaskStatusEvent(taskID, status string) {
 	s.hub.Publish(taskID, accounts.TaskEvent{TaskID: taskID, Status: status})
 }
 
-func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID uint64, leaseToken string) error {
+func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID int64, leaseToken string) error {
 	if accountID == 0 {
 		return ErrTaskStateConflict
 	}
@@ -374,7 +374,7 @@ func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken 
 	return ErrTaskStateConflict
 }
 
-func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, accountID uint64, leaseToken string, reason string) error {
+func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, accountID int64, leaseToken string, reason string) error {
 	if accountID == 0 {
 		return ErrTaskStateConflict
 	}
@@ -412,7 +412,7 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 	return ErrTaskStateConflict
 }
 
-func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, accountID uint64, leaseToken string, errMsg string) (bool, error) {
+func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, accountID int64, leaseToken string, errMsg string) (bool, error) {
 	if accountID == 0 {
 		return false, ErrTaskStateConflict
 	}
@@ -484,7 +484,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 	return false, ErrTaskStateConflict
 }
 
-func (s *Service) RecordAccountFailure(ctx context.Context, accountID uint64) (disabled bool, failCount int, err error) {
+func (s *Service) RecordAccountFailure(ctx context.Context, accountID int64) (disabled bool, failCount int, err error) {
 	if accountID == 0 {
 		return false, 0, nil
 	}
@@ -508,7 +508,7 @@ func (s *Service) RecordAccountFailure(ctx context.Context, accountID uint64) (d
 	return false, account.FailCount, nil
 }
 
-func (s *Service) ResetAccountFailure(ctx context.Context, accountID uint64) error {
+func (s *Service) ResetAccountFailure(ctx context.Context, accountID int64) error {
 	if accountID == 0 {
 		return nil
 	}
@@ -594,8 +594,8 @@ func outputStorageKey(raw string) string {
 	return strings.TrimPrefix(path[index:], "/")
 }
 
-func sortedAccountIDs(accountIDSet map[uint64]struct{}) []uint64 {
-	accountIDs := make([]uint64, 0, len(accountIDSet))
+func sortedAccountIDs(accountIDSet map[int64]struct{}) []int64 {
+	accountIDs := make([]int64, 0, len(accountIDSet))
 	for accountID := range accountIDSet {
 		accountIDs = append(accountIDs, accountID)
 	}

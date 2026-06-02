@@ -41,11 +41,11 @@ func (r *AccountRepository) Create(ctx context.Context, account *ApiAccount) err
 	if err != nil {
 		return err
 	}
-	account.ID = uint64(id)
+	account.ID = int64(id)
 	return nil
 }
 
-func (r *AccountRepository) GetByID(ctx context.Context, id uint64) (*ApiAccount, error) {
+func (r *AccountRepository) GetByID(ctx context.Context, id int64) (*ApiAccount, error) {
 	row, err := r.q.GetAccountByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -58,14 +58,8 @@ func (r *AccountRepository) List(ctx context.Context, keyword, platform string, 
 	keyword = strings.TrimSpace(keyword)
 	platform = strings.TrimSpace(platform)
 	keywordLike := "%" + keyword + "%"
-	hasKeyword := int64(0)
-	if keyword != "" {
-		hasKeyword = 1
-	}
-	hasPlatform := int64(0)
-	if platform != "" {
-		hasPlatform = 1
-	}
+	hasKeyword := keyword != ""
+	hasPlatform := platform != ""
 	params := dbsqlc.CountAccountsParams{
 		HasKeyword:  hasKeyword,
 		KeywordLike: keywordLike,
@@ -82,8 +76,8 @@ func (r *AccountRepository) List(ctx context.Context, keyword, platform string, 
 		KeywordLike: keywordLike,
 		HasPlatform: hasPlatform,
 		Platform:    platform,
-		Limit:       int32(pageSize),
-		Offset:      int32(offset),
+		PageLimit:   int32(pageSize),
+		PageOffset:  int32(offset),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -99,7 +93,7 @@ func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, e
 	return accountsFromSQLC(rows), nil
 }
 
-func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]uint64, error) {
+func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]int64, error) {
 	return r.q.ListAccountIDs(ctx)
 }
 
@@ -122,19 +116,19 @@ func (r *AccountRepository) Update(ctx context.Context, account *ApiAccount) err
 	})
 }
 
-func (r *AccountRepository) Delete(ctx context.Context, id uint64) error {
+func (r *AccountRepository) Delete(ctx context.Context, id int64) error {
 	return r.q.DeleteAccount(ctx, id)
 }
 
-func (r *AccountRepository) UpdateStatus(ctx context.Context, id uint64, status int8) error {
+func (r *AccountRepository) UpdateStatus(ctx context.Context, id int64, status int16) error {
 	return r.q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: status, ID: id})
 }
 
-func (r *AccountRepository) IncrementFailCount(ctx context.Context, id uint64) error {
+func (r *AccountRepository) IncrementFailCount(ctx context.Context, id int64) error {
 	return r.q.IncrementAccountFailCount(ctx, id)
 }
 
-func (r *AccountRepository) ResetFailCount(ctx context.Context, id uint64) error {
+func (r *AccountRepository) ResetFailCount(ctx context.Context, id int64) error {
 	return r.q.ResetAccountFailCount(ctx, id)
 }
 
@@ -176,8 +170,8 @@ type TaskRepository struct {
 
 type TaskStatisticLite struct {
 	TaskID      string
-	UserID      uint64
-	AccountID   uint64
+	UserID      int64
+	AccountID   int64
 	Status      string
 	Result      string
 	CreatedAt   time.Time
@@ -186,7 +180,7 @@ type TaskStatisticLite struct {
 
 type RunningTaskLease struct {
 	TaskID     string
-	AccountID  uint64
+	AccountID  int64
 	LeaseToken string
 }
 
@@ -238,7 +232,7 @@ func (r *TaskRepository) Create(ctx context.Context, task *tasks.Task) error {
 	if err != nil {
 		return err
 	}
-	task.ID = uint64(id)
+	task.ID = int64(id)
 	return nil
 }
 
@@ -251,7 +245,7 @@ func (r *TaskRepository) GetByTaskID(ctx context.Context, taskID string) (*tasks
 	return &task, nil
 }
 
-func (r *TaskRepository) GetByTaskIDAndUserID(ctx context.Context, taskID string, userID uint64) (*tasks.Task, error) {
+func (r *TaskRepository) GetByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) (*tasks.Task, error) {
 	row, err := r.q.GetTaskByTaskIDAndUserID(ctx, dbsqlc.GetTaskByTaskIDAndUserIDParams{TaskID: taskID, UserID: userID})
 	if err != nil {
 		return nil, err
@@ -260,7 +254,7 @@ func (r *TaskRepository) GetByTaskIDAndUserID(ctx context.Context, taskID string
 	return &task, nil
 }
 
-func (r *TaskRepository) GetByID(ctx context.Context, id uint64) (*tasks.Task, error) {
+func (r *TaskRepository) GetByID(ctx context.Context, id int64) (*tasks.Task, error) {
 	row, err := r.q.GetTaskByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -288,7 +282,7 @@ func (r *TaskRepository) Update(ctx context.Context, task *tasks.Task) error {
 	})
 }
 
-func (r *TaskRepository) MarkTaskRunning(ctx context.Context, taskID string, statuses []string, accountID uint64, leaseToken string) (int64, error) {
+func (r *TaskRepository) MarkTaskRunning(ctx context.Context, taskID string, statuses []string, accountID int64, leaseToken string) (int64, error) {
 	return r.q.MarkTaskRunning(ctx, dbsqlc.MarkTaskRunningParams{
 		AccountID:  accountID,
 		LeaseToken: leaseToken,
@@ -427,24 +421,12 @@ func (r *TaskRepository) ListOutputsByTaskIDs(ctx context.Context, taskIDs []str
 	return result, nil
 }
 
-func (r *TaskRepository) List(ctx context.Context, userID uint64, accountID uint64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error) {
-	hasUserID := int64(0)
-	if userID > 0 {
-		hasUserID = 1
-	}
-	hasAccountID := int64(0)
-	if accountID > 0 {
-		hasAccountID = 1
-	}
-	hasStatus := int64(0)
-	if status != "" {
-		hasStatus = 1
-	}
-	hasKeyword := int64(0)
+func (r *TaskRepository) List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error) {
+	hasUserID := userID > 0
+	hasAccountID := accountID > 0
+	hasStatus := status != ""
 	keywordLike := "%" + keyword + "%"
-	if keyword != "" {
-		hasKeyword = 1
-	}
+	hasKeyword := keyword != ""
 	countParams := dbsqlc.CountTasksParams{
 		HasUserID:    hasUserID,
 		UserID:       userID,
@@ -469,8 +451,8 @@ func (r *TaskRepository) List(ctx context.Context, userID uint64, accountID uint
 		Status:       status,
 		HasKeyword:   hasKeyword,
 		KeywordLike:  keywordLike,
-		Limit:        int32(pageSize),
-		Offset:       int32(offset),
+		PageLimit:    int32(pageSize),
+		PageOffset:   int32(offset),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -478,16 +460,16 @@ func (r *TaskRepository) List(ctx context.Context, userID uint64, accountID uint
 	return tasksFromSQLC(rows), total, nil
 }
 
-func (r *TaskRepository) GetByUserID(ctx context.Context, userID uint64, page, pageSize int) ([]*tasks.Task, int64, error) {
+func (r *TaskRepository) GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error) {
 	total, err := r.q.CountTasksByUserID(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}
 	offset := (page - 1) * pageSize
 	rows, err := r.q.ListTasksByUserID(ctx, dbsqlc.ListTasksByUserIDParams{
-		UserID: userID,
-		Limit:  int32(pageSize),
-		Offset: int32(offset),
+		UserID:     userID,
+		PageLimit:  int32(pageSize),
+		PageOffset: int32(offset),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -495,7 +477,7 @@ func (r *TaskRepository) GetByUserID(ctx context.Context, userID uint64, page, p
 	return tasksFromSQLC(rows), total, nil
 }
 
-func (r *TaskRepository) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, accountID uint64, statuses ...string) ([]string, error) {
+func (r *TaskRepository) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, accountID int64, statuses ...string) ([]string, error) {
 	if len(statuses) == 0 {
 		return r.q.ListTaskIDsByAccountID(ctx, accountID)
 	}
@@ -555,7 +537,7 @@ func (r *TaskRepository) ResetRunningTasksMissingLeaseTokenToPending(ctx context
 	return rowsAffected, err
 }
 
-func (r *TaskRepository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID uint64) error {
+func (r *TaskRepository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error {
 	return r.q.DeleteTaskByTaskIDAndUserID(ctx, dbsqlc.DeleteTaskByTaskIDAndUserIDParams{TaskID: taskID, UserID: userID})
 }
 
@@ -569,7 +551,7 @@ func (r *TaskRepository) MarkQueueFailed(ctx context.Context, taskID string, err
 }
 
 // FailRunningByAccountID 将指定账号下所有 running/pending 状态的任务标记为 failed
-func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID uint64, errMsg string) (int64, error) {
+func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID int64, errMsg string) (int64, error) {
 	now := time.Now()
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
@@ -588,7 +570,7 @@ func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID u
 		if rowsAffected != int64(len(candidates)) {
 			log.Printf("[TaskRepository] FailRunningByAccountID affected mismatch account_id=%d candidates=%d updated=%d", accountID, len(candidates), rowsAffected)
 		}
-		modelSetMap, err := listSingleModelSetByAccountIDsTx(ctx, q, []uint64{accountID})
+		modelSetMap, err := listSingleModelSetByAccountIDsTx(ctx, q, []int64{accountID})
 		if err != nil {
 			return err
 		}
@@ -629,7 +611,7 @@ func (r *TaskRepository) CountAllTasks(ctx context.Context) (int64, error) {
 }
 
 func (r *TaskRepository) ListStatisticsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]TaskStatisticLite, error) {
-	rows, err := r.q.ListTaskStatisticsByCreatedRange(ctx, dbsqlc.ListTaskStatisticsByCreatedRangeParams{CreatedAt: start, CreatedAt_2: end})
+	rows, err := r.q.ListTaskStatisticsByCreatedRange(ctx, dbsqlc.ListTaskStatisticsByCreatedRangeParams{StartedAt: start, EndedAt: end})
 	if err != nil {
 		return nil, err
 	}
@@ -716,7 +698,7 @@ func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Que
 	})
 }
 
-func (r *TaskRepository) resolveAccountSingleModelSet(ctx context.Context, accountID uint64) string {
+func (r *TaskRepository) resolveAccountSingleModelSet(ctx context.Context, accountID int64) string {
 	if accountID == 0 {
 		return ""
 	}
@@ -727,18 +709,18 @@ func (r *TaskRepository) resolveAccountSingleModelSet(ctx context.Context, accou
 	return singleModelFromSet(modelSet)
 }
 
-func (r *TaskRepository) listSingleModelSetByAccountIDs(ctx context.Context, accountIDs []uint64) (map[uint64]string, error) {
+func (r *TaskRepository) listSingleModelSetByAccountIDs(ctx context.Context, accountIDs []int64) (map[int64]string, error) {
 	return listSingleModelSetByAccountIDsTx(ctx, r.q, accountIDs)
 }
 
-func listSingleModelSetByAccountIDsTx(ctx context.Context, q *dbsqlc.Queries, accountIDs []uint64) (map[uint64]string, error) {
-	result := make(map[uint64]string)
+func listSingleModelSetByAccountIDsTx(ctx context.Context, q *dbsqlc.Queries, accountIDs []int64) (map[int64]string, error) {
+	result := make(map[int64]string)
 	if len(accountIDs) == 0 {
 		return result, nil
 	}
 
-	uniq := make(map[uint64]struct{}, len(accountIDs))
-	ids := make([]uint64, 0, len(accountIDs))
+	uniq := make(map[int64]struct{}, len(accountIDs))
+	ids := make([]int64, 0, len(accountIDs))
 	for _, id := range accountIDs {
 		if id == 0 {
 			continue
@@ -764,7 +746,7 @@ func listSingleModelSetByAccountIDsTx(ctx context.Context, q *dbsqlc.Queries, ac
 }
 
 func (r *TaskRepository) ListDailyStatsByDateRange(ctx context.Context, startDate, endDate string) ([]DailyStatAggregate, error) {
-	rows, err := r.q.ListDailyStatsByDateRange(ctx, dbsqlc.ListDailyStatsByDateRangeParams{StatDate: startDate, StatDate_2: endDate})
+	rows, err := r.q.ListDailyStatsByDateRange(ctx, dbsqlc.ListDailyStatsByDateRangeParams{StartDate: startDate, EndDate: endDate})
 	if err != nil {
 		return nil, err
 	}
@@ -785,7 +767,7 @@ func (r *TaskRepository) ListDailyStatsByDateRange(ctx context.Context, startDat
 }
 
 func (r *TaskRepository) ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate string) ([]StatEventLatencySample, error) {
-	rows, err := r.q.ListStatEventLatencySamplesByDateRange(ctx, dbsqlc.ListStatEventLatencySamplesByDateRangeParams{StatDate: startDate, StatDate_2: endDate})
+	rows, err := r.q.ListStatEventLatencySamplesByDateRange(ctx, dbsqlc.ListStatEventLatencySamplesByDateRangeParams{StartDate: startDate, EndDate: endDate})
 	if err != nil {
 		return nil, err
 	}
@@ -797,7 +779,7 @@ func (r *TaskRepository) ListStatEventLatencySamplesByDateRange(ctx context.Cont
 }
 
 func (r *TaskRepository) ListBackfilledDatesByRange(ctx context.Context, startDate, endDate string) ([]string, error) {
-	return r.q.ListBackfilledDatesByRange(ctx, dbsqlc.ListBackfilledDatesByRangeParams{StatDate: startDate, StatDate_2: endDate})
+	return r.q.ListBackfilledDatesByRange(ctx, dbsqlc.ListBackfilledDatesByRangeParams{StartDate: startDate, EndDate: endDate})
 }
 
 func (r *TaskRepository) MarkDailyBackfillDone(ctx context.Context, statDate string) error {

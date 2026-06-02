@@ -32,7 +32,7 @@ func TestTaskLeaseAssigningConfirmRunningRelease(t *testing.T) {
 	}
 
 	taskID := "a1"
-	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{101}, taskID)
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []int64{101}, taskID)
 	if err != nil {
 		t.Fatalf("try assign: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestReleaseTaskTokenMismatchDoesNotReleaseOrDecrement(t *testing.T) {
 	}
 
 	taskID := "token-mismatch-1"
-	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{201}, taskID)
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []int64{201}, taskID)
 	if err != nil || status != AssignTaskStatusAssigned {
 		t.Fatalf("assign account=%d token=%q status=%s err=%v", accountID, leaseToken, status, err)
 	}
@@ -130,7 +130,7 @@ func TestReleaseTaskWrongAccountDoesNotDecrement(t *testing.T) {
 	}
 
 	taskID := "wrong-account-1"
-	_, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{401}, taskID)
+	_, leaseToken, status, err := mgr.TryAssignTask(ctx, []int64{401}, taskID)
 	if err != nil || status != AssignTaskStatusAssigned {
 		t.Fatalf("assign status=%s err=%v", status, err)
 	}
@@ -163,7 +163,7 @@ func TestReleaseTaskIsIdempotentAfterLeaseRemoved(t *testing.T) {
 	}
 
 	taskID := "idempotent-1"
-	_, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{501}, taskID)
+	_, leaseToken, status, err := mgr.TryAssignTask(ctx, []int64{501}, taskID)
 	if err != nil || status != AssignTaskStatusAssigned {
 		t.Fatalf("assign status=%s err=%v", status, err)
 	}
@@ -209,7 +209,7 @@ func TestTaskLeaseReconcileLockBlocksAssignment(t *testing.T) {
 		t.Fatalf("timeout waiting for reconcile lock: %v", ctx.Err())
 	}
 
-	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{151}, "blocked-by-reconcile")
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []int64{151}, "blocked-by-reconcile")
 	if err != nil {
 		t.Fatalf("try assign during reconcile lock: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestTaskLeaseReconcileLockBlocksAssignment(t *testing.T) {
 		t.Fatalf("timeout waiting for reconcile lock release: %v", ctx.Err())
 	}
 
-	accountID, leaseToken, status, err = mgr.TryAssignTask(ctx, []uint64{151}, "assigned-after-reconcile")
+	accountID, leaseToken, status, err = mgr.TryAssignTask(ctx, []int64{151}, "assigned-after-reconcile")
 	if err != nil {
 		t.Fatalf("try assign after reconcile lock: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestTryAssignTaskNoCapacity(t *testing.T) {
 	}
 	_ = mgr.GetClient().HSet(ctx, KeyAccountConcurrent+":301", "count", 1).Err()
 
-	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{301}, "cap-1")
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []int64{301}, "cap-1")
 	if err != nil {
 		t.Fatalf("try assign: %v", err)
 	}
@@ -261,10 +261,10 @@ func TestTryAssignTaskExistingLeaseDoesNotIncrement(t *testing.T) {
 	}
 
 	taskID := "duplicate-lease-1"
-	if _, _, status, err := mgr.TryAssignTask(ctx, []uint64{701}, taskID); err != nil || status != AssignTaskStatusAssigned {
+	if _, _, status, err := mgr.TryAssignTask(ctx, []int64{701}, taskID); err != nil || status != AssignTaskStatusAssigned {
 		t.Fatalf("first assign status=%s err=%v", status, err)
 	}
-	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []uint64{701}, taskID)
+	accountID, leaseToken, status, err := mgr.TryAssignTask(ctx, []int64{701}, taskID)
 	if err != nil {
 		t.Fatalf("second assign: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestTryAssignTaskNoAccountsError(t *testing.T) {
 func TestRebuildRunningTaskLeasesRebuildsRunningAndPreservesRecentAssigning(t *testing.T) {
 	mgr := newTestRedisManager(t)
 	ctx := context.Background()
-	for _, accountID := range []uint64{601, 602, 603} {
+	for _, accountID := range []int64{601, 602, 603} {
 		if err := mgr.EnsureAccountConcurrent(ctx, accountID, 3); err != nil {
 			t.Fatalf("init account %d: %v", accountID, err)
 		}
@@ -320,7 +320,7 @@ func TestRebuildRunningTaskLeasesRebuildsRunningAndPreservesRecentAssigning(t *t
 		{TaskID: "task-b", AccountID: 601, LeaseToken: "lease-token-b"},
 		{TaskID: "task-c", AccountID: 602, LeaseToken: "known-token"},
 	}
-	if err := mgr.RebuildRunningTaskLeases(ctx, runningLeases, []uint64{601, 602, 603}); err != nil {
+	if err := mgr.RebuildRunningTaskLeases(ctx, runningLeases, []int64{601, 602, 603}); err != nil {
 		t.Fatalf("rebuild leases: %v", err)
 	}
 
@@ -352,7 +352,7 @@ func TestRebuildRunningTaskLeasesRebuildsRunningAndPreservesRecentAssigning(t *t
 			t.Fatalf("running lease %s not normalized: %+v", taskID, lease)
 		}
 	}
-	for accountID, want := range map[uint64]int{601: 2, 602: 1, 603: 1} {
+	for accountID, want := range map[int64]int{601: 2, 602: 1, 603: 1} {
 		count, err := mgr.GetAccountConcurrent(ctx, accountID)
 		if err != nil || count != want {
 			t.Fatalf("account %d count=%d want=%d err=%v", accountID, count, want, err)

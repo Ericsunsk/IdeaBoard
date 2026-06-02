@@ -8,19 +8,20 @@ package dbsqlc
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 const completeTask = `-- name: CompleteTask :execrows
 UPDATE tasks
 SET status = 'completed',
     lease_token = '',
-    result = ?,
+    result = $1,
     error_msg = '',
-    completed_at = ?
-WHERE task_id = ?
-  AND status IN (/*SLICE:statuses*/?)
+    completed_at = $2
+WHERE task_id = $3
+  AND status = ANY($4::text[])
 `
 
 type CompleteTaskParams struct {
@@ -31,20 +32,12 @@ type CompleteTaskParams struct {
 }
 
 func (q *Queries) CompleteTask(ctx context.Context, arg CompleteTaskParams) (int64, error) {
-	query := completeTask
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.Result)
-	queryParams = append(queryParams, arg.CompletedAt)
-	queryParams = append(queryParams, arg.TaskID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, completeTask,
+		arg.Result,
+		arg.CompletedAt,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -55,12 +48,12 @@ const completeTaskWithLease = `-- name: CompleteTaskWithLease :execrows
 UPDATE tasks
 SET status = 'completed',
     lease_token = '',
-    result = ?,
+    result = $1,
     error_msg = '',
-    completed_at = ?
-WHERE task_id = ?
-  AND status IN (/*SLICE:statuses*/?)
-  AND lease_token = ?
+    completed_at = $2
+WHERE task_id = $3
+  AND status = ANY($4::text[])
+  AND lease_token = $5
 `
 
 type CompleteTaskWithLeaseParams struct {
@@ -72,21 +65,13 @@ type CompleteTaskWithLeaseParams struct {
 }
 
 func (q *Queries) CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWithLeaseParams) (int64, error) {
-	query := completeTaskWithLease
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.Result)
-	queryParams = append(queryParams, arg.CompletedAt)
-	queryParams = append(queryParams, arg.TaskID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.LeaseToken)
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, completeTaskWithLease,
+		arg.Result,
+		arg.CompletedAt,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
+		arg.LeaseToken,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -121,20 +106,20 @@ func (q *Queries) CountRunningTasksMissingLeaseToken(ctx context.Context) (int64
 const countTasks = `-- name: CountTasks :one
 SELECT COUNT(*)
 FROM tasks
-WHERE (CAST(? AS SIGNED) = 0 OR user_id = ?)
-  AND (CAST(? AS SIGNED) = 0 OR account_id = ?)
-  AND (CAST(? AS SIGNED) = 0 OR status = ?)
-  AND (CAST(? AS SIGNED) = 0 OR prompt LIKE ?)
+WHERE (NOT $1::boolean OR user_id = $2)
+  AND (NOT $3::boolean OR account_id = $4)
+  AND (NOT $5::boolean OR status = $6)
+  AND (NOT $7::boolean OR prompt ILIKE $8)
 `
 
 type CountTasksParams struct {
-	HasUserID    int64  `json:"has_user_id"`
-	UserID       uint64 `json:"user_id"`
-	HasAccountID int64  `json:"has_account_id"`
-	AccountID    uint64 `json:"account_id"`
-	HasStatus    int64  `json:"has_status"`
+	HasUserID    bool   `json:"has_user_id"`
+	UserID       int64  `json:"user_id"`
+	HasAccountID bool   `json:"has_account_id"`
+	AccountID    int64  `json:"account_id"`
+	HasStatus    bool   `json:"has_status"`
 	Status       string `json:"status"`
-	HasKeyword   int64  `json:"has_keyword"`
+	HasKeyword   bool   `json:"has_keyword"`
 	KeywordLike  string `json:"keyword_like"`
 }
 
@@ -157,7 +142,7 @@ func (q *Queries) CountTasks(ctx context.Context, arg CountTasksParams) (int64, 
 const countTasksByStatus = `-- name: CountTasksByStatus :one
 SELECT COUNT(*)
 FROM tasks
-WHERE status = ?
+WHERE status = $1
 `
 
 func (q *Queries) CountTasksByStatus(ctx context.Context, status string) (int64, error) {
@@ -170,28 +155,34 @@ func (q *Queries) CountTasksByStatus(ctx context.Context, status string) (int64,
 const countTasksByUserID = `-- name: CountTasksByUserID :one
 SELECT COUNT(*)
 FROM tasks
-WHERE user_id = ?
+WHERE user_id = $1
 `
 
-func (q *Queries) CountTasksByUserID(ctx context.Context, userID uint64) (int64, error) {
+func (q *Queries) CountTasksByUserID(ctx context.Context, userID int64) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countTasksByUserID, userID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
-const createTask = `-- name: CreateTask :execlastid
+const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (
   task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (
+  $1, $2, $3, $4,
+  $5, $6, $7, $8,
+  $9, $10, $11, $12,
+  $13, $14, $15
+)
+RETURNING id
 `
 
 type CreateTaskParams struct {
 	TaskID      string       `json:"task_id"`
-	UserID      uint64       `json:"user_id"`
-	ChannelID   uint64       `json:"channel_id"`
-	AccountID   uint64       `json:"account_id"`
+	UserID      int64        `json:"user_id"`
+	ChannelID   int64        `json:"channel_id"`
+	AccountID   int64        `json:"account_id"`
 	Prompt      string       `json:"prompt"`
 	UserPrompt  string       `json:"user_prompt"`
 	Params      string       `json:"params"`
@@ -206,7 +197,7 @@ type CreateTaskParams struct {
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createTask,
+	row := q.db.QueryRowContext(ctx, createTask,
 		arg.TaskID,
 		arg.UserID,
 		arg.ChannelID,
@@ -223,20 +214,19 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.UpdatedAt,
 		arg.CompletedAt,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteTaskByTaskIDAndUserID = `-- name: DeleteTaskByTaskIDAndUserID :exec
 DELETE FROM tasks
-WHERE task_id = ? AND user_id = ?
+WHERE task_id = $1 AND user_id = $2
 `
 
 type DeleteTaskByTaskIDAndUserIDParams struct {
 	TaskID string `json:"task_id"`
-	UserID uint64 `json:"user_id"`
+	UserID int64  `json:"user_id"`
 }
 
 func (q *Queries) DeleteTaskByTaskIDAndUserID(ctx context.Context, arg DeleteTaskByTaskIDAndUserIDParams) error {
@@ -246,10 +236,10 @@ func (q *Queries) DeleteTaskByTaskIDAndUserID(ctx context.Context, arg DeleteTas
 
 const deleteTasksByUserID = `-- name: DeleteTasksByUserID :exec
 DELETE FROM tasks
-WHERE user_id = ?
+WHERE user_id = $1
 `
 
-func (q *Queries) DeleteTasksByUserID(ctx context.Context, userID uint64) error {
+func (q *Queries) DeleteTasksByUserID(ctx context.Context, userID int64) error {
 	_, err := q.db.ExecContext(ctx, deleteTasksByUserID, userID)
 	return err
 }
@@ -257,15 +247,15 @@ func (q *Queries) DeleteTasksByUserID(ctx context.Context, userID uint64) error 
 const failRunningTasksByAccountID = `-- name: FailRunningTasksByAccountID :execrows
 UPDATE tasks
 SET status = 'failed',
-    error_msg = ?,
-    completed_at = ?
-WHERE account_id = ? AND status IN ('running', 'pending')
+    error_msg = $1,
+    completed_at = $2
+WHERE account_id = $3 AND status IN ('running', 'pending')
 `
 
 type FailRunningTasksByAccountIDParams struct {
 	ErrorMsg    string       `json:"error_msg"`
 	CompletedAt sql.NullTime `json:"completed_at"`
-	AccountID   uint64       `json:"account_id"`
+	AccountID   int64        `json:"account_id"`
 }
 
 func (q *Queries) FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) (int64, error) {
@@ -281,13 +271,13 @@ UPDATE tasks
 SET status = 'failed',
     account_id = 0,
     lease_token = '',
-    error_msg = ?,
-    result = ?,
+    error_msg = $1,
+    result = $2,
     retry_count = retry_count + 1,
-    completed_at = ?
-WHERE task_id = ?
-  AND status IN (/*SLICE:statuses*/?)
-  AND lease_token = ?
+    completed_at = $3
+WHERE task_id = $4
+  AND status = ANY($5::text[])
+  AND lease_token = $6
 `
 
 type FinalFailTaskRunningWithLeaseParams struct {
@@ -300,22 +290,14 @@ type FinalFailTaskRunningWithLeaseParams struct {
 }
 
 func (q *Queries) FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFailTaskRunningWithLeaseParams) (int64, error) {
-	query := finalFailTaskRunningWithLease
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.ErrorMsg)
-	queryParams = append(queryParams, arg.Result)
-	queryParams = append(queryParams, arg.CompletedAt)
-	queryParams = append(queryParams, arg.TaskID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.LeaseToken)
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, finalFailTaskRunningWithLease,
+		arg.ErrorMsg,
+		arg.Result,
+		arg.CompletedAt,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
+		arg.LeaseToken,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -326,10 +308,10 @@ const getTaskByID = `-- name: GetTaskByID :one
 SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
        status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
 FROM tasks
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) GetTaskByID(ctx context.Context, id uint64) (Task, error) {
+func (q *Queries) GetTaskByID(ctx context.Context, id int64) (Task, error) {
 	row := q.db.QueryRowContext(ctx, getTaskByID, id)
 	var i Task
 	err := row.Scan(
@@ -357,7 +339,7 @@ const getTaskByTaskID = `-- name: GetTaskByTaskID :one
 SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
        status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
 FROM tasks
-WHERE task_id = ?
+WHERE task_id = $1
 `
 
 func (q *Queries) GetTaskByTaskID(ctx context.Context, taskID string) (Task, error) {
@@ -388,12 +370,12 @@ const getTaskByTaskIDAndUserID = `-- name: GetTaskByTaskIDAndUserID :one
 SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
        status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
 FROM tasks
-WHERE task_id = ? AND user_id = ?
+WHERE task_id = $1 AND user_id = $2
 `
 
 type GetTaskByTaskIDAndUserIDParams struct {
 	TaskID string `json:"task_id"`
-	UserID uint64 `json:"user_id"`
+	UserID int64  `json:"user_id"`
 }
 
 func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTaskIDAndUserIDParams) (Task, error) {
@@ -423,20 +405,20 @@ func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTas
 const listFailRunningCandidatesByAccountID = `-- name: ListFailRunningCandidatesByAccountID :many
 SELECT task_id, user_id, account_id, result, created_at, completed_at
 FROM tasks
-WHERE account_id = ? AND status IN ('running', 'pending')
+WHERE account_id = $1 AND status IN ('running', 'pending')
 ORDER BY id ASC
 `
 
 type ListFailRunningCandidatesByAccountIDRow struct {
 	TaskID      string       `json:"task_id"`
-	UserID      uint64       `json:"user_id"`
-	AccountID   uint64       `json:"account_id"`
+	UserID      int64        `json:"user_id"`
+	AccountID   int64        `json:"account_id"`
 	Result      string       `json:"result"`
 	CreatedAt   time.Time    `json:"created_at"`
 	CompletedAt sql.NullTime `json:"completed_at"`
 }
 
-func (q *Queries) ListFailRunningCandidatesByAccountID(ctx context.Context, accountID uint64) ([]ListFailRunningCandidatesByAccountIDRow, error) {
+func (q *Queries) ListFailRunningCandidatesByAccountID(ctx context.Context, accountID int64) ([]ListFailRunningCandidatesByAccountIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, listFailRunningCandidatesByAccountID, accountID)
 	if err != nil {
 		return nil, err
@@ -471,11 +453,11 @@ SELECT task_id
 FROM tasks
 WHERE status = 'running' AND (lease_token IS NULL OR lease_token = '')
 ORDER BY id ASC
-LIMIT ?
+LIMIT $1
 `
 
-func (q *Queries) ListRunningMissingLeaseTaskIDs(ctx context.Context, limit int32) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listRunningMissingLeaseTaskIDs, limit)
+func (q *Queries) ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listRunningMissingLeaseTaskIDs, rowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -502,17 +484,17 @@ SELECT task_id, account_id, lease_token
 FROM tasks
 WHERE status = 'running'
 ORDER BY id ASC
-LIMIT ?
+LIMIT $1
 `
 
 type ListRunningTaskLeasesRow struct {
 	TaskID     string `json:"task_id"`
-	AccountID  uint64 `json:"account_id"`
+	AccountID  int64  `json:"account_id"`
 	LeaseToken string `json:"lease_token"`
 }
 
-func (q *Queries) ListRunningTaskLeases(ctx context.Context, limit int32) ([]ListRunningTaskLeasesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listRunningTaskLeases, limit)
+func (q *Queries) ListRunningTaskLeases(ctx context.Context, rowLimit int32) ([]ListRunningTaskLeasesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRunningTaskLeases, rowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -539,17 +521,17 @@ SELECT task_id, account_id, lease_token
 FROM tasks
 WHERE status = 'running' AND (lease_token IS NULL OR lease_token = '')
 ORDER BY id ASC
-LIMIT ?
+LIMIT $1
 `
 
 type ListRunningTasksMissingLeaseTokenRow struct {
 	TaskID     string `json:"task_id"`
-	AccountID  uint64 `json:"account_id"`
+	AccountID  int64  `json:"account_id"`
 	LeaseToken string `json:"lease_token"`
 }
 
-func (q *Queries) ListRunningTasksMissingLeaseToken(ctx context.Context, limit int32) ([]ListRunningTasksMissingLeaseTokenRow, error) {
-	rows, err := q.db.QueryContext(ctx, listRunningTasksMissingLeaseToken, limit)
+func (q *Queries) ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimit int32) ([]ListRunningTasksMissingLeaseTokenRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRunningTasksMissingLeaseToken, rowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -574,11 +556,11 @@ func (q *Queries) ListRunningTasksMissingLeaseToken(ctx context.Context, limit i
 const listTaskIDsByAccountID = `-- name: ListTaskIDsByAccountID :many
 SELECT task_id
 FROM tasks
-WHERE account_id = ?
+WHERE account_id = $1
 ORDER BY id ASC
 `
 
-func (q *Queries) ListTaskIDsByAccountID(ctx context.Context, accountID uint64) ([]string, error) {
+func (q *Queries) ListTaskIDsByAccountID(ctx context.Context, accountID int64) ([]string, error) {
 	rows, err := q.db.QueryContext(ctx, listTaskIDsByAccountID, accountID)
 	if err != nil {
 		return nil, err
@@ -604,28 +586,17 @@ func (q *Queries) ListTaskIDsByAccountID(ctx context.Context, accountID uint64) 
 const listTaskIDsByAccountIDAndStatuses = `-- name: ListTaskIDsByAccountIDAndStatuses :many
 SELECT task_id
 FROM tasks
-WHERE account_id = ? AND status IN (/*SLICE:statuses*/?)
+WHERE account_id = $1 AND status = ANY($2::text[])
 ORDER BY id ASC
 `
 
 type ListTaskIDsByAccountIDAndStatusesParams struct {
-	AccountID uint64   `json:"account_id"`
+	AccountID int64    `json:"account_id"`
 	Statuses  []string `json:"statuses"`
 }
 
 func (q *Queries) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg ListTaskIDsByAccountIDAndStatusesParams) ([]string, error) {
-	query := listTaskIDsByAccountIDAndStatuses
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.AccountID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	rows, err := q.db.QueryContext(ctx, listTaskIDsByAccountIDAndStatuses, arg.AccountID, pq.Array(arg.Statuses))
 	if err != nil {
 		return nil, err
 	}
@@ -650,19 +621,19 @@ func (q *Queries) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg Lis
 const listTaskStatisticsByCreatedRange = `-- name: ListTaskStatisticsByCreatedRange :many
 SELECT task_id, user_id, account_id, status, result, created_at, completed_at
 FROM tasks
-WHERE created_at >= ? AND created_at < ?
+WHERE created_at >= $1 AND created_at < $2
 ORDER BY created_at ASC
 `
 
 type ListTaskStatisticsByCreatedRangeParams struct {
-	CreatedAt   time.Time `json:"created_at"`
-	CreatedAt_2 time.Time `json:"created_at_2"`
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at"`
 }
 
 type ListTaskStatisticsByCreatedRangeRow struct {
 	TaskID      string       `json:"task_id"`
-	UserID      uint64       `json:"user_id"`
-	AccountID   uint64       `json:"account_id"`
+	UserID      int64        `json:"user_id"`
+	AccountID   int64        `json:"account_id"`
 	Status      string       `json:"status"`
 	Result      string       `json:"result"`
 	CreatedAt   time.Time    `json:"created_at"`
@@ -670,7 +641,7 @@ type ListTaskStatisticsByCreatedRangeRow struct {
 }
 
 func (q *Queries) ListTaskStatisticsByCreatedRange(ctx context.Context, arg ListTaskStatisticsByCreatedRangeParams) ([]ListTaskStatisticsByCreatedRangeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listTaskStatisticsByCreatedRange, arg.CreatedAt, arg.CreatedAt_2)
+	rows, err := q.db.QueryContext(ctx, listTaskStatisticsByCreatedRange, arg.StartedAt, arg.EndedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -704,25 +675,25 @@ const listTasks = `-- name: ListTasks :many
 SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
        status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
 FROM tasks
-WHERE (CAST(? AS SIGNED) = 0 OR user_id = ?)
-  AND (CAST(? AS SIGNED) = 0 OR account_id = ?)
-  AND (CAST(? AS SIGNED) = 0 OR status = ?)
-  AND (CAST(? AS SIGNED) = 0 OR prompt LIKE ?)
+WHERE (NOT $1::boolean OR user_id = $2)
+  AND (NOT $3::boolean OR account_id = $4)
+  AND (NOT $5::boolean OR status = $6)
+  AND (NOT $7::boolean OR prompt ILIKE $8)
 ORDER BY created_at DESC
-LIMIT ? OFFSET ?
+LIMIT $10 OFFSET $9
 `
 
 type ListTasksParams struct {
-	HasUserID    int64  `json:"has_user_id"`
-	UserID       uint64 `json:"user_id"`
-	HasAccountID int64  `json:"has_account_id"`
-	AccountID    uint64 `json:"account_id"`
-	HasStatus    int64  `json:"has_status"`
+	HasUserID    bool   `json:"has_user_id"`
+	UserID       int64  `json:"user_id"`
+	HasAccountID bool   `json:"has_account_id"`
+	AccountID    int64  `json:"account_id"`
+	HasStatus    bool   `json:"has_status"`
 	Status       string `json:"status"`
-	HasKeyword   int64  `json:"has_keyword"`
+	HasKeyword   bool   `json:"has_keyword"`
 	KeywordLike  string `json:"keyword_like"`
-	Limit        int32  `json:"limit"`
-	Offset       int32  `json:"offset"`
+	PageOffset   int32  `json:"page_offset"`
+	PageLimit    int32  `json:"page_limit"`
 }
 
 func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]Task, error) {
@@ -735,8 +706,8 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]Task, e
 		arg.Status,
 		arg.HasKeyword,
 		arg.KeywordLike,
-		arg.Limit,
-		arg.Offset,
+		arg.PageOffset,
+		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err
@@ -780,19 +751,19 @@ const listTasksByUserID = `-- name: ListTasksByUserID :many
 SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
        status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
 FROM tasks
-WHERE user_id = ?
+WHERE user_id = $1
 ORDER BY created_at DESC
-LIMIT ? OFFSET ?
+LIMIT $3 OFFSET $2
 `
 
 type ListTasksByUserIDParams struct {
-	UserID uint64 `json:"user_id"`
-	Limit  int32  `json:"limit"`
-	Offset int32  `json:"offset"`
+	UserID     int64 `json:"user_id"`
+	PageOffset int32 `json:"page_offset"`
+	PageLimit  int32 `json:"page_limit"`
 }
 
 func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDParams) ([]Task, error) {
-	rows, err := q.db.QueryContext(ctx, listTasksByUserID, arg.UserID, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, listTasksByUserID, arg.UserID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -834,9 +805,9 @@ func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDPa
 const markQueueFailed = `-- name: MarkQueueFailed :exec
 UPDATE tasks
 SET status = 'failed',
-    error_msg = ?,
-    completed_at = ?
-WHERE task_id = ?
+    error_msg = $1,
+    completed_at = $2
+WHERE task_id = $3
 `
 
 type MarkQueueFailedParams struct {
@@ -854,11 +825,11 @@ const markTaskFailed = `-- name: MarkTaskFailed :execrows
 UPDATE tasks
 SET status = 'failed',
     lease_token = '',
-    error_msg = ?,
-    result = ?,
-    completed_at = ?
-WHERE task_id = ?
-  AND status IN (/*SLICE:statuses*/?)
+    error_msg = $1,
+    result = $2,
+    completed_at = $3
+WHERE task_id = $4
+  AND status = ANY($5::text[])
 `
 
 type MarkTaskFailedParams struct {
@@ -870,21 +841,13 @@ type MarkTaskFailedParams struct {
 }
 
 func (q *Queries) MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error) {
-	query := markTaskFailed
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.ErrorMsg)
-	queryParams = append(queryParams, arg.Result)
-	queryParams = append(queryParams, arg.CompletedAt)
-	queryParams = append(queryParams, arg.TaskID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, markTaskFailed,
+		arg.ErrorMsg,
+		arg.Result,
+		arg.CompletedAt,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -895,12 +858,12 @@ const markTaskFailedWithLease = `-- name: MarkTaskFailedWithLease :execrows
 UPDATE tasks
 SET status = 'failed',
     lease_token = '',
-    error_msg = ?,
-    result = ?,
-    completed_at = ?
-WHERE task_id = ?
-  AND status IN (/*SLICE:statuses*/?)
-  AND lease_token = ?
+    error_msg = $1,
+    result = $2,
+    completed_at = $3
+WHERE task_id = $4
+  AND status = ANY($5::text[])
+  AND lease_token = $6
 `
 
 type MarkTaskFailedWithLeaseParams struct {
@@ -913,22 +876,14 @@ type MarkTaskFailedWithLeaseParams struct {
 }
 
 func (q *Queries) MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFailedWithLeaseParams) (int64, error) {
-	query := markTaskFailedWithLease
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.ErrorMsg)
-	queryParams = append(queryParams, arg.Result)
-	queryParams = append(queryParams, arg.CompletedAt)
-	queryParams = append(queryParams, arg.TaskID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.LeaseToken)
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, markTaskFailedWithLease,
+		arg.ErrorMsg,
+		arg.Result,
+		arg.CompletedAt,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
+		arg.LeaseToken,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -938,34 +893,26 @@ func (q *Queries) MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFaile
 const markTaskRunning = `-- name: MarkTaskRunning :execrows
 UPDATE tasks
 SET status = 'running',
-    account_id = ?,
-    lease_token = ?
-WHERE task_id = ?
-  AND status IN (/*SLICE:statuses*/?)
+    account_id = $1,
+    lease_token = $2
+WHERE task_id = $3
+  AND status = ANY($4::text[])
 `
 
 type MarkTaskRunningParams struct {
-	AccountID  uint64   `json:"account_id"`
+	AccountID  int64    `json:"account_id"`
 	LeaseToken string   `json:"lease_token"`
 	TaskID     string   `json:"task_id"`
 	Statuses   []string `json:"statuses"`
 }
 
 func (q *Queries) MarkTaskRunning(ctx context.Context, arg MarkTaskRunningParams) (int64, error) {
-	query := markTaskRunning
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.AccountID)
-	queryParams = append(queryParams, arg.LeaseToken)
-	queryParams = append(queryParams, arg.TaskID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, markTaskRunning,
+		arg.AccountID,
+		arg.LeaseToken,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -977,11 +924,11 @@ UPDATE tasks
 SET status = 'pending',
     account_id = 0,
     lease_token = '',
-    error_msg = ?,
+    error_msg = $1,
     retry_count = retry_count + 1
-WHERE task_id = ?
-  AND status IN (/*SLICE:statuses*/?)
-  AND lease_token = ?
+WHERE task_id = $2
+  AND status = ANY($3::text[])
+  AND lease_token = $4
 `
 
 type RequeueTaskRunningWithLeaseParams struct {
@@ -992,20 +939,12 @@ type RequeueTaskRunningWithLeaseParams struct {
 }
 
 func (q *Queries) RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error) {
-	query := requeueTaskRunningWithLease
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.ErrorMsg)
-	queryParams = append(queryParams, arg.TaskID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.LeaseToken)
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, requeueTaskRunningWithLease,
+		arg.ErrorMsg,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
+		arg.LeaseToken,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -1019,23 +958,13 @@ SET status = 'pending',
     lease_token = '',
     error_msg = 'lease_token missing; reset to pending by task lease repair',
     completed_at = NULL
-WHERE task_id IN (/*SLICE:task_ids*/?)
+WHERE task_id = ANY($1::text[])
   AND status = 'running'
   AND (lease_token IS NULL OR lease_token = '')
 `
 
 func (q *Queries) ResetRunningMissingLeaseTasksByIDs(ctx context.Context, taskIds []string) (int64, error) {
-	query := resetRunningMissingLeaseTasksByIDs
-	var queryParams []interface{}
-	if len(taskIds) > 0 {
-		for _, v := range taskIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:task_ids*/?", strings.Repeat(",?", len(taskIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:task_ids*/?", "NULL", 1)
-	}
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, resetRunningMissingLeaseTasksByIDs, pq.Array(taskIds))
 	if err != nil {
 		return 0, err
 	}
@@ -1047,10 +976,10 @@ UPDATE tasks
 SET status = 'pending',
     account_id = 0,
     lease_token = '',
-    error_msg = ?
-WHERE task_id = ?
-  AND status IN (/*SLICE:statuses*/?)
-  AND lease_token = ?
+    error_msg = $1
+WHERE task_id = $2
+  AND status = ANY($3::text[])
+  AND lease_token = $4
 `
 
 type ResetTaskRunningToPendingWithLeaseParams struct {
@@ -1061,20 +990,12 @@ type ResetTaskRunningToPendingWithLeaseParams struct {
 }
 
 func (q *Queries) ResetTaskRunningToPendingWithLease(ctx context.Context, arg ResetTaskRunningToPendingWithLeaseParams) (int64, error) {
-	query := resetTaskRunningToPendingWithLease
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.ErrorMsg)
-	queryParams = append(queryParams, arg.TaskID)
-	if len(arg.Statuses) > 0 {
-		for _, v := range arg.Statuses {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.LeaseToken)
-	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	result, err := q.db.ExecContext(ctx, resetTaskRunningToPendingWithLease,
+		arg.ErrorMsg,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
+		arg.LeaseToken,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -1083,27 +1004,27 @@ func (q *Queries) ResetTaskRunningToPendingWithLease(ctx context.Context, arg Re
 
 const updateTask = `-- name: UpdateTask :exec
 UPDATE tasks
-SET task_id = ?,
-    user_id = ?,
-    channel_id = ?,
-    account_id = ?,
-    prompt = ?,
-    user_prompt = ?,
-    params = ?,
-    status = ?,
-    lease_token = ?,
-    retry_count = ?,
-    error_msg = ?,
-    result = ?,
-    completed_at = ?
-WHERE id = ?
+SET task_id = $1,
+    user_id = $2,
+    channel_id = $3,
+    account_id = $4,
+    prompt = $5,
+    user_prompt = $6,
+    params = $7,
+    status = $8,
+    lease_token = $9,
+    retry_count = $10,
+    error_msg = $11,
+    result = $12,
+    completed_at = $13
+WHERE id = $14
 `
 
 type UpdateTaskParams struct {
 	TaskID      string       `json:"task_id"`
-	UserID      uint64       `json:"user_id"`
-	ChannelID   uint64       `json:"channel_id"`
-	AccountID   uint64       `json:"account_id"`
+	UserID      int64        `json:"user_id"`
+	ChannelID   int64        `json:"channel_id"`
+	AccountID   int64        `json:"account_id"`
 	Prompt      string       `json:"prompt"`
 	UserPrompt  string       `json:"user_prompt"`
 	Params      string       `json:"params"`
@@ -1113,7 +1034,7 @@ type UpdateTaskParams struct {
 	ErrorMsg    string       `json:"error_msg"`
 	Result      string       `json:"result"`
 	CompletedAt sql.NullTime `json:"completed_at"`
-	ID          uint64       `json:"id"`
+	ID          int64        `json:"id"`
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {

@@ -8,17 +8,18 @@ package dbsqlc
 import (
 	"context"
 	"database/sql"
-	"strings"
+
+	"github.com/lib/pq"
 )
 
 const countUsers = `-- name: CountUsers :one
 SELECT COUNT(*)
 FROM users
-WHERE CAST(? AS SIGNED) = 0 OR username LIKE ?
+WHERE NOT $1::boolean OR username ILIKE $2
 `
 
 type CountUsersParams struct {
-	HasKeyword  int64  `json:"has_keyword"`
+	HasKeyword  bool   `json:"has_keyword"`
 	KeywordLike string `json:"keyword_like"`
 }
 
@@ -29,10 +30,14 @@ func (q *Queries) CountUsers(ctx context.Context, arg CountUsersParams) (int64, 
 	return count, err
 }
 
-const createUser = `-- name: CreateUser :execlastid
+const createUser = `-- name: CreateUser :one
 INSERT INTO users (
   username, auth_user_id, storage_uid, avatar, role, status
-) VALUES (?, ?, ?, ?, ?, ?)
+) VALUES (
+  $1, $2, $3,
+  $4, $5, $6
+)
+RETURNING id
 `
 
 type CreateUserParams struct {
@@ -41,11 +46,11 @@ type CreateUserParams struct {
 	StorageUid string         `json:"storage_uid"`
 	Avatar     string         `json:"avatar"`
 	Role       string         `json:"role"`
-	Status     int8           `json:"status"`
+	Status     int16          `json:"status"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createUser,
+	row := q.db.QueryRowContext(ctx, createUser,
 		arg.Username,
 		arg.AuthUserID,
 		arg.StorageUid,
@@ -53,98 +58,67 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (int64, 
 		arg.Role,
 		arg.Status,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.LastInsertId()
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteBoardMembersByBoardIDs = `-- name: DeleteBoardMembersByBoardIDs :exec
 DELETE FROM board_members
-WHERE board_id IN (/*SLICE:board_ids*/?)
+WHERE board_id = ANY($1::text[])
 `
 
 func (q *Queries) DeleteBoardMembersByBoardIDs(ctx context.Context, boardIds []string) error {
-	query := deleteBoardMembersByBoardIDs
-	var queryParams []interface{}
-	if len(boardIds) > 0 {
-		for _, v := range boardIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:board_ids*/?", strings.Repeat(",?", len(boardIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:board_ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	_, err := q.db.ExecContext(ctx, deleteBoardMembersByBoardIDs, pq.Array(boardIds))
 	return err
 }
 
 const deleteBoardMembersByUserID = `-- name: DeleteBoardMembersByUserID :exec
 DELETE FROM board_members
-WHERE user_id = ?
+WHERE user_id = $1
 `
 
-func (q *Queries) DeleteBoardMembersByUserID(ctx context.Context, userID uint64) error {
+func (q *Queries) DeleteBoardMembersByUserID(ctx context.Context, userID int64) error {
 	_, err := q.db.ExecContext(ctx, deleteBoardMembersByUserID, userID)
 	return err
 }
 
 const deleteBoardShareTokensByBoardIDs = `-- name: DeleteBoardShareTokensByBoardIDs :exec
 DELETE FROM board_share_tokens
-WHERE board_id IN (/*SLICE:board_ids*/?)
+WHERE board_id = ANY($1::text[])
 `
 
 func (q *Queries) DeleteBoardShareTokensByBoardIDs(ctx context.Context, boardIds []string) error {
-	query := deleteBoardShareTokensByBoardIDs
-	var queryParams []interface{}
-	if len(boardIds) > 0 {
-		for _, v := range boardIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:board_ids*/?", strings.Repeat(",?", len(boardIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:board_ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	_, err := q.db.ExecContext(ctx, deleteBoardShareTokensByBoardIDs, pq.Array(boardIds))
 	return err
 }
 
 const deleteBoardShareTokensByCreatedBy = `-- name: DeleteBoardShareTokensByCreatedBy :exec
 DELETE FROM board_share_tokens
-WHERE created_by = ?
+WHERE created_by = $1
 `
 
-func (q *Queries) DeleteBoardShareTokensByCreatedBy(ctx context.Context, createdBy uint64) error {
+func (q *Queries) DeleteBoardShareTokensByCreatedBy(ctx context.Context, createdBy int64) error {
 	_, err := q.db.ExecContext(ctx, deleteBoardShareTokensByCreatedBy, createdBy)
 	return err
 }
 
 const deleteUserBoardsByBoardIDs = `-- name: DeleteUserBoardsByBoardIDs :exec
 DELETE FROM user_boards
-WHERE board_id IN (/*SLICE:board_ids*/?)
+WHERE board_id = ANY($1::text[])
 `
 
 func (q *Queries) DeleteUserBoardsByBoardIDs(ctx context.Context, boardIds []string) error {
-	query := deleteUserBoardsByBoardIDs
-	var queryParams []interface{}
-	if len(boardIds) > 0 {
-		for _, v := range boardIds {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:board_ids*/?", strings.Repeat(",?", len(boardIds))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:board_ids*/?", "NULL", 1)
-	}
-	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	_, err := q.db.ExecContext(ctx, deleteUserBoardsByBoardIDs, pq.Array(boardIds))
 	return err
 }
 
 const deleteUserByID = `-- name: DeleteUserByID :exec
 DELETE FROM users
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) DeleteUserByID(ctx context.Context, id uint64) error {
+func (q *Queries) DeleteUserByID(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteUserByID, id)
 	return err
 }
@@ -152,7 +126,7 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uint64) error {
 const getUsedUIDForUpdate = `-- name: GetUsedUIDForUpdate :one
 SELECT storage_uid
 FROM users_used_uids
-WHERE storage_uid = ?
+WHERE storage_uid = $1
 LIMIT 1
 FOR UPDATE
 `
@@ -167,7 +141,7 @@ func (q *Queries) GetUsedUIDForUpdate(ctx context.Context, storageUid string) (s
 const getUserByAuthUserID = `-- name: GetUserByAuthUserID :one
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE auth_user_id = ?
+WHERE auth_user_id = $1
 `
 
 func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID sql.NullString) (User, error) {
@@ -190,10 +164,10 @@ func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID sql.NullSt
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE id = ?
+WHERE id = $1
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id uint64) (User, error) {
+func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
@@ -213,7 +187,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uint64) (User, error) {
 const getUserByStorageUID = `-- name: GetUserByStorageUID :one
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE storage_uid = ?
+WHERE storage_uid = $1
 `
 
 func (q *Queries) GetUserByStorageUID(ctx context.Context, storageUid string) (User, error) {
@@ -236,7 +210,7 @@ func (q *Queries) GetUserByStorageUID(ctx context.Context, storageUid string) (U
 const getUserByUsername = `-- name: GetUserByUsername :one
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE username = ?
+WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -259,26 +233,27 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 const getUserIDByStorageUIDForUpdate = `-- name: GetUserIDByStorageUIDForUpdate :one
 SELECT id
 FROM users
-WHERE storage_uid = ? AND id <> ?
+WHERE storage_uid = $1 AND id <> $2
 LIMIT 1
 FOR UPDATE
 `
 
 type GetUserIDByStorageUIDForUpdateParams struct {
 	StorageUid string `json:"storage_uid"`
-	ID         uint64 `json:"id"`
+	ID         int64  `json:"id"`
 }
 
-func (q *Queries) GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (uint64, error) {
+func (q *Queries) GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, getUserIDByStorageUIDForUpdate, arg.StorageUid, arg.ID)
-	var id uint64
+	var id int64
 	err := row.Scan(&id)
 	return id, err
 }
 
 const insertUsedUIDIgnore = `-- name: InsertUsedUIDIgnore :execrows
-INSERT IGNORE INTO users_used_uids (storage_uid)
-VALUES (?)
+INSERT INTO users_used_uids (storage_uid)
+VALUES ($1)
+ON CONFLICT (storage_uid) DO NOTHING
 `
 
 func (q *Queries) InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error) {
@@ -292,10 +267,10 @@ func (q *Queries) InsertUsedUIDIgnore(ctx context.Context, storageUid string) (i
 const listOwnedBoardIDsByUserID = `-- name: ListOwnedBoardIDsByUserID :many
 SELECT board_id
 FROM user_boards
-WHERE user_id = ?
+WHERE user_id = $1
 `
 
-func (q *Queries) ListOwnedBoardIDsByUserID(ctx context.Context, userID uint64) ([]string, error) {
+func (q *Queries) ListOwnedBoardIDsByUserID(ctx context.Context, userID int64) ([]string, error) {
 	rows, err := q.db.QueryContext(ctx, listOwnedBoardIDsByUserID, userID)
 	if err != nil {
 		return nil, err
@@ -325,7 +300,7 @@ ORDER BY id ASC
 `
 
 type ListUserStorageUIDsRow struct {
-	ID         uint64 `json:"id"`
+	ID         int64  `json:"id"`
 	StorageUid string `json:"storage_uid"`
 }
 
@@ -355,24 +330,24 @@ func (q *Queries) ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUID
 const listUsers = `-- name: ListUsers :many
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE CAST(? AS SIGNED) = 0 OR username LIKE ?
+WHERE NOT $1::boolean OR username ILIKE $2
 ORDER BY id DESC
-LIMIT ? OFFSET ?
+LIMIT $4 OFFSET $3
 `
 
 type ListUsersParams struct {
-	HasKeyword  int64  `json:"has_keyword"`
+	HasKeyword  bool   `json:"has_keyword"`
 	KeywordLike string `json:"keyword_like"`
-	Limit       int32  `json:"limit"`
-	Offset      int32  `json:"offset"`
+	PageOffset  int32  `json:"page_offset"`
+	PageLimit   int32  `json:"page_limit"`
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
 	rows, err := q.db.QueryContext(ctx, listUsers,
 		arg.HasKeyword,
 		arg.KeywordLike,
-		arg.Limit,
-		arg.Offset,
+		arg.PageOffset,
+		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err
@@ -407,13 +382,13 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 
 const updateUser = `-- name: UpdateUser :exec
 UPDATE users
-SET username = ?,
-    auth_user_id = ?,
-    storage_uid = ?,
-    avatar = ?,
-    role = ?,
-    status = ?
-WHERE id = ?
+SET username = $1,
+    auth_user_id = $2,
+    storage_uid = $3,
+    avatar = $4,
+    role = $5,
+    status = $6
+WHERE id = $7
 `
 
 type UpdateUserParams struct {
@@ -422,8 +397,8 @@ type UpdateUserParams struct {
 	StorageUid string         `json:"storage_uid"`
 	Avatar     string         `json:"avatar"`
 	Role       string         `json:"role"`
-	Status     int8           `json:"status"`
-	ID         uint64         `json:"id"`
+	Status     int16          `json:"status"`
+	ID         int64          `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
@@ -441,13 +416,13 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 
 const updateUserAvatar = `-- name: UpdateUserAvatar :exec
 UPDATE users
-SET avatar = ?
-WHERE id = ?
+SET avatar = $1
+WHERE id = $2
 `
 
 type UpdateUserAvatarParams struct {
 	Avatar string `json:"avatar"`
-	ID     uint64 `json:"id"`
+	ID     int64  `json:"id"`
 }
 
 func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) error {
@@ -457,13 +432,13 @@ func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarPara
 
 const updateUserRole = `-- name: UpdateUserRole :exec
 UPDATE users
-SET role = ?
-WHERE id = ?
+SET role = $1
+WHERE id = $2
 `
 
 type UpdateUserRoleParams struct {
 	Role string `json:"role"`
-	ID   uint64 `json:"id"`
+	ID   int64  `json:"id"`
 }
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
@@ -473,13 +448,13 @@ func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) 
 
 const updateUserStatus = `-- name: UpdateUserStatus :exec
 UPDATE users
-SET status = ?
-WHERE id = ?
+SET status = $1
+WHERE id = $2
 `
 
 type UpdateUserStatusParams struct {
-	Status int8   `json:"status"`
-	ID     uint64 `json:"id"`
+	Status int16 `json:"status"`
+	ID     int64 `json:"id"`
 }
 
 func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error {
@@ -489,13 +464,13 @@ func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusPara
 
 const updateUserStorageUID = `-- name: UpdateUserStorageUID :exec
 UPDATE users
-SET storage_uid = ?
-WHERE id = ?
+SET storage_uid = $1
+WHERE id = $2
 `
 
 type UpdateUserStorageUIDParams struct {
 	StorageUid string `json:"storage_uid"`
-	ID         uint64 `json:"id"`
+	ID         int64  `json:"id"`
 }
 
 func (q *Queries) UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) error {

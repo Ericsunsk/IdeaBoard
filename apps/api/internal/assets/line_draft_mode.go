@@ -3,7 +3,7 @@ package assets
 import "time"
 
 type LineDraftMode struct {
-	ID         uint64    `json:"id"`
+	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
 	CoverImage string    `json:"cover_image"`
 	Prompt     string    `json:"prompt"` // 发送给 API 的提示词模板

@@ -444,7 +444,7 @@ func insertTaskDailyStat(t *testing.T, db *sql.DB, stat TaskDailyStat) {
 	_, err := db.ExecContext(
 		context.Background(),
 		`INSERT INTO task_daily_stats (stat_date, model_name, user_key, total, completed, failed, latency_seconds_sum, latency_count)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		stat.StatDate, stat.ModelName, stat.UserKey, stat.Total, stat.Completed, stat.Failed, stat.LatencySecondsSum, stat.LatencyCount,
 	)
 	if err != nil {
@@ -457,7 +457,7 @@ func insertTaskStatEvent(t *testing.T, db *sql.DB, event TaskStatEvent) {
 	_, err := db.ExecContext(
 		context.Background(),
 		`INSERT INTO task_stat_events (task_id, stat_date, model_name, user_key, status, latency_seconds)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
 		event.TaskID, event.StatDate, event.ModelName, event.UserKey, event.Status, event.LatencySeconds,
 	)
 	if err != nil {

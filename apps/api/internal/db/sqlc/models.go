@@ -10,9 +10,9 @@ import (
 )
 
 type ApiAccount struct {
-	ID            uint64    `json:"id"`
+	ID            int64     `json:"id"`
 	Name          string    `json:"name"`
-	ChannelID     uint64    `json:"channel_id"`
+	ChannelID     int64     `json:"channel_id"`
 	Platform      string    `json:"platform"`
 	ApiType       string    `json:"api_type"`
 	ModelSet      string    `json:"model_set"`
@@ -21,7 +21,7 @@ type ApiAccount struct {
 	MaxConcurrent int32     `json:"max_concurrent"`
 	Timeout       int32     `json:"timeout"`
 	ExtraConfig   string    `json:"extra_config"`
-	Status        int8      `json:"status"`
+	Status        int16     `json:"status"`
 	FailCount     int32     `json:"fail_count"`
 	Weight        int32     `json:"weight"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -29,20 +29,20 @@ type ApiAccount struct {
 }
 
 type BoardMember struct {
-	ID        uint64    `json:"id"`
+	ID        int64     `json:"id"`
 	BoardID   string    `json:"board_id"`
-	UserID    uint64    `json:"user_id"`
+	UserID    int64     `json:"user_id"`
 	Role      string    `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type BoardShareToken struct {
-	ID        uint64       `json:"id"`
+	ID        int64        `json:"id"`
 	BoardID   string       `json:"board_id"`
 	Token     string       `json:"token"`
 	Role      string       `json:"role"`
-	CreatedBy uint64       `json:"created_by"`
+	CreatedBy int64        `json:"created_by"`
 	Revoked   bool         `json:"revoked"`
 	ExpiresAt sql.NullTime `json:"expires_at"`
 	CreatedAt time.Time    `json:"created_at"`
@@ -50,17 +50,17 @@ type BoardShareToken struct {
 }
 
 type Channel struct {
-	ID        uint64    `json:"id"`
+	ID        int64     `json:"id"`
 	Type      string    `json:"type"`
 	Name      string    `json:"name"`
 	ApiUrl    string    `json:"api_url"`
-	Status    int8      `json:"status"`
+	Status    int16     `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type LineDraftMode struct {
-	ID         uint64    `json:"id"`
+	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
 	CoverImage string    `json:"cover_image"`
 	Prompt     string    `json:"prompt"`
@@ -71,19 +71,19 @@ type LineDraftMode struct {
 }
 
 type SystemConfig struct {
-	ID        uint64    `json:"id"`
-	Key       string    `json:"key"`
+	ID        int64     `json:"id"`
+	ConfigKey string    `json:"config_key"`
 	Value     string    `json:"value"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Task struct {
-	ID          uint64       `json:"id"`
+	ID          int64        `json:"id"`
 	TaskID      string       `json:"task_id"`
-	UserID      uint64       `json:"user_id"`
-	ChannelID   uint64       `json:"channel_id"`
-	AccountID   uint64       `json:"account_id"`
+	UserID      int64        `json:"user_id"`
+	ChannelID   int64        `json:"channel_id"`
+	AccountID   int64        `json:"account_id"`
 	Prompt      string       `json:"prompt"`
 	UserPrompt  string       `json:"user_prompt"`
 	Params      string       `json:"params"`
@@ -98,7 +98,7 @@ type Task struct {
 }
 
 type TaskDailyStat struct {
-	ID                uint64    `json:"id"`
+	ID                int64     `json:"id"`
 	StatDate          string    `json:"stat_date"`
 	ModelName         string    `json:"model_name"`
 	UserKey           string    `json:"user_key"`
@@ -112,14 +112,14 @@ type TaskDailyStat struct {
 }
 
 type TaskDailyStatBackfill struct {
-	ID        uint64    `json:"id"`
+	ID        int64     `json:"id"`
 	StatDate  string    `json:"stat_date"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type TaskOutput struct {
-	ID         uint64    `json:"id"`
+	ID         int64     `json:"id"`
 	TaskID     string    `json:"task_id"`
 	Role       string    `json:"role"`
 	Url        string    `json:"url"`
@@ -134,7 +134,7 @@ type TaskOutput struct {
 }
 
 type TaskStatEvent struct {
-	ID             uint64    `json:"id"`
+	ID             int64     `json:"id"`
 	TaskID         string    `json:"task_id"`
 	StatDate       string    `json:"stat_date"`
 	ModelName      string    `json:"model_name"`
@@ -146,21 +146,21 @@ type TaskStatEvent struct {
 }
 
 type User struct {
-	ID         uint64         `json:"id"`
+	ID         int64          `json:"id"`
 	Username   string         `json:"username"`
 	AuthUserID sql.NullString `json:"auth_user_id"`
 	StorageUid string         `json:"storage_uid"`
 	Avatar     string         `json:"avatar"`
 	Role       string         `json:"role"`
-	Status     int8           `json:"status"`
+	Status     int16          `json:"status"`
 	CreatedAt  time.Time      `json:"created_at"`
 	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
 type UserBoard struct {
-	ID        uint64    `json:"id"`
+	ID        int64     `json:"id"`
 	BoardID   string    `json:"board_id"`
-	UserID    uint64    `json:"user_id"`
+	UserID    int64     `json:"user_id"`
 	Name      string    `json:"name"`
 	State     string    `json:"state"`
 	CreatedAt time.Time `json:"created_at"`
@@ -168,7 +168,7 @@ type UserBoard struct {
 }
 
 type UsersUsedUid struct {
-	ID         uint64    `json:"id"`
+	ID         int64     `json:"id"`
 	StorageUid string    `json:"storage_uid"`
 	CreatedAt  time.Time `json:"created_at"`
 }

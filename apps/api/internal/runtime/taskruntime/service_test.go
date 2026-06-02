@@ -92,13 +92,13 @@ func newTaskRuntimeServiceTestDB(t *testing.T) *sql.DB {
 type fakeTaskLeaseRebuilder struct {
 	calls      int
 	leases     []taskqueue.TaskLease
-	accountIDs []uint64
+	accountIDs []int64
 }
 
-func (f *fakeTaskLeaseRebuilder) RebuildRunningTaskLeases(ctx context.Context, leases []taskqueue.TaskLease, accountIDs []uint64) error {
+func (f *fakeTaskLeaseRebuilder) RebuildRunningTaskLeases(ctx context.Context, leases []taskqueue.TaskLease, accountIDs []int64) error {
 	f.calls++
 	f.leases = append([]taskqueue.TaskLease(nil), leases...)
-	f.accountIDs = append([]uint64(nil), accountIDs...)
+	f.accountIDs = append([]int64(nil), accountIDs...)
 	return nil
 }
 
@@ -155,7 +155,7 @@ func TestReconcileRunningTaskLeasesRebuildsFromDBRunningTasks(t *testing.T) {
 	if fmt.Sprintf("%v", rebuilder.leases) != fmt.Sprintf("%v", wantLeases) {
 		t.Fatalf("leases=%v, want %v", rebuilder.leases, wantLeases)
 	}
-	wantAccountIDs := []uint64{10, 20, 30}
+	wantAccountIDs := []int64{10, 20, 30}
 	if fmt.Sprintf("%v", rebuilder.accountIDs) != fmt.Sprintf("%v", wantAccountIDs) {
 		t.Fatalf("accountIDs=%v, want %v", rebuilder.accountIDs, wantAccountIDs)
 	}

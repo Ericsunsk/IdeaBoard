@@ -36,8 +36,8 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 | 维度 | 当前配置 |
 |------|----------|
 | 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
-| 后端 | `Go` + `Gin` + `GORM` + `Better Auth (Node.js/TypeScript)` |
-| 基础设施 | `MySQL 8.0+`、`Redis 8.6+` |
+| 后端 | `Go` + `Gin` + `sqlc` + `Better Auth (Fastify/Node.js/TypeScript)` |
+| 基础设施 | `PostgreSQL 17+`、`Redis 8.6+` |
 | 本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
 | 当前主链 | 画布节点编排 -> 任务提交 -> Worker 执行 -> 结果回写 |
 | 技术标识 | `ideaboard-*` |
@@ -50,9 +50,9 @@ graph LR
     Browser --> Auth["Better Auth (apps/auth)"]
     Browser --> Gin["Gin API (Go)"]
     
-    Gin --> MySQL[("MySQL")]
+    Gin --> Postgres[("PostgreSQL")]
     Gin --> Redis[("Redis Queue")]
-    Auth --> MySQL
+    Auth --> Postgres
     
     Redis --> Worker["Worker 消费者"]
     Worker --> AI["上游 AI 渠道"]
@@ -166,7 +166,7 @@ graph LR
 sequenceDiagram
     participant FE as 前端
     participant API as Go API
-    participant DB as MySQL/Redis
+    participant DB as PostgreSQL/Redis
     participant WK as Worker
     participant AI as AI 渠道
 
@@ -256,7 +256,7 @@ sequenceDiagram
 |------|----------|
 | Node.js | `20+` |
 | Go | `1.25+` |
-| MySQL | `8.0+` |
+| PostgreSQL | `17+` |
 | Redis | `8.6+` |
 
 ### 启动步骤
@@ -266,7 +266,7 @@ sequenceDiagram
 ```bash
 cd docker
 cp .env.example .env
-# 至少修改 MYSQL_ROOT_PASSWORD 和 MYSQL_PASSWORD
+# 至少修改 POSTGRES_PASSWORD
 docker compose -f compose.local.yml up -d
 ```
 
@@ -362,11 +362,12 @@ go build ./...
 
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
-| `DB_HOST` | `localhost` | MySQL 主机 |
-| `DB_PORT` | `3306` | MySQL 端口 |
-| `DB_USER` | `ideaboard` | MySQL 用户 |
-| `DB_PASSWORD` | 无默认值 | MySQL 密码；使用仓库自带 Docker Compose 时默认业务密码为 `ideaboard123` |
+| `DB_HOST` | `localhost` | PostgreSQL 主机 |
+| `DB_PORT` | `5432` | PostgreSQL 端口 |
+| `DB_USER` | `ideaboard` | PostgreSQL 用户 |
+| `DB_PASSWORD` | 无默认值 | PostgreSQL 密码；使用仓库自带 Docker Compose 时读取 `docker/.env` 的 `POSTGRES_PASSWORD` |
 | `DB_NAME` | `ideaboard` | 数据库名 |
+| `DB_SSLMODE` | `disable` | PostgreSQL SSL 模式；本地与 Docker 内网默认关闭 |
 | `REDIS_HOST` | `localhost` | Redis 主机 |
 | `REDIS_PORT` | `6379` | Redis 端口 |
 | `REDIS_AUTH` | 空 | Redis 密码 |
@@ -379,7 +380,6 @@ go build ./...
 | `AUTH_SERVICE_INTERNAL_KEY` | 空 | Go 调用 auth service 的 internal key |
 | `AUTH_SERVICE_TIMEOUT_SECONDS` | `5` | Go 调用 auth service 的超时秒数 |
 | `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |
-| `DB_LOG_MODE` | `warn` | GORM 日志等级，可选 `silent/error/warn/info` |
 
 Auth 服务关键变量：
 

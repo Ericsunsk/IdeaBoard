@@ -26,11 +26,11 @@ func (r *LineDraftModeRepository) Create(ctx context.Context, mode *LineDraftMod
 	if err != nil {
 		return err
 	}
-	mode.ID = uint64(id)
+	mode.ID = int64(id)
 	return nil
 }
 
-func (r *LineDraftModeRepository) GetByID(ctx context.Context, id uint64) (*LineDraftMode, error) {
+func (r *LineDraftModeRepository) GetByID(ctx context.Context, id int64) (*LineDraftMode, error) {
 	row, err := r.q.GetLineDraftModeByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (r *LineDraftModeRepository) Update(ctx context.Context, mode *LineDraftMod
 	})
 }
 
-func (r *LineDraftModeRepository) Delete(ctx context.Context, id uint64) error {
+func (r *LineDraftModeRepository) Delete(ctx context.Context, id int64) error {
 	return r.q.DeleteLineDraftMode(ctx, id)
 }
 

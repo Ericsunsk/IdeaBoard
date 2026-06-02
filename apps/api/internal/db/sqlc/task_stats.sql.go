@@ -10,9 +10,13 @@ import (
 )
 
 const insertTaskStatEventIgnore = `-- name: InsertTaskStatEventIgnore :execrows
-INSERT IGNORE INTO task_stat_events (
+INSERT INTO task_stat_events (
   task_id, stat_date, model_name, user_key, status, latency_seconds
-) VALUES (?, ?, ?, ?, ?, ?)
+) VALUES (
+  $1, $2, $3, $4,
+  $5, $6
+)
+ON CONFLICT (task_id) DO NOTHING
 `
 
 type InsertTaskStatEventIgnoreParams struct {
@@ -42,17 +46,17 @@ func (q *Queries) InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskS
 const listBackfilledDatesByRange = `-- name: ListBackfilledDatesByRange :many
 SELECT stat_date
 FROM task_daily_stat_backfills
-WHERE stat_date >= ? AND stat_date <= ?
+WHERE stat_date >= $1 AND stat_date <= $2
 ORDER BY stat_date ASC
 `
 
 type ListBackfilledDatesByRangeParams struct {
-	StatDate   string `json:"stat_date"`
-	StatDate_2 string `json:"stat_date_2"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }
 
 func (q *Queries) ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listBackfilledDatesByRange, arg.StatDate, arg.StatDate_2)
+	rows, err := q.db.QueryContext(ctx, listBackfilledDatesByRange, arg.StartDate, arg.EndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -77,13 +81,13 @@ func (q *Queries) ListBackfilledDatesByRange(ctx context.Context, arg ListBackfi
 const listDailyStatsByDateRange = `-- name: ListDailyStatsByDateRange :many
 SELECT stat_date, model_name, user_key, total, completed, failed, latency_seconds_sum, latency_count
 FROM task_daily_stats
-WHERE stat_date >= ? AND stat_date <= ?
+WHERE stat_date >= $1 AND stat_date <= $2
 ORDER BY stat_date ASC
 `
 
 type ListDailyStatsByDateRangeParams struct {
-	StatDate   string `json:"stat_date"`
-	StatDate_2 string `json:"stat_date_2"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }
 
 type ListDailyStatsByDateRangeRow struct {
@@ -98,7 +102,7 @@ type ListDailyStatsByDateRangeRow struct {
 }
 
 func (q *Queries) ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listDailyStatsByDateRange, arg.StatDate, arg.StatDate_2)
+	rows, err := q.db.QueryContext(ctx, listDailyStatsByDateRange, arg.StartDate, arg.EndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -132,13 +136,13 @@ func (q *Queries) ListDailyStatsByDateRange(ctx context.Context, arg ListDailySt
 const listStatEventLatencySamplesByDateRange = `-- name: ListStatEventLatencySamplesByDateRange :many
 SELECT model_name, latency_seconds
 FROM task_stat_events
-WHERE stat_date >= ? AND stat_date <= ? AND latency_seconds > 0
+WHERE stat_date >= $1 AND stat_date <= $2 AND latency_seconds > 0
 ORDER BY model_name ASC, latency_seconds ASC
 `
 
 type ListStatEventLatencySamplesByDateRangeParams struct {
-	StatDate   string `json:"stat_date"`
-	StatDate_2 string `json:"stat_date_2"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }
 
 type ListStatEventLatencySamplesByDateRangeRow struct {
@@ -147,7 +151,7 @@ type ListStatEventLatencySamplesByDateRangeRow struct {
 }
 
 func (q *Queries) ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error) {
-	rows, err := q.db.QueryContext(ctx, listStatEventLatencySamplesByDateRange, arg.StatDate, arg.StatDate_2)
+	rows, err := q.db.QueryContext(ctx, listStatEventLatencySamplesByDateRange, arg.StartDate, arg.EndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -170,8 +174,9 @@ func (q *Queries) ListStatEventLatencySamplesByDateRange(ctx context.Context, ar
 }
 
 const markDailyBackfillDone = `-- name: MarkDailyBackfillDone :exec
-INSERT IGNORE INTO task_daily_stat_backfills (stat_date)
-VALUES (?)
+INSERT INTO task_daily_stat_backfills (stat_date)
+VALUES ($1)
+ON CONFLICT (stat_date) DO NOTHING
 `
 
 func (q *Queries) MarkDailyBackfillDone(ctx context.Context, statDate string) error {
@@ -182,13 +187,17 @@ func (q *Queries) MarkDailyBackfillDone(ctx context.Context, statDate string) er
 const upsertTaskDailyStatDelta = `-- name: UpsertTaskDailyStatDelta :exec
 INSERT INTO task_daily_stats (
   stat_date, model_name, user_key, total, completed, failed, latency_seconds_sum, latency_count
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE
-  total = total + VALUES(total),
-  completed = completed + VALUES(completed),
-  failed = failed + VALUES(failed),
-  latency_seconds_sum = latency_seconds_sum + VALUES(latency_seconds_sum),
-  latency_count = latency_count + VALUES(latency_count)
+) VALUES (
+  $1, $2, $3, $4,
+  $5, $6, $7,
+  $8
+)
+ON CONFLICT (stat_date, model_name, user_key) DO UPDATE
+SET total = task_daily_stats.total + EXCLUDED.total,
+    completed = task_daily_stats.completed + EXCLUDED.completed,
+    failed = task_daily_stats.failed + EXCLUDED.failed,
+    latency_seconds_sum = task_daily_stats.latency_seconds_sum + EXCLUDED.latency_seconds_sum,
+    latency_count = task_daily_stats.latency_count + EXCLUDED.latency_count
 `
 
 type UpsertTaskDailyStatDeltaParams struct {
