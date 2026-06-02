@@ -1,5 +1,9 @@
-import express, { type NextFunction, type Request, type Response } from 'express'
+import Fastify, {
+  type FastifyReply,
+  type preHandlerHookHandler,
+} from 'fastify'
 import { toNodeHandler } from 'better-auth/node'
+import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http'
 import { auth, authDB } from './auth.js'
 import { env } from './env.js'
 import { isProductionRuntime } from './runtime-env.js'
@@ -28,10 +32,47 @@ type AuthGuardSettingsCache = {
   expiresAtMs: number
 }
 
-const app = express()
-// Trust only the configured reverse proxy ranges so req.ip reflects the real
+type AuthMiddlewareRequest = IncomingMessage & {
+  socket: IncomingMessage['socket']
+}
+
+type InternalHeaders = IncomingHttpHeaders
+
+type EnsureUserBody = {
+  username?: unknown
+  password?: unknown
+  allow_existing?: unknown
+  role?: unknown
+}
+
+type RoleParams = {
+  id?: string
+}
+
+type RoleBody = {
+  role?: unknown
+}
+
+type AuthUserIDParams = {
+  id?: string
+}
+
+type UserIDBody = {
+  userId?: unknown
+}
+
+type BanUserBody = UserIDBody & {
+  banReason?: unknown
+  banExpiresIn?: unknown
+}
+
+// Trust only the configured reverse proxy ranges so request.ip reflects the real
 // client IP from X-Forwarded-For without accepting arbitrary public proxies.
-app.set('trust proxy', env.auth.trustProxy)
+const app = Fastify({
+  bodyLimit: 1_048_576,
+  trustProxy: env.auth.trustProxy,
+})
+const betterAuthNodeHandler = toNodeHandler(auth)
 const authRateLimitStore = new Map<string, MemoryRateLimitEntry>()
 let authRateLimitCheckCounter = 0
 const AUTH_GUARD_SETTINGS_TTL_MS = 10_000
@@ -43,41 +84,63 @@ const DEFAULT_AUTH_GUARD_SETTINGS: AuthGuardSettings = {
 const allowedAuthOrigins = new Set(env.auth.trustedOrigins.map(normalizeCORSOrigin).filter(Boolean))
 let authGuardSettingsCache: AuthGuardSettingsCache | null = null
 
-app.get('/api/health', (_req, res) => {
-  sendSuccess(res, { status: 'ok' })
+app.setErrorHandler((error, _request, reply) => {
+  console.error('[auth] Unhandled request error', error)
+  sendError(reply, getErrorStatus(error), extractErrorMessage(error, 'internal server error'))
 })
 
-app.use('/api/auth', authCORSMiddleware)
-app.use('/api/auth', (req, res, next) => {
-  authEntryGuardMiddleware(req, res, next).catch(next)
-})
-app.all(['/api/auth', '/api/auth/{*authPath}'], toNodeHandler(auth))
-app.use(express.json({ limit: '1mb' }))
+app.addHook('onRequest', async (request, reply) => {
+  if (!isAuthRoute(request.raw.url || '')) {
+    return
+  }
 
-const requireInternalKey = (req: Request, res: Response, next: NextFunction) => {
+  const authReq = request.raw as AuthMiddlewareRequest
+
+  const corsHandled = authCORSMiddleware(authReq, reply.raw)
+  if (corsHandled) {
+    reply.hijack()
+    return
+  }
+
+  const guardHandled = await authEntryGuardMiddleware(authReq, reply.raw, request.ip)
+  if (guardHandled) {
+    reply.hijack()
+    return
+  }
+
+  reply.hijack()
+  await betterAuthNodeHandler(request.raw, reply.raw)
+})
+
+app.get('/api/health', async (_request, reply) => {
+  sendSuccess(reply, { status: 'ok' })
+})
+
+const requireInternalKey: preHandlerHookHandler = (request, reply, done) => {
   if (!env.auth.internalKey) {
-    next()
+    done()
     return
   }
-  const provided = String(req.header('x-internal-key') || '').trim()
+  const provided = getHeaderValue(request.headers['x-internal-key']).trim()
   if (!provided || provided !== env.auth.internalKey) {
-    sendError(res, 401, 'unauthorized internal request')
+    sendError(reply, 401, 'unauthorized internal request')
+    done()
     return
   }
-  next()
+  done()
 }
 
-app.get('/internal/session', requireInternalKey, async (req, res) => {
+app.get('/internal/session', { preHandler: requireInternalKey }, async (request, reply) => {
   try {
     const session = await auth.api.getSession({
-      headers: toHeaders(req),
+      headers: toHeaders(request.headers),
     })
     const user = extractAuthUser(session)
     if (!user) {
-      sendError(res, 401, 'unauthorized')
+      sendError(reply, 401, 'unauthorized')
       return
     }
-    sendSuccess(res, {
+    sendSuccess(reply, {
       session: {
         auth_user_id: user.id,
         username: normalizeUsername(user.username || user.name || ''),
@@ -85,265 +148,302 @@ app.get('/internal/session', requireInternalKey, async (req, res) => {
       },
     })
   } catch (error) {
-    sendError(res, 500, extractErrorMessage(error, 'failed to validate session'))
+    sendError(reply, 500, extractErrorMessage(error, 'failed to validate session'))
   }
 })
 
-app.post('/internal/users/ensure', requireInternalKey, async (req, res) => {
-  const username = normalizeUsername(req.body?.username)
-  const password = String(req.body?.password || '')
-  const allowExisting = Boolean(req.body?.allow_existing)
-  const role = normalizeAuthRole(req.body?.role)
+app.post<{ Body: EnsureUserBody }>(
+  '/internal/users/ensure',
+  { preHandler: requireInternalKey },
+  async (request, reply) => {
+    const username = normalizeUsername(request.body?.username)
+    const password = String(request.body?.password || '')
+    const allowExisting = Boolean(request.body?.allow_existing)
+    const role = normalizeAuthRole(request.body?.role)
 
-  if (!username) {
-    sendError(res, 400, 'username is required')
-    return
-  }
-  if (password.length < 6 || password.length > 50) {
-    sendError(res, 400, 'password length must be between 6 and 50')
-    return
-  }
-  if (!role) {
-    sendError(res, 400, 'role must be admin or user')
-    return
-  }
-
-  const email = `${username}@ideaboard.local`
-  try {
-    const created = await auth.api.signUpEmail({
-      body: {
-        email,
-        password,
-        name: username,
-        username,
-      },
-    })
-    const user = extractAuthUser(created)
-    if (!user) {
-      sendError(res, 500, 'auth user creation succeeded but user payload is empty')
+    if (!username) {
+      sendError(reply, 400, 'username is required')
       return
     }
-    await syncAuthUserRole(user.id, role)
-    sendSuccess(res, {
-      user: {
-        auth_user_id: user.id,
-        username: normalizeUsername(user.username || user.name || username),
-        email: String(user.email || email),
-        role,
-        existing: false,
-      },
-    })
-  } catch (error) {
-    if (allowExisting && isDuplicateUserError(error)) {
-      try {
-        const existing = await findUserByUsernameOrEmail(username, email)
-        if (existing) {
-          await syncAuthUserRole(existing.id, role)
-          sendSuccess(res, {
-            user: {
-              auth_user_id: existing.id,
-              username: normalizeUsername(existing.username || existing.name || username),
-              email: String(existing.email || email),
-              role,
-              existing: true,
-            },
-          })
-          return
-        }
-      } catch (lookupError) {
-        sendError(res, 500, extractErrorMessage(lookupError, 'failed to locate existing user'))
+    if (password.length < 6 || password.length > 50) {
+      sendError(reply, 400, 'password length must be between 6 and 50')
+      return
+    }
+    if (!role) {
+      sendError(reply, 400, 'role must be admin or user')
+      return
+    }
+
+    const email = `${username}@ideaboard.local`
+    try {
+      const created = await auth.api.signUpEmail({
+        body: {
+          email,
+          password,
+          name: username,
+          username,
+        },
+      })
+      const user = extractAuthUser(created)
+      if (!user) {
+        sendError(reply, 500, 'auth user creation succeeded but user payload is empty')
         return
       }
+      await syncAuthUserRole(user.id, role)
+      sendSuccess(reply, {
+        user: {
+          auth_user_id: user.id,
+          username: normalizeUsername(user.username || user.name || username),
+          email: String(user.email || email),
+          role,
+          existing: false,
+        },
+      })
+    } catch (error) {
+      if (allowExisting && isDuplicateUserError(error)) {
+        try {
+          const existing = await findUserByUsernameOrEmail(username, email)
+          if (existing) {
+            await syncAuthUserRole(existing.id, role)
+            sendSuccess(reply, {
+              user: {
+                auth_user_id: existing.id,
+                username: normalizeUsername(existing.username || existing.name || username),
+                email: String(existing.email || email),
+                role,
+                existing: true,
+              },
+            })
+            return
+          }
+        } catch (lookupError) {
+          sendError(reply, 500, extractErrorMessage(lookupError, 'failed to locate existing user'))
+          return
+        }
+      }
+      sendError(reply, 400, extractErrorMessage(error, 'failed to ensure user'))
     }
-    sendError(res, 400, extractErrorMessage(error, 'failed to ensure user'))
-  }
-})
+  },
+)
 
-app.put('/internal/users/:id/role', requireInternalKey, async (req, res) => {
-  const authUserID = String(req.params?.id || '').trim()
-  const role = normalizeAuthRole(req.body?.role)
-  if (!authUserID) {
-    sendError(res, 400, 'auth user id is required')
-    return
-  }
-  if (authUserID.length > 191) {
-    sendError(res, 400, 'auth user id is invalid')
-    return
-  }
-  if (!role) {
-    sendError(res, 400, 'role must be admin or user')
-    return
-  }
-
-  try {
-    const updated = await updateAuthUserRole(authUserID, role)
-    if (!updated) {
-      sendError(res, 404, 'auth user not found')
+app.put<{ Body: RoleBody; Params: RoleParams }>(
+  '/internal/users/:id/role',
+  { preHandler: requireInternalKey },
+  async (request, reply) => {
+    const authUserID = String(request.params?.id || '').trim()
+    const role = normalizeAuthRole(request.body?.role)
+    if (!authUserID) {
+      sendError(reply, 400, 'auth user id is required')
       return
     }
-    sendSuccess(res, {
-      auth_user_id: authUserID,
-      role,
-    })
-  } catch (error) {
-    sendError(res, 500, extractErrorMessage(error, 'failed to update auth user role'))
-  }
-})
-
-app.delete('/internal/users/:id', requireInternalKey, async (req, res) => {
-  const authUserID = String(req.params?.id || '').trim()
-  if (!authUserID) {
-    sendError(res, 400, 'auth user id is required')
-    return
-  }
-  if (authUserID.length > 191) {
-    sendError(res, 400, 'auth user id is invalid')
-    return
-  }
-
-  try {
-    const deleted = await removeAuthUserCascade(authUserID)
-    if (!deleted) {
-      sendError(res, 404, 'auth user not found')
+    if (authUserID.length > 191) {
+      sendError(reply, 400, 'auth user id is invalid')
       return
     }
-    sendSuccess(res, {
-      deleted: true,
-      auth_user_id: authUserID,
-    })
-  } catch (error) {
-    sendError(res, 500, extractErrorMessage(error, 'failed to delete auth user'))
-  }
-})
-
-app.post('/internal/users/ban', requireInternalKey, async (req, res) => {
-  const authUserID = String(req.body?.userId || '').trim()
-  const banReason = normalizeOptionalText(req.body?.banReason, 500)
-  const banExpiresIn = normalizeOptionalPositiveInteger(req.body?.banExpiresIn)
-  if (!authUserID) {
-    sendError(res, 400, 'auth user id is required')
-    return
-  }
-  if (authUserID.length > 191) {
-    sendError(res, 400, 'auth user id is invalid')
-    return
-  }
-  try {
-    const banned = await updateAuthUserBanState(authUserID, true, banReason, banExpiresIn)
-    if (!banned) {
-      sendError(res, 404, 'auth user not found')
+    if (!role) {
+      sendError(reply, 400, 'role must be admin or user')
       return
     }
-    await deleteAuthUserSessions(authUserID)
-    sendSuccess(res, {
-      auth_user_id: authUserID,
-      banned: true,
-    })
-  } catch (error) {
-    sendError(res, 500, extractErrorMessage(error, 'failed to ban auth user'))
-  }
-})
 
-app.post('/internal/users/unban', requireInternalKey, async (req, res) => {
-  const authUserID = String(req.body?.userId || '').trim()
-  if (!authUserID) {
-    sendError(res, 400, 'auth user id is required')
-    return
-  }
-  if (authUserID.length > 191) {
-    sendError(res, 400, 'auth user id is invalid')
-    return
-  }
-  try {
-    const updated = await updateAuthUserBanState(authUserID, false, null, null)
-    if (!updated) {
-      sendError(res, 404, 'auth user not found')
+    try {
+      const updated = await updateAuthUserRole(authUserID, role)
+      if (!updated) {
+        sendError(reply, 404, 'auth user not found')
+        return
+      }
+      sendSuccess(reply, {
+        auth_user_id: authUserID,
+        role,
+      })
+    } catch (error) {
+      sendError(reply, 500, extractErrorMessage(error, 'failed to update auth user role'))
+    }
+  },
+)
+
+app.delete<{ Params: AuthUserIDParams }>(
+  '/internal/users/:id',
+  { preHandler: requireInternalKey },
+  async (request, reply) => {
+    const authUserID = String(request.params?.id || '').trim()
+    if (!authUserID) {
+      sendError(reply, 400, 'auth user id is required')
       return
     }
-    sendSuccess(res, {
-      auth_user_id: authUserID,
-      banned: false,
-    })
-  } catch (error) {
-    sendError(res, 500, extractErrorMessage(error, 'failed to unban auth user'))
-  }
-})
-
-app.post('/internal/users/revoke-sessions', requireInternalKey, async (req, res) => {
-  const authUserID = String(req.body?.userId || '').trim()
-  if (!authUserID) {
-    sendError(res, 400, 'auth user id is required')
-    return
-  }
-  if (authUserID.length > 191) {
-    sendError(res, 400, 'auth user id is invalid')
-    return
-  }
-  try {
-    const deleted = await deleteAuthUserSessions(authUserID)
-    if (!deleted) {
-      sendError(res, 404, 'auth user not found')
+    if (authUserID.length > 191) {
+      sendError(reply, 400, 'auth user id is invalid')
       return
     }
-    sendSuccess(res, {
-      auth_user_id: authUserID,
-      revoked: true,
-    })
-  } catch (error) {
-    sendError(res, 500, extractErrorMessage(error, 'failed to revoke auth user sessions'))
-  }
-})
+
+    try {
+      const deleted = await removeAuthUserCascade(authUserID)
+      if (!deleted) {
+        sendError(reply, 404, 'auth user not found')
+        return
+      }
+      sendSuccess(reply, {
+        deleted: true,
+        auth_user_id: authUserID,
+      })
+    } catch (error) {
+      sendError(reply, 500, extractErrorMessage(error, 'failed to delete auth user'))
+    }
+  },
+)
+
+app.post<{ Body: BanUserBody }>(
+  '/internal/users/ban',
+  { preHandler: requireInternalKey },
+  async (request, reply) => {
+    const authUserID = String(request.body?.userId || '').trim()
+    const banReason = normalizeOptionalText(request.body?.banReason, 500)
+    const banExpiresIn = normalizeOptionalPositiveInteger(request.body?.banExpiresIn)
+    if (!authUserID) {
+      sendError(reply, 400, 'auth user id is required')
+      return
+    }
+    if (authUserID.length > 191) {
+      sendError(reply, 400, 'auth user id is invalid')
+      return
+    }
+    try {
+      const banned = await updateAuthUserBanState(authUserID, true, banReason, banExpiresIn)
+      if (!banned) {
+        sendError(reply, 404, 'auth user not found')
+        return
+      }
+      await deleteAuthUserSessions(authUserID)
+      sendSuccess(reply, {
+        auth_user_id: authUserID,
+        banned: true,
+      })
+    } catch (error) {
+      sendError(reply, 500, extractErrorMessage(error, 'failed to ban auth user'))
+    }
+  },
+)
+
+app.post<{ Body: UserIDBody }>(
+  '/internal/users/unban',
+  { preHandler: requireInternalKey },
+  async (request, reply) => {
+    const authUserID = String(request.body?.userId || '').trim()
+    if (!authUserID) {
+      sendError(reply, 400, 'auth user id is required')
+      return
+    }
+    if (authUserID.length > 191) {
+      sendError(reply, 400, 'auth user id is invalid')
+      return
+    }
+    try {
+      const updated = await updateAuthUserBanState(authUserID, false, null, null)
+      if (!updated) {
+        sendError(reply, 404, 'auth user not found')
+        return
+      }
+      sendSuccess(reply, {
+        auth_user_id: authUserID,
+        banned: false,
+      })
+    } catch (error) {
+      sendError(reply, 500, extractErrorMessage(error, 'failed to unban auth user'))
+    }
+  },
+)
+
+app.post<{ Body: UserIDBody }>(
+  '/internal/users/revoke-sessions',
+  { preHandler: requireInternalKey },
+  async (request, reply) => {
+    const authUserID = String(request.body?.userId || '').trim()
+    if (!authUserID) {
+      sendError(reply, 400, 'auth user id is required')
+      return
+    }
+    if (authUserID.length > 191) {
+      sendError(reply, 400, 'auth user id is invalid')
+      return
+    }
+    try {
+      const deleted = await deleteAuthUserSessions(authUserID)
+      if (!deleted) {
+        sendError(reply, 404, 'auth user not found')
+        return
+      }
+      sendSuccess(reply, {
+        auth_user_id: authUserID,
+        revoked: true,
+      })
+    } catch (error) {
+      sendError(reply, 500, extractErrorMessage(error, 'failed to revoke auth user sessions'))
+    }
+  },
+)
 
 if (isProductionRuntime() && !env.auth.internalKey) {
   throw new Error('AUTH_INTERNAL_KEY is required when NODE_ENV=production')
 }
 
-const server = app.listen(env.auth.port, env.auth.host, () => {
+try {
+  await app.listen({ port: env.auth.port, host: env.auth.host })
   if (!env.auth.internalKey) {
     console.warn('[auth] AUTH_INTERNAL_KEY is empty; internal endpoints are not protected')
   }
   console.log(`[auth] Better Auth service listening on http://${env.auth.host}:${env.auth.port}`)
-})
+} catch (error) {
+  console.error('[auth] Failed to start auth service', error)
+  await authDB.end()
+  process.exit(1)
+}
 
 function gracefulShutdown(signal: string) {
   console.log(`[auth] ${signal} received, shutting down gracefully...`)
-  server.close(() => {
-    authDB
-      .end()
-      .then(() => {
-        console.log('[auth] Database pool closed')
-        process.exit(0)
-      })
-      .catch((err) => {
-        console.error('[auth] Error closing database pool', err)
-        process.exit(1)
-      })
-  })
   // Force exit after 10s if graceful close hangs
   setTimeout(() => {
     console.error('[auth] Graceful shutdown timed out, forcing exit')
     process.exit(1)
   }, 10_000).unref()
+
+  app
+    .close()
+    .then(() => authDB.end())
+    .then(() => {
+      console.log('[auth] Database pool closed')
+      process.exit(0)
+    })
+    .catch((err) => {
+      console.error('[auth] Error closing auth service', err)
+      process.exit(1)
+    })
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
-function authCORSMiddleware(req: Request, res: Response, next: NextFunction) {
-  const origin = String(req.header('origin') || '').trim()
+function isAuthRoute(url: string): boolean {
+  const path = normalizeURLPath(url)
+  return path === '/api/auth' || path.startsWith('/api/auth/')
+}
+
+function normalizeURLPath(rawURL: string): string {
+  const rawPath = String(rawURL || '').split('?')[0] || '/'
+  return normalizeAuthPath(rawPath)
+}
+
+function authCORSMiddleware(req: IncomingMessage, res: ServerResponse): boolean {
+  const origin = getHeaderValue(req.headers.origin).trim()
   if (!origin) {
-    next()
-    return
+    return false
   }
 
   const isAllowed = allowedAuthOrigins.has(normalizeCORSOrigin(origin))
   if (!isAllowed) {
     if (req.method === 'OPTIONS') {
-      res.sendStatus(403)
-      return
+      sendNodeStatus(res, 403)
+      return true
     }
-    next()
-    return
+    return false
   }
 
   res.setHeader('Access-Control-Allow-Origin', origin)
@@ -351,15 +451,16 @@ function authCORSMiddleware(req: Request, res: Response, next: NextFunction) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
   res.setHeader(
     'Access-Control-Allow-Headers',
-    req.header('access-control-request-headers') || 'Content-Type, Authorization, Cookie, X-Requested-With',
+    getHeaderValue(req.headers['access-control-request-headers']) ||
+      'Content-Type, Authorization, Cookie, X-Requested-With',
   )
-  res.vary('Origin')
+  appendVaryHeader(res, 'Origin')
 
   if (req.method === 'OPTIONS') {
-    res.sendStatus(204)
-    return
+    sendNodeStatus(res, 204)
+    return true
   }
-  next()
+  return false
 }
 
 function normalizeCORSOrigin(raw: string): string {
@@ -386,7 +487,7 @@ async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
   }
   try {
     const [rows] = await authDB.query(
-      "SELECT `key`, `value` FROM system_configs WHERE `key` IN ('auth_registration_enabled', 'auth_rate_limit_window', 'auth_rate_limit_max_requests')"
+      "SELECT `key`, `value` FROM system_configs WHERE `key` IN ('auth_registration_enabled', 'auth_rate_limit_window', 'auth_rate_limit_max_requests')",
     )
     if (Array.isArray(rows)) {
       for (const row of rows as any[]) {
@@ -394,10 +495,20 @@ async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
           nextSettings.registrationEnabled = row.value === 'true'
         }
         if (row?.key === 'auth_rate_limit_window' && row?.value) {
-          nextSettings.windowSeconds = clampInteger(row.value, 1, 3600, DEFAULT_AUTH_GUARD_SETTINGS.windowSeconds)
+          nextSettings.windowSeconds = clampInteger(
+            row.value,
+            1,
+            3600,
+            DEFAULT_AUTH_GUARD_SETTINGS.windowSeconds,
+          )
         }
         if (row?.key === 'auth_rate_limit_max_requests' && row?.value) {
-          nextSettings.maxRequests = clampInteger(row.value, 1, 10000, DEFAULT_AUTH_GUARD_SETTINGS.maxRequests)
+          nextSettings.maxRequests = clampInteger(
+            row.value,
+            1,
+            10000,
+            DEFAULT_AUTH_GUARD_SETTINGS.maxRequests,
+          )
         }
       }
     }
@@ -414,28 +525,47 @@ async function getAuthGuardSettings(): Promise<AuthGuardSettings> {
   return nextSettings
 }
 
-async function authEntryGuardMiddleware(req: Request, res: Response, next: NextFunction) {
-  const path = normalizeAuthPath(req.path)
+async function authEntryGuardMiddleware(
+  req: AuthMiddlewareRequest,
+  res: ServerResponse,
+  requestIP: string,
+): Promise<boolean> {
+  const path = normalizeAuthPath(getAuthSubpath(req.url || ''))
   const settings = await getAuthGuardSettings()
 
   if (isSignUpPath(path)) {
     if (!settings.registrationEnabled) {
-      sendError(res, 403, '注册已关闭')
-      return
+      sendNodeJSON(res, 403, {
+        code: 403,
+        msg: '注册已关闭',
+      })
+      return true
     }
   }
 
   if (isRateLimitedAuthPath(path)) {
-    const limiterKey = buildRateLimitKey(req, path)
+    const limiterKey = buildRateLimitKey(req, path, requestIP)
     const check = checkAndHitRateLimit(limiterKey, settings.windowSeconds, settings.maxRequests)
     if (!check.allowed) {
       res.setHeader('Retry-After', String(check.retryAfterSeconds))
-      sendError(res, 429, '请求过于频繁，请稍后重试')
-      return
+      sendNodeJSON(res, 429, {
+        code: 429,
+        msg: '请求过于频繁，请稍后重试',
+      })
+      return true
     }
   }
 
-  next()
+  return false
+}
+
+function getAuthSubpath(rawURL: string): string {
+  const path = normalizeURLPath(rawURL)
+  if (path === '/api/auth') return '/'
+  if (path.startsWith('/api/auth/')) {
+    return path.slice('/api/auth'.length)
+  }
+  return path
 }
 
 function normalizeAuthPath(rawPath: string): string {
@@ -450,21 +580,18 @@ function isSignUpPath(path: string): boolean {
 }
 
 function isRateLimitedAuthPath(path: string): boolean {
-  return path === '/sign-in' || path === '/sign-up' || path.startsWith('/sign-in/') || path.startsWith('/sign-up/')
+  return (
+    path === '/sign-in' ||
+    path === '/sign-up' ||
+    path.startsWith('/sign-in/') ||
+    path.startsWith('/sign-up/')
+  )
 }
 
-function buildRateLimitKey(req: Request, path: string): string {
+function buildRateLimitKey(req: AuthMiddlewareRequest, path: string, requestIP: string): string {
   const bucket = path.startsWith('/sign-up/') ? 'signup' : 'signin'
-  const ip = getRequestIP(req)
+  const ip = requestIP.trim() || String(req.socket?.remoteAddress || '').trim() || 'unknown'
   return `${bucket}:${ip}`
-}
-
-function getRequestIP(req: Request): string {
-  const expressIP = String(req.ip || '').trim()
-  if (expressIP) return expressIP
-  const remoteIP = String(req.socket?.remoteAddress || '').trim()
-  if (remoteIP) return remoteIP
-  return 'unknown'
 }
 
 function clampInteger(value: unknown, min: number, max: number, fallback: number): number {
@@ -478,7 +605,11 @@ function clampInteger(value: unknown, min: number, max: number, fallback: number
   return parsed
 }
 
-function checkAndHitRateLimit(key: string, windowSeconds: number, maxRequests: number): { allowed: boolean; retryAfterSeconds: number } {
+function checkAndHitRateLimit(
+  key: string,
+  windowSeconds: number,
+  maxRequests: number,
+): { allowed: boolean; retryAfterSeconds: number } {
   const nowMs = Date.now()
   const windowMs = windowSeconds * 1000
 
@@ -521,24 +652,70 @@ function cleanupExpiredRateLimitEntries(nowMs: number) {
   }
 }
 
-function sendSuccess(res: Response, data: unknown) {
-  res.status(200).json({
+function sendSuccess(reply: FastifyReply, data: unknown) {
+  reply.status(200).send({
     code: 0,
     msg: 'success',
     data,
   })
 }
 
-function sendError(res: Response, status: number, msg: string) {
-  res.status(status).json({
+function sendError(reply: FastifyReply, status: number, msg: string) {
+  reply.status(status).send({
     code: status,
     msg,
   })
 }
 
-function toHeaders(req: Request): Headers {
+function getErrorStatus(error: unknown): number {
+  const candidate = error as { status?: unknown; statusCode?: unknown }
+  const status = Number(candidate.statusCode ?? candidate.status ?? 500)
+  if (!Number.isInteger(status) || status < 400 || status > 599) {
+    return 500
+  }
+  return status
+}
+
+function getHeaderValue(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return String(value[0] || '')
+  }
+  return String(value || '')
+}
+
+function sendNodeJSON(res: ServerResponse, status: number, payload: unknown) {
+  if (!res.hasHeader('Content-Type')) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  }
+  res.statusCode = status
+  res.end(JSON.stringify(payload))
+}
+
+function sendNodeStatus(res: ServerResponse, status: number) {
+  res.statusCode = status
+  res.end()
+}
+
+function appendVaryHeader(res: ServerResponse, value: string) {
+  const existing = res.getHeader('Vary')
+  if (!existing) {
+    res.setHeader('Vary', value)
+    return
+  }
+  const values = Array.isArray(existing) ? existing : String(existing).split(',')
+  const normalized = value.toLowerCase()
+  if (values.some((item) => item.trim().toLowerCase() === normalized)) {
+    return
+  }
+  res.setHeader(
+    'Vary',
+    [...values.map((item) => String(item).trim()).filter(Boolean), value].join(', '),
+  )
+}
+
+function toHeaders(rawHeaders: InternalHeaders): Headers {
   const headers = new Headers()
-  for (const [key, value] of Object.entries(req.headers)) {
+  for (const [key, value] of Object.entries(rawHeaders)) {
     if (Array.isArray(value)) {
       for (const item of value) {
         headers.append(key, item)
@@ -588,7 +765,9 @@ function normalizeOptionalPositiveInteger(raw: unknown): number | null {
 
 function extractAuthUser(payload: unknown): InternalUserShape | null {
   const candidate = payload as any
-  const user = (candidate?.user || candidate?.data?.user || candidate) as InternalUserShape | undefined
+  const user = (candidate?.user || candidate?.data?.user || candidate) as
+    | InternalUserShape
+    | undefined
   if (!user || typeof user.id !== 'string' || !user.id.trim()) {
     return null
   }
@@ -614,7 +793,10 @@ function isDuplicateUserError(error: unknown): boolean {
   )
 }
 
-async function findUserByUsernameOrEmail(username: string, email: string): Promise<InternalUserShape | null> {
+async function findUserByUsernameOrEmail(
+  username: string,
+  email: string,
+): Promise<InternalUserShape | null> {
   const [rows] = await authDB.query(
     'SELECT id, username, email, name, role FROM `user` WHERE username = ? OR email = ? LIMIT 1',
     [username, email],
@@ -640,7 +822,10 @@ async function syncAuthUserRole(authUserID: string, role: 'admin' | 'user') {
 }
 
 async function updateAuthUserRole(authUserID: string, role: 'admin' | 'user'): Promise<boolean> {
-  const [result] = await authDB.query('UPDATE `user` SET `role` = ? WHERE id = ? LIMIT 1', [role, authUserID])
+  const [result] = await authDB.query('UPDATE `user` SET `role` = ? WHERE id = ? LIMIT 1', [
+    role,
+    authUserID,
+  ])
   return Number((result as any)?.affectedRows || 0) > 0
 }
 
@@ -676,10 +861,9 @@ async function removeAuthUserCascade(authUserID: string): Promise<boolean> {
   const conn = await authDB.getConnection()
   try {
     await conn.beginTransaction()
-    const [rows] = await conn.query(
-      'SELECT id, email, username FROM `user` WHERE id = ? LIMIT 1',
-      [authUserID],
-    )
+    const [rows] = await conn.query('SELECT id, email, username FROM `user` WHERE id = ? LIMIT 1', [
+      authUserID,
+    ])
     if (!Array.isArray(rows) || rows.length === 0) {
       await conn.rollback()
       return false
@@ -694,7 +878,9 @@ async function removeAuthUserCascade(authUserID: string): Promise<boolean> {
 
     const verificationIdentifiers = [email, username, authUserID].filter(Boolean)
     if (verificationIdentifiers.length > 0) {
-      await conn.query('DELETE FROM `verification` WHERE identifier IN (?)', [verificationIdentifiers])
+      await conn.query('DELETE FROM `verification` WHERE identifier IN (?)', [
+        verificationIdentifiers,
+      ])
     }
 
     await conn.query('DELETE FROM `user` WHERE id = ? LIMIT 1', [authUserID])
