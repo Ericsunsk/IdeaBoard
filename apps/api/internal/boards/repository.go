@@ -2,135 +2,129 @@ package boards
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 	"strings"
-	"time"
 
-	mysqlDriver "github.com/go-sql-driver/mysql"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+	"api/internal/db/dbutil"
+	dbsqlc "api/internal/db/sqlc"
+	"api/internal/platform/database"
 )
 
 type BoardRepository struct {
-	db *gorm.DB
+	db *sql.DB
+	q  *dbsqlc.Queries
 }
 
-type boardWithRoleRow struct {
-	UserBoard
-	AccessRole string `gorm:"column:access_role"`
-}
-
-type boardMemberWithUserRow struct {
-	UserID    uint64 `gorm:"column:user_id"`
-	MemberUID string `gorm:"column:member_uid"`
-	Username  string `gorm:"column:username"`
-	Role      string `gorm:"column:role"`
-}
-
-func NewBoardRepository(db *gorm.DB) *BoardRepository {
-	return &BoardRepository{db: db}
+func NewBoardRepository(db *sql.DB) *BoardRepository {
+	return &BoardRepository{db: db, q: dbsqlc.New(db)}
 }
 
 func (r *BoardRepository) ListAccessibleByUserID(ctx context.Context, userID uint64) ([]BoardWithRole, error) {
-	var rows []boardWithRoleRow
-	err := r.db.WithContext(ctx).Table("user_boards AS b").
-		Select(
-			"b.id, b.board_id, b.user_id, b.name, b.state, b.created_at, b.updated_at, "+
-				"CASE WHEN b.user_id = ? THEN ? ELSE m.role END AS access_role",
-			userID,
-			string(BoardAccessRoleOwner),
-		).
-		Joins("LEFT JOIN board_members AS m ON m.board_id = b.board_id AND m.user_id = ?", userID).
-		Where("b.user_id = ? OR m.user_id = ?", userID, userID).
-		Order("b.updated_at DESC").
-		Scan(&rows).Error
+	rows, err := r.q.ListAccessibleBoardsByUserID(ctx, dbsqlc.ListAccessibleBoardsByUserIDParams{UserID: userID})
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]BoardWithRole, 0, len(rows))
 	for _, row := range rows {
-		role := normalizeBoardAccessRole(row.AccessRole)
+		role := BoardAccessRoleOwner
+		if row.UserID != userID {
+			role = normalizeBoardAccessRole(row.MemberRole.String)
+		}
 		if role == "" {
 			continue
 		}
 		result = append(result, BoardWithRole{
-			Board: row.UserBoard,
-			Role:  role,
+			Board: UserBoard{
+				ID:        row.ID,
+				BoardID:   row.BoardID,
+				UserID:    row.UserID,
+				Name:      row.Name,
+				State:     row.State,
+				CreatedAt: row.CreatedAt,
+				UpdatedAt: row.UpdatedAt,
+			},
+			Role: role,
 		})
 	}
 	return result, nil
 }
 
 func (r *BoardRepository) GetByBoardID(ctx context.Context, boardID string) (*UserBoard, error) {
-	var board UserBoard
-	tx := r.db.WithContext(ctx).Where("board_id = ?", boardID).Limit(1).Find(&board)
-	if tx.Error != nil {
-		return nil, tx.Error
+	row, err := r.q.GetBoardByBoardID(ctx, boardID)
+	if err != nil {
+		return nil, err
 	}
-	if tx.RowsAffected == 0 {
-		return nil, gorm.ErrRecordNotFound
-	}
+	board := userBoardFromSQLC(row)
 	return &board, nil
 }
 
 func (r *BoardRepository) Upsert(ctx context.Context, board *UserBoard) error {
-	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "board_id"},
-		},
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			"name":       board.Name,
-			"state":      board.State,
-			"updated_at": board.UpdatedAt,
-		}),
-	}).Create(board).Error
+	return r.q.UpsertBoard(ctx, dbsqlc.UpsertBoardParams{
+		BoardID:   board.BoardID,
+		UserID:    board.UserID,
+		Name:      board.Name,
+		State:     board.State,
+		CreatedAt: board.CreatedAt,
+		UpdatedAt: board.UpdatedAt,
+	})
 }
 
 func (r *BoardRepository) HasNameConflict(ctx context.Context, userID uint64, boardID, name string) (bool, error) {
-	query := r.db.WithContext(ctx).Model(&UserBoard{}).Where("user_id = ? AND LOWER(name) = LOWER(?)", userID, name)
+	hasBoardID := int64(0)
 	if strings.TrimSpace(boardID) != "" {
-		query = query.Where("board_id <> ?", boardID)
+		hasBoardID = 1
 	}
-	var count int64
-	if err := query.Count(&count).Error; err != nil {
+	count, err := r.q.CountBoardNameConflicts(ctx, dbsqlc.CountBoardNameConflictsParams{
+		UserID:     userID,
+		Name:       name,
+		HasBoardID: hasBoardID,
+		BoardID:    boardID,
+	})
+	if err != nil {
 		return false, err
 	}
 	return count > 0, nil
 }
 
 func (r *BoardRepository) GetMemberRole(ctx context.Context, boardID string, userID uint64) (BoardAccessRole, error) {
-	var member BoardMember
-	if err := r.db.WithContext(ctx).Select("role").Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error; err != nil {
+	raw, err := r.q.GetBoardMemberRole(ctx, dbsqlc.GetBoardMemberRoleParams{BoardID: boardID, UserID: userID})
+	if err != nil {
 		return "", err
 	}
-	role := normalizeBoardAccessRole(member.Role)
+	role := normalizeBoardAccessRole(raw)
 	if role == "" || role == BoardAccessRoleOwner {
-		return "", gorm.ErrRecordNotFound
+		return "", database.ErrNotFound
 	}
 	return role, nil
 }
 
 func (r *BoardRepository) DeleteByBoardID(ctx context.Context, boardID string) error {
-	return r.db.WithContext(ctx).Where("board_id = ?", boardID).Delete(&UserBoard{}).Error
+	return r.q.DeleteBoardByBoardID(ctx, boardID)
 }
 
 func (r *BoardRepository) DeleteMembersByBoardID(ctx context.Context, boardID string) error {
-	return r.db.WithContext(ctx).Where("board_id = ?", boardID).Delete(&BoardMember{}).Error
+	return r.q.DeleteBoardMembersByBoardID(ctx, boardID)
 }
 
 func (r *BoardRepository) DeleteShareTokensByBoardID(ctx context.Context, boardID string) error {
-	return r.db.WithContext(ctx).Where("board_id = ?", boardID).Delete(&BoardShareToken{}).Error
+	return r.q.DeleteBoardShareTokensByBoardID(ctx, boardID)
+}
+
+func (r *BoardRepository) DeleteBoardCascade(ctx context.Context, boardID string) error {
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		if err := q.DeleteBoardShareTokensByBoardID(ctx, boardID); err != nil {
+			return err
+		}
+		if err := q.DeleteBoardMembersByBoardID(ctx, boardID); err != nil {
+			return err
+		}
+		return q.DeleteBoardByBoardID(ctx, boardID)
+	})
 }
 
 func (r *BoardRepository) ListMembers(ctx context.Context, boardID string) ([]BoardMemberWithUser, error) {
-	var rows []boardMemberWithUserRow
-	err := r.db.WithContext(ctx).Table("board_members AS m").
-		Select("m.user_id, u.storage_uid AS member_uid, u.username, m.role").
-		Joins("INNER JOIN users AS u ON u.id = m.user_id").
-		Where("m.board_id = ?", boardID).
-		Order("m.created_at ASC").
-		Scan(&rows).Error
+	rows, err := r.q.ListBoardMembers(ctx, boardID)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +136,7 @@ func (r *BoardRepository) ListMembers(ctx context.Context, boardID string) ([]Bo
 		}
 		result = append(result, BoardMemberWithUser{
 			UserID:    row.UserID,
-			MemberUID: row.MemberUID,
+			MemberUID: row.MemberUid,
 			Username:  row.Username,
 			Role:      role,
 		})
@@ -151,75 +145,111 @@ func (r *BoardRepository) ListMembers(ctx context.Context, boardID string) ([]Bo
 }
 
 func (r *BoardRepository) UpsertMember(ctx context.Context, boardID string, userID uint64, role BoardAccessRole) error {
-	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "board_id"},
-			{Name: "user_id"},
-		},
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			"role":       string(role),
-			"updated_at": time.Now(),
-		}),
-	}).Create(&BoardMember{
+	return r.q.UpsertBoardMember(ctx, dbsqlc.UpsertBoardMemberParams{
 		BoardID: boardID,
 		UserID:  userID,
 		Role:    string(role),
-	}).Error
+	})
 }
 
 func (r *BoardRepository) DeleteMember(ctx context.Context, boardID string, userID uint64) error {
-	return r.db.WithContext(ctx).Where("board_id = ? AND user_id = ?", boardID, userID).Delete(&BoardMember{}).Error
+	return r.q.DeleteBoardMember(ctx, dbsqlc.DeleteBoardMemberParams{BoardID: boardID, UserID: userID})
 }
 
 func (r *BoardRepository) GetMemberByUserID(ctx context.Context, boardID string, userID uint64) (*BoardMember, error) {
-	var member BoardMember
-	if err := r.db.WithContext(ctx).Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error; err != nil {
+	row, err := r.q.GetBoardMemberByUserID(ctx, dbsqlc.GetBoardMemberByUserIDParams{BoardID: boardID, UserID: userID})
+	if err != nil {
 		return nil, err
+	}
+	member := BoardMember{
+		ID:        row.ID,
+		BoardID:   row.BoardID,
+		UserID:    row.UserID,
+		Role:      row.Role,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
 	}
 	return &member, nil
 }
 
 func (r *BoardRepository) CreateShareToken(ctx context.Context, token *BoardShareToken) error {
-	return r.db.WithContext(ctx).Create(token).Error
+	id, err := r.q.CreateBoardShareToken(ctx, dbsqlc.CreateBoardShareTokenParams{
+		BoardID:   token.BoardID,
+		Token:     token.Token,
+		Role:      token.Role,
+		CreatedBy: token.CreatedBy,
+		Revoked:   token.Revoked,
+		ExpiresAt: dbutil.NullTime(token.ExpiresAt),
+	})
+	if err != nil {
+		return err
+	}
+	token.ID = uint64(id)
+	return nil
 }
 
 func (r *BoardRepository) ListShareTokens(ctx context.Context, boardID string) ([]BoardShareToken, error) {
-	var list []BoardShareToken
-	if err := r.db.WithContext(ctx).Where("board_id = ?", boardID).Order("created_at DESC").Find(&list).Error; err != nil {
+	rows, err := r.q.ListBoardShareTokens(ctx, boardID)
+	if err != nil {
 		return nil, err
 	}
-	return list, nil
+	result := make([]BoardShareToken, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, boardShareTokenFromSQLC(row))
+	}
+	return result, nil
 }
 
 func (r *BoardRepository) GetShareTokenByToken(ctx context.Context, token string) (*BoardShareToken, error) {
-	var shareToken BoardShareToken
-	if err := r.db.WithContext(ctx).Where("token = ?", token).First(&shareToken).Error; err != nil {
+	row, err := r.q.GetBoardShareTokenByToken(ctx, token)
+	if err != nil {
 		return nil, err
 	}
+	shareToken := boardShareTokenFromSQLC(row)
 	return &shareToken, nil
 }
 
 func (r *BoardRepository) RevokeShareToken(ctx context.Context, boardID, token string) error {
-	return r.db.WithContext(ctx).Model(&BoardShareToken{}).
-		Where("board_id = ? AND token = ?", boardID, token).
-		Update("revoked", true).Error
+	return r.q.RevokeBoardShareToken(ctx, dbsqlc.RevokeBoardShareTokenParams{BoardID: boardID, Token: token})
 }
 
 func (r *BoardRepository) ShareTokenExists(ctx context.Context, token string) (bool, error) {
-	var count int64
-	if err := r.db.WithContext(ctx).Model(&BoardShareToken{}).Where("token = ?", token).Count(&count).Error; err != nil {
+	count, err := r.q.CountBoardShareTokenByToken(ctx, token)
+	if err != nil {
 		return false, err
 	}
 	return count > 0, nil
 }
 
 func IsBoardNameUniqueConstraintError(err error) bool {
-	var mysqlErr *mysqlDriver.MySQLError
-	if !errors.As(err, &mysqlErr) {
+	if !database.IsDuplicateConstraintError(err) {
 		return false
 	}
-	if mysqlErr.Number != 1062 {
-		return false
+	return strings.Contains(strings.ToLower(err.Error()), "idx_user_board_name")
+}
+
+func userBoardFromSQLC(row dbsqlc.UserBoard) UserBoard {
+	return UserBoard{
+		ID:        row.ID,
+		BoardID:   row.BoardID,
+		UserID:    row.UserID,
+		Name:      row.Name,
+		State:     row.State,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
 	}
-	return strings.Contains(strings.ToLower(mysqlErr.Message), "idx_user_board_name")
+}
+
+func boardShareTokenFromSQLC(row dbsqlc.BoardShareToken) BoardShareToken {
+	return BoardShareToken{
+		ID:        row.ID,
+		BoardID:   row.BoardID,
+		Token:     row.Token,
+		Role:      row.Role,
+		CreatedBy: row.CreatedBy,
+		Revoked:   row.Revoked,
+		ExpiresAt: dbutil.TimePtr(row.ExpiresAt),
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}
 }

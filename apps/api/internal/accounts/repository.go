@@ -1,109 +1,177 @@
 package accounts
 
 import (
-	"api/internal/tasks"
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+	"api/internal/db/dbutil"
+	dbsqlc "api/internal/db/sqlc"
+	"api/internal/tasks"
 )
 
 type AccountRepository struct {
-	db *gorm.DB
+	db *sql.DB
+	q  *dbsqlc.Queries
 }
 
-func NewAccountRepository(db *gorm.DB) *AccountRepository {
-	return &AccountRepository{db: db}
-}
-
-func (r *AccountRepository) dbWithContext(ctx context.Context) *gorm.DB {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return r.db.WithContext(ctx)
+func NewAccountRepository(db *sql.DB) *AccountRepository {
+	return &AccountRepository{db: db, q: dbsqlc.New(db)}
 }
 
 func (r *AccountRepository) Create(ctx context.Context, account *ApiAccount) error {
-	return r.dbWithContext(ctx).Create(account).Error
+	id, err := r.q.CreateAccount(ctx, dbsqlc.CreateAccountParams{
+		Name:          account.Name,
+		ChannelID:     account.ChannelID,
+		Platform:      account.Platform,
+		ApiType:       account.ApiType,
+		ModelSet:      account.ModelSet,
+		ApiKey:        account.ApiKey,
+		ProxyUrl:      account.ProxyURL,
+		MaxConcurrent: int32(account.MaxConcurrent),
+		Timeout:       int32(account.Timeout),
+		ExtraConfig:   account.ExtraConfig,
+		Status:        account.Status,
+		FailCount:     int32(account.FailCount),
+		Weight:        int32(account.Weight),
+	})
+	if err != nil {
+		return err
+	}
+	account.ID = uint64(id)
+	return nil
 }
 
 func (r *AccountRepository) GetByID(ctx context.Context, id uint64) (*ApiAccount, error) {
-	var account ApiAccount
-	if err := r.dbWithContext(ctx).First(&account, id).Error; err != nil {
+	row, err := r.q.GetAccountByID(ctx, id)
+	if err != nil {
 		return nil, err
 	}
+	account := accountFromSQLC(row)
 	return &account, nil
 }
 
 func (r *AccountRepository) List(ctx context.Context, keyword, platform string, page, pageSize int) ([]*ApiAccount, int64, error) {
-	var accounts []*ApiAccount
-	var total int64
-
-	query := r.dbWithContext(ctx).Model(&ApiAccount{})
-
+	keyword = strings.TrimSpace(keyword)
+	platform = strings.TrimSpace(platform)
+	keywordLike := "%" + keyword + "%"
+	hasKeyword := int64(0)
 	if keyword != "" {
-		query = query.Where("name LIKE ? OR platform LIKE ? OR api_type LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+		hasKeyword = 1
 	}
-
+	hasPlatform := int64(0)
 	if platform != "" {
-		query = query.Where("platform = ?", platform)
+		hasPlatform = 1
 	}
-
-	if err := query.Count(&total).Error; err != nil {
+	params := dbsqlc.CountAccountsParams{
+		HasKeyword:  hasKeyword,
+		KeywordLike: keywordLike,
+		HasPlatform: hasPlatform,
+		Platform:    platform,
+	}
+	total, err := r.q.CountAccounts(ctx, params)
+	if err != nil {
 		return nil, 0, err
 	}
-
 	offset := (page - 1) * pageSize
-	if err := query.Offset(offset).Limit(pageSize).Order("id DESC").Find(&accounts).Error; err != nil {
+	rows, err := r.q.ListAccounts(ctx, dbsqlc.ListAccountsParams{
+		HasKeyword:  hasKeyword,
+		KeywordLike: keywordLike,
+		HasPlatform: hasPlatform,
+		Platform:    platform,
+		Limit:       int32(pageSize),
+		Offset:      int32(offset),
+	})
+	if err != nil {
 		return nil, 0, err
 	}
-
-	return accounts, total, nil
+	return accountsFromSQLC(rows), total, nil
 }
 
 func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, error) {
-	var accounts []*ApiAccount
-	if err := r.dbWithContext(ctx).Where("status = 1").Find(&accounts).Error; err != nil {
+	rows, err := r.q.ListEnabledAccounts(ctx)
+	if err != nil {
 		return nil, err
 	}
-	return accounts, nil
+	return accountsFromSQLC(rows), nil
 }
 
 func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]uint64, error) {
-	var ids []uint64
-	if err := r.dbWithContext(ctx).Model(&ApiAccount{}).Order("id ASC").Pluck("id", &ids).Error; err != nil {
-		return nil, err
-	}
-	return ids, nil
+	return r.q.ListAccountIDs(ctx)
 }
 
 func (r *AccountRepository) Update(ctx context.Context, account *ApiAccount) error {
-	return r.dbWithContext(ctx).Save(account).Error
+	return r.q.UpdateAccount(ctx, dbsqlc.UpdateAccountParams{
+		Name:          account.Name,
+		ChannelID:     account.ChannelID,
+		Platform:      account.Platform,
+		ApiType:       account.ApiType,
+		ModelSet:      account.ModelSet,
+		ApiKey:        account.ApiKey,
+		ProxyUrl:      account.ProxyURL,
+		MaxConcurrent: int32(account.MaxConcurrent),
+		Timeout:       int32(account.Timeout),
+		ExtraConfig:   account.ExtraConfig,
+		Status:        account.Status,
+		FailCount:     int32(account.FailCount),
+		Weight:        int32(account.Weight),
+		ID:            account.ID,
+	})
 }
 
 func (r *AccountRepository) Delete(ctx context.Context, id uint64) error {
-	return r.dbWithContext(ctx).Delete(&ApiAccount{}, id).Error
+	return r.q.DeleteAccount(ctx, id)
 }
 
 func (r *AccountRepository) UpdateStatus(ctx context.Context, id uint64, status int8) error {
-	return r.dbWithContext(ctx).Model(&ApiAccount{}).Where("id = ?", id).Update("status", status).Error
+	return r.q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: status, ID: id})
 }
 
 func (r *AccountRepository) IncrementFailCount(ctx context.Context, id uint64) error {
-	return r.dbWithContext(ctx).Model(&ApiAccount{}).Where("id = ?", id).Update("fail_count", gorm.Expr("fail_count + 1")).Error
+	return r.q.IncrementAccountFailCount(ctx, id)
 }
 
 func (r *AccountRepository) ResetFailCount(ctx context.Context, id uint64) error {
-	return r.dbWithContext(ctx).Model(&ApiAccount{}).Where("id = ?", id).Update("fail_count", 0).Error
+	return r.q.ResetAccountFailCount(ctx, id)
+}
+
+func accountFromSQLC(row dbsqlc.ApiAccount) ApiAccount {
+	return ApiAccount{
+		ID:            row.ID,
+		Name:          row.Name,
+		ChannelID:     row.ChannelID,
+		Platform:      row.Platform,
+		ApiType:       row.ApiType,
+		ModelSet:      row.ModelSet,
+		ApiKey:        row.ApiKey,
+		ProxyURL:      row.ProxyUrl,
+		MaxConcurrent: int(row.MaxConcurrent),
+		Timeout:       int(row.Timeout),
+		ExtraConfig:   row.ExtraConfig,
+		Status:        row.Status,
+		FailCount:     int(row.FailCount),
+		Weight:        int(row.Weight),
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
+	}
+}
+
+func accountsFromSQLC(rows []dbsqlc.ApiAccount) []*ApiAccount {
+	result := make([]*ApiAccount, 0, len(rows))
+	for _, row := range rows {
+		account := accountFromSQLC(row)
+		result = append(result, &account)
+	}
+	return result
 }
 
 // Task Repository
 type TaskRepository struct {
-	db *gorm.DB
+	db *sql.DB
+	q  *dbsqlc.Queries
 }
 
 type TaskStatisticLite struct {
@@ -138,103 +206,209 @@ type StatEventLatencySample struct {
 	LatencySeconds float64
 }
 
-func NewTaskRepository(db *gorm.DB) *TaskRepository {
-	return &TaskRepository{db: db}
-}
-
-func (r *TaskRepository) dbWithContext(ctx context.Context) *gorm.DB {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return r.db.WithContext(ctx)
+func NewTaskRepository(db *sql.DB) *TaskRepository {
+	return &TaskRepository{db: db, q: dbsqlc.New(db)}
 }
 
 func (r *TaskRepository) Create(ctx context.Context, task *tasks.Task) error {
-	return r.dbWithContext(ctx).Create(task).Error
+	now := time.Now()
+	if task.CreatedAt.IsZero() {
+		task.CreatedAt = now
+	}
+	if task.UpdatedAt.IsZero() {
+		task.UpdatedAt = task.CreatedAt
+	}
+	id, err := r.q.CreateTask(ctx, dbsqlc.CreateTaskParams{
+		TaskID:      task.TaskID,
+		UserID:      task.UserID,
+		ChannelID:   task.ChannelID,
+		AccountID:   task.AccountID,
+		Prompt:      task.Prompt,
+		UserPrompt:  task.UserPrompt,
+		Params:      task.Params,
+		Status:      task.Status,
+		LeaseToken:  task.LeaseToken,
+		RetryCount:  int32(task.RetryCount),
+		ErrorMsg:    task.ErrorMsg,
+		Result:      task.Result,
+		CreatedAt:   task.CreatedAt,
+		UpdatedAt:   task.UpdatedAt,
+		CompletedAt: dbutil.NullTime(task.CompletedAt),
+	})
+	if err != nil {
+		return err
+	}
+	task.ID = uint64(id)
+	return nil
 }
 
 func (r *TaskRepository) GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error) {
-	var task tasks.Task
-	if err := r.dbWithContext(ctx).Where("task_id = ?", taskID).First(&task).Error; err != nil {
+	row, err := r.q.GetTaskByTaskID(ctx, taskID)
+	if err != nil {
 		return nil, err
 	}
+	task := taskFromSQLC(row)
 	return &task, nil
 }
 
 func (r *TaskRepository) GetByTaskIDAndUserID(ctx context.Context, taskID string, userID uint64) (*tasks.Task, error) {
-	var task tasks.Task
-	if err := r.dbWithContext(ctx).Where("task_id = ? AND user_id = ?", taskID, userID).First(&task).Error; err != nil {
+	row, err := r.q.GetTaskByTaskIDAndUserID(ctx, dbsqlc.GetTaskByTaskIDAndUserIDParams{TaskID: taskID, UserID: userID})
+	if err != nil {
 		return nil, err
 	}
+	task := taskFromSQLC(row)
 	return &task, nil
 }
 
 func (r *TaskRepository) GetByID(ctx context.Context, id uint64) (*tasks.Task, error) {
-	var task tasks.Task
-	if err := r.dbWithContext(ctx).First(&task, id).Error; err != nil {
+	row, err := r.q.GetTaskByID(ctx, id)
+	if err != nil {
 		return nil, err
 	}
+	task := taskFromSQLC(row)
 	return &task, nil
 }
 
 func (r *TaskRepository) Update(ctx context.Context, task *tasks.Task) error {
-	return r.dbWithContext(ctx).Save(task).Error
+	return r.q.UpdateTask(ctx, dbsqlc.UpdateTaskParams{
+		TaskID:      task.TaskID,
+		UserID:      task.UserID,
+		ChannelID:   task.ChannelID,
+		AccountID:   task.AccountID,
+		Prompt:      task.Prompt,
+		UserPrompt:  task.UserPrompt,
+		Params:      task.Params,
+		Status:      task.Status,
+		LeaseToken:  task.LeaseToken,
+		RetryCount:  int32(task.RetryCount),
+		ErrorMsg:    task.ErrorMsg,
+		Result:      task.Result,
+		CompletedAt: dbutil.NullTime(task.CompletedAt),
+		ID:          task.ID,
+	})
 }
 
-func (r *TaskRepository) UpdateByTaskIDAndStatuses(ctx context.Context, taskID string, statuses []string, updates map[string]interface{}) (int64, error) {
-	result := r.dbWithContext(ctx).Model(&tasks.Task{}).
-		Where("task_id = ? AND status IN ?", taskID, statuses).
-		Updates(updates)
-	return result.RowsAffected, result.Error
+func (r *TaskRepository) MarkTaskRunning(ctx context.Context, taskID string, statuses []string, accountID uint64, leaseToken string) (int64, error) {
+	return r.q.MarkTaskRunning(ctx, dbsqlc.MarkTaskRunningParams{
+		AccountID:  accountID,
+		LeaseToken: leaseToken,
+		TaskID:     taskID,
+		Statuses:   statuses,
+	})
 }
 
-func (r *TaskRepository) UpdateByTaskIDStatusesAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, updates map[string]interface{}) (int64, error) {
-	result := r.dbWithContext(ctx).Model(&tasks.Task{}).
-		Where("task_id = ? AND status IN ? AND lease_token = ?", taskID, statuses, leaseToken).
-		Updates(updates)
-	return result.RowsAffected, result.Error
+func (r *TaskRepository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time) (int64, error) {
+	return r.q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
+		ErrorMsg:    errMsg,
+		Result:      result,
+		CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+		TaskID:      taskID,
+		Statuses:    statuses,
+	})
 }
 
-func (r *TaskRepository) CompleteWithOutputs(ctx context.Context, taskID string, statuses []string, updates map[string]interface{}, outputs []tasks.TaskOutput) (int64, error) {
-	return r.completeWithOutputs(ctx, taskID, statuses, "", false, updates, outputs)
+func (r *TaskRepository) MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error) {
+	return r.q.MarkTaskFailedWithLease(ctx, dbsqlc.MarkTaskFailedWithLeaseParams{
+		ErrorMsg:    errMsg,
+		Result:      result,
+		CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+		TaskID:      taskID,
+		Statuses:    statuses,
+		LeaseToken:  leaseToken,
+	})
 }
 
-func (r *TaskRepository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, updates map[string]interface{}, outputs []tasks.TaskOutput) (int64, error) {
-	return r.completeWithOutputs(ctx, taskID, statuses, leaseToken, true, updates, outputs)
+func (r *TaskRepository) ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error) {
+	return r.q.ResetTaskRunningToPendingWithLease(ctx, dbsqlc.ResetTaskRunningToPendingWithLeaseParams{
+		ErrorMsg:   errMsg,
+		TaskID:     taskID,
+		Statuses:   statuses,
+		LeaseToken: leaseToken,
+	})
 }
 
-func (r *TaskRepository) completeWithOutputs(ctx context.Context, taskID string, statuses []string, leaseToken string, requireLeaseToken bool, updates map[string]interface{}, outputs []tasks.TaskOutput) (int64, error) {
+func (r *TaskRepository) RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error) {
+	return r.q.RequeueTaskRunningWithLease(ctx, dbsqlc.RequeueTaskRunningWithLeaseParams{
+		ErrorMsg:   errMsg,
+		TaskID:     taskID,
+		Statuses:   statuses,
+		LeaseToken: leaseToken,
+	})
+}
+
+func (r *TaskRepository) FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error) {
+	return r.q.FinalFailTaskRunningWithLease(ctx, dbsqlc.FinalFailTaskRunningWithLeaseParams{
+		ErrorMsg:    errMsg,
+		Result:      result,
+		CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+		TaskID:      taskID,
+		Statuses:    statuses,
+		LeaseToken:  leaseToken,
+	})
+}
+
+func (r *TaskRepository) CompleteWithOutputs(ctx context.Context, taskID string, statuses []string, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error) {
+	return r.completeWithOutputs(ctx, taskID, statuses, "", false, result, completedAt, outputs)
+}
+
+func (r *TaskRepository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error) {
+	return r.completeWithOutputs(ctx, taskID, statuses, leaseToken, true, result, completedAt, outputs)
+}
+
+func (r *TaskRepository) completeWithOutputs(ctx context.Context, taskID string, statuses []string, leaseToken string, requireLeaseToken bool, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error) {
 	var rowsAffected int64
-	err := r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		query := tx.Model(&tasks.Task{}).Where("task_id = ? AND status IN ?", taskID, statuses)
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		var err error
 		if requireLeaseToken {
-			query = query.Where("lease_token = ?", leaseToken)
+			rowsAffected, err = q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
+				Result:      result,
+				CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+				TaskID:      taskID,
+				Statuses:    statuses,
+				LeaseToken:  leaseToken,
+			})
+		} else {
+			rowsAffected, err = q.CompleteTask(ctx, dbsqlc.CompleteTaskParams{
+				Result:      result,
+				CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+				TaskID:      taskID,
+				Statuses:    statuses,
+			})
 		}
-		result := query.Updates(updates)
-		if result.Error != nil {
-			return result.Error
-		}
-		rowsAffected = result.RowsAffected
-		if rowsAffected == 0 {
-			return nil
-		}
-
-		if err := tx.Where("task_id = ?", taskID).Delete(&tasks.TaskOutput{}).Error; err != nil {
+		if err != nil || rowsAffected == 0 {
 			return err
 		}
-		if len(outputs) == 0 {
-			return nil
+		if err := q.DeleteOutputsByTaskID(ctx, taskID); err != nil {
+			return err
 		}
-		for i := range outputs {
-			outputs[i].TaskID = taskID
-			outputs[i].SortIndex = i
-			if strings.TrimSpace(outputs[i].Role) == "" {
-				outputs[i].Role = "image"
-			}
-		}
-		return tx.Create(&outputs).Error
+		return insertTaskOutputs(ctx, q, taskID, outputs)
 	})
 	return rowsAffected, err
+}
+
+func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, outputs []tasks.TaskOutput) error {
+	for i := range outputs {
+		output := outputs[i]
+		output.TaskID = taskID
+		output.SortIndex = i
+		if strings.TrimSpace(output.Role) == "" {
+			output.Role = "image"
+		}
+		if _, err := q.CreateTaskOutput(ctx, dbsqlc.CreateTaskOutputParams{
+			TaskID:     output.TaskID,
+			Role:       output.Role,
+			Url:        output.URL,
+			StorageKey: output.StorageKey,
+			MimeType:   output.MIMEType,
+			Width:      int32(output.Width),
+			Height:     int32(output.Height),
+			SizeBytes:  output.SizeBytes,
+			SortIndex:  int32(output.SortIndex),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *TaskRepository) ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error) {
@@ -242,239 +416,185 @@ func (r *TaskRepository) ListOutputsByTaskIDs(ctx context.Context, taskIDs []str
 	if len(taskIDs) == 0 {
 		return result, nil
 	}
-
-	var outputs []tasks.TaskOutput
-	if err := r.dbWithContext(ctx).
-		Where("task_id IN ?", taskIDs).
-		Order("task_id ASC, sort_index ASC, id ASC").
-		Find(&outputs).Error; err != nil {
+	rows, err := r.q.ListOutputsByTaskIDs(ctx, taskIDs)
+	if err != nil {
 		return nil, err
 	}
-	for _, output := range outputs {
+	for _, row := range rows {
+		output := taskOutputFromSQLC(row)
 		result[output.TaskID] = append(result[output.TaskID], output)
 	}
 	return result, nil
 }
 
 func (r *TaskRepository) List(ctx context.Context, userID uint64, accountID uint64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error) {
-	var items []*tasks.Task
-	var total int64
-
-	query := r.dbWithContext(ctx).Model(&tasks.Task{})
-
+	hasUserID := int64(0)
 	if userID > 0 {
-		query = query.Where("user_id = ?", userID)
+		hasUserID = 1
 	}
+	hasAccountID := int64(0)
 	if accountID > 0 {
-		query = query.Where("account_id = ?", accountID)
+		hasAccountID = 1
 	}
+	hasStatus := int64(0)
 	if status != "" {
-		query = query.Where("status = ?", status)
+		hasStatus = 1
 	}
+	hasKeyword := int64(0)
+	keywordLike := "%" + keyword + "%"
 	if keyword != "" {
-		query = query.Where("prompt LIKE ?", "%"+keyword+"%")
+		hasKeyword = 1
 	}
-
-	if err := query.Count(&total).Error; err != nil {
+	countParams := dbsqlc.CountTasksParams{
+		HasUserID:    hasUserID,
+		UserID:       userID,
+		HasAccountID: hasAccountID,
+		AccountID:    accountID,
+		HasStatus:    hasStatus,
+		Status:       status,
+		HasKeyword:   hasKeyword,
+		KeywordLike:  keywordLike,
+	}
+	total, err := r.q.CountTasks(ctx, countParams)
+	if err != nil {
 		return nil, 0, err
 	}
-
 	offset := (page - 1) * pageSize
-	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&items).Error; err != nil {
+	rows, err := r.q.ListTasks(ctx, dbsqlc.ListTasksParams{
+		HasUserID:    hasUserID,
+		UserID:       userID,
+		HasAccountID: hasAccountID,
+		AccountID:    accountID,
+		HasStatus:    hasStatus,
+		Status:       status,
+		HasKeyword:   hasKeyword,
+		KeywordLike:  keywordLike,
+		Limit:        int32(pageSize),
+		Offset:       int32(offset),
+	})
+	if err != nil {
 		return nil, 0, err
 	}
-
-	return items, total, nil
+	return tasksFromSQLC(rows), total, nil
 }
 
 func (r *TaskRepository) GetByUserID(ctx context.Context, userID uint64, page, pageSize int) ([]*tasks.Task, int64, error) {
-	var items []*tasks.Task
-	var total int64
-
-	query := r.dbWithContext(ctx).Model(&tasks.Task{}).Where("user_id = ?", userID)
-
-	if err := query.Count(&total).Error; err != nil {
+	total, err := r.q.CountTasksByUserID(ctx, userID)
+	if err != nil {
 		return nil, 0, err
 	}
-
 	offset := (page - 1) * pageSize
-	if err := query.Offset(offset).Limit(pageSize).Order("created_at DESC").Find(&items).Error; err != nil {
+	rows, err := r.q.ListTasksByUserID(ctx, dbsqlc.ListTasksByUserIDParams{
+		UserID: userID,
+		Limit:  int32(pageSize),
+		Offset: int32(offset),
+	})
+	if err != nil {
 		return nil, 0, err
 	}
-
-	return items, total, nil
+	return tasksFromSQLC(rows), total, nil
 }
 
 func (r *TaskRepository) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, accountID uint64, statuses ...string) ([]string, error) {
-	var taskIDs []string
-
-	query := r.dbWithContext(ctx).Model(&tasks.Task{}).
-		Where("account_id = ?", accountID)
-	if len(statuses) > 0 {
-		query = query.Where("status IN ?", statuses)
+	if len(statuses) == 0 {
+		return r.q.ListTaskIDsByAccountID(ctx, accountID)
 	}
-
-	if err := query.Pluck("task_id", &taskIDs).Error; err != nil {
-		return nil, err
-	}
-
-	return taskIDs, nil
-}
-
-func (r *TaskRepository) runningTasksQuery(ctx context.Context) *gorm.DB {
-	return r.dbWithContext(ctx).Model(&tasks.Task{}).
-		Where("status = ?", tasks.StatusRunning)
-}
-
-func missingLeaseTokenQuery(query *gorm.DB) *gorm.DB {
-	return query.Where("(lease_token IS NULL OR lease_token = ?)", "")
-}
-
-func (r *TaskRepository) runningTaskLeasesQuery(ctx context.Context) *gorm.DB {
-	return r.runningTasksQuery(ctx).
-		Select("task_id", "account_id", "lease_token")
+	return r.q.ListTaskIDsByAccountIDAndStatuses(ctx, dbsqlc.ListTaskIDsByAccountIDAndStatusesParams{
+		AccountID: accountID,
+		Statuses:  statuses,
+	})
 }
 
 func (r *TaskRepository) ListRunningTaskLeases(ctx context.Context, limit int) ([]RunningTaskLease, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be positive")
 	}
-
-	var leases []RunningTaskLease
-	if err := r.runningTaskLeasesQuery(ctx).
-		Order("id ASC").
-		Limit(limit).
-		Find(&leases).Error; err != nil {
+	rows, err := r.q.ListRunningTaskLeases(ctx, int32(limit))
+	if err != nil {
 		return nil, err
 	}
-	return leases, nil
+	result := make([]RunningTaskLease, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, RunningTaskLease{TaskID: row.TaskID, AccountID: row.AccountID, LeaseToken: row.LeaseToken})
+	}
+	return result, nil
 }
 
 func (r *TaskRepository) CountRunningTasksMissingLeaseToken(ctx context.Context) (int64, error) {
-	var count int64
-	if err := missingLeaseTokenQuery(r.runningTasksQuery(ctx)).Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return count, nil
+	return r.q.CountRunningTasksMissingLeaseToken(ctx)
 }
 
 func (r *TaskRepository) ListRunningTasksMissingLeaseToken(ctx context.Context, limit int) ([]RunningTaskLease, error) {
 	if limit <= 0 {
 		return nil, fmt.Errorf("limit must be positive")
 	}
-
-	var leases []RunningTaskLease
-	if err := missingLeaseTokenQuery(r.runningTaskLeasesQuery(ctx)).
-		Order("id ASC").
-		Limit(limit).
-		Find(&leases).Error; err != nil {
+	rows, err := r.q.ListRunningTasksMissingLeaseToken(ctx, int32(limit))
+	if err != nil {
 		return nil, err
 	}
-	return leases, nil
+	result := make([]RunningTaskLease, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, RunningTaskLease{TaskID: row.TaskID, AccountID: row.AccountID, LeaseToken: row.LeaseToken})
+	}
+	return result, nil
 }
 
 func (r *TaskRepository) ResetRunningTasksMissingLeaseTokenToPending(ctx context.Context, limit int) (int64, error) {
 	if limit <= 0 {
 		return 0, fmt.Errorf("limit must be positive")
 	}
-
 	var rowsAffected int64
-	err := r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var taskIDs []string
-		if err := missingLeaseTokenQuery(tx.Model(&tasks.Task{}).
-			Select("task_id").
-			Where("status = ?", tasks.StatusRunning)).
-			Order("id ASC").
-			Limit(limit).
-			Pluck("task_id", &taskIDs).Error; err != nil {
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		taskIDs, err := q.ListRunningMissingLeaseTaskIDs(ctx, int32(limit))
+		if err != nil || len(taskIDs) == 0 {
 			return err
 		}
-		if len(taskIDs) == 0 {
-			return nil
-		}
-
-		result := missingLeaseTokenQuery(tx.Model(&tasks.Task{}).
-			Where("task_id IN ?", taskIDs).
-			Where("status = ?", tasks.StatusRunning)).
-			Updates(map[string]interface{}{
-				"status":       tasks.StatusPending,
-				"account_id":   0,
-				"lease_token":  "",
-				"error_msg":    "lease_token missing; reset to pending by task lease repair",
-				"completed_at": nil,
-			})
-		if result.Error != nil {
-			return result.Error
-		}
-		rowsAffected = result.RowsAffected
-		return nil
+		rowsAffected, err = q.ResetRunningMissingLeaseTasksByIDs(ctx, taskIDs)
+		return err
 	})
 	return rowsAffected, err
 }
 
 func (r *TaskRepository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID uint64) error {
-	return r.dbWithContext(ctx).Where("task_id = ? AND user_id = ?", taskID, userID).Delete(&tasks.Task{}).Error
+	return r.q.DeleteTaskByTaskIDAndUserID(ctx, dbsqlc.DeleteTaskByTaskIDAndUserIDParams{TaskID: taskID, UserID: userID})
 }
 
 func (r *TaskRepository) MarkQueueFailed(ctx context.Context, taskID string, errMsg string) error {
 	now := time.Now()
-	return r.dbWithContext(ctx).Model(&tasks.Task{}).
-		Where("task_id = ?", taskID).
-		Updates(map[string]interface{}{
-			"status":       "failed",
-			"error_msg":    errMsg,
-			"completed_at": now,
-		}).Error
+	return r.q.MarkQueueFailed(ctx, dbsqlc.MarkQueueFailedParams{
+		ErrorMsg:    errMsg,
+		CompletedAt: sql.NullTime{Time: now, Valid: true},
+		TaskID:      taskID,
+	})
 }
 
 // FailRunningByAccountID 将指定账号下所有 running/pending 状态的任务标记为 failed
 func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID uint64, errMsg string) (int64, error) {
 	now := time.Now()
-	type candidate struct {
-		TaskID      string
-		UserID      uint64
-		AccountID   uint64
-		Result      string
-		CreatedAt   time.Time
-		CompletedAt *time.Time
-	}
-
 	var rowsAffected int64
-	err := r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var candidates []candidate
-		if err := tx.Model(&tasks.Task{}).
-			Select("task_id", "user_id", "account_id", "result", "created_at", "completed_at").
-			Where("account_id = ? AND status IN ?", accountID, []string{"running", "pending"}).
-			Find(&candidates).Error; err != nil {
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		candidates, err := q.ListFailRunningCandidatesByAccountID(ctx, accountID)
+		if err != nil {
 			return err
 		}
-
-		result := tx.Model(&tasks.Task{}).
-			Where("account_id = ? AND status IN ?", accountID, []string{"running", "pending"}).
-			Updates(map[string]interface{}{
-				"status":       "failed",
-				"error_msg":    errMsg,
-				"completed_at": now,
-			})
-		if result.Error != nil {
-			return result.Error
+		rowsAffected, err = q.FailRunningTasksByAccountID(ctx, dbsqlc.FailRunningTasksByAccountIDParams{
+			ErrorMsg:    errMsg,
+			CompletedAt: sql.NullTime{Time: now, Valid: true},
+			AccountID:   accountID,
+		})
+		if err != nil || len(candidates) == 0 {
+			return err
 		}
-		rowsAffected = result.RowsAffected
-		if len(candidates) == 0 {
-			return nil
+		if rowsAffected != int64(len(candidates)) {
+			log.Printf("[TaskRepository] FailRunningByAccountID affected mismatch account_id=%d candidates=%d updated=%d", accountID, len(candidates), rowsAffected)
 		}
-		if result.RowsAffected != int64(len(candidates)) {
-			log.Printf("[TaskRepository] FailRunningByAccountID affected mismatch account_id=%d candidates=%d updated=%d", accountID, len(candidates), result.RowsAffected)
-		}
-
-		modelSetMap, err := r.listSingleModelSetByAccountIDsTx(tx, []uint64{accountID})
+		modelSetMap, err := listSingleModelSetByAccountIDsTx(ctx, q, []uint64{accountID})
 		if err != nil {
 			return err
 		}
 		fallbackModelSet := modelSetMap[accountID]
-
 		for _, c := range candidates {
-			completedAt := c.CompletedAt
+			completedAt := dbutil.TimePtr(c.CompletedAt)
 			if completedAt == nil {
 				fallback := now
 				completedAt = &fallback
@@ -488,7 +608,7 @@ func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID u
 				CreatedAt:   c.CreatedAt,
 				CompletedAt: completedAt,
 			}
-			if err := r.upsertDailyStatByTaskWithFallbackModelTx(tx, task, fallbackModelSet); err != nil {
+			if err := upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModelSet); err != nil {
 				return fmt.Errorf("upsert daily stat for task %s: %w", c.TaskID, err)
 			}
 		}
@@ -501,32 +621,31 @@ func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID u
 }
 
 func (r *TaskRepository) CountByStatus(ctx context.Context, status string) (int64, error) {
-	var count int64
-	if err := r.dbWithContext(ctx).Model(&tasks.Task{}).Where("status = ?", status).Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return count, nil
+	return r.q.CountTasksByStatus(ctx, status)
 }
 
 func (r *TaskRepository) CountAllTasks(ctx context.Context) (int64, error) {
-	var count int64
-	if err := r.dbWithContext(ctx).Model(&tasks.Task{}).Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return count, nil
+	return r.q.CountAllTasks(ctx)
 }
 
 func (r *TaskRepository) ListStatisticsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]TaskStatisticLite, error) {
-	var rows []TaskStatisticLite
-	err := r.dbWithContext(ctx).Model(&tasks.Task{}).
-		Select("task_id", "user_id", "account_id", "status", "result", "created_at", "completed_at").
-		Where("created_at >= ? AND created_at < ?", start, end).
-		Order("created_at ASC").
-		Find(&rows).Error
+	rows, err := r.q.ListTaskStatisticsByCreatedRange(ctx, dbsqlc.ListTaskStatisticsByCreatedRangeParams{CreatedAt: start, CreatedAt_2: end})
 	if err != nil {
 		return nil, err
 	}
-	return rows, nil
+	result := make([]TaskStatisticLite, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, TaskStatisticLite{
+			TaskID:      row.TaskID,
+			UserID:      row.UserID,
+			AccountID:   row.AccountID,
+			Status:      row.Status,
+			Result:      row.Result,
+			CreatedAt:   row.CreatedAt,
+			CompletedAt: dbutil.TimePtr(row.CompletedAt),
+		})
+	}
+	return result, nil
 }
 
 func (r *TaskRepository) UpsertDailyStatByTask(ctx context.Context, task *tasks.Task) error {
@@ -537,12 +656,12 @@ func (r *TaskRepository) UpsertDailyStatByTaskWithFallbackModel(ctx context.Cont
 	if task != nil && strings.TrimSpace(fallbackModelSet) == "" && !resultContainsModel(task.Result) {
 		fallbackModelSet = r.resolveAccountSingleModelSet(ctx, task.AccountID)
 	}
-	return r.dbWithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return r.upsertDailyStatByTaskWithFallbackModelTx(tx, task, fallbackModelSet)
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModelSet)
 	})
 }
 
-func (r *TaskRepository) upsertDailyStatByTaskWithFallbackModelTx(tx *gorm.DB, task *tasks.Task, fallbackModelSet string) error {
+func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, fallbackModelSet string) error {
 	if task == nil || task.Status == "" || task.TaskID == "" {
 		return nil
 	}
@@ -573,7 +692,19 @@ func (r *TaskRepository) upsertDailyStatByTaskWithFallbackModelTx(tx *gorm.DB, t
 		failedDelta = 1
 	}
 
-	row := &TaskDailyStat{
+	inserted, err := q.InsertTaskStatEventIgnore(ctx, dbsqlc.InsertTaskStatEventIgnoreParams{
+		TaskID:         task.TaskID,
+		StatDate:       statDate,
+		ModelName:      model,
+		UserKey:        user,
+		Status:         task.Status,
+		LatencySeconds: latencySeconds,
+	})
+	if err != nil || inserted == 0 {
+		return err
+	}
+
+	return q.UpsertTaskDailyStatDelta(ctx, dbsqlc.UpsertTaskDailyStatDeltaParams{
 		StatDate:          statDate,
 		ModelName:         model,
 		UserKey:           user,
@@ -582,59 +713,25 @@ func (r *TaskRepository) upsertDailyStatByTaskWithFallbackModelTx(tx *gorm.DB, t
 		Failed:            failedDelta,
 		LatencySecondsSum: latencySeconds,
 		LatencyCount:      latencyCountDelta,
-	}
-
-	event := &TaskStatEvent{
-		TaskID:         task.TaskID,
-		StatDate:       statDate,
-		ModelName:      model,
-		UserKey:        user,
-		Status:         task.Status,
-		LatencySeconds: latencySeconds,
-	}
-	insert := tx.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "task_id"}},
-		DoNothing: true,
-	}).Create(event)
-	if insert.Error != nil {
-		return insert.Error
-	}
-	if insert.RowsAffected == 0 {
-		return nil
-	}
-
-	return tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "stat_date"},
-			{Name: "model_name"},
-			{Name: "user_key"},
-		},
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			"total":               gorm.Expr("total + ?", row.Total),
-			"completed":           gorm.Expr("completed + ?", row.Completed),
-			"failed":              gorm.Expr("failed + ?", row.Failed),
-			"latency_seconds_sum": gorm.Expr("latency_seconds_sum + ?", row.LatencySecondsSum),
-			"latency_count":       gorm.Expr("latency_count + ?", row.LatencyCount),
-		}),
-	}).Create(row).Error
+	})
 }
 
 func (r *TaskRepository) resolveAccountSingleModelSet(ctx context.Context, accountID uint64) string {
 	if accountID == 0 {
 		return ""
 	}
-	var account ApiAccount
-	if err := r.dbWithContext(ctx).Select("model_set").Where("id = ?", accountID).First(&account).Error; err != nil {
+	modelSet, err := r.q.GetAccountModelSetByID(ctx, accountID)
+	if err != nil {
 		return ""
 	}
-	return singleModelFromSet(account.ModelSet)
+	return singleModelFromSet(modelSet)
 }
 
 func (r *TaskRepository) listSingleModelSetByAccountIDs(ctx context.Context, accountIDs []uint64) (map[uint64]string, error) {
-	return r.listSingleModelSetByAccountIDsTx(r.dbWithContext(ctx), accountIDs)
+	return listSingleModelSetByAccountIDsTx(ctx, r.q, accountIDs)
 }
 
-func (r *TaskRepository) listSingleModelSetByAccountIDsTx(tx *gorm.DB, accountIDs []uint64) (map[uint64]string, error) {
+func listSingleModelSetByAccountIDsTx(ctx context.Context, q *dbsqlc.Queries, accountIDs []uint64) (map[uint64]string, error) {
 	result := make(map[uint64]string)
 	if len(accountIDs) == 0 {
 		return result, nil
@@ -656,14 +753,8 @@ func (r *TaskRepository) listSingleModelSetByAccountIDsTx(tx *gorm.DB, accountID
 		return result, nil
 	}
 
-	var rows []struct {
-		ID       uint64
-		ModelSet string
-	}
-	if err := tx.Model(&ApiAccount{}).
-		Select("id", "model_set").
-		Where("id IN ?", ids).
-		Find(&rows).Error; err != nil {
+	rows, err := q.ListAccountModelSetsByIDs(ctx, ids)
+	if err != nil {
 		return nil, err
 	}
 	for _, row := range rows {
@@ -673,48 +764,92 @@ func (r *TaskRepository) listSingleModelSetByAccountIDsTx(tx *gorm.DB, accountID
 }
 
 func (r *TaskRepository) ListDailyStatsByDateRange(ctx context.Context, startDate, endDate string) ([]DailyStatAggregate, error) {
-	var rows []DailyStatAggregate
-	err := r.dbWithContext(ctx).Model(&TaskDailyStat{}).
-		Select("stat_date", "model_name", "user_key", "total", "completed", "failed", "latency_seconds_sum", "latency_count").
-		Where("stat_date >= ? AND stat_date <= ?", startDate, endDate).
-		Order("stat_date ASC").
-		Find(&rows).Error
+	rows, err := r.q.ListDailyStatsByDateRange(ctx, dbsqlc.ListDailyStatsByDateRangeParams{StatDate: startDate, StatDate_2: endDate})
 	if err != nil {
 		return nil, err
 	}
-	return rows, nil
+	result := make([]DailyStatAggregate, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, DailyStatAggregate{
+			StatDate:          row.StatDate,
+			ModelName:         row.ModelName,
+			UserKey:           row.UserKey,
+			Total:             row.Total,
+			Completed:         row.Completed,
+			Failed:            row.Failed,
+			LatencySecondsSum: row.LatencySecondsSum,
+			LatencyCount:      row.LatencyCount,
+		})
+	}
+	return result, nil
 }
 
 func (r *TaskRepository) ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate string) ([]StatEventLatencySample, error) {
-	var rows []StatEventLatencySample
-	err := r.dbWithContext(ctx).Model(&TaskStatEvent{}).
-		Select("model_name", "latency_seconds").
-		Where("stat_date >= ? AND stat_date <= ? AND latency_seconds > 0", startDate, endDate).
-		Order("model_name ASC, latency_seconds ASC").
-		Find(&rows).Error
+	rows, err := r.q.ListStatEventLatencySamplesByDateRange(ctx, dbsqlc.ListStatEventLatencySamplesByDateRangeParams{StatDate: startDate, StatDate_2: endDate})
 	if err != nil {
 		return nil, err
 	}
-	return rows, nil
+	result := make([]StatEventLatencySample, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, StatEventLatencySample{ModelName: row.ModelName, LatencySeconds: row.LatencySeconds})
+	}
+	return result, nil
 }
 
 func (r *TaskRepository) ListBackfilledDatesByRange(ctx context.Context, startDate, endDate string) ([]string, error) {
-	var dates []string
-	if err := r.dbWithContext(ctx).Model(&TaskDailyStatBackfill{}).
-		Where("stat_date >= ? AND stat_date <= ?", startDate, endDate).
-		Order("stat_date ASC").
-		Pluck("stat_date", &dates).Error; err != nil {
-		return nil, err
-	}
-	return dates, nil
+	return r.q.ListBackfilledDatesByRange(ctx, dbsqlc.ListBackfilledDatesByRangeParams{StatDate: startDate, StatDate_2: endDate})
 }
 
 func (r *TaskRepository) MarkDailyBackfillDone(ctx context.Context, statDate string) error {
 	if statDate == "" {
 		return nil
 	}
-	return r.dbWithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "stat_date"}},
-		DoNothing: true,
-	}).Create(&TaskDailyStatBackfill{StatDate: statDate}).Error
+	return r.q.MarkDailyBackfillDone(ctx, statDate)
+}
+
+func taskFromSQLC(row dbsqlc.Task) tasks.Task {
+	return tasks.Task{
+		ID:          row.ID,
+		TaskID:      row.TaskID,
+		UserID:      row.UserID,
+		ChannelID:   row.ChannelID,
+		AccountID:   row.AccountID,
+		Prompt:      row.Prompt,
+		UserPrompt:  row.UserPrompt,
+		Params:      row.Params,
+		Status:      row.Status,
+		LeaseToken:  row.LeaseToken,
+		RetryCount:  int(row.RetryCount),
+		ErrorMsg:    row.ErrorMsg,
+		Result:      row.Result,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
+		CompletedAt: dbutil.TimePtr(row.CompletedAt),
+	}
+}
+
+func tasksFromSQLC(rows []dbsqlc.Task) []*tasks.Task {
+	result := make([]*tasks.Task, 0, len(rows))
+	for _, row := range rows {
+		task := taskFromSQLC(row)
+		result = append(result, &task)
+	}
+	return result
+}
+
+func taskOutputFromSQLC(row dbsqlc.TaskOutput) tasks.TaskOutput {
+	return tasks.TaskOutput{
+		ID:         row.ID,
+		TaskID:     row.TaskID,
+		Role:       row.Role,
+		URL:        row.Url,
+		StorageKey: row.StorageKey,
+		MIMEType:   row.MimeType,
+		Width:      int(row.Width),
+		Height:     int(row.Height),
+		SizeBytes:  row.SizeBytes,
+		SortIndex:  int(row.SortIndex),
+		CreatedAt:  row.CreatedAt,
+		UpdatedAt:  row.UpdatedAt,
+	}
 }

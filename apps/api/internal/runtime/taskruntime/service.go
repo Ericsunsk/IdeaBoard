@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/platform/database"
 	"api/internal/runtime/queuetypes"
 	"api/internal/runtime/taskqueue"
 	"api/internal/tasks"
-	"gorm.io/gorm"
 )
 
 const (
@@ -260,11 +260,7 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 	if strings.TrimSpace(leaseToken) == "" {
 		return ErrTaskStateConflict
 	}
-	rows, err := s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusPending}, map[string]interface{}{
-		"status":      tasks.StatusRunning,
-		"account_id":  accountID,
-		"lease_token": leaseToken,
-	})
+	rows, err := s.taskRepo.MarkTaskRunning(ctx, taskID, []string{tasks.StatusPending}, accountID, leaseToken)
 	if err != nil {
 		return err
 	}
@@ -275,7 +271,7 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return ErrTaskNotFound
 		}
 		return err
@@ -298,13 +294,7 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseTok
 	if err != nil {
 		return err
 	}
-	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, map[string]interface{}{
-		"status":       tasks.StatusCompleted,
-		"lease_token":  "",
-		"result":       result,
-		"error_msg":    "",
-		"completed_at": now,
-	}, outputs)
+	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, result, now, outputs)
 	if err != nil {
 		return err
 	}
@@ -322,7 +312,7 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseTok
 
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return ErrTaskNotFound
 		}
 		return err
@@ -346,19 +336,12 @@ func (s *Service) MarkTaskFailedWithLease(ctx context.Context, taskID string, le
 
 func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken string, requireLeaseToken bool, reason string) error {
 	now := time.Now()
-	updates := map[string]interface{}{
-		"status":       tasks.StatusFailed,
-		"lease_token":  "",
-		"error_msg":    reason,
-		"result":       formatTaskFailureResult(taskID, reason),
-		"completed_at": now,
-	}
 	var rows int64
 	var err error
 	if requireLeaseToken {
-		rows, err = s.taskRepo.UpdateByTaskIDStatusesAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, updates)
+		rows, err = s.taskRepo.MarkTaskFailedWithLease(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, reason, formatTaskFailureResult(taskID, reason), now)
 	} else {
-		rows, err = s.taskRepo.UpdateByTaskIDAndStatuses(ctx, taskID, []string{tasks.StatusPending}, updates)
+		rows, err = s.taskRepo.MarkTaskFailed(ctx, taskID, []string{tasks.StatusPending}, reason, formatTaskFailureResult(taskID, reason), now)
 	}
 	if err != nil {
 		return err
@@ -377,7 +360,7 @@ func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken 
 
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return ErrTaskNotFound
 		}
 		return err
@@ -399,17 +382,12 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 		return ErrTaskStateConflict
 	}
 
-	updates := map[string]interface{}{
-		"status":     tasks.StatusPending,
-		"account_id": 0,
-	}
+	errMsg := ""
 	if reason != "" {
-		updates["error_msg"] = reason
+		errMsg = reason
 	}
 
-	updates["lease_token"] = ""
-
-	rows, err := s.taskRepo.UpdateByTaskIDStatusesAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, updates)
+	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, errMsg)
 	if err != nil {
 		return err
 	}
@@ -420,7 +398,7 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return ErrTaskNotFound
 		}
 		return err
@@ -443,7 +421,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 	}
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return false, ErrTaskNotFound
 		}
 		return false, err
@@ -462,13 +440,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.UpdateByTaskIDStatusesAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, map[string]interface{}{
-			"status":      tasks.StatusPending,
-			"account_id":  0,
-			"lease_token": "",
-			"error_msg":   errMsg,
-			"retry_count": gorm.Expr("retry_count + 1"),
-		})
+		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, errMsg)
 		if err != nil {
 			return false, err
 		}
@@ -480,15 +452,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 	}
 
 	now := time.Now()
-	rows, err := s.taskRepo.UpdateByTaskIDStatusesAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, map[string]interface{}{
-		"status":       tasks.StatusFailed,
-		"account_id":   0,
-		"lease_token":  "",
-		"error_msg":    errMsg,
-		"result":       formatTaskFailureResult(taskID, errMsg),
-		"retry_count":  gorm.Expr("retry_count + 1"),
-		"completed_at": now,
-	})
+	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, errMsg, formatTaskFailureResult(taskID, errMsg), now)
 	if err != nil {
 		return false, err
 	}
@@ -506,7 +470,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 
 	latest, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return false, ErrTaskNotFound
 		}
 		return false, err

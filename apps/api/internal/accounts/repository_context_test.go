@@ -28,10 +28,8 @@ func TestTaskRepositoryCanceledContextAffectsQueryAndWrite(t *testing.T) {
 		t.Fatalf("GetByTaskID error=%v, want context.Canceled", err)
 	}
 
-	_, err := repo.UpdateByTaskIDAndStatuses(ctx, "ctx-cancel-task", []string{tasks.StatusPending}, map[string]interface{}{
-		"status": tasks.StatusRunning,
-	})
+	_, err := repo.MarkTaskRunning(ctx, "ctx-cancel-task", []string{tasks.StatusPending}, 1, "lease-context-cancel")
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("UpdateByTaskIDAndStatuses error=%v, want context.Canceled", err)
+		t.Fatalf("MarkTaskRunning error=%v, want context.Canceled", err)
 	}
 }

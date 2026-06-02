@@ -4,11 +4,11 @@ import "time"
 
 // Channel 渠道商
 type Channel struct {
-	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	Type      string    `gorm:"type:varchar(50);not null;default:'openai-compatible'" json:"type"`
-	Name      string    `gorm:"type:varchar(100);not null" json:"name"`
-	ApiURL    string    `gorm:"type:varchar(500);not null" json:"api_url"`
-	Status    int8      `gorm:"type:tinyint;default:1" json:"status"`
+	ID        uint64    `json:"id"`
+	Type      string    `json:"type"`
+	Name      string    `json:"name"`
+	ApiURL    string    `json:"api_url"`
+	Status    int8      `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

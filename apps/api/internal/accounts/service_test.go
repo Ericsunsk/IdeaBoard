@@ -2,15 +2,15 @@ package accounts
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
+	"time"
 
 	"api/internal/boards"
 	"api/internal/prompts"
 	"api/internal/users"
 	"api/internal/workflow"
-
-	"gorm.io/gorm"
 )
 
 func TestTemplateValueDescriptions(t *testing.T) {
@@ -389,15 +389,17 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	owner := mustCreateAccountsUploadUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
 	member := mustCreateAccountsUploadUser(t, userRepo, "member", "member-auth", "MEMB1A")
 	outsider := mustCreateAccountsUploadUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
-	if err := db.Create(&boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}"}).Error; err != nil {
+	boardRepo := boards.NewBoardRepository(db)
+	now := time.Now()
+	if err := boardRepo.Upsert(ctx, &boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if err := db.Create(&boards.BoardMember{BoardID: "board-1", UserID: member.ID, Role: string(boards.BoardAccessRoleViewer)}).Error; err != nil {
+	if err := boardRepo.UpsertMember(ctx, "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
 	svc := NewAccountService(AccountServiceDeps{
-		UploadBoards: testAccountUploadBoardAccessResolver{service: boards.NewBoardService(boards.NewBoardRepository(db), userRepo)},
+		UploadBoards: testAccountUploadBoardAccessResolver{service: boards.NewBoardService(boardRepo, userRepo)},
 		UploadOwners: testAccountUploadOwnerStorageUIDResolver{repo: userRepo},
 	}, AccountServiceOptions{})
 	allowed := "/uploads/workspace/OWNR1A/board-1/content/demo.png"
@@ -442,13 +444,9 @@ func (r testAccountUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx cont
 	return user.StorageUID, nil
 }
 
-func newAccountsWorkspaceUploadTestDB(t *testing.T) *gorm.DB {
+func newAccountsWorkspaceUploadTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db := newAccountsTestDB(t)
-	if err := db.AutoMigrate(&users.User{}, &users.UsedUID{}, &boards.UserBoard{}, &boards.BoardMember{}); err != nil {
-		t.Fatalf("auto migrate workspace upload models failed: %v", err)
-	}
-	return db
+	return newAccountsTestDB(t)
 }
 
 func mustCreateAccountsUploadUser(t *testing.T, repo *users.UserRepository, username string, authUserID string, storageUID string) *users.User {

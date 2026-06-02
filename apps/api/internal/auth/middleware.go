@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"strings"
 
+	"api/internal/platform/database"
 	"api/internal/platform/response"
 	"api/internal/users"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 // AuthMiddleware 认证中间件：通过 Better Auth session 校验并映射本地业务用户。
@@ -75,7 +75,7 @@ func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRep
 	if err == nil {
 		return user, nil
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !database.IsNotFound(err) {
 		return nil, err
 	}
 
@@ -87,7 +87,7 @@ func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRep
 			if strings.EqualFold(existingAuthUserID, authUserID) {
 				return existing, nil
 			}
-		} else if !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+		} else if !database.IsNotFound(lookupErr) {
 			return nil, lookupErr
 		}
 	}

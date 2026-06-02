@@ -4,6 +4,7 @@ import (
 	"api/internal/accounts"
 	"api/internal/runtime/queuetypes"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,8 +13,7 @@ import (
 	"api/internal/runtime/taskqueue"
 	"api/internal/runtime/taskruntime"
 	"api/internal/tasks"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"api/internal/testdb"
 )
 
 func TestUserFacingProviderErrorRecognizesWrappedDeadlineExceeded(t *testing.T) {
@@ -86,11 +86,13 @@ func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
-	if err := db.Exec(`CREATE TRIGGER fail_mark_completed BEFORE UPDATE ON tasks
-WHEN NEW.status = 'completed'
+	if _, err := db.ExecContext(context.Background(), `CREATE TRIGGER fail_mark_completed BEFORE UPDATE ON tasks
+FOR EACH ROW
 BEGIN
-	SELECT RAISE(ABORT, 'forced mark completed failure');
-END;`).Error; err != nil {
+	IF NEW.status = 'completed' THEN
+		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced mark completed failure';
+	END IF;
+END`); err != nil {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
@@ -126,11 +128,13 @@ func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
-	if err := db.Exec(`CREATE TRIGGER fail_mark_failed BEFORE UPDATE ON tasks
-WHEN NEW.status = 'failed'
+	if _, err := db.ExecContext(context.Background(), `CREATE TRIGGER fail_mark_failed BEFORE UPDATE ON tasks
+FOR EACH ROW
 BEGIN
-	SELECT RAISE(ABORT, 'forced mark failed failure');
-END;`).Error; err != nil {
+	IF NEW.status = 'failed' THEN
+		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced mark failed failure';
+	END IF;
+END`); err != nil {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
@@ -152,16 +156,7 @@ END;`).Error; err != nil {
 	}
 }
 
-func newTaskExecutionOrchestratorTestDB(t *testing.T) *gorm.DB {
+func newTaskExecutionOrchestratorTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	dsn := fmt.Sprintf("file:task_execution_orchestrator_%s?mode=memory&cache=shared", t.Name())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&accounts.ApiAccount{}, &tasks.Task{}, &tasks.TaskOutput{}); err != nil {
-		t.Fatalf("auto migrate failed: %v", err)
-	}
-	return db
+	return testdb.Open(t)
 }

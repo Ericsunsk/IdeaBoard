@@ -2,21 +2,22 @@ package settings
 
 import (
 	"context"
+	"database/sql"
+	"strings"
 
-	"gorm.io/gorm"
+	dbsqlc "api/internal/db/sqlc"
 )
 
 type SystemConfigRepository struct {
-	db *gorm.DB
+	q *dbsqlc.Queries
 }
 
-func NewSystemConfigRepository(db *gorm.DB) *SystemConfigRepository {
-	return &SystemConfigRepository{db: db}
+func NewSystemConfigRepository(db *sql.DB) *SystemConfigRepository {
+	return &SystemConfigRepository{q: dbsqlc.New(db)}
 }
 
 func (r *SystemConfigRepository) Get(ctx context.Context, key string) (string, error) {
-	var cfg SystemConfig
-	err := r.db.WithContext(ctx).Where("`key` = ?", key).First(&cfg).Error
+	cfg, err := r.q.GetSystemConfig(ctx, key)
 	if err != nil {
 		return "", err
 	}
@@ -24,29 +25,18 @@ func (r *SystemConfigRepository) Get(ctx context.Context, key string) (string, e
 }
 
 func (r *SystemConfigRepository) GetByPrefix(ctx context.Context, prefix string) (map[string]string, error) {
-	var cfgs []SystemConfig
-	err := r.db.WithContext(ctx).Where("`key` LIKE ?", prefix+"%").Find(&cfgs).Error
+	cfgs, err := r.q.ListSystemConfigsByPrefix(ctx, prefix+"%")
 	if err != nil {
 		return nil, err
 	}
 	result := make(map[string]string, len(cfgs))
 	for _, c := range cfgs {
-		// 去掉前缀返回
-		key := c.Key[len(prefix):]
+		key := strings.TrimPrefix(c.Key, prefix)
 		result[key] = c.Value
 	}
 	return result, nil
 }
 
 func (r *SystemConfigRepository) Set(ctx context.Context, key, value string) error {
-	db := r.db.WithContext(ctx)
-	var cfg SystemConfig
-	err := db.Where("`key` = ?", key).First(&cfg).Error
-	if err != nil {
-		// 不存在则创建
-		cfg = SystemConfig{Key: key, Value: value}
-		return db.Create(&cfg).Error
-	}
-	cfg.Value = value
-	return db.Save(&cfg).Error
+	return r.q.UpsertSystemConfig(ctx, dbsqlc.UpsertSystemConfigParams{Key: key, Value: value})
 }

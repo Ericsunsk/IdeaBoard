@@ -2,23 +2,15 @@ package accounts
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"api/internal/testdb"
 )
 
-func newAccountServiceTestDB(t *testing.T) *gorm.DB {
+func newAccountServiceTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&ApiAccount{}); err != nil {
-		t.Fatalf("auto migrate api account failed: %v", err)
-	}
-	return db
+	return testdb.Open(t)
 }
 
 func TestUpdateAccountNormalizesTimeout(t *testing.T) {

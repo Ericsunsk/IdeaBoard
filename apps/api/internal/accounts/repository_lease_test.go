@@ -2,15 +2,21 @@ package accounts
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"api/internal/tasks"
 )
 
-func TestTaskAutoMigrateIncludesLeaseTokenColumn(t *testing.T) {
-	db := newAccountsTestDB(t)
-	if !db.Migrator().HasColumn(&tasks.Task{}, "lease_token") {
-		t.Fatal("expected tasks table to contain lease_token column after AutoMigrate")
+func TestTaskSchemaIncludesLeaseTokenColumn(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "db", "schema", "schema.sql"))
+	if err != nil {
+		t.Fatalf("read schema failed: %v", err)
+	}
+	if !strings.Contains(string(raw), "lease_token VARCHAR(128) NOT NULL DEFAULT ''") {
+		t.Fatal("expected tasks table to contain lease_token column")
 	}
 }
 

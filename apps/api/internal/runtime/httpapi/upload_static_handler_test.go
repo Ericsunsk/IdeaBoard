@@ -9,15 +9,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"api/internal/auth"
 	"api/internal/boards"
 	"api/internal/platform/config"
+	"api/internal/testdb"
 	"api/internal/users"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 type uploadStaticTestEnv struct {
@@ -191,23 +191,18 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	mustWriteTestFile(t, filepath.Join("uploads", "tasks", "1", "task-demo", "output.png"), "task output")
 	mustWriteTestFile(t, filepath.Join("uploads", "2026", "05", "13", "legacy.txt"), "legacy upload")
 
-	db, err := gorm.Open(sqlite.Open("file:"+strings.ReplaceAll(t.Name(), "/", "_")+"?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&users.User{}, &users.UsedUID{}, &boards.UserBoard{}, &boards.BoardMember{}); err != nil {
-		t.Fatalf("auto migrate failed: %v", err)
-	}
-
+	db := testdb.Open(t)
 	userRepo := users.NewUserRepository(db)
 	owner := mustCreateUploadStaticUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
 	member := mustCreateUploadStaticUser(t, userRepo, "member", "member-auth", "MEMB1A")
 	mustCreateUploadStaticUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
 
-	if err := db.Create(&boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}"}).Error; err != nil {
+	boardRepo := boards.NewBoardRepository(db)
+	now := time.Now()
+	if err := boardRepo.Upsert(context.Background(), &boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if err := db.Create(&boards.BoardMember{BoardID: "board-1", UserID: member.ID, Role: string(boards.BoardAccessRoleViewer)}).Error; err != nil {
+	if err := boardRepo.UpsertMember(context.Background(), "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
@@ -223,7 +218,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 			}),
 			UserRepo: userRepo,
 		},
-		BoardService: boards.NewBoardService(boards.NewBoardRepository(db), userRepo),
+		BoardService: boards.NewBoardService(boardRepo, userRepo),
 	}
 	handler := uploadStaticHandler(deps)
 	router.GET("/uploads/*filepath", handler)

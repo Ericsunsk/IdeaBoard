@@ -3,14 +3,14 @@ package assets
 import "time"
 
 type LineDraftMode struct {
-	ID         uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name       string    `gorm:"type:varchar(100);not null" json:"name"`
-	CoverImage string    `gorm:"type:text" json:"cover_image"`
-	Prompt     string    `gorm:"type:text" json:"prompt"`    // 发送给 API 的提示词模板
-	SortOrder  int       `gorm:"type:int;default:0" json:"sort_order"`
-	IsEnabled  bool      `gorm:"type:tinyint;default:1" json:"is_enabled"`
-	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt  time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID         uint64    `json:"id"`
+	Name       string    `json:"name"`
+	CoverImage string    `json:"cover_image"`
+	Prompt     string    `json:"prompt"` // 发送给 API 的提示词模板
+	SortOrder  int       `json:"sort_order"`
+	IsEnabled  bool      `json:"is_enabled"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type CreateLineDraftModeRequest struct {

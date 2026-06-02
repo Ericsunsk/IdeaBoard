@@ -11,10 +11,9 @@ import (
 	"api/internal/runtime/taskqueue"
 	"api/internal/runtime/taskruntime"
 	"api/internal/tasks"
+	"api/internal/testdb"
 
 	"github.com/hibiken/asynq"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 type fakeRequeuer struct{}
@@ -124,13 +123,7 @@ func (f *fakeCancelStoreForAsynq) ClearCancelled(_ context.Context, taskID strin
 
 func newAsynqWorkerTestRepos(t *testing.T) (*accounts.AccountRepository, *accounts.TaskRepository) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&accounts.ApiAccount{}, &tasks.Task{}, &tasks.TaskOutput{}); err != nil {
-		t.Fatalf("auto migrate failed: %v", err)
-	}
+	db := testdb.Open(t)
 	return accounts.NewAccountRepository(db), accounts.NewTaskRepository(db)
 }
 

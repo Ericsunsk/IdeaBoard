@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,20 +10,14 @@ import (
 	"os"
 	"strings"
 
-	"api/internal/accounts"
-	"api/internal/assets"
 	"api/internal/auth"
 	"api/internal/boards"
-	"api/internal/channels"
+	"api/internal/db/migrations"
 	"api/internal/platform/config"
 	"api/internal/platform/database"
-	"api/internal/platform/settings"
-	"api/internal/tasks"
 	"api/internal/users"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 func configureLogging(logFilePath string) {
@@ -91,7 +84,7 @@ func runInitAdmin() {
 	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
 		log.Fatalf("Failed to cleanup duplicate board names: %v", err)
 	}
-	if err := migrateModels(db); err != nil {
+	if err := migrations.Up(context.Background(), db); err != nil {
 		log.Fatalf("Failed to migrate database schema: %v", err)
 	}
 
@@ -142,7 +135,7 @@ func runInitAdmin() {
 		log.Println("Better Auth admin user verified; local admin profile is ready")
 		return
 	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil && !database.IsNotFound(err) {
 		log.Fatalf("Failed to query local admin by auth_user_id: %v", err)
 	}
 
@@ -150,7 +143,7 @@ func runInitAdmin() {
 	if err == nil {
 		log.Fatalf("Local username 'admin' already exists without matching Better Auth user (%s)", strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)))
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !database.IsNotFound(err) {
 		log.Fatalf("Failed to query local admin username: %v", err)
 	}
 
@@ -224,47 +217,6 @@ func valueOrEmpty(value *string) string {
 		return ""
 	}
 	return *value
-}
-
-func migrateModels(db *gorm.DB) error {
-	migratorDB := db.Session(&gorm.Session{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
-	models := []interface{}{
-		&users.User{},
-		&users.UsedUID{},
-		&accounts.ApiAccount{},
-		&tasks.Task{},
-		&tasks.TaskOutput{},
-		&accounts.TaskDailyStat{},
-		&accounts.TaskStatEvent{},
-		&accounts.TaskDailyStatBackfill{},
-		&channels.Channel{},
-		&settings.SystemConfig{},
-		&assets.LineDraftMode{},
-		&boards.UserBoard{},
-		&boards.BoardMember{},
-		&boards.BoardShareToken{},
-	}
-	for _, model := range models {
-		if err := migratorDB.AutoMigrate(model); err != nil {
-			if isIgnorableDuplicateIndexError(err) {
-				log.Printf("[Main] Skip duplicate index migration error for model %T: %v", model, err)
-				continue
-			}
-			return err
-		}
-	}
-	return nil
-}
-
-func isIgnorableDuplicateIndexError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(strings.TrimSpace(err.Error()))
-	return strings.Contains(msg, "duplicate key name") ||
-		strings.Contains(msg, "error 1061")
 }
 
 // buildCORSMiddleware returns a Gin middleware for CORS handling.

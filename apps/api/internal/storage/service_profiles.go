@@ -3,12 +3,11 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
+	"api/internal/platform/database"
 )
 
 func (s *StorageService) ListProfiles(ctx context.Context) ([]StorageProfile, error) {
@@ -30,7 +29,7 @@ func (s *StorageService) GetProfile(ctx context.Context, id string) (*StoragePro
 			return &masked, nil
 		}
 	}
-	return nil, gorm.ErrRecordNotFound
+	return nil, database.ErrNotFound
 }
 
 func (s *StorageService) SaveProfile(ctx context.Context, profile *StorageProfile) (*StorageProfile, error) {
@@ -117,7 +116,7 @@ func (s *StorageService) DeleteProfile(ctx context.Context, id string) error {
 		removed = true
 	}
 	if !removed {
-		return gorm.ErrRecordNotFound
+		return database.ErrNotFound
 	}
 	return s.persistProfiles(ctx, next)
 }
@@ -136,7 +135,7 @@ func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*StorageP
 		}
 	}
 	if target == nil {
-		return nil, gorm.ErrRecordNotFound
+		return nil, database.ErrNotFound
 	}
 
 	if err := s.ensureProfileReadyForRuntime(*target); err != nil {
@@ -158,7 +157,7 @@ func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*StorageP
 func (s *StorageService) loadProfiles(ctx context.Context) ([]StorageProfile, error) {
 	val, err := s.configRepo.Get(ctx, StorageProfilesConfigKey)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return s.initializeProfilesConfig(ctx)
 		}
 		return nil, err
@@ -365,7 +364,7 @@ func (s *StorageService) findProfile(profiles []StorageProfile, id string) (*Sto
 			return &profiles[i], nil
 		}
 	}
-	return nil, gorm.ErrRecordNotFound
+	return nil, database.ErrNotFound
 }
 
 func (s *StorageService) indexOfProfile(profiles []StorageProfile, id string) int {

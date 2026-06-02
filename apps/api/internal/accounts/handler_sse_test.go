@@ -114,11 +114,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	go func() {
 		time.Sleep(80 * time.Millisecond)
 		now := time.Now()
-		rows, updateErr := taskRepo.UpdateByTaskIDAndStatuses(ctx, task.TaskID, []string{tasks.StatusPending}, map[string]interface{}{
-			"status":       tasks.StatusCompleted,
-			"result":       `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`,
-			"completed_at": now,
-		})
+		rows, updateErr := taskRepo.CompleteWithOutputs(ctx, task.TaskID, []string{tasks.StatusPending}, `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`, now, nil)
 		if updateErr != nil {
 			done <- updateErr
 			return

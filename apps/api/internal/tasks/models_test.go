@@ -1,37 +1,38 @@
 package tasks
 
 import (
-	"reflect"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestTaskParamsColumnSupportsSubmitLimit(t *testing.T) {
-	field, ok := reflect.TypeOf(Task{}).FieldByName("Params")
-	if !ok {
-		t.Fatalf("Task.Params field not found")
-	}
-	if !strings.Contains(field.Tag.Get("gorm"), "type:mediumtext") {
-		t.Fatalf("Task.Params must use mediumtext to support submit params limit, got %q", field.Tag.Get("gorm"))
+	schema := readDBSchema(t)
+	if !strings.Contains(schema, "params MEDIUMTEXT NOT NULL") {
+		t.Fatalf("tasks.params must use MEDIUMTEXT to support submit params limit")
 	}
 }
 
 func TestTaskResultColumnSupportsProviderMetadata(t *testing.T) {
-	field, ok := reflect.TypeOf(Task{}).FieldByName("Result")
-	if !ok {
-		t.Fatalf("Task.Result field not found")
-	}
-	if !strings.Contains(field.Tag.Get("gorm"), "type:mediumtext") {
-		t.Fatalf("Task.Result must use mediumtext to support provider metadata, got %q", field.Tag.Get("gorm"))
+	schema := readDBSchema(t)
+	if !strings.Contains(schema, "result MEDIUMTEXT NOT NULL") {
+		t.Fatalf("tasks.result must use MEDIUMTEXT to support provider metadata")
 	}
 }
 
 func TestTaskOutputUsesTaskSortIndex(t *testing.T) {
-	field, ok := reflect.TypeOf(TaskOutput{}).FieldByName("SortIndex")
-	if !ok {
-		t.Fatalf("TaskOutput.SortIndex field not found")
+	schema := readDBSchema(t)
+	if !strings.Contains(schema, "KEY idx_task_outputs_task_sort (task_id, sort_index)") {
+		t.Fatalf("task_outputs must keep task_id/sort_index index")
 	}
-	if !strings.Contains(field.Tag.Get("gorm"), "idx_task_outputs_task_sort") {
-		t.Fatalf("TaskOutput.SortIndex must be indexed with task_id, got %q", field.Tag.Get("gorm"))
+}
+
+func readDBSchema(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "db", "schema", "schema.sql"))
+	if err != nil {
+		t.Fatalf("read schema failed: %v", err)
 	}
+	return string(raw)
 }

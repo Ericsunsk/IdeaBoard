@@ -13,10 +13,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"api/internal/platform/database"
 	"api/internal/platform/jsonlimit"
 	"api/internal/users"
-
-	"gorm.io/gorm"
 )
 
 var ErrBoardNotFound = errors.New("board not found")
@@ -66,7 +65,7 @@ func (s *BoardService) ResolveBoardAccess(ctx context.Context, userID uint64, bo
 	}
 	board, err := s.repo.GetByBoardID(ctx, normalizedID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return nil, "", ErrBoardNotFound
 		}
 		return nil, "", err
@@ -76,7 +75,7 @@ func (s *BoardService) ResolveBoardAccess(ctx context.Context, userID uint64, bo
 	}
 	role, err := s.repo.GetMemberRole(ctx, board.BoardID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return nil, "", ErrBoardPermissionDenied
 		}
 		return nil, "", err
@@ -115,7 +114,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID uint64, boardID s
 		if existing.UserID != userID {
 			role, err = s.repo.GetMemberRole(ctx, existing.BoardID, userID)
 			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
+				if database.IsNotFound(err) {
 					return nil, ErrBoardPermissionDenied
 				}
 				return nil, err
@@ -161,7 +160,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID uint64, boardID s
 		return &BoardWithRole{Board: *saved, Role: role}, nil
 	}
 
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !database.IsNotFound(err) {
 		return nil, err
 	}
 
@@ -210,16 +209,7 @@ func (s *BoardService) DeleteBoard(ctx context.Context, userID uint64, boardID s
 			return fmt.Errorf("%w: %v", ErrBoardWorkspaceCleanupFailed, err)
 		}
 	}
-	return s.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		repo := NewBoardRepository(tx)
-		if err := repo.DeleteShareTokensByBoardID(ctx, board.BoardID); err != nil {
-			return err
-		}
-		if err := repo.DeleteMembersByBoardID(ctx, board.BoardID); err != nil {
-			return err
-		}
-		return repo.DeleteByBoardID(ctx, board.BoardID)
-	})
+	return s.repo.DeleteBoardCascade(ctx, board.BoardID)
 }
 
 func (s *BoardService) ListMembers(ctx context.Context, ownerUserID uint64, boardID string) ([]BoardMemberWithUser, error) {
@@ -265,7 +255,7 @@ func (s *BoardService) InviteMember(ctx context.Context, ownerUserID uint64, boa
 	}
 	memberUser, err := s.userRepo.GetByStorageUID(ctx, normalizedUID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return nil, ErrBoardMemberNotFound
 		}
 		return nil, err
@@ -299,7 +289,7 @@ func (s *BoardService) RemoveMember(ctx context.Context, ownerUserID uint64, boa
 	}
 	memberUser, err := s.userRepo.GetByStorageUID(ctx, normalizedUID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return ErrBoardMemberNotFound
 		}
 		return err
@@ -309,7 +299,7 @@ func (s *BoardService) RemoveMember(ctx context.Context, ownerUserID uint64, boa
 	}
 	member, err := s.repo.GetMemberByUserID(ctx, board.BoardID, memberUser.ID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return ErrBoardMemberNotFound
 		}
 		return err
@@ -371,7 +361,7 @@ func (s *BoardService) RevokeShareToken(ctx context.Context, ownerUserID uint64,
 	}
 	shareToken, err := s.repo.GetShareTokenByToken(ctx, normalizedToken)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return ErrShareTokenNotFound
 		}
 		return err
@@ -389,7 +379,7 @@ func (s *BoardService) JoinBoardByShareToken(ctx context.Context, userID uint64,
 	}
 	shareToken, err := s.repo.GetShareTokenByToken(ctx, normalizedToken)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return nil, ErrShareTokenNotFound
 		}
 		return nil, err
@@ -406,7 +396,7 @@ func (s *BoardService) JoinBoardByShareToken(ctx context.Context, userID uint64,
 	}
 	board, err := s.repo.GetByBoardID(ctx, shareToken.BoardID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if database.IsNotFound(err) {
 			return nil, ErrBoardNotFound
 		}
 		return nil, err

@@ -3,22 +3,22 @@ package accounts
 import "time"
 
 type ApiAccount struct {
-	ID            uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name          string    `gorm:"type:varchar(100);not null" json:"name"`
-	ChannelID     uint64    `gorm:"not null;default:0" json:"channel_id"`
-	Platform      string    `gorm:"type:varchar(50);not null" json:"platform"`
-	ApiType       string    `gorm:"type:varchar(50);not null" json:"api_type"`
-	ModelSet      string    `gorm:"type:varchar(255)" json:"model_set"`
-	ApiKey        string    `gorm:"type:text;not null" json:"-"`
-	ProxyURL      string    `gorm:"type:text" json:"proxy_url"`
-	MaxConcurrent int       `gorm:"type:int;default:3" json:"max_concurrent"`
-	Timeout       int       `gorm:"type:int;default:120" json:"timeout"`
-	ExtraConfig   string    `gorm:"type:text" json:"extra_config"`
-	Status        int8      `gorm:"type:tinyint;default:1" json:"status"`
-	FailCount     int       `gorm:"type:int;default:0" json:"fail_count"`
-	Weight        int       `gorm:"type:int;default:1" json:"weight"`
-	CreatedAt     time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt     time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID            uint64    `json:"id"`
+	Name          string    `json:"name"`
+	ChannelID     uint64    `json:"channel_id"`
+	Platform      string    `json:"platform"`
+	ApiType       string    `json:"api_type"`
+	ModelSet      string    `json:"model_set"`
+	ApiKey        string    `json:"-"`
+	ProxyURL      string    `json:"proxy_url"`
+	MaxConcurrent int       `json:"max_concurrent"`
+	Timeout       int       `json:"timeout"`
+	ExtraConfig   string    `json:"extra_config"`
+	Status        int8      `json:"status"`
+	FailCount     int       `json:"fail_count"`
+	Weight        int       `json:"weight"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // 请求结构
@@ -161,36 +161,36 @@ type AdminStatisticsUserRiskItem struct {
 
 // TaskDailyStat 按天+模型+用户的任务终态聚合快照（仅终态任务计入）。
 type TaskDailyStat struct {
-	ID                uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	StatDate          string    `gorm:"type:char(10);not null;uniqueIndex:uniq_task_daily_stat" json:"stat_date"`
-	ModelName         string    `gorm:"type:varchar(128);not null;default:'';uniqueIndex:uniq_task_daily_stat" json:"model_name"`
-	UserKey           string    `gorm:"type:varchar(128);not null;default:'';uniqueIndex:uniq_task_daily_stat" json:"user_key"`
-	Total             int64     `gorm:"type:bigint;not null;default:0" json:"total"`
-	Completed         int64     `gorm:"type:bigint;not null;default:0" json:"completed"`
-	Failed            int64     `gorm:"type:bigint;not null;default:0" json:"failed"`
-	LatencySecondsSum float64   `gorm:"type:double;not null;default:0" json:"latency_seconds_sum"`
-	LatencyCount      int64     `gorm:"type:bigint;not null;default:0" json:"latency_count"`
-	CreatedAt         time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt         time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID                uint64    `json:"id"`
+	StatDate          string    `json:"stat_date"`
+	ModelName         string    `json:"model_name"`
+	UserKey           string    `json:"user_key"`
+	Total             int64     `json:"total"`
+	Completed         int64     `json:"completed"`
+	Failed            int64     `json:"failed"`
+	LatencySecondsSum float64   `json:"latency_seconds_sum"`
+	LatencyCount      int64     `json:"latency_count"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // TaskStatEvent 终态任务统计事件，按 task_id 幂等去重。
 type TaskStatEvent struct {
-	ID             uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	TaskID         string    `gorm:"type:varchar(64);not null;uniqueIndex:uniq_task_stat_event_task_id" json:"task_id"`
-	StatDate       string    `gorm:"type:char(10);not null;index" json:"stat_date"`
-	ModelName      string    `gorm:"type:varchar(128);not null;default:''" json:"model_name"`
-	UserKey        string    `gorm:"type:varchar(128);not null;default:''" json:"user_key"`
-	Status         string    `gorm:"type:varchar(20);not null" json:"status"`
-	LatencySeconds float64   `gorm:"type:double;not null;default:0" json:"latency_seconds"`
-	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID             uint64    `json:"id"`
+	TaskID         string    `json:"task_id"`
+	StatDate       string    `json:"stat_date"`
+	ModelName      string    `json:"model_name"`
+	UserKey        string    `json:"user_key"`
+	Status         string    `json:"status"`
+	LatencySeconds float64   `json:"latency_seconds"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // TaskDailyStatBackfill 标记某日期已完成历史终态任务回填扫描。
 type TaskDailyStatBackfill struct {
-	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	StatDate  string    `gorm:"type:char(10);not null;uniqueIndex:uniq_task_daily_stat_backfill_date" json:"stat_date"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID        uint64    `json:"id"`
+	StatDate  string    `json:"stat_date"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }

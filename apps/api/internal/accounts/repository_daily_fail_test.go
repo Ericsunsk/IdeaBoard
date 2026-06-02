@@ -2,31 +2,23 @@ package accounts
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"testing"
 	"time"
 
 	"api/internal/tasks"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"api/internal/testdb"
 )
 
-func newTaskRepositoryTestDB(t *testing.T) *TaskRepository {
+func newTaskRepositoryTestDB(t *testing.T) (*TaskRepository, *sql.DB) {
 	t.Helper()
-	dsn := fmt.Sprintf("file:repo_fail_%s?mode=memory&cache=shared", t.Name())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&ApiAccount{}, &tasks.Task{}, &tasks.TaskOutput{}, &TaskDailyStat{}, &TaskStatEvent{}, &TaskDailyStatBackfill{}); err != nil {
-		t.Fatalf("auto migrate failed: %v", err)
-	}
-	return NewTaskRepository(db)
+	db := testdb.Open(t)
+	return NewTaskRepository(db), db
 }
 
 func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	ctx := context.Background()
-	taskRepo := newTaskRepositoryTestDB(t)
+	taskRepo, _ := newTaskRepositoryTestDB(t)
 	accountID := uint64(66)
 	createdAt := time.Now().Add(-10 * time.Minute)
 
@@ -74,7 +66,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	}
 
 	events := int64(0)
-	if err := taskRepo.db.Model(&TaskStatEvent{}).Count(&events).Error; err != nil {
+	if err := taskRepo.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM task_stat_events`).Scan(&events); err != nil {
 		t.Fatalf("count stat events failed: %v", err)
 	}
 	if events != 2 {
@@ -84,7 +76,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 
 func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 	ctx := context.Background()
-	taskRepo := newTaskRepositoryTestDB(t)
+	taskRepo, _ := newTaskRepositoryTestDB(t)
 	createdAt := time.Now().Add(-1 * time.Minute)
 	completedAt := createdAt.Add(10 * time.Second)
 	task := &tasks.Task{
@@ -115,7 +107,7 @@ func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 
 func TestUpsertDailyStatByTaskWithFallbackModelUsesProvidedSingleModel(t *testing.T) {
 	ctx := context.Background()
-	taskRepo := newTaskRepositoryTestDB(t)
+	taskRepo, _ := newTaskRepositoryTestDB(t)
 	createdAt := time.Now().Add(-2 * time.Minute)
 	completedAt := createdAt.Add(15 * time.Second)
 	task := &tasks.Task{

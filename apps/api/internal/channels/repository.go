@@ -2,42 +2,81 @@ package channels
 
 import (
 	"context"
+	"database/sql"
 
-	"gorm.io/gorm"
+	dbsqlc "api/internal/db/sqlc"
 )
 
 type ChannelRepository struct {
-	db *gorm.DB
+	q *dbsqlc.Queries
 }
 
-func NewChannelRepository(db *gorm.DB) *ChannelRepository {
-	return &ChannelRepository{db: db}
+func NewChannelRepository(db *sql.DB) *ChannelRepository {
+	return &ChannelRepository{q: dbsqlc.New(db)}
 }
 
 func (r *ChannelRepository) Create(ctx context.Context, channel *Channel) error {
-	return r.db.WithContext(ctx).Create(channel).Error
+	id, err := r.q.CreateChannel(ctx, dbsqlc.CreateChannelParams{
+		Type:   channel.Type,
+		Name:   channel.Name,
+		ApiUrl: channel.ApiURL,
+		Status: channel.Status,
+	})
+	if err != nil {
+		return err
+	}
+	channel.ID = uint64(id)
+	return nil
 }
 
 func (r *ChannelRepository) GetByID(ctx context.Context, id uint64) (*Channel, error) {
-	var channel Channel
-	if err := r.db.WithContext(ctx).First(&channel, id).Error; err != nil {
+	row, err := r.q.GetChannelByID(ctx, id)
+	if err != nil {
 		return nil, err
+	}
+	channel := Channel{
+		ID:        row.ID,
+		Type:      row.Type,
+		Name:      row.Name,
+		ApiURL:    row.ApiUrl,
+		Status:    row.Status,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
 	}
 	return &channel, nil
 }
 
 func (r *ChannelRepository) List(ctx context.Context) ([]*Channel, error) {
-	var channels []*Channel
-	if err := r.db.WithContext(ctx).Order("id ASC").Find(&channels).Error; err != nil {
+	rows, err := r.q.ListChannels(ctx)
+	if err != nil {
 		return nil, err
+	}
+	channels := make([]*Channel, 0, len(rows))
+	for _, row := range rows {
+		channel := Channel{
+			ID:        row.ID,
+			Type:      row.Type,
+			Name:      row.Name,
+			ApiURL:    row.ApiUrl,
+			Status:    row.Status,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+		}
+		channels = append(channels, &channel)
 	}
 	return channels, nil
 }
 
 func (r *ChannelRepository) Update(ctx context.Context, channel *Channel) error {
-	return r.db.WithContext(ctx).Save(channel).Error
+	return r.q.UpdateChannel(ctx, dbsqlc.UpdateChannelParams{
+		Type:   channel.Type,
+		Name:   channel.Name,
+		ApiUrl: channel.ApiURL,
+		Status: channel.Status,
+		ID:     channel.ID,
+	})
 }
 
 func (r *ChannelRepository) Delete(ctx context.Context, id uint64) error {
-	return r.db.WithContext(ctx).Delete(&Channel{}, id).Error
+	return r.q.DeleteChannel(ctx, id)
 }

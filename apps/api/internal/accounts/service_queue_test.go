@@ -4,13 +4,12 @@ import (
 	"api/internal/runtime/queuetypes"
 	"api/internal/runtime/taskqueue"
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
 	"api/internal/tasks"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"api/internal/testdb"
 )
 
 type fakeQueueForService struct {
@@ -77,17 +76,9 @@ func (f *fakeMonitorStore) MonitorInfo(context.Context, []uint64) (*queuetypes.M
 	return &queuetypes.MonitorInfo{}, nil
 }
 
-func newQueueServiceTestDB(t *testing.T) *gorm.DB {
+func newQueueServiceTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&ApiAccount{}, &tasks.Task{}, &tasks.TaskOutput{}); err != nil {
-		t.Fatalf("auto migrate failed: %v", err)
-	}
-	return db
+	return testdb.Open(t)
 }
 
 func createTestAccount(t *testing.T, repo *AccountRepository, name string, status int8) *ApiAccount {

@@ -2,56 +2,22 @@ package users
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 	"fmt"
 	"strings"
 
-	mysqlDriver "github.com/go-sql-driver/mysql"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+	"api/internal/db/dbutil"
+	dbsqlc "api/internal/db/sqlc"
+	"api/internal/platform/database"
 )
 
 type UserRepository struct {
-	db *gorm.DB
+	db *sql.DB
+	q  *dbsqlc.Queries
 }
 
-type cleanupUserBoard struct {
-	BoardID string `gorm:"column:board_id"`
-	UserID  uint64 `gorm:"column:user_id"`
-}
-
-func (cleanupUserBoard) TableName() string {
-	return "user_boards"
-}
-
-type cleanupBoardMember struct {
-	BoardID string `gorm:"column:board_id"`
-	UserID  uint64 `gorm:"column:user_id"`
-}
-
-func (cleanupBoardMember) TableName() string {
-	return "board_members"
-}
-
-type cleanupBoardShareToken struct {
-	BoardID   string `gorm:"column:board_id"`
-	CreatedBy uint64 `gorm:"column:created_by"`
-}
-
-func (cleanupBoardShareToken) TableName() string {
-	return "board_share_tokens"
-}
-
-type cleanupTask struct {
-	UserID uint64 `gorm:"column:user_id"`
-}
-
-func (cleanupTask) TableName() string {
-	return "tasks"
-}
-
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(db *sql.DB) *UserRepository {
+	return &UserRepository{db: db, q: dbsqlc.New(db)}
 }
 
 // Create 创建用户
@@ -59,45 +25,55 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 	if user == nil {
 		return fmt.Errorf("用户不能为空")
 	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		uid, err := allocateStorageUID(tx, strings.TrimSpace(user.StorageUID), 0)
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		uid, err := allocateStorageUID(ctx, q, strings.TrimSpace(user.StorageUID), 0)
 		if err != nil {
 			return err
 		}
 		user.StorageUID = uid
-		return tx.Create(user).Error
+		id, err := q.CreateUser(ctx, dbsqlc.CreateUserParams{
+			Username:   user.Username,
+			AuthUserID: dbutil.NullString(user.AuthUserID),
+			StorageUid: user.StorageUID,
+			Avatar:     user.Avatar,
+			Role:       user.Role,
+			Status:     user.Status,
+		})
+		if err != nil {
+			return err
+		}
+		user.ID = uint64(id)
+		return nil
 	})
 }
 
 // GetByID 根据ID获取用户
 func (r *UserRepository) GetByID(ctx context.Context, id uint64) (*User, error) {
-	var user User
-	err := r.db.WithContext(ctx).Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("id = ?", id).First(&user).Error
+	row, err := r.q.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
+	user := userFromSQLC(row)
 	return &user, nil
 }
 
 // GetByUsername 根据用户名获取用户
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
-	var user User
-	err := r.db.WithContext(ctx).Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("username = ?", username).First(&user).Error
+	row, err := r.q.GetUserByUsername(ctx, username)
 	if err != nil {
 		return nil, err
 	}
+	user := userFromSQLC(row)
 	return &user, nil
 }
 
 // GetByAuthUserID 根据 Better Auth user id 获取用户
 func (r *UserRepository) GetByAuthUserID(ctx context.Context, authUserID string) (*User, error) {
-	var user User
-	err := r.db.WithContext(ctx).Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").
-		Where("auth_user_id = ?", strings.TrimSpace(authUserID)).
-		First(&user).Error
+	row, err := r.q.GetUserByAuthUserID(ctx, sql.NullString{String: strings.TrimSpace(authUserID), Valid: strings.TrimSpace(authUserID) != ""})
 	if err != nil {
 		return nil, err
 	}
+	user := userFromSQLC(row)
 	return &user, nil
 }
 
@@ -105,138 +81,149 @@ func (r *UserRepository) GetByAuthUserID(ctx context.Context, authUserID string)
 func (r *UserRepository) GetByStorageUID(ctx context.Context, storageUID string) (*User, error) {
 	normalized := strings.TrimSpace(storageUID)
 	if !IsValidStorageUID(normalized) {
-		return nil, gorm.ErrRecordNotFound
+		return nil, database.ErrNotFound
 	}
-	var user User
-	err := r.db.WithContext(ctx).Select("id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at").Where("storage_uid = ?", normalized).First(&user).Error
+	row, err := r.q.GetUserByStorageUID(ctx, normalized)
 	if err != nil {
 		return nil, err
 	}
+	user := userFromSQLC(row)
 	return &user, nil
 }
 
 // Update 更新用户
 func (r *UserRepository) Update(ctx context.Context, user *User) error {
-	return r.db.WithContext(ctx).Save(user).Error
+	return r.q.UpdateUser(ctx, dbsqlc.UpdateUserParams{
+		Username:   user.Username,
+		AuthUserID: dbutil.NullString(user.AuthUserID),
+		StorageUid: user.StorageUID,
+		Avatar:     user.Avatar,
+		Role:       user.Role,
+		Status:     user.Status,
+		ID:         user.ID,
+	})
 }
 
 // Delete 删除用户及关联资产
 func (r *UserRepository) Delete(ctx context.Context, id uint64) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var user User
-		if err := tx.Select("id").Where("id = ?", id).First(&user).Error; err != nil {
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		if _, err := q.GetUserByID(ctx, id); err != nil {
 			return err
 		}
 
-		var ownedBoardIDs []string
-		if err := tx.Model(&cleanupUserBoard{}).Where("user_id = ?", id).Pluck("board_id", &ownedBoardIDs).Error; err != nil {
+		ownedBoardIDs, err := q.ListOwnedBoardIDsByUserID(ctx, id)
+		if err != nil {
 			return err
 		}
 		if len(ownedBoardIDs) > 0 {
-			if err := tx.Where("board_id IN ?", ownedBoardIDs).Delete(&cleanupBoardShareToken{}).Error; err != nil {
+			if err := q.DeleteBoardShareTokensByBoardIDs(ctx, ownedBoardIDs); err != nil {
 				return err
 			}
-			if err := tx.Where("board_id IN ?", ownedBoardIDs).Delete(&cleanupBoardMember{}).Error; err != nil {
+			if err := q.DeleteBoardMembersByBoardIDs(ctx, ownedBoardIDs); err != nil {
 				return err
 			}
-			if err := tx.Where("board_id IN ?", ownedBoardIDs).Delete(&cleanupUserBoard{}).Error; err != nil {
+			if err := q.DeleteUserBoardsByBoardIDs(ctx, ownedBoardIDs); err != nil {
 				return err
 			}
 		}
 
-		if err := tx.Where("created_by = ?", id).Delete(&cleanupBoardShareToken{}).Error; err != nil {
+		if err := q.DeleteBoardShareTokensByCreatedBy(ctx, id); err != nil {
 			return err
 		}
-		if err := tx.Where("user_id = ?", id).Delete(&cleanupBoardMember{}).Error; err != nil {
+		if err := q.DeleteBoardMembersByUserID(ctx, id); err != nil {
 			return err
 		}
-		if err := tx.Where("user_id = ?", id).Delete(&cleanupTask{}).Error; err != nil {
+		if err := q.DeleteTasksByUserID(ctx, id); err != nil {
 			return err
 		}
-
-		return tx.Delete(&User{}, id).Error
+		return q.DeleteUserByID(ctx, id)
 	})
 }
 
 // List 获取用户列表
 func (r *UserRepository) List(ctx context.Context, keyword string, page, pageSize int) ([]*User, int64, error) {
-	var users []*User
-	var total int64
-
-	query := r.db.WithContext(ctx).Model(&User{})
-
+	keyword = strings.TrimSpace(keyword)
+	hasKeyword := int64(0)
 	if keyword != "" {
-		query = query.Where("username LIKE ?", "%"+keyword+"%")
+		hasKeyword = 1
 	}
-
-	if err := query.Count(&total).Error; err != nil {
+	keywordLike := "%" + keyword + "%"
+	total, err := r.q.CountUsers(ctx, dbsqlc.CountUsersParams{HasKeyword: hasKeyword, KeywordLike: keywordLike})
+	if err != nil {
 		return nil, 0, err
 	}
-
 	offset := (page - 1) * pageSize
-	if err := query.Offset(offset).Limit(pageSize).Order("id DESC").Find(&users).Error; err != nil {
+	rows, err := r.q.ListUsers(ctx, dbsqlc.ListUsersParams{
+		HasKeyword:  hasKeyword,
+		KeywordLike: keywordLike,
+		Limit:       int32(pageSize),
+		Offset:      int32(offset),
+	})
+	if err != nil {
 		return nil, 0, err
 	}
-
-	return users, total, nil
+	result := make([]*User, 0, len(rows))
+	for _, row := range rows {
+		user := userFromSQLC(row)
+		result = append(result, &user)
+	}
+	return result, total, nil
 }
 
 // UpdateStatus 更新用户状态
 func (r *UserRepository) UpdateStatus(ctx context.Context, id uint64, status int8) error {
-	return r.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Update("status", status).Error
+	return r.q.UpdateUserStatus(ctx, dbsqlc.UpdateUserStatusParams{Status: status, ID: id})
 }
 
 func (r *UserRepository) UpdateRoleByID(ctx context.Context, id uint64, role string) error {
-	return r.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Update("role", role).Error
+	return r.q.UpdateUserRole(ctx, dbsqlc.UpdateUserRoleParams{Role: role, ID: id})
 }
 
 func (r *UserRepository) UpdateAvatarByID(ctx context.Context, id uint64, avatar string) error {
-	return r.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Update("avatar", strings.TrimSpace(avatar)).Error
+	return r.q.UpdateUserAvatar(ctx, dbsqlc.UpdateUserAvatarParams{Avatar: strings.TrimSpace(avatar), ID: id})
 }
 
 func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var users []User
-		if err := tx.Select("id, storage_uid").Order("id ASC").Find(&users).Error; err != nil {
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		rows, err := q.ListUserStorageUIDs(ctx)
+		if err != nil {
 			return err
 		}
 
-		seen := make(map[string]uint64, len(users))
-		for _, user := range users {
-			if user.ID == 0 {
+		seen := make(map[string]uint64, len(rows))
+		for _, row := range rows {
+			if row.ID == 0 {
 				continue
 			}
 
-			uid := strings.TrimSpace(user.StorageUID)
+			uid := strings.TrimSpace(row.StorageUid)
 			if IsValidStorageUID(uid) {
-				if firstUserID, duplicated := seen[uid]; !duplicated || firstUserID == user.ID {
-					if err := ensureUsedUIDRecorded(tx, uid); err != nil {
+				if firstUserID, duplicated := seen[uid]; !duplicated || firstUserID == row.ID {
+					if err := ensureUsedUIDRecorded(ctx, q, uid); err != nil {
 						return err
 					}
-					seen[uid] = user.ID
+					seen[uid] = row.ID
 					continue
 				}
 			}
 
-			uniqueUID, err := allocateStorageUID(tx, "", user.ID)
+			uniqueUID, err := allocateStorageUID(ctx, q, "", row.ID)
 			if err != nil {
 				return err
 			}
-			if err := tx.Model(&User{}).
-				Where("id = ?", user.ID).
-				Update("storage_uid", uniqueUID).Error; err != nil {
+			if err := q.UpdateUserStorageUID(ctx, dbsqlc.UpdateUserStorageUIDParams{StorageUid: uniqueUID, ID: row.ID}); err != nil {
 				return err
 			}
-			seen[uniqueUID] = user.ID
+			seen[uniqueUID] = row.ID
 		}
 		return nil
 	})
 }
 
-func allocateStorageUID(tx *gorm.DB, preferredUID string, excludeID uint64) (string, error) {
+func allocateStorageUID(ctx context.Context, q *dbsqlc.Queries, preferredUID string, excludeID uint64) (string, error) {
 	normalizedPreferred := strings.TrimSpace(preferredUID)
 	if IsValidStorageUID(normalizedPreferred) {
-		reserved, err := reserveStorageUID(tx, normalizedPreferred, excludeID)
+		reserved, err := reserveStorageUID(ctx, q, normalizedPreferred, excludeID)
 		if err != nil {
 			return "", err
 		}
@@ -250,7 +237,7 @@ func allocateStorageUID(tx *gorm.DB, preferredUID string, excludeID uint64) (str
 		if err != nil {
 			return "", err
 		}
-		reserved, err := reserveStorageUID(tx, storageUID, excludeID)
+		reserved, err := reserveStorageUID(ctx, q, storageUID, excludeID)
 		if err != nil {
 			return "", err
 		}
@@ -261,8 +248,8 @@ func allocateStorageUID(tx *gorm.DB, preferredUID string, excludeID uint64) (str
 	return "", fmt.Errorf("生成唯一用户存储标识失败")
 }
 
-func reserveStorageUID(tx *gorm.DB, storageUID string, excludeID uint64) (bool, error) {
-	taken, err := storageUIDTaken(tx, storageUID, excludeID)
+func reserveStorageUID(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID uint64) (bool, error) {
+	taken, err := storageUIDTaken(ctx, q, storageUID, excludeID)
 	if err != nil {
 		return false, err
 	}
@@ -270,81 +257,73 @@ func reserveStorageUID(tx *gorm.DB, storageUID string, excludeID uint64) (bool, 
 		return false, nil
 	}
 
-	recorded, err := recordUsedUID(tx, storageUID)
+	recorded, err := recordUsedUID(ctx, q, storageUID)
 	if err != nil {
 		return false, err
 	}
 	return recorded, nil
 }
 
-func storageUIDTaken(tx *gorm.DB, storageUID string, excludeID uint64) (bool, error) {
-	exists, err := storageUIDExists(tx, storageUID, excludeID)
+func storageUIDTaken(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID uint64) (bool, error) {
+	exists, err := storageUIDExists(ctx, q, storageUID, excludeID)
 	if err != nil {
 		return false, err
 	}
 	if exists {
 		return true, nil
 	}
-	return usedUIDExists(tx, storageUID)
+	return usedUIDExists(ctx, q, storageUID)
 }
 
-func storageUIDExists(tx *gorm.DB, storageUID string, excludeID uint64) (bool, error) {
-	query := tx.Model(&User{}).Where("storage_uid = ?", storageUID)
-	if excludeID > 0 {
-		query = query.Where("id <> ?", excludeID)
+func storageUIDExists(ctx context.Context, q *dbsqlc.Queries, storageUID string, excludeID uint64) (bool, error) {
+	_, err := q.GetUserIDByStorageUIDForUpdate(ctx, dbsqlc.GetUserIDByStorageUIDForUpdateParams{StorageUid: storageUID, ID: excludeID})
+	if err == nil {
+		return true, nil
 	}
-	var count int64
-	err := withOptionalUpdateLock(query).Count(&count).Error
-	return count > 0, err
-}
-
-func usedUIDExists(tx *gorm.DB, storageUID string) (bool, error) {
-	var count int64
-	err := withOptionalUpdateLock(tx.Model(&UsedUID{}).Where("storage_uid = ?", storageUID)).Count(&count).Error
-	return count > 0, err
-}
-
-func recordUsedUID(tx *gorm.DB, storageUID string) (bool, error) {
-	result := tx.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "storage_uid"}},
-		DoNothing: true,
-	}).Create(&UsedUID{StorageUID: storageUID})
-	if result.Error != nil {
-		return false, result.Error
+	if database.IsNotFound(err) {
+		return false, nil
 	}
-	return result.RowsAffected > 0, nil
+	return false, err
 }
 
-func ensureUsedUIDRecorded(tx *gorm.DB, storageUID string) error {
-	_, err := recordUsedUID(tx, storageUID)
+func usedUIDExists(ctx context.Context, q *dbsqlc.Queries, storageUID string) (bool, error) {
+	_, err := q.GetUsedUIDForUpdate(ctx, storageUID)
+	if err == nil {
+		return true, nil
+	}
+	if database.IsNotFound(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func recordUsedUID(ctx context.Context, q *dbsqlc.Queries, storageUID string) (bool, error) {
+	rows, err := q.InsertUsedUIDIgnore(ctx, storageUID)
+	if err != nil {
+		return false, err
+	}
+	return rows > 0, nil
+}
+
+func ensureUsedUIDRecorded(ctx context.Context, q *dbsqlc.Queries, storageUID string) error {
+	_, err := recordUsedUID(ctx, q, storageUID)
 	return err
 }
 
-func withOptionalUpdateLock(query *gorm.DB) *gorm.DB {
-	switch strings.ToLower(strings.TrimSpace(query.Dialector.Name())) {
-	case "mysql", "postgres", "sqlserver":
-		return query.Clauses(clause.Locking{Strength: "UPDATE"})
-	default:
-		return query
-	}
-}
-
-func isUniqueConstraintError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	var mysqlErr *mysqlDriver.MySQLError
-	if errors.As(err, &mysqlErr) {
-		return mysqlErr.Number == 1062
-	}
-
-	msg := strings.ToLower(strings.TrimSpace(err.Error()))
-	return strings.Contains(msg, "duplicate") ||
-		strings.Contains(msg, "unique constraint") ||
-		strings.Contains(msg, "unique failed")
-}
-
 func IsDuplicateConstraintError(err error) bool {
-	return isUniqueConstraintError(err)
+	return database.IsDuplicateConstraintError(err)
+}
+
+func userFromSQLC(row dbsqlc.User) User {
+	return User{
+		ID:         row.ID,
+		Username:   row.Username,
+		AuthUserID: dbutil.StringPtr(row.AuthUserID),
+		StorageUID: row.StorageUid,
+		Avatar:     row.Avatar,
+		Role:       row.Role,
+		Status:     row.Status,
+		CreatedAt:  row.CreatedAt,
+		UpdatedAt:  row.UpdatedAt,
+	}
 }

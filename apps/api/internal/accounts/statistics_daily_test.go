@@ -2,26 +2,17 @@ package accounts
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"testing"
 	"time"
 
 	"api/internal/tasks"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
-func newStatisticsTestService(t *testing.T) (*AccountService, *TaskRepository, *gorm.DB) {
+func newStatisticsTestService(t *testing.T) (*AccountService, *TaskRepository, *sql.DB) {
 	t.Helper()
 
-	dsn := fmt.Sprintf("file:statistics_%s?mode=memory&cache=shared", t.Name())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&ApiAccount{}, &tasks.Task{}, &tasks.TaskOutput{}, &TaskDailyStat{}, &TaskStatEvent{}, &TaskDailyStatBackfill{}); err != nil {
-		t.Fatalf("auto migrate failed: %v", err)
-	}
+	db := newAccountsTestDB(t)
 	taskRepo := NewTaskRepository(db)
 	svc := NewAccountService(AccountServiceDeps{TaskRepo: taskRepo}, AccountServiceOptions{})
 	return svc, taskRepo, db
@@ -40,9 +31,7 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 		{StatDate: yesterday, ModelName: "model-a", UserKey: "u1", Total: 1, Completed: 1, Failed: 0, LatencySecondsSum: 12, LatencyCount: 1},
 	}
 	for i := range seed {
-		if err := taskRepo.db.Create(&seed[i]).Error; err != nil {
-			t.Fatalf("seed daily stat failed: %v", err)
-		}
+		insertTaskDailyStat(t, taskRepo.db, seed[i])
 	}
 	events := []TaskStatEvent{
 		{TaskID: "latency-a-1", StatDate: today, ModelName: "model-a", UserKey: "u1", Status: tasks.StatusCompleted, LatencySeconds: 18},
@@ -51,9 +40,7 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 		{TaskID: "latency-zero", StatDate: today, ModelName: "model-b", UserKey: "u2", Status: tasks.StatusCompleted, LatencySeconds: 0},
 	}
 	for i := range events {
-		if err := taskRepo.db.Create(&events[i]).Error; err != nil {
-			t.Fatalf("seed stat event failed: %v", err)
-		}
+		insertTaskStatEvent(t, taskRepo.db, events[i])
 	}
 	if err := taskRepo.Create(ctx, &tasks.Task{TaskID: "p1", UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("seed pending task failed: %v", err)
@@ -117,9 +104,7 @@ func TestGetStatisticsQualityTrendAggregatedByDate(t *testing.T) {
 		{StatDate: yesterday, ModelName: "m1", UserKey: "u1", Total: 1, Completed: 1, Failed: 0},
 	}
 	for i := range seed {
-		if err := taskRepo.db.Create(&seed[i]).Error; err != nil {
-			t.Fatalf("seed daily stat failed: %v", err)
-		}
+		insertTaskDailyStat(t, taskRepo.db, seed[i])
 	}
 
 	stats, err := svc.GetStatistics(ctx, "7d")
@@ -154,9 +139,7 @@ func TestGetStatisticsUserRiskRanksByFailureVolume(t *testing.T) {
 		{StatDate: today, ModelName: "m1", UserKey: "high-volume", Total: 100, Completed: 50, Failed: 50},
 	}
 	for i := range seed {
-		if err := taskRepo.db.Create(&seed[i]).Error; err != nil {
-			t.Fatalf("seed daily stat failed: %v", err)
-		}
+		insertTaskDailyStat(t, taskRepo.db, seed[i])
 	}
 
 	stats, err := svc.GetStatistics(ctx, "7d")
@@ -428,16 +411,14 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 	}
 
 	day := created.Format("2006-01-02")
-	if err := db.Create(&TaskDailyStat{
+	insertTaskDailyStat(t, db, TaskDailyStat{
 		StatDate:  day,
 		ModelName: "unknown",
 		UserKey:   "12",
 		Total:     1,
 		Completed: 1,
 		Failed:    0,
-	}).Error; err != nil {
-		t.Fatalf("seed unknown daily stat failed: %v", err)
-	}
+	})
 
 	if _, err := svc.GetStatistics(ctx, "7d"); err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
@@ -455,5 +436,31 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 	}
 	if !foundUnknown {
 		t.Fatalf("expected unresolved unknown model row for multi-model account, rows=%+v", rows)
+	}
+}
+
+func insertTaskDailyStat(t *testing.T, db *sql.DB, stat TaskDailyStat) {
+	t.Helper()
+	_, err := db.ExecContext(
+		context.Background(),
+		`INSERT INTO task_daily_stats (stat_date, model_name, user_key, total, completed, failed, latency_seconds_sum, latency_count)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		stat.StatDate, stat.ModelName, stat.UserKey, stat.Total, stat.Completed, stat.Failed, stat.LatencySecondsSum, stat.LatencyCount,
+	)
+	if err != nil {
+		t.Fatalf("seed daily stat failed: %v", err)
+	}
+}
+
+func insertTaskStatEvent(t *testing.T, db *sql.DB, event TaskStatEvent) {
+	t.Helper()
+	_, err := db.ExecContext(
+		context.Background(),
+		`INSERT INTO task_stat_events (task_id, stat_date, model_name, user_key, status, latency_seconds)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		event.TaskID, event.StatDate, event.ModelName, event.UserKey, event.Status, event.LatencySeconds,
+	)
+	if err != nil {
+		t.Fatalf("seed stat event failed: %v", err)
 	}
 }

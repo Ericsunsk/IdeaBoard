@@ -11,6 +11,7 @@ import (
 	"api/internal/auth"
 	"api/internal/boards"
 	"api/internal/channels"
+	"api/internal/db/migrations"
 	"api/internal/imageproc"
 	"api/internal/platform/config"
 	"api/internal/platform/database"
@@ -49,7 +50,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	if err := boards.CleanupDuplicateBoardNames(db); err != nil {
 		return nil, fmt.Errorf("Failed to cleanup duplicate board names: %w", err)
 	}
-	if err := migrateModels(db); err != nil {
+	if err := migrations.Up(context.Background(), db); err != nil {
 		return nil, fmt.Errorf("Failed to migrate database schema: %w", err)
 	}
 

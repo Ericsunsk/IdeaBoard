@@ -3,26 +3,16 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"api/internal/platform/settings"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"api/internal/testdb"
 )
 
 func newStorageServiceTest(t *testing.T) (*StorageService, *settings.SystemConfigRepository) {
 	t.Helper()
 
-	dbName := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
-	db, err := gorm.Open(sqlite.Open("file:"+dbName+"?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&settings.SystemConfig{}); err != nil {
-		t.Fatalf("auto migrate system configs failed: %v", err)
-	}
-
+	db := testdb.Open(t)
 	repo := settings.NewSystemConfigRepository(db)
 	return NewStorageService(repo), repo
 }

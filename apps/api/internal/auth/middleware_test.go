@@ -4,9 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"api/internal/testdb"
 	"api/internal/users"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestPtrStringAndDerefString(t *testing.T) {
@@ -26,14 +25,7 @@ func TestPtrStringAndDerefString(t *testing.T) {
 }
 
 func TestResolveLocalUserByAuthIdentityDoesNotBindExistingUsername(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&users.User{}, &users.UsedUID{}); err != nil {
-		t.Fatalf("auto migrate users failed: %v", err)
-	}
-
+	db := testdb.Open(t)
 	userRepo := users.NewUserRepository(db)
 	existing := &users.User{Username: "alice", Status: 1, Role: "user"}
 	if err := userRepo.Create(context.Background(), existing); err != nil {

@@ -2,21 +2,18 @@ package imageproc
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	"api/internal/accounts"
 	"api/internal/boards"
 	"api/internal/platform/settings"
 	"api/internal/storage"
-	"api/internal/tasks"
+	"api/internal/testdb"
 	"api/internal/users"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestVectorizeLocalUploadImageRequiresWorkspaceAccess(t *testing.T) {
@@ -29,10 +26,12 @@ func TestVectorizeLocalUploadImageRequiresWorkspaceAccess(t *testing.T) {
 	owner := mustCreateVectorizeUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
 	member := mustCreateVectorizeUser(t, userRepo, "member", "member-auth", "MEMB1A")
 	outsider := mustCreateVectorizeUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
-	if err := db.Create(&boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}"}).Error; err != nil {
+	boardRepo := boards.NewBoardRepository(db)
+	now := time.Now()
+	if err := boardRepo.Upsert(ctx, &boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if err := db.Create(&boards.BoardMember{BoardID: "board-1", UserID: member.ID, Role: string(boards.BoardAccessRoleViewer)}).Error; err != nil {
+	if err := boardRepo.UpsertMember(ctx, "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {
 		t.Fatalf("create board member failed: %v", err)
 	}
 
@@ -119,16 +118,9 @@ func (r testVectorizeUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx co
 	return user.StorageUID, nil
 }
 
-func newVectorizeAccessTestDeps(t *testing.T) (*gorm.DB, *users.UserRepository, *boards.BoardService) {
+func newVectorizeAccessTestDeps(t *testing.T) (*sql.DB, *users.UserRepository, *boards.BoardService) {
 	t.Helper()
-	dsn := fmt.Sprintf("file:vectorize_%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-	if err := db.AutoMigrate(&users.User{}, &users.UsedUID{}, &boards.UserBoard{}, &boards.BoardMember{}, &settings.SystemConfig{}, &tasks.Task{}, &tasks.TaskOutput{}, &accounts.TaskDailyStat{}); err != nil {
-		t.Fatalf("auto migrate failed: %v", err)
-	}
+	db := testdb.Open(t)
 	userRepo := users.NewUserRepository(db)
 	boardService := boards.NewBoardService(boards.NewBoardRepository(db), userRepo)
 	return db, userRepo, boardService

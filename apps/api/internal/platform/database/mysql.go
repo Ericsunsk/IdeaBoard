@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -10,12 +11,10 @@ import (
 
 	"api/internal/platform/config"
 
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	_ "github.com/go-sql-driver/mysql"
 )
 
-func NewMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
+func NewMySQL(cfg config.DatabaseConfig) (*sql.DB, error) {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		cfg.User,
 		cfg.Password,
@@ -24,37 +23,21 @@ func NewMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		cfg.Database,
 	)
 
-	logMode := logger.Warn
-	switch strings.ToLower(os.Getenv("DB_LOG_MODE")) {
-	case "info":
-		logMode = logger.Info
-	case "error":
-		logMode = logger.Error
-	case "silent":
-		logMode = logger.Silent
-	}
-
 	maxRetries := getEnvInt("DB_CONNECT_MAX_RETRIES", 60)
 	retryInterval := time.Duration(getEnvInt("DB_CONNECT_RETRY_INTERVAL_MS", 1000)) * time.Millisecond
 
 	var lastErr error
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-			Logger: logger.Default.LogMode(logMode),
-		})
+		db, err := sql.Open("mysql", dsn)
 		if err == nil {
-			sqlDB, dbErr := db.DB()
-			if dbErr == nil {
-				if pingErr := sqlDB.Ping(); pingErr == nil {
-					sqlDB.SetMaxOpenConns(25)
-					sqlDB.SetMaxIdleConns(10)
-					sqlDB.SetConnMaxLifetime(5 * time.Minute)
-					return db, nil
-				} else {
-					err = pingErr
-				}
+			db.SetMaxOpenConns(25)
+			db.SetMaxIdleConns(10)
+			db.SetConnMaxLifetime(5 * time.Minute)
+			if pingErr := db.Ping(); pingErr == nil {
+				return db, nil
 			} else {
-				err = dbErr
+				err = pingErr
+				_ = db.Close()
 			}
 		}
 

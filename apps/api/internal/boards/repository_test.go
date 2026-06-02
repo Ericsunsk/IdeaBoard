@@ -2,34 +2,17 @@ package boards
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"strings"
+	"database/sql"
 	"testing"
+	"time"
 
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"api/internal/platform/database"
+	"api/internal/testdb"
 )
 
-func newBoardRepoTestDB(t *testing.T) *gorm.DB {
+func newBoardRepoTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-
-	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", sanitizeBoardSQLiteMemoryName(t.Name()))
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db failed: %v", err)
-	}
-
-	if err := db.AutoMigrate(&UserBoard{}); err != nil {
-		t.Fatalf("auto migrate user_boards failed: %v", err)
-	}
-
-	return db
-}
-
-func sanitizeBoardSQLiteMemoryName(name string) string {
-	replacer := strings.NewReplacer("/", "_", " ", "_", ":", "_")
-	return replacer.Replace(strings.TrimSpace(name))
+	return testdb.Open(t)
 }
 
 func TestBoardRepositoryGetByBoardID(t *testing.T) {
@@ -41,8 +24,8 @@ func TestBoardRepositoryGetByBoardID(t *testing.T) {
 		if board != nil {
 			t.Fatalf("board = %#v, want nil", board)
 		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			t.Fatalf("err = %v, want gorm.ErrRecordNotFound", err)
+		if !database.IsNotFound(err) {
+			t.Fatalf("err = %v, want not found", err)
 		}
 	})
 
@@ -54,7 +37,9 @@ func TestBoardRepositoryGetByBoardID(t *testing.T) {
 			Name:    "Board 1",
 			State:   "{}",
 		}
-		if err := db.Create(seed).Error; err != nil {
+		seed.CreatedAt = time.Now()
+		seed.UpdatedAt = seed.CreatedAt
+		if err := repo.Upsert(context.Background(), seed); err != nil {
 			t.Fatalf("seed board failed: %v", err)
 		}
 

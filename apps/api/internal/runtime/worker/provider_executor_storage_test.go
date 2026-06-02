@@ -10,9 +10,7 @@ import (
 	"api/internal/accounts"
 	"api/internal/platform/settings"
 	"api/internal/storage"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"api/internal/testdb"
 )
 
 func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *testing.T) {
@@ -28,13 +26,7 @@ func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *tes
 		_ = os.Chdir(oldWd)
 	})
 
-	db, err := gorm.Open(sqlite.Open("file:provider_storage?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db: %v", err)
-	}
-	if err := db.AutoMigrate(&settings.SystemConfig{}); err != nil {
-		t.Fatalf("auto migrate system configs: %v", err)
-	}
+	db := testdb.Open(t)
 
 	executor := &ProviderExecutor{
 		storageService: storage.NewStorageService(settings.NewSystemConfigRepository(db)),
