@@ -7,8 +7,11 @@
 import type { MonitorDataAccountLoads } from './monitorDataAccountLoads'
 
 export interface MonitorData {
+  /** River jobs waiting to be processed. */
   global_queue_len: number
+  /** Reserved queue subcount; River-backed task queues report 0. */
   wait_queue_len: number
+  /** Tasks currently marked running in PostgreSQL. */
   running_tasks: number
   account_loads: MonitorDataAccountLoads
 }

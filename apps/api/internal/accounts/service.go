@@ -2,7 +2,7 @@ package accounts
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"api/internal/events"
@@ -85,6 +85,6 @@ func (s *AccountService) TaskEventHub() *TaskEventHub {
 
 func (s *AccountService) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
 	if err := events.PublishTaskStatusBestEffort(ctx, s.taskEvents, events.NewTaskStatusEvent(taskID, status)); err != nil {
-		log.Printf("[AccountService] publish task status event failed task_id=%s status=%s err=%v", taskID, status, err)
+		slog.Warn("publish task status event failed", "task_id", taskID, "status", status, "err", err)
 	}
 }

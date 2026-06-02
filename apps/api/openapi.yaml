@@ -368,29 +368,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUserList'
-  /admin/users/{id}/status:
-    put:
-      tags: [AdminUsers]
-      operationId: updateAdminUserStatus
-      parameters:
-        - $ref: '#/components/parameters/IdPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [status]
-              properties:
-                status:
-                  type: integer
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
   /admin/users/{id}/ban:
     post:
       tags: [AdminUsers]

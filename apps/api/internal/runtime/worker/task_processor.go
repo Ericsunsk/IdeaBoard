@@ -3,7 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"api/internal/runtime/queuetypes"
 	"api/internal/runtime/taskqueue"
@@ -38,12 +38,12 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 	}
 
 	if err := p.taskRuntime.RefreshTaskAccounts(ctx, task); err != nil {
-		log.Printf("[TaskProcessor] 刷新任务账号失败: task=%s err=%v", task.TaskID, err)
+		slog.Warn("refresh task accounts failed", "task_id", task.TaskID, "err", err)
 		return err
 	}
 
 	if len(task.AccountIDs) == 0 {
-		log.Printf("[TaskProcessor] 没有可用账号: task=%s", task.TaskID)
+		slog.Info("no available account for task", "task_id", task.TaskID)
 		p.failTask(ctx, task, "没有可用账号")
 		return nil
 	}
@@ -56,13 +56,13 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 		if isContextInterrupted(err) {
 			return err
 		}
-		log.Printf("[TaskProcessor] 分配任务失败: task=%s err=%v", task.TaskID, err)
+		slog.Warn("assign task failed", "task_id", task.TaskID, "err", err)
 		return err
 	}
 
 	switch assignment.Status {
 	case taskqueue.AssignStatusDiscard:
-		log.Printf("[TaskProcessor] 任务状态已收敛，丢弃队列任务: task=%s", task.TaskID)
+		slog.Info("task converged; discard queued task", "task_id", task.TaskID)
 		return nil
 	case taskqueue.AssignStatusNoCapacity:
 		return fmt.Errorf("%w: task=%s", taskqueue.ErrNoAccountCapacity, task.TaskID)
@@ -79,7 +79,7 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 
 func (p *taskProcessor) failTask(ctx context.Context, task *queuetypes.TaskPayload, reason string) {
 	if err := p.taskRuntime.MarkTaskFailed(ctx, task.TaskID, reason); err != nil {
-		log.Printf("[TaskProcessor] 标记任务失败失败: task=%s err=%v", task.TaskID, err)
+		slog.Warn("mark task failed failed", "task_id", task.TaskID, "err", err)
 	}
-	log.Printf("[TaskProcessor] 任务 %s 失败, 原因: %s", task.TaskID, reason)
+	slog.Warn("task failed", "task_id", task.TaskID, "reason", reason)
 }

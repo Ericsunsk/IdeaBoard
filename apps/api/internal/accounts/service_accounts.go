@@ -3,7 +3,7 @@ package accounts
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"api/internal/platform/outbound"
@@ -81,7 +81,7 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 	if s.accountLoadStore != nil {
 		loads, loadErr := s.accountLoadStore.GetAccountLoadInfo(ctx, accountIDs)
 		if loadErr != nil {
-			log.Printf("[AccountService] 查询账号并发信息失败: %v", loadErr)
+			slog.Warn("load account concurrency info failed", "err", loadErr)
 		} else {
 			loadInfo = loads
 		}
@@ -90,7 +90,7 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 	if s.queueStats != nil {
 		queued, _, waitErr := s.queueStats.QueueLengths(ctx)
 		if waitErr != nil {
-			log.Printf("[AccountService] 查询等待队列长度失败: %v", waitErr)
+			slog.Warn("load queue lengths failed", "err", waitErr)
 		} else {
 			waitQueueCount = int(queued)
 		}
@@ -195,24 +195,24 @@ func (s *AccountService) StartAccount(ctx context.Context, id int64) error {
 func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
 	taskIDs, err := s.taskRepo.ListTaskIDsByAccountIDAndStatuses(ctx, id, tasks.StatusPending, tasks.StatusRunning)
 	if err != nil {
-		log.Printf("[StopAccount] 查询账号 %d 进行中任务失败: %v", id, err)
+		slog.Warn("list account running tasks failed", "account_id", id, "err", err)
 	} else {
 		for _, taskID := range taskIDs {
 			if cancelErr := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); cancelErr != nil {
-				log.Printf("[StopAccount] 标记任务取消失败: account=%d task=%s err=%v", id, taskID, cancelErr)
+				slog.Warn("mark task cancellation flag failed", "account_id", id, "task_id", taskID, "err", cancelErr)
 			}
 		}
 		if len(taskIDs) > 0 {
-			log.Printf("[StopAccount] 账号 %d 已标记 %d 个任务取消", id, len(taskIDs))
+			slog.Info("marked account tasks cancelled", "account_id", id, "task_count", len(taskIDs))
 		}
 	}
 
 	// 1. 将该账号下所有 running/pending 的任务标记为 failed
 	failedTaskIDs, err := s.taskRepo.FailRunningByAccountID(ctx, id, "账号已停用")
 	if err != nil {
-		log.Printf("[StopAccount] 标记账号 %d 任务失败: %v", id, err)
+		slog.Warn("mark running tasks failed by account failed", "account_id", id, "err", err)
 	} else if len(failedTaskIDs) > 0 {
-		log.Printf("[StopAccount] 已将账号 %d 的 %d 个进行中任务标记为失败", id, len(failedTaskIDs))
+		slog.Info("marked running tasks failed by account", "account_id", id, "task_count", len(failedTaskIDs))
 		for _, taskID := range failedTaskIDs {
 			s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		}

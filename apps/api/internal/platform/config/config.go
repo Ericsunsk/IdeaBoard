@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -69,7 +69,7 @@ func Load() *Config {
 
 	dbPassword := getEnv("DB_PASSWORD", "")
 	if dbPassword == "" {
-		log.Println("[Config] WARNING: DB_PASSWORD 未设置，数据库连接可能失败")
+		slog.Warn("DB_PASSWORD is not set; database connection may fail")
 	}
 
 	appEnv := detectAppEnv()
@@ -141,7 +141,7 @@ func detectGinMode() string {
 	case "debug", "release", "test":
 		return strings.ToLower(raw)
 	default:
-		log.Printf("[Config] WARNING: APP_GIN_MODE/GIN_MODE=%q 无效，已回退为 release", raw)
+		slog.Warn("invalid APP_GIN_MODE/GIN_MODE; fallback to release", "value", raw)
 		return "release"
 	}
 }
@@ -233,7 +233,7 @@ func getEnvInt(key string, defaultValue int) int {
 	}
 	value, err := strconv.Atoi(raw)
 	if err != nil || value <= 0 {
-		log.Printf("[Config] WARNING: %s=%q 不是有效正整数，已回退默认值 %d", key, raw, defaultValue)
+		slog.Warn("invalid positive integer env; fallback to default", "key", key, "value", raw, "default", defaultValue)
 		return defaultValue
 	}
 	return value
@@ -247,7 +247,7 @@ func getFirstEnvInt(defaultValue int, keys ...string) int {
 		}
 		value, err := strconv.Atoi(raw)
 		if err != nil || value <= 0 {
-			log.Printf("[Config] WARNING: %s=%q 不是有效正整数，已回退默认值 %d", key, raw, defaultValue)
+			slog.Warn("invalid positive integer env; fallback to default", "key", key, "value", raw, "default", defaultValue)
 			return defaultValue
 		}
 		return value
@@ -266,7 +266,7 @@ func getEnvBoolDefault(key string, defaultValue bool) bool {
 	case "0", "false", "f", "no", "n", "off":
 		return false
 	default:
-		log.Printf("[Config] WARNING: %s=%q 不是有效布尔值，已回退默认值 %t", key, raw, defaultValue)
+		slog.Warn("invalid boolean env; fallback to default", "key", key, "value", raw, "default", defaultValue)
 		return defaultValue
 	}
 }

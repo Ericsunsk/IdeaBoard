@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -68,16 +68,16 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID int64, req *task
 
 	if err := s.queue.Enqueue(ctx, queueTask); err != nil {
 		if markErr := s.taskRepo.MarkQueueFailed(ctx, taskID, "任务入队失败: "+err.Error()); markErr != nil {
-			log.Printf("[AccountService] mark queue failed task failed, task_id=%s err=%v", taskID, markErr)
+			slog.Warn("mark queue failed task failed", "task_id", taskID, "err", markErr)
 			return "", fmt.Errorf("任务提交失败，请稍后重试")
 		}
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		if failedTask, loadErr := s.taskRepo.GetByTaskID(ctx, taskID); loadErr == nil {
 			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, failedTask); statErr != nil {
-				log.Printf("[AccountService] upsert daily stat failed after queue fail, task_id=%s err=%v", taskID, statErr)
+				slog.Warn("upsert daily stat failed after queue fail", "task_id", taskID, "err", statErr)
 			}
 		} else {
-			log.Printf("[AccountService] load task failed after queue fail, task_id=%s err=%v", taskID, loadErr)
+			slog.Warn("load task failed after queue fail", "task_id", taskID, "err", loadErr)
 		}
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}

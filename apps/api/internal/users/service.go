@@ -3,7 +3,7 @@ package users
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"strings"
 	"unicode/utf8"
 )
@@ -86,7 +86,7 @@ func (s *UserService) DeleteUser(ctx context.Context, userID int64) error {
 
 	if s.workspaceCleaner != nil {
 		if err := s.workspaceCleaner.DeleteWorkspaceByStorageUID(ctx, targetUser.StorageUID); err != nil {
-			log.Printf("[users] delete workspace uploads failed for user_id=%d uid=%s: %v", targetUser.ID, targetUser.StorageUID, err)
+			slog.Warn("delete workspace uploads failed", "user_id", targetUser.ID, "storage_uid", targetUser.StorageUID, "err", err)
 			return errors.New("删除失败：用户工作区文件清理失败，请查看服务日志")
 		}
 	}

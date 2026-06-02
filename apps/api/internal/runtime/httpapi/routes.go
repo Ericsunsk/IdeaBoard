@@ -7,7 +7,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	iofs "io/fs"
-	"log"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -180,7 +180,7 @@ func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 	}
 
 	if _, err := iofs.Stat(frontendFS, "index.html"); err != nil {
-		log.Printf("[Main] Embedded frontend index.html not found, skip SPA routes: %v", err)
+		slog.Warn("embedded frontend index.html not found; skip SPA routes", "err", err)
 		return
 	}
 
@@ -252,7 +252,6 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.PUT("/settings/rate-limit", h.AdminHandler.UpdateRateLimitSettings)
 
 	adminApi.GET("/users", h.AdminHandler.ListUsers)
-	adminApi.PUT("/users/:id/status", h.AdminHandler.UpdateUserStatus)
 	adminApi.POST("/users/:id/ban", h.AdminHandler.BanUser)
 	adminApi.POST("/users/:id/unban", h.AdminHandler.UnbanUser)
 	adminApi.POST("/users/:id/revoke-sessions", h.AdminHandler.RevokeUserSessions)

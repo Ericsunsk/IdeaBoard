@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -263,7 +263,7 @@ func (h *AccountHandler) StreamUserTask(c *gin.Context) {
 	header.Set("X-Accel-Buffering", "no")
 	c.Status(http.StatusOK)
 	if err := http.NewResponseController(c.Writer).SetWriteDeadline(time.Time{}); err != nil {
-		log.Printf("[SSE] clear write deadline failed task_id=%s err=%v", taskID, err)
+		slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
 	}
 
 	if tasks.IsTerminalStatus(task.Status) {

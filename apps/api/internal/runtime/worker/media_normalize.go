@@ -3,7 +3,7 @@ package worker
 import (
 	"api/internal/platform/media"
 	"api/internal/platform/mediarefs"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"path"
@@ -21,7 +21,7 @@ func resolvePublicAssetBaseURL() *url.URL {
 		}
 		parsed, err := url.Parse(raw)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-			log.Printf("[Worker] 忽略无效的公网基址配置: %s=%q", key, raw)
+			slog.Warn("ignore invalid public asset base URL", "key", key, "value", raw)
 			continue
 		}
 		return parsed
@@ -161,13 +161,13 @@ func (c *ProviderExecutor) normalizeUpstreamMediaParams(params map[string]interf
 	}
 
 	if converted > 0 {
-		log.Printf("[Worker] 已补全上游媒体地址: feature=%s converted=%d", featureSlug, converted)
+		slog.Info("normalized upstream media URLs", "feature", featureSlug, "converted", converted)
 	}
 	if len(unresolvedKeys) > 0 {
 		keys := make([]string, 0, len(unresolvedKeys))
 		for key := range unresolvedKeys {
 			keys = append(keys, key)
 		}
-		log.Printf("[Worker] 上游媒体地址仍为相对路径，请配置 APP_PUBLIC_BASE_URL: feature=%s keys=%s", featureSlug, strings.Join(keys, ","))
+		slog.Warn("upstream media URLs remain relative; configure APP_PUBLIC_BASE_URL", "feature", featureSlug, "keys", strings.Join(keys, ","))
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -143,26 +143,26 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 	consume, err := consumer.Consume(func(msg jetstream.Msg) {
 		var event TaskStatusEvent
 		if err := json.Unmarshal(msg.Data(), &event); err != nil {
-			log.Printf("[NATS] discard malformed task status event subject=%s err=%v", msg.Subject(), err)
+			slog.Warn("discard malformed task status event", "subject", msg.Subject(), "err", err)
 			_ = msg.Term()
 			return
 		}
 		event = NormalizeTaskStatusEvent(event)
 		if event.TaskID == "" || event.Status == "" {
-			log.Printf("[NATS] discard incomplete task status event subject=%s task_id=%q status=%q", msg.Subject(), event.TaskID, event.Status)
+			slog.Warn("discard incomplete task status event", "subject", msg.Subject(), "task_id", event.TaskID, "status", event.Status)
 			_ = msg.Term()
 			return
 		}
 		if err := handler(context.Background(), event); err != nil {
-			log.Printf("[NATS] task status handler failed task_id=%s status=%s err=%v", event.TaskID, event.Status, err)
+			slog.Warn("task status handler failed", "task_id", event.TaskID, "status", event.Status, "err", err)
 			_ = msg.NakWithDelay(time.Second)
 			return
 		}
 		if err := msg.Ack(); err != nil {
-			log.Printf("[NATS] ack task status event failed task_id=%s status=%s err=%v", event.TaskID, event.Status, err)
+			slog.Warn("ack task status event failed", "task_id", event.TaskID, "status", event.Status, "err", err)
 		}
 	}, jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
-		log.Printf("[NATS] task status consumer error: %v", err)
+		slog.Warn("task status consumer error", "err", err)
 	}))
 	if err != nil {
 		return fmt.Errorf("start nats task status consumer %s: %w", b.consumerName, err)

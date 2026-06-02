@@ -5,7 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"strings"
 
 	"api/internal/accounts"
@@ -33,64 +34,64 @@ type repairTaskLeasesOptions struct {
 
 func runPreflight(args []string) {
 	if len(args) == 0 || args[0] != "task-leases" {
-		log.Fatalf("Usage: api preflight task-leases")
+		fatal("usage: api preflight task-leases")
 	}
 	if len(args) > 1 {
-		log.Fatalf("Usage: api preflight task-leases")
+		fatal("usage: api preflight task-leases")
 	}
 
 	cfg := config.Load()
-	configureLogging(cfg.App.LogFile)
+	configureRuntimeLogging(cfg)
 
 	taskRepo, err := newTaskLeasePreflightTaskRepo(cfg)
 	if err != nil {
-		log.Fatal(err)
+		fatal("failed to initialize task lease preflight repository", "err", err)
 	}
 	if err := runTaskLeasePreflight(context.Background(), taskRepo, defaultPreflightSampleLimit); err != nil {
-		log.Fatal(err)
+		fatal("task lease preflight failed", "err", err)
 	}
 }
 
 func runRepair(args []string) {
 	opts, err := parseRepairTaskLeasesArgs(args)
 	if err != nil {
-		log.Fatal(err)
+		fatal("failed to parse repair task-leases arguments", "err", err)
 	}
 	if opts.Limit <= 0 {
-		log.Fatal("repair limit must be greater than 0")
+		fatal("repair limit must be greater than 0")
 	}
 	if !opts.DryRun && (!opts.Yes || opts.To != "pending") {
-		log.Fatal("Refusing to mutate. Use: api repair task-leases --to=pending --yes")
+		fatal("refusing to mutate; use api repair task-leases --to=pending --yes")
 	}
 
 	cfg := config.Load()
-	configureLogging(cfg.App.LogFile)
+	configureRuntimeLogging(cfg)
 
 	taskRepo, err := newTaskLeasePreflightTaskRepo(cfg)
 	if err != nil {
-		log.Fatal(err)
+		fatal("failed to initialize task lease preflight repository", "err", err)
 	}
 
 	ctx := context.Background()
 	if opts.DryRun {
-		log.Printf("[Repair] task-leases dry-run mode: no data will be changed")
+		slog.Info("task lease repair dry-run mode")
 		report, err := reportTaskLeasePreflight(ctx, taskRepo, defaultPreflightSampleLimit)
 		if err != nil {
-			log.Fatal(err)
+			fatal("task lease repair dry-run failed", "err", err)
 		}
 		wouldReset := report.Count
 		if int64(opts.Limit) < wouldReset {
 			wouldReset = int64(opts.Limit)
 		}
-		log.Printf("[Repair] task-leases dry-run completed: eligible_missing=%d would_reset_to_pending=%d limit=%d", report.Count, wouldReset, opts.Limit)
+		slog.Info("task lease repair dry-run completed", "eligible_missing", report.Count, "would_reset_to_pending", wouldReset, "limit", opts.Limit)
 		return
 	}
 
 	affected, err := taskRepo.ResetRunningTasksMissingLeaseTokenToPending(ctx, opts.Limit)
 	if err != nil {
-		log.Fatal(fmt.Errorf("repair failed: %w", err))
+		fatal("task lease repair failed", "err", err)
 	}
-	log.Printf("[Repair] task-leases completed: reset_to_pending=%d limit=%d", affected, opts.Limit)
+	slog.Info("task lease repair completed", "reset_to_pending", affected, "limit", opts.Limit)
 }
 
 func parseRepairTaskLeasesArgs(args []string) (repairTaskLeasesOptions, error) {
@@ -102,7 +103,7 @@ func parseRepairTaskLeasesArgs(args []string) (repairTaskLeasesOptions, error) {
 		return opts, errors.New("usage: api repair task-leases [--dry-run] [--to=pending --yes] [--limit=N]")
 	}
 	fs := flag.NewFlagSet("repair task-leases", flag.ContinueOnError)
-	fs.SetOutput(log.Writer())
+	fs.SetOutput(os.Stderr)
 	fs.BoolVar(&opts.DryRun, "dry-run", true, "preview only; no mutation")
 	fs.StringVar(&opts.To, "to", "", "target status for mutation (supported: pending)")
 	fs.BoolVar(&opts.Yes, "yes", false, "confirm mutation")
@@ -151,7 +152,7 @@ func reportTaskLeasePreflight(ctx context.Context, repo taskLeasePreflightReposi
 	}
 	report.Count = count
 	if count == 0 {
-		log.Printf("[Preflight] OK: running tasks with missing lease_token = 0")
+		slog.Info("task lease preflight passed", "missing_lease_token", 0)
 		return report, nil
 	}
 	if sampleLimit <= 0 {
@@ -162,9 +163,9 @@ func reportTaskLeasePreflight(ctx context.Context, repo taskLeasePreflightReposi
 		return report, fmt.Errorf("preflight sample failed: %w", err)
 	}
 	report.Sample = sample
-	log.Printf("[Preflight] Found running tasks missing lease_token: count=%d sample=%d", count, len(sample))
+	slog.Warn("task lease preflight found running tasks missing lease token", "count", count, "sample", len(sample))
 	for i, row := range sample {
-		log.Printf("[Preflight] sample[%d] task_id=%s account_id=%d", i, row.TaskID, row.AccountID)
+		slog.Warn("task lease preflight sample", "index", i, "task_id", row.TaskID, "account_id", row.AccountID)
 	}
 	return report, nil
 }

@@ -3,7 +3,7 @@ package httpapi
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"mime/multipart"
 	"os"
 	"strconv"
@@ -89,7 +89,7 @@ func uploadProfileAvatarHandler(h UploadDeps) gin.HandlerFunc {
 		}
 		if err := h.UserRepo.UpdateAvatarByID(c.Request.Context(), userID, url); err != nil {
 			if cleanupErr := h.StorageService.DeleteProfileAvatarByURL(c.Request.Context(), user.StorageUID, url); cleanupErr != nil {
-				log.Printf("[profile] cleanup uploaded avatar failed user_id=%d url=%s: %v", userID, url, cleanupErr)
+				slog.Warn("cleanup uploaded avatar failed", "user_id", userID, "url", url, "err", cleanupErr)
 			}
 			response.InternalError(c, 500, "头像上传失败", err)
 			return

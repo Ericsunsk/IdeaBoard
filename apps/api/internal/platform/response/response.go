@@ -1,7 +1,7 @@
 package response
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,9 +37,9 @@ func ErrorWithStatus(c *gin.Context, httpStatus int, code int, msg string) {
 
 func InternalError(c *gin.Context, httpStatus int, publicMsg string, err error) {
 	if err != nil {
-		log.Printf("[HTTP] %s: %v", publicMsg, err)
+		slog.Warn("HTTP error response", "message", publicMsg, "err", err)
 	} else {
-		log.Printf("[HTTP] %s", publicMsg)
+		slog.Warn("HTTP error response", "message", publicMsg)
 	}
 	Error(c, httpStatus, publicMsg)
 }

@@ -2,7 +2,7 @@ package accounts
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 
 	"api/internal/tasks"
@@ -26,7 +26,7 @@ func (s *AccountService) attachOutputsForTasks(ctx context.Context, items []*tas
 
 	outputsByTaskID, err := s.taskRepo.ListOutputsByTaskIDs(ctx, taskIDs)
 	if err != nil {
-		log.Printf("[AccountService] load task outputs failed: %v", err)
+		slog.Warn("load task outputs failed", "err", err)
 		return
 	}
 	for _, item := range items {

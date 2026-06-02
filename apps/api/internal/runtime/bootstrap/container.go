@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"api/internal/accounts"
@@ -200,7 +200,7 @@ func (c *appContainer) close() error {
 func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies) {
 	frontendFS, err := web.DistFS()
 	if err != nil {
-		log.Printf("[Main] Failed to load embedded frontend dist: %v", err)
+		slog.Warn("failed to load embedded frontend dist", "err", err)
 	}
 
 	httpapi.RegisterRoutes(r, deps, frontendFS)
@@ -251,7 +251,7 @@ func newTaskStatusEventPublisher(
 		_ = bus.Close()
 		return nil, nil, err
 	}
-	log.Printf("[NATS] JetStream task events enabled stream=%s subject_prefix=%s", cfg.NATSStreamName, cfg.NATSSubjectPrefix)
+	slog.Info("NATS JetStream task events enabled", "stream", cfg.NATSStreamName, "subject_prefix", cfg.NATSSubjectPrefix)
 	return bus, bus, nil
 }
 

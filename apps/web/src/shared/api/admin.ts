@@ -11,7 +11,6 @@ import {
   revokeAdminUserSessions,
   unbanAdminUser,
   updateAdminUserRole,
-  updateAdminUserStatus,
 } from './generated-query/admin-users/admin-users'
 import type {
   ListAdminUsersParams,
@@ -36,7 +35,6 @@ export const adminApi = {
   ) => banAdminUser(id, data),
   unbanUser: (id: number) => unbanAdminUser(id),
   revokeUserSessions: (id: number) => revokeAdminUserSessions(id),
-  updateUserStatus: (id: number, status: number) => updateAdminUserStatus(id, { status }),
   updateUserRole: (id: number, role: UpdateAdminUserRoleBodyRole) =>
     updateAdminUserRole(id, { role }),
   deleteUser: (id: number) => deleteAdminUser(id),

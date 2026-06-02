@@ -38,11 +38,6 @@ export async function updateRegistrationSetting(enabled: boolean): Promise<Regis
   return requireApiData(res, '更新注册状态失败')
 }
 
-export async function updateAdminUserStatus(input: { id: number; status: number }): Promise<void> {
-  const res = await adminApi.updateUserStatus(input.id, input.status)
-  requireApiOk(res, input.status === 1 ? '解封失败' : '封禁失败')
-}
-
 export async function banAdminUser(input: {
   id: number
   reason?: string

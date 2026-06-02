@@ -3,8 +3,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,26 +11,13 @@ import (
 
 	"api/internal/auth"
 	"api/internal/db/migrations"
+	"api/internal/platform/applog"
 	"api/internal/platform/config"
 	"api/internal/platform/database"
 	"api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )
-
-func configureLogging(logFilePath string) {
-	logPath := strings.TrimSpace(logFilePath)
-	if logPath == "" {
-		logPath = "server.log"
-	}
-	if strings.EqualFold(logPath, "none") {
-		return
-	}
-	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if logFile != nil {
-		log.SetOutput(io.MultiWriter(os.Stderr, logFile))
-	}
-}
 
 func Run(args []string) {
 	if len(args) > 1 {
@@ -49,55 +35,56 @@ func Run(args []string) {
 	}
 
 	cfg := config.Load()
-	configureLogging(cfg.App.LogFile)
-	log.Println("[Main] ===== Server starting (build with storage profiles) =====")
+	configureRuntimeLogging(cfg)
+	slog.Info("server starting", "storage_profiles", true)
 
 	requireAuthInternalKeyForProduction(cfg)
 	gin.SetMode(cfg.App.GinMode)
-	log.Printf("[Main] Gin mode: %s (app env: %s)", gin.Mode(), cfg.App.Env)
+	slog.Info("gin mode configured", "gin_mode", gin.Mode(), "app_env", cfg.App.Env)
 
 	app, err := newRuntimeApp(cfg)
 	if err != nil {
-		log.Fatal(err)
+		fatal("failed to initialize runtime app", "err", err)
 	}
 	defer func() {
 		if err := app.close(); err != nil {
-			log.Printf("[Main] Failed to close River resources: %v", err)
+			slog.Warn("failed to close runtime resources", "err", err)
 		}
 	}()
 
 	app.start()
 	app.waitForShutdownSignal()
 	if err := app.shutdown(); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		fatal("server forced to shutdown", "err", err)
 	}
 }
 
 func runInitAdmin() {
 	cfg := config.Load()
+	configureRuntimeLogging(cfg)
 	requireAuthInternalKeyForProduction(cfg)
 	db, err := database.NewPostgres(cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		fatal("failed to connect to database", "err", err)
 	}
 	if err := migrations.Up(context.Background(), db); err != nil {
-		log.Fatalf("Failed to migrate database schema: %v", err)
+		fatal("failed to migrate database schema", "err", err)
 	}
 
 	userRepo := users.NewUserRepository(db)
 	ctx := context.Background()
 	if err := userRepo.EnsureStorageUIDs(ctx); err != nil {
-		log.Fatalf("Failed to ensure user storage uid: %v", err)
+		fatal("failed to ensure user storage uid", "err", err)
 	}
 	adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
 	if adminPassword == "" {
-		log.Fatal("[Init] INIT_ADMIN_PASSWORD 未配置；请显式设置强密码后重试")
+		fatal("INIT_ADMIN_PASSWORD is required")
 	}
 
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
 	provisioned, err := authServiceClient.EnsureUser(ctx, "admin", adminPassword, true, "admin")
 	if err != nil {
-		log.Fatalf("Failed to ensure Better Auth admin user: %v", err)
+		fatal("failed to ensure Better Auth admin user", "err", err)
 	}
 
 	ensureLocalAdminRole := func(user *users.User) error {
@@ -126,21 +113,21 @@ func runInitAdmin() {
 	localAdmin, err := userRepo.GetByAuthUserID(ctx, provisioned.AuthUserID)
 	if err == nil {
 		if err := ensureLocalAdminRole(localAdmin); err != nil {
-			log.Fatalf("Failed to update local admin profile by auth_user_id: %v", err)
+			fatal("failed to update local admin profile by auth_user_id", "err", err)
 		}
-		log.Println("Better Auth admin user verified; local admin profile is ready")
+		slog.Info("Better Auth admin user verified; local admin profile is ready")
 		return
 	}
 	if err != nil && !database.IsNotFound(err) {
-		log.Fatalf("Failed to query local admin by auth_user_id: %v", err)
+		fatal("failed to query local admin by auth_user_id", "err", err)
 	}
 
 	localAdminByName, err := userRepo.GetByUsername(ctx, "admin")
 	if err == nil {
-		log.Fatalf("Local username 'admin' already exists without matching Better Auth user (%s)", strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)))
+		fatal("local username admin already exists without matching Better Auth user", "auth_user_id", strings.TrimSpace(valueOrEmpty(localAdminByName.AuthUserID)))
 	}
 	if !database.IsNotFound(err) {
-		log.Fatalf("Failed to query local admin username: %v", err)
+		fatal("failed to query local admin username", "err", err)
 	}
 
 	localAdmin = &users.User{
@@ -150,10 +137,10 @@ func runInitAdmin() {
 		Status:     1,
 	}
 	if err := userRepo.Create(ctx, localAdmin); err != nil {
-		log.Fatalf("Failed to create local admin profile: %v", err)
+		fatal("failed to create local admin profile", "err", err)
 	}
 
-	log.Println("Created Better Auth admin account and local admin profile successfully")
+	slog.Info("created Better Auth admin account and local admin profile")
 }
 
 func requireAuthInternalKeyForProduction(cfg *config.Config) {
@@ -165,11 +152,25 @@ func requireAuthInternalKeyForProduction(cfg *config.Config) {
 	}
 	internalKey := strings.TrimSpace(cfg.Auth.InternalAPIKey)
 	if internalKey == "" {
-		log.Fatal("[Config] AUTH_SERVICE_INTERNAL_KEY must be set when APP_ENV=production")
+		fatal("AUTH_SERVICE_INTERNAL_KEY must be set when APP_ENV=production")
 	}
 	if isUnsafeProductionSecret(internalKey) {
-		log.Fatal("[Config] AUTH_SERVICE_INTERNAL_KEY must not use placeholder or development values in production")
+		fatal("AUTH_SERVICE_INTERNAL_KEY must not use placeholder or development values in production")
 	}
+}
+
+func configureRuntimeLogging(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+	if err := applog.Configure(cfg.App.LogFile, cfg.App.Env); err != nil {
+		slog.Warn("failed to open log file", "path", cfg.App.LogFile, "err", err)
+	}
+}
+
+func fatal(msg string, attrs ...any) {
+	slog.Error(msg, attrs...)
+	os.Exit(1)
 }
 
 func isProductionRuntime(env string) bool {

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -93,15 +93,7 @@ func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.Api
 	}
 	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
 
-	log.Printf(
-		"[Worker] OpenAI 请求: feature=%s endpoint=%s model=%s size=%s edit=%t images=%d",
-		featureSlug,
-		endpoint,
-		model,
-		size,
-		useEditEndpoint,
-		imageInputCount,
-	)
+	slog.Info("OpenAI-compatible image request", "feature", featureSlug, "endpoint", endpoint, "model", model, "size", size, "edit", useEditEndpoint, "images", imageInputCount)
 
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {

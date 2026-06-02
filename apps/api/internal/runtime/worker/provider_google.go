@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -93,7 +93,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", account.ApiKey)
 
-	log.Printf("[Worker] Google Gemini 请求: endpoint=%s model=%s inlineImages=%d", endpoint, model, len(inlineParts))
+	slog.Info("Google Gemini request", "endpoint", endpoint, "model", model, "inline_images", len(inlineParts))
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -289,7 +289,7 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", account.ApiKey)
 
-	log.Printf("[Worker] Google Imagen 请求: endpoint=%s model=%s sampleCount=%d", endpoint, model, sampleCount)
+	slog.Info("Google Imagen request", "endpoint", endpoint, "model", model, "sample_count", sampleCount)
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {

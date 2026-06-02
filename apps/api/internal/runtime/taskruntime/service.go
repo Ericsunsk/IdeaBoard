@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -122,7 +122,7 @@ func (s *Service) WatchTaskCancellation(parent context.Context, taskID string) (
 
 func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
 	if err := events.PublishTaskStatusBestEffort(ctx, s.taskEvents, events.NewTaskStatusEvent(taskID, status)); err != nil {
-		log.Printf("[TaskRuntime] publish task status event failed task_id=%s status=%s err=%v", taskID, status, err)
+		slog.Warn("publish task status event failed", "task_id", taskID, "status", status, "err", err)
 	}
 }
 
@@ -177,10 +177,10 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseTok
 	if rows > 0 {
 		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
 			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
-				log.Printf("[TaskRuntime] upsert daily stat failed after complete, task_id=%s err=%v", taskID, statErr)
+				slog.Warn("upsert daily stat failed after complete", "task_id", taskID, "err", statErr)
 			}
 		} else {
-			log.Printf("[TaskRuntime] load task for daily stat failed after complete, task_id=%s err=%v", taskID, getErr)
+			slog.Warn("load task for daily stat failed after complete", "task_id", taskID, "err", getErr)
 		}
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusCompleted)
 		return nil
@@ -225,10 +225,10 @@ func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken 
 	if rows > 0 {
 		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
 			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
-				log.Printf("[TaskRuntime] upsert daily stat failed after fail, task_id=%s err=%v", taskID, statErr)
+				slog.Warn("upsert daily stat failed after fail", "task_id", taskID, "err", statErr)
 			}
 		} else {
-			log.Printf("[TaskRuntime] load task for daily stat failed after fail, task_id=%s err=%v", taskID, getErr)
+			slog.Warn("load task for daily stat failed after fail", "task_id", taskID, "err", getErr)
 		}
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		return nil
@@ -335,10 +335,10 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 	if rows > 0 {
 		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
 			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
-				log.Printf("[TaskRuntime] upsert daily stat failed after failover-final-fail, task_id=%s err=%v", taskID, statErr)
+				slog.Warn("upsert daily stat failed after failover final fail", "task_id", taskID, "err", statErr)
 			}
 		} else {
-			log.Printf("[TaskRuntime] load task for daily stat failed after failover-final-fail, task_id=%s err=%v", taskID, getErr)
+			slog.Warn("load task for daily stat failed after failover final fail", "task_id", taskID, "err", getErr)
 		}
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		return false, nil

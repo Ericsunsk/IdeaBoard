@@ -3,7 +3,7 @@ package users
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -162,44 +162,6 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// UpdateUserStatus 保留兼容入口，内部转发到封禁/解封编排
-func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
-	var req struct {
-		Status *int16 `json:"status" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-	if req.Status == nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	targetUser, authUserID, currentStatus, ok := h.prepareManagedAuthUser(c)
-	if !ok {
-		return
-	}
-
-	switch *req.Status {
-	case 0:
-		if err := h.performBan(c.Request.Context(), targetUser, authUserID, currentStatus, AdminBanUserRequest{}); err != nil {
-			h.respondAdminActionError(c, err, "封禁")
-			return
-		}
-		response.Success(c, nil)
-	case 1:
-		if err := h.performUnban(c.Request.Context(), targetUser, authUserID, currentStatus); err != nil {
-			h.respondAdminActionError(c, err, "解封")
-			return
-		}
-		response.Success(c, nil)
-	default:
-		response.Error(c, 400, "状态值无效，仅支持0或1")
-	}
-}
-
 func (h *AdminHandler) BanUser(c *gin.Context) {
 	var req AdminBanUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -320,7 +282,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 	if err := h.authService.SetUserRole(c.Request.Context(), authUserID, nextRole); err != nil {
-		log.Printf("[users] role drift detected: local updated but auth sync failed user_id=%d auth_user_id=%s target_role=%s", targetUser.ID, authUserID, nextRole)
+		slog.Warn("role drift detected after local role update", "user_id", targetUser.ID, "auth_user_id", authUserID, "target_role", nextRole, "err", err)
 		response.InternalError(c, 502, "业务侧已取消管理员，但 Auth 角色同步失败，请重试或按运维流程补偿处理", err)
 		return
 	}
@@ -360,7 +322,7 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 			response.InternalError(c, 502, "删除 Auth 用户失败", err)
 			return
 		}
-		log.Printf("[users] auth user already missing during admin delete, continue local cleanup user_id=%d auth_user_id=%s", targetUser.ID, authUserID)
+		slog.Warn("auth user already missing during admin delete; continue local cleanup", "user_id", targetUser.ID, "auth_user_id", authUserID)
 	}
 
 	if err := h.userService.DeleteUser(c.Request.Context(), targetUser.ID); err != nil {
@@ -449,7 +411,7 @@ func (h *AdminHandler) performBan(ctx context.Context, targetUser *User, authUse
 	}
 	if err := h.userService.UpdateStatus(ctx, targetUser.ID, 0); err != nil {
 		if rollbackErr := h.authService.UnbanUser(ctx, authUserID); rollbackErr != nil {
-			log.Printf("[users] ban compensation failed user_id=%d auth_user_id=%s rollback_err=%v", targetUser.ID, authUserID, rollbackErr)
+			slog.Warn("ban compensation failed", "user_id", targetUser.ID, "auth_user_id", authUserID, "rollback_err", rollbackErr)
 			return &adminActionError{status: 500, msg: "业务侧封禁失败，且身份侧回滚失败，请按运维流程补偿处理", err: err}
 		}
 		return &adminActionError{status: 400, msg: err.Error(), err: err}
@@ -470,7 +432,7 @@ func (h *AdminHandler) performUnban(ctx context.Context, targetUser *User, authU
 	if err := h.userService.UpdateStatus(ctx, targetUser.ID, 1); err != nil {
 		rollbackErr := h.authService.BanUser(ctx, authUserID, "rollback after local unban failure", 0)
 		if rollbackErr != nil {
-			log.Printf("[users] unban compensation failed user_id=%d auth_user_id=%s rollback_err=%v", targetUser.ID, authUserID, rollbackErr)
+			slog.Warn("unban compensation failed", "user_id", targetUser.ID, "auth_user_id", authUserID, "rollback_err", rollbackErr)
 			return &adminActionError{status: 500, msg: "业务侧解封失败，且身份侧回滚失败，请按运维流程补偿处理", err: err}
 		}
 		return &adminActionError{status: 400, msg: err.Error(), err: err}

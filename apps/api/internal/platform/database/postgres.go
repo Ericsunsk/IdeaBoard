@@ -3,7 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"strconv"
@@ -39,7 +39,7 @@ func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
 		if attempt >= maxRetries {
 			break
 		}
-		log.Printf("[Database] PostgreSQL connect attempt %d/%d failed: %v; retrying in %s", attempt, maxRetries, err, retryInterval)
+		slog.Warn("PostgreSQL connect attempt failed", "attempt", attempt, "max_retries", maxRetries, "retry_interval", retryInterval, "err", err)
 		time.Sleep(retryInterval)
 	}
 	return nil, lastErr

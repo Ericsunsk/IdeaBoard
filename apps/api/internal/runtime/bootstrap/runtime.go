@@ -2,7 +2,7 @@ package bootstrap
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,16 +30,16 @@ func newRuntimeApp(cfg *config.Config) (*runtimeApp, error) {
 
 func (a *runtimeApp) start() {
 	go func() {
-		log.Printf("[Main] River worker starting: queue=%s concurrency=%d", a.container.workerQueueName, a.container.workerConcurrent)
+		slog.Info("River worker starting", "queue", a.container.workerQueueName, "concurrency", a.container.workerConcurrent)
 		if err := a.container.riverClient.Start(context.Background()); err != nil {
-			log.Fatalf("[Main] Failed to start River worker: %v", err)
+			fatal("failed to start River worker", "err", err)
 		}
 	}()
 
 	go func() {
-		log.Printf("Server starting on %s", a.httpServer.Addr)
+		slog.Info("HTTP server starting", "addr", a.httpServer.Addr)
 		if err := a.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			fatal("failed to start HTTP server", "err", err)
 		}
 	}()
 }
@@ -51,11 +51,11 @@ func (a *runtimeApp) waitForShutdownSignal() {
 }
 
 func (a *runtimeApp) shutdown() error {
-	log.Println("[Main] Shutting down server...")
+	slog.Info("server shutting down")
 	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer stopCancel()
 	if err := a.container.riverClient.Stop(stopCtx); err != nil {
-		log.Printf("[Main] River worker graceful stop failed: %v", err)
+		slog.Warn("River worker graceful stop failed", "err", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -64,7 +64,7 @@ func (a *runtimeApp) shutdown() error {
 		return err
 	}
 
-	log.Println("[Main] Server exited")
+	slog.Info("server exited")
 	return nil
 }
 

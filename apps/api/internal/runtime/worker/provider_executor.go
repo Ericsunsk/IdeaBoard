@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -56,8 +56,7 @@ type providerCallResult struct {
 }
 
 func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (string, error) {
-	log.Printf("[Worker] 调用 API, 账号: %s, ChannelID: %d",
-		account.Name, account.ChannelID)
+	slog.Info("calling provider API", "account_name", account.Name, "channel_id", account.ChannelID, "task_id", task.TaskID)
 
 	if account.ApiKey == "" {
 		return "", fmt.Errorf("账号 %s 的 API Key 为空", account.Name)
@@ -76,14 +75,14 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		}
 		account.ProxyURL = proxyURL
 		channelName = channel.Name
-		log.Printf("[Worker] 使用渠道商「%s」API URL: %s", channel.Name, channel.ApiURL)
+		slog.Info("using channel API URL", "channel_name", channel.Name, "channel_id", channel.ID, "api_url", channel.ApiURL)
 	}
 
 	// 解析任务参数（ratio, count 等）
 	var params map[string]interface{}
 	if task.Params != "" {
 		if err := json.Unmarshal([]byte(task.Params), &params); err != nil {
-			log.Printf("[Worker] 解析任务参数失败: task=%s err=%v", task.TaskID, err)
+			slog.Warn("parse task params failed", "task_id", task.TaskID, "err", err)
 		}
 	}
 	c.normalizeUpstreamMediaParams(params)
@@ -184,7 +183,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 	}
 
 	usesObjectStorage := c.storageService.UsesObjectStorage(ctx)
-	log.Printf("[Worker] 存储检查: service=true, objectStorage=%v, imageCount=%d", usesObjectStorage, len(imageURLs))
+	slog.Info("provider result storage check", "object_storage", usesObjectStorage, "image_count", len(imageURLs))
 
 	next := append([]string(nil), imageURLs...)
 	for index, currentURL := range next {
@@ -201,7 +200,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		}
 		storedURL, storeErr := c.storageService.StoreRemote(ctx, currentURL, storeOpts)
 		if storeErr == nil {
-			log.Printf("[Worker] 图片持久化成功: %s -> %s", truncateLogURL(currentURL), storedURL)
+			slog.Info("provider image materialized", "source_url", truncateLogURL(currentURL), "stored_url", storedURL)
 			next[index] = storedURL
 			continue
 		}
@@ -211,7 +210,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		if inlineImage {
 			return nil, fmt.Errorf("持久化上游图片失败: %w", storeErr)
 		}
-		log.Printf("[Worker] 转存远程图片失败，使用原始 URL: %v", storeErr)
+		slog.Warn("materialize remote image failed; keeping original URL", "err", storeErr)
 	}
 	return next, nil
 }
