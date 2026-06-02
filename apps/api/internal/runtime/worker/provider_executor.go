@@ -132,7 +132,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	imageURL := imageURLs[0]
 
 	if localRedrawCtx != nil {
-		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, localRedrawCtx, imageURL, timeout)
+		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, task.UserID, task.TaskID, localRedrawCtx, imageURL, timeout)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return "", err
@@ -143,7 +143,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	}
 
 	if !localRedrawStored {
-		imageURLs, err = c.materializeProviderResultImages(ctx, account, imageURLs)
+		imageURLs, err = c.materializeProviderResultImages(ctx, task.UserID, task.TaskID, account, imageURLs)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return "", err
@@ -175,7 +175,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	return string(resultJSON), nil
 }
 
-func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, account *accounts.ApiAccount, imageURLs []string) ([]string, error) {
+func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID uint64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, error) {
 	if len(imageURLs) == 0 {
 		return imageURLs, nil
 	}
@@ -193,9 +193,13 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 			continue
 		}
 
-		storedURL, storeErr := c.storageService.StoreRemote(ctx, currentURL, storage.StorageStoreOptions{
+		storeOpts := storage.StorageStoreOptions{
 			AllowHosts: []string{account.ProxyURL},
-		})
+		}
+		if dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, taskID); err == nil {
+			storeOpts.DirPrefix = dirPrefix
+		}
+		storedURL, storeErr := c.storageService.StoreRemote(ctx, currentURL, storeOpts)
 		if storeErr == nil {
 			log.Printf("[Worker] 图片持久化成功: %s -> %s", truncateLogURL(currentURL), storedURL)
 			next[index] = storedURL

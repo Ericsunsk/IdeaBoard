@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"api/internal/boards"
 	"api/internal/platform/response"
 	"api/internal/storage"
+	"api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,10 +30,19 @@ func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 			return
 		}
 
-		if resource.Kind == storage.UploadResourceKindWorkspace && resource.Workspace != nil {
-			if !authorizeWorkspaceUploadRead(c, deps, *resource.Workspace) {
+		switch resource.Kind {
+		case storage.UploadResourceKindWorkspace:
+			if resource.Workspace == nil || !authorizeWorkspaceUploadRead(c, deps, *resource.Workspace) {
 				return
 			}
+		case storage.UploadResourceKindProfileAvatar:
+		case storage.UploadResourceKindProfileVector, storage.UploadResourceKindTaskOutput:
+			if !authorizeOwnedUploadRead(c, deps, resource) {
+				return
+			}
+		default:
+			c.Status(http.StatusNotFound)
+			return
 		}
 
 		localPath := filepath.FromSlash(resource.ObjectKey)
@@ -58,14 +69,39 @@ func authorizeUploadRead(c *gin.Context, deps AuthDeps) bool {
 	return true
 }
 
+type staticUploadBoardAccessResolver struct {
+	service *boards.BoardService
+}
+
+func (r staticUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID uint64, boardID string) (uint64, error) {
+	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
+	if err != nil {
+		return 0, err
+	}
+	return board.UserID, nil
+}
+
 func authorizeWorkspaceUploadRead(c *gin.Context, deps StaticUploadDeps, uploadPath storage.UploadWorkspaceResource) bool {
 	userID := c.GetUint64("user_id")
 	if deps.BoardService == nil || deps.Auth.UserRepo == nil {
 		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("workspace upload dependencies not configured"))
 		return false
 	}
-
-	board, _, err := deps.BoardService.ResolveBoardAccess(c.Request.Context(), userID, uploadPath.BoardSegment)
+	resource := storage.UploadResource{
+		Kind: storage.UploadResourceKindWorkspace,
+		Workspace: &storage.UploadWorkspaceResource{
+			OwnerSegment: uploadPath.OwnerSegment,
+			BoardSegment: uploadPath.BoardSegment,
+			RelativePath: uploadPath.RelativePath,
+		},
+	}
+	err := storage.AuthorizeUploadResourceRead(
+		c.Request.Context(),
+		userID,
+		resource,
+		staticUploadBoardAccessResolver{service: deps.BoardService},
+		staticUploadOwnerStorageUIDResolver{repo: deps.Auth.UserRepo},
+	)
 	if err != nil {
 		switch {
 		case errors.Is(err, boards.ErrInvalidBoardInput):
@@ -74,26 +110,52 @@ func authorizeWorkspaceUploadRead(c *gin.Context, deps StaticUploadDeps, uploadP
 			response.Error(c, http.StatusNotFound, "资源不存在")
 		case errors.Is(err, boards.ErrBoardPermissionDenied):
 			response.Error(c, http.StatusForbidden, "无权访问该资源")
+		case errors.Is(err, storage.ErrUploadAccessOwnerMismatch):
+			response.Error(c, http.StatusNotFound, "资源不存在")
 		default:
 			response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
 		}
 		return false
 	}
 
-	owner, err := deps.Auth.UserRepo.GetByID(c.Request.Context(), board.UserID)
-	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
-		return false
-	}
-	ownerSegment, err := storage.NormalizeWorkspaceStorageUserSegment(owner.StorageUID)
-	if err != nil {
-		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
-		return false
-	}
-	if ownerSegment != uploadPath.OwnerSegment {
-		response.Error(c, http.StatusNotFound, "资源不存在")
-		return false
-	}
-
 	return true
+}
+
+func authorizeOwnedUploadRead(c *gin.Context, deps StaticUploadDeps, resource storage.UploadResource) bool {
+	userID := c.GetUint64("user_id")
+	if deps.Auth.UserRepo == nil {
+		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", fmt.Errorf("upload dependencies not configured"))
+		return false
+	}
+	err := storage.AuthorizeUploadResourceRead(
+		c.Request.Context(),
+		userID,
+		resource,
+		staticUploadBoardAccessResolver{service: deps.BoardService},
+		staticUploadOwnerStorageUIDResolver{repo: deps.Auth.UserRepo},
+	)
+	if err == nil {
+		return true
+	}
+	switch {
+	case errors.Is(err, storage.ErrUploadAccessInvalidPath):
+		response.Error(c, http.StatusNotFound, "资源不存在")
+	case errors.Is(err, storage.ErrUploadAccessDenied), errors.Is(err, storage.ErrUploadAccessOwnerMismatch):
+		response.Error(c, http.StatusForbidden, "无权访问该资源")
+	default:
+		response.InternalError(c, http.StatusInternalServerError, "读取上传资源失败", err)
+	}
+	return false
+}
+
+type staticUploadOwnerStorageUIDResolver struct {
+	repo *users.UserRepository
+}
+
+func (r staticUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID uint64) (string, error) {
+	user, err := r.repo.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return user.StorageUID, nil
 }

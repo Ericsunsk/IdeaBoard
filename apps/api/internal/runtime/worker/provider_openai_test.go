@@ -724,14 +724,14 @@ func TestCollectOpenAIEditImageInputsIncludesReferenceImageURLs(t *testing.T) {
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsAbsolutizesRelativeUploadPaths(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing.T) {
 	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
 
 	params := map[string]interface{}{
 		"feature":            "style-variation",
-		"image_urls":         []interface{}{"/uploads/2026/04/23/source.png"},
-		"original_image_url": "/uploads/2026/04/23/source.png",
-		"mask_image_url":     "/uploads/2026/04/23/mask.png",
+		"image_urls":         []interface{}{"/uploads/workspace/OWNR1A/board-1/content/source.png"},
+		"original_image_url": "/uploads/workspace/OWNR1A/board-1/content/source.png",
+		"mask_image_url":     "/uploads/workspace/OWNR1A/board-1/content/mask.png",
 		"variation_strength": 5,
 	}
 
@@ -742,13 +742,13 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesRelativeUploadPaths(t *testing.T
 	if !ok || len(imageURLs) != 1 {
 		t.Fatalf("unexpected image_urls: %#v", params["image_urls"])
 	}
-	if imageURLs[0] != "https://app.example.com/uploads/2026/04/23/source.png" {
+	if imageURLs[0] != "https://app.example.com/uploads/workspace/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized image_urls[0]: %#v", imageURLs[0])
 	}
-	if got := params["original_image_url"]; got != "https://app.example.com/uploads/2026/04/23/source.png" {
+	if got := params["original_image_url"]; got != "https://app.example.com/uploads/workspace/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized original_image_url: %#v", got)
 	}
-	if got := params["mask_image_url"]; got != "https://app.example.com/uploads/2026/04/23/mask.png" {
+	if got := params["mask_image_url"]; got != "https://app.example.com/uploads/workspace/OWNR1A/board-1/content/mask.png" {
 		t.Fatalf("unexpected normalized mask_image_url: %#v", got)
 	}
 	if got := params["variation_strength"]; got != 5 {
@@ -756,24 +756,49 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesRelativeUploadPaths(t *testing.T
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsPrefersAssetBaseURL(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsPrefersAssetBaseURLForStructuredUploadPaths(t *testing.T) {
 	t.Setenv("APP_PUBLIC_ASSET_BASE_URL", "https://api.example.com")
 	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
 
 	params := map[string]interface{}{
 		"feature":            "style-variation",
-		"original_image_url": "/uploads/2026/04/23/source.png",
+		"original_image_url": "/uploads/workspace/OWNR1A/board-1/content/source.png",
 	}
 
 	c := &ProviderExecutor{}
 	c.normalizeUpstreamMediaParams(params)
 
-	if got := params["original_image_url"]; got != "https://api.example.com/uploads/2026/04/23/source.png" {
+	if got := params["original_image_url"]; got != "https://api.example.com/uploads/workspace/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized original_image_url: %#v", got)
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsInlinesRelativeUploadPathsWithoutPublicBaseURL(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsRejectsLegacyGenericUploadPaths(t *testing.T) {
+	t.Setenv("APP_PUBLIC_BASE_URL", "https://app.example.com")
+
+	ref := "/uploads/2026/04/23/source.png"
+	params := map[string]interface{}{
+		"feature":            "style-variation",
+		"image_urls":         []interface{}{ref},
+		"original_image_url": ref,
+	}
+
+	c := &ProviderExecutor{}
+	c.normalizeUpstreamMediaParams(params)
+
+	imageURLs, ok := params["image_urls"].([]interface{})
+	if !ok || len(imageURLs) != 1 {
+		t.Fatalf("unexpected image_urls: %#v", params["image_urls"])
+	}
+	if got := imageURLs[0]; got != ref {
+		t.Fatalf("expected legacy upload path to remain unresolved, got %#v", got)
+	}
+	if got := params["original_image_url"]; got != ref {
+		t.Fatalf("expected legacy upload path to remain unresolved, got %#v", got)
+	}
+}
+
+func TestNormalizeUpstreamMediaParamsDoesNotInlineUploadPathsWithoutPublicBaseURL(t *testing.T) {
 	tempDir := t.TempDir()
 	previousWD, err := os.Getwd()
 	if err != nil {
@@ -798,10 +823,11 @@ func TestNormalizeUpstreamMediaParamsInlinesRelativeUploadPathsWithoutPublicBase
 		t.Fatalf("write png: %v", err)
 	}
 
+	ref := "/uploads/2026/04/23/source.png"
 	params := map[string]interface{}{
 		"feature":            "style-variation",
-		"image_urls":         []interface{}{"/uploads/2026/04/23/source.png"},
-		"original_image_url": "/uploads/2026/04/23/source.png",
+		"image_urls":         []interface{}{ref},
+		"original_image_url": ref,
 	}
 
 	c := &ProviderExecutor{}
@@ -811,12 +837,53 @@ func TestNormalizeUpstreamMediaParamsInlinesRelativeUploadPathsWithoutPublicBase
 	if !ok || len(imageURLs) != 1 {
 		t.Fatalf("unexpected image_urls: %#v", params["image_urls"])
 	}
-	imageDataURL, ok := imageURLs[0].(string)
-	if !ok || !strings.HasPrefix(imageDataURL, "data:image/png;base64,") {
-		t.Fatalf("unexpected inlined image_urls[0]: %#v", imageURLs[0])
+	if got := imageURLs[0]; got != ref {
+		t.Fatalf("expected upload path to remain unresolved, got %#v", got)
 	}
-	originalImageURL, ok := params["original_image_url"].(string)
-	if !ok || !strings.HasPrefix(originalImageURL, "data:image/png;base64,") {
-		t.Fatalf("unexpected inlined original_image_url: %#v", params["original_image_url"])
+	if got := params["original_image_url"]; got != ref {
+		t.Fatalf("expected upload path to remain unresolved, got %#v", got)
+	}
+}
+
+func TestNormalizeUpstreamMediaParamsDoesNotInlineWorkspaceUploadWithoutPublicBaseURL(t *testing.T) {
+	tempDir := t.TempDir()
+	previousWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWD)
+	})
+
+	filePath := filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "source.png")
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
+		t.Fatalf("mkdir uploads dir: %v", err)
+	}
+	if err := os.WriteFile(filePath, []byte("workspace image"), 0o644); err != nil {
+		t.Fatalf("write upload: %v", err)
+	}
+
+	ref := "/uploads/workspace/OWNR1A/board-1/content/source.png"
+	params := map[string]interface{}{
+		"feature":            "style-variation",
+		"image_urls":         []interface{}{ref},
+		"original_image_url": ref,
+	}
+
+	c := &ProviderExecutor{}
+	c.normalizeUpstreamMediaParams(params)
+
+	imageURLs, ok := params["image_urls"].([]interface{})
+	if !ok || len(imageURLs) != 1 {
+		t.Fatalf("unexpected image_urls: %#v", params["image_urls"])
+	}
+	if got := imageURLs[0]; got != ref {
+		t.Fatalf("expected workspace upload to remain relative, got %#v", got)
+	}
+	if got := params["original_image_url"]; got != ref {
+		t.Fatalf("expected workspace upload to remain relative, got %#v", got)
 	}
 }

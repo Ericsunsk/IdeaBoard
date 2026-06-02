@@ -5,6 +5,7 @@ import (
 
 	"api/internal/platform/settings"
 	"api/internal/runtime/taskqueue"
+	"api/internal/storage"
 )
 
 type AccountService struct {
@@ -18,6 +19,8 @@ type AccountService struct {
 	assigner         taskqueue.TaskAssigner
 	taskEventHub     *TaskEventHub
 	systemConfigRepo *settings.SystemConfigRepository
+	uploadBoards     storage.UploadBoardAccessResolver
+	uploadOwners     storage.UploadOwnerStorageUIDResolver
 }
 
 type AccountServiceDeps struct {
@@ -30,6 +33,8 @@ type AccountServiceDeps struct {
 	CancelStore      taskqueue.TaskCancellationStore
 	MonitorStore     taskqueue.TaskMonitorStore
 	SystemConfigRepo *settings.SystemConfigRepository
+	UploadBoards     storage.UploadBoardAccessResolver
+	UploadOwners     storage.UploadOwnerStorageUIDResolver
 }
 
 type AccountServiceOptions struct {
@@ -62,6 +67,8 @@ func NewAccountService(deps AccountServiceDeps, opts AccountServiceOptions) *Acc
 		cancelStore:      deps.CancelStore,
 		monitorStore:     deps.MonitorStore,
 		systemConfigRepo: deps.SystemConfigRepo,
+		uploadBoards:     deps.UploadBoards,
+		uploadOwners:     deps.UploadOwners,
 		taskEventHub:     opts.TaskEventHub,
 	}
 }

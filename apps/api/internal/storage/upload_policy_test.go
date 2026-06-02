@@ -77,13 +77,35 @@ func TestParseUploadResourceProfileAvatar(t *testing.T) {
 	}
 }
 
-func TestParseUploadResourceGenericAuthenticated(t *testing.T) {
-	resource, err := ParseUploadResource("/uploads/2026/05/30/demo.png")
+func TestParseUploadResourceProfileVector(t *testing.T) {
+	resource, err := ParseUploadResource("/uploads/profile/OWNR1A/vector/demo.svg")
 	if err != nil {
 		t.Fatalf("ParseUploadResource returned error: %v", err)
 	}
-	if resource.Kind != UploadResourceKindAuthenticated {
-		t.Fatalf("kind = %q, want %q", resource.Kind, UploadResourceKindAuthenticated)
+	if resource.Kind != UploadResourceKindProfileVector || resource.ProfileVector == nil {
+		t.Fatalf("kind = %q profileVector=%#v, want profile vector", resource.Kind, resource.ProfileVector)
+	}
+	if resource.ProfileVector.OwnerSegment != "OWNR1A" {
+		t.Fatalf("owner segment = %q", resource.ProfileVector.OwnerSegment)
+	}
+}
+
+func TestParseUploadResourceTaskOutput(t *testing.T) {
+	resource, err := ParseUploadResource("/uploads/tasks/42/task-abc/demo.png")
+	if err != nil {
+		t.Fatalf("ParseUploadResource returned error: %v", err)
+	}
+	if resource.Kind != UploadResourceKindTaskOutput || resource.TaskOutput == nil {
+		t.Fatalf("kind = %q taskOutput=%#v, want task output", resource.Kind, resource.TaskOutput)
+	}
+	if resource.TaskOutput.UserSegment != "42" || resource.TaskOutput.TaskSegment != "task-abc" {
+		t.Fatalf("task output = %#v", resource.TaskOutput)
+	}
+}
+
+func TestParseUploadResourceRejectsLegacyGenericPath(t *testing.T) {
+	if _, err := ParseUploadResource("/uploads/2026/05/30/demo.png"); err == nil {
+		t.Fatalf("expected legacy generic upload path to fail")
 	}
 }
 

@@ -43,6 +43,28 @@ export async function updateAdminUserStatus(input: { id: number; status: number 
   requireApiOk(res, input.status === 1 ? '解封失败' : '封禁失败')
 }
 
+export async function banAdminUser(input: {
+  id: number
+  reason?: string
+  expires_in_days?: number
+}): Promise<void> {
+  const res = await adminApi.banUser(input.id, {
+    reason: input.reason,
+    expires_in_days: input.expires_in_days,
+  })
+  requireApiOk(res, '封禁失败')
+}
+
+export async function unbanAdminUser(id: number): Promise<void> {
+  const res = await adminApi.unbanUser(id)
+  requireApiOk(res, '解封失败')
+}
+
+export async function revokeAdminUserSessions(id: number): Promise<void> {
+  const res = await adminApi.revokeUserSessions(id)
+  requireApiOk(res, '吊销会话失败')
+}
+
 export async function updateAdminUserRole(input: {
   id: number
   role: 'admin' | 'user'

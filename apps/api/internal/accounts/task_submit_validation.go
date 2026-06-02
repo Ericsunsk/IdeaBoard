@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"api/internal/platform/jsonlimit"
 	"api/internal/platform/mediarefs"
 	"api/internal/platform/outbound"
+	"api/internal/storage"
 )
 
 func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
@@ -36,6 +38,16 @@ func validateSubmitTaskPrompt(prompt string, maxBytes int, label string) error {
 }
 
 func validateSubmitTaskImageURLs(imageURLs []string) error {
+	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, validateSubmitTaskMediaRef)
+}
+
+func (s *AccountService) validateSubmitTaskImageURLs(ctx context.Context, userID uint64, imageURLs []string) error {
+	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, func(raw string) error {
+		return s.validateSubmitTaskMediaRef(ctx, userID, raw)
+	})
+}
+
+func validateSubmitTaskImageURLsWithRefValidator(imageURLs []string, validateRef func(string) error) error {
 	if len(imageURLs) > maxSubmitTaskImageURLs {
 		return fmt.Errorf("图片数量不能超过 %d 张", maxSubmitTaskImageURLs)
 	}
@@ -47,7 +59,7 @@ func validateSubmitTaskImageURLs(imageURLs []string) error {
 		if len([]byte(url)) > maxSubmitTaskImageURLBytes {
 			return fmt.Errorf("图片地址长度不能超过 %d 字符", maxSubmitTaskImageURLBytes)
 		}
-		if err := validateSubmitTaskMediaRef(url); err != nil {
+		if err := validateRef(url); err != nil {
 			return err
 		}
 	}
@@ -55,6 +67,16 @@ func validateSubmitTaskImageURLs(imageURLs []string) error {
 }
 
 func validateSubmitTaskMediaParams(params map[string]interface{}) error {
+	return validateSubmitTaskMediaParamsWithRefValidator(params, validateSubmitTaskMediaRef)
+}
+
+func (s *AccountService) validateSubmitTaskMediaParams(ctx context.Context, userID uint64, params map[string]interface{}) error {
+	return validateSubmitTaskMediaParamsWithRefValidator(params, func(raw string) error {
+		return s.validateSubmitTaskMediaRef(ctx, userID, raw)
+	})
+}
+
+func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}, validateRef func(string) error) error {
 	if params == nil {
 		return nil
 	}
@@ -65,7 +87,7 @@ func validateSubmitTaskMediaParams(params map[string]interface{}) error {
 		}
 	}
 	return mediarefs.ForEachParamMediaRef(params, func(key string, ref string) error {
-		if err := validateSubmitTaskMediaRef(ref); err != nil {
+		if err := validateRef(ref); err != nil {
 			return fmt.Errorf("%s 无效: %w", key, err)
 		}
 		return nil
@@ -74,6 +96,36 @@ func validateSubmitTaskMediaParams(params map[string]interface{}) error {
 
 func validateSubmitTaskMediaRef(raw string) error {
 	return mediarefs.ValidateMediaRef(raw, outbound.AllowHostsFromEnv(), maxSubmitTaskMediaDataURLBytes)
+}
+
+func (s *AccountService) validateSubmitTaskMediaRef(ctx context.Context, userID uint64, raw string) error {
+	if err := validateSubmitTaskMediaRef(raw); err != nil {
+		return err
+	}
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "/uploads/") {
+		return nil
+	}
+	resource, err := storage.ParseUploadResource(trimmed)
+	if err != nil {
+		return err
+	}
+	if resource.Kind != storage.UploadResourceKindWorkspace {
+		return fmt.Errorf("仅支持工作区上传资源")
+	}
+	if s.uploadBoards == nil || s.uploadOwners == nil {
+		return fmt.Errorf("无法校验工作区上传资源权限")
+	}
+	if err := storage.AuthorizeUploadResourceRead(
+		ctx,
+		userID,
+		resource,
+		s.uploadBoards,
+		s.uploadOwners,
+	); err != nil {
+		return fmt.Errorf("无权使用该工作区上传资源")
+	}
+	return nil
 }
 
 func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {

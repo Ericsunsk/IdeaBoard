@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/platform/mediarefs"
 	"api/internal/platform/response"
 	"api/internal/platform/safehttp"
 	"api/internal/storage"
@@ -56,10 +57,22 @@ func findPotrace() string {
 type VectorizeHandler struct {
 	taskRepo       *accounts.TaskRepository
 	storageService *storage.StorageService
+	uploadBoards   storage.UploadBoardAccessResolver
+	uploadOwners   storage.UploadOwnerStorageUIDResolver
 }
 
-func NewVectorizeHandler(taskRepo *accounts.TaskRepository, storageService *storage.StorageService) *VectorizeHandler {
-	return &VectorizeHandler{taskRepo: taskRepo, storageService: storageService}
+func NewVectorizeHandler(taskRepo *accounts.TaskRepository, storageService *storage.StorageService, deps ...VectorizeDeps) *VectorizeHandler {
+	handler := &VectorizeHandler{taskRepo: taskRepo, storageService: storageService}
+	if len(deps) > 0 {
+		handler.uploadBoards = deps[0].UploadBoards
+		handler.uploadOwners = deps[0].UploadOwners
+	}
+	return handler
+}
+
+type VectorizeDeps struct {
+	UploadBoards storage.UploadBoardAccessResolver
+	UploadOwners storage.UploadOwnerStorageUIDResolver
 }
 
 // Vectorize 执行位图转矢量图（用户端调用）
@@ -107,34 +120,10 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 		req.ColorCount = 0
 	}
 
-	// 下载图片：继承请求上下文，避免请求取消后继续外部 I/O
-	downloadCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	imgResp, err := safehttp.Get(downloadCtx, req.ImageURL, 20*time.Second)
+	body, err := h.loadVectorizeImage(ctx, userID, req.ImageURL)
 	if err != nil {
-		log.Printf("[Vectorize] download failed: err=%v", err)
-		response.Error(c, 400, "下载图片失败")
-		return
-	}
-	defer imgResp.Body.Close()
-	if imgResp.StatusCode != 200 {
-		response.Error(c, 500, fmt.Sprintf("下载图片返回 %d", imgResp.StatusCode))
-		return
-	}
-	if imgResp.ContentLength > maxVectorizeDownloadSize {
-		response.Error(c, 400, fmt.Sprintf("图片大小不能超过 %dMB", maxVectorizeDownloadSize/1024/1024))
-		return
-	}
-	contentType := strings.TrimSpace(strings.Split(imgResp.Header.Get("Content-Type"), ";")[0])
-	if contentType != "" && !strings.HasPrefix(strings.ToLower(contentType), "image/") {
-		response.Error(c, 400, "仅支持位图图片输入")
-		return
-	}
-
-	body, err := io.ReadAll(io.LimitReader(imgResp.Body, maxVectorizeDownloadSize+1))
-	if err != nil {
-		log.Printf("[Vectorize] read body failed: err=%v", err)
-		response.Error(c, 500, "读取图片失败")
+		log.Printf("[Vectorize] load image failed: err=%v", err)
+		response.Error(c, 400, err.Error())
 		return
 	}
 	if len(body) > maxVectorizeDownloadSize {
@@ -200,7 +189,7 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 	}
 
 	// 持久化 SVG 文件
-	persistedURL, err := h.persistSVG(ctx, svgData)
+	persistedURL, err := h.persistSVG(ctx, userID, svgData)
 	if err != nil {
 		log.Printf("[Vectorize] persist svg failed: err=%v", err)
 		response.Error(c, 500, "保存SVG失败")
@@ -416,14 +405,100 @@ func mergeSVGLayers(layerPaths []string, outputPath string, w, h, colorCount int
 	return nil
 }
 
+func (h *VectorizeHandler) loadVectorizeImage(ctx context.Context, userID uint64, rawImageURL string) ([]byte, error) {
+	imageURL := strings.TrimSpace(rawImageURL)
+	if imageURL == "" {
+		return nil, fmt.Errorf("图片地址不能为空")
+	}
+	if strings.HasPrefix(imageURL, "/uploads/") {
+		return h.loadLocalUploadImage(ctx, userID, imageURL)
+	}
+	return downloadVectorizeImage(ctx, imageURL)
+}
+
+func (h *VectorizeHandler) loadLocalUploadImage(ctx context.Context, userID uint64, rawPath string) ([]byte, error) {
+	if h.uploadBoards == nil || h.uploadOwners == nil {
+		return nil, fmt.Errorf("无法校验上传资源权限")
+	}
+	cleaned, err := mediarefs.ValidateUploadPath(rawPath)
+	if err != nil {
+		return nil, err
+	}
+	resource, err := storage.AuthorizeUploadPathRead(
+		ctx,
+		userID,
+		cleaned,
+		h.uploadBoards,
+		h.uploadOwners,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("无权读取该上传资源")
+	}
+	localPath := filepath.FromSlash(resource.ObjectKey)
+	info, err := os.Stat(localPath)
+	if err != nil || info.IsDir() {
+		return nil, fmt.Errorf("图片不存在")
+	}
+	if info.Size() > maxVectorizeDownloadSize {
+		return nil, fmt.Errorf("图片大小不能超过 %dMB", maxVectorizeDownloadSize/1024/1024)
+	}
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("读取图片失败")
+	}
+	if len(data) > maxVectorizeDownloadSize {
+		return nil, fmt.Errorf("图片大小不能超过 %dMB", maxVectorizeDownloadSize/1024/1024)
+	}
+	return data, nil
+}
+
+func downloadVectorizeImage(ctx context.Context, imageURL string) ([]byte, error) {
+	downloadCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	imgResp, err := safehttp.Get(downloadCtx, imageURL, 20*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("下载图片失败")
+	}
+	defer imgResp.Body.Close()
+	if imgResp.StatusCode != 200 {
+		return nil, fmt.Errorf("下载图片返回 %d", imgResp.StatusCode)
+	}
+	if imgResp.ContentLength > maxVectorizeDownloadSize {
+		return nil, fmt.Errorf("图片大小不能超过 %dMB", maxVectorizeDownloadSize/1024/1024)
+	}
+	contentType := strings.TrimSpace(strings.Split(imgResp.Header.Get("Content-Type"), ";")[0])
+	if contentType != "" && !strings.HasPrefix(strings.ToLower(contentType), "image/") {
+		return nil, fmt.Errorf("仅支持位图图片输入")
+	}
+	body, err := io.ReadAll(io.LimitReader(imgResp.Body, maxVectorizeDownloadSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("读取图片失败")
+	}
+	if len(body) > maxVectorizeDownloadSize {
+		return nil, fmt.Errorf("图片大小不能超过 %dMB", maxVectorizeDownloadSize/1024/1024)
+	}
+	return body, nil
+}
+
 // persistSVG 将 SVG 数据保存到存储
-func (h *VectorizeHandler) persistSVG(ctx context.Context, svgData []byte) (string, error) {
+func (h *VectorizeHandler) persistSVG(ctx context.Context, userID uint64, svgData []byte) (string, error) {
 	if h.storageService == nil {
 		return "", fmt.Errorf("存储服务不可用")
 	}
+	if h.uploadOwners == nil {
+		return "", fmt.Errorf("用户服务不可用")
+	}
+	storageUID, err := h.uploadOwners.GetStorageUIDByUserID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	dirPrefix, err := storage.ProfileVectorUploadDirPrefix(storageUID)
+	if err != nil {
+		return "", err
+	}
 
 	return h.storageService.StoreBytes(ctx, "vector.svg", svgData, storage.StorageStoreOptions{
-		DirPrefix: "vector",
+		DirPrefix: dirPrefix,
 	})
 }
 

@@ -133,7 +133,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS) {
 		response.Success(c, gin.H{"status": "ok"})
 	})
 
-	os.MkdirAll("uploads", 0755)
+	os.MkdirAll("uploads", 0700)
 	uploadsHandler := uploadStaticHandler(deps.StaticUploads)
 	r.GET("/uploads/*filepath", uploadsHandler)
 	r.HEAD("/uploads/*filepath", uploadsHandler)
@@ -258,6 +258,9 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 
 	adminApi.GET("/users", h.AdminHandler.ListUsers)
 	adminApi.PUT("/users/:id/status", h.AdminHandler.UpdateUserStatus)
+	adminApi.POST("/users/:id/ban", h.AdminHandler.BanUser)
+	adminApi.POST("/users/:id/unban", h.AdminHandler.UnbanUser)
+	adminApi.POST("/users/:id/revoke-sessions", h.AdminHandler.RevokeUserSessions)
 	adminApi.PUT("/users/:id/role", h.AdminHandler.UpdateUserRole)
 	adminApi.DELETE("/users/:id", h.AdminHandler.DeleteUser)
 

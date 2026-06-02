@@ -302,10 +302,10 @@ func (s *StorageService) saveBytesLocal(filename string, data []byte, opts Stora
 	}
 	objectKey := buildObjectKey(opts.DirPrefix, ext)
 	dst := filepath.FromSlash(objectKey)
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
 		return "", fmt.Errorf("创建目录失败: %v", err)
 	}
-	if err := os.WriteFile(dst, data, 0644); err != nil {
+	if err := os.WriteFile(dst, data, 0600); err != nil {
 		return "", fmt.Errorf("保存文件失败: %v", err)
 	}
 	return publicUploadURL(objectKey), nil

@@ -216,6 +216,84 @@ app.delete('/internal/users/:id', requireInternalKey, async (req, res) => {
   }
 })
 
+app.post('/internal/users/ban', requireInternalKey, async (req, res) => {
+  const authUserID = String(req.body?.userId || '').trim()
+  const banReason = normalizeOptionalText(req.body?.banReason, 500)
+  const banExpiresIn = normalizeOptionalPositiveInteger(req.body?.banExpiresIn)
+  if (!authUserID) {
+    sendError(res, 400, 'auth user id is required')
+    return
+  }
+  if (authUserID.length > 191) {
+    sendError(res, 400, 'auth user id is invalid')
+    return
+  }
+  try {
+    const banned = await updateAuthUserBanState(authUserID, true, banReason, banExpiresIn)
+    if (!banned) {
+      sendError(res, 404, 'auth user not found')
+      return
+    }
+    await deleteAuthUserSessions(authUserID)
+    sendSuccess(res, {
+      auth_user_id: authUserID,
+      banned: true,
+    })
+  } catch (error) {
+    sendError(res, 500, extractErrorMessage(error, 'failed to ban auth user'))
+  }
+})
+
+app.post('/internal/users/unban', requireInternalKey, async (req, res) => {
+  const authUserID = String(req.body?.userId || '').trim()
+  if (!authUserID) {
+    sendError(res, 400, 'auth user id is required')
+    return
+  }
+  if (authUserID.length > 191) {
+    sendError(res, 400, 'auth user id is invalid')
+    return
+  }
+  try {
+    const updated = await updateAuthUserBanState(authUserID, false, null, null)
+    if (!updated) {
+      sendError(res, 404, 'auth user not found')
+      return
+    }
+    sendSuccess(res, {
+      auth_user_id: authUserID,
+      banned: false,
+    })
+  } catch (error) {
+    sendError(res, 500, extractErrorMessage(error, 'failed to unban auth user'))
+  }
+})
+
+app.post('/internal/users/revoke-sessions', requireInternalKey, async (req, res) => {
+  const authUserID = String(req.body?.userId || '').trim()
+  if (!authUserID) {
+    sendError(res, 400, 'auth user id is required')
+    return
+  }
+  if (authUserID.length > 191) {
+    sendError(res, 400, 'auth user id is invalid')
+    return
+  }
+  try {
+    const deleted = await deleteAuthUserSessions(authUserID)
+    if (!deleted) {
+      sendError(res, 404, 'auth user not found')
+      return
+    }
+    sendSuccess(res, {
+      auth_user_id: authUserID,
+      revoked: true,
+    })
+  } catch (error) {
+    sendError(res, 500, extractErrorMessage(error, 'failed to revoke auth user sessions'))
+  }
+})
+
 if (isProductionRuntime() && !env.auth.internalKey) {
   throw new Error('AUTH_INTERNAL_KEY is required when NODE_ENV=production')
 }
@@ -493,6 +571,21 @@ function normalizeAuthRole(raw: unknown): 'admin' | 'user' | null {
   return null
 }
 
+function normalizeOptionalText(raw: unknown, maxLength: number): string | null {
+  const text = String(raw ?? '').trim()
+  if (!text) return null
+  return text.slice(0, maxLength)
+}
+
+function normalizeOptionalPositiveInteger(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const value = Number.parseInt(String(raw), 10)
+  if (!Number.isFinite(value) || value <= 0) {
+    return null
+  }
+  return value
+}
+
 function extractAuthUser(payload: unknown): InternalUserShape | null {
   const candidate = payload as any
   const user = (candidate?.user || candidate?.data?.user || candidate) as InternalUserShape | undefined
@@ -549,6 +642,34 @@ async function syncAuthUserRole(authUserID: string, role: 'admin' | 'user') {
 async function updateAuthUserRole(authUserID: string, role: 'admin' | 'user'): Promise<boolean> {
   const [result] = await authDB.query('UPDATE `user` SET `role` = ? WHERE id = ? LIMIT 1', [role, authUserID])
   return Number((result as any)?.affectedRows || 0) > 0
+}
+
+async function updateAuthUserBanState(
+  authUserID: string,
+  banned: boolean,
+  banReason: string | null,
+  banExpiresIn: number | null,
+): Promise<boolean> {
+  const [result] = await authDB.query(
+    'UPDATE `user` SET `banned` = ?, `banReason` = ?, `banExpires` = ?, `updatedAt` = ? WHERE id = ? LIMIT 1',
+    [
+      banned,
+      banned ? banReason || 'No reason' : null,
+      banned && banExpiresIn ? new Date(Date.now() + banExpiresIn * 1000) : null,
+      new Date(),
+      authUserID,
+    ],
+  )
+  return Number((result as any)?.affectedRows || 0) > 0
+}
+
+async function deleteAuthUserSessions(authUserID: string): Promise<boolean> {
+  const [rows] = await authDB.query('SELECT id FROM `user` WHERE id = ? LIMIT 1', [authUserID])
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return false
+  }
+  await authDB.query('DELETE FROM `session` WHERE userId = ?', [authUserID])
+  return true
 }
 
 async function removeAuthUserCascade(authUserID: string): Promise<boolean> {

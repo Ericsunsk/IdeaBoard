@@ -179,7 +179,7 @@ func (h *AccountHandler) CheckSubmitTaskReadiness(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	featureSlug, err := h.accountService.CheckSubmitTaskReadiness(c.Request.Context(), &req)
+	featureSlug, err := h.accountService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
 	if err != nil {
 		response.Success(c, gin.H{"ready": false, "message": err.Error()})
 		return

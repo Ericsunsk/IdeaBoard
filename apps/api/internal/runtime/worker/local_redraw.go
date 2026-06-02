@@ -127,7 +127,7 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 	}, nil
 }
 
-func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, bool, error) {
+func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID uint64, taskID string, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, bool, error) {
 	if redraw == nil {
 		return upstreamImageRef, false, nil
 	}
@@ -155,7 +155,11 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, redraw
 		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(composedBytes), false, nil
 	}
 	filename := fmt.Sprintf("local-redraw-%s-%d.png", sanitizeFeatureSlug(redraw.featureSlug), time.Now().UnixNano())
-	storedURL, err := c.storageService.StoreBytes(ctx, filename, composedBytes, storage.StorageStoreOptions{})
+	storeOpts := storage.StorageStoreOptions{}
+	if dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, taskID); err == nil {
+		storeOpts.DirPrefix = dirPrefix
+	}
+	storedURL, err := c.storageService.StoreBytes(ctx, filename, composedBytes, storeOpts)
 	if err != nil {
 		return "", false, fmt.Errorf("local redraw 持久化失败: feature=%s err=%w", redraw.featureSlug, err)
 	}

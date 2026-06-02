@@ -23,6 +23,28 @@ type AdminHandler struct {
 type AuthUserManager interface {
 	DeleteUser(ctx context.Context, authUserID string) error
 	SetUserRole(ctx context.Context, authUserID string, role string) error
+	BanUser(ctx context.Context, authUserID string, reason string, expiresInSeconds int) error
+	UnbanUser(ctx context.Context, authUserID string) error
+	RevokeUserSessions(ctx context.Context, authUserID string) error
+}
+
+type adminActionError struct {
+	status int
+	msg    string
+	err    error
+}
+
+func (e *adminActionError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if strings.TrimSpace(e.msg) != "" {
+		return e.msg
+	}
+	if e.err != nil {
+		return e.err.Error()
+	}
+	return "admin action failed"
 }
 
 func NewAdminHandler(userService *UserService, configRepo *settings.SystemConfigRepository, authService AuthUserManager) *AdminHandler {
@@ -140,7 +162,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// UpdateUserStatus 更新用户状态
+// UpdateUserStatus 保留兼容入口，内部转发到封禁/解封编排
 func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 	var req struct {
 		Status *int8 `json:"status" binding:"required"`
@@ -150,22 +172,87 @@ func (h *AdminHandler) UpdateUserStatus(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
+	if req.Status == nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
 
-	targetUser, ok := h.getTargetUserByParam(c)
+	targetUser, authUserID, currentStatus, ok := h.prepareManagedAuthUser(c)
 	if !ok {
 		return
 	}
 
-	if targetUser.Role == "admin" {
-		response.Error(c, 400, "不能修改管理员状态")
+	switch *req.Status {
+	case 0:
+		if err := h.performBan(c.Request.Context(), targetUser, authUserID, currentStatus, AdminBanUserRequest{}); err != nil {
+			h.respondAdminActionError(c, err, "封禁")
+			return
+		}
+		response.Success(c, nil)
+	case 1:
+		if err := h.performUnban(c.Request.Context(), targetUser, authUserID, currentStatus); err != nil {
+			h.respondAdminActionError(c, err, "解封")
+			return
+		}
+		response.Success(c, nil)
+	default:
+		response.Error(c, 400, "状态值无效，仅支持0或1")
+	}
+}
+
+func (h *AdminHandler) BanUser(c *gin.Context) {
+	var req AdminBanUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	if req.ExpiresInDays < 0 {
+		response.Error(c, 400, "expires_in_days 不能小于 0")
 		return
 	}
 
-	if err := h.userService.UpdateStatus(c.Request.Context(), targetUser.ID, *req.Status); err != nil {
-		response.Error(c, 400, err.Error())
+	targetUser, authUserID, currentStatus, ok := h.prepareManagedAuthUser(c)
+	if !ok {
+		return
+	}
+	if err := h.performBan(c.Request.Context(), targetUser, authUserID, currentStatus, req); err != nil {
+		h.respondAdminActionError(c, err, "封禁")
 		return
 	}
 
+	response.Success(c, nil)
+}
+
+func (h *AdminHandler) UnbanUser(c *gin.Context) {
+	targetUser, authUserID, currentStatus, ok := h.prepareManagedAuthUser(c)
+	if !ok {
+		return
+	}
+	if err := h.performUnban(c.Request.Context(), targetUser, authUserID, currentStatus); err != nil {
+		h.respondAdminActionError(c, err, "解封")
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+func (h *AdminHandler) RevokeUserSessions(c *gin.Context) {
+	targetUser, authUserID, _, ok := h.prepareManagedAuthUser(c)
+	if !ok {
+		return
+	}
+	if targetUser.ID == 0 {
+		response.Error(c, 400, "用户不存在")
+		return
+	}
+	if err := h.authService.RevokeUserSessions(c.Request.Context(), authUserID); err != nil {
+		if errors.Is(err, autherrors.ErrAuthUserNotFound) {
+			response.Error(c, 400, "目标用户在身份系统中不存在，无法吊销会话")
+			return
+		}
+		response.InternalError(c, 502, "身份侧会话吊销失败", err)
+		return
+	}
 	response.Success(c, nil)
 }
 
@@ -314,4 +401,95 @@ func normalizeAdminRole(role string) string {
 		return value
 	}
 	return ""
+}
+
+func (h *AdminHandler) prepareManagedAuthUser(c *gin.Context) (*User, string, int8, bool) {
+	targetUser, ok := h.getTargetUserByParam(c)
+	if !ok {
+		return nil, "", 0, false
+	}
+	currentUserID := c.GetUint64("user_id")
+	if currentUserID != 0 && currentUserID == targetUser.ID {
+		response.Error(c, 400, "不能操作当前登录管理员自己")
+		return nil, "", 0, false
+	}
+	if normalizeAdminRole(targetUser.Role) == "admin" {
+		response.Error(c, 400, "不能操作管理员账号")
+		return nil, "", 0, false
+	}
+
+	authUserID := strings.TrimSpace(derefString(targetUser.AuthUserID))
+	if authUserID == "" {
+		response.Error(c, 400, "目标用户缺少 auth_user_id，已拒绝操作以避免状态漂移")
+		return nil, "", 0, false
+	}
+	if h.authService == nil {
+		response.InternalError(c, 500, "认证服务未配置", errors.New("admin auth service client not configured"))
+		return nil, "", 0, false
+	}
+
+	return targetUser, authUserID, targetUser.Status, true
+}
+
+func (h *AdminHandler) performBan(ctx context.Context, targetUser *User, authUserID string, currentStatus int8, req AdminBanUserRequest) error {
+	if currentStatus == 0 {
+		return nil
+	}
+
+	reason := strings.TrimSpace(req.Reason)
+	expiresInSeconds := 0
+	if req.ExpiresInDays > 0 {
+		expiresInSeconds = req.ExpiresInDays * 24 * 60 * 60
+	}
+	if err := h.authService.BanUser(ctx, authUserID, reason, expiresInSeconds); err != nil {
+		if errors.Is(err, autherrors.ErrAuthUserNotFound) {
+			return &adminActionError{status: 400, msg: "目标用户在身份系统中不存在，已拒绝封禁以避免状态漂移", err: err}
+		}
+		return &adminActionError{status: 502, msg: "身份侧封禁失败", err: err}
+	}
+	if err := h.userService.UpdateStatus(ctx, targetUser.ID, 0); err != nil {
+		if rollbackErr := h.authService.UnbanUser(ctx, authUserID); rollbackErr != nil {
+			log.Printf("[users] ban compensation failed user_id=%d auth_user_id=%s rollback_err=%v", targetUser.ID, authUserID, rollbackErr)
+			return &adminActionError{status: 500, msg: "业务侧封禁失败，且身份侧回滚失败，请按运维流程补偿处理", err: err}
+		}
+		return &adminActionError{status: 400, msg: err.Error(), err: err}
+	}
+	return nil
+}
+
+func (h *AdminHandler) performUnban(ctx context.Context, targetUser *User, authUserID string, currentStatus int8) error {
+	if currentStatus == 1 {
+		return nil
+	}
+	if err := h.authService.UnbanUser(ctx, authUserID); err != nil {
+		if errors.Is(err, autherrors.ErrAuthUserNotFound) {
+			return &adminActionError{status: 400, msg: "目标用户在身份系统中不存在，已拒绝解封以避免状态漂移", err: err}
+		}
+		return &adminActionError{status: 502, msg: "身份侧解封失败", err: err}
+	}
+	if err := h.userService.UpdateStatus(ctx, targetUser.ID, 1); err != nil {
+		rollbackErr := h.authService.BanUser(ctx, authUserID, "rollback after local unban failure", 0)
+		if rollbackErr != nil {
+			log.Printf("[users] unban compensation failed user_id=%d auth_user_id=%s rollback_err=%v", targetUser.ID, authUserID, rollbackErr)
+			return &adminActionError{status: 500, msg: "业务侧解封失败，且身份侧回滚失败，请按运维流程补偿处理", err: err}
+		}
+		return &adminActionError{status: 400, msg: err.Error(), err: err}
+	}
+	return nil
+}
+
+func (h *AdminHandler) respondAdminActionError(c *gin.Context, err error, action string) {
+	if err == nil {
+		return
+	}
+	var actionErr *adminActionError
+	if errors.As(err, &actionErr) {
+		if actionErr.status >= 500 {
+			response.InternalError(c, actionErr.status, actionErr.msg, actionErr.err)
+			return
+		}
+		response.Error(c, actionErr.status, actionErr.msg)
+		return
+	}
+	response.InternalError(c, 500, action+"失败", err)
 }

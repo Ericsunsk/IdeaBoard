@@ -1,11 +1,16 @@
 package accounts
 
 import (
+	"context"
 	"strings"
 	"testing"
 
+	"api/internal/boards"
 	"api/internal/prompts"
+	"api/internal/users"
 	"api/internal/workflow"
+
+	"gorm.io/gorm"
 )
 
 func TestTemplateValueDescriptions(t *testing.T) {
@@ -315,9 +320,15 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 		}
 	})
 
-	t.Run("allow uploads relative path", func(t *testing.T) {
-		if err := validateSubmitTaskMediaRef("/uploads/2026/05/13/a.png"); err != nil {
-			t.Fatalf("expected upload path to pass: %v", err)
+	t.Run("allow structured uploads relative path", func(t *testing.T) {
+		if err := validateSubmitTaskMediaRef("/uploads/workspace/OWNR1A/board-1/content/a.png"); err != nil {
+			t.Fatalf("expected structured upload path to pass: %v", err)
+		}
+	})
+
+	t.Run("reject legacy generic upload path", func(t *testing.T) {
+		if err := validateSubmitTaskMediaRef("/uploads/2026/05/13/a.png"); err == nil {
+			t.Fatal("expected legacy generic upload path to fail")
 		}
 	})
 
@@ -369,4 +380,88 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 			t.Fatalf("unexpected reference_image_urls: got=%#v want=%#v", referenceURLs, wantReferenceURLs)
 		}
 	})
+}
+
+func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
+	ctx := context.Background()
+	db := newAccountsWorkspaceUploadTestDB(t)
+	userRepo := users.NewUserRepository(db)
+	owner := mustCreateAccountsUploadUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
+	member := mustCreateAccountsUploadUser(t, userRepo, "member", "member-auth", "MEMB1A")
+	outsider := mustCreateAccountsUploadUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
+	if err := db.Create(&boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}"}).Error; err != nil {
+		t.Fatalf("create board failed: %v", err)
+	}
+	if err := db.Create(&boards.BoardMember{BoardID: "board-1", UserID: member.ID, Role: string(boards.BoardAccessRoleViewer)}).Error; err != nil {
+		t.Fatalf("create board member failed: %v", err)
+	}
+
+	svc := NewAccountService(AccountServiceDeps{
+		UploadBoards: testAccountUploadBoardAccessResolver{service: boards.NewBoardService(boards.NewBoardRepository(db), userRepo)},
+		UploadOwners: testAccountUploadOwnerStorageUIDResolver{repo: userRepo},
+	}, AccountServiceOptions{})
+	allowed := "/uploads/workspace/OWNR1A/board-1/content/demo.png"
+	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, allowed); err != nil {
+		t.Fatalf("expected member to use workspace upload: %v", err)
+	}
+	if err := svc.validateSubmitTaskMediaRef(ctx, outsider.ID, allowed); err == nil {
+		t.Fatalf("expected outsider to be rejected")
+	}
+	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/workspace/WRONG1/board-1/content/demo.png"); err == nil {
+		t.Fatalf("expected owner segment mismatch to be rejected")
+	}
+	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/2026/05/13/demo.png"); err == nil {
+		t.Fatalf("expected legacy generic upload path to be rejected")
+	}
+	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/profile/MEMB1A/vector/demo.svg"); err == nil {
+		t.Fatalf("expected non-workspace upload path to be rejected")
+	}
+}
+
+type testAccountUploadBoardAccessResolver struct {
+	service *boards.BoardService
+}
+
+func (r testAccountUploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID uint64, boardID string) (uint64, error) {
+	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
+	if err != nil {
+		return 0, err
+	}
+	return board.UserID, nil
+}
+
+type testAccountUploadOwnerStorageUIDResolver struct {
+	repo *users.UserRepository
+}
+
+func (r testAccountUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID uint64) (string, error) {
+	user, err := r.repo.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return user.StorageUID, nil
+}
+
+func newAccountsWorkspaceUploadTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db := newAccountsTestDB(t)
+	if err := db.AutoMigrate(&users.User{}, &users.UsedUID{}, &boards.UserBoard{}, &boards.BoardMember{}); err != nil {
+		t.Fatalf("auto migrate workspace upload models failed: %v", err)
+	}
+	return db
+}
+
+func mustCreateAccountsUploadUser(t *testing.T, repo *users.UserRepository, username string, authUserID string, storageUID string) *users.User {
+	t.Helper()
+	user := &users.User{
+		Username:   username,
+		AuthUserID: &authUserID,
+		StorageUID: storageUID,
+		Role:       "user",
+		Status:     1,
+	}
+	if err := repo.Create(context.Background(), user); err != nil {
+		t.Fatalf("create user %s failed: %v", username, err)
+	}
+	return user
 }

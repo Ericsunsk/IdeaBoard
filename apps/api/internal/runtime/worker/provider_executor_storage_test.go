@@ -41,7 +41,7 @@ func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *tes
 	}
 	dataURL := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg+M8AAAICAQBx3Y4ZAAAAAElFTkSuQmCC"
 
-	urls, err := executor.materializeProviderResultImages(context.Background(), &accounts.ApiAccount{}, []string{dataURL})
+	urls, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", &accounts.ApiAccount{}, []string{dataURL})
 	if err != nil {
 		t.Fatalf("materializeProviderResultImages returned error: %v", err)
 	}
@@ -51,8 +51,8 @@ func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *tes
 	if strings.HasPrefix(urls[0], "data:image/") {
 		t.Fatalf("inline data URL should be stored before task result persistence")
 	}
-	if !strings.HasPrefix(urls[0], "/uploads/") {
-		t.Fatalf("stored URL=%q, want /uploads/ path", urls[0])
+	if !strings.HasPrefix(urls[0], "/uploads/tasks/42/task-owned/") {
+		t.Fatalf("stored URL=%q, want task output path", urls[0])
 	}
 	if _, err := os.Stat(filepath.FromSlash(strings.TrimPrefix(urls[0], "/"))); err != nil {
 		t.Fatalf("stored file not found: %v", err)

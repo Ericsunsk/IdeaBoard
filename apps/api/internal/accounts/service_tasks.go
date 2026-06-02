@@ -19,7 +19,7 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID uint64, req *tas
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	accounts, params, _, fullPrompt, err := s.prepareSubmitTask(ctx, req)
+	accounts, params, _, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
@@ -80,22 +80,22 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID uint64, req *tas
 	return taskID, nil
 }
 
-func (s *AccountService) CheckSubmitTaskReadiness(ctx context.Context, req *tasks.SubmitTaskRequest) (string, error) {
+func (s *AccountService) CheckSubmitTaskReadiness(ctx context.Context, userID uint64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	_, _, featureSlug, _, err := s.prepareSubmitTask(ctx, req)
+	_, _, featureSlug, _, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
 	return featureSlug, nil
 }
 
-func (s *AccountService) prepareSubmitTask(ctx context.Context, req *tasks.SubmitTaskRequest) ([]*ApiAccount, map[string]interface{}, string, string, error) {
+func (s *AccountService) prepareSubmitTask(ctx context.Context, userID uint64, req *tasks.SubmitTaskRequest) ([]*ApiAccount, map[string]interface{}, string, string, error) {
 	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
 		return nil, nil, "", "", err
 	}
-	if err := validateSubmitTaskImageURLs(req.ImageURLs); err != nil {
+	if err := s.validateSubmitTaskImageURLs(ctx, userID, req.ImageURLs); err != nil {
 		return nil, nil, "", "", err
 	}
 
@@ -119,7 +119,7 @@ func (s *AccountService) prepareSubmitTask(ctx context.Context, req *tasks.Submi
 	}
 	normalizeSubmitTaskMediaParams(params)
 	req.Params = params
-	if err := validateSubmitTaskMediaParams(req.Params); err != nil {
+	if err := s.validateSubmitTaskMediaParams(ctx, userID, req.Params); err != nil {
 		return nil, nil, "", "", err
 	}
 

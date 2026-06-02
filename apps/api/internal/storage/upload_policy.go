@@ -15,7 +15,8 @@ type UploadResourceKind string
 const (
 	UploadResourceKindWorkspace     UploadResourceKind = "workspace"
 	UploadResourceKindProfileAvatar UploadResourceKind = "profile_avatar"
-	UploadResourceKindAuthenticated UploadResourceKind = "authenticated"
+	UploadResourceKindProfileVector UploadResourceKind = "profile_vector"
+	UploadResourceKindTaskOutput    UploadResourceKind = "task_output"
 )
 
 type UploadWorkspaceResource struct {
@@ -29,11 +30,24 @@ type UploadProfileAvatarResource struct {
 	RelativePath string
 }
 
+type UploadProfileVectorResource struct {
+	OwnerSegment string
+	RelativePath string
+}
+
+type UploadTaskOutputResource struct {
+	UserSegment  string
+	TaskSegment  string
+	RelativePath string
+}
+
 type UploadResource struct {
 	Kind          UploadResourceKind
 	ObjectKey     string
 	Workspace     *UploadWorkspaceResource
 	ProfileAvatar *UploadProfileAvatarResource
+	ProfileVector *UploadProfileVectorResource
+	TaskOutput    *UploadTaskOutputResource
 }
 
 func WorkspaceContentUploadDirPrefix(storageUID string, boardID string) (string, error) {
@@ -84,6 +98,25 @@ func ProfileAvatarUploadObjectPrefix(storageUID string) (string, error) {
 	return path.Join(uploadObjectRoot, "profile", ownerSegment, "avatar") + "/", nil
 }
 
+func ProfileVectorUploadDirPrefix(storageUID string) (string, error) {
+	ownerSegment, err := NormalizeWorkspaceStorageUserSegment(storageUID)
+	if err != nil {
+		return "", err
+	}
+	return path.Join("profile", ownerSegment, "vector"), nil
+}
+
+func TaskOutputUploadDirPrefix(userID uint64, taskID string) (string, error) {
+	if userID == 0 {
+		return "", fmt.Errorf("用户ID无效")
+	}
+	taskSegment, err := NormalizeWorkspaceBoardSegment(taskID)
+	if err != nil {
+		return "", err
+	}
+	return path.Join("tasks", fmt.Sprintf("%d", userID), taskSegment), nil
+}
+
 func ParseUploadResource(rawPath string) (UploadResource, error) {
 	objectKey, err := normalizeUploadObjectKey(rawPath)
 	if err != nil {
@@ -91,7 +124,6 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 	}
 
 	resource := UploadResource{
-		Kind:      UploadResourceKindAuthenticated,
 		ObjectKey: objectKey,
 	}
 
@@ -120,7 +152,26 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 		return resource, nil
 	}
 
-	return resource, nil
+	if parts[0] == "profile" && len(parts) >= 4 && parts[1] != "" && parts[2] == "vector" && strings.Join(parts[3:], "") != "" {
+		resource.Kind = UploadResourceKindProfileVector
+		resource.ProfileVector = &UploadProfileVectorResource{
+			OwnerSegment: parts[1],
+			RelativePath: strings.Join(parts[3:], "/"),
+		}
+		return resource, nil
+	}
+
+	if parts[0] == "tasks" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
+		resource.Kind = UploadResourceKindTaskOutput
+		resource.TaskOutput = &UploadTaskOutputResource{
+			UserSegment:  parts[1],
+			TaskSegment:  parts[2],
+			RelativePath: strings.Join(parts[3:], "/"),
+		}
+		return resource, nil
+	}
+
+	return UploadResource{}, fmt.Errorf("不支持的上传资源路径")
 }
 
 func normalizeUploadObjectKey(raw string) (string, error) {

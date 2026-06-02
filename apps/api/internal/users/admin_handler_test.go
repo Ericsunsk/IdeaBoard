@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"api/internal/autherrors"
@@ -15,8 +16,14 @@ import (
 )
 
 type fakeAdminAuthManager struct {
-	deleteErr         error
-	deletedAuthUserID string
+	deleteErr          error
+	deletedAuthUserID  string
+	banErr             error
+	unbanErr           error
+	revokeErr          error
+	bannedAuthUserID   string
+	unbannedAuthUserID string
+	revokedAuthUserID  string
 }
 
 func (f *fakeAdminAuthManager) DeleteUser(_ context.Context, authUserID string) error {
@@ -26,6 +33,21 @@ func (f *fakeAdminAuthManager) DeleteUser(_ context.Context, authUserID string) 
 
 func (f *fakeAdminAuthManager) SetUserRole(_ context.Context, _ string, _ string) error {
 	return nil
+}
+
+func (f *fakeAdminAuthManager) BanUser(_ context.Context, authUserID string, _ string, _ int) error {
+	f.bannedAuthUserID = authUserID
+	return f.banErr
+}
+
+func (f *fakeAdminAuthManager) UnbanUser(_ context.Context, authUserID string) error {
+	f.unbannedAuthUserID = authUserID
+	return f.unbanErr
+}
+
+func (f *fakeAdminAuthManager) RevokeUserSessions(_ context.Context, authUserID string) error {
+	f.revokedAuthUserID = authUserID
+	return f.revokeErr
 }
 
 func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testing.T) {
@@ -75,5 +97,86 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	}
 	if taskCount != 0 {
 		t.Fatalf("task count = %d, want 0", taskCount)
+	}
+}
+
+func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	authUserID := "auth-ban-user"
+	targetUser := &User{
+		Username:   "target_user",
+		AuthUserID: &authUserID,
+		Role:       "user",
+		Status:     1,
+	}
+	if err := repo.Create(context.Background(), targetUser); err != nil {
+		t.Fatalf("create target user failed: %v", err)
+	}
+
+	authManager := &fakeAdminAuthManager{}
+	handler := NewAdminHandler(NewUserService(repo), nil, authManager)
+	router := gin.New()
+	router.POST("/admin/users/:id/ban", func(c *gin.Context) {
+		c.Set("user_id", uint64(999))
+		handler.BanUser(c)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+strconv.FormatUint(targetUser.ID, 10)+"/ban", strings.NewReader(`{"reason":"abuse","expires_in_days":7}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if authManager.bannedAuthUserID != authUserID {
+		t.Fatalf("banned auth user id = %q, want %q", authManager.bannedAuthUserID, authUserID)
+	}
+
+	updated, err := repo.GetByID(context.Background(), targetUser.ID)
+	if err != nil {
+		t.Fatalf("reload target user failed: %v", err)
+	}
+	if updated.Status != 0 {
+		t.Fatalf("updated status = %d, want 0", updated.Status)
+	}
+}
+
+func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	authUserID := "auth-revoke-user"
+	targetUser := &User{
+		Username:   "target_user",
+		AuthUserID: &authUserID,
+		Role:       "user",
+		Status:     1,
+	}
+	if err := repo.Create(context.Background(), targetUser); err != nil {
+		t.Fatalf("create target user failed: %v", err)
+	}
+
+	authManager := &fakeAdminAuthManager{}
+	handler := NewAdminHandler(NewUserService(repo), nil, authManager)
+	router := gin.New()
+	router.POST("/admin/users/:id/revoke-sessions", func(c *gin.Context) {
+		c.Set("user_id", uint64(999))
+		handler.RevokeUserSessions(c)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+strconv.FormatUint(targetUser.ID, 10)+"/revoke-sessions", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if authManager.revokedAuthUserID != authUserID {
+		t.Fatalf("revoked auth user id = %q, want %q", authManager.revokedAuthUserID, authUserID)
 	}
 }

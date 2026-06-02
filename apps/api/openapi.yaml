@@ -391,6 +391,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/users/{id}/ban:
+    post:
+      tags: [AdminUsers]
+      operationId: banAdminUser
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                expires_in_days:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/users/{id}/unban:
+    post:
+      tags: [AdminUsers]
+      operationId: unbanAdminUser
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/users/{id}/revoke-sessions:
+    post:
+      tags: [AdminUsers]
+      operationId: revokeAdminUserSessions
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
   /admin/users/{id}/role:
     put:
       tags: [AdminUsers]

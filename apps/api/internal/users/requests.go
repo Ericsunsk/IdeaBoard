@@ -10,3 +10,8 @@ type UserListResponse struct {
 	Total int64   `json:"total"`
 	List  []*User `json:"list"`
 }
+
+type AdminBanUserRequest struct {
+	Reason        string `json:"reason"`
+	ExpiresInDays int    `json:"expires_in_days"`
+}

@@ -220,6 +220,83 @@ func (c *ServiceClient) SetUserRole(ctx context.Context, authUserID string, role
 	return nil
 }
 
+func (c *ServiceClient) BanUser(ctx context.Context, authUserID string, reason string, expiresInSeconds int) error {
+	if c == nil {
+		return fmt.Errorf("auth service client not configured")
+	}
+	normalizedID := strings.TrimSpace(authUserID)
+	if normalizedID == "" {
+		return fmt.Errorf("auth user id is required")
+	}
+	payload := map[string]any{
+		"userId": normalizedID,
+	}
+	if reason := strings.TrimSpace(reason); reason != "" {
+		payload["banReason"] = reason
+	}
+	if expiresInSeconds > 0 {
+		payload["banExpiresIn"] = expiresInSeconds
+	}
+	return c.callInternalAdminMutation(ctx, "/internal/users/ban", payload, "ban")
+}
+
+func (c *ServiceClient) UnbanUser(ctx context.Context, authUserID string) error {
+	if c == nil {
+		return fmt.Errorf("auth service client not configured")
+	}
+	normalizedID := strings.TrimSpace(authUserID)
+	if normalizedID == "" {
+		return fmt.Errorf("auth user id is required")
+	}
+	return c.callInternalAdminMutation(ctx, "/internal/users/unban", map[string]any{
+		"userId": normalizedID,
+	}, "unban")
+}
+
+func (c *ServiceClient) RevokeUserSessions(ctx context.Context, authUserID string) error {
+	if c == nil {
+		return fmt.Errorf("auth service client not configured")
+	}
+	normalizedID := strings.TrimSpace(authUserID)
+	if normalizedID == "" {
+		return fmt.Errorf("auth user id is required")
+	}
+	return c.callInternalAdminMutation(ctx, "/internal/users/revoke-sessions", map[string]any{
+		"userId": normalizedID,
+	}, "revoke user sessions")
+}
+
+func (c *ServiceClient) callInternalAdminMutation(ctx context.Context, path string, payload map[string]any, action string) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	var resp authServiceEnvelope
+	status, err := c.doJSON(req, &resp)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusNotFound || resp.Code == http.StatusNotFound {
+		return ErrAuthUserNotFound
+	}
+	if status != http.StatusOK {
+		if resp.Msg != "" {
+			return fmt.Errorf("auth service %s failed: %s", action, resp.Msg)
+		}
+		return fmt.Errorf("auth service %s failed with status %d", action, status)
+	}
+	if resp.Code != 0 {
+		return fmt.Errorf("auth service %s rejected: %s", action, nonEmpty(resp.Msg, "unknown error"))
+	}
+	return nil
+}
+
 func (c *ServiceClient) doJSON(req *http.Request, out *authServiceEnvelope) (int, error) {
 	if c.internalAPIKey != "" {
 		req.Header.Set("X-Internal-Key", c.internalAPIKey)

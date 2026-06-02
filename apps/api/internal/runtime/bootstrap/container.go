@@ -95,6 +95,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
+	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 	taskEventHub := accounts.NewTaskEventHub()
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
 		AccountRepo:      accountRepo,
@@ -106,10 +107,11 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		CancelStore:      redisAsynqAssigner,
 		MonitorStore:     asynqQueue,
 		SystemConfigRepo: systemConfigRepo,
+		UploadBoards:     uploadBoardAccessResolver{service: boardService},
+		UploadOwners:     uploadOwnerStorageUIDResolver{repo: userRepo},
 	}, accounts.AccountServiceOptions{
 		TaskEventHub: taskEventHub,
 	})
-	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: authServiceClient,
@@ -128,8 +130,11 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 			AccountHandler:   accounts.NewAccountHandler(accountService),
 			BoardHandler:     boards.NewBoardHandler(boardService),
 			LineDraftHandler: assets.NewLineDraftHandler(lineDraftModeRepo),
-			VectorizeHandler: imageproc.NewVectorizeHandler(taskRepo, storageService),
-			Uploads:          uploadDeps,
+			VectorizeHandler: imageproc.NewVectorizeHandler(taskRepo, storageService, imageproc.VectorizeDeps{
+				UploadBoards: uploadBoardAccessResolver{service: boardService},
+				UploadOwners: uploadOwnerStorageUIDResolver{repo: userRepo},
+			}),
+			Uploads: uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler:         users.NewAdminHandler(userService, systemConfigRepo, authServiceClient),
@@ -187,4 +192,28 @@ func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies) {
 	}
 
 	httpapi.RegisterRoutes(r, deps, frontendFS)
+}
+
+type uploadBoardAccessResolver struct {
+	service *boards.BoardService
+}
+
+func (r uploadBoardAccessResolver) ResolveUploadBoardAccess(ctx context.Context, userID uint64, boardID string) (uint64, error) {
+	board, _, err := r.service.ResolveBoardAccess(ctx, userID, boardID)
+	if err != nil {
+		return 0, err
+	}
+	return board.UserID, nil
+}
+
+type uploadOwnerStorageUIDResolver struct {
+	repo *users.UserRepository
+}
+
+func (r uploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context.Context, userID uint64) (string, error) {
+	user, err := r.repo.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return user.StorageUID, nil
 }

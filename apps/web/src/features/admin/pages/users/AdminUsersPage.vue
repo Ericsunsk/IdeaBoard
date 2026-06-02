@@ -238,7 +238,10 @@ import {
   useGetAdminRegistrationSetting,
 } from '../../../../shared/api/generated-query/admin-settings/admin-settings'
 import {
+  banAdminUser,
   deleteAdminUser,
+  revokeAdminUserSessions,
+  unbanAdminUser,
   updateAdminUserRole,
   updateAdminUserStatus,
   updateRateLimitSettings,
@@ -278,6 +281,17 @@ function invalidateRateLimitSettingsQuery() {
 const updateUserStatusMutation = useMutation({
   mutationFn: updateAdminUserStatus,
   onSuccess: () => invalidateAdminUsersQuery(),
+})
+const banUserMutation = useMutation({
+  mutationFn: banAdminUser,
+  onSuccess: () => invalidateAdminUsersQuery(),
+})
+const unbanUserMutation = useMutation({
+  mutationFn: unbanAdminUser,
+  onSuccess: () => invalidateAdminUsersQuery(),
+})
+const revokeUserSessionsMutation = useMutation({
+  mutationFn: revokeAdminUserSessions,
 })
 const updateUserRoleMutation = useMutation({
   mutationFn: updateAdminUserRole,
@@ -589,14 +603,10 @@ function handleToggleStatus(row: User) {
       negativeText: '取消',
       onPositiveClick: async () => {
         try {
-          if (row.auth_user_id) {
-            const { error } = await authClient.admin.unbanUser({ userId: row.auth_user_id })
-            if (error) throw error
-          }
-          await updateUserStatusMutation.mutateAsync({ id: row.id, status: 1 })
+          await unbanUserMutation.mutateAsync(row.id)
           message.success('已解除封禁')
-        } catch (err: any) {
-          message.error(extractBetterAuthErrorMessage(err, '解封失败'))
+        } catch (error) {
+          message.error(formatDisplayErrorMessage(error, '解封失败'))
         }
       },
     })
@@ -608,38 +618,15 @@ const confirmBanUser = async () => {
   const row = banUserContext.value
   banFormLoading.value = true
   try {
-    await updateUserStatusMutation.mutateAsync({ id: row.id, status: 0 })
-    if (row.auth_user_id) {
-      let expiresIn: number | undefined = undefined
-      if (banForm.value.expiresInDays > 0) {
-        expiresIn = banForm.value.expiresInDays * 24 * 60 * 60
-      }
-      try {
-        const { error } = await authClient.admin.banUser({
-          userId: row.auth_user_id,
-          banReason: banForm.value.reason || undefined,
-          banExpiresIn: expiresIn,
-        })
-        if (error) throw error
-      } catch (authError: any) {
-        showBanModal.value = false
-        void invalidateAdminUsersQuery()
-        message.warning(
-          extractBetterAuthErrorMessage(
-            authError,
-            '已完成业务封禁，但身份侧封禁失败，请稍后重试身份侧操作',
-          ),
-        )
-        return
-      }
-    }
+    await banUserMutation.mutateAsync({
+      id: row.id,
+      reason: banForm.value.reason || undefined,
+      expires_in_days: banForm.value.expiresInDays || undefined,
+    })
     message.success(`已高级封禁用户 ${row.username}`)
     showBanModal.value = false
-  } catch (err: any) {
-    message.error(
-      err?.message ||
-        formatDisplayErrorMessage(err, extractBetterAuthErrorMessage(err, '封禁失败')),
-    )
+  } catch (error) {
+    message.error(formatDisplayErrorMessage(error, '封禁失败'))
   } finally {
     banFormLoading.value = false
   }
@@ -654,11 +641,10 @@ function handleRevokeSessions(row: User) {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        const { error } = await authClient.admin.revokeUserSessions({ userId: row.auth_user_id! })
-        if (error) throw error
+        await revokeUserSessionsMutation.mutateAsync(row.id)
         message.success('已强制吊销所有会话')
-      } catch (err: any) {
-        message.error(extractBetterAuthErrorMessage(err, '操作失败'))
+      } catch (error) {
+        message.error(formatDisplayErrorMessage(error, '操作失败'))
       }
     },
   })

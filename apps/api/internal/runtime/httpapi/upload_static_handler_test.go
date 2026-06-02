@@ -58,6 +58,16 @@ func TestUploadStaticHandlerWorkspaceAllowsMember(t *testing.T) {
 	}
 }
 
+func TestUploadStaticHandlerWorkspaceRejectsOwnerSegmentMismatch(t *testing.T) {
+	env := newUploadStaticTestEnv(t)
+
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/workspace/WRONG1/board-1/content/demo.txt", "session=member")
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+}
+
 func TestUploadStaticHandlerWorkspaceNonContentRejectsNonMember(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
@@ -101,6 +111,44 @@ func TestUploadStaticHandlerProfileAvatarAllowsLoggedInUser(t *testing.T) {
 	}
 }
 
+func TestUploadStaticHandlerProfileVectorAllowsOwnerOnly(t *testing.T) {
+	env := newUploadStaticTestEnv(t)
+
+	ownerRec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/profile/OWNR1A/vector/vector.svg", "session=owner")
+	if ownerRec.Code != http.StatusOK {
+		t.Fatalf("owner status = %d, want %d; body=%s", ownerRec.Code, http.StatusOK, ownerRec.Body.String())
+	}
+
+	memberRec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/profile/OWNR1A/vector/vector.svg", "session=member")
+	if memberRec.Code != http.StatusForbidden {
+		t.Fatalf("member status = %d, want %d; body=%s", memberRec.Code, http.StatusForbidden, memberRec.Body.String())
+	}
+}
+
+func TestUploadStaticHandlerTaskOutputAllowsOwnerOnly(t *testing.T) {
+	env := newUploadStaticTestEnv(t)
+
+	ownerRec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/tasks/1/task-demo/output.png", "session=owner")
+	if ownerRec.Code != http.StatusOK {
+		t.Fatalf("owner status = %d, want %d; body=%s", ownerRec.Code, http.StatusOK, ownerRec.Body.String())
+	}
+
+	memberRec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/tasks/1/task-demo/output.png", "session=member")
+	if memberRec.Code != http.StatusForbidden {
+		t.Fatalf("member status = %d, want %d; body=%s", memberRec.Code, http.StatusForbidden, memberRec.Body.String())
+	}
+}
+
+func TestUploadStaticHandlerRejectsLegacyGenericUploadPath(t *testing.T) {
+	env := newUploadStaticTestEnv(t)
+
+	rec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/2026/05/13/legacy.txt", "session=member")
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+}
+
 func TestUploadStaticHandlerProfileAvatarHeadAllowsLoggedInUser(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
@@ -139,6 +187,9 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "demo.txt"), "workspace content")
 	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "thumb", "demo.txt"), "workspace thumb")
 	mustWriteTestFile(t, filepath.Join("uploads", "profile", "OWNR1A", "avatar", "avatar.txt"), "profile avatar")
+	mustWriteTestFile(t, filepath.Join("uploads", "profile", "OWNR1A", "vector", "vector.svg"), "<svg/>")
+	mustWriteTestFile(t, filepath.Join("uploads", "tasks", "1", "task-demo", "output.png"), "task output")
+	mustWriteTestFile(t, filepath.Join("uploads", "2026", "05", "13", "legacy.txt"), "legacy upload")
 
 	db, err := gorm.Open(sqlite.Open("file:"+strings.ReplaceAll(t.Name(), "/", "_")+"?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
