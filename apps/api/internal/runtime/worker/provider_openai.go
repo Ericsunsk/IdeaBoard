@@ -457,10 +457,6 @@ func trustedOpenAIAssetHosts() []string {
 	return []string{base.Hostname()}
 }
 
-func countOpenAIImageInputs(params map[string]interface{}) int {
-	return len(collectOpenAIEditImageInputs(params))
-}
-
 func hasMultipleOpenAIImageURLs(raw interface{}) bool {
 	switch imageURLs := raw.(type) {
 	case []string:
@@ -491,10 +487,6 @@ func normalizeOpenAIImageURLStrings(refs []string) []string {
 		urls = append(urls, url)
 	}
 	return urls
-}
-
-func normalizeOpenAIImageInputs(params map[string]interface{}) []map[string]string {
-	return imageURLObjectRefs(mediarefs.CollectUniqueParamRefs(params, openAIImageInputRefKeys))
 }
 
 func appendOpenAIEditParams(reqBody map[string]interface{}, providerReq providerRequest) {
