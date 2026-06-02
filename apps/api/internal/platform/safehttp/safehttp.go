@@ -14,9 +14,11 @@ import (
 const defaultTimeout = 15 * time.Second
 
 type resolvedPolicy struct {
-	parsed       *url.URL
-	allowedHosts map[string]bool
-	allowedIPs   map[string]bool
+	parsed           *url.URL
+	allowedHosts     map[string]bool
+	allowedHostPorts map[string]bool
+	allowedIPs       map[string]bool
+	allowedIPPorts   map[string]bool
 }
 
 func ValidateURL(rawURL string) (*url.URL, error) {
@@ -69,8 +71,8 @@ func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout
 	resolveCtx, cancel := context.WithTimeout(ctx, resolveTimeout)
 	defer cancel()
 
-	normalizedAllowedHosts := normalizeAllowedHosts(allowHosts)
-	allowedIPs := resolveAllowedIPs(resolveCtx, normalizedAllowedHosts)
+	normalizedAllowedHosts, normalizedAllowedHostPorts := normalizeAllowedHosts(allowHosts)
+	allowedIPs, allowedIPPorts := resolveAllowedIPs(resolveCtx, normalizedAllowedHosts, normalizedAllowedHostPorts)
 
 	addrs, err := net.DefaultResolver.LookupIPAddr(resolveCtx, host)
 	if err != nil {
@@ -83,14 +85,16 @@ func resolvePolicyWithTimeout(ctx context.Context, rawURL string, resolveTimeout
 		return nil, fmt.Errorf("主机未解析到有效地址")
 	}
 
-	if _, err := filterAllowedIPs(host, addrs, normalizedAllowedHosts, allowedIPs); err != nil {
+	if _, err := filterAllowedIPs(host, defaultPort(parsed), addrs, normalizedAllowedHosts, normalizedAllowedHostPorts, allowedIPs, allowedIPPorts); err != nil {
 		return nil, err
 	}
 
 	return &resolvedPolicy{
-		parsed:       parsed,
-		allowedHosts: normalizedAllowedHosts,
-		allowedIPs:   allowedIPs,
+		parsed:           parsed,
+		allowedHosts:     normalizedAllowedHosts,
+		allowedHostPorts: normalizedAllowedHostPorts,
+		allowedIPs:       allowedIPs,
+		allowedIPPorts:   allowedIPPorts,
 	}, nil
 }
 
@@ -138,7 +142,7 @@ func DoWithAllowHosts(
 		buildRequest(req)
 	}
 	allowRequestProxyDialTarget(req.Context(), transport, req, policy)
-	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedIPs)
+	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedHostPorts, policy.allowedIPs, policy.allowedIPPorts)
 
 	return client.Do(req)
 }
@@ -160,7 +164,7 @@ func DoRequestWithAllowHosts(
 	transport := cloneDefaultTransport()
 	req = req.WithContext(ctx)
 	allowRequestProxyDialTarget(ctx, transport, req, policy)
-	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedIPs)
+	transport.DialContext = restrictedDialContext(policy.allowedHosts, policy.allowedHostPorts, policy.allowedIPs, policy.allowedIPPorts)
 	client := &http.Client{
 		Timeout:   effectiveTimeout(timeout),
 		Transport: transport,
@@ -212,10 +216,21 @@ func addProxyDialAllowance(ctx context.Context, policy *resolvedPolicy, proxyURL
 	if policy.allowedHosts == nil {
 		policy.allowedHosts = map[string]bool{}
 	}
-	policy.allowedHosts[host] = true
+	if policy.allowedHostPorts == nil {
+		policy.allowedHostPorts = map[string]bool{}
+	}
+	port := defaultPort(proxyURL)
+	if port == "" {
+		policy.allowedHosts[host] = true
+	} else {
+		policy.allowedHostPorts[hostPortKey(host, port)] = true
+	}
 
 	if policy.allowedIPs == nil {
 		policy.allowedIPs = map[string]bool{}
+	}
+	if policy.allowedIPPorts == nil {
+		policy.allowedIPPorts = map[string]bool{}
 	}
 	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if err != nil {
@@ -223,7 +238,11 @@ func addProxyDialAllowance(ctx context.Context, policy *resolvedPolicy, proxyURL
 	}
 	for _, addr := range addrs {
 		if key := ipKey(addr.IP); key != "" {
-			policy.allowedIPs[key] = true
+			if port == "" {
+				policy.allowedIPs[key] = true
+			} else {
+				policy.allowedIPPorts[hostPortKey(key, port)] = true
+			}
 		}
 	}
 }
@@ -235,16 +254,21 @@ func cloneDefaultTransport() *http.Transport {
 	return &http.Transport{}
 }
 
-func normalizeAllowedHosts(allowHosts []string) map[string]bool {
-	normalized := make(map[string]bool, len(allowHosts))
+func normalizeAllowedHosts(allowHosts []string) (map[string]bool, map[string]bool) {
+	normalizedHosts := make(map[string]bool, len(allowHosts))
+	normalizedHostPorts := make(map[string]bool, len(allowHosts))
 	for _, raw := range allowHosts {
-		host := normalizeHost(raw)
+		host, port := normalizeAllowedTarget(raw)
 		if host == "" {
 			continue
 		}
-		normalized[host] = true
+		if port == "" {
+			normalizedHosts[host] = true
+		} else {
+			normalizedHostPorts[hostPortKey(host, port)] = true
+		}
 	}
-	return normalized
+	return normalizedHosts, normalizedHostPorts
 }
 
 func normalizeHost(raw string) string {
@@ -267,8 +291,26 @@ func normalizeHost(raw string) string {
 	return strings.ToLower(strings.Trim(host, "[]"))
 }
 
-func resolveAllowedIPs(ctx context.Context, allowedHosts map[string]bool) map[string]bool {
+func normalizeAllowedTarget(raw string) (string, string) {
+	value := strings.TrimSpace(strings.ToLower(raw))
+	if value == "" {
+		return "", ""
+	}
+	if parsed, err := url.Parse(value); err == nil && parsed.Hostname() != "" {
+		return normalizeHost(parsed.Hostname()), defaultPort(parsed)
+	}
+	if strings.Contains(value, "/") {
+		return "", ""
+	}
+	if host, port, err := net.SplitHostPort(value); err == nil {
+		return normalizeHost(host), strings.TrimSpace(port)
+	}
+	return normalizeHost(value), ""
+}
+
+func resolveAllowedIPs(ctx context.Context, allowedHosts map[string]bool, allowedHostPorts map[string]bool) (map[string]bool, map[string]bool) {
 	ips := make(map[string]bool)
+	ipPorts := make(map[string]bool)
 	for host := range allowedHosts {
 		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 		if err != nil {
@@ -281,7 +323,23 @@ func resolveAllowedIPs(ctx context.Context, allowedHosts map[string]bool) map[st
 			}
 		}
 	}
-	return ips
+	for hostPort := range allowedHostPorts {
+		host, port := splitHostPortKey(hostPort)
+		if host == "" || port == "" {
+			continue
+		}
+		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			key := ipKey(addr.IP)
+			if key != "" {
+				ipPorts[hostPortKey(key, port)] = true
+			}
+		}
+	}
+	return ips, ipPorts
 }
 
 func ipKey(ip net.IP) string {
@@ -299,7 +357,7 @@ func effectiveTimeout(timeout time.Duration) time.Duration {
 	return defaultTimeout
 }
 
-func restrictedDialContext(allowedHosts map[string]bool, allowedIPs map[string]bool) func(context.Context, string, string) (net.Conn, error) {
+func restrictedDialContext(allowedHosts map[string]bool, allowedHostPorts map[string]bool, allowedIPs map[string]bool, allowedIPPorts map[string]bool) func(context.Context, string, string) (net.Conn, error) {
 	dialer := &net.Dialer{
 		Timeout:   defaultTimeout,
 		KeepAlive: 30 * time.Second,
@@ -316,7 +374,7 @@ func restrictedDialContext(allowedHosts map[string]bool, allowedIPs map[string]b
 			return nil, err
 		}
 
-		allowedAddrs, err := filterAllowedIPs(host, addrs, allowedHosts, allowedIPs)
+		allowedAddrs, err := filterAllowedIPs(host, port, addrs, allowedHosts, allowedHostPorts, allowedIPs, allowedIPPorts)
 		if err != nil {
 			return nil, err
 		}
@@ -351,9 +409,10 @@ func lookupDialIPs(ctx context.Context, host string) ([]net.IPAddr, error) {
 	return addrs, nil
 }
 
-func filterAllowedIPs(host string, addrs []net.IPAddr, allowedHosts map[string]bool, allowedIPs map[string]bool) ([]net.IPAddr, error) {
-	hostAllowed := allowedHosts[normalizeHost(host)]
-	allowLoopback := allowedHosts["localhost"]
+func filterAllowedIPs(host string, port string, addrs []net.IPAddr, allowedHosts map[string]bool, allowedHostPorts map[string]bool, allowedIPs map[string]bool, allowedIPPorts map[string]bool) ([]net.IPAddr, error) {
+	normalizedHost := normalizeHost(host)
+	hostAllowed := allowedHosts[normalizedHost] || allowedHostPorts[hostPortKey(normalizedHost, port)]
+	allowLoopback := allowedHosts["localhost"] || allowedHostPorts[hostPortKey("localhost", port)]
 
 	if strings.EqualFold(host, "localhost") && !hostAllowed {
 		return nil, fmt.Errorf("不允许访问本地地址")
@@ -361,11 +420,12 @@ func filterAllowedIPs(host string, addrs []net.IPAddr, allowedHosts map[string]b
 
 	allowed := make([]net.IPAddr, 0, len(addrs))
 	for _, addr := range addrs {
+		addrKey := ipKey(addr.IP)
 		if isLoopbackIP(addr.IP) && allowLoopback {
 			allowed = append(allowed, addr)
 			continue
 		}
-		if isPrivateOrLocal(addr.IP) && !hostAllowed && !allowedIPs[ipKey(addr.IP)] {
+		if isPrivateOrLocal(addr.IP) && !hostAllowed && !allowedIPs[addrKey] && !allowedIPPorts[hostPortKey(addrKey, port)] {
 			continue
 		}
 		allowed = append(allowed, addr)
@@ -395,4 +455,38 @@ func isPrivateOrLocal(ip net.IP) bool {
 func isLoopbackIP(ip net.IP) bool {
 	addr, ok := netip.AddrFromSlice(ip)
 	return ok && addr.IsLoopback()
+}
+
+func defaultPort(parsed *url.URL) string {
+	if parsed == nil {
+		return ""
+	}
+	if port := strings.TrimSpace(parsed.Port()); port != "" {
+		return port
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "http":
+		return "80"
+	case "https":
+		return "443"
+	default:
+		return ""
+	}
+}
+
+func hostPortKey(host string, port string) string {
+	host = normalizeHost(host)
+	port = strings.TrimSpace(port)
+	if host == "" || port == "" {
+		return ""
+	}
+	return host + "\x00" + port
+}
+
+func splitHostPortKey(key string) (string, string) {
+	parts := strings.SplitN(key, "\x00", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], parts[1]
 }

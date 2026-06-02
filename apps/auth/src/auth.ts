@@ -11,6 +11,8 @@ export const authDB = new Pool({
   database: env.database.database,
   ssl: env.database.sslMode === 'disable' ? false : { rejectUnauthorized: env.database.sslMode === 'verify-full' },
   max: 10,
+  connectionTimeoutMillis: 5_000,
+  idleTimeoutMillis: 30_000,
 })
 
 export const auth = betterAuth({

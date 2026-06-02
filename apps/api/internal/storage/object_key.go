@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func buildObjectKey(dirPrefix string, ext string) string {
+func buildObjectKey(dirPrefix string, ext string) (string, error) {
 	cleanExt := strings.TrimSpace(ext)
 	if cleanExt == "" {
 		cleanExt = ".png"
@@ -18,11 +18,28 @@ func buildObjectKey(dirPrefix string, ext string) string {
 
 	baseDir := "uploads"
 	if strings.TrimSpace(dirPrefix) != "" {
-		prefix := path.Clean(strings.TrimSpace(dirPrefix))
+		rawPrefix := strings.TrimSpace(dirPrefix)
+		if hasParentDirectorySegment(rawPrefix) {
+			return "", fmt.Errorf("上传目录前缀无效")
+		}
+		prefix := path.Clean(rawPrefix)
 		prefix = strings.TrimPrefix(prefix, "/")
+		if hasParentDirectorySegment(prefix) {
+			return "", fmt.Errorf("上传目录前缀无效")
+		}
 		if prefix != "." && prefix != "" {
 			baseDir = path.Join(baseDir, prefix)
 		}
 	}
-	return fmt.Sprintf("%s/%s/%d%s", baseDir, time.Now().Format("2006/01/02"), time.Now().UnixNano(), cleanExt)
+	now := time.Now()
+	return fmt.Sprintf("%s/%s/%d%s", baseDir, now.Format("2006/01/02"), now.UnixNano(), cleanExt), nil
+}
+
+func hasParentDirectorySegment(value string) bool {
+	for _, part := range strings.Split(strings.ReplaceAll(value, "\\", "/"), "/") {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
 }

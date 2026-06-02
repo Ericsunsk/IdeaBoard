@@ -493,6 +493,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseAdminAccount'
   /admin/accounts/{id}:
+    get:
+      tags: [AdminAccounts]
+      operationId: getAdminAccount
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAdminAccount'
     put:
       tags: [AdminAccounts]
       operationId: updateAdminAccount
@@ -523,6 +535,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/accounts/{id}/queue:
+    get:
+      tags: [AdminAccounts]
+      operationId: getAdminAccountQueue
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMonitorAccountLoad'
   /admin/accounts/{id}/start:
     post:
       tags: [AdminAccounts]
@@ -1089,18 +1114,19 @@ components:
 
     AdminAccount:
       type: object
-      required: [id, name, channel_id, platform, api_type, api_key, proxy_url, model_set, max_concurrent, current_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
+      required: [id, name, channel_id, platform, api_type, proxy_url, model_set, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
       properties:
         id: { type: integer }
         name: { type: string }
         channel_id: { type: integer }
         platform: { type: string }
         api_type: { type: string }
-        api_key: { type: string }
         proxy_url: { type: string }
         model_set: { type: string }
         max_concurrent: { type: integer }
         current_concurrent: { type: integer }
+        wait_queue_count: { type: integer }
+        running_status: { type: string }
         fail_count: { type: integer }
         weight: { type: integer }
         timeout: { type: integer }
@@ -1622,6 +1648,16 @@ components:
               properties:
                 account:
                   $ref: '#/components/schemas/AdminAccount'
+                current_concurrent: { type: integer }
+                max_concurrent: { type: integer }
+
+    ApiResponseMonitorAccountLoad:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/MonitorAccountLoad'
 
     ApiResponseMonitor:
       allOf:

@@ -67,7 +67,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 	if cancelled {
-		o.skipCancelledTask(ctx, task)
+		o.skipCancelledTask(ctx, task, taskqueue.TaskAssignment{})
 		return nil
 	}
 
@@ -88,7 +88,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 			slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", checkErr)
 		}
 		if cancelled {
-			o.skipCancelledTask(ctx, task)
+			o.skipCancelledTask(ctx, task, assignment)
 			return nil
 		}
 		slog.Warn("mark task running failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
@@ -100,15 +100,14 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	if err := o.taskRuntime.ConfirmTaskRunning(ctx, assignment); err != nil {
 		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
+		defer cleanupCancel()
 		if resetErr := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, accountID, assignment.LeaseToken, "确认任务运行租约失败"); resetErr != nil {
-			cleanupCancel()
 			if isTaskConvergedError(resetErr) {
 				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 				return nil
 			}
 			return resetErr
 		}
-		cleanupCancel()
 		if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "确认任务运行租约失败"); requeueErr != nil {
 			return requeueErr
 		}
@@ -123,7 +122,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 				slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", checkErr)
 			}
 			if cancelled {
-				o.skipCancelledTask(ctx, task)
+				o.skipCancelledTask(ctx, task, assignment)
 				return nil
 			}
 			return o.handleExecutionInterrupted(ctx, task, assignment, err)
@@ -182,7 +181,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 	if cancelled {
-		o.skipCancelledTask(ctx, task)
+		o.skipCancelledTask(ctx, task, assignment)
 		return nil
 	}
 
@@ -212,7 +211,7 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *queue
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", err)
 	} else if cancelled {
-		o.skipCancelledTask(cleanupCtx, task)
+		o.skipCancelledTask(cleanupCtx, task, assignment)
 		return nil
 	}
 	if err := o.taskRuntime.RefreshTaskAccounts(ctx, task); err != nil {
@@ -272,10 +271,15 @@ func (o *taskExecutionOrchestrator) failTask(ctx context.Context, task *queuetyp
 	return o.completeFailedTask(ctx, task, taskqueue.TaskAssignment{}, reason, 0)
 }
 
-func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *queuetypes.TaskPayload) {
+func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
+	if assignment.AccountID != 0 && strings.TrimSpace(assignment.LeaseToken) != "" {
+		if err := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, assignment.AccountID, assignment.LeaseToken, "任务已取消，释放运行租约"); err != nil && !isTaskConvergedError(err) {
+			slog.Warn("reset cancelled task running lease failed", "task_id", task.TaskID, "account_id", assignment.AccountID, "err", err)
+		}
+	}
 	if err := o.taskRuntime.ClearTaskCancelled(cleanupCtx, task.TaskID); err != nil {
 		slog.Warn("clear task cancellation marker failed", "task_id", task.TaskID, "err", err)
 	}

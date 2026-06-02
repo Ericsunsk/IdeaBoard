@@ -5,6 +5,8 @@ services:
     image: nginx:1.27-alpine
     container_name: ideaboard-gateway
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       api:
         condition: service_healthy
@@ -29,6 +31,10 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: ideaboard-cloudflared
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       gateway:
         condition: service_healthy
@@ -51,7 +57,11 @@ services:
       nats:
         condition: service_healthy
       auth:
-        condition: service_started
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
       APP_ENV: production
       APP_GIN_MODE: release
@@ -100,6 +110,10 @@ services:
     image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:?Set IMAGE_NAMESPACE in docker/.env}/ideaboard-auth:${IMAGE_TAG:-latest}
     container_name: ideaboard-auth
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       postgres:
         condition: service_healthy
@@ -135,6 +149,8 @@ services:
     image: postgres:17-alpine
     container_name: ideaboard-postgres
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ideaboard}
       POSTGRES_USER: ${POSTGRES_USER:-ideaboard}
@@ -156,6 +172,10 @@ services:
     image: nats:2.11-alpine
     container_name: ideaboard-nats
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     command:
       - -js
       - -sd

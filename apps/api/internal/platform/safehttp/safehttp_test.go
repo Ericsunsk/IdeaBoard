@@ -36,6 +36,15 @@ func TestValidateURLWithAllowHostsAllowsEquivalentLoopbackIP(t *testing.T) {
 	}
 }
 
+func TestValidateURLWithAllowHostsRejectsDifferentLoopbackPort(t *testing.T) {
+	if _, err := ValidateURLWithAllowHosts(
+		"http://127.0.0.1:6001/uploads/test.png",
+		"http://localhost:6000/v1",
+	); err == nil {
+		t.Fatal("expected different loopback port to be rejected")
+	}
+}
+
 func TestValidateURLWithAllowHostsStillRejectsOtherPrivateHosts(t *testing.T) {
 	if _, err := ValidateURLWithAllowHosts(
 		"http://10.0.0.8:6000/uploads/test.png",
@@ -128,14 +137,16 @@ func TestProxyDialAllowanceAllowsConfiguredLoopbackProxy(t *testing.T) {
 		t.Fatalf("parse proxy URL: %v", err)
 	}
 	policy := &resolvedPolicy{
-		allowedHosts: map[string]bool{},
-		allowedIPs:   map[string]bool{},
+		allowedHosts:     map[string]bool{},
+		allowedHostPorts: map[string]bool{},
+		allowedIPs:       map[string]bool{},
+		allowedIPPorts:   map[string]bool{},
 	}
 
 	addProxyDialAllowance(context.Background(), policy, proxyURL)
 
 	addrs := []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}
-	if _, err := filterAllowedIPs("127.0.0.1", addrs, policy.allowedHosts, policy.allowedIPs); err != nil {
+	if _, err := filterAllowedIPs("127.0.0.1", "7890", addrs, policy.allowedHosts, policy.allowedHostPorts, policy.allowedIPs, policy.allowedIPPorts); err != nil {
 		t.Fatalf("expected configured loopback proxy to be allowed, got %v", err)
 	}
 }

@@ -127,7 +127,10 @@ func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multip
 		return "", err
 	}
 
-	key := buildObjectKey(opts.DirPrefix, filepathExt(file.Filename))
+	key, err := buildObjectKey(opts.DirPrefix, filepathExt(file.Filename))
+	if err != nil {
+		return "", err
+	}
 	contentType := file.Header.Get("Content-Type")
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"

@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 import { isProductionRuntime } from './runtime-env.js'
 
-dotenv.config()
+dotenv.config({ quiet: true })
 
 function getEnv(name: string, fallback = ''): string {
   const raw = process.env[name]
@@ -21,6 +21,7 @@ function isUnsafeProductionSecret(value: string): boolean {
   const normalized = value.trim().toLowerCase()
   if (!normalized) return true
   if (normalized.startsWith('replace-with')) return true
+  if (normalized.startsWith('replace_with')) return true
   if (normalized.includes('change-before-production')) return true
   return normalized === 'changeme' || normalized === 'change-me' || normalized === 'password' || normalized === 'secret'
 }
@@ -34,6 +35,14 @@ function validateProductionURL(name: string, value: string) {
   } catch {
     throw new Error(`${name} must be a valid http(s) URL when NODE_ENV=production`)
   }
+}
+
+function validateDatabaseSSLMode(value: string): 'disable' | 'require' | 'verify-full' {
+  const normalized = value.toLowerCase()
+  if (normalized === 'disable' || normalized === 'require' || normalized === 'verify-full') {
+    return normalized
+  }
+  throw new Error('DB_SSLMODE must be one of disable, require, or verify-full')
 }
 
 const productionRuntime = isProductionRuntime()
@@ -50,10 +59,15 @@ const authSecret =
 const authBaseURL =
   getEnv('BETTER_AUTH_URL', getEnv('AUTH_BASE_URL', '')) ||
   (productionRuntime ? '' : 'http://localhost:5173')
+const dbPassword = getEnv('DB_PASSWORD', '')
+const dbSSLMode = validateDatabaseSSLMode(getEnv('DB_SSLMODE', 'disable'))
 
 if (productionRuntime) {
   if (isUnsafeProductionSecret(authInternalKey)) {
     throw new Error('AUTH_INTERNAL_KEY must be set to a non-placeholder value when NODE_ENV=production')
+  }
+  if (authInternalKey.length < 32) {
+    throw new Error('AUTH_INTERNAL_KEY must be at least 32 characters long')
   }
   if (isUnsafeProductionSecret(authSecret)) {
     throw new Error('BETTER_AUTH_SECRET must be set to a non-placeholder value when NODE_ENV=production')
@@ -61,10 +75,16 @@ if (productionRuntime) {
   if (authSecret.length < 32) {
     throw new Error('BETTER_AUTH_SECRET must be at least 32 characters long')
   }
+  if (isUnsafeProductionSecret(dbPassword)) {
+    throw new Error('DB_PASSWORD must be set to a non-placeholder value when NODE_ENV=production')
+  }
   if (!authBaseURL) {
     throw new Error('BETTER_AUTH_URL is required when NODE_ENV=production')
   }
   validateProductionURL('BETTER_AUTH_URL', authBaseURL)
+  for (const origin of trustedOrigins) {
+    validateProductionURL('AUTH_TRUSTED_ORIGINS entry', origin)
+  }
 }
 
 export const env = {
@@ -81,8 +101,8 @@ export const env = {
     host: getEnv('DB_HOST', '127.0.0.1'),
     port: getEnvInt('DB_PORT', 5432),
     user: getEnv('DB_USER', 'ideaboard'),
-    password: getEnv('DB_PASSWORD', ''),
+    password: dbPassword,
     database: getEnv('DB_NAME', 'ideaboard'),
-    sslMode: getEnv('DB_SSLMODE', 'disable'),
+    sslMode: dbSSLMode,
   },
 }

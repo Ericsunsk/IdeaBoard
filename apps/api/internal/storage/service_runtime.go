@@ -98,27 +98,12 @@ func (s *StorageService) DeleteWorkspaceUploadByURL(ctx context.Context, storage
 		return err
 	}
 
-	profile, err := s.resolveActiveProfile(ctx)
-	if err != nil {
-		return err
-	}
-	key, err := s.extractObjectKeyFromUserUploadURL(*profile, rawURL)
-	if err != nil {
-		return err
-	}
-	resource, err := ParseUploadResource(key)
-	if err != nil {
-		return err
-	}
-	if resource.Kind != UploadResourceKindWorkspace || resource.Workspace == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
-		return fmt.Errorf("仅允许删除当前画布工作区上传文件")
-	}
-
-	adapter, err := s.adapterRegistry.get(profile.Provider)
-	if err != nil {
-		return err
-	}
-	return adapter.Delete(ctx, profile, key)
+	return s.deleteUserUploadByURL(ctx, rawURL, func(resource UploadResource) error {
+		if resource.Kind != UploadResourceKindWorkspace || resource.Workspace == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
+			return fmt.Errorf("仅允许删除当前画布工作区上传文件")
+		}
+		return nil
+	})
 }
 
 func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
@@ -127,6 +112,15 @@ func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUI
 		return err
 	}
 
+	return s.deleteUserUploadByURL(ctx, rawURL, func(resource UploadResource) error {
+		if resource.Kind != UploadResourceKindProfileAvatar || resource.ProfileAvatar == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
+			return fmt.Errorf("仅允许删除当前用户头像文件")
+		}
+		return nil
+	})
+}
+
+func (s *StorageService) deleteUserUploadByURL(ctx context.Context, rawURL string, validateResource func(UploadResource) error) error {
 	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return err
@@ -139,8 +133,8 @@ func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUI
 	if err != nil {
 		return err
 	}
-	if resource.Kind != UploadResourceKindProfileAvatar || resource.ProfileAvatar == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
-		return fmt.Errorf("仅允许删除当前用户头像文件")
+	if err := validateResource(resource); err != nil {
+		return err
 	}
 
 	adapter, err := s.adapterRegistry.get(profile.Provider)
@@ -300,7 +294,10 @@ func (s *StorageService) saveBytesLocal(filename string, data []byte, opts Stora
 	if ext == "" {
 		ext = ".png"
 	}
-	objectKey := buildObjectKey(opts.DirPrefix, ext)
+	objectKey, err := buildObjectKey(opts.DirPrefix, ext)
+	if err != nil {
+		return "", err
+	}
 	dst := filepath.FromSlash(objectKey)
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
 		return "", fmt.Errorf("创建目录失败: %v", err)

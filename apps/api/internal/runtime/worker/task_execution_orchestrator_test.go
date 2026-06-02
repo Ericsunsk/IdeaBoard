@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"api/internal/runtime/taskqueue"
 	"api/internal/runtime/taskruntime"
@@ -111,6 +112,64 @@ END`); err != nil {
 	}
 	if !strings.Contains(err.Error(), "forced mark completed failure") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskExecutionOrchestratorTestDB(t)
+	accountRepo := accounts.NewAccountRepository(db)
+	taskRepo := accounts.NewTaskRepository(db)
+	account := createRiverTestAccount(t, accountRepo, "cancel-after-provider-account")
+
+	task := &tasks.Task{
+		TaskID:    "cancel-after-provider-task",
+		UserID:    1,
+		ChannelID: 1,
+		Status:    tasks.StatusPending,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	cancelStore := newFakeCancelStoreForRiver()
+	assigner := &fakeAssigner{}
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, task *queuetypes.TaskPayload) (string, error) {
+		if err := cancelStore.MarkCancelled(ctx, task.TaskID, time.Minute); err != nil {
+			t.Fatalf("mark cancelled failed: %v", err)
+		}
+		return `{"image_url":"https://example.com/image.png"}`, nil
+	})
+
+	assignment := taskqueue.TaskAssignment{
+		TaskID:     task.TaskID,
+		AccountID:  account.ID,
+		Status:     taskqueue.AssignStatusAssigned,
+		LeaseToken: "lease-cancel-after-provider",
+	}
+	if err := orchestrator.execute(ctx, &queuetypes.TaskPayload{
+		TaskID:     task.TaskID,
+		AccountIDs: []int64{account.ID},
+	}, assignment); err != nil {
+		t.Fatalf("execute returned error: %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	}
+	if updated.AccountID != 0 {
+		t.Fatalf("account_id = %d, want 0", updated.AccountID)
+	}
+	if updated.LeaseToken != "" {
+		t.Fatalf("lease_token = %q, want empty", updated.LeaseToken)
+	}
+	if !cancelStore.cleared[task.TaskID] {
+		t.Fatal("cancel marker was not cleared")
 	}
 }
 

@@ -92,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, ref, watchPostEffect, type ComponentPublicInstance } from 'vue'
 import { MediaImage } from '@iconoir/vue'
 import { clampImageNodeOutputCount, type ImageNodeItem } from '../../types/canvasNodes'
 import type { ImageNodeAction, ImageStrengthAction } from '../../types/imageActions'
@@ -174,33 +174,15 @@ const imageStageRef = ref<StageExpose | null>(null)
 const promptDraft = ref('')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 
-watch(
-  [
-    () => props.flowNodeId,
-    imageStageRef,
-    () => props.setImageStageRef,
-    () => props.clearImageStageRef,
-  ],
-  ([flowNodeId, stageVm, setImageStageRef, clearImageStageRef], oldValues, onCleanup) => {
-    const stageElement = stageVm?.stageElement ?? null
-    const [prevFlowNodeId, prevStageVm] = oldValues ?? []
-    const prevStageElement = prevStageVm?.stageElement ?? null
-    if (prevFlowNodeId && prevFlowNodeId !== flowNodeId) {
-      clearImageStageRef?.(prevFlowNodeId, prevStageElement)
-    }
-    if (flowNodeId) {
-      setImageStageRef?.(flowNodeId, stageElement)
-    }
-    onCleanup(() => {
-      if (flowNodeId) clearImageStageRef?.(flowNodeId, stageElement)
-    })
-  },
-  { immediate: true },
-)
+watchPostEffect((onCleanup) => {
+  const flowNodeId = props.flowNodeId
+  const stageElement = imageStageRef.value?.stageElement ?? null
+  if (!flowNodeId) return
 
-onBeforeUnmount(() => {
-  if (!props.flowNodeId) return
-  props.clearImageStageRef?.(props.flowNodeId, imageStageRef.value?.stageElement ?? null)
+  props.setImageStageRef?.(flowNodeId, stageElement)
+  onCleanup(() => {
+    props.clearImageStageRef?.(flowNodeId, stageElement)
+  })
 })
 
 function submitPrompt(prompt: string, outputCount: number) {

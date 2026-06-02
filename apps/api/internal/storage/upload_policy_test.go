@@ -101,3 +101,12 @@ func TestParseUploadResourceRejectsTraversalOutsideUploads(t *testing.T) {
 		t.Fatalf("expected traversal outside uploads to fail")
 	}
 }
+
+func TestBuildObjectKeyRejectsTraversalDirPrefix(t *testing.T) {
+	if _, err := buildObjectKey("../private", ".png"); err == nil {
+		t.Fatalf("expected traversal dir prefix to fail")
+	}
+	if _, err := buildObjectKey("workspace/OWNER/../../private", ".png"); err == nil {
+		t.Fatalf("expected nested traversal dir prefix to fail")
+	}
+}

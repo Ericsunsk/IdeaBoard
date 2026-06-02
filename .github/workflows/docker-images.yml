@@ -76,7 +76,7 @@ jobs:
       - name: Build Auth
         working-directory: apps/auth
         run: |
-          npm ci --omit=optional
+          npm ci --omit=optional --no-audit --fund=false
           npm run build
 
   build-pr-images:
@@ -212,6 +212,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image.cache_scope }}
 
       - name: Generate ${{ matrix.image.display }} SBOM
+        timeout-minutes: 10
         uses: anchore/sbom-action@v0.24.0
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
@@ -221,6 +222,7 @@ jobs:
           upload-release-assets: false
 
       - name: Scan ${{ matrix.image.display }} image
+        timeout-minutes: 10
         uses: anchore/scan-action@v7.4.0
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
@@ -232,9 +234,11 @@ jobs:
           output-format: table
 
       - name: Install Cosign
+        timeout-minutes: 5
         uses: sigstore/cosign-installer@v4.1.2
 
       - name: Sign ${{ matrix.image.display }} image
+        timeout-minutes: 5
         env:
           IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${IMAGE}"

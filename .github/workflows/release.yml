@@ -21,6 +21,7 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Resolve tag
@@ -63,11 +64,11 @@ jobs:
 
       - name: Install web dependencies
         working-directory: apps/web
-        run: npm ci
+        run: npm ci --no-audit --fund=false
 
       - name: Install auth dependencies
         working-directory: apps/auth
-        run: npm ci
+        run: npm ci --no-audit --fund=false
 
       - name: Audit web production dependencies
         working-directory: apps/web

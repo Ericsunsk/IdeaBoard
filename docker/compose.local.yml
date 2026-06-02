@@ -3,6 +3,8 @@ services:
     image: postgres:17-alpine
     container_name: ideaboard-postgres
     restart: always
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ideaboard}
       POSTGRES_USER: ${POSTGRES_USER:-ideaboard}
@@ -26,6 +28,10 @@ services:
     image: nats:2.11-alpine
     container_name: ideaboard-nats
     restart: always
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     command:
       - -js
       - -sd

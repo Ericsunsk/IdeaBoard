@@ -113,7 +113,12 @@ app.addHook('onRequest', async (request, reply) => {
 })
 
 app.get('/api/health', async (_request, reply) => {
-  sendSuccess(reply, { status: 'ok' })
+  try {
+    await authDB.query('SELECT 1')
+    sendSuccess(reply, { status: 'ok', database: 'ok' })
+  } catch (error) {
+    sendError(reply, 503, extractErrorMessage(error, 'database is not ready'))
+  }
 })
 
 const requireInternalKey: preHandlerHookHandler = (request, reply, done) => {
