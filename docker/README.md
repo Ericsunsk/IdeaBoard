@@ -98,11 +98,11 @@ docker compose -f docker/compose.yml --env-file docker/.env pull
 docker compose -f docker/compose.yml --env-file docker/.env up -d
 ```
 
-推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 PostgreSQL dump 写入 `backups/postgres/`，并在启动后检查 `api` 和 `auth` 的 `/api/health`。如果 health gate 失败，请先查看 `gateway/api/auth/postgres` 日志，再决定是否把 `IMAGE_TAG` 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
+推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 PostgreSQL dump 写入 `backups/postgres/`，并在启动后检查 PostgreSQL、NATS JetStream、`api`/`auth` health、River schema 和默认 JetStream event stream。已启动的 stack 也可以随时执行 `ideaboard smoke` 复验。如果 health gate 失败，请先查看 `gateway/api/auth/postgres/nats` 日志，再决定是否把 `IMAGE_TAG` 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
 
-生产数据在 Docker volumes 中持久化：`postgres-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
+生产数据在 Docker volumes 中持久化：`postgres-data`、`nats-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
 
-当前 Docker stack 只管理 PostgreSQL 数据库；部署脚本不会自动转换或导入其他数据库形态的数据。
+当前 Docker stack 管理 PostgreSQL 数据库与 NATS JetStream 数据目录；部署脚本不会自动转换或导入其他数据库形态的数据。
 
 
 ## 常见问题

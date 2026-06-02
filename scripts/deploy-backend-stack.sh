@@ -239,7 +239,25 @@ backup_postgres() {
 print_backend_health_logs() {
   echo "Recent service logs for health gate failure:" >&2
   docker_compose ps >&2 || true
-  docker_compose logs --tail=120 gateway api auth >&2 || true
+  docker_compose logs --tail=120 gateway api auth postgres nats >&2 || true
+}
+
+wait_for_nats() {
+  local timeout="${NATS_WAIT_TIMEOUT_SECONDS:-120}"
+  local elapsed=0
+
+  echo "Waiting for NATS JetStream to become ready..."
+  while (( elapsed < timeout )); do
+    if docker_compose exec -T nats wget -q -T 3 -O /dev/null 'http://127.0.0.1:8222/healthz?js-enabled-only=true' >/dev/null 2>&1; then
+      echo "NATS JetStream health is OK"
+      return 0
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+
+  print_backend_health_logs
+  die "NATS JetStream did not become ready within ${timeout}s"
 }
 
 wait_for_http_from_gateway() {
@@ -265,6 +283,74 @@ wait_for_http_from_gateway() {
 wait_for_backend_health() {
   wait_for_http_from_gateway "api" "http://api:6000/api/health"
   wait_for_http_from_gateway "auth" "http://auth:6001/api/health"
+}
+
+is_false_value() {
+  local value
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  [[ "$value" == "0" || "$value" == "false" || "$value" == "no" || "$value" == "off" ]]
+}
+
+event_bus_enabled() {
+  local value
+  value="$(env_value NATS_EVENT_BUS_ENABLED)"
+  if [[ -z "$value" ]]; then
+    value="true"
+  fi
+  ! is_false_value "$value"
+}
+
+check_river_schema() {
+  local result
+
+  echo "Checking River schema..."
+  result="$(
+    docker_compose exec -T postgres sh -c \
+      'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT CASE WHEN to_regclass('\''public.river_job'\'') IS NULL THEN '\''missing'\'' ELSE '\''ok'\'' END"'
+  )" || {
+    print_backend_health_logs
+    die "River schema check failed"
+  }
+  if [[ "$(printf '%s' "$result" | tr -d '[:space:]')" != "ok" ]]; then
+    print_backend_health_logs
+    die "River schema is missing river_job"
+  fi
+  echo "River schema is OK"
+}
+
+check_nats_event_stream() {
+  local stream_name
+  local body
+
+  if ! event_bus_enabled; then
+    echo "Skipping NATS stream check because NATS_EVENT_BUS_ENABLED=false"
+    return 0
+  fi
+
+  stream_name="$(env_value NATS_STREAM_NAME)"
+  stream_name="${stream_name:-IDEABOARD_EVENTS}"
+
+  echo "Checking NATS JetStream stream: $stream_name"
+  body="$(
+    docker_compose exec -T nats wget -q -T 3 -O - 'http://127.0.0.1:8222/jsz?streams=true&consumers=true&config=true'
+  )" || {
+    print_backend_health_logs
+    die "NATS JetStream stream check failed"
+  }
+  if ! printf '%s' "$body" | grep -F "\"$stream_name\"" >/dev/null; then
+    print_backend_health_logs
+    die "NATS JetStream stream not found: $stream_name"
+  fi
+  echo "NATS JetStream stream is OK"
+}
+
+run_backend_smoke_checks() {
+  wait_for_postgres
+  wait_for_nats
+  wait_for_backend_health
+  check_river_schema
+  check_nats_event_stream
+  echo "Backend smoke checks passed"
 }
 
 login_ghcr_if_configured() {
@@ -303,7 +389,11 @@ case "$command" in
     backup_postgres
     docker_compose run --rm auth npm run migrate:dist
     docker_compose up -d
-    wait_for_backend_health
+    run_backend_smoke_checks
+    docker_compose ps
+    ;;
+  smoke)
+    run_backend_smoke_checks
     docker_compose ps
     ;;
   restart)
@@ -335,7 +425,7 @@ case "$command" in
     ;;
   *)
     cat >&2 <<EOF
-Usage: ideaboard [update|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|ps]
+Usage: ideaboard [update|smoke|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|ps]
 
 Default command: update
 Environment file: $ENV_FILE

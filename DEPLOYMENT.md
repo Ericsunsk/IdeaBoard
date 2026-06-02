@@ -223,11 +223,13 @@ Service: http://gateway:80
 
 ```bash
 docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env ps
+ideaboard smoke
 curl http://127.0.0.1:8080/api/health
 curl http://127.0.0.1:8080/api/auth/get-session
 ```
 
 `/api/auth/get-session` 未登录时返回未认证是正常的；关键是 Gateway 能转发到 Auth Service，不应出现连接失败。
+`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、API/Auth health、River schema 和默认 JetStream event stream。
 
 ### 7. 升级与回滚
 
@@ -248,12 +250,12 @@ ideaboard update
 
 ```bash
 ls -lh /opt/stacks/ideaboard/backups/postgres/
-docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 gateway api auth postgres
+docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 gateway api auth postgres nats
 ```
 
 当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。
 
-数据保存在 Docker volumes：`postgres-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
+数据保存在 Docker volumes：`postgres-data`、`nats-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
 
 <a id="release-artifact"></a>
 

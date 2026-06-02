@@ -17,6 +17,13 @@
 - 未配置 `NATS_URL` 时，开发环境退回本地 hub 发布；Docker Compose 生产栈默认启用 JetStream。
 - 禁止将 NATS JetStream 用作任务执行队列，避免与 River 形成双队列语义。
 
+## Smoke 验收
+
+- `ideaboard update` 启动生产 stack 后会执行 backend smoke checks。
+- `ideaboard smoke` 可对已运行的生产 stack 做手动复验。
+- Smoke checks 覆盖 PostgreSQL ready、NATS JetStream ready、API/Auth health、River `river_job` schema 和默认 JetStream event stream。
+- `NATS_EVENT_BUS_ENABLED=false` 时跳过 event stream 检查；River schema 仍必须存在。
+
 ## Retry 对齐
 
 - DB 业务重试上限仍由 `TaskRuntimeService` 控制（当前默认 3 次）。
