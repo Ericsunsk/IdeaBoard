@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import * as v from 'valibot'
 import {
   DEFAULT_FUSION_BLEND_POINT,
   DEFAULT_PROMPT_ASPECT_RATIO,
@@ -16,102 +16,108 @@ type PersistedCanvasBoardState = CanvasBoardSnapshot & {
   updatedAt: number
 }
 
-const finiteNumberSchema = z.number().finite()
+const finiteNumberSchema = v.pipe(v.number(), v.finite())
 
-const workflowNodeOutputStatusSchema = z.enum(['idle', 'running', 'ready', 'stale'])
-const canvasConnectionNodeTypeSchema = z.enum([
+const positiveFiniteNumberSchema = v.pipe(finiteNumberSchema, v.minValue(Number.MIN_VALUE))
+
+const outputCountSchema = v.pipe(
+  finiteNumberSchema,
+  v.integer(),
+  v.minValue(MIN_IMAGE_NODE_OUTPUT_COUNT),
+  v.maxValue(MAX_IMAGE_NODE_OUTPUT_COUNT),
+)
+
+const positiveIntegerSchema = v.pipe(finiteNumberSchema, v.integer(), v.minValue(1))
+
+const nonEmptyStringSchema = v.pipe(v.string(), v.minLength(1))
+
+const workflowNodeOutputStatusSchema = v.picklist(['idle', 'running', 'ready', 'stale'])
+const canvasConnectionNodeTypeSchema = v.picklist([
   'image',
   'prompt',
   'viewpoint',
   'fusion',
 ])
-const canvasConnectionPortSchema = z.enum(['image', 'prompt'])
+const canvasConnectionPortSchema = v.picklist(['image', 'prompt'])
 
-const imageNodeOutputItemSchema = z.object({
-  url: z.string().min(1),
-  ratio: finiteNumberSchema.positive(),
-}).strict()
+const imageNodeOutputItemSchema = v.strictObject({
+  url: nonEmptyStringSchema,
+  ratio: positiveFiniteNumberSchema,
+})
 
-const promptNodeInputImageSchema = imageNodeOutputItemSchema.extend({
-  id: z.string().min(1),
-  sourceType: z.enum(['node', 'external']),
-  sourceId: z.string().min(1),
-  sourceNodeId: z.string().min(1).optional(),
-}).strict()
+const promptNodeInputImageSchema = v.strictObject({
+  url: nonEmptyStringSchema,
+  ratio: positiveFiniteNumberSchema,
+  id: nonEmptyStringSchema,
+  sourceType: v.picklist(['node', 'external']),
+  sourceId: nonEmptyStringSchema,
+  sourceNodeId: v.optional(nonEmptyStringSchema),
+})
 
-const promptNodeItemSchema = z.object({
+const promptNodeItemSchema = v.strictObject({
   id: finiteNumberSchema,
-  type: z.literal('prompt'),
+  type: v.literal('prompt'),
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
-  title: z.string().optional(),
-  text: z.string(),
-  outputCount: finiteNumberSchema
-    .int()
-    .min(MIN_IMAGE_NODE_OUTPUT_COUNT)
-    .max(MAX_IMAGE_NODE_OUTPUT_COUNT)
-    .default(DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
-  aspectRatio: z.enum(PROMPT_ASPECT_RATIO_OPTIONS).default(DEFAULT_PROMPT_ASPECT_RATIO),
-  inputImages: z.array(promptNodeInputImageSchema).default([]),
-}).strict()
+  title: v.optional(v.string()),
+  text: v.string(),
+  outputCount: v.optional(outputCountSchema, DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
+  aspectRatio: v.optional(v.picklist(PROMPT_ASPECT_RATIO_OPTIONS), DEFAULT_PROMPT_ASPECT_RATIO),
+  inputImages: v.optional(v.array(promptNodeInputImageSchema), () => []),
+})
 
-const viewpointNodeItemSchema = z.object({
+const viewpointNodeItemSchema = v.strictObject({
   id: finiteNumberSchema,
-  type: z.literal('viewpoint'),
+  type: v.literal('viewpoint'),
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
-  title: z.string().optional(),
-  activeCategory: z.enum(['top', 'bottom', 'set']),
-  selectedViewpoint: z.string(),
-  lighting: z.enum(['warm_white', 'afternoon', 'hard_light']),
+  title: v.optional(v.string()),
+  activeCategory: v.picklist(['top', 'bottom', 'set']),
+  selectedViewpoint: v.string(),
+  lighting: v.picklist(['warm_white', 'afternoon', 'hard_light']),
   outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: z.array(imageNodeOutputItemSchema),
-}).strict()
+  outputImages: v.array(imageNodeOutputItemSchema),
+})
 
-const imageNodeItemSchema = z.object({
+const imageNodeItemSchema = v.strictObject({
   id: finiteNumberSchema,
-  type: z.literal('image-node'),
+  type: v.literal('image-node'),
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
-  title: z.string().optional(),
-  sourceImageUrl: z.string(),
-  sourceImageRatio: finiteNumberSchema.positive(),
-  outputCount: finiteNumberSchema
-    .int()
-    .min(MIN_IMAGE_NODE_OUTPUT_COUNT)
-    .max(MAX_IMAGE_NODE_OUTPUT_COUNT)
-    .optional(),
+  title: v.optional(v.string()),
+  sourceImageUrl: v.string(),
+  sourceImageRatio: positiveFiniteNumberSchema,
+  outputCount: v.optional(outputCountSchema),
   outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: z.array(imageNodeOutputItemSchema),
-}).strict()
+  outputImages: v.array(imageNodeOutputItemSchema),
+})
 
-const fusionNodeItemSchema = z.object({
+const fusionNodeItemSchema = v.strictObject({
   id: finiteNumberSchema,
-  type: z.literal('fusion'),
+  type: v.literal('fusion'),
   x: finiteNumberSchema,
   y: finiteNumberSchema,
   width: finiteNumberSchema,
-  title: z.string().optional(),
-  prompt: z.string().default(''),
-  outputCount: finiteNumberSchema
-    .int()
-    .min(MIN_IMAGE_NODE_OUTPUT_COUNT)
-    .max(MAX_IMAGE_NODE_OUTPUT_COUNT)
-    .default(DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
-  aspectRatio: z.enum(PROMPT_ASPECT_RATIO_OPTIONS).default(DEFAULT_PROMPT_ASPECT_RATIO),
-  blendPoint: z.object({
-    x: finiteNumberSchema.min(0).max(1),
-    y: finiteNumberSchema.min(0).max(1),
-  }).default(DEFAULT_FUSION_BLEND_POINT),
-  inputImages: z.array(promptNodeInputImageSchema).max(4).default([]),
+  title: v.optional(v.string()),
+  prompt: v.optional(v.string(), ''),
+  outputCount: v.optional(outputCountSchema, DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
+  aspectRatio: v.optional(v.picklist(PROMPT_ASPECT_RATIO_OPTIONS), DEFAULT_PROMPT_ASPECT_RATIO),
+  blendPoint: v.optional(
+    v.strictObject({
+      x: v.pipe(finiteNumberSchema, v.minValue(0), v.maxValue(1)),
+      y: v.pipe(finiteNumberSchema, v.minValue(0), v.maxValue(1)),
+    }),
+    () => ({ ...DEFAULT_FUSION_BLEND_POINT }),
+  ),
+  inputImages: v.optional(v.pipe(v.array(promptNodeInputImageSchema), v.maxLength(4)), () => []),
   outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: z.array(imageNodeOutputItemSchema),
-}).strict()
+  outputImages: v.array(imageNodeOutputItemSchema),
+})
 
-const canvasConnectionSchema = z.object({
+const canvasConnectionSchema = v.strictObject({
   id: finiteNumberSchema,
   fromNodeType: canvasConnectionNodeTypeSchema,
   fromNodeId: finiteNumberSchema,
@@ -119,34 +125,42 @@ const canvasConnectionSchema = z.object({
   toNodeType: canvasConnectionNodeTypeSchema,
   toNodeId: finiteNumberSchema,
   toPort: canvasConnectionPortSchema,
-}).strict()
+})
 
-const canvasViewportStateSchema = z.object({
+const canvasViewportStateSchema = v.strictObject({
   canvasX: finiteNumberSchema,
   canvasY: finiteNumberSchema,
   zoomLevel: finiteNumberSchema,
-}).strict()
+})
 
-const canvasBoardSnapshotShape = z
-  .object({
-    imageNodes: z.array(imageNodeItemSchema),
-    promptNodes: z.array(promptNodeItemSchema),
-    viewpointNodes: z.array(viewpointNodeItemSchema),
-    fusionNodes: z.array(fusionNodeItemSchema),
-    connections: z.array(canvasConnectionSchema),
-    viewport: canvasViewportStateSchema,
-  })
-  .strict()
+const canvasBoardSnapshotShape = v.strictObject({
+  imageNodes: v.array(imageNodeItemSchema),
+  promptNodes: v.array(promptNodeItemSchema),
+  viewpointNodes: v.array(viewpointNodeItemSchema),
+  fusionNodes: v.array(fusionNodeItemSchema),
+  connections: v.array(canvasConnectionSchema),
+  viewport: canvasViewportStateSchema,
+})
 
-export const canvasBoardSnapshotSchema = canvasBoardSnapshotShape satisfies z.ZodType<CanvasBoardSnapshot>
+export const canvasBoardSnapshotSchema = canvasBoardSnapshotShape satisfies v.GenericSchema<
+  unknown,
+  CanvasBoardSnapshot
+>
 
-const canvasBoardStateShape = canvasBoardSnapshotShape
-  .extend({
-    previewSnapshotDataUrl: z.string().min(1).optional(),
-    previewSnapshotUpdatedAt: finiteNumberSchema.optional(),
-    previewSnapshotVersion: finiteNumberSchema.int().positive().optional(),
-    updatedAt: finiteNumberSchema,
-  })
-  .strict()
+const canvasBoardStateShape = v.strictObject({
+  imageNodes: v.array(imageNodeItemSchema),
+  promptNodes: v.array(promptNodeItemSchema),
+  viewpointNodes: v.array(viewpointNodeItemSchema),
+  fusionNodes: v.array(fusionNodeItemSchema),
+  connections: v.array(canvasConnectionSchema),
+  viewport: canvasViewportStateSchema,
+  previewSnapshotDataUrl: v.optional(nonEmptyStringSchema),
+  previewSnapshotUpdatedAt: v.optional(finiteNumberSchema),
+  previewSnapshotVersion: v.optional(positiveIntegerSchema),
+  updatedAt: finiteNumberSchema,
+})
 
-export const canvasBoardStateSchema = canvasBoardStateShape satisfies z.ZodType<PersistedCanvasBoardState>
+export const canvasBoardStateSchema = canvasBoardStateShape satisfies v.GenericSchema<
+  unknown,
+  PersistedCanvasBoardState
+>

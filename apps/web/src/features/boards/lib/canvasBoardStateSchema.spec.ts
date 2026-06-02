@@ -1,3 +1,4 @@
+import * as v from 'valibot'
 import { canvasBoardStateSchema } from './canvasBoardStateSchema'
 
 function expect(condition: unknown, message: string) {
@@ -86,7 +87,7 @@ function createValidState() {
 }
 
 function testValidEmptySnapshot() {
-  const parsed = canvasBoardStateSchema.safeParse({
+  const parsed = v.safeParse(canvasBoardStateSchema, {
     imageNodes: [],
     promptNodes: [],
     viewpointNodes: [],
@@ -99,21 +100,21 @@ function testValidEmptySnapshot() {
 }
 
 function testValidAllNodeMinimumShape() {
-  const parsed = canvasBoardStateSchema.safeParse(createValidState())
+  const parsed = v.safeParse(canvasBoardStateSchema, createValidState())
   expect(parsed.success === true, 'expected minimum node shapes to be valid')
   if (parsed.success) {
     expect(
-      parsed.data.promptNodes[0]?.title === 'Custom Prompt',
+      parsed.output.promptNodes[0]?.title === 'Custom Prompt',
       'expected known title field to be preserved',
     )
-    expect(parsed.data.previewSnapshotVersion === 2, 'expected preview version to be preserved')
+    expect(parsed.output.previewSnapshotVersion === 2, 'expected preview version to be preserved')
   }
 }
 
 function testInvalidStateRejected() {
   const invalid = createValidState()
   invalid.connections[0]!.toNodeType = 'unknown' as any
-  const parsed = canvasBoardStateSchema.safeParse(invalid)
+  const parsed = v.safeParse(canvasBoardStateSchema, invalid)
   expect(parsed.success === false, 'expected invalid state to be rejected')
 }
 
@@ -122,23 +123,29 @@ function testFusionBlendPointDefaultApplied() {
   state.fusionNodes = [{ ...state.fusionNodes[0] }]
   delete state.fusionNodes[0].blendPoint
   delete state.fusionNodes[0].aspectRatio
-  const parsed = canvasBoardStateSchema.safeParse(state)
+  const parsed = v.safeParse(canvasBoardStateSchema, state)
   expect(parsed.success === true, 'expected fusion node without defaulted fields to stay valid')
   if (parsed.success) {
-    expect(parsed.data.fusionNodes[0]?.blendPoint.x === 0.5, 'expected blendPoint x default to 0.5')
-    expect(parsed.data.fusionNodes[0]?.blendPoint.y === 0.5, 'expected blendPoint y default to 0.5')
-    expect(parsed.data.fusionNodes[0]?.aspectRatio === 'auto', 'expected aspectRatio default to auto')
+    expect(
+      parsed.output.fusionNodes[0]?.blendPoint.x === 0.5,
+      'expected blendPoint x default to 0.5',
+    )
+    expect(
+      parsed.output.fusionNodes[0]?.blendPoint.y === 0.5,
+      'expected blendPoint y default to 0.5',
+    )
+    expect(parsed.output.fusionNodes[0]?.aspectRatio === 'auto', 'expected aspectRatio default to auto')
   }
 }
 
 function testUnknownFieldsAreRejected() {
-  const parsed = canvasBoardStateSchema.safeParse({
+  const parsed = v.safeParse(canvasBoardStateSchema, {
     ...createValidState(),
     futureTopLevelField: 'unexpected',
   })
   expect(parsed.success === false, 'expected unknown top-level field to be rejected')
 
-  const nestedParsed = canvasBoardStateSchema.safeParse({
+  const nestedParsed = v.safeParse(canvasBoardStateSchema, {
     ...createValidState(),
     fusionNodes: [
       {

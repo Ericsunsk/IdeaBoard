@@ -8,6 +8,7 @@ import type {
   PromptNodeItem,
   ViewpointNodeItem,
 } from '../../workspace/types/canvasNodes'
+import * as v from 'valibot'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import { canvasBoardStateSchema } from './canvasBoardStateSchema'
 
@@ -40,8 +41,8 @@ function getScopedStorageKey(): string | null {
 }
 
 function toValidBoardState(item: unknown): CanvasBoardState | null {
-  const parsed = canvasBoardStateSchema.safeParse(item)
-  return parsed.success ? parsed.data : null
+  const parsed = v.safeParse(canvasBoardStateSchema, item)
+  return parsed.success ? parsed.output : null
 }
 
 function readRawStateMap(): Record<string, CanvasBoardState> {
