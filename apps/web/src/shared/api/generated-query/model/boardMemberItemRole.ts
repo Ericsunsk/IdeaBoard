@@ -5,11 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BoardMemberItemRole = typeof BoardMemberItemRole[keyof typeof BoardMemberItemRole];
-
+export type BoardMemberItemRole = (typeof BoardMemberItemRole)[keyof typeof BoardMemberItemRole]
 
 export const BoardMemberItemRole = {
   owner: 'owner',
   editor: 'editor',
   viewer: 'viewer',
-} as const;
+} as const

@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { Channel } from './channel';
+import type { Channel } from './channel'
 
 export type ApiResponseChannelListData = {
-  list: Channel[];
-};
+  list: Channel[]
+}

@@ -145,9 +145,7 @@ const maxVisibleImageInputs = computed(() =>
   Math.max(0, Math.min(4, Math.floor(Number(props.maxImageInputs) || 0))),
 )
 const visibleImageInputs = computed(() =>
-  props.imageInputs
-    .filter((item) => item.id && item.url)
-    .slice(0, maxVisibleImageInputs.value),
+  props.imageInputs.filter((item) => item.id && item.url).slice(0, maxVisibleImageInputs.value),
 )
 const shouldShowImageInputRow = computed(
   () => props.showImageInput && maxVisibleImageInputs.value > 0,
@@ -161,7 +159,9 @@ const canSubmit = computed(
     !props.submitDisabled &&
     (props.allowEmpty || props.modelValue.trim().length > 0),
 )
-const shouldRenderAspectRatio = computed(() => props.showAspectRatio && props.aspectRatio !== undefined)
+const shouldRenderAspectRatio = computed(
+  () => props.showAspectRatio && props.aspectRatio !== undefined,
+)
 const toolPopovers = useNodeToolPopoverGroup({
   keys: ['aspect-ratio', 'output-count'] as const,
   rootRefs: [actionsRef],

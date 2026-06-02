@@ -4,230 +4,258 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  computed,
-  unref
-} from 'vue';
-import type {
-  MaybeRef
-} from 'vue';
+import { computed, unref } from 'vue'
+import type { MaybeRef } from 'vue'
 
 import type {
   ApiResponseFeaturePrompt,
   ApiResponseFeaturePromptMap,
-  SetAdminFeaturePromptBody
-} from '../model';
+  SetAdminFeaturePromptBody,
+} from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getListAdminFeaturePromptsUrl = () => {
+  return `/admin/feature-prompts`
+}
 
-
-
-export const listAdminFeaturePrompts = (
-
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-
-
-      return orvalMutator<ApiResponseFeaturePromptMap>(
-      {url: `/admin/feature-prompts`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
+export const listAdminFeaturePrompts = async (
+  options?: RequestInit,
+): Promise<ApiResponseFeaturePromptMap> => {
+  return orvalMutator<ApiResponseFeaturePromptMap>(getListAdminFeaturePromptsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
 
 export const getListAdminFeaturePromptsQueryKey = () => {
-    return [
-    'admin','feature-prompts'
-    ] as const;
-    }
-
-
-export const getListAdminFeaturePromptsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminFeaturePrompts>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminFeaturePrompts>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getListAdminFeaturePromptsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminFeaturePrompts>>> = ({ signal }) => listAdminFeaturePrompts(requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminFeaturePrompts>>, TError, TData>
+  return ['admin', 'feature-prompts'] as const
 }
 
-export type ListAdminFeaturePromptsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminFeaturePrompts>>>
+export const getListAdminFeaturePromptsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminFeaturePrompts>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listAdminFeaturePrompts>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminFeaturePromptsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminFeaturePrompts>>> = ({
+    signal,
+  }) => listAdminFeaturePrompts({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminFeaturePrompts>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminFeaturePromptsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminFeaturePrompts>>
+>
 export type ListAdminFeaturePromptsQueryError = ErrorType<unknown>
 
-
-
-export function useListAdminFeaturePrompts<TData = Awaited<ReturnType<typeof listAdminFeaturePrompts>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminFeaturePrompts>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
+export function useListAdminFeaturePrompts<
+  TData = Awaited<ReturnType<typeof listAdminFeaturePrompts>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminFeaturePrompts>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminFeaturePromptsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const getAdminFeaturePrompt = (
-    slug: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      slug = unref(slug);
-
-      return orvalMutator<ApiResponseFeaturePrompt>(
-      {url: `/admin/feature-prompts/${encodeURIComponent(String(slug))}`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
-
-export const getGetAdminFeaturePromptQueryKey = (slug: MaybeRef<string>,) => {
-    return [
-    'admin','feature-prompts',slug
-    ] as const;
-    }
-
-
-export const getGetAdminFeaturePromptQueryOptions = <TData = Awaited<ReturnType<typeof getAdminFeaturePrompt>>, TError = ErrorType<unknown>>(slug: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminFeaturePrompt>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getGetAdminFeaturePromptQueryKey(slug);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminFeaturePrompt>>> = ({ signal }) => getAdminFeaturePrompt(slug, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(slug) !== null && unref(slug) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminFeaturePrompt>>, TError, TData>
+export const getGetAdminFeaturePromptUrl = (slug: string) => {
+  return `/admin/feature-prompts/${encodeURIComponent(String(slug))}`
 }
 
-export type GetAdminFeaturePromptQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminFeaturePrompt>>>
+export const getAdminFeaturePrompt = async (
+  slug: string,
+  options?: RequestInit,
+): Promise<ApiResponseFeaturePrompt> => {
+  return orvalMutator<ApiResponseFeaturePrompt>(getGetAdminFeaturePromptUrl(slug), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminFeaturePromptQueryKey = (slug: MaybeRef<string>) => {
+  return ['admin', 'feature-prompts', slug] as const
+}
+
+export const getGetAdminFeaturePromptQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminFeaturePrompt>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminFeaturePrompt>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminFeaturePromptQueryKey(slug)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminFeaturePrompt>>> = ({ signal }) =>
+    getAdminFeaturePrompt(unref(slug), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(slug) !== null && unref(slug) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getAdminFeaturePrompt>>, TError, TData>
+}
+
+export type GetAdminFeaturePromptQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminFeaturePrompt>>
+>
 export type GetAdminFeaturePromptQueryError = ErrorType<unknown>
 
+export function useGetAdminFeaturePrompt<
+  TData = Awaited<ReturnType<typeof getAdminFeaturePrompt>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminFeaturePrompt>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminFeaturePromptQueryOptions(slug, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useGetAdminFeaturePrompt<TData = Awaited<ReturnType<typeof getAdminFeaturePrompt>>, TError = ErrorType<unknown>>(
- slug: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminFeaturePrompt>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getGetAdminFeaturePromptQueryOptions(slug,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const setAdminFeaturePrompt = (
-    slug: MaybeRef<string>,
-    setAdminFeaturePromptBody: MaybeRef<SetAdminFeaturePromptBody>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      slug = unref(slug);
-setAdminFeaturePromptBody = unref(setAdminFeaturePromptBody);
-
-      return orvalMutator<ApiResponseFeaturePrompt>(
-      {url: `/admin/feature-prompts/${encodeURIComponent(String(slug))}`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: setAdminFeaturePromptBody, signal
-    },
-      options);
-    }
-
-
-
-
-export const getSetAdminFeaturePromptQueryKey = (slug: MaybeRef<string>,
-    setAdminFeaturePromptBody?: MaybeRef<SetAdminFeaturePromptBody>,) => {
-    return [
-    'PUT', 'admin','feature-prompts',slug, setAdminFeaturePromptBody
-    ] as const;
-    }
-
-
-export const getSetAdminFeaturePromptQueryOptions = <TData = Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError = ErrorType<unknown>>(slug: MaybeRef<string>,
-    setAdminFeaturePromptBody: MaybeRef<SetAdminFeaturePromptBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getSetAdminFeaturePromptQueryKey(slug,setAdminFeaturePromptBody);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminFeaturePrompt>>> = ({ signal }) => setAdminFeaturePrompt(slug,setAdminFeaturePromptBody, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(slug) !== null && unref(slug) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>
+export const getSetAdminFeaturePromptUrl = (slug: string) => {
+  return `/admin/feature-prompts/${encodeURIComponent(String(slug))}`
 }
 
-export type SetAdminFeaturePromptQueryResult = NonNullable<Awaited<ReturnType<typeof setAdminFeaturePrompt>>>
+export const setAdminFeaturePrompt = async (
+  slug: string,
+  setAdminFeaturePromptBody: SetAdminFeaturePromptBody,
+  options?: RequestInit,
+): Promise<ApiResponseFeaturePrompt> => {
+  return orvalMutator<ApiResponseFeaturePrompt>(getSetAdminFeaturePromptUrl(slug), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(setAdminFeaturePromptBody),
+  })
+}
+
+export const getSetAdminFeaturePromptQueryKey = (
+  slug: MaybeRef<string>,
+  setAdminFeaturePromptBody?: MaybeRef<SetAdminFeaturePromptBody>,
+) => {
+  return ['PUT', 'admin', 'feature-prompts', slug, setAdminFeaturePromptBody] as const
+}
+
+export const getSetAdminFeaturePromptQueryOptions = <
+  TData = Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  setAdminFeaturePromptBody: MaybeRef<SetAdminFeaturePromptBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getSetAdminFeaturePromptQueryKey(slug, setAdminFeaturePromptBody)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminFeaturePrompt>>> = ({ signal }) =>
+    setAdminFeaturePrompt(unref(slug), unref(setAdminFeaturePromptBody), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(slug) !== null && unref(slug) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>
+}
+
+export type SetAdminFeaturePromptQueryResult = NonNullable<
+  Awaited<ReturnType<typeof setAdminFeaturePrompt>>
+>
 export type SetAdminFeaturePromptQueryError = ErrorType<unknown>
 
+export function useSetAdminFeaturePrompt<
+  TData = Awaited<ReturnType<typeof setAdminFeaturePrompt>>,
+  TError = ErrorType<unknown>,
+>(
+  slug: MaybeRef<string>,
+  setAdminFeaturePromptBody: MaybeRef<SetAdminFeaturePromptBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSetAdminFeaturePromptQueryOptions(
+    slug,
+    setAdminFeaturePromptBody,
+    options,
+  )
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useSetAdminFeaturePrompt<TData = Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError = ErrorType<unknown>>(
- slug: MaybeRef<string>,
-    setAdminFeaturePromptBody: MaybeRef<SetAdminFeaturePromptBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof setAdminFeaturePrompt>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getSetAdminFeaturePromptQueryOptions(slug,setAdminFeaturePromptBody,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }

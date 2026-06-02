@@ -11,7 +11,11 @@ type UseFlowSnapshotNodeUpdaterOptions = {
 }
 
 export function useFlowSnapshotNodeUpdater(options: UseFlowSnapshotNodeUpdaterOptions) {
-  function updateSnapshotNode(nodeId: string, mutate: SnapshotMutator, optionsArg?: SnapshotOptions) {
+  function updateSnapshotNode(
+    nodeId: string,
+    mutate: SnapshotMutator,
+    optionsArg?: SnapshotOptions,
+  ) {
     options.updateSnapshotNodeBase(nodeId, mutate, optionsArg)
     options.scheduleFlowNodeInternalsRefresh([nodeId])
   }

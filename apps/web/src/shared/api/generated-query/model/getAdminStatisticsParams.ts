@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { GetAdminStatisticsRange } from './getAdminStatisticsRange';
+import type { GetAdminStatisticsRange } from './getAdminStatisticsRange'
 
 export type GetAdminStatisticsParams = {
-range: GetAdminStatisticsRange;
-};
+  range: GetAdminStatisticsRange
+}

@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { Task } from './task';
+import type { Task } from './task'
 
 export type ApiResponseTaskListData = {
-  list: Task[];
-  total: number;
-};
+  list: Task[]
+  total: number
+}

@@ -6,8 +6,8 @@
  */
 
 export type AdminStatisticsSlowModelsItem = {
-  name: string;
-  avg_seconds: number;
-  p95_seconds: number;
-  samples: number;
-};
+  name: string
+  avg_seconds: number
+  p95_seconds: number
+  samples: number
+}

@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseBase } from './apiResponseBase';
-import type { ApiResponseStorageProfileWithMessageData } from './apiResponseStorageProfileWithMessageData';
+import type { ApiResponseBase } from './apiResponseBase'
+import type { ApiResponseStorageProfileWithMessageData } from './apiResponseStorageProfileWithMessageData'
 
 export type ApiResponseStorageProfileWithMessage = ApiResponseBase & {
-  data?: ApiResponseStorageProfileWithMessageData;
-};
+  data?: ApiResponseStorageProfileWithMessageData
+}

@@ -50,7 +50,9 @@
         @canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
       />
       <div class="image-node-stage-actions">
-        <NodeActionButton variant="stage-ghost" @click="emit('open-preview')">预览</NodeActionButton>
+        <NodeActionButton variant="stage-ghost" @click="emit('open-preview')"
+          >预览</NodeActionButton
+        >
         <NodeActionButton v-if="!inputLocked" variant="stage-ghost" @click="emit('reset')">
           清空
         </NodeActionButton>
@@ -115,7 +117,10 @@ const emit = defineEmits<{
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'expand-submit', prompt: string, outputCount: number): void
   (e: 'update:output-count', value: number): void
-  (e: 'expand-handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
+  (
+    e: 'expand-handle-pointerdown',
+    payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },
+  ): void
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
@@ -124,7 +129,9 @@ const emit = defineEmits<{
 
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, { maxSide: 1280 })
-const emptyStateLabel = computed(() => (props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入'))
+const emptyStateLabel = computed(() =>
+  props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
+)
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.outputCount))
 const stageElement = ref<HTMLElement | null>(null)
@@ -158,7 +165,6 @@ function submitExpand(prompt: string, outputCount: number) {
 function selectOutputCount(value: number) {
   emit('update:output-count', clampImageNodeOutputCount(value))
 }
-
 </script>
 
 <style scoped>

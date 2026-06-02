@@ -10,10 +10,7 @@ import {
   executeFlowViewpointNode,
   validateFlowViewpointNodeInputs,
 } from '../services/flowViewpointExecutor'
-import type {
-  CanvasExecutionOutputNodeType,
-  ViewpointNodeItem,
-} from '../types/canvasNodes'
+import type { CanvasExecutionOutputNodeType, ViewpointNodeItem } from '../types/canvasNodes'
 import type { SubmitTaskData } from '../../../shared/api/task'
 import type { FlowHistorySnapshot } from './useFlowTransactions'
 

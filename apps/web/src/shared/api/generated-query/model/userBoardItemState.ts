@@ -8,4 +8,4 @@
 /**
  * @nullable
  */
-export type UserBoardItemState = { [key: string]: unknown } | null;
+export type UserBoardItemState = { [key: string]: unknown } | null

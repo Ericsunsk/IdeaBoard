@@ -77,10 +77,7 @@ import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import PromptTextComposer from './PromptTextComposer.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 import { useSortableMediaInputs } from './composables/useSortableMediaInputs'
-import {
-  normalizePromptAspectRatio,
-  type PromptAspectRatio,
-} from '../../config/promptAspectRatio'
+import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../config/promptAspectRatio'
 
 const props = defineProps<{
   node: PromptNodeItem

@@ -55,7 +55,10 @@ export function containImageRect(
   return createCanvasExtendRect(0, top, width, height)
 }
 
-export function clampFrameToImageRect(frame: CanvasExtendRect, imageRect: CanvasExtendRect): CanvasExtendRect {
+export function clampFrameToImageRect(
+  frame: CanvasExtendRect,
+  imageRect: CanvasExtendRect,
+): CanvasExtendRect {
   const originalLeft = imageRect.left
   const originalTop = imageRect.top
   const originalRight = imageRect.left + imageRect.width
@@ -159,10 +162,18 @@ export function resolveCanvasExtendIntent(
     left: toPercent(extendLeftPx, originalWidth),
   }
   const hasExtension =
-    extendPercent.top > 0 || extendPercent.right > 0 || extendPercent.bottom > 0 || extendPercent.left > 0
+    extendPercent.top > 0 ||
+    extendPercent.right > 0 ||
+    extendPercent.bottom > 0 ||
+    extendPercent.left > 0
   return {
     frameRect: normalizedFrameRect,
-    originalImageRect: createCanvasExtendRect(originalLeft, originalTop, originalWidth, originalHeight),
+    originalImageRect: createCanvasExtendRect(
+      originalLeft,
+      originalTop,
+      originalWidth,
+      originalHeight,
+    ),
     extendPercent,
     targetRatio: normalizedFrameRect.height / normalizedFrameRect.width,
     hasExtension,

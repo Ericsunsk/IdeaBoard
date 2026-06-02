@@ -4,291 +4,328 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  unref
-} from 'vue';
-import type {
-  MaybeRef
-} from 'vue';
+import { unref } from 'vue'
+import type { MaybeRef } from 'vue'
 
 import type {
   ApiResponseRateLimitSetting,
   ApiResponseRegistrationSetting,
   RateLimitSetting,
-  UpdateAdminRegistrationSettingBody
-} from '../model';
+  UpdateAdminRegistrationSettingBody,
+} from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getGetAdminRegistrationSettingUrl = () => {
+  return `/admin/settings/registration`
+}
 
-
-
-export const getAdminRegistrationSetting = (
-
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-
-
-      return orvalMutator<ApiResponseRegistrationSetting>(
-      {url: `/admin/settings/registration`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
+export const getAdminRegistrationSetting = async (
+  options?: RequestInit,
+): Promise<ApiResponseRegistrationSetting> => {
+  return orvalMutator<ApiResponseRegistrationSetting>(getGetAdminRegistrationSettingUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
 
 export const getGetAdminRegistrationSettingQueryKey = () => {
-    return [
-    'admin','settings','registration'
-    ] as const;
-    }
-
-
-export const getGetAdminRegistrationSettingQueryOptions = <TData = Awaited<ReturnType<typeof getAdminRegistrationSetting>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRegistrationSetting>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getGetAdminRegistrationSettingQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRegistrationSetting>>> = ({ signal }) => getAdminRegistrationSetting(requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminRegistrationSetting>>, TError, TData>
+  return ['admin', 'settings', 'registration'] as const
 }
 
-export type GetAdminRegistrationSettingQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminRegistrationSetting>>>
+export const getGetAdminRegistrationSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminRegistrationSetting>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminRegistrationSetting>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminRegistrationSettingQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRegistrationSetting>>> = ({
+    signal,
+  }) => getAdminRegistrationSetting({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminRegistrationSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminRegistrationSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminRegistrationSetting>>
+>
 export type GetAdminRegistrationSettingQueryError = ErrorType<unknown>
 
-
-
-export function useGetAdminRegistrationSetting<TData = Awaited<ReturnType<typeof getAdminRegistrationSetting>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRegistrationSetting>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
+export function useGetAdminRegistrationSetting<
+  TData = Awaited<ReturnType<typeof getAdminRegistrationSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminRegistrationSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetAdminRegistrationSettingQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const updateAdminRegistrationSetting = (
-    updateAdminRegistrationSettingBody: MaybeRef<UpdateAdminRegistrationSettingBody>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      updateAdminRegistrationSettingBody = unref(updateAdminRegistrationSettingBody);
-
-      return orvalMutator<ApiResponseRegistrationSetting>(
-      {url: `/admin/settings/registration`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: updateAdminRegistrationSettingBody, signal
-    },
-      options);
-    }
-
-
-
-
-export const getUpdateAdminRegistrationSettingQueryKey = (updateAdminRegistrationSettingBody?: MaybeRef<UpdateAdminRegistrationSettingBody>,) => {
-    return [
-    'PUT', 'admin','settings','registration', updateAdminRegistrationSettingBody
-    ] as const;
-    }
-
-
-export const getUpdateAdminRegistrationSettingQueryOptions = <TData = Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError = ErrorType<unknown>>(updateAdminRegistrationSettingBody: MaybeRef<UpdateAdminRegistrationSettingBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getUpdateAdminRegistrationSettingQueryKey(updateAdminRegistrationSettingBody);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>> = ({ signal }) => updateAdminRegistrationSetting(updateAdminRegistrationSettingBody, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError, TData>
+export const getUpdateAdminRegistrationSettingUrl = () => {
+  return `/admin/settings/registration`
 }
 
-export type UpdateAdminRegistrationSettingQueryResult = NonNullable<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>>
+export const updateAdminRegistrationSetting = async (
+  updateAdminRegistrationSettingBody: UpdateAdminRegistrationSettingBody,
+  options?: RequestInit,
+): Promise<ApiResponseRegistrationSetting> => {
+  return orvalMutator<ApiResponseRegistrationSetting>(getUpdateAdminRegistrationSettingUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateAdminRegistrationSettingBody),
+  })
+}
+
+export const getUpdateAdminRegistrationSettingQueryKey = (
+  updateAdminRegistrationSettingBody?: MaybeRef<UpdateAdminRegistrationSettingBody>,
+) => {
+  return ['PUT', 'admin', 'settings', 'registration', updateAdminRegistrationSettingBody] as const
+}
+
+export const getUpdateAdminRegistrationSettingQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  updateAdminRegistrationSettingBody: MaybeRef<UpdateAdminRegistrationSettingBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminRegistrationSettingQueryKey(updateAdminRegistrationSettingBody)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>> = ({
+    signal,
+  }) =>
+    updateAdminRegistrationSetting(unref(updateAdminRegistrationSettingBody), {
+      signal,
+      ...requestOptions,
+    })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
+    TError,
+    TData
+  >
+}
+
+export type UpdateAdminRegistrationSettingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminRegistrationSetting>>
+>
 export type UpdateAdminRegistrationSettingQueryError = ErrorType<unknown>
 
+export function useUpdateAdminRegistrationSetting<
+  TData = Awaited<ReturnType<typeof updateAdminRegistrationSetting>>,
+  TError = ErrorType<unknown>,
+>(
+  updateAdminRegistrationSettingBody: MaybeRef<UpdateAdminRegistrationSettingBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminRegistrationSettingQueryOptions(
+    updateAdminRegistrationSettingBody,
+    options,
+  )
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useUpdateAdminRegistrationSetting<TData = Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError = ErrorType<unknown>>(
- updateAdminRegistrationSettingBody: MaybeRef<UpdateAdminRegistrationSettingBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminRegistrationSetting>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getUpdateAdminRegistrationSettingQueryOptions(updateAdminRegistrationSettingBody,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getGetAdminRateLimitSettingsUrl = () => {
+  return `/admin/settings/rate-limit`
+}
 
-
-
-
-
-export const getAdminRateLimitSettings = (
-
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-
-
-      return orvalMutator<ApiResponseRateLimitSetting>(
-      {url: `/admin/settings/rate-limit`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
+export const getAdminRateLimitSettings = async (
+  options?: RequestInit,
+): Promise<ApiResponseRateLimitSetting> => {
+  return orvalMutator<ApiResponseRateLimitSetting>(getGetAdminRateLimitSettingsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
 
 export const getGetAdminRateLimitSettingsQueryKey = () => {
-    return [
-    'admin','settings','rate-limit'
-    ] as const;
-    }
-
-
-export const getGetAdminRateLimitSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminRateLimitSettings>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRateLimitSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getGetAdminRateLimitSettingsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRateLimitSettings>>> = ({ signal }) => getAdminRateLimitSettings(requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminRateLimitSettings>>, TError, TData>
+  return ['admin', 'settings', 'rate-limit'] as const
 }
 
-export type GetAdminRateLimitSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminRateLimitSettings>>>
+export const getGetAdminRateLimitSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminRateLimitSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminRateLimitSettings>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminRateLimitSettingsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRateLimitSettings>>> = ({
+    signal,
+  }) => getAdminRateLimitSettings({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminRateLimitSettings>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminRateLimitSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminRateLimitSettings>>
+>
 export type GetAdminRateLimitSettingsQueryError = ErrorType<unknown>
 
-
-
-export function useGetAdminRateLimitSettings<TData = Awaited<ReturnType<typeof getAdminRateLimitSettings>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRateLimitSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
+export function useGetAdminRateLimitSettings<
+  TData = Awaited<ReturnType<typeof getAdminRateLimitSettings>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminRateLimitSettings>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetAdminRateLimitSettingsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const updateAdminRateLimitSettings = (
-    rateLimitSetting: MaybeRef<RateLimitSetting>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      rateLimitSetting = unref(rateLimitSetting);
-
-      return orvalMutator<ApiResponseRateLimitSetting>(
-      {url: `/admin/settings/rate-limit`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: rateLimitSetting, signal
-    },
-      options);
-    }
-
-
-
-
-export const getUpdateAdminRateLimitSettingsQueryKey = (rateLimitSetting?: MaybeRef<RateLimitSetting>,) => {
-    return [
-    'PUT', 'admin','settings','rate-limit', rateLimitSetting
-    ] as const;
-    }
-
-
-export const getUpdateAdminRateLimitSettingsQueryOptions = <TData = Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError = ErrorType<unknown>>(rateLimitSetting: MaybeRef<RateLimitSetting>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getUpdateAdminRateLimitSettingsQueryKey(rateLimitSetting);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>> = ({ signal }) => updateAdminRateLimitSettings(rateLimitSetting, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError, TData>
+export const getUpdateAdminRateLimitSettingsUrl = () => {
+  return `/admin/settings/rate-limit`
 }
 
-export type UpdateAdminRateLimitSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>>
+export const updateAdminRateLimitSettings = async (
+  rateLimitSetting: RateLimitSetting,
+  options?: RequestInit,
+): Promise<ApiResponseRateLimitSetting> => {
+  return orvalMutator<ApiResponseRateLimitSetting>(getUpdateAdminRateLimitSettingsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(rateLimitSetting),
+  })
+}
+
+export const getUpdateAdminRateLimitSettingsQueryKey = (
+  rateLimitSetting?: MaybeRef<RateLimitSetting>,
+) => {
+  return ['PUT', 'admin', 'settings', 'rate-limit', rateLimitSetting] as const
+}
+
+export const getUpdateAdminRateLimitSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
+  TError = ErrorType<unknown>,
+>(
+  rateLimitSetting: MaybeRef<RateLimitSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminRateLimitSettingsQueryKey(rateLimitSetting)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>> = ({
+    signal,
+  }) => updateAdminRateLimitSettings(unref(rateLimitSetting), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
+    TError,
+    TData
+  >
+}
+
+export type UpdateAdminRateLimitSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminRateLimitSettings>>
+>
 export type UpdateAdminRateLimitSettingsQueryError = ErrorType<unknown>
 
+export function useUpdateAdminRateLimitSettings<
+  TData = Awaited<ReturnType<typeof updateAdminRateLimitSettings>>,
+  TError = ErrorType<unknown>,
+>(
+  rateLimitSetting: MaybeRef<RateLimitSetting>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminRateLimitSettingsQueryOptions(rateLimitSetting, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useUpdateAdminRateLimitSettings<TData = Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError = ErrorType<unknown>>(
- rateLimitSetting: MaybeRef<RateLimitSetting>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminRateLimitSettings>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getUpdateAdminRateLimitSettingsQueryOptions(rateLimitSetting,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }

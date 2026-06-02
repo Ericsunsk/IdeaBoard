@@ -21,11 +21,6 @@ export const boardApi = {
   joinByShareToken: (token: string) => joinBoardByShareToken({ token }),
 }
 
-export {
-  deleteUserBoard as deleteBoard,
-  joinBoardByShareToken,
-  listUserBoards,
-  upsertUserBoard,
-}
+export { deleteUserBoard as deleteBoard, joinBoardByShareToken, listUserBoards, upsertUserBoard }
 
 export default boardApi

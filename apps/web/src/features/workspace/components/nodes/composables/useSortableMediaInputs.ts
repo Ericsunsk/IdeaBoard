@@ -81,9 +81,7 @@ export function useSortableMediaInputs<T extends SortableMediaInput>({
       }
 
       const byId = new Map(currentItems.map((item) => [item.id, item]))
-      const next = imageIds
-        .map((imageId) => byId.get(imageId))
-        .filter((item): item is T => !!item)
+      const next = imageIds.map((imageId) => byId.get(imageId)).filter((item): item is T => !!item)
       if (next.length !== currentItems.length) {
         finishReorder()
         return

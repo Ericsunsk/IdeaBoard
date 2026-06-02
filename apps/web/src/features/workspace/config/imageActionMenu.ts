@@ -1,4 +1,8 @@
-import { IMAGE_NODE_ACTION, type ImageNodeAction, type ImageStrengthAction } from '../types/imageActions'
+import {
+  IMAGE_NODE_ACTION,
+  type ImageNodeAction,
+  type ImageStrengthAction,
+} from '../types/imageActions'
 import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../shared/domain/workflowFeatureRegistry'
 
 export type ImageActionMenuIcon =

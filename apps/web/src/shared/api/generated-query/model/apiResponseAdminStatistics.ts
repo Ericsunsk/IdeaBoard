@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminStatistics } from './adminStatistics';
-import type { ApiResponseBase } from './apiResponseBase';
+import type { AdminStatistics } from './adminStatistics'
+import type { ApiResponseBase } from './apiResponseBase'
 
 export type ApiResponseAdminStatistics = ApiResponseBase & {
-  data?: AdminStatistics;
-};
+  data?: AdminStatistics
+}

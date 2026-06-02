@@ -6,6 +6,6 @@
  */
 
 export interface ApiResponseBase {
-  code: number;
-  msg: string;
+  code: number
+  msg: string
 }

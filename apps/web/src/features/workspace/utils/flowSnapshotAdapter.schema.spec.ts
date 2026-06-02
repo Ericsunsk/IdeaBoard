@@ -62,7 +62,11 @@ function makePromptFlowNode(params: { flowId: string; id: number; text: string }
   }
 }
 
-function makeFusionFlowNode(params: { flowId: string; id: number; prompt?: string }): FlowAdapterNode {
+function makeFusionFlowNode(params: {
+  flowId: string
+  id: number
+  prompt?: string
+}): FlowAdapterNode {
   return {
     id: params.flowId,
     type: 'canvas',

@@ -14,11 +14,7 @@ import { getDefaultCanvasNodeTitle } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransactions'
 
-export type FlowCreatableNodeKind =
-  | 'prompt'
-  | 'image'
-  | 'fusion'
-  | 'viewpoint'
+export type FlowCreatableNodeKind = 'prompt' | 'image' | 'fusion' | 'viewpoint'
 
 type UseFlowNodeMutationsOptions = {
   nodes: Ref<Array<Record<string, any>>>
@@ -84,7 +80,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       connection.targetHandle === 'in:image',
     validateConnectionMutation: (connection, existingEdges) => {
       const targetKind = lookupData(connection.target ?? '')?.kind
-      if ((targetKind !== 'prompt' && targetKind !== 'fusion') || connection.targetHandle !== 'in:image') {
+      if (
+        (targetKind !== 'prompt' && targetKind !== 'fusion') ||
+        connection.targetHandle !== 'in:image'
+      ) {
         return null
       }
       const imageInputCount = existingEdges.filter(
@@ -234,10 +233,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     updateSnapshotNode(nodeId, (snapshotNode) => patchFlowSnapshotParam(snapshotNode, payload))
   }
 
-  const EXECUTION_NODE_KINDS = new Set([
-    'fusion',
-    'viewpoint',
-  ])
+  const EXECUTION_NODE_KINDS = new Set(['fusion', 'viewpoint'])
 
   function markFlowExecutionNodeDirty(
     nodeId: string,

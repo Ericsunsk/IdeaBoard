@@ -8,9 +8,7 @@ interface NodeToolPopoverGroupOptions<T extends string> {
   closeOnEscape?: boolean
 }
 
-export function useNodeToolPopoverGroup<T extends string>(
-  options: NodeToolPopoverGroupOptions<T>,
-) {
+export function useNodeToolPopoverGroup<T extends string>(options: NodeToolPopoverGroupOptions<T>) {
   const activeKey = ref<T | null>(null)
   const keySet = new Set(options.keys)
   const closeOnEscape = options.closeOnEscape ?? true

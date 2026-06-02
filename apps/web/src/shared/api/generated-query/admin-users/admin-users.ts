@@ -4,25 +4,18 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  computed,
-  unref
-} from 'vue';
-import type {
-  MaybeRef
-} from 'vue';
+import { computed, unref } from 'vue'
+import type { MaybeRef } from 'vue'
 
 import type {
   ApiResponseEmpty,
@@ -30,478 +23,537 @@ import type {
   BanAdminUserBody,
   ListAdminUsersParams,
   UpdateAdminUserRoleBody,
-  UpdateAdminUserStatusBody
-} from '../model';
+  UpdateAdminUserStatusBody,
+} from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getListAdminUsersUrl = (params?: ListAdminUsersParams) => {
+  const normalizedParams = new URLSearchParams()
 
-
-
-export const listAdminUsers = (
-    params?: MaybeRef<ListAdminUsersParams>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      params = unref(params);
-
-      return orvalMutator<ApiResponseUserList>(
-      {url: `/admin/users`, method: 'GET',
-        params: unref(params), signal
-    },
-      options);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
     }
+  })
 
+  const stringifiedParams = normalizedParams.toString()
 
+  return stringifiedParams.length > 0 ? `/admin/users?${stringifiedParams}` : `/admin/users`
+}
 
+export const listAdminUsers = async (
+  params?: ListAdminUsersParams,
+  options?: RequestInit,
+): Promise<ApiResponseUserList> => {
+  return orvalMutator<ApiResponseUserList>(getListAdminUsersUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
 
-export const getListAdminUsersQueryKey = (params?: MaybeRef<ListAdminUsersParams>,) => {
-    return [
-    'admin','users', ...(params ? [params] : [])
-    ] as const;
-    }
+export const getListAdminUsersQueryKey = (params?: MaybeRef<ListAdminUsersParams>) => {
+  return ['admin', 'users', ...(params ? [params] : [])] as const
+}
 
-
-export const getListAdminUsersQueryOptions = <TData = Awaited<ReturnType<typeof listAdminUsers>>, TError = ErrorType<unknown>>(params?: MaybeRef<ListAdminUsersParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListAdminUsersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminUsers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRef<ListAdminUsersParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = getListAdminUsersQueryKey(params)
 
-  const queryKey =  getListAdminUsersQueryKey(params);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminUsers>>> = ({ signal }) =>
+    listAdminUsers(unref(params), { signal, ...requestOptions })
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminUsers>>> = ({ signal }) => listAdminUsers(params, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminUsers>>,
+    TError,
+    TData
+  >
 }
 
 export type ListAdminUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminUsers>>>
 export type ListAdminUsersQueryError = ErrorType<unknown>
 
+export function useListAdminUsers<
+  TData = Awaited<ReturnType<typeof listAdminUsers>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRef<ListAdminUsersParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminUsersQueryOptions(params, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useListAdminUsers<TData = Awaited<ReturnType<typeof listAdminUsers>>, TError = ErrorType<unknown>>(
- params?: MaybeRef<ListAdminUsersParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getListAdminUsersQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const updateAdminUserStatus = (
-    id: MaybeRef<number>,
-    updateAdminUserStatusBody: MaybeRef<UpdateAdminUserStatusBody>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      id = unref(id);
-updateAdminUserStatusBody = unref(updateAdminUserStatusBody);
-
-      return orvalMutator<ApiResponseEmpty>(
-      {url: `/admin/users/${encodeURIComponent(String(id))}/status`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: updateAdminUserStatusBody, signal
-    },
-      options);
-    }
-
-
-
-
-export const getUpdateAdminUserStatusQueryKey = (id: MaybeRef<number>,
-    updateAdminUserStatusBody?: MaybeRef<UpdateAdminUserStatusBody>,) => {
-    return [
-    'PUT', 'admin','users',id,'status', updateAdminUserStatusBody
-    ] as const;
-    }
-
-
-export const getUpdateAdminUserStatusQueryOptions = <TData = Awaited<ReturnType<typeof updateAdminUserStatus>>, TError = ErrorType<unknown>>(id: MaybeRef<number>,
-    updateAdminUserStatusBody: MaybeRef<UpdateAdminUserStatusBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getUpdateAdminUserStatusQueryKey(id,updateAdminUserStatusBody);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminUserStatus>>> = ({ signal }) => updateAdminUserStatus(id,updateAdminUserStatusBody, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(id) !== null && unref(id) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserStatus>>, TError, TData>
+export const getUpdateAdminUserStatusUrl = (id: number) => {
+  return `/admin/users/${encodeURIComponent(String(id))}/status`
 }
 
-export type UpdateAdminUserStatusQueryResult = NonNullable<Awaited<ReturnType<typeof updateAdminUserStatus>>>
+export const updateAdminUserStatus = async (
+  id: number,
+  updateAdminUserStatusBody: UpdateAdminUserStatusBody,
+  options?: RequestInit,
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getUpdateAdminUserStatusUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateAdminUserStatusBody),
+  })
+}
+
+export const getUpdateAdminUserStatusQueryKey = (
+  id: MaybeRef<number>,
+  updateAdminUserStatusBody?: MaybeRef<UpdateAdminUserStatusBody>,
+) => {
+  return ['PUT', 'admin', 'users', id, 'status', updateAdminUserStatusBody] as const
+}
+
+export const getUpdateAdminUserStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminUserStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  updateAdminUserStatusBody: MaybeRef<UpdateAdminUserStatusBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserStatus>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminUserStatusQueryKey(id, updateAdminUserStatusBody)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminUserStatus>>> = ({ signal }) =>
+    updateAdminUserStatus(unref(id), unref(updateAdminUserStatusBody), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserStatus>>, TError, TData>
+}
+
+export type UpdateAdminUserStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminUserStatus>>
+>
 export type UpdateAdminUserStatusQueryError = ErrorType<unknown>
 
+export function useUpdateAdminUserStatus<
+  TData = Awaited<ReturnType<typeof updateAdminUserStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  updateAdminUserStatusBody: MaybeRef<UpdateAdminUserStatusBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserStatus>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminUserStatusQueryOptions(id, updateAdminUserStatusBody, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useUpdateAdminUserStatus<TData = Awaited<ReturnType<typeof updateAdminUserStatus>>, TError = ErrorType<unknown>>(
- id: MaybeRef<number>,
-    updateAdminUserStatusBody: MaybeRef<UpdateAdminUserStatusBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserStatus>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getUpdateAdminUserStatusQueryOptions(id,updateAdminUserStatusBody,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getBanAdminUserUrl = (id: number) => {
+  return `/admin/users/${encodeURIComponent(String(id))}/ban`
+}
 
+export const banAdminUser = async (
+  id: number,
+  banAdminUserBody?: BanAdminUserBody,
+  options?: RequestInit,
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getBanAdminUserUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(banAdminUserBody),
+  })
+}
 
-
-
-
-export const banAdminUser = (
-    id: MaybeRef<number>,
-    banAdminUserBody?: MaybeRef<BanAdminUserBody>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getBanAdminUserQueryKey = (
+  id: MaybeRef<number>,
+  banAdminUserBody?: MaybeRef<BanAdminUserBody>,
 ) => {
-      id = unref(id);
-banAdminUserBody = unref(banAdminUserBody);
+  return ['POST', 'admin', 'users', id, 'ban', banAdminUserBody] as const
+}
 
-      return orvalMutator<ApiResponseEmpty>(
-      {url: `/admin/users/${encodeURIComponent(String(id))}/ban`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: banAdminUserBody, signal
-    },
-      options);
-    }
-
-
-
-
-export const getBanAdminUserQueryKey = (id: MaybeRef<number>,
-    banAdminUserBody?: MaybeRef<BanAdminUserBody>,) => {
-    return [
-    'POST', 'admin','users',id,'ban', banAdminUserBody
-    ] as const;
-    }
-
-
-export const getBanAdminUserQueryOptions = <TData = Awaited<ReturnType<typeof banAdminUser>>, TError = ErrorType<unknown>>(id: MaybeRef<number>,
-    banAdminUserBody?: MaybeRef<BanAdminUserBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof banAdminUser>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getBanAdminUserQueryOptions = <
+  TData = Awaited<ReturnType<typeof banAdminUser>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  banAdminUserBody?: MaybeRef<BanAdminUserBody>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof banAdminUser>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = getBanAdminUserQueryKey(id, banAdminUserBody)
 
-  const queryKey =  getBanAdminUserQueryKey(id,banAdminUserBody);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof banAdminUser>>> = ({ signal }) =>
+    banAdminUser(unref(id), unref(banAdminUserBody), { signal, ...requestOptions })
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof banAdminUser>>> = ({ signal }) => banAdminUser(id,banAdminUserBody, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(id) !== null && unref(id) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof banAdminUser>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof banAdminUser>>, TError, TData>
 }
 
 export type BanAdminUserQueryResult = NonNullable<Awaited<ReturnType<typeof banAdminUser>>>
 export type BanAdminUserQueryError = ErrorType<unknown>
 
+export function useBanAdminUser<
+  TData = Awaited<ReturnType<typeof banAdminUser>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  banAdminUserBody?: MaybeRef<BanAdminUserBody>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof banAdminUser>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getBanAdminUserQueryOptions(id, banAdminUserBody, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useBanAdminUser<TData = Awaited<ReturnType<typeof banAdminUser>>, TError = ErrorType<unknown>>(
- id: MaybeRef<number>,
-    banAdminUserBody?: MaybeRef<BanAdminUserBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof banAdminUser>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getBanAdminUserQueryOptions(id,banAdminUserBody,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getUnbanAdminUserUrl = (id: number) => {
+  return `/admin/users/${encodeURIComponent(String(id))}/unban`
+}
 
+export const unbanAdminUser = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getUnbanAdminUserUrl(id), {
+    ...options,
+    method: 'POST',
+  })
+}
 
+export const getUnbanAdminUserQueryKey = (id: MaybeRef<number>) => {
+  return ['POST', 'admin', 'users', id, 'unban'] as const
+}
 
-
-
-export const unbanAdminUser = (
-    id: MaybeRef<number>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getUnbanAdminUserQueryOptions = <
+  TData = Awaited<ReturnType<typeof unbanAdminUser>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof unbanAdminUser>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      id = unref(id);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseEmpty>(
-      {url: `/admin/users/${encodeURIComponent(String(id))}/unban`, method: 'POST', signal
-    },
-      options);
-    }
+  const queryKey = getUnbanAdminUserQueryKey(id)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof unbanAdminUser>>> = ({ signal }) =>
+    unbanAdminUser(unref(id), { signal, ...requestOptions })
 
-
-
-export const getUnbanAdminUserQueryKey = (id: MaybeRef<number>,) => {
-    return [
-    'POST', 'admin','users',id,'unban'
-    ] as const;
-    }
-
-
-export const getUnbanAdminUserQueryOptions = <TData = Awaited<ReturnType<typeof unbanAdminUser>>, TError = ErrorType<unknown>>(id: MaybeRef<number>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unbanAdminUser>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getUnbanAdminUserQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof unbanAdminUser>>> = ({ signal }) => unbanAdminUser(id, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(id) !== null && unref(id) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof unbanAdminUser>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof unbanAdminUser>>, TError, TData>
 }
 
 export type UnbanAdminUserQueryResult = NonNullable<Awaited<ReturnType<typeof unbanAdminUser>>>
 export type UnbanAdminUserQueryError = ErrorType<unknown>
 
+export function useUnbanAdminUser<
+  TData = Awaited<ReturnType<typeof unbanAdminUser>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof unbanAdminUser>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUnbanAdminUserQueryOptions(id, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useUnbanAdminUser<TData = Awaited<ReturnType<typeof unbanAdminUser>>, TError = ErrorType<unknown>>(
- id: MaybeRef<number>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof unbanAdminUser>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getUnbanAdminUserQueryOptions(id,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const revokeAdminUserSessions = (
-    id: MaybeRef<number>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      id = unref(id);
-
-      return orvalMutator<ApiResponseEmpty>(
-      {url: `/admin/users/${encodeURIComponent(String(id))}/revoke-sessions`, method: 'POST', signal
-    },
-      options);
-    }
-
-
-
-
-export const getRevokeAdminUserSessionsQueryKey = (id: MaybeRef<number>,) => {
-    return [
-    'POST', 'admin','users',id,'revoke-sessions'
-    ] as const;
-    }
-
-
-export const getRevokeAdminUserSessionsQueryOptions = <TData = Awaited<ReturnType<typeof revokeAdminUserSessions>>, TError = ErrorType<unknown>>(id: MaybeRef<number>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof revokeAdminUserSessions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getRevokeAdminUserSessionsQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof revokeAdminUserSessions>>> = ({ signal }) => revokeAdminUserSessions(id, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(id) !== null && unref(id) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof revokeAdminUserSessions>>, TError, TData>
+export const getRevokeAdminUserSessionsUrl = (id: number) => {
+  return `/admin/users/${encodeURIComponent(String(id))}/revoke-sessions`
 }
 
-export type RevokeAdminUserSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof revokeAdminUserSessions>>>
+export const revokeAdminUserSessions = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getRevokeAdminUserSessionsUrl(id), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getRevokeAdminUserSessionsQueryKey = (id: MaybeRef<number>) => {
+  return ['POST', 'admin', 'users', id, 'revoke-sessions'] as const
+}
+
+export const getRevokeAdminUserSessionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof revokeAdminUserSessions>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof revokeAdminUserSessions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getRevokeAdminUserSessionsQueryKey(id)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof revokeAdminUserSessions>>> = ({
+    signal,
+  }) => revokeAdminUserSessions(unref(id), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof revokeAdminUserSessions>>, TError, TData>
+}
+
+export type RevokeAdminUserSessionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof revokeAdminUserSessions>>
+>
 export type RevokeAdminUserSessionsQueryError = ErrorType<unknown>
 
+export function useRevokeAdminUserSessions<
+  TData = Awaited<ReturnType<typeof revokeAdminUserSessions>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof revokeAdminUserSessions>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRevokeAdminUserSessionsQueryOptions(id, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useRevokeAdminUserSessions<TData = Awaited<ReturnType<typeof revokeAdminUserSessions>>, TError = ErrorType<unknown>>(
- id: MaybeRef<number>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof revokeAdminUserSessions>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getRevokeAdminUserSessionsQueryOptions(id,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const updateAdminUserRole = (
-    id: MaybeRef<number>,
-    updateAdminUserRoleBody: MaybeRef<UpdateAdminUserRoleBody>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      id = unref(id);
-updateAdminUserRoleBody = unref(updateAdminUserRoleBody);
-
-      return orvalMutator<ApiResponseEmpty>(
-      {url: `/admin/users/${encodeURIComponent(String(id))}/role`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: updateAdminUserRoleBody, signal
-    },
-      options);
-    }
-
-
-
-
-export const getUpdateAdminUserRoleQueryKey = (id: MaybeRef<number>,
-    updateAdminUserRoleBody?: MaybeRef<UpdateAdminUserRoleBody>,) => {
-    return [
-    'PUT', 'admin','users',id,'role', updateAdminUserRoleBody
-    ] as const;
-    }
-
-
-export const getUpdateAdminUserRoleQueryOptions = <TData = Awaited<ReturnType<typeof updateAdminUserRole>>, TError = ErrorType<unknown>>(id: MaybeRef<number>,
-    updateAdminUserRoleBody: MaybeRef<UpdateAdminUserRoleBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserRole>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getUpdateAdminUserRoleQueryKey(id,updateAdminUserRoleBody);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminUserRole>>> = ({ signal }) => updateAdminUserRole(id,updateAdminUserRoleBody, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(id) !== null && unref(id) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserRole>>, TError, TData>
+export const getUpdateAdminUserRoleUrl = (id: number) => {
+  return `/admin/users/${encodeURIComponent(String(id))}/role`
 }
 
-export type UpdateAdminUserRoleQueryResult = NonNullable<Awaited<ReturnType<typeof updateAdminUserRole>>>
+export const updateAdminUserRole = async (
+  id: number,
+  updateAdminUserRoleBody: UpdateAdminUserRoleBody,
+  options?: RequestInit,
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getUpdateAdminUserRoleUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateAdminUserRoleBody),
+  })
+}
+
+export const getUpdateAdminUserRoleQueryKey = (
+  id: MaybeRef<number>,
+  updateAdminUserRoleBody?: MaybeRef<UpdateAdminUserRoleBody>,
+) => {
+  return ['PUT', 'admin', 'users', id, 'role', updateAdminUserRoleBody] as const
+}
+
+export const getUpdateAdminUserRoleQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminUserRole>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  updateAdminUserRoleBody: MaybeRef<UpdateAdminUserRoleBody>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserRole>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminUserRoleQueryKey(id, updateAdminUserRoleBody)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminUserRole>>> = ({ signal }) =>
+    updateAdminUserRole(unref(id), unref(updateAdminUserRoleBody), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserRole>>, TError, TData>
+}
+
+export type UpdateAdminUserRoleQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminUserRole>>
+>
 export type UpdateAdminUserRoleQueryError = ErrorType<unknown>
 
+export function useUpdateAdminUserRole<
+  TData = Awaited<ReturnType<typeof updateAdminUserRole>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  updateAdminUserRoleBody: MaybeRef<UpdateAdminUserRoleBody>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserRole>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminUserRoleQueryOptions(id, updateAdminUserRoleBody, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useUpdateAdminUserRole<TData = Awaited<ReturnType<typeof updateAdminUserRole>>, TError = ErrorType<unknown>>(
- id: MaybeRef<number>,
-    updateAdminUserRoleBody: MaybeRef<UpdateAdminUserRoleBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminUserRole>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getUpdateAdminUserRoleQueryOptions(id,updateAdminUserRoleBody,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getDeleteAdminUserUrl = (id: number) => {
+  return `/admin/users/${encodeURIComponent(String(id))}`
+}
 
+export const deleteAdminUser = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getDeleteAdminUserUrl(id), {
+    ...options,
+    method: 'DELETE',
+  })
+}
 
+export const getDeleteAdminUserQueryKey = (id: MaybeRef<number>) => {
+  return ['DELETE', 'admin', 'users', id] as const
+}
 
-
-
-export const deleteAdminUser = (
-    id: MaybeRef<number>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getDeleteAdminUserQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteAdminUser>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminUser>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      id = unref(id);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseEmpty>(
-      {url: `/admin/users/${encodeURIComponent(String(id))}`, method: 'DELETE', signal
-    },
-      options);
-    }
+  const queryKey = getDeleteAdminUserQueryKey(id)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminUser>>> = ({ signal }) =>
+    deleteAdminUser(unref(id), { signal, ...requestOptions })
 
-
-
-export const getDeleteAdminUserQueryKey = (id: MaybeRef<number>,) => {
-    return [
-    'DELETE', 'admin','users',id
-    ] as const;
-    }
-
-
-export const getDeleteAdminUserQueryOptions = <TData = Awaited<ReturnType<typeof deleteAdminUser>>, TError = ErrorType<unknown>>(id: MaybeRef<number>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminUser>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getDeleteAdminUserQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminUser>>> = ({ signal }) => deleteAdminUser(id, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(id) !== null && unref(id) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminUser>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminUser>>, TError, TData>
 }
 
 export type DeleteAdminUserQueryResult = NonNullable<Awaited<ReturnType<typeof deleteAdminUser>>>
 export type DeleteAdminUserQueryError = ErrorType<unknown>
 
+export function useDeleteAdminUser<
+  TData = Awaited<ReturnType<typeof deleteAdminUser>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminUser>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteAdminUserQueryOptions(id, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useDeleteAdminUser<TData = Awaited<ReturnType<typeof deleteAdminUser>>, TError = ErrorType<unknown>>(
- id: MaybeRef<number>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminUser>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getDeleteAdminUserQueryOptions(id,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }

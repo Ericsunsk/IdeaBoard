@@ -62,7 +62,10 @@ function inferExtensionFromUrl(rawUrl: string): string {
   return extension ? `.${extension.toLowerCase()}` : '.png'
 }
 
-function splitTitleAndExtension(rawTitle: string, rawUrl: string): { stem: string; extension: string } {
+function splitTitleAndExtension(
+  rawTitle: string,
+  rawUrl: string,
+): { stem: string; extension: string } {
   const safeTitle = sanitizeFileNameSegment(rawTitle)
   const titleExtension = safeTitle.match(/\.([a-z0-9]{2,5})$/i)?.[0] ?? ''
   if (titleExtension) {
@@ -157,11 +160,7 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       const data = node.data
       if (!data) continue
       const kind = data.kind
-      if (
-        kind !== 'image' &&
-        kind !== 'fusion' &&
-        kind !== 'viewpoint'
-      ) {
+      if (kind !== 'image' && kind !== 'fusion' && kind !== 'viewpoint') {
         continue
       }
       const snapshotNode = data.snapshotNode

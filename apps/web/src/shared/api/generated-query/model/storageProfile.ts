@@ -4,15 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { StorageProfileConfig } from './storageProfileConfig';
+import type { StorageProfileConfig } from './storageProfileConfig'
 
 export interface StorageProfile {
-  id: string;
-  name: string;
-  provider: string;
-  enabled: boolean;
-  is_current: boolean;
-  builtin: boolean;
-  secret_configured: boolean;
-  config: StorageProfileConfig;
+  id: string
+  name: string
+  provider: string
+  enabled: boolean
+  is_current: boolean
+  builtin: boolean
+  secret_configured: boolean
+  config: StorageProfileConfig
 }

@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseStorageBucketInfoDataInfo } from './apiResponseStorageBucketInfoDataInfo';
+import type { ApiResponseStorageBucketInfoDataInfo } from './apiResponseStorageBucketInfoDataInfo'
 
 export type ApiResponseStorageBucketInfoData = {
-  info: ApiResponseStorageBucketInfoDataInfo;
-};
+  info: ApiResponseStorageBucketInfoDataInfo
+}

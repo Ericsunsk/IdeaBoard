@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminAccount } from './adminAccount';
+import type { AdminAccount } from './adminAccount'
 
 export type ApiResponseAccountListData = {
-  list: AdminAccount[];
-  total: number;
-};
+  list: AdminAccount[]
+  total: number
+}

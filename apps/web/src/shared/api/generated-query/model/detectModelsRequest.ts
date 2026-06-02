@@ -4,10 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ProviderAPIType } from './providerAPIType';
+import type { ProviderAPIType } from './providerAPIType'
 
 export interface DetectModelsRequest {
-  base_url: string;
-  api_key: string;
-  api_type?: ProviderAPIType;
+  base_url: string
+  api_key: string
+  api_type?: ProviderAPIType
 }

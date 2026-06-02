@@ -4,11 +4,11 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { PageParameter } from './pageParameter';
-import type { PageSizeParameter } from './pageSizeParameter';
+import type { PageParameter } from './pageParameter'
+import type { PageSizeParameter } from './pageSizeParameter'
 
 export type ListAdminUsersParams = {
-keyword?: string;
-page?: PageParameter;
-page_size?: PageSizeParameter;
-};
+  keyword?: string
+  page?: PageParameter
+  page_size?: PageSizeParameter
+}

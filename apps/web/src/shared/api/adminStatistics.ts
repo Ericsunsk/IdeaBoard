@@ -22,8 +22,7 @@ export const adminStatisticsApi = {
   get: (range: GetAdminStatisticsRange): Promise<ApiResponse<AdminStatisticsResponse>> =>
     getAdminStatistics({ range }),
   backfill: (range: GetAdminStatisticsRange): Promise<ApiResponse<AdminStatisticsBackfillResult>> =>
-    apiPost<AdminStatisticsBackfillResult, { range: GetAdminStatisticsRange }>(
-      '/admin/statistics/backfill',
-      { range },
-    ),
+    apiPost<AdminStatisticsBackfillResult>('/admin/statistics/backfill', {
+      body: { range },
+    }),
 }

@@ -6,5 +6,5 @@
  */
 
 export type ApiResponseRevokedData = {
-  revoked: boolean;
-};
+  revoked: boolean
+}

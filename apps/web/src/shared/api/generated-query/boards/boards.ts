@@ -4,25 +4,18 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  computed,
-  unref
-} from 'vue';
-import type {
-  MaybeRef
-} from 'vue';
+import { computed, unref } from 'vue'
+import type { MaybeRef } from 'vue'
 
 import type {
   ApiResponseBoardMember,
@@ -37,757 +30,884 @@ import type {
   InviteBoardMemberRequest,
   JoinBoardByShareTokenBody,
   UpdateBoardMemberRoleRequest,
-  UserBoardUpsertRequest
-} from '../model';
+  UserBoardUpsertRequest,
+} from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getListUserBoardsUrl = () => {
+  return `/user/boards`
+}
 
-
-
-export const listUserBoards = (
-
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-
-
-      return orvalMutator<ApiResponseUserBoardList>(
-      {url: `/user/boards`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
+export const listUserBoards = async (options?: RequestInit): Promise<ApiResponseUserBoardList> => {
+  return orvalMutator<ApiResponseUserBoardList>(getListUserBoardsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
 
 export const getListUserBoardsQueryKey = () => {
-    return [
-    'user','boards'
-    ] as const;
-    }
+  return ['user', 'boards'] as const
+}
 
+export const getListUserBoardsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUserBoards>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserBoards>>, TError, TData>>
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-export const getListUserBoardsQueryOptions = <TData = Awaited<ReturnType<typeof listUserBoards>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserBoards>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
+  const queryKey = getListUserBoardsQueryKey()
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserBoards>>> = ({ signal }) =>
+    listUserBoards({ signal, ...requestOptions })
 
-  const queryKey =  getListUserBoardsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserBoards>>> = ({ signal }) => listUserBoards(requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUserBoards>>, TError, TData>
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUserBoards>>,
+    TError,
+    TData
+  >
 }
 
 export type ListUserBoardsQueryResult = NonNullable<Awaited<ReturnType<typeof listUserBoards>>>
 export type ListUserBoardsQueryError = ErrorType<unknown>
 
-
-
-export function useListUserBoards<TData = Awaited<ReturnType<typeof listUserBoards>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserBoards>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
+export function useListUserBoards<
+  TData = Awaited<ReturnType<typeof listUserBoards>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserBoards>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListUserBoardsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  return query;
+  return query
 }
 
+export const getUpsertUserBoardUrl = (boardId: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}`
+}
 
+export const upsertUserBoard = async (
+  boardId: string,
+  userBoardUpsertRequest: UserBoardUpsertRequest,
+  options?: RequestInit,
+): Promise<ApiResponseUserBoard> => {
+  return orvalMutator<ApiResponseUserBoard>(getUpsertUserBoardUrl(boardId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(userBoardUpsertRequest),
+  })
+}
 
-
-
-
-export const upsertUserBoard = (
-    boardId: MaybeRef<string>,
-    userBoardUpsertRequest: MaybeRef<UserBoardUpsertRequest>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getUpsertUserBoardQueryKey = (
+  boardId: MaybeRef<string>,
+  userBoardUpsertRequest?: MaybeRef<UserBoardUpsertRequest>,
 ) => {
-      boardId = unref(boardId);
-userBoardUpsertRequest = unref(userBoardUpsertRequest);
+  return ['PUT', 'user', 'boards', boardId, userBoardUpsertRequest] as const
+}
 
-      return orvalMutator<ApiResponseUserBoard>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: userBoardUpsertRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getUpsertUserBoardQueryKey = (boardId: MaybeRef<string>,
-    userBoardUpsertRequest?: MaybeRef<UserBoardUpsertRequest>,) => {
-    return [
-    'PUT', 'user','boards',boardId, userBoardUpsertRequest
-    ] as const;
-    }
-
-
-export const getUpsertUserBoardQueryOptions = <TData = Awaited<ReturnType<typeof upsertUserBoard>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>,
-    userBoardUpsertRequest: MaybeRef<UserBoardUpsertRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getUpsertUserBoardQueryOptions = <
+  TData = Awaited<ReturnType<typeof upsertUserBoard>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  userBoardUpsertRequest: MaybeRef<UserBoardUpsertRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = getUpsertUserBoardQueryKey(boardId, userBoardUpsertRequest)
 
-  const queryKey =  getUpsertUserBoardQueryKey(boardId,userBoardUpsertRequest);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof upsertUserBoard>>> = ({ signal }) =>
+    upsertUserBoard(unref(boardId), unref(userBoardUpsertRequest), { signal, ...requestOptions })
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof upsertUserBoard>>> = ({ signal }) => upsertUserBoard(boardId,userBoardUpsertRequest, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>
 }
 
 export type UpsertUserBoardQueryResult = NonNullable<Awaited<ReturnType<typeof upsertUserBoard>>>
 export type UpsertUserBoardQueryError = ErrorType<unknown>
 
+export function useUpsertUserBoard<
+  TData = Awaited<ReturnType<typeof upsertUserBoard>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  userBoardUpsertRequest: MaybeRef<UserBoardUpsertRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpsertUserBoardQueryOptions(boardId, userBoardUpsertRequest, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useUpsertUserBoard<TData = Awaited<ReturnType<typeof upsertUserBoard>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>,
-    userBoardUpsertRequest: MaybeRef<UserBoardUpsertRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof upsertUserBoard>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getUpsertUserBoardQueryOptions(boardId,userBoardUpsertRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getDeleteUserBoardUrl = (boardId: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}`
+}
 
+export const deleteUserBoard = async (
+  boardId: string,
+  options?: RequestInit,
+): Promise<ApiResponseDeleted> => {
+  return orvalMutator<ApiResponseDeleted>(getDeleteUserBoardUrl(boardId), {
+    ...options,
+    method: 'DELETE',
+  })
+}
 
+export const getDeleteUserBoardQueryKey = (boardId: MaybeRef<string>) => {
+  return ['DELETE', 'user', 'boards', boardId] as const
+}
 
-
-
-export const deleteUserBoard = (
-    boardId: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getDeleteUserBoardQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteUserBoard>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      boardId = unref(boardId);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseDeleted>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}`, method: 'DELETE', signal
-    },
-      options);
-    }
+  const queryKey = getDeleteUserBoardQueryKey(boardId)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteUserBoard>>> = ({ signal }) =>
+    deleteUserBoard(unref(boardId), { signal, ...requestOptions })
 
-
-
-export const getDeleteUserBoardQueryKey = (boardId: MaybeRef<string>,) => {
-    return [
-    'DELETE', 'user','boards',boardId
-    ] as const;
-    }
-
-
-export const getDeleteUserBoardQueryOptions = <TData = Awaited<ReturnType<typeof deleteUserBoard>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getDeleteUserBoardQueryKey(boardId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteUserBoard>>> = ({ signal }) => deleteUserBoard(boardId, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>
 }
 
 export type DeleteUserBoardQueryResult = NonNullable<Awaited<ReturnType<typeof deleteUserBoard>>>
 export type DeleteUserBoardQueryError = ErrorType<unknown>
 
+export function useDeleteUserBoard<
+  TData = Awaited<ReturnType<typeof deleteUserBoard>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteUserBoardQueryOptions(boardId, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useDeleteUserBoard<TData = Awaited<ReturnType<typeof deleteUserBoard>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoard>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getDeleteUserBoardQueryOptions(boardId,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getListBoardMembersUrl = (boardId: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/members`
+}
 
+export const listBoardMembers = async (
+  boardId: string,
+  options?: RequestInit,
+): Promise<ApiResponseBoardMemberList> => {
+  return orvalMutator<ApiResponseBoardMemberList>(getListBoardMembersUrl(boardId), {
+    ...options,
+    method: 'GET',
+  })
+}
 
+export const getListBoardMembersQueryKey = (boardId: MaybeRef<string>) => {
+  return ['user', 'boards', boardId, 'members'] as const
+}
 
-
-
-export const listBoardMembers = (
-    boardId: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getListBoardMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBoardMembers>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      boardId = unref(boardId);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseBoardMemberList>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}/members`, method: 'GET', signal
-    },
-      options);
-    }
+  const queryKey = getListBoardMembersQueryKey(boardId)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listBoardMembers>>> = ({ signal }) =>
+    listBoardMembers(unref(boardId), { signal, ...requestOptions })
 
-
-
-export const getListBoardMembersQueryKey = (boardId: MaybeRef<string>,) => {
-    return [
-    'user','boards',boardId,'members'
-    ] as const;
-    }
-
-
-export const getListBoardMembersQueryOptions = <TData = Awaited<ReturnType<typeof listBoardMembers>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getListBoardMembersQueryKey(boardId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBoardMembers>>> = ({ signal }) => listBoardMembers(boardId, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>
 }
 
 export type ListBoardMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listBoardMembers>>>
 export type ListBoardMembersQueryError = ErrorType<unknown>
 
+export function useListBoardMembers<
+  TData = Awaited<ReturnType<typeof listBoardMembers>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListBoardMembersQueryOptions(boardId, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useListBoardMembers<TData = Awaited<ReturnType<typeof listBoardMembers>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardMembers>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getListBoardMembersQueryOptions(boardId,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const inviteBoardMember = (
-    boardId: MaybeRef<string>,
-    inviteBoardMemberRequest: MaybeRef<InviteBoardMemberRequest>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      boardId = unref(boardId);
-inviteBoardMemberRequest = unref(inviteBoardMemberRequest);
-
-      return orvalMutator<ApiResponseBoardMember>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}/members/invite`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: inviteBoardMemberRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getInviteBoardMemberQueryKey = (boardId: MaybeRef<string>,
-    inviteBoardMemberRequest?: MaybeRef<InviteBoardMemberRequest>,) => {
-    return [
-    'POST', 'user','boards',boardId,'members','invite', inviteBoardMemberRequest
-    ] as const;
-    }
-
-
-export const getInviteBoardMemberQueryOptions = <TData = Awaited<ReturnType<typeof inviteBoardMember>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>,
-    inviteBoardMemberRequest: MaybeRef<InviteBoardMemberRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getInviteBoardMemberQueryKey(boardId,inviteBoardMemberRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof inviteBoardMember>>> = ({ signal }) => inviteBoardMember(boardId,inviteBoardMemberRequest, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>
+export const getInviteBoardMemberUrl = (boardId: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/members/invite`
 }
 
-export type InviteBoardMemberQueryResult = NonNullable<Awaited<ReturnType<typeof inviteBoardMember>>>
+export const inviteBoardMember = async (
+  boardId: string,
+  inviteBoardMemberRequest: InviteBoardMemberRequest,
+  options?: RequestInit,
+): Promise<ApiResponseBoardMember> => {
+  return orvalMutator<ApiResponseBoardMember>(getInviteBoardMemberUrl(boardId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(inviteBoardMemberRequest),
+  })
+}
+
+export const getInviteBoardMemberQueryKey = (
+  boardId: MaybeRef<string>,
+  inviteBoardMemberRequest?: MaybeRef<InviteBoardMemberRequest>,
+) => {
+  return ['POST', 'user', 'boards', boardId, 'members', 'invite', inviteBoardMemberRequest] as const
+}
+
+export const getInviteBoardMemberQueryOptions = <
+  TData = Awaited<ReturnType<typeof inviteBoardMember>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  inviteBoardMemberRequest: MaybeRef<InviteBoardMemberRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getInviteBoardMemberQueryKey(boardId, inviteBoardMemberRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof inviteBoardMember>>> = ({ signal }) =>
+    inviteBoardMember(unref(boardId), unref(inviteBoardMemberRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>
+}
+
+export type InviteBoardMemberQueryResult = NonNullable<
+  Awaited<ReturnType<typeof inviteBoardMember>>
+>
 export type InviteBoardMemberQueryError = ErrorType<unknown>
 
+export function useInviteBoardMember<
+  TData = Awaited<ReturnType<typeof inviteBoardMember>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  inviteBoardMemberRequest: MaybeRef<InviteBoardMemberRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getInviteBoardMemberQueryOptions(boardId, inviteBoardMemberRequest, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useInviteBoardMember<TData = Awaited<ReturnType<typeof inviteBoardMember>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>,
-    inviteBoardMemberRequest: MaybeRef<InviteBoardMemberRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof inviteBoardMember>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getInviteBoardMemberQueryOptions(boardId,inviteBoardMemberRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const updateBoardMemberRole = (
-    boardId: MaybeRef<string>,
-    memberUid: MaybeRef<string>,
-    updateBoardMemberRoleRequest: MaybeRef<UpdateBoardMemberRoleRequest>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      boardId = unref(boardId);
-memberUid = unref(memberUid);
-updateBoardMemberRoleRequest = unref(updateBoardMemberRoleRequest);
-
-      return orvalMutator<ApiResponseBoardMember>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberUid))}/role`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: updateBoardMemberRoleRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getUpdateBoardMemberRoleQueryKey = (boardId: MaybeRef<string>,
-    memberUid: MaybeRef<string>,
-    updateBoardMemberRoleRequest?: MaybeRef<UpdateBoardMemberRoleRequest>,) => {
-    return [
-    'PUT', 'user','boards',boardId,'members',memberUid,'role', updateBoardMemberRoleRequest
-    ] as const;
-    }
-
-
-export const getUpdateBoardMemberRoleQueryOptions = <TData = Awaited<ReturnType<typeof updateBoardMemberRole>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>,
-    memberUid: MaybeRef<string>,
-    updateBoardMemberRoleRequest: MaybeRef<UpdateBoardMemberRoleRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getUpdateBoardMemberRoleQueryKey(boardId,memberUid,updateBoardMemberRoleRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof updateBoardMemberRole>>> = ({ signal }) => updateBoardMemberRole(boardId,memberUid,updateBoardMemberRoleRequest, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined && unref(memberUid) !== null && unref(memberUid) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>
+export const getUpdateBoardMemberRoleUrl = (boardId: string, memberUid: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberUid))}/role`
 }
 
-export type UpdateBoardMemberRoleQueryResult = NonNullable<Awaited<ReturnType<typeof updateBoardMemberRole>>>
+export const updateBoardMemberRole = async (
+  boardId: string,
+  memberUid: string,
+  updateBoardMemberRoleRequest: UpdateBoardMemberRoleRequest,
+  options?: RequestInit,
+): Promise<ApiResponseBoardMember> => {
+  return orvalMutator<ApiResponseBoardMember>(getUpdateBoardMemberRoleUrl(boardId, memberUid), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateBoardMemberRoleRequest),
+  })
+}
+
+export const getUpdateBoardMemberRoleQueryKey = (
+  boardId: MaybeRef<string>,
+  memberUid: MaybeRef<string>,
+  updateBoardMemberRoleRequest?: MaybeRef<UpdateBoardMemberRoleRequest>,
+) => {
+  return [
+    'PUT',
+    'user',
+    'boards',
+    boardId,
+    'members',
+    memberUid,
+    'role',
+    updateBoardMemberRoleRequest,
+  ] as const
+}
+
+export const getUpdateBoardMemberRoleQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateBoardMemberRole>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  memberUid: MaybeRef<string>,
+  updateBoardMemberRoleRequest: MaybeRef<UpdateBoardMemberRoleRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateBoardMemberRoleQueryKey(
+    boardId,
+    memberUid,
+    updateBoardMemberRoleRequest,
+  )
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateBoardMemberRole>>> = ({ signal }) =>
+    updateBoardMemberRole(unref(boardId), unref(memberUid), unref(updateBoardMemberRoleRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        unref(boardId) !== null &&
+        unref(boardId) !== undefined &&
+        unref(memberUid) !== null &&
+        unref(memberUid) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>
+}
+
+export type UpdateBoardMemberRoleQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateBoardMemberRole>>
+>
 export type UpdateBoardMemberRoleQueryError = ErrorType<unknown>
 
+export function useUpdateBoardMemberRole<
+  TData = Awaited<ReturnType<typeof updateBoardMemberRole>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  memberUid: MaybeRef<string>,
+  updateBoardMemberRoleRequest: MaybeRef<UpdateBoardMemberRoleRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateBoardMemberRoleQueryOptions(
+    boardId,
+    memberUid,
+    updateBoardMemberRoleRequest,
+    options,
+  )
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useUpdateBoardMemberRole<TData = Awaited<ReturnType<typeof updateBoardMemberRole>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>,
-    memberUid: MaybeRef<string>,
-    updateBoardMemberRoleRequest: MaybeRef<UpdateBoardMemberRoleRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getUpdateBoardMemberRoleQueryOptions(boardId,memberUid,updateBoardMemberRoleRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const removeBoardMember = (
-    boardId: MaybeRef<string>,
-    memberUid: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      boardId = unref(boardId);
-memberUid = unref(memberUid);
-
-      return orvalMutator<ApiResponseDeleted>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberUid))}`, method: 'DELETE', signal
-    },
-      options);
-    }
-
-
-
-
-export const getRemoveBoardMemberQueryKey = (boardId: MaybeRef<string>,
-    memberUid: MaybeRef<string>,) => {
-    return [
-    'DELETE', 'user','boards',boardId,'members',memberUid
-    ] as const;
-    }
-
-
-export const getRemoveBoardMemberQueryOptions = <TData = Awaited<ReturnType<typeof removeBoardMember>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>,
-    memberUid: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getRemoveBoardMemberQueryKey(boardId,memberUid);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof removeBoardMember>>> = ({ signal }) => removeBoardMember(boardId,memberUid, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined && unref(memberUid) !== null && unref(memberUid) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>
+export const getRemoveBoardMemberUrl = (boardId: string, memberUid: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberUid))}`
 }
 
-export type RemoveBoardMemberQueryResult = NonNullable<Awaited<ReturnType<typeof removeBoardMember>>>
+export const removeBoardMember = async (
+  boardId: string,
+  memberUid: string,
+  options?: RequestInit,
+): Promise<ApiResponseDeleted> => {
+  return orvalMutator<ApiResponseDeleted>(getRemoveBoardMemberUrl(boardId, memberUid), {
+    ...options,
+    method: 'DELETE',
+  })
+}
+
+export const getRemoveBoardMemberQueryKey = (
+  boardId: MaybeRef<string>,
+  memberUid: MaybeRef<string>,
+) => {
+  return ['DELETE', 'user', 'boards', boardId, 'members', memberUid] as const
+}
+
+export const getRemoveBoardMemberQueryOptions = <
+  TData = Awaited<ReturnType<typeof removeBoardMember>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  memberUid: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getRemoveBoardMemberQueryKey(boardId, memberUid)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof removeBoardMember>>> = ({ signal }) =>
+    removeBoardMember(unref(boardId), unref(memberUid), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        unref(boardId) !== null &&
+        unref(boardId) !== undefined &&
+        unref(memberUid) !== null &&
+        unref(memberUid) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>
+}
+
+export type RemoveBoardMemberQueryResult = NonNullable<
+  Awaited<ReturnType<typeof removeBoardMember>>
+>
 export type RemoveBoardMemberQueryError = ErrorType<unknown>
 
+export function useRemoveBoardMember<
+  TData = Awaited<ReturnType<typeof removeBoardMember>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  memberUid: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRemoveBoardMemberQueryOptions(boardId, memberUid, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useRemoveBoardMember<TData = Awaited<ReturnType<typeof removeBoardMember>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>,
-    memberUid: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getRemoveBoardMemberQueryOptions(boardId,memberUid,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const listBoardShareTokens = (
-    boardId: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      boardId = unref(boardId);
-
-      return orvalMutator<ApiResponseBoardShareTokenList>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
-
-export const getListBoardShareTokensQueryKey = (boardId: MaybeRef<string>,) => {
-    return [
-    'user','boards',boardId,'share-tokens'
-    ] as const;
-    }
-
-
-export const getListBoardShareTokensQueryOptions = <TData = Awaited<ReturnType<typeof listBoardShareTokens>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardShareTokens>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getListBoardShareTokensQueryKey(boardId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBoardShareTokens>>> = ({ signal }) => listBoardShareTokens(boardId, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBoardShareTokens>>, TError, TData>
+export const getListBoardShareTokensUrl = (boardId: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens`
 }
 
-export type ListBoardShareTokensQueryResult = NonNullable<Awaited<ReturnType<typeof listBoardShareTokens>>>
+export const listBoardShareTokens = async (
+  boardId: string,
+  options?: RequestInit,
+): Promise<ApiResponseBoardShareTokenList> => {
+  return orvalMutator<ApiResponseBoardShareTokenList>(getListBoardShareTokensUrl(boardId), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListBoardShareTokensQueryKey = (boardId: MaybeRef<string>) => {
+  return ['user', 'boards', boardId, 'share-tokens'] as const
+}
+
+export const getListBoardShareTokensQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBoardShareTokens>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listBoardShareTokens>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListBoardShareTokensQueryKey(boardId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listBoardShareTokens>>> = ({ signal }) =>
+    listBoardShareTokens(unref(boardId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listBoardShareTokens>>, TError, TData>
+}
+
+export type ListBoardShareTokensQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBoardShareTokens>>
+>
 export type ListBoardShareTokensQueryError = ErrorType<unknown>
 
+export function useListBoardShareTokens<
+  TData = Awaited<ReturnType<typeof listBoardShareTokens>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listBoardShareTokens>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListBoardShareTokensQueryOptions(boardId, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useListBoardShareTokens<TData = Awaited<ReturnType<typeof listBoardShareTokens>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listBoardShareTokens>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getListBoardShareTokensQueryOptions(boardId,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const createBoardShareToken = (
-    boardId: MaybeRef<string>,
-    createBoardShareTokenRequest: MaybeRef<CreateBoardShareTokenRequest>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      boardId = unref(boardId);
-createBoardShareTokenRequest = unref(createBoardShareTokenRequest);
-
-      return orvalMutator<ApiResponseBoardShareToken>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: createBoardShareTokenRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getCreateBoardShareTokenQueryKey = (boardId: MaybeRef<string>,
-    createBoardShareTokenRequest?: MaybeRef<CreateBoardShareTokenRequest>,) => {
-    return [
-    'POST', 'user','boards',boardId,'share-tokens', createBoardShareTokenRequest
-    ] as const;
-    }
-
-
-export const getCreateBoardShareTokenQueryOptions = <TData = Awaited<ReturnType<typeof createBoardShareToken>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>,
-    createBoardShareTokenRequest: MaybeRef<CreateBoardShareTokenRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getCreateBoardShareTokenQueryKey(boardId,createBoardShareTokenRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof createBoardShareToken>>> = ({ signal }) => createBoardShareToken(boardId,createBoardShareTokenRequest, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>
+export const getCreateBoardShareTokenUrl = (boardId: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens`
 }
 
-export type CreateBoardShareTokenQueryResult = NonNullable<Awaited<ReturnType<typeof createBoardShareToken>>>
+export const createBoardShareToken = async (
+  boardId: string,
+  createBoardShareTokenRequest: CreateBoardShareTokenRequest,
+  options?: RequestInit,
+): Promise<ApiResponseBoardShareToken> => {
+  return orvalMutator<ApiResponseBoardShareToken>(getCreateBoardShareTokenUrl(boardId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createBoardShareTokenRequest),
+  })
+}
+
+export const getCreateBoardShareTokenQueryKey = (
+  boardId: MaybeRef<string>,
+  createBoardShareTokenRequest?: MaybeRef<CreateBoardShareTokenRequest>,
+) => {
+  return ['POST', 'user', 'boards', boardId, 'share-tokens', createBoardShareTokenRequest] as const
+}
+
+export const getCreateBoardShareTokenQueryOptions = <
+  TData = Awaited<ReturnType<typeof createBoardShareToken>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  createBoardShareTokenRequest: MaybeRef<CreateBoardShareTokenRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getCreateBoardShareTokenQueryKey(boardId, createBoardShareTokenRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof createBoardShareToken>>> = ({ signal }) =>
+    createBoardShareToken(unref(boardId), unref(createBoardShareTokenRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>
+}
+
+export type CreateBoardShareTokenQueryResult = NonNullable<
+  Awaited<ReturnType<typeof createBoardShareToken>>
+>
 export type CreateBoardShareTokenQueryError = ErrorType<unknown>
 
+export function useCreateBoardShareToken<
+  TData = Awaited<ReturnType<typeof createBoardShareToken>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  createBoardShareTokenRequest: MaybeRef<CreateBoardShareTokenRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCreateBoardShareTokenQueryOptions(
+    boardId,
+    createBoardShareTokenRequest,
+    options,
+  )
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useCreateBoardShareToken<TData = Awaited<ReturnType<typeof createBoardShareToken>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>,
-    createBoardShareTokenRequest: MaybeRef<CreateBoardShareTokenRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof createBoardShareToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getCreateBoardShareTokenQueryOptions(boardId,createBoardShareTokenRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const revokeBoardShareToken = (
-    boardId: MaybeRef<string>,
-    token: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      boardId = unref(boardId);
-token = unref(token);
-
-      return orvalMutator<ApiResponseRevoked>(
-      {url: `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens/${encodeURIComponent(String(token))}/revoke`, method: 'POST', signal
-    },
-      options);
-    }
-
-
-
-
-export const getRevokeBoardShareTokenQueryKey = (boardId: MaybeRef<string>,
-    token: MaybeRef<string>,) => {
-    return [
-    'POST', 'user','boards',boardId,'share-tokens',token,'revoke'
-    ] as const;
-    }
-
-
-export const getRevokeBoardShareTokenQueryOptions = <TData = Awaited<ReturnType<typeof revokeBoardShareToken>>, TError = ErrorType<unknown>>(boardId: MaybeRef<string>,
-    token: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getRevokeBoardShareTokenQueryKey(boardId,token);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof revokeBoardShareToken>>> = ({ signal }) => revokeBoardShareToken(boardId,token, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(boardId) !== null && unref(boardId) !== undefined && unref(token) !== null && unref(token) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
+export const getRevokeBoardShareTokenUrl = (boardId: string, token: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens/${encodeURIComponent(String(token))}/revoke`
 }
 
-export type RevokeBoardShareTokenQueryResult = NonNullable<Awaited<ReturnType<typeof revokeBoardShareToken>>>
+export const revokeBoardShareToken = async (
+  boardId: string,
+  token: string,
+  options?: RequestInit,
+): Promise<ApiResponseRevoked> => {
+  return orvalMutator<ApiResponseRevoked>(getRevokeBoardShareTokenUrl(boardId, token), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getRevokeBoardShareTokenQueryKey = (
+  boardId: MaybeRef<string>,
+  token: MaybeRef<string>,
+) => {
+  return ['POST', 'user', 'boards', boardId, 'share-tokens', token, 'revoke'] as const
+}
+
+export const getRevokeBoardShareTokenQueryOptions = <
+  TData = Awaited<ReturnType<typeof revokeBoardShareToken>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  token: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getRevokeBoardShareTokenQueryKey(boardId, token)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof revokeBoardShareToken>>> = ({ signal }) =>
+    revokeBoardShareToken(unref(boardId), unref(token), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        unref(boardId) !== null &&
+        unref(boardId) !== undefined &&
+        unref(token) !== null &&
+        unref(token) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
+}
+
+export type RevokeBoardShareTokenQueryResult = NonNullable<
+  Awaited<ReturnType<typeof revokeBoardShareToken>>
+>
 export type RevokeBoardShareTokenQueryError = ErrorType<unknown>
 
+export function useRevokeBoardShareToken<
+  TData = Awaited<ReturnType<typeof revokeBoardShareToken>>,
+  TError = ErrorType<unknown>,
+>(
+  boardId: MaybeRef<string>,
+  token: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRevokeBoardShareTokenQueryOptions(boardId, token, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useRevokeBoardShareToken<TData = Awaited<ReturnType<typeof revokeBoardShareToken>>, TError = ErrorType<unknown>>(
- boardId: MaybeRef<string>,
-    token: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getRevokeBoardShareTokenQueryOptions(boardId,token,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const joinBoardByShareToken = (
-    joinBoardByShareTokenBody: MaybeRef<JoinBoardByShareTokenBody>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      joinBoardByShareTokenBody = unref(joinBoardByShareTokenBody);
-
-      return orvalMutator<ApiResponseUserBoard>(
-      {url: `/user/boards/share-tokens/join`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: joinBoardByShareTokenBody, signal
-    },
-      options);
-    }
-
-
-
-
-export const getJoinBoardByShareTokenQueryKey = (joinBoardByShareTokenBody?: MaybeRef<JoinBoardByShareTokenBody>,) => {
-    return [
-    'POST', 'user','boards','share-tokens','join', joinBoardByShareTokenBody
-    ] as const;
-    }
-
-
-export const getJoinBoardByShareTokenQueryOptions = <TData = Awaited<ReturnType<typeof joinBoardByShareToken>>, TError = ErrorType<unknown>>(joinBoardByShareTokenBody: MaybeRef<JoinBoardByShareTokenBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof joinBoardByShareToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getJoinBoardByShareTokenQueryKey(joinBoardByShareTokenBody);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof joinBoardByShareToken>>> = ({ signal }) => joinBoardByShareToken(joinBoardByShareTokenBody, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof joinBoardByShareToken>>, TError, TData>
+export const getJoinBoardByShareTokenUrl = () => {
+  return `/user/boards/share-tokens/join`
 }
 
-export type JoinBoardByShareTokenQueryResult = NonNullable<Awaited<ReturnType<typeof joinBoardByShareToken>>>
+export const joinBoardByShareToken = async (
+  joinBoardByShareTokenBody: JoinBoardByShareTokenBody,
+  options?: RequestInit,
+): Promise<ApiResponseUserBoard> => {
+  return orvalMutator<ApiResponseUserBoard>(getJoinBoardByShareTokenUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(joinBoardByShareTokenBody),
+  })
+}
+
+export const getJoinBoardByShareTokenQueryKey = (
+  joinBoardByShareTokenBody?: MaybeRef<JoinBoardByShareTokenBody>,
+) => {
+  return ['POST', 'user', 'boards', 'share-tokens', 'join', joinBoardByShareTokenBody] as const
+}
+
+export const getJoinBoardByShareTokenQueryOptions = <
+  TData = Awaited<ReturnType<typeof joinBoardByShareToken>>,
+  TError = ErrorType<unknown>,
+>(
+  joinBoardByShareTokenBody: MaybeRef<JoinBoardByShareTokenBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof joinBoardByShareToken>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getJoinBoardByShareTokenQueryKey(joinBoardByShareTokenBody)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof joinBoardByShareToken>>> = ({ signal }) =>
+    joinBoardByShareToken(unref(joinBoardByShareTokenBody), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof joinBoardByShareToken>>,
+    TError,
+    TData
+  >
+}
+
+export type JoinBoardByShareTokenQueryResult = NonNullable<
+  Awaited<ReturnType<typeof joinBoardByShareToken>>
+>
 export type JoinBoardByShareTokenQueryError = ErrorType<unknown>
 
+export function useJoinBoardByShareToken<
+  TData = Awaited<ReturnType<typeof joinBoardByShareToken>>,
+  TError = ErrorType<unknown>,
+>(
+  joinBoardByShareTokenBody: MaybeRef<JoinBoardByShareTokenBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof joinBoardByShareToken>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getJoinBoardByShareTokenQueryOptions(joinBoardByShareTokenBody, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useJoinBoardByShareToken<TData = Awaited<ReturnType<typeof joinBoardByShareToken>>, TError = ErrorType<unknown>>(
- joinBoardByShareTokenBody: MaybeRef<JoinBoardByShareTokenBody>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof joinBoardByShareToken>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getJoinBoardByShareTokenQueryOptions(joinBoardByShareTokenBody,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }

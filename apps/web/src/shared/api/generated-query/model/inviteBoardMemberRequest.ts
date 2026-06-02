@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { InviteBoardMemberRequestRole } from './inviteBoardMemberRequestRole';
+import type { InviteBoardMemberRequestRole } from './inviteBoardMemberRequestRole'
 
 export interface InviteBoardMemberRequest {
-  member_uid: string;
-  role: InviteBoardMemberRequestRole;
+  member_uid: string
+  role: InviteBoardMemberRequestRole
 }

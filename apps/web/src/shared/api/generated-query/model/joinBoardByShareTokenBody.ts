@@ -6,5 +6,5 @@
  */
 
 export interface JoinBoardByShareTokenBody {
-  token: string;
+  token: string
 }

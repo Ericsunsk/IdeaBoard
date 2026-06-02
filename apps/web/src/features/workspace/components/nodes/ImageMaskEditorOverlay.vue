@@ -152,8 +152,9 @@ onBeforeUnmount(() => {
   opacity: 1;
 }
 
-:global(.image-node-stage:has(.image-mask-editor-overlay.is-image-layer-hidden)
-    .image-node-stage-image) {
+:global(
+  .image-node-stage:has(.image-mask-editor-overlay.is-image-layer-hidden) .image-node-stage-image
+) {
   opacity: 0;
 }
 </style>

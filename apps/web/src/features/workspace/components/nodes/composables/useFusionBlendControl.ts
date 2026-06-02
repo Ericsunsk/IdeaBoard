@@ -59,7 +59,8 @@ export function useFusionBlendControl({
 
   function onBlendPointerMove(event: PointerEvent) {
     if (!blendDragging.value) return
-    if (activeBlendPointerId.value !== null && event.pointerId !== activeBlendPointerId.value) return
+    if (activeBlendPointerId.value !== null && event.pointerId !== activeBlendPointerId.value)
+      return
     const point = resolveBlendPointFromPointer(event)
     if (!point) return
     draftBlendPoint.value = constrainBlendPointForCurrentInputs(point)
@@ -81,7 +82,8 @@ export function useFusionBlendControl({
 
   function onBlendPointerUp(event: PointerEvent) {
     if (!blendDragging.value) return
-    if (activeBlendPointerId.value !== null && event.pointerId !== activeBlendPointerId.value) return
+    if (activeBlendPointerId.value !== null && event.pointerId !== activeBlendPointerId.value)
+      return
     stopBlendDrag(true)
   }
 

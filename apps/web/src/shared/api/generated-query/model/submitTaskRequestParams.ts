@@ -5,4 +5,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SubmitTaskRequestParams = { [key: string]: unknown };
+export type SubmitTaskRequestParams = { [key: string]: unknown }

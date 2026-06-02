@@ -30,11 +30,7 @@ export interface FlowAdapterEdge {
   data?: unknown
 }
 
-type SnapshotNodeCollectionKey =
-  | 'imageNodes'
-  | 'promptNodes'
-  | 'viewpointNodes'
-  | 'fusionNodes'
+type SnapshotNodeCollectionKey = 'imageNodes' | 'promptNodes' | 'viewpointNodes' | 'fusionNodes'
 
 const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
   key: SnapshotNodeCollectionKey

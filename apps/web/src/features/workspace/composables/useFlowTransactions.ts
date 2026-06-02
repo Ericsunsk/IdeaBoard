@@ -52,7 +52,10 @@ export function useFlowTransactions(options: UseFlowTransactionsOptions): FlowTr
     options.refreshSnapshot()
   }
 
-  function recordHistory(historyBefore: FlowHistorySnapshot, commitOptions?: CommitMutationOptions) {
+  function recordHistory(
+    historyBefore: FlowHistorySnapshot,
+    commitOptions?: CommitMutationOptions,
+  ) {
     if (commitOptions?.recordHistory !== false) {
       options.pushHistory(historyBefore)
     }

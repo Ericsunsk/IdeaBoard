@@ -5,10 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type CreateBoardShareTokenRequestRole = typeof CreateBoardShareTokenRequestRole[keyof typeof CreateBoardShareTokenRequestRole];
-
+export type CreateBoardShareTokenRequestRole =
+  (typeof CreateBoardShareTokenRequestRole)[keyof typeof CreateBoardShareTokenRequestRole]
 
 export const CreateBoardShareTokenRequestRole = {
   editor: 'editor',
   viewer: 'viewer',
-} as const;
+} as const

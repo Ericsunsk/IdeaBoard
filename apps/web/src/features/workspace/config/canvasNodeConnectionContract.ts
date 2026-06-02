@@ -52,11 +52,7 @@ export function getCanvasNodePortContracts(
     case 'viewpoint':
       return [input('image', 'image', true), input('prompt', 'prompt'), output('image', 'image')]
     case 'fusion':
-      return [
-        input('image', 'image', true),
-        input('prompt', 'prompt'),
-        output('image', 'image'),
-      ]
+      return [input('image', 'image', true), input('prompt', 'prompt'), output('image', 'image')]
     default:
       return []
   }

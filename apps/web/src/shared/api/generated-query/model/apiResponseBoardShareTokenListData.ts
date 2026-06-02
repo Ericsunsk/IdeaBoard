@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { BoardShareTokenItem } from './boardShareTokenItem';
+import type { BoardShareTokenItem } from './boardShareTokenItem'
 
 export type ApiResponseBoardShareTokenListData = {
-  list: BoardShareTokenItem[];
-};
+  list: BoardShareTokenItem[]
+}

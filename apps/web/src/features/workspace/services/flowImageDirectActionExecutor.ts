@@ -12,7 +12,10 @@ import {
   extendExecutionImageSize,
   scaleExecutionImageSize,
 } from '../utils/executionSizeParams'
-import { buildPromptAspectRatioTaskParams, type PromptAspectRatio } from '../config/promptAspectRatio'
+import {
+  buildPromptAspectRatioTaskParams,
+  type PromptAspectRatio,
+} from '../config/promptAspectRatio'
 import { extractTaskImageUrls } from '../utils/flowImageDirectActionTaskResult'
 import { assertTaskSubmitReady, waitTaskResult } from './flowTaskExecutorUtils'
 import type { ImageDirectActionSource } from '../utils/flowImageDirectActionSource'
@@ -24,9 +27,7 @@ import {
 
 export type ImageHdUpscaleFactor = 2 | 3 | 4
 
-type ImageSizeLoader = (
-  url: string,
-) => Promise<{ width: number; height: number } | null>
+type ImageSizeLoader = (url: string) => Promise<{ width: number; height: number } | null>
 
 type CanvasExtendPercent = {
   top: number
@@ -75,9 +76,7 @@ export function resolveSourceOutputFormat(url: string): 'jpg' | 'png' {
   }
 }
 
-export async function assertDirectActionSubmitReady(
-  action: ImageDirectTaskAction,
-): Promise<void> {
+export async function assertDirectActionSubmitReady(action: ImageDirectTaskAction): Promise<void> {
   await assertTaskSubmitReady(
     buildExecutionTaskRequest({
       prompt: 'submit readiness',
@@ -195,9 +194,7 @@ export async function submitPromptImageGenerationTask(
   return submitRes.data.task_id
 }
 
-export async function submitImageInpaintTask(
-  input: SubmitImageInpaintTaskInput,
-): Promise<string> {
+export async function submitImageInpaintTask(input: SubmitImageInpaintTaskInput): Promise<string> {
   const referenceImageUrls = (input.referenceImageUrls ?? [])
     .map((url) => url.trim())
     .filter(Boolean)
@@ -222,9 +219,7 @@ export async function submitImageInpaintTask(
   return submitRes.data.task_id
 }
 
-export async function submitCanvasExtendTask(
-  input: SubmitCanvasExtendTaskInput,
-): Promise<string> {
+export async function submitCanvasExtendTask(input: SubmitCanvasExtendTaskInput): Promise<string> {
   const imageSize = await input.loadImageSize(input.source.url)
   const prompt = `${input.prompt ?? ''}`.trim()
   const request = buildExecutionTaskRequest({

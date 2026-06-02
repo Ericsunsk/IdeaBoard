@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseBase } from './apiResponseBase';
-import type { ApiResponseBoardShareTokenData } from './apiResponseBoardShareTokenData';
+import type { ApiResponseBase } from './apiResponseBase'
+import type { ApiResponseBoardShareTokenData } from './apiResponseBoardShareTokenData'
 
 export type ApiResponseBoardShareToken = ApiResponseBase & {
-  data?: ApiResponseBoardShareTokenData;
-};
+  data?: ApiResponseBoardShareTokenData
+}

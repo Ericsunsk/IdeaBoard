@@ -5,10 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UpdateAdminUserRoleBodyRole = typeof UpdateAdminUserRoleBodyRole[keyof typeof UpdateAdminUserRoleBodyRole];
-
+export type UpdateAdminUserRoleBodyRole =
+  (typeof UpdateAdminUserRoleBodyRole)[keyof typeof UpdateAdminUserRoleBodyRole]
 
 export const UpdateAdminUserRoleBodyRole = {
   admin: 'admin',
   user: 'user',
-} as const;
+} as const

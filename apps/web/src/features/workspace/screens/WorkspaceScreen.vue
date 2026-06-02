@@ -34,7 +34,13 @@
       @zoom-in="onZoomIn"
     />
 
-    <div ref="canvasWrapRef" class="workspace-flow-canvas-wrap" @dragover.prevent="onCanvasDragOver" @drop.prevent="onCanvasDrop" @wheel="onCanvasWheel">
+    <div
+      ref="canvasWrapRef"
+      class="workspace-flow-canvas-wrap"
+      @dragover.prevent="onCanvasDragOver"
+      @drop.prevent="onCanvasDrop"
+      @wheel="onCanvasWheel"
+    >
       <VueFlow
         v-model:nodes="nodes"
         v-model:edges="edges"
@@ -90,12 +96,34 @@
             :set-image-stage-ref="setImageStageRef"
             :clear-image-stage-ref="clearImageStageRef"
             :expand-mode-active="flowExpandNodeId === nodeProps.id"
-            :expand-overlay-style="flowExpandNodeId === nodeProps.id ? flowExpandOverlayStyle : null"
+            :expand-overlay-style="
+              flowExpandNodeId === nodeProps.id ? flowExpandOverlayStyle : null
+            "
             :expand-handle-radius="flowExpandHandleRadius"
             :mask-editor-mode-active="flowMaskEditorNodeId === nodeProps.id"
-            :mask-editor-overlay-style="flowMaskEditorNodeId === nodeProps.id ? flowMaskEditorOverlayStyle : null"
-            :mask-editor-canvas-width="Math.max(1, Math.round(flowMaskEditorOverlayStyle?.width ? parseFloat(flowMaskEditorOverlayStyle.width) : 0))"
-            :mask-editor-canvas-height="Math.max(1, Math.round(flowMaskEditorOverlayStyle?.height ? parseFloat(flowMaskEditorOverlayStyle.height) : 0))"
+            :mask-editor-overlay-style="
+              flowMaskEditorNodeId === nodeProps.id ? flowMaskEditorOverlayStyle : null
+            "
+            :mask-editor-canvas-width="
+              Math.max(
+                1,
+                Math.round(
+                  flowMaskEditorOverlayStyle?.width
+                    ? parseFloat(flowMaskEditorOverlayStyle.width)
+                    : 0,
+                ),
+              )
+            "
+            :mask-editor-canvas-height="
+              Math.max(
+                1,
+                Math.round(
+                  flowMaskEditorOverlayStyle?.height
+                    ? parseFloat(flowMaskEditorOverlayStyle.height)
+                    : 0,
+                ),
+              )
+            "
             :mask-layer-opacity="maskEditorLayerOpacity"
             :image-layer-visible="true"
             :mask-editor-brush-size="flowMaskEditorBrushSize"
@@ -117,25 +145,31 @@
             @node-mousedown="(event) => onFlowNodeMouseDown(nodeProps.id, event)"
             @request-internals-update="() => scheduleFlowNodeInternalsRefresh([nodeProps.id])"
             @image-contextmenu="(event) => onFlowImageContextMenu(nodeProps.id, event)"
-            @image-prompt-generate="(prompt, outputCount) => onFlowImagePromptGenerate(nodeProps.id, prompt, outputCount)"
-            @image-expand-submit="(prompt, outputCount) => onFlowImageExpandSubmit(nodeProps.id, prompt, outputCount)"
+            @image-prompt-generate="
+              (prompt, outputCount) => onFlowImagePromptGenerate(nodeProps.id, prompt, outputCount)
+            "
+            @image-expand-submit="
+              (prompt, outputCount) => onFlowImageExpandSubmit(nodeProps.id, prompt, outputCount)
+            "
             @fusion-contextmenu="(event) => onFlowFusionContextMenu(nodeProps.id, event)"
             @fusion-prompt-generate="
               (prompt, outputCount, aspectRatio) =>
                 onFlowFusionPromptGenerate(nodeProps.id, prompt, outputCount, aspectRatio)
             "
-            @prompt-generate="(prompt, outputCount, aspectRatio) => onFlowPromptGenerate(nodeProps.id, prompt, outputCount, aspectRatio)"
+            @prompt-generate="
+              (prompt, outputCount, aspectRatio) =>
+                onFlowPromptGenerate(nodeProps.id, prompt, outputCount, aspectRatio)
+            "
             @image-action="(action) => onFlowImageDirectAction(nodeProps.id, action)"
             @strength-action-mousedown="onFlowImageStrengthActionMouseDown"
             @strength-track-mousedown="onFlowImageStrengthTrackMouseDown"
             @expand-handle-pointerdown="
-              (payload) => onFlowExpandHandlePointerDown(nodeProps.id, payload.anchor, payload.event)
+              (payload) =>
+                onFlowExpandHandlePointerDown(nodeProps.id, payload.anchor, payload.event)
             "
             @expand-handle-pointermove="onFlowExpandHandlePointerMove"
             @expand-handle-pointerup="onFlowExpandHandlePointerUp"
-            @expand-frame-pointerdown="
-              (event) => onFlowExpandFramePointerDown(nodeProps.id, event)
-            "
+            @expand-frame-pointerdown="(event) => onFlowExpandFramePointerDown(nodeProps.id, event)"
             @mask-canvas-pointerdown="onFlowMaskEditorCanvasPointerDown"
           />
         </template>
@@ -197,9 +231,7 @@ import {
 } from '../composables/useFlowNodeMutations'
 import { useFlowGenerationHandlers } from '../composables/useFlowGenerationHandlers'
 import { useFlowImageDirectActions } from '../composables/useFlowImageDirectActions'
-import {
-  useFlowImageActionStrengthControl,
-} from '../composables/useFlowImageActionStrengthControl'
+import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
 import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
 import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
@@ -232,9 +264,7 @@ import { useFlowWorkspaceRuntime } from '../composables/useFlowWorkspaceRuntime'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import WorkspaceCanvasOverlays from '../components/WorkspaceCanvasOverlays.vue'
 import WorkspaceScreenChrome from '../components/WorkspaceScreenChrome.vue'
-import {
-  useMaskEditorViewportController,
-} from '../composables/useMaskEditorViewportController'
+import { useMaskEditorViewportController } from '../composables/useMaskEditorViewportController'
 
 const appToast = useAppToast()
 const route = useRoute()
@@ -442,10 +472,7 @@ const {
 const { nodeContextMenu, canvasNodeMenuItems, closeNodeContextMenu, openNodeContextMenu } =
   useFlowNodeContextMenu()
 
-const {
-  getImageNodeSnapshot,
-  getImageNodeDisplayPayload,
-} = useFlowImageNodeSnapshots({
+const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
   nodes: nodes as Ref<Node[]>,
 })
 const { uploadImageToBoard, applyImageFileToImageNode, createImageNodeFromFile } =
@@ -492,10 +519,7 @@ function onFlowImageOpenPreview(nodeId: string) {
   void openNodeImagePreview(snapshot, 'latest-output')
 }
 
-const {
-  onFlowViewpointGenerate,
-  isFlowExecutionNodeRunning,
-} = useFlowGenerationHandlers({
+const { onFlowViewpointGenerate, isFlowExecutionNodeRunning } = useFlowGenerationHandlers({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
   currentBoardId,
@@ -648,19 +672,16 @@ const { onFlowDeleteNode, onFlowPromptTextUpdate, onFlowNodeParamUpdate, onFlowI
     markFlowExecutionNodeDirty,
   })
 
-const {
-  onFlowImageExpandSubmit,
-  onFlowExpandHandlePointerDown,
-  onFlowExpandFramePointerDown,
-} = useFlowExpandInteractionHandlers({
-  flowExpandNodeId,
-  closeActiveImagePromptComposer,
-  clearActiveNodePanels,
-  hideStrengthControl,
-  commitFlowExpandMode,
-  beginFlowExpandHandleResize,
-  beginFlowExpandFrameDrag,
-})
+const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFramePointerDown } =
+  useFlowExpandInteractionHandlers({
+    flowExpandNodeId,
+    closeActiveImagePromptComposer,
+    clearActiveNodePanels,
+    hideStrengthControl,
+    commitFlowExpandMode,
+    beginFlowExpandHandleResize,
+    beginFlowExpandFrameDrag,
+  })
 
 const {
   maskEditorChromeAnchorRect,
@@ -1048,7 +1069,6 @@ onMounted(async () => {
 .canvas-layout.tool-text .workspace-flow-canvas-wrap :deep(.vue-flow__pane) {
   cursor: text;
 }
-
 </style>
 
 <style>

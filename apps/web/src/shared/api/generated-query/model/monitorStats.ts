@@ -6,8 +6,8 @@
  */
 
 export interface MonitorStats {
-  pending: number;
-  running: number;
-  completed: number;
-  failed: number;
+  pending: number
+  running: number
+  completed: number
+  failed: number
 }

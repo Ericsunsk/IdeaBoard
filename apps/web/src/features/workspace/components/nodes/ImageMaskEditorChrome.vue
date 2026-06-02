@@ -82,7 +82,10 @@
           <label class="image-mask-editor-field">
             <span class="image-mask-editor-field-label">粗细</span>
             <div class="image-mask-editor-size-input-row">
-              <div class="image-mask-editor-range-wrap" :style="rangeTooltipStyle(brushSize, 4, 48)">
+              <div
+                class="image-mask-editor-range-wrap"
+                :style="rangeTooltipStyle(brushSize, 4, 48)"
+              >
                 <input
                   type="range"
                   min="4"
@@ -186,11 +189,7 @@
             <Redo />
           </NodeToolIconButton>
         </template>
-        <div
-          v-else
-          class="image-mask-editor-feather-pop"
-          @mousedown.stop
-        >
+        <div v-else class="image-mask-editor-feather-pop" @mousedown.stop>
           <div
             ref="featherStrengthTrackRef"
             class="image-mask-editor-feather-track"
@@ -201,10 +200,7 @@
             aria-valuemax="100"
             @mousedown.stop.prevent="onFeatherTrackMouseDown"
           >
-            <div
-              class="image-mask-editor-feather-fill"
-              :style="{ width: `${featherStrength}%` }"
-            />
+            <div class="image-mask-editor-feather-fill" :style="{ width: `${featherStrength}%` }" />
           </div>
         </div>
       </div>
@@ -801,5 +797,4 @@ onBeforeUnmount(() => {
   opacity: 1;
   transform: translate(-50%, 0);
 }
-
 </style>

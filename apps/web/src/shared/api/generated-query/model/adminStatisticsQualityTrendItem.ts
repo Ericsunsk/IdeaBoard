@@ -6,10 +6,10 @@
  */
 
 export type AdminStatisticsQualityTrendItem = {
-  date: string;
-  label: string;
-  total: number;
-  success: number;
-  fail: number;
-  success_rate: number;
-};
+  date: string
+  label: string
+  total: number
+  success: number
+  fail: number
+  success_rate: number
+}

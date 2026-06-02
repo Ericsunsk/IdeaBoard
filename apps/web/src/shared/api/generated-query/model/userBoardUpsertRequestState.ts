@@ -8,4 +8,4 @@
 /**
  * @nullable
  */
-export type UserBoardUpsertRequestState = { [key: string]: unknown } | null;
+export type UserBoardUpsertRequestState = { [key: string]: unknown } | null

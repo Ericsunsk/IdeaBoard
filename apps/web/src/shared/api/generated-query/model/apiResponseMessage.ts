@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseBase } from './apiResponseBase';
-import type { ApiResponseMessageData } from './apiResponseMessageData';
+import type { ApiResponseBase } from './apiResponseBase'
+import type { ApiResponseMessageData } from './apiResponseMessageData'
 
 export type ApiResponseMessage = ApiResponseBase & {
-  data?: ApiResponseMessageData;
-};
+  data?: ApiResponseMessageData
+}

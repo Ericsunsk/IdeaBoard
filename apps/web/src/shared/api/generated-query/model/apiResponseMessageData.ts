@@ -6,5 +6,5 @@
  */
 
 export type ApiResponseMessageData = {
-  message: string;
-};
+  message: string
+}

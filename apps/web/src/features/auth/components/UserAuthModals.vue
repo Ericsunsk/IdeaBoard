@@ -47,7 +47,8 @@ function isSafeInternalRedirectPath(path: string) {
 function resolveLoginRedirectPath() {
   const redirect = route.query.redirect
   const rawRedirectPath = Array.isArray(redirect) ? redirect[0] : redirect
-  const redirectPath = typeof rawRedirectPath === 'string' ? rawRedirectPath.trim() : rawRedirectPath
+  const redirectPath =
+    typeof rawRedirectPath === 'string' ? rawRedirectPath.trim() : rawRedirectPath
   if (!redirectPath || typeof redirectPath !== 'string') {
     return '/user/home'
   }

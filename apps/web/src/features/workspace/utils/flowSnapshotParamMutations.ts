@@ -4,9 +4,7 @@ import {
 } from '../components/nodes/config/nodeOptionConfig'
 import type { PromptNodeInputImage, ViewpointNodeItem } from '../types/canvasNodes'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
-import {
-  clampImageNodeOutputCount,
-} from '../types/canvasNodes'
+import { clampImageNodeOutputCount } from '../types/canvasNodes'
 import {
   areFusionBlendPointsEqual,
   constrainFusionBlendPoint,

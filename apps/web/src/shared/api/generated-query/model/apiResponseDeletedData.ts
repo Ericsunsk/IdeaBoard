@@ -6,5 +6,5 @@
  */
 
 export type ApiResponseDeletedData = {
-  deleted: boolean;
-};
+  deleted: boolean
+}

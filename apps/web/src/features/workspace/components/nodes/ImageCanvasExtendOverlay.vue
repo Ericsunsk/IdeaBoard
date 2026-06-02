@@ -18,11 +18,7 @@
         :style="handleStyle"
         @pointerdown.stop.prevent="emit('handle-pointerdown', { anchor, event: $event })"
       />
-      <div
-        class="image-node-expand-composer-wrap"
-        data-image-extend-composer
-        @pointerdown.stop
-      >
+      <div class="image-node-expand-composer-wrap" data-image-extend-composer @pointerdown.stop>
         <NodePromptComposer
           v-model="promptDraft"
           offset="10px"
@@ -65,7 +61,9 @@ const emit = defineEmits<{
 const promptDraft = ref('')
 const anchors = CANVAS_EXTEND_DRAG_ANCHORS
 const handleStyle = computed(() => {
-  const radius = Number.isFinite(props.handleRadius) ? Math.max(2, Math.round(props.handleRadius)) : 4
+  const radius = Number.isFinite(props.handleRadius)
+    ? Math.max(2, Math.round(props.handleRadius))
+    : 4
   const diameter = radius * 2
   return {
     width: `${diameter}px`,
@@ -101,26 +99,10 @@ function onSubmit(prompt: string, outputCount: number) {
   pointer-events: auto;
   cursor: move;
   background-image:
-    repeating-linear-gradient(
-      to bottom,
-      var(--expand-frame-grid) 0 4px,
-      transparent 4px 9px
-    ),
-    repeating-linear-gradient(
-      to bottom,
-      var(--expand-frame-grid) 0 4px,
-      transparent 4px 9px
-    ),
-    repeating-linear-gradient(
-      to right,
-      var(--expand-frame-grid) 0 4px,
-      transparent 4px 9px
-    ),
-    repeating-linear-gradient(
-      to right,
-      var(--expand-frame-grid) 0 4px,
-      transparent 4px 9px
-    );
+    repeating-linear-gradient(to bottom, var(--expand-frame-grid) 0 4px, transparent 4px 9px),
+    repeating-linear-gradient(to bottom, var(--expand-frame-grid) 0 4px, transparent 4px 9px),
+    repeating-linear-gradient(to right, var(--expand-frame-grid) 0 4px, transparent 4px 9px),
+    repeating-linear-gradient(to right, var(--expand-frame-grid) 0 4px, transparent 4px 9px);
   background-size:
     1px 100%,
     1px 100%,

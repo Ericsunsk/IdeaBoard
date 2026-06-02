@@ -134,7 +134,10 @@ function testFusionBlendPointDefaultApplied() {
       parsed.output.fusionNodes[0]?.blendPoint.y === 0.5,
       'expected blendPoint y default to 0.5',
     )
-    expect(parsed.output.fusionNodes[0]?.aspectRatio === 'auto', 'expected aspectRatio default to auto')
+    expect(
+      parsed.output.fusionNodes[0]?.aspectRatio === 'auto',
+      'expected aspectRatio default to auto',
+    )
   }
 }
 

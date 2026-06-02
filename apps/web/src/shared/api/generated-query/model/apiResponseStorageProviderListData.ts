@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { StorageProviderMeta } from './storageProviderMeta';
+import type { StorageProviderMeta } from './storageProviderMeta'
 
 export type ApiResponseStorageProviderListData = {
-  providers: StorageProviderMeta[];
-};
+  providers: StorageProviderMeta[]
+}

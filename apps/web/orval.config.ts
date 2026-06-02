@@ -8,13 +8,17 @@ export default defineConfig({
       schemas: 'src/shared/api/generated-query/model',
       mode: 'tags-split',
       client: 'vue-query',
-      httpClient: 'axios',
+      httpClient: 'fetch',
       clean: true,
+      formatter: 'prettier',
       urlEncodeParameters: true,
       override: {
         mutator: {
           path: './src/shared/api/orvalMutator.ts',
           name: 'orvalMutator',
+        },
+        fetch: {
+          includeHttpResponseReturnType: false,
         },
         query: {
           useQuery: true,

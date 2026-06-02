@@ -6,10 +6,10 @@
  */
 
 export type AdminStatisticsModelHealthItem = {
-  name: string;
-  total: number;
-  completed: number;
-  failed: number;
-  failure_rate: number;
-  avg_seconds: number;
-};
+  name: string
+  total: number
+  completed: number
+  failed: number
+  failure_rate: number
+  avg_seconds: number
+}

@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { StorageProfile } from './storageProfile';
+import type { StorageProfile } from './storageProfile'
 
 export type ApiResponseStorageProfileListData = {
-  profiles: StorageProfile[];
-};
+  profiles: StorageProfile[]
+}

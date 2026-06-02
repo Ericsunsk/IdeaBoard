@@ -32,12 +32,7 @@ const positiveIntegerSchema = v.pipe(finiteNumberSchema, v.integer(), v.minValue
 const nonEmptyStringSchema = v.pipe(v.string(), v.minLength(1))
 
 const workflowNodeOutputStatusSchema = v.picklist(['idle', 'running', 'ready', 'stale'])
-const canvasConnectionNodeTypeSchema = v.picklist([
-  'image',
-  'prompt',
-  'viewpoint',
-  'fusion',
-])
+const canvasConnectionNodeTypeSchema = v.picklist(['image', 'prompt', 'viewpoint', 'fusion'])
 const canvasConnectionPortSchema = v.picklist(['image', 'prompt'])
 
 const imageNodeOutputItemSchema = v.strictObject({

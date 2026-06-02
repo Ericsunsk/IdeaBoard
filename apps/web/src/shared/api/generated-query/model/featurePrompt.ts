@@ -6,6 +6,6 @@
  */
 
 export interface FeaturePrompt {
-  slug: string;
-  prompt: string;
+  slug: string
+  prompt: string
 }

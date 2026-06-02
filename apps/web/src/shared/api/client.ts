@@ -1,6 +1,7 @@
-import axios, { type AxiosRequestConfig } from 'axios'
+import { ofetch, type FetchError, type FetchOptions } from 'ofetch'
 import { handleAuthFailure } from '../utils/auth'
 import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
+import type { ApiResponse } from '../types'
 
 export type ApiClientError = Error & {
   code?: number
@@ -9,14 +10,7 @@ export type ApiClientError = Error & {
   data?: unknown
 }
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
+export type ApiRequestConfig = Omit<FetchOptions<'json'>, 'params'>
 
 function toObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
@@ -36,53 +30,75 @@ export function createApiError(payload?: unknown, status?: number): ApiClientErr
   return error
 }
 
-api.interceptors.response.use(
-  (response) => {
-    const data = normalizeRuntimeMediaRefs(response.data)
+function requestURL(request: unknown): string {
+  if (typeof request === 'string') return request
+  if (request instanceof URL) return request.toString()
+  if (request instanceof Request) return request.url
+  return ''
+}
+
+const apiFetch = ofetch.create({
+  baseURL: API_BASE_URL,
+  credentials: 'include',
+  retry: false,
+  timeout: 10000,
+  onResponse({ response }) {
+    const data = normalizeRuntimeMediaRefs(response._data)
+    response._data = data
     if (data && typeof data.code === 'number' && data.code !== 0) {
-      const requestUrl = response.config?.url || ''
+      const requestUrl = response.url || ''
       handleAuthFailure({ status: response.status, payload: data, requestUrl })
-      return Promise.reject(createApiError(data, response.status))
+      throw createApiError(data, response.status)
     }
-    return data
   },
-  (error) => {
-    if (error.response) {
-      const requestUrl = error.config?.url || ''
-      handleAuthFailure({ status: error.response.status, payload: error.response.data, requestUrl })
-      return Promise.reject(createApiError(error.response.data, error.response.status))
+  onResponseError({ request, response }) {
+    const payload = response._data
+    const requestUrl = response.url || requestURL(request)
+    handleAuthFailure({ status: response.status, payload, requestUrl })
+    throw createApiError(payload, response.status)
+  },
+})
+
+async function apiRequest<T>(url: string, config?: ApiRequestConfig): Promise<T> {
+  try {
+    return await apiFetch<T>(url, config)
+  } catch (error) {
+    if (error && typeof error === 'object' && 'status' in error && 'msg' in error) {
+      throw error
     }
-    return Promise.reject(createApiError(error))
-  },
-)
-
-import type { ApiResponse } from '../types'
-
-type AxiosConfig<D = unknown> = AxiosRequestConfig<D> | undefined
-
-export function apiGet<T>(url: string, config?: AxiosConfig): Promise<ApiResponse<T>> {
-  return api.get<unknown, ApiResponse<T>>(url, config)
+    const fetchError = error as FetchError<unknown>
+    if (fetchError?.response) {
+      const payload = fetchError.data ?? fetchError.response._data
+      const requestUrl = fetchError.response.url || requestURL(fetchError.request)
+      handleAuthFailure({ status: fetchError.response.status, payload, requestUrl })
+      throw createApiError(payload, fetchError.response.status)
+    }
+    throw createApiError(error)
+  }
 }
 
-export function apiPost<T, D = unknown>(
-  url: string,
-  data?: D,
-  config?: AxiosConfig<D>,
-): Promise<ApiResponse<T>> {
-  return api.post<unknown, ApiResponse<T>, D>(url, data, config)
+export function apiGet<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
+  return apiRequest<ApiResponse<T>>(url, { ...config, method: 'GET' })
 }
 
-export function apiPut<T, D = unknown>(
-  url: string,
-  data?: D,
-  config?: AxiosConfig<D>,
-): Promise<ApiResponse<T>> {
-  return api.put<unknown, ApiResponse<T>, D>(url, data, config)
+export function apiPost<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
+  return apiRequest<ApiResponse<T>>(url, { ...config, method: 'POST' })
 }
 
-export function apiDelete<T>(url: string, config?: AxiosConfig): Promise<ApiResponse<T>> {
-  return api.delete<unknown, ApiResponse<T>>(url, config)
+export function apiPut<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
+  return apiRequest<ApiResponse<T>>(url, { ...config, method: 'PUT' })
 }
 
-export { api }
+export function apiDelete<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
+  return apiRequest<ApiResponse<T>>(url, { ...config, method: 'DELETE' })
+}
+
+export const api = {
+  request: apiRequest,
+  get: apiGet,
+  post: apiPost,
+  put: apiPut,
+  delete: apiDelete,
+}
+
 export default api

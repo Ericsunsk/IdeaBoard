@@ -6,16 +6,16 @@
  */
 
 export interface TaskOutput {
-  id: number;
-  task_id: string;
-  role: string;
-  url: string;
-  storage_key?: string;
-  mime_type?: string;
-  width?: number;
-  height?: number;
-  size_bytes?: number;
-  sort_index: number;
-  created_at: string;
-  updated_at: string;
+  id: number
+  task_id: string
+  role: string
+  url: string
+  storage_key?: string
+  mime_type?: string
+  width?: number
+  height?: number
+  size_bytes?: number
+  sort_index: number
+  created_at: string
+  updated_at: string
 }

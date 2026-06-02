@@ -4,25 +4,18 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  computed,
-  unref
-} from 'vue';
-import type {
-  MaybeRef
-} from 'vue';
+import { computed, unref } from 'vue'
+import type { MaybeRef } from 'vue'
 
 import type {
   ApiResponseChannel,
@@ -30,339 +23,369 @@ import type {
   ApiResponseDetectModels,
   ApiResponseEmpty,
   ChannelFormData,
-  DetectModelsRequest
-} from '../model';
+  DetectModelsRequest,
+} from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getListAdminChannelsUrl = () => {
+  return `/admin/channels`
+}
 
-
-
-export const listAdminChannels = (
-
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-
-
-      return orvalMutator<ApiResponseChannelList>(
-      {url: `/admin/channels`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
+export const listAdminChannels = async (options?: RequestInit): Promise<ApiResponseChannelList> => {
+  return orvalMutator<ApiResponseChannelList>(getListAdminChannelsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
 
 export const getListAdminChannelsQueryKey = () => {
-    return [
-    'admin','channels'
-    ] as const;
-    }
-
-
-export const getListAdminChannelsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminChannels>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminChannels>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getListAdminChannelsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminChannels>>> = ({ signal }) => listAdminChannels(requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminChannels>>, TError, TData>
+  return ['admin', 'channels'] as const
 }
 
-export type ListAdminChannelsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminChannels>>>
+export const getListAdminChannelsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminChannels>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminChannels>>, TError, TData>>
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminChannelsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminChannels>>> = ({ signal }) =>
+    listAdminChannels({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminChannels>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminChannelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminChannels>>
+>
 export type ListAdminChannelsQueryError = ErrorType<unknown>
 
-
-
-export function useListAdminChannels<TData = Awaited<ReturnType<typeof listAdminChannels>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminChannels>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
+export function useListAdminChannels<
+  TData = Awaited<ReturnType<typeof listAdminChannels>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminChannels>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListAdminChannelsQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const createAdminChannel = (
-    channelFormData: MaybeRef<ChannelFormData>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      channelFormData = unref(channelFormData);
-
-      return orvalMutator<ApiResponseChannel>(
-      {url: `/admin/channels`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: channelFormData, signal
-    },
-      options);
-    }
-
-
-
-
-export const getCreateAdminChannelQueryKey = (channelFormData?: MaybeRef<ChannelFormData>,) => {
-    return [
-    'POST', 'admin','channels', channelFormData
-    ] as const;
-    }
-
-
-export const getCreateAdminChannelQueryOptions = <TData = Awaited<ReturnType<typeof createAdminChannel>>, TError = ErrorType<unknown>>(channelFormData: MaybeRef<ChannelFormData>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof createAdminChannel>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getCreateAdminChannelQueryKey(channelFormData);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof createAdminChannel>>> = ({ signal }) => createAdminChannel(channelFormData, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof createAdminChannel>>, TError, TData>
+export const getCreateAdminChannelUrl = () => {
+  return `/admin/channels`
 }
 
-export type CreateAdminChannelQueryResult = NonNullable<Awaited<ReturnType<typeof createAdminChannel>>>
+export const createAdminChannel = async (
+  channelFormData: ChannelFormData,
+  options?: RequestInit,
+): Promise<ApiResponseChannel> => {
+  return orvalMutator<ApiResponseChannel>(getCreateAdminChannelUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(channelFormData),
+  })
+}
+
+export const getCreateAdminChannelQueryKey = (channelFormData?: MaybeRef<ChannelFormData>) => {
+  return ['POST', 'admin', 'channels', channelFormData] as const
+}
+
+export const getCreateAdminChannelQueryOptions = <
+  TData = Awaited<ReturnType<typeof createAdminChannel>>,
+  TError = ErrorType<unknown>,
+>(
+  channelFormData: MaybeRef<ChannelFormData>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof createAdminChannel>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getCreateAdminChannelQueryKey(channelFormData)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof createAdminChannel>>> = ({ signal }) =>
+    createAdminChannel(unref(channelFormData), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof createAdminChannel>>,
+    TError,
+    TData
+  >
+}
+
+export type CreateAdminChannelQueryResult = NonNullable<
+  Awaited<ReturnType<typeof createAdminChannel>>
+>
 export type CreateAdminChannelQueryError = ErrorType<unknown>
 
+export function useCreateAdminChannel<
+  TData = Awaited<ReturnType<typeof createAdminChannel>>,
+  TError = ErrorType<unknown>,
+>(
+  channelFormData: MaybeRef<ChannelFormData>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof createAdminChannel>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCreateAdminChannelQueryOptions(channelFormData, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useCreateAdminChannel<TData = Awaited<ReturnType<typeof createAdminChannel>>, TError = ErrorType<unknown>>(
- channelFormData: MaybeRef<ChannelFormData>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof createAdminChannel>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getCreateAdminChannelQueryOptions(channelFormData,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const detectAdminChannelModels = (
-    detectModelsRequest: MaybeRef<DetectModelsRequest>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      detectModelsRequest = unref(detectModelsRequest);
-
-      return orvalMutator<ApiResponseDetectModels>(
-      {url: `/admin/channels/detect-models`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: detectModelsRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getDetectAdminChannelModelsQueryKey = (detectModelsRequest?: MaybeRef<DetectModelsRequest>,) => {
-    return [
-    'POST', 'admin','channels','detect-models', detectModelsRequest
-    ] as const;
-    }
-
-
-export const getDetectAdminChannelModelsQueryOptions = <TData = Awaited<ReturnType<typeof detectAdminChannelModels>>, TError = ErrorType<unknown>>(detectModelsRequest: MaybeRef<DetectModelsRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof detectAdminChannelModels>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getDetectAdminChannelModelsQueryKey(detectModelsRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof detectAdminChannelModels>>> = ({ signal }) => detectAdminChannelModels(detectModelsRequest, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof detectAdminChannelModels>>, TError, TData>
+export const getDetectAdminChannelModelsUrl = () => {
+  return `/admin/channels/detect-models`
 }
 
-export type DetectAdminChannelModelsQueryResult = NonNullable<Awaited<ReturnType<typeof detectAdminChannelModels>>>
+export const detectAdminChannelModels = async (
+  detectModelsRequest: DetectModelsRequest,
+  options?: RequestInit,
+): Promise<ApiResponseDetectModels> => {
+  return orvalMutator<ApiResponseDetectModels>(getDetectAdminChannelModelsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(detectModelsRequest),
+  })
+}
+
+export const getDetectAdminChannelModelsQueryKey = (
+  detectModelsRequest?: MaybeRef<DetectModelsRequest>,
+) => {
+  return ['POST', 'admin', 'channels', 'detect-models', detectModelsRequest] as const
+}
+
+export const getDetectAdminChannelModelsQueryOptions = <
+  TData = Awaited<ReturnType<typeof detectAdminChannelModels>>,
+  TError = ErrorType<unknown>,
+>(
+  detectModelsRequest: MaybeRef<DetectModelsRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof detectAdminChannelModels>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDetectAdminChannelModelsQueryKey(detectModelsRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof detectAdminChannelModels>>> = ({
+    signal,
+  }) => detectAdminChannelModels(unref(detectModelsRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof detectAdminChannelModels>>,
+    TError,
+    TData
+  >
+}
+
+export type DetectAdminChannelModelsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof detectAdminChannelModels>>
+>
 export type DetectAdminChannelModelsQueryError = ErrorType<unknown>
 
+export function useDetectAdminChannelModels<
+  TData = Awaited<ReturnType<typeof detectAdminChannelModels>>,
+  TError = ErrorType<unknown>,
+>(
+  detectModelsRequest: MaybeRef<DetectModelsRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof detectAdminChannelModels>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDetectAdminChannelModelsQueryOptions(detectModelsRequest, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useDetectAdminChannelModels<TData = Awaited<ReturnType<typeof detectAdminChannelModels>>, TError = ErrorType<unknown>>(
- detectModelsRequest: MaybeRef<DetectModelsRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof detectAdminChannelModels>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getDetectAdminChannelModelsQueryOptions(detectModelsRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const updateAdminChannel = (
-    id: MaybeRef<number>,
-    channelFormData: MaybeRef<ChannelFormData>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      id = unref(id);
-channelFormData = unref(channelFormData);
-
-      return orvalMutator<ApiResponseChannel>(
-      {url: `/admin/channels/${encodeURIComponent(String(id))}`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: channelFormData, signal
-    },
-      options);
-    }
-
-
-
-
-export const getUpdateAdminChannelQueryKey = (id: MaybeRef<number>,
-    channelFormData?: MaybeRef<ChannelFormData>,) => {
-    return [
-    'PUT', 'admin','channels',id, channelFormData
-    ] as const;
-    }
-
-
-export const getUpdateAdminChannelQueryOptions = <TData = Awaited<ReturnType<typeof updateAdminChannel>>, TError = ErrorType<unknown>>(id: MaybeRef<number>,
-    channelFormData: MaybeRef<ChannelFormData>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminChannel>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getUpdateAdminChannelQueryKey(id,channelFormData);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminChannel>>> = ({ signal }) => updateAdminChannel(id,channelFormData, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(id) !== null && unref(id) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof updateAdminChannel>>, TError, TData>
+export const getUpdateAdminChannelUrl = (id: number) => {
+  return `/admin/channels/${encodeURIComponent(String(id))}`
 }
 
-export type UpdateAdminChannelQueryResult = NonNullable<Awaited<ReturnType<typeof updateAdminChannel>>>
+export const updateAdminChannel = async (
+  id: number,
+  channelFormData: ChannelFormData,
+  options?: RequestInit,
+): Promise<ApiResponseChannel> => {
+  return orvalMutator<ApiResponseChannel>(getUpdateAdminChannelUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(channelFormData),
+  })
+}
+
+export const getUpdateAdminChannelQueryKey = (
+  id: MaybeRef<number>,
+  channelFormData?: MaybeRef<ChannelFormData>,
+) => {
+  return ['PUT', 'admin', 'channels', id, channelFormData] as const
+}
+
+export const getUpdateAdminChannelQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminChannel>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  channelFormData: MaybeRef<ChannelFormData>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminChannel>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getUpdateAdminChannelQueryKey(id, channelFormData)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminChannel>>> = ({ signal }) =>
+    updateAdminChannel(unref(id), unref(channelFormData), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof updateAdminChannel>>, TError, TData>
+}
+
+export type UpdateAdminChannelQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminChannel>>
+>
 export type UpdateAdminChannelQueryError = ErrorType<unknown>
 
+export function useUpdateAdminChannel<
+  TData = Awaited<ReturnType<typeof updateAdminChannel>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  channelFormData: MaybeRef<ChannelFormData>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminChannel>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getUpdateAdminChannelQueryOptions(id, channelFormData, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useUpdateAdminChannel<TData = Awaited<ReturnType<typeof updateAdminChannel>>, TError = ErrorType<unknown>>(
- id: MaybeRef<number>,
-    channelFormData: MaybeRef<ChannelFormData>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof updateAdminChannel>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getUpdateAdminChannelQueryOptions(id,channelFormData,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const deleteAdminChannel = (
-    id: MaybeRef<number>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      id = unref(id);
-
-      return orvalMutator<ApiResponseEmpty>(
-      {url: `/admin/channels/${encodeURIComponent(String(id))}`, method: 'DELETE', signal
-    },
-      options);
-    }
-
-
-
-
-export const getDeleteAdminChannelQueryKey = (id: MaybeRef<number>,) => {
-    return [
-    'DELETE', 'admin','channels',id
-    ] as const;
-    }
-
-
-export const getDeleteAdminChannelQueryOptions = <TData = Awaited<ReturnType<typeof deleteAdminChannel>>, TError = ErrorType<unknown>>(id: MaybeRef<number>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminChannel>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getDeleteAdminChannelQueryKey(id);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminChannel>>> = ({ signal }) => deleteAdminChannel(id, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(id) !== null && unref(id) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminChannel>>, TError, TData>
+export const getDeleteAdminChannelUrl = (id: number) => {
+  return `/admin/channels/${encodeURIComponent(String(id))}`
 }
 
-export type DeleteAdminChannelQueryResult = NonNullable<Awaited<ReturnType<typeof deleteAdminChannel>>>
+export const deleteAdminChannel = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getDeleteAdminChannelUrl(id), {
+    ...options,
+    method: 'DELETE',
+  })
+}
+
+export const getDeleteAdminChannelQueryKey = (id: MaybeRef<number>) => {
+  return ['DELETE', 'admin', 'channels', id] as const
+}
+
+export const getDeleteAdminChannelQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteAdminChannel>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminChannel>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getDeleteAdminChannelQueryKey(id)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteAdminChannel>>> = ({ signal }) =>
+    deleteAdminChannel(unref(id), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof deleteAdminChannel>>, TError, TData>
+}
+
+export type DeleteAdminChannelQueryResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAdminChannel>>
+>
 export type DeleteAdminChannelQueryError = ErrorType<unknown>
 
+export function useDeleteAdminChannel<
+  TData = Awaited<ReturnType<typeof deleteAdminChannel>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminChannel>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteAdminChannelQueryOptions(id, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useDeleteAdminChannel<TData = Awaited<ReturnType<typeof deleteAdminChannel>>, TError = ErrorType<unknown>>(
- id: MaybeRef<number>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteAdminChannel>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getDeleteAdminChannelQueryOptions(id,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }

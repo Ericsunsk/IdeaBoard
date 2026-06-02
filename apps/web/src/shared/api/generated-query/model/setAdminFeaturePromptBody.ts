@@ -6,5 +6,5 @@
  */
 
 export type SetAdminFeaturePromptBody = {
-  prompt: string;
-};
+  prompt: string
+}

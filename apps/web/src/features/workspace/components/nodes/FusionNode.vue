@@ -50,14 +50,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Keyframes } from '@iconoir/vue'
-import {
-  clampImageNodeOutputCount,
-  type FusionNodeItem,
-} from '../../types/canvasNodes'
-import {
-  normalizePromptAspectRatio,
-  type PromptAspectRatio,
-} from '../../config/promptAspectRatio'
+import { clampImageNodeOutputCount, type FusionNodeItem } from '../../types/canvasNodes'
+import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../config/promptAspectRatio'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import type { FusionBlendPoint } from '../../utils/fusionBlend'
 import FusionStage from './FusionStage.vue'

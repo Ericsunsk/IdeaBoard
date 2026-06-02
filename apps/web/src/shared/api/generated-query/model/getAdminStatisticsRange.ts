@@ -5,11 +5,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetAdminStatisticsRange = typeof GetAdminStatisticsRange[keyof typeof GetAdminStatisticsRange];
-
+export type GetAdminStatisticsRange =
+  (typeof GetAdminStatisticsRange)[keyof typeof GetAdminStatisticsRange]
 
 export const GetAdminStatisticsRange = {
   '7d': '7d',
   '30d': '30d',
   '1y': '1y',
-} as const;
+} as const

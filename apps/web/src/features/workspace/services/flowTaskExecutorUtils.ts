@@ -89,12 +89,7 @@ export function parseHandlePort(handle: string | null | undefined): string {
 
 export function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null {
   const [head] = nodeId.split('-')
-  if (
-    head === 'prompt' ||
-    head === 'image' ||
-    head === 'viewpoint' ||
-    head === 'fusion'
-  ) {
+  if (head === 'prompt' || head === 'image' || head === 'viewpoint' || head === 'fusion') {
     return head
   }
   return null

@@ -132,7 +132,11 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     results.forEach((result) => {
       if (result.status === 'fulfilled') {
         successCount += 1
-        updatePendingImageResultNode(result.value.resultNodeId, result.value.url, result.value.ratio)
+        updatePendingImageResultNode(
+          result.value.resultNodeId,
+          result.value.url,
+          result.value.ratio,
+        )
         return
       }
       firstFailure ??= result.reason
@@ -140,7 +144,8 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     params.resultNodeIds.forEach((resultNodeId, index) => {
       if (results[index]?.status !== 'fulfilled') removePendingImageResultNode(resultNodeId)
     })
-    if (successCount === 0) throw firstFailure instanceof Error ? firstFailure : new Error('生成失败')
+    if (successCount === 0)
+      throw firstFailure instanceof Error ? firstFailure : new Error('生成失败')
     if (successCount < params.totalCount) {
       options.onWarning(`生成完成 ${successCount}/${params.totalCount} 张，部分任务失败`)
     } else {
@@ -191,12 +196,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       const taskId =
         action === IMAGE_NODE_ACTION.hdUpscale
           ? await submitHdUpscaleTask(source, loadImageSizeFromUrl, runOptions?.strength)
-          : await submitDirectActionTask(
-              source,
-              action,
-              loadImageSizeFromUrl,
-              runOptions?.strength,
-            )
+          : await submitDirectActionTask(source, action, loadImageSizeFromUrl, runOptions?.strength)
       const urls = await waitExistingOrLiveTaskResult(taskId)
       const firstUrl = pickFirstValidUrl(urls)
       if (!firstUrl) throw new Error('任务完成但未返回图片')
@@ -501,7 +501,10 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
     const snapshot = fusionNode.data.snapshotNode as FusionNodeItem
     const taskGraph = {
-      nodes: options.nodes.value as Array<{ id: string; data?: { kind?: string; snapshotNode?: unknown } }>,
+      nodes: options.nodes.value as Array<{
+        id: string
+        data?: { kind?: string; snapshotNode?: unknown }
+      }>,
       edges: options.edges.value as Array<{
         source: string
         sourceHandle?: string | null

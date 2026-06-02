@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseBase } from './apiResponseBase';
-import type { FeaturePrompt } from './featurePrompt';
+import type { ApiResponseBase } from './apiResponseBase'
+import type { FeaturePrompt } from './featurePrompt'
 
 export type ApiResponseFeaturePrompt = ApiResponseBase & {
-  data?: FeaturePrompt;
-};
+  data?: FeaturePrompt
+}

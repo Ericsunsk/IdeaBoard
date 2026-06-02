@@ -6,11 +6,11 @@
  */
 
 export interface StorageProviderField {
-  key: string;
-  label: string;
-  type: string;
-  placeholder?: string;
-  hint?: string;
-  required?: boolean;
-  secret?: boolean;
+  key: string
+  label: string
+  type: string
+  placeholder?: string
+  hint?: string
+  required?: boolean
+  secret?: boolean
 }

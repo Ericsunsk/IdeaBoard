@@ -6,9 +6,9 @@
  */
 
 export type AdminStatisticsUserRiskItem = {
-  name: string;
-  total: number;
-  completed: number;
-  failed: number;
-  failure_rate: number;
-};
+  name: string
+  total: number
+  completed: number
+  failed: number
+  failure_rate: number
+}

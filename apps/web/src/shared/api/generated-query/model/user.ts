@@ -6,13 +6,13 @@
  */
 
 export interface User {
-  id: number;
-  uid: string;
-  username: string;
-  auth_user_id?: string;
-  avatar?: string;
-  role: string;
-  status: number;
-  created_at: string;
-  updated_at: string;
+  id: number
+  uid: string
+  username: string
+  auth_user_id?: string
+  avatar?: string
+  role: string
+  status: number
+  created_at: string
+  updated_at: string
 }

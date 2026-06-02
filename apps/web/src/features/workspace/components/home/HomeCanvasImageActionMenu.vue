@@ -32,11 +32,7 @@
           <ImageActionMenuIcon :icon="item.icon" />
         </NodeToolIconButton>
       </template>
-      <div
-        v-else
-        class="style-strength-pop"
-        @mousedown.stop
-      >
+      <div v-else class="style-strength-pop" @mousedown.stop>
         <div
           :ref="setStrengthTrackRef"
           class="style-strength-track"

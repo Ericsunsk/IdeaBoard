@@ -4,11 +4,11 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { StorageProfilePayloadConfig } from './storageProfilePayloadConfig';
+import type { StorageProfilePayloadConfig } from './storageProfilePayloadConfig'
 
 export interface StorageProfilePayload {
-  name: string;
-  provider: string;
-  enabled: boolean;
-  config: StorageProfilePayloadConfig;
+  name: string
+  provider: string
+  enabled: boolean
+  config: StorageProfilePayloadConfig
 }

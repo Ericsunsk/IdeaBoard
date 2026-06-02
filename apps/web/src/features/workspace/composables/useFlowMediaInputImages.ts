@@ -56,7 +56,9 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
           options.updateSnapshotNodeBase(
             mediaInputNode.id,
             (snapshotNode) => {
-              const current = Array.isArray(snapshotNode.inputImages) ? snapshotNode.inputImages : []
+              const current = Array.isArray(snapshotNode.inputImages)
+                ? snapshotNode.inputImages
+                : []
               const nextImages = current
                 .map((item) => {
                   const sourceType = (item as { sourceType?: unknown })?.sourceType
@@ -69,9 +71,13 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
                 })
                 .filter((item): item is MediaInputImage => !!item)
               const nextNodeSourceIds = new Set(
-                nextImages.filter((item) => item.sourceType === 'node').map((item) => item.sourceId),
+                nextImages
+                  .filter((item) => item.sourceType === 'node')
+                  .map((item) => item.sourceId),
               )
-              nextImages.push(...linkedImages.filter((item) => !nextNodeSourceIds.has(item.sourceId)))
+              nextImages.push(
+                ...linkedImages.filter((item) => !nextNodeSourceIds.has(item.sourceId)),
+              )
               const limitedNextImages = nextImages.slice(0, 4)
               const same =
                 current.length === limitedNextImages.length &&
@@ -80,7 +86,8 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
                     (item as { id?: unknown })?.id === limitedNextImages[idx]?.id &&
                     (item as { sourceType?: unknown })?.sourceType ===
                       limitedNextImages[idx]?.sourceType &&
-                    (item as { sourceId?: unknown })?.sourceId === limitedNextImages[idx]?.sourceId &&
+                    (item as { sourceId?: unknown })?.sourceId ===
+                      limitedNextImages[idx]?.sourceId &&
                     (item as { url?: unknown })?.url === limitedNextImages[idx]?.url &&
                     (item as { ratio?: unknown })?.ratio === limitedNextImages[idx]?.ratio,
                 )

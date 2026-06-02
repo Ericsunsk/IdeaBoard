@@ -40,7 +40,6 @@ export function resolveImageDirectActionSource(
     ratio,
     x: Number(node.position?.x ?? imageNode.x ?? 0),
     y: Number(node.position?.y ?? imageNode.y ?? 0),
-    width:
-      Number.isFinite(width) && width > 0 ? width : DEFAULT_IMAGE_DIRECT_ACTION_NODE_WIDTH,
+    width: Number.isFinite(width) && width > 0 ? width : DEFAULT_IMAGE_DIRECT_ACTION_NODE_WIDTH,
   }
 }

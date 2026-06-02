@@ -4,11 +4,11 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { MonitorDataAccountLoads } from './monitorDataAccountLoads';
+import type { MonitorDataAccountLoads } from './monitorDataAccountLoads'
 
 export interface MonitorData {
-  global_queue_len: number;
-  wait_queue_len: number;
-  running_tasks: number;
-  account_loads: MonitorDataAccountLoads;
+  global_queue_len: number
+  wait_queue_len: number
+  running_tasks: number
+  account_loads: MonitorDataAccountLoads
 }

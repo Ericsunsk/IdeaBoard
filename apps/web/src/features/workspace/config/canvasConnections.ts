@@ -18,10 +18,7 @@ export type CanvasConnectionNodeLookup = (
   nodeId: number,
 ) => CanvasConnectionContractNode | null
 
-const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>([
-  'viewpoint',
-  'fusion',
-])
+const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>(['viewpoint', 'fusion'])
 
 export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasConnectionTone {
   if (port === 'prompt') return 'prompt'
@@ -40,9 +37,7 @@ export function isCanvasConnectionAllowed(
   const fromPort = getCanvasNodeVisibleOutputPorts(from.nodeType).find(
     (port) => port.port === from.port,
   )
-  const toPort = getCanvasNodeVisibleInputPorts(to.nodeType).find(
-    (port) => port.port === to.port,
-  )
+  const toPort = getCanvasNodeVisibleInputPorts(to.nodeType).find((port) => port.port === to.port)
   if (!fromPort || !toPort) return false
 
   if (from.nodeType === 'prompt') {

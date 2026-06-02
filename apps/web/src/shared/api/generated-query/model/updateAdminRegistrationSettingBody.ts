@@ -6,5 +6,5 @@
  */
 
 export type UpdateAdminRegistrationSettingBody = {
-  enabled: boolean;
-};
+  enabled: boolean
+}

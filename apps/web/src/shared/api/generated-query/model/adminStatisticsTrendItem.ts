@@ -4,11 +4,11 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminStatisticsTrendItemSegmentsItem } from './adminStatisticsTrendItemSegmentsItem';
+import type { AdminStatisticsTrendItemSegmentsItem } from './adminStatisticsTrendItemSegmentsItem'
 
 export type AdminStatisticsTrendItem = {
-  date: string;
-  label: string;
-  total: number;
-  segments: AdminStatisticsTrendItemSegmentsItem[];
-};
+  date: string
+  label: string
+  total: number
+  segments: AdminStatisticsTrendItemSegmentsItem[]
+}

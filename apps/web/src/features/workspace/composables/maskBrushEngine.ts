@@ -132,7 +132,10 @@ function getOrCreateBrushStamp(
       gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
     } else {
       gradient.addColorStop(0, MASK_PAINT_COLOR)
-      gradient.addColorStop(1, `rgba(${MASK_PAINT_RGB.r}, ${MASK_PAINT_RGB.g}, ${MASK_PAINT_RGB.b}, 0)`)
+      gradient.addColorStop(
+        1,
+        `rgba(${MASK_PAINT_RGB.r}, ${MASK_PAINT_RGB.g}, ${MASK_PAINT_RGB.b}, 0)`,
+      )
     }
     ctx.fillStyle = gradient
   }

@@ -4,15 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { UserBoardItemAccessRole } from './userBoardItemAccessRole';
-import type { UserBoardItemState } from './userBoardItemState';
+import type { UserBoardItemAccessRole } from './userBoardItemAccessRole'
+import type { UserBoardItemState } from './userBoardItemState'
 
 export interface UserBoardItem {
-  board_id: string;
-  name: string;
+  board_id: string
+  name: string
   /** @nullable */
-  state: UserBoardItemState;
-  access_role?: UserBoardItemAccessRole;
-  created_at: number;
-  updated_at: number;
+  state: UserBoardItemState
+  access_role?: UserBoardItemAccessRole
+  created_at: number
+  updated_at: number
 }

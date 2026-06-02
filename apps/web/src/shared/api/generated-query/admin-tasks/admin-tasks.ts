@@ -4,234 +4,242 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  computed,
-  unref
-} from 'vue';
-import type {
-  MaybeRef
-} from 'vue';
+import { computed, unref } from 'vue'
+import type { MaybeRef } from 'vue'
 
 import type {
   ApiResponseTask,
   ApiResponseTaskId,
   ApiResponseTaskList,
   ListAdminTasksParams,
-  SubmitTaskRequest
-} from '../model';
+  SubmitTaskRequest,
+} from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getListAdminTasksUrl = (params?: ListAdminTasksParams) => {
+  const normalizedParams = new URLSearchParams()
 
-
-
-export const listAdminTasks = (
-    params?: MaybeRef<ListAdminTasksParams>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      params = unref(params);
-
-      return orvalMutator<ApiResponseTaskList>(
-      {url: `/admin/tasks`, method: 'GET',
-        params: unref(params), signal
-    },
-      options);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
     }
+  })
 
+  const stringifiedParams = normalizedParams.toString()
 
+  return stringifiedParams.length > 0 ? `/admin/tasks?${stringifiedParams}` : `/admin/tasks`
+}
 
+export const listAdminTasks = async (
+  params?: ListAdminTasksParams,
+  options?: RequestInit,
+): Promise<ApiResponseTaskList> => {
+  return orvalMutator<ApiResponseTaskList>(getListAdminTasksUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
 
-export const getListAdminTasksQueryKey = (params?: MaybeRef<ListAdminTasksParams>,) => {
-    return [
-    'admin','tasks', ...(params ? [params] : [])
-    ] as const;
-    }
+export const getListAdminTasksQueryKey = (params?: MaybeRef<ListAdminTasksParams>) => {
+  return ['admin', 'tasks', ...(params ? [params] : [])] as const
+}
 
-
-export const getListAdminTasksQueryOptions = <TData = Awaited<ReturnType<typeof listAdminTasks>>, TError = ErrorType<unknown>>(params?: MaybeRef<ListAdminTasksParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminTasks>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListAdminTasksQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRef<ListAdminTasksParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminTasks>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = getListAdminTasksQueryKey(params)
 
-  const queryKey =  getListAdminTasksQueryKey(params);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminTasks>>> = ({ signal }) =>
+    listAdminTasks(unref(params), { signal, ...requestOptions })
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminTasks>>> = ({ signal }) => listAdminTasks(params, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminTasks>>, TError, TData>
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminTasks>>,
+    TError,
+    TData
+  >
 }
 
 export type ListAdminTasksQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminTasks>>>
 export type ListAdminTasksQueryError = ErrorType<unknown>
 
+export function useListAdminTasks<
+  TData = Awaited<ReturnType<typeof listAdminTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRef<ListAdminTasksParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminTasks>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminTasksQueryOptions(params, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useListAdminTasks<TData = Awaited<ReturnType<typeof listAdminTasks>>, TError = ErrorType<unknown>>(
- params?: MaybeRef<ListAdminTasksParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAdminTasks>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getListAdminTasksQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getSubmitAdminTaskUrl = () => {
+  return `/admin/tasks/submit`
+}
 
+export const submitAdminTask = async (
+  submitTaskRequest: SubmitTaskRequest,
+  options?: RequestInit,
+): Promise<ApiResponseTaskId> => {
+  return orvalMutator<ApiResponseTaskId>(getSubmitAdminTaskUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(submitTaskRequest),
+  })
+}
 
+export const getSubmitAdminTaskQueryKey = (submitTaskRequest?: MaybeRef<SubmitTaskRequest>) => {
+  return ['POST', 'admin', 'tasks', 'submit', submitTaskRequest] as const
+}
 
-
-
-export const submitAdminTask = (
-    submitTaskRequest: MaybeRef<SubmitTaskRequest>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getSubmitAdminTaskQueryOptions = <
+  TData = Awaited<ReturnType<typeof submitAdminTask>>,
+  TError = ErrorType<unknown>,
+>(
+  submitTaskRequest: MaybeRef<SubmitTaskRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof submitAdminTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      submitTaskRequest = unref(submitTaskRequest);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseTaskId>(
-      {url: `/admin/tasks/submit`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: submitTaskRequest, signal
-    },
-      options);
-    }
+  const queryKey = getSubmitAdminTaskQueryKey(submitTaskRequest)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof submitAdminTask>>> = ({ signal }) =>
+    submitAdminTask(unref(submitTaskRequest), { signal, ...requestOptions })
 
-
-
-export const getSubmitAdminTaskQueryKey = (submitTaskRequest?: MaybeRef<SubmitTaskRequest>,) => {
-    return [
-    'POST', 'admin','tasks','submit', submitTaskRequest
-    ] as const;
-    }
-
-
-export const getSubmitAdminTaskQueryOptions = <TData = Awaited<ReturnType<typeof submitAdminTask>>, TError = ErrorType<unknown>>(submitTaskRequest: MaybeRef<SubmitTaskRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof submitAdminTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getSubmitAdminTaskQueryKey(submitTaskRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof submitAdminTask>>> = ({ signal }) => submitAdminTask(submitTaskRequest, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof submitAdminTask>>, TError, TData>
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof submitAdminTask>>,
+    TError,
+    TData
+  >
 }
 
 export type SubmitAdminTaskQueryResult = NonNullable<Awaited<ReturnType<typeof submitAdminTask>>>
 export type SubmitAdminTaskQueryError = ErrorType<unknown>
 
+export function useSubmitAdminTask<
+  TData = Awaited<ReturnType<typeof submitAdminTask>>,
+  TError = ErrorType<unknown>,
+>(
+  submitTaskRequest: MaybeRef<SubmitTaskRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof submitAdminTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSubmitAdminTaskQueryOptions(submitTaskRequest, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useSubmitAdminTask<TData = Awaited<ReturnType<typeof submitAdminTask>>, TError = ErrorType<unknown>>(
- submitTaskRequest: MaybeRef<SubmitTaskRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof submitAdminTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getSubmitAdminTaskQueryOptions(submitTaskRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getGetAdminTaskUrl = (taskId: string) => {
+  return `/admin/tasks/${encodeURIComponent(String(taskId))}`
+}
 
+export const getAdminTask = async (
+  taskId: string,
+  options?: RequestInit,
+): Promise<ApiResponseTask> => {
+  return orvalMutator<ApiResponseTask>(getGetAdminTaskUrl(taskId), {
+    ...options,
+    method: 'GET',
+  })
+}
 
+export const getGetAdminTaskQueryKey = (taskId: MaybeRef<string>) => {
+  return ['admin', 'tasks', taskId] as const
+}
 
-
-
-export const getAdminTask = (
-    taskId: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getGetAdminTaskQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminTask>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      taskId = unref(taskId);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseTask>(
-      {url: `/admin/tasks/${encodeURIComponent(String(taskId))}`, method: 'GET', signal
-    },
-      options);
-    }
+  const queryKey = getGetAdminTaskQueryKey(taskId)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminTask>>> = ({ signal }) =>
+    getAdminTask(unref(taskId), { signal, ...requestOptions })
 
-
-
-export const getGetAdminTaskQueryKey = (taskId: MaybeRef<string>,) => {
-    return [
-    'admin','tasks',taskId
-    ] as const;
-    }
-
-
-export const getGetAdminTaskQueryOptions = <TData = Awaited<ReturnType<typeof getAdminTask>>, TError = ErrorType<unknown>>(taskId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getGetAdminTaskQueryKey(taskId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminTask>>> = ({ signal }) => getAdminTask(taskId, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminTask>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getAdminTask>>, TError, TData>
 }
 
 export type GetAdminTaskQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminTask>>>
 export type GetAdminTaskQueryError = ErrorType<unknown>
 
+export function useGetAdminTask<
+  TData = Awaited<ReturnType<typeof getAdminTask>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminTaskQueryOptions(taskId, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useGetAdminTask<TData = Awaited<ReturnType<typeof getAdminTask>>, TError = ErrorType<unknown>>(
- taskId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getGetAdminTaskQueryOptions(taskId,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
-
-
-
-
-
-

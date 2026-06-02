@@ -4,95 +4,81 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  unref
-} from 'vue';
+import { unref } from 'vue'
 
-import type {
-  ApiResponseUserInfo
-} from '../model';
+import type { ApiResponseUserInfo } from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getGetUserInfoUrl = () => {
+  return `/user/info`
+}
 
-
-
-export const getUserInfo = (
-
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-
-
-      return orvalMutator<ApiResponseUserInfo>(
-      {url: `/user/info`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
+export const getUserInfo = async (options?: RequestInit): Promise<ApiResponseUserInfo> => {
+  return orvalMutator<ApiResponseUserInfo>(getGetUserInfoUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
 
 export const getGetUserInfoQueryKey = () => {
-    return [
-    'user','info'
-    ] as const;
-    }
+  return ['user', 'info'] as const
+}
 
+export const getGetUserInfoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserInfo>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserInfo>>, TError, TData>>
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-export const getGetUserInfoQueryOptions = <TData = Awaited<ReturnType<typeof getUserInfo>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserInfo>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
+  const queryKey = getGetUserInfoQueryKey()
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserInfo>>> = ({ signal }) =>
+    getUserInfo({ signal, ...requestOptions })
 
-  const queryKey =  getGetUserInfoQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserInfo>>> = ({ signal }) => getUserInfo(requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserInfo>>, TError, TData>
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUserInfo>>,
+    TError,
+    TData
+  >
 }
 
 export type GetUserInfoQueryResult = NonNullable<Awaited<ReturnType<typeof getUserInfo>>>
 export type GetUserInfoQueryError = ErrorType<unknown>
 
-
-
-export function useGetUserInfo<TData = Awaited<ReturnType<typeof getUserInfo>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserInfo>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
+export function useGetUserInfo<
+  TData = Awaited<ReturnType<typeof getUserInfo>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserInfo>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetUserInfoQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  return query;
+  return query
 }
-
-
-
-
-
-

@@ -5,10 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UpdateBoardMemberRoleRequestRole = typeof UpdateBoardMemberRoleRequestRole[keyof typeof UpdateBoardMemberRoleRequestRole];
-
+export type UpdateBoardMemberRoleRequestRole =
+  (typeof UpdateBoardMemberRoleRequestRole)[keyof typeof UpdateBoardMemberRoleRequestRole]
 
 export const UpdateBoardMemberRoleRequestRole = {
   editor: 'editor',
   viewer: 'viewer',
-} as const;
+} as const

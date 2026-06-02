@@ -561,5 +561,4 @@ onUnmounted(() => {
     min-height: calc(100vh - 90px);
   }
 }
-
 </style>

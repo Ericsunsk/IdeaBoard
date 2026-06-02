@@ -1,7 +1,4 @@
-import {
-  DEFAULT_PROMPT_ASPECT_RATIO,
-  type PromptAspectRatio,
-} from '../config/promptAspectRatio'
+import { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio } from '../config/promptAspectRatio'
 import {
   DEFAULT_FUSION_BLEND_POINT,
   normalizeFusionBlendPoint,
@@ -133,9 +130,7 @@ export interface FusionNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export type CanvasExecutionOutputNodeType =
-  | 'viewpoint'
-  | 'fusion'
+export type CanvasExecutionOutputNodeType = 'viewpoint' | 'fusion'
 
 export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
   'viewpoint',
@@ -151,19 +146,13 @@ export function isCanvasExecutionOutputNodeType(
   )
 }
 
-export type CanvasExecutionOutputNodeItem =
-  | ViewpointNodeItem
-  | FusionNodeItem
+export type CanvasExecutionOutputNodeItem = ViewpointNodeItem | FusionNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
 
 export type CanvasImageOutputNodeItem = ImageNodeItem | CanvasExecutionOutputNodeItem
 
-export type CanvasConnectionNodeType =
-  | 'image'
-  | 'prompt'
-  | 'viewpoint'
-  | 'fusion'
+export type CanvasConnectionNodeType = 'image' | 'prompt' | 'viewpoint' | 'fusion'
 
 export const CANVAS_CONNECTION_NODE_TYPES: readonly CanvasConnectionNodeType[] = [
   'image',
@@ -203,11 +192,7 @@ export interface CanvasConnection {
   toPort: CanvasConnectionPort
 }
 
-export type CanvasNodeItem =
-  | PromptNodeItem
-  | ViewpointNodeItem
-  | ImageNodeItem
-  | FusionNodeItem
+export type CanvasNodeItem = PromptNodeItem | ViewpointNodeItem | ImageNodeItem | FusionNodeItem
 
 export interface CanvasViewportState {
   canvasX: number

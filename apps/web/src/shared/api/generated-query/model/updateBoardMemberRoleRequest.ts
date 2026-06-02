@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { UpdateBoardMemberRoleRequestRole } from './updateBoardMemberRoleRequestRole';
+import type { UpdateBoardMemberRoleRequestRole } from './updateBoardMemberRoleRequestRole'
 
 export interface UpdateBoardMemberRoleRequest {
-  role: UpdateBoardMemberRoleRequestRole;
+  role: UpdateBoardMemberRoleRequestRole
 }

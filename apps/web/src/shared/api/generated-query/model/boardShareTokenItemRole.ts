@@ -5,10 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BoardShareTokenItemRole = typeof BoardShareTokenItemRole[keyof typeof BoardShareTokenItemRole];
-
+export type BoardShareTokenItemRole =
+  (typeof BoardShareTokenItemRole)[keyof typeof BoardShareTokenItemRole]
 
 export const BoardShareTokenItemRole = {
   editor: 'editor',
   viewer: 'viewer',
-} as const;
+} as const

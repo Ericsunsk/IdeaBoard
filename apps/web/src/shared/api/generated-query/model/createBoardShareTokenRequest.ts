@@ -4,10 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreateBoardShareTokenRequestRole } from './createBoardShareTokenRequestRole';
+import type { CreateBoardShareTokenRequestRole } from './createBoardShareTokenRequestRole'
 
 export interface CreateBoardShareTokenRequest {
-  role: CreateBoardShareTokenRequestRole;
+  role: CreateBoardShareTokenRequestRole
   /** @nullable */
-  expires_at?: number | null;
+  expires_at?: number | null
 }

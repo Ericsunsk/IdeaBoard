@@ -119,7 +119,14 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { ArrowLeft, Download, ShareAndroid, ShareAndroidSolid, SquareCursor, User } from '@iconoir/vue'
+import {
+  ArrowLeft,
+  Download,
+  ShareAndroid,
+  ShareAndroidSolid,
+  SquareCursor,
+  User,
+} from '@iconoir/vue'
 
 const props = defineProps<{
   currentBoardName: string

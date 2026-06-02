@@ -4,15 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { StorageProviderField } from './storageProviderField';
+import type { StorageProviderField } from './storageProviderField'
 
 export interface StorageProviderMeta {
-  provider: string;
-  label: string;
-  description: string;
-  builtin: boolean;
-  create_allowed: boolean;
-  supports_test: boolean;
-  supports_bucket_info: boolean;
-  fields: StorageProviderField[];
+  provider: string
+  label: string
+  description: string
+  builtin: boolean
+  create_allowed: boolean
+  supports_test: boolean
+  supports_bucket_info: boolean
+  fields: StorageProviderField[]
 }

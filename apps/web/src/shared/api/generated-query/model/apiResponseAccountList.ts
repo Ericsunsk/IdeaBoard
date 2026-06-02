@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseAccountListData } from './apiResponseAccountListData';
-import type { ApiResponseBase } from './apiResponseBase';
+import type { ApiResponseAccountListData } from './apiResponseAccountListData'
+import type { ApiResponseBase } from './apiResponseBase'
 
 export type ApiResponseAccountList = ApiResponseBase & {
-  data?: ApiResponseAccountListData;
-};
+  data?: ApiResponseAccountListData
+}

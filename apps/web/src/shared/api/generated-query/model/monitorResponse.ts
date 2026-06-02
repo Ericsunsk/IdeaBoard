@@ -4,10 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { MonitorData } from './monitorData';
-import type { MonitorStats } from './monitorStats';
+import type { MonitorData } from './monitorData'
+import type { MonitorStats } from './monitorStats'
 
 export interface MonitorResponse {
-  monitor: MonitorData;
-  stats: MonitorStats;
+  monitor: MonitorData
+  stats: MonitorStats
 }

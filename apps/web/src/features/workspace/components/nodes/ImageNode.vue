@@ -72,7 +72,9 @@
         :strength-pct="strengthPct ?? 50"
         :set-strength-track-ref="setStrengthTrackRef"
         @action="emit('action', $event)"
-        @strength-action-mousedown="(action, event) => emit('strength-action-mousedown', action, event)"
+        @strength-action-mousedown="
+          (action, event) => emit('strength-action-mousedown', action, event)
+        "
         @strength-track-mousedown="emit('strength-track-mousedown', $event)"
       />
       <NodePromptComposer
@@ -92,10 +94,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue'
 import { MediaImage } from '@iconoir/vue'
-import {
-  clampImageNodeOutputCount,
-  type ImageNodeItem,
-} from '../../types/canvasNodes'
+import { clampImageNodeOutputCount, type ImageNodeItem } from '../../types/canvasNodes'
 import type { ImageNodeAction, ImageStrengthAction } from '../../types/imageActions'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import NodePromptComposer from './NodePromptComposer.vue'
@@ -151,7 +150,10 @@ const emit = defineEmits<{
   (e: 'action', action: ImageNodeAction): void
   (e: 'strength-action-mousedown', action: ImageStrengthAction, event: MouseEvent): void
   (e: 'strength-track-mousedown', event: MouseEvent): void
-  (e: 'expand-handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
+  (
+    e: 'expand-handle-pointerdown',
+    payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },
+  ): void
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
@@ -173,7 +175,12 @@ const promptDraft = ref('')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 
 watch(
-  [() => props.flowNodeId, imageStageRef, () => props.setImageStageRef, () => props.clearImageStageRef],
+  [
+    () => props.flowNodeId,
+    imageStageRef,
+    () => props.setImageStageRef,
+    () => props.clearImageStageRef,
+  ],
   ([flowNodeId, stageVm, setImageStageRef, clearImageStageRef], oldValues, onCleanup) => {
     const stageElement = stageVm?.stageElement ?? null
     const [prevFlowNodeId, prevStageVm] = oldValues ?? []
@@ -219,7 +226,6 @@ function onImageStageContextMenu(event: MouseEvent) {
   }
   emit('contextmenu', event)
 }
-
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>
@@ -254,5 +260,4 @@ function onImageStageContextMenu(event: MouseEvent) {
 .workflow-node.image-node.is-mask-editor-mode.active .image-node-stage {
   border-color: transparent;
 }
-
 </style>

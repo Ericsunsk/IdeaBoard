@@ -4,11 +4,11 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { BoardMemberItemRole } from './boardMemberItemRole';
+import type { BoardMemberItemRole } from './boardMemberItemRole'
 
 export interface BoardMemberItem {
-  user_id: number;
-  member_uid: string;
-  username: string;
-  role: BoardMemberItemRole;
+  user_id: number
+  member_uid: string
+  username: string
+  role: BoardMemberItemRole
 }

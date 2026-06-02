@@ -6,5 +6,5 @@
  */
 
 export type ApiResponseTaskIdData = {
-  task_id: string;
-};
+  task_id: string
+}

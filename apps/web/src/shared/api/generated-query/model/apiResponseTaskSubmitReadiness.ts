@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseBase } from './apiResponseBase';
-import type { ApiResponseTaskSubmitReadinessData } from './apiResponseTaskSubmitReadinessData';
+import type { ApiResponseBase } from './apiResponseBase'
+import type { ApiResponseTaskSubmitReadinessData } from './apiResponseTaskSubmitReadinessData'
 
 export type ApiResponseTaskSubmitReadiness = ApiResponseBase & {
-  data?: ApiResponseTaskSubmitReadinessData;
-};
+  data?: ApiResponseTaskSubmitReadinessData
+}

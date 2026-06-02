@@ -6,8 +6,8 @@
  */
 
 export type AdminStatisticsBackfillStatus = {
-  range_start: string;
-  range_end: string;
-  missing_days: number;
-  backfilled_days: number;
-};
+  range_start: string
+  range_end: string
+  missing_days: number
+  backfilled_days: number
+}

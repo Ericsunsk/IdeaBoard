@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { BoardMemberItem } from './boardMemberItem';
+import type { BoardMemberItem } from './boardMemberItem'
 
 export type ApiResponseBoardMemberData = {
-  member: BoardMemberItem;
-};
+  member: BoardMemberItem
+}

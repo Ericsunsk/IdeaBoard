@@ -6,5 +6,5 @@
  */
 
 export type UpdateAdminUserStatusBody = {
-  status: number;
-};
+  status: number
+}

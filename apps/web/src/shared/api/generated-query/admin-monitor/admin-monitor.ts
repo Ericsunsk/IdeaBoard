@@ -4,95 +4,81 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  unref
-} from 'vue';
+import { unref } from 'vue'
 
-import type {
-  ApiResponseMonitor
-} from '../model';
+import type { ApiResponseMonitor } from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getGetAdminMonitorUrl = () => {
+  return `/admin/monitor`
+}
 
-
-
-export const getAdminMonitor = (
-
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-
-
-      return orvalMutator<ApiResponseMonitor>(
-      {url: `/admin/monitor`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
+export const getAdminMonitor = async (options?: RequestInit): Promise<ApiResponseMonitor> => {
+  return orvalMutator<ApiResponseMonitor>(getGetAdminMonitorUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
 
 export const getGetAdminMonitorQueryKey = () => {
-    return [
-    'admin','monitor'
-    ] as const;
-    }
+  return ['admin', 'monitor'] as const
+}
 
+export const getGetAdminMonitorQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminMonitor>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMonitor>>, TError, TData>>
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-export const getGetAdminMonitorQueryOptions = <TData = Awaited<ReturnType<typeof getAdminMonitor>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMonitor>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
+  const queryKey = getGetAdminMonitorQueryKey()
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminMonitor>>> = ({ signal }) =>
+    getAdminMonitor({ signal, ...requestOptions })
 
-  const queryKey =  getGetAdminMonitorQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminMonitor>>> = ({ signal }) => getAdminMonitor(requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminMonitor>>, TError, TData>
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminMonitor>>,
+    TError,
+    TData
+  >
 }
 
 export type GetAdminMonitorQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminMonitor>>>
 export type GetAdminMonitorQueryError = ErrorType<unknown>
 
-
-
-export function useGetAdminMonitor<TData = Awaited<ReturnType<typeof getAdminMonitor>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMonitor>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
+export function useGetAdminMonitor<
+  TData = Awaited<ReturnType<typeof getAdminMonitor>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMonitor>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetAdminMonitorQueryOptions(options)
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  return query;
+  return query
 }
-
-
-
-
-
-

@@ -44,12 +44,7 @@ export function useFlowPromptGenerationOrchestrator(
     const normalizedAspectRatio = normalizePromptAspectRatio(aspectRatio)
     const inputImages = options.getMediaInputImages(promptNodeId)
     if (inputImages.length === 0) {
-      void options.runTextPromptGeneration(
-        promptNodeId,
-        prompt,
-        outputCount,
-        normalizedAspectRatio,
-      )
+      void options.runTextPromptGeneration(promptNodeId, prompt, outputCount, normalizedAspectRatio)
       return
     }
     const linkedSourceNodeIds = new Set(options.resolvePromptInputImageNodeIds(promptNodeId))

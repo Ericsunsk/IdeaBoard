@@ -69,7 +69,9 @@
           :image-layer-visible="props.imageLayerVisible ?? true"
           :mask-editor-brush-size="props.maskEditorBrushSize ?? 18"
           :mask-editor-brush-shape="props.maskEditorBrushShape ?? 'round'"
-          :set-mask-canvas-ref="(element) => (props.setMaskCanvasRef ?? (() => {}))(props.nodeId, element)"
+          :set-mask-canvas-ref="
+            (element) => (props.setMaskCanvasRef ?? (() => {}))(props.nodeId, element)
+          "
           @node-mousedown="noopMouse"
           @update:title="emitNodeParam('title', $event)"
           @update:output-count="emitNodeParam('outputCount', $event)"
@@ -257,7 +259,10 @@ const emit = defineEmits<{
   (e: 'image-action', action: ImageNodeAction): void
   (e: 'strength-action-mousedown', action: ImageStrengthAction, event: MouseEvent): void
   (e: 'strength-track-mousedown', event: MouseEvent): void
-  (e: 'expand-handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
+  (
+    e: 'expand-handle-pointerdown',
+    payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },
+  ): void
   (e: 'expand-handle-pointermove', event: PointerEvent): void
   (e: 'expand-handle-pointerup', event: PointerEvent): void
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
@@ -327,7 +332,6 @@ const displayImage = computed<{ url: string } | null>(() => {
   const url = latestOutput?.url || imageSnapshot.value.sourceImageUrl || ''
   return url ? { url } : null
 })
-
 
 const imageGenerating = computed(
   () => !!props.imageDirectGenerating || imageSnapshot.value?.outputStatus === 'running',
@@ -410,12 +414,7 @@ function refreshHandleRailObserver() {
   }
 }
 
-function setHandleRailBounds(next: {
-  left: number
-  top: number
-  width: number
-  height: number
-}) {
+function setHandleRailBounds(next: { left: number; top: number; width: number; height: number }) {
   const changed =
     handleRailBounds.left !== next.left ||
     handleRailBounds.top !== next.top ||

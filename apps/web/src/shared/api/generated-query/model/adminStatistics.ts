@@ -4,20 +4,20 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminStatisticsBackfillStatus } from './adminStatisticsBackfillStatus';
-import type { AdminStatisticsModelHealthItem } from './adminStatisticsModelHealthItem';
-import type { AdminStatisticsQualityTrendItem } from './adminStatisticsQualityTrendItem';
-import type { AdminStatisticsSlowModelsItem } from './adminStatisticsSlowModelsItem';
-import type { AdminStatisticsSummary } from './adminStatisticsSummary';
-import type { AdminStatisticsTrendItem } from './adminStatisticsTrendItem';
-import type { AdminStatisticsUserRiskItem } from './adminStatisticsUserRiskItem';
+import type { AdminStatisticsBackfillStatus } from './adminStatisticsBackfillStatus'
+import type { AdminStatisticsModelHealthItem } from './adminStatisticsModelHealthItem'
+import type { AdminStatisticsQualityTrendItem } from './adminStatisticsQualityTrendItem'
+import type { AdminStatisticsSlowModelsItem } from './adminStatisticsSlowModelsItem'
+import type { AdminStatisticsSummary } from './adminStatisticsSummary'
+import type { AdminStatisticsTrendItem } from './adminStatisticsTrendItem'
+import type { AdminStatisticsUserRiskItem } from './adminStatisticsUserRiskItem'
 
 export interface AdminStatistics {
-  summary: AdminStatisticsSummary;
-  trend: AdminStatisticsTrendItem[];
-  model_health: AdminStatisticsModelHealthItem[];
-  quality_trend: AdminStatisticsQualityTrendItem[];
-  slow_models: AdminStatisticsSlowModelsItem[];
-  user_risk: AdminStatisticsUserRiskItem[];
-  backfill_status: AdminStatisticsBackfillStatus;
+  summary: AdminStatisticsSummary
+  trend: AdminStatisticsTrendItem[]
+  model_health: AdminStatisticsModelHealthItem[]
+  quality_trend: AdminStatisticsQualityTrendItem[]
+  slow_models: AdminStatisticsSlowModelsItem[]
+  user_risk: AdminStatisticsUserRiskItem[]
+  backfill_status: AdminStatisticsBackfillStatus
 }

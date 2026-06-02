@@ -4,9 +4,9 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseBase } from './apiResponseBase';
-import type { MonitorResponse } from './monitorResponse';
+import type { ApiResponseBase } from './apiResponseBase'
+import type { MonitorResponse } from './monitorResponse'
 
 export type ApiResponseMonitor = ApiResponseBase & {
-  data?: MonitorResponse;
-};
+  data?: MonitorResponse
+}

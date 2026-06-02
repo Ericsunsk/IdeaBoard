@@ -4,6 +4,6 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { MonitorAccountLoad } from './monitorAccountLoad';
+import type { MonitorAccountLoad } from './monitorAccountLoad'
 
-export type MonitorDataAccountLoads = {[key: string]: MonitorAccountLoad};
+export type MonitorDataAccountLoads = { [key: string]: MonitorAccountLoad }

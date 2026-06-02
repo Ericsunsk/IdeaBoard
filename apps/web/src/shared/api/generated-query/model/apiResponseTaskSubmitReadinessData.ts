@@ -6,7 +6,7 @@
  */
 
 export type ApiResponseTaskSubmitReadinessData = {
-  ready: boolean;
-  message?: string;
-  feature?: string;
-};
+  ready: boolean
+  message?: string
+  feature?: string
+}

@@ -92,8 +92,13 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       const snapshotNode = node.data.snapshotNode as Record<string, unknown>
       const nodeType = getNodeType(nodeId)
       if (nodeType === 'image') {
-        const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages : []
-        const outputStatus = resolveWorkflowNodeOutputStatus(snapshotNode.outputStatus, outputImages)
+        const outputImages = Array.isArray(snapshotNode.outputImages)
+          ? snapshotNode.outputImages
+          : []
+        const outputStatus = resolveWorkflowNodeOutputStatus(
+          snapshotNode.outputStatus,
+          outputImages,
+        )
         return outputStatus !== 'running' && !!`${snapshotNode.sourceImageUrl ?? ''}`.trim()
       }
       if (!nodeType || !isCanvasExecutionOutputNodeType(nodeType)) return false
@@ -180,9 +185,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       )
       const disconnectedPorts = requiredPorts.filter((port) => !status.incoming[port])
       if (disconnectedPorts.length > 0) {
-        const missingLabels = disconnectedPorts.map((port) =>
-          formatNodePortLabel(nodeType, port),
-        )
+        const missingLabels = disconnectedPorts.map((port) => formatNodePortLabel(nodeType, port))
         return {
           label:
             disconnectedPorts.length === 1
@@ -196,9 +199,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
         .map((port) => port.port)
         .filter((port) => !!status.incoming[port] && !!status.pendingIncoming[port])
       if (pendingPorts.length > 0) {
-        const pendingLabels = pendingPorts.map((port) =>
-          formatNodePortLabel(nodeType, port),
-        )
+        const pendingLabels = pendingPorts.map((port) => formatNodePortLabel(nodeType, port))
         return {
           label:
             pendingPorts.length === 1

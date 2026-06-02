@@ -6,5 +6,5 @@
  */
 
 export type ApiResponseRegistrationSettingData = {
-  enabled: boolean;
-};
+  enabled: boolean
+}

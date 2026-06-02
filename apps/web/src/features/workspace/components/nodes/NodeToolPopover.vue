@@ -28,6 +28,5 @@ const props = withDefaults(
   },
 )
 
-const layoutClass =
-  props.layout === 'row' ? 'node-tool-popover-row' : 'node-tool-popover-grid'
+const layoutClass = props.layout === 'row' ? 'node-tool-popover-row' : 'node-tool-popover-grid'
 </script>

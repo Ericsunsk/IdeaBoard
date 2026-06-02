@@ -38,9 +38,7 @@
       <p class="page-subtitle">Explore, expand, and refine your ideas</p>
 
       <section class="boards-toolbar">
-        <button class="create-btn" type="button" @click="createAndOpenBoard">
-          + New Canvas
-        </button>
+        <button class="create-btn" type="button" @click="createAndOpenBoard">+ New Canvas</button>
         <label class="search-wrap">
           <Search class="search-icon boards-icon" />
           <input v-model.trim="searchKeyword" type="text" placeholder="Search canvases..." />

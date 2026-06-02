@@ -5,10 +5,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ProviderAPIType = typeof ProviderAPIType[keyof typeof ProviderAPIType];
-
+export type ProviderAPIType = (typeof ProviderAPIType)[keyof typeof ProviderAPIType]
 
 export const ProviderAPIType = {
   'openai-compatible': 'openai-compatible',
   'google-ai': 'google-ai',
-} as const;
+} as const

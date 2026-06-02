@@ -133,7 +133,10 @@ export function useMaskEditorViewportController(options: UseMaskEditorViewportCo
       viewportRect.height - MASK_EDITOR_CHROME_LAYOUT.viewportPadding * 2,
     )
     const availableImageWidth = Math.max(1, availableWidth - chromeOutset.left - chromeOutset.right)
-    const fitZoom = Math.min(availableImageWidth / flowImageWidth, availableHeight / flowImageHeight)
+    const fitZoom = Math.min(
+      availableImageWidth / flowImageWidth,
+      availableHeight / flowImageHeight,
+    )
     const zoom = Math.max(
       MASK_EDITOR_FOCUS_MIN_ZOOM,
       Math.min(

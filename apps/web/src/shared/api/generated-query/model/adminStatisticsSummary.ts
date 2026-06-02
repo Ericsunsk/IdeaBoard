@@ -6,16 +6,16 @@
  */
 
 export type AdminStatisticsSummary = {
-  total_calls: number;
-  today_calls: number;
-  today_success: number;
-  today_failed: number;
-  yesterday_calls: number;
-  yesterday_success: number;
-  yesterday_failed: number;
-  this_month_calls: number;
-  pending: number;
-  running: number;
-  completed: number;
-  failed: number;
-};
+  total_calls: number
+  today_calls: number
+  today_success: number
+  today_failed: number
+  yesterday_calls: number
+  yesterday_success: number
+  yesterday_failed: number
+  this_month_calls: number
+  pending: number
+  running: number
+  completed: number
+  failed: number
+}

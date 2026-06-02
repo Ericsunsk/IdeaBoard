@@ -4,25 +4,18 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  computed,
-  unref
-} from 'vue';
-import type {
-  MaybeRef
-} from 'vue';
+import { computed, unref } from 'vue'
+import type { MaybeRef } from 'vue'
 
 import type {
   ApiResponseMessage,
@@ -31,397 +24,444 @@ import type {
   ApiResponseTaskList,
   ApiResponseTaskSubmitReadiness,
   ListUserTasksParams,
-  SubmitTaskRequest
-} from '../model';
+  SubmitTaskRequest,
+} from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getSubmitUserTaskUrl = () => {
+  return `/user/drawing/submit`
+}
 
+export const submitUserTask = async (
+  submitTaskRequest: SubmitTaskRequest,
+  options?: RequestInit,
+): Promise<ApiResponseTaskId> => {
+  return orvalMutator<ApiResponseTaskId>(getSubmitUserTaskUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(submitTaskRequest),
+  })
+}
 
+export const getSubmitUserTaskQueryKey = (submitTaskRequest?: MaybeRef<SubmitTaskRequest>) => {
+  return ['POST', 'user', 'drawing', 'submit', submitTaskRequest] as const
+}
 
-export const submitUserTask = (
-    submitTaskRequest: MaybeRef<SubmitTaskRequest>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getSubmitUserTaskQueryOptions = <
+  TData = Awaited<ReturnType<typeof submitUserTask>>,
+  TError = ErrorType<unknown>,
+>(
+  submitTaskRequest: MaybeRef<SubmitTaskRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof submitUserTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      submitTaskRequest = unref(submitTaskRequest);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseTaskId>(
-      {url: `/user/drawing/submit`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: submitTaskRequest, signal
-    },
-      options);
-    }
+  const queryKey = getSubmitUserTaskQueryKey(submitTaskRequest)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof submitUserTask>>> = ({ signal }) =>
+    submitUserTask(unref(submitTaskRequest), { signal, ...requestOptions })
 
-
-
-export const getSubmitUserTaskQueryKey = (submitTaskRequest?: MaybeRef<SubmitTaskRequest>,) => {
-    return [
-    'POST', 'user','drawing','submit', submitTaskRequest
-    ] as const;
-    }
-
-
-export const getSubmitUserTaskQueryOptions = <TData = Awaited<ReturnType<typeof submitUserTask>>, TError = ErrorType<unknown>>(submitTaskRequest: MaybeRef<SubmitTaskRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof submitUserTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getSubmitUserTaskQueryKey(submitTaskRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof submitUserTask>>> = ({ signal }) => submitUserTask(submitTaskRequest, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof submitUserTask>>, TError, TData>
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof submitUserTask>>,
+    TError,
+    TData
+  >
 }
 
 export type SubmitUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof submitUserTask>>>
 export type SubmitUserTaskQueryError = ErrorType<unknown>
 
+export function useSubmitUserTask<
+  TData = Awaited<ReturnType<typeof submitUserTask>>,
+  TError = ErrorType<unknown>,
+>(
+  submitTaskRequest: MaybeRef<SubmitTaskRequest>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof submitUserTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSubmitUserTaskQueryOptions(submitTaskRequest, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useSubmitUserTask<TData = Awaited<ReturnType<typeof submitUserTask>>, TError = ErrorType<unknown>>(
- submitTaskRequest: MaybeRef<SubmitTaskRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof submitUserTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getSubmitUserTaskQueryOptions(submitTaskRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const checkUserTaskSubmitReadiness = (
-    submitTaskRequest: MaybeRef<SubmitTaskRequest>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      submitTaskRequest = unref(submitTaskRequest);
-
-      return orvalMutator<ApiResponseTaskSubmitReadiness>(
-      {url: `/user/drawing/submit/readiness`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: submitTaskRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getCheckUserTaskSubmitReadinessQueryKey = (submitTaskRequest?: MaybeRef<SubmitTaskRequest>,) => {
-    return [
-    'POST', 'user','drawing','submit','readiness', submitTaskRequest
-    ] as const;
-    }
-
-
-export const getCheckUserTaskSubmitReadinessQueryOptions = <TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError = ErrorType<unknown>>(submitTaskRequest: MaybeRef<SubmitTaskRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getCheckUserTaskSubmitReadinessQueryKey(submitTaskRequest);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>> = ({ signal }) => checkUserTaskSubmitReadiness(submitTaskRequest, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>
+export const getCheckUserTaskSubmitReadinessUrl = () => {
+  return `/user/drawing/submit/readiness`
 }
 
-export type CheckUserTaskSubmitReadinessQueryResult = NonNullable<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>>
+export const checkUserTaskSubmitReadiness = async (
+  submitTaskRequest: SubmitTaskRequest,
+  options?: RequestInit,
+): Promise<ApiResponseTaskSubmitReadiness> => {
+  return orvalMutator<ApiResponseTaskSubmitReadiness>(getCheckUserTaskSubmitReadinessUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(submitTaskRequest),
+  })
+}
+
+export const getCheckUserTaskSubmitReadinessQueryKey = (
+  submitTaskRequest?: MaybeRef<SubmitTaskRequest>,
+) => {
+  return ['POST', 'user', 'drawing', 'submit', 'readiness', submitTaskRequest] as const
+}
+
+export const getCheckUserTaskSubmitReadinessQueryOptions = <
+  TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+  TError = ErrorType<unknown>,
+>(
+  submitTaskRequest: MaybeRef<SubmitTaskRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getCheckUserTaskSubmitReadinessQueryKey(submitTaskRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>> = ({
+    signal,
+  }) => checkUserTaskSubmitReadiness(unref(submitTaskRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+    TError,
+    TData
+  >
+}
+
+export type CheckUserTaskSubmitReadinessQueryResult = NonNullable<
+  Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>
+>
 export type CheckUserTaskSubmitReadinessQueryError = ErrorType<unknown>
 
+export function useCheckUserTaskSubmitReadiness<
+  TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>,
+  TError = ErrorType<unknown>,
+>(
+  submitTaskRequest: MaybeRef<SubmitTaskRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCheckUserTaskSubmitReadinessQueryOptions(submitTaskRequest, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useCheckUserTaskSubmitReadiness<TData = Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError = ErrorType<unknown>>(
- submitTaskRequest: MaybeRef<SubmitTaskRequest>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof checkUserTaskSubmitReadiness>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getCheckUserTaskSubmitReadinessQueryOptions(submitTaskRequest,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getListUserTasksUrl = (params?: ListUserTasksParams) => {
+  const normalizedParams = new URLSearchParams()
 
-
-
-
-
-export const listUserTasks = (
-    params?: MaybeRef<ListUserTasksParams>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      params = unref(params);
-
-      return orvalMutator<ApiResponseTaskList>(
-      {url: `/user/drawing`, method: 'GET',
-        params: unref(params), signal
-    },
-      options);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
     }
+  })
 
+  const stringifiedParams = normalizedParams.toString()
 
+  return stringifiedParams.length > 0 ? `/user/drawing?${stringifiedParams}` : `/user/drawing`
+}
 
+export const listUserTasks = async (
+  params?: ListUserTasksParams,
+  options?: RequestInit,
+): Promise<ApiResponseTaskList> => {
+  return orvalMutator<ApiResponseTaskList>(getListUserTasksUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
 
-export const getListUserTasksQueryKey = (params?: MaybeRef<ListUserTasksParams>,) => {
-    return [
-    'user','drawing', ...(params ? [params] : [])
-    ] as const;
-    }
+export const getListUserTasksQueryKey = (params?: MaybeRef<ListUserTasksParams>) => {
+  return ['user', 'drawing', ...(params ? [params] : [])] as const
+}
 
-
-export const getListUserTasksQueryOptions = <TData = Awaited<ReturnType<typeof listUserTasks>>, TError = ErrorType<unknown>>(params?: MaybeRef<ListUserTasksParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserTasks>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
+export const getListUserTasksQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUserTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRef<ListUserTasksParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserTasks>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = getListUserTasksQueryKey(params)
 
-  const queryKey =  getListUserTasksQueryKey(params);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserTasks>>> = ({ signal }) =>
+    listUserTasks(unref(params), { signal, ...requestOptions })
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserTasks>>> = ({ signal }) => listUserTasks(params, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUserTasks>>, TError, TData>
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUserTasks>>,
+    TError,
+    TData
+  >
 }
 
 export type ListUserTasksQueryResult = NonNullable<Awaited<ReturnType<typeof listUserTasks>>>
 export type ListUserTasksQueryError = ErrorType<unknown>
 
+export function useListUserTasks<
+  TData = Awaited<ReturnType<typeof listUserTasks>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRef<ListUserTasksParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserTasks>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListUserTasksQueryOptions(params, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useListUserTasks<TData = Awaited<ReturnType<typeof listUserTasks>>, TError = ErrorType<unknown>>(
- params?: MaybeRef<ListUserTasksParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserTasks>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getListUserTasksQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getGetUserTaskUrl = (taskId: string) => {
+  return `/user/drawing/${encodeURIComponent(String(taskId))}`
+}
 
+export const getUserTask = async (
+  taskId: string,
+  options?: RequestInit,
+): Promise<ApiResponseTask> => {
+  return orvalMutator<ApiResponseTask>(getGetUserTaskUrl(taskId), {
+    ...options,
+    method: 'GET',
+  })
+}
 
+export const getGetUserTaskQueryKey = (taskId: MaybeRef<string>) => {
+  return ['user', 'drawing', taskId] as const
+}
 
-
-
-export const getUserTask = (
-    taskId: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getGetUserTaskQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserTask>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      taskId = unref(taskId);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseTask>(
-      {url: `/user/drawing/${encodeURIComponent(String(taskId))}`, method: 'GET', signal
-    },
-      options);
-    }
+  const queryKey = getGetUserTaskQueryKey(taskId)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserTask>>> = ({ signal }) =>
+    getUserTask(unref(taskId), { signal, ...requestOptions })
 
-
-
-export const getGetUserTaskQueryKey = (taskId: MaybeRef<string>,) => {
-    return [
-    'user','drawing',taskId
-    ] as const;
-    }
-
-
-export const getGetUserTaskQueryOptions = <TData = Awaited<ReturnType<typeof getUserTask>>, TError = ErrorType<unknown>>(taskId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getGetUserTaskQueryKey(taskId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserTask>>> = ({ signal }) => getUserTask(taskId, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserTask>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getUserTask>>, TError, TData>
 }
 
 export type GetUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof getUserTask>>>
 export type GetUserTaskQueryError = ErrorType<unknown>
 
+export function useGetUserTask<
+  TData = Awaited<ReturnType<typeof getUserTask>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetUserTaskQueryOptions(taskId, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useGetUserTask<TData = Awaited<ReturnType<typeof getUserTask>>, TError = ErrorType<unknown>>(
- taskId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getGetUserTaskQueryOptions(taskId,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
+export const getDeleteUserTaskUrl = (taskId: string) => {
+  return `/user/drawing/${encodeURIComponent(String(taskId))}`
+}
 
+export const deleteUserTask = async (
+  taskId: string,
+  options?: RequestInit,
+): Promise<ApiResponseMessage> => {
+  return orvalMutator<ApiResponseMessage>(getDeleteUserTaskUrl(taskId), {
+    ...options,
+    method: 'DELETE',
+  })
+}
 
+export const getDeleteUserTaskQueryKey = (taskId: MaybeRef<string>) => {
+  return ['DELETE', 'user', 'drawing', taskId] as const
+}
 
-
-
-export const deleteUserTask = (
-    taskId: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
+export const getDeleteUserTaskQueryOptions = <
+  TData = Awaited<ReturnType<typeof deleteUserTask>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
 ) => {
-      taskId = unref(taskId);
+  const { query: queryOptions, request: requestOptions } = options ?? {}
 
-      return orvalMutator<ApiResponseMessage>(
-      {url: `/user/drawing/${encodeURIComponent(String(taskId))}`, method: 'DELETE', signal
-    },
-      options);
-    }
+  const queryKey = getDeleteUserTaskQueryKey(taskId)
 
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteUserTask>>> = ({ signal }) =>
+    deleteUserTask(unref(taskId), { signal, ...requestOptions })
 
-
-
-export const getDeleteUserTaskQueryKey = (taskId: MaybeRef<string>,) => {
-    return [
-    'DELETE', 'user','drawing',taskId
-    ] as const;
-    }
-
-
-export const getDeleteUserTaskQueryOptions = <TData = Awaited<ReturnType<typeof deleteUserTask>>, TError = ErrorType<unknown>>(taskId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getDeleteUserTaskQueryKey(taskId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteUserTask>>> = ({ signal }) => deleteUserTask(taskId, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof deleteUserTask>>, TError, TData>
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof deleteUserTask>>, TError, TData>
 }
 
 export type DeleteUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof deleteUserTask>>>
 export type DeleteUserTaskQueryError = ErrorType<unknown>
 
+export function useDeleteUserTask<
+  TData = Awaited<ReturnType<typeof deleteUserTask>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserTask>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getDeleteUserTaskQueryOptions(taskId, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useDeleteUserTask<TData = Awaited<ReturnType<typeof deleteUserTask>>, TError = ErrorType<unknown>>(
- taskId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof deleteUserTask>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getDeleteUserTaskQueryOptions(taskId,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
 
-
-
-
-
-
-export const streamUserTaskEvents = (
-    taskId: MaybeRef<string>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      taskId = unref(taskId);
-
-      return orvalMutator<string>(
-      {url: `/user/drawing/${encodeURIComponent(String(taskId))}/events`, method: 'GET', signal
-    },
-      options);
-    }
-
-
-
-
-export const getStreamUserTaskEventsQueryKey = (taskId: MaybeRef<string>,) => {
-    return [
-    'user','drawing',taskId,'events'
-    ] as const;
-    }
-
-
-export const getStreamUserTaskEventsQueryOptions = <TData = Awaited<ReturnType<typeof streamUserTaskEvents>>, TError = ErrorType<unknown>>(taskId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamUserTaskEvents>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getStreamUserTaskEventsQueryKey(taskId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamUserTaskEvents>>> = ({ signal }) => streamUserTaskEvents(taskId, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamUserTaskEvents>>, TError, TData>
+export const getStreamUserTaskEventsUrl = (taskId: string) => {
+  return `/user/drawing/${encodeURIComponent(String(taskId))}/events`
 }
 
-export type StreamUserTaskEventsQueryResult = NonNullable<Awaited<ReturnType<typeof streamUserTaskEvents>>>
+export const streamUserTaskEvents = async (
+  taskId: string,
+  options?: RequestInit,
+): Promise<string> => {
+  return orvalMutator<string>(getStreamUserTaskEventsUrl(taskId), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getStreamUserTaskEventsQueryKey = (taskId: MaybeRef<string>) => {
+  return ['user', 'drawing', taskId, 'events'] as const
+}
+
+export const getStreamUserTaskEventsQueryOptions = <
+  TData = Awaited<ReturnType<typeof streamUserTaskEvents>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof streamUserTaskEvents>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getStreamUserTaskEventsQueryKey(taskId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof streamUserTaskEvents>>> = ({ signal }) =>
+    streamUserTaskEvents(unref(taskId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(taskId) !== null && unref(taskId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof streamUserTaskEvents>>, TError, TData>
+}
+
+export type StreamUserTaskEventsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof streamUserTaskEvents>>
+>
 export type StreamUserTaskEventsQueryError = ErrorType<unknown>
 
+export function useStreamUserTaskEvents<
+  TData = Awaited<ReturnType<typeof streamUserTaskEvents>>,
+  TError = ErrorType<unknown>,
+>(
+  taskId: MaybeRef<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof streamUserTaskEvents>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getStreamUserTaskEventsQueryOptions(taskId, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useStreamUserTaskEvents<TData = Awaited<ReturnType<typeof streamUserTaskEvents>>, TError = ErrorType<unknown>>(
- taskId: MaybeRef<string>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof streamUserTaskEvents>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getStreamUserTaskEventsQueryOptions(taskId,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }

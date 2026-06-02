@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { UpdateAdminUserRoleBodyRole } from './updateAdminUserRoleBodyRole';
+import type { UpdateAdminUserRoleBodyRole } from './updateAdminUserRoleBodyRole'
 
 export type UpdateAdminUserRoleBody = {
-  role: UpdateAdminUserRoleBodyRole;
-};
+  role: UpdateAdminUserRoleBodyRole
+}

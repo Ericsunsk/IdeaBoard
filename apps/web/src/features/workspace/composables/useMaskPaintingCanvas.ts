@@ -102,10 +102,7 @@ function blurAlphaVertical(
   }
 }
 
-export function featherMaskPreviewCanvas(
-  canvas: HTMLCanvasElement,
-  radius = 6,
-): boolean {
+export function featherMaskPreviewCanvas(canvas: HTMLCanvasElement, radius = 6): boolean {
   const width = canvas.width
   const height = canvas.height
   if (!width || !height) return false
@@ -145,9 +142,7 @@ export function featherMaskPreviewCanvas(
   return true
 }
 
-function extractMaskIntensity(
-  data: Uint8ClampedArray,
-): Float32Array {
+function extractMaskIntensity(data: Uint8ClampedArray): Float32Array {
   const total = data.length / 4
   const values = new Float32Array(total)
   for (let i = 0; i < total; i += 1) {

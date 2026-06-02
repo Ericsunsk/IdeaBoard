@@ -5,4 +5,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ApiResponseFeaturePromptMapDataPrompts = {[key: string]: string};
+export type ApiResponseFeaturePromptMapDataPrompts = { [key: string]: string }

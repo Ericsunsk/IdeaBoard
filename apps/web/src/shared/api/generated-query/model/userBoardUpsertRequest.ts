@@ -4,12 +4,12 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { UserBoardUpsertRequestState } from './userBoardUpsertRequestState';
+import type { UserBoardUpsertRequestState } from './userBoardUpsertRequestState'
 
 export interface UserBoardUpsertRequest {
-  name: string;
+  name: string
   /** @nullable */
-  state: UserBoardUpsertRequestState;
-  created_at?: number;
-  updated_at?: number;
+  state: UserBoardUpsertRequestState
+  created_at?: number
+  updated_at?: number
 }

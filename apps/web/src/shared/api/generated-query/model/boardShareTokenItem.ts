@@ -4,15 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { BoardShareTokenItemRole } from './boardShareTokenItemRole';
+import type { BoardShareTokenItemRole } from './boardShareTokenItemRole'
 
 export interface BoardShareTokenItem {
-  token: string;
-  role: BoardShareTokenItemRole;
-  revoked: boolean;
+  token: string
+  role: BoardShareTokenItemRole
+  revoked: boolean
   /** @nullable */
-  expires_at?: number | null;
-  created_at: number;
-  updated_at: number;
-  share_url: string;
+  expires_at?: number | null
+  created_at: number
+  updated_at: number
+  share_url: string
 }

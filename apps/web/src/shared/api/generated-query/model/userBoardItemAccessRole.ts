@@ -5,11 +5,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UserBoardItemAccessRole = typeof UserBoardItemAccessRole[keyof typeof UserBoardItemAccessRole];
-
+export type UserBoardItemAccessRole =
+  (typeof UserBoardItemAccessRole)[keyof typeof UserBoardItemAccessRole]
 
 export const UserBoardItemAccessRole = {
   owner: 'owner',
   editor: 'editor',
   viewer: 'viewer',
-} as const;
+} as const

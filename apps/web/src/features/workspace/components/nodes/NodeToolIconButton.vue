@@ -62,7 +62,9 @@ const buttonStyle = computed(() => ({
     : { '--node-tool-icon-button-icon-size': toCssSize(props.iconSize) }),
 }))
 const resolvedTooltip = computed(() => props.tooltip ?? '')
-const resolvedAriaLabel = computed(() => (props.ariaLabelValue ?? resolvedTooltip.value) || undefined)
+const resolvedAriaLabel = computed(
+  () => (props.ariaLabelValue ?? resolvedTooltip.value) || undefined,
+)
 </script>
 
 <style scoped>

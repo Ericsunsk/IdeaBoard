@@ -4,14 +4,14 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ProviderAPIType } from './providerAPIType';
+import type { ProviderAPIType } from './providerAPIType'
 
 export interface Channel {
-  id: number;
-  type: ProviderAPIType;
-  name: string;
-  api_url: string;
-  status: number;
-  created_at: string;
-  updated_at: string;
+  id: number
+  type: ProviderAPIType
+  name: string
+  api_url: string
+  status: number
+  created_at: string
+  updated_at: string
 }

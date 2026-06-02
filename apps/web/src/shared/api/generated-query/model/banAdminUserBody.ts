@@ -6,6 +6,6 @@
  */
 
 export type BanAdminUserBody = {
-  reason?: string;
-  expires_in_days?: number;
-};
+  reason?: string
+  expires_in_days?: number
+}

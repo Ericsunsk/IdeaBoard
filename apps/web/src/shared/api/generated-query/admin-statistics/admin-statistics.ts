@@ -4,100 +4,103 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useQuery
-} from '@tanstack/vue-query';
+import { useQuery } from '@tanstack/vue-query'
 import type {
   DataTag,
   QueryClient,
   QueryFunction,
   QueryKey,
   UseQueryOptions,
-  UseQueryReturnType
-} from '@tanstack/vue-query';
+  UseQueryReturnType,
+} from '@tanstack/vue-query'
 
-import {
-  unref
-} from 'vue';
-import type {
-  MaybeRef
-} from 'vue';
+import { unref } from 'vue'
+import type { MaybeRef } from 'vue'
 
-import type {
-  ApiResponseAdminStatistics,
-  GetAdminStatisticsParams
-} from '../model';
+import type { ApiResponseAdminStatistics, GetAdminStatisticsParams } from '../model'
 
-import { orvalMutator } from '../../orvalMutator';
-import type { ErrorType } from '../../orvalMutator';
+import { orvalMutator } from '../../orvalMutator'
+import type { ErrorType } from '../../orvalMutator'
 
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+export const getGetAdminStatisticsUrl = (params: GetAdminStatisticsParams) => {
+  const normalizedParams = new URLSearchParams()
 
-
-
-export const getAdminStatistics = (
-    params: MaybeRef<GetAdminStatisticsParams>,
- options?: SecondParameter<typeof orvalMutator>,signal?: AbortSignal
-) => {
-      params = unref(params);
-
-      return orvalMutator<ApiResponseAdminStatistics>(
-      {url: `/admin/statistics`, method: 'GET',
-        params: unref(params), signal
-    },
-      options);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
     }
+  })
 
+  const stringifiedParams = normalizedParams.toString()
 
-
-
-export const getGetAdminStatisticsQueryKey = (params?: MaybeRef<GetAdminStatisticsParams>,) => {
-    return [
-    'admin','statistics', ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetAdminStatisticsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminStatistics>>, TError = ErrorType<unknown>>(params: MaybeRef<GetAdminStatisticsParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminStatistics>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  getGetAdminStatisticsQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminStatistics>>> = ({ signal }) => getAdminStatistics(params, requestOptions, signal);
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminStatistics>>, TError, TData>
+  return stringifiedParams.length > 0
+    ? `/admin/statistics?${stringifiedParams}`
+    : `/admin/statistics`
 }
 
-export type GetAdminStatisticsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminStatistics>>>
+export const getAdminStatistics = async (
+  params: GetAdminStatisticsParams,
+  options?: RequestInit,
+): Promise<ApiResponseAdminStatistics> => {
+  return orvalMutator<ApiResponseAdminStatistics>(getGetAdminStatisticsUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminStatisticsQueryKey = (params?: MaybeRef<GetAdminStatisticsParams>) => {
+  return ['admin', 'statistics', ...(params ? [params] : [])] as const
+}
+
+export const getGetAdminStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminStatistics>>,
+  TError = ErrorType<unknown>,
+>(
+  params: MaybeRef<GetAdminStatisticsParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminStatistics>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminStatisticsQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminStatistics>>> = ({ signal }) =>
+    getAdminStatistics(unref(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminStatistics>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminStatistics>>
+>
 export type GetAdminStatisticsQueryError = ErrorType<unknown>
 
+export function useGetAdminStatistics<
+  TData = Awaited<ReturnType<typeof getAdminStatistics>>,
+  TError = ErrorType<unknown>,
+>(
+  params: MaybeRef<GetAdminStatisticsParams>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminStatistics>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminStatisticsQueryOptions(params, options)
 
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
 
-export function useGetAdminStatistics<TData = Awaited<ReturnType<typeof getAdminStatistics>>, TError = ErrorType<unknown>>(
- params: MaybeRef<GetAdminStatisticsParams>, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminStatistics>>, TError, TData>>, request?: SecondParameter<typeof orvalMutator>}
- , queryClient?: QueryClient
- ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
 
-  const queryOptions = getGetAdminStatisticsQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>;
-
-  return query;
+  return query
 }
-
-
-
-
-
-

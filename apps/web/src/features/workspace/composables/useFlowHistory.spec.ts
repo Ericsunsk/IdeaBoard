@@ -44,7 +44,10 @@ function testUndoRedoAndBaseline() {
   history.clearBaseline()
   nodes.value = [{ id: 'n3' }]
   history.undo()
-  expect((nodes.value[0] as { id: string })?.id === 'n3', 'expected baseline clear to reset history')
+  expect(
+    (nodes.value[0] as { id: string })?.id === 'n3',
+    'expected baseline clear to reset history',
+  )
 }
 
 function testRedoStackClearedAfterNewPush() {

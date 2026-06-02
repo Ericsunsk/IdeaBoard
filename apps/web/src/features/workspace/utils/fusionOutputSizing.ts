@@ -1,7 +1,4 @@
-import {
-  resolvePromptAspectRatioValue,
-  type PromptAspectRatio,
-} from '../config/promptAspectRatio'
+import { resolvePromptAspectRatioValue, type PromptAspectRatio } from '../config/promptAspectRatio'
 import { computeFusionBlendWeights, type FusionBlendPoint } from './fusionBlend'
 
 export type FusionOutputImageSize = {
@@ -30,7 +27,9 @@ export type ResolvedFusionOutputSize = {
 
 const FUSION_WEIGHT_TIE_EPSILON = 0.01
 
-function normalizeSize(size: FusionOutputImageSize | null | undefined): FusionOutputImageSize | null {
+function normalizeSize(
+  size: FusionOutputImageSize | null | undefined,
+): FusionOutputImageSize | null {
   if (!size) return null
   const width = Math.max(1, Math.round(Number(size.width)))
   const height = Math.max(1, Math.round(Number(size.height)))
@@ -70,8 +69,7 @@ function averageArea(
 function geometricMean(values: number[]): number {
   const safeValues = values.filter((value) => Number.isFinite(value) && value > 0)
   if (safeValues.length === 0) return 1
-  const logAverage =
-    safeValues.reduce((sum, value) => sum + Math.log(value), 0) / safeValues.length
+  const logAverage = safeValues.reduce((sum, value) => sum + Math.log(value), 0) / safeValues.length
   return Math.exp(logAverage)
 }
 

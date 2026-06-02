@@ -27,7 +27,10 @@ const FUSION_SLOT_POSITION_TABLE: Record<number, readonly FusionSlotPosition[]> 
   4: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
 }
 
-const FUSION_SLOT_ANCHOR_FACTORIES: Record<FusionSlotPosition, (geometry: ReturnType<typeof getFusionSlotGeometry>) => FusionBlendPoint> = {
+const FUSION_SLOT_ANCHOR_FACTORIES: Record<
+  FusionSlotPosition,
+  (geometry: ReturnType<typeof getFusionSlotGeometry>) => FusionBlendPoint
+> = {
   center: () => ({ ...DEFAULT_FUSION_BLEND_POINT }),
   'top-left': (geometry) => ({ x: geometry.centerNear, y: geometry.centerNear }),
   'top-right': (geometry) => ({ x: geometry.centerFar, y: geometry.centerNear }),
@@ -64,10 +67,7 @@ function getFusionSlotPosition(imageCount: number, index: number): FusionSlotPos
   return slots[index] ?? 'center'
 }
 
-function getAnchorForPosition(
-  position: FusionSlotPosition,
-  stageWidth?: number,
-): FusionBlendPoint {
+function getAnchorForPosition(position: FusionSlotPosition, stageWidth?: number): FusionBlendPoint {
   const geometry = getFusionSlotGeometry(stageWidth)
   return FUSION_SLOT_ANCHOR_FACTORIES[position](geometry)
 }

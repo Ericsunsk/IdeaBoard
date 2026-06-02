@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { UserBoardItem } from './userBoardItem';
+import type { UserBoardItem } from './userBoardItem'
 
 export type ApiResponseUserBoardListData = {
-  list: UserBoardItem[];
-};
+  list: UserBoardItem[]
+}

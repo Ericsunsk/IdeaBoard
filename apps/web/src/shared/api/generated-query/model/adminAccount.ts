@@ -6,21 +6,21 @@
  */
 
 export interface AdminAccount {
-  id: number;
-  name: string;
-  channel_id: number;
-  platform: string;
-  api_type: string;
-  api_key: string;
-  proxy_url: string;
-  model_set: string;
-  max_concurrent: number;
-  current_concurrent: number;
-  fail_count: number;
-  weight: number;
-  timeout: number;
-  extra_config: string;
-  status: number;
-  created_at: string;
-  updated_at: string;
+  id: number
+  name: string
+  channel_id: number
+  platform: string
+  api_type: string
+  api_key: string
+  proxy_url: string
+  model_set: string
+  max_concurrent: number
+  current_concurrent: number
+  fail_count: number
+  weight: number
+  timeout: number
+  extra_config: string
+  status: number
+  created_at: string
+  updated_at: string
 }

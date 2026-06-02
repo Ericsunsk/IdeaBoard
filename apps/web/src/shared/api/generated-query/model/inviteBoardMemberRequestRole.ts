@@ -5,10 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type InviteBoardMemberRequestRole = typeof InviteBoardMemberRequestRole[keyof typeof InviteBoardMemberRequestRole];
-
+export type InviteBoardMemberRequestRole =
+  (typeof InviteBoardMemberRequestRole)[keyof typeof InviteBoardMemberRequestRole]
 
 export const InviteBoardMemberRequestRole = {
   editor: 'editor',
   viewer: 'viewer',
-} as const;
+} as const

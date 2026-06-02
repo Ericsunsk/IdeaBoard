@@ -6,6 +6,6 @@
  */
 
 export interface RateLimitSetting {
-  window_seconds: number;
-  max_requests: number;
+  window_seconds: number
+  max_requests: number
 }

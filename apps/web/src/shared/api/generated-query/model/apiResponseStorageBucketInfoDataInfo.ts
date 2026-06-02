@@ -6,5 +6,5 @@
  */
 
 export type ApiResponseStorageBucketInfoDataInfo = {
-  domains?: string[];
-};
+  domains?: string[]
+}

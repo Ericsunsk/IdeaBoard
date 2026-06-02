@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { ApiResponseFeaturePromptMapDataPrompts } from './apiResponseFeaturePromptMapDataPrompts';
+import type { ApiResponseFeaturePromptMapDataPrompts } from './apiResponseFeaturePromptMapDataPrompts'
 
 export type ApiResponseFeaturePromptMapData = {
-  prompts: ApiResponseFeaturePromptMapDataPrompts;
-};
+  prompts: ApiResponseFeaturePromptMapDataPrompts
+}

@@ -6,6 +6,6 @@
  */
 
 export interface MonitorAccountLoad {
-  current_concurrent: number;
-  max_concurrent: number;
+  current_concurrent: number
+  max_concurrent: number
 }

@@ -4,23 +4,23 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { TaskOutput } from './taskOutput';
+import type { TaskOutput } from './taskOutput'
 
 export interface Task {
-  id: number;
-  task_id: string;
-  user_id: number;
-  channel_id?: number;
-  account_id?: number;
-  prompt: string;
-  params?: string;
-  status: string;
-  retry_count?: number;
-  error_msg?: string;
-  result?: string;
-  outputs?: TaskOutput[];
-  created_at: string;
-  updated_at: string;
+  id: number
+  task_id: string
+  user_id: number
+  channel_id?: number
+  account_id?: number
+  prompt: string
+  params?: string
+  status: string
+  retry_count?: number
+  error_msg?: string
+  result?: string
+  outputs?: TaskOutput[]
+  created_at: string
+  updated_at: string
   /** @nullable */
-  completed_at?: string | null;
+  completed_at?: string | null
 }

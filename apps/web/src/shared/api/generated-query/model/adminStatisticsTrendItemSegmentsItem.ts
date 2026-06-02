@@ -6,6 +6,6 @@
  */
 
 export type AdminStatisticsTrendItemSegmentsItem = {
-  label: string;
-  value: number;
-};
+  label: string
+  value: number
+}

@@ -1,7 +1,4 @@
-import {
-  CANVAS_CONNECTION_NODE_TYPES,
-  type CanvasConnectionPort,
-} from '../types/canvasNodes'
+import { CANVAS_CONNECTION_NODE_TYPES, type CanvasConnectionPort } from '../types/canvasNodes'
 
 export const CANVAS_CONNECTION_NODE_TYPE_WHITELIST = CANVAS_CONNECTION_NODE_TYPES
 
