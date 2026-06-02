@@ -29,13 +29,16 @@ func TestNormalizeTaskStatusEvent(t *testing.T) {
 	}
 }
 
-func TestPublishTaskStatusBestEffortAcceptsNilContext(t *testing.T) {
+func TestPublishTaskStatusBestEffortPublishesNormalizedEvent(t *testing.T) {
 	publisher := &recordingPublisher{}
-	if err := PublishTaskStatusBestEffort(nil, publisher, NewTaskStatusEvent("task-1", "pending")); err != nil {
+	if err := PublishTaskStatusBestEffort(context.TODO(), publisher, TaskStatusEvent{
+		TaskID: " task-1 ",
+		Status: " pending ",
+	}); err != nil {
 		t.Fatalf("PublishTaskStatusBestEffort failed: %v", err)
 	}
-	if publisher.event.TaskID != "task-1" || publisher.event.Status != "pending" {
-		t.Fatalf("event=(%s,%s), want=(task-1,pending)", publisher.event.TaskID, publisher.event.Status)
+	if publisher.event.Type != EventTypeTaskStatusChanged || publisher.event.TaskID != "task-1" || publisher.event.Status != "pending" {
+		t.Fatalf("event=(%s,%s,%s), want=(%s,task-1,pending)", publisher.event.Type, publisher.event.TaskID, publisher.event.Status, EventTypeTaskStatusChanged)
 	}
 }
 

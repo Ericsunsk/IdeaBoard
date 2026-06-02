@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -109,7 +110,7 @@ func (s *AccountService) prepareSubmitTask(ctx context.Context, userID int64, re
 		return nil, nil, "", "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 	if len(accounts) == 0 {
-		return nil, nil, "", "", fmt.Errorf(noAvailableAPIAccountMessage)
+		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
 
 	params := make(map[string]interface{}, len(req.Params)+2)
@@ -140,7 +141,7 @@ func (s *AccountService) prepareSubmitTask(ctx context.Context, userID int64, re
 	}
 	accounts = filterAccountsByFeature(accounts, featureSlug)
 	if len(accounts) == 0 {
-		return nil, nil, "", "", fmt.Errorf(noAvailableAPIAccountMessage)
+		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
 
 	fullPrompt := applyTaskSystemPrompt(req.Prompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {

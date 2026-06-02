@@ -51,9 +51,6 @@ func PublishTaskStatusBestEffort(parent context.Context, publisher TaskStatusPub
 	if publisher == nil {
 		return nil
 	}
-	if parent == nil {
-		parent = context.Background()
-	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), DefaultPublishTimeout)
 	defer cancel()
 	return publisher.PublishTaskStatus(ctx, NormalizeTaskStatusEvent(event))

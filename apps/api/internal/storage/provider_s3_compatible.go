@@ -4,6 +4,7 @@ import (
 	"api/internal/platform/outbound"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -94,7 +95,7 @@ func ensureS3BucketAccessible(ctx context.Context, client s3BucketExistenceCheck
 		return fmt.Errorf("验证 Bucket 失败: %v", err)
 	}
 	if !exists {
-		return fmt.Errorf("Bucket 不存在或当前凭证无权访问")
+		return errors.New("bucket 不存在或当前凭证无权访问")
 	}
 	return nil
 }
@@ -224,7 +225,7 @@ func (s *S3CompatibleService) validateBaseConfig(cfg *S3CompatibleConfig) error 
 		endpointURL = "http://" + endpointHost
 	}
 	if _, err := outbound.ValidateConfiguredEndpoint(endpointURL, outbound.AllowHostsFromEnv()...); err != nil {
-		return fmt.Errorf("Endpoint 不可用，仅支持可达的公网 http(s) 地址")
+		return errors.New("endpoint 不可用，仅支持可达的公网 http(s) 地址")
 	}
 	return nil
 }

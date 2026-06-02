@@ -109,7 +109,7 @@ func TestEnsureS3BucketAccessible(t *testing.T) {
 
 	t.Run("returns error when bucket does not exist", func(t *testing.T) {
 		err := ensureS3BucketAccessible(context.Background(), &stubS3BucketExistenceChecker{exists: false}, "feng-assets")
-		if err == nil || err.Error() != "Bucket 不存在或当前凭证无权访问" {
+		if err == nil || err.Error() != "bucket 不存在或当前凭证无权访问" {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})

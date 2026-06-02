@@ -220,9 +220,7 @@ func (h *VectorizeHandler) Vectorize(c *gin.Context) {
 		Result:      string(resultJSON),
 		CompletedAt: &now,
 	}
-	if err := h.taskRepo.Create(ctx, task); err != nil {
-		// 不影响返回结果
-	}
+	_ = h.taskRepo.Create(ctx, task)
 
 	response.Success(c, gin.H{
 		"svg_url": persistedURL,

@@ -39,7 +39,7 @@ func (c *ProviderExecutor) callGoogleAI(ctx context.Context, account *accounts.A
 	requestedModel, useImagen := resolveGoogleModel(params, resolvedModel)
 	if useImagen {
 		if len(collectGoogleImageRefs(params)) > 0 {
-			return providerCallResult{}, fmt.Errorf("Google Imagen 当前不支持图像参考输入，请选择 Gemini 图像模型")
+			return providerCallResult{}, errors.New("google imagen 当前不支持图像参考输入，请选择 gemini 图像模型")
 		}
 		return c.callGoogleImagenPredict(ctx, account, baseURL, prompt, timeout, params, requestedModel)
 	}
@@ -260,7 +260,7 @@ func extractGoogleGeminiImageResponses(respBody []byte) ([]string, error) {
 	}
 
 	if len(urls) == 0 {
-		return nil, fmt.Errorf("Google Gemini 未返回图片数据，请确认模型支持图像输出")
+		return nil, errors.New("google gemini 未返回图片数据，请确认模型支持图像输出")
 	}
 	return urls, nil
 }
@@ -400,7 +400,7 @@ func extractGoogleImagenResponses(respBody []byte) ([]string, error) {
 		}
 	}
 	if len(urls) == 0 {
-		return nil, fmt.Errorf("Google Imagen 未返回图片数据")
+		return nil, errors.New("google imagen 未返回图片数据")
 	}
 	return urls, nil
 }

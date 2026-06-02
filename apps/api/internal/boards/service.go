@@ -122,7 +122,8 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 		}
 
 		nextName := existing.Name
-		if role == BoardAccessRoleOwner {
+		switch role {
+		case BoardAccessRoleOwner:
 			conflicted, err := s.repo.HasNameConflict(ctx, existing.UserID, normalizedID, name)
 			if err != nil {
 				return nil, err
@@ -131,11 +132,11 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 				return nil, ErrBoardNameConflict
 			}
 			nextName = name
-		} else if role == BoardAccessRoleEditor {
+		case BoardAccessRoleEditor:
 			if name != normalizeBoardName(existing.Name) {
 				return nil, ErrBoardPermissionDenied
 			}
-		} else {
+		default:
 			return nil, ErrBoardPermissionDenied
 		}
 

@@ -36,6 +36,14 @@ func TestRiverWorkerNoCapacitySnoozesJob(t *testing.T) {
 	}
 }
 
+func TestRiverWorkerRejectsNilJob(t *testing.T) {
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(&fakeAssigner{}, &fakeRuntime{}, nil))
+
+	if err := worker.Work(context.Background(), nil); err == nil {
+		t.Fatal("expected nil job error")
+	}
+}
+
 func TestTaskProcessorProcessesSynchronously(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9}
 	runtime := &fakeRuntime{}

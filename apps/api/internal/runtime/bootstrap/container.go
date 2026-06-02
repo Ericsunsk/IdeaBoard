@@ -48,21 +48,21 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 
 	db, err := database.NewPostgres(cfg.Database)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	if err := migrations.Up(context.Background(), db); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("Failed to migrate database schema: %w", err)
+		return nil, fmt.Errorf("failed to migrate database schema: %w", err)
 	}
 	riverPool, err := worker.NewRiverPgxPool(context.Background(), database.PostgresDSN(cfg.Database))
 	if err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("Failed to connect River database pool: %w", err)
+		return nil, fmt.Errorf("failed to connect River database pool: %w", err)
 	}
 	if err := worker.MigrateRiver(context.Background(), riverPool); err != nil {
 		riverPool.Close()
 		_ = db.Close()
-		return nil, fmt.Errorf("Failed to migrate River schema: %w", err)
+		return nil, fmt.Errorf("failed to migrate River schema: %w", err)
 	}
 	postgresAssigner := taskqueue.NewPostgresTaskAssigner(db)
 	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(db)
@@ -71,7 +71,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	if err := userRepo.EnsureStorageUIDs(context.Background()); err != nil {
 		riverPool.Close()
 		_ = db.Close()
-		return nil, fmt.Errorf("Failed to ensure user storage uid: %w", err)
+		return nil, fmt.Errorf("failed to ensure user storage uid: %w", err)
 	}
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := accounts.NewTaskRepository(db)
@@ -88,7 +88,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	if err != nil {
 		riverPool.Close()
 		_ = db.Close()
-		return nil, fmt.Errorf("Failed to initialize task event bus: %w", err)
+		return nil, fmt.Errorf("failed to initialize task event bus: %w", err)
 	}
 	riverQueue := taskqueue.NewRiverQueue(nil, db, postgresRuntimeStore, cfg.Queue.MaxRetry)
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
@@ -168,7 +168,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		_ = eventBus.Close()
 		riverPool.Close()
 		_ = db.Close()
-		return nil, fmt.Errorf("Failed to initialize River client: %w", err)
+		return nil, fmt.Errorf("failed to initialize River client: %w", err)
 	}
 	riverQueue.SetClient(riverClient)
 

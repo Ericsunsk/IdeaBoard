@@ -427,9 +427,7 @@ func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL, b
 	candidate := strings.TrimPrefix(relativePath, "/")
 	if forcePathStyle && strings.TrimSpace(bucketName) != "" {
 		bucketPrefix := strings.Trim(strings.TrimSpace(bucketName), "/") + "/"
-		if strings.HasPrefix(candidate, bucketPrefix) {
-			candidate = strings.TrimPrefix(candidate, bucketPrefix)
-		}
+		candidate = strings.TrimPrefix(candidate, bucketPrefix)
 	}
 
 	return normalizeUploadObjectKey(candidate)

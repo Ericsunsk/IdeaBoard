@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"api/internal/accounts"
@@ -58,8 +57,11 @@ func (w *RiverTaskWorker) SetNoCapacityRetryDelay(delay time.Duration) {
 }
 
 func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.DrawingTaskArgs]) error {
+	if job == nil {
+		return errors.New("river job is nil")
+	}
 	task := job.Args.Task
-	if job != nil && job.JobRow != nil {
+	if job.JobRow != nil {
 		task.RiverJobID = job.ID
 	}
 	if err := w.processor.Process(ctx, &task); err != nil {
@@ -80,7 +82,7 @@ type RiverServerOptions struct {
 
 func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverServerOptions) (*river.Client[pgx.Tx], error) {
 	if dbPool == nil {
-		return nil, fmt.Errorf("river db pool is nil")
+		return nil, errors.New("river db pool is nil")
 	}
 	queueName := opts.QueueName
 	if queueName == "" {
@@ -113,7 +115,7 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 
 func MigrateRiver(ctx context.Context, dbPool *pgxpool.Pool) error {
 	if dbPool == nil {
-		return fmt.Errorf("river db pool is nil")
+		return errors.New("river db pool is nil")
 	}
 	migrator, err := rivermigrate.New(riverpgxv5.New(dbPool), nil)
 	if err != nil {

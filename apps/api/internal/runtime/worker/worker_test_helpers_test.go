@@ -2,13 +2,12 @@ package worker
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	"api/internal/accounts"
 	"api/internal/runtime/queuetypes"
 	"api/internal/runtime/taskqueue"
-	"api/internal/testdb"
-	"testing"
 )
 
 type fakeRequeuer struct{}
@@ -98,12 +97,6 @@ func (f *fakeCancelStoreForRiver) ClearCancelled(_ context.Context, taskID strin
 	f.cleared[taskID] = true
 	delete(f.cancelled, taskID)
 	return nil
-}
-
-func newRiverWorkerTestRepos(t *testing.T) (*accounts.AccountRepository, *accounts.TaskRepository) {
-	t.Helper()
-	db := testdb.Open(t)
-	return accounts.NewAccountRepository(db), accounts.NewTaskRepository(db)
 }
 
 func createRiverTestAccount(t *testing.T, repo *accounts.AccountRepository, name string) *accounts.ApiAccount {

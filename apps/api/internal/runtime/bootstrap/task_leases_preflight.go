@@ -99,7 +99,7 @@ func parseRepairTaskLeasesArgs(args []string) (repairTaskLeasesOptions, error) {
 		Limit:  defaultRepairLimit,
 	}
 	if len(args) == 0 || args[0] != "task-leases" {
-		return opts, errors.New("Usage: api repair task-leases [--dry-run] [--to=pending --yes] [--limit=N]")
+		return opts, errors.New("usage: api repair task-leases [--dry-run] [--to=pending --yes] [--limit=N]")
 	}
 	fs := flag.NewFlagSet("repair task-leases", flag.ContinueOnError)
 	fs.SetOutput(log.Writer())
