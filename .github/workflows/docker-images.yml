@@ -6,6 +6,7 @@ on:
       - "apps/api/**"
       - "apps/auth/**"
       - "docker/**"
+      - ".grype.yaml"
       - ".github/workflows/docker-images.yml"
   push:
     branches:
@@ -17,6 +18,7 @@ on:
       - "apps/api/**"
       - "apps/auth/**"
       - "docker/**"
+      - ".grype.yaml"
       - ".github/workflows/docker-images.yml"
   workflow_dispatch:
     inputs:
@@ -214,6 +216,7 @@ jobs:
         uses: anchore/scan-action@v7.4.0
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          config: .grype.yaml
           fail-build: true
           severity-cutoff: high
           output-format: table

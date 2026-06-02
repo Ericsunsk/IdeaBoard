@@ -1,0 +1,3 @@
+# Vulnerability exceptions live here so every image scan uses the same policy.
+# Keep exceptions narrow, temporary, and tied to a triage note.
+ignore: []

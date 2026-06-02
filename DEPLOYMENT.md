@@ -158,6 +158,30 @@ ghcr.io/<github-owner>/<github-repo>/ideaboard-api:<tag>
 ghcr.io/<github-owner>/<github-repo>/ideaboard-auth:<tag>
 ```
 
+#### 镜像供应链检查
+
+发布路径会为每个镜像生成 CycloneDX SBOM artifact，使用 Grype 拦截 `high` 及以上漏洞，并用 Cosign keyless OIDC 对镜像 digest 签名。
+
+Grype 的统一 triage 文件是仓库根目录 [`.grype.yaml`](./.grype.yaml)。新增例外时只加窄范围规则，例外原因和复查日期写在对应 PR 或 issue 里；优先升级基础镜像或依赖，不要直接放宽 workflow 的 `severity-cutoff`：
+
+```yaml
+ignore:
+  - vulnerability: CVE-YYYY-NNNN
+    fix-state: unknown
+    package:
+      name: package-name
+      type: deb
+```
+
+部署前可用镜像 digest 验证签名。`--certificate-identity` 的 ref 需匹配实际发布来源；tag 发布时改成 `refs/tags/vX.Y.Z`：
+
+```bash
+cosign verify \
+  --certificate-identity "https://github.com/<github-owner>/<github-repo>/.github/workflows/docker-images.yml@refs/heads/main" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  "ghcr.io/<github-owner>/<github-repo>/ideaboard-api@sha256:<digest>"
+```
+
 ### 2. 首次 VPS 初始化 + 部署
 
 ```bash
