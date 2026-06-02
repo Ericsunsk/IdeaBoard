@@ -523,12 +523,34 @@ func generateLeaseToken() (string, error) {
 
 // GetAccountLoadInfo 获取所有账号的负载信息
 func (r *RedisManager) GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*queuetypes.AccountLoad, error) {
-	result := make(map[int64]*queuetypes.AccountLoad)
+	result := make(map[int64]*queuetypes.AccountLoad, len(accountIDs))
+	countCmds := make(map[int64]*redis.StringCmd, len(accountIDs))
+	maxCmds := make(map[int64]*redis.StringCmd, len(accountIDs))
 
+	pipe := r.rdb.Pipeline()
 	for _, id := range accountIDs {
 		key := fmt.Sprintf("%s:%d", KeyAccountConcurrent, id)
-		count, _ := r.rdb.HGet(ctx, key, "count").Int()
-		max, _ := r.rdb.HGet(ctx, key, "max").Int()
+		countCmds[id] = pipe.HGet(ctx, key, "count")
+		maxCmds[id] = pipe.HGet(ctx, key, "max")
+	}
+	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+		return nil, err
+	}
+
+	for _, id := range accountIDs {
+		count, err := countCmds[id].Int()
+		if err == redis.Nil {
+			count = 0
+		} else if err != nil {
+			return nil, err
+		}
+
+		max, err := maxCmds[id].Int()
+		if err == redis.Nil {
+			max = 3
+		} else if err != nil {
+			return nil, err
+		}
 		if max == 0 {
 			max = 3
 		}

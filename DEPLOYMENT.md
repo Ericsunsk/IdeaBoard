@@ -174,6 +174,10 @@ GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $G
 - `APP_BASE_URL`
 - `API_BASE_URL`
 - `CLOUDFLARE_TUNNEL_TOKEN`
+- `POSTGRES_PASSWORD`
+- `REDIS_PASSWORD`
+- `AUTH_INTERNAL_KEY`
+- `BETTER_AUTH_SECRET`
 
 可选：
 
@@ -423,7 +427,7 @@ nano /opt/ideaboard/apps/api/.env
 部署时至少确认：
 
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`
-- `REDIS_HOST/REDIS_PORT/REDIS_AUTH`
+- `REDIS_HOST/REDIS_PORT/REDIS_AUTH`（生产必须配置 Redis 密码；Docker Compose 会从必填 `REDIS_PASSWORD` 注入）
 - `APP_ENV=production`（生产环境必须显式设置）
 - `APP_PORT=6000`
 - `APP_HOST=127.0.0.1`（建议反向代理场景启用）
@@ -436,7 +440,7 @@ nano /opt/ideaboard/apps/api/.env
 建议：
 
 - 不要在生产环境继续使用本地开发默认账号
-- 若 Redis 开启密码，必须同步配置 `REDIS_AUTH`
+- 生产环境必须为 Redis 设置密码；非 Docker 部署时必须同步配置 `REDIS_AUTH`
 - 若前面有 Nginx / 其他反向代理，建议设置 `APP_HOST=127.0.0.1`
 - 生产环境请固定设置 `APP_ENV=production`，不要依赖默认值；发布包 systemd 已设置该值，不要在 `.env` 中写回 `development`
 - `AUTH_SERVICE_INTERNAL_KEY` 建议使用足够长的随机字符串，并只在 API 与 Auth Service 两侧共享

@@ -153,7 +153,7 @@ func enqueueAsynqTask(task *queuetypes.TaskPayload) *asynq.Task {
 }
 
 func TestAsynqHandlerInvalidPayloadSkipRetry(t *testing.T) {
-	processor := newTaskProcessor(&fakeAssigner{}, &fakeRuntime{}, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error { return nil }, false)
+	processor := newTaskProcessor(&fakeAssigner{}, &fakeRuntime{}, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error { return nil })
 	handler := newAsynqTaskHandlerWithProcessor(processor)
 
 	err := handler.HandleTask(context.Background(), asynq.NewTask(taskqueue.AsynqTaskTypeDrawingGenerate, []byte("{invalid")))
@@ -168,7 +168,7 @@ func TestAsynqHandlerInvalidPayloadSkipRetry(t *testing.T) {
 func TestAsynqHandlerNoCapacityDoesNotMarkFailed(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusNoCapacity}
 	runtime := &fakeRuntime{}
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error { return nil }, false))
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error { return nil }))
 
 	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "cap-1", AccountIDs: []int64{1}}))
 	if !errors.Is(err, taskqueue.ErrNoAccountCapacity) {
@@ -188,7 +188,7 @@ func TestAsynqHandlerRefreshAccountsErrorRetriesWithoutMarkingFailed(t *testing.
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called when account refresh fails")
 		return nil
-	}, false))
+	}))
 
 	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "refresh-error-1", AccountIDs: []int64{1}}))
 	if !errors.Is(err, refreshErr) {
@@ -206,7 +206,7 @@ func TestAsynqHandlerAssignInfrastructureErrorRetriesWithoutMarkingFailed(t *tes
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called when assign fails")
 		return nil
-	}, false))
+	}))
 
 	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "assign-error-1", AccountIDs: []int64{1}}))
 	if !errors.Is(err, assignErr) {
@@ -223,7 +223,7 @@ func TestAsynqHandlerAssignContextCanceledDoesNotMarkFailed(t *testing.T) {
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called when assign is canceled")
 		return nil
-	}, false))
+	}))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -242,7 +242,7 @@ func TestAsynqHandlerAssignContextDeadlineDoesNotMarkFailed(t *testing.T) {
 	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, func(context.Context, *queuetypes.TaskPayload, taskqueue.TaskAssignment) error {
 		t.Fatal("execute should not be called when assign deadline is exceeded")
 		return nil
-	}, false))
+	}))
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 	defer cancel()
@@ -263,7 +263,7 @@ func TestAsynqHandlerProcessesSynchronously(t *testing.T) {
 		time.Sleep(80 * time.Millisecond)
 		executed = true
 		return nil
-	}, false))
+	}))
 
 	start := time.Now()
 	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: "sync-1", AccountIDs: []int64{9}}))
@@ -296,7 +296,7 @@ func TestAsynqHandlerTerminalTaskDoesNotCallProvider(t *testing.T) {
 		providerCalled = true
 		return "", nil
 	})
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute))
 
 	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []int64{acc.ID}}))
 	if err != nil {
@@ -326,7 +326,7 @@ func TestAsynqHandlerCancelledTaskClearsCancelAndSkipsProvider(t *testing.T) {
 		providerCalled = true
 		return "", nil
 	})
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute))
 
 	err := handler.HandleTask(context.Background(), enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []int64{acc.ID}}))
 	if err != nil {
@@ -365,7 +365,7 @@ func TestAsynqHandlerPropagatesContextToProvider(t *testing.T) {
 		}
 		return `{"status":"success","image_url":"https://example.com/image.png"}`, nil
 	})
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute))
 
 	parent := context.WithValue(context.Background(), ctxKey, "trace-id")
 	ctx, cancel := context.WithTimeout(parent, time.Second)
@@ -401,7 +401,7 @@ func TestAsynqHandlerParentContextCanceledResetsTaskAndPropagatesError(t *testin
 		<-ctx.Done()
 		return "", ctx.Err()
 	})
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute))
 	defer cancel()
 
 	err := handler.HandleTask(ctx, enqueueAsynqTask(&queuetypes.TaskPayload{TaskID: taskID, AccountIDs: []int64{acc.ID}}))
@@ -455,7 +455,7 @@ func TestAsynqHandlerParentContextDeadlineExceededResetsTaskAndPropagatesError(t
 		<-ctx.Done()
 		return "", ctx.Err()
 	})
-	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute, false))
+	handler := newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, runtime, orchestrator.execute))
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(20*time.Millisecond))
 	defer cancel()

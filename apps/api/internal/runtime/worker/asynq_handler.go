@@ -42,7 +42,7 @@ func NewAsynqTaskHandler(
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 	taskRuntime.SetEventHub(taskEventHub)
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, enqueuer, taskRuntime, executor.callDrawingAPI)
-	return newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute, false))
+	return newAsynqTaskHandlerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute))
 }
 
 func newAsynqTaskHandlerWithProcessor(processor *taskProcessor) *AsynqTaskHandler {

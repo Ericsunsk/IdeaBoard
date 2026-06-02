@@ -1,6 +1,12 @@
 name: Docker Images
 
 on:
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - "apps/auth/**"
+      - "docker/**"
+      - ".github/workflows/docker-images.yml"
   push:
     branches:
       - main
@@ -45,6 +51,16 @@ jobs:
         working-directory: apps/api
         run: go test ./...
 
+      - name: Test API with race detector
+        working-directory: apps/api
+        run: go test -race ./...
+
+      - name: Lint API
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          working-directory: apps/api
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -70,6 +86,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -83,6 +100,7 @@ jobs:
           images: ${{ steps.images.outputs.api }}
           tags: |
             type=ref,event=branch
+            type=ref,event=pr
             type=ref,event=tag
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
@@ -94,11 +112,11 @@ jobs:
           context: ./apps/api
           file: ./apps/api/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.api-meta.outputs.tags }}
           labels: ${{ steps.api-meta.outputs.labels }}
           cache-from: type=gha,scope=ideaboard-api
-          cache-to: type=gha,mode=max,scope=ideaboard-api
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=ideaboard-api' || '' }}
 
       - name: Auth image metadata
         id: auth-meta
@@ -107,6 +125,7 @@ jobs:
           images: ${{ steps.images.outputs.auth }}
           tags: |
             type=ref,event=branch
+            type=ref,event=pr
             type=ref,event=tag
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
@@ -118,8 +137,8 @@ jobs:
           context: ./apps/auth
           file: ./apps/auth/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.auth-meta.outputs.tags }}
           labels: ${{ steps.auth-meta.outputs.labels }}
           cache-from: type=gha,scope=ideaboard-auth
-          cache-to: type=gha,mode=max,scope=ideaboard-auth
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=ideaboard-auth' || '' }}

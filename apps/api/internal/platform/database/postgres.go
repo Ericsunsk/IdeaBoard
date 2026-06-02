@@ -26,7 +26,7 @@ func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
 		if err == nil {
 			db.SetMaxOpenConns(25)
 			db.SetMaxIdleConns(10)
-			db.SetConnMaxLifetime(5 * time.Minute)
+			db.SetConnMaxLifetime(30 * time.Minute)
 			if pingErr := db.Ping(); pingErr == nil {
 				return db, nil
 			} else {

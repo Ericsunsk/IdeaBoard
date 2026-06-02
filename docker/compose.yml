@@ -71,7 +71,7 @@ services:
       DB_SSLMODE: disable
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_AUTH: ${REDIS_PASSWORD:-}
+      REDIS_AUTH: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
       TASK_QUEUE_WORKER_CONCURRENCY: ${TASK_QUEUE_WORKER_CONCURRENCY:-5}
       ASYNQ_TASK_TIMEOUT_SECONDS: ${ASYNQ_TASK_TIMEOUT_SECONDS:-180}
       ASYNQ_NO_CAPACITY_RETRY_SECONDS: ${ASYNQ_NO_CAPACITY_RETRY_SECONDS:-5}
@@ -150,26 +150,17 @@ services:
     container_name: ideaboard-redis
     restart: unless-stopped
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
     volumes:
       - redis-data:/data
     command:
       - sh
       - -c
-      - |
-        if [ -n "$$REDIS_PASSWORD" ]; then
-          exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
-        fi
-        exec redis-server --appendonly yes
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
     healthcheck:
       test:
         - CMD-SHELL
-        - |
-          if [ -n "$$REDIS_PASSWORD" ]; then
-            redis-cli -a "$$REDIS_PASSWORD" ping
-          else
-            redis-cli ping
-          fi
+        - redis-cli -a "$$REDIS_PASSWORD" ping
       interval: 10s
       timeout: 5s
       retries: 10

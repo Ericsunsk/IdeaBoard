@@ -46,11 +46,17 @@ func NewServiceClient(cfg config.AuthServiceConfig) *ServiceClient {
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConns = 100
+	transport.MaxIdleConnsPerHost = 10
+	transport.IdleConnTimeout = 90 * time.Second
+
 	return &ServiceClient{
 		baseURL:        strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
 		internalAPIKey: strings.TrimSpace(cfg.InternalAPIKey),
 		httpClient: &http.Client{
-			Timeout: timeout,
+			Timeout:   timeout,
+			Transport: transport,
 		},
 	}
 }

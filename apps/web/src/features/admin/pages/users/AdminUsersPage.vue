@@ -243,7 +243,6 @@ import {
   revokeAdminUserSessions,
   unbanAdminUser,
   updateAdminUserRole,
-  updateAdminUserStatus,
   updateRateLimitSettings,
   updateRegistrationSetting,
 } from '../../../../shared/query/adminQueries'
@@ -278,10 +277,6 @@ function invalidateRateLimitSettingsQuery() {
   return queryClient.invalidateQueries({ queryKey: getGetAdminRateLimitSettingsQueryKey() })
 }
 
-const updateUserStatusMutation = useMutation({
-  mutationFn: updateAdminUserStatus,
-  onSuccess: () => invalidateAdminUsersQuery(),
-})
 const banUserMutation = useMutation({
   mutationFn: banAdminUser,
   onSuccess: () => invalidateAdminUsersQuery(),

@@ -370,7 +370,7 @@ go build ./...
 | `DB_SSLMODE` | `disable` | PostgreSQL SSL 模式；本地与 Docker 内网默认关闭 |
 | `REDIS_HOST` | `localhost` | Redis 主机 |
 | `REDIS_PORT` | `6379` | Redis 端口 |
-| `REDIS_AUTH` | 空 | Redis 密码 |
+| `REDIS_AUTH` | 空 | Redis 密码；本地开发可留空，生产环境必须设置 |
 | `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
 | `APP_PORT` | `6000` | 后端监听端口 |
 | `APP_HOST` / `APP_BIND_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |

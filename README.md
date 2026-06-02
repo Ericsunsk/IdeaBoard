@@ -214,7 +214,7 @@ docker compose -f compose.local.yml up -d
 </details>
 
 > [!NOTE]
-> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 PostgreSQL / Redis 直接暴露到外网。若你需要 Redis 密码，可在 `docker/.env` 中设置 `REDIS_PASSWORD`，并在 `apps/api/.env` 中同步设置 `REDIS_AUTH`。
+> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 PostgreSQL / Redis 直接暴露到外网。生产 `docker/compose.yml` 要求 `REDIS_PASSWORD` 必填，并会自动注入 API 的 `REDIS_AUTH`；本地 `compose.local.yml` 仍可留空 Redis 密码做开发。
 > 当前后端只支持 PostgreSQL；部署脚本不会自动转换其他数据库形态的数据。
 
 ### 2. 配置后端环境

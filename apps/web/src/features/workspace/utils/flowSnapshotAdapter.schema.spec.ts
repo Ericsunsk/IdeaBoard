@@ -1,13 +1,10 @@
+import { describe, expect, it } from 'vitest'
 import {
   canvasBoardSnapshotToFlow,
   flowToCanvasBoardSnapshot,
   type FlowAdapterEdge,
   type FlowAdapterNode,
 } from './flowSnapshotAdapter'
-
-function expect(condition: unknown, message: string) {
-  if (!condition) throw new Error(message)
-}
 
 function makeImageFlowNode(params: {
   flowId: string
@@ -94,137 +91,23 @@ function makeFusionFlowNode(params: {
   }
 }
 
-function testTransientRunningImageNodeIsNotPersisted() {
-  const nodes: FlowAdapterNode[] = [
-    makeImageFlowNode({
-      flowId: 'image-1',
-      id: 1,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/source.png',
-    }),
-    makeImageFlowNode({
-      flowId: 'image-2',
-      id: 2,
-      outputStatus: 'running',
-      sourceImageUrl: '',
-    }),
-  ]
-  const edges: FlowAdapterEdge[] = [
-    {
-      id: 'edge-1',
-      source: 'image-1',
-      sourceHandle: 'out:image',
-      target: 'image-2',
-      targetHandle: 'in:image',
-    },
-  ]
-
-  const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
-  expect(snapshot.imageNodes.length === 1, 'expected only non-transient image node to persist')
-  expect(snapshot.imageNodes[0]?.id === 1, 'expected persisted image node id to be 1')
-  expect(
-    snapshot.connections.length === 0,
-    'expected connections to transient image node to be removed',
-  )
-}
-
-function testReadyImageNodeIsPersistedWithConnection() {
-  const nodes: FlowAdapterNode[] = [
-    makeImageFlowNode({
-      flowId: 'image-1',
-      id: 1,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/source.png',
-    }),
-    makeImageFlowNode({
-      flowId: 'image-2',
-      id: 2,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/result.png',
-    }),
-  ]
-  const edges: FlowAdapterEdge[] = [
-    {
-      id: 'edge-1',
-      source: 'image-1',
-      sourceHandle: 'out:image',
-      target: 'image-2',
-      targetHandle: 'in:image',
-    },
-  ]
-
-  const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
-  expect(snapshot.imageNodes.length === 2, 'expected ready image nodes to persist')
-  expect(
-    snapshot.connections.length === 1,
-    'expected connection between ready image nodes to persist',
-  )
-  expect(snapshot.connections[0]?.fromNodeType === 'image', 'expected fromNodeType to be image')
-  expect(snapshot.connections[0]?.toNodeType === 'image', 'expected toNodeType to be image')
-}
-
-function testAggregateInputHandlesAreResolvedBeforePersistence() {
-  const nodes: FlowAdapterNode[] = [
-    makeImageFlowNode({
-      flowId: 'image-1',
-      id: 1,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/source.png',
-    }),
-    makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
-    makeFusionFlowNode({ flowId: 'fusion-4', id: 4 }),
-  ]
-  const edges: FlowAdapterEdge[] = [
-    {
-      id: 'edge-image-fusion',
-      source: 'image-1',
-      sourceHandle: 'out:image',
-      target: 'fusion-4',
-      targetHandle: 'in:__auto',
-    },
-    {
-      id: 'edge-prompt-fusion',
-      source: 'prompt-3',
-      sourceHandle: 'out:prompt',
-      target: 'fusion-4',
-      targetHandle: 'in:__auto',
-    },
-  ]
-
-  const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
-  expect(snapshot.connections.length === 2, 'expected aggregate handle connections to persist')
-  expect(
-    snapshot.connections.some(
-      (connection) => connection.fromNodeType === 'image' && connection.toPort === 'image',
-    ),
-    'expected image aggregate connection to resolve to image input',
-  )
-  expect(
-    snapshot.connections.some(
-      (connection) => connection.fromNodeType === 'prompt' && connection.toPort === 'prompt',
-    ),
-    'expected prompt aggregate connection to resolve to prompt input',
-  )
-}
-
-function testConnectionRoundTripPreservesEdges() {
-  const nodes: FlowAdapterNode[] = [
-    makeImageFlowNode({
-      flowId: 'image-1',
-      id: 1,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/source.png',
-    }),
-    makeImageFlowNode({
-      flowId: 'image-2',
-      id: 2,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/result.png',
-    }),
-  ]
-  const snapshot = flowToCanvasBoardSnapshot({
-    nodes,
-    edges: [
+describe('flowSnapshotAdapter', () => {
+  it('does not persist transient running image nodes', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'running',
+        sourceImageUrl: '',
+      }),
+    ]
+    const edges: FlowAdapterEdge[] = [
       {
         id: 'edge-1',
         source: 'image-1',
@@ -232,137 +115,233 @@ function testConnectionRoundTripPreservesEdges() {
         target: 'image-2',
         targetHandle: 'in:image',
       },
-    ],
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
+    expect(snapshot.imageNodes.length).toBe(1)
+    expect(snapshot.imageNodes[0]?.id).toBe(1)
+    expect(snapshot.connections.length).toBe(0)
   })
-  const flow = canvasBoardSnapshotToFlow(snapshot)
-  const savedAgain = flowToCanvasBoardSnapshot(flow)
 
-  expect(savedAgain.connections.length === 1, 'expected round-trip connection to persist')
-  expect(
-    savedAgain.connections[0]?.fromNodeId === 1 && savedAgain.connections[0]?.toNodeId === 2,
-    'expected round-trip connection endpoints to be stable',
-  )
-}
-
-function testPromptImageInputPreservesMultipleConnections() {
-  const nodes: FlowAdapterNode[] = [
-    makeImageFlowNode({
-      flowId: 'image-1',
-      id: 1,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/source-1.png',
-    }),
-    makeImageFlowNode({
-      flowId: 'image-2',
-      id: 2,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/source-2.png',
-    }),
-    makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
-  ]
-  const snapshot = flowToCanvasBoardSnapshot({
-    nodes,
-    edges: [
+  it('persists ready image nodes with connections', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/result.png',
+      }),
+    ]
+    const edges: FlowAdapterEdge[] = [
       {
-        id: 'edge-image-1-prompt',
+        id: 'edge-1',
         source: 'image-1',
         sourceHandle: 'out:image',
-        target: 'prompt-3',
+        target: 'image-2',
         targetHandle: 'in:image',
       },
-      {
-        id: 'edge-image-2-prompt',
-        source: 'image-2',
-        sourceHandle: 'out:image',
-        target: 'prompt-3',
-        targetHandle: 'in:image',
-      },
-    ],
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
+    expect(snapshot.imageNodes.length).toBe(2)
+    expect(snapshot.connections.length).toBe(1)
+    expect(snapshot.connections[0]?.fromNodeType).toBe('image')
+    expect(snapshot.connections[0]?.toNodeType).toBe('image')
   })
 
-  const promptImageInputs = snapshot.connections.filter(
-    (connection) => connection.toNodeType === 'prompt' && connection.toPort === 'image',
-  )
-  expect(promptImageInputs.length === 2, 'expected prompt image input to preserve multiple edges')
-}
-
-function testFusionImageInputPreservesMultipleConnections() {
-  const nodes: FlowAdapterNode[] = [
-    makeImageFlowNode({
-      flowId: 'image-1',
-      id: 1,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/source-1.png',
-    }),
-    makeImageFlowNode({
-      flowId: 'image-2',
-      id: 2,
-      outputStatus: 'ready',
-      sourceImageUrl: 'https://example.com/source-2.png',
-    }),
-    makeFusionFlowNode({ flowId: 'fusion-3', id: 3, prompt: 'blend two references' }),
-  ]
-  const snapshot = flowToCanvasBoardSnapshot({
-    nodes,
-    edges: [
+  it('resolves aggregate input handles before persistence', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source.png',
+      }),
+      makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
+      makeFusionFlowNode({ flowId: 'fusion-4', id: 4 }),
+    ]
+    const edges: FlowAdapterEdge[] = [
       {
-        id: 'edge-image-1-fusion',
+        id: 'edge-image-fusion',
         source: 'image-1',
         sourceHandle: 'out:image',
-        target: 'fusion-3',
-        targetHandle: 'in:image',
+        target: 'fusion-4',
+        targetHandle: 'in:__auto',
       },
       {
-        id: 'edge-image-2-fusion',
-        source: 'image-2',
-        sourceHandle: 'out:image',
-        target: 'fusion-3',
-        targetHandle: 'in:image',
+        id: 'edge-prompt-fusion',
+        source: 'prompt-3',
+        sourceHandle: 'out:prompt',
+        target: 'fusion-4',
+        targetHandle: 'in:__auto',
       },
-    ],
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges })
+    expect(snapshot.connections.length).toBe(2)
+    expect(
+      snapshot.connections.some(
+        (connection) => connection.fromNodeType === 'image' && connection.toPort === 'image',
+      ),
+    ).toBe(true)
+    expect(
+      snapshot.connections.some(
+        (connection) => connection.fromNodeType === 'prompt' && connection.toPort === 'prompt',
+      ),
+    ).toBe(true)
   })
 
-  const fusionImageInputs = snapshot.connections.filter(
-    (connection) => connection.toNodeType === 'fusion' && connection.toPort === 'image',
-  )
-  expect(fusionImageInputs.length === 2, 'expected fusion image input to preserve multiple edges')
-}
+  it('preserves edges across connection round trips', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/result.png',
+      }),
+    ]
+    const snapshot = flowToCanvasBoardSnapshot({
+      nodes,
+      edges: [
+        {
+          id: 'edge-1',
+          source: 'image-1',
+          sourceHandle: 'out:image',
+          target: 'image-2',
+          targetHandle: 'in:image',
+        },
+      ],
+    })
+    const flow = canvasBoardSnapshotToFlow(snapshot)
+    const savedAgain = flowToCanvasBoardSnapshot(flow)
 
-function testFusionBlendPointRoundTripPreserved() {
-  const flow = canvasBoardSnapshotToFlow({
-    imageNodes: [],
-    promptNodes: [],
-    viewpointNodes: [],
-    fusionNodes: [
-      {
-        id: 31,
-        type: 'fusion',
-        x: 200,
-        y: 120,
-        width: 280,
-        prompt: '',
-        outputCount: 1,
-        aspectRatio: 'auto',
-        blendPoint: { x: 0.62, y: 0.41 },
-        inputImages: [],
-        outputStatus: 'idle',
-        outputImages: [],
-      },
-    ],
-    connections: [],
-    viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },
+    expect(savedAgain.connections.length).toBe(1)
+    expect(savedAgain.connections[0]?.fromNodeId).toBe(1)
+    expect(savedAgain.connections[0]?.toNodeId).toBe(2)
   })
-  const restored = flowToCanvasBoardSnapshot(flow)
-  expect(restored.fusionNodes[0]?.blendPoint.x === 0.62, 'expected fusion blendPoint x to persist')
-  expect(restored.fusionNodes[0]?.blendPoint.y === 0.41, 'expected fusion blendPoint y to persist')
-}
 
-testTransientRunningImageNodeIsNotPersisted()
-testReadyImageNodeIsPersistedWithConnection()
-testAggregateInputHandlesAreResolvedBeforePersistence()
-testConnectionRoundTripPreservesEdges()
-testPromptImageInputPreservesMultipleConnections()
-testFusionImageInputPreservesMultipleConnections()
-testFusionBlendPointRoundTripPreserved()
+  it('preserves multiple prompt image input connections', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-1.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-2.png',
+      }),
+      makePromptFlowNode({ flowId: 'prompt-3', id: 3, text: 'studio light' }),
+    ]
+    const snapshot = flowToCanvasBoardSnapshot({
+      nodes,
+      edges: [
+        {
+          id: 'edge-image-1-prompt',
+          source: 'image-1',
+          sourceHandle: 'out:image',
+          target: 'prompt-3',
+          targetHandle: 'in:image',
+        },
+        {
+          id: 'edge-image-2-prompt',
+          source: 'image-2',
+          sourceHandle: 'out:image',
+          target: 'prompt-3',
+          targetHandle: 'in:image',
+        },
+      ],
+    })
 
-console.log('flowSnapshotAdapter snapshot checks passed')
+    const promptImageInputs = snapshot.connections.filter(
+      (connection) => connection.toNodeType === 'prompt' && connection.toPort === 'image',
+    )
+    expect(promptImageInputs.length).toBe(2)
+  })
+
+  it('preserves multiple fusion image input connections', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-1',
+        id: 1,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-1.png',
+      }),
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'ready',
+        sourceImageUrl: 'https://example.com/source-2.png',
+      }),
+      makeFusionFlowNode({ flowId: 'fusion-3', id: 3, prompt: 'blend two references' }),
+    ]
+    const snapshot = flowToCanvasBoardSnapshot({
+      nodes,
+      edges: [
+        {
+          id: 'edge-image-1-fusion',
+          source: 'image-1',
+          sourceHandle: 'out:image',
+          target: 'fusion-3',
+          targetHandle: 'in:image',
+        },
+        {
+          id: 'edge-image-2-fusion',
+          source: 'image-2',
+          sourceHandle: 'out:image',
+          target: 'fusion-3',
+          targetHandle: 'in:image',
+        },
+      ],
+    })
+
+    const fusionImageInputs = snapshot.connections.filter(
+      (connection) => connection.toNodeType === 'fusion' && connection.toPort === 'image',
+    )
+    expect(fusionImageInputs.length).toBe(2)
+  })
+
+  it('preserves fusion blend points across round trips', () => {
+    const flow = canvasBoardSnapshotToFlow({
+      imageNodes: [],
+      promptNodes: [],
+      viewpointNodes: [],
+      fusionNodes: [
+        {
+          id: 31,
+          type: 'fusion',
+          x: 200,
+          y: 120,
+          width: 280,
+          prompt: '',
+          outputCount: 1,
+          aspectRatio: 'auto',
+          blendPoint: { x: 0.62, y: 0.41 },
+          inputImages: [],
+          outputStatus: 'idle',
+          outputImages: [],
+        },
+      ],
+      connections: [],
+      viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },
+    })
+    const restored = flowToCanvasBoardSnapshot(flow)
+    expect(restored.fusionNodes[0]?.blendPoint.x).toBe(0.62)
+    expect(restored.fusionNodes[0]?.blendPoint.y).toBe(0.41)
+  })
+})

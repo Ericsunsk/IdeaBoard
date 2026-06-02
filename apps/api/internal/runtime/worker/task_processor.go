@@ -16,23 +16,20 @@ type consumerTaskRuntime interface {
 }
 
 type taskProcessor struct {
-	assigner     taskqueue.TaskAssigner
-	taskRuntime  consumerTaskRuntime
-	executeTask  func(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) error
-	asyncExecute bool
+	assigner    taskqueue.TaskAssigner
+	taskRuntime consumerTaskRuntime
+	executeTask func(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) error
 }
 
 func newTaskProcessor(
 	assigner taskqueue.TaskAssigner,
 	taskRuntime consumerTaskRuntime,
 	executeTask func(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) error,
-	asyncExecute bool,
 ) *taskProcessor {
 	return &taskProcessor{
-		assigner:     assigner,
-		taskRuntime:  taskRuntime,
-		executeTask:  executeTask,
-		asyncExecute: asyncExecute,
+		assigner:    assigner,
+		taskRuntime: taskRuntime,
+		executeTask: executeTask,
 	}
 }
 
@@ -75,14 +72,6 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 		return fmt.Errorf("unexpected assign status %q for task=%s", assignment.Status, task.TaskID)
 	}
 
-	if p.asyncExecute {
-		go func() {
-			if execErr := p.executeTask(ctx, task, assignment); execErr != nil {
-				log.Printf("[TaskProcessor] 异步执行任务失败: task=%s account=%d err=%v", task.TaskID, assignment.AccountID, execErr)
-			}
-		}()
-		return nil
-	}
 	return p.executeTask(ctx, task, assignment)
 }
 

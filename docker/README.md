@@ -13,7 +13,8 @@
 ```bash
 cd docker
 cp .env.example .env
-# 至少修改 POSTGRES_PASSWORD；不要使用弱默认密码。
+# 生产 stack 至少修改 POSTGRES_PASSWORD、REDIS_PASSWORD 和对外域名/密钥；
+# 本地 compose.local.yml 可按需留空 REDIS_PASSWORD。
 docker compose -f compose.local.yml up -d
 ```
 
@@ -55,7 +56,7 @@ docker compose -f compose.local.yml logs -f redis
 | 容器名 | `ideaboard-redis` |
 | 宿主机端口 | `127.0.0.1:${REDIS_PORT:-6379}` |
 | 持久化 | `appendonly yes` |
-| 默认密码 | `${REDIS_PASSWORD:-无}` |
+| 密码 | 生产 `compose.yml` 必填；本地 `compose.local.yml` 可留空 |
 
 
 ## 连接信息
@@ -87,7 +88,7 @@ GUI 客户端：
 
 - Host：`localhost`
 - Port：`6379`
-- Password：若设置了 `REDIS_PASSWORD`，客户端也必须同步填写；后端请同步配置 `REDIS_AUTH`
+- Password：生产环境必须填写 `REDIS_PASSWORD`；本地开发仅在设置了 `REDIS_PASSWORD` 时填写。生产后端由 `compose.yml` 自动把 `REDIS_PASSWORD` 注入为 `REDIS_AUTH`。
 
 
 ## 常用操作
