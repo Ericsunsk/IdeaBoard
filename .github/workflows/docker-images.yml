@@ -119,6 +119,7 @@ jobs:
             type=sha,prefix=sha-
 
       - name: Build ${{ matrix.image.display }} image
+        timeout-minutes: 20
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.image.context }}
@@ -192,6 +193,7 @@ jobs:
 
       - name: Build and push ${{ matrix.image.display }} image
         id: build
+        timeout-minutes: 20
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.image.context }}

@@ -1,26 +1,26 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.22.2-alpine AS node-base
+ARG NODE_VERSION=22.22.2
 
-FROM node-base AS builder
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS builder
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=optional
 
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-FROM node-base AS prod-deps
+FROM node:${NODE_VERSION}-alpine AS prod-deps
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --omit=optional
 
-FROM node-base AS runtime
+FROM node:${NODE_VERSION}-alpine AS runtime
 
 WORKDIR /app
 
