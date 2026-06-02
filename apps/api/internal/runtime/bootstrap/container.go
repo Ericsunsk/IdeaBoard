@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -15,27 +16,27 @@ import (
 	"api/internal/imageproc"
 	"api/internal/platform/config"
 	"api/internal/platform/database"
-	"api/internal/platform/redis"
 	"api/internal/platform/settings"
 	"api/internal/prompts"
 	"api/internal/runtime/httpapi"
 	"api/internal/runtime/taskqueue"
-	"api/internal/runtime/taskruntime"
 	"api/internal/runtime/worker"
 	"api/internal/storage"
 	"api/internal/users"
 	"api/web"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
 )
 
 type appContainer struct {
 	router *gin.Engine
 
-	asynqQueue       *taskqueue.AsynqQueue
-	asynqServer      *asynq.Server
-	asynqMux         *asynq.ServeMux
+	db               *sql.DB
+	riverPool        *pgxpool.Pool
+	riverClient      *river.Client[pgx.Tx]
 	workerQueueName  string
 	workerConcurrent int
 }
@@ -48,25 +49,26 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		return nil, fmt.Errorf("Failed to connect to database: %w", err)
 	}
 	if err := migrations.Up(context.Background(), db); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("Failed to migrate database schema: %w", err)
 	}
-
-	rdb := redis.NewRedis(cfg.Redis)
-	if err := rdb.Ping(context.Background()); err != nil {
-		return nil, fmt.Errorf("[Main] Failed to connect to Redis: %w", err)
+	riverPool, err := worker.NewRiverPgxPool(context.Background(), database.PostgresDSN(cfg.Database))
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("Failed to connect River database pool: %w", err)
 	}
-	redisMgr := redis.NewRedisManager(rdb.GetClient())
-	redisAsynqAssigner := taskqueue.NewRedisAsynqAssigner(redisMgr)
-	asynqConnOpt := worker.BuildAsynqRedisConnOpt(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Auth)
-	asynqQueue := taskqueue.NewAsynqQueue(
-		asynqConnOpt,
-		redisMgr,
-		time.Duration(cfg.Queue.AsynqTaskTimeoutSeconds)*time.Second,
-		cfg.Queue.AsynqMaxRetry,
-	)
+	if err := worker.MigrateRiver(context.Background(), riverPool); err != nil {
+		riverPool.Close()
+		_ = db.Close()
+		return nil, fmt.Errorf("Failed to migrate River schema: %w", err)
+	}
+	postgresAssigner := taskqueue.NewPostgresTaskAssigner(db)
+	postgresRuntimeStore := taskqueue.NewPostgresTaskRuntimeStore(db)
 
 	userRepo := users.NewUserRepository(db)
 	if err := userRepo.EnsureStorageUIDs(context.Background()); err != nil {
+		riverPool.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("Failed to ensure user storage uid: %w", err)
 	}
 	accountRepo := accounts.NewAccountRepository(db)
@@ -76,34 +78,20 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	lineDraftModeRepo := assets.NewLineDraftModeRepository(db)
 	boardRepo := boards.NewBoardRepository(db)
 
-	reconcileRuntime := taskruntime.NewService(accountRepo, taskRepo, redisAsynqAssigner, redisAsynqAssigner)
-	reconcileCtx, reconcileCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	reconcileResult, err := reconcileRuntime.ReconcileRunningTaskLeases(reconcileCtx, taskruntime.RunningTaskLeaseReconcileOptions{
-		AssignmentDrainDelay: 2 * time.Second,
-	})
-	reconcileCancel()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to reconcile running task leases: %w", taskLeaseStartupRepairHint(err))
-	}
-	log.Printf("[Main] Reconciled running task leases: running=%d rebuilt_leases=%d rebuilt_account_counts=%d",
-		reconcileResult.RunningTasks,
-		reconcileResult.RebuiltLeases,
-		reconcileResult.AccountCountsRebuilt,
-	)
-
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 	taskEventHub := accounts.NewTaskEventHub()
+	riverQueue := taskqueue.NewRiverQueue(nil, db, postgresRuntimeStore, cfg.Queue.MaxRetry)
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
-		Queue:            asynqQueue,
-		QueueStats:       asynqQueue,
-		Assigner:         redisAsynqAssigner,
-		ConcurrencyStore: redisAsynqAssigner,
-		CancelStore:      redisAsynqAssigner,
-		MonitorStore:     asynqQueue,
+		Queue:            riverQueue,
+		QueueStats:       riverQueue,
+		AccountLoadStore: postgresRuntimeStore,
+		ConcurrencyStore: postgresRuntimeStore,
+		CancelStore:      postgresRuntimeStore,
+		MonitorStore:     riverQueue,
 		SystemConfigRepo: systemConfigRepo,
 		UploadBoards:     uploadBoardAccessResolver{service: boardService},
 		UploadOwners:     uploadOwnerStorageUIDResolver{repo: userRepo},
@@ -150,37 +138,51 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 	})
 
-	asynqHandler := worker.NewAsynqTaskHandler(
+	riverTaskWorker := worker.NewRiverTaskWorker(
 		accountRepo,
 		channelRepo,
 		taskRepo,
-		asynqQueue,
-		redisAsynqAssigner,
-		redisAsynqAssigner,
+		riverQueue,
+		postgresAssigner,
+		postgresRuntimeStore,
 		storageService,
 		taskEventHub,
 	)
-	asynqServer, asynqMux := worker.NewAsynqServer(asynqConnOpt, worker.AsynqServerOptions{
-		QueueName:            taskqueue.AsynqQueueDefault,
-		Concurrency:          cfg.Queue.WorkerConcurrency,
-		NoCapacityRetryDelay: time.Duration(cfg.Queue.AsynqNoCapacityDelaySec) * time.Second,
-	}, asynqHandler)
+	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
+	riverClient, err := worker.NewRiverClient(riverPool, riverTaskWorker, worker.RiverServerOptions{
+		QueueName:   taskqueue.RiverQueueDefault,
+		Concurrency: cfg.Queue.WorkerConcurrency,
+		JobTimeout:  time.Duration(cfg.Queue.TaskTimeoutSeconds) * time.Second,
+		MaxRetry:    cfg.Queue.MaxRetry,
+	})
+	if err != nil {
+		riverPool.Close()
+		_ = db.Close()
+		return nil, fmt.Errorf("Failed to initialize River client: %w", err)
+	}
+	riverQueue.SetClient(riverClient)
 
 	return &appContainer{
 		router:           router,
-		asynqQueue:       asynqQueue,
-		asynqServer:      asynqServer,
-		asynqMux:         asynqMux,
-		workerQueueName:  taskqueue.AsynqQueueDefault,
+		db:               db,
+		riverPool:        riverPool,
+		riverClient:      riverClient,
+		workerQueueName:  taskqueue.RiverQueueDefault,
 		workerConcurrent: cfg.Queue.WorkerConcurrency,
 	}, nil
 }
 
 func (c *appContainer) close() error {
-	if c == nil || c.asynqQueue == nil {
+	if c == nil {
 		return nil
 	}
-	return c.asynqQueue.Close()
+	if c.riverPool != nil {
+		c.riverPool.Close()
+	}
+	if c.db != nil {
+		return c.db.Close()
+	}
+	return nil
 }
 
 func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies) {

@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
@@ -58,20 +57,6 @@ func TestParseRepairTaskLeasesArgsExplicitDryRunWins(t *testing.T) {
 	}
 	if !opts.DryRun {
 		t.Fatal("DryRun should remain true when explicitly set")
-	}
-}
-
-func TestTaskLeaseStartupRepairHint(t *testing.T) {
-	err := taskLeaseStartupRepairHint(errors.New("running task lease missing token: task_id=x account_id=1"))
-	if err == nil {
-		t.Fatal("expected non-nil error")
-	}
-	msg := err.Error()
-	if !strings.Contains(msg, "api preflight task-leases") {
-		t.Fatalf("missing preflight hint in %q", msg)
-	}
-	if !strings.Contains(msg, "api repair task-leases --to=pending --yes") {
-		t.Fatalf("missing repair hint in %q", msg)
 	}
 }
 

@@ -53,10 +53,6 @@ func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRe
 		return nil, err
 	}
 
-	if s.assigner != nil {
-		s.assigner.EnsureAccountConcurrent(ctx, account.ID, account.MaxConcurrent)
-	}
-
 	return account, nil
 }
 
@@ -82,8 +78,8 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 		accountIDs[i] = accounts[i].ID
 	}
 	loadInfo := map[int64]*queuetypes.AccountLoad{}
-	if s.assigner != nil {
-		loads, loadErr := s.assigner.GetAccountLoadInfo(ctx, accountIDs)
+	if s.accountLoadStore != nil {
+		loads, loadErr := s.accountLoadStore.GetAccountLoadInfo(ctx, accountIDs)
 		if loadErr != nil {
 			log.Printf("[AccountService] 查询账号并发信息失败: %v", loadErr)
 		} else {
@@ -92,11 +88,11 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 	}
 	waitQueueCount := 0
 	if s.queueStats != nil {
-		_, wait, waitErr := s.queueStats.QueueLengths(ctx)
+		queued, _, waitErr := s.queueStats.QueueLengths(ctx)
 		if waitErr != nil {
 			log.Printf("[AccountService] 查询等待队列长度失败: %v", waitErr)
 		} else {
-			waitQueueCount = int(wait)
+			waitQueueCount = int(queued)
 		}
 	}
 	result := make([]*AccountWithLoad, len(accounts))
@@ -168,10 +164,6 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 		return err
 	}
 
-	if s.assigner != nil {
-		s.assigner.SetAccountMaxConcurrent(ctx, account.ID, account.MaxConcurrent)
-	}
-
 	return nil
 }
 
@@ -182,11 +174,6 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id int64) error {
 	}
 	if account.Status != 0 {
 		return fmt.Errorf("请先停用账号后再删除")
-	}
-	if s.concurrencyStore != nil {
-		if err := s.concurrencyStore.DeleteAccountConcurrent(ctx, id); err != nil {
-			log.Printf("[DeleteAccount] 删除账号并发计数失败: account=%d err=%v", id, err)
-		}
 	}
 	return s.accountRepo.Delete(ctx, id)
 }
@@ -202,7 +189,7 @@ func (s *AccountService) StartAccount(ctx context.Context, id int64) error {
 		return err
 	}
 
-	return s.assigner.EnsureAccountConcurrent(ctx, id, account.MaxConcurrent)
+	return nil
 }
 
 func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
@@ -228,14 +215,6 @@ func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
 		log.Printf("[StopAccount] 已将账号 %d 的 %d 个进行中任务标记为失败", id, affected)
 	}
 
-	// 2. 清除 Redis 中该账号的并发计数（释放占位）
-	if s.concurrencyStore != nil {
-		if err := s.concurrencyStore.DeleteAccountConcurrent(ctx, id); err != nil {
-			log.Printf("[StopAccount] 删除账号并发计数失败: account=%d err=%v", id, err)
-		}
-	}
-
-	// 3. 停用账号
 	return s.accountRepo.UpdateStatus(ctx, id, 0)
 }
 

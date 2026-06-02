@@ -2,8 +2,8 @@
 
 `docker/` 目录同时包含本地开发依赖和生产 Docker Compose stack：
 
-- `compose.local.yml`：本地开发用 `PostgreSQL + Redis`
-- `compose.yml`：生产 VPS 用 `Cloudflared + Gateway + API + Auth + PostgreSQL + Redis`
+- `compose.local.yml`：本地开发用 PostgreSQL
+- `compose.yml`：生产 VPS 用 `Cloudflared + Gateway + API + Auth + PostgreSQL`
 
 生产环境请优先使用根目录 [DEPLOYMENT.md](../DEPLOYMENT.md) 中的 GHCR + Docker Compose 部署方式。
 
@@ -13,8 +13,7 @@
 ```bash
 cd docker
 cp .env.example .env
-# 生产 stack 至少修改 POSTGRES_PASSWORD、REDIS_PASSWORD 和对外域名/密钥；
-# 本地 compose.local.yml 可按需留空 REDIS_PASSWORD。
+# 生产 stack 至少修改 POSTGRES_PASSWORD 和对外域名/密钥。
 docker compose -f compose.local.yml up -d
 ```
 
@@ -28,7 +27,6 @@ docker compose -f compose.local.yml ps
 
 ```bash
 docker compose -f compose.local.yml logs -f postgres
-docker compose -f compose.local.yml logs -f redis
 ```
 
 
@@ -48,17 +46,6 @@ docker compose -f compose.local.yml logs -f redis
 > [!TIP]
 > compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
 
-### Redis
-
-| 项目 | 说明 |
-|------|------|
-| 镜像 | `redis:8.6.2` |
-| 容器名 | `ideaboard-redis` |
-| 宿主机端口 | `127.0.0.1:${REDIS_PORT:-6379}` |
-| 持久化 | `appendonly yes` |
-| 密码 | 生产 `compose.yml` 必填；本地 `compose.local.yml` 可留空 |
-
-
 ## 连接信息
 
 ### PostgreSQL
@@ -75,21 +62,6 @@ GUI 客户端：
 - Port：`5432`
 - User：`ideaboard`
 - Password：你在 `docker/.env` 中设置的 `POSTGRES_PASSWORD`
-
-### Redis
-
-命令行：
-
-```bash
-redis-cli -h localhost -p 6379 ${REDIS_PASSWORD:+-a "$REDIS_PASSWORD"}
-```
-
-GUI 客户端：
-
-- Host：`localhost`
-- Port：`6379`
-- Password：生产环境必须填写 `REDIS_PASSWORD`；本地开发仅在设置了 `REDIS_PASSWORD` 时填写。生产后端由 `compose.yml` 自动把 `REDIS_PASSWORD` 注入为 `REDIS_AUTH`。
-
 
 ## 常用操作
 
@@ -128,7 +100,7 @@ docker compose -f docker/compose.yml --env-file docker/.env up -d
 
 推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 PostgreSQL dump 写入 `backups/postgres/`，并在启动后检查 `api` 和 `auth` 的 `/api/health`。如果 health gate 失败，请先查看 `gateway/api/auth/postgres` 日志，再决定是否把 `IMAGE_TAG` 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
 
-生产数据在 Docker volumes 中持久化：`postgres-data`、`redis-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
+生产数据在 Docker volumes 中持久化：`postgres-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
 
 当前 Docker stack 只管理 PostgreSQL 数据库；部署脚本不会自动转换或导入其他数据库形态的数据。
 

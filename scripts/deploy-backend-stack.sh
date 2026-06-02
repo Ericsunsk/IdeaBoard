@@ -298,7 +298,7 @@ case "$command" in
   deploy)
     login_ghcr_if_configured
     docker_compose pull
-    docker_compose up -d postgres redis
+    docker_compose up -d postgres
     wait_for_postgres
     backup_postgres
     docker_compose run --rm auth npm run migrate:dist

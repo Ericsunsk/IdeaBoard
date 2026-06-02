@@ -1,6 +1,6 @@
 package queuetypes
 
-// TaskPayload is the durable drawing task payload carried by Asynq.
+// TaskPayload is the durable drawing task payload carried by River.
 type TaskPayload struct {
 	TaskID     string  `json:"task_id"`
 	UserID     int64   `json:"user_id"`
@@ -9,6 +9,8 @@ type TaskPayload struct {
 	AccountIDs []int64 `json:"account_ids"`
 	RetryCount int     `json:"retry_count"`
 	CreatedAt  int64   `json:"created_at"`
+	// RiverJobID is injected by the worker at runtime and is not persisted in job args.
+	RiverJobID int64 `json:"-"`
 }
 
 // AccountLoad describes current account concurrency state.

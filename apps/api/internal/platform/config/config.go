@@ -13,7 +13,6 @@ import (
 
 type Config struct {
 	Database DatabaseConfig
-	Redis    RedisConfig
 	Queue    QueueConfig
 	App      AppConfig
 	Auth     AuthServiceConfig
@@ -28,12 +27,6 @@ type DatabaseConfig struct {
 	SSLMode  string
 }
 
-type RedisConfig struct {
-	Host string
-	Port string
-	Auth string
-}
-
 type AppConfig struct {
 	Port               string
 	Host               string
@@ -44,10 +37,10 @@ type AppConfig struct {
 }
 
 type QueueConfig struct {
-	WorkerConcurrency       int
-	AsynqTaskTimeoutSeconds int
-	AsynqNoCapacityDelaySec int
-	AsynqMaxRetry           int
+	WorkerConcurrency           int
+	TaskTimeoutSeconds          int
+	NoCapacityRetryDelaySeconds int
+	MaxRetry                    int
 }
 
 type AuthServiceConfig struct {
@@ -78,16 +71,11 @@ func Load() *Config {
 			Database: getEnv("DB_NAME", "ideaboard"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
-		Redis: RedisConfig{
-			Host: getEnv("REDIS_HOST", "localhost"),
-			Port: getEnv("REDIS_PORT", "6379"),
-			Auth: getEnv("REDIS_AUTH", ""),
-		},
 		Queue: QueueConfig{
-			WorkerConcurrency:       getEnvInt("TASK_QUEUE_WORKER_CONCURRENCY", 5),
-			AsynqTaskTimeoutSeconds: getEnvInt("ASYNQ_TASK_TIMEOUT_SECONDS", 180),
-			AsynqNoCapacityDelaySec: getEnvInt("ASYNQ_NO_CAPACITY_RETRY_SECONDS", 5),
-			AsynqMaxRetry:           getEnvInt("ASYNQ_MAX_RETRY", 25),
+			WorkerConcurrency:           getEnvInt("TASK_QUEUE_WORKER_CONCURRENCY", 5),
+			TaskTimeoutSeconds:          getFirstEnvInt(180, "RIVER_TASK_TIMEOUT_SECONDS", "TASK_QUEUE_TASK_TIMEOUT_SECONDS"),
+			NoCapacityRetryDelaySeconds: getFirstEnvInt(5, "RIVER_NO_CAPACITY_RETRY_SECONDS", "TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS"),
+			MaxRetry:                    getFirstEnvInt(25, "RIVER_MAX_RETRY", "TASK_QUEUE_MAX_RETRY"),
 		},
 		App: AppConfig{
 			Port:               getEnv("APP_PORT", "6000"),
@@ -224,4 +212,20 @@ func getEnvInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	return value
+}
+
+func getFirstEnvInt(defaultValue int, keys ...string) int {
+	for _, key := range keys {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		value, err := strconv.Atoi(raw)
+		if err != nil || value <= 0 {
+			log.Printf("[Config] WARNING: %s=%q 不是有效正整数，已回退默认值 %d", key, raw, defaultValue)
+			return defaultValue
+		}
+		return value
+	}
+	return defaultValue
 }

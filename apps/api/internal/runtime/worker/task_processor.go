@@ -11,7 +11,6 @@ import (
 
 type consumerTaskRuntime interface {
 	RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error
-	ReleaseTask(ctx context.Context, assignment taskqueue.TaskAssignment) error
 	MarkTaskFailed(ctx context.Context, taskID string, reason string) error
 }
 
@@ -45,7 +44,7 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 
 	if len(task.AccountIDs) == 0 {
 		log.Printf("[TaskProcessor] 没有可用账号: task=%s", task.TaskID)
-		p.failTask(ctx, task, 0, "没有可用账号")
+		p.failTask(ctx, task, "没有可用账号")
 		return nil
 	}
 
@@ -62,6 +61,9 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 	}
 
 	switch assignment.Status {
+	case taskqueue.AssignStatusDiscard:
+		log.Printf("[TaskProcessor] 任务状态已收敛，丢弃队列任务: task=%s", task.TaskID)
+		return nil
 	case taskqueue.AssignStatusNoCapacity:
 		return fmt.Errorf("%w: task=%s", taskqueue.ErrNoAccountCapacity, task.TaskID)
 	case taskqueue.AssignStatusAssigned:
@@ -75,10 +77,7 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 	return p.executeTask(ctx, task, assignment)
 }
 
-func (p *taskProcessor) failTask(ctx context.Context, task *queuetypes.TaskPayload, accountID int64, reason string) {
-	if err := p.taskRuntime.ReleaseTask(ctx, taskqueue.TaskAssignment{TaskID: task.TaskID, AccountID: accountID}); err != nil {
-		log.Printf("[TaskProcessor] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
-	}
+func (p *taskProcessor) failTask(ctx context.Context, task *queuetypes.TaskPayload, reason string) {
 	if err := p.taskRuntime.MarkTaskFailed(ctx, task.TaskID, reason); err != nil {
 		log.Printf("[TaskProcessor] 标记任务失败失败: task=%s err=%v", task.TaskID, err)
 	}

@@ -22,30 +22,8 @@ services:
     networks:
       - ideaboard-network
 
-  redis:
-    image: redis:8.6.2
-    container_name: ideaboard-redis
-    restart: always
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis-data:/data
-    command:
-      - sh
-      - -c
-      - |
-        if [ -n "$$REDIS_PASSWORD" ]; then
-          exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
-        fi
-        exec redis-server --appendonly yes
-    networks:
-      - ideaboard-network
-
 volumes:
   postgres-data:
-  redis-data:
 
 networks:
   ideaboard-network:

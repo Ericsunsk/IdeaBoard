@@ -67,7 +67,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 	if cancelled {
-		o.skipCancelledTask(ctx, task, assignment)
+		o.skipCancelledTask(ctx, task)
 		return nil
 	}
 
@@ -76,11 +76,11 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 
 	if err := o.taskRuntime.MarkTaskRunning(ctx, task.TaskID, accountID, assignment.LeaseToken); err != nil {
 		if errors.Is(err, taskruntime.ErrTaskAlreadyRunning) {
-			o.dropTask(ctx, task, taskqueue.TaskAssignment{}, "任务已由同账号执行，丢弃重复队列任务")
+			o.dropTask(ctx, task, "任务已由同账号执行，丢弃重复队列任务")
 			return nil
 		}
 		if errors.Is(err, taskruntime.ErrTaskNotFound) || errors.Is(err, taskruntime.ErrTaskTerminal) || errors.Is(err, taskruntime.ErrTaskStateConflict) {
-			o.dropTask(ctx, task, assignment, "任务状态已收敛，丢弃脏队列任务")
+			o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 			return nil
 		}
 		cancelled, checkErr := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
@@ -88,7 +88,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 			log.Printf("[Worker] 检查任务取消状态失败: task=%s err=%v", task.TaskID, checkErr)
 		}
 		if cancelled {
-			o.skipCancelledTask(ctx, task, assignment)
+			o.skipCancelledTask(ctx, task)
 			return nil
 		}
 		log.Printf("[Worker] 标记任务运行中失败: %v", err)
@@ -98,18 +98,15 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 	if err := o.taskRuntime.ConfirmTaskRunning(ctx, assignment); err != nil {
-		log.Printf("[Worker] 确认 Redis 运行租约失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
+		log.Printf("[Worker] 确认任务运行租约失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		if resetErr := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, accountID, assignment.LeaseToken, "确认任务运行租约失败"); resetErr != nil {
 			cleanupCancel()
 			if isTaskConvergedError(resetErr) {
-				o.dropTask(ctx, task, assignment, "任务状态已收敛，丢弃脏队列任务")
+				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 				return nil
 			}
 			return resetErr
-		}
-		if releaseErr := o.taskRuntime.ReleaseTask(cleanupCtx, assignment); releaseErr != nil {
-			log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, releaseErr)
 		}
 		cleanupCancel()
 		if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "确认任务运行租约失败"); requeueErr != nil {
@@ -126,7 +123,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 				log.Printf("[Worker] 检查任务取消状态失败: task=%s err=%v", task.TaskID, checkErr)
 			}
 			if cancelled {
-				o.skipCancelledTask(ctx, task, assignment)
+				o.skipCancelledTask(ctx, task)
 				return nil
 			}
 			return o.handleExecutionInterrupted(ctx, task, assignment, err)
@@ -140,13 +137,10 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 			}
 			return nil
 		}
-		if err := o.taskRuntime.ReleaseTask(ctx, assignment); err != nil {
-			log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, accountID, err)
-		}
 		requeued, requeueErr := o.taskRuntime.RequeueTaskForFailover(ctx, task.TaskID, accountID, assignment.LeaseToken, reason)
 		if requeueErr != nil {
 			if errors.Is(requeueErr, taskruntime.ErrTaskNotFound) || errors.Is(requeueErr, taskruntime.ErrTaskTerminal) || errors.Is(requeueErr, taskruntime.ErrTaskStateConflict) {
-				o.dropTask(ctx, task, taskqueue.TaskAssignment{}, "任务状态已收敛，丢弃脏队列任务")
+				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 				return nil
 			}
 			log.Printf("[Worker] 重置任务为待重试失败: task=%s err=%v", task.TaskID, requeueErr)
@@ -188,7 +182,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 	if cancelled {
-		o.skipCancelledTask(ctx, task, assignment)
+		o.skipCancelledTask(ctx, task)
 		return nil
 	}
 
@@ -209,14 +203,16 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *queue
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if err := o.taskRuntime.ReleaseTask(cleanupCtx, assignment); err != nil {
-		log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, assignment.AccountID, err)
+	if assignment.AccountID != 0 && assignment.LeaseToken != "" {
+		if err := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, assignment.AccountID, assignment.LeaseToken, reason); err != nil && !isTaskConvergedError(err) {
+			log.Printf("[Worker] 重置任务为待调度失败: task=%s account=%d err=%v", task.TaskID, assignment.AccountID, err)
+		}
 	}
 	cancelled, err := o.taskRuntime.IsTaskCancelled(cleanupCtx, task.TaskID)
 	if err != nil {
 		log.Printf("[Worker] 检查任务取消状态失败: task=%s err=%v", task.TaskID, err)
 	} else if cancelled {
-		o.skipCancelledTask(cleanupCtx, task, taskqueue.TaskAssignment{})
+		o.skipCancelledTask(cleanupCtx, task)
 		return nil
 	}
 	if err := o.taskRuntime.RefreshTaskAccounts(ctx, task); err != nil {
@@ -235,9 +231,6 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *queu
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if err := o.taskRuntime.ReleaseTask(cleanupCtx, assignment); err != nil {
-		log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, assignment.AccountID, err)
-	}
 	if err := o.taskRuntime.MarkTaskCompleted(cleanupCtx, task.TaskID, assignment.LeaseToken, result); err != nil {
 		if isTaskConvergedError(err) {
 			log.Printf("[Worker] 任务状态已收敛，跳过完成回写: task=%s err=%v", task.TaskID, err)
@@ -257,9 +250,6 @@ func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if err := o.taskRuntime.ReleaseTask(cleanupCtx, assignment); err != nil {
-		log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, assignment.AccountID, err)
-	}
 	var err error
 	if assignment.LeaseToken != "" {
 		err = o.taskRuntime.MarkTaskFailedWithLease(cleanupCtx, task.TaskID, assignment.LeaseToken, reason)
@@ -282,26 +272,17 @@ func (o *taskExecutionOrchestrator) failTask(ctx context.Context, task *queuetyp
 	return o.completeFailedTask(ctx, task, taskqueue.TaskAssignment{}, reason, 0)
 }
 
-func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) {
+func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *queuetypes.TaskPayload) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if err := o.taskRuntime.ReleaseTask(cleanupCtx, assignment); err != nil {
-		log.Printf("[Worker] 释放已取消任务占位失败: task=%s account=%d err=%v", task.TaskID, assignment.AccountID, err)
-	}
 	if err := o.taskRuntime.ClearTaskCancelled(cleanupCtx, task.TaskID); err != nil {
 		log.Printf("[Worker] 清理任务取消标记失败: task=%s err=%v", task.TaskID, err)
 	}
 	log.Printf("[Worker] 任务 %s 已取消，停止执行", task.TaskID)
 }
 
-func (o *taskExecutionOrchestrator) dropTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, reason string) {
-	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
-	defer cleanupCancel()
-
-	if err := o.taskRuntime.ReleaseTask(cleanupCtx, assignment); err != nil {
-		log.Printf("[Worker] 释放脏任务占位失败: task=%s account=%d err=%v", task.TaskID, assignment.AccountID, err)
-	}
+func (o *taskExecutionOrchestrator) dropTask(ctx context.Context, task *queuetypes.TaskPayload, reason string) {
 	log.Printf("[Worker] 任务 %s 已丢弃: %s", task.TaskID, reason)
 }
 
@@ -309,9 +290,6 @@ func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Conte
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if err := o.taskRuntime.ReleaseTask(cleanupCtx, assignment); err != nil {
-		log.Printf("[Worker] 释放任务占位失败: task=%s account=%d err=%v", task.TaskID, assignment.AccountID, err)
-	}
 	if err := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, assignment.AccountID, assignment.LeaseToken, "worker context interrupted, waiting retry"); err != nil {
 		if errors.Is(err, taskruntime.ErrTaskNotFound) || errors.Is(err, taskruntime.ErrTaskTerminal) || errors.Is(err, taskruntime.ErrTaskStateConflict) {
 			log.Printf("[Worker] 中断任务状态已收敛: task=%s err=%v", task.TaskID, err)

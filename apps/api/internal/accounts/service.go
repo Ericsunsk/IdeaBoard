@@ -13,10 +13,10 @@ type AccountService struct {
 	taskRepo         *TaskRepository
 	queue            taskqueue.TaskEnqueuer
 	queueStats       taskqueue.QueueStatsStore
+	accountLoadStore taskqueue.AccountLoadStore
 	concurrencyStore taskqueue.AccountConcurrencyStore
 	cancelStore      taskqueue.TaskCancellationStore
 	monitorStore     taskqueue.TaskMonitorStore
-	assigner         taskqueue.TaskAssigner
 	taskEventHub     *TaskEventHub
 	systemConfigRepo *settings.SystemConfigRepository
 	uploadBoards     storage.UploadBoardAccessResolver
@@ -28,7 +28,7 @@ type AccountServiceDeps struct {
 	TaskRepo         *TaskRepository
 	Queue            taskqueue.TaskEnqueuer
 	QueueStats       taskqueue.QueueStatsStore
-	Assigner         taskqueue.TaskAssigner
+	AccountLoadStore taskqueue.AccountLoadStore
 	ConcurrencyStore taskqueue.AccountConcurrencyStore
 	CancelStore      taskqueue.TaskCancellationStore
 	MonitorStore     taskqueue.TaskMonitorStore
@@ -62,7 +62,7 @@ func NewAccountService(deps AccountServiceDeps, opts AccountServiceOptions) *Acc
 		taskRepo:         deps.TaskRepo,
 		queue:            deps.Queue,
 		queueStats:       deps.QueueStats,
-		assigner:         deps.Assigner,
+		accountLoadStore: deps.AccountLoadStore,
 		concurrencyStore: deps.ConcurrencyStore,
 		cancelStore:      deps.CancelStore,
 		monitorStore:     deps.MonitorStore,

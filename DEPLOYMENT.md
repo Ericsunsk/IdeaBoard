@@ -32,7 +32,7 @@
 <a id="deployment-profile"></a>
 ## 部署概览
 
-本文档适用于 `Linux amd64/arm64` 服务器。当前优先推荐 `Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel`，保留 `Nginx + systemd + PostgreSQL + Redis + Better Auth Node Service` 作为传统部署方式。
+本文档适用于 `Linux amd64/arm64` 服务器。当前优先推荐 `Cloudflare Pages + GHCR + Docker Compose + Cloudflare Tunnel`，保留 `Nginx + systemd + PostgreSQL + Better Auth Node Service` 作为传统部署方式。
 
 ### 推荐拓扑
 
@@ -47,7 +47,6 @@ graph LR
     Gateway -- "/api /uploads" --> API["ideaboard-api<br>GHCR image"]
     Auth --> Postgres[("PostgreSQL volume")]
     API --> Postgres
-    API --> Redis[("Redis volume")]
 ```
 
 ### 传统拓扑
@@ -62,7 +61,6 @@ graph LR
     
     Auth --> Postgres[("PostgreSQL")]
     Server --> Postgres
-    Server --> Redis[("Redis")]
     Server --> AI["OSS / 上游 AI 渠道"]
 ```
 
@@ -83,7 +81,7 @@ graph LR
 
 ### Cloudflare Pages + Cloudflare Tunnel + VPS 拓扑
 
-推荐的混合部署方式：Cloudflare Pages 托管前端，Cloudflare Tunnel 暴露后端 API 域名，VPS 只在本机运行后端、认证服务、PostgreSQL 与 Redis。
+推荐的混合部署方式：Cloudflare Pages 托管前端，Cloudflare Tunnel 暴露后端 API 域名，VPS 只在本机运行后端、认证服务与 PostgreSQL。
 
 ```mermaid
 graph LR
@@ -96,7 +94,6 @@ graph LR
     Nginx -- "/api /uploads" --> Server["ideaboard-server (:6000)"]
     Auth --> Postgres[("PostgreSQL")]
     Server --> Postgres
-    Server --> Redis[("Redis")]
 ```
 
 Pages 项目建议配置：
@@ -112,7 +109,7 @@ Pages 项目建议配置：
 
 前端默认从 `VITE_API_BASE_URL` 派生 `/uploads/*` 的访问域名；如需独立素材域名，可额外设置 `VITE_PUBLIC_ASSET_BASE_URL=https://assets.example.com`。
 
-VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、PostgreSQL、Redis 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。Docker 生产环境至少同步：
+VPS 侧推荐使用本文的 Docker Compose stack 部署 API、Auth、PostgreSQL 与 Gateway，不再依赖 VPS 托管 `apps/web/dist`。Docker 生产环境至少同步：
 
 ```bash
 # /opt/stacks/ideaboard/docker/.env
@@ -128,7 +125,7 @@ Hostname: api.example.com
 Service: http://gateway:80
 ```
 
-VPS 防火墙建议只开放 SSH；API 域名通过 compose 内的 `cloudflared` 到达 Gateway，无需把 `6000/6001/PostgreSQL/Redis` 暴露到公网。
+VPS 防火墙建议只开放 SSH；API 域名通过 compose 内的 `cloudflared` 到达 Gateway，无需把 `6000/6001/PostgreSQL` 暴露到公网。
 
 <a id="recommended-docker"></a>
 
@@ -175,7 +172,6 @@ GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $G
 - `API_BASE_URL`
 - `CLOUDFLARE_TUNNEL_TOKEN`
 - `POSTGRES_PASSWORD`
-- `REDIS_PASSWORD`
 - `AUTH_INTERNAL_KEY`
 - `BETTER_AUTH_SECRET`
 
@@ -257,7 +253,7 @@ docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stack
 
 当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。
 
-数据保存在 Docker volumes：`postgres-data`、`redis-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
+数据保存在 Docker volumes：`postgres-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
 
 <a id="release-artifact"></a>
 
@@ -311,14 +307,14 @@ release/v0.1.0/ideaboard-bundle-v0.1.0-linux-amd64/
 
 - 系统：`Linux amd64`
 - 端口：`80`
-- 软件：`nginx`、`postgresql`、`redis-server`、`nodejs >= 22.18`、`npm`、`tar`
+- 软件：`nginx`、`postgresql`、`nodejs >= 22.18`、`npm`、`tar`
 - 可选依赖：`potrace`，用于转矢量能力
 
 Ubuntu / Debian 参考安装命令：
 
 ```bash
 sudo apt update
-sudo apt install -y nginx redis-server postgresql postgresql-client nodejs npm
+sudo apt install -y nginx postgresql postgresql-client nodejs npm
 sudo apt install -y potrace
 ```
 
@@ -388,7 +384,7 @@ chown -R ideaboard:ideaboard /opt/ideaboard/apps /opt/ideaboard/deploy /opt/idea
 - `ideaboard` 为 systemd 服务默认运行用户（非 root）。
 - 升级时请保留该用户与目录权限设置，避免服务因权限不足启动失败。
 
-### 4. 准备数据库与缓存
+### 4. 准备数据库
 
 #### PostgreSQL
 
@@ -402,16 +398,6 @@ CREATE DATABASE ideaboard OWNER ideaboard;
 \c ideaboard
 GRANT ALL PRIVILEGES ON DATABASE ideaboard TO ideaboard;
 ```
-
-#### Redis
-
-```bash
-sudo systemctl enable redis-server
-sudo systemctl restart redis-server
-sudo systemctl status redis-server --no-pager
-```
-
-如果你的系统服务名是 `redis`，请替换为对应名称。
 
 <a id="runtime-config"></a>
 
@@ -427,7 +413,6 @@ nano /opt/ideaboard/apps/api/.env
 部署时至少确认：
 
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`
-- `REDIS_HOST/REDIS_PORT/REDIS_AUTH`（生产必须配置 Redis 密码；Docker Compose 会从必填 `REDIS_PASSWORD` 注入）
 - `APP_ENV=production`（生产环境必须显式设置）
 - `APP_PORT=6000`
 - `APP_HOST=127.0.0.1`（建议反向代理场景启用）
@@ -440,7 +425,6 @@ nano /opt/ideaboard/apps/api/.env
 建议：
 
 - 不要在生产环境继续使用本地开发默认账号
-- 生产环境必须为 Redis 设置密码；非 Docker 部署时必须同步配置 `REDIS_AUTH`
 - 若前面有 Nginx / 其他反向代理，建议设置 `APP_HOST=127.0.0.1`
 - 生产环境请固定设置 `APP_ENV=production`，不要依赖默认值；发布包 systemd 已设置该值，不要在 `.env` 中写回 `development`
 - `AUTH_SERVICE_INTERNAL_KEY` 建议使用足够长的随机字符串，并只在 API 与 Auth Service 两侧共享

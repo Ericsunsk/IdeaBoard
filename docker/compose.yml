@@ -48,8 +48,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
       auth:
         condition: service_started
     environment:
@@ -69,13 +67,10 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB:-ideaboard}
       DB_SSLMODE: disable
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_AUTH: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
       TASK_QUEUE_WORKER_CONCURRENCY: ${TASK_QUEUE_WORKER_CONCURRENCY:-5}
-      ASYNQ_TASK_TIMEOUT_SECONDS: ${ASYNQ_TASK_TIMEOUT_SECONDS:-180}
-      ASYNQ_NO_CAPACITY_RETRY_SECONDS: ${ASYNQ_NO_CAPACITY_RETRY_SECONDS:-5}
-      ASYNQ_MAX_RETRY: ${ASYNQ_MAX_RETRY:-25}
+      RIVER_TASK_TIMEOUT_SECONDS: ${RIVER_TASK_TIMEOUT_SECONDS:-180}
+      RIVER_NO_CAPACITY_RETRY_SECONDS: ${RIVER_NO_CAPACITY_RETRY_SECONDS:-5}
+      RIVER_MAX_RETRY: ${RIVER_MAX_RETRY:-25}
     volumes:
       - api-uploads:/app/uploads
     healthcheck:
@@ -145,32 +140,8 @@ services:
     networks:
       - ideaboard-network
 
-  redis:
-    image: redis:8.6.2
-    container_name: ideaboard-redis
-    restart: unless-stopped
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
-    volumes:
-      - redis-data:/data
-    command:
-      - sh
-      - -c
-      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - redis-cli -a "$$REDIS_PASSWORD" ping
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    networks:
-      - ideaboard-network
-
 volumes:
   postgres-data:
-  redis-data:
   api-uploads:
 
 networks:

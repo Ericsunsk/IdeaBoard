@@ -30,9 +30,9 @@ func newRuntimeApp(cfg *config.Config) (*runtimeApp, error) {
 
 func (a *runtimeApp) start() {
 	go func() {
-		log.Printf("[Main] Asynq worker starting: queue=%s concurrency=%d", a.container.workerQueueName, a.container.workerConcurrent)
-		if err := a.container.asynqServer.Run(a.container.asynqMux); err != nil {
-			log.Fatalf("[Main] Failed to start asynq worker: %v", err)
+		log.Printf("[Main] River worker starting: queue=%s concurrency=%d", a.container.workerQueueName, a.container.workerConcurrent)
+		if err := a.container.riverClient.Start(context.Background()); err != nil {
+			log.Fatalf("[Main] Failed to start River worker: %v", err)
 		}
 	}()
 
@@ -52,7 +52,11 @@ func (a *runtimeApp) waitForShutdownSignal() {
 
 func (a *runtimeApp) shutdown() error {
 	log.Println("[Main] Shutting down server...")
-	a.container.asynqServer.Shutdown()
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stopCancel()
+	if err := a.container.riverClient.Stop(stopCtx); err != nil {
+		log.Printf("[Main] River worker graceful stop failed: %v", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

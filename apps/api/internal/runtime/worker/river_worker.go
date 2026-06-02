@@ -1,0 +1,134 @@
+package worker
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"api/internal/accounts"
+	"api/internal/channels"
+	"api/internal/runtime/taskqueue"
+	"api/internal/runtime/taskruntime"
+	"api/internal/storage"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
+)
+
+type RiverTaskWorker struct {
+	river.WorkerDefaults[taskqueue.DrawingTaskArgs]
+	processor            *taskProcessor
+	noCapacityRetryDelay time.Duration
+}
+
+func NewRiverTaskWorker(
+	accountRepo *accounts.AccountRepository,
+	channelRepo *channels.ChannelRepository,
+	taskRepo *accounts.TaskRepository,
+	enqueuer taskqueue.TaskEnqueuer,
+	assigner taskqueue.TaskAssigner,
+	cancelStore taskqueue.TaskCancellationStore,
+	storageService *storage.StorageService,
+	taskEventHub *accounts.TaskEventHub,
+) *RiverTaskWorker {
+	executor := &ProviderExecutor{
+		channelRepo:    channelRepo,
+		storageService: storageService,
+	}
+	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
+	taskRuntime.SetEventHub(taskEventHub)
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, enqueuer, taskRuntime, executor.callDrawingAPI)
+	return newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute))
+}
+
+func newRiverTaskWorkerWithProcessor(processor *taskProcessor) *RiverTaskWorker {
+	return &RiverTaskWorker{processor: processor, noCapacityRetryDelay: 5 * time.Second}
+}
+
+func (w *RiverTaskWorker) SetNoCapacityRetryDelay(delay time.Duration) {
+	if w == nil || delay <= 0 {
+		return
+	}
+	w.noCapacityRetryDelay = delay
+}
+
+func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.DrawingTaskArgs]) error {
+	task := job.Args.Task
+	if job != nil && job.JobRow != nil {
+		task.RiverJobID = job.ID
+	}
+	if err := w.processor.Process(ctx, &task); err != nil {
+		if errors.Is(err, taskqueue.ErrNoAccountCapacity) {
+			return river.JobSnooze(w.noCapacityRetryDelay)
+		}
+		return err
+	}
+	return nil
+}
+
+type RiverServerOptions struct {
+	QueueName   string
+	Concurrency int
+	JobTimeout  time.Duration
+	MaxRetry    int
+}
+
+func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverServerOptions) (*river.Client[pgx.Tx], error) {
+	if dbPool == nil {
+		return nil, fmt.Errorf("river db pool is nil")
+	}
+	queueName := opts.QueueName
+	if queueName == "" {
+		queueName = taskqueue.RiverQueueDefault
+	}
+	concurrency := opts.Concurrency
+	if concurrency <= 0 {
+		concurrency = 5
+	}
+	maxRetry := opts.MaxRetry
+	if maxRetry <= 0 {
+		maxRetry = 25
+	}
+	jobTimeout := opts.JobTimeout
+	if jobTimeout <= 0 {
+		jobTimeout = 3 * time.Minute
+	}
+
+	workers := river.NewWorkers()
+	river.AddWorker(workers, worker)
+	return river.NewClient(riverpgxv5.New(dbPool), &river.Config{
+		Queues: map[string]river.QueueConfig{
+			queueName: {MaxWorkers: concurrency},
+		},
+		Workers:     workers,
+		MaxAttempts: maxRetry,
+		JobTimeout:  jobTimeout,
+	})
+}
+
+func MigrateRiver(ctx context.Context, dbPool *pgxpool.Pool) error {
+	if dbPool == nil {
+		return fmt.Errorf("river db pool is nil")
+	}
+	migrator, err := rivermigrate.New(riverpgxv5.New(dbPool), nil)
+	if err != nil {
+		return err
+	}
+	_, err = migrator.Migrate(ctx, rivermigrate.DirectionUp, nil)
+	return err
+}
+
+func NewRiverPgxPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	return pgxpool.NewWithConfig(ctx, cfg)
+}
+
+type RiverTx = pgx.Tx

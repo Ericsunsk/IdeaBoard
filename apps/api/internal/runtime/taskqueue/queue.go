@@ -11,6 +11,7 @@ import (
 const (
 	AssignStatusAssigned   = "assigned"
 	AssignStatusNoCapacity = "no_capacity"
+	AssignStatusDiscard    = "discard"
 )
 
 var ErrNoAccountCapacity = errors.New("no account capacity")
@@ -26,10 +27,6 @@ type QueueStatsStore interface {
 type TaskAssigner interface {
 	Assign(ctx context.Context, accountIDs []int64, task *queuetypes.TaskPayload) (TaskAssignment, error)
 	ConfirmTaskRunning(ctx context.Context, assignment TaskAssignment) error
-	Release(ctx context.Context, taskID string, accountID int64, leaseToken string) error
-	EnsureAccountConcurrent(ctx context.Context, accountID int64, maxConcurrent int) error
-	SetAccountMaxConcurrent(ctx context.Context, accountID int64, maxConcurrent int) error
-	GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*queuetypes.AccountLoad, error)
 }
 
 type TaskAssignment struct {
@@ -39,24 +36,13 @@ type TaskAssignment struct {
 	LeaseToken string
 }
 
-type TaskLease struct {
-	TaskID     string
-	AccountID  int64
-	LeaseToken string
-}
-
-type TaskLeaseRebuilder interface {
-	RebuildRunningTaskLeases(ctx context.Context, leases []TaskLease, accountIDs []int64) error
-}
-
-type TaskLeaseReconcileLocker interface {
-	WithTaskLeaseReconcileLock(ctx context.Context, fn func(context.Context) error) error
-}
-
 type AccountConcurrencyStore interface {
-	DeleteAccountConcurrent(ctx context.Context, accountID int64) error
 	GetAccountConcurrent(ctx context.Context, accountID int64) (int, error)
 	GetAccountMaxConcurrent(ctx context.Context, accountID int64) (int, error)
+}
+
+type AccountLoadStore interface {
+	GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*queuetypes.AccountLoad, error)
 }
 
 type TaskCancellationStore interface {

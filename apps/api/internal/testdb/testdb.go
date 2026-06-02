@@ -53,6 +53,7 @@ TRUNCATE TABLE
   system_configs,
   channels,
   task_daily_stat_backfills,
+  task_cancellations,
   task_stat_events,
   task_daily_stats,
   task_outputs,

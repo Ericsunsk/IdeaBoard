@@ -40,7 +40,7 @@ func TestExecuteDropsDuplicateTaskWhenAlreadyRunningOnSameAccount(t *testing.T) 
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := accounts.NewTaskRepository(db)
-	account := createAsynqTestAccount(t, accountRepo, "dup-running-account")
+	account := createRiverTestAccount(t, accountRepo, "dup-running-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
 		TaskID:    "dup-running-task",
@@ -53,7 +53,7 @@ func TestExecuteDropsDuplicateTaskWhenAlreadyRunningOnSameAccount(t *testing.T) 
 	}
 
 	assigner := &fakeAssigner{}
-	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	providerCalled := false
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
 		providerCalled = true
@@ -76,7 +76,7 @@ func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := accounts.NewTaskRepository(db)
-	account := createAsynqTestAccount(t, accountRepo, "complete-fail-account")
+	account := createRiverTestAccount(t, accountRepo, "complete-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
 		TaskID:    "complete-fail-task",
@@ -97,7 +97,7 @@ END`); err != nil {
 	}
 
 	assigner := &fakeAssigner{}
-	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
 		return `{"image_url":"https://example.com/image.png"}`, nil
 	})
@@ -118,7 +118,7 @@ func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := accounts.NewTaskRepository(db)
-	account := createAsynqTestAccount(t, accountRepo, "failed-fail-account")
+	account := createRiverTestAccount(t, accountRepo, "failed-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
 		TaskID:    "failed-fail-task",
@@ -139,7 +139,7 @@ END`); err != nil {
 	}
 
 	assigner := &fakeAssigner{}
-	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForAsynq())
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
 		return "", errors.New("provider boom")
 	})

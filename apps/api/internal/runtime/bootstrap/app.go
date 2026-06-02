@@ -62,7 +62,7 @@ func Run(args []string) {
 	}
 	defer func() {
 		if err := app.close(); err != nil {
-			log.Printf("[Main] Failed to close asynq queue resources: %v", err)
+			log.Printf("[Main] Failed to close River resources: %v", err)
 		}
 	}()
 

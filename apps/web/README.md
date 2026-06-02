@@ -73,4 +73,4 @@ apps/web/
 ## 相关文档
 
 - [根目录 README.md](../../README.md)：项目总体说明
-- [docker/README.md](../../docker/README.md)：本地 PostgreSQL / Redis 启动说明
+- [docker/README.md](../../docker/README.md)：本地 PostgreSQL 启动说明

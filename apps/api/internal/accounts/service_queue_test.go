@@ -2,7 +2,6 @@ package accounts
 
 import (
 	"api/internal/runtime/queuetypes"
-	"api/internal/runtime/taskqueue"
 	"context"
 	"database/sql"
 	"testing"
@@ -13,45 +12,27 @@ import (
 )
 
 type fakeQueueForService struct {
-	waitLen int64
+	queuedLen int64
 }
 
 func (f *fakeQueueForService) Enqueue(context.Context, *queuetypes.TaskPayload) error { return nil }
 func (f *fakeQueueForService) QueueLengths(context.Context) (int64, int64, error) {
-	return 0, f.waitLen, nil
+	return f.queuedLen, 0, nil
 }
 
-type fakeAssignerForService struct {
+type fakeAccountLoadStore struct {
 	loadInfo map[int64]*queuetypes.AccountLoad
 }
 
-func (f *fakeAssignerForService) Assign(context.Context, []int64, *queuetypes.TaskPayload) (taskqueue.TaskAssignment, error) {
-	return taskqueue.TaskAssignment{}, nil
-}
-func (f *fakeAssignerForService) ConfirmTaskRunning(context.Context, taskqueue.TaskAssignment) error {
-	return nil
-}
-func (f *fakeAssignerForService) Release(context.Context, string, int64, string) error { return nil }
-func (f *fakeAssignerForService) EnsureAccountConcurrent(context.Context, int64, int) error {
-	return nil
-}
-func (f *fakeAssignerForService) SetAccountMaxConcurrent(context.Context, int64, int) error {
-	return nil
-}
-func (f *fakeAssignerForService) GetAccountLoadInfo(context.Context, []int64) (map[int64]*queuetypes.AccountLoad, error) {
+func (f *fakeAccountLoadStore) GetAccountLoadInfo(context.Context, []int64) (map[int64]*queuetypes.AccountLoad, error) {
 	return f.loadInfo, nil
 }
 
 type fakeConcurrencyStore struct {
 	concurrent map[int64]int
 	max        map[int64]int
-	deleted    []int64
 }
 
-func (f *fakeConcurrencyStore) DeleteAccountConcurrent(_ context.Context, accountID int64) error {
-	f.deleted = append(f.deleted, accountID)
-	return nil
-}
 func (f *fakeConcurrencyStore) GetAccountConcurrent(_ context.Context, accountID int64) (int, error) {
 	return f.concurrent[accountID], nil
 }
@@ -117,9 +98,9 @@ func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo: accountRepo,
 		TaskRepo:    taskRepo,
-		Queue:       &fakeQueueForService{waitLen: 7},
-		QueueStats:  &fakeQueueForService{waitLen: 7},
-		Assigner: &fakeAssignerForService{
+		Queue:       &fakeQueueForService{queuedLen: 7},
+		QueueStats:  &fakeQueueForService{queuedLen: 7},
+		AccountLoadStore: &fakeAccountLoadStore{
 			loadInfo: map[int64]*queuetypes.AccountLoad{
 				acc.ID: {CurrentConcurrent: 2, MaxConcurrent: 3},
 			},
@@ -158,7 +139,7 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 		TaskRepo:         taskRepo,
 		Queue:            &fakeQueueForService{},
 		QueueStats:       &fakeQueueForService{},
-		Assigner:         &fakeAssignerForService{},
+		AccountLoadStore: &fakeAccountLoadStore{},
 		ConcurrencyStore: concurrency,
 		CancelStore:      &fakeCancelStore{},
 		MonitorStore:     &fakeMonitorStore{},
@@ -173,19 +154,18 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 	}
 }
 
-func TestDeleteAccountCallsDeleteAccountConcurrent(t *testing.T) {
+func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
 	taskRepo := NewTaskRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 0)
-	concurrency := &fakeConcurrencyStore{}
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		Queue:            &fakeQueueForService{},
 		QueueStats:       &fakeQueueForService{},
-		Assigner:         &fakeAssignerForService{},
-		ConcurrencyStore: concurrency,
+		AccountLoadStore: &fakeAccountLoadStore{},
+		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      &fakeCancelStore{},
 		MonitorStore:     &fakeMonitorStore{},
 	}, AccountServiceOptions{})
@@ -193,8 +173,8 @@ func TestDeleteAccountCallsDeleteAccountConcurrent(t *testing.T) {
 	if err := svc.DeleteAccount(context.Background(), acc.ID); err != nil {
 		t.Fatalf("DeleteAccount failed: %v", err)
 	}
-	if len(concurrency.deleted) != 1 || concurrency.deleted[0] != acc.ID {
-		t.Fatalf("DeleteAccountConcurrent calls=%v, want [%d]", concurrency.deleted, acc.ID)
+	if _, err := accountRepo.GetByID(context.Background(), acc.ID); err == nil {
+		t.Fatalf("deleted account %d is still queryable", acc.ID)
 	}
 }
 
@@ -208,7 +188,7 @@ func TestDeleteAccountRequiresStoppedAccount(t *testing.T) {
 		TaskRepo:         taskRepo,
 		Queue:            &fakeQueueForService{},
 		QueueStats:       &fakeQueueForService{},
-		Assigner:         &fakeAssignerForService{},
+		AccountLoadStore: &fakeAccountLoadStore{},
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      &fakeCancelStore{},
 		MonitorStore:     &fakeMonitorStore{},
@@ -219,7 +199,7 @@ func TestDeleteAccountRequiresStoppedAccount(t *testing.T) {
 	}
 }
 
-func TestStopAccountMarksCancelAndDeleteConcurrent(t *testing.T) {
+func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
 	taskRepo := NewTaskRepository(db)
@@ -234,15 +214,14 @@ func TestStopAccountMarksCancelAndDeleteConcurrent(t *testing.T) {
 		t.Fatalf("create running task failed: %v", err)
 	}
 
-	concurrency := &fakeConcurrencyStore{}
 	cancelStore := &fakeCancelStore{}
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
 		Queue:            &fakeQueueForService{},
 		QueueStats:       &fakeQueueForService{},
-		Assigner:         &fakeAssignerForService{},
-		ConcurrencyStore: concurrency,
+		AccountLoadStore: &fakeAccountLoadStore{},
+		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      cancelStore,
 		MonitorStore:     &fakeMonitorStore{},
 	}, AccountServiceOptions{})
@@ -253,7 +232,15 @@ func TestStopAccountMarksCancelAndDeleteConcurrent(t *testing.T) {
 	if len(cancelStore.marked) != 2 {
 		t.Fatalf("MarkCancelled calls=%v, want 2 tasks", cancelStore.marked)
 	}
-	if len(concurrency.deleted) != 1 || concurrency.deleted[0] != acc.ID {
-		t.Fatalf("DeleteAccountConcurrent calls=%v, want [%d]", concurrency.deleted, acc.ID)
+	pendingAfter, err := taskRepo.GetByTaskID(context.Background(), pending.TaskID)
+	if err != nil {
+		t.Fatalf("load pending task failed: %v", err)
+	}
+	runningAfter, err := taskRepo.GetByTaskID(context.Background(), running.TaskID)
+	if err != nil {
+		t.Fatalf("load running task failed: %v", err)
+	}
+	if pendingAfter.Status != tasks.StatusFailed || runningAfter.Status != tasks.StatusFailed {
+		t.Fatalf("stopped account tasks statuses=%q/%q, want failed/failed", pendingAfter.Status, runningAfter.Status)
 	}
 }

@@ -38,8 +38,7 @@
   <img src="https://img.shields.io/badge/auth-Better_Auth-111827?style=flat-square" alt="Auth: Better Auth" />
   <br/>
   <img src="https://img.shields.io/badge/database-PostgreSQL_17-4169e1?style=flat-square&logo=postgresql&logoColor=white" alt="Database: PostgreSQL 17" />
-  <img src="https://img.shields.io/badge/cache-Redis_8.6-dc382d?style=flat-square&logo=redis&logoColor=white" alt="Cache: Redis 8.6" />
-  <img src="https://img.shields.io/badge/queue-Asynq-00add8?style=flat-square" alt="Queue: Asynq" />
+  <img src="https://img.shields.io/badge/queue-River-00add8?style=flat-square" alt="Queue: River" />
 </p>
 
 <p align="center">
@@ -82,9 +81,10 @@ flowchart TB
     Nginx -- /api/auth/** --> Auth["Better Auth Service<br>Node.js :6001"]
     Nginx -- /api/* --> GoAPI["Go API<br>Gin :6000"]
     Nginx -- /uploads/* --> Static["静态资源服务<br>/uploads/*"]
-    Auth --> Postgres[("PostgreSQL 17")] & Redis[("Redis 8.6")]
-    GoAPI --> Postgres & Redis & Worker["Worker 消费者"]
-    Worker --> Queue["Redis Queue"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / S3-compatible"]
+    Auth --> Postgres[("PostgreSQL 17")]
+    GoAPI --> Postgres & Worker["Worker 消费者"]
+    Worker --> Queue["River Queue<br>PostgreSQL"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / S3-compatible"]
+    Queue --> Postgres
     Static --> Storage
 
     style Browser fill:#f9f,stroke:#333,stroke-width:1px
@@ -93,14 +93,13 @@ flowchart TB
     style GoAPI fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px
     style Static fill:#fff,stroke:#333,stroke-width:1px
     style Postgres fill:#eff6ff,stroke:#1d4ed8,stroke-width:1px
-    style Redis fill:#ffebee,stroke:#c62828,stroke-width:1px
     style Worker fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
     style Queue fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
     style AI fill:#f5f5f5,stroke:#616161,stroke-width:1px
     style Storage fill:#f5f5f5,stroke:#616161,stroke-width:1px
 ```
 
-生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth、PostgreSQL 与 Redis，并由 Cloudflare Tunnel 暴露 API 域名。
+生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth 与 PostgreSQL，并由 Cloudflare Tunnel 暴露 API 域名。任务队列由 River 写入 PostgreSQL，不再依赖外部缓存队列。
 
 <a id="highlights"></a>
 
@@ -190,7 +189,6 @@ flowchart TB
 | Node.js | `22.18+` |
 | Go      | `1.25+`  |
 | PostgreSQL | `17+` |
-| Redis   | `8.6+`   |
 
 ### 1. 启动本地依赖
 
@@ -209,12 +207,12 @@ docker compose -f compose.local.yml up -d
 | 业务数据库      | `${POSTGRES_DB:-ideaboard}` |
 | 业务用户        | `${POSTGRES_USER:-ideaboard}` |
 | 业务密码        | `docker/.env` 中的 `POSTGRES_PASSWORD` |
-| Redis           | `127.0.0.1:6379` |
+| 任务队列        | River + PostgreSQL |
 
 </details>
 
 > [!NOTE]
-> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 PostgreSQL / Redis 直接暴露到外网。生产 `docker/compose.yml` 要求 `REDIS_PASSWORD` 必填，并会自动注入 API 的 `REDIS_AUTH`；本地 `compose.local.yml` 仍可留空 Redis 密码做开发。
+> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 PostgreSQL 直接暴露到外网。
 > 当前后端只支持 PostgreSQL；部署脚本不会自动转换其他数据库形态的数据。
 
 ### 2. 配置后端环境
@@ -225,7 +223,7 @@ cp .env.example .env
 ```
 
 > [!TIP]
-> 至少确认数据库、Redis、端口以及 `AUTH_SERVICE_BASE_URL` / `AUTH_SERVICE_INTERNAL_KEY` 配置正确。`.env.example` 里的敏感字段是空值或占位值，不应直接用于部署。
+> 至少确认数据库、端口以及 `AUTH_SERVICE_BASE_URL` / `AUTH_SERVICE_INTERNAL_KEY` 配置正确。`.env.example` 里的敏感字段是空值或占位值，不应直接用于部署。
 
 如果后端放在 Nginx / 宝塔等反向代理后面，建议额外设置：
 
@@ -356,7 +354,7 @@ ideaboard delete --yes
 
 ### Cloudflare Pages + Tunnel + VPS
 
-适用于前端部署到 Cloudflare Pages，后端、认证服务、PostgreSQL 与 Redis 继续运行在 VPS，并通过 Cloudflare Tunnel 暴露 `api.example.com` 的混合部署。
+适用于前端部署到 Cloudflare Pages，后端、认证服务与 PostgreSQL 继续运行在 VPS，并通过 Cloudflare Tunnel 暴露 `api.example.com` 的混合部署。
 
 <p>
   <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages/create/pages">
@@ -397,6 +395,7 @@ VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api
 | [DEVELOPMENT.md](./DEVELOPMENT.md)                                     | 架构、contract、本地开发与目录边界                       |
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)                                 | Feature System Prompt 配置手册与推荐模板                 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md)                                       | Cloudflare + Docker Compose、传统 Linux 部署、升级与回滚 |
+| [docs/river_migration.md](./docs/river_migration.md)                   | River + PostgreSQL 任务队列迁移决策                      |
 | [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)     | Auth 运维边界与应急流程                                  |
 | [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 目录边界与命名约束                                       |
 | [docker/README.md](./docker/README.md)                                 | Docker 本地依赖与生产 stack 说明                         |

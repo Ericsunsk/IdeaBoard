@@ -80,7 +80,7 @@
 
 - 提供用户画布工作台、画板管理、用户中心与管理后台。
 - 支持草图成图、风格延展、局部改款、局部重绘、双图融合、单视角展示、商品展示、图案生成、HD 与图片延伸。
-- 支持任务落库、Redis 队列、Worker 异步执行、账号池调度、状态轮询与结果持久化。
+- 支持任务落库、River + PostgreSQL 队列、Worker 异步执行、账号池调度、状态轮询与结果持久化。
 - 支持 `Local / S3-compatible` 存储配置。
 
 ### 认证与后台
@@ -92,6 +92,6 @@
 
 ### 部署与文档
 
-- 标准部署形态为 `Nginx + systemd + Go API + Better Auth Node Service + PostgreSQL + Redis`。
+- 标准部署形态为 `Nginx + systemd + Go API + Better Auth Node Service + PostgreSQL`。
 - 发布包由 `scripts/package-deploy.sh` 生成，包含前端静态产物、Go API 二进制、Auth Service 构建产物、systemd 与 Nginx 模板。
 - 文档覆盖项目入口、开发 contract、系统提示词配置、Auth 运维边界、本地依赖与 Linux 部署流程。

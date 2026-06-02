@@ -37,7 +37,7 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 |------|----------|
 | 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
 | 后端 | `Go` + `Gin` + `sqlc` + `Better Auth (Fastify/Node.js/TypeScript)` |
-| 基础设施 | `PostgreSQL 17+`、`Redis 8.6+` |
+| 基础设施 | `PostgreSQL 17+`（业务数据与 River 任务队列） |
 | 本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
 | 当前主链 | 画布节点编排 -> 任务提交 -> Worker 执行 -> 结果回写 |
 | 技术标识 | `ideaboard-*` |
@@ -50,11 +50,10 @@ graph LR
     Browser --> Auth["Better Auth (apps/auth)"]
     Browser --> Gin["Gin API (Go)"]
     
-    Gin --> Postgres[("PostgreSQL")]
-    Gin --> Redis[("Redis Queue")]
+    Gin --> Postgres[("PostgreSQL<br>业务数据 + River 队列")]
     Auth --> Postgres
     
-    Redis --> Worker["Worker 消费者"]
+    Postgres --> Worker["Worker 消费者"]
     Worker --> AI["上游 AI 渠道"]
     Worker --> Storage["Local / S3-compatible 对象存储"]
 ```
@@ -166,7 +165,7 @@ graph LR
 sequenceDiagram
     participant FE as 前端
     participant API as Go API
-    participant DB as PostgreSQL/Redis
+    participant DB as PostgreSQL/River
     participant WK as Worker
     participant AI as AI 渠道
 
@@ -257,7 +256,6 @@ sequenceDiagram
 | Node.js | `20+` |
 | Go | `1.25+` |
 | PostgreSQL | `17+` |
-| Redis | `8.6+` |
 
 ### 启动步骤
 
@@ -368,9 +366,10 @@ go build ./...
 | `DB_PASSWORD` | 无默认值 | PostgreSQL 密码；使用仓库自带 Docker Compose 时读取 `docker/.env` 的 `POSTGRES_PASSWORD` |
 | `DB_NAME` | `ideaboard` | 数据库名 |
 | `DB_SSLMODE` | `disable` | PostgreSQL SSL 模式；本地与 Docker 内网默认关闭 |
-| `REDIS_HOST` | `localhost` | Redis 主机 |
-| `REDIS_PORT` | `6379` | Redis 端口 |
-| `REDIS_AUTH` | 空 | Redis 密码；本地开发可留空，生产环境必须设置 |
+| `TASK_QUEUE_WORKER_CONCURRENCY` | `5` | River worker 并发数 |
+| `RIVER_TASK_TIMEOUT_SECONDS` | `180` | River 任务执行保护超时 |
+| `RIVER_NO_CAPACITY_RETRY_SECONDS` | `5` | 账号容量不足时 River snooze/retry 间隔 |
+| `RIVER_MAX_RETRY` | `25` | River 基础设施级最大重试次数 |
 | `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
 | `APP_PORT` | `6000` | 后端监听端口 |
 | `APP_HOST` / `APP_BIND_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
@@ -418,7 +417,7 @@ apps/web/src/
 
 apps/api/
 ├── cmd/                      # 服务入口
-├── internal/platform/        # 基础设施：config、database、redis、response、safehttp
+├── internal/platform/        # 基础设施：config、database、response、safehttp
 ├── internal/runtime/         # 启动、HTTP 路由、队列与 worker
 ├── internal/auth/            # 鉴权中间件与 auth service client
 ├── internal/users/           # 用户管理

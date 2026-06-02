@@ -16,7 +16,7 @@ import (
 )
 
 func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
-	dsn := buildPostgresDSN(cfg)
+	dsn := PostgresDSN(cfg)
 	maxRetries := getEnvInt("DB_CONNECT_MAX_RETRIES", 60)
 	retryInterval := time.Duration(getEnvInt("DB_CONNECT_RETRY_INTERVAL_MS", 1000)) * time.Millisecond
 
@@ -45,7 +45,7 @@ func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
 	return nil, lastErr
 }
 
-func buildPostgresDSN(cfg config.DatabaseConfig) string {
+func PostgresDSN(cfg config.DatabaseConfig) string {
 	values := url.Values{}
 	values.Set("sslmode", cfg.SSLMode)
 

@@ -1176,9 +1176,15 @@ components:
       type: object
       required: [global_queue_len, wait_queue_len, running_tasks, account_loads]
       properties:
-        global_queue_len: { type: integer }
-        wait_queue_len: { type: integer }
-        running_tasks: { type: integer }
+        global_queue_len:
+          type: integer
+          description: River jobs waiting to be processed.
+        wait_queue_len:
+          type: integer
+          description: Reserved queue subcount; River-backed task queues report 0.
+        running_tasks:
+          type: integer
+          description: Tasks currently marked running in PostgreSQL.
         account_loads:
           type: object
           additionalProperties:

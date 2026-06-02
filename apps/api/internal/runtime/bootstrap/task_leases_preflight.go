@@ -181,14 +181,3 @@ func newTaskLeasePreflightTaskRepo(cfg *config.Config) (taskLeasePreflightReposi
 	}
 	return casted, nil
 }
-
-func taskLeaseStartupRepairHint(reconcileErr error) error {
-	if reconcileErr == nil {
-		return nil
-	}
-	msg := strings.ToLower(reconcileErr.Error())
-	if !strings.Contains(msg, "running task lease missing token") {
-		return reconcileErr
-	}
-	return fmt.Errorf("%w\n[Main] Startup blocked: found running task(s) missing lease_token.\n[Main] Run preflight first: api preflight task-leases\n[Main] Preview repair: api repair task-leases --dry-run\n[Main] Execute repair: api repair task-leases --to=pending --yes", reconcileErr)
-}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 
@@ -19,18 +18,14 @@ import (
 )
 
 const (
-	defaultTaskRetryLimit               = 3
-	defaultRunningTaskLeaseReconcileMax = 10000
+	defaultTaskRetryLimit = 3
 )
 
 var (
-	ErrTaskNotFound                   = errors.New("task not found")
-	ErrTaskTerminal                   = errors.New("task already in terminal state")
-	ErrTaskStateConflict              = errors.New("task state conflict")
-	ErrTaskAlreadyRunning             = errors.New("task already running on same account")
-	ErrTaskRepositoryUnavailable      = errors.New("task repository unavailable")
-	ErrTaskLeaseRebuilderUnavailable  = errors.New("task lease rebuilder unavailable")
-	ErrTaskLeaseReconcileLimitReached = errors.New("task lease reconcile limit reached")
+	ErrTaskNotFound       = errors.New("task not found")
+	ErrTaskTerminal       = errors.New("task already in terminal state")
+	ErrTaskStateConflict  = errors.New("task state conflict")
+	ErrTaskAlreadyRunning = errors.New("task already running on same account")
 )
 
 type EventHub interface {
@@ -41,8 +36,6 @@ type Service struct {
 	accountRepo *accounts.AccountRepository
 	taskRepo    *accounts.TaskRepository
 	queue       taskqueue.TaskAssigner
-	rebuilder   taskqueue.TaskLeaseRebuilder
-	leaseLocker taskqueue.TaskLeaseReconcileLocker
 	cancelStore taskqueue.TaskCancellationStore
 	hub         EventHub
 }
@@ -58,12 +51,6 @@ func NewService(
 		taskRepo:    taskRepo,
 		queue:       assigner,
 		cancelStore: cancelStore,
-	}
-	if rebuilder, ok := assigner.(taskqueue.TaskLeaseRebuilder); ok {
-		service.rebuilder = rebuilder
-	}
-	if leaseLocker, ok := assigner.(taskqueue.TaskLeaseReconcileLocker); ok {
-		service.leaseLocker = leaseLocker
 	}
 	return service
 }
@@ -94,123 +81,14 @@ func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.Task
 				continue
 			}
 		}
-		maxConcurrent := accounts.NormalizeMaxConcurrent(account.MaxConcurrent)
-		if err := s.queue.EnsureAccountConcurrent(ctx, account.ID, maxConcurrent); err != nil {
-			return err
-		}
 		next = append(next, account.ID)
 	}
 	task.AccountIDs = next
 	return nil
 }
 
-func (s *Service) ReleaseTask(ctx context.Context, assignment taskqueue.TaskAssignment) error {
-	if assignment.AccountID == 0 {
-		return nil
-	}
-	if strings.TrimSpace(assignment.LeaseToken) == "" {
-		return ErrTaskStateConflict
-	}
-	return s.queue.Release(ctx, assignment.TaskID, assignment.AccountID, assignment.LeaseToken)
-}
-
 func (s *Service) ConfirmTaskRunning(ctx context.Context, assignment taskqueue.TaskAssignment) error {
 	return s.queue.ConfirmTaskRunning(ctx, assignment)
-}
-
-type RunningTaskLeaseReconcileOptions struct {
-	MaxRunningTasks      int
-	AssignmentDrainDelay time.Duration
-}
-
-type RunningTaskLeaseReconcileResult struct {
-	RunningTasks         int
-	RebuiltLeases        int
-	AccountCountsRebuilt int
-}
-
-func (s *Service) ReconcileRunningTaskLeases(ctx context.Context, opts RunningTaskLeaseReconcileOptions) (RunningTaskLeaseReconcileResult, error) {
-	if s.leaseLocker != nil {
-		var result RunningTaskLeaseReconcileResult
-		err := s.leaseLocker.WithTaskLeaseReconcileLock(ctx, func(lockCtx context.Context) error {
-			var reconcileErr error
-			result, reconcileErr = s.reconcileRunningTaskLeasesLocked(lockCtx, opts)
-			return reconcileErr
-		})
-		return result, err
-	}
-	return s.reconcileRunningTaskLeasesLocked(ctx, opts)
-}
-
-func (s *Service) reconcileRunningTaskLeasesLocked(ctx context.Context, opts RunningTaskLeaseReconcileOptions) (RunningTaskLeaseReconcileResult, error) {
-	var result RunningTaskLeaseReconcileResult
-	if s.taskRepo == nil {
-		return result, ErrTaskRepositoryUnavailable
-	}
-	if s.rebuilder == nil {
-		return result, ErrTaskLeaseRebuilderUnavailable
-	}
-
-	limit := opts.MaxRunningTasks
-	if limit <= 0 {
-		limit = defaultRunningTaskLeaseReconcileMax
-	}
-	if opts.AssignmentDrainDelay > 0 {
-		timer := time.NewTimer(opts.AssignmentDrainDelay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return result, ctx.Err()
-		case <-timer.C:
-		}
-	}
-	running, err := s.taskRepo.ListRunningTaskLeases(ctx, limit+1)
-	if err != nil {
-		return result, err
-	}
-	if len(running) > limit {
-		return result, fmt.Errorf("%w: running_tasks>%d", ErrTaskLeaseReconcileLimitReached, limit)
-	}
-
-	leases := make([]taskqueue.TaskLease, 0, len(running))
-	accountIDSet := make(map[int64]struct{}, len(running))
-	for _, row := range running {
-		if row.TaskID == "" || row.AccountID == 0 {
-			return result, fmt.Errorf("invalid running task lease: task_id=%q account_id=%d", row.TaskID, row.AccountID)
-		}
-		leaseToken := strings.TrimSpace(row.LeaseToken)
-		if leaseToken == "" {
-			return result, fmt.Errorf("running task lease missing token: task_id=%q account_id=%d", row.TaskID, row.AccountID)
-		}
-		leases = append(leases, taskqueue.TaskLease{TaskID: row.TaskID, AccountID: row.AccountID, LeaseToken: leaseToken})
-		accountIDSet[row.AccountID] = struct{}{}
-	}
-
-	if s.accountRepo != nil {
-		accountIDs, err := s.accountRepo.ListAccountIDs(ctx)
-		if err != nil {
-			return result, err
-		}
-		for _, accountID := range accountIDs {
-			if accountID == 0 {
-				continue
-			}
-			accountIDSet[accountID] = struct{}{}
-		}
-	}
-
-	accountIDs := sortedAccountIDs(accountIDSet)
-	sort.Slice(leases, func(i, j int) bool {
-		return leases[i].TaskID < leases[j].TaskID
-	})
-	if err := s.rebuilder.RebuildRunningTaskLeases(ctx, leases, accountIDs); err != nil {
-		return result, err
-	}
-
-	result.RunningTasks = len(running)
-	result.RebuiltLeases = len(leases)
-	result.AccountCountsRebuilt = len(accountIDs)
-	return result, nil
 }
 
 func (s *Service) IsTaskCancelled(ctx context.Context, taskID string) (bool, error) {
@@ -276,7 +154,10 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 		}
 		return err
 	}
-	if task.Status == tasks.StatusRunning && task.AccountID == accountID && task.LeaseToken == leaseToken {
+	if task.Status == tasks.StatusRunning && task.AccountID == accountID {
+		if task.LeaseToken == leaseToken {
+			return nil
+		}
 		return ErrTaskAlreadyRunning
 	}
 	if tasks.IsTerminalStatus(task.Status) {
@@ -592,17 +473,6 @@ func outputStorageKey(raw string) string {
 		return ""
 	}
 	return strings.TrimPrefix(path[index:], "/")
-}
-
-func sortedAccountIDs(accountIDSet map[int64]struct{}) []int64 {
-	accountIDs := make([]int64, 0, len(accountIDSet))
-	for accountID := range accountIDSet {
-		accountIDs = append(accountIDs, accountID)
-	}
-	sort.Slice(accountIDs, func(i, j int) bool {
-		return accountIDs[i] < accountIDs[j]
-	})
-	return accountIDs
 }
 
 func formatTaskFailureResult(taskID string, reason string) string {
