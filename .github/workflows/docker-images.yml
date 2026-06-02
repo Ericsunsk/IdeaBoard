@@ -30,6 +30,10 @@ on:
 permissions:
   contents: read
 
+env:
+  GRYPE_LOG_LEVEL: error
+  SYFT_LOG_LEVEL: error
+
 concurrency:
   group: docker-images-${{ github.ref_name }}
   cancel-in-progress: true
@@ -37,6 +41,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -72,13 +77,14 @@ jobs:
       - name: Build Auth
         working-directory: apps/auth
         run: |
-          npm ci
+          npm ci --omit=optional
           npm run build
 
   build-pr-images:
     if: github.event_name == 'pull_request'
     needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
@@ -134,6 +140,7 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
@@ -219,6 +226,7 @@ jobs:
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
           config: .grype.yaml
+          cache-db: true
           fail-build: true
           severity-cutoff: high
           output-format: table
