@@ -31,8 +31,7 @@ permissions:
   contents: read
 
 env:
-  GRYPE_LOG_LEVEL: error
-  SYFT_LOG_LEVEL: error
+  GRYPE_LOG_QUIET: "true"
 
 concurrency:
   group: docker-images-${{ github.ref_name }}
@@ -228,6 +227,7 @@ jobs:
           config: .grype.yaml
           cache-db: true
           fail-build: true
+          only-fixed: true
           severity-cutoff: high
           output-format: table
 
