@@ -188,6 +188,8 @@ ideaboard update
 
 `ideaboard update` 会在执行 Auth migration 前自动导出 PostgreSQL backup 到 `/opt/stacks/ideaboard/backups/postgres/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 `api`、`auth` 的 `/api/health` health gate 失败都会中止部署并打印相关容器日志。
 
+当前 Docker stack 只管理 PostgreSQL 数据库；`ideaboard update` 不会自动转换或导入其他数据库形态的数据。首次部署或切换部署形态前，请先确认目标 PostgreSQL 中已有需要保留的数据，或明确按空库初始化。
+
 常用运维：
 
 ```bash
@@ -648,3 +650,5 @@ nginx -t && systemctl reload nginx
 5. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
 
 Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IMAGE_TAG` 改回上一版并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup，再运行 migration 和 health gate；历史 backup 位于 `/opt/stacks/ideaboard/backups/postgres/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+
+Docker stack 的数据面以 PostgreSQL volume 为准；回滚镜像不会自动转换、导入或恢复非 PostgreSQL 数据。

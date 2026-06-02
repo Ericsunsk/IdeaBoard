@@ -129,6 +129,8 @@ docker compose -f docker/compose.yml --env-file docker/.env up -d
 
 生产数据在 Docker volumes 中持久化：`postgres-data`、`redis-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
 
+当前 Docker stack 只管理 PostgreSQL 数据库；部署脚本不会自动转换或导入其他数据库形态的数据。
+
 
 ## 常见问题
 
