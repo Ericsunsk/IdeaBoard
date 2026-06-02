@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.18.0-alpine AS node-base
+FROM node:22.22.2-alpine AS node-base
 
 FROM node-base AS builder
 
@@ -28,7 +28,7 @@ ENV NODE_ENV=production \
     AUTH_HOST=0.0.0.0 \
     AUTH_PORT=6001
 
-COPY --from=prod-deps --chown=node:node /app/package.json /app/package-lock.json ./
+COPY --from=prod-deps --chown=node:node /app/package.json ./
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/dist ./dist
 

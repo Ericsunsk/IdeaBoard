@@ -103,7 +103,7 @@ Pages 项目建议配置：
 | Root directory | `apps/web` |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Environment variable | `NODE_VERSION=22.18.0` |
+| Environment variable | `NODE_VERSION=22.22.2` |
 | Environment variable | `VITE_API_BASE_URL=https://api.example.com/api` |
 | Environment variable | `VITE_AUTH_BASE_URL=https://api.example.com` |
 
