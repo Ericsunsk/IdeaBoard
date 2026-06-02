@@ -27,14 +27,13 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: docker-images-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
 
     steps:
@@ -74,71 +73,155 @@ jobs:
           npm ci
           npm run build
 
+  build-pr-images:
+    if: github.event_name == 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: api
+            display: API
+            context: ./apps/api
+            file: ./apps/api/Dockerfile
+            cache_scope: ideaboard-api
+          - name: auth
+            display: Auth
+            context: ./apps/auth
+            file: ./apps/auth/Dockerfile
+            cache_scope: ideaboard-auth
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Prepare image names
-        id: images
+        id: image
         shell: bash
         run: |
           repository="${GITHUB_REPOSITORY,,}"
-          echo "api=ghcr.io/${repository}/ideaboard-api" >> "$GITHUB_OUTPUT"
-          echo "auth=ghcr.io/${repository}/ideaboard-auth" >> "$GITHUB_OUTPUT"
+          echo "name=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=ref,event=pr
+            type=sha,prefix=sha-
+
+      - name: Build ${{ matrix.image.display }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.file }}
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image.cache_scope }}
+
+  publish-images:
+    if: github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: api
+            display: API
+            context: ./apps/api
+            file: ./apps/api/Dockerfile
+            cache_scope: ideaboard-api
+            sbom_file: api.sbom.cyclonedx.json
+            sbom_artifact: ideaboard-api-sbom-cyclonedx-json
+          - name: auth
+            display: Auth
+            context: ./apps/auth
+            file: ./apps/auth/Dockerfile
+            cache_scope: ideaboard-auth
+            sbom_file: auth.sbom.cyclonedx.json
+            sbom_artifact: ideaboard-auth-sbom-cyclonedx-json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare image names
+        id: image
+        shell: bash
+        run: |
+          repository="${GITHUB_REPOSITORY,,}"
+          echo "name=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: API image metadata
-        id: api-meta
+      - name: Image metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.images.outputs.api }}
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
             type=ref,event=tag
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.image_tag != '' }}
 
-      - name: Build and push API image
+      - name: Build and push ${{ matrix.image.display }} image
+        id: build
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/api
-          file: ./apps/api/Dockerfile
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.file }}
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.api-meta.outputs.tags }}
-          labels: ${{ steps.api-meta.outputs.labels }}
-          cache-from: type=gha,scope=ideaboard-api
-          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=ideaboard-api' || '' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.cache_scope }}
 
-      - name: Auth image metadata
-        id: auth-meta
-        uses: docker/metadata-action@v5
+      - name: Generate ${{ matrix.image.display }} SBOM
+        uses: anchore/sbom-action@v0.24.0
         with:
-          images: ${{ steps.images.outputs.auth }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=ref,event=tag
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.image_tag != '' }}
+          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: ${{ matrix.image.sbom_file }}
+          artifact-name: ${{ matrix.image.sbom_artifact }}
+          upload-release-assets: false
 
-      - name: Build and push Auth image
-        uses: docker/build-push-action@v6
+      - name: Scan ${{ matrix.image.display }} image
+        uses: anchore/scan-action@v7.4.0
         with:
-          context: ./apps/auth
-          file: ./apps/auth/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.auth-meta.outputs.tags }}
-          labels: ${{ steps.auth-meta.outputs.labels }}
-          cache-from: type=gha,scope=ideaboard-auth
-          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=ideaboard-auth' || '' }}
+          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.1.2
+
+      - name: Sign ${{ matrix.image.display }} image
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}"

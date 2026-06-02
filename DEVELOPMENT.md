@@ -371,7 +371,9 @@ go build ./...
 | `DB_PASSWORD` | 无默认值 | PostgreSQL 密码；使用仓库自带 Docker Compose 时读取 `docker/.env` 的 `POSTGRES_PASSWORD` |
 | `DB_NAME` | `ideaboard` | 数据库名 |
 | `DB_SSLMODE` | `disable` | PostgreSQL SSL 模式；本地与 Docker 内网默认关闭 |
-| `TASK_QUEUE_WORKER_CONCURRENCY` | `5` | River worker 并发数 |
+| `DB_CONNECT_MAX_RETRIES` | `60` | API 启动时等待 PostgreSQL 就绪的最大重试次数 |
+| `DB_CONNECT_RETRY_INTERVAL_MS` | `1000` | API 启动时 PostgreSQL 连接重试间隔 |
+| `RIVER_WORKER_CONCURRENCY` | `5` | River worker 并发数 |
 | `RIVER_TASK_TIMEOUT_SECONDS` | `180` | River 任务执行保护超时 |
 | `RIVER_NO_CAPACITY_RETRY_SECONDS` | `5` | 账号容量不足时 River snooze/retry 间隔 |
 | `RIVER_MAX_RETRY` | `25` | River 基础设施级最大重试次数 |
@@ -386,8 +388,8 @@ go build ./...
 | `NATS_DRAIN_TIMEOUT_SECONDS` | `2` | NATS 连接关闭 drain 超时 |
 | `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
 | `APP_PORT` | `6000` | 后端监听端口 |
-| `APP_HOST` / `APP_BIND_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
-| `APP_GIN_MODE` / `GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
+| `APP_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
+| `APP_GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
 | `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS allowlist，多个 origin 用逗号分隔；生产同源访问通常留空，跨源直连 API 时必须显式配置 |
 | `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
 | `AUTH_SERVICE_INTERNAL_KEY` | 空 | Go 调用 auth service 的 internal key |

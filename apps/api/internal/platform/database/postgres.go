@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"api/internal/platform/config"
@@ -17,8 +14,8 @@ import (
 
 func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
 	dsn := PostgresDSN(cfg)
-	maxRetries := getEnvInt("DB_CONNECT_MAX_RETRIES", 60)
-	retryInterval := time.Duration(getEnvInt("DB_CONNECT_RETRY_INTERVAL_MS", 1000)) * time.Millisecond
+	maxRetries := positiveIntDefault(cfg.ConnectMaxRetries, 60)
+	retryInterval := time.Duration(positiveIntDefault(cfg.ConnectRetryIntervalMS, 1000)) * time.Millisecond
 
 	var lastErr error
 	for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -45,6 +42,13 @@ func NewPostgres(cfg config.DatabaseConfig) (*sql.DB, error) {
 	return nil, lastErr
 }
 
+func positiveIntDefault(value, defaultValue int) int {
+	if value > 0 {
+		return value
+	}
+	return defaultValue
+}
+
 func PostgresDSN(cfg config.DatabaseConfig) string {
 	values := url.Values{}
 	values.Set("sslmode", cfg.SSLMode)
@@ -57,16 +61,4 @@ func PostgresDSN(cfg config.DatabaseConfig) string {
 		RawQuery: values.Encode(),
 	}
 	return dsn.String()
-}
-
-func getEnvInt(key string, defaultValue int) int {
-	raw := strings.TrimSpace(os.Getenv(key))
-	if raw == "" {
-		return defaultValue
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value <= 0 {
-		return defaultValue
-	}
-	return value
 }

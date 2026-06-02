@@ -1,6 +1,59 @@
 package config
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
+
+var configEnvKeys = []string{
+	"ENV_FILE",
+	"DB_HOST",
+	"DB_PORT",
+	"DB_USER",
+	"DB_PASSWORD",
+	"DB_NAME",
+	"DB_SSLMODE",
+	"DB_CONNECT_MAX_RETRIES",
+	"DB_CONNECT_RETRY_INTERVAL_MS",
+	"APP_ENV",
+	"APP_PORT",
+	"APP_HOST",
+	"APP_GIN_MODE",
+	"APP_LOG_FILE",
+	"APP_CORS_ALLOWED_ORIGINS",
+	"AUTH_SERVICE_BASE_URL",
+	"AUTH_SERVICE_INTERNAL_KEY",
+	"AUTH_SERVICE_TIMEOUT_SECONDS",
+	"RIVER_WORKER_CONCURRENCY",
+	"RIVER_TASK_TIMEOUT_SECONDS",
+	"RIVER_NO_CAPACITY_RETRY_SECONDS",
+	"RIVER_MAX_RETRY",
+	"NATS_URL",
+	"NATS_EVENT_BUS_ENABLED",
+	"NATS_STREAM_NAME",
+	"NATS_SUBJECT_PREFIX",
+	"NATS_CONSUMER_NAME",
+	"NATS_RETENTION_DAYS",
+	"NATS_CONNECT_TIMEOUT_SECONDS",
+	"NATS_REQUEST_TIMEOUT_SECONDS",
+	"NATS_DRAIN_TIMEOUT_SECONDS",
+	"GO_ENV",
+	"ENV",
+	"APP_BIND_HOST",
+	"GIN_MODE",
+	"TASK_QUEUE_WORKER_CONCURRENCY",
+	"TASK_QUEUE_TASK_TIMEOUT_SECONDS",
+	"TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS",
+	"TASK_QUEUE_MAX_RETRY",
+}
+
+func resetConfigEnv(t *testing.T) {
+	t.Helper()
+	loadEnvOnce = sync.Once{}
+	for _, key := range configEnvKeys {
+		t.Setenv(key, "")
+	}
+}
 
 func TestIsProductionAppEnv(t *testing.T) {
 	for _, env := range []string{"production", "prod", "release"} {
@@ -13,71 +66,134 @@ func TestIsProductionAppEnv(t *testing.T) {
 	}
 }
 
-func TestDetectGinMode(t *testing.T) {
+func TestNormalizeGinMode(t *testing.T) {
 	t.Run("defaults to release", func(t *testing.T) {
-		t.Setenv("APP_GIN_MODE", "")
-		t.Setenv("GIN_MODE", "")
-
-		if got := detectGinMode(); got != "release" {
+		if got := normalizeGinMode(""); got != "release" {
 			t.Fatalf("expected default gin mode release, got %q", got)
 		}
 	})
 
-	t.Run("app specific override wins", func(t *testing.T) {
-		t.Setenv("APP_GIN_MODE", "debug")
-		t.Setenv("GIN_MODE", "release")
-
-		if got := detectGinMode(); got != "debug" {
-			t.Fatalf("expected APP_GIN_MODE to win, got %q", got)
-		}
-	})
-
 	t.Run("accepts valid gin mode", func(t *testing.T) {
-		t.Setenv("APP_GIN_MODE", "")
-		t.Setenv("GIN_MODE", "test")
-
-		if got := detectGinMode(); got != "test" {
-			t.Fatalf("expected GIN_MODE test, got %q", got)
+		if got := normalizeGinMode(" test "); got != "test" {
+			t.Fatalf("expected gin mode test, got %q", got)
 		}
 	})
 
 	t.Run("invalid value falls back to release", func(t *testing.T) {
-		t.Setenv("APP_GIN_MODE", "verbose")
-		t.Setenv("GIN_MODE", "")
-
-		if got := detectGinMode(); got != "release" {
+		if got := normalizeGinMode("verbose"); got != "release" {
 			t.Fatalf("expected invalid gin mode to fall back to release, got %q", got)
 		}
 	})
 }
 
-func TestLoadQueueDefaults(t *testing.T) {
-	t.Setenv("TASK_QUEUE_WORKER_CONCURRENCY", "")
-	t.Setenv("RIVER_TASK_TIMEOUT_SECONDS", "")
-	t.Setenv("RIVER_NO_CAPACITY_RETRY_SECONDS", "")
-	t.Setenv("RIVER_MAX_RETRY", "")
-	t.Setenv("NATS_URL", "")
-	t.Setenv("NATS_EVENT_BUS_ENABLED", "")
+func TestLoadDatabaseConfig(t *testing.T) {
+	t.Run("connect retry defaults", func(t *testing.T) {
+		resetConfigEnv(t)
+
+		cfg := Load()
+		if cfg.Database.ConnectMaxRetries != 60 {
+			t.Fatalf("expected ConnectMaxRetries=60, got %d", cfg.Database.ConnectMaxRetries)
+		}
+		if cfg.Database.ConnectRetryIntervalMS != 1000 {
+			t.Fatalf("expected ConnectRetryIntervalMS=1000, got %d", cfg.Database.ConnectRetryIntervalMS)
+		}
+	})
+
+	t.Run("connect retry env names", func(t *testing.T) {
+		resetConfigEnv(t)
+		t.Setenv("DB_CONNECT_MAX_RETRIES", "7")
+		t.Setenv("DB_CONNECT_RETRY_INTERVAL_MS", "250")
+
+		cfg := Load()
+		if cfg.Database.ConnectMaxRetries != 7 {
+			t.Fatalf("expected ConnectMaxRetries=7, got %d", cfg.Database.ConnectMaxRetries)
+		}
+		if cfg.Database.ConnectRetryIntervalMS != 250 {
+			t.Fatalf("expected ConnectRetryIntervalMS=250, got %d", cfg.Database.ConnectRetryIntervalMS)
+		}
+	})
+}
+
+func TestLoadQueueConfig(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		resetConfigEnv(t)
+
+		cfg := Load()
+		if cfg.Queue.WorkerConcurrency != 5 {
+			t.Fatalf("expected WorkerConcurrency=5, got %d", cfg.Queue.WorkerConcurrency)
+		}
+		if cfg.Queue.TaskTimeoutSeconds != 180 {
+			t.Fatalf("expected TaskTimeoutSeconds=180, got %d", cfg.Queue.TaskTimeoutSeconds)
+		}
+		if cfg.Queue.NoCapacityRetryDelaySeconds != 5 {
+			t.Fatalf("expected NoCapacityRetryDelaySeconds=5, got %d", cfg.Queue.NoCapacityRetryDelaySeconds)
+		}
+		if cfg.Queue.MaxRetry != 25 {
+			t.Fatalf("expected MaxRetry=25, got %d", cfg.Queue.MaxRetry)
+		}
+	})
+
+	t.Run("river env names", func(t *testing.T) {
+		resetConfigEnv(t)
+		t.Setenv("RIVER_WORKER_CONCURRENCY", "12")
+		t.Setenv("RIVER_TASK_TIMEOUT_SECONDS", "240")
+		t.Setenv("RIVER_NO_CAPACITY_RETRY_SECONDS", "9")
+		t.Setenv("RIVER_MAX_RETRY", "31")
+
+		cfg := Load()
+		if cfg.Queue.WorkerConcurrency != 12 {
+			t.Fatalf("expected WorkerConcurrency=12, got %d", cfg.Queue.WorkerConcurrency)
+		}
+		if cfg.Queue.TaskTimeoutSeconds != 240 {
+			t.Fatalf("expected TaskTimeoutSeconds=240, got %d", cfg.Queue.TaskTimeoutSeconds)
+		}
+		if cfg.Queue.NoCapacityRetryDelaySeconds != 9 {
+			t.Fatalf("expected NoCapacityRetryDelaySeconds=9, got %d", cfg.Queue.NoCapacityRetryDelaySeconds)
+		}
+		if cfg.Queue.MaxRetry != 31 {
+			t.Fatalf("expected MaxRetry=31, got %d", cfg.Queue.MaxRetry)
+		}
+	})
+}
+
+func TestLoadIgnoresLegacyAliases(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("GO_ENV", "production")
+	t.Setenv("ENV", "production")
+	t.Setenv("APP_BIND_HOST", "127.0.0.1")
+	t.Setenv("GIN_MODE", "debug")
+	t.Setenv("TASK_QUEUE_WORKER_CONCURRENCY", "12")
+	t.Setenv("TASK_QUEUE_TASK_TIMEOUT_SECONDS", "240")
+	t.Setenv("TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS", "9")
+	t.Setenv("TASK_QUEUE_MAX_RETRY", "31")
 
 	cfg := Load()
+	if cfg.App.Env != "development" {
+		t.Fatalf("expected APP_ENV default to win over legacy aliases, got %q", cfg.App.Env)
+	}
+	if cfg.App.Host != "" {
+		t.Fatalf("expected APP_BIND_HOST to be ignored, got host %q", cfg.App.Host)
+	}
+	if cfg.App.GinMode != "release" {
+		t.Fatalf("expected GIN_MODE to be ignored, got gin mode %q", cfg.App.GinMode)
+	}
 	if cfg.Queue.WorkerConcurrency != 5 {
-		t.Fatalf("expected WorkerConcurrency=5, got %d", cfg.Queue.WorkerConcurrency)
+		t.Fatalf("expected TASK_QUEUE_WORKER_CONCURRENCY to be ignored, got %d", cfg.Queue.WorkerConcurrency)
 	}
 	if cfg.Queue.TaskTimeoutSeconds != 180 {
-		t.Fatalf("expected TaskTimeoutSeconds=180, got %d", cfg.Queue.TaskTimeoutSeconds)
+		t.Fatalf("expected TASK_QUEUE_TASK_TIMEOUT_SECONDS to be ignored, got %d", cfg.Queue.TaskTimeoutSeconds)
 	}
 	if cfg.Queue.NoCapacityRetryDelaySeconds != 5 {
-		t.Fatalf("expected NoCapacityRetryDelaySeconds=5, got %d", cfg.Queue.NoCapacityRetryDelaySeconds)
+		t.Fatalf("expected TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS to be ignored, got %d", cfg.Queue.NoCapacityRetryDelaySeconds)
 	}
 	if cfg.Queue.MaxRetry != 25 {
-		t.Fatalf("expected MaxRetry=25, got %d", cfg.Queue.MaxRetry)
+		t.Fatalf("expected TASK_QUEUE_MAX_RETRY to be ignored, got %d", cfg.Queue.MaxRetry)
 	}
 }
 
 func TestLoadEventBusConfig(t *testing.T) {
 	t.Run("defaults to disabled without nats url", func(t *testing.T) {
-		t.Setenv("NATS_URL", "")
-		t.Setenv("NATS_EVENT_BUS_ENABLED", "")
+		resetConfigEnv(t)
 
 		cfg := Load()
 		if cfg.Events.Enabled {
@@ -95,8 +211,8 @@ func TestLoadEventBusConfig(t *testing.T) {
 	})
 
 	t.Run("nats url enables event bus", func(t *testing.T) {
+		resetConfigEnv(t)
 		t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
-		t.Setenv("NATS_EVENT_BUS_ENABLED", "")
 
 		cfg := Load()
 		if !cfg.Events.Enabled {
@@ -108,6 +224,7 @@ func TestLoadEventBusConfig(t *testing.T) {
 	})
 
 	t.Run("explicit disabled wins over nats url", func(t *testing.T) {
+		resetConfigEnv(t)
 		t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
 		t.Setenv("NATS_EVENT_BUS_ENABLED", "false")
 
@@ -120,9 +237,7 @@ func TestLoadEventBusConfig(t *testing.T) {
 
 func TestDetectCORSAllowedOrigins(t *testing.T) {
 	t.Run("development default is local vite origins", func(t *testing.T) {
-		t.Setenv("APP_CORS_ALLOWED_ORIGINS", "")
-
-		got := detectCORSAllowedOrigins("development")
+		got := detectCORSAllowedOrigins("", "development")
 		want := []string{"http://localhost:5173", "http://127.0.0.1:5173"}
 		if len(got) != len(want) {
 			t.Fatalf("got %v, want %v", got, want)
@@ -135,17 +250,13 @@ func TestDetectCORSAllowedOrigins(t *testing.T) {
 	})
 
 	t.Run("production default is closed", func(t *testing.T) {
-		t.Setenv("APP_CORS_ALLOWED_ORIGINS", "")
-
-		if got := detectCORSAllowedOrigins("production"); len(got) != 0 {
+		if got := detectCORSAllowedOrigins("", "production"); len(got) != 0 {
 			t.Fatalf("got %v, want empty", got)
 		}
 	})
 
 	t.Run("explicit env wins", func(t *testing.T) {
-		t.Setenv("APP_CORS_ALLOWED_ORIGINS", "https://example.com, https://admin.example.com,https://example.com")
-
-		got := detectCORSAllowedOrigins("development")
+		got := detectCORSAllowedOrigins("https://example.com, https://admin.example.com,https://example.com", "development")
 		want := []string{"https://example.com", "https://admin.example.com"}
 		if len(got) != len(want) {
 			t.Fatalf("got %v, want %v", got, want)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 )
 
@@ -20,12 +21,14 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	Database string
-	SSLMode  string
+	Host                   string
+	Port                   string
+	User                   string
+	Password               string
+	Database               string
+	SSLMode                string
+	ConnectMaxRetries      int
+	ConnectRetryIntervalMS int
 }
 
 type AppConfig struct {
@@ -62,92 +65,127 @@ type AuthServiceConfig struct {
 	TimeoutSeconds int
 }
 
+type envConfig struct {
+	DBHost                   string `env:"DB_HOST"`
+	DBPort                   string `env:"DB_PORT"`
+	DBUser                   string `env:"DB_USER"`
+	DBPassword               string `env:"DB_PASSWORD"`
+	DBName                   string `env:"DB_NAME"`
+	DBSSLMode                string `env:"DB_SSLMODE"`
+	DBConnectMaxRetries      string `env:"DB_CONNECT_MAX_RETRIES"`
+	DBConnectRetryIntervalMS string `env:"DB_CONNECT_RETRY_INTERVAL_MS"`
+
+	RiverWorkerConcurrency           string `env:"RIVER_WORKER_CONCURRENCY"`
+	RiverTaskTimeoutSeconds          string `env:"RIVER_TASK_TIMEOUT_SECONDS"`
+	RiverNoCapacityRetryDelaySeconds string `env:"RIVER_NO_CAPACITY_RETRY_SECONDS"`
+	RiverMaxRetry                    string `env:"RIVER_MAX_RETRY"`
+
+	NATSEventBusEnabled string `env:"NATS_EVENT_BUS_ENABLED"`
+	NATSURL             string `env:"NATS_URL"`
+	NATSStreamName      string `env:"NATS_STREAM_NAME"`
+	NATSSubjectPrefix   string `env:"NATS_SUBJECT_PREFIX"`
+	NATSConsumerName    string `env:"NATS_CONSUMER_NAME"`
+	NATSRetentionDays   string `env:"NATS_RETENTION_DAYS"`
+	NATSConnectTimeout  string `env:"NATS_CONNECT_TIMEOUT_SECONDS"`
+	NATSRequestTimeout  string `env:"NATS_REQUEST_TIMEOUT_SECONDS"`
+	NATSDrainTimeout    string `env:"NATS_DRAIN_TIMEOUT_SECONDS"`
+
+	AppPort               string `env:"APP_PORT"`
+	AppHost               string `env:"APP_HOST"`
+	AppEnv                string `env:"APP_ENV"`
+	AppGinMode            string `env:"APP_GIN_MODE"`
+	AppLogFile            string `env:"APP_LOG_FILE"`
+	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
+
+	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
+	AuthServiceInternalAPIKey string `env:"AUTH_SERVICE_INTERNAL_KEY"`
+	AuthServiceTimeoutSeconds string `env:"AUTH_SERVICE_TIMEOUT_SECONDS"`
+}
+
 var loadEnvOnce sync.Once
 
 func Load() *Config {
 	loadEnvFile()
 
-	dbPassword := getEnv("DB_PASSWORD", "")
-	if dbPassword == "" {
+	raw, err := env.ParseAs[envConfig]()
+	if err != nil {
+		slog.Warn("failed to parse environment config; using defaults where possible", "error", err)
+	}
+
+	raw.DBPassword = strings.TrimSpace(raw.DBPassword)
+	if raw.DBPassword == "" {
 		slog.Warn("DB_PASSWORD is not set; database connection may fail")
 	}
 
-	appEnv := detectAppEnv()
-	ginMode := detectGinMode()
-	natsURL := strings.TrimSpace(getEnv("NATS_URL", ""))
+	appEnv := normalizeAppEnv(raw.AppEnv)
+	ginMode := normalizeGinMode(raw.AppGinMode)
+	natsURL := strings.TrimSpace(raw.NATSURL)
 
 	return &Config{
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "ideaboard"),
-			Password: dbPassword,
-			Database: getEnv("DB_NAME", "ideaboard"),
-			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+			Host:                   stringEnvDefault(raw.DBHost, "localhost"),
+			Port:                   stringEnvDefault(raw.DBPort, "5432"),
+			User:                   stringEnvDefault(raw.DBUser, "ideaboard"),
+			Password:               raw.DBPassword,
+			Database:               stringEnvDefault(raw.DBName, "ideaboard"),
+			SSLMode:                stringEnvDefault(raw.DBSSLMode, "disable"),
+			ConnectMaxRetries:      parsePositiveIntEnv("DB_CONNECT_MAX_RETRIES", raw.DBConnectMaxRetries, 60),
+			ConnectRetryIntervalMS: parsePositiveIntEnv("DB_CONNECT_RETRY_INTERVAL_MS", raw.DBConnectRetryIntervalMS, 1000),
 		},
 		Queue: QueueConfig{
-			WorkerConcurrency:           getEnvInt("TASK_QUEUE_WORKER_CONCURRENCY", 5),
-			TaskTimeoutSeconds:          getFirstEnvInt(180, "RIVER_TASK_TIMEOUT_SECONDS", "TASK_QUEUE_TASK_TIMEOUT_SECONDS"),
-			NoCapacityRetryDelaySeconds: getFirstEnvInt(5, "RIVER_NO_CAPACITY_RETRY_SECONDS", "TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS"),
-			MaxRetry:                    getFirstEnvInt(25, "RIVER_MAX_RETRY", "TASK_QUEUE_MAX_RETRY"),
+			WorkerConcurrency:           parsePositiveIntEnv("RIVER_WORKER_CONCURRENCY", raw.RiverWorkerConcurrency, 5),
+			TaskTimeoutSeconds:          parsePositiveIntEnv("RIVER_TASK_TIMEOUT_SECONDS", raw.RiverTaskTimeoutSeconds, 180),
+			NoCapacityRetryDelaySeconds: parsePositiveIntEnv("RIVER_NO_CAPACITY_RETRY_SECONDS", raw.RiverNoCapacityRetryDelaySeconds, 5),
+			MaxRetry:                    parsePositiveIntEnv("RIVER_MAX_RETRY", raw.RiverMaxRetry, 25),
 		},
 		Events: EventBusConfig{
-			Enabled:            getEnvBoolDefault("NATS_EVENT_BUS_ENABLED", natsURL != ""),
+			Enabled:            parseBoolEnvDefault("NATS_EVENT_BUS_ENABLED", raw.NATSEventBusEnabled, natsURL != ""),
 			NATSURL:            natsURL,
-			NATSStreamName:     getEnv("NATS_STREAM_NAME", "IDEABOARD_EVENTS"),
-			NATSSubjectPrefix:  getEnv("NATS_SUBJECT_PREFIX", "ideaboard"),
-			NATSConsumerName:   getEnv("NATS_CONSUMER_NAME", ""),
-			NATSRetentionDays:  getEnvInt("NATS_RETENTION_DAYS", 7),
-			NATSConnectTimeout: getEnvInt("NATS_CONNECT_TIMEOUT_SECONDS", 5),
-			NATSRequestTimeout: getEnvInt("NATS_REQUEST_TIMEOUT_SECONDS", 5),
-			NATSDrainTimeout:   getEnvInt("NATS_DRAIN_TIMEOUT_SECONDS", 2),
+			NATSStreamName:     stringEnvDefault(raw.NATSStreamName, "IDEABOARD_EVENTS"),
+			NATSSubjectPrefix:  stringEnvDefault(raw.NATSSubjectPrefix, "ideaboard"),
+			NATSConsumerName:   strings.TrimSpace(raw.NATSConsumerName),
+			NATSRetentionDays:  parsePositiveIntEnv("NATS_RETENTION_DAYS", raw.NATSRetentionDays, 7),
+			NATSConnectTimeout: parsePositiveIntEnv("NATS_CONNECT_TIMEOUT_SECONDS", raw.NATSConnectTimeout, 5),
+			NATSRequestTimeout: parsePositiveIntEnv("NATS_REQUEST_TIMEOUT_SECONDS", raw.NATSRequestTimeout, 5),
+			NATSDrainTimeout:   parsePositiveIntEnv("NATS_DRAIN_TIMEOUT_SECONDS", raw.NATSDrainTimeout, 2),
 		},
 		App: AppConfig{
-			Port:               getEnv("APP_PORT", "6000"),
-			Host:               getFirstEnv("APP_HOST", "APP_BIND_HOST"),
+			Port:               stringEnvDefault(raw.AppPort, "6000"),
+			Host:               strings.TrimSpace(raw.AppHost),
 			Env:                appEnv,
 			GinMode:            ginMode,
-			LogFile:            getEnv("APP_LOG_FILE", "server.log"),
-			CORSAllowedOrigins: detectCORSAllowedOrigins(appEnv),
+			LogFile:            stringEnvDefault(raw.AppLogFile, "server.log"),
+			CORSAllowedOrigins: detectCORSAllowedOrigins(raw.AppCORSAllowedOrigins, appEnv),
 		},
 		Auth: AuthServiceConfig{
-			BaseURL:        getEnv("AUTH_SERVICE_BASE_URL", "http://127.0.0.1:6001"),
-			InternalAPIKey: strings.TrimSpace(getEnv("AUTH_SERVICE_INTERNAL_KEY", "")),
-			TimeoutSeconds: getEnvInt("AUTH_SERVICE_TIMEOUT_SECONDS", 5),
+			BaseURL:        stringEnvDefault(raw.AuthServiceBaseURL, "http://127.0.0.1:6001"),
+			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
+			TimeoutSeconds: parsePositiveIntEnv("AUTH_SERVICE_TIMEOUT_SECONDS", raw.AuthServiceTimeoutSeconds, 5),
 		},
 	}
 }
 
-func detectAppEnv() string {
-	for _, key := range []string{"APP_ENV", "GO_ENV", "ENV"} {
-		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-			return value
-		}
-	}
-	if ginMode := strings.TrimSpace(os.Getenv("GIN_MODE")); ginMode != "" {
-		return ginMode
-	}
-	return "development"
+func normalizeAppEnv(raw string) string {
+	return stringEnvDefault(raw, "development")
 }
 
-func detectGinMode() string {
-	raw := strings.TrimSpace(getFirstEnv("APP_GIN_MODE", "GIN_MODE"))
-	if raw == "" {
-		// Default to release so local startup keeps request logging but skips Gin's route dump.
+func normalizeGinMode(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
 		return "release"
 	}
 
-	switch strings.ToLower(raw) {
+	switch strings.ToLower(value) {
 	case "debug", "release", "test":
-		return strings.ToLower(raw)
+		return strings.ToLower(value)
 	default:
-		slog.Warn("invalid APP_GIN_MODE/GIN_MODE; fallback to release", "value", raw)
+		slog.Warn("invalid APP_GIN_MODE; fallback to release", "value", value)
 		return "release"
 	}
 }
 
-func detectCORSAllowedOrigins(appEnv string) []string {
-	origins := splitCSVEnv(getEnv("APP_CORS_ALLOWED_ORIGINS", ""))
+func detectCORSAllowedOrigins(raw, appEnv string) []string {
+	origins := splitCSVEnv(raw)
 	if len(origins) > 0 || isProductionAppEnv(appEnv) {
 		return origins
 	}
@@ -210,63 +248,38 @@ func loadEnvFile() {
 	})
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
+func stringEnvDefault(raw, defaultValue string) string {
+	if value := strings.TrimSpace(raw); value != "" {
 		return value
 	}
 	return defaultValue
 }
 
-func getFirstEnv(keys ...string) string {
-	for _, key := range keys {
-		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
-func getEnvInt(key string, defaultValue int) int {
-	raw := strings.TrimSpace(getEnv(key, ""))
-	if raw == "" {
+func parsePositiveIntEnv(key, raw string, defaultValue int) int {
+	value := strings.TrimSpace(raw)
+	if value == "" {
 		return defaultValue
 	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value <= 0 {
-		slog.Warn("invalid positive integer env; fallback to default", "key", key, "value", raw, "default", defaultValue)
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		slog.Warn("invalid positive integer env; fallback to default", "key", key, "value", value, "default", defaultValue)
 		return defaultValue
 	}
-	return value
+	return parsed
 }
 
-func getFirstEnvInt(defaultValue int, keys ...string) int {
-	for _, key := range keys {
-		raw := strings.TrimSpace(os.Getenv(key))
-		if raw == "" {
-			continue
-		}
-		value, err := strconv.Atoi(raw)
-		if err != nil || value <= 0 {
-			slog.Warn("invalid positive integer env; fallback to default", "key", key, "value", raw, "default", defaultValue)
-			return defaultValue
-		}
-		return value
-	}
-	return defaultValue
-}
-
-func getEnvBoolDefault(key string, defaultValue bool) bool {
-	raw := strings.TrimSpace(os.Getenv(key))
-	if raw == "" {
+func parseBoolEnvDefault(key, raw string, defaultValue bool) bool {
+	value := strings.TrimSpace(raw)
+	if value == "" {
 		return defaultValue
 	}
-	switch strings.ToLower(raw) {
+	switch strings.ToLower(value) {
 	case "1", "true", "t", "yes", "y", "on":
 		return true
 	case "0", "false", "f", "no", "n", "off":
 		return false
 	default:
-		slog.Warn("invalid boolean env; fallback to default", "key", key, "value", raw, "default", defaultValue)
+		slog.Warn("invalid boolean env; fallback to default", "key", key, "value", value, "default", defaultValue)
 		return defaultValue
 	}
 }
