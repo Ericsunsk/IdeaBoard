@@ -26,6 +26,11 @@ const (
 )
 
 func (c *ProviderExecutor) callGoogleAI(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
+	req := newProviderRequest(prompt, 0, 0, params, resolvedModel)
+	return c.callGoogleAIWithRequest(ctx, account, req, timeout)
+}
+
+func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account *accounts.ApiAccount, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
 	baseURL := "https://generativelanguage.googleapis.com"
 	if strings.TrimSpace(account.ProxyURL) != "" {
 		baseURL = strings.TrimRight(strings.TrimSpace(account.ProxyURL), "/")
@@ -36,14 +41,14 @@ func (c *ProviderExecutor) callGoogleAI(ctx context.Context, account *accounts.A
 	}
 	baseURL = validatedBaseURL
 
-	requestedModel, useImagen := resolveGoogleModel(params, resolvedModel)
+	requestedModel, useImagen := resolveGoogleModel(providerReq.Params, providerReq.Model)
 	if useImagen {
-		if len(collectGoogleImageRefs(params)) > 0 {
+		if len(providerReq.MediaRefs.GoogleImages) > 0 {
 			return providerCallResult{}, errors.New("google imagen 当前不支持图像参考输入，请选择 gemini 图像模型")
 		}
-		return c.callGoogleImagenPredict(ctx, account, baseURL, prompt, timeout, params, requestedModel)
+		return c.callGoogleImagenPredict(ctx, account, baseURL, providerReq, timeout, requestedModel)
 	}
-	return c.callGoogleGeminiGenerateContent(ctx, account, baseURL, prompt, timeout, params, requestedModel)
+	return c.callGoogleGeminiGenerateContent(ctx, account, baseURL, providerReq, timeout, requestedModel)
 }
 
 func resolveGoogleModel(params map[string]interface{}, resolvedModel string) (model string, useImagen bool) {
@@ -65,11 +70,11 @@ func isGoogleImagenModel(model string) bool {
 	return strings.HasPrefix(normalized, "imagen-")
 }
 
-func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, account *accounts.ApiAccount, baseURL, prompt string, timeout time.Duration, params map[string]interface{}, requestedModel string) (providerCallResult, error) {
+func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, requestedModel string) (providerCallResult, error) {
 	model := strings.TrimSpace(requestedModel)
 
-	parts := []map[string]interface{}{{"text": prompt}}
-	inlineParts, err := collectGoogleInlineImageParts(ctx, params, timeout)
+	parts := []map[string]interface{}{{"text": providerReq.Prompt}}
+	inlineParts, err := collectGoogleInlineImageParts(ctx, providerReq, timeout)
 	if err != nil {
 		return providerCallResult{}, err
 	}
@@ -125,8 +130,8 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 	}, nil
 }
 
-func collectGoogleInlineImageParts(ctx context.Context, params map[string]interface{}, timeout time.Duration) ([]map[string]interface{}, error) {
-	refs := collectGoogleImageRefs(params)
+func collectGoogleInlineImageParts(ctx context.Context, providerReq providerRequest, timeout time.Duration) ([]map[string]interface{}, error) {
+	refs := providerReq.MediaRefs.GoogleImages
 	if len(refs) == 0 {
 		return nil, nil
 	}
@@ -148,37 +153,7 @@ func collectGoogleInlineImageParts(ctx context.Context, params map[string]interf
 }
 
 func collectGoogleImageRefs(params map[string]interface{}) []string {
-	if params == nil {
-		return nil
-	}
-	seen := map[string]struct{}{}
-	refs := make([]string, 0, 6)
-	appendRef := func(raw string) {
-		raw = strings.TrimSpace(raw)
-		if raw == "" {
-			return
-		}
-		if _, ok := seen[raw]; ok {
-			return
-		}
-		seen[raw] = struct{}{}
-		refs = append(refs, raw)
-	}
-	for _, ref := range mediarefs.CollectStringList(params["image_urls"]) {
-		appendRef(ref)
-	}
-	for _, ref := range mediarefs.CollectStringList(params["reference_image_urls"]) {
-		appendRef(ref)
-	}
-	for _, ref := range mediarefs.CollectStringList(params["mask_image_urls"]) {
-		appendRef(ref)
-	}
-	for _, key := range []string{"original_image_url", "mask_image_url"} {
-		if ref, ok := workflow.ReadWorkflowStringParam(params, key); ok {
-			appendRef(ref)
-		}
-	}
-	return refs
+	return mediarefs.CollectUniqueParamRefs(params, googleImageInputRefKeys)
 }
 
 func resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Duration) (string, []byte, error) {
@@ -265,18 +240,18 @@ func extractGoogleGeminiImageResponses(respBody []byte) ([]string, error) {
 	return urls, nil
 }
 
-func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account *accounts.ApiAccount, baseURL, prompt string, timeout time.Duration, params map[string]interface{}, requestedModel string) (providerCallResult, error) {
+func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, requestedModel string) (providerCallResult, error) {
 	model := strings.TrimSpace(requestedModel)
-	sampleCount := parseGoogleSampleCount(params)
+	sampleCount := parseGoogleSampleCount(providerReq.Params)
 	reqBody := map[string]interface{}{
 		"instances": []map[string]interface{}{
-			{"prompt": prompt},
+			{"prompt": providerReq.Prompt},
 		},
 		"parameters": map[string]interface{}{
 			"sampleCount": sampleCount,
 		},
 	}
-	if ratio, ok := parseGoogleAspectRatio(params); ok {
+	if ratio, ok := parseGoogleAspectRatio(providerReq.Params); ok {
 		reqBody["parameters"].(map[string]interface{})["aspectRatio"] = ratio
 	}
 

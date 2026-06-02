@@ -76,6 +76,12 @@ func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 		"image_urls": []interface{}{
 			"data:image/png;base64,aGVsbG8=",
 		},
+		"original_image_url": "data:image/png;base64,aGVsbG8=",
+		"mask_image_url":     "https://img.example/mask.png",
+		"mask_image_urls": []interface{}{
+			"https://img.example/mask-list.png",
+			"https://img.example/mask.png",
+		},
 		"reference_image_urls": []interface{}{
 			"https://img.example/ref-a.png",
 			"data:image/png;base64,aGVsbG8=",
@@ -87,6 +93,8 @@ func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 		"data:image/png;base64,aGVsbG8=",
 		"https://img.example/ref-a.png",
 		"https://img.example/ref-b.png",
+		"https://img.example/mask-list.png",
+		"https://img.example/mask.png",
 	}
 	if strings.Join(refs, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("unexpected refs: got=%#v want=%#v", refs, want)

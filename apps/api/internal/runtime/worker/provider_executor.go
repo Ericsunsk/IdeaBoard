@@ -110,12 +110,13 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	if strings.TrimSpace(resolvedModel) == "" {
 		return "", fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name)
 	}
+	providerReq := newProviderRequest(task.Prompt, width, height, params, resolvedModel)
 	switch {
 	case workflow.IsGoogleNativeAPIType(apiType):
-		callResult, err = c.callGoogleAI(ctx, account, task.Prompt, timeout, params, resolvedModel)
+		callResult, err = c.callGoogleAIWithRequest(ctx, account, providerReq, timeout)
 	default:
 		// OpenAI-compatible providers use the DALL-E style image endpoints.
-		callResult, err = c.callOpenAI(ctx, account, task.Prompt, width, height, timeout, params, resolvedModel)
+		callResult, err = c.callOpenAIWithRequest(ctx, account, providerReq, timeout)
 	}
 
 	if err != nil {

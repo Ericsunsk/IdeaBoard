@@ -69,3 +69,33 @@ func TestForEachParamMediaRef(t *testing.T) {
 		t.Fatalf("expected reference_image_urls type error")
 	}
 }
+
+func TestCollectUniqueParamRefsPreservesKeyOrderAndDedupes(t *testing.T) {
+	params := map[string]interface{}{
+		"image_url":            " https://img.example/single.png ",
+		"image_urls":           []interface{}{"https://img.example/a.png", "https://img.example/b.png"},
+		"original_image_url":   "https://img.example/a.png",
+		"mask_image_url":       "https://img.example/mask.png",
+		"mask_image_urls":      []string{"https://img.example/mask.png", " "},
+		"reference_image_urls": []interface{}{"https://img.example/b.png", "https://img.example/ref.png", 42},
+	}
+
+	got := CollectUniqueParamRefs(params, []string{
+		"image_url",
+		"image_urls",
+		"original_image_url",
+		"mask_image_url",
+		"mask_image_urls",
+		"reference_image_urls",
+	})
+	want := []string{
+		"https://img.example/single.png",
+		"https://img.example/a.png",
+		"https://img.example/b.png",
+		"https://img.example/mask.png",
+		"https://img.example/ref.png",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("unexpected refs: got=%#v want=%#v", got, want)
+	}
+}
