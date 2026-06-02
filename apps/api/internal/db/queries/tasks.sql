@@ -225,18 +225,13 @@ SET status = 'failed',
     completed_at = sqlc.arg(completed_at)
 WHERE task_id = sqlc.arg(task_id);
 
--- name: ListFailRunningCandidatesByAccountID :many
-SELECT task_id, user_id, account_id, result, created_at, completed_at
-FROM tasks
-WHERE account_id = sqlc.arg(account_id) AND status IN ('running', 'pending')
-ORDER BY id ASC;
-
--- name: FailRunningTasksByAccountID :execrows
+-- name: FailRunningTasksByAccountID :many
 UPDATE tasks
 SET status = 'failed',
     error_msg = sqlc.arg(error_msg),
     completed_at = sqlc.arg(completed_at)
-WHERE account_id = sqlc.arg(account_id) AND status IN ('running', 'pending');
+WHERE account_id = sqlc.arg(account_id) AND status IN ('running', 'pending')
+RETURNING task_id, user_id, account_id, result, created_at, completed_at;
 
 -- name: CountTasksByStatus :one
 SELECT COUNT(*)

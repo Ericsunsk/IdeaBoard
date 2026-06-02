@@ -208,11 +208,14 @@ func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
 	}
 
 	// 1. 将该账号下所有 running/pending 的任务标记为 failed
-	affected, err := s.taskRepo.FailRunningByAccountID(ctx, id, "账号已停用")
+	failedTaskIDs, err := s.taskRepo.FailRunningByAccountID(ctx, id, "账号已停用")
 	if err != nil {
 		log.Printf("[StopAccount] 标记账号 %d 任务失败: %v", id, err)
-	} else if affected > 0 {
-		log.Printf("[StopAccount] 已将账号 %d 的 %d 个进行中任务标记为失败", id, affected)
+	} else if len(failedTaskIDs) > 0 {
+		log.Printf("[StopAccount] 已将账号 %d 的 %d 个进行中任务标记为失败", id, len(failedTaskIDs))
+		for _, taskID := range failedTaskIDs {
+			s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
+		}
 	}
 
 	return s.accountRepo.UpdateStatus(ctx, id, 0)

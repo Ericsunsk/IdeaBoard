@@ -44,7 +44,7 @@ type Querier interface {
 	DeleteTasksByUserID(ctx context.Context, userID int64) error
 	DeleteUserBoardsByBoardIDs(ctx context.Context, boardIds []string) error
 	DeleteUserByID(ctx context.Context, id int64) error
-	FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) (int64, error)
+	FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) ([]FailRunningTasksByAccountIDRow, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFailTaskRunningWithLeaseParams) (int64, error)
 	GetAccountByID(ctx context.Context, id int64) (ApiAccount, error)
 	GetAccountModelSetByID(ctx context.Context, id int64) (string, error)
@@ -78,7 +78,6 @@ type Querier interface {
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
 	ListEnabledAccounts(ctx context.Context) ([]ApiAccount, error)
 	ListEnabledLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
-	ListFailRunningCandidatesByAccountID(ctx context.Context, accountID int64) ([]ListFailRunningCandidatesByAccountIDRow, error)
 	ListLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskOutput, error)
 	ListOwnedBoardIDsByUserID(ctx context.Context, userID int64) ([]string, error)

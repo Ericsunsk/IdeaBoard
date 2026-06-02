@@ -8,9 +8,28 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/events"
 	"api/internal/tasks"
 	"api/internal/testdb"
 )
+
+type recordingTaskStatusPublisher struct {
+	ch chan events.TaskStatusEvent
+}
+
+func newRecordingTaskStatusPublisher() *recordingTaskStatusPublisher {
+	return &recordingTaskStatusPublisher{ch: make(chan events.TaskStatusEvent, 8)}
+}
+
+func (p *recordingTaskStatusPublisher) PublishTaskStatus(ctx context.Context, event events.TaskStatusEvent) error {
+	event = events.NormalizeTaskStatusEvent(event)
+	select {
+	case p.ch <- event:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
 func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 	ctx := context.Background()
@@ -136,13 +155,8 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := accounts.NewTaskRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
-	hub := accounts.NewTaskEventHub()
-	service.SetEventHub(hub)
-	events, unsubscribe, ok := hub.Subscribe("task-publish", 1)
-	if !ok {
-		t.Fatal("subscribe rejected unexpectedly")
-	}
-	defer unsubscribe()
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
 
 	task := &tasks.Task{
 		TaskID:    "task-publish",
@@ -159,7 +173,7 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 	}
 
 	select {
-	case event := <-events:
+	case event := <-publisher.ch:
 		if event.TaskID != task.TaskID || event.Status != tasks.StatusRunning {
 			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, task.TaskID, tasks.StatusRunning)
 		}
@@ -290,8 +304,8 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := accounts.NewTaskRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
-	hub := accounts.NewTaskEventHub()
-	service.SetEventHub(hub)
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
 
 	requeueTask := &tasks.Task{
 		TaskID:     "task-requeue-publish-pending",
@@ -305,11 +319,6 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	if err := taskRepo.Create(ctx, requeueTask); err != nil {
 		t.Fatalf("seed requeue task failed: %v", err)
 	}
-	pendingEvents, unsubPending, ok := hub.Subscribe(requeueTask.TaskID, 1)
-	if !ok {
-		t.Fatal("subscribe pending rejected unexpectedly")
-	}
-	defer unsubPending()
 	requeued, err := service.RequeueTaskForFailover(ctx, requeueTask.TaskID, requeueTask.AccountID, requeueTask.LeaseToken, "retry")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover pending returned error: %v", err)
@@ -318,7 +327,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		t.Fatalf("expected requeued=true")
 	}
 	select {
-	case event := <-pendingEvents:
+	case event := <-publisher.ch:
 		if event.Status != tasks.StatusPending {
 			t.Fatalf("requeue event status=%s, want %s", event.Status, tasks.StatusPending)
 		}
@@ -338,11 +347,6 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	if err := taskRepo.Create(ctx, finalTask); err != nil {
 		t.Fatalf("seed final requeue task failed: %v", err)
 	}
-	failedEvents, unsubFailed, ok := hub.Subscribe(finalTask.TaskID, 1)
-	if !ok {
-		t.Fatal("subscribe failed rejected unexpectedly")
-	}
-	defer unsubFailed()
 	requeued, err = service.RequeueTaskForFailover(ctx, finalTask.TaskID, finalTask.AccountID, finalTask.LeaseToken, "stop retry")
 	if err != nil {
 		t.Fatalf("RequeueTaskForFailover failed returned error: %v", err)
@@ -351,7 +355,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 		t.Fatalf("expected requeued=false when final fail")
 	}
 	select {
-	case event := <-failedEvents:
+	case event := <-publisher.ch:
 		if event.Status != tasks.StatusFailed {
 			t.Fatalf("final fail event status=%s, want %s", event.Status, tasks.StatusFailed)
 		}

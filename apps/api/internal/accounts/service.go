@@ -1,8 +1,11 @@
 package accounts
 
 import (
+	"context"
+	"log"
 	"time"
 
+	"api/internal/events"
 	"api/internal/platform/settings"
 	"api/internal/runtime/taskqueue"
 	"api/internal/storage"
@@ -18,6 +21,7 @@ type AccountService struct {
 	cancelStore      taskqueue.TaskCancellationStore
 	monitorStore     taskqueue.TaskMonitorStore
 	taskEventHub     *TaskEventHub
+	taskEvents       events.TaskStatusPublisher
 	systemConfigRepo *settings.SystemConfigRepository
 	uploadBoards     storage.UploadBoardAccessResolver
 	uploadOwners     storage.UploadOwnerStorageUIDResolver
@@ -39,6 +43,7 @@ type AccountServiceDeps struct {
 
 type AccountServiceOptions struct {
 	TaskEventHub *TaskEventHub
+	TaskEvents   events.TaskStatusPublisher
 }
 
 const defaultAccountMaxConcurrent = 3
@@ -70,13 +75,16 @@ func NewAccountService(deps AccountServiceDeps, opts AccountServiceOptions) *Acc
 		uploadBoards:     deps.UploadBoards,
 		uploadOwners:     deps.UploadOwners,
 		taskEventHub:     opts.TaskEventHub,
+		taskEvents:       opts.TaskEvents,
 	}
-}
-
-func (s *AccountService) SetTaskEventHub(hub *TaskEventHub) {
-	s.taskEventHub = hub
 }
 
 func (s *AccountService) TaskEventHub() *TaskEventHub {
 	return s.taskEventHub
+}
+
+func (s *AccountService) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
+	if err := events.PublishTaskStatusBestEffort(ctx, s.taskEvents, events.NewTaskStatusEvent(taskID, status)); err != nil {
+		log.Printf("[AccountService] publish task status event failed task_id=%s status=%s err=%v", taskID, status, err)
+	}
 }

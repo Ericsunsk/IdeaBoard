@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/events"
 	"api/internal/platform/database"
 	"api/internal/runtime/queuetypes"
 	"api/internal/runtime/taskqueue"
@@ -28,16 +29,12 @@ var (
 	ErrTaskAlreadyRunning = errors.New("task already running on same account")
 )
 
-type EventHub interface {
-	Publish(taskID string, event accounts.TaskEvent)
-}
-
 type Service struct {
 	accountRepo *accounts.AccountRepository
 	taskRepo    *accounts.TaskRepository
 	queue       taskqueue.TaskAssigner
 	cancelStore taskqueue.TaskCancellationStore
-	hub         EventHub
+	taskEvents  events.TaskStatusPublisher
 }
 
 func NewService(
@@ -55,9 +52,8 @@ func NewService(
 	return service
 }
 
-// SetEventHub injects the event hub for SSE task event streaming.
-func (s *Service) SetEventHub(hub EventHub) {
-	s.hub = hub
+func (s *Service) SetTaskStatusPublisher(publisher events.TaskStatusPublisher) {
+	s.taskEvents = publisher
 }
 
 func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.TaskPayload) error {
@@ -124,11 +120,10 @@ func (s *Service) WatchTaskCancellation(parent context.Context, taskID string) (
 	return ctx, cancel
 }
 
-func (s *Service) publishTaskStatusEvent(taskID, status string) {
-	if s.hub == nil {
-		return
+func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
+	if err := events.PublishTaskStatusBestEffort(ctx, s.taskEvents, events.NewTaskStatusEvent(taskID, status)); err != nil {
+		log.Printf("[TaskRuntime] publish task status event failed task_id=%s status=%s err=%v", taskID, status, err)
 	}
-	s.hub.Publish(taskID, accounts.TaskEvent{TaskID: taskID, Status: status})
 }
 
 func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID int64, leaseToken string) error {
@@ -143,7 +138,7 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 		return err
 	}
 	if rows > 0 {
-		s.publishTaskStatusEvent(taskID, tasks.StatusRunning)
+		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusRunning)
 		return nil
 	}
 
@@ -187,7 +182,7 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseTok
 		} else {
 			log.Printf("[TaskRuntime] load task for daily stat failed after complete, task_id=%s err=%v", taskID, getErr)
 		}
-		s.publishTaskStatusEvent(taskID, tasks.StatusCompleted)
+		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusCompleted)
 		return nil
 	}
 
@@ -235,7 +230,7 @@ func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken 
 		} else {
 			log.Printf("[TaskRuntime] load task for daily stat failed after fail, task_id=%s err=%v", taskID, getErr)
 		}
-		s.publishTaskStatusEvent(taskID, tasks.StatusFailed)
+		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		return nil
 	}
 
@@ -273,7 +268,7 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 		return err
 	}
 	if rows > 0 {
-		s.publishTaskStatusEvent(taskID, tasks.StatusPending)
+		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusPending)
 		return nil
 	}
 
@@ -326,7 +321,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 			return false, err
 		}
 		if rows > 0 {
-			s.publishTaskStatusEvent(taskID, tasks.StatusPending)
+			s.publishTaskStatusEvent(ctx, taskID, tasks.StatusPending)
 			return true, nil
 		}
 		return false, ErrTaskStateConflict
@@ -345,7 +340,7 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 		} else {
 			log.Printf("[TaskRuntime] load task for daily stat failed after failover-final-fail, task_id=%s err=%v", taskID, getErr)
 		}
-		s.publishTaskStatusEvent(taskID, tasks.StatusFailed)
+		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		return false, nil
 	}
 

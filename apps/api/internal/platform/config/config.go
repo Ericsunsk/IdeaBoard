@@ -14,6 +14,7 @@ import (
 type Config struct {
 	Database DatabaseConfig
 	Queue    QueueConfig
+	Events   EventBusConfig
 	App      AppConfig
 	Auth     AuthServiceConfig
 }
@@ -43,6 +44,18 @@ type QueueConfig struct {
 	MaxRetry                    int
 }
 
+type EventBusConfig struct {
+	Enabled            bool
+	NATSURL            string
+	NATSStreamName     string
+	NATSSubjectPrefix  string
+	NATSConsumerName   string
+	NATSRetentionDays  int
+	NATSConnectTimeout int
+	NATSRequestTimeout int
+	NATSDrainTimeout   int
+}
+
 type AuthServiceConfig struct {
 	BaseURL        string
 	InternalAPIKey string
@@ -61,6 +74,7 @@ func Load() *Config {
 
 	appEnv := detectAppEnv()
 	ginMode := detectGinMode()
+	natsURL := strings.TrimSpace(getEnv("NATS_URL", ""))
 
 	return &Config{
 		Database: DatabaseConfig{
@@ -76,6 +90,17 @@ func Load() *Config {
 			TaskTimeoutSeconds:          getFirstEnvInt(180, "RIVER_TASK_TIMEOUT_SECONDS", "TASK_QUEUE_TASK_TIMEOUT_SECONDS"),
 			NoCapacityRetryDelaySeconds: getFirstEnvInt(5, "RIVER_NO_CAPACITY_RETRY_SECONDS", "TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS"),
 			MaxRetry:                    getFirstEnvInt(25, "RIVER_MAX_RETRY", "TASK_QUEUE_MAX_RETRY"),
+		},
+		Events: EventBusConfig{
+			Enabled:            getEnvBoolDefault("NATS_EVENT_BUS_ENABLED", natsURL != ""),
+			NATSURL:            natsURL,
+			NATSStreamName:     getEnv("NATS_STREAM_NAME", "IDEABOARD_EVENTS"),
+			NATSSubjectPrefix:  getEnv("NATS_SUBJECT_PREFIX", "ideaboard"),
+			NATSConsumerName:   getEnv("NATS_CONSUMER_NAME", ""),
+			NATSRetentionDays:  getEnvInt("NATS_RETENTION_DAYS", 7),
+			NATSConnectTimeout: getEnvInt("NATS_CONNECT_TIMEOUT_SECONDS", 5),
+			NATSRequestTimeout: getEnvInt("NATS_REQUEST_TIMEOUT_SECONDS", 5),
+			NATSDrainTimeout:   getEnvInt("NATS_DRAIN_TIMEOUT_SECONDS", 2),
 		},
 		App: AppConfig{
 			Port:               getEnv("APP_PORT", "6000"),
@@ -228,4 +253,20 @@ func getFirstEnvInt(defaultValue int, keys ...string) int {
 		return value
 	}
 	return defaultValue
+}
+
+func getEnvBoolDefault(key string, defaultValue bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return defaultValue
+	}
+	switch strings.ToLower(raw) {
+	case "1", "true", "t", "yes", "y", "on":
+		return true
+	case "0", "false", "f", "no", "n", "off":
+		return false
+	default:
+		log.Printf("[Config] WARNING: %s=%q 不是有效布尔值，已回退默认值 %t", key, raw, defaultValue)
+		return defaultValue
+	}
 }

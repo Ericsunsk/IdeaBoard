@@ -37,8 +37,8 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 |------|----------|
 | 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
 | 后端 | `Go` + `Gin` + `sqlc` + `Better Auth (Fastify/Node.js/TypeScript)` |
-| 基础设施 | `PostgreSQL 17+`（业务数据与 River 任务队列） |
-| 本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001` |
+| 基础设施 | `PostgreSQL 17+`（业务数据与 River 任务队列）+ `NATS JetStream`（事件层） |
+| 本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001`，NATS `4222/8222` |
 | 当前主链 | 画布节点编排 -> 任务提交 -> Worker 执行 -> 结果回写 |
 | 技术标识 | `ideaboard-*` |
 
@@ -51,9 +51,12 @@ graph LR
     Browser --> Gin["Gin API (Go)"]
     
     Gin --> Postgres[("PostgreSQL<br>业务数据 + River 队列")]
+    Gin --> NATS["NATS JetStream<br>任务状态事件"]
     Auth --> Postgres
     
     Postgres --> Worker["Worker 消费者"]
+    Worker --> NATS
+    NATS --> Gin
     Worker --> AI["上游 AI 渠道"]
     Worker --> Storage["Local / S3-compatible 对象存储"]
 ```
@@ -166,6 +169,7 @@ sequenceDiagram
     participant FE as 前端
     participant API as Go API
     participant DB as PostgreSQL/River
+    participant NATS as NATS JetStream
     participant WK as Worker
     participant AI as AI 渠道
 
@@ -180,8 +184,9 @@ sequenceDiagram
     AI-->>WK: 返回结果
     WK->>WK: 持久化存储 (OSS/Local)
     WK->>DB: 更新状态为 Success/Failed
+    WK->>NATS: 发布 task.status_changed
     
-    WK-->>API: 发布任务状态事件
+    NATS-->>API: 桥接任务状态事件到本地 SSE hub
     API-->>FE: SSE 推送任务状态与最终结果
 ```
 
@@ -370,6 +375,15 @@ go build ./...
 | `RIVER_TASK_TIMEOUT_SECONDS` | `180` | River 任务执行保护超时 |
 | `RIVER_NO_CAPACITY_RETRY_SECONDS` | `5` | 账号容量不足时 River snooze/retry 间隔 |
 | `RIVER_MAX_RETRY` | `25` | River 基础设施级最大重试次数 |
+| `NATS_URL` | 空 | NATS 服务地址；非空时默认启用 JetStream 事件层 |
+| `NATS_EVENT_BUS_ENABLED` | 随 `NATS_URL` | 显式开启或关闭 JetStream 事件层 |
+| `NATS_STREAM_NAME` | `IDEABOARD_EVENTS` | JetStream 事件 stream 名称 |
+| `NATS_SUBJECT_PREFIX` | `ideaboard` | 事件 subject 前缀 |
+| `NATS_CONSUMER_NAME` | 主机名派生 | 当前 API 实例的任务事件 consumer 名称 |
+| `NATS_RETENTION_DAYS` | `7` | JetStream 事件保留天数 |
+| `NATS_CONNECT_TIMEOUT_SECONDS` | `5` | NATS 初始连接超时 |
+| `NATS_REQUEST_TIMEOUT_SECONDS` | `5` | JetStream API 请求超时 |
+| `NATS_DRAIN_TIMEOUT_SECONDS` | `2` | NATS 连接关闭 drain 超时 |
 | `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
 | `APP_PORT` | `6000` | 后端监听端口 |
 | `APP_HOST` / `APP_BIND_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |

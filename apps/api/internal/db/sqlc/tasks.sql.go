@@ -244,12 +244,13 @@ func (q *Queries) DeleteTasksByUserID(ctx context.Context, userID int64) error {
 	return err
 }
 
-const failRunningTasksByAccountID = `-- name: FailRunningTasksByAccountID :execrows
+const failRunningTasksByAccountID = `-- name: FailRunningTasksByAccountID :many
 UPDATE tasks
 SET status = 'failed',
     error_msg = $1,
     completed_at = $2
 WHERE account_id = $3 AND status IN ('running', 'pending')
+RETURNING task_id, user_id, account_id, result, created_at, completed_at
 `
 
 type FailRunningTasksByAccountIDParams struct {
@@ -258,12 +259,43 @@ type FailRunningTasksByAccountIDParams struct {
 	AccountID   int64        `json:"account_id"`
 }
 
-func (q *Queries) FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, failRunningTasksByAccountID, arg.ErrorMsg, arg.CompletedAt, arg.AccountID)
+type FailRunningTasksByAccountIDRow struct {
+	TaskID      string       `json:"task_id"`
+	UserID      int64        `json:"user_id"`
+	AccountID   int64        `json:"account_id"`
+	Result      string       `json:"result"`
+	CreatedAt   time.Time    `json:"created_at"`
+	CompletedAt sql.NullTime `json:"completed_at"`
+}
+
+func (q *Queries) FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) ([]FailRunningTasksByAccountIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, failRunningTasksByAccountID, arg.ErrorMsg, arg.CompletedAt, arg.AccountID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected()
+	defer rows.Close()
+	var items []FailRunningTasksByAccountIDRow
+	for rows.Next() {
+		var i FailRunningTasksByAccountIDRow
+		if err := rows.Scan(
+			&i.TaskID,
+			&i.UserID,
+			&i.AccountID,
+			&i.Result,
+			&i.CreatedAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const finalFailTaskRunningWithLease = `-- name: FinalFailTaskRunningWithLease :execrows
@@ -400,52 +432,6 @@ func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTas
 		&i.CompletedAt,
 	)
 	return i, err
-}
-
-const listFailRunningCandidatesByAccountID = `-- name: ListFailRunningCandidatesByAccountID :many
-SELECT task_id, user_id, account_id, result, created_at, completed_at
-FROM tasks
-WHERE account_id = $1 AND status IN ('running', 'pending')
-ORDER BY id ASC
-`
-
-type ListFailRunningCandidatesByAccountIDRow struct {
-	TaskID      string       `json:"task_id"`
-	UserID      int64        `json:"user_id"`
-	AccountID   int64        `json:"account_id"`
-	Result      string       `json:"result"`
-	CreatedAt   time.Time    `json:"created_at"`
-	CompletedAt sql.NullTime `json:"completed_at"`
-}
-
-func (q *Queries) ListFailRunningCandidatesByAccountID(ctx context.Context, accountID int64) ([]ListFailRunningCandidatesByAccountIDRow, error) {
-	rows, err := q.db.QueryContext(ctx, listFailRunningCandidatesByAccountID, accountID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListFailRunningCandidatesByAccountIDRow
-	for rows.Next() {
-		var i ListFailRunningCandidatesByAccountIDRow
-		if err := rows.Scan(
-			&i.TaskID,
-			&i.UserID,
-			&i.AccountID,
-			&i.Result,
-			&i.CreatedAt,
-			&i.CompletedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listRunningMissingLeaseTaskIDs = `-- name: ListRunningMissingLeaseTaskIDs :many

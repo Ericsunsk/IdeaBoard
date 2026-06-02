@@ -56,6 +56,8 @@ func TestLoadQueueDefaults(t *testing.T) {
 	t.Setenv("RIVER_TASK_TIMEOUT_SECONDS", "")
 	t.Setenv("RIVER_NO_CAPACITY_RETRY_SECONDS", "")
 	t.Setenv("RIVER_MAX_RETRY", "")
+	t.Setenv("NATS_URL", "")
+	t.Setenv("NATS_EVENT_BUS_ENABLED", "")
 
 	cfg := Load()
 	if cfg.Queue.WorkerConcurrency != 5 {
@@ -70,6 +72,50 @@ func TestLoadQueueDefaults(t *testing.T) {
 	if cfg.Queue.MaxRetry != 25 {
 		t.Fatalf("expected MaxRetry=25, got %d", cfg.Queue.MaxRetry)
 	}
+}
+
+func TestLoadEventBusConfig(t *testing.T) {
+	t.Run("defaults to disabled without nats url", func(t *testing.T) {
+		t.Setenv("NATS_URL", "")
+		t.Setenv("NATS_EVENT_BUS_ENABLED", "")
+
+		cfg := Load()
+		if cfg.Events.Enabled {
+			t.Fatal("expected event bus disabled without NATS_URL")
+		}
+		if cfg.Events.NATSStreamName != "IDEABOARD_EVENTS" {
+			t.Fatalf("NATSStreamName=%q, want IDEABOARD_EVENTS", cfg.Events.NATSStreamName)
+		}
+		if cfg.Events.NATSSubjectPrefix != "ideaboard" {
+			t.Fatalf("NATSSubjectPrefix=%q, want ideaboard", cfg.Events.NATSSubjectPrefix)
+		}
+		if cfg.Events.NATSDrainTimeout != 2 {
+			t.Fatalf("NATSDrainTimeout=%d, want 2", cfg.Events.NATSDrainTimeout)
+		}
+	})
+
+	t.Run("nats url enables event bus", func(t *testing.T) {
+		t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+		t.Setenv("NATS_EVENT_BUS_ENABLED", "")
+
+		cfg := Load()
+		if !cfg.Events.Enabled {
+			t.Fatal("expected NATS_URL to enable event bus")
+		}
+		if cfg.Events.NATSURL != "nats://127.0.0.1:4222" {
+			t.Fatalf("NATSURL=%q, want nats://127.0.0.1:4222", cfg.Events.NATSURL)
+		}
+	})
+
+	t.Run("explicit disabled wins over nats url", func(t *testing.T) {
+		t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+		t.Setenv("NATS_EVENT_BUS_ENABLED", "false")
+
+		cfg := Load()
+		if cfg.Events.Enabled {
+			t.Fatal("expected explicit false to disable event bus")
+		}
+	})
 }
 
 func TestDetectCORSAllowedOrigins(t *testing.T) {

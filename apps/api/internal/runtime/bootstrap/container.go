@@ -13,6 +13,7 @@ import (
 	"api/internal/boards"
 	"api/internal/channels"
 	"api/internal/db/migrations"
+	"api/internal/events"
 	"api/internal/imageproc"
 	"api/internal/platform/config"
 	"api/internal/platform/database"
@@ -37,6 +38,7 @@ type appContainer struct {
 	db               *sql.DB
 	riverPool        *pgxpool.Pool
 	riverClient      *river.Client[pgx.Tx]
+	eventBus         *events.NATSJetStreamEventBus
 	workerQueueName  string
 	workerConcurrent int
 }
@@ -82,6 +84,12 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	userService := users.NewUserService(userRepo, storageService)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 	taskEventHub := accounts.NewTaskEventHub()
+	taskEvents, eventBus, err := newTaskStatusEventPublisher(context.Background(), cfg.Events, taskEventHub)
+	if err != nil {
+		riverPool.Close()
+		_ = db.Close()
+		return nil, fmt.Errorf("Failed to initialize task event bus: %w", err)
+	}
 	riverQueue := taskqueue.NewRiverQueue(nil, db, postgresRuntimeStore, cfg.Queue.MaxRetry)
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
 		AccountRepo:      accountRepo,
@@ -97,6 +105,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		UploadOwners:     uploadOwnerStorageUIDResolver{repo: userRepo},
 	}, accounts.AccountServiceOptions{
 		TaskEventHub: taskEventHub,
+		TaskEvents:   taskEvents,
 	})
 
 	authDeps := httpapi.AuthDeps{
@@ -146,7 +155,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		postgresAssigner,
 		postgresRuntimeStore,
 		storageService,
-		taskEventHub,
+		taskEvents,
 	)
 	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
 	riverClient, err := worker.NewRiverClient(riverPool, riverTaskWorker, worker.RiverServerOptions{
@@ -156,6 +165,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		MaxRetry:    cfg.Queue.MaxRetry,
 	})
 	if err != nil {
+		_ = eventBus.Close()
 		riverPool.Close()
 		_ = db.Close()
 		return nil, fmt.Errorf("Failed to initialize River client: %w", err)
@@ -167,6 +177,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		db:               db,
 		riverPool:        riverPool,
 		riverClient:      riverClient,
+		eventBus:         eventBus,
 		workerQueueName:  taskqueue.RiverQueueDefault,
 		workerConcurrent: cfg.Queue.WorkerConcurrency,
 	}, nil
@@ -176,13 +187,19 @@ func (c *appContainer) close() error {
 	if c == nil {
 		return nil
 	}
+	var closeErr error
+	if c.eventBus != nil {
+		closeErr = c.eventBus.Close()
+	}
 	if c.riverPool != nil {
 		c.riverPool.Close()
 	}
 	if c.db != nil {
-		return c.db.Close()
+		if err := c.db.Close(); err != nil && closeErr == nil {
+			closeErr = err
+		}
 	}
-	return nil
+	return closeErr
 }
 
 func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies) {
@@ -192,6 +209,55 @@ func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies) {
 	}
 
 	httpapi.RegisterRoutes(r, deps, frontendFS)
+}
+
+type taskEventHubPublisher struct {
+	hub *accounts.TaskEventHub
+}
+
+func (p taskEventHubPublisher) PublishTaskStatus(_ context.Context, event events.TaskStatusEvent) error {
+	if p.hub == nil {
+		return nil
+	}
+	event = events.NormalizeTaskStatusEvent(event)
+	p.hub.Publish(event.TaskID, accounts.TaskEvent{TaskID: event.TaskID, Status: event.Status})
+	return nil
+}
+
+func newTaskStatusEventPublisher(
+	ctx context.Context,
+	cfg config.EventBusConfig,
+	hub *accounts.TaskEventHub,
+) (events.TaskStatusPublisher, *events.NATSJetStreamEventBus, error) {
+	localPublisher := taskEventHubPublisher{hub: hub}
+	if !cfg.Enabled {
+		return localPublisher, nil, nil
+	}
+	if cfg.NATSURL == "" {
+		return nil, nil, fmt.Errorf("NATS_EVENT_BUS_ENABLED=true requires NATS_URL")
+	}
+
+	bus, err := events.NewNATSJetStreamEventBus(ctx, events.NATSJetStreamConfig{
+		URL:            cfg.NATSURL,
+		StreamName:     cfg.NATSStreamName,
+		SubjectPrefix:  cfg.NATSSubjectPrefix,
+		ConsumerName:   cfg.NATSConsumerName,
+		Retention:      time.Duration(cfg.NATSRetentionDays) * 24 * time.Hour,
+		ConnectTimeout: time.Duration(cfg.NATSConnectTimeout) * time.Second,
+		RequestTimeout: time.Duration(cfg.NATSRequestTimeout) * time.Second,
+		DrainTimeout:   time.Duration(cfg.NATSDrainTimeout) * time.Second,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := bus.SubscribeTaskStatus(ctx, func(ctx context.Context, event events.TaskStatusEvent) error {
+		return localPublisher.PublishTaskStatus(ctx, event)
+	}); err != nil {
+		_ = bus.Close()
+		return nil, nil, err
+	}
+	log.Printf("[NATS] JetStream task events enabled stream=%s subject_prefix=%s", cfg.NATSStreamName, cfg.NATSSubjectPrefix)
+	return bus, bus, nil
 }
 
 type uploadBoardAccessResolver struct {

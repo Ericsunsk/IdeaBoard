@@ -45,12 +45,19 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("seed task2 failed: %v", err)
 	}
 
-	affected, err := taskRepo.FailRunningByAccountID(ctx, accountID, "stopped")
+	failedTaskIDs, err := taskRepo.FailRunningByAccountID(ctx, accountID, "stopped")
 	if err != nil {
 		t.Fatalf("FailRunningByAccountID failed: %v", err)
 	}
-	if affected != 2 {
-		t.Fatalf("affected=%d, want 2", affected)
+	if len(failedTaskIDs) != 2 {
+		t.Fatalf("failedTaskIDs=%v, want 2 tasks", failedTaskIDs)
+	}
+	failedSet := map[string]bool{}
+	for _, taskID := range failedTaskIDs {
+		failedSet[taskID] = true
+	}
+	if !failedSet["acc-fail-1"] || !failedSet["acc-fail-2"] {
+		t.Fatalf("failedTaskIDs=%v, want acc-fail-1 and acc-fail-2", failedTaskIDs)
 	}
 
 	day := createdAt.Format("2006-01-02")

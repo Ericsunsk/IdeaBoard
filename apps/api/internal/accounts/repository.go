@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -551,31 +550,25 @@ func (r *TaskRepository) MarkQueueFailed(ctx context.Context, taskID string, err
 }
 
 // FailRunningByAccountID 将指定账号下所有 running/pending 状态的任务标记为 failed
-func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID int64, errMsg string) (int64, error) {
+func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID int64, errMsg string) ([]string, error) {
 	now := time.Now()
-	var rowsAffected int64
+	var failedTasks []dbsqlc.FailRunningTasksByAccountIDRow
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		candidates, err := q.ListFailRunningCandidatesByAccountID(ctx, accountID)
-		if err != nil {
-			return err
-		}
-		rowsAffected, err = q.FailRunningTasksByAccountID(ctx, dbsqlc.FailRunningTasksByAccountIDParams{
+		updated, err := q.FailRunningTasksByAccountID(ctx, dbsqlc.FailRunningTasksByAccountIDParams{
 			ErrorMsg:    errMsg,
 			CompletedAt: sql.NullTime{Time: now, Valid: true},
 			AccountID:   accountID,
 		})
-		if err != nil || len(candidates) == 0 {
+		if err != nil || len(updated) == 0 {
 			return err
 		}
-		if rowsAffected != int64(len(candidates)) {
-			log.Printf("[TaskRepository] FailRunningByAccountID affected mismatch account_id=%d candidates=%d updated=%d", accountID, len(candidates), rowsAffected)
-		}
+		failedTasks = updated
 		modelSetMap, err := listSingleModelSetByAccountIDsTx(ctx, q, []int64{accountID})
 		if err != nil {
 			return err
 		}
 		fallbackModelSet := modelSetMap[accountID]
-		for _, c := range candidates {
+		for _, c := range updated {
 			completedAt := dbutil.TimePtr(c.CompletedAt)
 			if completedAt == nil {
 				fallback := now
@@ -597,9 +590,13 @@ func (r *TaskRepository) FailRunningByAccountID(ctx context.Context, accountID i
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return rowsAffected, nil
+	taskIDs := make([]string, 0, len(failedTasks))
+	for _, task := range failedTasks {
+		taskIDs = append(taskIDs, task.TaskID)
+	}
+	return taskIDs, nil
 }
 
 func (r *TaskRepository) CountByStatus(ctx context.Context, status string) (int64, error) {

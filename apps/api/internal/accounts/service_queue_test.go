@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"api/internal/events"
 	"api/internal/runtime/queuetypes"
 	"context"
 	"database/sql"
@@ -55,6 +56,15 @@ type fakeMonitorStore struct{}
 
 func (f *fakeMonitorStore) MonitorInfo(context.Context, []int64) (*queuetypes.MonitorInfo, error) {
 	return &queuetypes.MonitorInfo{}, nil
+}
+
+type recordingTaskStatusPublisher struct {
+	events []events.TaskStatusEvent
+}
+
+func (p *recordingTaskStatusPublisher) PublishTaskStatus(_ context.Context, event events.TaskStatusEvent) error {
+	p.events = append(p.events, events.NormalizeTaskStatusEvent(event))
+	return nil
 }
 
 func newQueueServiceTestDB(t *testing.T) *sql.DB {
@@ -215,6 +225,7 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	}
 
 	cancelStore := &fakeCancelStore{}
+	taskEvents := &recordingTaskStatusPublisher{}
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,
 		TaskRepo:         taskRepo,
@@ -224,7 +235,7 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 		ConcurrencyStore: &fakeConcurrencyStore{},
 		CancelStore:      cancelStore,
 		MonitorStore:     &fakeMonitorStore{},
-	}, AccountServiceOptions{})
+	}, AccountServiceOptions{TaskEvents: taskEvents})
 
 	if err := svc.StopAccount(context.Background(), acc.ID); err != nil {
 		t.Fatalf("StopAccount failed: %v", err)
@@ -242,5 +253,15 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	}
 	if pendingAfter.Status != tasks.StatusFailed || runningAfter.Status != tasks.StatusFailed {
 		t.Fatalf("stopped account tasks statuses=%q/%q, want failed/failed", pendingAfter.Status, runningAfter.Status)
+	}
+	if len(taskEvents.events) != 2 {
+		t.Fatalf("published task events=%v, want 2", taskEvents.events)
+	}
+	published := map[string]string{}
+	for _, event := range taskEvents.events {
+		published[event.TaskID] = event.Status
+	}
+	if published[pending.TaskID] != tasks.StatusFailed || published[running.TaskID] != tasks.StatusFailed {
+		t.Fatalf("published statuses=%v, want failed for stopped tasks", published)
 	}
 }

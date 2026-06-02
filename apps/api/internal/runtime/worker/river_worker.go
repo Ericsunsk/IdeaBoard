@@ -8,6 +8,7 @@ import (
 
 	"api/internal/accounts"
 	"api/internal/channels"
+	"api/internal/events"
 	"api/internal/runtime/taskqueue"
 	"api/internal/runtime/taskruntime"
 	"api/internal/storage"
@@ -33,14 +34,14 @@ func NewRiverTaskWorker(
 	assigner taskqueue.TaskAssigner,
 	cancelStore taskqueue.TaskCancellationStore,
 	storageService *storage.StorageService,
-	taskEventHub *accounts.TaskEventHub,
+	taskEvents events.TaskStatusPublisher,
 ) *RiverTaskWorker {
 	executor := &ProviderExecutor{
 		channelRepo:    channelRepo,
 		storageService: storageService,
 	}
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
-	taskRuntime.SetEventHub(taskEventHub)
+	taskRuntime.SetTaskStatusPublisher(taskEvents)
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, enqueuer, taskRuntime, executor.callDrawingAPI)
 	return newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute))
 }

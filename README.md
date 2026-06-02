@@ -69,7 +69,7 @@ IdeaBoard 是一套围绕 AI 设计工作流打造的全栈系统。前端提供
 
 | 维度         | 当前配置                                                         |
 | ------------ | ---------------------------------------------------------------- |
-| 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001`                  |
+| 默认本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001`，NATS `4222/8222` |
 | 运行方式     | 本地开发、Cloudflare Pages + VPS Docker Compose、标准 Linux 部署 |
 | 核心界面     | 用户画布工作台、画板管理、管理后台                               |
 
@@ -82,8 +82,10 @@ flowchart TB
     Nginx -- /api/* --> GoAPI["Go API<br>Gin :6000"]
     Nginx -- /uploads/* --> Static["静态资源服务<br>/uploads/*"]
     Auth --> Postgres[("PostgreSQL 17")]
-    GoAPI --> Postgres & Worker["Worker 消费者"]
+    GoAPI --> Postgres & Worker["Worker 消费者"] & NATS["NATS JetStream<br>事件层"]
     Worker --> Queue["River Queue<br>PostgreSQL"] & AI["上游 AI 渠道"] & Storage["对象存储<br>Local / S3-compatible"]
+    Worker --> NATS
+    NATS --> GoAPI
     Queue --> Postgres
     Static --> Storage
 
@@ -95,11 +97,12 @@ flowchart TB
     style Postgres fill:#eff6ff,stroke:#1d4ed8,stroke-width:1px
     style Worker fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
     style Queue fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    style NATS fill:#fff7ed,stroke:#c2410c,stroke-width:1px
     style AI fill:#f5f5f5,stroke:#616161,stroke-width:1px
     style Storage fill:#f5f5f5,stroke:#616161,stroke-width:1px
 ```
 
-生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth 与 PostgreSQL，并由 Cloudflare Tunnel 暴露 API 域名。任务队列由 River 写入 PostgreSQL，不再依赖外部缓存队列。
+生产环境推荐由 Cloudflare Pages 托管前端，VPS 上的 Docker Compose stack 运行 Gateway、Go API、Better Auth、PostgreSQL 与 NATS JetStream，并由 Cloudflare Tunnel 暴露 API 域名。任务队列由 River 写入 PostgreSQL；JetStream 只承载任务状态事件、audit 与实时 fanout，不作为任务队列。
 
 <a id="highlights"></a>
 
@@ -208,11 +211,12 @@ docker compose -f compose.local.yml up -d
 | 业务用户        | `${POSTGRES_USER:-ideaboard}` |
 | 业务密码        | `docker/.env` 中的 `POSTGRES_PASSWORD` |
 | 任务队列        | River + PostgreSQL |
+| 事件层          | NATS JetStream |
 
 </details>
 
 > [!NOTE]
-> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 PostgreSQL 直接暴露到外网。
+> `docker compose` 默认只绑定到本机回环地址 `127.0.0.1`，避免把 PostgreSQL 与 NATS 直接暴露到外网。
 > 当前后端只支持 PostgreSQL；部署脚本不会自动转换其他数据库形态的数据。
 
 ### 2. 配置后端环境

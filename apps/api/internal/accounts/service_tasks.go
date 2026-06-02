@@ -66,7 +66,11 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID int64, req *task
 	}
 
 	if err := s.queue.Enqueue(ctx, queueTask); err != nil {
-		_ = s.taskRepo.MarkQueueFailed(ctx, taskID, "任务入队失败: "+err.Error())
+		if markErr := s.taskRepo.MarkQueueFailed(ctx, taskID, "任务入队失败: "+err.Error()); markErr != nil {
+			log.Printf("[AccountService] mark queue failed task failed, task_id=%s err=%v", taskID, markErr)
+			return "", fmt.Errorf("任务提交失败，请稍后重试")
+		}
+		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		if failedTask, loadErr := s.taskRepo.GetByTaskID(ctx, taskID); loadErr == nil {
 			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, failedTask); statErr != nil {
 				log.Printf("[AccountService] upsert daily stat failed after queue fail, task_id=%s err=%v", taskID, statErr)
@@ -77,6 +81,7 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID int64, req *task
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
+	s.publishTaskStatusEvent(ctx, taskID, tasks.StatusPending)
 	return taskID, nil
 }
 
