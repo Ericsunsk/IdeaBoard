@@ -173,7 +173,7 @@ ignore:
       type: deb
 ```
 
-部署前可用镜像 digest 验证签名。`--certificate-identity` 的 ref 需匹配实际发布来源；tag 发布时改成 `refs/tags/vX.Y.Z`：
+当前 `ideaboard update` 不会自动执行 Cosign 验签；部署前可用镜像 digest 手动验证签名。`--certificate-identity` 的 ref 需匹配实际发布来源；tag 发布时改成 `refs/tags/vX.Y.Z`：
 
 ```bash
 cosign verify \

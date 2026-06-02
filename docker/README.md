@@ -98,6 +98,8 @@ docker compose -f docker/compose.yml --env-file docker/.env pull
 docker compose -f docker/compose.yml --env-file docker/.env up -d
 ```
 
+后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。漏洞 triage 与人工验签命令见根目录 [DEPLOYMENT.md](../DEPLOYMENT.md#recommended-docker)。
+
 推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 PostgreSQL dump 写入 `backups/postgres/`，并在启动后检查 PostgreSQL、NATS JetStream、`api`/`auth` health、River schema 和默认 JetStream event stream。已启动的 stack 也可以随时执行 `ideaboard smoke` 复验。如果 health gate 失败，请先查看 `gateway/api/auth/postgres/nats` 日志，再决定是否把 `IMAGE_TAG` 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
 
 生产数据在 Docker volumes 中持久化：`postgres-data`、`nats-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。

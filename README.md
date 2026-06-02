@@ -328,6 +328,8 @@ IdeaBoard/
 
 ### 推荐部署：Cloudflare Pages + GHCR + Docker Compose
 
+后端镜像由 [docker-images.yml](./.github/workflows/docker-images.yml) 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。漏洞 triage 与人工验签命令见 [DEPLOYMENT.md](./DEPLOYMENT.md#recommended-docker)。
+
 首次 VPS 初始化 + 部署：
 
 ```bash
