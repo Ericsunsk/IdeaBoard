@@ -598,6 +598,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseAdminAccount'
+  /admin/accounts/limits:
+    get:
+      tags: [AdminAccounts]
+      operationId: getAdminAccountLimits
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAccountLimits'
   /admin/accounts/{id}:
     get:
       tags: [AdminAccounts]
@@ -1395,6 +1406,23 @@ components:
         extra_config: { type: string }
         status: { type: integer }
 
+    AccountLimitRange:
+      type: object
+      required: [min, max, default]
+      properties:
+        min: { type: integer }
+        max: { type: integer }
+        default: { type: integer }
+
+    AccountLimits:
+      type: object
+      required: [max_concurrent, timeout_seconds]
+      properties:
+        max_concurrent:
+          $ref: '#/components/schemas/AccountLimitRange'
+        timeout_seconds:
+          $ref: '#/components/schemas/AccountLimitRange'
+
     MonitorAccountLoad:
       type: object
       required: [current_concurrent, max_concurrent]
@@ -1953,6 +1981,18 @@ components:
                   $ref: '#/components/schemas/AdminAccount'
                 current_concurrent: { type: integer }
                 max_concurrent: { type: integer }
+
+    ApiResponseAccountLimits:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [limits]
+              properties:
+                limits:
+                  $ref: '#/components/schemas/AccountLimits'
 
     ApiResponseMonitorAccountLoad:
       allOf:

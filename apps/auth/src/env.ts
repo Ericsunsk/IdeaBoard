@@ -54,10 +54,10 @@ const trustedOrigins = getEnv('AUTH_TRUSTED_ORIGINS', '')
 
 const authInternalKey = getEnv('AUTH_INTERNAL_KEY', '')
 const authSecret =
-  getEnv('BETTER_AUTH_SECRET', getEnv('AUTH_SECRET', '')) ||
+  getEnv('BETTER_AUTH_SECRET', '') ||
   (productionRuntime ? '' : 'ideaboard-local-development-secret-change-before-production')
 const authBaseURL =
-  getEnv('BETTER_AUTH_URL', getEnv('AUTH_BASE_URL', '')) ||
+  getEnv('BETTER_AUTH_URL', '') ||
   (productionRuntime ? '' : 'http://localhost:5173')
 const dbPassword = getEnv('DB_PASSWORD', '')
 const dbSSLMode = validateDatabaseSSLMode(getEnv('DB_SSLMODE', 'disable'))

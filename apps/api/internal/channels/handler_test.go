@@ -139,3 +139,25 @@ func TestIsDevLikeEnvironment(t *testing.T) {
 		t.Fatal("empty appEnv with debug mode should be dev-like")
 	}
 }
+
+func TestDetectModelsAllowHostsMergesEnvironmentAndDevDefaults(t *testing.T) {
+	prevMode := gin.Mode()
+	t.Cleanup(func() {
+		gin.SetMode(prevMode)
+	})
+
+	t.Setenv("API_OUTBOUND_ALLOW_HOSTS", "models.internal")
+	gin.SetMode(gin.ReleaseMode)
+	prodHandler := NewChannelHandler(nil, "production")
+	if got := strings.Join(prodHandler.detectModelsAllowHosts(), ","); got != "models.internal" {
+		t.Fatalf("production allow hosts = %q, want models.internal", got)
+	}
+
+	devHandler := NewChannelHandler(nil, "development")
+	got := strings.Join(devHandler.detectModelsAllowHosts(), ",")
+	for _, want := range []string{"models.internal", "localhost", "127.0.0.1", "::1"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("development allow hosts = %q, missing %q", got, want)
+		}
+	}
+}

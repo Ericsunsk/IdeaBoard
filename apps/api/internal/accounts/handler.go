@@ -25,6 +25,10 @@ func NewAccountHandler(accountService *AccountService) *AccountHandler {
 
 // ============ 账号池 API ============
 
+func (h *AccountHandler) GetAccountLimits(c *gin.Context) {
+	response.Success(c, gin.H{"limits": CurrentAccountLimits()})
+}
+
 func (h *AccountHandler) ListAccounts(c *gin.Context) {
 	var req AccountListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {

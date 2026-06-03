@@ -20,6 +20,7 @@ import type { MaybeRef } from 'vue'
 import type {
   AdminAccountCreateRequest,
   AdminAccountUpdateRequest,
+  ApiResponseAccountLimits,
   ApiResponseAccountList,
   ApiResponseAdminAccount,
   ApiResponseEmpty,
@@ -174,6 +175,72 @@ export function useCreateAdminAccount<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getCreateAdminAccountQueryOptions(adminAccountCreateRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminAccountLimitsUrl = () => {
+  return `/admin/accounts/limits`
+}
+
+export const getAdminAccountLimits = async (
+  options?: RequestInit,
+): Promise<ApiResponseAccountLimits> => {
+  return orvalMutator<ApiResponseAccountLimits>(getGetAdminAccountLimitsUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminAccountLimitsQueryKey = () => {
+  return ['admin', 'accounts', 'limits'] as const
+}
+
+export const getGetAdminAccountLimitsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminAccountLimits>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAccountLimits>>, TError, TData>>
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminAccountLimitsQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAccountLimits>>> = ({ signal }) =>
+    getAdminAccountLimits({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminAccountLimits>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminAccountLimitsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminAccountLimits>>
+>
+export type GetAdminAccountLimitsQueryError = ErrorType<unknown>
+
+export function useGetAdminAccountLimits<
+  TData = Awaited<ReturnType<typeof getAdminAccountLimits>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminAccountLimits>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminAccountLimitsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

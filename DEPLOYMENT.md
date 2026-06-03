@@ -455,6 +455,8 @@ nano /opt/ideaboard/apps/api/.env
 - `AUTH_SERVICE_BASE_URL=http://127.0.0.1:6001`
 - `AUTH_SERVICE_INTERNAL_KEY`（必须与认证服务的 `AUTH_INTERNAL_KEY` 完全一致，且不能使用 `replace-with-*` 占位值）
 
+> 说明：`APP_BASE_URL`、`API_BASE_URL` 仍然是 docker compose / deploy 层的输入；API 运行时实际读取的是 `APP_PUBLIC_BASE_URL` 和 `APP_PUBLIC_ASSET_BASE_URL`。
+
 建议：
 
 - 不要在生产环境继续使用本地开发默认账号

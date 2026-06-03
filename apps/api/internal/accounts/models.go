@@ -51,6 +51,17 @@ type UpdateAccountRequest struct {
 	Status        int16  `json:"status"`
 }
 
+type AccountLimitRange struct {
+	Min     int `json:"min"`
+	Max     int `json:"max"`
+	Default int `json:"default"`
+}
+
+type AccountLimits struct {
+	MaxConcurrent  AccountLimitRange `json:"max_concurrent"`
+	TimeoutSeconds AccountLimitRange `json:"timeout_seconds"`
+}
+
 // 列表响应
 type AccountListRequest struct {
 	Keyword  string `form:"keyword"`

@@ -1,5 +1,10 @@
 import type { FormRules } from 'naive-ui'
-import accountApi, { type ApiAccount } from '../../../../shared/api/account'
+import accountApi, {
+  FALLBACK_ACCOUNT_LIMITS,
+  normalizeAccountLimits,
+  type AccountLimits,
+  type ApiAccount,
+} from '../../../../shared/api/account'
 import channelApi, { type Channel } from '../../../../shared/api/channel'
 import { extractApiErrorMessage, splitCommaValues } from '../../shared/lib/assetLibraryShared'
 
@@ -32,17 +37,32 @@ export function useChannelAccounts(options: {
   const accountSaveLoading = ref(false)
   const currentAccountId = ref(0)
   const selectedChannelForAccount = ref<Channel | null>(null)
-  const accountForm = ref({
-    channel_id: 0,
-    model_values: [] as string[],
-    api_key: '',
-    max_concurrent: 3,
-    timeout: 120,
-  })
+  const accountLimits = ref<AccountLimits>(FALLBACK_ACCOUNT_LIMITS)
+
+  function createEmptyAccountForm(channelId = 0) {
+    return {
+      channel_id: channelId,
+      model_values: [] as string[],
+      api_key: '',
+      max_concurrent: accountLimits.value.max_concurrent.default,
+      timeout: accountLimits.value.timeout_seconds.default,
+    }
+  }
+
+  const accountForm = ref(createEmptyAccountForm())
   const detectModelsLoading = ref(false)
   const detectedModelValues = ref<string[]>([])
   const detectedModelSessionCache = ref(new Set<string>())
   const hasShownApiKeyHint = ref(false)
+
+  async function loadAccountLimits() {
+    try {
+      const res = await accountApi.getAccountLimits()
+      accountLimits.value = normalizeAccountLimits(res.data?.limits)
+    } catch {
+      accountLimits.value = FALLBACK_ACCOUNT_LIMITS
+    }
+  }
 
   async function loadAllAccounts(): Promise<ApiAccount[]> {
     const all: ApiAccount[] = []
@@ -67,7 +87,8 @@ export function useChannelAccounts(options: {
   async function loadAccounts() {
     accountLoading.value = true
     try {
-      accounts.value = await loadAllAccounts()
+      const [nextAccounts] = await Promise.all([loadAllAccounts(), loadAccountLimits()])
+      accounts.value = nextAccounts
     } finally {
       accountLoading.value = false
     }
@@ -116,13 +137,7 @@ export function useChannelAccounts(options: {
   function openAddAccountModal(channel: Channel) {
     isEditAccount.value = false
     selectedChannelForAccount.value = channel
-    accountForm.value = {
-      channel_id: channel.id,
-      model_values: [],
-      api_key: '',
-      max_concurrent: 3,
-      timeout: 120,
-    }
+    accountForm.value = createEmptyAccountForm(channel.id)
     detectedModelValues.value = []
     detectedModelSessionCache.value = new Set()
     hasShownApiKeyHint.value = false
@@ -272,6 +287,7 @@ export function useChannelAccounts(options: {
     isEditAccount,
     accountFormRef,
     accountSaveLoading,
+    accountLimits,
     selectedChannelForAccount,
     accountForm,
     detectModelsLoading,

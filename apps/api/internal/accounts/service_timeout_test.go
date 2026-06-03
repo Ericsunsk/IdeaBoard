@@ -83,3 +83,26 @@ func TestNormalizeAccountTimeout(t *testing.T) {
 		})
 	}
 }
+
+func TestCurrentAccountLimits(t *testing.T) {
+	limits := CurrentAccountLimits()
+
+	if limits.MaxConcurrent.Min != minAccountMaxConcurrent {
+		t.Fatalf("max concurrent min = %d, want %d", limits.MaxConcurrent.Min, minAccountMaxConcurrent)
+	}
+	if limits.MaxConcurrent.Default != defaultAccountMaxConcurrent {
+		t.Fatalf("max concurrent default = %d, want %d", limits.MaxConcurrent.Default, defaultAccountMaxConcurrent)
+	}
+	if limits.MaxConcurrent.Max != maxAccountMaxConcurrent {
+		t.Fatalf("max concurrent max = %d, want %d", limits.MaxConcurrent.Max, maxAccountMaxConcurrent)
+	}
+	if limits.TimeoutSeconds.Min != minAccountTimeoutSeconds {
+		t.Fatalf("timeout min = %d, want %d", limits.TimeoutSeconds.Min, minAccountTimeoutSeconds)
+	}
+	if limits.TimeoutSeconds.Default != defaultAccountTimeoutSeconds {
+		t.Fatalf("timeout default = %d, want %d", limits.TimeoutSeconds.Default, defaultAccountTimeoutSeconds)
+	}
+	if limits.TimeoutSeconds.Max != maxAccountTimeoutSeconds {
+		t.Fatalf("timeout max = %d, want %d", limits.TimeoutSeconds.Max, maxAccountTimeoutSeconds)
+	}
+}

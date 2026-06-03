@@ -218,8 +218,8 @@
             <n-form-item label="最大并发数" path="max_concurrent">
               <n-input-number
                 v-model:value="accountForm.max_concurrent"
-                :min="1"
-                :max="50"
+                :min="accountLimits.max_concurrent.min"
+                :max="accountLimits.max_concurrent.max"
                 style="width: 100%"
               />
             </n-form-item>
@@ -228,8 +228,8 @@
             <n-form-item label="超时时间(秒)" path="timeout">
               <n-input-number
                 v-model:value="accountForm.timeout"
-                :min="10"
-                :max="600"
+                :min="accountLimits.timeout_seconds.min"
+                :max="accountLimits.timeout_seconds.max"
                 style="width: 100%"
               />
             </n-form-item>
@@ -401,6 +401,7 @@ const {
   isEditAccount,
   accountFormRef,
   accountSaveLoading,
+  accountLimits,
   selectedChannelForAccount,
   accountForm,
   detectModelsLoading,

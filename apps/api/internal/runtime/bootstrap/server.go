@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -13,13 +12,8 @@ import (
 )
 
 func newHTTPServer(cfg *config.Config, handler *gin.Engine) *http.Server {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = cfg.App.Port
-	}
-
 	return &http.Server{
-		Addr:              listenerAddr(cfg.App.Host, port),
+		Addr:              listenerAddr(cfg.App.Host, cfg.App.Port),
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,

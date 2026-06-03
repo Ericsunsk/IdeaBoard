@@ -259,6 +259,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.DELETE("/users/:id", h.AdminHandler.DeleteUser)
 
 	adminApi.GET("/accounts", h.AccountHandler.ListAccounts)
+	adminApi.GET("/accounts/limits", h.AccountHandler.GetAccountLimits)
 	adminApi.GET("/accounts/:id", h.AccountHandler.GetAccount)
 	adminApi.POST("/accounts", h.AccountHandler.CreateAccount)
 	adminApi.PUT("/accounts/:id", h.AccountHandler.UpdateAccount)

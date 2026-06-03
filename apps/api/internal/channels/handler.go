@@ -209,10 +209,11 @@ func (h *ChannelHandler) DetectModels(c *gin.Context) {
 }
 
 func (h *ChannelHandler) detectModelsAllowHosts() []string {
-	if !h.isDevLikeEnvironment() {
-		return nil
+	allowHosts := outbound.AllowHostsFromEnv()
+	if h.isDevLikeEnvironment() {
+		allowHosts = append(allowHosts, "localhost", "127.0.0.1", "::1")
 	}
-	return []string{"localhost", "127.0.0.1", "::1"}
+	return allowHosts
 }
 
 func (h *ChannelHandler) isDevLikeEnvironment() bool {

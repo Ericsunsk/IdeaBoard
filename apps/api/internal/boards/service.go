@@ -370,10 +370,8 @@ func BuildBoardShareURL(baseURL, token string) string {
 }
 
 func ResolvePublicBaseURL(requestScheme, requestHost string) string {
-	for _, key := range []string{"APP_PUBLIC_BASE_URL", "APP_BASE_URL", "PUBLIC_BASE_URL"} {
-		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-			return strings.TrimRight(value, "/")
-		}
+	if value := strings.TrimSpace(os.Getenv("APP_PUBLIC_BASE_URL")); value != "" {
+		return strings.TrimRight(value, "/")
 	}
 	host := strings.TrimSpace(requestHost)
 	if host == "" {

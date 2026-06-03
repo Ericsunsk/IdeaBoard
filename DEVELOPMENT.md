@@ -363,6 +363,10 @@ go build ./...
 
 ## 环境变量
 
+下面按常用程度拆开。日常本地开发和常规部署通常只需要看“常用配置”，其余多半是调优或基础设施接入时才会改。
+
+### 常用配置
+
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `DB_HOST` | `localhost` | PostgreSQL 主机 |
@@ -371,8 +375,32 @@ go build ./...
 | `DB_PASSWORD` | 无默认值 | PostgreSQL 密码；使用仓库自带 Docker Compose 时读取 `docker/.env` 的 `POSTGRES_PASSWORD` |
 | `DB_NAME` | `ideaboard` | 数据库名 |
 | `DB_SSLMODE` | `disable` | PostgreSQL SSL 模式；本地与 Docker 内网默认关闭 |
+| `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
+| `APP_PORT` | `6000` | 后端监听端口 |
+| `APP_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
+| `APP_GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
+| `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS allowlist，多个 origin 用逗号分隔；生产同源访问通常留空，跨源直连 API 时必须显式配置 |
+| `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
+| `AUTH_SERVICE_INTERNAL_KEY` | 空 | Go 调用 auth service 的 internal key |
+
+Auth 服务关键变量：
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `AUTH_HOST` | `127.0.0.1` | Auth 服务监听地址；生产建议仅监听回环地址 |
+| `AUTH_PORT` | `6001` | Auth 服务监听端口 |
+| `AUTH_INTERNAL_KEY` | 空 | Auth internal endpoint 保护密钥；生产必须设置为非占位随机值，并与 Go 的 `AUTH_SERVICE_INTERNAL_KEY` 一致 |
+| `AUTH_TRUSTED_ORIGINS` | 空 | Better Auth 可信浏览器源 |
+| `BETTER_AUTH_SECRET` | 本地开发 fallback | Better Auth 签名密钥；生产必须设置为非占位随机值，至少 32 字符高熵随机值 |
+| `BETTER_AUTH_URL` | `http://localhost:5173`（本地开发） | Better Auth 对外基准 URL；生产必须设置为正式访问地址 |
+
+### 高级调优
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
 | `DB_CONNECT_MAX_RETRIES` | `60` | API 启动时等待 PostgreSQL 就绪的最大重试次数 |
 | `DB_CONNECT_RETRY_INTERVAL_MS` | `1000` | API 启动时 PostgreSQL 连接重试间隔 |
+| `AUTH_SERVICE_TIMEOUT_SECONDS` | `5` | Go 调用 auth service 的超时秒数 |
 | `RIVER_WORKER_CONCURRENCY` | `5` | River worker 并发数 |
 | `RIVER_TASK_TIMEOUT_SECONDS` | `180` | River 任务执行保护超时 |
 | `RIVER_NO_CAPACITY_RETRY_SECONDS` | `5` | 账号容量不足时 River snooze/retry 间隔 |
@@ -386,26 +414,7 @@ go build ./...
 | `NATS_CONNECT_TIMEOUT_SECONDS` | `5` | NATS 初始连接超时 |
 | `NATS_REQUEST_TIMEOUT_SECONDS` | `5` | JetStream API 请求超时 |
 | `NATS_DRAIN_TIMEOUT_SECONDS` | `2` | NATS 连接关闭 drain 超时 |
-| `APP_ENV` | `development` | 运行环境标识；生产环境必须显式设置为 `production` |
-| `APP_PORT` | `6000` | 后端监听端口 |
-| `APP_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
-| `APP_GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
-| `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS allowlist，多个 origin 用逗号分隔；生产同源访问通常留空，跨源直连 API 时必须显式配置 |
-| `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
-| `AUTH_SERVICE_INTERNAL_KEY` | 空 | Go 调用 auth service 的 internal key |
-| `AUTH_SERVICE_TIMEOUT_SECONDS` | `5` | Go 调用 auth service 的超时秒数 |
 | `ENV_FILE` | 空 | 可选，自定义 `.env` 路径 |
-
-Auth 服务关键变量：
-
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `AUTH_HOST` | `127.0.0.1` | Auth 服务监听地址；生产建议仅监听回环地址 |
-| `AUTH_PORT` | `6001` | Auth 服务监听端口 |
-| `AUTH_INTERNAL_KEY` | 空 | Auth internal endpoint 保护密钥；生产必须设置为非占位随机值，并与 Go 的 `AUTH_SERVICE_INTERNAL_KEY` 一致 |
-| `AUTH_TRUSTED_ORIGINS` | 空 | Better Auth 可信浏览器源 |
-| `BETTER_AUTH_SECRET` | 本地开发 fallback | Better Auth 签名密钥；生产必须设置为非占位随机值，至少 32 字符高熵随机值 |
-| `BETTER_AUTH_URL` | `http://localhost:5173`（本地开发） | Better Auth 对外基准 URL；生产必须设置为正式访问地址 |
 
 
 <a id="repo-map"></a>

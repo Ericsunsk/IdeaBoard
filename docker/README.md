@@ -124,3 +124,5 @@ docker compose -f compose.local.yml up -d
 1. `docker compose -f compose.local.yml ps` 中 PostgreSQL 是否为 `Up`。
 2. `apps/api/.env` 中 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 是否与 compose 配置一致。
 3. 若你改过 `POSTGRES_DB`、`POSTGRES_USER` 或 `POSTGRES_PASSWORD`，后端也必须同步修改。
+
+> 说明：`APP_BASE_URL` 和 `API_BASE_URL` 只是 compose / deploy 层的输入，api 容器实际读取的是 `APP_PUBLIC_BASE_URL`、`APP_PUBLIC_ASSET_BASE_URL` 和 `BETTER_AUTH_URL`。
