@@ -82,21 +82,6 @@ func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRep
 	return user, nil
 }
 
-func ptrString(value string) *string {
-	v := strings.TrimSpace(value)
-	if v == "" {
-		return nil
-	}
-	return &v
-}
-
-func derefString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
 // AdminMiddleware 管理员中间件 - 通过角色判断是否为管理员
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

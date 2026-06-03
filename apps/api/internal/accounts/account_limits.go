@@ -1,10 +1,6 @@
 package accounts
 
 func normalizeMaxConcurrent(value int) int {
-	return NormalizeMaxConcurrent(value)
-}
-
-func NormalizeMaxConcurrent(value int) int {
 	if value <= 0 {
 		return defaultAccountMaxConcurrent
 	}

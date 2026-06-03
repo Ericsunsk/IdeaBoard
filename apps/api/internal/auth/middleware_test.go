@@ -10,22 +10,6 @@ import (
 	"api/internal/users"
 )
 
-func TestPtrStringAndDerefString(t *testing.T) {
-	if got := ptrString("  "); got != nil {
-		t.Fatal("expected blank string to map to nil pointer")
-	}
-	v := ptrString("  alice  ")
-	if v == nil || *v != "alice" {
-		t.Fatalf("trimmed pointer = %#v, want alice", v)
-	}
-	if got := derefString(nil); got != "" {
-		t.Fatalf("deref nil = %q, want empty string", got)
-	}
-	if got := derefString(v); got != "alice" {
-		t.Fatalf("deref value = %q, want alice", got)
-	}
-}
-
 func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
 	db := testdb.Open(t)
 	userRepo := users.NewUserRepository(db)
