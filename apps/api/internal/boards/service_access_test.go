@@ -2,6 +2,7 @@ package boards
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -77,6 +78,47 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	}
 	if len(members) != 2 {
 		t.Fatalf("members len = %d, want 2", len(members))
+	}
+}
+
+func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
+	db := testdb.Open(t)
+	userRepo := users.NewUserRepository(db)
+	repo := NewBoardRepository(db)
+	service := NewBoardService(repo, userRepo)
+	ctx := context.Background()
+
+	owner := createBoardTestUser(t, userRepo, "editor-owner")
+	editor := createBoardTestUser(t, userRepo, "editor-member")
+
+	boardID := "editable-board"
+	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: map[string]interface{}{"v": 1}}); err != nil {
+		t.Fatalf("create board failed: %v", err)
+	}
+	if _, err := service.InviteMember(ctx, owner.ID, boardID, editor.StorageUID, string(BoardAccessRoleEditor)); err != nil {
+		t.Fatalf("invite editor failed: %v", err)
+	}
+
+	updated, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: map[string]interface{}{"v": 2}})
+	if err != nil {
+		t.Fatalf("editor update failed: %v", err)
+	}
+	if updated.Role != BoardAccessRoleEditor {
+		t.Fatalf("updated role = %s, want editor", updated.Role)
+	}
+	if updated.Board.UserID != owner.ID {
+		t.Fatalf("updated owner id = %d, want %d", updated.Board.UserID, owner.ID)
+	}
+	var state map[string]int
+	if err := json.Unmarshal([]byte(updated.Board.State), &state); err != nil {
+		t.Fatalf("decode updated state failed: %v", err)
+	}
+	if state["v"] != 2 {
+		t.Fatalf("updated state v = %d, want 2", state["v"])
+	}
+
+	if _, err := service.UpsertBoard(ctx, editor.ID, boardID, &UpsertBoardRequest{Name: "Renamed Board", State: map[string]interface{}{"v": 3}}); !errors.Is(err, ErrBoardPermissionDenied) {
+		t.Fatalf("editor rename err = %v, want ErrBoardPermissionDenied", err)
 	}
 }
 

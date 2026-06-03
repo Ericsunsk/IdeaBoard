@@ -59,32 +59,28 @@ func (s *BoardService) ListBoards(ctx context.Context, userID int64) ([]BoardWit
 }
 
 func (s *BoardService) ResolveBoardAccess(ctx context.Context, userID int64, boardID string) (*UserBoard, BoardAccessRole, error) {
-	normalizedID := normalizeBoardID(boardID)
-	if normalizedID == "" {
-		return nil, "", ErrInvalidBoardInput
-	}
-	boardWithRole, err := s.repo.GetAccessibleByBoardID(ctx, userID, normalizedID)
+	access, err := s.resolveAccessibleBoard(ctx, userID, boardID)
 	if err != nil {
-		if database.IsNotFound(err) {
-			return nil, "", ErrBoardNotFound
-		}
 		return nil, "", err
 	}
-	return &boardWithRole.Board, boardWithRole.Role, nil
+	return &access.Board, access.Role, nil
 }
 
 func (s *BoardService) ResolveBoardWriteAccess(ctx context.Context, userID int64, boardID string) (*UserBoard, BoardAccessRole, error) {
-	board, role, err := s.ResolveBoardAccess(ctx, userID, boardID)
+	access, err := s.resolveAccessibleBoard(ctx, userID, boardID)
 	if err != nil {
 		return nil, "", err
 	}
-	if !boardRoleCanWrite(role) {
+	if !access.CanWrite() {
 		return nil, "", ErrBoardPermissionDenied
 	}
-	return board, role, nil
+	return &access.Board, access.Role, nil
 }
 
 func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID string, req *UpsertBoardRequest) (*BoardWithRole, error) {
+	if req == nil {
+		return nil, ErrInvalidBoardInput
+	}
 	normalizedID := normalizeBoardID(boardID)
 	name := normalizeBoardName(req.Name)
 	if normalizedID == "" || name == "" {
@@ -98,73 +94,36 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 	createdAt := resolveClientTime(req.CreatedAt, now)
 	updatedAt := resolveClientTime(req.UpdatedAt, now)
 
-	if existing, err := s.repo.GetByOwnerAndBoardID(ctx, userID, normalizedID); err == nil {
-		conflicted, err := s.repo.HasNameConflict(ctx, userID, normalizedID, name)
-		if err != nil {
+	if existing, err := s.resolveOwnerBoardByNormalizedID(ctx, userID, normalizedID); err == nil {
+		if err := s.ensureBoardNameAvailable(ctx, userID, normalizedID, name); err != nil {
 			return nil, err
 		}
-		if conflicted {
-			return nil, ErrBoardNameConflict
-		}
-		board := &UserBoard{
-			BoardID:   existing.BoardID,
-			UserID:    existing.UserID,
-			Name:      name,
-			State:     state,
-			CreatedAt: existing.CreatedAt,
-			UpdatedAt: updatedAt,
-		}
-		if err := s.repo.Upsert(ctx, board); err != nil {
-			if IsBoardNameUniqueConstraintError(err) {
-				return nil, ErrBoardNameConflict
-			}
-			return nil, err
-		}
-		saved, err := s.repo.GetByOwnerAndBoardID(ctx, userID, normalizedID)
-		if err != nil {
-			return nil, err
-		}
-		return &BoardWithRole{Board: *saved, Role: BoardAccessRoleOwner}, nil
-	} else if !database.IsNotFound(err) {
+		board := existing.Board
+		board.Name = name
+		board.State = state
+		board.UpdatedAt = updatedAt
+		return s.saveAndReloadBoardForActor(ctx, userID, &board)
+	} else if !errors.Is(err, ErrBoardNotFound) {
 		return nil, err
 	}
 
-	if accessible, err := s.repo.GetAccessibleByBoardID(ctx, userID, normalizedID); err == nil {
+	if accessible, err := s.resolveAccessibleBoardByNormalizedID(ctx, userID, normalizedID); err == nil {
 		if accessible.Role != BoardAccessRoleEditor {
 			return nil, ErrBoardPermissionDenied
 		}
 		if name != normalizeBoardName(accessible.Board.Name) {
 			return nil, ErrBoardPermissionDenied
 		}
-		board := &UserBoard{
-			BoardID:   accessible.Board.BoardID,
-			UserID:    accessible.Board.UserID,
-			Name:      accessible.Board.Name,
-			State:     state,
-			CreatedAt: accessible.Board.CreatedAt,
-			UpdatedAt: updatedAt,
-		}
-		if err := s.repo.Upsert(ctx, board); err != nil {
-			if IsBoardNameUniqueConstraintError(err) {
-				return nil, ErrBoardNameConflict
-			}
-			return nil, err
-		}
-		saved, err := s.repo.GetAccessibleByBoardID(ctx, userID, normalizedID)
-		if err != nil {
-			return nil, err
-		}
-		return saved, nil
-	} else if !database.IsNotFound(err) {
+		board := accessible.Board
+		board.State = state
+		board.UpdatedAt = updatedAt
+		return s.saveAndReloadBoardForActor(ctx, userID, &board)
+	} else if !errors.Is(err, ErrBoardNotFound) {
 		return nil, err
 	}
 
-	conflicted, err := s.repo.HasNameConflict(ctx, userID, normalizedID, name)
-	if err != nil {
+	if err := s.ensureBoardNameAvailable(ctx, userID, normalizedID, name); err != nil {
 		return nil, err
-	}
-	if conflicted {
-		return nil, ErrBoardNameConflict
 	}
 	board := &UserBoard{
 		BoardID:   normalizedID,
@@ -174,17 +133,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 	}
-	if err := s.repo.Upsert(ctx, board); err != nil {
-		if IsBoardNameUniqueConstraintError(err) {
-			return nil, ErrBoardNameConflict
-		}
-		return nil, err
-	}
-	saved, err := s.repo.GetByOwnerAndBoardID(ctx, userID, normalizedID)
-	if err != nil {
-		return nil, err
-	}
-	return &BoardWithRole{Board: *saved, Role: BoardAccessRoleOwner}, nil
+	return s.saveAndReloadBoardForActor(ctx, userID, board)
 }
 
 func (s *BoardService) DeleteBoard(ctx context.Context, userID int64, boardID string) error {
@@ -324,7 +273,7 @@ func (s *BoardService) CreateShareToken(ctx context.Context, ownerUserID int64, 
 		BoardID:   board.BoardID,
 		Token:     token,
 		Role:      string(targetRole),
-		CreatedBy: ownerUserID,
+		CreatedBy: board.UserID,
 		Revoked:   false,
 		ExpiresAt: expiresAtTime,
 	}
@@ -386,20 +335,18 @@ func (s *BoardService) JoinBoardByShareToken(ctx context.Context, userID int64, 
 	if role == "" {
 		return nil, ErrShareTokenInvalid
 	}
-	board, err := s.repo.GetByOwnerAndBoardID(ctx, shareToken.CreatedBy, shareToken.BoardID)
+	ownerAccess, err := s.resolveOwnerBoardByNormalizedID(ctx, shareToken.CreatedBy, shareToken.BoardID)
 	if err != nil {
-		if database.IsNotFound(err) {
-			return nil, ErrBoardNotFound
-		}
 		return nil, err
 	}
+	board := ownerAccess.Board
 	if board.UserID == userID {
-		return &BoardWithRole{Board: *board, Role: BoardAccessRoleOwner}, nil
+		return &BoardWithRole{Board: board, Role: BoardAccessRoleOwner}, nil
 	}
 	if err := s.repo.UpsertMember(ctx, board.UserID, board.BoardID, userID, role); err != nil {
 		return nil, err
 	}
-	return &BoardWithRole{Board: *board, Role: role}, nil
+	return &BoardWithRole{Board: board, Role: role}, nil
 }
 
 func BuildBoardShareURL(baseURL, token string) string {
@@ -490,10 +437,6 @@ func normalizeBoardMemberRole(role string) BoardAccessRole {
 	}
 }
 
-func boardRoleCanWrite(role BoardAccessRole) bool {
-	return role == BoardAccessRoleOwner || role == BoardAccessRoleEditor
-}
-
 func marshalState(state interface{}) (string, error) {
 	if state == nil {
 		return "null", nil
@@ -518,12 +461,38 @@ func resolveClientTime(raw *int64, fallback time.Time) time.Time {
 	return time.UnixMilli(*raw)
 }
 
-func (s *BoardService) requireOwnerBoard(ctx context.Context, userID int64, boardID string) (*UserBoard, error) {
+func (s *BoardService) resolveAccessibleBoard(ctx context.Context, userID int64, boardID string) (*BoardWithRole, error) {
 	normalizedID := normalizeBoardID(boardID)
 	if normalizedID == "" {
 		return nil, ErrInvalidBoardInput
 	}
-	board, err := s.repo.GetByOwnerAndBoardID(ctx, userID, normalizedID)
+	return s.resolveAccessibleBoardByNormalizedID(ctx, userID, normalizedID)
+}
+
+func (s *BoardService) resolveAccessibleBoardByNormalizedID(ctx context.Context, userID int64, normalizedBoardID string) (*BoardWithRole, error) {
+	boardWithRole, err := s.repo.GetAccessibleByBoardID(ctx, userID, normalizedBoardID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil, ErrBoardNotFound
+		}
+		return nil, err
+	}
+	if boardWithRole == nil || boardWithRole.Role == "" {
+		return nil, ErrBoardNotFound
+	}
+	return boardWithRole, nil
+}
+
+func (s *BoardService) resolveOwnerBoard(ctx context.Context, userID int64, boardID string) (*BoardWithRole, error) {
+	normalizedID := normalizeBoardID(boardID)
+	if normalizedID == "" {
+		return nil, ErrInvalidBoardInput
+	}
+	return s.resolveOwnerBoardByNormalizedID(ctx, userID, normalizedID)
+}
+
+func (s *BoardService) resolveOwnerBoardByNormalizedID(ctx context.Context, userID int64, normalizedBoardID string) (*BoardWithRole, error) {
+	board, err := s.repo.GetByOwnerAndBoardID(ctx, userID, normalizedBoardID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return nil, ErrBoardNotFound
@@ -536,7 +505,42 @@ func (s *BoardService) requireOwnerBoard(ctx context.Context, userID int64, boar
 	if board.UserID != userID {
 		return nil, ErrBoardPermissionDenied
 	}
-	return board, nil
+	return &BoardWithRole{Board: *board, Role: BoardAccessRoleOwner}, nil
+}
+
+func (s *BoardService) ensureBoardNameAvailable(ctx context.Context, ownerUserID int64, boardID string, name string) error {
+	conflicted, err := s.repo.HasNameConflict(ctx, ownerUserID, boardID, name)
+	if err != nil {
+		return err
+	}
+	if conflicted {
+		return ErrBoardNameConflict
+	}
+	return nil
+}
+
+func (s *BoardService) saveAndReloadBoardForActor(ctx context.Context, actorUserID int64, board *UserBoard) (*BoardWithRole, error) {
+	if board == nil {
+		return nil, ErrInvalidBoardInput
+	}
+	if err := s.repo.Upsert(ctx, board); err != nil {
+		if IsBoardNameUniqueConstraintError(err) {
+			return nil, ErrBoardNameConflict
+		}
+		return nil, err
+	}
+	if board.UserID == actorUserID {
+		return s.resolveOwnerBoardByNormalizedID(ctx, actorUserID, board.BoardID)
+	}
+	return s.resolveAccessibleBoardByNormalizedID(ctx, actorUserID, board.BoardID)
+}
+
+func (s *BoardService) requireOwnerBoard(ctx context.Context, userID int64, boardID string) (*UserBoard, error) {
+	access, err := s.resolveOwnerBoard(ctx, userID, boardID)
+	if err != nil {
+		return nil, err
+	}
+	return &access.Board, nil
 }
 
 func generateBoardShareToken(ctx context.Context, repo *BoardRepository) (string, error) {

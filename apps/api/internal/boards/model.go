@@ -47,6 +47,10 @@ type BoardWithRole struct {
 	Role  BoardAccessRole
 }
 
+func (b BoardWithRole) CanWrite() bool {
+	return b.Role == BoardAccessRoleOwner || b.Role == BoardAccessRoleEditor
+}
+
 type BoardMemberWithUser struct {
 	UserID    int64           `json:"user_id"`
 	MemberUID string          `json:"member_uid"`
