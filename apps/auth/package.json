@@ -8,16 +8,16 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "migrate": "node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./src/auth.ts --yes",
-    "migrate:dist": "node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes"
+    "migrate:dist": "node dist/migrate.js"
   },
   "dependencies": {
-    "@better-auth/cli": "^1.4.21",
     "better-auth": "^1.6.13",
     "dotenv": "^17.4.2",
     "fastify": "^5.8.5",
     "pg": "^8.21.0"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
     "@types/pg": "^8.20.0",
     "@types/node": "^25.9.1",
     "tsx": "^4.20.6",

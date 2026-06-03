@@ -91,8 +91,15 @@ func ProfileAvatarUploadObjectPrefix(storageUID string) (string, error) {
 	return path.Join(uploadObjectRoot, "profile", ownerSegment, "avatar") + "/", nil
 }
 
+func TaskOutputUserUploadObjectPrefix(userID int64) (string, error) {
+	if userID <= 0 {
+		return "", fmt.Errorf("用户ID无效")
+	}
+	return path.Join(uploadObjectRoot, "tasks", fmt.Sprintf("%d", userID)) + "/", nil
+}
+
 func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
-	if userID == 0 {
+	if userID <= 0 {
 		return "", fmt.Errorf("用户ID无效")
 	}
 	taskSegment, err := NormalizeWorkspaceBoardSegment(taskID)
@@ -100,6 +107,30 @@ func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 		return "", err
 	}
 	return path.Join("tasks", fmt.Sprintf("%d", userID), taskSegment), nil
+}
+
+func TaskOutputUploadObjectPrefix(userID int64, taskID string) (string, error) {
+	dirPrefix, err := TaskOutputUploadDirPrefix(userID, taskID)
+	if err != nil {
+		return "", err
+	}
+	return path.Join(uploadObjectRoot, dirPrefix) + "/", nil
+}
+
+func userUploadObjectPrefixes(userID int64, storageUID string) ([]string, error) {
+	workspacePrefix, err := WorkspaceUserUploadObjectPrefix(storageUID)
+	if err != nil {
+		return nil, err
+	}
+	profileAvatarPrefix, err := ProfileAvatarUploadObjectPrefix(storageUID)
+	if err != nil {
+		return nil, err
+	}
+	taskOutputPrefix, err := TaskOutputUserUploadObjectPrefix(userID)
+	if err != nil {
+		return nil, err
+	}
+	return []string{workspacePrefix, profileAvatarPrefix, taskOutputPrefix}, nil
 }
 
 func ParseUploadResource(rawPath string) (UploadResource, error) {

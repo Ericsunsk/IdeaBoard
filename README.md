@@ -250,7 +250,7 @@ npm run dev
 生产部署时必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）和 `BETTER_AUTH_URL`（正式访问地址），并让 `AUTH_INTERNAL_KEY` 与 Go API 的 `AUTH_SERVICE_INTERNAL_KEY` 保持一致。
 
 > [!IMPORTANT]
-> 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（生产环境对应 `node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。
+> 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（源码生产部署先 build 再执行 `migrate:dist`；发布包已包含 `dist`，直接安装依赖后执行 `migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移，运行时 Auth 镜像不包含 Better Auth CLI。
 
 <details>
 <summary>Auth 服务能力说明</summary>

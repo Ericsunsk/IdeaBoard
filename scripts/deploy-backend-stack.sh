@@ -60,6 +60,15 @@ generate_secret() {
   echo
 }
 
+generate_url_safe_secret() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+    return
+  fi
+  od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+  echo
+}
+
 env_value() {
   local key="$1"
   awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
@@ -90,16 +99,38 @@ is_placeholder() {
   [[ -z "$value" || "$value" == replace-with-* || "$value" == "your-github-owner/your-repo" || "$value" == *"example.com"* ]]
 }
 
-infer_image_namespace() {
-  local remote
-  remote="$(git -C "$ROOT_DIR" config --get remote.origin.url 2>/dev/null || true)"
-  if [[ "$remote" =~ github.com[:/]([^/]+)/([^/.]+)(\.git)?$ ]]; then
-    local owner="${BASH_REMATCH[1]}"
-    local repo="${BASH_REMATCH[2]}"
-    printf '%s/%s\n' \
-      "$(printf '%s' "$owner" | tr '[:upper:]' '[:lower:]')" \
-      "$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')"
-  fi
+is_ideaboard_image_ref() {
+  local value="$1"
+  local component="$2"
+  [[ "$value" =~ ^ghcr\.io/[^[:space:]/]+/[^[:space:]/]+/ideaboard-${component}@sha256:[a-fA-F0-9]{64}$ ]]
+}
+
+is_url_userinfo_value() {
+  local value="$1"
+  [[ "$value" =~ ^[A-Za-z0-9._~-]+$ ]]
+}
+
+image_source_repo_from_ref() {
+  local value="$1"
+  local image_path
+  local owner
+  local rest
+  local repo
+
+  image_path="${value%@sha256:*}"
+  image_path="${image_path#ghcr.io/}"
+  owner="${image_path%%/*}"
+  rest="${image_path#*/}"
+  repo="${rest%%/*}"
+  [[ -n "$owner" && -n "$repo" && "$rest" != "$image_path" ]] || return 1
+  printf '%s/%s\n' "$owner" "$repo"
+}
+
+image_owner_from_ref() {
+  local value="$1"
+  local repo
+  repo="$(image_source_repo_from_ref "$value")" || return 1
+  printf '%s\n' "${repo%%/*}"
 }
 
 ensure_env_file() {
@@ -109,22 +140,16 @@ ensure_env_file() {
     echo "Created $ENV_FILE"
   fi
 
-  local namespace
-  namespace="$(env_value IMAGE_NAMESPACE)"
-  if [[ "$namespace" == "your-github-owner/your-repo" || -z "$namespace" ]]; then
-    namespace="$(infer_image_namespace)"
-    if [[ -n "$namespace" ]]; then
-      set_env_value IMAGE_NAMESPACE "$namespace"
-      echo "Inferred IMAGE_NAMESPACE=$namespace"
-    fi
-  fi
-
   for key in POSTGRES_PASSWORD AUTH_INTERNAL_KEY BETTER_AUTH_SECRET; do
     if is_placeholder "$(env_value "$key")"; then
       set_env_value "$key" "$(generate_secret)"
       echo "Generated $key"
     fi
   done
+  if is_placeholder "$(env_value NATS_PASSWORD)"; then
+    set_env_value NATS_PASSWORD "$(generate_url_safe_secret)"
+    echo "Generated NATS_PASSWORD"
+  fi
 }
 
 validate_env_file() {
@@ -135,11 +160,14 @@ validate_env_file() {
     APP_BASE_URL \
     API_BASE_URL \
     CLOUDFLARE_TUNNEL_TOKEN \
-    IMAGE_TAG \
+    IDEABOARD_API_IMAGE \
+    IDEABOARD_AUTH_IMAGE \
+    IDEABOARD_AUTH_MIGRATE_IMAGE \
     CLOUDFLARED_VERSION \
     POSTGRES_PASSWORD \
     AUTH_INTERNAL_KEY \
-    BETTER_AUTH_SECRET; do
+    BETTER_AUTH_SECRET \
+    NATS_PASSWORD; do
     if is_placeholder "$(env_value "$key")"; then
       missing+=("$key")
     fi
@@ -151,25 +179,49 @@ validate_env_file() {
     return 1
   fi
 
-  if [[ "$(env_value IMAGE_TAG)" =~ ^(latest|main|master)$ ]]; then
-    echo "Please set IMAGE_TAG to an immutable release tag or commit, not a mutable ref." >&2
+  local api_image
+  local auth_image
+  local auth_migrate_image
+  local api_repo
+  local auth_repo
+  local auth_migrate_repo
+  local nats_user
+  local nats_password
+  api_image="$(env_value IDEABOARD_API_IMAGE)"
+  auth_image="$(env_value IDEABOARD_AUTH_IMAGE)"
+  auth_migrate_image="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+
+  if ! is_ideaboard_image_ref "$api_image" "api"; then
+    echo "Please set IDEABOARD_API_IMAGE to a full immutable GHCR digest ref, e.g. ghcr.io/owner/repo/ideaboard-api@sha256:..." >&2
+    return 1
+  fi
+  if ! is_ideaboard_image_ref "$auth_image" "auth"; then
+    echo "Please set IDEABOARD_AUTH_IMAGE to a full immutable GHCR digest ref, e.g. ghcr.io/owner/repo/ideaboard-auth@sha256:..." >&2
+    return 1
+  fi
+  if ! is_ideaboard_image_ref "$auth_migrate_image" "auth-migrate"; then
+    echo "Please set IDEABOARD_AUTH_MIGRATE_IMAGE to a full immutable GHCR digest ref, e.g. ghcr.io/owner/repo/ideaboard-auth-migrate@sha256:..." >&2
+    return 1
+  fi
+  api_repo="$(image_source_repo_from_ref "$api_image")"
+  auth_repo="$(image_source_repo_from_ref "$auth_image")"
+  auth_migrate_repo="$(image_source_repo_from_ref "$auth_migrate_image")"
+  if [[ "$api_repo" != "$auth_repo" || "$api_repo" != "$auth_migrate_repo" ]]; then
+    echo "IDEABOARD_API_IMAGE, IDEABOARD_AUTH_IMAGE, and IDEABOARD_AUTH_MIGRATE_IMAGE must come from the same GHCR owner/repo." >&2
+    return 1
+  fi
+  nats_user="$(env_value NATS_USER)"
+  nats_user="${nats_user:-ideaboard}"
+  nats_password="$(env_value NATS_PASSWORD)"
+  if ! is_url_userinfo_value "$nats_user"; then
+    echo "NATS_USER may only contain URL-safe characters: A-Z a-z 0-9 . _ ~ -" >&2
+    return 1
+  fi
+  if ! is_url_userinfo_value "$nats_password"; then
+    echo "NATS_PASSWORD may only contain URL-safe characters: A-Z a-z 0-9 . _ ~ -" >&2
     return 1
   fi
   return 0
-}
-
-ensure_image_namespace_for_deploy() {
-  local namespace
-  namespace="$(env_value IMAGE_NAMESPACE)"
-  if [[ "$namespace" == "your-github-owner/your-repo" || -z "$namespace" ]]; then
-    namespace="$(infer_image_namespace)"
-    if [[ -n "$namespace" ]]; then
-      set_env_value IMAGE_NAMESPACE "$namespace"
-      echo "Inferred IMAGE_NAMESPACE=$namespace"
-      return
-    fi
-    die "cannot infer IMAGE_NAMESPACE. Set IMAGE_NAMESPACE in $ENV_FILE"
-  fi
 }
 
 docker_compose() {
@@ -432,20 +484,59 @@ login_ghcr_if_configured() {
   fi
 
   local username
-  username="${GHCR_USERNAME:-${IMAGE_NAMESPACE%%/*}}"
-  [[ -n "$username" ]] || die "GHCR_TOKEN is set, but GHCR_USERNAME or IMAGE_NAMESPACE is empty"
+  username="${GHCR_USERNAME:-$(image_owner_from_ref "$(env_value IDEABOARD_API_IMAGE)")}"
+  [[ -n "$username" ]] || die "GHCR_TOKEN is set, but GHCR_USERNAME or IDEABOARD_API_IMAGE is empty"
 
   printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$username" --password-stdin
 }
 
-auth_migrate_command=(
-  node
-  node_modules/@better-auth/cli/dist/index.mjs
-  migrate
-  --config
-  ./dist/auth.js
-  --yes
-)
+cosign_verify_enabled() {
+  local value
+  value="$(env_value COSIGN_VERIFY)"
+  if [[ -z "$value" ]]; then
+    value="true"
+  fi
+  ! is_false_value "$value"
+}
+
+verify_image_signature() {
+  local image_ref="$1"
+  local identity_regexp
+  local oidc_issuer
+  local source_repo
+  local source_repo_regexp
+
+  if ! cosign_verify_enabled; then
+    echo "Skipping cosign verification for $image_ref because COSIGN_VERIFY=false"
+    return 0
+  fi
+  command -v cosign >/dev/null 2>&1 || die "cosign is required to verify image signatures. Install cosign or set COSIGN_VERIFY=false only for temporary offline recovery."
+
+  identity_regexp="$(env_value COSIGN_CERTIFICATE_IDENTITY_REGEXP)"
+  if [[ -z "$identity_regexp" ]]; then
+    source_repo="$(image_source_repo_from_ref "$image_ref")" || die "cannot derive GitHub source repository from image ref: $image_ref"
+    source_repo_regexp="${source_repo//./\\.}"
+    identity_regexp="https://github.com/${source_repo_regexp}/\\.github/workflows/docker-images\\.yml@refs/(heads|tags)/.+"
+  fi
+  oidc_issuer="$(env_value COSIGN_CERTIFICATE_OIDC_ISSUER)"
+  oidc_issuer="${oidc_issuer:-https://token.actions.githubusercontent.com}"
+
+  echo "Verifying image signature: $image_ref"
+  cosign verify \
+    --certificate-identity-regexp "$identity_regexp" \
+    --certificate-oidc-issuer "$oidc_issuer" \
+    "$image_ref" >/dev/null
+}
+
+verify_image_signatures() {
+  verify_image_signature "$(env_value IDEABOARD_API_IMAGE)"
+  verify_image_signature "$(env_value IDEABOARD_AUTH_IMAGE)"
+  verify_image_signature "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
+}
+
+run_auth_migration() {
+  docker_compose run --rm auth-migrate
+}
 
 ensure_env_file
 
@@ -459,18 +550,17 @@ if [[ "$command" == "init-env" ]]; then
 fi
 
 validate_env_file || exit 1
-ensure_image_namespace_for_deploy
-IMAGE_NAMESPACE="$(env_value IMAGE_NAMESPACE)"
 
 case "$command" in
   deploy)
     login_ghcr_if_configured
-    docker_compose pull
+    verify_image_signatures
+    docker_compose --profile tools pull
     docker_compose up -d postgres
     wait_for_postgres
     backup_postgres
     backup_api_uploads
-    docker_compose run --rm auth "${auth_migrate_command[@]}"
+    run_auth_migration
     docker_compose up -d
     run_backend_smoke_checks
     docker_compose ps
@@ -495,13 +585,14 @@ case "$command" in
     ;;
   pull)
     login_ghcr_if_configured
-    docker_compose pull
+    verify_image_signatures
+    docker_compose --profile tools pull
     ;;
   up)
     docker_compose up -d
     ;;
   migrate)
-    docker_compose run --rm auth "${auth_migrate_command[@]}"
+    run_auth_migration
     ;;
   ps)
     docker_compose ps

@@ -1,17 +1,17 @@
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 
 type UseFlowLeaveGuardOptions = {
-  onLeave?: () => void
+  onLeave?: () => void | Promise<void>
 }
 
 export function useFlowLeaveGuard(options: UseFlowLeaveGuardOptions = {}) {
-  onBeforeRouteUpdate(() => {
-    options.onLeave?.()
+  onBeforeRouteUpdate(async () => {
+    await options.onLeave?.()
     return true
   })
 
-  onBeforeRouteLeave(() => {
-    options.onLeave?.()
+  onBeforeRouteLeave(async () => {
+    await options.onLeave?.()
     return true
   })
 }

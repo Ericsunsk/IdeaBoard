@@ -14,23 +14,40 @@ export function useFlowAutosave(options: UseFlowAutosaveOptions) {
   const online = useOnline()
   const hasPendingSave = ref(false)
   const dirtyVersion = ref(0)
+  let activeSaveTask: Promise<void> | null = null
+
+  async function runSaveLoop(silent = true) {
+    let nextSilent = silent
+    do {
+      hasPendingSave.value = false
+      if (!options.isDirty.value) return
+      if (options.isSaving.value) {
+        hasPendingSave.value = true
+        return
+      }
+      const saveVersion = dirtyVersion.value
+      const saved = await options.save({ silent: nextSilent })
+      if (!saved) return
+      if (dirtyVersion.value > saveVersion) {
+        options.isDirty.value = true
+        hasPendingSave.value = true
+      }
+      nextSilent = true
+    } while (hasPendingSave.value)
+  }
 
   async function runSaveNow(silent = true) {
-    if (!options.isDirty.value) return
-    if (options.isSaving.value) {
+    if (!options.isDirty.value && !hasPendingSave.value) return
+    if (activeSaveTask) {
       hasPendingSave.value = true
+      await activeSaveTask
+      await runSaveNow(silent)
       return
     }
-    const saveVersion = dirtyVersion.value
-    const saved = await options.save({ silent })
-    if (!saved) return
-    if (dirtyVersion.value > saveVersion) {
-      options.isDirty.value = true
-      hasPendingSave.value = true
-    }
-    if (!hasPendingSave.value) return
-    hasPendingSave.value = false
-    await runSaveNow(true)
+    activeSaveTask = runSaveLoop(silent).finally(() => {
+      activeSaveTask = null
+    })
+    await activeSaveTask
   }
 
   const triggerAutosave = useDebounceFn(() => {

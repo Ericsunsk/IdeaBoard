@@ -44,10 +44,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
@@ -61,14 +61,14 @@ jobs:
         run: go test -race ./...
 
       - name: Lint API
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7
         with:
           version: v2.12.2
           working-directory: apps/api
           args: ./...
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: "22.22.2"
           cache: "npm"
@@ -95,16 +95,24 @@ jobs:
             display: API
             context: ./apps/api
             file: ./apps/api/Dockerfile
+            target: runtime
             cache_scope: ideaboard-api
           - name: auth
             display: Auth
             context: ./apps/auth
             file: ./apps/auth/Dockerfile
+            target: runtime
             cache_scope: ideaboard-auth
+          - name: auth-migrate
+            display: Auth Migration
+            context: ./apps/auth
+            file: ./apps/auth/Dockerfile
+            target: migrator
+            cache_scope: ideaboard-auth-migrate
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Prepare image names
         id: image
@@ -114,11 +122,11 @@ jobs:
           echo "name=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
 
       - name: Image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
@@ -127,10 +135,11 @@ jobs:
 
       - name: Build ${{ matrix.image.display }} image
         timeout-minutes: 20
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.file }}
+          target: ${{ matrix.image.target }}
           platforms: linux/amd64,linux/arm64
           push: false
           tags: ${{ steps.meta.outputs.tags }}
@@ -156,6 +165,7 @@ jobs:
             display: API
             context: ./apps/api
             file: ./apps/api/Dockerfile
+            target: runtime
             cache_scope: ideaboard-api
             sbom_file: api.sbom.cyclonedx.json
             sbom_artifact: ideaboard-api-sbom-cyclonedx-json
@@ -163,13 +173,22 @@ jobs:
             display: Auth
             context: ./apps/auth
             file: ./apps/auth/Dockerfile
+            target: runtime
             cache_scope: ideaboard-auth
             sbom_file: auth.sbom.cyclonedx.json
             sbom_artifact: ideaboard-auth-sbom-cyclonedx-json
+          - name: auth-migrate
+            display: Auth Migration
+            context: ./apps/auth
+            file: ./apps/auth/Dockerfile
+            target: migrator
+            cache_scope: ideaboard-auth-migrate
+            sbom_file: auth-migrate.sbom.cyclonedx.json
+            sbom_artifact: ideaboard-auth-migrate-sbom-cyclonedx-json
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Prepare image names
         id: image
@@ -179,10 +198,10 @@ jobs:
           echo "name=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -190,7 +209,7 @@ jobs:
 
       - name: Image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
@@ -203,10 +222,11 @@ jobs:
       - name: Build and push ${{ matrix.image.display }} image
         id: build
         timeout-minutes: 20
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.file }}
+          target: ${{ matrix.image.target }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -216,7 +236,7 @@ jobs:
 
       - name: Generate ${{ matrix.image.display }} SBOM
         timeout-minutes: 10
-        uses: anchore/sbom-action@v0.24.0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
@@ -226,22 +246,31 @@ jobs:
 
       - name: Scan ${{ matrix.image.display }} image
         timeout-minutes: 10
-        uses: anchore/scan-action@v7.4.0
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
           config: .grype.yaml
           cache-db: true
           fail-build: true
-          only-fixed: true
           severity-cutoff: high
           output-format: table
 
       - name: Install Cosign
         timeout-minutes: 5
-        uses: sigstore/cosign-installer@v4.1.2
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
 
       - name: Sign ${{ matrix.image.display }} image
         timeout-minutes: 5
         env:
           IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${IMAGE}"
+
+      - name: Print deploy image reference
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+        run: |
+          echo "${{ matrix.image.display }} image: ${IMAGE}"
+          echo "### ${{ matrix.image.display }} image" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          echo "${IMAGE}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

@@ -6,15 +6,24 @@ import {
   normalizeCanvasBoardName,
   renameCanvasBoard,
 } from '../../boards/lib/canvasBoards'
+import {
+  hydrateCanvasBoardsFromServer,
+  isBoardNameConflictError,
+  syncCanvasBoardToServer,
+} from '../../boards/lib/boardSync'
 
 type BoardMeta = { id: string; name: string }
 
 type UseFlowBoardHeaderActionsOptions = {
   currentBoardId: Ref<string | null | undefined>
-  message: { warning: (msg: string) => void; success: (msg: string) => void }
+  message: {
+    warning: (msg: string) => void
+    success: (msg: string) => void
+    error?: (msg: string) => void
+  }
   router: Router
   route: { query: Record<string, unknown> }
-  flushAutosave: () => void
+  flushAutosave: () => Promise<void>
 }
 
 export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOptions) {
@@ -76,7 +85,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     cancelBoardRename()
   }
 
-  function onConfirmBoardRename() {
+  async function onConfirmBoardRename() {
     const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) return
     const normalized = normalizeCanvasBoardName(boardNameDraft.value)
@@ -90,7 +99,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     if (normalized === currentName) {
       return
     }
-    if (isCanvasBoardNameTaken(boardId, normalized)) {
+    if (isCanvasBoardNameTaken(normalized, boardId)) {
       options.message.warning('名称已存在')
       return
     }
@@ -99,6 +108,17 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
       return
     }
     refreshBoardMetas()
+    try {
+      await syncCanvasBoardToServer(boardId)
+    } catch (error) {
+      await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
+      refreshBoardMetas()
+      options.message.error?.(
+        isBoardNameConflictError(error) ? '名称已存在，请更换后再试' : '重命名同步失败，请稍后重试',
+      )
+      console.warn('[workspace] failed to sync renamed board', error)
+      return
+    }
     options.message.success('已重命名画布')
   }
 
@@ -111,7 +131,7 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
   }
 
   async function navigateToBoard(boardId: string) {
-    options.flushAutosave()
+    await options.flushAutosave()
     await options.router.push({
       path: '/user/workspace',
       query: { ...options.route.query, boardId },

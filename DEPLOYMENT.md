@@ -135,12 +135,12 @@ VPS 防火墙建议只开放 SSH；API 域名通过 compose 内的 `cloudflared`
 
 ```text
 GitHub Actions
-  -> ghcr.io/<owner>/<repo>/ideaboard-api:<tag>
-  -> ghcr.io/<owner>/<repo>/ideaboard-auth:<tag>
+  -> ghcr.io/<owner>/<repo>/ideaboard-api@sha256:<digest>
+  -> ghcr.io/<owner>/<repo>/ideaboard-auth@sha256:<digest>
+  -> ghcr.io/<owner>/<repo>/ideaboard-auth-migrate@sha256:<digest>
 
 VPS
-  -> docker compose pull
-  -> docker compose up -d
+  -> ideaboard update
 ```
 
 ### 1. 构建并发布镜像
@@ -151,13 +151,14 @@ VPS
 - push `v*` tag
 - 在 GitHub Actions 手动运行 workflow，并可填写额外 `image_tag`
 
-生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。
+生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
 镜像命名约定：
 
 ```text
-ghcr.io/<github-owner>/<github-repo>/ideaboard-api:<tag>
-ghcr.io/<github-owner>/<github-repo>/ideaboard-auth:<tag>
+ghcr.io/<github-owner>/<github-repo>/ideaboard-api@sha256:<digest>
+ghcr.io/<github-owner>/<github-repo>/ideaboard-auth@sha256:<digest>
+ghcr.io/<github-owner>/<github-repo>/ideaboard-auth-migrate@sha256:<digest>
 ```
 
 #### 镜像供应链检查
@@ -175,7 +176,7 @@ ignore:
       type: deb
 ```
 
-当前 `ideaboard update` 不会自动执行 Cosign 验签；部署前可用镜像 digest 手动验证签名。`--certificate-identity` 的 ref 需匹配实际发布来源；tag 发布时改成 `refs/tags/vX.Y.Z`：
+`ideaboard update` 默认会在 pull 前执行 Cosign keyless 验签。未显式设置 `COSIGN_CERTIFICATE_IDENTITY_REGEXP` 时，脚本会从 `IDEABOARD_API_IMAGE` / `IDEABOARD_AUTH_IMAGE` / `IDEABOARD_AUTH_MIGRATE_IMAGE` 的 `ghcr.io/<owner>/<repo>/...` 自动派生签名身份，只接受同仓库 `docker-images.yml` workflow 的 branch/tag 发布；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
 
 ```bash
 cosign verify \
@@ -202,14 +203,16 @@ GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 - `APP_BASE_URL`
 - `API_BASE_URL`
 - `CLOUDFLARE_TUNNEL_TOKEN`
+- `IDEABOARD_API_IMAGE`
+- `IDEABOARD_AUTH_IMAGE`
+- `IDEABOARD_AUTH_MIGRATE_IMAGE`
 - `POSTGRES_PASSWORD`
 - `AUTH_INTERNAL_KEY`
 - `BETTER_AUTH_SECRET`
+- `NATS_PASSWORD`
 
 可选：
 
-- `IMAGE_NAMESPACE`（通常自动推断）
-- `IMAGE_TAG`（必须显式设置为不可变发布 tag 或 commit）
 - `CLOUDFLARED_VERSION`（必须显式设置固定版本，避免跟随 latest 漂移）
 
 ### 3. 后续部署 / 升级
@@ -269,11 +272,11 @@ curl http://127.0.0.1:8080/api/auth/get-session
 
 ```bash
 nano /opt/stacks/ideaboard/docker/.env
-# 修改 IMAGE_TAG，必要时也固定 CLOUDFLARED_VERSION
+# 修改 IDEABOARD_API_IMAGE / IDEABOARD_AUTH_IMAGE / IDEABOARD_AUTH_MIGRATE_IMAGE，必要时也固定 CLOUDFLARED_VERSION
 ideaboard update
 ```
 
-回滚时把 `IMAGE_TAG` 改回上一版，再执行：
+回滚时把三个 digest 镜像引用改回上一版，再执行：
 
 ```bash
 ideaboard update
@@ -472,13 +475,12 @@ nano /opt/ideaboard/apps/api/.env
 cp /opt/ideaboard/apps/auth/.env.example /opt/ideaboard/apps/auth/.env
 nano /opt/ideaboard/apps/auth/.env
 cd /opt/ideaboard/apps/auth
-npm ci
-node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes
-npm prune --omit=dev
+npm ci --omit=dev --omit=optional --no-audit --fund=false
+npm run migrate:dist
 ```
 
 > [!IMPORTANT]
-> 启用 Better Auth Admin plugin 后，必须先执行 `node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes`（开发环境对应 `npm --prefix apps/auth run migrate`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 字段；不要手写 DDL。
+> 启用 Better Auth Admin plugin 后，必须先执行 `npm --prefix apps/auth run migrate:dist`（开发环境对应 `npm --prefix apps/auth run migrate`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 字段；不要手写 DDL。Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移，运行时 `auth` 镜像不包含 Better Auth CLI。
 
 部署时至少确认：
 
@@ -491,7 +493,7 @@ npm prune --omit=dev
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
 
 > [!IMPORTANT]
-> Better Auth 会在同一个 PostgreSQL 库里维护 `user/session/account/verification` 等认证表。上面的 `node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
+> Better Auth 会在同一个 PostgreSQL 库里维护 `user/session/account/verification` 等认证表。上面的 `npm run migrate:dist` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
 >
 > 后台 `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销、开放注册开关、防刷限流设置；不开放后台改密。角色升降级与彻底注销均由 Go Admin API 编排，并依赖 `AUTH_SERVICE_INTERNAL_KEY` 调用 Auth Service internal endpoint；限流配置来源于后台设置并写入 `system_configs`，不通过环境变量注入。
 
@@ -652,7 +654,7 @@ nginx -t && systemctl reload nginx
 2. 解压到 `/opt/ideaboard/releases/`。
 3. 用新版本覆盖 `/opt/ideaboard/apps`、`/opt/ideaboard/deploy`。
 4. 保留原有 `/opt/ideaboard/apps/api/.env` 与 `/opt/ideaboard/apps/auth/.env`。
-5. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes && npm prune --omit=dev`。
+5. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci --omit=dev --omit=optional --no-audit --fund=false && npm run migrate:dist`。
 6. 执行 `systemctl restart ideaboard-auth ideaboard`。
 7. 再次执行健康检查与页面验证。
 
@@ -668,10 +670,10 @@ nginx -t && systemctl reload nginx
 
 1. 回到 `/opt/ideaboard/releases/` 中上一个版本目录。
 2. 重新复制上一版本的 `apps`、`deploy`。
-3. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes && npm prune --omit=dev`。
+3. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci --omit=dev --omit=optional --no-audit --fund=false && npm run migrate:dist`。
 4. 执行 `systemctl restart ideaboard-auth ideaboard`。
 5. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
 
-Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IMAGE_TAG` 改回上一版并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup 和 `api-uploads` tar，再运行 migration 和 health gate；历史 backup 默认位于 `/opt/stacks/ideaboard-backups/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 改回上一版 digest 并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup 和 `api-uploads` tar，再运行 migration 和 health gate；历史 backup 默认位于 `/opt/stacks/ideaboard-backups/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
 
 Docker stack 的数据面以 PostgreSQL volume 为准；回滚镜像不会自动转换、导入或恢复非 PostgreSQL 数据。

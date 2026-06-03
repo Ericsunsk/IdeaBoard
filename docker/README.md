@@ -90,17 +90,19 @@ docker/.env.example
 docker/nginx/ideaboard.prod.conf
 ```
 
-基础命令：
+生产部署命令：
 
 ```bash
 cp docker/.env.example docker/.env
-docker compose -f docker/compose.yml --env-file docker/.env pull
-docker compose -f docker/compose.yml --env-file docker/.env up -d
+nano docker/.env
+IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-backend-stack.sh update
 ```
 
-后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。漏洞 triage 与人工验签命令见根目录 [DEPLOYMENT.md](../DEPLOYMENT.md#recommended-docker)。
+后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。生产 `.env` 必须填写 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 的完整 digest 引用，`ideaboard update` 会在 pull 前自动验签。
 
-推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 PostgreSQL dump 写入 `backups/postgres/`，并在启动后检查 PostgreSQL、NATS JetStream、`api`/`auth` health、River schema 和默认 JetStream event stream。已启动的 stack 也可以随时执行 `ideaboard smoke` 复验。如果 health gate 失败，请先查看 `gateway/api/auth/postgres/nats` 日志，再决定是否把 `IMAGE_TAG` 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
+推荐生产环境使用 `ideaboard update`，它会在 Auth migration 前把 PostgreSQL dump 写入 `backups/postgres/`，并在启动后检查 PostgreSQL、NATS JetStream、`api`/`auth` health、River schema 和默认 JetStream event stream。已启动的 stack 也可以随时执行 `ideaboard smoke` 复验。如果 health gate 失败，请先查看 `gateway/api/auth/postgres/nats` 日志，再决定是否把三张镜像 digest 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
+
+直接运行 `docker compose pull && docker compose up -d` 只适合本地排障；这条路径不会自动执行 Cosign 验签、Auth migration、数据备份和 smoke gate。
 
 生产数据在 Docker volumes 中持久化：`postgres-data`、`nats-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。
 

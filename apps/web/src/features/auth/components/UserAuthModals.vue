@@ -16,6 +16,8 @@
 </template>
 
 <script setup lang="ts">
+import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
+
 const props = defineProps<{
   mode: 'login' | 'register'
 }>()
@@ -35,15 +37,6 @@ function goRegister() {
   void router.replace('/user/register')
 }
 
-const SAFE_REDIRECT_PREFIXES = ['/user', '/admin', '/share'] as const
-
-function isSafeInternalRedirectPath(path: string) {
-  if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) {
-    return false
-  }
-  return SAFE_REDIRECT_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
-}
-
 function resolveLoginRedirectPath() {
   const redirect = route.query.redirect
   const rawRedirectPath = Array.isArray(redirect) ? redirect[0] : redirect
@@ -53,9 +46,6 @@ function resolveLoginRedirectPath() {
     return '/user/home'
   }
   if (!isSafeInternalRedirectPath(redirectPath)) {
-    return '/user/home'
-  }
-  if (redirectPath.startsWith('/user/login') || redirectPath.startsWith('/user/register')) {
     return '/user/home'
   }
   return redirectPath

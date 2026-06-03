@@ -2,6 +2,7 @@ import boardApi, { type UserBoardItem } from '../../../shared/api/board'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import {
   getCanvasBoardById,
+  listCanvasBoards,
   normalizeCanvasBoardName,
   replaceCanvasBoards,
   type CanvasBoardMeta,
@@ -13,6 +14,10 @@ import {
 } from './canvasBoardState'
 
 const hydrateInFlight = new Map<string, Promise<void>>()
+
+export type HydrateCanvasBoardsFromServerOptions = {
+  preserveLocalNewer?: boolean
+}
 
 function toLocalMeta(board: UserBoardItem): CanvasBoardMeta | null {
   const boardId = board.board_id?.trim()
@@ -38,7 +43,18 @@ function toLocalState(board: UserBoardItem): CanvasBoardState | null {
   } as CanvasBoardState
 }
 
-function applyRemoteBoardsToLocal(boards: UserBoardItem[]) {
+function isLocalNewer(localUpdatedAt: number | undefined, remoteUpdatedAt: number | undefined) {
+  const local = Number(localUpdatedAt)
+  const remote = Number(remoteUpdatedAt)
+  if (!Number.isFinite(local)) return false
+  if (!Number.isFinite(remote)) return true
+  return local > remote
+}
+
+function applyRemoteBoardsToLocal(
+  boards: UserBoardItem[],
+  options: Required<HydrateCanvasBoardsFromServerOptions>,
+) {
   const metas: CanvasBoardMeta[] = []
   const stateMap: Record<string, CanvasBoardState> = {}
   boards.forEach((board) => {
@@ -48,8 +64,39 @@ function applyRemoteBoardsToLocal(boards: UserBoardItem[]) {
     const state = toLocalState(board)
     if (state) stateMap[meta.id] = state
   })
-  replaceCanvasBoards(metas)
-  replaceCanvasBoardStateMap(stateMap)
+  if (!options.preserveLocalNewer) {
+    replaceCanvasBoards(metas)
+    replaceCanvasBoardStateMap(stateMap)
+    return
+  }
+
+  const mergedMetas = new Map<string, CanvasBoardMeta>()
+  const localMetas = listCanvasBoards()
+  const localMetaMap = new Map(localMetas.map((meta) => [meta.id, meta]))
+
+  metas.forEach((remoteMeta) => {
+    const localMeta = localMetaMap.get(remoteMeta.id)
+    mergedMetas.set(
+      remoteMeta.id,
+      localMeta && isLocalNewer(localMeta.updatedAt, remoteMeta.updatedAt) ? localMeta : remoteMeta,
+    )
+  })
+
+  const mergedStateMap: Record<string, CanvasBoardState> = {}
+  mergedMetas.forEach((_, boardId) => {
+    const localState = getCanvasBoardState(boardId)
+    const remoteState = stateMap[boardId]
+    if (localState && remoteState && isLocalNewer(localState.updatedAt, remoteState.updatedAt)) {
+      mergedStateMap[boardId] = localState
+      return
+    }
+    if (remoteState) {
+      mergedStateMap[boardId] = remoteState
+    }
+  })
+
+  replaceCanvasBoards([...mergedMetas.values()])
+  replaceCanvasBoardStateMap(mergedStateMap)
 }
 
 async function listRemoteBoards(): Promise<UserBoardItem[]> {
@@ -57,22 +104,26 @@ async function listRemoteBoards(): Promise<UserBoardItem[]> {
   return Array.isArray(res.data?.list) ? res.data.list : []
 }
 
-export async function hydrateCanvasBoardsFromServer() {
+export async function hydrateCanvasBoardsFromServer(
+  options: HydrateCanvasBoardsFromServerOptions = {},
+) {
   const scope = getAuthStorageUserScope()
   if (!scope) return
-  const inFlight = hydrateInFlight.get(scope)
+  const resolvedOptions = { preserveLocalNewer: options.preserveLocalNewer !== false }
+  const hydrateKey = `${scope}:${resolvedOptions.preserveLocalNewer ? 'preserve' : 'replace'}`
+  const inFlight = hydrateInFlight.get(hydrateKey)
   if (inFlight) return inFlight
   const task = (async () => {
     const remoteBoards = await listRemoteBoards()
-    applyRemoteBoardsToLocal(remoteBoards)
+    applyRemoteBoardsToLocal(remoteBoards, resolvedOptions)
   })()
     .catch((error) => {
       console.warn('[boards] hydrate from server failed', error)
     })
     .finally(() => {
-      hydrateInFlight.delete(scope)
+      hydrateInFlight.delete(hydrateKey)
     })
-  hydrateInFlight.set(scope, task)
+  hydrateInFlight.set(hydrateKey, task)
   return task
 }
 
@@ -84,7 +135,7 @@ export async function syncCanvasBoardToServer(boardId: string) {
     name: board.name,
     state,
     created_at: board.createdAt,
-    updated_at: state?.updatedAt ?? board.updatedAt,
+    updated_at: Math.max(board.updatedAt, state?.updatedAt ?? 0),
   })
 }
 

@@ -95,6 +95,52 @@ func TestDeleteLocalByPrefixRemovesWorkspaceTree(t *testing.T) {
 	}
 }
 
+func TestDeleteLocalByPrefixRemovesUserUploadTrees(t *testing.T) {
+	withTempWorkingDir(t)
+
+	service := &StorageService{}
+	targetFiles := []string{
+		filepath.FromSlash(filepath.Join("uploads", "workspace", "CLN123", "board1", "content", "demo.png")),
+		filepath.FromSlash(filepath.Join("uploads", "profile", "CLN123", "avatar", "avatar.png")),
+		filepath.FromSlash(filepath.Join("uploads", "tasks", "42", "task-owned", "result.png")),
+	}
+	otherFiles := []string{
+		filepath.FromSlash(filepath.Join("uploads", "workspace", "OTHER1", "board1", "content", "keep.png")),
+		filepath.FromSlash(filepath.Join("uploads", "profile", "OTHER1", "avatar", "keep.png")),
+		filepath.FromSlash(filepath.Join("uploads", "tasks", "43", "task-owned", "keep.png")),
+	}
+
+	for _, file := range append(targetFiles, otherFiles...) {
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatalf("mkdir failed: %v", err)
+		}
+		if err := os.WriteFile(file, []byte("demo"), 0o644); err != nil {
+			t.Fatalf("write file failed: %v", err)
+		}
+	}
+
+	prefixes, err := userUploadObjectPrefixes(42, "CLN123")
+	if err != nil {
+		t.Fatalf("userUploadObjectPrefixes returned error: %v", err)
+	}
+	for _, prefix := range prefixes {
+		if err := service.deleteLocalByPrefix(prefix); err != nil {
+			t.Fatalf("deleteLocalByPrefix(%q) returned error: %v", prefix, err)
+		}
+	}
+
+	for _, file := range targetFiles {
+		if _, err := os.Stat(file); !os.IsNotExist(err) {
+			t.Fatalf("expected target file %q to be removed, stat err = %v", file, err)
+		}
+	}
+	for _, file := range otherFiles {
+		if _, err := os.Stat(file); err != nil {
+			t.Fatalf("expected unrelated file %q to exist, stat err = %v", file, err)
+		}
+	}
+}
+
 func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 	t.Run("virtual host style", func(t *testing.T) {
 		parsed, err := url.Parse("https://img.example.com/uploads/workspace/AB12C3/2026/04/24/demo.png")

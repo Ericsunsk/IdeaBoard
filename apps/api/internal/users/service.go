@@ -11,22 +11,22 @@ import (
 const maxUserKeywordLength = 64
 
 type UserService struct {
-	repo             *UserRepository
-	workspaceCleaner UserWorkspaceCleaner
+	repo          *UserRepository
+	uploadCleaner UserUploadCleaner
 }
 
-type UserWorkspaceCleaner interface {
-	DeleteWorkspaceByStorageUID(ctx context.Context, storageUID string) error
+type UserUploadCleaner interface {
+	DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error
 }
 
-func NewUserService(repo *UserRepository, workspaceCleaner ...UserWorkspaceCleaner) *UserService {
-	var cleaner UserWorkspaceCleaner
-	if len(workspaceCleaner) > 0 {
-		cleaner = workspaceCleaner[0]
+func NewUserService(repo *UserRepository, uploadCleaner ...UserUploadCleaner) *UserService {
+	var cleaner UserUploadCleaner
+	if len(uploadCleaner) > 0 {
+		cleaner = uploadCleaner[0]
 	}
 	return &UserService{
-		repo:             repo,
-		workspaceCleaner: cleaner,
+		repo:          repo,
+		uploadCleaner: cleaner,
 	}
 }
 
@@ -84,10 +84,10 @@ func (s *UserService) DeleteUser(ctx context.Context, userID int64) error {
 		return errors.New("用户不存在")
 	}
 
-	if s.workspaceCleaner != nil {
-		if err := s.workspaceCleaner.DeleteWorkspaceByStorageUID(ctx, targetUser.StorageUID); err != nil {
-			slog.Warn("delete workspace uploads failed", "user_id", targetUser.ID, "storage_uid", targetUser.StorageUID, "err", err)
-			return errors.New("删除失败：用户工作区文件清理失败，请查看服务日志")
+	if s.uploadCleaner != nil {
+		if err := s.uploadCleaner.DeleteUserUploads(ctx, targetUser.ID, targetUser.StorageUID); err != nil {
+			slog.Warn("delete user uploads failed", "user_id", targetUser.ID, "storage_uid", targetUser.StorageUID, "err", err)
+			return errors.New("删除失败：用户文件清理失败，请查看服务日志")
 		}
 	}
 

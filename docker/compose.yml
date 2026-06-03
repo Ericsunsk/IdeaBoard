@@ -48,7 +48,7 @@ services:
       - ideaboard-network
 
   api:
-    image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:?Set IMAGE_NAMESPACE in docker/.env}/ideaboard-api:${IMAGE_TAG:?Set IMAGE_TAG in docker/.env}
+    image: ${IDEABOARD_API_IMAGE:?Set IDEABOARD_API_IMAGE in docker/.env}
     container_name: ideaboard-api
     restart: unless-stopped
     depends_on:
@@ -85,7 +85,7 @@ services:
       RIVER_TASK_TIMEOUT_SECONDS: ${RIVER_TASK_TIMEOUT_SECONDS:-180}
       RIVER_NO_CAPACITY_RETRY_SECONDS: ${RIVER_NO_CAPACITY_RETRY_SECONDS:-5}
       RIVER_MAX_RETRY: ${RIVER_MAX_RETRY:-25}
-      NATS_URL: nats://nats:4222
+      NATS_URL: nats://${NATS_USER:-ideaboard}:${NATS_PASSWORD:?Set NATS_PASSWORD}@nats:4222
       NATS_EVENT_BUS_ENABLED: ${NATS_EVENT_BUS_ENABLED:-true}
       NATS_STREAM_NAME: ${NATS_STREAM_NAME:-IDEABOARD_EVENTS}
       NATS_SUBJECT_PREFIX: ${NATS_SUBJECT_PREFIX:-ideaboard}
@@ -107,7 +107,7 @@ services:
       - ideaboard-network
 
   auth:
-    image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:?Set IMAGE_NAMESPACE in docker/.env}/ideaboard-auth:${IMAGE_TAG:?Set IMAGE_TAG in docker/.env}
+    image: ${IDEABOARD_AUTH_IMAGE:?Set IDEABOARD_AUTH_IMAGE in docker/.env}
     container_name: ideaboard-auth
     restart: unless-stopped
     cap_drop:
@@ -142,6 +142,32 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+    networks:
+      - ideaboard-network
+
+  auth-migrate:
+    image: ${IDEABOARD_AUTH_MIGRATE_IMAGE:?Set IDEABOARD_AUTH_MIGRATE_IMAGE in docker/.env}
+    profiles:
+      - tools
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_ENV: production
+      AUTH_INTERNAL_KEY: ${AUTH_INTERNAL_KEY:?Set AUTH_INTERNAL_KEY}
+      AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-${APP_BASE_URL:?Set APP_BASE_URL}}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-${API_BASE_URL:?Set API_BASE_URL}}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-ideaboard}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB:-ideaboard}
+      DB_SSLMODE: disable
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - ideaboard-network
 
@@ -182,6 +208,10 @@ services:
       - /data
       - -m
       - "8222"
+      - --user
+      - ${NATS_USER:-ideaboard}
+      - --pass
+      - ${NATS_PASSWORD:?Set NATS_PASSWORD}
     volumes:
       - nats-data:/data
     healthcheck:

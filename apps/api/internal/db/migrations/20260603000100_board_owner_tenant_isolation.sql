@@ -1,7 +1,4 @@
 -- migrate:up
-ALTER TABLE user_boards DROP CONSTRAINT IF EXISTS uk_user_boards_board_id;
-ALTER TABLE user_boards ADD CONSTRAINT uk_user_boards_user_board_id UNIQUE (user_id, board_id);
-
 ALTER TABLE board_members ADD COLUMN IF NOT EXISTS owner_user_id BIGINT;
 
 DELETE FROM board_members AS m
@@ -30,6 +27,4 @@ ALTER TABLE board_members DROP CONSTRAINT IF EXISTS idx_board_member;
 ALTER TABLE board_members ADD CONSTRAINT idx_board_member UNIQUE (board_id, user_id);
 ALTER TABLE board_members DROP COLUMN IF EXISTS owner_user_id;
 
-ALTER TABLE user_boards DROP CONSTRAINT IF EXISTS uk_user_boards_user_board_id;
-ALTER TABLE user_boards ADD CONSTRAINT uk_user_boards_board_id UNIQUE (board_id);
 CREATE INDEX idx_board_member_user ON board_members (user_id, board_id);

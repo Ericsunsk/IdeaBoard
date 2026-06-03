@@ -60,6 +60,9 @@ export type UseFlowBoardPersistenceOptions = {
 }
 
 export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions) {
+  let saveSequence = 0
+  let loadSequence = 0
+
   function hasPendingImageResultNode(nodes: unknown[]): boolean {
     return nodes.some((node) => {
       const snapshotNode = (node as FlowNodeLike)?.data?.snapshotNode
@@ -131,22 +134,30 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
   async function importBoardSnapshot() {
     const boardId = readBoardIdFromQuery()
     if (!boardId) {
+      loadSequence += 1
+      options.isLoadingBoardSnapshot.value = false
       importEmptyBoardSnapshot()
       return
     }
+    const loadToken = ++loadSequence
+    const isLoadStillCurrent = () => loadToken === loadSequence && currentBoardId.value === boardId
     options.isLoadingBoardSnapshot.value = true
     try {
       const snapshot = await loadBoardSnapshotForFlow(boardId)
+      if (!isLoadStillCurrent()) return
       if (!snapshot) {
         importEmptyBoardSnapshot()
         return
       }
       applyBoardSnapshot(snapshot)
     } catch (error) {
+      if (!isLoadStillCurrent()) return
       console.warn('[workspace] load board snapshot failed', error)
       options.onError('导入画布快照失败，请稍后重试')
     } finally {
-      options.isLoadingBoardSnapshot.value = false
+      if (loadToken === loadSequence) {
+        options.isLoadingBoardSnapshot.value = false
+      }
     }
   }
 
@@ -200,6 +211,8 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       options.onWarning('缺少 boardId，无法保存')
       return false
     }
+    const saveToken = ++saveSequence
+    const isSaveStillCurrent = () => currentBoardId.value === boardId
     options.isSavingBoard.value = true
     try {
       const { userId, userUid } = options.getUserIdentity()
@@ -218,17 +231,20 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       const snapshot = buildCurrentBoardSnapshot()
       const stabilizedSnapshot = await uploadLifecycle.stabilizeSnapshotForSave(snapshot)
       await saveBoardSnapshotFromFlow(boardId, stabilizedSnapshot)
-      options.boardBaseSnapshot.value = stabilizedSnapshot
-      const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
-      if (!hasPendingImageResultNode(options.nodes.value)) {
-        options.commitNodes(nextFlow.nodes as unknown[])
-        options.commitEdges(nextFlow.edges as unknown[])
-        options.clearFlowHistoryBaseline()
-      }
-      options.isDirty.value = false
-      options.saveStatus.value = 'saved'
-      if (!saveOptions.silent) {
-        options.onSuccess('已保存')
+      const shouldCommitToCurrentGraph = isSaveStillCurrent()
+      if (shouldCommitToCurrentGraph) {
+        options.boardBaseSnapshot.value = stabilizedSnapshot
+        const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
+        if (!hasPendingImageResultNode(options.nodes.value)) {
+          options.commitNodes(nextFlow.nodes as unknown[])
+          options.commitEdges(nextFlow.edges as unknown[])
+          options.clearFlowHistoryBaseline()
+        }
+        options.isDirty.value = false
+        options.saveStatus.value = 'saved'
+        if (!saveOptions.silent) {
+          options.onSuccess('已保存')
+        }
       }
       const previewRefreshTask = refreshBoardPreviewAfterSave(boardId, stabilizedSnapshot).catch(
         (error) => {
@@ -239,16 +255,24 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
         await previewRefreshTask
       }
       await uploadLifecycle.recycleRemovedUploadsAfterSave(previousSnapshot, stabilizedSnapshot)
-      options.refreshSnapshot()
-      options.onGraphCommitted?.()
+      if (isSaveStillCurrent()) {
+        options.refreshSnapshot()
+        options.onGraphCommitted?.()
+      }
       return true
     } catch (error) {
-      options.saveStatus.value = 'failed'
+      if (isSaveStillCurrent()) {
+        options.saveStatus.value = 'failed'
+      }
       console.warn('[workspace] save board snapshot failed', error)
-      options.onError(error instanceof Error ? error.message : '保存失败，请稍后重试')
+      if (isSaveStillCurrent()) {
+        options.onError(error instanceof Error ? error.message : '保存失败，请稍后重试')
+      }
       return false
     } finally {
-      options.isSavingBoard.value = false
+      if (saveToken === saveSequence) {
+        options.isSavingBoard.value = false
+      }
     }
   }
 

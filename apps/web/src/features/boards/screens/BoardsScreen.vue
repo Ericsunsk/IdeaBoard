@@ -256,7 +256,7 @@ async function createAndOpenBoard() {
     await syncCanvasBoardToServer(board.id)
   } catch (error) {
     if (isBoardNameConflictError(error)) {
-      await hydrateCanvasBoardsFromServer()
+      await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
       reloadBoards()
       appToast.error('画布名称已存在，请重试')
       return
@@ -269,12 +269,6 @@ async function createAndOpenBoard() {
 
 function openBoard(board: CanvasBoardMeta) {
   touchCanvasBoard(board.id)
-  void syncCanvasBoardToServer(board.id).catch((error) => {
-    if (isBoardNameConflictError(error)) {
-      appToast.error('当前画布名称与其他画布重复，请先重命名')
-    }
-    console.warn('[boards] failed to sync board open touch', error)
-  })
   router.push({ path: '/user/workspace', query: { boardId: board.id } })
 }
 
@@ -333,13 +327,13 @@ async function commitRename() {
   try {
     await syncCanvasBoardToServer(boardId)
   } catch (error) {
-    if (isBoardNameConflictError(error)) {
-      await hydrateCanvasBoardsFromServer()
-      reloadBoards()
-      appToast.error('名称已存在，请更换后再试')
-      return
-    }
+    await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
+    reloadBoards()
+    appToast.error(
+      isBoardNameConflictError(error) ? '名称已存在，请更换后再试' : '重命名同步失败，请稍后重试',
+    )
     console.warn('[boards] failed to sync renamed board', error)
+    return
   }
   reloadBoards()
   appToast.success('画布已重命名')
@@ -374,7 +368,7 @@ async function handleDuplicateAction(board: CanvasBoardMeta) {
     await syncCanvasBoardToServer(copy.id)
   } catch (error) {
     if (isBoardNameConflictError(error)) {
-      await hydrateCanvasBoardsFromServer()
+      await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
       reloadBoards()
       appToast.error('复制后的画布名称已存在，请重试')
       return

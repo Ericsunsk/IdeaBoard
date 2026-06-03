@@ -20,7 +20,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --omit=optional
 
-FROM node:${NODE_VERSION}-alpine AS runtime
+FROM node:${NODE_VERSION}-alpine AS runtime-base
 
 RUN rm -rf \
     /usr/local/bin/corepack \
@@ -30,6 +30,8 @@ RUN rm -rf \
     /usr/local/lib/node_modules/npm
 
 WORKDIR /app
+
+FROM runtime-base AS runtime
 
 ENV NODE_ENV=production \
     AUTH_HOST=0.0.0.0 \
@@ -44,3 +46,15 @@ EXPOSE 6001
 USER node
 
 CMD ["node", "dist/index.js"]
+
+FROM runtime-base AS migrator
+
+ENV NODE_ENV=production
+
+COPY --from=prod-deps --chown=node:node /app/package.json ./
+COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist ./dist
+
+USER node
+
+CMD ["node", "dist/migrate.js"]

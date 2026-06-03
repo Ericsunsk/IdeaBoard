@@ -42,13 +42,13 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           fetch-depth: 0
           ref: ${{ steps.meta.outputs.tag }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: "22.22.2"
           cache: "npm"
@@ -57,7 +57,7 @@ jobs:
             apps/auth/package-lock.json
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
@@ -87,7 +87,7 @@ jobs:
         run: go test -race ./...
 
       - name: Lint Go API
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7
         with:
           version: v2.12.2
           working-directory: apps/api
@@ -293,7 +293,7 @@ jobs:
           fi
 
       - name: Create or update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.tag }}

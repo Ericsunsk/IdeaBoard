@@ -90,6 +90,52 @@ func TestParseUploadResourceTaskOutput(t *testing.T) {
 	}
 }
 
+func TestTaskOutputUploadPrefixes(t *testing.T) {
+	dirPrefix, err := TaskOutputUploadDirPrefix(42, "task-abc")
+	if err != nil {
+		t.Fatalf("TaskOutputUploadDirPrefix returned error: %v", err)
+	}
+	if dirPrefix != "tasks/42/task-abc" {
+		t.Fatalf("dir prefix = %q, want %q", dirPrefix, "tasks/42/task-abc")
+	}
+
+	userPrefix, err := TaskOutputUserUploadObjectPrefix(42)
+	if err != nil {
+		t.Fatalf("TaskOutputUserUploadObjectPrefix returned error: %v", err)
+	}
+	if userPrefix != "uploads/tasks/42/" {
+		t.Fatalf("user object prefix = %q, want %q", userPrefix, "uploads/tasks/42/")
+	}
+
+	taskPrefix, err := TaskOutputUploadObjectPrefix(42, "task-abc")
+	if err != nil {
+		t.Fatalf("TaskOutputUploadObjectPrefix returned error: %v", err)
+	}
+	if taskPrefix != "uploads/tasks/42/task-abc/" {
+		t.Fatalf("task object prefix = %q, want %q", taskPrefix, "uploads/tasks/42/task-abc/")
+	}
+}
+
+func TestUserUploadObjectPrefixesIncludesAllUserOwnedUploadRoots(t *testing.T) {
+	prefixes, err := userUploadObjectPrefixes(42, "OWNR1A")
+	if err != nil {
+		t.Fatalf("userUploadObjectPrefixes returned error: %v", err)
+	}
+	want := []string{
+		"uploads/workspace/OWNR1A/",
+		"uploads/profile/OWNR1A/avatar/",
+		"uploads/tasks/42/",
+	}
+	if len(prefixes) != len(want) {
+		t.Fatalf("prefixes = %#v, want %#v", prefixes, want)
+	}
+	for i := range want {
+		if prefixes[i] != want[i] {
+			t.Fatalf("prefixes[%d] = %q, want %q", i, prefixes[i], want[i])
+		}
+	}
+}
+
 func TestParseUploadResourceRejectsLegacyGenericPath(t *testing.T) {
 	if _, err := ParseUploadResource("/uploads/2026/05/30/demo.png"); err == nil {
 		t.Fatalf("expected legacy generic upload path to fail")

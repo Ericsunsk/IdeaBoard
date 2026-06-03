@@ -152,20 +152,28 @@ func (s *StorageService) DeleteWorkspaceByStorageUID(ctx context.Context, storag
 	return s.deleteUploadObjectPrefix(ctx, prefix)
 }
 
-func (s *StorageService) DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error {
-	dirPrefix, err := TaskOutputUploadDirPrefix(userID, taskID)
+func (s *StorageService) DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error {
+	prefixes, err := userUploadObjectPrefixes(userID, storageUID)
 	if err != nil {
 		return err
 	}
-	return s.deleteUploadObjectPrefix(ctx, path.Join(uploadObjectRoot, dirPrefix)+"/")
+	return s.deleteUploadObjectPrefixes(ctx, prefixes)
+}
+
+func (s *StorageService) DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error {
+	prefix, err := TaskOutputUploadObjectPrefix(userID, taskID)
+	if err != nil {
+		return err
+	}
+	return s.deleteUploadObjectPrefix(ctx, prefix)
 }
 
 func (s *StorageService) deleteUploadObjectPrefix(ctx context.Context, prefix string) error {
+	return s.deleteUploadObjectPrefixes(ctx, []string{prefix})
+}
+
+func (s *StorageService) deleteUploadObjectPrefixes(ctx context.Context, prefixes []string) error {
 	profile, err := s.resolveActiveProfile(ctx)
-	if err != nil {
-		return err
-	}
-	normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
 	if err != nil {
 		return err
 	}
@@ -174,7 +182,16 @@ func (s *StorageService) deleteUploadObjectPrefix(ctx context.Context, prefix st
 	if err != nil {
 		return err
 	}
-	return adapter.DeleteByPrefix(ctx, profile, normalizedPrefix)
+	for _, prefix := range prefixes {
+		normalizedPrefix, err := normalizeUploadObjectPrefix(prefix)
+		if err != nil {
+			return err
+		}
+		if err := adapter.DeleteByPrefix(ctx, profile, normalizedPrefix); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *StorageService) DeleteWorkspaceBoardByStorageUID(ctx context.Context, storageUID string, boardID string) error {

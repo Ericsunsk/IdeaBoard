@@ -330,12 +330,12 @@ const { scheduleFlowNodeInternalsRefresh } = useFlowNodeInternalsRefreshQueue({
 })
 
 async function onNavigateRequest(path: string) {
-  void flushAutosave()
+  await flushAutosave()
   await router.push(path)
 }
 
 async function onLogoutRequest() {
-  void flushAutosave()
+  await flushAutosave()
   await logoutAndRedirect('/user/home')
 }
 
@@ -422,12 +422,11 @@ const {
   message: {
     warning: (msg: string) => appToast.warning(msg),
     success: (msg: string) => appToast.success(msg),
+    error: (msg: string) => appToast.error(msg),
   },
   router,
   route,
-  flushAutosave: () => {
-    void flushAutosave()
-  },
+  flushAutosave: () => flushAutosave(),
 })
 
 const flowNodeMutations = useFlowNodeMutations({
@@ -899,9 +898,7 @@ useFlowKeyboardShortcuts({
 })
 
 useFlowLeaveGuard({
-  onLeave: () => {
-    void flushAutosave()
-  },
+  onLeave: () => flushAutosave(),
 })
 
 onMounted(async () => {

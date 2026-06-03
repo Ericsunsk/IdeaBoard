@@ -9,10 +9,30 @@ import {
   clearStoredAuth,
   hasValidStoredAuth,
 } from '../../shared/utils/auth'
+import { clearAuthScopedQueryCache } from '../../shared/query/queryClient'
 import type { ErrorType } from '../../shared/api/orvalMutator'
 import { resolveAuthUrl } from '../../shared/config/runtimeUrls'
 
 const SESSION_CACHE_TTL_MS = 30_000
+
+function getUserIdentity(authUser: User | null): string | null {
+  if (!authUser) return null
+
+  const authUserId = typeof authUser.auth_user_id === 'string' ? authUser.auth_user_id.trim() : ''
+  if (authUserId) return `auth:${authUserId}`
+
+  const uid = typeof authUser.uid === 'string' ? authUser.uid.trim() : ''
+  if (uid) return `uid:${uid}`
+
+  if (typeof authUser.id === 'number' && Number.isFinite(authUser.id)) {
+    return `id:${authUser.id}`
+  }
+
+  const username = typeof authUser.username === 'string' ? authUser.username.trim() : ''
+  if (username) return `username:${username}`
+
+  return null
+}
 
 export const useUserStore = defineStore('user', () => {
   const storedUser = getStoredUser()
@@ -30,6 +50,9 @@ export const useUserStore = defineStore('user', () => {
   const isAdmin = computed(() => user.value?.role === 'admin')
 
   function updateAuth(newUser: User) {
+    if (getUserIdentity(user.value) !== getUserIdentity(newUser)) {
+      clearAuthScopedQueryCache()
+    }
     user.value = newUser
     userInfoLoaded.value = true
     sessionValidatedAt.value = Date.now()
@@ -37,6 +60,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function resetAuth() {
+    clearAuthScopedQueryCache()
     user.value = null
     userInfoLoaded.value = false
     sessionValidatedAt.value = 0
