@@ -28,6 +28,13 @@ func TestTaskOutputUsesTaskSortIndex(t *testing.T) {
 	}
 }
 
+func TestTaskOutputCascadesWithTaskDelete(t *testing.T) {
+	schema := readDBSchema(t)
+	if !strings.Contains(schema, "CONSTRAINT fk_task_outputs_task_id FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE") {
+		t.Fatalf("task_outputs must cascade when parent task is deleted")
+	}
+}
+
 func readDBSchema(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "db", "schema", "schema.sql"))

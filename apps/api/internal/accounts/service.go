@@ -12,33 +12,39 @@ import (
 )
 
 type AccountService struct {
-	accountRepo      *AccountRepository
-	taskRepo         *TaskRepository
-	queue            taskqueue.TaskEnqueuer
-	queueStats       taskqueue.QueueStatsStore
-	accountLoadStore taskqueue.AccountLoadStore
-	concurrencyStore taskqueue.AccountConcurrencyStore
-	cancelStore      taskqueue.TaskCancellationStore
-	monitorStore     taskqueue.TaskMonitorStore
-	taskEventHub     *TaskEventHub
-	taskEvents       events.TaskStatusPublisher
-	systemConfigRepo *settings.SystemConfigRepository
-	uploadBoards     storage.UploadBoardAccessResolver
-	uploadOwners     storage.UploadOwnerStorageUIDResolver
+	accountRepo       *AccountRepository
+	taskRepo          *TaskRepository
+	queue             taskqueue.TaskEnqueuer
+	queueStats        taskqueue.QueueStatsStore
+	accountLoadStore  taskqueue.AccountLoadStore
+	concurrencyStore  taskqueue.AccountConcurrencyStore
+	cancelStore       taskqueue.TaskCancellationStore
+	monitorStore      taskqueue.TaskMonitorStore
+	taskEventHub      *TaskEventHub
+	taskEvents        events.TaskStatusPublisher
+	systemConfigRepo  *settings.SystemConfigRepository
+	uploadBoards      storage.UploadBoardAccessResolver
+	uploadOwners      storage.UploadOwnerStorageUIDResolver
+	taskOutputCleaner TaskOutputObjectCleaner
+}
+
+type TaskOutputObjectCleaner interface {
+	DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error
 }
 
 type AccountServiceDeps struct {
-	AccountRepo      *AccountRepository
-	TaskRepo         *TaskRepository
-	Queue            taskqueue.TaskEnqueuer
-	QueueStats       taskqueue.QueueStatsStore
-	AccountLoadStore taskqueue.AccountLoadStore
-	ConcurrencyStore taskqueue.AccountConcurrencyStore
-	CancelStore      taskqueue.TaskCancellationStore
-	MonitorStore     taskqueue.TaskMonitorStore
-	SystemConfigRepo *settings.SystemConfigRepository
-	UploadBoards     storage.UploadBoardAccessResolver
-	UploadOwners     storage.UploadOwnerStorageUIDResolver
+	AccountRepo       *AccountRepository
+	TaskRepo          *TaskRepository
+	Queue             taskqueue.TaskEnqueuer
+	QueueStats        taskqueue.QueueStatsStore
+	AccountLoadStore  taskqueue.AccountLoadStore
+	ConcurrencyStore  taskqueue.AccountConcurrencyStore
+	CancelStore       taskqueue.TaskCancellationStore
+	MonitorStore      taskqueue.TaskMonitorStore
+	SystemConfigRepo  *settings.SystemConfigRepository
+	UploadBoards      storage.UploadBoardAccessResolver
+	UploadOwners      storage.UploadOwnerStorageUIDResolver
+	TaskOutputCleaner TaskOutputObjectCleaner
 }
 
 type AccountServiceOptions struct {
@@ -63,19 +69,20 @@ const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加�
 
 func NewAccountService(deps AccountServiceDeps, opts AccountServiceOptions) *AccountService {
 	return &AccountService{
-		accountRepo:      deps.AccountRepo,
-		taskRepo:         deps.TaskRepo,
-		queue:            deps.Queue,
-		queueStats:       deps.QueueStats,
-		accountLoadStore: deps.AccountLoadStore,
-		concurrencyStore: deps.ConcurrencyStore,
-		cancelStore:      deps.CancelStore,
-		monitorStore:     deps.MonitorStore,
-		systemConfigRepo: deps.SystemConfigRepo,
-		uploadBoards:     deps.UploadBoards,
-		uploadOwners:     deps.UploadOwners,
-		taskEventHub:     opts.TaskEventHub,
-		taskEvents:       opts.TaskEvents,
+		accountRepo:       deps.AccountRepo,
+		taskRepo:          deps.TaskRepo,
+		queue:             deps.Queue,
+		queueStats:        deps.QueueStats,
+		accountLoadStore:  deps.AccountLoadStore,
+		concurrencyStore:  deps.ConcurrencyStore,
+		cancelStore:       deps.CancelStore,
+		monitorStore:      deps.MonitorStore,
+		systemConfigRepo:  deps.SystemConfigRepo,
+		uploadBoards:      deps.UploadBoards,
+		uploadOwners:      deps.UploadOwners,
+		taskOutputCleaner: deps.TaskOutputCleaner,
+		taskEventHub:      opts.TaskEventHub,
+		taskEvents:        opts.TaskEvents,
 	}
 }
 

@@ -52,6 +52,20 @@ func (f *fakeCancelStore) MarkCancelled(_ context.Context, taskID string, _ time
 func (f *fakeCancelStore) IsCancelled(context.Context, string) (bool, error) { return false, nil }
 func (f *fakeCancelStore) ClearCancelled(context.Context, string) error      { return nil }
 
+type recordingTaskOutputCleaner struct {
+	calls []taskOutputCleanerCall
+}
+
+type taskOutputCleanerCall struct {
+	userID int64
+	taskID string
+}
+
+func (c *recordingTaskOutputCleaner) DeleteTaskOutputsByUserTask(_ context.Context, userID int64, taskID string) error {
+	c.calls = append(c.calls, taskOutputCleanerCall{userID: userID, taskID: taskID})
+	return nil
+}
+
 type fakeMonitorStore struct{}
 
 func (f *fakeMonitorStore) MonitorInfo(context.Context, []int64) (*queuetypes.MonitorInfo, error) {
@@ -263,5 +277,65 @@ func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	}
 	if published[pending.TaskID] != tasks.StatusFailed || published[running.TaskID] != tasks.StatusFailed {
 		t.Fatalf("published statuses=%v, want failed for stopped tasks", published)
+	}
+}
+
+func TestDeleteUserTaskCleansOutputsAndTaskOutputObjects(t *testing.T) {
+	ctx := context.Background()
+	db := newQueueServiceTestDB(t)
+	taskRepo := NewTaskRepository(db)
+
+	task := &tasks.Task{
+		TaskID:     "delete-with-outputs",
+		UserID:     42,
+		ChannelID:  1,
+		AccountID:  7,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-delete",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("create task failed: %v", err)
+	}
+
+	rows, err := taskRepo.CompleteWithOutputs(ctx, task.TaskID, []string{tasks.StatusRunning}, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
+		{
+			Role:       "image",
+			URL:        "/uploads/tasks/42/delete-with-outputs/2026/06/03/result.png",
+			StorageKey: "uploads/tasks/42/delete-with-outputs/2026/06/03/result.png",
+			MIMEType:   "image/png",
+			Width:      1024,
+			Height:     1024,
+		},
+	})
+	if err != nil {
+		t.Fatalf("complete with outputs failed: %v", err)
+	}
+	if rows != 1 {
+		t.Fatalf("complete rows=%d, want 1", rows)
+	}
+
+	cleaner := &recordingTaskOutputCleaner{}
+	svc := NewAccountService(AccountServiceDeps{
+		TaskRepo:          taskRepo,
+		CancelStore:       &fakeCancelStore{},
+		TaskOutputCleaner: cleaner,
+	}, AccountServiceOptions{})
+
+	if err := svc.DeleteUserTask(ctx, task.TaskID, task.UserID); err != nil {
+		t.Fatalf("DeleteUserTask failed: %v", err)
+	}
+
+	if len(cleaner.calls) != 1 || cleaner.calls[0].userID != task.UserID || cleaner.calls[0].taskID != task.TaskID {
+		t.Fatalf("cleaner calls=%+v, want one call for user/task", cleaner.calls)
+	}
+	outputsByTask, err := taskRepo.ListOutputsByTaskIDs(ctx, []string{task.TaskID})
+	if err != nil {
+		t.Fatalf("list outputs failed: %v", err)
+	}
+	if len(outputsByTask[task.TaskID]) != 0 {
+		t.Fatalf("outputs after delete=%+v, want none", outputsByTask[task.TaskID])
+	}
+	if _, err := taskRepo.GetByTaskID(ctx, task.TaskID); err == nil {
+		t.Fatal("deleted task is still queryable")
 	}
 }

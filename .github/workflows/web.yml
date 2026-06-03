@@ -1,0 +1,63 @@
+name: Web
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "apps/api/openapi.yaml"
+      - ".github/workflows/web.yml"
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "apps/web/**"
+      - "apps/api/openapi.yaml"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.22.2"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Generate API client
+        working-directory: apps/web
+        run: npm run api:generate
+
+      - name: Check generated API drift
+        run: git diff --exit-code -- apps/web/src/shared/api/generated-query
+
+      - name: Lint
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: Test
+        working-directory: apps/web
+        run: npm run test:run
+
+      - name: Build
+        working-directory: apps/web
+        run: npm run build

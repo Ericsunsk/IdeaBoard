@@ -17,6 +17,10 @@ tags:
   - name: AdminChannels
   - name: AdminStorage
   - name: AdminFeaturePrompts
+  - name: UserAssets
+  - name: AdminAssets
+  - name: UserLineDraftModes
+  - name: AdminLineDraftModes
 paths:
   /user/info:
     get:
@@ -29,6 +33,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUserInfo'
+  /user/profile/avatar:
+    post:
+      tags: [UserAssets]
+      operationId: uploadUserProfileAvatar
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Uploaded profile avatar metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUploadAvatar'
   /user/boards:
     get:
       tags: [Boards]
@@ -67,6 +95,52 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDeleted'
+  /user/boards/{board_id}/uploads:
+    post:
+      tags: [UserAssets]
+      operationId: uploadUserBoardAsset
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Uploaded board asset metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUploadImage'
+    delete:
+      tags: [UserAssets]
+      operationId: deleteUserBoardUpload
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BoardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteUploadRequest'
+      responses:
+        '200':
+          description: Deleted board upload
           content:
             application/json:
               schema:
@@ -291,6 +365,38 @@ paths:
 
                 event: task
                 data: {"task_id":"task_123","status":"running"}
+  /user/download:
+    get:
+      tags: [UserAssets]
+      operationId: downloadUserImage
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+      responses:
+        '200':
+          description: Downloaded image bytes
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+  /user/line-draft-modes:
+    get:
+      tags: [UserLineDraftModes]
+      operationId: listUserLineDraftModes
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Enabled line draft modes without prompt templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUserLineDraftModeList'
 
   /admin/settings/registration:
     get:
@@ -659,6 +765,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseAdminStatistics'
+  /admin/statistics/backfill:
+    post:
+      tags: [AdminStatistics]
+      operationId: backfillAdminStatistics
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminStatisticsBackfillRequest'
+      responses:
+        '200':
+          description: Backfilled missing daily statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAdminStatisticsBackfill'
+  /admin/upload:
+    post:
+      tags: [AdminAssets]
+      operationId: uploadAdminAsset
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Uploaded admin asset metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseUploadImage'
 
   /admin/channels:
     get:
@@ -845,6 +994,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseStorageBucketInfo'
 
+  /admin/line-draft-modes:
+    get:
+      tags: [AdminLineDraftModes]
+      operationId: listAdminLineDraftModes
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: All line draft modes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseAdminLineDraftModeList'
+    post:
+      tags: [AdminLineDraftModes]
+      operationId: createAdminLineDraftMode
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LineDraftModePayload'
+      responses:
+        '200':
+          description: Created line draft mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseLineDraftMode'
+  /admin/line-draft-modes/{id}:
+    put:
+      tags: [AdminLineDraftModes]
+      operationId: updateAdminLineDraftMode
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LineDraftModeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LineDraftModePayload'
+      responses:
+        '200':
+          description: Updated line draft mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+    delete:
+      tags: [AdminLineDraftModes]
+      operationId: deleteAdminLineDraftMode
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LineDraftModeId'
+      responses:
+        '200':
+          description: Deleted line draft mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+
   /admin/feature-prompts:
     get:
       tags: [AdminFeaturePrompts]
@@ -899,6 +1115,12 @@ paths:
                 $ref: '#/components/schemas/ApiResponseFeaturePrompt'
 
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+
   parameters:
     BoardId:
       name: board_id
@@ -920,6 +1142,11 @@ components:
       in: path
       required: true
       schema: { type: string }
+    LineDraftModeId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
     MemberUid:
       name: member_uid
       in: path
@@ -1302,6 +1529,25 @@ components:
             missing_days: { type: integer }
             backfilled_days: { type: integer }
 
+    AdminStatisticsBackfillRequest:
+      type: object
+      properties:
+        range:
+          type: string
+          enum: [7d, 30d, 1y]
+
+    AdminStatisticsBackfillResult:
+      type: object
+      required: [range, range_start, range_end, scanned_days, backfilled_days]
+      properties:
+        range:
+          type: string
+          enum: [7d, 30d, 1y]
+        range_start: { type: string }
+        range_end: { type: string }
+        scanned_days: { type: integer }
+        backfilled_days: { type: integer }
+
     Channel:
       type: object
       required: [id, type, name, api_url, status, created_at, updated_at]
@@ -1377,7 +1623,7 @@ components:
 
     StorageProfile:
       type: object
-      required: [id, name, provider, enabled, is_current, builtin, secret_configured, config]
+      required: [id, name, provider, enabled, is_current, builtin, config]
       properties:
         id: { type: string }
         name: { type: string }
@@ -1400,6 +1646,63 @@ components:
         config:
           type: object
           additionalProperties: true
+
+    UploadImageMetadata:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        mime: { type: string }
+        ext: { type: string }
+
+    UploadAvatarMetadata:
+      type: object
+      required: [avatar]
+      properties:
+        avatar: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        mime: { type: string }
+        ext: { type: string }
+
+    DeleteUploadRequest:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+
+    UserLineDraftMode:
+      type: object
+      required: [id, name, cover_image]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        cover_image: { type: string }
+
+    LineDraftMode:
+      type: object
+      required: [id, name, cover_image, prompt, sort_order, is_enabled, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        cover_image: { type: string }
+        prompt: { type: string }
+        sort_order: { type: integer }
+        is_enabled: { type: boolean }
+        created_at: { type: string }
+        updated_at: { type: string }
+
+    LineDraftModePayload:
+      type: object
+      required: [name, prompt]
+      properties:
+        name: { type: string }
+        cover_image: { type: string }
+        prompt: { type: string }
+        sort_order: { type: integer }
+        is_enabled: { type: boolean }
 
     FeaturePrompt:
       type: object
@@ -1675,6 +1978,14 @@ components:
             data:
               $ref: '#/components/schemas/AdminStatistics'
 
+    ApiResponseAdminStatisticsBackfill:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AdminStatisticsBackfillResult'
+
     ApiResponseChannelList:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
@@ -1766,6 +2077,62 @@ components:
                     domains:
                       type: array
                       items: { type: string }
+
+    ApiResponseUploadImage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/UploadImageMetadata'
+
+    ApiResponseUploadAvatar:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/UploadAvatarMetadata'
+
+    ApiResponseUserLineDraftModeList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/UserLineDraftMode'
+
+    ApiResponseAdminLineDraftModeList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [list]
+              properties:
+                list:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/LineDraftMode'
+
+    ApiResponseLineDraftMode:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [mode]
+              properties:
+                mode:
+                  $ref: '#/components/schemas/LineDraftMode'
 
     ApiResponseFeaturePromptMap:
       allOf:

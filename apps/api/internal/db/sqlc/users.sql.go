@@ -8,8 +8,6 @@ package dbsqlc
 import (
 	"context"
 	"database/sql"
-
-	"github.com/lib/pq"
 )
 
 const countUsers = `-- name: CountUsers :one
@@ -63,13 +61,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (int64, 
 	return id, err
 }
 
-const deleteBoardMembersByBoardIDs = `-- name: DeleteBoardMembersByBoardIDs :exec
+const deleteBoardMembersByOwnerUserID = `-- name: DeleteBoardMembersByOwnerUserID :exec
 DELETE FROM board_members
-WHERE board_id = ANY($1::text[])
+WHERE owner_user_id = $1
 `
 
-func (q *Queries) DeleteBoardMembersByBoardIDs(ctx context.Context, boardIds []string) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardMembersByBoardIDs, pq.Array(boardIds))
+func (q *Queries) DeleteBoardMembersByOwnerUserID(ctx context.Context, ownerUserID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteBoardMembersByOwnerUserID, ownerUserID)
 	return err
 }
 
@@ -83,16 +81,6 @@ func (q *Queries) DeleteBoardMembersByUserID(ctx context.Context, userID int64) 
 	return err
 }
 
-const deleteBoardShareTokensByBoardIDs = `-- name: DeleteBoardShareTokensByBoardIDs :exec
-DELETE FROM board_share_tokens
-WHERE board_id = ANY($1::text[])
-`
-
-func (q *Queries) DeleteBoardShareTokensByBoardIDs(ctx context.Context, boardIds []string) error {
-	_, err := q.db.ExecContext(ctx, deleteBoardShareTokensByBoardIDs, pq.Array(boardIds))
-	return err
-}
-
 const deleteBoardShareTokensByCreatedBy = `-- name: DeleteBoardShareTokensByCreatedBy :exec
 DELETE FROM board_share_tokens
 WHERE created_by = $1
@@ -103,13 +91,13 @@ func (q *Queries) DeleteBoardShareTokensByCreatedBy(ctx context.Context, created
 	return err
 }
 
-const deleteUserBoardsByBoardIDs = `-- name: DeleteUserBoardsByBoardIDs :exec
+const deleteUserBoardsByUserID = `-- name: DeleteUserBoardsByUserID :exec
 DELETE FROM user_boards
-WHERE board_id = ANY($1::text[])
+WHERE user_id = $1
 `
 
-func (q *Queries) DeleteUserBoardsByBoardIDs(ctx context.Context, boardIds []string) error {
-	_, err := q.db.ExecContext(ctx, deleteUserBoardsByBoardIDs, pq.Array(boardIds))
+func (q *Queries) DeleteUserBoardsByUserID(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserBoardsByUserID, userID)
 	return err
 }
 
@@ -262,35 +250,6 @@ func (q *Queries) InsertUsedUIDIgnore(ctx context.Context, storageUid string) (i
 		return 0, err
 	}
 	return result.RowsAffected()
-}
-
-const listOwnedBoardIDsByUserID = `-- name: ListOwnedBoardIDsByUserID :many
-SELECT board_id
-FROM user_boards
-WHERE user_id = $1
-`
-
-func (q *Queries) ListOwnedBoardIDsByUserID(ctx context.Context, userID int64) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, listOwnedBoardIDsByUserID, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var board_id string
-		if err := rows.Scan(&board_id); err != nil {
-			return nil, err
-		}
-		items = append(items, board_id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listUserStorageUIDs = `-- name: ListUserStorageUIDs :many

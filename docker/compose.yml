@@ -28,7 +28,7 @@ services:
       - ideaboard-network
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:${CLOUDFLARED_VERSION:?Set CLOUDFLARED_VERSION in docker/.env}
     container_name: ideaboard-cloudflared
     restart: unless-stopped
     cap_drop:
@@ -48,7 +48,7 @@ services:
       - ideaboard-network
 
   api:
-    image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:?Set IMAGE_NAMESPACE in docker/.env}/ideaboard-api:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:?Set IMAGE_NAMESPACE in docker/.env}/ideaboard-api:${IMAGE_TAG:?Set IMAGE_TAG in docker/.env}
     container_name: ideaboard-api
     restart: unless-stopped
     depends_on:
@@ -107,7 +107,7 @@ services:
       - ideaboard-network
 
   auth:
-    image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:?Set IMAGE_NAMESPACE in docker/.env}/ideaboard-auth:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:?Set IMAGE_NAMESPACE in docker/.env}/ideaboard-auth:${IMAGE_TAG:?Set IMAGE_TAG in docker/.env}
     container_name: ideaboard-auth
     restart: unless-stopped
     cap_drop:

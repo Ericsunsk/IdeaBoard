@@ -17,6 +17,9 @@ import (
 )
 
 func normalizeOpenAIEditMultipartImage(filename, mimeType string, data []byte) (string, string, []byte, error) {
+	if err := media.ValidateImageDimensions(data); err != nil {
+		return "", "", nil, err
+	}
 	normalizedMimeType := normalizeImageMIMEType(mimeType, data)
 	switch normalizedMimeType {
 	case "image/png", "image/jpeg":

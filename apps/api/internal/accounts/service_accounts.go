@@ -197,9 +197,15 @@ func (s *AccountService) StopAccount(ctx context.Context, id int64) error {
 	if err != nil {
 		slog.Warn("list account running tasks failed", "account_id", id, "err", err)
 	} else {
-		for _, taskID := range taskIDs {
-			if cancelErr := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); cancelErr != nil {
-				slog.Warn("mark task cancellation flag failed", "account_id", id, "task_id", taskID, "err", cancelErr)
+		if s.cancelStore == nil {
+			if len(taskIDs) > 0 {
+				slog.Warn("task cancellation store not configured", "account_id", id, "task_count", len(taskIDs))
+			}
+		} else {
+			for _, taskID := range taskIDs {
+				if cancelErr := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); cancelErr != nil {
+					slog.Warn("mark task cancellation flag failed", "account_id", id, "task_id", taskID, "err", cancelErr)
+				}
 			}
 		}
 		if len(taskIDs) > 0 {

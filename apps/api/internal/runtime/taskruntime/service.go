@@ -151,6 +151,7 @@ func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID 
 	}
 	if task.Status == tasks.StatusRunning && task.AccountID == accountID {
 		if task.LeaseToken == leaseToken {
+			s.publishTaskStatusEvent(ctx, taskID, tasks.StatusRunning)
 			return nil
 		}
 		return ErrTaskAlreadyRunning

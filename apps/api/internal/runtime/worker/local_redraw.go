@@ -2,6 +2,7 @@ package worker
 
 import (
 	"api/internal/accounts"
+	"api/internal/platform/media"
 	"api/internal/platform/mediarefs"
 	"api/internal/platform/safehttp"
 	"api/internal/storage"
@@ -18,7 +19,6 @@ import (
 	"image/png"
 	"math"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -84,7 +84,7 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 		return nil, fmt.Errorf("local redraw 缺少蒙版: feature=%s", featureSlug)
 	}
 
-	allowHosts := buildLocalRedrawAllowHosts(account)
+	allowHosts := trustedImageDownloadHosts(account)
 	originalImage, err := loadImageFromRef(ctx, originalRef, timeout, allowHosts)
 	if err != nil {
 		return nil, fmt.Errorf("local redraw 读取原图失败: feature=%s err=%w", featureSlug, err)
@@ -186,31 +186,6 @@ func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {
 	}
 }
 
-func buildLocalRedrawAllowHosts(account *accounts.ApiAccount) []string {
-	hosts := map[string]struct{}{}
-	appendHost := func(raw string) {
-		parsed, err := url.Parse(strings.TrimSpace(raw))
-		if err == nil && strings.TrimSpace(parsed.Hostname()) != "" {
-			hosts[strings.TrimSpace(parsed.Hostname())] = struct{}{}
-			return
-		}
-		host := strings.TrimSpace(raw)
-		if host != "" {
-			hosts[host] = struct{}{}
-		}
-	}
-
-	appendHost(account.ProxyURL)
-	for _, host := range trustedOpenAIAssetHosts() {
-		appendHost(host)
-	}
-	out := make([]string, 0, len(hosts))
-	for host := range hosts {
-		out = append(out, host)
-	}
-	return out
-}
-
 func readLocalRedrawOriginalImageRef(params map[string]interface{}) (string, bool) {
 	if ref, ok := workflow.ReadWorkflowStringParam(params, "original_image_url"); ok {
 		return ref, true
@@ -264,6 +239,9 @@ func loadImageFromRef(ctx context.Context, ref string, timeout time.Duration, al
 	}
 	data, err := loadImageBytesFromRef(ctx, trimmed, timeout, allowHosts)
 	if err != nil {
+		return nil, err
+	}
+	if err := media.ValidateImageDimensions(data); err != nil {
 		return nil, err
 	}
 	decoded, _, err := image.Decode(bytes.NewReader(data))

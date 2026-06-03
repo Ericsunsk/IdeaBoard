@@ -64,10 +64,10 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 	if _, err := db.ExecContext(context.Background(), `INSERT INTO user_boards (board_id, user_id, name, state) VALUES ($1, $2, $3, $4)`, ownedBoardID, first.ID, "Owned", "{}"); err != nil {
 		t.Fatalf("seed user_boards failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, $3)`, ownedBoardID, first.ID, "viewer"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (owner_user_id, board_id, user_id, role) VALUES ($1, $2, $3, $4)`, first.ID, ownedBoardID, first.ID, "viewer"); err != nil {
 		t.Fatalf("seed board_members owned failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, $3)`, "board-shared", first.ID, "viewer"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (owner_user_id, board_id, user_id, role) VALUES ($1, $2, $3, $4)`, first.ID, "board-shared", first.ID, "viewer"); err != nil {
 		t.Fatalf("seed board_members shared failed: %v", err)
 	}
 	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token, role, created_by) VALUES ($1, $2, $3, $4)`, ownedBoardID, "owned-token", "viewer", first.ID); err != nil {

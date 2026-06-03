@@ -198,11 +198,20 @@ func (s *AccountService) ListTasks(ctx context.Context, req *tasks.TaskListReque
 }
 
 func (s *AccountService) DeleteUserTask(ctx context.Context, taskID string, userID int64) error {
-	if _, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID); err != nil {
+	task, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID)
+	if err != nil {
 		return err
+	}
+	if s.cancelStore == nil {
+		return fmt.Errorf("task cancellation store not configured")
 	}
 	if err := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); err != nil {
 		return err
+	}
+	if s.taskOutputCleaner != nil {
+		if err := s.taskOutputCleaner.DeleteTaskOutputsByUserTask(ctx, task.UserID, task.TaskID); err != nil {
+			return err
+		}
 	}
 	return s.taskRepo.DeleteByTaskIDAndUserID(ctx, taskID, userID)
 }

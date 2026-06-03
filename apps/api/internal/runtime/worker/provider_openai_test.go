@@ -58,6 +58,11 @@ func buildTinyPNGBytes(t *testing.T) []byte {
 	return buf.Bytes()
 }
 
+func buildTinyPNGDataURL(t *testing.T) string {
+	t.Helper()
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
+}
+
 func buildTinyWebPBytes(t *testing.T) []byte {
 	t.Helper()
 	return mustDecodeBase64(t, tinyWebPBase64)
@@ -322,8 +327,8 @@ func TestCallOpenAIGenerationMapsImageURLsToStringImageField(t *testing.T) {
 func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	var gotPath string
 	var gotMultipart multipartRequestCapture
-	imageA := []byte("style-fusion-image-a")
-	imageB := []byte("style-fusion-image-b")
+	imageA := buildTinyPNGBytes(t)
+	imageB := buildTinyPNGBytes(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -433,8 +438,8 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 		ApiKey:   "test-key",
 		ModelSet: "gpt-image-1",
 	}
-	maskDataURL := "data:image/png;base64,bWFzaw=="
-	sourceDataURL := "data:image/png;base64,c291cmNl"
+	maskDataURL := buildTinyPNGDataURL(t)
+	sourceDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
 		"feature":            "partial-edit",
 		"image_urls":         []interface{}{maskDataURL},
@@ -478,7 +483,7 @@ func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) 
 		ModelSet: "gpt-image-1",
 	}
 	sourceWebPDataURL := "data:image/webp;base64," + tinyWebPBase64
-	maskDataURL := "data:image/png;base64,bWFzaw=="
+	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
 		"feature":            "partial-edit",
 		"image_urls":         []interface{}{sourceWebPDataURL},
@@ -532,7 +537,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 		ModelSet: "gpt-image-1",
 	}
 	sourceURL := server.URL + "/source.webp"
-	maskDataURL := "data:image/png;base64,bWFzaw=="
+	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
 		"feature":            "partial-edit",
 		"image_urls":         []interface{}{sourceURL},
@@ -595,13 +600,14 @@ func TestCallOpenAIUsesFirstModelWhenAccountHasMultiModelSet(t *testing.T) {
 }
 
 func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
+	outputData := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/out.png"}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + outputData + `"}]}`))
 	}))
 	defer server.Close()
 
-	c := &ProviderExecutor{}
+	c := newTestProviderExecutorWithLocalStorage(t)
 	account := &accounts.ApiAccount{
 		ID:       1,
 		Name:     "test",
@@ -647,8 +653,8 @@ func TestCallOpenAIHDUpscaleMaskedUsesMultipartFiles(t *testing.T) {
 		ApiKey:   "test-key",
 		ModelSet: "gpt-image-1",
 	}
-	sourceDataURL := "data:image/png;base64,c291cmNl"
-	maskDataURL := "data:image/png;base64,bWFzaw=="
+	sourceDataURL := buildTinyPNGDataURL(t)
+	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
 		"feature":            "hd-upscale",
 		"image_urls":         []interface{}{sourceDataURL},

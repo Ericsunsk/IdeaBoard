@@ -17,7 +17,12 @@ import type {
 import { unref } from 'vue'
 import type { MaybeRef } from 'vue'
 
-import type { ApiResponseAdminStatistics, GetAdminStatisticsParams } from '../model'
+import type {
+  AdminStatisticsBackfillRequest,
+  ApiResponseAdminStatistics,
+  ApiResponseAdminStatisticsBackfill,
+  GetAdminStatisticsParams,
+} from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
 import type { ErrorType } from '../../orvalMutator'
@@ -95,6 +100,88 @@ export function useGetAdminStatistics<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetAdminStatisticsQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getBackfillAdminStatisticsUrl = () => {
+  return `/admin/statistics/backfill`
+}
+
+export const backfillAdminStatistics = async (
+  adminStatisticsBackfillRequest?: AdminStatisticsBackfillRequest,
+  options?: RequestInit,
+): Promise<ApiResponseAdminStatisticsBackfill> => {
+  return orvalMutator<ApiResponseAdminStatisticsBackfill>(getBackfillAdminStatisticsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminStatisticsBackfillRequest),
+  })
+}
+
+export const getBackfillAdminStatisticsQueryKey = (
+  adminStatisticsBackfillRequest?: MaybeRef<AdminStatisticsBackfillRequest>,
+) => {
+  return ['POST', 'admin', 'statistics', 'backfill', adminStatisticsBackfillRequest] as const
+}
+
+export const getBackfillAdminStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof backfillAdminStatistics>>,
+  TError = ErrorType<unknown>,
+>(
+  adminStatisticsBackfillRequest?: MaybeRef<AdminStatisticsBackfillRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof backfillAdminStatistics>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getBackfillAdminStatisticsQueryKey(adminStatisticsBackfillRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof backfillAdminStatistics>>> = ({
+    signal,
+  }) =>
+    backfillAdminStatistics(unref(adminStatisticsBackfillRequest), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof backfillAdminStatistics>>,
+    TError,
+    TData
+  >
+}
+
+export type BackfillAdminStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof backfillAdminStatistics>>
+>
+export type BackfillAdminStatisticsQueryError = ErrorType<unknown>
+
+export function useBackfillAdminStatistics<
+  TData = Awaited<ReturnType<typeof backfillAdminStatistics>>,
+  TError = ErrorType<unknown>,
+>(
+  adminStatisticsBackfillRequest?: MaybeRef<AdminStatisticsBackfillRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof backfillAdminStatistics>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getBackfillAdminStatisticsQueryOptions(
+    adminStatisticsBackfillRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

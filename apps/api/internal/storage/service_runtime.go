@@ -149,6 +149,18 @@ func (s *StorageService) DeleteWorkspaceByStorageUID(ctx context.Context, storag
 	if err != nil {
 		return err
 	}
+	return s.deleteUploadObjectPrefix(ctx, prefix)
+}
+
+func (s *StorageService) DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error {
+	dirPrefix, err := TaskOutputUploadDirPrefix(userID, taskID)
+	if err != nil {
+		return err
+	}
+	return s.deleteUploadObjectPrefix(ctx, path.Join(uploadObjectRoot, dirPrefix)+"/")
+}
+
+func (s *StorageService) deleteUploadObjectPrefix(ctx context.Context, prefix string) error {
 	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
 		return err

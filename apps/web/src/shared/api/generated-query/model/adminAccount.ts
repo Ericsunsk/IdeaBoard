@@ -11,11 +11,12 @@ export interface AdminAccount {
   channel_id: number
   platform: string
   api_type: string
-  api_key: string
   proxy_url: string
   model_set: string
   max_concurrent: number
-  current_concurrent: number
+  current_concurrent?: number
+  wait_queue_count?: number
+  running_status?: string
   fail_count: number
   weight: number
   timeout: number

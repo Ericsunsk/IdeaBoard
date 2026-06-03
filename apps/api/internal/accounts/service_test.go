@@ -394,7 +394,7 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	if err := boardRepo.Upsert(ctx, &boards.UserBoard{BoardID: "board-1", UserID: owner.ID, Name: "Demo", State: "{}", CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if err := boardRepo.UpsertMember(ctx, "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {
+	if err := boardRepo.UpsertMember(ctx, owner.ID, "board-1", member.ID, boards.BoardAccessRoleViewer); err != nil {
 		t.Fatalf("create board member failed: %v", err)
 	}
 

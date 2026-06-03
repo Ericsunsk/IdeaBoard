@@ -151,6 +151,8 @@ VPS
 - push `v*` tag
 - 在 GitHub Actions 手动运行 workflow，并可填写额外 `image_tag`
 
+生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。
+
 镜像命名约定：
 
 ```text
@@ -185,10 +187,15 @@ cosign verify \
 ### 2. 首次 VPS 初始化 + 部署
 
 ```bash
-GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh?ref=main | bash'
+REF=v0.1.0
+curl -fsSL \
+  -H "Accept: application/vnd.github.raw" \
+  "https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh?ref=${REF}" \
+  -o /tmp/bootstrap-vps.sh
+GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 ```
 
-强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。
+把 `REF` 换成明确的发布 tag 或 commit SHA。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。
 
 至少修改：
 
@@ -202,7 +209,8 @@ GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $G
 可选：
 
 - `IMAGE_NAMESPACE`（通常自动推断）
-- `IMAGE_TAG`（默认 `latest`）
+- `IMAGE_TAG`（必须显式设置为不可变发布 tag 或 commit）
+- `CLOUDFLARED_VERSION`（必须显式设置固定版本，避免跟随 latest 漂移）
 
 ### 3. 后续部署 / 升级
 
@@ -210,7 +218,7 @@ GITHUB_TOKEN=your-github-token bash -lc 'curl -fsSL -H "Authorization: Bearer $G
 ideaboard update
 ```
 
-`ideaboard update` 会在执行 Auth migration 前自动导出 PostgreSQL backup 到 `/opt/stacks/ideaboard/backups/postgres/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 `api`、`auth` 的 `/api/health` health gate 失败都会中止部署并打印相关容器日志。
+`ideaboard update` 会在执行 Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 `api`、`auth` 的 `/api/health` health gate 失败都会中止部署并打印相关容器日志。
 
 当前 Docker stack 只管理 PostgreSQL 数据库；`ideaboard update` 不会自动转换或导入其他数据库形态的数据。首次部署或切换部署形态前，请先确认目标 PostgreSQL 中已有需要保留的数据，或明确按空库初始化。
 
@@ -261,6 +269,7 @@ curl http://127.0.0.1:8080/api/auth/get-session
 
 ```bash
 nano /opt/stacks/ideaboard/docker/.env
+# 修改 IMAGE_TAG，必要时也固定 CLOUDFLARED_VERSION
 ideaboard update
 ```
 
@@ -273,11 +282,11 @@ ideaboard update
 若新版本已执行 migration，先保留故障现场并确认最近 backup：
 
 ```bash
-ls -lh /opt/stacks/ideaboard/backups/postgres/
+ls -lh /opt/stacks/ideaboard-backups/
 docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 gateway api auth postgres nats
 ```
 
-当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。
+当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。数据库 backup 与 `api-uploads` tar 分别保留在同一备份目录下。
 
 数据保存在 Docker volumes：`postgres-data`、`nats-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
 
@@ -462,12 +471,12 @@ cp /opt/ideaboard/apps/auth/.env.example /opt/ideaboard/apps/auth/.env
 nano /opt/ideaboard/apps/auth/.env
 cd /opt/ideaboard/apps/auth
 npm ci
-npm run migrate:dist
+node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes
 npm prune --omit=dev
 ```
 
 > [!IMPORTANT]
-> 启用 Better Auth Admin plugin 后，必须先执行 `npm run migrate:dist`（开发环境对应 `npm --prefix apps/auth run migrate`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 字段；不要手写 DDL。
+> 启用 Better Auth Admin plugin 后，必须先执行 `node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes`（开发环境对应 `npm --prefix apps/auth run migrate`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 字段；不要手写 DDL。
 
 部署时至少确认：
 
@@ -480,7 +489,7 @@ npm prune --omit=dev
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
 
 > [!IMPORTANT]
-> Better Auth 会在同一个 PostgreSQL 库里维护 `user/session/account/verification` 等认证表。`npm run migrate:dist` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
+> Better Auth 会在同一个 PostgreSQL 库里维护 `user/session/account/verification` 等认证表。上面的 `node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
 >
 > 后台 `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销、开放注册开关、防刷限流设置；不开放后台改密。角色升降级与彻底注销均由 Go Admin API 编排，并依赖 `AUTH_SERVICE_INTERNAL_KEY` 调用 Auth Service internal endpoint；限流配置来源于后台设置并写入 `system_configs`，不通过环境变量注入。
 
@@ -641,7 +650,7 @@ nginx -t && systemctl reload nginx
 2. 解压到 `/opt/ideaboard/releases/`。
 3. 用新版本覆盖 `/opt/ideaboard/apps`、`/opt/ideaboard/deploy`。
 4. 保留原有 `/opt/ideaboard/apps/api/.env` 与 `/opt/ideaboard/apps/auth/.env`。
-5. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && npm run migrate:dist && npm prune --omit=dev`。
+5. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes && npm prune --omit=dev`。
 6. 执行 `systemctl restart ideaboard-auth ideaboard`。
 7. 再次执行健康检查与页面验证。
 
@@ -657,10 +666,10 @@ nginx -t && systemctl reload nginx
 
 1. 回到 `/opt/ideaboard/releases/` 中上一个版本目录。
 2. 重新复制上一版本的 `apps`、`deploy`。
-3. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && npm run migrate:dist && npm prune --omit=dev`。
+3. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci && node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes && npm prune --omit=dev`。
 4. 执行 `systemctl restart ideaboard-auth ideaboard`。
 5. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
 
-Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IMAGE_TAG` 改回上一版并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup，再运行 migration 和 health gate；历史 backup 位于 `/opt/stacks/ideaboard/backups/postgres/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IMAGE_TAG` 改回上一版并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup 和 `api-uploads` tar，再运行 migration 和 health gate；历史 backup 默认位于 `/opt/stacks/ideaboard-backups/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
 
 Docker stack 的数据面以 PostgreSQL volume 为准；回滚镜像不会自动转换、导入或恢复非 PostgreSQL 数据。

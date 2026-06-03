@@ -13,6 +13,6 @@ export interface StorageProfile {
   enabled: boolean
   is_current: boolean
   builtin: boolean
-  secret_configured: boolean
+  secret_configured?: boolean
   config: StorageProfileConfig
 }

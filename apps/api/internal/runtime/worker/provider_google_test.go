@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -20,6 +21,8 @@ func TestCallGoogleGeminiGenerateContent(t *testing.T) {
 	var gotAPIKey string
 	var gotAuth string
 	var gotBody map[string]interface{}
+	inputDataURL := buildTinyPNGDataURL(t)
+	inputBase64 := strings.TrimPrefix(inputDataURL, "data:image/png;base64,")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
@@ -40,7 +43,7 @@ func TestCallGoogleGeminiGenerateContent(t *testing.T) {
 	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{ProxyURL: server.URL, ApiKey: "google-key", ModelSet: "gemini-2.5-flash-image"}
 	params := map[string]interface{}{
-		"image_urls": []interface{}{"data:image/png;base64,aGVsbG8="},
+		"image_urls": []interface{}{inputDataURL},
 	}
 
 	got, err := c.callGoogleAI(context.Background(), account, "draw a cat", 2*time.Second, params, "gemini-2.5-flash-image")
@@ -66,7 +69,7 @@ func TestCallGoogleGeminiGenerateContent(t *testing.T) {
 		t.Fatalf("expected prompt+inlineData parts, got %d", len(parts))
 	}
 	inline := parts[1].(map[string]interface{})["inlineData"].(map[string]interface{})
-	if inline["mimeType"] != "image/png" || inline["data"] != "aGVsbG8=" {
+	if inline["mimeType"] != "image/png" || inline["data"] != inputBase64 {
 		t.Fatalf("unexpected inlineData: %#v", inline)
 	}
 }
@@ -161,17 +164,18 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 	var gotPath string
 	var gotAPIKey string
 	var gotAuth string
+	outputData := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotAPIKey = r.Header.Get("x-goog-api-key")
 		gotAuth = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"aGVsbG8="}}]}}]}`))
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"` + outputData + `"}}]}}]}`))
 	}))
 	defer server.Close()
 
-	c := &ProviderExecutor{}
+	c := newTestProviderExecutorWithLocalStorage(t)
 	account := &accounts.ApiAccount{
 		ID:       1,
 		Name:     "google-native",
@@ -200,7 +204,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 	if gotAuth != "" {
 		t.Fatalf("did not expect Authorization header, got %q", gotAuth)
 	}
-	if !strings.Contains(result, `"image_urls":["data:image/png;base64,aGVsbG8="]`) {
+	if !strings.Contains(result, `"/uploads/tasks/0/task-google-native/`) {
 		t.Fatalf("expected google image_urls result, got %s", result)
 	}
 }

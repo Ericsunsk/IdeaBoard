@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"api/internal/accounts"
+	"api/internal/platform/media"
 	"api/internal/platform/mediarefs"
 	"api/internal/platform/outbound"
 	"api/internal/platform/safehttp"
@@ -98,7 +99,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", account.ApiKey)
 
-	slog.Info("Google Gemini request", "endpoint", endpoint, "model", model, "inline_images", len(inlineParts))
+	slog.Info("Google Gemini request", "endpoint", redactLogURL(endpoint), "model", model, "inline_images", len(inlineParts))
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -163,6 +164,9 @@ func resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Durat
 		if err != nil {
 			return "", nil, fmt.Errorf("解析 data URL 失败: %w", err)
 		}
+		if err := media.ValidateImageDimensions(parsed.Data); err != nil {
+			return "", nil, err
+		}
 		return parsed.MIMEType, parsed.Data, nil
 	}
 
@@ -189,6 +193,9 @@ func resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Durat
 	}
 	if len(body) == 0 {
 		return "", nil, fmt.Errorf("拉取图像为空: %q", ref)
+	}
+	if err := media.ValidateImageDimensions(body); err != nil {
+		return "", nil, err
 	}
 	mimeType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 	if idx := strings.Index(mimeType, ";"); idx > 0 {
@@ -264,7 +271,7 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", account.ApiKey)
 
-	slog.Info("Google Imagen request", "endpoint", endpoint, "model", model, "sample_count", sampleCount)
+	slog.Info("Google Imagen request", "endpoint", redactLogURL(endpoint), "model", model, "sample_count", sampleCount)
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {

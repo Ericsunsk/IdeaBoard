@@ -182,7 +182,41 @@ func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
 	}
 }
 
-func TestMarkTaskRunningReturnsAlreadyRunningForSameAccount(t *testing.T) {
+func TestMarkTaskRunningPublishesRunningWhenAlreadyAssignedByAssigner(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := accounts.NewTaskRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
+
+	task := &tasks.Task{
+		TaskID:     "task-running-assigned-publish",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  42,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-already-assigned",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-already-assigned"); err != nil {
+		t.Fatalf("MarkTaskRunning returned error: %v", err)
+	}
+
+	select {
+	case event := <-publisher.ch:
+		if event.TaskID != task.TaskID || event.Status != tasks.StatusRunning {
+			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, task.TaskID, tasks.StatusRunning)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for running event")
+	}
+}
+
+func TestMarkTaskRunningReturnsAlreadyRunningForSameAccountDifferentLease(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := accounts.NewTaskRepository(db)
@@ -202,7 +236,7 @@ func TestMarkTaskRunningReturnsAlreadyRunningForSameAccount(t *testing.T) {
 		t.Fatalf("first MarkTaskRunning returned error: %v", err)
 	}
 
-	err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-running-dup")
+	err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-running-other")
 	if !errors.Is(err, ErrTaskAlreadyRunning) {
 		t.Fatalf("expected ErrTaskAlreadyRunning, got %v", err)
 	}

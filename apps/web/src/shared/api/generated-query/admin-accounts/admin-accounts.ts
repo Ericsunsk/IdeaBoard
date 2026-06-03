@@ -23,6 +23,7 @@ import type {
   ApiResponseAccountList,
   ApiResponseAdminAccount,
   ApiResponseEmpty,
+  ApiResponseMonitorAccountLoad,
   ListAdminAccountsParams,
 } from '../model'
 
@@ -183,6 +184,74 @@ export function useCreateAdminAccount<
   return query
 }
 
+export const getGetAdminAccountUrl = (id: number) => {
+  return `/admin/accounts/${encodeURIComponent(String(id))}`
+}
+
+export const getAdminAccount = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ApiResponseAdminAccount> => {
+  return orvalMutator<ApiResponseAdminAccount>(getGetAdminAccountUrl(id), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminAccountQueryKey = (id: MaybeRef<number>) => {
+  return ['admin', 'accounts', id] as const
+}
+
+export const getGetAdminAccountQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminAccount>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAccount>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminAccountQueryKey(id)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAccount>>> = ({ signal }) =>
+    getAdminAccount(unref(id), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getAdminAccount>>, TError, TData>
+}
+
+export type GetAdminAccountQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminAccount>>>
+export type GetAdminAccountQueryError = ErrorType<unknown>
+
+export function useGetAdminAccount<
+  TData = Awaited<ReturnType<typeof getAdminAccount>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAccount>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminAccountQueryOptions(id, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
 export const getUpdateAdminAccountUrl = (id: number) => {
   return `/admin/accounts/${encodeURIComponent(String(id))}`
 }
@@ -321,6 +390,80 @@ export function useDeleteAdminAccount<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getDeleteAdminAccountQueryOptions(id, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminAccountQueueUrl = (id: number) => {
+  return `/admin/accounts/${encodeURIComponent(String(id))}/queue`
+}
+
+export const getAdminAccountQueue = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ApiResponseMonitorAccountLoad> => {
+  return orvalMutator<ApiResponseMonitorAccountLoad>(getGetAdminAccountQueueUrl(id), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminAccountQueueQueryKey = (id: MaybeRef<number>) => {
+  return ['admin', 'accounts', id, 'queue'] as const
+}
+
+export const getGetAdminAccountQueueQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminAccountQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminAccountQueue>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminAccountQueueQueryKey(id)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAccountQueue>>> = ({ signal }) =>
+    getAdminAccountQueue(unref(id), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => unref(id) !== null && unref(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getAdminAccountQueue>>, TError, TData>
+}
+
+export type GetAdminAccountQueueQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminAccountQueue>>
+>
+export type GetAdminAccountQueueQueryError = ErrorType<unknown>
+
+export function useGetAdminAccountQueue<
+  TData = Awaited<ReturnType<typeof getAdminAccountQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRef<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminAccountQueue>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminAccountQueueQueryOptions(id, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

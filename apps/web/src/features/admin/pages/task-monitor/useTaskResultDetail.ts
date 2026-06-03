@@ -11,6 +11,20 @@ const RESULT_DEBUG_MAX_KEYS = 40
 const RESULT_ARRAY_PREVIEW_LENGTH = 5
 const SENSITIVE_KEY_PATTERN =
   /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
+const APP_ASSET_PATH_RE = /^\/(?:uploads|assets)\//
+const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
+
+export function isAllowedResultImageUrl(rawUrl: string): boolean {
+  const url = rawUrl.trim()
+  if (!url || url.startsWith('//') || url.includes('\\')) return false
+  if (APP_ASSET_PATH_RE.test(url)) return true
+
+  try {
+    return HTTP_PROTOCOLS.has(new URL(url).protocol)
+  } catch {
+    return false
+  }
+}
 
 export function useTaskResultDetail(options: {
   message: { success: (content: string) => void; error: (content: string) => void }
@@ -76,8 +90,13 @@ export function useTaskResultDetail(options: {
   })
 
   function openResultImage(url: string) {
-    if (!url) return
-    window.open(url, '_blank', 'noopener,noreferrer')
+    const normalizedUrl = url.trim()
+    if (!normalizedUrl) return
+    if (!isAllowedResultImageUrl(normalizedUrl)) {
+      options.message.error('图片链接不安全，已拒绝打开')
+      return
+    }
+    window.open(normalizedUrl, '_blank', 'noopener,noreferrer')
   }
 
   function copyToClipboard(text: string) {

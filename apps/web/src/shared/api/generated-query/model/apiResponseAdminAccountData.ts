@@ -8,4 +8,6 @@ import type { AdminAccount } from './adminAccount'
 
 export type ApiResponseAdminAccountData = {
   account: AdminAccount
+  current_concurrent?: number
+  max_concurrent?: number
 }

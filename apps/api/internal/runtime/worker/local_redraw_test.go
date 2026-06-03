@@ -11,6 +11,8 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -46,6 +48,22 @@ func mustDecodeDataURLImage(t *testing.T, raw string) image.Image {
 	img, err := png.Decode(bytes.NewReader(decoded))
 	if err != nil {
 		t.Fatalf("decode png: %v", err)
+	}
+	return img
+}
+
+func mustDecodeStoredUploadImage(t *testing.T, raw string) image.Image {
+	t.Helper()
+	if !strings.HasPrefix(raw, "/uploads/") {
+		t.Fatalf("unexpected stored upload url: %q", raw)
+	}
+	data, err := os.ReadFile(filepath.FromSlash(strings.TrimPrefix(raw, "/")))
+	if err != nil {
+		t.Fatalf("read stored upload: %v", err)
+	}
+	img, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("decode stored upload: %v", err)
 	}
 	return img
 }
@@ -209,7 +227,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		t.Fatalf("marshal params: %v", err)
 	}
 
-	c := &ProviderExecutor{}
+	c := newTestProviderExecutorWithLocalStorage(t)
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
@@ -250,7 +268,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		t.Fatalf("unmarshal result: %v", err)
 	}
 	imageURL, _ := result["image_url"].(string)
-	finalImage := mustDecodeDataURLImage(t, imageURL)
+	finalImage := mustDecodeStoredUploadImage(t, imageURL)
 
 	outsideMask := color.NRGBAModel.Convert(finalImage.At(40, 40)).(color.NRGBA)
 	if outsideMask != (color.NRGBA{R: 0, G: 0, B: 255, A: 255}) {

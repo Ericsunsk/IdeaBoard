@@ -44,7 +44,11 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) 
 
 		user, err := resolveLocalUserByAuthIdentity(c.Request.Context(), userRepo, identity)
 		if err != nil {
-			response.InternalError(c, http.StatusUnauthorized, "用户不存在或已停用", err)
+			if database.IsNotFound(err) {
+				response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
+			} else {
+				response.InternalError(c, http.StatusUnauthorized, "用户不存在或已停用", err)
+			}
 			c.Abort()
 			return
 		}
@@ -72,46 +76,8 @@ func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo *users.UserRep
 	}
 
 	user, err := userRepo.GetByAuthUserID(ctx, authUserID)
-	if err == nil {
-		return user, nil
-	}
-	if !database.IsNotFound(err) {
-		return nil, err
-	}
-
-	preferredUsername := users.NormalizeAuthUsername(identity.Username, identity.Email, authUserID)
-	if preferredUsername != "" {
-		existing, lookupErr := userRepo.GetByUsername(ctx, preferredUsername)
-		if lookupErr == nil {
-			existingAuthUserID := strings.TrimSpace(derefString(existing.AuthUserID))
-			if strings.EqualFold(existingAuthUserID, authUserID) {
-				return existing, nil
-			}
-		} else if !database.IsNotFound(lookupErr) {
-			return nil, lookupErr
-		}
-	}
-
-	for attempt := 0; attempt < 20; attempt++ {
-		candidateUsername := users.BuildAuthUsernameCandidate(preferredUsername, authUserID, attempt)
-		localUser := &users.User{
-			Username:   candidateUsername,
-			AuthUserID: ptrString(authUserID),
-			Status:     1,
-			Role:       "user",
-		}
-		createErr := userRepo.Create(ctx, localUser)
-		if createErr == nil {
-			return localUser, nil
-		}
-		if !users.IsDuplicateConstraintError(createErr) {
-			return nil, createErr
-		}
-	}
-
-	user, err = userRepo.GetByAuthUserID(ctx, authUserID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve user profile for auth user %s: %w", authUserID, err)
+		return nil, err
 	}
 	return user, nil
 }

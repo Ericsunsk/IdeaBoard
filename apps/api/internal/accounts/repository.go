@@ -537,7 +537,35 @@ func (r *TaskRepository) ResetRunningTasksMissingLeaseTokenToPending(ctx context
 }
 
 func (r *TaskRepository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error {
-	return r.q.DeleteTaskByTaskIDAndUserID(ctx, dbsqlc.DeleteTaskByTaskIDAndUserIDParams{TaskID: taskID, UserID: userID})
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	result, err := tx.ExecContext(ctx, `DELETE FROM tasks WHERE task_id = $1 AND user_id = $2`, taskID, userID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows > 0 {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM task_outputs WHERE task_id = $1`, taskID); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 func (r *TaskRepository) MarkQueueFailed(ctx context.Context, taskID string, errMsg string) error {

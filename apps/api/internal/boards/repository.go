@@ -50,8 +50,31 @@ func (r *BoardRepository) ListAccessibleByUserID(ctx context.Context, userID int
 	return result, nil
 }
 
-func (r *BoardRepository) GetByBoardID(ctx context.Context, boardID string) (*UserBoard, error) {
-	row, err := r.q.GetBoardByBoardID(ctx, boardID)
+func (r *BoardRepository) GetAccessibleByBoardID(ctx context.Context, userID int64, boardID string) (*BoardWithRole, error) {
+	row, err := r.q.GetAccessibleBoardByBoardID(ctx, dbsqlc.GetAccessibleBoardByBoardIDParams{UserID: userID, BoardID: boardID})
+	if err != nil {
+		return nil, err
+	}
+	board := BoardWithRole{
+		Board: UserBoard{
+			ID:        row.ID,
+			BoardID:   row.BoardID,
+			UserID:    row.UserID,
+			Name:      row.Name,
+			State:     row.State,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+		},
+		Role: BoardAccessRoleOwner,
+	}
+	if row.UserID != userID {
+		board.Role = normalizeBoardAccessRole(row.MemberRole.String)
+	}
+	return &board, nil
+}
+
+func (r *BoardRepository) GetByOwnerAndBoardID(ctx context.Context, ownerUserID int64, boardID string) (*UserBoard, error) {
+	row, err := r.q.GetBoardByOwnerAndBoardID(ctx, dbsqlc.GetBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +107,8 @@ func (r *BoardRepository) HasNameConflict(ctx context.Context, userID int64, boa
 	return count > 0, nil
 }
 
-func (r *BoardRepository) GetMemberRole(ctx context.Context, boardID string, userID int64) (BoardAccessRole, error) {
-	raw, err := r.q.GetBoardMemberRole(ctx, dbsqlc.GetBoardMemberRoleParams{BoardID: boardID, UserID: userID})
+func (r *BoardRepository) GetMemberRole(ctx context.Context, ownerUserID int64, boardID string, userID int64) (BoardAccessRole, error) {
+	raw, err := r.q.GetBoardMemberRole(ctx, dbsqlc.GetBoardMemberRoleParams{OwnerUserID: ownerUserID, BoardID: boardID, UserID: userID})
 	if err != nil {
 		return "", err
 	}
@@ -96,32 +119,32 @@ func (r *BoardRepository) GetMemberRole(ctx context.Context, boardID string, use
 	return role, nil
 }
 
-func (r *BoardRepository) DeleteByBoardID(ctx context.Context, boardID string) error {
-	return r.q.DeleteBoardByBoardID(ctx, boardID)
+func (r *BoardRepository) DeleteByBoardID(ctx context.Context, ownerUserID int64, boardID string) error {
+	return r.q.DeleteBoardByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
 }
 
-func (r *BoardRepository) DeleteMembersByBoardID(ctx context.Context, boardID string) error {
-	return r.q.DeleteBoardMembersByBoardID(ctx, boardID)
+func (r *BoardRepository) DeleteMembersByBoardID(ctx context.Context, ownerUserID int64, boardID string) error {
+	return r.q.DeleteBoardMembersByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardMembersByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
 }
 
-func (r *BoardRepository) DeleteShareTokensByBoardID(ctx context.Context, boardID string) error {
-	return r.q.DeleteBoardShareTokensByBoardID(ctx, boardID)
+func (r *BoardRepository) DeleteShareTokensByBoardID(ctx context.Context, ownerUserID int64, boardID string) error {
+	return r.q.DeleteBoardShareTokensByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardShareTokensByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
 }
 
-func (r *BoardRepository) DeleteBoardCascade(ctx context.Context, boardID string) error {
+func (r *BoardRepository) DeleteBoardCascade(ctx context.Context, ownerUserID int64, boardID string) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		if err := q.DeleteBoardShareTokensByBoardID(ctx, boardID); err != nil {
+		if err := q.DeleteBoardShareTokensByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardShareTokensByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID}); err != nil {
 			return err
 		}
-		if err := q.DeleteBoardMembersByBoardID(ctx, boardID); err != nil {
+		if err := q.DeleteBoardMembersByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardMembersByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID}); err != nil {
 			return err
 		}
-		return q.DeleteBoardByBoardID(ctx, boardID)
+		return q.DeleteBoardByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
 	})
 }
 
-func (r *BoardRepository) ListMembers(ctx context.Context, boardID string) ([]BoardMemberWithUser, error) {
-	rows, err := r.q.ListBoardMembers(ctx, boardID)
+func (r *BoardRepository) ListMembers(ctx context.Context, ownerUserID int64, boardID string) ([]BoardMemberWithUser, error) {
+	rows, err := r.q.ListBoardMembers(ctx, dbsqlc.ListBoardMembersParams{OwnerUserID: ownerUserID, BoardID: boardID})
 	if err != nil {
 		return nil, err
 	}
@@ -141,30 +164,32 @@ func (r *BoardRepository) ListMembers(ctx context.Context, boardID string) ([]Bo
 	return result, nil
 }
 
-func (r *BoardRepository) UpsertMember(ctx context.Context, boardID string, userID int64, role BoardAccessRole) error {
+func (r *BoardRepository) UpsertMember(ctx context.Context, ownerUserID int64, boardID string, userID int64, role BoardAccessRole) error {
 	return r.q.UpsertBoardMember(ctx, dbsqlc.UpsertBoardMemberParams{
-		BoardID: boardID,
-		UserID:  userID,
-		Role:    string(role),
+		OwnerUserID: ownerUserID,
+		BoardID:     boardID,
+		UserID:      userID,
+		Role:        string(role),
 	})
 }
 
-func (r *BoardRepository) DeleteMember(ctx context.Context, boardID string, userID int64) error {
-	return r.q.DeleteBoardMember(ctx, dbsqlc.DeleteBoardMemberParams{BoardID: boardID, UserID: userID})
+func (r *BoardRepository) DeleteMember(ctx context.Context, ownerUserID int64, boardID string, userID int64) error {
+	return r.q.DeleteBoardMember(ctx, dbsqlc.DeleteBoardMemberParams{OwnerUserID: ownerUserID, BoardID: boardID, UserID: userID})
 }
 
-func (r *BoardRepository) GetMemberByUserID(ctx context.Context, boardID string, userID int64) (*BoardMember, error) {
-	row, err := r.q.GetBoardMemberByUserID(ctx, dbsqlc.GetBoardMemberByUserIDParams{BoardID: boardID, UserID: userID})
+func (r *BoardRepository) GetMemberByUserID(ctx context.Context, ownerUserID int64, boardID string, userID int64) (*BoardMember, error) {
+	row, err := r.q.GetBoardMemberByUserID(ctx, dbsqlc.GetBoardMemberByUserIDParams{OwnerUserID: ownerUserID, BoardID: boardID, UserID: userID})
 	if err != nil {
 		return nil, err
 	}
 	member := BoardMember{
-		ID:        row.ID,
-		BoardID:   row.BoardID,
-		UserID:    row.UserID,
-		Role:      row.Role,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:          row.ID,
+		OwnerUserID: row.OwnerUserID,
+		BoardID:     row.BoardID,
+		UserID:      row.UserID,
+		Role:        row.Role,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
 	}
 	return &member, nil
 }
@@ -185,8 +210,8 @@ func (r *BoardRepository) CreateShareToken(ctx context.Context, token *BoardShar
 	return nil
 }
 
-func (r *BoardRepository) ListShareTokens(ctx context.Context, boardID string) ([]BoardShareToken, error) {
-	rows, err := r.q.ListBoardShareTokens(ctx, boardID)
+func (r *BoardRepository) ListShareTokens(ctx context.Context, ownerUserID int64, boardID string) ([]BoardShareToken, error) {
+	rows, err := r.q.ListBoardShareTokens(ctx, dbsqlc.ListBoardShareTokensParams{OwnerUserID: ownerUserID, BoardID: boardID})
 	if err != nil {
 		return nil, err
 	}
@@ -206,8 +231,8 @@ func (r *BoardRepository) GetShareTokenByToken(ctx context.Context, token string
 	return &shareToken, nil
 }
 
-func (r *BoardRepository) RevokeShareToken(ctx context.Context, boardID, token string) error {
-	return r.q.RevokeBoardShareToken(ctx, dbsqlc.RevokeBoardShareTokenParams{BoardID: boardID, Token: token})
+func (r *BoardRepository) RevokeShareToken(ctx context.Context, ownerUserID int64, boardID, token string) error {
+	return r.q.RevokeBoardShareToken(ctx, dbsqlc.RevokeBoardShareTokenParams{OwnerUserID: ownerUserID, BoardID: boardID, Token: token})
 }
 
 func (r *BoardRepository) ShareTokenExists(ctx context.Context, token string) (bool, error) {

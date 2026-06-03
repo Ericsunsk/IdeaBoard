@@ -111,26 +111,16 @@ func (r *UserRepository) Delete(ctx context.Context, id int64) error {
 			return err
 		}
 
-		ownedBoardIDs, err := q.ListOwnedBoardIDsByUserID(ctx, id)
-		if err != nil {
-			return err
-		}
-		if len(ownedBoardIDs) > 0 {
-			if err := q.DeleteBoardShareTokensByBoardIDs(ctx, ownedBoardIDs); err != nil {
-				return err
-			}
-			if err := q.DeleteBoardMembersByBoardIDs(ctx, ownedBoardIDs); err != nil {
-				return err
-			}
-			if err := q.DeleteUserBoardsByBoardIDs(ctx, ownedBoardIDs); err != nil {
-				return err
-			}
-		}
-
 		if err := q.DeleteBoardShareTokensByCreatedBy(ctx, id); err != nil {
 			return err
 		}
+		if err := q.DeleteBoardMembersByOwnerUserID(ctx, id); err != nil {
+			return err
+		}
 		if err := q.DeleteBoardMembersByUserID(ctx, id); err != nil {
+			return err
+		}
+		if err := q.DeleteUserBoardsByUserID(ctx, id); err != nil {
 			return err
 		}
 		if err := q.DeleteTasksByUserID(ctx, id); err != nil {

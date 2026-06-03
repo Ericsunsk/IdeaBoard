@@ -7,17 +7,17 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "migrate": "better-auth migrate --config ./src/auth.ts --yes",
-    "migrate:dist": "better-auth migrate --config ./dist/auth.js --yes"
+    "migrate": "node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./src/auth.ts --yes",
+    "migrate:dist": "node node_modules/@better-auth/cli/dist/index.mjs migrate --config ./dist/auth.js --yes"
   },
   "dependencies": {
+    "@better-auth/cli": "^1.4.21",
     "better-auth": "^1.6.13",
     "dotenv": "^17.4.2",
     "fastify": "^5.8.5",
     "pg": "^8.21.0"
   },
   "devDependencies": {
-    "@better-auth/cli": "^1.4.21",
     "@types/pg": "^8.20.0",
     "@types/node": "^25.9.1",
     "tsx": "^4.20.6",

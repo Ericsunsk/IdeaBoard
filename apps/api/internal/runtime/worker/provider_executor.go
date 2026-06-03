@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -75,7 +76,7 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		}
 		account.ProxyURL = proxyURL
 		channelName = channel.Name
-		slog.Info("using channel API URL", "channel_name", channel.Name, "channel_id", channel.ID, "api_url", channel.ApiURL)
+		slog.Info("using channel API URL", "channel_name", channel.Name, "channel_id", channel.ID, "api_url", redactLogURL(channel.ApiURL))
 	}
 
 	// 解析任务参数（ratio, count 等）
@@ -180,38 +181,29 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		return imageURLs, nil
 	}
 	if c.storageService == nil {
-		return imageURLs, nil
+		return nil, fmt.Errorf("持久化上游图片失败: 存储服务未初始化")
 	}
 
-	usesObjectStorage := c.storageService.UsesObjectStorage(ctx)
-	slog.Info("provider result storage check", "object_storage", usesObjectStorage, "image_count", len(imageURLs))
+	slog.Info("provider result storage check", "object_storage", c.storageService.UsesObjectStorage(ctx), "image_count", len(imageURLs))
 
 	next := append([]string(nil), imageURLs...)
 	for index, currentURL := range next {
-		inlineImage := isInlineDataImageURL(currentURL)
-		if !inlineImage && !usesObjectStorage {
-			continue
-		}
-
 		storeOpts := storage.StorageStoreOptions{
-			AllowHosts: []string{account.ProxyURL},
+			AllowHosts: trustedImageDownloadHosts(account),
 		}
 		if dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, taskID); err == nil {
 			storeOpts.DirPrefix = dirPrefix
 		}
 		storedURL, storeErr := c.storageService.StoreRemote(ctx, currentURL, storeOpts)
 		if storeErr == nil {
-			slog.Info("provider image materialized", "source_url", truncateLogURL(currentURL), "stored_url", storedURL)
+			slog.Info("provider image materialized", "source_url", redactLogURL(currentURL), "stored_url", redactLogURL(storedURL))
 			next[index] = storedURL
 			continue
 		}
 		if errors.Is(storeErr, context.Canceled) {
 			return nil, storeErr
 		}
-		if inlineImage {
-			return nil, fmt.Errorf("持久化上游图片失败: %w", storeErr)
-		}
-		slog.Warn("materialize remote image failed; keeping original URL", "err", storeErr)
+		return nil, fmt.Errorf("持久化上游图片失败: %w", storeErr)
 	}
 	return next, nil
 }
@@ -220,8 +212,21 @@ func isInlineDataImageURL(raw string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(raw)), "data:image/")
 }
 
-func truncateLogURL(raw string) string {
+func redactLogURL(raw string) string {
 	trimmed := strings.TrimSpace(raw)
+	if isInlineDataImageURL(trimmed) {
+		return "data:image/...;base64,[redacted]"
+	}
+	if parsed, err := url.Parse(trimmed); err == nil {
+		if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+			clone := *parsed
+			clone.User = nil
+			clone.RawQuery = ""
+			clone.ForceQuery = false
+			clone.Fragment = ""
+			trimmed = clone.String()
+		}
+	}
 	if len(trimmed) <= 80 {
 		return trimmed
 	}

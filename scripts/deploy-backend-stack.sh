@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -31,8 +32,9 @@ ROOT_DIR="$(find_stack_root)"
 COMPOSE_FILE="$ROOT_DIR/docker/compose.yml"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/docker/.env}"
 ENV_EXAMPLE="$ROOT_DIR/docker/.env.example"
-BACKUP_DIR="${BACKUP_DIR:-$ROOT_DIR/backups/postgres}"
+BACKUP_DIR="${BACKUP_DIR:-$(cd "$ROOT_DIR/.." && pwd)/$(basename "$ROOT_DIR")-backups}"
 BACKUP_RETAIN="${BACKUP_RETAIN:-5}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-ideaboard}"
 
 command="${1:-deploy}"
 if [[ "$command" == "update" ]]; then
@@ -133,6 +135,8 @@ validate_env_file() {
     APP_BASE_URL \
     API_BASE_URL \
     CLOUDFLARE_TUNNEL_TOKEN \
+    IMAGE_TAG \
+    CLOUDFLARED_VERSION \
     POSTGRES_PASSWORD \
     AUTH_INTERNAL_KEY \
     BETTER_AUTH_SECRET; do
@@ -144,6 +148,11 @@ validate_env_file() {
   if (( ${#missing[@]} > 0 )); then
     echo "Please edit $ENV_FILE and replace these values:" >&2
     printf '  - %s\n' "${missing[@]}" >&2
+    return 1
+  fi
+
+  if [[ "$(env_value IMAGE_TAG)" =~ ^(latest|main|master)$ ]]; then
+    echo "Please set IMAGE_TAG to an immutable release tag or commit, not a mutable ref." >&2
     return 1
   fi
   return 0
@@ -184,7 +193,8 @@ wait_for_postgres() {
   die "PostgreSQL did not become ready within ${timeout}s"
 }
 
-prune_postgres_backups() {
+prune_backups() {
+  local pattern="$1"
   local retain="$BACKUP_RETAIN"
   local backups=()
   local backup
@@ -196,7 +206,7 @@ prune_postgres_backups() {
 
   while IFS= read -r backup; do
     backups+=("$backup")
-  done < <(find "$BACKUP_DIR" -type f -name 'postgres-*.sql' | sort)
+  done < <(find "$BACKUP_DIR" -type f -name "$pattern" | sort)
 
   delete_count=$(( ${#backups[@]} - retain ))
   if (( delete_count <= 0 )); then
@@ -208,6 +218,22 @@ prune_postgres_backups() {
   done
 }
 
+finalize_backup_file() {
+  local tmp_file="$1"
+  local backup_file="$2"
+  local prune_pattern="$3"
+  local success_message="$4"
+  local failure_message="$5"
+
+  if ! mv "$tmp_file" "$backup_file"; then
+    rm -f -- "$tmp_file"
+    die "$failure_message"
+  fi
+  chmod 600 "$backup_file"
+  prune_backups "$prune_pattern"
+  echo "$success_message"
+}
+
 backup_postgres() {
   local timestamp
   local database
@@ -215,6 +241,7 @@ backup_postgres() {
   local tmp_file
 
   mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
   timestamp="$(date +%Y%m%d-%H%M%S)"
   database="$(env_value POSTGRES_DB)"
   database="${database:-ideaboard}"
@@ -223,17 +250,63 @@ backup_postgres() {
 
   echo "Creating PostgreSQL backup: $backup_file"
   if docker_compose exec -T postgres sh -c 'pg_dump --clean --if-exists --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$tmp_file"; then
-    if ! mv "$tmp_file" "$backup_file"; then
-      rm -f -- "$tmp_file"
-      die "PostgreSQL backup finalize failed; deployment aborted before migration"
-    fi
-    prune_postgres_backups
-    echo "PostgreSQL backup completed: $backup_file"
+    finalize_backup_file \
+      "$tmp_file" \
+      "$backup_file" \
+      'postgres-*.sql' \
+      "PostgreSQL backup completed: $backup_file" \
+      "PostgreSQL backup finalize failed; deployment aborted before migration"
     return 0
   fi
 
   rm -f -- "$tmp_file"
   die "PostgreSQL backup failed; deployment aborted before migration"
+}
+
+backup_api_uploads() {
+  local timestamp
+  local backup_file
+  local tmp_file
+  local volume_name
+
+  mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
+  timestamp="$(date +%Y%m%d-%H%M%S)"
+  backup_file="$BACKUP_DIR/api-uploads-${timestamp}.tar.gz"
+  tmp_file="${backup_file}.tmp"
+  volume_name="${COMPOSE_PROJECT_NAME}_api-uploads"
+
+  echo "Creating api-uploads backup: $backup_file"
+  if docker volume inspect "$volume_name" >/dev/null 2>&1; then
+    if docker run --rm \
+      -v "$volume_name:/data:ro" \
+      -v "$BACKUP_DIR:/backup" \
+      postgres:17-alpine \
+      sh -c "tar -C /data -czf /backup/$(basename "$tmp_file") ." ; then
+      finalize_backup_file \
+        "$tmp_file" \
+        "$backup_file" \
+        'api-uploads-*.tar.gz' \
+        "api-uploads backup completed: $backup_file" \
+        "api-uploads backup finalize failed; deployment aborted before migration"
+      return 0
+    fi
+    rm -f -- "$tmp_file"
+    die "api-uploads backup failed; deployment aborted before migration"
+  fi
+
+  if tar -czf "$tmp_file" --files-from /dev/null; then
+    finalize_backup_file \
+      "$tmp_file" \
+      "$backup_file" \
+      'api-uploads-*.tar.gz' \
+      "api-uploads volume not found; wrote empty archive: $backup_file" \
+      "api-uploads empty backup finalize failed; deployment aborted before migration"
+    return 0
+  fi
+
+  rm -f -- "$tmp_file"
+  die "api-uploads empty backup failed; deployment aborted before migration"
 }
 
 print_backend_health_logs() {
@@ -365,6 +438,15 @@ login_ghcr_if_configured() {
   printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$username" --password-stdin
 }
 
+auth_migrate_command=(
+  node
+  node_modules/@better-auth/cli/dist/index.mjs
+  migrate
+  --config
+  ./dist/auth.js
+  --yes
+)
+
 ensure_env_file
 
 if [[ "$command" == "init-env" ]]; then
@@ -387,7 +469,8 @@ case "$command" in
     docker_compose up -d postgres
     wait_for_postgres
     backup_postgres
-    docker_compose run --rm auth npm run migrate:dist
+    backup_api_uploads
+    docker_compose run --rm auth "${auth_migrate_command[@]}"
     docker_compose up -d
     run_backend_smoke_checks
     docker_compose ps
@@ -418,7 +501,7 @@ case "$command" in
     docker_compose up -d
     ;;
   migrate)
-    docker_compose run --rm auth npm run migrate:dist
+    docker_compose run --rm auth "${auth_migrate_command[@]}"
     ;;
   ps)
     docker_compose ps

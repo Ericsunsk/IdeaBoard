@@ -4,7 +4,7 @@ set -euo pipefail
 
 STACK_DIR="${IDEABOARD_STACK_DIR:-/opt/stacks/ideaboard}"
 REPO_URL="${IDEABOARD_REPO_URL:-https://github.com/Ericsunsk/IdeaBoard.git}"
-BRANCH="${IDEABOARD_BRANCH:-main}"
+BRANCH="${IDEABOARD_BRANCH:-}"
 EDITOR_BIN="${EDITOR:-nano}"
 BIN_PATH="${IDEABOARD_BIN_PATH:-/usr/local/bin/ideaboard}"
 GIT_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
@@ -13,15 +13,25 @@ ASKPASS_FILE=""
 
 usage() {
   cat <<EOF
-Usage: bootstrap-vps.sh [--force]
+Usage: bootstrap-vps.sh --ref <tag-or-commit> [--force]
 
 Options:
+  --ref, --branch  Git tag, branch, or commit to deploy. Can also be set with IDEABOARD_BRANCH.
   --force, -f    Move any existing stack directory to a backup, clone again, and restore docker/.env if present.
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --ref|--branch)
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for $1" >&2
+        usage >&2
+        exit 1
+      }
+      BRANCH="$2"
+      shift
+      ;;
     --force|-f)
       FORCE=1
       ;;
@@ -81,6 +91,17 @@ restore_env_from_backup() {
   fi
 }
 
+checkout_ref() {
+  local dir="$1"
+
+  git_with_auth -C "$dir" fetch --tags --prune origin
+  if git -C "$dir" rev-parse --verify --quiet "origin/$BRANCH^{commit}" >/dev/null; then
+    git_with_auth -C "$dir" checkout -B "$BRANCH" "origin/$BRANCH"
+    return
+  fi
+  git_with_auth -C "$dir" checkout --detach "$BRANCH"
+}
+
 need_command() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "Missing command: $1" >&2
@@ -90,6 +111,11 @@ need_command() {
 
 need_command git
 need_command docker
+
+if [[ -z "$BRANCH" ]]; then
+  echo "Error: set IDEABOARD_BRANCH or pass --ref with an explicit release tag or commit." >&2
+  exit 1
+fi
 
 if ! docker compose version >/dev/null 2>&1; then
   echo "Missing command: docker compose" >&2
@@ -116,16 +142,14 @@ if [[ -e "$STACK_DIR" ]] && is_force_enabled; then
   BACKUP_DIR="$(make_backup_dir)"
   mv "$STACK_DIR" "$BACKUP_DIR"
   echo "Backed up existing stack to $BACKUP_DIR"
-  if ! git_with_auth clone --branch "$BRANCH" "$REPO_URL" "$STACK_DIR"; then
+  if ! git_with_auth clone "$REPO_URL" "$STACK_DIR" || ! checkout_ref "$STACK_DIR"; then
     mv "$BACKUP_DIR" "$STACK_DIR"
     echo "Clone failed; restored stack from $BACKUP_DIR" >&2
     exit 1
   fi
   restore_env_from_backup "$BACKUP_DIR"
 elif [[ -d "$STACK_DIR/.git" ]]; then
-  git_with_auth -C "$STACK_DIR" fetch --prune origin "$BRANCH"
-  git_with_auth -C "$STACK_DIR" checkout "$BRANCH"
-  git_with_auth -C "$STACK_DIR" pull --ff-only origin "$BRANCH"
+  checkout_ref "$STACK_DIR"
 else
   if [[ -e "$STACK_DIR" ]]; then
     if [[ -n "$(find "$STACK_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
@@ -134,7 +158,8 @@ else
     fi
     rmdir "$STACK_DIR"
   fi
-  git_with_auth clone --branch "$BRANCH" "$REPO_URL" "$STACK_DIR"
+  git_with_auth clone "$REPO_URL" "$STACK_DIR"
+  checkout_ref "$STACK_DIR"
 fi
 
 chmod +x "$STACK_DIR/scripts/deploy-backend-stack.sh" "$STACK_DIR/scripts/uninstall-vps.sh"

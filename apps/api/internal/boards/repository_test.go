@@ -8,6 +8,7 @@ import (
 
 	"api/internal/platform/database"
 	"api/internal/testdb"
+	"api/internal/users"
 )
 
 func newBoardRepoTestDB(t *testing.T) *sql.DB {
@@ -15,12 +16,22 @@ func newBoardRepoTestDB(t *testing.T) *sql.DB {
 	return testdb.Open(t)
 }
 
-func TestBoardRepositoryGetByBoardID(t *testing.T) {
+func TestBoardRepositoryOwnerAndAccessibleLookup(t *testing.T) {
 	db := newBoardRepoTestDB(t)
 	repo := NewBoardRepository(db)
+	userRepo := users.NewUserRepository(db)
 
-	t.Run("missing board returns record not found", func(t *testing.T) {
-		board, err := repo.GetByBoardID(context.Background(), "missing-board")
+	owner := &users.User{Username: "owner", Status: 1, Role: "user"}
+	if err := userRepo.Create(context.Background(), owner); err != nil {
+		t.Fatalf("seed owner failed: %v", err)
+	}
+	member := &users.User{Username: "member", Status: 1, Role: "user"}
+	if err := userRepo.Create(context.Background(), member); err != nil {
+		t.Fatalf("seed member failed: %v", err)
+	}
+
+	t.Run("missing owner board returns record not found", func(t *testing.T) {
+		board, err := repo.GetByOwnerAndBoardID(context.Background(), owner.ID, "missing-board")
 		if board != nil {
 			t.Fatalf("board = %#v, want nil", board)
 		}
@@ -29,11 +40,11 @@ func TestBoardRepositoryGetByBoardID(t *testing.T) {
 		}
 	})
 
-	t.Run("existing board returns board", func(t *testing.T) {
+	t.Run("existing board returns owner board", func(t *testing.T) {
 		const boardID = "board-1"
 		seed := &UserBoard{
 			BoardID: boardID,
-			UserID:  1,
+			UserID:  owner.ID,
 			Name:    "Board 1",
 			State:   "{}",
 		}
@@ -43,15 +54,32 @@ func TestBoardRepositoryGetByBoardID(t *testing.T) {
 			t.Fatalf("seed board failed: %v", err)
 		}
 
-		board, err := repo.GetByBoardID(context.Background(), boardID)
+		board, err := repo.GetByOwnerAndBoardID(context.Background(), owner.ID, boardID)
 		if err != nil {
-			t.Fatalf("GetByBoardID returned error: %v", err)
+			t.Fatalf("GetByOwnerAndBoardID returned error: %v", err)
 		}
 		if board == nil {
 			t.Fatalf("board is nil")
 		}
 		if board.BoardID != boardID {
 			t.Fatalf("board.BoardID = %q, want %q", board.BoardID, boardID)
+		}
+
+		if err := repo.UpsertMember(context.Background(), owner.ID, boardID, member.ID, BoardAccessRoleViewer); err != nil {
+			t.Fatalf("seed board member failed: %v", err)
+		}
+		accessible, err := repo.GetAccessibleByBoardID(context.Background(), member.ID, boardID)
+		if err != nil {
+			t.Fatalf("GetAccessibleByBoardID returned error: %v", err)
+		}
+		if accessible == nil {
+			t.Fatal("accessible board is nil")
+		}
+		if accessible.Board.UserID != owner.ID {
+			t.Fatalf("accessible owner id = %d, want %d", accessible.Board.UserID, owner.ID)
+		}
+		if accessible.Role != BoardAccessRoleViewer {
+			t.Fatalf("accessible role = %s, want viewer", accessible.Role)
 		}
 	})
 }

@@ -98,7 +98,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	}
 	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
 
-	slog.Info("OpenAI-compatible image request", "feature", featureSlug, "endpoint", endpoint, "model", model, "size", size, "edit", useEditEndpoint, "images", imageInputCount)
+	slog.Info("OpenAI-compatible image request", "feature", featureSlug, "endpoint", redactLogURL(endpoint), "model", model, "size", size, "edit", useEditEndpoint, "images", imageInputCount)
 
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHostsFromEnv()...)
 	if err != nil {
