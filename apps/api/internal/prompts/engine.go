@@ -1,6 +1,7 @@
 package prompts
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -48,11 +49,19 @@ func describeTemplateLabel(value string, labels map[string]string) string {
 	return normalized
 }
 
+type promptParamReader func(map[string]interface{}, string) (interface{}, bool)
+type promptParamFormatter func(interface{}) (string, bool)
+
 type promptTemplateBinding struct {
 	placeholder string
 	paramKey    string
-	reader      func(map[string]interface{}, string) (interface{}, bool)
-	formatter   func(interface{}) (string, bool)
+	reader      promptParamReader
+	formatter   promptParamFormatter
+}
+
+type featurePromptMergePolicy struct {
+	appendUserPromptWhenTemplateMissesPlaceholder bool
+	appendBasePromptWithoutTemplate               bool
 }
 
 var featurePromptBindings = map[string][]promptTemplateBinding{
@@ -90,6 +99,18 @@ var featurePromptBindings = map[string][]promptTemplateBinding{
 			formatter:   lightingPromptValue,
 		},
 	},
+}
+
+var defaultFeaturePromptMergePolicy = featurePromptMergePolicy{
+	appendUserPromptWhenTemplateMissesPlaceholder: true,
+	appendBasePromptWithoutTemplate:               true,
+}
+
+func resolveFeaturePromptMergePolicy(featureSlug string) featurePromptMergePolicy {
+	if featureSlug == workflow.FeatureSlugStyleVariation {
+		return featurePromptMergePolicy{}
+	}
+	return defaultFeaturePromptMergePolicy
 }
 
 func stringPromptBinding(placeholder string, paramKey string) promptTemplateBinding {
@@ -170,23 +191,21 @@ func ApplyFeatureSystemPrompt(
 		"{{user_prompt}}": userPrompt,
 	}
 	applyPromptTemplateBindings(varMap, featureSlug, params)
+	policy := resolveFeaturePromptMergePolicy(featureSlug)
 	if strings.Contains(sysPrompt, "{{") {
 		hasUserPromptPlaceholder := strings.Contains(sysPrompt, "{{user_prompt}}")
 		result := sysPrompt
 		for k, v := range varMap {
 			result = strings.ReplaceAll(result, k, v)
 		}
-		if featureSlug != workflow.FeatureSlugStyleVariation &&
+		if policy.appendUserPromptWhenTemplateMissesPlaceholder &&
 			!hasUserPromptPlaceholder &&
 			strings.TrimSpace(userPrompt) != "" {
 			result += " " + userPrompt
 		}
-		if featureSlug == workflow.FeatureSlugStyleVariation {
-			return result
-		}
 		return result
 	}
-	if featureSlug == workflow.FeatureSlugStyleVariation {
+	if !policy.appendBasePromptWithoutTemplate {
 		return sysPrompt
 	}
 	return sysPrompt + " " + basePrompt
@@ -219,35 +238,43 @@ func formatImageWeightsTemplateValue(raw interface{}) (string, bool) {
 }
 
 func readImageWeightNumber(value interface{}) (float64, bool) {
-	var weight float64
 	switch typed := value.(type) {
 	case float64:
-		weight = typed
+		return finiteImageWeightNumber(typed)
 	case float32:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case int:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case int8:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case int16:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case int32:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case int64:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case uint:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case uint8:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case uint16:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case uint32:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
 	case uint64:
-		weight = float64(typed)
+		return finiteImageWeightNumber(float64(typed))
+	case json.Number:
+		weight, err := typed.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return finiteImageWeightNumber(weight)
 	default:
 		return 0, false
 	}
+}
+
+func finiteImageWeightNumber(weight float64) (float64, bool) {
 	return weight, !math.IsNaN(weight) && !math.IsInf(weight, 0)
 }
 
