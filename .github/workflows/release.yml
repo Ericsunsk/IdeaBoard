@@ -91,6 +91,7 @@ jobs:
         with:
           version: v2.12.2
           working-directory: apps/api
+          args: ./...
 
       - name: Build web archive
         shell: bash

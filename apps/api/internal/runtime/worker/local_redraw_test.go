@@ -36,22 +36,6 @@ func mustEncodePNGDataURL(t *testing.T, img image.Image) string {
 	return payload.String()
 }
 
-func mustDecodeDataURLImage(t *testing.T, raw string) image.Image {
-	t.Helper()
-	if !strings.HasPrefix(raw, "data:image/png;base64,") {
-		t.Fatalf("unexpected data url prefix: %q", raw)
-	}
-	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(raw, "data:image/png;base64,"))
-	if err != nil {
-		t.Fatalf("decode data url: %v", err)
-	}
-	img, err := png.Decode(bytes.NewReader(decoded))
-	if err != nil {
-		t.Fatalf("decode png: %v", err)
-	}
-	return img
-}
-
 func mustDecodeStoredUploadImage(t *testing.T, raw string) image.Image {
 	t.Helper()
 	if !strings.HasPrefix(raw, "/uploads/") {
