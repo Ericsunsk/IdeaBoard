@@ -77,15 +77,63 @@ func TestApplyFeatureSystemPromptTemplateWithoutUserPromptStillKeepsBasePrompt(t
 		"user prompt",
 		"style-fusion",
 		map[string]interface{}{
-			"blend_ratio": 30,
+			"image_weights": []interface{}{0.6, 0.4},
 		},
 		func(string) (string, error) {
-			return "SYS ratio={{blend_ratio}}", nil
+			return "SYS weights={{image_weights}}", nil
 		},
 	)
 
-	if got != "SYS ratio=30 user prompt" {
+	if got != "SYS weights=Image 1: 60%, Image 2: 40% user prompt" {
 		t.Fatalf("got %q, want template result + base prompt", got)
+	}
+}
+
+func TestApplyFeatureSystemPromptImageWeightsIgnoresInvalidListItems(t *testing.T) {
+	got := ApplyFeatureSystemPrompt(
+		"",
+		"",
+		"style-fusion",
+		map[string]interface{}{
+			"image_weights": []interface{}{0.5, "invalid", 0.25},
+		},
+		func(string) (string, error) {
+			return "SYS {{image_weights}}", nil
+		},
+	)
+
+	if got != "SYS Image 1: 50%, Image 2: 25%" {
+		t.Fatalf("got %q, want only numeric image weights", got)
+	}
+}
+
+func TestApplyFeatureSystemPromptDoesNotExposeAssetOrDeprecatedVariables(t *testing.T) {
+	got := ApplyFeatureSystemPrompt(
+		"",
+		"",
+		"hd-upscale",
+		map[string]interface{}{
+			"category":           "dress",
+			"pattern_mode":       "tile",
+			"original_image_url": "https://img.example/original.png",
+			"mask_image_url":     "https://img.example/mask.png",
+			"use_mask":           true,
+		},
+		func(string) (string, error) {
+			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}}", nil
+		},
+	)
+
+	want := "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}}"
+	if got != want {
+		t.Fatalf("got %q, want unsupported placeholders to remain unchanged", got)
+	}
+	if strings.Contains(got, "dress") ||
+		strings.Contains(got, "tile") ||
+		strings.Contains(got, "https://img.example/original.png") ||
+		strings.Contains(got, "https://img.example/mask.png") ||
+		strings.Contains(got, "true") {
+		t.Fatalf("got %q, want no runtime media or deprecated values exposed", got)
 	}
 }
 
@@ -105,20 +153,23 @@ func TestApplyFeatureSystemPromptTemplateWithUserPromptDoesNotAppendBasePromptTw
 	}
 }
 
-func TestApplyFeatureSystemPromptTemplateWithoutUserPromptDoesNotAppendBasePrompt(t *testing.T) {
+func TestApplyFeatureSystemPromptHDUpscaleDoesNotExposeUseMask(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",
 		"",
 		"hd-upscale",
 		map[string]interface{}{
-			"upscale_mode": "enhancement",
+			"image_urls":         []interface{}{"https://img.example/original.png"},
+			"original_image_url": "https://img.example/original.png",
+			"use_mask":           true,
+			"upscale_mode":       "enhancement",
 		},
 		func(string) (string, error) {
-			return "SYS mode={{upscale_mode}}", nil
+			return "SYS use_mask={{use_mask}} mode={{upscale_mode}}", nil
 		},
 	)
 
-	if got != "SYS mode=enhancement" {
-		t.Fatalf("got %q, want template result without base prompt fallback", got)
+	if got != "SYS use_mask={{use_mask}} mode=enhancement" {
+		t.Fatalf("got %q, want unsupported use_mask placeholder to remain unchanged", got)
 	}
 }

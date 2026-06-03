@@ -337,8 +337,7 @@ func appendOpenAIAllowedParams(reqBody map[string]interface{}, providerReq provi
 		reqBody["image_urls"] = imageURLs
 	}
 
-	allowedKeys := append(openAISharedAllowedParamKeys(), "mask_image_url")
-	for _, key := range allowedKeys {
+	for _, key := range openAISharedAllowedParamKeys() {
 		if v, ok := providerReq.Params[key]; ok {
 			reqBody[key] = v
 		}
@@ -349,16 +348,11 @@ func openAISharedAllowedParamKeys() []string {
 	return []string{
 		"variation_strength",
 		"viewpoint",
-		"blend_ratio",
 		"extend_top",
 		"extend_right",
 		"extend_bottom",
 		"extend_left",
-		"image_a_weight",
-		"image_b_weight",
 		"original_image_url",
-		"mask_image_urls",
-		"use_mask",
 		"upscale_mode",
 		"upscale_factor",
 		"output_format",
@@ -411,39 +405,6 @@ func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
 		featureSlug == workflow.FeatureSlugPartialEdit ||
 		featureSlug == workflow.FeatureSlugRemoveBg ||
 		featureSlug == workflow.FeatureSlugStyleFusion {
-		return true
-	}
-	return featureSlug == workflow.FeatureSlugHDUpscale && (hasOpenAIMaskInput(params) || isLocalRedrawEnabled(params))
-}
-
-func isLocalRedrawEnabled(params map[string]interface{}) bool {
-	if params == nil {
-		return false
-	}
-	enabled, ok := params[localRedrawEnabledParam].(bool)
-	return ok && enabled
-}
-
-func hasOpenAIMaskInput(params map[string]interface{}) bool {
-	if params == nil {
-		return false
-	}
-	if value, ok := params["mask_image_url"].(string); ok && strings.TrimSpace(value) != "" {
-		return true
-	}
-	switch values := params["mask_image_urls"].(type) {
-	case []string:
-		if len(values) > 0 {
-			return true
-		}
-	case []interface{}:
-		for _, value := range values {
-			if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
-				return true
-			}
-		}
-	}
-	if enabled, ok := params["use_mask"].(bool); ok && enabled {
 		return true
 	}
 	return false

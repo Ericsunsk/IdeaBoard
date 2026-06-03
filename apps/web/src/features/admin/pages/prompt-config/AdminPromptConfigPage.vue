@@ -64,7 +64,7 @@
           <button
             v-for="v in getVarsForSlug(item.slug)"
             :key="v.key"
-            :class="['var-btn', `is-${getVarTone(v.key)}`]"
+            :class="['var-btn', `is-${v.tone}`]"
             @click="insertVar(item.slug, v.key)"
           >
             <span class="var-btn-key">{{ v.key }}</span>
@@ -117,7 +117,6 @@ import {
   getFeatureNote,
   getGroupFilledCount as calcGroupFilledCount,
   getGroupVariableCount as calcGroupVariableCount,
-  getVarTone,
   getVarsForSlug,
   type FeatureGroup,
   type FeatureSlug,
@@ -403,12 +402,6 @@ async function savePrompt(slug: FeatureSlug) {
   --var-bg: #92400e;
   --var-bg-hover: #b45309;
   --var-key: #fef3c7;
-}
-
-.var-btn.is-asset {
-  --var-bg: #1d4ed8;
-  --var-bg-hover: #2563eb;
-  --var-key: #dbeafe;
 }
 
 .var-btn.is-context {

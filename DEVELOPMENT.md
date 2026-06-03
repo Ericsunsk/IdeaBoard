@@ -107,35 +107,27 @@ graph LR
 |-----------|----------|
 | `sketch-to-image` | 草图成图 |
 | `style-variation` | 风格延展 |
-| `partial-edit` | 局部改款 |
+| `partial-edit` | 局部重绘 |
 | `remove-bg` | 抠图 |
-| `style-fusion` | 双图融合 |
+| `style-fusion` | 多图融合 |
 | `virtual-3d` | 虚拟 3D 展示 |
 | `pattern-gen` | 图案生成 |
 | `hd-upscale` | HD |
-| `image-extend` | 图片延伸 |
+| `image-extend` | 扩图 |
 
 ### 契约规则
 
 - `feature` 应作为顶层任务字段传递，并在后端统一校验。
 - `image_urls` 应作为顶层任务字段传递，不再在 `params` 里双轨存放。
 - `params` 只承载 feature 专属参数，不再额外复制 `feature` 与 `image_urls`。
-- 工作流参数只接受最新 canonical key，例如 `feature`、`use_mask`、`mask_image_url`、`mask_image_urls`、`upscale_mode`。
+- 工作流参数只接受最新 canonical key，例如 `feature`、`upscale_mode`、`mask_image_url`、`reference_image_urls`。
+- `use_mask`、`mask_image_url`、`mask_image_urls` 是 `partial-edit` 局部重绘链路的运行时边界参数，不是 prompt 模板变量。
 - 已下线能力不进入产品文案、展示分组或模板 contract。
 
 对应实现：
 
 - [executionContract.ts](./apps/web/src/features/workspace/config/executionContract.ts)
 - [features.go](./apps/api/internal/workflow/features.go)
-
-### 画布直连工具
-
-除 workflow feature 外，画布中还存在少量直接工具动作：
-
-- `to-vector`
-
-它们不进入 `feature_prompt:<slug>` 模板链，也不属于 workflow feature contract 的 active slug 集合。审计 prompt 系统或 admin 配置页时，不要把这类直连工具误当成 workflow feature 漏斗的一部分。
-
 
 <a id="task-lifecycle"></a>
 ## 任务生命周期
@@ -150,15 +142,15 @@ graph LR
   "feature": "style-fusion",
   "image_urls": ["https://..."],
   "params": {
-    "blend_ratio": 0.5
+    "image_weights": [0.6, 0.4]
   }
 }
 ```
 
 ### 前端入口
 
-- [useNodeExecutors.ts](./apps/web/src/features/workspace/composables/useNodeExecutors.ts)
-- [useCanvasDirectActions.ts](./apps/web/src/features/workspace/composables/useCanvasDirectActions.ts)
+- [useFlowPromptGenerationOrchestrator.ts](./apps/web/src/features/workspace/composables/useFlowPromptGenerationOrchestrator.ts)
+- [useFlowImageDirectActions.ts](./apps/web/src/features/workspace/composables/useFlowImageDirectActions.ts)
 - [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts)
 - [WorkspaceScreen.vue](./apps/web/src/features/workspace/screens/WorkspaceScreen.vue)
 
@@ -207,23 +199,29 @@ sequenceDiagram
 - `feature slug` 是唯一索引，只接受当前 canonical slug。
 - `{{user_prompt}}` 是用户输入信号，与系统提示词模板分层装配。
 - `mode -> template` 映射仅保留必要项。
-- 执行语义相关 hidden constraint 由后端在特定 feature 下追加。
+- 执行语义由后台模板和显式参数表达；后端不再注入不可见 hidden constraint 片段。
+- Fusion 节点使用 `{{image_weights}}` 表达 2 到 4 张输入图的有序权重；旧的 A/B/ratio 变量已下线。
+- Prompt 节点的 `pattern-gen` system prompt 是可选配置；为空时直接使用用户输入，后续可通过后台补充辅助性约束。
 
 ### 常用变量
 
 | 变量 | 说明 |
 |------|------|
 | `{{user_prompt}}` | 用户输入文本 |
-| `{{blend_ratio}}` | 融合比例 |
-| `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 图片延伸参数 |
+| `{{image_weights}}` | Fusion 有序图片权重，例如 `Image 1: 60%, Image 2: 40%` |
+| `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 扩图参数 |
 | `{{viewpoint}}` | 展示视角描述 |
 | `{{lighting}}` | 打光描述 |
-| `{{use_mask}}` | 是否启用 mask |
-| `{{mask_image_url}}` | Mask 图 URL |
+| `{{upscale_mode}}` | HD 增强模式 |
+| `{{upscale_factor}}` | HD 倍数 |
+| `{{output_format}}` | HD 输出格式 |
+| `{{output_quality}}` | HD 输出质量 |
+
+`original_image_url`、`image_urls`、`mask_image_url`、`mask_image_urls`、`reference_image_urls` 是运行时媒体字段，不是 prompt 模板变量；不要写成 `{{...}}` 插入 system prompt 正文。
 
 相关入口：
 
-- 管理页：[FeaturePromptConfigScreen.vue](./apps/web/src/features/admin/prompt-config/FeaturePromptConfigScreen.vue)
+- 管理页：[AdminPromptConfigPage.vue](./apps/web/src/features/admin/pages/prompt-config/AdminPromptConfigPage.vue)
 - 后端装配：[engine.go](./apps/api/internal/prompts/engine.go)
 
 
@@ -381,7 +379,7 @@ go build ./...
 | `APP_GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
 | `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS allowlist，多个 origin 用逗号分隔；生产同源访问通常留空，跨源直连 API 时必须显式配置 |
 | `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
-| `AUTH_SERVICE_INTERNAL_KEY` | 空 | Go 调用 auth service 的 internal key |
+| `AUTH_INTERNAL_KEY` | 空 | Go 调用 auth service internal endpoint 的保护密钥；必须与 Auth 服务同名变量一致 |
 
 Auth 服务关键变量：
 
@@ -389,7 +387,7 @@ Auth 服务关键变量：
 |--------|--------|------|
 | `AUTH_HOST` | `127.0.0.1` | Auth 服务监听地址；生产建议仅监听回环地址 |
 | `AUTH_PORT` | `6001` | Auth 服务监听端口 |
-| `AUTH_INTERNAL_KEY` | 空 | Auth internal endpoint 保护密钥；生产必须设置为非占位随机值，并与 Go 的 `AUTH_SERVICE_INTERNAL_KEY` 一致 |
+| `AUTH_INTERNAL_KEY` | 空 | Auth internal endpoint 保护密钥；生产必须设置为非占位随机值，并与 API 的同名变量一致 |
 | `AUTH_TRUSTED_ORIGINS` | 空 | Better Auth 可信浏览器源 |
 | `BETTER_AUTH_SECRET` | 本地开发 fallback | Better Auth 签名密钥；生产必须设置为非占位随机值，至少 32 字符高熵随机值 |
 | `BETTER_AUTH_URL` | `http://localhost:5173`（本地开发） | Better Auth 对外基准 URL；生产必须设置为正式访问地址 |

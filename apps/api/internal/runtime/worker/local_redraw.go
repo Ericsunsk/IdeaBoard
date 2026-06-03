@@ -26,10 +26,7 @@ import (
 	_ "golang.org/x/image/webp"
 )
 
-const (
-	localRedrawEnabledParam = "__local_redraw_enabled"
-	maskLuminanceThreshold  = 16
-)
+const maskLuminanceThreshold = 16
 
 type localRedrawContext struct {
 	featureSlug string
@@ -116,7 +113,6 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 		return nil, err
 	}
 	stripLocalRedrawMaskParams(params)
-	params[localRedrawEnabledParam] = true
 
 	return &localRedrawContext{
 		featureSlug: featureSlug,
@@ -174,16 +170,11 @@ func shouldUseLocalRedrawPipeline(params map[string]interface{}) bool {
 	if !ok {
 		return false
 	}
-	if !hasOpenAIMaskInput(params) {
+	if featureSlug != workflow.FeatureSlugPartialEdit {
 		return false
 	}
-	switch featureSlug {
-	case workflow.FeatureSlugPartialEdit,
-		workflow.FeatureSlugHDUpscale:
-		return true
-	default:
-		return false
-	}
+	_, hasMask := readLocalRedrawMaskRef(params)
+	return hasMask
 }
 
 func readLocalRedrawOriginalImageRef(params map[string]interface{}) (string, bool) {

@@ -145,11 +145,11 @@ flowchart TB
     </td>
     <td valign="top" width="33%">
       <strong>编辑调整</strong><br/>
-      局部改款、局部重绘、双图融合
+      局部重绘、多图融合
     </td>
     <td valign="top" width="33%">
       <strong>图片工具</strong><br/>
-      局部重绘、图片延伸、HD
+      扩图、HD
     </td>
   </tr>
   <tr>
@@ -227,7 +227,7 @@ cp .env.example .env
 ```
 
 > [!TIP]
-> 至少确认数据库、端口以及 `AUTH_SERVICE_BASE_URL` / `AUTH_SERVICE_INTERNAL_KEY` 配置正确。`.env.example` 里的敏感字段是空值或占位值，不应直接用于部署。
+> 至少确认数据库、端口以及 `AUTH_SERVICE_BASE_URL` / `AUTH_INTERNAL_KEY` 配置正确。`.env.example` 里的敏感字段是空值或占位值，不应直接用于部署。
 
 如果后端放在 Nginx / 宝塔等反向代理后面，建议额外设置：
 
@@ -247,7 +247,7 @@ npm run migrate
 npm run dev
 ```
 
-生产部署时必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）和 `BETTER_AUTH_URL`（正式访问地址），并让 `AUTH_INTERNAL_KEY` 与 Go API 的 `AUTH_SERVICE_INTERNAL_KEY` 保持一致。
+生产部署时必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）和 `BETTER_AUTH_URL`（正式访问地址），并让 API 与 Auth 服务使用相同的 `AUTH_INTERNAL_KEY`。
 
 > [!IMPORTANT]
 > 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（源码生产部署先 build 再执行 `migrate:dist`；发布包已包含 `dist`，直接安装依赖后执行 `migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移，运行时 Auth 镜像不包含 Better Auth CLI。

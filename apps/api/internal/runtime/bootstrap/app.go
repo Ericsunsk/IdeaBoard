@@ -152,10 +152,10 @@ func requireAuthInternalKeyForProduction(cfg *config.Config) {
 	}
 	internalKey := strings.TrimSpace(cfg.Auth.InternalAPIKey)
 	if internalKey == "" {
-		fatal("AUTH_SERVICE_INTERNAL_KEY must be set when APP_ENV=production")
+		fatal("AUTH_INTERNAL_KEY must be set when APP_ENV=production")
 	}
 	if isUnsafeProductionSecret(internalKey) {
-		fatal("AUTH_SERVICE_INTERNAL_KEY must not use placeholder or development values in production")
+		fatal("AUTH_INTERNAL_KEY must not use placeholder or development values in production")
 	}
 }
 

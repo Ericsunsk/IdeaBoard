@@ -635,15 +635,21 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIHDUpscaleMaskedUsesMultipartFiles(t *testing.T) {
+func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testing.T) {
 	var gotPath string
-	var gotMultipart multipartRequestCapture
+	var gotBody map[string]interface{}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
-		gotMultipart = readMultipartRequest(t, r)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &gotBody); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/upscale-masked.png"}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/upscale.png"}]}`))
 	}))
 	defer server.Close()
 
@@ -660,25 +666,31 @@ func TestCallOpenAIHDUpscaleMaskedUsesMultipartFiles(t *testing.T) {
 		"image_urls":         []interface{}{sourceDataURL},
 		"original_image_url": sourceDataURL,
 		"mask_image_url":     maskDataURL,
+		"mask_image_urls":    []interface{}{maskDataURL},
 		"use_mask":           true,
+		"upscale_mode":       "enhancement",
+		"upscale_factor":     2,
 	}
 
 	if _, err := c.callOpenAI(context.Background(), account, "upscale prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
-	if gotPath != "/v1/images/edits" {
-		t.Fatalf("expected edit endpoint, got %s", gotPath)
+	if gotPath != "/v1/images/generations" {
+		t.Fatalf("expected generations endpoint, got %s", gotPath)
 	}
-	images := gotMultipart.Files["image"]
-	if len(images) != 1 {
-		t.Fatalf("expected one image file, got %#v", images)
+	if gotBody["image"] != sourceDataURL {
+		t.Fatalf("expected source image field, got %#v", gotBody["image"])
 	}
-	if gotMultipart.Fields["original_image_url"][0] != sourceDataURL {
-		t.Fatalf("expected original_image_url field to stay, got %#v", gotMultipart.Fields["original_image_url"])
+	if gotBody["original_image_url"] != sourceDataURL {
+		t.Fatalf("expected original_image_url field to stay, got %#v", gotBody["original_image_url"])
 	}
-	masks := gotMultipart.Files["mask"]
-	if len(masks) != 1 {
-		t.Fatalf("expected one mask file, got %#v", masks)
+	if gotBody["upscale_mode"] != "enhancement" {
+		t.Fatalf("expected upscale_mode field, got %#v", gotBody["upscale_mode"])
+	}
+	for _, key := range []string{"mask", "images", "mask_image_url", "mask_image_urls", "use_mask"} {
+		if _, exists := gotBody[key]; exists {
+			t.Fatalf("did not expect %s in hd-upscale generation request body: %#v", key, gotBody[key])
+		}
 	}
 }
 
@@ -691,11 +703,20 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	}
 
 	if !shouldUseOpenAIEditEndpoint(map[string]interface{}{
-		"feature":    "hd-upscale",
+		"feature":    "partial-edit",
 		"image_urls": []interface{}{"https://img.example/source.png"},
 		"use_mask":   true,
 	}) {
-		t.Fatalf("expected masked hd-upscale to use edit endpoint")
+		t.Fatalf("expected partial-edit to use edit endpoint")
+	}
+
+	if shouldUseOpenAIEditEndpoint(map[string]interface{}{
+		"feature":        "hd-upscale",
+		"image_urls":     []interface{}{"https://img.example/source.png"},
+		"mask_image_url": "https://img.example/mask.png",
+		"use_mask":       true,
+	}) {
+		t.Fatalf("expected hd-upscale to stay on generation endpoint even with stale mask params")
 	}
 
 	for _, feature := range []string{"style-fusion", "remove-bg"} {

@@ -98,7 +98,7 @@ type envConfig struct {
 	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
 
 	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
-	AuthServiceInternalAPIKey string `env:"AUTH_SERVICE_INTERNAL_KEY"`
+	AuthServiceInternalAPIKey string `env:"AUTH_INTERNAL_KEY"`
 	AuthServiceTimeoutSeconds string `env:"AUTH_SERVICE_TIMEOUT_SECONDS"`
 }
 

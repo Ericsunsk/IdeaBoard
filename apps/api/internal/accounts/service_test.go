@@ -66,9 +66,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 
 func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	params := map[string]interface{}{
-		"mask_image_url": "https://mask.example/a.png",
-		"use_mask":       true,
-		"upscale_mode":   "enhancement",
+		"upscale_mode": "enhancement",
 	}
 
 	got := prompts.ApplyFeatureSystemPrompt(
@@ -77,24 +75,14 @@ func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 		"hd-upscale",
 		params,
 		func(slug string) (string, error) {
-			return "SYS={{user_prompt}}|{{mask_image_url}}|{{use_mask}}|{{upscale_mode}}", nil
+			return "SYS={{user_prompt}}|{{upscale_mode}}", nil
 		},
 	)
 
-	want := "SYS=user prompt|https://mask.example/a.png|true|enhancement"
+	want := "SYS=user prompt|enhancement"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
-}
-
-func TestMaskedRequestDetectionUsesCanonicalAliases(t *testing.T) {
-	hdUpscaleParams := map[string]interface{}{
-		"mask_image_url": "https://mask.example/1.png",
-	}
-	if !prompts.IsMaskedHDUpscaleRequest(hdUpscaleParams) {
-		t.Fatalf("expected hd-upscale masked request to be detected by canonical mask_image_url")
-	}
-
 }
 
 func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) {
@@ -134,12 +122,10 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			basePrompt: "base fusion prompt",
 			userPrompt: "融合但不要太夸张",
 			params: map[string]interface{}{
-				"blend_ratio":    55,
-				"image_a_weight": 60,
-				"image_b_weight": 40,
+				"image_weights": []interface{}{0.6, 0.4},
 			},
-			template: "SYS {{user_prompt}} ratio={{blend_ratio}} a={{image_a_weight}} b={{image_b_weight}}",
-			want:     "SYS 融合但不要太夸张 ratio=55 a=60 b=40",
+			template: "SYS {{user_prompt}} weights={{image_weights}}",
+			want:     "SYS 融合但不要太夸张 weights=Image 1: 60%, Image 2: 40%",
 		},
 		{
 			name:       "canvas extend",
@@ -156,18 +142,17 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			want:     "SYS 右侧延展为工作室背景 top=0 right=22 bottom=0 left=0",
 		},
 		{
-			name:       "masked hd-upscale",
+			name:       "hd-upscale",
 			feature:    workflow.FeatureSlugHDUpscale,
 			basePrompt: "user prompt",
 			userPrompt: "",
 			params: map[string]interface{}{
 				"original_image_url": "https://example.com/original.png",
-				"mask_image_url":     "https://example.com/mask.png",
-				"use_mask":           true,
 				"upscale_mode":       "enhancement",
+				"upscale_factor":     2,
 			},
-			template: "SYS original={{original_image_url}} mask={{mask_image_url}} use_mask={{use_mask}} mode={{upscale_mode}}",
-			want:     "SYS original=https://example.com/original.png mask=https://example.com/mask.png use_mask=true mode=enhancement",
+			template: "SYS mode={{upscale_mode}} factor={{upscale_factor}}",
+			want:     "SYS mode=enhancement factor=2",
 		},
 	}
 

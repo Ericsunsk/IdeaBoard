@@ -86,14 +86,25 @@ func TestBuildLocalRedrawMaskSamplerUsesLuminanceFallbackAndPadding(t *testing.T
 	}
 }
 
-func TestShouldUseOpenAIEditEndpointForLocalRedrawHDUpscale(t *testing.T) {
+func TestShouldUseLocalRedrawPipelineOnlyForPartialEditWithMask(t *testing.T) {
 	params := map[string]interface{}{
-		"feature":               "hd-upscale",
-		"image_urls":            []interface{}{"data:image/png;base64,aGVsbG8="},
-		localRedrawEnabledParam: true,
+		"feature":        "partial-edit",
+		"image_urls":     []interface{}{"data:image/png;base64,aGVsbG8="},
+		"mask_image_url": "data:image/png;base64,bWFzaw==",
 	}
-	if !shouldUseOpenAIEditEndpoint(params) {
-		t.Fatalf("expected masked hd-upscale local redraw to keep edit endpoint")
+	if !shouldUseLocalRedrawPipeline(params) {
+		t.Fatalf("expected partial-edit with mask to use local redraw pipeline")
+	}
+
+	params["feature"] = "hd-upscale"
+	if shouldUseLocalRedrawPipeline(params) {
+		t.Fatalf("expected hd-upscale to stay out of local redraw even with stale mask params")
+	}
+
+	params["feature"] = "partial-edit"
+	delete(params, "mask_image_url")
+	if shouldUseLocalRedrawPipeline(params) {
+		t.Fatalf("expected partial-edit without mask to stay out of local redraw pipeline")
 	}
 }
 

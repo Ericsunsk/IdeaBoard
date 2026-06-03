@@ -34,88 +34,113 @@ export const WORKFLOW_FEATURE_GROUP_LIST: readonly WorkflowFeatureGroupMeta[] = 
   {
     key: WORKFLOW_FEATURE_GROUP.fusion,
     title: 'Fusion',
-    desc: '双图融合时的主次、比例和修饰语义。',
+    desc: '2 到 4 图融合时的主次、权重和修饰语义。',
     order: 40,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.inpaint,
     title: 'Inpaint',
-    desc: '局部重绘与局部改款能力。',
+    desc: '局部重绘能力。',
     order: 50,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.imageTools,
     title: 'Image Tools',
-    desc: '图片右键工具里的高清放大和图片延伸。',
+    desc: '图片右键工具里的 HD 和扩图。',
     order: 60,
   },
 ] as const
 
 export interface WorkflowFeatureRegistryItem {
   slug: WorkflowFeature
+  label: string
+  title: string
   adminTitle: string
   groupKey: WorkflowFeatureGroupKey
   imageActionLabel?: string
   imageActionTitle?: string
 }
 
-export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] = [
+type WorkflowFeatureRegistryBaseItem = Omit<
+  WorkflowFeatureRegistryItem,
+  'title' | 'adminTitle'
+>
+
+const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[] = [
   {
     slug: WORKFLOW_FEATURE.sketchToImage,
-    adminTitle: 'Quick · 草图成图',
+    label: '草图成图',
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
     imageActionLabel: '草图成图',
     imageActionTitle: '草图成图',
   },
   {
     slug: WORKFLOW_FEATURE.partialEdit,
-    adminTitle: 'Inpaint · 局部改款',
+    label: '局部重绘',
     groupKey: WORKFLOW_FEATURE_GROUP.inpaint,
   },
   {
     slug: WORKFLOW_FEATURE.styleVariation,
-    adminTitle: 'Quick · 风格延展',
+    label: '风格延展',
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
     imageActionLabel: '风格延展',
     imageActionTitle: '风格延展',
   },
   {
     slug: WORKFLOW_FEATURE.styleFusion,
-    adminTitle: 'Fusion · 双图融合',
+    label: '多图融合',
     groupKey: WORKFLOW_FEATURE_GROUP.fusion,
   },
   {
     slug: WORKFLOW_FEATURE.virtual3d,
-    adminTitle: 'Display · 商品展示',
+    label: '商品展示',
     groupKey: WORKFLOW_FEATURE_GROUP.display,
   },
   {
     slug: WORKFLOW_FEATURE.removeBg,
-    adminTitle: 'Quick · 抠图',
+    label: '抠图',
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
     imageActionLabel: '抠图',
     imageActionTitle: '抠图',
   },
   {
     slug: WORKFLOW_FEATURE.patternGen,
-    adminTitle: 'Pattern · 图案生成',
+    label: '图案生成',
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
   },
   {
     slug: WORKFLOW_FEATURE.hdUpscale,
-    adminTitle: 'Image Tools · 高清放大',
+    label: 'HD',
     groupKey: WORKFLOW_FEATURE_GROUP.imageTools,
     imageActionLabel: 'HD',
     imageActionTitle: 'HD',
   },
   {
     slug: WORKFLOW_FEATURE.imageExtend,
-    adminTitle: 'Image Tools · 图片延伸',
+    label: '扩图',
     groupKey: WORKFLOW_FEATURE_GROUP.imageTools,
     imageActionLabel: '扩图',
     imageActionTitle: '扩图',
   },
 ] as const
+
+function getWorkflowFeatureGroupTitle(groupKey: WorkflowFeatureGroupKey): string {
+  return WORKFLOW_FEATURE_GROUP_LIST.find((group) => group.key === groupKey)?.title || groupKey
+}
+
+function getWorkflowFeatureTitle(item: WorkflowFeatureRegistryBaseItem): string {
+  return `${getWorkflowFeatureGroupTitle(item.groupKey)} · ${item.label}`
+}
+
+export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] =
+  WORKFLOW_FEATURE_REGISTRY_BASE.map((item) => {
+    const title = getWorkflowFeatureTitle(item)
+    return {
+      ...item,
+      title,
+      adminTitle: title,
+    }
+  })
 
 export const WORKFLOW_FEATURE_REGISTRY_MAP = Object.fromEntries(
   WORKFLOW_FEATURE_REGISTRY.map((item) => [item.slug, item]),

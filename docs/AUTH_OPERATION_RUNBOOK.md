@@ -87,7 +87,7 @@
 > `用户管理` 页的身份侧操作建议仅允许内网/VPN/IP allowlist 访问。
 
 - 生产环境必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）与 `BETTER_AUTH_URL`（正式访问地址），不得使用 `replace-with-*` 或本地开发 fallback。
-- `AUTH_INTERNAL_KEY` 必须与 Go API 的 `AUTH_SERVICE_INTERNAL_KEY` 一致，并仅在 API 与 Auth Service 间共享；生产环境不得使用占位值。
+- `AUTH_INTERNAL_KEY` 必须在 API 与 Auth Service 中保持一致，并仅在两侧共享；生产环境不得使用占位值。
 - Auth Service 与 Go API 建议只监听 `127.0.0.1`，由 Nginx 统一对外暴露，避免绕过可信代理与限流边界。
 - 登录/注册限流依赖可信代理解析后的客户端 IP；不要让公网直接访问 `:6001`。
 - 使用最小权限账号，避免共享管理员口令。

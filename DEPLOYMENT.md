@@ -456,7 +456,7 @@ nano /opt/ideaboard/apps/api/.env
 - `APP_PUBLIC_BASE_URL`（正式前端地址，用于生成分享链接，例如 `https://app.example.com`）
 - `APP_PUBLIC_ASSET_BASE_URL`（正式素材/API 地址，用于 `/uploads/*` 与上游模型可访问图片，例如 `https://api.example.com`）
 - `AUTH_SERVICE_BASE_URL=http://127.0.0.1:6001`
-- `AUTH_SERVICE_INTERNAL_KEY`（必须与认证服务的 `AUTH_INTERNAL_KEY` 完全一致，且不能使用 `replace-with-*` 占位值）
+- `AUTH_INTERNAL_KEY`（API 与 Auth 服务共用的 internal endpoint 保护密钥，且不能使用 `replace-with-*` 占位值）
 
 > 说明：`APP_BASE_URL`、`API_BASE_URL` 仍然是 docker compose / deploy 层的输入；API 运行时实际读取的是 `APP_PUBLIC_BASE_URL` 和 `APP_PUBLIC_ASSET_BASE_URL`。
 
@@ -465,7 +465,7 @@ nano /opt/ideaboard/apps/api/.env
 - 不要在生产环境继续使用本地开发默认账号
 - 若前面有 Nginx / 其他反向代理，建议设置 `APP_HOST=127.0.0.1`
 - 生产环境请固定设置 `APP_ENV=production`，不要依赖默认值；发布包 systemd 已设置该值，不要在 `.env` 中写回 `development`
-- `AUTH_SERVICE_INTERNAL_KEY` 建议使用足够长的随机字符串，并只在 API 与 Auth Service 两侧共享
+- `AUTH_INTERNAL_KEY` 建议使用足够长的随机字符串，并只在 API 与 Auth Service 两侧共享
 
 完整字段说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
@@ -486,7 +486,7 @@ npm run migrate:dist
 
 - `AUTH_HOST=127.0.0.1`
 - `AUTH_PORT=6001`
-- `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的 `AUTH_SERVICE_INTERNAL_KEY` 一致，且不能使用 `replace-with-*` 占位值
+- `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的同名变量一致，且不能使用 `replace-with-*` 占位值
 - `AUTH_TRUSTED_ORIGINS` 包含你的正式前端访问源，例如 `https://app.example.com`
 - `BETTER_AUTH_SECRET` 至少 32 字符高熵随机值，例如 `openssl rand -base64 32`；不能使用 `replace-with-*` 或本地开发 fallback
 - `BETTER_AUTH_URL` 设置为 Auth 对外访问地址；Pages + Tunnel 部署时通常是 `https://api.example.com`
@@ -495,7 +495,7 @@ npm run migrate:dist
 > [!IMPORTANT]
 > Better Auth 会在同一个 PostgreSQL 库里维护 `user/session/account/verification` 等认证表。上面的 `npm run migrate:dist` 会按 `dist/auth.js` 中的配置创建或更新这些认证表；当前项目仍由 Go API 维护业务侧 `users` 表，并通过 `auth_user_id` 关联 Better Auth 用户。
 >
-> 后台 `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销、开放注册开关、防刷限流设置；不开放后台改密。角色升降级与彻底注销均由 Go Admin API 编排，并依赖 `AUTH_SERVICE_INTERNAL_KEY` 调用 Auth Service internal endpoint；限流配置来源于后台设置并写入 `system_configs`，不通过环境变量注入。
+> 后台 `用户管理` 页当前支持：角色升降级、身份侧封禁/解封、会话吊销/踢下线、伪装登录/停止伪装、受控彻底注销、开放注册开关、防刷限流设置；不开放后台改密。角色升降级与彻底注销均由 Go Admin API 编排，并依赖 `AUTH_INTERNAL_KEY` 调用 Auth Service internal endpoint；限流配置来源于后台设置并写入 `system_configs`，不通过环境变量注入。
 
 ### 3. 配置 systemd
 
