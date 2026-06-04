@@ -47,14 +47,3 @@ func collectProviderMediaRefs(params map[string]interface{}) providerMediaRefs {
 		GoogleImages: mediarefs.CollectUniqueParamRefs(params, googleImageInputRefKeys),
 	}
 }
-
-func imageURLObjectRefs(refs []string) []map[string]string {
-	if len(refs) == 0 {
-		return nil
-	}
-	out := make([]map[string]string, 0, len(refs))
-	for _, ref := range refs {
-		out = append(out, map[string]string{"image_url": ref})
-	}
-	return out
-}

@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/testdb"
 )
@@ -150,60 +151,34 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 	}
 }
 
-func TestTaskRuntimePublishesStatusChanges(t *testing.T) {
+func TestConfirmTaskLeasePublishesRunningStatus(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := accounts.NewTaskRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	assigner := taskqueue.NewPostgresTaskAssigner(db)
+	service := NewService(nil, taskRepo, assigner, nil)
 	publisher := newRecordingTaskStatusPublisher()
 	service.SetTaskStatusPublisher(publisher)
 
 	task := &tasks.Task{
-		TaskID:    "task-publish",
-		UserID:    1,
-		ChannelID: 1,
-		Status:    tasks.StatusPending,
-	}
-	if err := taskRepo.Create(ctx, task); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-
-	if err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-publish"); err != nil {
-		t.Fatalf("MarkTaskRunning returned error: %v", err)
-	}
-
-	select {
-	case event := <-publisher.ch:
-		if event.TaskID != task.TaskID || event.Status != tasks.StatusRunning {
-			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, task.TaskID, tasks.StatusRunning)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for running event")
-	}
-}
-
-func TestMarkTaskRunningPublishesRunningWhenAlreadyAssignedByAssigner(t *testing.T) {
-	ctx := context.Background()
-	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
-	publisher := newRecordingTaskStatusPublisher()
-	service.SetTaskStatusPublisher(publisher)
-
-	task := &tasks.Task{
-		TaskID:     "task-running-assigned-publish",
+		TaskID:     "task-publish",
 		UserID:     1,
 		ChannelID:  1,
 		AccountID:  42,
 		Status:     tasks.StatusRunning,
-		LeaseToken: "lease-already-assigned",
+		LeaseToken: "lease-publish",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-already-assigned"); err != nil {
-		t.Fatalf("MarkTaskRunning returned error: %v", err)
+	if err := service.ConfirmTaskLease(ctx, taskqueue.TaskAssignment{
+		TaskID:     task.TaskID,
+		AccountID:  task.AccountID,
+		Status:     taskqueue.AssignStatusAssigned,
+		LeaseToken: task.LeaseToken,
+	}); err != nil {
+		t.Fatalf("ConfirmTaskLease returned error: %v", err)
 	}
 
 	select {
@@ -216,29 +191,41 @@ func TestMarkTaskRunningPublishesRunningWhenAlreadyAssignedByAssigner(t *testing
 	}
 }
 
-func TestMarkTaskRunningReturnsAlreadyRunningForSameAccountDifferentLease(t *testing.T) {
+func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
 	taskRepo := accounts.NewTaskRepository(db)
-	service := NewService(nil, taskRepo, nil, nil)
+	assigner := taskqueue.NewPostgresTaskAssigner(db)
+	service := NewService(nil, taskRepo, assigner, nil)
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
 
 	task := &tasks.Task{
-		TaskID:    "task-running-dup-same-account",
-		UserID:    1,
-		ChannelID: 1,
-		Status:    tasks.StatusPending,
+		TaskID:     "task-stale-lease",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  42,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-current",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	if err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-running-dup"); err != nil {
-		t.Fatalf("first MarkTaskRunning returned error: %v", err)
+	err := service.ConfirmTaskLease(ctx, taskqueue.TaskAssignment{
+		TaskID:     task.TaskID,
+		AccountID:  task.AccountID,
+		Status:     taskqueue.AssignStatusAssigned,
+		LeaseToken: "lease-stale",
+	})
+	if err == nil {
+		t.Fatal("expected stale lease confirmation to fail")
 	}
 
-	err := service.MarkTaskRunning(ctx, task.TaskID, 42, "lease-running-other")
-	if !errors.Is(err, ErrTaskAlreadyRunning) {
-		t.Fatalf("expected ErrTaskAlreadyRunning, got %v", err)
+	select {
+	case event := <-publisher.ch:
+		t.Fatalf("unexpected published event: %+v", event)
+	default:
 	}
 }
 

@@ -273,7 +273,7 @@ func IsBoardNameUniqueConstraintError(err error) bool {
 	if !database.IsDuplicateConstraintError(err) {
 		return false
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "idx_user_board_name")
+	return strings.Contains(strings.ToLower(err.Error()), "uq_user_board_name")
 }
 
 func IsBoardIDUniqueConstraintError(err error) bool {

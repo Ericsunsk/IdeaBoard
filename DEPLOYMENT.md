@@ -203,6 +203,7 @@ GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 - `APP_BASE_URL`
 - `API_BASE_URL`
 - `CLOUDFLARE_TUNNEL_TOKEN`
+- `CLOUDFLARED_VERSION`
 - `IDEABOARD_API_IMAGE`
 - `IDEABOARD_AUTH_IMAGE`
 - `IDEABOARD_AUTH_MIGRATE_IMAGE`
@@ -210,10 +211,6 @@ GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 - `AUTH_INTERNAL_KEY`
 - `BETTER_AUTH_SECRET`
 - `NATS_PASSWORD`
-
-可选：
-
-- `CLOUDFLARED_VERSION`（必须显式设置固定版本，避免跟随 latest 漂移）
 
 ### 3. 后续部署 / 升级
 
@@ -274,7 +271,7 @@ curl http://127.0.0.1:8080/api/auth/get-session
 
 ```bash
 nano /opt/stacks/ideaboard/docker/.env
-# 修改 IDEABOARD_API_IMAGE / IDEABOARD_AUTH_IMAGE / IDEABOARD_AUTH_MIGRATE_IMAGE，必要时也固定 CLOUDFLARED_VERSION
+# 修改 IDEABOARD_API_IMAGE / IDEABOARD_AUTH_IMAGE / IDEABOARD_AUTH_MIGRATE_IMAGE，并保持 CLOUDFLARED_VERSION 为固定版本
 ideaboard update
 ```
 
@@ -567,7 +564,7 @@ server_name _;
 
 发布包内置 Nginx 配置已将 `client_max_body_size` 设为 `50m`，与后台上传接口上限保持一致；若你手写 Nginx 配置，请同步该值。
 
-SSE 任务进度接口需要关闭 Nginx 缓冲并放宽读取超时，确认 `ideaboard.conf` 包含以下 location（放在 `location /api/` 之前）：
+SSE 任务进度接口需要关闭 Nginx 缓冲并放宽读取超时，发布包的 `ideaboard.conf` 由 `deploy/templates/nginx/ideaboard.conf.template` 生成，并包含以下 location（放在 `location /api/` 之前）：
 
 ```nginx
 location /api/user/tasks/ {
@@ -576,6 +573,7 @@ location /api/user/tasks/ {
     proxy_buffering off;
     proxy_cache off;
     proxy_read_timeout 10m;
+    proxy_set_header Connection "";
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

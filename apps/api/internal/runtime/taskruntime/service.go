@@ -23,10 +23,9 @@ const (
 )
 
 var (
-	ErrTaskNotFound       = errors.New("task not found")
-	ErrTaskTerminal       = errors.New("task already in terminal state")
-	ErrTaskStateConflict  = errors.New("task state conflict")
-	ErrTaskAlreadyRunning = errors.New("task already running on same account")
+	ErrTaskNotFound      = errors.New("task not found")
+	ErrTaskTerminal      = errors.New("task already in terminal state")
+	ErrTaskStateConflict = errors.New("task state conflict")
 )
 
 type Service struct {
@@ -83,8 +82,15 @@ func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.Task
 	return nil
 }
 
-func (s *Service) ConfirmTaskRunning(ctx context.Context, assignment taskqueue.TaskAssignment) error {
-	return s.queue.ConfirmTaskRunning(ctx, assignment)
+func (s *Service) ConfirmTaskLease(ctx context.Context, assignment taskqueue.TaskAssignment) error {
+	if s.queue == nil {
+		return ErrTaskStateConflict
+	}
+	if err := s.queue.ConfirmTaskLease(ctx, assignment); err != nil {
+		return err
+	}
+	s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusRunning)
+	return nil
 }
 
 func (s *Service) IsTaskCancelled(ctx context.Context, taskID string) (bool, error) {
@@ -124,42 +130,6 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 	if err := events.PublishTaskStatusBestEffort(ctx, s.taskEvents, events.NewTaskStatusEvent(taskID, status)); err != nil {
 		slog.Warn("publish task status event failed", "task_id", taskID, "status", status, "err", err)
 	}
-}
-
-func (s *Service) MarkTaskRunning(ctx context.Context, taskID string, accountID int64, leaseToken string) error {
-	if accountID == 0 {
-		return ErrTaskStateConflict
-	}
-	if strings.TrimSpace(leaseToken) == "" {
-		return ErrTaskStateConflict
-	}
-	rows, err := s.taskRepo.MarkTaskRunning(ctx, taskID, []string{tasks.StatusPending}, accountID, leaseToken)
-	if err != nil {
-		return err
-	}
-	if rows > 0 {
-		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusRunning)
-		return nil
-	}
-
-	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return ErrTaskNotFound
-		}
-		return err
-	}
-	if task.Status == tasks.StatusRunning && task.AccountID == accountID {
-		if task.LeaseToken == leaseToken {
-			s.publishTaskStatusEvent(ctx, taskID, tasks.StatusRunning)
-			return nil
-		}
-		return ErrTaskAlreadyRunning
-	}
-	if tasks.IsTerminalStatus(task.Status) {
-		return ErrTaskTerminal
-	}
-	return ErrTaskStateConflict
 }
 
 func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseToken string, result string) error {

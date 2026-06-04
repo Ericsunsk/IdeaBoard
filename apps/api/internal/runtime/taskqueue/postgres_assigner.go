@@ -127,9 +127,9 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 	}, nil
 }
 
-func (a *PostgresTaskAssigner) ConfirmTaskRunning(ctx context.Context, assignment TaskAssignment) error {
+func (a *PostgresTaskAssigner) ConfirmTaskLease(ctx context.Context, assignment TaskAssignment) error {
 	if assignment.AccountID == 0 || strings.TrimSpace(assignment.LeaseToken) == "" {
-		return fmt.Errorf("confirm task running: invalid assignment")
+		return fmt.Errorf("confirm task lease: invalid assignment")
 	}
 	var count int64
 	err := a.db.QueryRowContext(ctx, `
@@ -148,7 +148,7 @@ WHERE task_id = $1
 		return err
 	}
 	if count == 0 {
-		return fmt.Errorf("confirm task running: lease not found")
+		return fmt.Errorf("confirm task lease: lease not found")
 	}
 	return nil
 }

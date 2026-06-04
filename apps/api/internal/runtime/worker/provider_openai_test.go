@@ -729,8 +729,8 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	}
 }
 
-func TestCollectOpenAIEditImageInputsIncludesReferenceImageURLs(t *testing.T) {
-	refs := collectOpenAIEditImageInputs(map[string]interface{}{
+func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
+	refs := collectOpenAIEditImageRefs(map[string]interface{}{
 		"image_urls": []interface{}{
 			"https://img.example/source.png",
 		},
@@ -741,10 +741,10 @@ func TestCollectOpenAIEditImageInputsIncludesReferenceImageURLs(t *testing.T) {
 			"https://img.example/ref-b.png",
 		},
 	})
-	want := []map[string]string{
-		{"image_url": "https://img.example/source.png"},
-		{"image_url": "https://img.example/ref-a.png"},
-		{"image_url": "https://img.example/ref-b.png"},
+	want := []string{
+		"https://img.example/source.png",
+		"https://img.example/ref-a.png",
+		"https://img.example/ref-b.png",
 	}
 	if !reflect.DeepEqual(refs, want) {
 		t.Fatalf("unexpected refs: got=%#v want=%#v", refs, want)

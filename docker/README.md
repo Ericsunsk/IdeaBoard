@@ -87,7 +87,7 @@ docker compose -f compose.local.yml restart
 ```text
 docker/compose.yml
 docker/.env.example
-docker/nginx/ideaboard.prod.conf
+deploy/templates/nginx/ideaboard.conf.template
 ```
 
 生产部署命令：

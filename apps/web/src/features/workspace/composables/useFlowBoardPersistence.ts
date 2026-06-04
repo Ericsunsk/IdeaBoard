@@ -1,6 +1,6 @@
-import { renderBoardPreviewDataUrl } from '../../boards/lib/boardPreviewSerializer'
-import { BOARD_PREVIEW_RENDERER_VERSION } from '../../boards/lib/boardPreviewVersion'
-import { setCanvasBoardPreviewSnapshot } from '../../boards/lib/canvasBoardState'
+import { renderBoardPreviewDataUrl } from '../../canvas/lib/boardPreviewSerializer'
+import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas/lib/boardPreviewVersion'
+import { setCanvasBoardPreviewSnapshot } from '../../canvas/lib/canvasBoardState'
 import { syncCanvasBoardToServer } from '../../boards/lib/boardSync'
 import { getCanvasBoardById } from '../../boards/lib/canvasBoards'
 import {

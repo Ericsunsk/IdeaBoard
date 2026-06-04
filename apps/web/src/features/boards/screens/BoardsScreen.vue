@@ -101,9 +101,9 @@ import {
   duplicateCanvasBoardState,
   getCanvasBoardState,
   setCanvasBoardPreviewSnapshot,
-} from '../lib/canvasBoardState'
-import { renderBoardPreviewDataUrl } from '../lib/boardPreviewSerializer'
-import { BOARD_PREVIEW_RENDERER_VERSION } from '../lib/boardPreviewVersion'
+} from '../../canvas/lib/canvasBoardState'
+import { renderBoardPreviewDataUrl } from '../../canvas/lib/boardPreviewSerializer'
+import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas/lib/boardPreviewVersion'
 import {
   hydrateCanvasBoardsFromServer,
   isBoardNameConflictError,

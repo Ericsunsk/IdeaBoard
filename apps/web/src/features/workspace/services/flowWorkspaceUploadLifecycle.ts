@@ -2,7 +2,7 @@ import {
   collectCanvasBoardImageUrls,
   getCanvasBoardState,
   isImageUrlReferencedInOtherCanvasBoardStates,
-} from '../../boards/lib/canvasBoardState'
+} from '../../canvas/lib/canvasBoardState'
 import { uploadApi } from '../../../shared/api/upload'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from './flowMediaIO'

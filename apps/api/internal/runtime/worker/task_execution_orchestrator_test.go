@@ -37,23 +37,24 @@ func TestUserFacingProviderErrorFallsBackForNonTimeout(t *testing.T) {
 	}
 }
 
-func TestExecuteDropsDuplicateTaskWhenAlreadyRunningOnSameAccount(t *testing.T) {
+func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := accounts.NewTaskRepository(db)
-	account := createRiverTestAccount(t, accountRepo, "dup-running-account")
+	account := createRiverTestAccount(t, accountRepo, "confirm-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
-		TaskID:    "dup-running-task",
-		UserID:    1,
-		ChannelID: 1,
-		AccountID: account.ID,
-		Status:    tasks.StatusRunning,
+		TaskID:     "confirm-fail-task",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  account.ID,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-confirm-fail",
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	assigner := &fakeAssigner{}
+	assigner := &fakeAssigner{confirmErr: errors.New("lease confirmation failed")}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	providerCalled := false
 	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
@@ -62,14 +63,24 @@ func TestExecuteDropsDuplicateTaskWhenAlreadyRunningOnSameAccount(t *testing.T) 
 	})
 
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
-		TaskID:     "dup-running-task",
+		TaskID:     "confirm-fail-task",
 		AccountIDs: []int64{account.ID},
-	}, taskqueue.TaskAssignment{TaskID: "dup-running-task", AccountID: account.ID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-direct-dup"})
+	}, taskqueue.TaskAssignment{TaskID: "confirm-fail-task", AccountID: account.ID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-confirm-fail"})
 	if err != nil {
 		t.Fatalf("execute returned error: %v", err)
 	}
 	if providerCalled {
-		t.Fatal("duplicate running task should not call provider")
+		t.Fatal("task with unconfirmed lease should not call provider")
+	}
+	updated, err := taskRepo.GetByTaskID(context.Background(), "confirm-fail-task")
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	}
+	if updated.AccountID != 0 {
+		t.Fatalf("account_id = %d, want 0", updated.AccountID)
 	}
 }
 
@@ -80,10 +91,12 @@ func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 	account := createRiverTestAccount(t, accountRepo, "complete-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
-		TaskID:    "complete-fail-task",
-		UserID:    1,
-		ChannelID: 1,
-		Status:    tasks.StatusPending,
+		TaskID:     "complete-fail-task",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  account.ID,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-direct-complete",
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
@@ -123,10 +136,12 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	account := createRiverTestAccount(t, accountRepo, "cancel-after-provider-account")
 
 	task := &tasks.Task{
-		TaskID:    "cancel-after-provider-task",
-		UserID:    1,
-		ChannelID: 1,
-		Status:    tasks.StatusPending,
+		TaskID:     "cancel-after-provider-task",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  account.ID,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-cancel-after-provider",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -173,6 +188,71 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	}
 }
 
+func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskExecutionOrchestratorTestDB(t)
+	accountRepo := accounts.NewAccountRepository(db)
+	taskRepo := accounts.NewTaskRepository(db)
+	account := createRiverTestAccount(t, accountRepo, "cancel-before-provider-account")
+
+	task := &tasks.Task{
+		TaskID:     "cancel-before-provider-task",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  account.ID,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-cancel-before-provider",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	cancelStore := newFakeCancelStoreForRiver()
+	if err := cancelStore.MarkCancelled(ctx, task.TaskID, time.Minute); err != nil {
+		t.Fatalf("mark cancelled failed: %v", err)
+	}
+	assigner := &fakeAssigner{}
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
+	providerCalled := false
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
+		providerCalled = true
+		return `{"image_url":"https://example.com/image.png"}`, nil
+	})
+
+	assignment := taskqueue.TaskAssignment{
+		TaskID:     task.TaskID,
+		AccountID:  account.ID,
+		Status:     taskqueue.AssignStatusAssigned,
+		LeaseToken: task.LeaseToken,
+	}
+	if err := orchestrator.execute(ctx, &queuetypes.TaskPayload{
+		TaskID:     task.TaskID,
+		AccountIDs: []int64{account.ID},
+	}, assignment); err != nil {
+		t.Fatalf("execute returned error: %v", err)
+	}
+	if providerCalled {
+		t.Fatal("cancelled task should not call provider")
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusPending {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	}
+	if updated.AccountID != 0 {
+		t.Fatalf("account_id = %d, want 0", updated.AccountID)
+	}
+	if updated.LeaseToken != "" {
+		t.Fatalf("lease_token = %q, want empty", updated.LeaseToken)
+	}
+	if !cancelStore.cleared[task.TaskID] {
+		t.Fatal("cancel marker was not cleared")
+	}
+}
+
 func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
@@ -180,10 +260,12 @@ func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	account := createRiverTestAccount(t, accountRepo, "failed-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
-		TaskID:    "failed-fail-task",
-		UserID:    1,
-		ChannelID: 1,
-		Status:    tasks.StatusPending,
+		TaskID:     "failed-fail-task",
+		UserID:     1,
+		ChannelID:  1,
+		AccountID:  account.ID,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "lease-direct-failed",
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}

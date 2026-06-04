@@ -19,6 +19,7 @@ type fakeAssigner struct {
 	assignStatus   string
 	assignToken    string
 	assignErr      error
+	confirmErr     error
 	confirmCalls   int
 	lastRiverJobID int64
 }
@@ -36,9 +37,9 @@ func (f *fakeAssigner) Assign(_ context.Context, _ []int64, task *queuetypes.Tas
 	}, nil
 }
 
-func (f *fakeAssigner) ConfirmTaskRunning(context.Context, taskqueue.TaskAssignment) error {
+func (f *fakeAssigner) ConfirmTaskLease(context.Context, taskqueue.TaskAssignment) error {
 	f.confirmCalls++
-	return nil
+	return f.confirmErr
 }
 
 func (f *fakeAssigner) leaseToken() string {

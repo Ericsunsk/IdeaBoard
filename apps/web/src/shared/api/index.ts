@@ -17,14 +17,4 @@ export type {
   AdminStatisticsResponse,
 } from './adminStatistics'
 
-export {
-  accountApi,
-  createAccount,
-  deleteAccount,
-  listAccounts,
-  startAccount,
-  stopAccount,
-  updateAccount,
-} from './account'
-export type { ApiAccount } from './account'
 export * from './storage'

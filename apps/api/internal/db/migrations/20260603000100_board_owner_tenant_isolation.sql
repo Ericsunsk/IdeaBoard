@@ -15,16 +15,16 @@ WHERE m.board_id = b.board_id
   AND m.owner_user_id IS NULL;
 
 ALTER TABLE board_members ALTER COLUMN owner_user_id SET NOT NULL;
-ALTER TABLE board_members DROP CONSTRAINT IF EXISTS idx_board_member;
-ALTER TABLE board_members ADD CONSTRAINT idx_board_member UNIQUE (owner_user_id, board_id, user_id);
+ALTER TABLE board_members DROP CONSTRAINT IF EXISTS uq_board_member;
+ALTER TABLE board_members ADD CONSTRAINT uq_board_member UNIQUE (owner_user_id, board_id, user_id);
 
 DROP INDEX IF EXISTS idx_board_member_user;
 CREATE INDEX idx_board_member_user ON board_members (user_id, owner_user_id, board_id);
 
 -- migrate:down
 DROP INDEX IF EXISTS idx_board_member_user;
-ALTER TABLE board_members DROP CONSTRAINT IF EXISTS idx_board_member;
-ALTER TABLE board_members ADD CONSTRAINT idx_board_member UNIQUE (board_id, user_id);
+ALTER TABLE board_members DROP CONSTRAINT IF EXISTS uq_board_member;
+ALTER TABLE board_members ADD CONSTRAINT uq_board_member UNIQUE (board_id, user_id);
 ALTER TABLE board_members DROP COLUMN IF EXISTS owner_user_id;
 
 CREATE INDEX idx_board_member_user ON board_members (user_id, board_id);

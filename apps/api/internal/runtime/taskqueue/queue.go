@@ -26,7 +26,7 @@ type QueueStatsStore interface {
 
 type TaskAssigner interface {
 	Assign(ctx context.Context, accountIDs []int64, task *queuetypes.TaskPayload) (TaskAssignment, error)
-	ConfirmTaskRunning(ctx context.Context, assignment TaskAssignment) error
+	ConfirmTaskLease(ctx context.Context, assignment TaskAssignment) error
 }
 
 type TaskAssignment struct {

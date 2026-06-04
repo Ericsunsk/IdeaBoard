@@ -281,15 +281,6 @@ func (r *TaskRepository) Update(ctx context.Context, task *tasks.Task) error {
 	})
 }
 
-func (r *TaskRepository) MarkTaskRunning(ctx context.Context, taskID string, statuses []string, accountID int64, leaseToken string) (int64, error) {
-	return r.q.MarkTaskRunning(ctx, dbsqlc.MarkTaskRunningParams{
-		AccountID:  accountID,
-		LeaseToken: leaseToken,
-		TaskID:     taskID,
-		Statuses:   statuses,
-	})
-}
-
 func (r *TaskRepository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time) (int64, error) {
 	return r.q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
 		ErrorMsg:    errMsg,

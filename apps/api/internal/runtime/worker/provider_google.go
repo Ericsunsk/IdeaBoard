@@ -26,6 +26,100 @@ const (
 	maxGoogleDataURLBytes = 10 * 1024 * 1024
 )
 
+type googleGeminiRequest struct {
+	Contents         []googleGeminiContent        `json:"contents"`
+	GenerationConfig googleGeminiGenerationConfig `json:"generationConfig"`
+}
+
+type googleGeminiContent struct {
+	Parts []googleGeminiPart `json:"parts"`
+}
+
+type googleGeminiPart struct {
+	Text       string                  `json:"text,omitempty"`
+	InlineData *googleGeminiInlineData `json:"inlineData,omitempty"`
+}
+
+type googleGeminiInlineData struct {
+	MIMEType      string `json:"mimeType,omitempty"`
+	MIMETypeSnake string `json:"mime_type,omitempty"`
+	Data          string `json:"data"`
+}
+
+func (d googleGeminiInlineData) normalizedMIMEType() string {
+	if strings.TrimSpace(d.MIMEType) != "" {
+		return strings.TrimSpace(d.MIMEType)
+	}
+	if strings.TrimSpace(d.MIMETypeSnake) != "" {
+		return strings.TrimSpace(d.MIMETypeSnake)
+	}
+	return "image/png"
+}
+
+type googleGeminiGenerationConfig struct {
+	ResponseModalities []string `json:"responseModalities"`
+}
+
+type googleGeminiResponse struct {
+	Candidates []googleGeminiCandidate `json:"candidates"`
+}
+
+type googleGeminiCandidate struct {
+	Content googleGeminiContentResponse `json:"content"`
+}
+
+type googleGeminiContentResponse struct {
+	Parts []googleGeminiPartResponse `json:"parts"`
+}
+
+type googleGeminiPartResponse struct {
+	InlineData      *googleGeminiInlineData `json:"inlineData"`
+	InlineDataSnake *googleGeminiInlineData `json:"inline_data"`
+}
+
+func (p googleGeminiPartResponse) imageData() *googleGeminiInlineData {
+	if p.InlineData != nil {
+		return p.InlineData
+	}
+	return p.InlineDataSnake
+}
+
+type googleImagenRequest struct {
+	Instances  []googleImagenInstance `json:"instances"`
+	Parameters googleImagenParameters `json:"parameters"`
+}
+
+type googleImagenInstance struct {
+	Prompt string `json:"prompt"`
+}
+
+type googleImagenParameters struct {
+	SampleCount int    `json:"sampleCount"`
+	AspectRatio string `json:"aspectRatio,omitempty"`
+}
+
+type googleImagenResponse struct {
+	Predictions []googleImagenPrediction `json:"predictions"`
+}
+
+type googleImagenPrediction struct {
+	BytesBase64Encoded      string                  `json:"bytesBase64Encoded"`
+	BytesBase64EncodedSnake string                  `json:"bytes_base64_encoded"`
+	Image                   *googleImagenPrediction `json:"image"`
+}
+
+func (p googleImagenPrediction) base64Data() string {
+	for _, value := range []string{p.BytesBase64Encoded, p.BytesBase64EncodedSnake} {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	if p.Image != nil {
+		return p.Image.base64Data()
+	}
+	return ""
+}
+
 func (c *ProviderExecutor) callGoogleAI(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
 	req := newProviderRequest(prompt, 0, 0, params, resolvedModel)
 	return c.callGoogleAIWithRequest(ctx, account, req, timeout)
@@ -74,24 +168,27 @@ func isGoogleImagenModel(model string) bool {
 func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, requestedModel string) (providerCallResult, error) {
 	model := strings.TrimSpace(requestedModel)
 
-	parts := []map[string]interface{}{{"text": providerReq.Prompt}}
+	parts := []googleGeminiPart{{Text: providerReq.Prompt}}
 	inlineParts, err := collectGoogleInlineImageParts(ctx, providerReq, timeout)
 	if err != nil {
 		return providerCallResult{}, err
 	}
 	parts = append(parts, inlineParts...)
 
-	reqBody := map[string]interface{}{
-		"contents": []map[string]interface{}{
-			{"parts": parts},
+	reqBody := googleGeminiRequest{
+		Contents: []googleGeminiContent{
+			{Parts: parts},
 		},
-		"generationConfig": map[string]interface{}{
-			"responseModalities": []string{"IMAGE", "TEXT"},
+		GenerationConfig: googleGeminiGenerationConfig{
+			ResponseModalities: []string{"IMAGE", "TEXT"},
 		},
 	}
 
 	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent", strings.TrimRight(baseURL, "/"), url.PathEscape(model))
-	bodyJSON, _ := json.Marshal(reqBody)
+	bodyJSON, marshalErr := json.Marshal(reqBody)
+	if marshalErr != nil {
+		return providerCallResult{}, fmt.Errorf("序列化 Google Gemini 请求失败: %w", marshalErr)
+	}
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
 	if err != nil {
 		return providerCallResult{}, err
@@ -131,22 +228,22 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 	}, nil
 }
 
-func collectGoogleInlineImageParts(ctx context.Context, providerReq providerRequest, timeout time.Duration) ([]map[string]interface{}, error) {
+func collectGoogleInlineImageParts(ctx context.Context, providerReq providerRequest, timeout time.Duration) ([]googleGeminiPart, error) {
 	refs := providerReq.MediaRefs.GoogleImages
 	if len(refs) == 0 {
 		return nil, nil
 	}
 
-	parts := make([]map[string]interface{}, 0, len(refs))
+	parts := make([]googleGeminiPart, 0, len(refs))
 	for _, ref := range refs {
 		mimeType, data, err := resolveGoogleImageBytes(ctx, ref, timeout)
 		if err != nil {
 			return nil, err
 		}
-		parts = append(parts, map[string]interface{}{
-			"inlineData": map[string]interface{}{
-				"mimeType": mimeType,
-				"data":     base64.StdEncoding.EncodeToString(data),
+		parts = append(parts, googleGeminiPart{
+			InlineData: &googleGeminiInlineData{
+				MIMEType: mimeType,
+				Data:     base64.StdEncoding.EncodeToString(data),
 			},
 		})
 	}
@@ -208,36 +305,23 @@ func resolveGoogleImageBytes(ctx context.Context, ref string, timeout time.Durat
 }
 
 func extractGoogleGeminiImageResponses(respBody []byte) ([]string, error) {
-	var respData map[string]interface{}
+	var respData googleGeminiResponse
 	if err := json.Unmarshal(respBody, &respData); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
 	}
 
 	var urls []string
-	candidates, _ := respData["candidates"].([]interface{})
-	for _, candidate := range candidates {
-		candidateObj, _ := candidate.(map[string]interface{})
-		contentObj, _ := candidateObj["content"].(map[string]interface{})
-		parts, _ := contentObj["parts"].([]interface{})
-		for _, part := range parts {
-			partObj, _ := part.(map[string]interface{})
-			inline := partObj["inlineData"]
+	for _, candidate := range respData.Candidates {
+		for _, part := range candidate.Content.Parts {
+			inline := part.imageData()
 			if inline == nil {
-				inline = partObj["inline_data"]
+				continue
 			}
-			inlineObj, _ := inline.(map[string]interface{})
-			data, _ := inlineObj["data"].(string)
+			data := inline.Data
 			if strings.TrimSpace(data) == "" {
 				continue
 			}
-			mimeType, _ := inlineObj["mimeType"].(string)
-			if strings.TrimSpace(mimeType) == "" {
-				mimeType, _ = inlineObj["mime_type"].(string)
-			}
-			if strings.TrimSpace(mimeType) == "" {
-				mimeType = "image/png"
-			}
-			urls = append(urls, "data:"+strings.TrimSpace(mimeType)+";base64,"+strings.TrimSpace(data))
+			urls = append(urls, "data:"+inline.normalizedMIMEType()+";base64,"+strings.TrimSpace(data))
 		}
 	}
 
@@ -250,20 +334,23 @@ func extractGoogleGeminiImageResponses(respBody []byte) ([]string, error) {
 func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, requestedModel string) (providerCallResult, error) {
 	model := strings.TrimSpace(requestedModel)
 	sampleCount := parseGoogleSampleCount(providerReq.Params)
-	reqBody := map[string]interface{}{
-		"instances": []map[string]interface{}{
-			{"prompt": providerReq.Prompt},
+	reqBody := googleImagenRequest{
+		Instances: []googleImagenInstance{
+			{Prompt: providerReq.Prompt},
 		},
-		"parameters": map[string]interface{}{
-			"sampleCount": sampleCount,
+		Parameters: googleImagenParameters{
+			SampleCount: sampleCount,
 		},
 	}
 	if ratio, ok := parseGoogleAspectRatio(providerReq.Params); ok {
-		reqBody["parameters"].(map[string]interface{})["aspectRatio"] = ratio
+		reqBody.Parameters.AspectRatio = ratio
 	}
 
 	endpoint := fmt.Sprintf("%s/v1beta/models/%s:predict", strings.TrimRight(baseURL, "/"), url.PathEscape(model))
-	bodyJSON, _ := json.Marshal(reqBody)
+	bodyJSON, marshalErr := json.Marshal(reqBody)
+	if marshalErr != nil {
+		return providerCallResult{}, fmt.Errorf("序列化 Google Imagen 请求失败: %w", marshalErr)
+	}
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
 	if err != nil {
 		return providerCallResult{}, err
@@ -369,15 +456,14 @@ func parseGoogleAspectRatio(params map[string]interface{}) (string, bool) {
 }
 
 func extractGoogleImagenResponses(respBody []byte) ([]string, error) {
-	var respData map[string]interface{}
+	var respData googleImagenResponse
 	if err := json.Unmarshal(respBody, &respData); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
 	}
 
-	predictions, _ := respData["predictions"].([]interface{})
-	urls := make([]string, 0, len(predictions))
-	for _, prediction := range predictions {
-		if base64Data := findGoogleImagenBase64(prediction); strings.TrimSpace(base64Data) != "" {
+	urls := make([]string, 0, len(respData.Predictions))
+	for _, prediction := range respData.Predictions {
+		if base64Data := prediction.base64Data(); strings.TrimSpace(base64Data) != "" {
 			urls = append(urls, "data:image/png;base64,"+strings.TrimSpace(base64Data))
 		}
 	}
@@ -385,27 +471,4 @@ func extractGoogleImagenResponses(respBody []byte) ([]string, error) {
 		return nil, errors.New("google imagen 未返回图片数据")
 	}
 	return urls, nil
-}
-
-func findGoogleImagenBase64(node interface{}) string {
-	switch typed := node.(type) {
-	case map[string]interface{}:
-		for _, key := range []string{"bytesBase64Encoded", "bytes_base64_encoded"} {
-			if text, ok := typed[key].(string); ok && strings.TrimSpace(text) != "" {
-				return text
-			}
-		}
-		for _, child := range typed {
-			if found := findGoogleImagenBase64(child); found != "" {
-				return found
-			}
-		}
-	case []interface{}:
-		for _, child := range typed {
-			if found := findGoogleImagenBase64(child); found != "" {
-				return found
-			}
-		}
-	}
-	return ""
 }

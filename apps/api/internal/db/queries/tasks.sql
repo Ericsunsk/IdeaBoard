@@ -126,14 +126,6 @@ WHERE task_id = ANY(sqlc.arg(task_ids)::text[])
   AND status = 'running'
   AND (lease_token IS NULL OR lease_token = '');
 
--- name: MarkTaskRunning :execrows
-UPDATE tasks
-SET status = 'running',
-    account_id = sqlc.arg(account_id),
-    lease_token = sqlc.arg(lease_token)
-WHERE task_id = sqlc.arg(task_id)
-  AND status = ANY(sqlc.arg(statuses)::text[]);
-
 -- name: CompleteTaskWithLease :execrows
 UPDATE tasks
 SET status = 'completed',

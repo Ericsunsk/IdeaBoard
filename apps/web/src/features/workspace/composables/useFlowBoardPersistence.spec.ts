@@ -30,7 +30,7 @@ vi.mock('../services/flowWorkspaceUploadLifecycle', () => ({
   })),
 }))
 
-vi.mock('../../boards/lib/boardPreviewSerializer', () => ({
+vi.mock('../../canvas/lib/boardPreviewSerializer', () => ({
   renderBoardPreviewDataUrl: vi.fn(async () => ''),
 }))
 

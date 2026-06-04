@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserBoardItem } from '../../../shared/api/board'
-import type { CanvasBoardState } from './canvasBoardState'
+import type { CanvasBoardState } from '../../canvas/lib/canvasBoardState'
 import { clearStoredAuth, setStoredAuth } from '../../../shared/utils/auth'
-import { getCanvasBoardState, replaceCanvasBoardStateMap } from './canvasBoardState'
+import { getCanvasBoardState, replaceCanvasBoardStateMap } from '../../canvas/lib/canvasBoardState'
 import { listCanvasBoards, replaceCanvasBoards } from './canvasBoards'
 import { hydrateCanvasBoardsFromServer, syncCanvasBoardToServer } from './boardSync'
 

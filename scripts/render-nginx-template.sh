@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEMPLATE_PATH="${2:-$ROOT_DIR/deploy/templates/nginx/ideaboard.conf.template}"
+OUTPUT_PATH="${1:-}"
+
+if [[ -z "$OUTPUT_PATH" ]]; then
+  echo "Usage: render-nginx-template.sh <output-path> [template-path]" >&2
+  exit 1
+fi
+
+NGINX_API_UPSTREAM="${NGINX_API_UPSTREAM:-http://127.0.0.1:6000}"
+NGINX_AUTH_UPSTREAM="${NGINX_AUTH_UPSTREAM:-http://127.0.0.1:6001}"
+NGINX_AUTH_HEALTH_UPSTREAM="${NGINX_AUTH_HEALTH_UPSTREAM:-http://127.0.0.1:6001/api/health}"
+NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/opt/ideaboard/apps/web/dist}"
+NGINX_ROOT_DIRECTIVE="${NGINX_ROOT_DIRECTIVE:-try_files \$uri \$uri/ /index.html}"
+
+escape_sed_replacement() {
+  printf '%s' "$1" | sed -e 's/[|&\\]/\\&/g'
+}
+
+mkdir -p "$(dirname "$OUTPUT_PATH")"
+
+sed \
+  -e "s|\${NGINX_API_UPSTREAM}|$(escape_sed_replacement "$NGINX_API_UPSTREAM")|g" \
+  -e "s|\${NGINX_AUTH_UPSTREAM}|$(escape_sed_replacement "$NGINX_AUTH_UPSTREAM")|g" \
+  -e "s|\${NGINX_AUTH_HEALTH_UPSTREAM}|$(escape_sed_replacement "$NGINX_AUTH_HEALTH_UPSTREAM")|g" \
+  -e "s|\${NGINX_WEB_ROOT}|$(escape_sed_replacement "$NGINX_WEB_ROOT")|g" \
+  -e "s|\${NGINX_ROOT_DIRECTIVE}|$(escape_sed_replacement "$NGINX_ROOT_DIRECTIVE")|g" \
+  "$TEMPLATE_PATH" > "$OUTPUT_PATH"

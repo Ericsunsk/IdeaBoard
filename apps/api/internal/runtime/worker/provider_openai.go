@@ -27,6 +27,70 @@ import (
 
 const maxOpenAIDataURLBytes = 10 * 1024 * 1024
 
+type openAIImageURLRef struct {
+	ImageURL string `json:"image_url"`
+}
+
+type openAIImageRequestBody struct {
+	Model     string
+	Prompt    string
+	Size      string
+	Image     string
+	ImageURLs []string
+	Images    []openAIImageURLRef
+	Mask      *openAIImageURLRef
+	Extra     map[string]interface{}
+}
+
+func newOpenAIImageRequestBody(providerReq providerRequest) openAIImageRequestBody {
+	return openAIImageRequestBody{
+		Model:  providerReq.Model,
+		Prompt: providerReq.Prompt,
+		Size:   providerReq.Size,
+		Extra:  map[string]interface{}{},
+	}
+}
+
+func (b openAIImageRequestBody) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b.toMap())
+}
+
+func (b openAIImageRequestBody) toMap() map[string]interface{} {
+	out := make(map[string]interface{}, len(b.Extra)+7)
+	for key, value := range b.Extra {
+		out[key] = value
+	}
+	if b.Model != "" {
+		out["model"] = b.Model
+	}
+	if b.Prompt != "" {
+		out["prompt"] = b.Prompt
+	}
+	if b.Size != "" {
+		out["size"] = b.Size
+	}
+	if b.Image != "" {
+		out["image"] = b.Image
+	}
+	if len(b.ImageURLs) > 0 {
+		out["image_urls"] = b.ImageURLs
+	}
+	if len(b.Images) > 0 {
+		out["images"] = b.Images
+	}
+	if b.Mask != nil && strings.TrimSpace(b.Mask.ImageURL) != "" {
+		out["mask"] = b.Mask
+	}
+	return out
+}
+
+func (b *openAIImageRequestBody) setExtra(key string, value interface{}) {
+	if b.Extra == nil {
+		b.Extra = map[string]interface{}{}
+	}
+	b.Extra[key] = value
+}
+
 // callOpenAI 调用 OpenAI DALL-E 风格接口（也兼容其他 OpenAI 兼容平台）
 func (c *ProviderExecutor) callOpenAI(ctx context.Context, account *accounts.ApiAccount, prompt string, width, height int, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
 	req := newProviderRequest(prompt, width, height, params, resolvedModel)
@@ -51,18 +115,14 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	imageInputCount := len(providerReq.MediaRefs.OpenAIImages)
 	featureSlug, _ := workflow.ReadWorkflowStringParam(providerReq.Params, "feature")
 
-	reqBody := map[string]interface{}{
-		"model":  model,
-		"prompt": providerReq.Prompt,
-		"size":   size,
-	}
+	reqBody := newOpenAIImageRequestBody(providerReq)
 
 	if useEditEndpoint {
-		appendOpenAIEditParams(reqBody, providerReq)
+		appendOpenAIEditParams(&reqBody, providerReq)
 	} else {
-		appendOpenAIAllowedParams(reqBody, providerReq)
+		appendOpenAIAllowedParams(&reqBody, providerReq)
 	}
-	finalizeOpenAIRequestBody(reqBody, providerReq.Params)
+	finalizeOpenAIRequestBody(&reqBody, providerReq.Params)
 
 	// 如果 ProxyURL 已包含 /v1，则不再拼接 /v1
 	endpoint := baseURL + "/v1/images/generations"
@@ -89,7 +149,10 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 		}
 		req.Header.Set("Content-Type", contentType)
 	} else {
-		bodyJSON, _ := json.Marshal(reqBody)
+		bodyJSON, marshalErr := json.Marshal(reqBody)
+		if marshalErr != nil {
+			return providerCallResult{}, fmt.Errorf("序列化 OpenAI 请求失败: %w", marshalErr)
+		}
 		req, err = http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(bodyJSON))
 		if err != nil {
 			return providerCallResult{}, err
@@ -132,11 +195,11 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	}, nil
 }
 
-func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody map[string]interface{}, timeout time.Duration) (*bytes.Buffer, string, error) {
+func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody openAIImageRequestBody, timeout time.Duration) (*bytes.Buffer, string, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
-	for key, value := range reqBody {
+	for key, value := range reqBody.toMap() {
 		if key == "images" || key == "mask" {
 			continue
 		}
@@ -145,7 +208,7 @@ func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody map[string
 		}
 	}
 
-	imageRefs := extractOpenAIImageRefs(reqBody["images"])
+	imageRefs := openAIImageURLRefStrings(reqBody.Images)
 	for index, ref := range imageRefs {
 		if err := writeOpenAIMultipartImagePart(ctx, writer, "image", ref, index, timeout); err != nil {
 			return nil, "", err
@@ -155,7 +218,8 @@ func buildOpenAIEditMultipartRequestBody(ctx context.Context, reqBody map[string
 		return nil, "", fmt.Errorf("OpenAI 编辑请求缺少 image")
 	}
 
-	if maskRef := extractOpenAIImageRef(reqBody["mask"]); strings.TrimSpace(maskRef) != "" {
+	if reqBody.Mask != nil && strings.TrimSpace(reqBody.Mask.ImageURL) != "" {
+		maskRef := reqBody.Mask.ImageURL
 		if err := writeOpenAIMultipartImagePart(ctx, writer, "mask", maskRef, 0, timeout); err != nil {
 			return nil, "", err
 		}
@@ -289,41 +353,33 @@ func inferOpenAIImageFileExtension(mimeType string) string {
 	return "png"
 }
 
-func extractOpenAIImageRef(raw interface{}) string {
-	switch value := raw.(type) {
-	case map[string]string:
-		return value["image_url"]
-	case map[string]interface{}:
-		if text, ok := value["image_url"].(string); ok {
-			return text
+func openAIImageURLRefStrings(refs []openAIImageURLRef) []string {
+	if len(refs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		if text := strings.TrimSpace(ref.ImageURL); text != "" {
+			out = append(out, text)
 		}
 	}
-	return ""
+	return out
 }
 
-func extractOpenAIImageRefs(raw interface{}) []string {
-	switch values := raw.(type) {
-	case []map[string]string:
-		out := make([]string, 0, len(values))
-		for _, value := range values {
-			if ref := strings.TrimSpace(value["image_url"]); ref != "" {
-				out = append(out, ref)
-			}
-		}
-		return out
-	case []interface{}:
-		out := make([]string, 0, len(values))
-		for _, value := range values {
-			if ref := strings.TrimSpace(extractOpenAIImageRef(value)); ref != "" {
-				out = append(out, ref)
-			}
-		}
-		return out
+func openAIImageURLRefs(refs []string) []openAIImageURLRef {
+	if len(refs) == 0 {
+		return nil
 	}
-	return nil
+	out := make([]openAIImageURLRef, 0, len(refs))
+	for _, ref := range refs {
+		if text := strings.TrimSpace(ref); text != "" {
+			out = append(out, openAIImageURLRef{ImageURL: text})
+		}
+	}
+	return out
 }
 
-func appendOpenAIAllowedParams(reqBody map[string]interface{}, providerReq providerRequest) {
+func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq providerRequest) {
 	if providerReq.Params == nil {
 		return
 	}
@@ -332,14 +388,14 @@ func appendOpenAIAllowedParams(reqBody map[string]interface{}, providerReq provi
 		// 默认保留首图 image 字段以兼容部分只接收单图的上游实现。
 		// 但多图输入必须避免回退成单图字段，防止上游优先读取首图导致退化。
 		if len(imageURLs) == 1 {
-			reqBody["image"] = imageURLs[0]
+			reqBody.Image = imageURLs[0]
 		}
-		reqBody["image_urls"] = imageURLs
+		reqBody.ImageURLs = imageURLs
 	}
 
 	for _, key := range openAISharedAllowedParamKeys() {
 		if v, ok := providerReq.Params[key]; ok {
-			reqBody[key] = v
+			reqBody.setExtra(key, v)
 		}
 	}
 }
@@ -360,41 +416,32 @@ func openAISharedAllowedParamKeys() []string {
 	}
 }
 
-func finalizeOpenAIRequestBody(reqBody map[string]interface{}, params map[string]interface{}) {
+func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, params map[string]interface{}) {
 	if reqBody == nil || params == nil {
 		return
 	}
 	// 兜底保护：当 image_urls 已是多图时，确保不会携带退化的单图 image 字段。
-	if hasMultipleOpenAIImageURLs(reqBody["image_urls"]) {
-		delete(reqBody, "image")
+	if len(reqBody.ImageURLs) > 1 {
+		reqBody.Image = ""
 	}
-	image, ok := reqBody["image"].(string)
-	if !ok || !strings.HasPrefix(image, "data:") {
+	image := reqBody.Image
+	if image == "" || !strings.HasPrefix(image, "data:") {
 		return
 	}
-	switch imageURLs := reqBody["image_urls"].(type) {
-	case []string:
-		if len(imageURLs) == 1 && imageURLs[0] == image {
-			delete(reqBody, "image_urls")
-		}
-	case []interface{}:
-		if len(imageURLs) == 1 {
-			if first, ok := imageURLs[0].(string); ok && first == image {
-				delete(reqBody, "image_urls")
-			}
-		}
+	if len(reqBody.ImageURLs) == 1 && reqBody.ImageURLs[0] == image {
+		reqBody.ImageURLs = nil
 	}
 	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
 	if featureSlug != workflow.FeatureSlugStyleVariation {
 		return
 	}
-	if original, ok := reqBody["original_image_url"].(string); ok && original == image {
-		delete(reqBody, "original_image_url")
+	if original, ok := reqBody.Extra["original_image_url"].(string); ok && original == image {
+		delete(reqBody.Extra, "original_image_url")
 	}
 }
 
 func shouldUseOpenAIEditEndpoint(params map[string]interface{}) bool {
-	if len(collectOpenAIEditImageInputs(params)) == 0 {
+	if len(collectOpenAIEditImageRefs(params)) == 0 {
 		return false
 	}
 	featureSlug, ok := workflow.ReadWorkflowStringParam(params, "feature")
@@ -418,23 +465,6 @@ func trustedOpenAIAssetHosts() []string {
 	return []string{base.Hostname()}
 }
 
-func hasMultipleOpenAIImageURLs(raw interface{}) bool {
-	switch imageURLs := raw.(type) {
-	case []string:
-		return len(imageURLs) > 1
-	case []interface{}:
-		count := 0
-		for _, value := range imageURLs {
-			if imageURL, ok := value.(string); ok && strings.TrimSpace(imageURL) != "" {
-				count++
-			}
-		}
-		return count > 1
-	default:
-		return false
-	}
-}
-
 func normalizeOpenAIImageURLStrings(refs []string) []string {
 	if len(refs) == 0 {
 		return nil
@@ -450,27 +480,27 @@ func normalizeOpenAIImageURLStrings(refs []string) []string {
 	return urls
 }
 
-func appendOpenAIEditParams(reqBody map[string]interface{}, providerReq providerRequest) {
+func appendOpenAIEditParams(reqBody *openAIImageRequestBody, providerReq providerRequest) {
 	if providerReq.Params == nil {
 		return
 	}
-	if refs := imageURLObjectRefs(providerReq.MediaRefs.OpenAIImages); len(refs) > 0 {
-		reqBody["images"] = refs
+	if refs := openAIImageURLRefs(providerReq.MediaRefs.OpenAIImages); len(refs) > 0 {
+		reqBody.Images = refs
 	}
 	if maskURL, ok := workflow.ReadWorkflowStringParam(providerReq.Params, "mask_image_url"); ok {
-		reqBody["mask"] = map[string]string{"image_url": maskURL}
+		reqBody.Mask = &openAIImageURLRef{ImageURL: maskURL}
 	}
 
 	allowedKeys := openAISharedAllowedParamKeys()
 	for _, key := range allowedKeys {
 		if v, ok := providerReq.Params[key]; ok {
-			reqBody[key] = v
+			reqBody.setExtra(key, v)
 		}
 	}
 }
 
-func collectOpenAIEditImageInputs(params map[string]interface{}) []map[string]string {
-	return imageURLObjectRefs(mediarefs.CollectUniqueParamRefs(params, openAIImageInputRefKeys))
+func collectOpenAIEditImageRefs(params map[string]interface{}) []string {
+	return mediarefs.CollectUniqueParamRefs(params, openAIImageInputRefKeys)
 }
 
 func extractOpenAIImageResponses(respBody []byte, params map[string]interface{}) ([]string, error) {

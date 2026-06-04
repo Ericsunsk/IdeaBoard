@@ -141,6 +141,44 @@ func TestPostgresTaskAssignerDiscardsRunningTaskForDifferentRiverJob(t *testing.
 	}
 }
 
+func TestPostgresTaskAssignerConfirmsMatchingLease(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "confirm-lease", 1)
+	createAssignerTask(t, db, "running-confirm-lease", accountID, tasks.StatusRunning, "lease-confirm")
+
+	err := assigner.ConfirmTaskLease(ctx, TaskAssignment{
+		TaskID:     "running-confirm-lease",
+		AccountID:  accountID,
+		Status:     AssignStatusAssigned,
+		LeaseToken: "lease-confirm",
+	})
+	if err != nil {
+		t.Fatalf("ConfirmTaskLease failed: %v", err)
+	}
+}
+
+func TestPostgresTaskAssignerRejectsStaleLease(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "stale-lease", 1)
+	createAssignerTask(t, db, "running-stale-lease", accountID, tasks.StatusRunning, "lease-current")
+
+	err := assigner.ConfirmTaskLease(ctx, TaskAssignment{
+		TaskID:     "running-stale-lease",
+		AccountID:  accountID,
+		Status:     AssignStatusAssigned,
+		LeaseToken: "lease-stale",
+	})
+	if err == nil {
+		t.Fatal("expected stale lease confirmation to fail")
+	}
+}
+
 func newPostgresAssignerTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	return testdb.Open(t)

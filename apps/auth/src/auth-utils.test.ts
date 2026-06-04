@@ -1,0 +1,81 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import {
+  clampInteger,
+  extractAuthUser,
+  extractErrorMessage,
+  getAuthSubpath,
+  isDuplicateUserError,
+  isRateLimitedAuthPath,
+  isSignUpPath,
+  normalizeAuthPath,
+  normalizeAuthRole,
+  normalizeOptionalPositiveInteger,
+  normalizeOptionalText,
+  normalizeURLPath,
+  normalizeUsername,
+} from './auth-utils.js'
+
+describe('auth route helpers', () => {
+  it('normalizes URL paths and auth subpaths', () => {
+    assert.equal(normalizeAuthPath('sign-in/email'), '/sign-in/email')
+    assert.equal(normalizeURLPath('/api/auth/sign-in/email?next=/'), '/api/auth/sign-in/email')
+    assert.equal(getAuthSubpath('/api/auth'), '/')
+    assert.equal(getAuthSubpath('/api/auth/sign-up/email?x=1'), '/sign-up/email')
+  })
+
+  it('classifies guarded auth paths', () => {
+    assert.equal(isSignUpPath('/sign-up/email'), true)
+    assert.equal(isSignUpPath('/sign-in/email'), false)
+    assert.equal(isRateLimitedAuthPath('/sign-in/email'), true)
+    assert.equal(isRateLimitedAuthPath('/callback/github'), false)
+  })
+})
+
+describe('auth input normalization', () => {
+  it('normalizes usernames and roles', () => {
+    assert.equal(normalizeUsername('  Alice 张三!!__ '), 'Alice')
+    assert.equal(normalizeUsername('a'.repeat(80)), 'a'.repeat(50))
+    assert.equal(normalizeAuthRole('ADMIN'), 'admin')
+    assert.equal(normalizeAuthRole(undefined), 'user')
+    assert.equal(normalizeAuthRole('owner'), null)
+  })
+
+  it('normalizes optional fields', () => {
+    assert.equal(normalizeOptionalText('  hello world  ', 5), 'hello')
+    assert.equal(normalizeOptionalText('   ', 5), null)
+    assert.equal(normalizeOptionalPositiveInteger('60'), 60)
+    assert.equal(normalizeOptionalPositiveInteger('-1'), null)
+    assert.equal(normalizeOptionalPositiveInteger('abc'), null)
+  })
+
+  it('clamps integer settings to the accepted range', () => {
+    assert.equal(clampInteger('30', 1, 60, 10), 30)
+    assert.equal(clampInteger('0', 1, 60, 10), 10)
+    assert.equal(clampInteger('61', 1, 60, 10), 10)
+    assert.equal(clampInteger('abc', 1, 60, 10), 10)
+  })
+})
+
+describe('auth payload helpers', () => {
+  it('extracts auth users from supported Better Auth payload shapes', () => {
+    assert.deepEqual(extractAuthUser({ id: 'user_1', email: 'a@example.com' }), {
+      id: 'user_1',
+      email: 'a@example.com',
+    })
+    assert.deepEqual(extractAuthUser({ data: { user: { id: 'user_2' } } }), { id: 'user_2' })
+    assert.equal(extractAuthUser({ data: { user: { id: '' } } }), null)
+  })
+
+  it('extracts display-safe error messages', () => {
+    assert.equal(extractErrorMessage(new Error('failed'), 'fallback'), 'failed')
+    assert.equal(extractErrorMessage({ data: { msg: 'bad request' } }, 'fallback'), 'bad request')
+    assert.equal(extractErrorMessage({}, 'fallback'), 'fallback')
+  })
+
+  it('detects duplicate-user errors', () => {
+    assert.equal(isDuplicateUserError(new Error('user already exists')), true)
+    assert.equal(isDuplicateUserError({ data: { message: 'unique constraint failed' } }), true)
+    assert.equal(isDuplicateUserError(new Error('network unavailable')), false)
+  })
+})

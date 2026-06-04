@@ -96,7 +96,6 @@ type Querier interface {
 	MarkQueueFailed(ctx context.Context, arg MarkQueueFailedParams) error
 	MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error)
 	MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFailedWithLeaseParams) (int64, error)
-	MarkTaskRunning(ctx context.Context, arg MarkTaskRunningParams) (int64, error)
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
 	ResetAccountFailCount(ctx context.Context, id int64) error
 	ResetRunningMissingLeaseTasksByIDs(ctx context.Context, taskIds []string) (int64, error)

@@ -11,7 +11,7 @@ import {
   getCanvasBoardState,
   replaceCanvasBoardStateMap,
   type CanvasBoardState,
-} from './canvasBoardState'
+} from '../../canvas/lib/canvasBoardState'
 
 const hydrateInFlight = new Map<string, Promise<void>>()
 

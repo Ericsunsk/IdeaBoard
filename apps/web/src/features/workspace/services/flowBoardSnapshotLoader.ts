@@ -1,5 +1,5 @@
 import type { LocationQueryValue } from 'vue-router'
-import { getCanvasBoardState } from '../../boards/lib/canvasBoardState'
+import { getCanvasBoardState } from '../../canvas/lib/canvasBoardState'
 import { hydrateCanvasBoardsFromServer } from '../../boards/lib/boardSync'
 import type { CanvasBoardSnapshot } from '../types/canvasNodes'
 

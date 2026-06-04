@@ -876,35 +876,6 @@ func (q *Queries) MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFaile
 	return result.RowsAffected()
 }
 
-const markTaskRunning = `-- name: MarkTaskRunning :execrows
-UPDATE tasks
-SET status = 'running',
-    account_id = $1,
-    lease_token = $2
-WHERE task_id = $3
-  AND status = ANY($4::text[])
-`
-
-type MarkTaskRunningParams struct {
-	AccountID  int64    `json:"account_id"`
-	LeaseToken string   `json:"lease_token"`
-	TaskID     string   `json:"task_id"`
-	Statuses   []string `json:"statuses"`
-}
-
-func (q *Queries) MarkTaskRunning(ctx context.Context, arg MarkTaskRunningParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, markTaskRunning,
-		arg.AccountID,
-		arg.LeaseToken,
-		arg.TaskID,
-		pq.Array(arg.Statuses),
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const requeueTaskRunningWithLease = `-- name: RequeueTaskRunningWithLease :execrows
 UPDATE tasks
 SET status = 'pending',
