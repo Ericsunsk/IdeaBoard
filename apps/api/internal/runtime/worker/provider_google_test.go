@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/runtime/queuetypes"
-	"api/internal/workflow"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestCallGoogleGeminiGenerateContent(t *testing.T) {

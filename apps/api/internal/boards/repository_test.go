@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/platform/database"
-	"api/internal/testdb"
-	"api/internal/users"
+	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/users"
 )
 
 func newBoardRepoTestDB(t *testing.T) *sql.DB {

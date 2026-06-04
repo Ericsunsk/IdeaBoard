@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/accounts"
+	"ideaboard/api/internal/accounts"
 )
 
 func TestCallOpenAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {

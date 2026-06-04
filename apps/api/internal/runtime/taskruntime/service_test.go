@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/events"
-	"api/internal/tasks"
-	"api/internal/testdb"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/testdb"
 )
 
 type recordingTaskStatusPublisher struct {

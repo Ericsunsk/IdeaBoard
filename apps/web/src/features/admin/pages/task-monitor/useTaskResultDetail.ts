@@ -4,11 +4,7 @@ import {
 } from '../../../../shared/utils/errorMessages'
 import { formatAdminDateTime, formatDurationSeconds } from '../../../../shared/utils/dateTime'
 import type { Task } from '../../../../shared/api/task'
-import {
-  getSafeResultImageUrl,
-  getSafeTaskResultImageUrl,
-  isAllowedResultImageUrl,
-} from '../../shared/lib/monitorShared'
+import { getSafeResultImageUrl, getSafeTaskResultImageUrl } from './taskResultImages'
 
 const RESULT_MAX_STRING_LENGTH = 300
 const RESULT_DEBUG_MAX_DEPTH = 4
@@ -17,7 +13,7 @@ const RESULT_ARRAY_PREVIEW_LENGTH = 5
 const SENSITIVE_KEY_PATTERN =
   /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
 
-export { isAllowedResultImageUrl }
+export { isAllowedResultImageUrl } from './taskResultImages'
 
 export function useTaskResultDetail(options: {
   message: { success: (content: string) => void; error: (content: string) => void }

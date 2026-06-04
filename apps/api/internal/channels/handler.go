@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/platform/outbound"
-	"api/internal/platform/response"
-	"api/internal/platform/safehttp"
-	"api/internal/workflow"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
 )

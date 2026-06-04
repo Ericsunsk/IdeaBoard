@@ -1,4 +1,4 @@
-module api
+module ideaboard/api
 
 go 1.25.7
 

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"api/internal/platform/jsonlimit"
-	"api/internal/platform/mediarefs"
-	"api/internal/platform/outbound"
-	"api/internal/storage"
+	"ideaboard/api/internal/platform/jsonlimit"
+	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/storage"
 )
 
 func normalizeSubmitTaskMediaParams(params map[string]interface{}) {

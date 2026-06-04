@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/queuetypes"
 )
 
 const (

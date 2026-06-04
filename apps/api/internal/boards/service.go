@@ -13,9 +13,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"api/internal/platform/database"
-	"api/internal/platform/jsonlimit"
-	"api/internal/users"
+	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/jsonlimit"
+	"ideaboard/api/internal/users"
 )
 
 var ErrBoardNotFound = errors.New("board not found")

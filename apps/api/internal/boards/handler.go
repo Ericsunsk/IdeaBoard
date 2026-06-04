@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"api/internal/platform/response"
-	"api/internal/users"
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

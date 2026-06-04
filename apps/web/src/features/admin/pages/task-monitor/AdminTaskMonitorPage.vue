@@ -324,10 +324,10 @@ import {
   XmarkCircle,
 } from '@iconoir/vue'
 import type { ECElementEvent } from 'echarts/core'
-import { taskStatusOptions, getTaskStatusConfig } from '../../shared/lib/monitorShared'
+import { taskStatusOptions, getTaskStatusConfig } from './taskMonitorColumns'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
-import { VChart } from '../../shared/components/AdminEChart'
+import { VChart } from '../../shared/lib/adminEChart'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { useTaskMonitor } from './useTaskMonitor'
 import './AdminTaskMonitorPage.css'

@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"strings"
 
-	"api/internal/db/dbutil"
-	dbsqlc "api/internal/db/sqlc"
-	"api/internal/platform/database"
+	"ideaboard/api/internal/db/dbutil"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/database"
 )
 
 type BoardRepository struct {
@@ -280,7 +280,7 @@ func IsBoardIDUniqueConstraintError(err error) bool {
 	if !database.IsDuplicateConstraintError(err) {
 		return false
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "uk_user_boards_board_id")
+	return strings.Contains(strings.ToLower(err.Error()), "uq_user_boards_board_id")
 }
 
 func userBoardFromSQLC(row dbsqlc.UserBoard) UserBoard {

@@ -1,8 +1,8 @@
 package channels
 
 import (
-	"api/internal/platform/outbound"
 	"fmt"
+	"ideaboard/api/internal/platform/outbound"
 	"strings"
 	"testing"
 

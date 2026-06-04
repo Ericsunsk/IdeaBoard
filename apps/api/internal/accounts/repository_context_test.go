@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"api/internal/tasks"
+	"ideaboard/api/internal/tasks"
 )
 
 func TestTaskRepositoryCanceledContextAffectsQueryAndWrite(t *testing.T) {

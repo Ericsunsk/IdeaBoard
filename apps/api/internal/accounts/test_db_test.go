@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"api/internal/testdb"
+	"ideaboard/api/internal/testdb"
 )
 
 func newAccountsTestDB(t *testing.T) *sql.DB {

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/safehttp"
 )
 
 const allowHostsEnvKey = "API_OUTBOUND_ALLOW_HOSTS"

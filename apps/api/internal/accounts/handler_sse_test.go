@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/tasks"
+	"ideaboard/api/internal/tasks"
 
 	"github.com/gin-gonic/gin"
 )

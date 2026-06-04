@@ -1,15 +1,15 @@
 package accounts
 
 import (
-	"api/internal/events"
-	"api/internal/runtime/queuetypes"
 	"context"
 	"database/sql"
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/runtime/queuetypes"
 	"testing"
 	"time"
 
-	"api/internal/tasks"
-	"api/internal/testdb"
+	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/testdb"
 )
 
 type fakeQueueForService struct {

@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/events"
-	"api/internal/platform/database"
-	"api/internal/runtime/queuetypes"
-	"api/internal/runtime/taskqueue"
-	"api/internal/tasks"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/tasks"
 )
 
 const (

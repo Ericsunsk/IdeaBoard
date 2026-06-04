@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"api/internal/accounts"
+	"ideaboard/api/internal/accounts"
 )
 
 func TestParseRepairTaskLeasesArgsDefaults(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"api/internal/db/migrations"
-	"api/internal/platform/database"
+	"ideaboard/api/internal/db/migrations"
+	"ideaboard/api/internal/platform/database"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )

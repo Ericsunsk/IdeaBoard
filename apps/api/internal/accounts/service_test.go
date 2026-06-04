@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/boards"
-	"api/internal/prompts"
-	"api/internal/users"
-	"api/internal/workflow"
+	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/users"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestTemplateValueDescriptions(t *testing.T) {

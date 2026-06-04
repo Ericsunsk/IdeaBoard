@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"time"
 
-	"api/internal/events"
-	"api/internal/platform/settings"
-	"api/internal/runtime/taskqueue"
-	"api/internal/storage"
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/storage"
 )
 
 type AccountService struct {

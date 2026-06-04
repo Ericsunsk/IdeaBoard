@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/platform/media"
-	"api/internal/platform/response"
-	"api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/safehttp"
 
 	"github.com/gin-gonic/gin"
 )

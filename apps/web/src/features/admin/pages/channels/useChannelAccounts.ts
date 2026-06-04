@@ -6,7 +6,7 @@ import accountApi, {
   type ApiAccount,
 } from '../../../../shared/api/account'
 import channelApi, { type Channel } from '../../../../shared/api/channel'
-import { extractApiErrorMessage, splitCommaValues } from '../../shared/lib/assetLibraryShared'
+import { extractApiErrorMessage, splitCommaValues } from './channelModelUtils'
 
 const ACCOUNT_PAGE_SIZE = 100
 const MAX_DETECTED_MODELS = 100

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"api/internal/runtime/bootstrap"
+	"ideaboard/api/internal/runtime/bootstrap"
 )
 
 func main() {

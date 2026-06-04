@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"api/internal/autherrors"
-	"api/internal/platform/database"
+	"ideaboard/api/internal/autherrors"
+	"ideaboard/api/internal/platform/database"
 
 	"github.com/gin-gonic/gin"
 )

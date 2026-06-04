@@ -1,6 +1,6 @@
 import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../../shared/api/task'
-import { createMonitorTaskColumns } from '../../shared/lib/monitorShared'
+import { createMonitorTaskColumns } from './taskMonitorColumns'
 import { useListAdminTasks } from '../../../../shared/api/generated-query/admin-tasks/admin-tasks'
 import { calcDurationSeconds } from '../../../../shared/utils/dateTime'
 import { useAdminQueryPolling } from '../../shared/composables/useAdminQueryPolling'

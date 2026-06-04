@@ -1,11 +1,11 @@
 package worker
 
 import (
-	"api/internal/runtime/queuetypes"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"ideaboard/api/internal/runtime/queuetypes"
 	"image"
 	"image/color"
 	"image/png"
@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/workflow"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/workflow"
 )
 
 const tinyWebPBase64 = "UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA"

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"api/internal/workflow"
+	"ideaboard/api/internal/workflow"
 )
 
 var featureAllowConfigKeys = map[string]struct{}{

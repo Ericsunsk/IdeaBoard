@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	dbsqlc "api/internal/db/sqlc"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 )
 
 func WithTx(ctx context.Context, db *sql.DB, fn func(*dbsqlc.Queries) error) error {

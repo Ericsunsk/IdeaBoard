@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/tasks"
-	"api/internal/testdb"
+	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/testdb"
 )
 
 func newTaskRepositoryTestDB(t *testing.T) (*TaskRepository, *sql.DB) {

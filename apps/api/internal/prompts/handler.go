@@ -1,9 +1,9 @@
 package prompts
 
 import (
-	"api/internal/platform/response"
-	"api/internal/platform/settings"
-	"api/internal/workflow"
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
 )

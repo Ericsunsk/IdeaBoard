@@ -104,7 +104,7 @@
 
 <script setup lang="ts">
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
-import { VChart } from '../../shared/components/AdminEChart'
+import { VChart } from '../../shared/lib/adminEChart'
 import { useAdminMonitorData } from './useAdminMonitorData'
 import { useUsageStatisticsData } from './useUsageStatisticsData'
 import { useUsageStatisticsCharts } from './useUsageStatisticsCharts'

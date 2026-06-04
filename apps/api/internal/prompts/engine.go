@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"api/internal/workflow"
+	"ideaboard/api/internal/workflow"
 )
 
 var viewpointTemplateLabels = map[string]string{

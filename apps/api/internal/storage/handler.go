@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"api/internal/platform/response"
+	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )

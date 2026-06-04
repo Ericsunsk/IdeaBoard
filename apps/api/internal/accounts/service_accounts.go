@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"strings"
 
-	"api/internal/platform/outbound"
-	"api/internal/runtime/queuetypes"
-	"api/internal/tasks"
-	"api/internal/workflow"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/workflow"
 )
 
 func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRequest) (*ApiAccount, error) {

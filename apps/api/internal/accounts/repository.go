@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/db/dbutil"
-	dbsqlc "api/internal/db/sqlc"
-	"api/internal/tasks"
+	"ideaboard/api/internal/db/dbutil"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/tasks"
 )
 
 type AccountRepository struct {

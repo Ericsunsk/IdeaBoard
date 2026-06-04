@@ -3,7 +3,7 @@ package accounts
 import (
 	"testing"
 
-	"api/internal/workflow"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestFilterAccountsByFeatureKeepsAccountsWithoutExplicitConfig(t *testing.T) {

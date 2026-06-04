@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/runtime/queuetypes"
-	"api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
 )
 
 type fakeRequeuer struct{}

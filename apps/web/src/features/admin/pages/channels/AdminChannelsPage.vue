@@ -254,7 +254,7 @@ import type { Channel, ChannelFormData } from '../../../../shared/api/channel'
 import { NButton, NIcon } from 'naive-ui'
 import { Plus } from '@iconoir/vue'
 import AdminToolbar from '../../shared/components/AdminToolbar.vue'
-import { extractApiErrorMessage, getModelCategoryClass } from '../../shared/lib/assetLibraryShared'
+import { extractApiErrorMessage, getModelCategoryClass } from './channelModelUtils'
 import { useChannelAccounts } from './useChannelAccounts'
 
 const message = useMessage()

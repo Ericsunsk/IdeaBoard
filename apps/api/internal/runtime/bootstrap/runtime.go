@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"api/internal/platform/config"
+	"ideaboard/api/internal/platform/config"
 )
 
 type runtimeApp struct {

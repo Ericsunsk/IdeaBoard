@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/platform/response"
-	"api/internal/tasks"
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/tasks"
 
 	"github.com/gin-gonic/gin"
 )

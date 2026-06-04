@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS task_daily_stats (
   latency_count BIGINT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uniq_task_daily_stat UNIQUE (stat_date, model_name, user_key)
+  CONSTRAINT uq_task_daily_stat UNIQUE (stat_date, model_name, user_key)
 );
 
 CREATE TABLE IF NOT EXISTS task_stat_events (
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS task_stat_events (
   latency_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uniq_task_stat_event_task_id UNIQUE (task_id)
+  CONSTRAINT uq_task_stat_event_task_id UNIQUE (task_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_stat_events_stat_date ON task_stat_events (stat_date);
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS task_daily_stat_backfills (
   stat_date CHAR(10) NOT NULL,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uniq_task_daily_stat_backfill_date UNIQUE (stat_date)
+  CONSTRAINT uq_task_daily_stat_backfill_date UNIQUE (stat_date)
 );
 
 CREATE TABLE IF NOT EXISTS channels (
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS user_boards (
   state TEXT NOT NULL,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uk_user_boards_user_board_id UNIQUE (user_id, board_id)
+  CONSTRAINT uq_user_boards_user_board_id UNIQUE (user_id, board_id)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_board_name ON user_boards (user_id, lower(name));

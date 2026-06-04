@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"api/internal/db/dbutil"
-	dbsqlc "api/internal/db/sqlc"
-	"api/internal/platform/database"
+	"ideaboard/api/internal/db/dbutil"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/database"
 )
 
 type UserRepository struct {

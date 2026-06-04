@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"api/internal/platform/database"
+	"ideaboard/api/internal/platform/database"
 )
 
 type recordingUserUploadCleaner struct {

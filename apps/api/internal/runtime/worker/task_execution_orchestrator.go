@@ -1,17 +1,17 @@
 package worker
 
 import (
-	"api/internal/runtime/queuetypes"
 	"context"
 	"errors"
+	"ideaboard/api/internal/runtime/queuetypes"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/runtime/taskqueue"
-	"api/internal/runtime/taskruntime"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/runtime/taskruntime"
 )
 
 type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (string, error)

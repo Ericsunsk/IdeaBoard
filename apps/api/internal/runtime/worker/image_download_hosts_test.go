@@ -3,7 +3,7 @@ package worker
 import (
 	"testing"
 
-	"api/internal/accounts"
+	"ideaboard/api/internal/accounts"
 )
 
 func TestTrustedImageDownloadHostsIncludesProxyEnvAndTrustedAssets(t *testing.T) {

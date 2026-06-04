@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/prompts"
-	"api/internal/runtime/queuetypes"
-	"api/internal/tasks"
-	"api/internal/workflow"
+	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/workflow"
 )
 
 func (s *AccountService) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {

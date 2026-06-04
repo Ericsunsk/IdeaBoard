@@ -1,16 +1,16 @@
 package worker
 
 import (
-	"api/internal/platform/media"
-	"api/internal/platform/mediarefs"
+	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/platform/mediarefs"
 	"log/slog"
 	"net/url"
 	"os"
 	"path"
 	"strings"
 
-	"api/internal/storage"
-	"api/internal/workflow"
+	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/workflow"
 )
 
 func resolvePublicAssetBaseURL() *url.URL {

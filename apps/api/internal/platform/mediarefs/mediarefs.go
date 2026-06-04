@@ -6,8 +6,8 @@ import (
 	"path"
 	"strings"
 
-	"api/internal/platform/media"
-	"api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/platform/outbound"
 )
 
 var stringKeys = []string{"image_url", "original_image_url", "mask_image_url"}

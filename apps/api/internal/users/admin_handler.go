@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"api/internal/autherrors"
-	"api/internal/platform/response"
-	"api/internal/platform/settings"
+	"ideaboard/api/internal/autherrors"
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/settings"
 
 	"github.com/gin-gonic/gin"
 )

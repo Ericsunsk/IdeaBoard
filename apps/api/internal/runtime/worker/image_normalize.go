@@ -1,9 +1,9 @@
 package worker
 
 import (
-	"api/internal/platform/media"
 	"bytes"
 	"fmt"
+	"ideaboard/api/internal/platform/media"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/tasks"
+	"ideaboard/api/internal/tasks"
 )
 
 func normalizeStatisticsRange(raw string) (StatisticsRange, int) {

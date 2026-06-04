@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	dbsqlc "api/internal/db/sqlc"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 )
 
 type ChannelRepository struct {

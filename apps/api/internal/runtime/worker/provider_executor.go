@@ -1,23 +1,23 @@
 package worker
 
 import (
-	"api/internal/platform/outbound"
-	"api/internal/runtime/queuetypes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/runtime/queuetypes"
 	"io"
 	"log/slog"
 	"net/url"
 	"strings"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/channels"
-	"api/internal/storage"
-	"api/internal/tasks"
-	"api/internal/workflow"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/channels"
+	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/workflow"
 )
 
 const (

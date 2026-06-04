@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"api/internal/runtime/queuetypes"
-	"api/internal/tasks"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 )
 
 func (s *AccountService) GetMonitorInfo(ctx context.Context) (*queuetypes.MonitorInfo, error) {

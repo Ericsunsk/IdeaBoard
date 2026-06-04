@@ -1,16 +1,16 @@
 package worker
 
 import (
-	"api/internal/accounts"
-	"api/internal/platform/media"
-	"api/internal/platform/mediarefs"
-	"api/internal/platform/safehttp"
-	"api/internal/storage"
-	"api/internal/workflow"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/workflow"
 	"image"
 	"image/color"
 	"image/draw"

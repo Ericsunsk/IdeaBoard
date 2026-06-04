@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/platform/config"
+	"ideaboard/api/internal/platform/config"
 
 	"github.com/gin-gonic/gin"
 )

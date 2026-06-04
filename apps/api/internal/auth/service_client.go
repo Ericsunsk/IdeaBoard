@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/autherrors"
-	"api/internal/platform/config"
+	"ideaboard/api/internal/autherrors"
+	"ideaboard/api/internal/platform/config"
 )
 
 var (

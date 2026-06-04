@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"api/internal/tasks"
+	"ideaboard/api/internal/tasks"
 )
 
 func TestTaskSchemaIncludesLeaseTokenColumn(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/runtime/queuetypes"
-	"api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"

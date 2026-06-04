@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/platform/media"
-	"api/internal/platform/mediarefs"
-	"api/internal/platform/safehttp"
+	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/platform/safehttp"
 )
 
 const (

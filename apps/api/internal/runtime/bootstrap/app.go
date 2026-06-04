@@ -9,12 +9,12 @@ import (
 	"os"
 	"strings"
 
-	"api/internal/auth"
-	"api/internal/db/migrations"
-	"api/internal/platform/applog"
-	"api/internal/platform/config"
-	"api/internal/platform/database"
-	"api/internal/users"
+	"ideaboard/api/internal/auth"
+	"ideaboard/api/internal/db/migrations"
+	"ideaboard/api/internal/platform/applog"
+	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

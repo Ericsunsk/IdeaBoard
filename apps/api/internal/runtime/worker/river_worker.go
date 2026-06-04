@@ -5,12 +5,12 @@ import (
 	"errors"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/channels"
-	"api/internal/events"
-	"api/internal/runtime/taskqueue"
-	"api/internal/runtime/taskruntime"
-	"api/internal/storage"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/channels"
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/runtime/taskruntime"
+	"ideaboard/api/internal/storage"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

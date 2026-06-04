@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/platform/database"
+	"ideaboard/api/internal/platform/database"
 )
 
 func (s *StorageService) ListProfiles(ctx context.Context) ([]StorageProfile, error) {

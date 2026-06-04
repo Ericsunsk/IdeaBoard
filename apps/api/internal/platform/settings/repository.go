@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"strings"
 
-	dbsqlc "api/internal/db/sqlc"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 )
 
 type SystemConfigRepository struct {

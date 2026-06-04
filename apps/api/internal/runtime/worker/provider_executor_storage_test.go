@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"api/internal/accounts"
-	"api/internal/platform/settings"
-	"api/internal/storage"
-	"api/internal/testdb"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/testdb"
 )
 
 func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *testing.T) {

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"api/internal/boards"
-	"api/internal/platform/media"
-	"api/internal/platform/response"
-	"api/internal/storage"
+	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"api/internal/platform/settings"
-	"api/internal/testdb"
+	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/testdb"
 )
 
 func newStorageServiceTest(t *testing.T) (*StorageService, *settings.SystemConfigRepository) {

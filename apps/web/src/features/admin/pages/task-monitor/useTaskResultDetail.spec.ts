@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isAllowedResultImageUrl, useTaskResultDetail } from './useTaskResultDetail'
-import { getSafeTaskResultImageUrl } from '../../shared/lib/monitorShared'
+import { useTaskResultDetail } from './useTaskResultDetail'
+import { getSafeTaskResultImageUrl, isAllowedResultImageUrl } from './taskResultImages'
 import type { Task } from '../../../../shared/api/task'
 
 describe('task result image URL validation', () => {

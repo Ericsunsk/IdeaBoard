@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"api/internal/users"
+	"ideaboard/api/internal/users"
 )
 
 func NormalizeWorkspaceStorageUserSegment(storageUID string) (string, error) {

@@ -1,11 +1,11 @@
 package worker
 
 import (
-	"api/internal/runtime/queuetypes"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"ideaboard/api/internal/runtime/queuetypes"
 	"image"
 	"image/color"
 	"image/png"
@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"api/internal/accounts"
+	"ideaboard/api/internal/accounts"
 )
 
 func mustEncodePNGDataURL(t *testing.T, img image.Image) string {

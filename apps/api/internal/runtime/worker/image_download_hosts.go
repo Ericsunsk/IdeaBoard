@@ -4,8 +4,8 @@ import (
 	"net/url"
 	"strings"
 
-	"api/internal/accounts"
-	"api/internal/platform/outbound"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/platform/outbound"
 )
 
 func trustedImageDownloadHosts(account *accounts.ApiAccount) []string {

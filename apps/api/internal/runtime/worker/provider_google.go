@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/platform/media"
-	"api/internal/platform/mediarefs"
-	"api/internal/platform/outbound"
-	"api/internal/platform/safehttp"
-	"api/internal/workflow"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/platform/media"
+	"ideaboard/api/internal/platform/mediarefs"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
+	"ideaboard/api/internal/workflow"
 )
 
 const (

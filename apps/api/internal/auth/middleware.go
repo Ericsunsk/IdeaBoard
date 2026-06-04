@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	"api/internal/platform/database"
-	"api/internal/platform/response"
-	"api/internal/users"
+	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
 )

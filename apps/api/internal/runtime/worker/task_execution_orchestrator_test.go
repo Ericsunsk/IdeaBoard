@@ -1,20 +1,20 @@
 package worker
 
 import (
-	"api/internal/accounts"
-	"api/internal/runtime/queuetypes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/runtime/queuetypes"
 	"strings"
 	"testing"
 	"time"
 
-	"api/internal/runtime/taskqueue"
-	"api/internal/runtime/taskruntime"
-	"api/internal/tasks"
-	"api/internal/testdb"
+	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/runtime/taskruntime"
+	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/testdb"
 )
 
 func TestUserFacingProviderErrorRecognizesWrappedDeadlineExceeded(t *testing.T) {

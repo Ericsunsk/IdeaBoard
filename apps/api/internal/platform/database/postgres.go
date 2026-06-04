@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"api/internal/platform/config"
+	"ideaboard/api/internal/platform/config"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )

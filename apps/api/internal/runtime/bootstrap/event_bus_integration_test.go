@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/accounts"
-	"api/internal/events"
-	"api/internal/platform/config"
-	"api/internal/tasks"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/tasks"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"

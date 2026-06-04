@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/queuetypes"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"

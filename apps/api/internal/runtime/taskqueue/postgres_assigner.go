@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"api/internal/runtime/queuetypes"
-	"api/internal/tasks"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
 
 	"github.com/lib/pq"
 )

@@ -1,4 +1,5 @@
 import { extractSafeApiErrorMessage as extractApiErrorMessage } from '../../../../shared/utils/errorMessages'
+
 export { extractApiErrorMessage }
 
 export function splitCommaValues(input: string | null | undefined): string[] {
@@ -9,9 +10,6 @@ export function splitCommaValues(input: string | null | undefined): string[] {
     .filter(Boolean)
 }
 
-/**
- * Get the CSS class/variant for a model based on its family (GPT, MJ, SD, etc.)
- */
 export function getModelCategoryClass(model: string): string {
   const m = model.toLowerCase()
   if (m.includes('dalle') || m.includes('gpt')) return 'is-indigo'
@@ -19,3 +17,4 @@ export function getModelCategoryClass(model: string): string {
   if (m.includes('sd') || m.includes('stable')) return 'is-cyan'
   return ''
 }
+

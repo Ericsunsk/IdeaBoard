@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/tasks"
+	"ideaboard/api/internal/tasks"
 )
 
 func newStatisticsTestService(t *testing.T) (*AccountService, *TaskRepository, *sql.DB) {

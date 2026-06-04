@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"api/internal/accounts"
-	"api/internal/platform/config"
-	"api/internal/platform/database"
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/platform/database"
 )
 
 const (

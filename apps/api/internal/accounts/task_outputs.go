@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"api/internal/tasks"
+	"ideaboard/api/internal/tasks"
 )
 
 func (s *AccountService) attachOutputsForTasks(ctx context.Context, items []*tasks.Task) {

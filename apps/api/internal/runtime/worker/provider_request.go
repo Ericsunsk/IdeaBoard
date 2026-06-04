@@ -3,7 +3,7 @@ package worker
 import (
 	"fmt"
 
-	"api/internal/platform/mediarefs"
+	"ideaboard/api/internal/platform/mediarefs"
 )
 
 var (

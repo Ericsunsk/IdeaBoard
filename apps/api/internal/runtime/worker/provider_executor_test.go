@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"api/internal/accounts"
+	"ideaboard/api/internal/accounts"
 )
 
 func TestResolveAccountTimeout(t *testing.T) {

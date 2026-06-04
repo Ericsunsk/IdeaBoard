@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"api/internal/platform/settings"
+	"ideaboard/api/internal/platform/settings"
 )
 
 type StorageStoreOptions struct {

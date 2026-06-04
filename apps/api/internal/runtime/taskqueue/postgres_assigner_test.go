@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"api/internal/runtime/queuetypes"
-	"api/internal/tasks"
-	"api/internal/testdb"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/testdb"
 )
 
 func TestTaskLeaseTokenBindsToRiverJobID(t *testing.T) {

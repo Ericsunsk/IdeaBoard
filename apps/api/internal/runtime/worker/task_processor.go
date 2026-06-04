@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"api/internal/runtime/queuetypes"
-	"api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
 )
 
 type consumerTaskRuntime interface {
