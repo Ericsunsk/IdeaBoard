@@ -1,4 +1,4 @@
-package accounts
+package taskstore
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/testdb"
 )
 
 func TestTaskSchemaIncludesLeaseTokenColumn(t *testing.T) {
@@ -22,8 +23,8 @@ func TestTaskSchemaIncludesLeaseTokenColumn(t *testing.T) {
 
 func TestListRunningTaskLeasesIncludesLeaseToken(t *testing.T) {
 	ctx := context.Background()
-	db := newAccountsTestDB(t)
-	repo := NewTaskRepository(db)
+	db := testdb.Open(t)
+	repo := NewRepository(db)
 
 	if err := repo.Create(ctx, &tasks.Task{
 		TaskID:     "running-with-token",
@@ -73,8 +74,8 @@ func TestListRunningTaskLeasesIncludesLeaseToken(t *testing.T) {
 
 func TestRunningTasksMissingLeaseTokenPreflightOnlyMatchesRunningMissingLeaseToken(t *testing.T) {
 	ctx := context.Background()
-	db := newAccountsTestDB(t)
-	repo := NewTaskRepository(db)
+	db := testdb.Open(t)
+	repo := NewRepository(db)
 
 	seedTasks(t, repo, ctx,
 		&tasks.Task{TaskID: "running-missing-1", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
@@ -109,8 +110,8 @@ func TestRunningTasksMissingLeaseTokenPreflightOnlyMatchesRunningMissingLeaseTok
 
 func TestRunningTasksMissingLeaseTokenPreflightDoesNotMutate(t *testing.T) {
 	ctx := context.Background()
-	db := newAccountsTestDB(t)
-	repo := NewTaskRepository(db)
+	db := testdb.Open(t)
+	repo := NewRepository(db)
 
 	seedTasks(t, repo, ctx,
 		&tasks.Task{TaskID: "running-missing-token", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
@@ -134,8 +135,8 @@ func TestRunningTasksMissingLeaseTokenPreflightDoesNotMutate(t *testing.T) {
 
 func TestResetRunningTasksMissingLeaseTokenToPendingRepairsOnlyTargets(t *testing.T) {
 	ctx := context.Background()
-	db := newAccountsTestDB(t)
-	repo := NewTaskRepository(db)
+	db := testdb.Open(t)
+	repo := NewRepository(db)
 
 	seedTasks(t, repo, ctx,
 		&tasks.Task{TaskID: "running-missing-1", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
@@ -162,8 +163,8 @@ func TestResetRunningTasksMissingLeaseTokenToPendingRepairsOnlyTargets(t *testin
 
 func TestResetRunningTasksMissingLeaseTokenToPendingHonorsLimit(t *testing.T) {
 	ctx := context.Background()
-	db := newAccountsTestDB(t)
-	repo := NewTaskRepository(db)
+	db := testdb.Open(t)
+	repo := NewRepository(db)
 
 	seedTasks(t, repo, ctx,
 		&tasks.Task{TaskID: "running-missing-1", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
@@ -193,8 +194,8 @@ func TestResetRunningTasksMissingLeaseTokenToPendingHonorsLimit(t *testing.T) {
 
 func TestResetRunningTasksMissingLeaseTokenToPendingRequiresPositiveLimit(t *testing.T) {
 	ctx := context.Background()
-	db := newAccountsTestDB(t)
-	repo := NewTaskRepository(db)
+	db := testdb.Open(t)
+	repo := NewRepository(db)
 
 	seedTasks(t, repo, ctx,
 		&tasks.Task{TaskID: "running-missing-token", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
@@ -210,7 +211,7 @@ func TestResetRunningTasksMissingLeaseTokenToPendingRequiresPositiveLimit(t *tes
 	assertTaskState(t, repo, ctx, "running-missing-token", tasks.StatusRunning, 11, "")
 }
 
-func seedTasks(t *testing.T, repo *TaskRepository, ctx context.Context, items ...*tasks.Task) {
+func seedTasks(t *testing.T, repo *Repository, ctx context.Context, items ...*tasks.Task) {
 	t.Helper()
 	for _, item := range items {
 		if err := repo.Create(ctx, item); err != nil {
@@ -219,7 +220,7 @@ func seedTasks(t *testing.T, repo *TaskRepository, ctx context.Context, items ..
 	}
 }
 
-func assertTaskState(t *testing.T, repo *TaskRepository, ctx context.Context, taskID string, status string, accountID int64, leaseToken string) {
+func assertTaskState(t *testing.T, repo *Repository, ctx context.Context, taskID string, status string, accountID int64, leaseToken string) {
 	t.Helper()
 	task, err := repo.GetByTaskID(ctx, taskID)
 	if err != nil {
@@ -231,7 +232,7 @@ func assertTaskState(t *testing.T, repo *TaskRepository, ctx context.Context, ta
 	}
 }
 
-func assertTaskRepairNote(t *testing.T, repo *TaskRepository, ctx context.Context, taskID string) {
+func assertTaskRepairNote(t *testing.T, repo *Repository, ctx context.Context, taskID string) {
 	t.Helper()
 	task, err := repo.GetByTaskID(ctx, taskID)
 	if err != nil {

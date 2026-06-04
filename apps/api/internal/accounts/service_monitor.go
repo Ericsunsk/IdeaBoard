@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"ideaboard/api/internal/runtime/queuetypes"
-	"ideaboard/api/internal/tasks"
 )
 
 func (s *AccountService) GetMonitorInfo(ctx context.Context) (*queuetypes.MonitorInfo, error) {
@@ -21,18 +20,4 @@ func (s *AccountService) GetMonitorInfo(ctx context.Context) (*queuetypes.Monito
 		accountIDs[i] = acc.ID
 	}
 	return s.monitorStore.MonitorInfo(ctx, accountIDs)
-}
-
-func (s *AccountService) GetTaskStats(ctx context.Context) (map[string]int64, error) {
-	pending, _ := s.taskRepo.CountByStatus(ctx, tasks.StatusPending)
-	running, _ := s.taskRepo.CountByStatus(ctx, tasks.StatusRunning)
-	completed, _ := s.taskRepo.CountByStatus(ctx, tasks.StatusCompleted)
-	failed, _ := s.taskRepo.CountByStatus(ctx, tasks.StatusFailed)
-
-	return map[string]int64{
-		tasks.StatusPending:   pending,
-		tasks.StatusRunning:   running,
-		tasks.StatusCompleted: completed,
-		tasks.StatusFailed:    failed,
-	}, nil
 }

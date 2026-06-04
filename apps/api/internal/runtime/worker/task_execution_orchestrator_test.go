@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/taskstore"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ func TestUserFacingProviderErrorFallsBackForNonTimeout(t *testing.T) {
 func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, accountRepo, "confirm-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
@@ -87,7 +88,7 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, accountRepo, "complete-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
@@ -132,7 +133,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	ctx := context.Background()
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, accountRepo, "cancel-after-provider-account")
 
 	task := &tasks.Task{
@@ -192,7 +193,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, accountRepo, "cancel-before-provider-account")
 
 	task := &tasks.Task{
@@ -256,7 +257,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	account := createRiverTestAccount(t, accountRepo, "failed-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{

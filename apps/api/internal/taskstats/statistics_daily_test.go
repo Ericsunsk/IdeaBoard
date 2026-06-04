@@ -1,4 +1,4 @@
-package accounts
+package taskstats
 
 import (
 	"context"
@@ -6,41 +6,44 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/taskstore"
+	"ideaboard/api/internal/testdb"
 )
 
-func newStatisticsTestService(t *testing.T) (*AccountService, *TaskRepository, *sql.DB) {
+func newStatisticsTestService(t *testing.T) (*Service, *taskstore.Repository, *sql.DB) {
 	t.Helper()
 
-	db := newAccountsTestDB(t)
-	taskRepo := NewTaskRepository(db)
-	svc := NewAccountService(AccountServiceDeps{TaskRepo: taskRepo}, AccountServiceOptions{})
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	svc := NewService(taskRepo)
 	return svc, taskRepo, db
 }
 
 func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	ctx := context.Background()
-	svc, taskRepo, _ := newStatisticsTestService(t)
+	svc, taskRepo, db := newStatisticsTestService(t)
 	now := time.Now()
 	today := now.Format("2006-01-02")
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 
-	seed := []TaskDailyStat{
+	seed := []taskDailyStatSeed{
 		{StatDate: today, ModelName: "model-a", UserKey: "u1", Total: 2, Completed: 2, Failed: 0, LatencySecondsSum: 30, LatencyCount: 2},
 		{StatDate: today, ModelName: "model-b", UserKey: "u2", Total: 1, Completed: 0, Failed: 1, LatencySecondsSum: 0, LatencyCount: 0},
 		{StatDate: yesterday, ModelName: "model-a", UserKey: "u1", Total: 1, Completed: 1, Failed: 0, LatencySecondsSum: 12, LatencyCount: 1},
 	}
 	for i := range seed {
-		insertTaskDailyStat(t, taskRepo.db, seed[i])
+		insertTaskDailyStat(t, db, seed[i])
 	}
-	events := []TaskStatEvent{
+	events := []taskStatEventSeed{
 		{TaskID: "latency-a-1", StatDate: today, ModelName: "model-a", UserKey: "u1", Status: tasks.StatusCompleted, LatencySeconds: 18},
 		{TaskID: "latency-a-2", StatDate: today, ModelName: "model-a", UserKey: "u1", Status: tasks.StatusCompleted, LatencySeconds: 30},
 		{TaskID: "latency-a-3", StatDate: yesterday, ModelName: "model-a", UserKey: "u1", Status: tasks.StatusCompleted, LatencySeconds: 12},
 		{TaskID: "latency-zero", StatDate: today, ModelName: "model-b", UserKey: "u2", Status: tasks.StatusCompleted, LatencySeconds: 0},
 	}
 	for i := range events {
-		insertTaskStatEvent(t, taskRepo.db, events[i])
+		insertTaskStatEvent(t, db, events[i])
 	}
 	if err := taskRepo.Create(ctx, &tasks.Task{TaskID: "p1", UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("seed pending task failed: %v", err)
@@ -93,18 +96,18 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 
 func TestGetStatisticsQualityTrendAggregatedByDate(t *testing.T) {
 	ctx := context.Background()
-	svc, taskRepo, _ := newStatisticsTestService(t)
+	svc, _, db := newStatisticsTestService(t)
 	now := time.Now()
 	today := now.Format("2006-01-02")
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 
-	seed := []TaskDailyStat{
+	seed := []taskDailyStatSeed{
 		{StatDate: today, ModelName: "m1", UserKey: "u1", Total: 2, Completed: 2, Failed: 0},
 		{StatDate: today, ModelName: "m2", UserKey: "u2", Total: 3, Completed: 1, Failed: 2},
 		{StatDate: yesterday, ModelName: "m1", UserKey: "u1", Total: 1, Completed: 1, Failed: 0},
 	}
 	for i := range seed {
-		insertTaskDailyStat(t, taskRepo.db, seed[i])
+		insertTaskDailyStat(t, db, seed[i])
 	}
 
 	stats, err := svc.GetStatistics(ctx, "7d")
@@ -131,15 +134,15 @@ func TestGetStatisticsQualityTrendAggregatedByDate(t *testing.T) {
 
 func TestGetStatisticsUserRiskRanksByFailureVolume(t *testing.T) {
 	ctx := context.Background()
-	svc, taskRepo, _ := newStatisticsTestService(t)
+	svc, _, db := newStatisticsTestService(t)
 	today := time.Now().Format("2006-01-02")
 
-	seed := []TaskDailyStat{
+	seed := []taskDailyStatSeed{
 		{StatDate: today, ModelName: "m1", UserKey: "low-volume", Total: 1, Completed: 0, Failed: 1},
 		{StatDate: today, ModelName: "m1", UserKey: "high-volume", Total: 100, Completed: 50, Failed: 50},
 	}
 	for i := range seed {
-		insertTaskDailyStat(t, taskRepo.db, seed[i])
+		insertTaskDailyStat(t, db, seed[i])
 	}
 
 	stats, err := svc.GetStatistics(ctx, "7d")
@@ -354,34 +357,12 @@ func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
 	}
 }
 
-func TestExtractTaskModelPrefersModelAndAvoidsMixedModelSet(t *testing.T) {
-	tests := []struct {
-		name string
-		raw  string
-		want string
-	}{
-		{name: "prefer model", raw: `{"model":"gpt-image-1","model_set":"a,b"}`, want: "gpt-image-1"},
-		{name: "single model_set", raw: `{"model_set":"gpt-image-1"}`, want: "gpt-image-1"},
-		{name: "mixed model_set", raw: `{"model_set":"a,b"}`, want: "未识别模型"},
-		{name: "empty", raw: `{}`, want: "未识别模型"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractTaskModel(tt.raw)
-			if got != tt.want {
-				t.Fatalf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 	ctx := context.Background()
 	svc, taskRepo, db := newStatisticsTestService(t)
-	accountRepo := NewAccountRepository(db)
-	svc.accountRepo = accountRepo
+	accountRepo := accounts.NewAccountRepository(db)
 
-	account := &ApiAccount{
+	account := &accounts.ApiAccount{
 		Name:      "acc-multi",
 		ChannelID: 1,
 		Platform:  "openai-compatible",
@@ -411,7 +392,7 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 	}
 
 	day := created.Format("2006-01-02")
-	insertTaskDailyStat(t, db, TaskDailyStat{
+	insertTaskDailyStat(t, db, taskDailyStatSeed{
 		StatDate:  day,
 		ModelName: "unknown",
 		UserKey:   "12",
@@ -439,7 +420,27 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 	}
 }
 
-func insertTaskDailyStat(t *testing.T, db *sql.DB, stat TaskDailyStat) {
+type taskDailyStatSeed struct {
+	StatDate          string
+	ModelName         string
+	UserKey           string
+	Total             int64
+	Completed         int64
+	Failed            int64
+	LatencySecondsSum float64
+	LatencyCount      int64
+}
+
+type taskStatEventSeed struct {
+	TaskID         string
+	StatDate       string
+	ModelName      string
+	UserKey        string
+	Status         string
+	LatencySeconds float64
+}
+
+func insertTaskDailyStat(t *testing.T, db *sql.DB, stat taskDailyStatSeed) {
 	t.Helper()
 	_, err := db.ExecContext(
 		context.Background(),
@@ -452,7 +453,7 @@ func insertTaskDailyStat(t *testing.T, db *sql.DB, stat TaskDailyStat) {
 	}
 }
 
-func insertTaskStatEvent(t *testing.T, db *sql.DB, event TaskStatEvent) {
+func insertTaskStatEvent(t *testing.T, db *sql.DB, event taskStatEventSeed) {
 	t.Helper()
 	_, err := db.ExecContext(
 		context.Background(),

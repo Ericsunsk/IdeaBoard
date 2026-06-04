@@ -25,6 +25,7 @@ import (
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/taskservice"
+	"ideaboard/api/internal/taskstats"
 	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
@@ -69,6 +70,7 @@ type AdminRouteDeps struct {
 	AdminHandler         *users.AdminHandler
 	AccountHandler       *accounts.AccountHandler
 	TaskHandler          *taskservice.Handler
+	TaskStatsHandler     *taskstats.Handler
 	ChannelHandler       *channels.ChannelHandler
 	StorageHandler       *storage.StorageHandler
 	LineDraftHandler     *assets.LineDraftHandler
@@ -274,9 +276,9 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.POST("/tasks/submit", h.TaskHandler.SubmitTask)
 	adminApi.GET("/tasks/:task_id", h.TaskHandler.GetTask)
 	adminApi.GET("/tasks", h.TaskHandler.ListTasks)
-	adminApi.GET("/monitor", h.AccountHandler.GetMonitor)
-	adminApi.GET("/statistics", h.AccountHandler.GetStatistics)
-	adminApi.POST("/statistics/backfill", h.AccountHandler.BackfillStatistics)
+	adminApi.GET("/monitor", h.TaskStatsHandler.GetMonitor)
+	adminApi.GET("/statistics", h.TaskStatsHandler.GetStatistics)
+	adminApi.POST("/statistics/backfill", h.TaskStatsHandler.BackfillStatistics)
 
 	adminApi.POST("/upload", adminUploadHandler(h.StorageService))
 

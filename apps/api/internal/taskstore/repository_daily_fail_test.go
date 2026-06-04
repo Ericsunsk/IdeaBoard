@@ -1,4 +1,4 @@
-package accounts
+package taskstore
 
 import (
 	"context"
@@ -10,15 +10,15 @@ import (
 	"ideaboard/api/internal/testdb"
 )
 
-func newTaskRepositoryTestDB(t *testing.T) (*TaskRepository, *sql.DB) {
+func newRepositoryTestDB(t *testing.T) (*Repository, *sql.DB) {
 	t.Helper()
 	db := testdb.Open(t)
-	return NewTaskRepository(db), db
+	return NewRepository(db), db
 }
 
 func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	ctx := context.Background()
-	taskRepo, _ := newTaskRepositoryTestDB(t)
+	taskRepo, _ := newRepositoryTestDB(t)
 	accountID := int64(66)
 	createdAt := time.Now().Add(-10 * time.Minute)
 
@@ -83,7 +83,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 
 func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 	ctx := context.Background()
-	taskRepo, _ := newTaskRepositoryTestDB(t)
+	taskRepo, _ := newRepositoryTestDB(t)
 	createdAt := time.Now().Add(-1 * time.Minute)
 	completedAt := createdAt.Add(10 * time.Second)
 	task := &tasks.Task{
@@ -114,7 +114,7 @@ func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 
 func TestUpsertDailyStatByTaskWithFallbackModelUsesProvidedSingleModel(t *testing.T) {
 	ctx := context.Background()
-	taskRepo, _ := newTaskRepositoryTestDB(t)
+	taskRepo, _ := newRepositoryTestDB(t)
 	createdAt := time.Now().Add(-2 * time.Minute)
 	completedAt := createdAt.Add(15 * time.Second)
 	task := &tasks.Task{

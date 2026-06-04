@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/taskstore"
 )
 
 func TestParseRepairTaskLeasesArgsDefaults(t *testing.T) {
@@ -70,7 +70,7 @@ func TestRunTaskLeasePreflightOK(t *testing.T) {
 func TestRunTaskLeasePreflightFindings(t *testing.T) {
 	repo := &fakeTaskLeasePreflightRepo{
 		count: 2,
-		list: []accounts.RunningTaskLease{
+		list: []taskstore.RunningTaskLease{
 			{TaskID: "task-a", AccountID: 11},
 			{TaskID: "task-b", AccountID: 22},
 		},
@@ -87,7 +87,7 @@ func TestRunTaskLeasePreflightFindings(t *testing.T) {
 func TestReportTaskLeasePreflightFindingsDoesNotFailDryRun(t *testing.T) {
 	repo := &fakeTaskLeasePreflightRepo{
 		count: 1,
-		list:  []accounts.RunningTaskLease{{TaskID: "task-a", AccountID: 11}},
+		list:  []taskstore.RunningTaskLease{{TaskID: "task-a", AccountID: 11}},
 	}
 	report, err := reportTaskLeasePreflight(context.Background(), repo, 5)
 	if err != nil {
@@ -100,14 +100,14 @@ func TestReportTaskLeasePreflightFindingsDoesNotFailDryRun(t *testing.T) {
 
 type fakeTaskLeasePreflightRepo struct {
 	count int64
-	list  []accounts.RunningTaskLease
+	list  []taskstore.RunningTaskLease
 }
 
 func (f *fakeTaskLeasePreflightRepo) CountRunningTasksMissingLeaseToken(context.Context) (int64, error) {
 	return f.count, nil
 }
 
-func (f *fakeTaskLeasePreflightRepo) ListRunningTasksMissingLeaseToken(context.Context, int) ([]accounts.RunningTaskLease, error) {
+func (f *fakeTaskLeasePreflightRepo) ListRunningTasksMissingLeaseToken(context.Context, int) ([]taskstore.RunningTaskLease, error) {
 	return f.list, nil
 }
 

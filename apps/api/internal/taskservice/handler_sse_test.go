@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +20,7 @@ import (
 func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := testdb.Open(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	ctx := context.Background()
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: NewEventHub()})
 
@@ -70,7 +70,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := testdb.Open(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	ctx := context.Background()
 	hub := NewEventHub()
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: hub})

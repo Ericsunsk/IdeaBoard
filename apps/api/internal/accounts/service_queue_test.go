@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/taskstore"
 	"testing"
 	"time"
 
@@ -102,7 +103,7 @@ func createTestAccount(t *testing.T, repo *AccountRepository, name string, statu
 func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
-	taskRepo := NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 
 	svc := NewAccountService(AccountServiceDeps{
@@ -137,7 +138,7 @@ func TestListAccountsUsesQueueAndLoadInfo(t *testing.T) {
 func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
-	taskRepo := NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 	concurrency := &fakeConcurrencyStore{
 		concurrent: map[int64]int{acc.ID: 1},
@@ -165,7 +166,7 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
-	taskRepo := NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 0)
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,
@@ -188,7 +189,7 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 func TestDeleteAccountRequiresStoppedAccount(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
-	taskRepo := NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	acc := createTestAccount(t, accountRepo, "running", 1)
 	svc := NewAccountService(AccountServiceDeps{
 		AccountRepo:      accountRepo,
@@ -208,7 +209,7 @@ func TestDeleteAccountRequiresStoppedAccount(t *testing.T) {
 func TestStopAccountMarksCancelAndFailsInFlightTasks(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)
-	taskRepo := NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	acc := createTestAccount(t, accountRepo, "a1", 1)
 
 	pending := &tasks.Task{TaskID: "t-pending", UserID: 1, ChannelID: 1, AccountID: acc.ID, Status: tasks.StatusPending}

@@ -9,9 +9,14 @@ import (
 	"ideaboard/api/internal/runtime/taskqueue"
 )
 
+type AccountTaskStore interface {
+	ListTaskIDsByAccountIDAndStatuses(ctx context.Context, accountID int64, statuses ...string) ([]string, error)
+	FailRunningByAccountID(ctx context.Context, accountID int64, errMsg string) ([]string, error)
+}
+
 type AccountService struct {
 	accountRepo      *AccountRepository
-	taskRepo         *TaskRepository
+	taskRepo         AccountTaskStore
 	queueStats       taskqueue.QueueStatsStore
 	accountLoadStore taskqueue.AccountLoadStore
 	concurrencyStore taskqueue.AccountConcurrencyStore
@@ -22,7 +27,7 @@ type AccountService struct {
 
 type AccountServiceDeps struct {
 	AccountRepo      *AccountRepository
-	TaskRepo         *TaskRepository
+	TaskRepo         AccountTaskStore
 	QueueStats       taskqueue.QueueStatsStore
 	AccountLoadStore taskqueue.AccountLoadStore
 	ConcurrencyStore taskqueue.AccountConcurrencyStore

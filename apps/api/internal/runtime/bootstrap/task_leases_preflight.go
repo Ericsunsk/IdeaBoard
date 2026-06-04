@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/taskstore"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 
 type taskLeasePreflightRepository interface {
 	CountRunningTasksMissingLeaseToken(ctx context.Context) (int64, error)
-	ListRunningTasksMissingLeaseToken(ctx context.Context, limit int) ([]accounts.RunningTaskLease, error)
+	ListRunningTasksMissingLeaseToken(ctx context.Context, limit int) ([]taskstore.RunningTaskLease, error)
 	ResetRunningTasksMissingLeaseTokenToPending(ctx context.Context, limit int) (int64, error)
 }
 
@@ -130,7 +130,7 @@ func parseRepairTaskLeasesArgs(args []string) (repairTaskLeasesOptions, error) {
 
 type taskLeasePreflightReport struct {
 	Count  int64
-	Sample []accounts.RunningTaskLease
+	Sample []taskstore.RunningTaskLease
 }
 
 func runTaskLeasePreflight(ctx context.Context, repo taskLeasePreflightRepository, sampleLimit int) error {
@@ -175,7 +175,7 @@ func newTaskLeasePreflightTaskRepo(cfg *config.Config) (taskLeasePreflightReposi
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	repo := accounts.NewTaskRepository(db)
+	repo := taskstore.NewRepository(db)
 	casted, ok := any(repo).(taskLeasePreflightRepository)
 	if !ok {
 		return nil, errors.New("task repository does not implement task-lease preflight methods")

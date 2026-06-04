@@ -21,10 +21,18 @@ func NewHandler(taskService *Service) *Handler {
 	return &Handler{taskService: taskService}
 }
 
-func (h *Handler) SubmitTask(c *gin.Context) {
+func requireUserID(c *gin.Context) (int64, bool) {
 	userID := c.GetInt64("user_id")
 	if userID == 0 {
-		response.Error(c, 401, "未登录")
+		response.Error(c, http.StatusUnauthorized, "未登录")
+		return 0, false
+	}
+	return userID, true
+}
+
+func (h *Handler) SubmitTask(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
 		return
 	}
 	var req tasks.SubmitTaskRequest
@@ -41,9 +49,8 @@ func (h *Handler) SubmitTask(c *gin.Context) {
 }
 
 func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Error(c, 401, "未登录")
+	userID, ok := requireUserID(c)
+	if !ok {
 		return
 	}
 	var req tasks.SubmitTaskRequest
@@ -84,7 +91,10 @@ func (h *Handler) ListTasks(c *gin.Context) {
 }
 
 func (h *Handler) GetUserTasks(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
 	var req tasks.TaskListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		response.Error(c, 400, "参数错误")
@@ -103,7 +113,10 @@ func (h *Handler) GetUserTasks(c *gin.Context) {
 }
 
 func (h *Handler) GetUserTask(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
 	taskID := c.Param("task_id")
 	task, err := h.taskService.GetUserTask(c.Request.Context(), taskID, userID)
 	if err != nil {
@@ -114,12 +127,11 @@ func (h *Handler) GetUserTask(c *gin.Context) {
 }
 
 func (h *Handler) StreamUserTask(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	taskID := c.Param("task_id")
-	if userID == 0 {
-		response.Error(c, http.StatusUnauthorized, "未登录")
+	userID, ok := requireUserID(c)
+	if !ok {
 		return
 	}
+	taskID := c.Param("task_id")
 	ctx := c.Request.Context()
 	task, err := h.taskService.GetUserTask(ctx, taskID, userID)
 	if err != nil {
@@ -215,7 +227,10 @@ func writeSSEvent(c *gin.Context, event string, data interface{}) bool {
 }
 
 func (h *Handler) DeleteUserTask(c *gin.Context) {
-	userID := c.GetInt64("user_id")
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
 	taskID := c.Param("task_id")
 	if err := h.taskService.DeleteUserTask(c.Request.Context(), taskID, userID); err != nil {
 		response.Error(c, 500, "删除失败")

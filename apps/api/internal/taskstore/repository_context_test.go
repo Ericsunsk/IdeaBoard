@@ -1,4 +1,4 @@
-package accounts
+package taskstore
 
 import (
 	"context"
@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/testdb"
 )
 
-func TestTaskRepositoryCanceledContextAffectsQueryAndWrite(t *testing.T) {
-	db := newQueueServiceTestDB(t)
-	repo := NewTaskRepository(db)
+func TestRepositoryCanceledContextAffectsQueryAndWrite(t *testing.T) {
+	db := testdb.Open(t)
+	repo := NewRepository(db)
 
 	if err := repo.Create(context.Background(), &tasks.Task{
 		TaskID:    "ctx-cancel-task",

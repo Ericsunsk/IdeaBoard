@@ -23,6 +23,8 @@ import (
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/taskservice"
+	"ideaboard/api/internal/taskstats"
+	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/users"
 	"ideaboard/api/web"
 
@@ -74,7 +76,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		return nil, fmt.Errorf("failed to ensure user storage uid: %w", err)
 	}
 	accountRepo := accounts.NewAccountRepository(db)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	channelRepo := channels.NewChannelRepository(db)
 	systemConfigRepo := settings.NewSystemConfigRepository(db)
 	lineDraftModeRepo := assets.NewLineDraftModeRepository(db)
@@ -115,8 +117,10 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		EventHub:   taskEventHub,
 		TaskEvents: taskEvents,
 	})
+	taskStatsService := taskstats.NewService(taskRepo)
 	accountHandler := accounts.NewAccountHandler(accountService)
 	taskHandler := taskservice.NewHandler(taskService)
+	taskStatsHandler := taskstats.NewHandler(taskStatsService, accountService)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: authServiceClient,
@@ -142,6 +146,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 			AdminHandler:         users.NewAdminHandler(userService, systemConfigRepo, authServiceClient),
 			AccountHandler:       accountHandler,
 			TaskHandler:          taskHandler,
+			TaskStatsHandler:     taskStatsHandler,
 			ChannelHandler:       channels.NewChannelHandler(channelRepo, cfg.App.Env),
 			StorageHandler:       storage.NewStorageHandler(storageService),
 			LineDraftHandler:     assets.NewLineDraftHandler(lineDraftModeRepo),

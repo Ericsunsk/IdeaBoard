@@ -16,8 +16,12 @@ import (
 
 type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (string, error)
 
+type accountLookupStore interface {
+	GetByID(ctx context.Context, id int64) (*accounts.ApiAccount, error)
+}
+
 type taskExecutionOrchestrator struct {
-	accountRepo  *accounts.AccountRepository
+	accountRepo  accountLookupStore
 	enqueuer     taskqueue.TaskEnqueuer
 	taskRuntime  *taskruntime.Service
 	providerCall providerCallFunc
@@ -26,7 +30,7 @@ type taskExecutionOrchestrator struct {
 const taskCleanupTimeout = 5 * time.Second
 
 func newTaskExecutionOrchestrator(
-	accountRepo *accounts.AccountRepository,
+	accountRepo accountLookupStore,
 	enqueuer taskqueue.TaskEnqueuer,
 	taskRuntime *taskruntime.Service,
 	providerCall providerCallFunc,

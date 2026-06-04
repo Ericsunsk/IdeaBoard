@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -35,7 +35,7 @@ func (p *recordingTaskStatusPublisher) PublishTaskStatus(ctx context.Context, ev
 func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
@@ -75,7 +75,7 @@ func TestResetTaskRunningToPendingResetsState(t *testing.T) {
 func TestResetTaskRunningToPendingRejectsTerminalTask(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
@@ -109,7 +109,7 @@ func newTaskRuntimeServiceTestDB(t *testing.T) *sql.DB {
 func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
@@ -154,7 +154,7 @@ func TestRequeueTaskForFailoverRequeuesWhenBelowRetryLimit(t *testing.T) {
 func TestConfirmTaskLeasePublishesRunningStatus(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
 	service := NewService(nil, taskRepo, assigner, nil)
 	publisher := newRecordingTaskStatusPublisher()
@@ -194,7 +194,7 @@ func TestConfirmTaskLeasePublishesRunningStatus(t *testing.T) {
 func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
 	service := NewService(nil, taskRepo, assigner, nil)
 	publisher := newRecordingTaskStatusPublisher()
@@ -232,7 +232,7 @@ func TestConfirmTaskLeaseRejectsStaleLeaseWithoutPublishing(t *testing.T) {
 func TestMarkTaskCompletedRejectsLeaseTokenMismatch(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
@@ -264,7 +264,7 @@ func TestMarkTaskCompletedRejectsLeaseTokenMismatch(t *testing.T) {
 func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
@@ -323,7 +323,7 @@ func TestRequeueTaskForFailoverFailsWhenRetryLimitReached(t *testing.T) {
 func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 	publisher := newRecordingTaskStatusPublisher()
 	service.SetTaskStatusPublisher(publisher)
@@ -388,7 +388,7 @@ func TestRequeueTaskForFailoverPublishesPendingOrFailed(t *testing.T) {
 func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
@@ -437,7 +437,7 @@ func TestMarkTaskCompletedUpsertsDailyStat(t *testing.T) {
 func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{
@@ -475,7 +475,7 @@ func TestMarkTaskCompletedPersistsTaskOutputs(t *testing.T) {
 func TestMarkTaskCompletedRejectsInlineImageResult(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)
-	taskRepo := accounts.NewTaskRepository(db)
+	taskRepo := taskstore.NewRepository(db)
 	service := NewService(nil, taskRepo, nil, nil)
 
 	task := &tasks.Task{

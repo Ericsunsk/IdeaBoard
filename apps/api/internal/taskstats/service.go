@@ -1,4 +1,4 @@
-package accounts
+package taskstats
 
 import (
 	"context"
@@ -9,7 +9,28 @@ import (
 	"time"
 
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/taskstore"
 )
+
+type Store interface {
+	CountByStatus(ctx context.Context, status string) (int64, error)
+	CountAllTasks(ctx context.Context) (int64, error)
+	ListBackfilledDatesByRange(ctx context.Context, startDate, endDate string) ([]string, error)
+	ListDailyStatsByDateRange(ctx context.Context, startDate, endDate string) ([]taskstore.DailyStatAggregate, error)
+	ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate string) ([]taskstore.StatEventLatencySample, error)
+	ListStatisticsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]taskstore.TaskStatisticLite, error)
+	ListSingleModelSetByAccountIDs(ctx context.Context, accountIDs []int64) (map[int64]string, error)
+	UpsertDailyStatByTaskWithFallbackModel(ctx context.Context, task *tasks.Task, fallbackModelSet string) error
+	MarkDailyBackfillDone(ctx context.Context, statDate string) error
+}
+
+type Service struct {
+	store Store
+}
+
+func NewService(store Store) *Service {
+	return &Service{store: store}
+}
 
 func normalizeStatisticsRange(raw string) (StatisticsRange, int) {
 	switch StatisticsRange(strings.TrimSpace(strings.ToLower(raw))) {
@@ -22,7 +43,33 @@ func normalizeStatisticsRange(raw string) (StatisticsRange, int) {
 	}
 }
 
-func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*AdminStatisticsResponse, error) {
+func (s *Service) GetTaskStats(ctx context.Context) (map[string]int64, error) {
+	pending, err := s.store.CountByStatus(ctx, tasks.StatusPending)
+	if err != nil {
+		return nil, err
+	}
+	running, err := s.store.CountByStatus(ctx, tasks.StatusRunning)
+	if err != nil {
+		return nil, err
+	}
+	completed, err := s.store.CountByStatus(ctx, tasks.StatusCompleted)
+	if err != nil {
+		return nil, err
+	}
+	failed, err := s.store.CountByStatus(ctx, tasks.StatusFailed)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]int64{
+		tasks.StatusPending:   pending,
+		tasks.StatusRunning:   running,
+		tasks.StatusCompleted: completed,
+		tasks.StatusFailed:    failed,
+	}, nil
+}
+
+func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminStatisticsResponse, error) {
 	_, days := normalizeStatisticsRange(rawRange)
 	now := time.Now()
 	loc := now.Location()
@@ -31,7 +78,7 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
 	rangeStart := todayStart.AddDate(0, 0, -(days - 1))
 
-	totalCalls, err := s.taskRepo.CountAllTasks(ctx)
+	totalCalls, err := s.store.CountAllTasks(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +90,7 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 
 	rangeStartDate := rangeStart.Format("2006-01-02")
 	rangeEndDate := todayStart.Format("2006-01-02")
-	backfilledDates, err := s.taskRepo.ListBackfilledDatesByRange(ctx, rangeStartDate, rangeEndDate)
+	backfilledDates, err := s.store.ListBackfilledDatesByRange(ctx, rangeStartDate, rangeEndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -55,18 +102,18 @@ func (s *AccountService) GetStatistics(ctx context.Context, rawRange string) (*A
 	if rangeStart.Before(monthStart) {
 		queryStart = rangeStart
 	}
-	allDailyRows, err := s.taskRepo.ListDailyStatsByDateRange(ctx, queryStart.Format("2006-01-02"), rangeEndDate)
+	allDailyRows, err := s.store.ListDailyStatsByDateRange(ctx, queryStart.Format("2006-01-02"), rangeEndDate)
 	if err != nil {
 		return nil, err
 	}
-	latencySamples, err := s.taskRepo.ListStatEventLatencySamplesByDateRange(ctx, rangeStartDate, rangeEndDate)
+	latencySamples, err := s.store.ListStatEventLatencySamplesByDateRange(ctx, rangeStartDate, rangeEndDate)
 	if err != nil {
 		return nil, err
 	}
 
 	yesterdayDate := yesterdayStart.Format("2006-01-02")
 	monthStartDate := monthStart.Format("2006-01-02")
-	var rangeDailyRows, yesterdayRows, monthRows []DailyStatAggregate
+	var rangeDailyRows, yesterdayRows, monthRows []taskstore.DailyStatAggregate
 	for _, row := range allDailyRows {
 		if row.StatDate >= rangeStartDate && row.StatDate <= rangeEndDate {
 			rangeDailyRows = append(rangeDailyRows, row)
@@ -339,7 +386,7 @@ func percentile95(values []float64) float64 {
 	return values[idx]
 }
 
-func (s *AccountService) BackfillStatistics(ctx context.Context, rawRange string) (*AdminStatisticsBackfillResult, error) {
+func (s *Service) BackfillStatistics(ctx context.Context, rawRange string) (*AdminStatisticsBackfillResult, error) {
 	normalizedRange, days := normalizeStatisticsRange(rawRange)
 	now := time.Now()
 	loc := now.Location()
@@ -348,7 +395,7 @@ func (s *AccountService) BackfillStatistics(ctx context.Context, rawRange string
 	rangeStartDate := rangeStart.Format("2006-01-02")
 	rangeEndDate := todayStart.Format("2006-01-02")
 
-	backfilledDates, err := s.taskRepo.ListBackfilledDatesByRange(ctx, rangeStartDate, rangeEndDate)
+	backfilledDates, err := s.store.ListBackfilledDatesByRange(ctx, rangeStartDate, rangeEndDate)
 	if err != nil {
 		return nil, fmt.Errorf("list backfilled dates: %w", err)
 	}
@@ -367,7 +414,7 @@ func (s *AccountService) BackfillStatistics(ctx context.Context, rawRange string
 	}, nil
 }
 
-func sumDailyTotal(rows []DailyStatAggregate) int64 {
+func sumDailyTotal(rows []taskstore.DailyStatAggregate) int64 {
 	var total int64
 	for _, row := range rows {
 		total += row.Total
@@ -407,7 +454,7 @@ func buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart time.Time, da
 	return missing
 }
 
-func (s *AccountService) backfillDailyStatsByMissingDays(ctx context.Context, days []time.Time) (int, error) {
+func (s *Service) backfillDailyStatsByMissingDays(ctx context.Context, days []time.Time) (int, error) {
 	if len(days) == 0 {
 		return 0, nil
 	}
@@ -416,7 +463,7 @@ func (s *AccountService) backfillDailyStatsByMissingDays(ctx context.Context, da
 	backfilledCount := 0
 	for _, dayStart := range days {
 		dayEnd := dayStart.AddDate(0, 0, 1)
-		rows, err := s.taskRepo.ListStatisticsByCreatedAtRange(ctx, dayStart, dayEnd)
+		rows, err := s.store.ListStatisticsByCreatedAtRange(ctx, dayStart, dayEnd)
 		if err != nil {
 			return backfilledCount, err
 		}
@@ -426,7 +473,7 @@ func (s *AccountService) backfillDailyStatsByMissingDays(ctx context.Context, da
 				accountIDs = append(accountIDs, row.AccountID)
 			}
 		}
-		modelSetMap, err := s.taskRepo.listSingleModelSetByAccountIDs(ctx, accountIDs)
+		modelSetMap, err := s.store.ListSingleModelSetByAccountIDs(ctx, accountIDs)
 		if err != nil {
 			return backfilledCount, err
 		}
@@ -443,13 +490,13 @@ func (s *AccountService) backfillDailyStatsByMissingDays(ctx context.Context, da
 				CreatedAt:   row.CreatedAt.In(loc),
 				CompletedAt: row.CompletedAt,
 			}
-			if err := s.taskRepo.UpsertDailyStatByTaskWithFallbackModel(ctx, task, modelSetMap[row.AccountID]); err != nil {
+			if err := s.store.UpsertDailyStatByTaskWithFallbackModel(ctx, task, modelSetMap[row.AccountID]); err != nil {
 				return backfilledCount, err
 			}
 		}
 		dayDate := dayStart.In(loc).Format("2006-01-02")
 		if dayDate != todayDate {
-			if err := s.taskRepo.MarkDailyBackfillDone(ctx, dayDate); err != nil {
+			if err := s.store.MarkDailyBackfillDone(ctx, dayDate); err != nil {
 				return backfilledCount, err
 			}
 			backfilledCount++

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/runtime/taskqueue"
@@ -26,9 +25,9 @@ type RiverTaskWorker struct {
 }
 
 func NewRiverTaskWorker(
-	accountRepo *accounts.AccountRepository,
+	accountRepo taskruntime.AccountStore,
 	channelRepo *channels.ChannelRepository,
-	taskRepo *accounts.TaskRepository,
+	taskRepo taskruntime.TaskStore,
 	enqueuer taskqueue.TaskEnqueuer,
 	assigner taskqueue.TaskAssigner,
 	cancelStore taskqueue.TaskCancellationStore,

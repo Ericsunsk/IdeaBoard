@@ -28,17 +28,36 @@ var (
 	ErrTaskStateConflict = errors.New("task state conflict")
 )
 
+type AccountStore interface {
+	GetAllEnabled(ctx context.Context) ([]*accounts.ApiAccount, error)
+	GetByID(ctx context.Context, id int64) (*accounts.ApiAccount, error)
+	IncrementFailCount(ctx context.Context, id int64) error
+	UpdateStatus(ctx context.Context, id int64, status int16) error
+	ResetFailCount(ctx context.Context, id int64) error
+}
+
+type TaskStore interface {
+	CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error)
+	MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time) (int64, error)
+	MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error)
+	ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error)
+	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error)
+	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error)
+	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
+	UpsertDailyStatByTask(ctx context.Context, task *tasks.Task) error
+}
+
 type Service struct {
-	accountRepo *accounts.AccountRepository
-	taskRepo    *accounts.TaskRepository
+	accountRepo AccountStore
+	taskRepo    TaskStore
 	queue       taskqueue.TaskAssigner
 	cancelStore taskqueue.TaskCancellationStore
 	taskEvents  events.TaskStatusPublisher
 }
 
 func NewService(
-	accountRepo *accounts.AccountRepository,
-	taskRepo *accounts.TaskRepository,
+	accountRepo AccountStore,
+	taskRepo TaskStore,
 	assigner taskqueue.TaskAssigner,
 	cancelStore taskqueue.TaskCancellationStore,
 ) *Service {
