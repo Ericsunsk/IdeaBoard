@@ -1,11 +1,11 @@
 import type { FormRules } from 'naive-ui'
 import channelApi, { type Channel } from '../../../../shared/api/channel'
-import providerAccountApi, {
-  FALLBACK_PROVIDER_ACCOUNT_LIMITS,
-  normalizeProviderAccountLimits,
-  type ProviderAccount,
-  type ProviderAccountLimits,
-} from '../../shared/api/providerAccounts'
+import adminAccountApi, {
+  FALLBACK_ADMIN_ACCOUNT_LIMITS,
+  normalizeAdminAccountLimits,
+  type AdminAccount,
+  type AdminAccountLimits,
+} from '../../shared/api/adminAccounts'
 import { extractApiErrorMessage, splitCommaValues } from './channelModelUtils'
 
 const ACCOUNT_PAGE_SIZE = 100
@@ -29,7 +29,7 @@ export function useChannelAccounts(options: {
   }
   onAfterMutation: () => Promise<void> | void
 }) {
-  const accounts = ref<ProviderAccount[]>([])
+  const accounts = ref<AdminAccount[]>([])
   const accountLoading = ref(false)
   const showAccountModal = ref(false)
   const isEditAccount = ref(false)
@@ -37,7 +37,7 @@ export function useChannelAccounts(options: {
   const accountSaveLoading = ref(false)
   const currentAccountId = ref(0)
   const selectedChannelForAccount = ref<Channel | null>(null)
-  const accountLimits = ref<ProviderAccountLimits>(FALLBACK_PROVIDER_ACCOUNT_LIMITS)
+  const accountLimits = ref<AdminAccountLimits>(FALLBACK_ADMIN_ACCOUNT_LIMITS)
 
   function createEmptyAccountForm(channelId = 0) {
     return {
@@ -57,20 +57,20 @@ export function useChannelAccounts(options: {
 
   async function loadAccountLimits() {
     try {
-      const res = await providerAccountApi.getProviderAccountLimits()
-      accountLimits.value = normalizeProviderAccountLimits(res.data?.limits)
+      const res = await adminAccountApi.getLimits()
+      accountLimits.value = normalizeAdminAccountLimits(res.data?.limits)
     } catch {
-      accountLimits.value = FALLBACK_PROVIDER_ACCOUNT_LIMITS
+      accountLimits.value = FALLBACK_ADMIN_ACCOUNT_LIMITS
     }
   }
 
-  async function loadAllAccounts(): Promise<ProviderAccount[]> {
-    const all: ProviderAccount[] = []
+  async function loadAllAccounts(): Promise<AdminAccount[]> {
+    const all: AdminAccount[] = []
     let page = 1
     let total = Number.POSITIVE_INFINITY
 
     while (true) {
-      const res = await providerAccountApi.listProviderAccounts({
+      const res = await adminAccountApi.list({
         page,
         page_size: ACCOUNT_PAGE_SIZE,
       })
@@ -112,7 +112,7 @@ export function useChannelAccounts(options: {
     return Array.from(models)
   }
 
-  function getAccStatusClass(acc: ProviderAccount) {
+  function getAccStatusClass(acc: AdminAccount) {
     if (acc.status === 0) return 'acc-warning'
     if (acc.fail_count >= 5) return 'acc-error'
     return 'acc-success'
@@ -147,7 +147,7 @@ export function useChannelAccounts(options: {
     showAccountModal.value = true
   }
 
-  function openEditAccountModal(account: ProviderAccount) {
+  function openEditAccountModal(account: AdminAccount) {
     isEditAccount.value = true
     currentAccountId.value = account.id
     const channel = options.channels.value.find((c) => c.id === account.channel_id)
@@ -234,10 +234,10 @@ export function useChannelAccounts(options: {
           ...baseData,
           ...(accountForm.value.api_key ? { api_key: accountForm.value.api_key } : {}),
         }
-        await providerAccountApi.updateProviderAccount(currentAccountId.value, updateData)
+        await adminAccountApi.update(currentAccountId.value, updateData)
         options.message.success('账号已更新')
       } else {
-        await providerAccountApi.createProviderAccount({
+        await adminAccountApi.create({
           ...baseData,
           api_key: accountForm.value.api_key,
         })
@@ -253,13 +253,13 @@ export function useChannelAccounts(options: {
     }
   }
 
-  async function toggleAccountStatus(account: ProviderAccount) {
+  async function toggleAccountStatus(account: AdminAccount) {
     try {
       if (account.status === 1) {
-        await providerAccountApi.stopProviderAccount(account.id)
+        await adminAccountApi.stop(account.id)
         options.message.success('账号已停止')
       } else {
-        await providerAccountApi.startProviderAccount(account.id)
+        await adminAccountApi.start(account.id)
         options.message.success('账号已启动')
       }
       await options.onAfterMutation()
@@ -268,7 +268,7 @@ export function useChannelAccounts(options: {
     }
   }
 
-  function handleDeleteAccount(account: ProviderAccount) {
+  function handleDeleteAccount(account: AdminAccount) {
     options.dialog.warning({
       title: '确认删除',
       content: '确定删除该账号吗？',
@@ -276,7 +276,7 @@ export function useChannelAccounts(options: {
       negativeText: '取消',
       onPositiveClick: async () => {
         try {
-          await providerAccountApi.deleteProviderAccount(account.id)
+          await adminAccountApi.delete(account.id)
           options.message.success('账号已删除')
           await options.onAfterMutation()
         } catch (error) {

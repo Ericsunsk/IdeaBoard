@@ -12,12 +12,15 @@ import {
 import { setAdminFeaturePrompt } from '../../../../shared/api/generated-query/admin-feature-prompts/admin-feature-prompts'
 import { backfillAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
 import type { ApiResponse } from '../../../../shared/types'
-import type { RateLimitSetting } from '../../../../shared/api/generated-query/model'
+import type {
+  AdminStatisticsBackfillResult,
+  GetAdminStatisticsRange,
+  RateLimitSetting,
+} from '../../../../shared/api/generated-query/model'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
-import type { AdminStatisticsBackfillResult } from '../api/statistics'
 import { storageApi, type StorageProfile, type StorageProfilePayload } from '../api/storage'
 
-export type AdminStatisticsRange = '7d' | '30d' | '1y'
+export type AdminStatisticsRange = GetAdminStatisticsRange
 export type RateLimitSettings = { window_seconds: number; max_requests: number }
 export type RegistrationSetting = { enabled: boolean }
 

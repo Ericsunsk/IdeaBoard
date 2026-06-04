@@ -103,34 +103,6 @@ func (r *Repository) GetByTaskIDAndUserID(ctx context.Context, taskID string, us
 	return &task, nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, id int64) (*tasks.Task, error) {
-	row, err := r.q.GetTaskByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	task := taskFromSQLC(row)
-	return &task, nil
-}
-
-func (r *Repository) Update(ctx context.Context, task *tasks.Task) error {
-	return r.q.UpdateTask(ctx, dbsqlc.UpdateTaskParams{
-		TaskID:      task.TaskID,
-		UserID:      task.UserID,
-		ChannelID:   task.ChannelID,
-		AccountID:   task.AccountID,
-		Prompt:      task.Prompt,
-		UserPrompt:  task.UserPrompt,
-		Params:      task.Params,
-		Status:      task.Status,
-		LeaseToken:  task.LeaseToken,
-		RetryCount:  int32(task.RetryCount),
-		ErrorMsg:    task.ErrorMsg,
-		Result:      task.Result,
-		CompletedAt: dbutil.NullTime(task.CompletedAt),
-		ID:          task.ID,
-	})
-}
-
 func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time) (int64, error) {
 	return r.q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
 		ErrorMsg:    errMsg,
@@ -181,37 +153,20 @@ func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID s
 	})
 }
 
-func (r *Repository) CompleteWithOutputs(ctx context.Context, taskID string, statuses []string, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error) {
-	return r.completeWithOutputs(ctx, taskID, statuses, "", false, result, completedAt, outputs)
-}
-
 func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error) {
-	return r.completeWithOutputs(ctx, taskID, statuses, leaseToken, true, result, completedAt, outputs)
-}
-
-func (r *Repository) completeWithOutputs(ctx context.Context, taskID string, statuses []string, leaseToken string, requireLeaseToken bool, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		var err error
-		if requireLeaseToken {
-			rowsAffected, err = q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
-				Result:      result,
-				CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-				TaskID:      taskID,
-				Statuses:    statuses,
-				LeaseToken:  leaseToken,
-			})
-		} else {
-			rowsAffected, err = q.CompleteTask(ctx, dbsqlc.CompleteTaskParams{
-				Result:      result,
-				CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-				TaskID:      taskID,
-				Statuses:    statuses,
-			})
-		}
-		if err != nil || rowsAffected == 0 {
+		updated, err := q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
+			Result:      result,
+			CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+			TaskID:      taskID,
+			Statuses:    statuses,
+			LeaseToken:  leaseToken,
+		})
+		if err != nil || updated == 0 {
 			return err
 		}
+		rowsAffected = updated
 		if err := q.DeleteOutputsByTaskID(ctx, taskID); err != nil {
 			return err
 		}
@@ -327,21 +282,6 @@ func (r *Repository) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, acco
 	})
 }
 
-func (r *Repository) ListRunningTaskLeases(ctx context.Context, limit int) ([]RunningTaskLease, error) {
-	if limit <= 0 {
-		return nil, fmt.Errorf("limit must be positive")
-	}
-	rows, err := r.q.ListRunningTaskLeases(ctx, int32(limit))
-	if err != nil {
-		return nil, err
-	}
-	result := make([]RunningTaskLease, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, RunningTaskLease{TaskID: row.TaskID, AccountID: row.AccountID, LeaseToken: row.LeaseToken})
-	}
-	return result, nil
-}
-
 func (r *Repository) CountRunningTasksMissingLeaseToken(ctx context.Context) (int64, error) {
 	return r.q.CountRunningTasksMissingLeaseToken(ctx)
 }
@@ -378,35 +318,10 @@ func (r *Repository) ResetRunningTasksMissingLeaseTokenToPending(ctx context.Con
 }
 
 func (r *Repository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	}()
-
-	result, err := tx.ExecContext(ctx, `DELETE FROM tasks WHERE task_id = $1 AND user_id = $2`, taskID, userID)
-	if err != nil {
-		return err
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows > 0 {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM task_outputs WHERE task_id = $1`, taskID); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	committed = true
-	return nil
+	return r.q.DeleteTaskByTaskIDAndUserID(ctx, dbsqlc.DeleteTaskByTaskIDAndUserIDParams{
+		TaskID: taskID,
+		UserID: userID,
+	})
 }
 
 func (r *Repository) MarkQueueFailed(ctx context.Context, taskID string, errMsg string) error {

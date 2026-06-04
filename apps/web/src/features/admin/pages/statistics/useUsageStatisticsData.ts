@@ -1,5 +1,5 @@
-import type { AdminStatisticsResponse } from '../../shared/api/statistics'
 import { useGetAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
+import type { AdminStatistics } from '../../../../shared/api/generated-query/model'
 import type { AdminStatisticsRange } from '../../shared/queries/adminActions'
 
 type RangeOption = { label: string; key: AdminStatisticsRange }
@@ -20,7 +20,7 @@ export function useUsageStatisticsData() {
     },
   })
 
-  const adminStatistics = computed<AdminStatisticsResponse | null>(
+  const adminStatistics = computed<AdminStatistics | null>(
     () => statisticsQuery.data.value?.data ?? null,
   )
 

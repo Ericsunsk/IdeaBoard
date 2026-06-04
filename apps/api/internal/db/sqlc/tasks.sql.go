@@ -13,37 +13,6 @@ import (
 	"github.com/lib/pq"
 )
 
-const completeTask = `-- name: CompleteTask :execrows
-UPDATE tasks
-SET status = 'completed',
-    lease_token = '',
-    result = $1,
-    error_msg = '',
-    completed_at = $2
-WHERE task_id = $3
-  AND status = ANY($4::text[])
-`
-
-type CompleteTaskParams struct {
-	Result      string       `json:"result"`
-	CompletedAt sql.NullTime `json:"completed_at"`
-	TaskID      string       `json:"task_id"`
-	Statuses    []string     `json:"statuses"`
-}
-
-func (q *Queries) CompleteTask(ctx context.Context, arg CompleteTaskParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, completeTask,
-		arg.Result,
-		arg.CompletedAt,
-		arg.TaskID,
-		pq.Array(arg.Statuses),
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const completeTaskWithLease = `-- name: CompleteTaskWithLease :execrows
 UPDATE tasks
 SET status = 'completed',
@@ -336,37 +305,6 @@ func (q *Queries) FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFa
 	return result.RowsAffected()
 }
 
-const getTaskByID = `-- name: GetTaskByID :one
-SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
-       status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
-FROM tasks
-WHERE id = $1
-`
-
-func (q *Queries) GetTaskByID(ctx context.Context, id int64) (Task, error) {
-	row := q.db.QueryRowContext(ctx, getTaskByID, id)
-	var i Task
-	err := row.Scan(
-		&i.ID,
-		&i.TaskID,
-		&i.UserID,
-		&i.ChannelID,
-		&i.AccountID,
-		&i.Prompt,
-		&i.UserPrompt,
-		&i.Params,
-		&i.Status,
-		&i.LeaseToken,
-		&i.RetryCount,
-		&i.ErrorMsg,
-		&i.Result,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.CompletedAt,
-	)
-	return i, err
-}
-
 const getTaskByTaskID = `-- name: GetTaskByTaskID :one
 SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
        status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
@@ -455,43 +393,6 @@ func (q *Queries) ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit i
 			return nil, err
 		}
 		items = append(items, task_id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listRunningTaskLeases = `-- name: ListRunningTaskLeases :many
-SELECT task_id, account_id, lease_token
-FROM tasks
-WHERE status = 'running'
-ORDER BY id ASC
-LIMIT $1
-`
-
-type ListRunningTaskLeasesRow struct {
-	TaskID     string `json:"task_id"`
-	AccountID  int64  `json:"account_id"`
-	LeaseToken string `json:"lease_token"`
-}
-
-func (q *Queries) ListRunningTaskLeases(ctx context.Context, rowLimit int32) ([]ListRunningTaskLeasesRow, error) {
-	rows, err := q.db.QueryContext(ctx, listRunningTaskLeases, rowLimit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListRunningTaskLeasesRow
-	for rows.Next() {
-		var i ListRunningTaskLeasesRow
-		if err := rows.Scan(&i.TaskID, &i.AccountID, &i.LeaseToken); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -957,59 +858,4 @@ func (q *Queries) ResetTaskRunningToPendingWithLease(ctx context.Context, arg Re
 		return 0, err
 	}
 	return result.RowsAffected()
-}
-
-const updateTask = `-- name: UpdateTask :exec
-UPDATE tasks
-SET task_id = $1,
-    user_id = $2,
-    channel_id = $3,
-    account_id = $4,
-    prompt = $5,
-    user_prompt = $6,
-    params = $7,
-    status = $8,
-    lease_token = $9,
-    retry_count = $10,
-    error_msg = $11,
-    result = $12,
-    completed_at = $13
-WHERE id = $14
-`
-
-type UpdateTaskParams struct {
-	TaskID      string       `json:"task_id"`
-	UserID      int64        `json:"user_id"`
-	ChannelID   int64        `json:"channel_id"`
-	AccountID   int64        `json:"account_id"`
-	Prompt      string       `json:"prompt"`
-	UserPrompt  string       `json:"user_prompt"`
-	Params      string       `json:"params"`
-	Status      string       `json:"status"`
-	LeaseToken  string       `json:"lease_token"`
-	RetryCount  int32        `json:"retry_count"`
-	ErrorMsg    string       `json:"error_msg"`
-	Result      string       `json:"result"`
-	CompletedAt sql.NullTime `json:"completed_at"`
-	ID          int64        `json:"id"`
-}
-
-func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
-	_, err := q.db.ExecContext(ctx, updateTask,
-		arg.TaskID,
-		arg.UserID,
-		arg.ChannelID,
-		arg.AccountID,
-		arg.Prompt,
-		arg.UserPrompt,
-		arg.Params,
-		arg.Status,
-		arg.LeaseToken,
-		arg.RetryCount,
-		arg.ErrorMsg,
-		arg.Result,
-		arg.CompletedAt,
-		arg.ID,
-	)
-	return err
 }

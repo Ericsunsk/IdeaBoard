@@ -1,7 +1,6 @@
 import { ofetch, type FetchError, type FetchOptions } from 'ofetch'
 import { handleAuthFailure } from '../utils/auth'
 import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
-import type { ApiResponse } from '../types'
 
 export type ApiClientError = Error & {
   code?: number
@@ -77,28 +76,8 @@ async function apiRequest<T>(url: string, config?: ApiRequestConfig): Promise<T>
   }
 }
 
-export function apiGet<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
-  return apiRequest<ApiResponse<T>>(url, { ...config, method: 'GET' })
-}
-
-export function apiPost<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
-  return apiRequest<ApiResponse<T>>(url, { ...config, method: 'POST' })
-}
-
-export function apiPut<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
-  return apiRequest<ApiResponse<T>>(url, { ...config, method: 'PUT' })
-}
-
-export function apiDelete<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
-  return apiRequest<ApiResponse<T>>(url, { ...config, method: 'DELETE' })
-}
-
 export const api = {
   request: apiRequest,
-  get: apiGet,
-  post: apiPost,
-  put: apiPut,
-  delete: apiDelete,
 }
 
 export default api

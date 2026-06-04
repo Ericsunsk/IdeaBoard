@@ -83,6 +83,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 		Prompt:     "internal prompt",
 		UserPrompt: "user prompt",
 		Status:     tasks.StatusPending,
+		LeaseToken: "lease-sse-live",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -116,7 +117,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	go func() {
 		time.Sleep(80 * time.Millisecond)
 		now := time.Now()
-		rows, updateErr := taskRepo.CompleteWithOutputs(ctx, task.TaskID, []string{tasks.StatusPending}, `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`, now, nil)
+		rows, updateErr := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusPending}, task.LeaseToken, `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`, now, nil)
 		if updateErr != nil {
 			done <- updateErr
 			return

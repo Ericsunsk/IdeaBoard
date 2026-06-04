@@ -10,7 +10,6 @@ import (
 )
 
 type Querier interface {
-	CompleteTask(ctx context.Context, arg CompleteTaskParams) (int64, error)
 	CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWithLeaseParams) (int64, error)
 	CountAccounts(ctx context.Context, arg CountAccountsParams) (int64, error)
 	CountAllTasks(ctx context.Context) (int64, error)
@@ -55,7 +54,6 @@ type Querier interface {
 	GetChannelByID(ctx context.Context, id int64) (Channel, error)
 	GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error)
 	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
-	GetTaskByID(ctx context.Context, id int64) (Task, error)
 	GetTaskByTaskID(ctx context.Context, taskID string) (Task, error)
 	GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTaskIDAndUserIDParams) (Task, error)
 	GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error)
@@ -81,7 +79,6 @@ type Querier interface {
 	ListLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskOutput, error)
 	ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error)
-	ListRunningTaskLeases(ctx context.Context, rowLimit int32) ([]ListRunningTaskLeasesRow, error)
 	ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimit int32) ([]ListRunningTasksMissingLeaseTokenRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
 	ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error)
@@ -105,7 +102,6 @@ type Querier interface {
 	UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) error
 	UpdateChannel(ctx context.Context, arg UpdateChannelParams) error
 	UpdateLineDraftMode(ctx context.Context, arg UpdateLineDraftModeParams) error
-	UpdateTask(ctx context.Context, arg UpdateTaskParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) error
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) error
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error

@@ -136,7 +136,6 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		Auth: authDeps,
 		UserRoutes: httpapi.UserRouteDeps{
 			AuthHandler:      auth.NewAuthHandler(userService),
-			AccountHandler:   accountHandler,
 			TaskHandler:      taskHandler,
 			BoardHandler:     boards.NewBoardHandler(boardService),
 			LineDraftHandler: assets.NewLineDraftHandler(lineDraftModeRepo),

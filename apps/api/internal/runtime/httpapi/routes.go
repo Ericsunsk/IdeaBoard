@@ -59,7 +59,6 @@ type StaticUploadDeps struct {
 
 type UserRouteDeps struct {
 	AuthHandler      *auth.AuthHandler
-	AccountHandler   *accounts.AccountHandler
 	TaskHandler      *taskservice.Handler
 	BoardHandler     *boards.BoardHandler
 	LineDraftHandler *assets.LineDraftHandler

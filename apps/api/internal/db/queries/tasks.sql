@@ -22,29 +22,6 @@ SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params
 FROM tasks
 WHERE task_id = sqlc.arg(task_id) AND user_id = sqlc.arg(user_id);
 
--- name: GetTaskByID :one
-SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
-       status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
-FROM tasks
-WHERE id = sqlc.arg(id);
-
--- name: UpdateTask :exec
-UPDATE tasks
-SET task_id = sqlc.arg(task_id),
-    user_id = sqlc.arg(user_id),
-    channel_id = sqlc.arg(channel_id),
-    account_id = sqlc.arg(account_id),
-    prompt = sqlc.arg(prompt),
-    user_prompt = sqlc.arg(user_prompt),
-    params = sqlc.arg(params),
-    status = sqlc.arg(status),
-    lease_token = sqlc.arg(lease_token),
-    retry_count = sqlc.arg(retry_count),
-    error_msg = sqlc.arg(error_msg),
-    result = sqlc.arg(result),
-    completed_at = sqlc.arg(completed_at)
-WHERE id = sqlc.arg(id);
-
 -- name: CountTasks :one
 SELECT COUNT(*)
 FROM tasks
@@ -89,13 +66,6 @@ FROM tasks
 WHERE account_id = sqlc.arg(account_id) AND status = ANY(sqlc.arg(statuses)::text[])
 ORDER BY id ASC;
 
--- name: ListRunningTaskLeases :many
-SELECT task_id, account_id, lease_token
-FROM tasks
-WHERE status = 'running'
-ORDER BY id ASC
-LIMIT sqlc.arg(row_limit);
-
 -- name: CountRunningTasksMissingLeaseToken :one
 SELECT COUNT(*)
 FROM tasks
@@ -136,16 +106,6 @@ SET status = 'completed',
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
   AND lease_token = sqlc.arg(lease_token);
-
--- name: CompleteTask :execrows
-UPDATE tasks
-SET status = 'completed',
-    lease_token = '',
-    result = sqlc.arg(result),
-    error_msg = '',
-    completed_at = sqlc.arg(completed_at)
-WHERE task_id = sqlc.arg(task_id)
-  AND status = ANY(sqlc.arg(statuses)::text[]);
 
 -- name: MarkTaskFailed :execrows
 UPDATE tasks

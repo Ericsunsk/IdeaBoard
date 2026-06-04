@@ -394,7 +394,7 @@ func TestDeleteUserTaskCleansOutputsAndTaskOutputObjects(t *testing.T) {
 		t.Fatalf("create task failed: %v", err)
 	}
 
-	rows, err := taskRepo.CompleteWithOutputs(ctx, task.TaskID, []string{tasks.StatusRunning}, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
+	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, task.LeaseToken, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
 		{
 			Role:       "image",
 			URL:        "/uploads/tasks/42/delete-with-outputs/2026/06/03/result.png",
