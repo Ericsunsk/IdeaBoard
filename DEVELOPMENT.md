@@ -257,7 +257,7 @@ sequenceDiagram
 | 组件 | 建议版本 |
 |------|----------|
 | Node.js | `20+` |
-| Go | `1.25+` |
+| Go | `1.26.3+` |
 | PostgreSQL | `17+` |
 
 ### 启动步骤
@@ -345,6 +345,16 @@ npm run build
 cd apps/api
 go test ./...
 go build ./...
+```
+
+### SQL 生成代码
+
+`sqlc` 作为 Go module tool 固定在 `apps/api/go.mod`，不要依赖全局安装版本。修改 `apps/api/internal/db/queries` 或 `apps/api/internal/db/schema` 后执行：
+
+```bash
+cd apps/api
+go tool sqlc generate
+git diff --exit-code -- internal/db/sqlc
 ```
 
 ### 跨层改动

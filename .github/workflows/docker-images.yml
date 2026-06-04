@@ -68,6 +68,12 @@ jobs:
           go-version-file: apps/api/go.mod
           cache-dependency-path: apps/api/go.sum
 
+      - name: Check sqlc generated code
+        working-directory: apps/api
+        run: |
+          go tool sqlc generate
+          git diff --exit-code -- internal/db/sqlc
+
       - name: Test API
         working-directory: apps/api
         env:
