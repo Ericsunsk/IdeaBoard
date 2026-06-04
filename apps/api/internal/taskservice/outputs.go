@@ -1,4 +1,4 @@
-package accounts
+package taskservice
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"ideaboard/api/internal/tasks"
 )
 
-func (s *AccountService) attachOutputsForTasks(ctx context.Context, items []*tasks.Task) {
+func (s *Service) attachOutputsForTasks(ctx context.Context, items []*tasks.Task) {
 	if len(items) == 0 || s == nil || s.taskRepo == nil {
 		return
 	}

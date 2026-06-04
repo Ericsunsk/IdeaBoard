@@ -3,7 +3,7 @@ import type {
   StorageProfile,
   StorageProvider,
   StorageProviderMeta,
-} from '../../../../shared/api/storage'
+} from '../../shared/api/storage'
 import {
   getListAdminStorageProfilesQueryKey,
   useListAdminStorageProfiles,
@@ -16,7 +16,7 @@ import {
   fetchStorageBucketDomains,
   saveStorageProfile,
   testStorageProfile,
-} from '../../../../shared/query/adminQueries'
+} from '../../shared/queries/adminActions'
 import { buildVendorPresets, type VendorPresetOption } from './storageMeta'
 import {
   buildPayload,

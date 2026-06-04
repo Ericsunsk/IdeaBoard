@@ -1,6 +1,6 @@
-import type { AdminStatisticsResponse } from '../../../../shared/api/adminStatistics'
+import type { AdminStatisticsResponse } from '../../shared/api/statistics'
 import { useGetAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
-import type { AdminStatisticsRange } from '../../../../shared/query/adminQueries'
+import type { AdminStatisticsRange } from '../../shared/queries/adminActions'
 
 type RangeOption = { label: string; key: AdminStatisticsRange }
 

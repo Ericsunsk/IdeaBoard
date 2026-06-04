@@ -1,4 +1,4 @@
-import type { StorageProvider, StorageProviderMeta } from '../../../../shared/api/storage'
+import type { StorageProvider, StorageProviderMeta } from '../../shared/api/storage'
 import logoAlibabaCloud from '../../../../shared/assets/storage-vendors/alibabacloud.svg'
 import logoAmazonS3 from '../../../../shared/assets/storage-vendors/amazons3.svg'
 import logoCloudflare from '../../../../shared/assets/storage-vendors/cloudflare.svg'

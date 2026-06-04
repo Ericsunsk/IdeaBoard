@@ -1,4 +1,4 @@
-package accounts
+package taskservice
 
 import (
 	"context"
@@ -10,31 +10,118 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/accounts"
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
+	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 )
 
-func (s *AccountService) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
+type Service struct {
+	accountRepo       AccountStore
+	taskRepo          TaskStore
+	queue             taskqueue.TaskEnqueuer
+	cancelStore       taskqueue.TaskCancellationStore
+	systemConfigRepo  *settings.SystemConfigRepository
+	uploadBoards      storage.UploadBoardAccessResolver
+	uploadOwners      storage.UploadOwnerStorageUIDResolver
+	taskOutputCleaner TaskOutputObjectCleaner
+	eventHub          *EventHub
+	taskEvents        events.TaskStatusPublisher
+}
+
+type TaskOutputObjectCleaner interface {
+	DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error
+}
+
+type AccountStore interface {
+	GetAllEnabled(ctx context.Context) ([]*accounts.ApiAccount, error)
+}
+
+type TaskStore interface {
+	Create(ctx context.Context, task *tasks.Task) error
+	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
+	GetByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) (*tasks.Task, error)
+	List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error)
+	GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error)
+	DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error
+	MarkQueueFailed(ctx context.Context, taskID string, errMsg string) error
+	UpsertDailyStatByTask(ctx context.Context, task *tasks.Task) error
+	ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error)
+}
+
+type ServiceDeps struct {
+	AccountRepo       AccountStore
+	TaskRepo          TaskStore
+	Queue             taskqueue.TaskEnqueuer
+	CancelStore       taskqueue.TaskCancellationStore
+	SystemConfigRepo  *settings.SystemConfigRepository
+	UploadBoards      storage.UploadBoardAccessResolver
+	UploadOwners      storage.UploadOwnerStorageUIDResolver
+	TaskOutputCleaner TaskOutputObjectCleaner
+}
+
+type ServiceOptions struct {
+	EventHub   *EventHub
+	TaskEvents events.TaskStatusPublisher
+}
+
+const taskCancelTTL = 24 * time.Hour
+const maxTaskKeywordLength = 200
+const maxSubmitTaskPromptBytes = 8 * 1024
+const maxSubmitTaskFinalPromptBytes = 32 * 1024
+const maxSubmitTaskImageURLs = 16
+const maxSubmitTaskImageURLBytes = 4096
+const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
+const maxSubmitTaskParamsDepth = 24
+const maxSubmitTaskMediaDataURLBytes = 10 * 1024 * 1024
+const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加账号"
+
+func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
+	return &Service{
+		accountRepo:       deps.AccountRepo,
+		taskRepo:          deps.TaskRepo,
+		queue:             deps.Queue,
+		cancelStore:       deps.CancelStore,
+		systemConfigRepo:  deps.SystemConfigRepo,
+		uploadBoards:      deps.UploadBoards,
+		uploadOwners:      deps.UploadOwners,
+		taskOutputCleaner: deps.TaskOutputCleaner,
+		eventHub:          opts.EventHub,
+		taskEvents:        opts.TaskEvents,
+	}
+}
+
+func (s *Service) EventHub() *EventHub {
+	return s.eventHub
+}
+
+func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
+	if err := events.PublishTaskStatusBestEffort(ctx, s.taskEvents, events.NewTaskStatusEvent(taskID, status)); err != nil {
+		slog.Warn("publish task status event failed", "task_id", taskID, "status", status, "err", err)
+	}
+}
+
+func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	accounts, params, _, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
+	apiAccounts, params, _, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
 
-	// 生成任务ID
 	taskID := generateSecureTaskID("task")
 
-	// 序列化参数
 	paramsJSON, err := marshalSubmitTaskParams(params)
 	if err != nil {
 		return "", err
 	}
 
-	// 创建任务记录
 	task := &tasks.Task{
 		TaskID:     taskID,
 		UserID:     userID,
@@ -49,13 +136,11 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID int64, req *task
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
-	// 获取所有可用账号ID
-	accountIDs := make([]int64, len(accounts))
-	for i, acc := range accounts {
+	accountIDs := make([]int64, len(apiAccounts))
+	for i, acc := range apiAccounts {
 		accountIDs[i] = acc.ID
 	}
 
-	// 推送到全局队列
 	queueTask := &queuetypes.TaskPayload{
 		TaskID:     taskID,
 		UserID:     userID,
@@ -86,7 +171,7 @@ func (s *AccountService) SubmitTask(ctx context.Context, userID int64, req *task
 	return taskID, nil
 }
 
-func (s *AccountService) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
+func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
@@ -97,7 +182,7 @@ func (s *AccountService) CheckSubmitTaskReadiness(ctx context.Context, userID in
 	return featureSlug, nil
 }
 
-func (s *AccountService) prepareSubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) ([]*ApiAccount, map[string]interface{}, string, string, error) {
+func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) ([]*accounts.ApiAccount, map[string]interface{}, string, string, error) {
 	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
 		return nil, nil, "", "", err
 	}
@@ -105,11 +190,11 @@ func (s *AccountService) prepareSubmitTask(ctx context.Context, userID int64, re
 		return nil, nil, "", "", err
 	}
 
-	accounts, err := s.accountRepo.GetAllEnabled(ctx)
+	apiAccounts, err := s.accountRepo.GetAllEnabled(ctx)
 	if err != nil {
 		return nil, nil, "", "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
-	if len(accounts) == 0 {
+	if len(apiAccounts) == 0 {
 		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
 
@@ -139,8 +224,8 @@ func (s *AccountService) prepareSubmitTask(ctx context.Context, userID int64, re
 			req.Params["feature"] = featureSlug
 		}
 	}
-	accounts = filterAccountsByFeature(accounts, featureSlug)
-	if len(accounts) == 0 {
+	apiAccounts = accounts.FilterAccountsByFeature(apiAccounts, featureSlug)
+	if len(apiAccounts) == 0 {
 		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
 
@@ -157,10 +242,10 @@ func (s *AccountService) prepareSubmitTask(ctx context.Context, userID int64, re
 		return nil, nil, "", "", err
 	}
 
-	return accounts, req.Params, featureSlug, fullPrompt, nil
+	return apiAccounts, req.Params, featureSlug, fullPrompt, nil
 }
 
-func (s *AccountService) GetTask(ctx context.Context, taskID string) (*tasks.Task, error) {
+func (s *Service) GetTask(ctx context.Context, taskID string) (*tasks.Task, error) {
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		return nil, err
@@ -169,7 +254,7 @@ func (s *AccountService) GetTask(ctx context.Context, taskID string) (*tasks.Tas
 	return task, nil
 }
 
-func (s *AccountService) GetUserTask(ctx context.Context, taskID string, userID int64) (*tasks.Task, error) {
+func (s *Service) GetUserTask(ctx context.Context, taskID string, userID int64) (*tasks.Task, error) {
 	task, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID)
 	if err != nil {
 		return nil, err
@@ -178,7 +263,7 @@ func (s *AccountService) GetUserTask(ctx context.Context, taskID string, userID 
 	return task, nil
 }
 
-func (s *AccountService) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]*tasks.Task, int64, error) {
+func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]*tasks.Task, int64, error) {
 	if req.Page < 1 {
 		req.Page = 1
 	}
@@ -197,7 +282,7 @@ func (s *AccountService) ListTasks(ctx context.Context, req *tasks.TaskListReque
 	return items, total, nil
 }
 
-func (s *AccountService) DeleteUserTask(ctx context.Context, taskID string, userID int64) error {
+func (s *Service) DeleteUserTask(ctx context.Context, taskID string, userID int64) error {
 	task, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID)
 	if err != nil {
 		return err
@@ -216,7 +301,7 @@ func (s *AccountService) DeleteUserTask(ctx context.Context, taskID string, user
 	return s.taskRepo.DeleteByTaskIDAndUserID(ctx, taskID, userID)
 }
 
-func (s *AccountService) GetUserTasks(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error) {
+func (s *Service) GetUserTasks(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -231,11 +316,9 @@ func (s *AccountService) GetUserTasks(ctx context.Context, userID int64, page, p
 	return items, total, nil
 }
 
-// generateSecureTaskID produces a non-guessable task identifier using crypto/rand.
 func generateSecureTaskID(prefix string) string {
 	b := make([]byte, 12)
 	if _, err := rand.Read(b); err != nil {
-		// Extremely unlikely; fall back to timestamp only.
 		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
 	}
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
@@ -248,7 +331,6 @@ func applyTaskSystemPrompt(
 	params map[string]interface{},
 	loadPrompt func(string) (string, error),
 ) string {
-	// 管理员后台配置是系统提示词唯一来源；这里不再追加代码层隐藏约束。
 	return prompts.ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug, params, loadPrompt)
 }
 

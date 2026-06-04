@@ -4,7 +4,7 @@ import type {
   StorageProvider,
   StorageProviderField,
   StorageProviderMeta,
-} from '../../../../shared/api/storage'
+} from '../../shared/api/storage'
 
 export interface StorageCard {
   id: string

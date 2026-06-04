@@ -1,4 +1,4 @@
-package accounts
+package taskservice
 
 import (
 	"bufio"
@@ -10,17 +10,19 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/testdb"
 
 	"github.com/gin-gonic/gin"
 )
 
 func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db := newAccountsTestDB(t)
-	taskRepo := NewTaskRepository(db)
+	db := testdb.Open(t)
+	taskRepo := accounts.NewTaskRepository(db)
 	ctx := context.Background()
-	service := NewAccountService(AccountServiceDeps{TaskRepo: taskRepo}, AccountServiceOptions{TaskEventHub: NewTaskEventHub()})
+	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: NewEventHub()})
 
 	task := &tasks.Task{
 		TaskID:     "task-sse-terminal",
@@ -36,7 +38,7 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	handler := NewAccountHandler(service)
+	handler := NewHandler(service)
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
 		c.Set("user_id", int64(7))
@@ -67,11 +69,11 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 
 func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db := newAccountsTestDB(t)
-	taskRepo := NewTaskRepository(db)
+	db := testdb.Open(t)
+	taskRepo := accounts.NewTaskRepository(db)
 	ctx := context.Background()
-	hub := NewTaskEventHub()
-	service := NewAccountService(AccountServiceDeps{TaskRepo: taskRepo}, AccountServiceOptions{TaskEventHub: hub})
+	hub := NewEventHub()
+	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: hub})
 
 	task := &tasks.Task{
 		TaskID:     "task-sse-live",
@@ -86,7 +88,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	handler := NewAccountHandler(service)
+	handler := NewHandler(service)
 	router := gin.New()
 	router.GET("/events/:task_id", func(c *gin.Context) {
 		c.Set("user_id", int64(8))

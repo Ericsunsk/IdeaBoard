@@ -12,7 +12,7 @@ func TestFilterAccountsByFeatureKeepsAccountsWithoutExplicitConfig(t *testing.T)
 		{ID: 2, ExtraConfig: `{"timeout":120}`},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
+	got := FilterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
 	if len(got) != 2 {
 		t.Fatalf("expected all accounts to remain eligible, got=%d", len(got))
 	}
@@ -25,7 +25,7 @@ func TestFilterAccountsByFeatureSupportsExplicitAllowList(t *testing.T) {
 		{ID: 3, ExtraConfig: `{"timeout":120}`},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
+	got := FilterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 eligible accounts, got=%d", len(got))
 	}
@@ -41,7 +41,7 @@ func TestFilterAccountsByFeatureSupportsExplicitBlockList(t *testing.T) {
 		{ID: 3, ExtraConfig: `{"features":["image-extend"],"disabled_features":["style-fusion"]}`},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
+	got := FilterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 eligible account, got=%d", len(got))
 	}
@@ -56,7 +56,7 @@ func TestFilterAccountsByFeatureIgnoresMalformedFeatureConfig(t *testing.T) {
 		{ID: 2, ExtraConfig: `{"features":{"not-a-feature":true}}`},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
+	got := FilterAccountsByFeature(accounts, workflow.FeatureSlugImageExtend)
 	if len(got) != 2 {
 		t.Fatalf("expected malformed feature config to be ignored, got=%d", len(got))
 	}
@@ -68,14 +68,14 @@ func TestFilterAccountsByFeatureKeepsGooglePlatformsForReferenceFeatures(t *test
 		{ID: 2, ApiType: workflow.ProviderOpenAICompatible},
 	}
 
-	got := filterAccountsByFeature(accounts, workflow.FeatureSlugStyleFusion)
+	got := FilterAccountsByFeature(accounts, workflow.FeatureSlugStyleFusion)
 	if len(got) != 2 {
 		t.Fatalf("expected google native platforms to remain compatible, got=%d", len(got))
 	}
 }
 
 func TestParseTaskFeatureSlugReturnsEmptyForInvalidJSON(t *testing.T) {
-	if got := parseTaskFeatureSlug("{invalid-json"); got != "" {
+	if got := ParseTaskFeatureSlug("{invalid-json"); got != "" {
 		t.Fatalf("expected empty feature slug for invalid params json, got=%q", got)
 	}
 }

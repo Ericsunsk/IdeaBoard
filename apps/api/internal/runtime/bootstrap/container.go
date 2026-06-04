@@ -22,6 +22,7 @@ import (
 	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskservice"
 	"ideaboard/api/internal/users"
 	"ideaboard/api/web"
 
@@ -82,7 +83,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	storageService := storage.NewStorageService(systemConfigRepo)
 	userService := users.NewUserService(userRepo, storageService)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
-	taskEventHub := accounts.NewTaskEventHub()
+	taskEventHub := taskservice.NewEventHub()
 	taskEvents, eventBus, err := newTaskStatusEventPublisher(context.Background(), cfg.Events, taskEventHub)
 	if err != nil {
 		riverPool.Close()
@@ -91,22 +92,31 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	}
 	riverQueue := taskqueue.NewRiverQueue(nil, db, postgresRuntimeStore, cfg.Queue.MaxRetry)
 	accountService := accounts.NewAccountService(accounts.AccountServiceDeps{
+		AccountRepo:      accountRepo,
+		TaskRepo:         taskRepo,
+		QueueStats:       riverQueue,
+		AccountLoadStore: postgresRuntimeStore,
+		ConcurrencyStore: postgresRuntimeStore,
+		CancelStore:      postgresRuntimeStore,
+		MonitorStore:     riverQueue,
+	}, accounts.AccountServiceOptions{
+		TaskEvents: taskEvents,
+	})
+	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		AccountRepo:       accountRepo,
 		TaskRepo:          taskRepo,
 		Queue:             riverQueue,
-		QueueStats:        riverQueue,
-		AccountLoadStore:  postgresRuntimeStore,
-		ConcurrencyStore:  postgresRuntimeStore,
 		CancelStore:       postgresRuntimeStore,
-		MonitorStore:      riverQueue,
 		SystemConfigRepo:  systemConfigRepo,
 		UploadBoards:      uploadBoardAccessResolver{service: boardService},
 		UploadOwners:      uploadOwnerStorageUIDResolver{repo: userRepo},
 		TaskOutputCleaner: storageService,
-	}, accounts.AccountServiceOptions{
-		TaskEventHub: taskEventHub,
-		TaskEvents:   taskEvents,
+	}, taskservice.ServiceOptions{
+		EventHub:   taskEventHub,
+		TaskEvents: taskEvents,
 	})
+	accountHandler := accounts.NewAccountHandler(accountService)
+	taskHandler := taskservice.NewHandler(taskService)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: authServiceClient,
@@ -122,14 +132,16 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		Auth: authDeps,
 		UserRoutes: httpapi.UserRouteDeps{
 			AuthHandler:      auth.NewAuthHandler(userService),
-			AccountHandler:   accounts.NewAccountHandler(accountService),
+			AccountHandler:   accountHandler,
+			TaskHandler:      taskHandler,
 			BoardHandler:     boards.NewBoardHandler(boardService),
 			LineDraftHandler: assets.NewLineDraftHandler(lineDraftModeRepo),
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler:         users.NewAdminHandler(userService, systemConfigRepo, authServiceClient),
-			AccountHandler:       accounts.NewAccountHandler(accountService),
+			AccountHandler:       accountHandler,
+			TaskHandler:          taskHandler,
 			ChannelHandler:       channels.NewChannelHandler(channelRepo, cfg.App.Env),
 			StorageHandler:       storage.NewStorageHandler(storageService),
 			LineDraftHandler:     assets.NewLineDraftHandler(lineDraftModeRepo),
@@ -208,7 +220,7 @@ func registerHTTPRoutes(r *gin.Engine, deps httpapi.Dependencies) {
 }
 
 type taskEventHubPublisher struct {
-	hub *accounts.TaskEventHub
+	hub *taskservice.EventHub
 }
 
 func (p taskEventHubPublisher) PublishTaskStatus(_ context.Context, event events.TaskStatusEvent) error {
@@ -216,14 +228,14 @@ func (p taskEventHubPublisher) PublishTaskStatus(_ context.Context, event events
 		return nil
 	}
 	event = events.NormalizeTaskStatusEvent(event)
-	p.hub.Publish(event.TaskID, accounts.TaskEvent{TaskID: event.TaskID, Status: event.Status})
+	p.hub.Publish(event.TaskID, taskservice.TaskEvent{TaskID: event.TaskID, Status: event.Status})
 	return nil
 }
 
 func newTaskStatusEventPublisher(
 	ctx context.Context,
 	cfg config.EventBusConfig,
-	hub *accounts.TaskEventHub,
+	hub *taskservice.EventHub,
 ) (events.TaskStatusPublisher, *events.NATSJetStreamEventBus, error) {
 	localPublisher := taskEventHubPublisher{hub: hub}
 	if !cfg.Enabled {

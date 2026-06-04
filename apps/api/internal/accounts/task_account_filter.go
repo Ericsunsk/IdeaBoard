@@ -15,10 +15,6 @@ var featureDenyConfigKeys = map[string]struct{}{
 	"disabled_features": {},
 }
 
-func filterAccountsByFeature(accounts []*ApiAccount, featureSlug string) []*ApiAccount {
-	return FilterAccountsByFeature(accounts, featureSlug)
-}
-
 func FilterAccountsByFeature(accounts []*ApiAccount, featureSlug string) []*ApiAccount {
 	if featureSlug == "" {
 		return accounts
@@ -55,10 +51,6 @@ func accountAllowsFeature(account *ApiAccount, featureSlug string) bool {
 
 func isFeatureCompatibleWithAPIType(featureSlug, apiType string) bool {
 	return true
-}
-
-func parseTaskFeatureSlug(paramsJSON string) string {
-	return ParseTaskFeatureSlug(paramsJSON)
 }
 
 func ParseTaskFeatureSlug(paramsJSON string) string {

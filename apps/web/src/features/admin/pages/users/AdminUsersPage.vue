@@ -245,7 +245,7 @@ import {
   updateAdminUserRole,
   updateRateLimitSettings,
   updateRegistrationSetting,
-} from '../../../../shared/query/adminQueries'
+} from '../../shared/queries/adminActions'
 import { Filter, MoreHoriz, Settings } from '@iconoir/vue'
 import AdminToolbar from '../../shared/components/AdminToolbar.vue'
 import { adminPopoverPanelThemeOverrides } from '../../shared/theme/adminThemeOverrides'

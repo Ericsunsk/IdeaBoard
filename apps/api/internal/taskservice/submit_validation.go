@@ -1,4 +1,4 @@
-package accounts
+package taskservice
 
 import (
 	"context"
@@ -41,7 +41,7 @@ func validateSubmitTaskImageURLs(imageURLs []string) error {
 	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, validateSubmitTaskMediaRef)
 }
 
-func (s *AccountService) validateSubmitTaskImageURLs(ctx context.Context, userID int64, imageURLs []string) error {
+func (s *Service) validateSubmitTaskImageURLs(ctx context.Context, userID int64, imageURLs []string) error {
 	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, func(raw string) error {
 		return s.validateSubmitTaskMediaRef(ctx, userID, raw)
 	})
@@ -70,7 +70,7 @@ func validateSubmitTaskMediaParams(params map[string]interface{}) error {
 	return validateSubmitTaskMediaParamsWithRefValidator(params, validateSubmitTaskMediaRef)
 }
 
-func (s *AccountService) validateSubmitTaskMediaParams(ctx context.Context, userID int64, params map[string]interface{}) error {
+func (s *Service) validateSubmitTaskMediaParams(ctx context.Context, userID int64, params map[string]interface{}) error {
 	return validateSubmitTaskMediaParamsWithRefValidator(params, func(raw string) error {
 		return s.validateSubmitTaskMediaRef(ctx, userID, raw)
 	})
@@ -98,7 +98,7 @@ func validateSubmitTaskMediaRef(raw string) error {
 	return mediarefs.ValidateMediaRef(raw, outbound.AllowHostsFromEnv(), maxSubmitTaskMediaDataURLBytes)
 }
 
-func (s *AccountService) validateSubmitTaskMediaRef(ctx context.Context, userID int64, raw string) error {
+func (s *Service) validateSubmitTaskMediaRef(ctx context.Context, userID int64, raw string) error {
 	if err := validateSubmitTaskMediaRef(raw); err != nil {
 		return err
 	}

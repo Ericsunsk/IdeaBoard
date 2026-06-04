@@ -22,6 +22,22 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ideaboard_test
+          POSTGRES_USER: ideaboard
+          POSTGRES_PASSWORD: ideaboard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
 
     steps:
       - name: Resolve tag
@@ -80,10 +96,14 @@ jobs:
 
       - name: Test Go API
         working-directory: apps/api
+        env:
+          GOFLAGS: -p=1
         run: go test ./...
 
       - name: Test Go API with race detector
         working-directory: apps/api
+        env:
+          GOFLAGS: -p=1
         run: go test -race ./...
 
       - name: Lint Go API

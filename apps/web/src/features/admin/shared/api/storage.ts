@@ -7,14 +7,14 @@ import {
   listAdminStorageProviders,
   testAdminStorageProfile,
   updateAdminStorageProfile,
-} from '../generated-query/admin-storage/admin-storage'
-import type { ApiResponse } from '../../types'
+} from '../../../../shared/api/generated-query/admin-storage/admin-storage'
+import type { ApiResponse } from '../../../../shared/types'
 import type {
   StorageProfile as GeneratedStorageProfile,
   StorageProfilePayload as GeneratedStorageProfilePayload,
   StorageProviderField as GeneratedStorageProviderField,
   StorageProviderMeta as GeneratedStorageProviderMeta,
-} from '../generated-query/model'
+} from '../../../../shared/api/generated-query/model'
 
 export type StorageProvider = string
 export type StorageFieldType = string

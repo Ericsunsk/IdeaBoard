@@ -1,11 +1,21 @@
-import { adminApi } from '../api/admin'
-import { featurePromptApi } from '../api/featurePrompt'
-import { adminStatisticsApi } from '../api/adminStatistics'
-import { storageApi } from '../api/storage'
-import type { ApiResponse } from '../types'
-import type { AdminStatisticsBackfillResult } from '../api/adminStatistics'
-import type { StorageProfile, StorageProfilePayload } from '../api/storage'
-import { sanitizeApiErrorMessage } from '../utils/errorMessages'
+import {
+  updateAdminRateLimitSettings,
+  updateAdminRegistrationSetting,
+} from '../../../../shared/api/generated-query/admin-settings/admin-settings'
+import {
+  banAdminUser as requestBanAdminUser,
+  deleteAdminUser as requestDeleteAdminUser,
+  revokeAdminUserSessions as requestRevokeAdminUserSessions,
+  unbanAdminUser as requestUnbanAdminUser,
+  updateAdminUserRole as requestUpdateAdminUserRole,
+} from '../../../../shared/api/generated-query/admin-users/admin-users'
+import { setAdminFeaturePrompt } from '../../../../shared/api/generated-query/admin-feature-prompts/admin-feature-prompts'
+import { backfillAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
+import type { ApiResponse } from '../../../../shared/types'
+import type { RateLimitSetting } from '../../../../shared/api/generated-query/model'
+import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
+import type { AdminStatisticsBackfillResult } from '../api/statistics'
+import { storageApi, type StorageProfile, type StorageProfilePayload } from '../api/storage'
 
 export type AdminStatisticsRange = '7d' | '30d' | '1y'
 export type RateLimitSettings = { window_seconds: number; max_requests: number }
@@ -29,12 +39,12 @@ function requireApiOk<T>(res: ApiResponse<T>, fallback: string): T | undefined {
 }
 
 export async function updateRateLimitSettings(data: RateLimitSettings): Promise<RateLimitSettings> {
-  const res = await adminApi.updateRateLimitSettings(data)
+  const res = await updateAdminRateLimitSettings(data as RateLimitSetting)
   return requireApiData(res, '保存限流配置失败')
 }
 
 export async function updateRegistrationSetting(enabled: boolean): Promise<RegistrationSetting> {
-  const res = await adminApi.updateRegistrationSetting(enabled)
+  const res = await updateAdminRegistrationSetting({ enabled })
   return requireApiData(res, '更新注册状态失败')
 }
 
@@ -43,7 +53,7 @@ export async function banAdminUser(input: {
   reason?: string
   expires_in_days?: number
 }): Promise<void> {
-  const res = await adminApi.banUser(input.id, {
+  const res = await requestBanAdminUser(input.id, {
     reason: input.reason,
     expires_in_days: input.expires_in_days,
   })
@@ -51,12 +61,12 @@ export async function banAdminUser(input: {
 }
 
 export async function unbanAdminUser(id: number): Promise<void> {
-  const res = await adminApi.unbanUser(id)
+  const res = await requestUnbanAdminUser(id)
   requireApiOk(res, '解封失败')
 }
 
 export async function revokeAdminUserSessions(id: number): Promise<void> {
-  const res = await adminApi.revokeUserSessions(id)
+  const res = await requestRevokeAdminUserSessions(id)
   requireApiOk(res, '吊销会话失败')
 }
 
@@ -64,26 +74,26 @@ export async function updateAdminUserRole(input: {
   id: number
   role: 'admin' | 'user'
 }): Promise<void> {
-  const res = await adminApi.updateUserRole(input.id, input.role)
+  const res = await requestUpdateAdminUserRole(input.id, { role: input.role })
   requireApiOk(res, '角色更新失败')
 }
 
 export async function deleteAdminUser(id: number): Promise<void> {
-  const res = await adminApi.deleteUser(id)
+  const res = await requestDeleteAdminUser(id)
   requireApiOk(res, '注销失败')
 }
 
 export async function saveFeaturePrompt(
   input: SaveFeaturePromptInput,
 ): Promise<{ slug: string; prompt: string }> {
-  const res = await featurePromptApi.adminSet(input.slug, input.prompt)
+  const res = await setAdminFeaturePrompt(input.slug, { prompt: input.prompt })
   return requireApiData(res, '保存提示词失败')
 }
 
 export async function triggerAdminStatisticsBackfill(
   range: AdminStatisticsRange,
 ): Promise<AdminStatisticsBackfillResult> {
-  const res = await adminStatisticsApi.backfill(range)
+  const res = await backfillAdminStatistics({ range })
   return requireApiData(res, '补录失败')
 }
 

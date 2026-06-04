@@ -1,12 +1,12 @@
-package accounts
+package taskservice
 
 import (
 	"testing"
 	"time"
 )
 
-func TestTaskEventHub_SubscribeAndPublish(t *testing.T) {
-	hub := NewTaskEventHub()
+func TestEventHubSubscribeAndPublish(t *testing.T) {
+	hub := NewEventHub()
 
 	ch, unsub, ok := hub.Subscribe("task-1", 1)
 	if !ok {
@@ -27,8 +27,8 @@ func TestTaskEventHub_SubscribeAndPublish(t *testing.T) {
 	}
 }
 
-func TestTaskEventHub_Unsubscribe(t *testing.T) {
-	hub := NewTaskEventHub()
+func TestEventHubUnsubscribe(t *testing.T) {
+	hub := NewEventHub()
 
 	ch, unsub, ok := hub.Subscribe("task-1", 1)
 	if !ok {
@@ -36,7 +36,6 @@ func TestTaskEventHub_Unsubscribe(t *testing.T) {
 	}
 	unsub()
 
-	// Unsubscribe removes subscription and should not receive further events.
 	hub.Publish("task-1", TaskEvent{TaskID: "task-1", Status: "completed"})
 	select {
 	case event := <-ch:
@@ -44,20 +43,19 @@ func TestTaskEventHub_Unsubscribe(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 
-	if hub.SubscriberCount("task-1") != 0 {
-		t.Errorf("expected 0 subscribers, got %d", hub.SubscriberCount("task-1"))
+	if hub.subscriberCount("task-1") != 0 {
+		t.Errorf("expected 0 subscribers, got %d", hub.subscriberCount("task-1"))
 	}
 }
 
-func TestTaskEventHub_PublishNoSubscribers(t *testing.T) {
-	hub := NewTaskEventHub()
+func TestEventHubPublishNoSubscribers(t *testing.T) {
+	hub := NewEventHub()
 
-	// Should not panic
 	hub.Publish("nonexistent", TaskEvent{TaskID: "x", Status: "running"})
 }
 
-func TestTaskEventHub_MultipleSubscribers(t *testing.T) {
-	hub := NewTaskEventHub()
+func TestEventHubMultipleSubscribers(t *testing.T) {
+	hub := NewEventHub()
 
 	ch1, unsub1, ok := hub.Subscribe("task-1", 1)
 	if !ok {
@@ -90,23 +88,20 @@ func TestTaskEventHub_MultipleSubscribers(t *testing.T) {
 	}
 }
 
-func TestTaskEventHub_NonBlockingPublish(t *testing.T) {
-	hub := NewTaskEventHub()
+func TestEventHubNonBlockingPublish(t *testing.T) {
+	hub := NewEventHub()
 
-	// Create a subscriber with a full channel (buffer size 8), then fill it
 	ch, unsub, ok := hub.Subscribe("task-1", 1)
 	if !ok {
 		t.Fatal("subscribe rejected unexpectedly")
 	}
 	defer unsub()
 
-	// Fill the buffer
 	for i := 0; i < 10; i++ {
 		event := TaskEvent{TaskID: "task-1", Status: "running"}
 		hub.Publish("task-1", event)
 	}
 
-	// Drain to avoid goroutine leak
 	drained := 0
 	timeout := time.After(100 * time.Millisecond)
 	for {
@@ -114,17 +109,16 @@ func TestTaskEventHub_NonBlockingPublish(t *testing.T) {
 		case <-ch:
 			drained++
 		case <-timeout:
-			goto done
+			if drained == 0 {
+				t.Error("expected at least some events to be received")
+			}
+			return
 		}
-	}
-done:
-	if drained == 0 {
-		t.Error("expected at least some events to be received")
 	}
 }
 
-func TestTaskEventHub_SlowConsumerKeepsNewestEvent(t *testing.T) {
-	hub := NewTaskEventHub()
+func TestEventHubSlowConsumerKeepsNewestEvent(t *testing.T) {
+	hub := NewEventHub()
 	ch, unsub, ok := hub.Subscribe("task-1", 1)
 	if !ok {
 		t.Fatal("subscribe rejected unexpectedly")
@@ -149,8 +143,8 @@ func TestTaskEventHub_SlowConsumerKeepsNewestEvent(t *testing.T) {
 	}
 }
 
-func TestTaskEventHub_RejectsWhenPerUserLimitReached(t *testing.T) {
-	hub := NewTaskEventHubWithLimits(10, 1)
+func TestEventHubRejectsWhenPerUserLimitReached(t *testing.T) {
+	hub := newEventHubWithLimits(10, 1)
 	_, unsub, ok := hub.Subscribe("task-1", 9)
 	if !ok {
 		t.Fatal("first subscribe rejected unexpectedly")
@@ -162,8 +156,8 @@ func TestTaskEventHub_RejectsWhenPerUserLimitReached(t *testing.T) {
 	}
 }
 
-func TestTaskEventHub_RejectsWhenGlobalLimitReached(t *testing.T) {
-	hub := NewTaskEventHubWithLimits(1, 10)
+func TestEventHubRejectsWhenGlobalLimitReached(t *testing.T) {
+	hub := newEventHubWithLimits(1, 10)
 	_, unsub, ok := hub.Subscribe("task-1", 1)
 	if !ok {
 		t.Fatal("first subscribe rejected unexpectedly")

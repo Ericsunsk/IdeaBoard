@@ -1,4 +1,4 @@
-package accounts
+package taskservice
 
 import (
 	"sync"
@@ -12,18 +12,17 @@ type TaskEvent struct {
 	Status string
 }
 
-// taskSubscription represents a single subscriber to a task's events.
 type taskSubscription struct {
 	ch     chan TaskEvent
 	done   chan struct{}
 	userID int64
 }
 
-// TaskEventHub manages per-task subscriptions for SSE streaming.
+// EventHub manages per-task subscriptions for SSE streaming.
 // It is safe for concurrent use.
-type TaskEventHub struct {
+type EventHub struct {
 	mu             sync.RWMutex
-	subs           map[string][]*taskSubscription // taskID -> subscribers
+	subs           map[string][]*taskSubscription
 	globalLimit    int
 	perUserLimit   int
 	total          int64
@@ -36,19 +35,18 @@ const (
 	defaultSSEMaxConnPeriod = 30 * time.Minute
 )
 
-// NewTaskEventHub creates a new hub.
-func NewTaskEventHub() *TaskEventHub {
-	return NewTaskEventHubWithLimits(defaultSSEGlobalLimit, defaultSSEPerUserLimit)
+func NewEventHub() *EventHub {
+	return newEventHubWithLimits(defaultSSEGlobalLimit, defaultSSEPerUserLimit)
 }
 
-func NewTaskEventHubWithLimits(globalLimit, perUserLimit int) *TaskEventHub {
+func newEventHubWithLimits(globalLimit, perUserLimit int) *EventHub {
 	if globalLimit <= 0 {
 		globalLimit = defaultSSEGlobalLimit
 	}
 	if perUserLimit <= 0 {
 		perUserLimit = defaultSSEPerUserLimit
 	}
-	return &TaskEventHub{
+	return &EventHub{
 		subs:           make(map[string][]*taskSubscription),
 		globalLimit:    globalLimit,
 		perUserLimit:   perUserLimit,
@@ -59,7 +57,7 @@ func NewTaskEventHubWithLimits(globalLimit, perUserLimit int) *TaskEventHub {
 // Subscribe returns a channel that receives TaskEvents for the given taskID,
 // and an unsubscribe function. Unsubscribe removes the subscriber from the hub
 // but does not close the channel.
-func (h *TaskEventHub) Subscribe(taskID string, userID int64) (<-chan TaskEvent, func(), bool) {
+func (h *EventHub) Subscribe(taskID string, userID int64) (<-chan TaskEvent, func(), bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -87,7 +85,7 @@ func (h *TaskEventHub) Subscribe(taskID string, userID int64) (<-chan TaskEvent,
 
 		select {
 		case <-sub.done:
-			return // already unsubscribed
+			return
 		default:
 		}
 		close(sub.done)
@@ -119,10 +117,9 @@ func (h *TaskEventHub) Subscribe(taskID string, userID int64) (<-chan TaskEvent,
 // Publish sends an event to all subscribers of the given taskID.
 // It is non-blocking; for slow consumers older buffered events may be dropped
 // to keep delivery moving and preserve the latest status when possible.
-func (h *TaskEventHub) Publish(taskID string, event TaskEvent) {
+func (h *EventHub) Publish(taskID string, event TaskEvent) {
 	h.mu.RLock()
 	subs := h.subs[taskID]
-	// Copy slice to avoid holding lock during sends
 	copied := make([]*taskSubscription, len(subs))
 	copy(copied, subs)
 	h.mu.RUnlock()
@@ -130,7 +127,6 @@ func (h *TaskEventHub) Publish(taskID string, event TaskEvent) {
 	for _, sub := range copied {
 		select {
 		case <-sub.done:
-			// subscriber already cancelled
 		default:
 			select {
 			case sub.ch <- event:
@@ -148,16 +144,8 @@ func (h *TaskEventHub) Publish(taskID string, event TaskEvent) {
 	}
 }
 
-// SubscriberCount returns the number of active subscribers for a taskID.
-// Useful for testing and diagnostics.
-func (h *TaskEventHub) SubscriberCount(taskID string) int {
+func (h *EventHub) subscriberCount(taskID string) int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.subs[taskID])
-}
-
-func (h *TaskEventHub) TotalSubscriberCount() int {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return int(h.total)
 }

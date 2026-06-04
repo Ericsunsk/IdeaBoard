@@ -24,6 +24,7 @@ import (
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/taskservice"
 	"ideaboard/api/internal/users"
 
 	"github.com/gin-gonic/gin"
@@ -58,6 +59,7 @@ type StaticUploadDeps struct {
 type UserRouteDeps struct {
 	AuthHandler      *auth.AuthHandler
 	AccountHandler   *accounts.AccountHandler
+	TaskHandler      *taskservice.Handler
 	BoardHandler     *boards.BoardHandler
 	LineDraftHandler *assets.LineDraftHandler
 	Uploads          UploadDeps
@@ -66,6 +68,7 @@ type UserRouteDeps struct {
 type AdminRouteDeps struct {
 	AdminHandler         *users.AdminHandler
 	AccountHandler       *accounts.AccountHandler
+	TaskHandler          *taskservice.Handler
 	ChannelHandler       *channels.ChannelHandler
 	StorageHandler       *storage.StorageHandler
 	LineDraftHandler     *assets.LineDraftHandler
@@ -219,12 +222,12 @@ func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 
 func registerUserRoutes(userApi *gin.RouterGroup, h UserRouteDeps) {
 	userApi.GET("/info", h.AuthHandler.GetCurrentUser)
-	userApi.POST("/tasks/submit/readiness", h.AccountHandler.CheckSubmitTaskReadiness)
-	userApi.POST("/tasks/submit", h.AccountHandler.SubmitTask)
-	userApi.GET("/tasks/:task_id/events", h.AccountHandler.StreamUserTask)
-	userApi.GET("/tasks/:task_id", h.AccountHandler.GetUserTask)
-	userApi.DELETE("/tasks/:task_id", h.AccountHandler.DeleteUserTask)
-	userApi.GET("/tasks", h.AccountHandler.GetUserTasks)
+	userApi.POST("/tasks/submit/readiness", h.TaskHandler.CheckSubmitTaskReadiness)
+	userApi.POST("/tasks/submit", h.TaskHandler.SubmitTask)
+	userApi.GET("/tasks/:task_id/events", h.TaskHandler.StreamUserTask)
+	userApi.GET("/tasks/:task_id", h.TaskHandler.GetUserTask)
+	userApi.DELETE("/tasks/:task_id", h.TaskHandler.DeleteUserTask)
+	userApi.GET("/tasks", h.TaskHandler.GetUserTasks)
 	userApi.GET("/boards", h.BoardHandler.ListBoards)
 	userApi.PUT("/boards/:board_id", h.BoardHandler.UpsertBoard)
 	userApi.DELETE("/boards/:board_id", h.BoardHandler.DeleteBoard)
@@ -268,9 +271,9 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.POST("/accounts/:id/stop", h.AccountHandler.StopAccount)
 	adminApi.GET("/accounts/:id/queue", h.AccountHandler.GetAccountQueue)
 
-	adminApi.POST("/tasks/submit", h.AccountHandler.SubmitTask)
-	adminApi.GET("/tasks/:task_id", h.AccountHandler.GetTask)
-	adminApi.GET("/tasks", h.AccountHandler.ListTasks)
+	adminApi.POST("/tasks/submit", h.TaskHandler.SubmitTask)
+	adminApi.GET("/tasks/:task_id", h.TaskHandler.GetTask)
+	adminApi.GET("/tasks", h.TaskHandler.ListTasks)
 	adminApi.GET("/monitor", h.AccountHandler.GetMonitor)
 	adminApi.GET("/statistics", h.AccountHandler.GetStatistics)
 	adminApi.POST("/statistics/backfill", h.AccountHandler.BackfillStatistics)

@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/taskservice"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -32,7 +32,7 @@ func TestNATSJetStreamTaskEventBridgeSmoke(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	hub := accounts.NewTaskEventHub()
+	hub := taskservice.NewEventHub()
 	publisher, eventBus, err := newTaskStatusEventPublisher(ctx, config.EventBusConfig{
 		Enabled:            true,
 		NATSURL:            natsURL,

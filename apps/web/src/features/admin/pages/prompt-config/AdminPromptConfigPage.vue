@@ -106,7 +106,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminEditorModal from '../../shared/components/AdminEditorModal.vue'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { saveFeaturePrompt } from '../../../../shared/query/adminQueries'
+import { saveFeaturePrompt } from '../../shared/queries/adminActions'
 import {
   getListAdminFeaturePromptsQueryKey,
   useListAdminFeaturePrompts,
