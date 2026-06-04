@@ -1,5 +1,28 @@
-import { describe, expect, it } from 'vitest'
-import { isSafeInternalRedirectPath } from './auth'
+import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  clearStoredAuth,
+  getStoredUser,
+  handleAuthFailure,
+  isSafeInternalRedirectPath,
+  setStoredAuth,
+} from './auth'
+import type { User } from '../types'
+
+const adminUser: User = {
+  id: 1,
+  uid: 'ADMIN1',
+  username: 'admin',
+  auth_user_id: 'auth-admin',
+  role: 'admin',
+  status: 1,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+}
+
+beforeEach(() => {
+  clearStoredAuth()
+  window.history.pushState({}, '', '/user/home')
+})
 
 describe('isSafeInternalRedirectPath', () => {
   it('allows safe internal redirect paths with query and hash', () => {
@@ -22,5 +45,21 @@ describe('isSafeInternalRedirectPath', () => {
     expect(isSafeInternalRedirectPath('/user/register#start')).toBe(false)
     expect(isSafeInternalRedirectPath('/admin/login?redirect=/admin/users')).toBe(false)
     expect(isSafeInternalRedirectPath('/shareevil?token=abc')).toBe(false)
+  })
+})
+
+describe('handleAuthFailure', () => {
+  it('clears stored admin user state after an admin API 403', () => {
+    setStoredAuth(adminUser)
+    window.history.pushState({}, '', '/admin/task-monitor')
+
+    const handled = handleAuthFailure({
+      status: 403,
+      requestUrl: '/api/admin/tasks',
+    })
+
+    expect(handled).toBe(true)
+    expect(getStoredUser()).toBeNull()
+    expect(window.location.pathname).toBe('/user/home')
   })
 })

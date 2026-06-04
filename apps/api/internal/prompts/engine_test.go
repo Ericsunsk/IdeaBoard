@@ -153,6 +153,24 @@ func TestApplyFeatureSystemPromptTemplateWithUserPromptDoesNotAppendBasePromptTw
 	}
 }
 
+func TestApplyFeatureSystemPromptDoesNotReplacePlaceholdersInsideUserPrompt(t *testing.T) {
+	got := ApplyFeatureSystemPrompt(
+		"",
+		"literal {{strength}}",
+		"style-variation",
+		map[string]interface{}{
+			"variation_strength": 40,
+		},
+		func(string) (string, error) {
+			return "SYS strength={{strength}} prompt={{user_prompt}}", nil
+		},
+	)
+
+	if got != "SYS strength=40 prompt=literal {{strength}}" {
+		t.Fatalf("got %q, want user prompt placeholder content left literal", got)
+	}
+}
+
 func TestApplyFeatureSystemPromptHDUpscaleDoesNotExposeUseMask(t *testing.T) {
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",

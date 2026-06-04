@@ -19,7 +19,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "wget -q -T 3 -O /dev/null http://127.0.0.1/api/health"
+        - "wget -q -T 3 -O /dev/null http://127.0.0.1/api/health && wget -q -T 3 -O /dev/null http://127.0.0.1/api/auth/health"
       interval: 20s
       timeout: 5s
       retries: 6

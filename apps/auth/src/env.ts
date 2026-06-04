@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import { isIP } from 'node:net'
 import { isProductionRuntime } from './runtime-env.js'
 
 dotenv.config({ quiet: true })
@@ -26,13 +27,19 @@ function isUnsafeProductionSecret(value: string): boolean {
   return normalized === 'changeme' || normalized === 'change-me' || normalized === 'password' || normalized === 'secret'
 }
 
-function validateProductionURL(name: string, value: string) {
+function validateProductionURL(name: string, value: string, options: { requireHTTPS?: boolean } = {}) {
   try {
     const parsed = new URL(value)
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       throw new Error('invalid protocol')
     }
+    if (options.requireHTTPS && parsed.protocol !== 'https:') {
+      throw new Error('insecure protocol')
+    }
   } catch {
+    if (options.requireHTTPS) {
+      throw new Error(`${name} must be a valid https URL when NODE_ENV=production`)
+    }
     throw new Error(`${name} must be a valid http(s) URL when NODE_ENV=production`)
   }
 }
@@ -45,6 +52,21 @@ function validateDatabaseSSLMode(value: string): 'disable' | 'require' | 'verify
   throw new Error('DB_SSLMODE must be one of disable, require, or verify-full')
 }
 
+function isLoopbackHost(value: string): boolean {
+  const normalized = value.trim().toLowerCase().replace(/^\[(.*)\]$/, '$1')
+  if (normalized === 'localhost') return true
+
+  const ipVersion = isIP(normalized)
+  if (ipVersion === 4) return normalized.split('.')[0] === '127'
+  if (ipVersion !== 6) return false
+
+  return (
+    normalized === '::1' ||
+    normalized === '0:0:0:0:0:0:0:1' ||
+    normalized.startsWith('::ffff:127.')
+  )
+}
+
 const productionRuntime = isProductionRuntime()
 
 const trustedOrigins = getEnv('AUTH_TRUSTED_ORIGINS', '')
@@ -53,6 +75,9 @@ const trustedOrigins = getEnv('AUTH_TRUSTED_ORIGINS', '')
   .filter(Boolean)
 
 const authInternalKey = getEnv('AUTH_INTERNAL_KEY', '')
+const authHost = getEnv('AUTH_HOST', '127.0.0.1')
+const allowInsecureInternalBypass =
+  !productionRuntime && !authInternalKey && getEnv('AUTH_INSECURE_DEV', '') === '1' && isLoopbackHost(authHost)
 const authSecret =
   getEnv('BETTER_AUTH_SECRET', '') ||
   (productionRuntime ? '' : 'ideaboard-local-development-secret-change-before-production')
@@ -61,6 +86,12 @@ const authBaseURL =
   (productionRuntime ? '' : 'http://localhost:5173')
 const dbPassword = getEnv('DB_PASSWORD', '')
 const dbSSLMode = validateDatabaseSSLMode(getEnv('DB_SSLMODE', 'disable'))
+
+if (!authInternalKey && !allowInsecureInternalBypass) {
+  throw new Error(
+    'AUTH_INTERNAL_KEY is required unless AUTH_INSECURE_DEV=1 and AUTH_HOST is loopback',
+  )
+}
 
 if (productionRuntime) {
   if (isUnsafeProductionSecret(authInternalKey)) {
@@ -81,7 +112,7 @@ if (productionRuntime) {
   if (!authBaseURL) {
     throw new Error('BETTER_AUTH_URL is required when NODE_ENV=production')
   }
-  validateProductionURL('BETTER_AUTH_URL', authBaseURL)
+  validateProductionURL('BETTER_AUTH_URL', authBaseURL, { requireHTTPS: true })
   for (const origin of trustedOrigins) {
     validateProductionURL('AUTH_TRUSTED_ORIGINS entry', origin)
   }
@@ -90,9 +121,10 @@ if (productionRuntime) {
 export const env = {
   auth: {
     port: getEnvInt('AUTH_PORT', 6001),
-    host: getEnv('AUTH_HOST', '127.0.0.1'),
+    host: authHost,
     trustProxy: getEnv('AUTH_TRUST_PROXY', 'loopback'),
     internalKey: authInternalKey,
+    allowInsecureInternalBypass,
     secret: authSecret,
     baseURL: authBaseURL,
     trustedOrigins,

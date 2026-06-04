@@ -364,7 +364,7 @@ backup_api_uploads() {
 print_backend_health_logs() {
   echo "Recent service logs for health gate failure:" >&2
   docker_compose ps >&2 || true
-  docker_compose logs --tail=120 gateway api auth postgres nats >&2 || true
+  docker_compose logs --tail=120 gateway cloudflared api auth postgres nats >&2 || true
 }
 
 wait_for_nats() {
@@ -406,8 +406,8 @@ wait_for_http_from_gateway() {
 }
 
 wait_for_backend_health() {
-  wait_for_http_from_gateway "api" "http://api:6000/api/health"
-  wait_for_http_from_gateway "auth" "http://auth:6001/api/health"
+  wait_for_http_from_gateway "api gateway route" "http://127.0.0.1/api/health"
+  wait_for_http_from_gateway "auth gateway route" "http://127.0.0.1/api/auth/health"
 }
 
 is_false_value() {
@@ -469,12 +469,60 @@ check_nats_event_stream() {
   echo "NATS JetStream stream is OK"
 }
 
+http_get_quiet() {
+  local url="$1"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fs --max-time 5 "$url" >/dev/null
+    return
+  fi
+
+  command -v wget >/dev/null 2>&1 || die "curl or wget is required for public API health checks"
+  wget -q -T 5 -O /dev/null "$url"
+}
+
+public_api_health_url() {
+  local base_url="$1"
+
+  if [[ "$base_url" == */api ]]; then
+    printf '%s/health\n' "$base_url"
+    return
+  fi
+  printf '%s/api/health\n' "$base_url"
+}
+
+check_public_api_health() {
+  local base_url
+  local public_health_url
+  local timeout="${PUBLIC_API_HEALTH_WAIT_TIMEOUT_SECONDS:-120}"
+  local elapsed=0
+
+  base_url="$(env_value API_BASE_URL)"
+  base_url="${base_url%/}"
+  [[ -n "$base_url" ]] || die "API_BASE_URL is required for public API health checks"
+
+  public_health_url="$(public_api_health_url "$base_url")"
+  echo "Waiting for public API health: $public_health_url"
+  while (( elapsed < timeout )); do
+    if http_get_quiet "$public_health_url"; then
+      echo "public API health is OK"
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+
+  print_backend_health_logs
+  die "public API health gate failed after ${timeout}s: $public_health_url"
+}
+
 run_backend_smoke_checks() {
   wait_for_postgres
   wait_for_nats
   wait_for_backend_health
   check_river_schema
   check_nats_event_stream
+  check_public_api_health
   echo "Backend smoke checks passed"
 }
 

@@ -175,7 +175,8 @@ CREATE TABLE user_boards (
   state TEXT NOT NULL,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uk_user_boards_user_board_id UNIQUE (user_id, board_id)
+  CONSTRAINT uk_user_boards_user_board_id UNIQUE (user_id, board_id),
+  CONSTRAINT uk_user_boards_board_id UNIQUE (board_id)
 );
 
 CREATE UNIQUE INDEX idx_user_board_name ON user_boards (user_id, lower(name));

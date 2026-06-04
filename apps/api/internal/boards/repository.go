@@ -107,6 +107,18 @@ func (r *BoardRepository) HasNameConflict(ctx context.Context, userID int64, boa
 	return count > 0, nil
 }
 
+func (r *BoardRepository) BoardIDExistsForOtherOwner(ctx context.Context, userID int64, boardID string) (bool, error) {
+	var count int64
+	err := r.db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM user_boards
+WHERE board_id = $1 AND user_id <> $2`, boardID, userID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *BoardRepository) GetMemberRole(ctx context.Context, ownerUserID int64, boardID string, userID int64) (BoardAccessRole, error) {
 	raw, err := r.q.GetBoardMemberRole(ctx, dbsqlc.GetBoardMemberRoleParams{OwnerUserID: ownerUserID, BoardID: boardID, UserID: userID})
 	if err != nil {
@@ -232,7 +244,21 @@ func (r *BoardRepository) GetShareTokenByToken(ctx context.Context, token string
 }
 
 func (r *BoardRepository) RevokeShareToken(ctx context.Context, ownerUserID int64, boardID, token string) error {
-	return r.q.RevokeBoardShareToken(ctx, dbsqlc.RevokeBoardShareTokenParams{OwnerUserID: ownerUserID, BoardID: boardID, Token: token})
+	result, err := r.db.ExecContext(ctx, `
+UPDATE board_share_tokens
+SET revoked = TRUE
+WHERE created_by = $1 AND board_id = $2 AND token = $3`, ownerUserID, boardID, token)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }
 
 func (r *BoardRepository) ShareTokenExists(ctx context.Context, token string) (bool, error) {
@@ -248,6 +274,13 @@ func IsBoardNameUniqueConstraintError(err error) bool {
 		return false
 	}
 	return strings.Contains(strings.ToLower(err.Error()), "idx_user_board_name")
+}
+
+func IsBoardIDUniqueConstraintError(err error) bool {
+	if !database.IsDuplicateConstraintError(err) {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "uk_user_boards_board_id")
 }
 
 func userBoardFromSQLC(row dbsqlc.UserBoard) UserBoard {

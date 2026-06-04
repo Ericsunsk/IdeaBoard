@@ -4,6 +4,11 @@ import {
 } from '../../../../shared/utils/errorMessages'
 import { formatAdminDateTime, formatDurationSeconds } from '../../../../shared/utils/dateTime'
 import type { Task } from '../../../../shared/api/task'
+import {
+  getSafeResultImageUrl,
+  getSafeTaskResultImageUrl,
+  isAllowedResultImageUrl,
+} from '../../shared/lib/monitorShared'
 
 const RESULT_MAX_STRING_LENGTH = 300
 const RESULT_DEBUG_MAX_DEPTH = 4
@@ -11,20 +16,8 @@ const RESULT_DEBUG_MAX_KEYS = 40
 const RESULT_ARRAY_PREVIEW_LENGTH = 5
 const SENSITIVE_KEY_PATTERN =
   /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
-const APP_ASSET_PATH_RE = /^\/(?:uploads|assets)\//
-const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
 
-export function isAllowedResultImageUrl(rawUrl: string): boolean {
-  const url = rawUrl.trim()
-  if (!url || url.startsWith('//') || url.includes('\\')) return false
-  if (APP_ASSET_PATH_RE.test(url)) return true
-
-  try {
-    return HTTP_PROTOCOLS.has(new URL(url).protocol)
-  } catch {
-    return false
-  }
-}
+export { isAllowedResultImageUrl }
 
 export function useTaskResultDetail(options: {
   message: { success: (content: string) => void; error: (content: string) => void }
@@ -35,12 +28,7 @@ export function useTaskResultDetail(options: {
 
   const resultImageUrl = computed(() => {
     if (!detailTask.value?.result) return ''
-    try {
-      const r = JSON.parse(detailTask.value.result)
-      return r.image_url || ''
-    } catch {
-      return ''
-    }
+    return getSafeTaskResultImageUrl(detailTask.value.result)
   })
 
   const resultSummaryText = computed(() => {
@@ -90,9 +78,9 @@ export function useTaskResultDetail(options: {
   })
 
   function openResultImage(url: string) {
-    const normalizedUrl = url.trim()
-    if (!normalizedUrl) return
-    if (!isAllowedResultImageUrl(normalizedUrl)) {
+    if (!url.trim()) return
+    const normalizedUrl = getSafeResultImageUrl(url)
+    if (!normalizedUrl) {
       options.message.error('图片链接不安全，已拒绝打开')
       return
     }

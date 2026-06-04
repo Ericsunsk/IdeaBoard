@@ -139,7 +139,7 @@ export function handleAuthFailure(params: {
   const code = payload?.code ?? status
 
   if (code === 403 && isAdminApiRequest(requestUrl) && isAdminPage()) {
-    clearAuthScopedQueryCache()
+    clearAuthFailureState()
     window.location.href = '/user/home'
     return true
   }

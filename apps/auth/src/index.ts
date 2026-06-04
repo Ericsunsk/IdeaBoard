@@ -6,7 +6,6 @@ import { toNodeHandler } from 'better-auth/node'
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from 'node:http'
 import { auth, authDB } from './auth.js'
 import { env } from './env.js'
-import { isProductionRuntime } from './runtime-env.js'
 
 type InternalUserShape = {
   id: string
@@ -123,6 +122,11 @@ app.get('/api/health', async (_request, reply) => {
 
 const requireInternalKey: preHandlerHookHandler = (request, reply, done) => {
   if (!env.auth.internalKey) {
+    if (env.auth.allowInsecureInternalBypass) {
+      done()
+      return
+    }
+    sendError(reply, 500, 'internal key is not configured')
     done()
     return
   }
@@ -386,14 +390,12 @@ app.post<{ Body: UserIDBody }>(
   },
 )
 
-if (isProductionRuntime() && !env.auth.internalKey) {
-  throw new Error('AUTH_INTERNAL_KEY is required when NODE_ENV=production')
-}
-
 try {
   await app.listen({ port: env.auth.port, host: env.auth.host })
   if (!env.auth.internalKey) {
-    console.warn('[auth] AUTH_INTERNAL_KEY is empty; internal endpoints are not protected')
+    console.warn(
+      '[auth] AUTH_INTERNAL_KEY is empty because AUTH_INSECURE_DEV=1 and AUTH_HOST is loopback; internal endpoints are not protected',
+    )
   }
   console.log(`[auth] Better Auth service listening on http://${env.auth.host}:${env.auth.port}`)
 } catch (error) {

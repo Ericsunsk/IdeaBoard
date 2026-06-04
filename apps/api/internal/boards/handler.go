@@ -86,6 +86,10 @@ func (h *BoardHandler) UpsertBoard(c *gin.Context) {
 			response.Error(c, 409, "画布名称已存在，请使用其他名称")
 			return
 		}
+		if errors.Is(err, ErrBoardIDConflict) {
+			response.Error(c, 409, "画布ID已存在，请刷新后重试")
+			return
+		}
 		response.InternalError(c, 500, "更新画布失败", err)
 		return
 	}

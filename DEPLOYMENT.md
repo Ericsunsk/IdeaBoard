@@ -221,7 +221,7 @@ GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 ideaboard update
 ```
 
-`ideaboard update` 会在执行 Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 `api`、`auth` 的 `/api/health` health gate 失败都会中止部署并打印相关容器日志。
+`ideaboard update` 会在执行 Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 Gateway 的 `/api/health`、`/api/auth/health` 或公网 `${API_BASE_URL}/api/health` health gate 失败都会中止部署并打印相关容器日志。
 
 当前 Docker stack 只管理 PostgreSQL 数据库；`ideaboard update` 不会自动转换或导入其他数据库形态的数据。首次部署或切换部署形态前，请先确认目标 PostgreSQL 中已有需要保留的数据，或明确按空库初始化。
 
@@ -260,11 +260,13 @@ Service: http://gateway:80
 docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env ps
 ideaboard smoke
 curl http://127.0.0.1:8080/api/health
+curl http://127.0.0.1:8080/api/auth/health
+curl "${API_BASE_URL}/api/health"
 curl http://127.0.0.1:8080/api/auth/get-session
 ```
 
 `/api/auth/get-session` 未登录时返回未认证是正常的；关键是 Gateway 能转发到 Auth Service，不应出现连接失败。
-`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、API/Auth health、River schema 和默认 JetStream event stream。
+`ideaboard smoke` 会检查 PostgreSQL、NATS JetStream、Gateway API/Auth health、River schema、默认 JetStream event stream，以及公网 `${API_BASE_URL}/api/health`。
 
 ### 7. 升级与回滚
 
@@ -480,16 +482,16 @@ npm run migrate:dist
 ```
 
 > [!IMPORTANT]
-> 启用 Better Auth Admin plugin 后，必须先执行 `npm --prefix apps/auth run migrate:dist`（开发环境对应 `npm --prefix apps/auth run migrate`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 字段；不要手写 DDL。Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移，运行时 `auth` 镜像不包含 Better Auth CLI。
+> 启用 Better Auth Admin plugin 后，必须先执行 `npm --prefix apps/auth run migrate:dist`（开发环境对应 `npm --prefix apps/auth run migrate`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 字段；不要手写 DDL。迁移脚本使用当前项目安装的 `better-auth` runtime，Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移。
 
 部署时至少确认：
 
 - `AUTH_HOST=127.0.0.1`
 - `AUTH_PORT=6001`
-- `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的同名变量一致，且不能使用 `replace-with-*` 占位值
+- `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的同名变量一致，且不能使用 `replace-with-*` 占位值；不要设置 `AUTH_INSECURE_DEV`
 - `AUTH_TRUSTED_ORIGINS` 包含你的正式前端访问源，例如 `https://app.example.com`
 - `BETTER_AUTH_SECRET` 至少 32 字符高熵随机值，例如 `openssl rand -base64 32`；不能使用 `replace-with-*` 或本地开发 fallback
-- `BETTER_AUTH_URL` 设置为 Auth 对外访问地址；Pages + Tunnel 部署时通常是 `https://api.example.com`
+- `BETTER_AUTH_URL` 设置为 HTTPS 的 Auth 对外访问地址；Pages + Tunnel 部署时通常是 `https://api.example.com`
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
 
 > [!IMPORTANT]
@@ -601,13 +603,14 @@ Nginx 验证：
 ```bash
 curl -I http://127.0.0.1/
 curl http://127.0.0.1/api/health
+curl http://127.0.0.1/api/auth/health
 ```
 
 上线前至少确认：
 
 1. 首页可正常访问。
 2. `/api/health` 返回成功。
-3. `ideaboard-auth` 运行正常，登录/注册请求走 `/api/auth/**`。
+3. `/api/auth/health` 返回成功，登录/注册请求走 `/api/auth/**`。
 4. 管理员可登录。
 5. 图片上传正常。
 6. `/uploads/*` 可以访问。

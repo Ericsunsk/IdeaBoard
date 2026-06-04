@@ -21,6 +21,7 @@ import (
 var ErrBoardNotFound = errors.New("board not found")
 var ErrInvalidBoardInput = errors.New("invalid board input")
 var ErrBoardNameConflict = errors.New("board name conflict")
+var ErrBoardIDConflict = errors.New("board id conflict")
 var ErrBoardPermissionDenied = errors.New("board permission denied")
 var ErrBoardMemberNotFound = errors.New("board member not found")
 var ErrBoardMemberInvalidRole = errors.New("board member invalid role")
@@ -123,6 +124,9 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 	}
 
 	if err := s.ensureBoardNameAvailable(ctx, userID, normalizedID, name); err != nil {
+		return nil, err
+	}
+	if err := s.ensureBoardIDAvailable(ctx, userID, normalizedID); err != nil {
 		return nil, err
 	}
 	board := &UserBoard{
@@ -310,7 +314,16 @@ func (s *BoardService) RevokeShareToken(ctx context.Context, ownerUserID int64, 
 	if shareToken.BoardID != board.BoardID {
 		return ErrShareTokenNotFound
 	}
-	return s.repo.RevokeShareToken(ctx, board.UserID, board.BoardID, normalizedToken)
+	if shareToken.CreatedBy != board.UserID {
+		return ErrShareTokenNotFound
+	}
+	if err := s.repo.RevokeShareToken(ctx, board.UserID, board.BoardID, normalizedToken); err != nil {
+		if database.IsNotFound(err) {
+			return ErrShareTokenNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *BoardService) JoinBoardByShareToken(ctx context.Context, userID int64, token string) (*BoardWithRole, error) {
@@ -517,6 +530,17 @@ func (s *BoardService) ensureBoardNameAvailable(ctx context.Context, ownerUserID
 	return nil
 }
 
+func (s *BoardService) ensureBoardIDAvailable(ctx context.Context, ownerUserID int64, boardID string) error {
+	conflicted, err := s.repo.BoardIDExistsForOtherOwner(ctx, ownerUserID, boardID)
+	if err != nil {
+		return err
+	}
+	if conflicted {
+		return ErrBoardIDConflict
+	}
+	return nil
+}
+
 func (s *BoardService) saveAndReloadBoardForActor(ctx context.Context, actorUserID int64, board *UserBoard) (*BoardWithRole, error) {
 	if board == nil {
 		return nil, ErrInvalidBoardInput
@@ -524,6 +548,9 @@ func (s *BoardService) saveAndReloadBoardForActor(ctx context.Context, actorUser
 	if err := s.repo.Upsert(ctx, board); err != nil {
 		if IsBoardNameUniqueConstraintError(err) {
 			return nil, ErrBoardNameConflict
+		}
+		if IsBoardIDUniqueConstraintError(err) {
+			return nil, ErrBoardIDConflict
 		}
 		return nil, err
 	}

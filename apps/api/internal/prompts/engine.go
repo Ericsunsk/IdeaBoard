@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"api/internal/workflow"
@@ -195,9 +196,7 @@ func ApplyFeatureSystemPrompt(
 	if strings.Contains(sysPrompt, "{{") {
 		hasUserPromptPlaceholder := strings.Contains(sysPrompt, "{{user_prompt}}")
 		result := sysPrompt
-		for k, v := range varMap {
-			result = strings.ReplaceAll(result, k, v)
-		}
+		result = replacePromptTemplateVariables(result, varMap)
 		if policy.appendUserPromptWhenTemplateMissesPlaceholder &&
 			!hasUserPromptPlaceholder &&
 			strings.TrimSpace(userPrompt) != "" {
@@ -209,6 +208,26 @@ func ApplyFeatureSystemPrompt(
 		return sysPrompt
 	}
 	return sysPrompt + " " + basePrompt
+}
+
+func replacePromptTemplateVariables(template string, values map[string]string) string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		if key == "{{user_prompt}}" {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	result := template
+	for _, key := range keys {
+		result = strings.ReplaceAll(result, key, values[key])
+	}
+	if userPrompt, ok := values["{{user_prompt}}"]; ok {
+		result = strings.ReplaceAll(result, "{{user_prompt}}", userPrompt)
+	}
+	return result
 }
 
 func formatImageWeightsTemplateValue(raw interface{}) (string, bool) {

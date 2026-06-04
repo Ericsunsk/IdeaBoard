@@ -26,7 +26,12 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create board A failed: %v", err)
 	}
-	boardB, err := service.UpsertBoard(ctx, ownerB.ID, boardID, &UpsertBoardRequest{Name: "Beta Board", State: map[string]interface{}{"v": 2}})
+	if _, err := service.UpsertBoard(ctx, ownerB.ID, boardID, &UpsertBoardRequest{Name: "Beta Board", State: map[string]interface{}{"v": 2}}); !errors.Is(err, ErrBoardIDConflict) {
+		t.Fatalf("duplicate board id err = %v, want ErrBoardIDConflict", err)
+	}
+
+	boardBID := "owner-b-board"
+	boardB, err := service.UpsertBoard(ctx, ownerB.ID, boardBID, &UpsertBoardRequest{Name: "Beta Board", State: map[string]interface{}{"v": 2}})
 	if err != nil {
 		t.Fatalf("create board B failed: %v", err)
 	}
@@ -45,7 +50,7 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 		t.Fatalf("owner A access = (%d, %s), want (%d, owner)", accessA.UserID, roleA, ownerA.ID)
 	}
 
-	accessB, roleB, err := service.ResolveBoardAccess(ctx, ownerB.ID, boardID)
+	accessB, roleB, err := service.ResolveBoardAccess(ctx, ownerB.ID, boardBID)
 	if err != nil {
 		t.Fatalf("resolve owner B access failed: %v", err)
 	}

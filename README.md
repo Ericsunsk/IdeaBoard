@@ -247,10 +247,10 @@ npm run migrate
 npm run dev
 ```
 
-生产部署时必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）和 `BETTER_AUTH_URL`（正式访问地址），并让 API 与 Auth 服务使用相同的 `AUTH_INTERNAL_KEY`。
+本地开发如果暂时不配置 `AUTH_INTERNAL_KEY`，必须显式设置 `AUTH_INSECURE_DEV=1`，且 `AUTH_HOST` 保持为 `127.0.0.1`、`localhost` 或 `::1` 这类 loopback 地址。生产部署时必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）和 HTTPS 的 `BETTER_AUTH_URL`（正式访问地址），并让 API 与 Auth 服务使用相同的 `AUTH_INTERNAL_KEY`。
 
 > [!IMPORTANT]
-> 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（源码生产部署先 build 再执行 `migrate:dist`；发布包已包含 `dist`，直接安装依赖后执行 `migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移，运行时 Auth 镜像不包含 Better Auth CLI。
+> 启用 Better Auth Admin plugin 后，请先执行 `npm --prefix apps/auth run migrate`（源码生产部署先 build 再执行 `migrate:dist`；发布包已包含 `dist`，直接安装依赖后执行 `migrate:dist`），以补齐 `user.role`、`user.banned`、`user.banReason`、`user.banExpires` 与 `session.impersonatedBy` 等字段。迁移脚本使用当前项目安装的 `better-auth` runtime，Docker stack 会通过已签名的 `ideaboard-auth-migrate` 镜像运行迁移。
 
 <details>
 <summary>Auth 服务能力说明</summary>
