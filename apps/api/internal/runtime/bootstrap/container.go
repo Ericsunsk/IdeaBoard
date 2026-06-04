@@ -25,6 +25,7 @@ import (
 	"ideaboard/api/internal/taskservice"
 	"ideaboard/api/internal/taskstats"
 	"ideaboard/api/internal/taskstore"
+	"ideaboard/api/internal/tasksubmission"
 	"ideaboard/api/internal/users"
 	"ideaboard/api/web"
 
@@ -104,10 +105,36 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	}, accounts.AccountServiceOptions{
 		TaskEvents: taskEvents,
 	})
+	riverTaskWorker := worker.NewRiverTaskWorker(
+		accountRepo,
+		channelRepo,
+		taskRepo,
+		riverQueue,
+		postgresAssigner,
+		postgresRuntimeStore,
+		storageService,
+		taskEvents,
+	)
+	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
+	riverClient, err := worker.NewRiverClient(riverPool, riverTaskWorker, worker.RiverServerOptions{
+		QueueName:   taskqueue.RiverQueueDefault,
+		Concurrency: cfg.Queue.WorkerConcurrency,
+		JobTimeout:  time.Duration(cfg.Queue.TaskTimeoutSeconds) * time.Second,
+		MaxRetry:    cfg.Queue.MaxRetry,
+	})
+	if err != nil {
+		_ = eventBus.Close()
+		riverPool.Close()
+		_ = db.Close()
+		return nil, fmt.Errorf("failed to initialize River client: %w", err)
+	}
+	riverQueue.SetClient(riverClient)
+	submissionStore := tasksubmission.NewStore(riverPool, riverClient, taskqueue.RiverQueueDefault, cfg.Queue.MaxRetry)
+
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		AccountRepo:       accountRepo,
 		TaskRepo:          taskRepo,
-		Queue:             riverQueue,
+		SubmissionStore:   submissionStore,
 		CancelStore:       postgresRuntimeStore,
 		SystemConfigRepo:  systemConfigRepo,
 		UploadBoards:      uploadBoardAccessResolver{service: boardService},
@@ -158,31 +185,6 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		},
 		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 	})
-
-	riverTaskWorker := worker.NewRiverTaskWorker(
-		accountRepo,
-		channelRepo,
-		taskRepo,
-		riverQueue,
-		postgresAssigner,
-		postgresRuntimeStore,
-		storageService,
-		taskEvents,
-	)
-	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(cfg.Queue.NoCapacityRetryDelaySeconds) * time.Second)
-	riverClient, err := worker.NewRiverClient(riverPool, riverTaskWorker, worker.RiverServerOptions{
-		QueueName:   taskqueue.RiverQueueDefault,
-		Concurrency: cfg.Queue.WorkerConcurrency,
-		JobTimeout:  time.Duration(cfg.Queue.TaskTimeoutSeconds) * time.Second,
-		MaxRetry:    cfg.Queue.MaxRetry,
-	})
-	if err != nil {
-		_ = eventBus.Close()
-		riverPool.Close()
-		_ = db.Close()
-		return nil, fmt.Errorf("failed to initialize River client: %w", err)
-	}
-	riverQueue.SetClient(riverClient)
 
 	return &appContainer{
 		router:           router,

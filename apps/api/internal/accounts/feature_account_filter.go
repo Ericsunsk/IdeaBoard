@@ -32,9 +32,6 @@ func accountAllowsFeature(account *ApiAccount, featureSlug string) bool {
 	if account == nil || featureSlug == "" {
 		return true
 	}
-	if !isFeatureCompatibleWithAPIType(featureSlug, account.ApiType) {
-		return false
-	}
 	allowed, blocked, constrained := parseFeatureRulesFromExtraConfig(account.ExtraConfig)
 	if !constrained {
 		return true
@@ -49,11 +46,7 @@ func accountAllowsFeature(account *ApiAccount, featureSlug string) bool {
 	return ok
 }
 
-func isFeatureCompatibleWithAPIType(featureSlug, apiType string) bool {
-	return true
-}
-
-func ParseTaskFeatureSlug(paramsJSON string) string {
+func ParseFeatureSlugFromParamsJSON(paramsJSON string) string {
 	paramsJSON = strings.TrimSpace(paramsJSON)
 	if paramsJSON == "" {
 		return ""

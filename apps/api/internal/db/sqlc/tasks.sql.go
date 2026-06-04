@@ -689,28 +689,6 @@ func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDPa
 	return items, nil
 }
 
-const markQueueFailed = `-- name: MarkQueueFailed :execrows
-UPDATE tasks
-SET status = 'failed',
-    error_msg = $1,
-    completed_at = $2
-WHERE task_id = $3
-`
-
-type MarkQueueFailedParams struct {
-	ErrorMsg    string       `json:"error_msg"`
-	CompletedAt sql.NullTime `json:"completed_at"`
-	TaskID      string       `json:"task_id"`
-}
-
-func (q *Queries) MarkQueueFailed(ctx context.Context, arg MarkQueueFailedParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, markQueueFailed, arg.ErrorMsg, arg.CompletedAt, arg.TaskID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const markTaskFailed = `-- name: MarkTaskFailed :execrows
 UPDATE tasks
 SET status = 'failed',

@@ -24,7 +24,7 @@ import (
 type Service struct {
 	accountRepo       AccountStore
 	taskRepo          TaskStore
-	queue             taskqueue.TaskEnqueuer
+	submissionStore   TaskSubmissionStore
 	cancelStore       taskqueue.TaskCancellationStore
 	systemConfigRepo  *settings.SystemConfigRepository
 	uploadBoards      storage.UploadBoardAccessResolver
@@ -43,20 +43,22 @@ type AccountStore interface {
 }
 
 type TaskStore interface {
-	Create(ctx context.Context, task *tasks.Task) error
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
 	GetByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) (*tasks.Task, error)
 	List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error)
 	GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error)
 	DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error
-	MarkQueueFailed(ctx context.Context, taskID string, errMsg string) error
 	ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error)
+}
+
+type TaskSubmissionStore interface {
+	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *queuetypes.TaskPayload) error
 }
 
 type ServiceDeps struct {
 	AccountRepo       AccountStore
 	TaskRepo          TaskStore
-	Queue             taskqueue.TaskEnqueuer
+	SubmissionStore   TaskSubmissionStore
 	CancelStore       taskqueue.TaskCancellationStore
 	SystemConfigRepo  *settings.SystemConfigRepository
 	UploadBoards      storage.UploadBoardAccessResolver
@@ -84,7 +86,7 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 	return &Service{
 		accountRepo:       deps.AccountRepo,
 		taskRepo:          deps.TaskRepo,
-		queue:             deps.Queue,
+		submissionStore:   deps.SubmissionStore,
 		cancelStore:       deps.CancelStore,
 		systemConfigRepo:  deps.SystemConfigRepo,
 		uploadBoards:      deps.UploadBoards,
@@ -131,10 +133,6 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		Status:     tasks.StatusPending,
 	}
 
-	if err := s.taskRepo.Create(ctx, task); err != nil {
-		return "", fmt.Errorf("任务提交失败，请稍后重试")
-	}
-
 	accountIDs := make([]int64, len(apiAccounts))
 	for i, acc := range apiAccounts {
 		accountIDs[i] = acc.ID
@@ -150,12 +148,11 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		CreatedAt:  time.Now().Unix(),
 	}
 
-	if err := s.queue.Enqueue(ctx, queueTask); err != nil {
-		if markErr := s.taskRepo.MarkQueueFailed(ctx, taskID, "任务入队失败: "+err.Error()); markErr != nil {
-			slog.Warn("mark queue failed task failed", "task_id", taskID, "err", markErr)
-			return "", fmt.Errorf("任务提交失败，请稍后重试")
-		}
-		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
+	if s.submissionStore == nil {
+		return "", fmt.Errorf("任务提交服务未配置")
+	}
+	if err := s.submissionStore.SubmitTask(ctx, task, queueTask); err != nil {
+		slog.Warn("submit task transaction failed", "task_id", taskID, "err", err)
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 

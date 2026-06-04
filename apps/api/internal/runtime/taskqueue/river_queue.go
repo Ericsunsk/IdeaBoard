@@ -33,6 +33,10 @@ type riverClient interface {
 	Insert(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error)
 }
 
+type RiverTxClient interface {
+	InsertTx(ctx context.Context, tx pgx.Tx, args river.JobArgs, opts *river.InsertOpts) (*rivertype.JobInsertResult, error)
+}
+
 type RiverQueue struct {
 	client           riverClient
 	db               *sql.DB
@@ -78,16 +82,49 @@ func (q *RiverQueue) Enqueue(ctx context.Context, task *queuetypes.TaskPayload) 
 	if q == nil || q.client == nil {
 		return fmt.Errorf("river enqueue: client not configured")
 	}
-	args := DrawingTaskArgs{Task: *task}
-	_, err := q.client.Insert(ctx, args, &river.InsertOpts{
-		Queue:       q.queueName,
-		MaxAttempts: q.maxRetry,
-		Tags:        []string{task.TaskID},
-	})
+	_, err := q.client.Insert(ctx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, q.queueName, q.maxRetry))
 	if err != nil {
 		return fmt.Errorf("river enqueue: %w", err)
 	}
 	return nil
+}
+
+func InsertDrawingTaskTx(ctx context.Context, client RiverTxClient, tx pgx.Tx, task *queuetypes.TaskPayload, queueName string, maxRetry int) error {
+	if task == nil {
+		return fmt.Errorf("river enqueue tx: task is nil")
+	}
+	if strings.TrimSpace(task.TaskID) == "" {
+		return fmt.Errorf("river enqueue tx: empty task_id")
+	}
+	if client == nil {
+		return fmt.Errorf("river enqueue tx: client not configured")
+	}
+	if tx == nil {
+		return fmt.Errorf("river enqueue tx: tx is nil")
+	}
+	_, err := client.InsertTx(ctx, tx, DrawingTaskArgs{Task: *task}, drawingTaskInsertOpts(task, queueName, maxRetry))
+	if err != nil {
+		return fmt.Errorf("river enqueue tx: %w", err)
+	}
+	return nil
+}
+
+func drawingTaskInsertOpts(task *queuetypes.TaskPayload, queueName string, maxRetry int) *river.InsertOpts {
+	if strings.TrimSpace(queueName) == "" {
+		queueName = RiverQueueDefault
+	}
+	if maxRetry <= 0 {
+		maxRetry = 25
+	}
+	taskID := ""
+	if task != nil {
+		taskID = task.TaskID
+	}
+	return &river.InsertOpts{
+		Queue:       queueName,
+		MaxAttempts: maxRetry,
+		Tags:        []string{taskID},
+	}
 }
 
 func (q *RiverQueue) QueueLengths(ctx context.Context) (int64, int64, error) {

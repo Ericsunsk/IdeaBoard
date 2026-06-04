@@ -170,13 +170,6 @@ WHERE task_id = sqlc.arg(task_id) AND user_id = sqlc.arg(user_id);
 DELETE FROM tasks
 WHERE user_id = sqlc.arg(user_id);
 
--- name: MarkQueueFailed :execrows
-UPDATE tasks
-SET status = 'failed',
-    error_msg = sqlc.arg(error_msg),
-    completed_at = sqlc.arg(completed_at)
-WHERE task_id = sqlc.arg(task_id);
-
 -- name: FailRunningTasksByAccountID :many
 UPDATE tasks
 SET status = 'failed',

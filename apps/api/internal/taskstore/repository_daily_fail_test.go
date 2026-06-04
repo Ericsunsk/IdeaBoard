@@ -116,35 +116,6 @@ func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 	}
 }
 
-func TestMarkQueueFailedUpsertsDailyStats(t *testing.T) {
-	ctx := context.Background()
-	taskRepo, _ := newRepositoryTestDB(t)
-	createdAt := time.Now().Add(-2 * time.Minute)
-	task := &tasks.Task{
-		TaskID:    "queue-failed-stat",
-		UserID:    12,
-		ChannelID: 1,
-		Status:    tasks.StatusPending,
-		CreatedAt: createdAt,
-	}
-	if err := taskRepo.Create(ctx, task); err != nil {
-		t.Fatalf("seed task failed: %v", err)
-	}
-
-	if err := taskRepo.MarkQueueFailed(ctx, task.TaskID, "queue failed"); err != nil {
-		t.Fatalf("MarkQueueFailed failed: %v", err)
-	}
-
-	day := createdAt.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
-	if err != nil {
-		t.Fatalf("list daily stats failed: %v", err)
-	}
-	if len(rows) != 1 || rows[0].Failed != 1 || rows[0].Total != 1 || rows[0].Completed != 0 {
-		t.Fatalf("unexpected queue failed daily row: %+v", rows)
-	}
-}
-
 func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 	ctx := context.Background()
 	taskRepo, _ := newRepositoryTestDB(t)

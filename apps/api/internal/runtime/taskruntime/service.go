@@ -78,7 +78,7 @@ func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.Task
 	if err != nil {
 		return err
 	}
-	featureSlug := accounts.ParseTaskFeatureSlug(task.Params)
+	featureSlug := accounts.ParseFeatureSlugFromParamsJSON(task.Params)
 	enabledAccounts = accounts.FilterAccountsByFeature(enabledAccounts, featureSlug)
 
 	hasScopedCandidates := task.AccountIDs != nil

@@ -2,11 +2,15 @@ package taskservice
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/boards"
+	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
@@ -313,6 +317,49 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	}
 }
 
+func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
+	ctx := context.Background()
+	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+		{ID: 101},
+		{ID: 202},
+	}}
+	submissionStore := &recordingSubmissionStore{}
+	taskEvents := &recordingTaskStatusPublisher{}
+	svc := NewService(ServiceDeps{
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+	}, ServiceOptions{
+		TaskEvents: taskEvents,
+	})
+
+	taskID, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt: "draw a chair",
+		Params: map[string]interface{}{"size": "1024x1024"},
+	})
+	if err != nil {
+		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if taskID == "" {
+		t.Fatalf("expected task id")
+	}
+	if len(submissionStore.calls) != 1 {
+		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
+	}
+	call := submissionStore.calls[0]
+	if call.task.TaskID != taskID || call.task.UserID != 42 || call.task.Status != tasks.StatusPending {
+		t.Fatalf("unexpected task: %+v", call.task)
+	}
+	if call.queueTask.TaskID != taskID || call.queueTask.UserID != 42 {
+		t.Fatalf("unexpected queue task: %+v", call.queueTask)
+	}
+	if !slices.Equal(call.queueTask.AccountIDs, []int64{101, 202}) {
+		t.Fatalf("queue account ids=%v, want [101 202]", call.queueTask.AccountIDs)
+	}
+	if len(taskEvents.events) != 1 || taskEvents.events[0].TaskID != taskID || taskEvents.events[0].Status != tasks.StatusPending {
+		t.Fatalf("unexpected task events: %+v", taskEvents.events)
+	}
+}
+
 type testTaskUploadBoardAccessResolver struct {
 	service *boards.BoardService
 }
@@ -350,6 +397,45 @@ func mustCreateTaskUploadUser(t *testing.T, repo *users.UserRepository, username
 		t.Fatalf("create user %s failed: %v", username, err)
 	}
 	return user
+}
+
+type fakeSubmitAccountStore struct {
+	accounts []*accounts.ApiAccount
+	err      error
+}
+
+func (s *fakeSubmitAccountStore) GetAllEnabled(context.Context) ([]*accounts.ApiAccount, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.accounts, nil
+}
+
+type recordingSubmissionStore struct {
+	calls []submitCall
+	err   error
+}
+
+type submitCall struct {
+	task      *tasks.Task
+	queueTask *queuetypes.TaskPayload
+}
+
+func (s *recordingSubmissionStore) SubmitTask(_ context.Context, task *tasks.Task, queueTask *queuetypes.TaskPayload) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.calls = append(s.calls, submitCall{task: task, queueTask: queueTask})
+	return nil
+}
+
+type recordingTaskStatusPublisher struct {
+	events []events.TaskStatusEvent
+}
+
+func (p *recordingTaskStatusPublisher) PublishTaskStatus(_ context.Context, event events.TaskStatusEvent) error {
+	p.events = append(p.events, events.NormalizeTaskStatusEvent(event))
+	return nil
 }
 
 type fakeCancelStore struct {

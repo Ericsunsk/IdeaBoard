@@ -354,21 +354,6 @@ func (r *Repository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string,
 	})
 }
 
-func (r *Repository) MarkQueueFailed(ctx context.Context, taskID string, errMsg string) error {
-	now := time.Now()
-	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		updated, err := q.MarkQueueFailed(ctx, dbsqlc.MarkQueueFailedParams{
-			ErrorMsg:    errMsg,
-			CompletedAt: sql.NullTime{Time: now, Valid: true},
-			TaskID:      taskID,
-		})
-		if err != nil || updated == 0 {
-			return err
-		}
-		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
-	})
-}
-
 // FailRunningByAccountID 将指定账号下所有 running/pending 状态的任务标记为 failed
 func (r *Repository) FailRunningByAccountID(ctx context.Context, accountID int64, errMsg string) ([]string, error) {
 	now := time.Now()

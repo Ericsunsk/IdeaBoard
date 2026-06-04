@@ -74,8 +74,8 @@ func TestFilterAccountsByFeatureKeepsGooglePlatformsForReferenceFeatures(t *test
 	}
 }
 
-func TestParseTaskFeatureSlugReturnsEmptyForInvalidJSON(t *testing.T) {
-	if got := ParseTaskFeatureSlug("{invalid-json"); got != "" {
+func TestParseFeatureSlugFromParamsJSONReturnsEmptyForInvalidJSON(t *testing.T) {
+	if got := ParseFeatureSlugFromParamsJSON("{invalid-json"); got != "" {
 		t.Fatalf("expected empty feature slug for invalid params json, got=%q", got)
 	}
 }
