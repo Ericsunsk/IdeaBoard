@@ -206,7 +206,7 @@ validate_env_file() {
   api_repo="$(image_source_repo_from_ref "$api_image")"
   auth_repo="$(image_source_repo_from_ref "$auth_image")"
   auth_migrate_repo="$(image_source_repo_from_ref "$auth_migrate_image")"
-  if [[ "$api_repo" != "$auth_repo" || "$api_repo" != "$auth_migrate_repo" ]]; then
+  if ! [[ "$api_repo" == "$auth_repo" && "$api_repo" == "$auth_migrate_repo" ]]; then
     echo "IDEABOARD_API_IMAGE, IDEABOARD_AUTH_IMAGE, and IDEABOARD_AUTH_MIGRATE_IMAGE must come from the same GHCR owner/repo." >&2
     return 1
   fi
@@ -234,6 +234,7 @@ wait_for_postgres() {
 
   echo "Waiting for PostgreSQL to become ready..."
   while (( elapsed < timeout )); do
+    # shellcheck disable=SC2016 # Container env vars must expand inside postgres.
     if docker_compose exec -T postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1' >/dev/null 2>&1; then
       return 0
     fi
@@ -301,6 +302,7 @@ backup_postgres() {
   tmp_file="${backup_file}.tmp"
 
   echo "Creating PostgreSQL backup: $backup_file"
+  # shellcheck disable=SC2016 # Container env vars must expand inside postgres.
   if docker_compose exec -T postgres sh -c 'pg_dump --clean --if-exists --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$tmp_file"; then
     finalize_backup_file \
       "$tmp_file" \
@@ -393,6 +395,7 @@ wait_for_http_from_gateway() {
 
   echo "Waiting for $name health: $url"
   while (( elapsed < timeout )); do
+    # shellcheck disable=SC2016 # $1 must expand inside the gateway shell.
     if docker_compose exec -T gateway sh -c 'wget -q -T 3 -O /dev/null "$1"' sh "$url" >/dev/null 2>&1; then
       echo "$name health is OK"
       return 0
@@ -430,6 +433,7 @@ check_river_schema() {
 
   echo "Checking River schema..."
   result="$(
+    # shellcheck disable=SC2016 # Container env vars must expand inside postgres.
     docker_compose exec -T postgres sh -c \
       'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT CASE WHEN to_regclass('\''public.river_job'\'') IS NULL THEN '\''missing'\'' ELSE '\''ok'\'' END"'
   )" || {
