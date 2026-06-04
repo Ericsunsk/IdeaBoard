@@ -1,10 +1,12 @@
 package testdb
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/db/migrations"
 	"ideaboard/api/internal/platform/database"
@@ -40,7 +42,9 @@ func Open(t testing.TB) *sql.DB {
 
 func cleanup(t testing.TB, db *sql.DB) {
 	t.Helper()
-	_, err := db.ExecContext(t.Context(), `
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err := db.ExecContext(ctx, `
 DROP TRIGGER IF EXISTS fail_mark_completed ON tasks;
 DROP TRIGGER IF EXISTS fail_mark_failed ON tasks;
 DROP FUNCTION IF EXISTS fail_mark_completed();
