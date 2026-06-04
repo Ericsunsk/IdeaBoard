@@ -219,12 +219,12 @@ func RegisterFrontendRoutes(r *gin.Engine, frontendFS iofs.FS) {
 
 func registerUserRoutes(userApi *gin.RouterGroup, h UserRouteDeps) {
 	userApi.GET("/info", h.AuthHandler.GetCurrentUser)
-	userApi.POST("/drawing/submit/readiness", h.AccountHandler.CheckSubmitTaskReadiness)
-	userApi.POST("/drawing/submit", h.AccountHandler.SubmitTask)
-	userApi.GET("/drawing/:task_id/events", h.AccountHandler.StreamUserTask)
-	userApi.GET("/drawing/:task_id", h.AccountHandler.GetUserTask)
-	userApi.DELETE("/drawing/:task_id", h.AccountHandler.DeleteUserTask)
-	userApi.GET("/drawing", h.AccountHandler.GetUserTasks)
+	userApi.POST("/tasks/submit/readiness", h.AccountHandler.CheckSubmitTaskReadiness)
+	userApi.POST("/tasks/submit", h.AccountHandler.SubmitTask)
+	userApi.GET("/tasks/:task_id/events", h.AccountHandler.StreamUserTask)
+	userApi.GET("/tasks/:task_id", h.AccountHandler.GetUserTask)
+	userApi.DELETE("/tasks/:task_id", h.AccountHandler.DeleteUserTask)
+	userApi.GET("/tasks", h.AccountHandler.GetUserTasks)
 	userApi.GET("/boards", h.BoardHandler.ListBoards)
 	userApi.PUT("/boards/:board_id", h.BoardHandler.UpsertBoard)
 	userApi.DELETE("/boards/:board_id", h.BoardHandler.DeleteBoard)

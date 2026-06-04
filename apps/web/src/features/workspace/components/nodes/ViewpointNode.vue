@@ -82,7 +82,7 @@ import {
   VIEWPOINT_CATEGORY_OPTIONS,
   VIEWPOINT_LIGHTING_OPTIONS,
   VIEWPOINT_OPTIONS_BY_CATEGORY,
-} from './config/nodeOptionConfig'
+} from '../../config/nodeOptions'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
 
 const props = defineProps<{

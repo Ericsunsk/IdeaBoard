@@ -1,7 +1,7 @@
 import {
   normalizeViewpointSelectionByCategory,
   VIEWPOINT_LIGHTING_OPTIONS,
-} from '../components/nodes/config/nodeOptionConfig'
+} from '../config/nodeOptions'
 import type { PromptNodeInputImage, ViewpointNodeItem } from '../types/canvasNodes'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import { clampImageNodeOutputCount } from '../types/canvasNodes'

@@ -3,5 +3,5 @@
 </template>
 
 <script setup lang="ts">
-import BoardsScreen from '../../features/boards/screens/BoardsScreen.vue'
+import BoardsScreen from '../../boards/screens/BoardsScreen.vue'
 </script>

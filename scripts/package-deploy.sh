@@ -151,7 +151,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location /api/user/drawing/ {
+    location /api/user/tasks/ {
         proxy_pass http://127.0.0.1:6000;
         proxy_http_version 1.1;
         proxy_buffering off;

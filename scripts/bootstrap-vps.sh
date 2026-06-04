@@ -10,6 +10,7 @@ BIN_PATH="${IDEABOARD_BIN_PATH:-/usr/local/bin/ideaboard}"
 GIT_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 FORCE="${IDEABOARD_FORCE:-0}"
 ASKPASS_FILE=""
+DEPLOY_SCRIPT="$STACK_DIR/scripts/deploy-stack.sh"
 
 usage() {
   cat <<EOF
@@ -162,20 +163,20 @@ else
   checkout_ref "$STACK_DIR"
 fi
 
-chmod +x "$STACK_DIR/scripts/deploy-backend-stack.sh" "$STACK_DIR/scripts/uninstall-vps.sh"
+chmod +x "$DEPLOY_SCRIPT" "$STACK_DIR/scripts/uninstall-vps.sh"
 if [[ -w "$(dirname "$BIN_PATH")" ]]; then
-  ln -sf "$STACK_DIR/scripts/deploy-backend-stack.sh" "$BIN_PATH"
+  ln -sf "$DEPLOY_SCRIPT" "$BIN_PATH"
 else
   echo "Skip installing $BIN_PATH: directory is not writable" >&2
 fi
-"$STACK_DIR/scripts/deploy-backend-stack.sh" init-env
+"$DEPLOY_SCRIPT" init-env
 
 if [[ -t 0 || -e /dev/tty ]]; then
   "$EDITOR_BIN" "$STACK_DIR/docker/.env" </dev/tty >/dev/tty
 fi
 
 if [[ -n "$GIT_TOKEN" && -z "${GHCR_TOKEN:-}" ]]; then
-  GHCR_TOKEN="$GIT_TOKEN" "$STACK_DIR/scripts/deploy-backend-stack.sh"
+  GHCR_TOKEN="$GIT_TOKEN" "$DEPLOY_SCRIPT"
 else
-  "$STACK_DIR/scripts/deploy-backend-stack.sh"
+  "$DEPLOY_SCRIPT"
 fi

@@ -114,7 +114,7 @@ remove_cli() {
 
   local target
   target="$(readlink "$BIN_PATH" || true)"
-  if [[ "$target" == "$STACK_DIR/scripts/deploy-backend-stack.sh" ]]; then
+  if [[ "$target" == "$STACK_DIR/scripts/deploy-stack.sh" ]]; then
     rm -f "$BIN_PATH"
     echo "Removed $BIN_PATH"
   else

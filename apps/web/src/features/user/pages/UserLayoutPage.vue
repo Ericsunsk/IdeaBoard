@@ -3,5 +3,5 @@
 </template>
 
 <script setup lang="ts">
-import UserLayout from '../../features/user/layout/UserLayout.vue'
+import UserLayout from '../layout/UserLayout.vue'
 </script>

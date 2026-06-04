@@ -9,8 +9,8 @@
 </template>
 
 <script setup lang="ts">
-import boardApi from '../../shared/api/board'
-import { hydrateCanvasBoardsFromServer } from '../../features/boards/lib/boardSync'
+import boardApi from '../../../shared/api/board'
+import { hydrateCanvasBoardsFromServer } from '../../boards/lib/boardSync'
 
 const route = useRoute()
 const router = useRouter()

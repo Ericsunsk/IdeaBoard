@@ -33,7 +33,7 @@ import type { ErrorType } from '../../orvalMutator'
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
 export const getSubmitUserTaskUrl = () => {
-  return `/user/drawing/submit`
+  return `/user/tasks/submit`
 }
 
 export const submitUserTask = async (
@@ -49,7 +49,7 @@ export const submitUserTask = async (
 }
 
 export const getSubmitUserTaskQueryKey = (submitTaskRequest?: MaybeRef<SubmitTaskRequest>) => {
-  return ['POST', 'user', 'drawing', 'submit', submitTaskRequest] as const
+  return ['POST', 'user', 'tasks', 'submit', submitTaskRequest] as const
 }
 
 export const getSubmitUserTaskQueryOptions = <
@@ -102,7 +102,7 @@ export function useSubmitUserTask<
 }
 
 export const getCheckUserTaskSubmitReadinessUrl = () => {
-  return `/user/drawing/submit/readiness`
+  return `/user/tasks/submit/readiness`
 }
 
 export const checkUserTaskSubmitReadiness = async (
@@ -120,7 +120,7 @@ export const checkUserTaskSubmitReadiness = async (
 export const getCheckUserTaskSubmitReadinessQueryKey = (
   submitTaskRequest?: MaybeRef<SubmitTaskRequest>,
 ) => {
-  return ['POST', 'user', 'drawing', 'submit', 'readiness', submitTaskRequest] as const
+  return ['POST', 'user', 'tasks', 'submit', 'readiness', submitTaskRequest] as const
 }
 
 export const getCheckUserTaskSubmitReadinessQueryOptions = <
@@ -190,7 +190,7 @@ export const getListUserTasksUrl = (params?: ListUserTasksParams) => {
 
   const stringifiedParams = normalizedParams.toString()
 
-  return stringifiedParams.length > 0 ? `/user/drawing?${stringifiedParams}` : `/user/drawing`
+  return stringifiedParams.length > 0 ? `/user/tasks?${stringifiedParams}` : `/user/tasks`
 }
 
 export const listUserTasks = async (
@@ -204,7 +204,7 @@ export const listUserTasks = async (
 }
 
 export const getListUserTasksQueryKey = (params?: MaybeRef<ListUserTasksParams>) => {
-  return ['user', 'drawing', ...(params ? [params] : [])] as const
+  return ['user', 'tasks', ...(params ? [params] : [])] as const
 }
 
 export const getListUserTasksQueryOptions = <
@@ -257,7 +257,7 @@ export function useListUserTasks<
 }
 
 export const getGetUserTaskUrl = (taskId: string) => {
-  return `/user/drawing/${encodeURIComponent(String(taskId))}`
+  return `/user/tasks/${encodeURIComponent(String(taskId))}`
 }
 
 export const getUserTask = async (
@@ -271,7 +271,7 @@ export const getUserTask = async (
 }
 
 export const getGetUserTaskQueryKey = (taskId: MaybeRef<string>) => {
-  return ['user', 'drawing', taskId] as const
+  return ['user', 'tasks', taskId] as const
 }
 
 export const getGetUserTaskQueryOptions = <
@@ -325,7 +325,7 @@ export function useGetUserTask<
 }
 
 export const getDeleteUserTaskUrl = (taskId: string) => {
-  return `/user/drawing/${encodeURIComponent(String(taskId))}`
+  return `/user/tasks/${encodeURIComponent(String(taskId))}`
 }
 
 export const deleteUserTask = async (
@@ -339,7 +339,7 @@ export const deleteUserTask = async (
 }
 
 export const getDeleteUserTaskQueryKey = (taskId: MaybeRef<string>) => {
-  return ['DELETE', 'user', 'drawing', taskId] as const
+  return ['DELETE', 'user', 'tasks', taskId] as const
 }
 
 export const getDeleteUserTaskQueryOptions = <
@@ -393,7 +393,7 @@ export function useDeleteUserTask<
 }
 
 export const getStreamUserTaskEventsUrl = (taskId: string) => {
-  return `/user/drawing/${encodeURIComponent(String(taskId))}/events`
+  return `/user/tasks/${encodeURIComponent(String(taskId))}/events`
 }
 
 export const streamUserTaskEvents = async (
@@ -407,7 +407,7 @@ export const streamUserTaskEvents = async (
 }
 
 export const getStreamUserTaskEventsQueryKey = (taskId: MaybeRef<string>) => {
-  return ['user', 'drawing', taskId, 'events'] as const
+  return ['user', 'tasks', taskId, 'events'] as const
 }
 
 export const getStreamUserTaskEventsQueryOptions = <

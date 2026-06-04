@@ -12,40 +12,40 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/share',
     name: 'ShareJoin',
-    component: () => import('../../pages/user/UserShareJoinPage.vue'),
+    component: () => import('../../features/user/pages/UserShareJoinPage.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/user',
-    component: () => import('../../pages/user/UserLayoutPage.vue'),
+    component: () => import('../../features/user/pages/UserLayoutPage.vue'),
     children: [
       {
         path: 'home',
         name: 'UserHome',
-        component: () => import('../../pages/user/UserHomePage.vue'),
+        component: () => import('../../features/user/pages/UserHomePage.vue'),
       },
       {
         path: 'login',
         name: 'UserLogin',
-        component: () => import('../../pages/user/UserHomePage.vue'),
+        component: () => import('../../features/user/pages/UserHomePage.vue'),
         meta: { guest: true },
       },
       {
         path: 'register',
         name: 'UserRegister',
-        component: () => import('../../pages/user/UserHomePage.vue'),
+        component: () => import('../../features/user/pages/UserHomePage.vue'),
         meta: { guest: true },
       },
       {
         path: 'boards',
         name: 'UserBoards',
-        component: () => import('../../pages/user/UserBoardsPage.vue'),
+        component: () => import('../../features/user/pages/UserBoardsPage.vue'),
         meta: { requiresAuth: true },
       },
       {
         path: 'center',
         name: 'UserCenter',
-        component: () => import('../../pages/user/UserCenterPage.vue'),
+        component: () => import('../../features/user/pages/UserCenterPage.vue'),
         meta: { requiresAuth: true },
       },
     ],
@@ -53,7 +53,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/user/workspace',
     name: 'UserWorkspace',
-    component: () => import('../../pages/user/UserWorkspacePage.vue'),
+    component: () => import('../../features/user/pages/UserWorkspacePage.vue'),
     meta: { requiresAuth: true },
   },
   ...adminRoutes,

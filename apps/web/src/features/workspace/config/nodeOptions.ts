@@ -1,4 +1,4 @@
-import type { ViewpointNodeItem } from '../../../types/canvasNodes'
+import type { ViewpointNodeItem } from '../types/canvasNodes'
 
 type OptionItem<T extends string | number> = { label: string; value: T }
 type ViewpointCategory = ViewpointNodeItem['activeCategory']

@@ -371,7 +371,7 @@ cd /root
 TAG=v0.1.0
 BUNDLE="ideaboard-bundle-${TAG}-linux-amd64.tar.gz"
 curl -L -o "$BUNDLE" \
-  "https://github.com/2837123/Feng-AI/releases/download/${TAG}/${BUNDLE}"
+  "https://github.com/Ericsunsk/IdeaBoard/releases/download/${TAG}/${BUNDLE}"
 sha256sum "$BUNDLE"
 ```
 
@@ -570,7 +570,7 @@ server_name _;
 SSE 任务进度接口需要关闭 Nginx 缓冲并放宽读取超时，确认 `ideaboard.conf` 包含以下 location（放在 `location /api/` 之前）：
 
 ```nginx
-location /api/user/drawing/ {
+location /api/user/tasks/ {
     proxy_pass http://127.0.0.1:6000;
     proxy_http_version 1.1;
     proxy_buffering off;

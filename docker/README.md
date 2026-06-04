@@ -95,7 +95,7 @@ docker/nginx/ideaboard.prod.conf
 ```bash
 cp docker/.env.example docker/.env
 nano docker/.env
-IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-backend-stack.sh update
+IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-stack.sh update
 ```
 
 后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。生产 `.env` 必须填写 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 的完整 digest 引用，`ideaboard update` 会在 pull 前自动验签。

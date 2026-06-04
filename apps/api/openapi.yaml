@@ -273,7 +273,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUserBoard'
-  /user/drawing/submit:
+  /user/tasks/submit:
     post:
       tags: [Tasks]
       operationId: submitUserTask
@@ -290,7 +290,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskId'
-  /user/drawing/submit/readiness:
+  /user/tasks/submit/readiness:
     post:
       tags: [Tasks]
       operationId: checkUserTaskSubmitReadiness
@@ -307,7 +307,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskSubmitReadiness'
-  /user/drawing:
+  /user/tasks:
     get:
       tags: [Tasks]
       operationId: listUserTasks
@@ -321,7 +321,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskList'
-  /user/drawing/{task_id}:
+  /user/tasks/{task_id}:
     get:
       tags: [Tasks]
       operationId: getUserTask
@@ -346,7 +346,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseMessage'
-  /user/drawing/{task_id}/events:
+  /user/tasks/{task_id}/events:
     get:
       tags: [Tasks]
       operationId: streamUserTaskEvents
