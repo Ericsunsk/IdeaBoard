@@ -101,13 +101,20 @@ func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `CREATE TRIGGER fail_mark_completed BEFORE UPDATE ON tasks
-FOR EACH ROW
+	if _, err := db.ExecContext(context.Background(), `
+CREATE OR REPLACE FUNCTION fail_mark_completed()
+RETURNS trigger AS $$
 BEGIN
 	IF NEW.status = 'completed' THEN
-		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced mark completed failure';
+		RAISE EXCEPTION 'forced mark completed failure';
 	END IF;
-END`); err != nil {
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER fail_mark_completed BEFORE UPDATE ON tasks
+FOR EACH ROW EXECUTE FUNCTION fail_mark_completed();
+`); err != nil {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 
@@ -270,13 +277,20 @@ func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `CREATE TRIGGER fail_mark_failed BEFORE UPDATE ON tasks
-FOR EACH ROW
+	if _, err := db.ExecContext(context.Background(), `
+CREATE OR REPLACE FUNCTION fail_mark_failed()
+RETURNS trigger AS $$
 BEGIN
 	IF NEW.status = 'failed' THEN
-		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced mark failed failure';
+		RAISE EXCEPTION 'forced mark failed failure';
 	END IF;
-END`); err != nil {
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER fail_mark_failed BEFORE UPDATE ON tasks
+FOR EACH ROW EXECUTE FUNCTION fail_mark_failed();
+`); err != nil {
 		t.Fatalf("create trigger failed: %v", err)
 	}
 

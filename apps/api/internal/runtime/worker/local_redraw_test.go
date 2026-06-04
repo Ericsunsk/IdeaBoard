@@ -208,7 +208,6 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		}
 	}))
 	defer server.Close()
-	t.Setenv("APP_PUBLIC_BASE_URL", server.URL)
 
 	params := map[string]interface{}{
 		"feature":            "partial-edit",

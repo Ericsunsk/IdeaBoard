@@ -187,6 +187,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 	}
 	task := &queuetypes.TaskPayload{
 		TaskID: "task-google-native",
+		UserID: 42,
 		Prompt: "draw a cat",
 		Params: `{"feature":"pattern-gen"}`,
 	}
@@ -204,7 +205,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 	if gotAuth != "" {
 		t.Fatalf("did not expect Authorization header, got %q", gotAuth)
 	}
-	if !strings.Contains(result, `"/uploads/tasks/0/task-google-native/`) {
+	if !strings.Contains(result, `"/uploads/tasks/42/task-google-native/`) {
 		t.Fatalf("expected google image_urls result, got %s", result)
 	}
 }

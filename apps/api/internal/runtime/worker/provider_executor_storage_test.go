@@ -40,6 +40,8 @@ func TestMaterializeProviderResultImagesStoresInlineDataURLToLocalStorage(t *tes
 
 func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	t.Helper()
+	t.Setenv("APP_PUBLIC_ASSET_BASE_URL", "")
+	t.Setenv("APP_PUBLIC_BASE_URL", "")
 	oldWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("get cwd: %v", err)
