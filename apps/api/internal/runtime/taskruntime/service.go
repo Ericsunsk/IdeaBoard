@@ -44,7 +44,6 @@ type TaskStore interface {
 	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error)
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
-	UpsertDailyStatByTask(ctx context.Context, task *tasks.Task) error
 }
 
 type Service struct {
@@ -165,13 +164,6 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseTok
 		return err
 	}
 	if rows > 0 {
-		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
-			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
-				slog.Warn("upsert daily stat failed after complete", "task_id", taskID, "err", statErr)
-			}
-		} else {
-			slog.Warn("load task for daily stat failed after complete", "task_id", taskID, "err", getErr)
-		}
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusCompleted)
 		return nil
 	}
@@ -213,13 +205,6 @@ func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken 
 		return err
 	}
 	if rows > 0 {
-		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
-			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
-				slog.Warn("upsert daily stat failed after fail", "task_id", taskID, "err", statErr)
-			}
-		} else {
-			slog.Warn("load task for daily stat failed after fail", "task_id", taskID, "err", getErr)
-		}
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		return nil
 	}
@@ -323,13 +308,6 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 		return false, err
 	}
 	if rows > 0 {
-		if task, getErr := s.taskRepo.GetByTaskID(ctx, taskID); getErr == nil {
-			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, task); statErr != nil {
-				slog.Warn("upsert daily stat failed after failover final fail", "task_id", taskID, "err", statErr)
-			}
-		} else {
-			slog.Warn("load task for daily stat failed after failover final fail", "task_id", taskID, "err", getErr)
-		}
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
 		return false, nil
 	}

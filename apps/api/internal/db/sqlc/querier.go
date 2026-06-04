@@ -90,7 +90,7 @@ type Querier interface {
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	MarkDailyBackfillDone(ctx context.Context, statDate string) error
-	MarkQueueFailed(ctx context.Context, arg MarkQueueFailedParams) error
+	MarkQueueFailed(ctx context.Context, arg MarkQueueFailedParams) (int64, error)
 	MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error)
 	MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFailedWithLeaseParams) (int64, error)
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)

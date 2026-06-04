@@ -104,24 +104,42 @@ func (r *Repository) GetByTaskIDAndUserID(ctx context.Context, taskID string, us
 }
 
 func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time) (int64, error) {
-	return r.q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
-		ErrorMsg:    errMsg,
-		Result:      result,
-		CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-		TaskID:      taskID,
-		Statuses:    statuses,
+	var rowsAffected int64
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
+			ErrorMsg:    errMsg,
+			Result:      result,
+			CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+			TaskID:      taskID,
+			Statuses:    statuses,
+		})
+		if err != nil || updated == 0 {
+			return err
+		}
+		rowsAffected = updated
+		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
 	})
+	return rowsAffected, err
 }
 
 func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error) {
-	return r.q.MarkTaskFailedWithLease(ctx, dbsqlc.MarkTaskFailedWithLeaseParams{
-		ErrorMsg:    errMsg,
-		Result:      result,
-		CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-		TaskID:      taskID,
-		Statuses:    statuses,
-		LeaseToken:  leaseToken,
+	var rowsAffected int64
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.MarkTaskFailedWithLease(ctx, dbsqlc.MarkTaskFailedWithLeaseParams{
+			ErrorMsg:    errMsg,
+			Result:      result,
+			CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+			TaskID:      taskID,
+			Statuses:    statuses,
+			LeaseToken:  leaseToken,
+		})
+		if err != nil || updated == 0 {
+			return err
+		}
+		rowsAffected = updated
+		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
 	})
+	return rowsAffected, err
 }
 
 func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error) {
@@ -143,14 +161,23 @@ func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID str
 }
 
 func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error) {
-	return r.q.FinalFailTaskRunningWithLease(ctx, dbsqlc.FinalFailTaskRunningWithLeaseParams{
-		ErrorMsg:    errMsg,
-		Result:      result,
-		CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-		TaskID:      taskID,
-		Statuses:    statuses,
-		LeaseToken:  leaseToken,
+	var rowsAffected int64
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.FinalFailTaskRunningWithLease(ctx, dbsqlc.FinalFailTaskRunningWithLeaseParams{
+			ErrorMsg:    errMsg,
+			Result:      result,
+			CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+			TaskID:      taskID,
+			Statuses:    statuses,
+			LeaseToken:  leaseToken,
+		})
+		if err != nil || updated == 0 {
+			return err
+		}
+		rowsAffected = updated
+		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
 	})
+	return rowsAffected, err
 }
 
 func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error) {
@@ -170,7 +197,10 @@ func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskI
 		if err := q.DeleteOutputsByTaskID(ctx, taskID); err != nil {
 			return err
 		}
-		return insertTaskOutputs(ctx, q, taskID, outputs)
+		if err := insertTaskOutputs(ctx, q, taskID, outputs); err != nil {
+			return err
+		}
+		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
 	})
 	return rowsAffected, err
 }
@@ -326,10 +356,16 @@ func (r *Repository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string,
 
 func (r *Repository) MarkQueueFailed(ctx context.Context, taskID string, errMsg string) error {
 	now := time.Now()
-	return r.q.MarkQueueFailed(ctx, dbsqlc.MarkQueueFailedParams{
-		ErrorMsg:    errMsg,
-		CompletedAt: sql.NullTime{Time: now, Valid: true},
-		TaskID:      taskID,
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.MarkQueueFailed(ctx, dbsqlc.MarkQueueFailedParams{
+			ErrorMsg:    errMsg,
+			CompletedAt: sql.NullTime{Time: now, Valid: true},
+			TaskID:      taskID,
+		})
+		if err != nil || updated == 0 {
+			return err
+		}
+		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
 	})
 }
 
@@ -416,12 +452,25 @@ func (r *Repository) UpsertDailyStatByTask(ctx context.Context, task *tasks.Task
 }
 
 func (r *Repository) UpsertDailyStatByTaskWithFallbackModel(ctx context.Context, task *tasks.Task, fallbackModelSet string) error {
-	if task != nil && strings.TrimSpace(fallbackModelSet) == "" && !resultContainsModel(task.Result) {
-		fallbackModelSet = r.resolveAccountSingleModelSet(ctx, task.AccountID)
-	}
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		if task != nil && strings.TrimSpace(fallbackModelSet) == "" && !resultContainsModel(task.Result) {
+			fallbackModelSet = resolveAccountSingleModelSetTx(ctx, q, task.AccountID)
+		}
 		return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModelSet)
 	})
+}
+
+func upsertDailyStatByTaskIDTx(ctx context.Context, q *dbsqlc.Queries, taskID string) error {
+	row, err := q.GetTaskByTaskID(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	task := taskFromSQLC(row)
+	fallbackModelSet := ""
+	if !resultContainsModel(task.Result) {
+		fallbackModelSet = resolveAccountSingleModelSetTx(ctx, q, task.AccountID)
+	}
+	return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, &task, fallbackModelSet)
 }
 
 func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, fallbackModelSet string) error {
@@ -479,11 +528,11 @@ func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Que
 	})
 }
 
-func (r *Repository) resolveAccountSingleModelSet(ctx context.Context, accountID int64) string {
+func resolveAccountSingleModelSetTx(ctx context.Context, q *dbsqlc.Queries, accountID int64) string {
 	if accountID == 0 {
 		return ""
 	}
-	modelSet, err := r.q.GetAccountModelSetByID(ctx, accountID)
+	modelSet, err := q.GetAccountModelSetByID(ctx, accountID)
 	if err != nil {
 		return ""
 	}

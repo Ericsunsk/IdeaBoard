@@ -50,7 +50,6 @@ type TaskStore interface {
 	GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error)
 	DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error
 	MarkQueueFailed(ctx context.Context, taskID string, errMsg string) error
-	UpsertDailyStatByTask(ctx context.Context, task *tasks.Task) error
 	ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error)
 }
 
@@ -157,13 +156,6 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 			return "", fmt.Errorf("任务提交失败，请稍后重试")
 		}
 		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
-		if failedTask, loadErr := s.taskRepo.GetByTaskID(ctx, taskID); loadErr == nil {
-			if statErr := s.taskRepo.UpsertDailyStatByTask(ctx, failedTask); statErr != nil {
-				slog.Warn("upsert daily stat failed after queue fail", "task_id", taskID, "err", statErr)
-			}
-		} else {
-			slog.Warn("load task failed after queue fail", "task_id", taskID, "err", loadErr)
-		}
 		return "", fmt.Errorf("任务提交失败，请稍后重试")
 	}
 
