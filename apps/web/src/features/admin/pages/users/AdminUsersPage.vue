@@ -1,232 +1,332 @@
 <template>
-  <div class="admin-page users-page">
-    <div class="summary-grid">
-      <AdminSummaryCard label="总用户" :value="users.length" />
-      <AdminSummaryCard label="正常" :value="activeUserCount" />
-      <AdminSummaryCard label="封禁" :value="bannedUserCount" />
-      <AdminSummaryCard label="系统保留" :value="reservedUserCount" />
+  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
+    <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
+      <Card>
+        <template #subtitle>总用户</template>
+        <template #title>{{ users.length }}</template>
+      </Card>
+      <Card>
+        <template #subtitle>正常</template>
+        <template #title>{{ activeUserCount }}</template>
+      </Card>
+      <Card>
+        <template #subtitle>封禁</template>
+        <template #title>{{ bannedUserCount }}</template>
+      </Card>
+      <Card>
+        <template #subtitle>系统保留</template>
+        <template #title>{{ reservedUserCount }}</template>
+      </Card>
     </div>
 
-    <AdminToolbar
-      v-model:search="searchKeyword"
-      search-placeholder="搜索用户..."
-      refresh-label="刷新用户"
-      @refresh="loadUsers"
-      @search-submit="loadUsers"
-    >
-      <template #actions>
-        <div class="control-pill">
-          <span class="control-label">开放注册</span>
-          <n-switch
-            v-model:value="registrationEnabled"
-            :loading="registrationSettingLoading"
-            size="small"
-            @update:value="handleToggleRegistration"
-          />
-        </div>
-
-        <n-popover
-          trigger="click"
-          placement="bottom-end"
-          :show-arrow="false"
-          :theme-overrides="adminPopoverPanelThemeOverrides"
-        >
-          <template #trigger>
-            <n-button secondary class="admin-icon-btn">
-              <template #icon
-                ><n-icon><Settings /></n-icon
-              ></template>
-            </n-button>
-          </template>
-          <div class="rate-limit-panel">
-            <div class="panel-header">
-              <div class="panel-title">限流策略</div>
-              <div class="panel-desc">API 请求频率全局控制</div>
-            </div>
-            <div class="panel-body">
-              <n-form
-                :model="rateLimitForm"
-                label-placement="top"
-                size="small"
-                :show-feedback="false"
-              >
-                <div class="form-row">
-                  <n-form-item label="最大请求 (次)" class="flex-1">
-                    <n-input-number
-                      v-model:value="rateLimitForm.max_requests"
-                      :min="1"
-                      placeholder="100"
-                    />
-                  </n-form-item>
-                  <n-form-item label="窗口周期 (秒)" class="flex-1">
-                    <n-input-number
-                      v-model:value="rateLimitForm.window_seconds"
-                      :min="1"
-                      placeholder="60"
-                    />
-                  </n-form-item>
-                </div>
-                <div class="panel-footer">
-                  <n-button
-                    type="primary"
-                    block
-                    :loading="rateLimitSaving"
-                    @click="handleSaveRateLimit"
-                  >
-                    保存配置
-                  </n-button>
-                </div>
-              </n-form>
-            </div>
-          </div>
-        </n-popover>
-      </template>
-    </AdminToolbar>
-
-    <div class="table-card users-table-card">
-      <AdminCardHeader title="用户目录" variant="table">
-        <template #extra>
-          <n-popover
-            placement="bottom-end"
-            trigger="click"
-            :show-arrow="false"
-            :theme-overrides="adminPopoverPanelThemeOverrides"
-          >
-            <template #trigger>
-              <n-button quaternary size="small" class="sort-btn">
-                <template #icon
-                  ><n-icon><Filter /></n-icon
-                ></template>
-                Sort
-                <span v-if="currentSorts.length > 0" class="sort-count"
-                  >({{ currentSorts.length }})</span
-                >
-              </n-button>
+    <Toolbar>
+      <template #start>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <IconField class="relative w-full sm:w-[300px]">
+            <InputIcon>
+              <Search />
+            </InputIcon>
+            <InputText
+              v-model="searchKeyword"
+              placeholder="搜索用户..."
+              fluid
+              @keydown.enter="loadUsers"
+            />
+            <Button
+              v-if="searchKeyword"
+              text
+              rounded
+              class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
+              aria-label="清空搜索"
+              @click="searchKeyword = ''"
+            >
+              <template #icon>
+                <Xmark />
+              </template>
+            </Button>
+          </IconField>
+          <Button text rounded aria-label="刷新用户" @click="loadUsers">
+            <template #icon>
+              <Refresh />
             </template>
-            <div class="sort-panel">
-              <n-checkbox-group v-model:value="currentSorts">
-                <n-space vertical :size="12">
-                  <n-checkbox value="role" class="minimal-checkbox">管理员优先</n-checkbox>
-                  <n-checkbox value="status" class="minimal-checkbox">正常状态优先</n-checkbox>
-                  <n-checkbox
-                    value="newest"
-                    :disabled="currentSorts.includes('oldest')"
-                    class="minimal-checkbox"
-                    >最新加入</n-checkbox
-                  >
-                  <n-checkbox
-                    value="oldest"
-                    :disabled="currentSorts.includes('newest')"
-                    class="minimal-checkbox"
-                    >最早加入</n-checkbox
-                  >
-                </n-space>
-              </n-checkbox-group>
+          </Button>
+        </div>
+      </template>
+      <template #end>
+        <div class="flex flex-wrap items-center justify-end gap-2.5">
+          <div
+            class="flex items-center gap-2.5 rounded-full border border-admin-border bg-admin-surface-muted px-3.5 py-[7px]"
+          >
+            <span class="text-admin-body font-[650] text-admin-text-2">开放注册</span>
+            <ToggleSwitch
+              v-model="registrationEnabled"
+              size="small"
+              :disabled="registrationSettingLoading"
+              @update:model-value="handleToggleRegistration"
+            />
+          </div>
+
+          <Button
+            text
+            rounded
+            class="!min-w-[38px] !rounded-xl"
+            aria-label="打开限流策略"
+            @click="toggleRateLimitPanel"
+          >
+            <template #icon>
+              <Settings />
+            </template>
+          </Button>
+          <Popover ref="rateLimitPopoverRef">
+            <div class="w-[280px] max-w-[calc(100vw_-_48px)] bg-admin-card">
+              <div class="border-b border-admin-border px-5 py-4">
+                <div class="text-admin-content font-semibold text-admin-title-color">限流策略</div>
+                <div class="mt-0.5 text-admin-meta text-admin-subtitle-color">
+                  API 请求频率全局控制
+                </div>
+              </div>
+              <div class="px-5 py-5">
+                <div class="flex flex-col gap-3.5">
+                  <div class="grid grid-cols-1 gap-3">
+                    <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+                      <span>最大请求 (次)</span>
+                      <InputNumber
+                        v-model="rateLimitForm.max_requests"
+                        :min="1"
+                        placeholder="100"
+                        fluid
+                      />
+                    </label>
+                    <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+                      <span>窗口周期 (秒)</span>
+                      <InputNumber
+                        v-model="rateLimitForm.window_seconds"
+                        :min="1"
+                        placeholder="60"
+                        fluid
+                      />
+                    </label>
+                  </div>
+                  <div class="mt-4">
+                    <Button
+                      label="保存配置"
+                      :loading="rateLimitSaving"
+                      fluid
+                      @click="handleSaveRateLimit"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-          </n-popover>
+          </Popover>
+        </div>
+      </template>
+    </Toolbar>
+
+    <div
+      class="min-w-0 overflow-visible rounded-[20px] border border-admin-border-soft bg-admin-card-strong p-0 shadow-none"
+    >
+      <Toolbar class="border-0 border-b border-admin-border-soft bg-transparent">
+        <template #start>
+          <span class="text-admin-title-sm font-bold text-admin-title-color">用户目录</span>
         </template>
-      </AdminCardHeader>
-      <div class="table-container">
-        <n-data-table
-          :columns="columns"
-          :data="sortedUsers"
-          :loading="loading"
-          :pagination="false"
-          :bordered="false"
-          :show-header="false"
-          :row-key="(row: User) => row.id"
-          class="admin-compact-table"
-        />
-      </div>
+        <template #end>
+          <SelectButton
+            v-model="currentSorts"
+            :options="sortOptions"
+            option-label="label"
+            option-value="value"
+            option-disabled="disabled"
+            multiple
+            :allow-empty="false"
+            size="small"
+            class="max-w-full"
+          />
+        </template>
+      </Toolbar>
+      <DataTable
+        :value="sortedUsers"
+        :loading="loading"
+        data-key="id"
+        row-hover
+        class="overflow-hidden rounded-b-[20px]"
+        :pt="adminDenseDataTablePt"
+      >
+        <Column header="用户" :style="{ minWidth: '240px' }">
+          <template #body="{ data: user }">
+            <div class="flex min-w-0 items-center gap-3">
+              <div class="relative shrink-0">
+                <Avatar
+                  v-if="user.avatar"
+                  :image="user.avatar"
+                  shape="circle"
+                  class="!h-9 !w-9"
+                />
+                <Avatar
+                  v-else
+                  :label="getUserInitial(user)"
+                  shape="circle"
+                  class="!h-9 !w-9 !bg-admin-surface-muted !font-bold !text-admin-accent"
+                />
+                <span
+                  class="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
+                  :class="user.status === 1 ? 'bg-admin-success' : 'bg-admin-danger'"
+                />
+              </div>
+              <div class="min-w-0">
+                <div class="truncate text-admin-content font-bold text-admin-text-1">
+                  {{ user.username }}
+                </div>
+                <div class="truncate font-mono text-admin-caption text-admin-text-3">
+                  ID: {{ user.uid }}
+                </div>
+              </div>
+            </div>
+          </template>
+        </Column>
+
+        <Column header="角色" :style="{ width: '112px' }">
+          <template #body="{ data: user }">
+            <Tag
+              :value="user.role === 'admin' ? 'Admin' : 'User'"
+              :severity="user.role === 'admin' ? 'danger' : 'secondary'"
+              rounded
+            />
+          </template>
+        </Column>
+
+        <Column header="状态" :style="{ width: '112px' }">
+          <template #body="{ data: user }">
+            <Tag
+              :value="user.status === 1 ? '正常' : '封禁'"
+              :severity="user.status === 1 ? 'success' : 'danger'"
+              rounded
+            />
+          </template>
+        </Column>
+
+        <Column header="加入时间" :style="{ width: '136px' }">
+          <template #body="{ data: user }">
+            <span class="text-admin-body text-admin-text-3">
+              {{ user.created_at ? formatDateOnly(user.created_at) : '-' }}
+            </span>
+          </template>
+        </Column>
+
+        <Column header="操作" :style="{ width: '72px' }" :body-style="{ textAlign: 'right' }">
+          <template #body="{ data: user }">
+            <Button
+              text
+              rounded
+              aria-haspopup="menu"
+              :aria-label="`${user.username} 操作菜单`"
+              @click="toggleUserActionMenu($event, user)"
+            >
+              <template #icon>
+                <MoreHoriz />
+              </template>
+            </Button>
+          </template>
+        </Column>
+
+        <template #empty>暂无匹配用户</template>
+        <template #loading>正在加载用户...</template>
+      </DataTable>
+      <Menu ref="userActionMenuRef" :model="userActionMenuItems" popup />
     </div>
   </div>
 
-  <!-- 高级封禁弹窗 -->
-  <n-modal
-    v-model:show="showBanModal"
-    preset="card"
-    title="高级访问限制"
-    style="
-      width: 440px;
-      border-radius: 16px;
-      background: var(--admin-card);
-      border: 1px solid var(--admin-border);
-    "
+  <Dialog
+    :visible="showBanModal"
+    modal
+    dismissable-mask
+    :draggable="false"
+    :style="{ width: '480px', maxWidth: 'calc(100vw - 24px)' }"
+    @update:visible="handleBanDialogVisibleUpdate"
   >
-    <div
-      style="
-        color: var(--admin-text-2);
-        margin-bottom: 24px;
-        font-size: var(--admin-font-size-content);
-        line-height: 1.6;
-      "
-    >
-      您即将对用户
-      <strong style="color: var(--admin-text-1)">{{ banUserContext?.username }}</strong>
-      实施强制访问限制。该用户将立即断开所有连接，并且在封禁期间无法重新登录。
-    </div>
-    <n-form :model="banForm" label-placement="top">
-      <n-form-item label="封禁时长 (Duration)">
-        <n-select
-          v-model:value="banForm.expiresInDays"
-          :options="[
-            { label: '永久封禁 (Permanent)', value: 0 },
-            { label: '1 天 (24 小时警告)', value: 1 },
-            { label: '7 天 (严重警告)', value: 7 },
-            { label: '30 天 (短期隔离)', value: 30 },
-          ]"
-        />
-      </n-form-item>
-      <n-form-item label="封禁原因 (内部记录)">
-        <n-input
-          v-model:value="banForm.reason"
-          type="textarea"
-          placeholder="例如：发表违规内容、恶意刷量..."
-          :rows="3"
-        />
-      </n-form-item>
-      <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px">
-        <n-button quaternary @click="showBanModal = false">取消</n-button>
-        <n-button
-          type="error"
-          :loading="banFormLoading"
-          style="border-radius: 6px"
-          @click="confirmBanUser"
-        >
-          确认封禁
-        </n-button>
+    <template #header>
+      <div class="min-w-0 pr-4">
+        <div class="mb-3 flex flex-wrap gap-2">
+          <Tag value="访问控制" severity="secondary" rounded />
+          <Tag value="强制限制" severity="danger" rounded />
+        </div>
+        <h2 class="m-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color">
+          高级访问限制
+        </h2>
+        <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-subtitle-color">
+          {{ banModalDescription }}
+        </p>
       </div>
-    </n-form>
-  </n-modal>
+    </template>
+
+    <div class="flex flex-col gap-3.5">
+      <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+        <span>封禁时长 (Duration)</span>
+        <Select
+          v-model="banForm.expiresInDays"
+          :options="banDurationOptions"
+          option-label="label"
+          option-value="value"
+          class="w-full"
+        />
+      </label>
+      <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+        <span>封禁原因 (内部记录)</span>
+        <Textarea
+          v-model="banForm.reason"
+          placeholder="例如：发表违规内容、恶意刷量..."
+          rows="3"
+          auto-resize
+          class="w-full"
+        />
+      </label>
+    </div>
+
+    <template #footer>
+      <div class="flex w-full flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div class="max-w-[480px] text-admin-meta leading-6 text-admin-text-3">
+          封禁会立即断开该用户所有连接，封禁期间无法重新登录。
+        </div>
+        <div class="flex flex-wrap justify-end gap-2">
+          <Button label="取消" severity="secondary" outlined @click="closeBanModal" />
+          <Button
+            label="确认封禁"
+            severity="danger"
+            :loading="banFormLoading"
+            @click="confirmBanUser"
+          />
+        </div>
+      </div>
+    </template>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
 import { authClient, extractBetterAuthErrorMessage } from '../../../../shared/auth/client'
-import {
-  NInput,
-  NButton,
-  NDataTable,
-  NIcon,
-  NTag,
-  NSpace,
-  NSwitch,
-  NPopover,
-  NInputNumber,
-  NForm,
-  NFormItem,
-  NAvatar,
-  NDropdown,
-  useMessage,
-  useDialog,
-  NModal,
-  NSelect,
-  NCheckboxGroup,
-  NCheckbox,
-} from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
+import Avatar from 'primevue/avatar'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Dialog from 'primevue/dialog'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
+import Popover from 'primevue/popover'
+import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
+import Tag from 'primevue/tag'
+import Textarea from 'primevue/textarea'
+import ToggleSwitch from 'primevue/toggleswitch'
+import Toolbar from 'primevue/toolbar'
+import { useConfirm } from 'primevue/useconfirm'
 import type { User } from '../../../../shared/types'
+import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDateOnly } from '../../../../shared/utils/dateTime'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
+import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import {
   getListAdminUsersQueryKey,
   useListAdminUsers,
@@ -246,14 +346,32 @@ import {
   updateRateLimitSettings,
   updateRegistrationSetting,
 } from '../../shared/queries/adminActions'
-import { Filter, MoreHoriz, Settings } from '@iconoir/vue'
-import AdminToolbar from '../../shared/components/AdminToolbar.vue'
-import { adminPopoverPanelThemeOverrides } from '../../shared/theme/adminThemeOverrides'
+import { MoreHoriz, Refresh, Search, Settings, Xmark } from '@iconoir/vue'
 
-const message = useMessage()
-const dialog = useDialog()
+type UserActionKey = 'status' | 'revoke' | 'impersonate' | 'role' | 'delete'
+
+type UserActionItem = {
+  key: UserActionKey
+  label: string
+  disabled?: boolean
+  divided?: boolean
+}
+
+type PrimePopupPanel = {
+  toggle: (event: Event) => void
+}
+
+type PrimePopupMenu = PrimePopupPanel & {
+  hide?: () => void
+}
+
+const appToast = useAppToast()
+const confirm = useConfirm()
 
 const queryClient = useQueryClient()
+const rateLimitPopoverRef = ref<PrimePopupPanel | null>(null)
+const userActionMenuRef = ref<PrimePopupMenu | null>(null)
+const activeActionUser = ref<User | null>(null)
 const userListParams = { page: 1, page_size: 100 } as const
 const searchKeyword = ref('')
 const appliedSearchKeyword = ref('')
@@ -315,6 +433,25 @@ const updateRegistrationSettingMutation = useMutation({
 const users = computed<User[]>(() => usersQuery.data.value?.data?.list ?? [])
 const loading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
 const currentSorts = ref<string[]>(['role', 'status', 'newest'])
+const sortOptions = computed(() => [
+  { label: '管理员优先', value: 'role' },
+  { label: '正常状态优先', value: 'status' },
+  { label: '最新加入', value: 'newest', disabled: currentSorts.value.includes('oldest') },
+  { label: '最早加入', value: 'oldest', disabled: currentSorts.value.includes('newest') },
+])
+const userActionMenuItems = computed<MenuItem[]>(() => {
+  const user = activeActionUser.value
+  if (!user) return []
+
+  return getUserActionItems(user).flatMap((item) => {
+    const menuItem: MenuItem = {
+      label: item.label,
+      disabled: item.disabled,
+      command: () => handleActionSelect(item.key, user),
+    }
+    return item.divided ? [{ separator: true } as MenuItem, menuItem] : [menuItem]
+  })
+})
 
 // 后端限流配置状态
 const rateLimitForm = ref({
@@ -341,17 +478,30 @@ const banForm = ref({
   reason: '',
 })
 
+const banDurationOptions: Array<{ label: string; value: number }> = [
+  { label: '永久封禁 (Permanent)', value: 0 },
+  { label: '1 天 (24 小时警告)', value: 1 },
+  { label: '7 天 (严重警告)', value: 7 },
+  { label: '30 天 (短期隔离)', value: 30 },
+]
+
+const banModalDescription = computed(() =>
+  banUserContext.value
+    ? `您即将对用户 ${banUserContext.value.username} 实施强制访问限制。`
+    : '请选择用户后再配置访问限制。',
+)
+
 watch(
   () => usersQuery.error.value,
   (error) => {
-    if (error) message.error(formatDisplayErrorMessage(error, '加载用户失败'))
+    if (error) appToast.error(formatDisplayErrorMessage(error, '加载用户失败'))
   },
 )
 
 watch(
   () => registrationSettingQuery.error.value || rateLimitSettingsQuery.error.value,
   (error) => {
-    if (error) message.error(formatDisplayErrorMessage(error, '加载后台配置失败'))
+    if (error) appToast.error(formatDisplayErrorMessage(error, '加载后台配置失败'))
   },
 )
 
@@ -376,119 +526,57 @@ watch(
   { immediate: true },
 )
 
-const columns: DataTableColumns<User> = [
-  {
-    title: '用户信息',
-    key: 'user',
-    render: (row) => {
-      return h('div', { class: 'user-profile-cell' }, [
-        h('div', { class: 'avatar-wrapper' }, [
-          h(NAvatar, {
-            round: true,
-            size: 26,
-            src: row.avatar || undefined,
-            fallbackSrc: 'https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg',
-          }),
-          h('span', {
-            class: ['user-avatar-status', row.status === 1 ? 'is-normal' : 'is-banned'],
-          }),
-        ]),
-        h('div', { style: 'display: flex; flex-direction: column; gap: 0px;' }, [
-          h('span', { class: 'user-name' }, row.username),
-          h('span', { class: 'user-id' }, `ID: ${row.uid}`),
-        ]),
-      ])
+function getUserInitial(user: User) {
+  return (user.username || user.uid || '?').slice(0, 1).toUpperCase()
+}
+
+function toggleRateLimitPanel(event: Event) {
+  rateLimitPopoverRef.value?.toggle(event)
+}
+
+function toggleUserActionMenu(event: Event, user: User) {
+  activeActionUser.value = user
+  userActionMenuRef.value?.toggle(event)
+}
+
+function getUserActionItems(row: User): UserActionItem[] {
+  const isAdmin = row.role === 'admin'
+  return [
+    {
+      key: 'status',
+      label: row.status === 1 ? '用户封禁' : '解除封禁',
+      disabled: isAdmin,
     },
-  },
-  {
-    title: '角色',
-    key: 'role',
-    width: 100,
-    render: (row) => {
-      const isAdmin = row.role === 'admin'
-      return h(
-        NTag,
-        {
-          type: isAdmin ? 'error' : 'info',
-          size: 'small',
-          round: true,
-          bordered: false,
-          style:
-            (isAdmin
-              ? 'background: rgba(239, 68, 68, 0.1); color: var(--admin-danger);'
-              : 'background: var(--admin-surface-muted); color: var(--admin-text-3);') +
-            ' border-radius: 99px !important; padding: 0 10px; font-weight: 600; font-size: var(--admin-font-size-caption);',
-        },
-        { default: () => (isAdmin ? 'Admin' : 'User') },
-      )
+    { key: 'revoke', label: '吊销会话' },
+    { key: 'impersonate', label: '伪装登录' },
+    {
+      key: 'role',
+      label: isAdmin ? '取消管理' : '设为管理',
     },
-  },
-  {
-    title: '加入时间',
-    key: 'created_at',
-    width: 160,
-    render: (row) => {
-      return h(
-        'span',
-        { style: 'color: var(--admin-text-3); font-size: var(--admin-font-size-body);' },
-        row.created_at ? formatDateOnly(row.created_at) : '-',
-      )
+    {
+      key: 'delete',
+      label: '注销用户',
+      disabled: isAdmin,
+      divided: true,
     },
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 80,
-    align: 'right',
-    render: (row) => {
-      const isAdmin = row.role === 'admin'
-      return h(
-        NDropdown,
-        {
-          trigger: 'click',
-          options: [
-            {
-              label: row.status === 1 ? '用户封禁' : '解除封禁',
-              key: 'status',
-              disabled: isAdmin,
-              props: {
-                style:
-                  row.status === 1 ? 'color: var(--admin-danger)' : 'color: var(--admin-success)',
-              },
-            },
-            { label: '吊销会话', key: 'revoke' },
-            { label: '伪装登录', key: 'impersonate' },
-            {
-              label: isAdmin ? '取消管理' : '设为管理',
-              key: 'role',
-              props: {
-                style: isAdmin ? 'color: var(--admin-warning)' : 'color: var(--admin-accent)',
-              },
-            },
-            { type: 'divider', key: 'd1' },
-            {
-              label: '注销用户',
-              key: 'delete',
-              disabled: isAdmin,
-              props: { style: 'color: var(--admin-danger)' },
-            },
-          ],
-          onSelect: (key) => handleAction(key, row),
-        },
-        {
-          default: () =>
-            h(
-              NButton,
-              { quaternary: true, circle: true, size: 'small' },
-              {
-                icon: () => h(NIcon, null, { default: () => h(MoreHoriz) }),
-              },
-            ),
-        },
-      )
-    },
-  },
-]
+  ]
+}
+
+function handleActionSelect(key: UserActionKey, row: User) {
+  activeActionUser.value = null
+  userActionMenuRef.value?.hide?.()
+  handleAction(key, row)
+}
+
+function closeBanModal() {
+  if (banFormLoading.value) return
+  showBanModal.value = false
+  banUserContext.value = null
+}
+
+function handleBanDialogVisibleUpdate(visible: boolean) {
+  if (!visible) closeBanModal()
+}
 
 const sortedUsers = computed(() => {
   const kw = searchKeyword.value.trim().toLowerCase()
@@ -543,9 +631,9 @@ async function handleSaveRateLimit() {
       window_seconds: rateLimitForm.value.window_seconds,
       max_requests: rateLimitForm.value.max_requests,
     })
-    message.success('限流配置已保存')
+    appToast.success('限流配置已保存')
   } catch (error) {
-    message.error(formatDisplayErrorMessage(error, '保存失败'))
+    appToast.error(formatDisplayErrorMessage(error, '保存失败'))
   }
 }
 
@@ -553,14 +641,14 @@ async function handleToggleRegistration(newValue: boolean) {
   const fallbackEnabled = registrationSettingQuery.data.value?.data?.enabled ?? !newValue
   try {
     await updateRegistrationSettingMutation.mutateAsync(newValue)
-    message.success(newValue ? '已开放注册' : '已关闭注册')
+    appToast.success(newValue ? '已开放注册' : '已关闭注册')
   } catch (error) {
     registrationEnabled.value = fallbackEnabled
-    message.error(formatDisplayErrorMessage(error, '更新注册状态失败'))
+    appToast.error(formatDisplayErrorMessage(error, '更新注册状态失败'))
   }
 }
 
-function handleAction(key: string, row: User) {
+function handleAction(key: UserActionKey, row: User) {
   switch (key) {
     case 'status':
       handleToggleStatus(row)
@@ -580,9 +668,34 @@ function handleAction(key: string, row: User) {
   }
 }
 
+function requireAdminConfirm(options: {
+  header: string
+  message: string
+  acceptLabel: string
+  severity: 'warn' | 'danger'
+  accept: () => void | Promise<void>
+}) {
+  confirm.require({
+    header: options.header,
+    message: options.message,
+    rejectLabel: '取消',
+    acceptLabel: options.acceptLabel,
+    acceptProps: {
+      severity: options.severity,
+    },
+    rejectProps: {
+      severity: 'secondary',
+      outlined: true,
+    },
+    accept: () => {
+      void options.accept()
+    },
+  })
+}
+
 function handleToggleStatus(row: User) {
   if (row.role === 'admin') {
-    message.warning('管理员账号不可封禁或解封')
+    appToast.warning('管理员账号不可封禁或解封')
     return
   }
 
@@ -591,17 +704,17 @@ function handleToggleStatus(row: User) {
     banForm.value = { expiresInDays: 0, reason: '' }
     showBanModal.value = true
   } else {
-    dialog.warning({
-      title: '确认解除封禁',
-      content: `确定要恢复用户 ${row.username} 的访问权限吗？`,
-      positiveText: '确认解封',
-      negativeText: '取消',
-      onPositiveClick: async () => {
+    requireAdminConfirm({
+      header: '确认解除封禁',
+      message: `确定要恢复用户 ${row.username} 的访问权限吗？`,
+      acceptLabel: '确认解封',
+      severity: 'warn',
+      accept: async () => {
         try {
           await unbanUserMutation.mutateAsync(row.id)
-          message.success('已解除封禁')
+          appToast.success('已解除封禁')
         } catch (error) {
-          message.error(formatDisplayErrorMessage(error, '解封失败'))
+          appToast.error(formatDisplayErrorMessage(error, '解封失败'))
         }
       },
     })
@@ -618,10 +731,11 @@ const confirmBanUser = async () => {
       reason: banForm.value.reason || undefined,
       expires_in_days: banForm.value.expiresInDays || undefined,
     })
-    message.success(`已高级封禁用户 ${row.username}`)
+    appToast.success(`已高级封禁用户 ${row.username}`)
     showBanModal.value = false
+    banUserContext.value = null
   } catch (error) {
-    message.error(formatDisplayErrorMessage(error, '封禁失败'))
+    appToast.error(formatDisplayErrorMessage(error, '封禁失败'))
   } finally {
     banFormLoading.value = false
   }
@@ -629,17 +743,17 @@ const confirmBanUser = async () => {
 
 function handleRevokeSessions(row: User) {
   if (!row.auth_user_id) return
-  dialog.warning({
-    title: '确认踢下线',
-    content: `将强制吊销账号 ${row.username} 的所有活跃会话，是否继续？`,
-    positiveText: '确认',
-    negativeText: '取消',
-    onPositiveClick: async () => {
+  requireAdminConfirm({
+    header: '确认踢下线',
+    message: `将强制吊销账号 ${row.username} 的所有活跃会话，是否继续？`,
+    acceptLabel: '确认',
+    severity: 'warn',
+    accept: async () => {
       try {
         await revokeUserSessionsMutation.mutateAsync(row.id)
-        message.success('已强制吊销所有会话')
+        appToast.success('已强制吊销所有会话')
       } catch (error) {
-        message.error(formatDisplayErrorMessage(error, '操作失败'))
+        appToast.error(formatDisplayErrorMessage(error, '操作失败'))
       }
     },
   })
@@ -647,31 +761,31 @@ function handleRevokeSessions(row: User) {
 
 async function handleImpersonate(row: User) {
   if (!row.auth_user_id) {
-    message.error('目标用户缺少 Auth 标识，无法伪装登录')
+    appToast.error('目标用户缺少 Auth 标识，无法伪装登录')
     return
   }
   try {
     const { error } = await authClient.admin.impersonateUser({ userId: row.auth_user_id! })
     if (error) throw error
-    message.success(`正在以 ${row.username} 的身份登录...`)
+    appToast.success(`正在以 ${row.username} 的身份登录...`)
     setTimeout(() => (window.location.href = '/'), 1000)
   } catch (err: any) {
-    message.error(extractBetterAuthErrorMessage(err, '伪装失败'))
+    appToast.error(extractBetterAuthErrorMessage(err, '伪装失败'))
   }
 }
 
 function handleDeleteUser(row: User) {
-  dialog.error({
-    title: '危险操作：彻底注销',
-    content: `确定要彻底删除用户 ${row.username} 吗？此操作将清除该用户在 Auth 及业务数据库中的所有数据，不可撤销！`,
-    positiveText: '确定删除',
-    negativeText: '取消',
-    onPositiveClick: async () => {
+  requireAdminConfirm({
+    header: '危险操作：彻底注销',
+    message: `确定要彻底删除用户 ${row.username} 吗？此操作将清除该用户在 Auth 及业务数据库中的所有数据，不可撤销！`,
+    acceptLabel: '确定删除',
+    severity: 'danger',
+    accept: async () => {
       try {
         await deleteUserMutation.mutateAsync(row.id)
-        message.success('用户已受控彻底注销')
+        appToast.success('用户已受控彻底注销')
       } catch (err: any) {
-        message.error(formatDisplayErrorMessage(err, '注销失败'))
+        appToast.error(formatDisplayErrorMessage(err, '注销失败'))
       }
     },
   })
@@ -679,20 +793,20 @@ function handleDeleteUser(row: User) {
 
 function handleToggleRole(row: User) {
   const nextRole: 'admin' | 'user' = row.role === 'admin' ? 'user' : 'admin'
-  dialog.warning({
-    title: nextRole === 'admin' ? '确认设为管理员' : '确认取消管理员',
-    content:
+  requireAdminConfirm({
+    header: nextRole === 'admin' ? '确认设为管理员' : '确认取消管理员',
+    message:
       nextRole === 'admin'
         ? `确定要将用户 ${row.username} 设为管理员吗？该用户将获得后台访问权限。`
         : `确定要取消用户 ${row.username} 的管理员权限吗？`,
-    positiveText: '确认',
-    negativeText: '取消',
-    onPositiveClick: async () => {
+    acceptLabel: '确认',
+    severity: 'warn',
+    accept: async () => {
       try {
         await updateUserRoleMutation.mutateAsync({ id: row.id, role: nextRole })
-        message.success(nextRole === 'admin' ? '已设为管理员' : '已取消管理员')
+        appToast.success(nextRole === 'admin' ? '已设为管理员' : '已取消管理员')
       } catch (err: any) {
-        message.error(formatDisplayErrorMessage(err, '角色更新失败'))
+        appToast.error(formatDisplayErrorMessage(err, '角色更新失败'))
       }
     },
   })
@@ -702,150 +816,3 @@ const activeUserCount = computed(() => users.value.filter((u) => u.status === 1)
 const bannedUserCount = computed(() => users.value.filter((u) => u.status === 0).length)
 const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'admin').length)
 </script>
-
-<style scoped>
-@import '../../shared/styles/adminCommon.css';
-
-.admin-compact-table :deep(.user-profile-cell) {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.admin-compact-table :deep(.avatar-wrapper) {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  overflow: visible;
-  flex-shrink: 0;
-}
-
-.admin-compact-table :deep(.user-avatar-status) {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 8px;
-  height: 8px;
-  box-sizing: border-box;
-  border: 1.5px solid var(--admin-card-strong);
-  border-radius: 50%;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.admin-compact-table :deep(.user-avatar-status.is-normal) {
-  background: var(--admin-success);
-}
-
-.admin-compact-table :deep(.user-avatar-status.is-banned) {
-  background: var(--admin-danger-hover);
-}
-
-.admin-compact-table :deep(.user-name) {
-  font-weight: 600;
-  color: var(--admin-text-1);
-  font-size: var(--admin-font-size-content);
-}
-
-.admin-compact-table :deep(.user-id) {
-  font-size: var(--admin-font-size-caption);
-  color: var(--admin-text-3);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-.admin-compact-table :deep(.status-badge-cell) {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background-color: var(--admin-surface-muted);
-  border: 1px solid var(--admin-border);
-  border-radius: 999px;
-}
-
-.admin-compact-table :deep(.status-text) {
-  font-size: var(--admin-font-size-meta);
-  font-weight: 500;
-  color: var(--admin-text-2);
-}
-
-.rate-limit-panel {
-  width: 280px;
-  background: var(--admin-card);
-}
-
-.panel-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--admin-border);
-}
-
-.panel-title {
-  font-size: var(--admin-font-size-content);
-  font-weight: 600;
-  color: var(--admin-title-color);
-}
-
-.panel-desc {
-  font-size: var(--admin-font-size-meta);
-  color: var(--admin-subtitle-color);
-  margin-top: 2px;
-}
-
-.panel-body {
-  padding: 20px;
-}
-
-.form-row {
-  display: flex;
-  gap: 12px;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.panel-footer {
-  margin-top: 16px;
-}
-
-.users-table-card {
-  padding: 0;
-  overflow: hidden;
-}
-
-.sort-btn {
-  border-radius: 6px;
-  font-weight: 500;
-  color: var(--admin-text-2);
-}
-
-.sort-count {
-  margin-left: 4px;
-  opacity: 0.8;
-}
-
-.sort-panel {
-  min-width: 130px;
-  padding: 12px;
-}
-
-.minimal-checkbox {
-  --n-font-size: var(--admin-font-size-body) !important;
-  color: var(--admin-text-2);
-}
-
-.minimal-checkbox:hover {
-  color: var(--admin-text-1);
-}
-
-.table-container {
-  padding: 0;
-}
-
-.users-table-card :deep(.n-data-table-thead) {
-  display: none;
-}
-</style>

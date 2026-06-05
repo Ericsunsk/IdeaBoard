@@ -1,5 +1,14 @@
-import type { EChartsOption } from 'echarts'
-import type { Ref } from 'vue'
+import { computed, type Ref } from 'vue'
+import {
+  adminChartTheme,
+  defineAdminChartData,
+  defineAdminChartOptions,
+  getParsedY,
+  type AdminChartData,
+  type AdminChartOptions,
+  type AdminTooltipItem,
+  withAlpha,
+} from '../../shared/lib/adminChart'
 
 type StatisticsLike = {
   summary?: {
@@ -54,30 +63,53 @@ type MonitorLike = {
   account_loads: Record<number, { current_concurrent: number; max_concurrent: number }>
 }
 
-const adminChartTheme = {
-  tooltipBg: '#f8fafc',
-  tooltipBorder: '#d9e2ef',
-  tooltipText: '#0f172a',
-  tooltipMuted: '#64748b',
-  axisLine: '#d5deea',
-  axisText: '#6e7487',
-  splitLine: '#edf2f7',
-  legendText: '#475569',
-  legendInactive: '#cbd5e1',
-  emptyText: '#6e7487',
-  emptyStroke: '#c8d0e4',
-  cardBg: '#f8fafc',
-  mainText: '#293042',
-  shadow: 'rgba(41,48,66,0.18)',
+type ModelRiskPoint = {
+  x: number
+  y: number
+  name: string
+  total: number
+  failed: number
+  avgSeconds: number
+  failureRate: number
 }
+
+type SlowModelPoint = {
+  value: number
+  name: string
+  avgSeconds: number
+  samples: number
+}
+
+type AccountLoadPoint = {
+  value: number
+  id: string
+  current: number
+  max: number
+}
+
+type UserRiskPoint = {
+  value: number
+  name: string
+  failed: number
+  completed: number
+  total: number
+  failureRate: number
+}
+
+const defaultModelColors = [
+  adminChartTheme.brand,
+  adminChartTheme.slate,
+  adminChartTheme.cyan,
+  adminChartTheme.olive,
+  adminChartTheme.mauve,
+  adminChartTheme.mist,
+]
 
 export function useUsageStatisticsCharts(options: {
   adminStatistics: Ref<StatisticsLike | null>
   timeRange: Ref<string>
   monitorData: Ref<MonitorLike | null>
 }) {
-  const defaultModelColors = ['#818cf8', '#c084fc', '#22d3ee', '#14b8a6', '#f59e0b', '#ef4444']
-
   function getModelColorByName(name: string) {
     const key = normalizeModelName(name)
     if (!key) return null
@@ -106,7 +138,7 @@ export function useUsageStatisticsCharts(options: {
         }
       })
       if (segments.length === 0)
-        segments.push({ label: '无数据', value: 0, color: adminChartTheme.emptyStroke })
+        segments.push({ label: '无数据', value: 0, color: adminChartTheme.emptyText })
       return { date: day.label || day.date, total: day.total, segments }
     })
   })
@@ -147,97 +179,70 @@ export function useUsageStatisticsCharts(options: {
     return true
   }
 
-  const trendChartOption = computed<EChartsOption>(() => {
-    const categories = trendData.value.map((day) => day.date)
-    const hasAnyCalls = trendData.value.some((day) => day.total > 0)
+  const trendChartData = computed<AdminChartData>(() =>
+    defineAdminChartData({
+      labels: trendData.value.map((day) => day.date),
+      datasets: trendSeriesModelOrder.value.map((model) => ({
+        type: 'line',
+        label: model.label,
+        data: trendData.value.map((day) => {
+          const segment = day.segments.find((seg) => seg.label === model.label)
+          return segment?.value || 0
+        }),
+        borderColor: model.color,
+        backgroundColor: withAlpha(model.color, 0.16),
+        fill: true,
+        tension: 0.38,
+        borderWidth: 2,
+        pointRadius: trendData.value.length <= 1 ? 3 : 0,
+        pointHoverRadius: 4,
+        pointBackgroundColor: model.color,
+        stack: 'usage',
+      })),
+    }),
+  )
 
-    const series = trendSeriesModelOrder.value.map((model) => ({
-      name: model.label,
-      type: 'line' as const,
-      smooth: true,
-      stack: 'usage',
-      symbol: trendData.value.length <= 1 ? 'circle' : 'none',
-      symbolSize: 6,
-      showSymbol: trendData.value.length <= 1,
-      lineStyle: { width: 2, color: model.color },
-      areaStyle: { opacity: 0.16, color: model.color },
-      emphasis: { focus: 'series' as const },
-      data: trendData.value.map((day) => {
-        const segment = day.segments.find((seg) => seg.label === model.label)
-        return segment?.value || 0
-      }),
-    }))
-
-    return {
-      animationDuration: 300,
-      color: trendSeriesModelOrder.value.map((m) => m.color),
-      legend: {
-        type: 'scroll',
-        top: 0,
-        left: 0,
-        right: 0,
-        icon: 'roundRect',
-        itemWidth: 10,
-        itemHeight: 6,
-        itemGap: 14,
-        pageIconColor: adminChartTheme.legendText,
-        pageIconInactiveColor: adminChartTheme.legendInactive,
-        pageTextStyle: { color: adminChartTheme.axisText },
-        textStyle: { color: adminChartTheme.legendText, fontSize: 11 },
-      },
-      grid: { left: 18, right: 24, top: 42, bottom: 34, containLabel: true },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: adminChartTheme.tooltipBg,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
-        axisPointer: {
-          type: 'line',
-          lineStyle: { color: adminChartTheme.tooltipMuted, type: 'dashed' },
-        },
-        valueFormatter: (value: number | string) => Number(value || 0).toLocaleString(),
-      },
-      xAxis: {
-        type: 'category',
-        boundaryGap: false,
-        data: categories,
-        axisLine: { lineStyle: { color: adminChartTheme.axisLine } },
-        axisTick: { show: false },
-        axisLabel: {
-          color: adminChartTheme.axisText,
-          fontSize: 11,
-          hideOverlap: true,
-          interval: (index: number) => shouldShowTrendLabel(index),
+  const trendChartOptions = computed<AdminChartOptions>(() =>
+    defineAdminChartOptions({
+      ...baseChartOptions(),
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        ...baseChartOptions().plugins,
+        tooltip: {
+          ...baseTooltipOptions(),
+          callbacks: {
+            label: (context) =>
+              `${context.dataset.label || '调用'}: ${getParsedY(context).toLocaleString()}`,
+          },
         },
       },
-      yAxis: {
-        type: 'value',
-        minInterval: 1,
-        axisLabel: {
-          color: adminChartTheme.axisText,
-          fontSize: 11,
-          formatter: (value: number) => Math.round(value).toString(),
+      scales: {
+        x: {
+          stacked: true,
+          ticks: {
+            color: adminChartTheme.axisText,
+            maxRotation: 0,
+            autoSkip: false,
+            callback: (_value, index) =>
+              shouldShowTrendLabel(index) ? trendData.value[index]?.date || '' : '',
+          },
+          grid: { color: withAlpha(adminChartTheme.splitLine, 0.75) },
+          border: { color: adminChartTheme.axisLine },
         },
-        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: {
+            color: adminChartTheme.axisText,
+            precision: 0,
+            callback: (value) => Math.round(Number(value)).toString(),
+          },
+          grid: { color: adminChartTheme.splitLine },
+          border: { display: false },
+        },
       },
-      series,
-      graphic: hasAnyCalls
-        ? []
-        : [
-            {
-              type: 'text',
-              left: 'center',
-              top: 'middle',
-              style: {
-                text: '暂无调用数据',
-                fill: adminChartTheme.emptyText,
-                fontSize: 12,
-              },
-            },
-          ],
-    } as EChartsOption
-  })
+    }),
+  )
 
   const todayCalls = computed(() => options.adminStatistics.value?.summary?.today_calls || 0)
   const todaySuccess = computed(() => options.adminStatistics.value?.summary?.today_success || 0)
@@ -286,125 +291,88 @@ export function useUsageStatisticsCharts(options: {
       })),
   )
 
-  const modelRiskChartOption = computed<EChartsOption>(() => {
-    const hasModelRiskData = modelRiskRows.value.length > 0
+  const modelRiskChartData = computed<AdminChartData>(() => {
     const maxTotal = Math.max(1, ...modelRiskRows.value.map((item) => item.total))
-    return {
-      animationDuration: 300,
-      grid: {
-        left: 46,
-        right: 78,
-        top: hasModelRiskData ? 58 : 44,
-        bottom: 52,
-        containLabel: true,
-      },
-      tooltip: {
-        trigger: 'item',
-        backgroundColor: adminChartTheme.tooltipBg,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
-        formatter: (rawParams: unknown) => {
-          const params = rawParams as {
-            name?: string
-            value?: [number, number, number, number]
-          }
-          const [avgSeconds = 0, failureRate = 0, total = 0, failed = 0] = params.value || []
-          return `${escapeHTML(params.name || '未知模型')}<br/>失败率：${failureRate.toFixed(1)}%<br/>平均耗时：${avgSeconds.toFixed(2)}s<br/>调用量：${total.toLocaleString()}<br/>失败：${failed.toLocaleString()}`
-        },
-      },
-      visualMap: {
-        show: hasModelRiskData,
-        type: 'piecewise',
-        dimension: 1,
-        top: 0,
-        right: 8,
-        orient: 'horizontal',
-        itemWidth: 8,
-        itemHeight: 8,
-        itemGap: 12,
-        textStyle: { color: adminChartTheme.axisText, fontSize: 11 },
-        pieces: [
-          { gt: 20, label: '高风险', color: '#ef4444' },
-          { gt: 5, lte: 20, label: '关注', color: '#f59e0b' },
-          { lte: 5, label: '稳定', color: '#10b981' },
-        ],
-      },
-      xAxis: {
-        type: 'value',
-        name: '平均耗时',
-        nameLocation: 'middle',
-        min: 0,
-        nameGap: 32,
-        splitNumber: 4,
-        axisLabel: {
-          color: adminChartTheme.axisText,
-          fontSize: 10,
-          formatter: (value: number) => `${value.toFixed(1)}s`,
-        },
-        nameTextStyle: { color: adminChartTheme.axisText, fontSize: 10 },
-        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
-      },
-      yAxis: {
-        type: 'value',
-        name: '失败率',
-        min: 0,
-        max: 100,
-        nameGap: 24,
-        axisLabel: {
-          color: adminChartTheme.axisText,
-          fontSize: 10,
-          formatter: '{value}%',
-        },
-        nameTextStyle: { color: adminChartTheme.axisText, fontSize: 10 },
-        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
-      },
-      series: [
+    const points = modelRiskRows.value.map<ModelRiskPoint>((item) => ({
+      x: item.avgSeconds,
+      y: item.failureRate,
+      name: item.name,
+      total: item.total,
+      failed: item.failed,
+      avgSeconds: item.avgSeconds,
+      failureRate: item.failureRate,
+    }))
+    return defineAdminChartData({
+      labels: modelRiskRows.value.map((item) => item.name),
+      datasets: [
         {
-          type: 'scatter' as const,
-          data: modelRiskRows.value.map((item) => ({
-            name: item.name,
-            value: [item.avgSeconds, item.failureRate, item.total, item.failed],
-          })),
-          symbolSize: (rawValue: unknown) => {
-            const value = Array.isArray(rawValue) ? Number(rawValue[2] || 0) : 0
-            return 10 + Math.sqrt(value / maxTotal) * 30
-          },
-          emphasis: {
-            focus: 'self' as const,
-            scale: true,
-            label: {
-              show: true,
-              formatter: ({ name }: { name?: string }) => name || '',
-              color: adminChartTheme.mainText,
-              fontSize: 11,
-            },
-          },
-          itemStyle: {
-            opacity: 0.88,
-            borderColor: adminChartTheme.cardBg,
-            borderWidth: 1,
-            shadowBlur: 8,
-            shadowColor: adminChartTheme.shadow,
-          },
+          type: 'scatter',
+          label: '模型风险',
+          data: points,
+          pointRadius: modelRiskRows.value.map((item) => 7 + Math.sqrt(item.total / maxTotal) * 18),
+          pointHoverRadius: modelRiskRows.value.map(
+            (item) => 9 + Math.sqrt(item.total / maxTotal) * 20,
+          ),
+          pointBackgroundColor: modelRiskRows.value.map((item) => riskColor(item.failureRate)),
+          pointBorderColor: adminChartTheme.cardBg,
+          pointBorderWidth: 1,
         },
       ],
-      graphic: hasModelRiskData
-        ? []
-        : [
-            {
-              type: 'text',
-              left: 'center',
-              top: '48%',
-              style: {
-                text: '暂无模型风险数据',
-                fill: adminChartTheme.emptyText,
-                fontSize: 12,
-              },
-            },
-          ],
-    } as EChartsOption
+    })
   })
+
+  const modelRiskChartOptions = computed<AdminChartOptions>(() =>
+    defineAdminChartOptions({
+      ...baseChartOptions(),
+      interaction: { mode: 'nearest', intersect: true },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...baseTooltipOptions(),
+          callbacks: {
+            title: (items) => getModelRiskPoint(items[0])?.name || '未知模型',
+            label: (context) => {
+              const point = getModelRiskPoint(context)
+              if (!point) return ''
+              return `失败率: ${point.failureRate.toFixed(1)}%`
+            },
+            afterLabel: (context) => {
+              const point = getModelRiskPoint(context)
+              if (!point) return []
+              return [
+                `平均耗时: ${point.avgSeconds.toFixed(2)}s`,
+                `调用量: ${point.total.toLocaleString()}`,
+                `失败: ${point.failed.toLocaleString()}`,
+              ]
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          title: { display: true, text: '平均耗时', color: adminChartTheme.axisText },
+          ticks: {
+            color: adminChartTheme.axisText,
+            callback: (value) => `${Number(value).toFixed(1)}s`,
+          },
+          grid: { color: adminChartTheme.splitLine },
+          border: { display: false },
+        },
+        y: {
+          beginAtZero: true,
+          max: 100,
+          title: { display: true, text: '失败率', color: adminChartTheme.axisText },
+          ticks: {
+            color: adminChartTheme.axisText,
+            callback: (value) => `${Number(value)}%`,
+          },
+          grid: { color: adminChartTheme.splitLine },
+          border: { display: false },
+        },
+      },
+    }),
+  )
 
   const qualityTrendRows = computed(() =>
     (options.adminStatistics.value?.quality_trend || []).map((item) => ({
@@ -415,106 +383,96 @@ export function useUsageStatisticsCharts(options: {
       successRate: normalizePercent(item.success_rate),
     })),
   )
-  const qualityTrendChartOption = computed<EChartsOption>(() => {
-    const hasQualityData = qualityTrendRows.value.some((item) => item.total > 0)
-    const categories = qualityTrendRows.value.map((item) => item.label)
-    return {
-      animationDuration: 300,
-      color: ['#ef4444', '#6366f1'],
-      legend: {
-        top: 0,
-        right: 0,
-        itemWidth: 10,
-        itemHeight: 6,
-        icon: 'roundRect',
-        textStyle: { color: adminChartTheme.legendText, fontSize: 11 },
-      },
-      grid: { left: 44, right: 54, top: 42, bottom: 36, containLabel: true },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'cross' },
-        backgroundColor: adminChartTheme.tooltipBg,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
-        formatter: (rawParams: unknown) => {
-          const params = Array.isArray(rawParams) ? rawParams : [rawParams]
-          const first = params[0] as { axisValueLabel?: string; dataIndex?: number } | undefined
-          const row = qualityTrendRows.value[first?.dataIndex ?? -1]
-          const axisValue = escapeHTML(String(first?.axisValueLabel || ''))
-          if (!row) return axisValue
-          return `${axisValue}<br/>总调用：${row.total.toLocaleString()}<br/>成功：${row.success.toLocaleString()}<br/>失败：${row.fail.toLocaleString()}<br/>成功率：${row.successRate.toFixed(1)}%`
-        },
-      },
-      xAxis: {
-        type: 'category',
-        data: categories,
-        axisLine: { lineStyle: { color: adminChartTheme.axisLine } },
-        axisTick: { show: false },
-        axisLabel: {
-          color: adminChartTheme.axisText,
-          fontSize: 10,
-          hideOverlap: true,
-          interval: (index: number) =>
-            shouldShowAxisLabel(index, qualityTrendRows.value.length, options.timeRange.value),
-        },
-      },
-      yAxis: [
+
+  const qualityTrendChartData = computed<AdminChartData>(() =>
+    defineAdminChartData({
+      labels: qualityTrendRows.value.map((item) => item.label),
+      datasets: [
         {
-          type: 'value',
-          min: 0,
-          minInterval: 1,
-          axisLabel: { color: adminChartTheme.axisText, fontSize: 10 },
-          splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
-        },
-        {
-          type: 'value',
-          min: 0,
-          max: 100,
-          axisLabel: {
-            color: adminChartTheme.axisText,
-            fontSize: 10,
-            formatter: '{value}%',
-          },
-          splitLine: { show: false },
-        },
-      ],
-      series: [
-        {
-          name: '失败',
-          type: 'bar' as const,
-          yAxisIndex: 0,
-          barMaxWidth: 18,
+          type: 'bar',
+          label: '失败',
           data: qualityTrendRows.value.map((item) => item.fail),
-          itemStyle: { color: '#ef4444', borderRadius: [3, 3, 0, 0] },
+          backgroundColor: withAlpha(adminChartTheme.danger, 0.82),
+          borderRadius: 4,
+          maxBarThickness: 18,
+          yAxisID: 'y',
         },
         {
-          name: '成功率',
-          type: 'line' as const,
-          yAxisIndex: 1,
-          smooth: true,
-          symbolSize: 5,
-          lineStyle: { width: 2, color: '#6366f1' },
-          itemStyle: { color: '#6366f1' },
+          type: 'line',
+          label: '成功率',
           data: qualityTrendRows.value.map((item) => item.successRate),
+          borderColor: adminChartTheme.brand,
+          backgroundColor: adminChartTheme.brand,
+          borderWidth: 2,
+          tension: 0.36,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          yAxisID: 'yRate',
         },
       ],
-      graphic: hasQualityData
-        ? []
-        : [
-            {
-              type: 'text',
-              left: 'center',
-              top: 'middle',
-              style: {
-                text: '暂无服务质量趋势数据',
-                fill: adminChartTheme.emptyText,
-                fontSize: 12,
-              },
+    }),
+  )
+
+  const qualityTrendChartOptions = computed<AdminChartOptions>(() =>
+    defineAdminChartOptions({
+      ...baseChartOptions(),
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        ...baseChartOptions().plugins,
+        tooltip: {
+          ...baseTooltipOptions(),
+          callbacks: {
+            label: (context) => {
+              const label = context.dataset.label || ''
+              const value = getParsedY(context)
+              return label === '成功率' ? `${label}: ${value.toFixed(1)}%` : `${label}: ${value}`
             },
-          ],
-    } as EChartsOption
-  })
+            afterBody: (items) => {
+              const index = items[0]?.dataIndex ?? -1
+              const row = qualityTrendRows.value[index]
+              if (!row) return []
+              return [
+                `总调用: ${row.total.toLocaleString()}`,
+                `成功: ${row.success.toLocaleString()}`,
+              ]
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: adminChartTheme.axisText,
+            maxRotation: 0,
+            autoSkip: false,
+            callback: (_value, index) =>
+              shouldShowAxisLabel(index, qualityTrendRows.value.length, options.timeRange.value)
+                ? qualityTrendRows.value[index]?.label || ''
+                : '',
+          },
+          grid: { display: false },
+          border: { color: adminChartTheme.axisLine },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: adminChartTheme.axisText, precision: 0 },
+          grid: { color: adminChartTheme.splitLine },
+          border: { display: false },
+        },
+        yRate: {
+          beginAtZero: true,
+          max: 100,
+          position: 'right',
+          ticks: {
+            color: adminChartTheme.axisText,
+            callback: (value) => `${Number(value)}%`,
+          },
+          grid: { display: false },
+          border: { display: false },
+        },
+      },
+    }),
+  )
 
   const slowModelRows = computed(() =>
     (options.adminStatistics.value?.slow_models || [])
@@ -531,98 +489,50 @@ export function useUsageStatisticsCharts(options: {
           color:
             getModelColorByName(modelName) ||
             defaultModelColors[idx % defaultModelColors.length] ||
-            '#6366f1',
+            adminChartTheme.brand,
         }
       })
       .sort((a, b) => b.p95Seconds - a.p95Seconds)
       .slice(0, 6),
   )
-  const slowModelsChartOption = computed<EChartsOption>(() => {
-    const hasSlowModelData = slowModelRows.value.length > 0
-    return {
-      animationDuration: 260,
-      grid: { left: 14, right: 76, top: 12, bottom: 12, containLabel: true },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        backgroundColor: adminChartTheme.tooltipBg,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
-        formatter: (rawParams: unknown) => {
-          const params = (Array.isArray(rawParams) ? rawParams[0] : rawParams) as {
-            axisValueLabel?: string
-            data?: { p95Seconds?: number; avgSeconds?: number; samples?: number }
-          }
-          const data = params.data || {}
-          const p95 = Number(data.p95Seconds || 0)
-          const avg = Number(data.avgSeconds || 0)
-          const samples = Number(data.samples || 0)
-          return `${escapeHTML(params.axisValueLabel || '未知模型')}<br/>P95：${p95.toFixed(2)}s<br/>平均：${avg.toFixed(2)}s<br/>样本：${samples.toLocaleString()}`
-        },
-      },
-      xAxis: {
-        type: 'value',
-        min: 0,
-        splitNumber: 3,
-        axisLabel: {
-          color: adminChartTheme.axisText,
-          fontSize: 10,
-          formatter: (value: number) => `${value.toFixed(1)}s`,
-        },
-        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
-      },
-      yAxis: {
-        type: 'category',
-        inverse: true,
-        axisTick: { show: false },
-        axisLine: { show: false },
-        axisLabel: {
-          color: adminChartTheme.axisText,
-          fontSize: 11,
-          width: 110,
-          overflow: 'truncate',
-        },
-        data: slowModelRows.value.map((row) => row.name),
-      },
-      series: [
+
+  const slowModelsChartData = computed<AdminChartData>(() =>
+    defineAdminChartData({
+      labels: slowModelRows.value.map((row) => truncateLabel(row.name, 18)),
+      datasets: [
         {
-          type: 'bar' as const,
-          barWidth: 8,
-          showBackground: true,
-          backgroundStyle: { color: 'rgba(148, 163, 184, 0.1)', borderRadius: [0, 4, 4, 0] },
-          data: slowModelRows.value.map((row) => ({
+          type: 'bar',
+          label: 'P95',
+          data: slowModelRows.value.map<SlowModelPoint>((row) => ({
             value: row.p95Seconds,
-            p95Seconds: row.p95Seconds,
+            name: row.name,
             avgSeconds: row.avgSeconds,
             samples: row.samples,
-            itemStyle: { color: row.color, borderRadius: [0, 4, 4, 0] },
           })),
-          label: {
-            show: true,
-            position: 'right',
-            color: adminChartTheme.axisText,
-            fontSize: 10,
-            formatter: ({ value }: { value: number }) => `${Number(value || 0).toFixed(2)}s`,
-          },
+          parsing: { xAxisKey: 'value' },
+          backgroundColor: slowModelRows.value.map((row) => row.color),
+          borderRadius: 5,
+          barThickness: 8,
         },
       ],
-      graphic: hasSlowModelData
-        ? []
-        : [
-            {
-              type: 'text',
-              left: 'center',
-              top: 'middle',
-              style: {
-                text: '暂无慢模型数据',
-                fill: adminChartTheme.emptyText,
-                fontSize: 12,
-              },
-            },
-          ],
-    } as EChartsOption
-  })
+    }),
+  )
+
+  const slowModelsChartOptions = computed<AdminChartOptions>(() =>
+    horizontalBarOptions({
+      tooltipTitle: (context) => getSlowModelPoint(context)?.name || '',
+      tooltipLines: (context) => {
+        const point = getSlowModelPoint(context)
+        if (!point) return []
+        return [
+          `P95: ${point.value.toFixed(2)}s`,
+          `平均: ${point.avgSeconds.toFixed(2)}s`,
+          `样本: ${point.samples.toLocaleString()}`,
+        ]
+      },
+      xTick: (value) => `${Number(value).toFixed(1)}s`,
+    }),
+  )
 
   const monitorQueueTotal = computed(
     () =>
@@ -649,8 +559,7 @@ export function useUsageStatisticsCharts(options: {
         const current = val.current_concurrent || 0
         const max = Math.max(1, val.max_concurrent || 0)
         const percent = Math.min(100, Math.round((current / max) * 100))
-        const color = percent >= 90 ? '#ef4444' : percent >= 70 ? '#f59e0b' : '#10b981'
-        return { id, current, max, percent, color }
+        return { id, current, max, percent, color: riskColor(percent, { warning: 70, danger: 90 }) }
       })
       .sort((a, b) => b.percent - a.percent)
       .slice(0, 5)
@@ -659,88 +568,43 @@ export function useUsageStatisticsCharts(options: {
   const peakAccountLoad = computed(() => accountLoadRows.value[0] || null)
   const peakAccountLoadPercent = computed(() => peakAccountLoad.value?.percent || 0)
 
-  const accountLoadChartOption = computed<EChartsOption>(() => {
-    const hasAccountData = accountLoadRows.value.length > 0
-    return {
-      animationDuration: 260,
-      grid: { left: 10, right: 70, top: 8, bottom: 8, containLabel: true },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        backgroundColor: adminChartTheme.tooltipBg,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
-        formatter: (rawParams: unknown) => {
-          const params = (Array.isArray(rawParams) ? rawParams[0] : rawParams) as {
-            axisValueLabel?: string
-            data?: { current?: number; max?: number; value?: number }
-          }
-          const current = Number(params.data?.current || 0)
-          const max = Number(params.data?.max || 0)
-          const value = Number(params.data?.value || 0)
-          return `${escapeHTML(params.axisValueLabel || '未知账号')}<br/>并发：${current}/${max}<br/>负载：${value}%`
-        },
-      },
-      xAxis: {
-        type: 'value',
-        min: 0,
-        max: 100,
-        splitNumber: 4,
-        axisTick: { show: false },
-        axisLine: { show: false },
-        axisLabel: { color: adminChartTheme.axisText, fontSize: 10, formatter: '{value}%' },
-        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
-      },
-      yAxis: {
-        type: 'category',
-        inverse: true,
-        axisTick: { show: false },
-        axisLine: { show: false },
-        axisLabel: { color: adminChartTheme.axisText, fontSize: 11 },
-        data: accountLoadRows.value.map((item) => `#${item.id}`),
-      },
-      series: [
+  const accountLoadChartData = computed<AdminChartData>(() =>
+    defineAdminChartData({
+      labels: accountLoadRows.value.map((item) => `#${item.id}`),
+      datasets: [
         {
-          type: 'bar' as const,
-          barWidth: 10,
-          showBackground: true,
-          backgroundStyle: {
-            color: 'rgba(148, 163, 184, 0.12)',
-            borderRadius: [0, 6, 6, 0],
-          },
-          data: accountLoadRows.value.map((item) => ({
+          type: 'bar',
+          label: '并发负载',
+          data: accountLoadRows.value.map<AccountLoadPoint>((item) => ({
             value: item.percent,
+            id: item.id,
             current: item.current,
             max: item.max,
-            itemStyle: { color: item.color, borderRadius: [0, 6, 6, 0] },
           })),
-          label: {
-            show: true,
-            position: 'right',
-            color: adminChartTheme.axisText,
-            fontSize: 10,
-            formatter: ({ data }: { data: { current: number; max: number } }) =>
-              `${data.current}/${data.max}`,
-          },
+          parsing: { xAxisKey: 'value' },
+          backgroundColor: accountLoadRows.value.map((item) => item.color),
+          borderRadius: 6,
+          barThickness: 10,
         },
       ],
-      graphic: hasAccountData
-        ? []
-        : [
-            {
-              type: 'text',
-              left: 'center',
-              top: 'middle',
-              style: {
-                text: '暂无渠道并发数据',
-                fill: adminChartTheme.emptyText,
-                fontSize: 12,
-              },
-            },
-          ],
-    } as EChartsOption
-  })
+    }),
+  )
+
+  const accountLoadChartOptions = computed<AdminChartOptions>(() =>
+    horizontalBarOptions({
+      tooltipTitle: (context) => {
+        const point = getAccountLoadPoint(context)
+        return point ? `#${point.id}` : ''
+      },
+      tooltipLines: (context) => {
+        const point = getAccountLoadPoint(context)
+        if (!point) return []
+        return [`并发: ${point.current}/${point.max}`, `负载: ${point.value}%`]
+      },
+      xTick: (value) => `${Number(value)}%`,
+      max: 100,
+    }),
+  )
 
   const userRiskRows = computed(() =>
     (options.adminStatistics.value?.user_risk || [])
@@ -754,105 +618,54 @@ export function useUsageStatisticsCharts(options: {
       .sort((a, b) => b.failed - a.failed)
       .slice(0, 6),
   )
-  const userRiskChartOption = computed<EChartsOption>(() => {
-    const hasRiskData = userRiskRows.value.length > 0
-    return {
-      animationDuration: 260,
-      grid: { left: 14, right: 68, top: 12, bottom: 12, containLabel: true },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        backgroundColor: adminChartTheme.tooltipBg,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        textStyle: { color: adminChartTheme.tooltipText, fontSize: 12 },
-        formatter: (rawParams: unknown) => {
-          const params = (Array.isArray(rawParams) ? rawParams[0] : rawParams) as {
-            axisValueLabel?: string
-            data?: {
-              failed?: number
-              failureRate?: number
-              completed?: number
-              total?: number
-            }
-          }
-          const data = params.data || {}
-          const total = Number(data.total || 0)
-          const completed = Number(data.completed || 0)
-          const failed = Number(data.failed || 0)
-          const failureRate = Number(data.failureRate || 0)
-          return `${escapeHTML(params.axisValueLabel || '未知用户')}<br/>失败：${failed.toLocaleString()}<br/>成功：${completed.toLocaleString()}<br/>总调用：${total.toLocaleString()}<br/>失败率：${failureRate.toFixed(1)}%`
-        },
-      },
-      xAxis: {
-        type: 'value',
-        min: 0,
-        splitNumber: 3,
-        axisLabel: { color: adminChartTheme.axisText, fontSize: 10 },
-        splitLine: { lineStyle: { color: adminChartTheme.splitLine } },
-      },
-      yAxis: {
-        type: 'category',
-        inverse: true,
-        axisTick: { show: false },
-        axisLine: { show: false },
-        axisLabel: {
-          color: adminChartTheme.axisText,
-          fontSize: 11,
-          width: 100,
-          overflow: 'truncate',
-        },
-        data: userRiskRows.value.map((item) => item.name),
-      },
-      series: [
+
+  const userRiskChartData = computed<AdminChartData>(() =>
+    defineAdminChartData({
+      labels: userRiskRows.value.map((item) => truncateLabel(item.name, 16)),
+      datasets: [
         {
-          type: 'bar' as const,
-          barWidth: 8,
-          showBackground: true,
-          backgroundStyle: { color: 'rgba(148, 163, 184, 0.1)', borderRadius: [0, 4, 4, 0] },
-          data: userRiskRows.value.map((item) => ({
+          type: 'bar',
+          label: '失败',
+          data: userRiskRows.value.map<UserRiskPoint>((item) => ({
             value: item.failed,
+            name: item.name,
             failed: item.failed,
             completed: item.completed,
             total: item.total,
             failureRate: item.failureRate,
-            itemStyle: {
-              color:
-                item.failureRate >= 20 ? '#ef4444' : item.failureRate >= 8 ? '#f59e0b' : '#6366f1',
-              borderRadius: [0, 4, 4, 0],
-            },
           })),
-          label: {
-            show: true,
-            position: 'right',
-            color: adminChartTheme.axisText,
-            fontSize: 10,
-            formatter: ({ data }: { data: { failureRate: number } }) =>
-              `${data.failureRate.toFixed(1)}%`,
-          },
+          parsing: { xAxisKey: 'value' },
+          backgroundColor: userRiskRows.value.map((item) =>
+            riskColor(item.failureRate, { warning: 8, danger: 20 }),
+          ),
+          borderRadius: 5,
+          barThickness: 8,
         },
       ],
-      graphic: hasRiskData
-        ? []
-        : [
-            {
-              type: 'text',
-              left: 'center',
-              top: 'middle',
-              style: {
-                text: '暂无异常用户数据',
-                fill: adminChartTheme.emptyText,
-                fontSize: 12,
-              },
-            },
-          ],
-    } as EChartsOption
-  })
+    }),
+  )
+
+  const userRiskChartOptions = computed<AdminChartOptions>(() =>
+    horizontalBarOptions({
+      tooltipTitle: (context) => getUserRiskPoint(context)?.name || '',
+      tooltipLines: (context) => {
+        const point = getUserRiskPoint(context)
+        if (!point) return []
+        return [
+          `失败: ${point.failed.toLocaleString()}`,
+          `成功: ${point.completed.toLocaleString()}`,
+          `总调用: ${point.total.toLocaleString()}`,
+          `失败率: ${point.failureRate.toFixed(1)}%`,
+        ]
+      },
+    }),
+  )
 
   return {
     trendData,
     totalCallsInRange,
-    trendChartOption,
+    trendChartData,
+    trendChartOptions,
     todayCalls,
     todayFailed,
     todayCallsFoot,
@@ -861,17 +674,109 @@ export function useUsageStatisticsCharts(options: {
     todaySuccessRateFoot,
     queuePressure,
     queuePressureFoot,
-    modelRiskChartOption,
-    qualityTrendChartOption,
-    slowModelsChartOption,
-    accountLoadChartOption,
+    modelRiskChartData,
+    modelRiskChartOptions,
+    qualityTrendChartData,
+    qualityTrendChartOptions,
+    slowModelsChartData,
+    slowModelsChartOptions,
+    accountLoadChartData,
+    accountLoadChartOptions,
     peakAccountLoadPercent,
-    userRiskChartOption,
+    userRiskChartData,
+    userRiskChartOptions,
   }
 }
 
-function escapeHTML(value: string) {
-  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+function baseChartOptions(): AdminChartOptions {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    resizeDelay: 80,
+    animation: { duration: 260 },
+    plugins: {
+      legend: {
+        position: 'top',
+        align: 'start',
+        labels: {
+          boxWidth: 10,
+          boxHeight: 6,
+          usePointStyle: true,
+          color: adminChartTheme.legendText,
+        },
+      },
+      tooltip: baseTooltipOptions(),
+    },
+  }
+}
+
+function baseTooltipOptions() {
+  return {
+    backgroundColor: adminChartTheme.tooltipBg,
+    borderColor: adminChartTheme.tooltipBorder,
+    borderWidth: 1,
+    titleColor: adminChartTheme.tooltipText,
+    bodyColor: adminChartTheme.tooltipText,
+    bodyFont: { size: 12 },
+    titleFont: { size: 12, weight: 700 },
+    padding: 10,
+    displayColors: true,
+  }
+}
+
+function horizontalBarOptions(config: {
+  tooltipTitle: (context: AdminTooltipItem) => string
+  tooltipLines: (context: AdminTooltipItem) => string[]
+  xTick?: (value: string | number) => string
+  max?: number
+}): AdminChartOptions {
+  return defineAdminChartOptions({
+    ...baseChartOptions(),
+    indexAxis: 'y',
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        ...baseTooltipOptions(),
+        callbacks: {
+          title: (items) => (items[0] ? config.tooltipTitle(items[0]) : ''),
+          label: (context) => config.tooltipLines(context),
+        },
+      },
+    },
+    scales: {
+      x: {
+        beginAtZero: true,
+        max: config.max,
+        ticks: {
+          color: adminChartTheme.axisText,
+          callback: (value) => (config.xTick ? config.xTick(value) : String(value)),
+        },
+        grid: { color: adminChartTheme.splitLine },
+        border: { display: false },
+      },
+      y: {
+        ticks: { color: adminChartTheme.axisText },
+        grid: { display: false },
+        border: { display: false },
+      },
+    },
+  })
+}
+
+function getModelRiskPoint(context: AdminTooltipItem | undefined) {
+  return context?.raw as ModelRiskPoint | undefined
+}
+
+function getSlowModelPoint(context: AdminTooltipItem | undefined) {
+  return context?.raw as SlowModelPoint | undefined
+}
+
+function getAccountLoadPoint(context: AdminTooltipItem | undefined) {
+  return context?.raw as AccountLoadPoint | undefined
+}
+
+function getUserRiskPoint(context: AdminTooltipItem | undefined) {
+  return context?.raw as UserRiskPoint | undefined
 }
 
 function normalizeModelName(name: string | null | undefined): string {
@@ -913,9 +818,20 @@ function normalizePercent(value: number): number {
   return Math.max(0, Math.min(100, percent))
 }
 
-function shouldShowAxisLabel(index: number, count: number, timeRange: string) {
+function shouldShowAxisLabel(index: number, count: number, range: string) {
   if (count <= 7) return true
-  if (timeRange === '30d') return index === 0 || index === count - 1 || index % 6 === 0
-  if (timeRange === '1y') return index === 0 || index === count - 1 || index % 30 === 0
+  if (range === '30d') return index === 0 || index === count - 1 || index % 6 === 0
+  if (range === '1y') return index === 0 || index === count - 1 || index % 30 === 0
   return true
+}
+
+function riskColor(value: number, thresholds = { warning: 5, danger: 20 }) {
+  if (value >= thresholds.danger) return adminChartTheme.danger
+  if (value >= thresholds.warning) return adminChartTheme.warning
+  return adminChartTheme.success
+}
+
+function truncateLabel(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value
+  return `${value.slice(0, maxLength - 1)}…`
 }

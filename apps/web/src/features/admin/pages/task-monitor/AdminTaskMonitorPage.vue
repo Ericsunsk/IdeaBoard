@@ -1,319 +1,605 @@
 <template>
-  <div class="admin-page task-monitor-page">
-    <div class="summary-grid task-status-grid">
-      <AdminSummaryCard label="执行中" :value="pageStats.running" :foot="runningFoot" />
-      <AdminSummaryCard label="排队中" :value="pageStats.pending" :foot="pendingFoot" />
-      <AdminSummaryCard label="失败" :value="pageStats.failed" :foot="failedFoot" />
-      <AdminSummaryCard label="其他" :value="summaryOtherCount" :foot="otherFoot" />
+  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
+    <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
+      <Card>
+        <template #subtitle>执行中</template>
+        <template #title>{{ pageStats.running }}</template>
+        <template #content>{{ runningFoot }}</template>
+      </Card>
+      <Card>
+        <template #subtitle>排队中</template>
+        <template #title>{{ pageStats.pending }}</template>
+        <template #content>{{ pendingFoot }}</template>
+      </Card>
+      <Card>
+        <template #subtitle>失败</template>
+        <template #title>{{ pageStats.failed }}</template>
+        <template #content>{{ failedFoot }}</template>
+      </Card>
+      <Card>
+        <template #subtitle>其他</template>
+        <template #title>{{ summaryOtherCount }}</template>
+        <template #content>{{ otherFoot }}</template>
+      </Card>
     </div>
 
-    <div class="monitor-insight-grid">
-      <div class="table-card monitor-insight-card slow-task-panel">
-        <div class="inline-panel-head">
-          <div class="inline-panel-title">慢任务 Top</div>
-          <span class="inline-panel-stat">{{ slowTasks.length }} 条</span>
-        </div>
-        <div class="monitor-insight-body">
-          <div v-if="slowTasks.length" class="slow-task-chart-host">
-            <VChart
-              class="echart-host"
-              :option="slowTaskChartOption"
-              autoresize
-              @click="handleSlowTaskChartClick"
+    <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
+      <Card class="xl:col-span-5">
+        <template #title>
+          <div class="flex items-start justify-between gap-3">
+            <span>慢任务 Top</span>
+            <Tag :value="`${slowTasks.length} 条`" severity="secondary" rounded />
+          </div>
+        </template>
+        <template #subtitle>当前页耗时超过 60s</template>
+        <template #content>
+          <div v-if="slowTasks.length" class="h-[174px] min-w-0">
+            <Chart
+              type="bar"
+              class="h-full w-full min-w-0"
+              :data="slowTaskChartData"
+              :options="slowTaskChartOptions"
+              :plugins="adminChartPlugins"
+              @select="handleSlowTaskChartSelect"
             />
           </div>
-          <div v-else class="inline-panel-empty slow-task-empty">-</div>
-        </div>
-      </div>
+          <Message v-else severity="secondary" :closable="false">暂无慢任务</Message>
+        </template>
+      </Card>
 
-      <div class="table-card monitor-insight-card active-task-panel">
-        <div class="inline-panel-head">
-          <div class="inline-panel-title">活跃任务龄</div>
-          <span class="inline-panel-stat">{{ activeTasks.length }} 条</span>
-        </div>
-        <div class="monitor-insight-body">
-          <div v-if="activeTasks.length" class="inline-panel-list">
-            <button
+      <Card class="xl:col-span-3">
+        <template #title>
+          <div class="flex items-start justify-between gap-3">
+            <span>活跃任务龄</span>
+            <Tag :value="`${activeTasks.length} 条`" severity="secondary" rounded />
+          </div>
+        </template>
+        <template #subtitle>排队与执行中的等待时间</template>
+        <template #content>
+          <div v-if="activeTasks.length" class="flex flex-col gap-2">
+            <Button
               v-for="row in activeTasks"
               :key="row.task.task_id"
               type="button"
-              class="inline-task-item"
+              text
+              severity="secondary"
+              class="w-full justify-start"
               @click="showDetail(row.task)"
             >
-              <span class="task-id">{{ row.task.task_id }}</span>
-              <span class="task-meta">{{ getTaskStatusConfig(row.task.status).text }}</span>
-              <span class="task-age">{{ formatSeconds(row.seconds) }}</span>
-            </button>
+              <span class="min-w-0 truncate font-semibold">{{ row.task.task_id }}</span>
+              <span class="ml-auto shrink-0 text-xs text-admin-text-3">
+                {{ getTaskStatusConfig(row.task.status).text }}
+              </span>
+              <span class="shrink-0 font-mono text-xs text-admin-info">
+                {{ formatSeconds(row.seconds) }}
+              </span>
+            </Button>
           </div>
-          <div v-else class="inline-panel-empty">-</div>
-        </div>
-      </div>
+          <Message v-else severity="secondary" :closable="false">暂无活跃任务</Message>
+        </template>
+      </Card>
 
-      <div class="table-card monitor-insight-card failure-task-panel">
-        <div class="inline-panel-head">
-          <div class="inline-panel-title">失败样本</div>
-          <span class="inline-panel-stat">{{ failedTasks.length }} 条</span>
-        </div>
-        <div class="monitor-insight-body">
-          <div v-if="failedTasks.length" class="inline-panel-list">
-            <button
+      <Card class="xl:col-span-4">
+        <template #title>
+          <div class="flex items-start justify-between gap-3">
+            <span>失败样本</span>
+            <Tag :value="`${failedTasks.length} 条`" severity="danger" rounded />
+          </div>
+        </template>
+        <template #subtitle>当前页失败原因速览</template>
+        <template #content>
+          <div v-if="failedTasks.length" class="flex flex-col gap-2">
+            <Button
               v-for="task in failedTasks.slice(0, 5)"
               :key="task.task_id"
               type="button"
-              class="inline-task-item"
+              text
+              severity="danger"
+              class="w-full justify-start"
               @click="showDetail(task)"
             >
-              <span class="task-id">{{ task.task_id }}</span>
-              <span class="task-meta">{{ getErrorReason(task) || '-' }}</span>
-            </button>
+              <span class="min-w-0 truncate font-semibold">{{ task.task_id }}</span>
+              <span class="ml-auto min-w-0 truncate text-xs">
+                {{ getErrorReason(task) || '-' }}
+              </span>
+            </Button>
           </div>
-          <div v-else class="inline-panel-empty">-</div>
-        </div>
-      </div>
+          <Message v-else severity="secondary" :closable="false">暂无失败样本</Message>
+        </template>
+      </Card>
     </div>
 
-    <div class="table-card admin-table-card tasks-list-card">
-      <AdminCardHeader title="任务列表" size="small" variant="table">
-        <template #prefix>
-          <n-icon size="18" class="tasks-list-title-icon"><List /></n-icon>
-        </template>
-        <template #extra>
-          <div class="tasks-list-actions">
-            <n-input
-              v-model:value="searchKeyword"
-              class="task-search-control"
-              placeholder="搜索用户ID或提示词..."
-              clearable
-              @keyup.enter="handleSearch"
-              @clear="handleSearch"
+    <div
+      class="min-w-0 overflow-hidden rounded-[20px] border border-admin-border-soft bg-admin-card-strong p-0 shadow-none"
+    >
+      <Toolbar class="border-0 border-b border-admin-border-soft bg-transparent">
+        <template #start>
+          <div class="flex min-w-0 items-center gap-3">
+            <span
+              class="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-xl border border-admin-border-soft bg-admin-accent-softer text-admin-accent"
             >
-              <template #prefix>
-                <n-icon><Search /></n-icon>
-              </template>
-            </n-input>
-            <n-select
-              v-model:value="filterStatus"
-              class="task-status-control"
-              :options="taskStatusOptions"
-              placeholder="所有状态"
-              clearable
-            />
-            <n-button secondary class="admin-icon-btn" aria-label="刷新任务列表" @click="loadTasks">
-              <template #icon>
-                <n-icon><Refresh /></n-icon>
-              </template>
-            </n-button>
+              <List />
+            </span>
+            <div class="min-w-0">
+              <div class="text-admin-title-sm font-bold text-admin-title-color">任务列表</div>
+              <div class="truncate text-admin-meta text-admin-subtitle-color">
+                {{ taskTableSubtitle }}
+              </div>
+            </div>
           </div>
         </template>
-      </AdminCardHeader>
-      <n-data-table
-        :columns="columns"
-        :data="tasks"
-        :loading="loading"
-        :pagination="false"
-        :bordered="false"
-        size="small"
-        class="admin-table-dense"
-        :scroll-x="1000"
-      />
-      <div class="pagination-wrapper">
-        <n-pagination v-model:page="page" :page-count="pageCount" @update:page="loadTasks" />
+        <template #end>
+          <div
+            class="flex min-w-0 flex-wrap justify-end gap-2 max-md:w-full max-md:justify-stretch"
+          >
+            <IconField
+              class="relative min-w-[230px] flex-1 basis-[280px] max-w-[360px] max-md:max-w-none"
+            >
+              <InputIcon>
+                <Search />
+              </InputIcon>
+              <InputText
+                v-model="searchKeyword"
+                class="w-full pr-10"
+                placeholder="搜索用户 ID 或提示词"
+                aria-label="搜索用户 ID 或提示词"
+                @keyup.enter="handleSearch"
+              />
+              <Button
+                v-if="searchKeyword"
+                class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
+                type="button"
+                text
+                rounded
+                aria-label="清空搜索"
+                @click="clearSearch"
+              >
+                <template #icon>
+                  <Xmark />
+                </template>
+              </Button>
+            </IconField>
+            <Select
+              v-model="filterStatus"
+              class="w-[152px] max-md:w-full"
+              :options="taskStatusOptions"
+              option-label="label"
+              option-value="value"
+              placeholder="所有状态"
+              show-clear
+            />
+            <Button
+              text
+              rounded
+              class="!h-[38px] !w-[38px] !min-w-[38px] !rounded-xl"
+              aria-label="刷新任务列表"
+              @click="loadTasks"
+            >
+              <template #icon>
+                <Refresh />
+              </template>
+            </Button>
+          </div>
+        </template>
+      </Toolbar>
+
+      <div class="px-3 pt-3">
+        <DataTable
+          :value="tasks"
+          :loading="loading"
+          data-key="task_id"
+          size="small"
+          :pt="adminDenseDataTablePt"
+          :table-style="{ minWidth: '1160px' }"
+        >
+          <template #empty>
+            <div class="py-7 text-center text-admin-body text-admin-text-3">暂无任务</div>
+          </template>
+
+          <Column header="创建时间" :style="{ width: '150px' }">
+            <template #body="{ data }">
+              <span
+                class="whitespace-nowrap font-mono text-admin-meta font-semibold text-admin-text-2-strong"
+              >
+                {{ formatTaskCreatedAt(data) }}
+              </span>
+            </template>
+          </Column>
+
+          <Column header="结果" :style="{ width: '76px' }" :body-style="{ textAlign: 'center' }">
+            <template #body="{ data }">
+              <PrimeImage
+                v-if="getTaskResultImageUrl(data)"
+                :src="getTaskResultImageUrl(data)"
+                preview
+                image-class="block overflow-hidden rounded-[10px] border border-admin-border-soft bg-admin-surface-muted"
+                :image-style="{ width: '42px', height: '42px', objectFit: 'cover' }"
+              />
+              <span v-else class="text-admin-meta text-admin-text-3">-</span>
+            </template>
+          </Column>
+
+          <Column header="用户" :style="{ width: '132px' }">
+            <template #body="{ data }">
+              <span
+                class="block max-w-[116px] truncate text-admin-meta font-bold text-admin-text-1"
+              >
+                {{ getTaskUserIdentifier(data) }}
+              </span>
+            </template>
+          </Column>
+
+          <Column header="提示词" :style="{ width: '260px' }">
+            <template #body="{ data }">
+              <span
+                class="block max-w-[244px] truncate text-admin-meta text-admin-text-2-strong"
+                :title="data.prompt || '-'"
+              >
+                {{ data.prompt || '-' }}
+              </span>
+            </template>
+          </Column>
+
+          <Column header="账号" :style="{ width: '80px' }" :body-style="{ textAlign: 'center' }">
+            <template #body="{ data }">
+              <span class="text-admin-meta text-admin-text-3">{{ data.account_id || '-' }}</span>
+            </template>
+          </Column>
+
+          <Column header="API调用" :style="{ width: '140px' }">
+            <template #body="{ data }">
+              <span v-if="getTaskApiCall(data)" class="inline-flex max-w-32 items-center gap-1.5">
+                <Tag :value="getTaskApiCall(data)?.platform" severity="info" rounded />
+                <span
+                  v-if="getTaskApiCall(data)?.modelSet"
+                  class="block max-w-[70px] truncate text-admin-caption text-admin-text-3"
+                >
+                  {{ getTaskApiCall(data)?.modelSet }}
+                </span>
+              </span>
+              <span v-else class="text-admin-meta text-admin-text-3">-</span>
+            </template>
+          </Column>
+
+          <Column header="状态" :style="{ width: '94px' }">
+            <template #body="{ data }">
+              <Tag
+                :value="getTaskStatusConfig(data.status).text"
+                :severity="getTaskStatusConfig(data.status).severity"
+                rounded
+                class="min-w-16 justify-center"
+              />
+            </template>
+          </Column>
+
+          <Column header="耗时" :style="{ width: '80px' }" :body-style="{ textAlign: 'center' }">
+            <template #body="{ data }">
+              <span v-if="getTaskDuration(data)" :class="getTaskDurationClass(data)">
+                {{ getTaskDuration(data)?.seconds }}s
+              </span>
+              <span v-else class="text-admin-meta text-admin-text-3">-</span>
+            </template>
+          </Column>
+
+          <Column header="错误诊断" :style="{ width: '220px' }">
+            <template #body="{ data }">
+              <span
+                v-if="getTaskSanitizedError(data)"
+                class="block max-w-[210px] truncate text-admin-meta text-admin-danger"
+              >
+                {{ getTaskSanitizedError(data) }}
+              </span>
+              <span v-else class="text-admin-meta text-admin-text-3">-</span>
+            </template>
+          </Column>
+
+          <Column header="操作" :style="{ width: '88px' }" :body-style="{ textAlign: 'center' }">
+            <template #body="{ data }">
+              <Button size="small" text rounded label="详情" @click="showDetail(data)">
+                <template #icon>
+                  <Eye />
+                </template>
+              </Button>
+            </template>
+          </Column>
+        </DataTable>
+      </div>
+
+      <div
+        class="flex items-center justify-end gap-3 border-t border-admin-border-soft bg-white/75 px-5 py-3 max-md:flex-wrap max-md:justify-center max-md:px-3.5"
+      >
+        <div
+          class="mr-auto whitespace-nowrap text-admin-meta text-admin-subtitle-color max-md:mr-0 max-md:w-full max-md:text-center"
+        >
+          第 {{ page }} 页 · 当前 {{ tasks.length }} 条 · 共 {{ total }} 条
+        </div>
+        <Paginator
+          :first="paginationFirst"
+          :rows="TASK_MONITOR_PAGE_SIZE"
+          :total-records="total"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink"
+          @page="handlePageChange"
+        />
       </div>
     </div>
 
-    <n-modal
-      v-model:show="detailModalVisible"
-      class="premium-detail-modal"
-      preset="card"
-      style="width: 640px; max-width: 95vw; border-radius: 20px"
-      :bordered="false"
-      :segmented="{ content: 'soft' }"
+    <Dialog
+      v-model:visible="detailModalVisible"
+      modal
+      :style="{ width: '680px', maxWidth: '95vw' }"
+      :pt="detailDialogPt"
+      :draggable="false"
     >
       <template #header>
-        <div class="premium-drawer-header">
-          <div class="h-left">
-            <n-icon
-              size="22"
-              class="h-icon"
-              :color="getTaskStatusConfig(detailTask?.status || '').color"
+        <div class="flex w-full items-center justify-between gap-3.5">
+          <div class="flex min-w-0 items-center gap-3">
+            <span
+              class="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[14px] border border-admin-border-soft bg-admin-surface-muted"
+              :style="{ color: getTaskStatusConfig(detailTask?.status || '').color }"
             >
               <CheckCircle v-if="detailTask?.status === 'completed'" />
               <XmarkCircle v-else-if="detailTask?.status === 'failed'" />
               <Clock v-else />
-            </n-icon>
-            <div class="h-info">
-              <span class="h-title">任务详情控制台</span>
-              <span class="h-id">ID: {{ detailTask?.task_id }}</span>
+            </span>
+            <div class="flex min-w-0 flex-col">
+              <span class="text-admin-title-sm leading-tight font-bold text-admin-title-color">
+                任务详情控制台
+              </span>
+              <span class="mt-1 truncate font-mono text-admin-caption text-admin-subtitle-color">
+                ID: {{ detailTask?.task_id }}
+              </span>
             </div>
           </div>
-          <div class="h-actions">
-            <n-button
-              quaternary
+          <div class="flex shrink-0 items-center gap-2">
+            <Tag
+              v-if="detailTask"
+              :value="getTaskStatusConfig(detailTask.status).text"
+              :severity="getTaskStatusConfig(detailTask.status).severity"
+              rounded
+              class="max-md:hidden"
+            />
+            <Button
+              text
+              rounded
               size="small"
-              circle
+              aria-label="复制任务 ID"
               @click="copyToClipboard(detailTask?.task_id || '')"
             >
               <template #icon>
-                <n-icon><Copy /></n-icon>
+                <Copy />
               </template>
-            </n-button>
+            </Button>
           </div>
         </div>
       </template>
 
-      <div v-if="detailTask" class="premium-detail-body">
-        <div class="status-banner" :class="detailTask.status">
-          <div class="banner-main">
-            <span class="status-label">当前状态</span>
-            <span class="status-value">{{ getTaskStatusConfig(detailTask.status).text }}</span>
+      <div v-if="detailTask" class="flex flex-col gap-[18px]">
+        <div :class="getTaskStatusBannerClass(detailTask.status)">
+          <div class="flex flex-col gap-1.5">
+            <span class="text-admin-caption font-bold text-admin-text-3">当前状态</span>
+            <span class="flex items-center gap-[9px]">
+              <span :class="getTaskStatusDotClass(detailTask.status)" />
+              <span class="text-admin-heading leading-[1.15] font-extrabold text-admin-text-1">
+                {{ getTaskStatusConfig(detailTask.status).text }}
+              </span>
+            </span>
           </div>
-          <div v-if="detailTask.status === 'failed'" class="banner-error">
-            <n-icon class="err-icon"><WarningTriangle /></n-icon>
+          <div
+            v-if="detailTask.status === 'failed'"
+            class="flex items-start gap-2.5 rounded-xl border border-admin-danger/20 bg-admin-danger/10 px-3 py-2.5 text-admin-body leading-[1.55] text-admin-danger"
+          >
+            <WarningTriangle class="mt-0.5 shrink-0" />
             <span>{{ getErrorReason(detailTask) || '处理过程中发生未知错误' }}</span>
           </div>
-          <div v-else class="banner-metrics">
-            <div class="detail-metric">
-              <span class="m-label">总耗时</span>
-              <span class="m-val">{{ calcDuration(detailTask) }}</span>
+          <div
+            v-else
+            class="grid grid-cols-1 gap-2.5 border-t border-admin-divider pt-3 md:grid-cols-2"
+          >
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[13px] border border-admin-border bg-white/70 px-3 py-2.5"
+            >
+              <span class="text-admin-micro font-bold text-admin-text-3">总耗时</span>
+              <span class="truncate text-admin-body font-bold text-admin-text-2-strong">
+                {{ calcDuration(detailTask) }}
+              </span>
             </div>
-            <div class="detail-metric">
-              <span class="m-label">创建于</span>
-              <span class="m-val">{{ formatDateTime(detailTask.created_at).split('-')[1] }}</span>
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[13px] border border-admin-border bg-white/70 px-3 py-2.5"
+            >
+              <span class="text-admin-micro font-bold text-admin-text-3">创建于</span>
+              <span class="truncate text-admin-body font-bold text-admin-text-2-strong">
+                {{ formatDateTime(detailTask.created_at).split('-')[1] }}
+              </span>
             </div>
           </div>
         </div>
 
-        <div class="detail-section">
-          <div class="section-title">
-            <n-icon><Fingerprint /></n-icon>
+        <div class="flex flex-col gap-2.5">
+          <div
+            class="flex min-w-0 items-center gap-2 text-admin-body font-bold text-admin-title-color"
+          >
+            <Fingerprint class="h-[17px] w-[17px] shrink-0 text-admin-subtitle-color" />
             <span>身份与归属</span>
           </div>
-          <div class="metadata-grid">
-            <div class="meta-item">
-              <span class="label">用户 ID</span>
-              <div class="val-group">
-                <span class="value">{{ detailTask.user_id }}</span>
-                <n-button
-                  quaternary
-                  circle
-                  size="tiny"
+          <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
+            >
+              <span class="text-admin-caption font-bold text-admin-text-3">用户 ID</span>
+              <div class="flex min-w-0 items-center justify-between gap-2">
+                <span class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1">
+                  {{ detailTask.user_id }}
+                </span>
+                <Button
+                  text
+                  rounded
+                  size="small"
+                  aria-label="复制用户 ID"
                   @click="copyToClipboard(String(detailTask.user_id))"
                 >
                   <template #icon>
-                    <n-icon><Copy /></n-icon>
+                    <Copy />
                   </template>
-                </n-button>
+                </Button>
               </div>
             </div>
-            <div class="meta-item">
-              <span class="label">账号 ID</span>
-              <span class="value">{{ detailTask.account_id || 'N/A' }}</span>
-            </div>
-            <div class="meta-item">
-              <span class="label">创建时间</span>
-              <span class="value">{{ formatDateTime(detailTask.created_at) }}</span>
-            </div>
-            <div class="meta-item">
-              <span class="label">完成时间</span>
-              <span class="value">{{ formatDateTime(detailTask.completed_at) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="detail-section">
-          <div class="section-title">
-            <n-icon><ChatBubble /></n-icon>
-            <span>任务指令 (Prompt)</span>
-            <n-button
-              quaternary
-              size="tiny"
-              class="title-action"
-              @click="copyToClipboard(detailTask.prompt || '')"
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
             >
-              复制全文
-            </n-button>
-          </div>
-          <div class="prompt-card">
-            <div class="prompt-content">{{ detailTask.prompt || '无提示词' }}</div>
+              <span class="text-admin-caption font-bold text-admin-text-3">账号 ID</span>
+              <span class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1">
+                {{ detailTask.account_id || 'N/A' }}
+              </span>
+            </div>
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
+            >
+              <span class="text-admin-caption font-bold text-admin-text-3">创建时间</span>
+              <span class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1">
+                {{ formatDateTime(detailTask.created_at) }}
+              </span>
+            </div>
+            <div
+              class="flex min-w-0 flex-col gap-1 rounded-[14px] border border-admin-border bg-admin-surface-muted/70 px-3 py-2.5"
+            >
+              <span class="text-admin-caption font-bold text-admin-text-3">完成时间</span>
+              <span class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1">
+                {{ formatDateTime(detailTask.completed_at) }}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div v-if="resultImageUrl" class="detail-section">
-          <div class="section-title">
-            <n-icon><MediaImage /></n-icon>
+        <div class="flex flex-col gap-2.5">
+          <div
+            class="flex min-w-0 items-center gap-2 text-admin-body font-bold text-admin-title-color"
+          >
+            <ChatBubble class="h-[17px] w-[17px] shrink-0 text-admin-subtitle-color" />
+            <span>任务指令 (Prompt)</span>
+            <Button
+              text
+              size="small"
+              label="复制全文"
+              class="ml-auto !text-admin-caption !text-admin-text-3"
+              @click="copyToClipboard(detailTask.prompt || '')"
+            />
+          </div>
+          <div
+            class="max-h-[210px] overflow-y-auto rounded-[14px] border border-admin-border-soft bg-white/80 px-4 py-3.5"
+          >
+            <div
+              class="whitespace-pre-wrap break-words text-admin-body leading-[1.7] text-admin-text-2-strong"
+            >
+              {{ detailTask.prompt || '无提示词' }}
+            </div>
+          </div>
+        </div>
+
+        <div v-if="resultImageUrl" class="flex flex-col gap-2.5">
+          <div
+            class="flex min-w-0 items-center gap-2 text-admin-body font-bold text-admin-title-color"
+          >
+            <MediaImage class="h-[17px] w-[17px] shrink-0 text-admin-subtitle-color" />
             <span>生成结果</span>
           </div>
-          <div class="result-image-box">
-            <n-image
+          <div
+            class="group relative overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-preview-bg transition-colors hover:border-admin-border-hover"
+          >
+            <PrimeImage
               :src="resultImageUrl"
-              width="100%"
-              object-fit="contain"
-              class="standard-image"
+              preview
+              image-class="block"
+              :image-style="{ width: '100%', objectFit: 'contain' }"
             />
-            <div class="image-overlay">
-              <n-button tertiary size="small" @click="openResultImage(resultImageUrl)">
-                在新窗口打开
-              </n-button>
+            <div
+              class="absolute right-3 bottom-3 opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              <Button
+                severity="secondary"
+                size="small"
+                label="在新窗口打开"
+                @click="openResultImage(resultImageUrl)"
+              />
             </div>
           </div>
         </div>
 
-        <div class="detail-section">
-          <div class="section-title">
-            <n-icon><CodeBrackets /></n-icon>
+        <div class="flex flex-col gap-2.5">
+          <div
+            class="flex min-w-0 items-center gap-2 text-admin-body font-bold text-admin-title-color"
+          >
+            <CodeBrackets class="h-[17px] w-[17px] shrink-0 text-admin-subtitle-color" />
             <span>API 响应摘要</span>
-            <n-button
-              quaternary
-              size="tiny"
-              class="title-action"
+            <Button
+              text
+              size="small"
+              label="复制 JSON"
+              class="ml-auto !text-admin-caption !text-admin-text-3"
               @click="copyToClipboard(resultSummaryText)"
-            >
-              复制 JSON
-            </n-button>
+            />
           </div>
-          <div class="json-card">
-            <pre>{{ resultSummaryText }}</pre>
+          <div
+            class="overflow-x-auto rounded-[14px] border border-admin-border-soft bg-white/80 px-4 py-3.5 font-mono text-admin-meta"
+          >
+            <pre class="m-0 leading-[1.6] text-admin-text-2-strong">{{ resultSummaryText }}</pre>
           </div>
 
-          <div v-if="resultDebugText" class="debug-wrapper">
-            <div class="debug-header" @click="showDebugResult = !showDebugResult">
-              <div class="header-left">
-                <n-icon><Terminal /></n-icon>
+          <div
+            v-if="resultDebugText"
+            class="mt-2 overflow-hidden rounded-[14px] border border-admin-border-soft bg-admin-surface-muted/65"
+          >
+            <div
+              class="flex cursor-pointer items-center justify-between gap-3 px-3.5 py-3"
+              @click="showDebugResult = !showDebugResult"
+            >
+              <div
+                class="flex items-center gap-2 text-admin-meta font-semibold text-admin-text-2-strong"
+              >
+                <Terminal class="h-[17px] w-[17px] shrink-0 text-admin-subtitle-color" />
                 <span>原始调试详情 (脱敏)</span>
               </div>
-              <n-button text size="tiny">{{ showDebugResult ? '隐藏' : '展开' }}</n-button>
+              <Button
+                text
+                size="small"
+                :label="showDebugResult ? '隐藏' : '展开'"
+                @click.stop="showDebugResult = !showDebugResult"
+              />
             </div>
-            <n-collapse-transition :show="showDebugResult">
-              <div class="json-card debug-mode">
-                <pre>{{ resultDebugText }}</pre>
-              </div>
-            </n-collapse-transition>
+            <div
+              v-show="showDebugResult"
+              class="overflow-x-auto rounded-none border-0 border-t border-admin-border-soft bg-white/75 px-4 py-3.5 font-mono text-admin-meta"
+            >
+              <pre class="m-0 leading-[1.6] text-admin-text-3">{{ resultDebugText }}</pre>
+            </div>
           </div>
         </div>
       </div>
-    </n-modal>
+    </Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  NButton,
-  NCollapseTransition,
-  NDataTable,
-  NIcon,
-  NImage,
-  NInput,
-  NModal,
-  NPagination,
-  NSelect,
-  useMessage,
-} from 'naive-ui'
+import Button from 'primevue/button'
+import Chart from 'primevue/chart'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Dialog from 'primevue/dialog'
+import IconField from 'primevue/iconfield'
+import PrimeImage from 'primevue/image'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
+import Paginator from 'primevue/paginator'
+import type { PageState } from 'primevue/paginator'
+import Select from 'primevue/select'
+import Tag from 'primevue/tag'
+import Toolbar from 'primevue/toolbar'
 import {
   ChatBubble,
   CheckCircle,
   Clock,
   CodeBrackets,
   Copy,
+  Eye,
   Fingerprint,
   List,
   MediaImage,
@@ -321,18 +607,72 @@ import {
   Search,
   Terminal,
   WarningTriangle,
+  Xmark,
   XmarkCircle,
 } from '@iconoir/vue'
-import type { ECElementEvent } from 'echarts/core'
-import { taskStatusOptions, getTaskStatusConfig } from './taskMonitorColumns'
-import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
-import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
-import { VChart } from '../../shared/lib/adminEChart'
+import { useAppToast } from '../../../../shared/composables/useAppToast'
+import {
+  adminChartPlugins,
+  adminChartTheme,
+  defineAdminChartData,
+  defineAdminChartOptions,
+  type AdminChartData,
+  type AdminChartOptions,
+  withAlpha,
+} from '../../shared/lib/adminChart'
+import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
+import {
+  formatTaskCreatedAt,
+  getTaskApiCall,
+  getTaskDuration,
+  getTaskResultImageUrl,
+  getTaskSanitizedError,
+  getTaskStatusConfig,
+  getTaskUserIdentifier,
+  taskStatusOptions,
+} from './taskMonitorColumns'
 import { useTaskResultDetail } from './useTaskResultDetail'
-import { useTaskMonitor } from './useTaskMonitor'
-import './AdminTaskMonitorPage.css'
+import { TASK_MONITOR_PAGE_SIZE, useTaskMonitor } from './useTaskMonitor'
 
-const message = useMessage()
+type PrimeChartSelectEvent = {
+  element?: {
+    index?: number
+  }
+}
+
+const appToast = useAppToast()
+const detailDialogPt = {
+  root: {
+    class:
+      '!overflow-hidden !border !border-[rgba(215,224,235,0.92)] !bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(247,250,253,0.96))] !shadow-[0_24px_60px_rgba(45,64,89,0.16)]',
+  },
+  header: {
+    class:
+      '!border-b !border-admin-border-soft !px-6 !pt-5 !pb-3.5 max-[720px]:!px-[18px] max-[720px]:!pt-4 max-[720px]:!pb-3',
+  },
+  content: {
+    class:
+      '!max-h-[75vh] !overflow-y-auto !px-6 !pt-[18px] !pb-6 max-[720px]:!px-[18px] max-[720px]:!pt-3.5 max-[720px]:!pb-5',
+  },
+} as const
+
+const detailBannerBaseClass =
+  'relative flex flex-col gap-3 overflow-hidden rounded-[18px] border border-admin-border-soft bg-admin-surface-muted px-[18px] py-4 before:absolute before:top-3.5 before:bottom-3.5 before:left-0 before:w-1 before:rounded-full before:bg-admin-text-3'
+const detailStatusBannerClassByStatus: Record<string, string> = {
+  completed:
+    'bg-[linear-gradient(135deg,rgba(47,158,115,0.1),rgba(255,255,255,0.74))] before:bg-admin-success',
+  failed:
+    'bg-[linear-gradient(135deg,rgba(209,77,90,0.095),rgba(255,255,255,0.74))] before:bg-admin-danger',
+  running:
+    'bg-[linear-gradient(135deg,rgba(212,136,48,0.1),rgba(255,255,255,0.74))] before:bg-admin-warning',
+}
+const detailStatusDotBaseClass =
+  'h-[9px] w-[9px] shrink-0 rounded-full bg-admin-text-3 shadow-[0_0_0_4px_rgba(152,162,179,0.14)]'
+const detailStatusDotClassByStatus: Record<string, string> = {
+  completed: 'bg-admin-success shadow-[0_0_0_4px_rgba(47,158,115,0.14)]',
+  failed: 'bg-admin-danger shadow-[0_0_0_4px_rgba(209,77,90,0.14)]',
+  running: 'bg-admin-warning shadow-[0_0_0_4px_rgba(212,136,48,0.15)]',
+}
 
 const {
   detailModalVisible,
@@ -347,25 +687,24 @@ const {
   showDetail,
   getErrorReason,
   calcDuration,
-} = useTaskResultDetail({ message })
+} = useTaskResultDetail({ message: appToast })
 
 const {
   tasks,
   total,
   loading,
   page,
-  pageCount,
   pageStats,
   failedTasks,
   activeTasks,
   slowTasks,
   filterStatus,
   searchKeyword,
-  columns,
   loadTasks,
   handleSearch,
-} = useTaskMonitor({ onShowDetail: showDetail })
+} = useTaskMonitor()
 
+const paginationFirst = computed(() => (page.value - 1) * TASK_MONITOR_PAGE_SIZE)
 const summaryOtherCount = computed(() =>
   Math.max(
     0,
@@ -390,66 +729,111 @@ const failedFoot = computed(
   () => `当前页失败率 ${formatPercent(pageStats.value.failed, currentPageCount.value)}`,
 )
 const otherFoot = computed(() => `当前页 ${currentPageCount.value} / 查询 ${total.value}`)
+const taskTableSubtitle = computed(() => {
+  const statusLabel =
+    taskStatusOptions.find((option) => option.value === filterStatus.value)?.label || '全部状态'
+  const keyword = searchKeyword.value.trim()
+  return keyword
+    ? `${statusLabel} · 关键词 ${keyword} · 共 ${total.value} 条`
+    : `${statusLabel} · 共 ${total.value} 条`
+})
 
-const slowTaskChartOption = computed(() => ({
-  animation: false,
-  tooltip: {
-    trigger: 'item',
-    formatter: '{b}<br/>耗时: {c}s',
-  },
-  grid: {
-    top: 6,
-    left: 8,
-    right: 18,
-    bottom: 8,
-    containLabel: true,
-  },
-  xAxis: {
-    type: 'value',
-    axisLine: { show: false },
-    axisTick: { show: false },
-    splitLine: { lineStyle: { color: '#e7edf5' } },
-    axisLabel: {
-      color: 'var(--admin-text-3)',
-      fontSize: 11,
-    },
-  },
-  yAxis: {
-    type: 'category',
-    data: slowTasks.value.map((row) => row.task.task_id),
-    axisTick: { show: false },
-    axisLine: { show: false },
-    axisLabel: {
-      color: 'var(--admin-text-2)',
-      fontSize: 11,
-      width: 140,
-      overflow: 'truncate',
-    },
-  },
-  series: [
-    {
-      name: '耗时',
-      type: 'bar',
-      data: slowTasks.value.map((row) => row.seconds),
-      barWidth: 12,
-      itemStyle: {
-        color: '#7e9eff',
-        borderRadius: [0, 5, 5, 0],
+const slowTaskChartData = computed<AdminChartData>(() =>
+  defineAdminChartData({
+    labels: slowTasks.value.map((row) => row.task.task_id),
+    datasets: [
+      {
+        type: 'bar',
+        label: '耗时',
+        data: slowTasks.value.map((row) => row.seconds),
+        backgroundColor: withAlpha(adminChartTheme.info, 0.72),
+        hoverBackgroundColor: adminChartTheme.info,
+        borderRadius: 6,
+        barThickness: 12,
       },
-      emphasis: {
-        itemStyle: {
-          color: '#5e84ff',
+    ],
+  }),
+)
+
+const slowTaskChartOptions = computed<AdminChartOptions>(() =>
+  defineAdminChartOptions({
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    animation: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.96)',
+        titleColor: 'var(--color-admin-text-1)',
+        bodyColor: 'var(--color-admin-text-1)',
+        bodyFont: { size: 12 },
+        titleFont: { size: 12, weight: 700 },
+        padding: 10,
+        displayColors: false,
+        borderWidth: 1,
+        borderColor: 'var(--color-admin-border-soft)',
+        callbacks: {
+          label: (context) => `耗时: ${Number(context.raw || 0)}s`,
         },
       },
     },
-  ],
-}))
+    scales: {
+      x: {
+        beginAtZero: true,
+        grid: { color: 'rgba(71, 117, 168, 0.12)' },
+        border: { display: false },
+        ticks: {
+          color: 'var(--color-admin-text-3)',
+          callback: (value) => `${Number(value)}s`,
+        },
+      },
+      y: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: {
+          color: 'var(--color-admin-text-2)',
+          callback: (_value, index) =>
+            truncateChartLabel(slowTasks.value[index]?.task.task_id || '', 18),
+        },
+      },
+    },
+  }),
+)
 
-function handleSlowTaskChartClick(event: ECElementEvent) {
-  if (event.componentType !== 'series' || typeof event.dataIndex !== 'number') return
-  const row = slowTasks.value[event.dataIndex]
+function handleSlowTaskChartSelect(event: PrimeChartSelectEvent) {
+  const index = event.element?.index
+  if (typeof index !== 'number') return
+  const row = slowTasks.value[index]
   if (!row) return
   showDetail(row.task)
+}
+
+function handlePageChange(event: PageState) {
+  page.value = event.page + 1
+}
+
+function clearSearch() {
+  searchKeyword.value = ''
+  handleSearch()
+}
+
+function getTaskStatusBannerClass(status: string) {
+  return [detailBannerBaseClass, detailStatusBannerClassByStatus[status]]
+}
+
+function getTaskStatusDotClass(status: string) {
+  return [detailStatusDotBaseClass, detailStatusDotClassByStatus[status]]
+}
+
+function getTaskDurationClass(task: Parameters<typeof getTaskDuration>[0]) {
+  const tone = getTaskDuration(task)?.tone
+  return [
+    'font-mono text-admin-meta font-bold',
+    tone === 'success' && 'text-admin-success',
+    tone === 'warning' && 'text-admin-warning',
+    tone === 'danger' && 'text-admin-danger',
+  ]
 }
 
 function formatSeconds(seconds: number) {
@@ -465,5 +849,10 @@ function formatSeconds(seconds: number) {
 function formatPercent(value: number, totalValue: number) {
   if (totalValue <= 0) return '0.0%'
   return `${((value / totalValue) * 100).toFixed(1)}%`
+}
+
+function truncateChartLabel(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value
+  return `${value.slice(0, maxLength - 1)}…`
 }
 </script>

@@ -757,6 +757,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseMonitor'
+  /admin/monitor/stream:
+    get:
+      tags: [AdminMonitor]
+      operationId: streamAdminMonitor
+      responses:
+        '200':
+          description: Server-sent monitor snapshots. Snapshot events carry ApiResponseMonitor JSON.
+          content:
+            text/event-stream:
+              schema:
+                type: string
 
   /admin/statistics:
     get:

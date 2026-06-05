@@ -1,4 +1,3 @@
-import type { FormRules } from 'naive-ui'
 import channelApi, { type Channel } from '../../../../shared/api/channel'
 import adminAccountApi, {
   FALLBACK_ADMIN_ACCOUNT_LIMITS,
@@ -22,9 +21,7 @@ export function useChannelAccounts(options: {
     warning: (options: {
       title: string
       content: string
-      positiveText: string
-      negativeText: string
-      onPositiveClick: () => void | Promise<void>
+      onConfirm: () => void | Promise<void>
     }) => void
   }
   onAfterMutation: () => Promise<void> | void
@@ -33,7 +30,6 @@ export function useChannelAccounts(options: {
   const accountLoading = ref(false)
   const showAccountModal = ref(false)
   const isEditAccount = ref(false)
-  const accountFormRef = ref()
   const accountSaveLoading = ref(false)
   const currentAccountId = ref(0)
   const selectedChannelForAccount = ref<Channel | null>(null)
@@ -52,6 +48,7 @@ export function useChannelAccounts(options: {
   const accountForm = ref(createEmptyAccountForm())
   const detectModelsLoading = ref(false)
   const detectedModelValues = ref<string[]>([])
+  const modelSuggestions = ref<string[]>([])
   const detectedModelSessionCache = ref(new Set<string>())
   const hasShownApiKeyHint = ref(false)
 
@@ -112,30 +109,12 @@ export function useChannelAccounts(options: {
     return Array.from(models)
   }
 
-  function getAccStatusClass(acc: AdminAccount) {
-    if (acc.status === 0) return 'acc-warning'
-    if (acc.fail_count >= 5) return 'acc-error'
-    return 'acc-success'
-  }
-
   const accountModelOptions = computed(() => {
     const detectedModels = detectedModelValues.value
     const currentValues = accountForm.value.model_values || []
     const allModels = new Set([...detectedModels, ...currentValues])
     return Array.from(allModels).map((m) => ({ label: m, value: m }))
   })
-
-  const accountRules: FormRules = {
-    model_values: [
-      {
-        required: true,
-        type: 'array',
-        min: 1,
-        message: '请至少选择一个模型',
-        trigger: ['change', 'blur'],
-      },
-    ],
-  }
 
   function openAddAccountModal(channel: Channel) {
     isEditAccount.value = false
@@ -145,6 +124,14 @@ export function useChannelAccounts(options: {
     detectedModelSessionCache.value = new Set()
     hasShownApiKeyHint.value = false
     showAccountModal.value = true
+  }
+
+  function searchModelSuggestions(event: { query?: string }) {
+    const query = (event.query || '').trim().toLowerCase()
+    const options = accountModelOptions.value.map((item) => item.value)
+    modelSuggestions.value = query
+      ? options.filter((model) => model.toLowerCase().includes(query))
+      : options
   }
 
   function openEditAccountModal(account: AdminAccount) {
@@ -210,7 +197,14 @@ export function useChannelAccounts(options: {
 
   async function handleSaveAccount() {
     try {
-      await accountFormRef.value?.validate()
+      const selectedModels = accountForm.value.model_values
+        .map((item) => item.trim())
+        .filter(Boolean)
+      accountForm.value.model_values = Array.from(new Set(selectedModels))
+      if (accountForm.value.model_values.length === 0) {
+        options.message.warning('请至少选择或输入一个模型')
+        return
+      }
       if (!isEditAccount.value && !accountForm.value.api_key) {
         options.message.warning('新增账号必须输入 API 密钥')
         return
@@ -272,9 +266,7 @@ export function useChannelAccounts(options: {
     options.dialog.warning({
       title: '确认删除',
       content: '确定删除该账号吗？',
-      positiveText: '确定',
-      negativeText: '取消',
-      onPositiveClick: async () => {
+      onConfirm: async () => {
         try {
           await adminAccountApi.delete(account.id)
           options.message.success('账号已删除')
@@ -291,21 +283,20 @@ export function useChannelAccounts(options: {
     accountLoading,
     showAccountModal,
     isEditAccount,
-    accountFormRef,
     accountSaveLoading,
     accountLimits,
     selectedChannelForAccount,
     accountForm,
     detectModelsLoading,
+    modelSuggestions,
     accountModelOptions,
-    accountRules,
     loadAccounts,
     getChannelAccounts,
     getChannelActiveModels,
-    getAccStatusClass,
     openAddAccountModal,
     openEditAccountModal,
     handleDetectModelsOnSelectOpen,
+    searchModelSuggestions,
     handleSaveAccount,
     toggleAccountStatus,
     handleDeleteAccount,

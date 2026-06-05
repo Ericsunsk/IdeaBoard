@@ -1,150 +1,145 @@
-/* 全局样式重置 */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@import 'tailwindcss';
+
+@theme {
+  --font-admin: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+
+  --color-admin-bg: #eef3f8;
+  --color-admin-shell: rgba(255, 255, 255, 0.62);
+  --color-admin-card: rgba(255, 255, 255, 0.94);
+  --color-admin-card-strong: #ffffff;
+  --color-admin-border: #d7e0eb;
+  --color-admin-border-soft: #e7edf4;
+  --color-admin-border-hover: #c5d1df;
+  --color-admin-border-pressed: #b8c5d5;
+  --color-admin-border-strong: #b9c8da;
+  --color-admin-text-1: #1d2939;
+  --color-admin-text-2: #667085;
+  --color-admin-text-2-strong: #475467;
+  --color-admin-text-3: #98a2b3;
+  --color-admin-text-disabled: #b7c0cc;
+  --color-admin-text-inverse: #ffffff;
+  --color-admin-title-color: #1d2939;
+  --color-admin-subtitle-color: #98a2b3;
+  --color-admin-accent: #26364f;
+  --color-admin-accent-hover: #1d2a3f;
+  --color-admin-accent-pressed: #111827;
+  --color-admin-accent-soft: rgba(38, 54, 79, 0.09);
+  --color-admin-accent-softer: rgba(38, 54, 79, 0.055);
+  --color-admin-focus-ring: rgba(38, 54, 79, 0.12);
+  --color-admin-surface-muted: #f5f8fb;
+  --color-admin-surface-hover: #f1f5f9;
+  --color-admin-surface-pressed: #e8eef5;
+  --color-admin-surface-disabled: #f0f4f8;
+  --color-admin-control-bg: #f8fafc;
+  --color-admin-control-bg-hover: #f1f5f9;
+  --color-admin-control-border: #d7e0eb;
+  --color-admin-control-border-hover: #c5d1df;
+  --color-admin-control-border-pressed: #b8c5d5;
+  --color-admin-nav-active-bg: #22304a;
+  --color-admin-nav-active-bg-hover: #19243a;
+  --color-admin-preview-bg: #f3f6fa;
+  --color-admin-divider: rgba(29, 41, 57, 0.08);
+  --color-admin-success: #2f9e73;
+  --color-admin-warning: #d48830;
+  --color-admin-warning-strong: #e79a38;
+  --color-admin-warning-hover: #eba84e;
+  --color-admin-danger: #d14d5a;
+  --color-admin-danger-hover: #df6370;
+  --color-admin-danger-pressed: #b23a45;
+  --color-admin-info: #4775a8;
+  --color-admin-model-indigo: #4f6f9f;
+  --color-admin-model-purple: #7b668f;
+  --color-admin-model-cyan: #3d8b9a;
+
+  --text-admin-micro: 10px;
+  --text-admin-caption: 11px;
+  --text-admin-meta: 12px;
+  --text-admin-body: 13px;
+  --text-admin-content: 14px;
+  --text-admin-title-sm: 15px;
+  --text-admin-title: 16px;
+  --text-admin-heading: 18px;
+  --text-admin-icon: 20px;
+  --text-admin-summary-value: 28px;
+  --text-admin-modal-title: 26px;
+  --text-admin-modal-title-mobile: 22px;
+
+  --leading-admin-tight: 1.2;
+  --leading-admin-body: 1.5;
 }
 
-html,
-body {
-  height: 100%;
-  background: #f8f9fd;
-  color: #202436;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+    background: #eef3f8;
+    color: #1d2939;
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #app {
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  :root {
+    --ib-control-icon: #5f6368;
+    --ib-control-icon-hover: #26364f;
+    --ib-control-bg-hover: #e8eaed;
+  }
+
+  /* 全局链接样式 */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* 滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f8f9fd;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #c8d0e4;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #aeb8cf;
+  }
+
+  /* 选中文字颜色 */
+  ::selection {
+    background: rgba(38, 54, 79, 0.18);
+    color: #1d2939;
+  }
 }
 
-#app {
-  width: 100%;
-  min-height: 100vh;
-}
-
-:root {
-  --ib-control-icon: #5f6368;
-  --ib-control-icon-hover: #6757c8;
-  --ib-control-bg-hover: #e8eaed;
-}
-
-/* 全局链接样式 */
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-/* 滚动条样式 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f8f9fd;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c8d0e4;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #aeb8cf;
-}
-
-/* 选中文字颜色 */
-::selection {
-  background: rgba(102, 126, 234, 0.3);
-  color: #202436;
-}
-
-/* Admin-only Naive UI teleported overlays (modal/dialog/mask). */
-body.admin-route .n-modal .n-card {
-  --n-color: #101113;
-  --n-color-modal: #101113;
-  --n-border-color: #232326;
-  --n-title-text-color: #f4f4f5;
-  --n-text-color: #a1a1aa;
-  --n-action-color: #151618;
-  --n-close-icon-color: #d4d4d8;
-  --n-close-icon-color-hover: #ffffff;
-  --n-close-icon-color-pressed: #f4f4f5;
-  --n-close-color-hover: rgba(255, 255, 255, 0.08);
-  --n-close-color-pressed: rgba(255, 255, 255, 0.12);
-  --n-border-radius: 18px;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
-}
-
-body.admin-route .n-modal .n-card > .n-card-header {
-  padding: 20px 20px 14px;
-}
-
-body.admin-route .n-modal .n-card > .n-card-header .n-card-header__main {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-body.admin-route .n-modal .n-card > .n-card__content {
-  padding: 0 20px 20px;
-}
-
-body.admin-route .n-modal .n-card > .n-card__action,
-body.admin-route .n-modal .n-card > .n-card__footer {
-  padding: 14px 20px;
-  background: #151618;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-body.admin-route .n-modal .n-card > .n-card__action .n-space,
-body.admin-route .n-modal .n-card > .n-card__footer .n-space {
-  width: 100%;
-  justify-content: flex-end;
-}
-
-body.admin-route .n-modal .n-card .n-form-item:last-child {
-  margin-bottom: 0;
-}
-
-body.admin-route .n-modal .n-card .n-button,
-body.admin-route .n-dialog .n-button {
-  min-width: 88px;
-}
-
-body.admin-route .n-dialog {
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
-}
-
-body.admin-route .n-dialog__title {
-  font-size: 18px;
-  letter-spacing: 0.01em;
-}
-
-body.admin-route .n-dialog__content {
-  color: #a1a1aa;
-}
-
-body.admin-route .n-dialog__action {
-  padding-top: 14px;
-}
-
-body.admin-route .n-modal-mask {
-  backdrop-filter: blur(4px);
-  background: rgba(0, 0, 0, 0.56);
-}
-
-/* User-facing toast skin, aligned with the previous Naive UI message treatment. */
+/* User-facing toast skin. */
 [data-sonner-toaster].ideaboard-toaster {
   --ideaboard-toast-bg: rgba(255, 255, 255, 0.9);
   --ideaboard-toast-border: #dbe2f1;
   --ideaboard-toast-text: #2b3245;
   --ideaboard-toast-muted: #697287;
   --ideaboard-toast-shadow: 0 10px 24px rgba(50, 63, 95, 0.14);
-  --ideaboard-toast-accent: #7a6bd5;
+  --ideaboard-toast-accent: #26364f;
   --ideaboard-toast-success: #2f9a64;
   --ideaboard-toast-warning: #c9892b;
   --ideaboard-toast-error: #cb4a5c;
-  --ideaboard-toast-info: #7a6bd5;
+  --ideaboard-toast-info: #26364f;
   width: min(300px, calc(100vw - 28px));
 }
 
@@ -154,7 +149,7 @@ body.admin-route .n-modal-mask {
   border: 1px solid var(--ideaboard-toast-border);
   border-radius: 14px;
   background:
-    radial-gradient(circle at 18% 20%, rgba(154, 129, 233, 0.14) 0%, rgba(154, 129, 233, 0) 58%),
+    radial-gradient(circle at 18% 20%, rgba(38, 54, 79, 0.1) 0%, rgba(38, 54, 79, 0) 58%),
     var(--ideaboard-toast-bg);
   box-shadow: var(--ideaboard-toast-shadow);
   color: var(--ideaboard-toast-text);
@@ -220,7 +215,7 @@ body.admin-route .n-modal-mask {
 [data-sonner-toaster].ideaboard-toaster
   [data-sonner-toast].ideaboard-toast
   [data-close-button]:hover {
-  background: rgba(122, 107, 213, 0.08);
+  background: rgba(38, 54, 79, 0.08);
   color: #5f6780;
 }
 

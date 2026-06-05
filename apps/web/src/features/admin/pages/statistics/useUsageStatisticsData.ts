@@ -23,9 +23,13 @@ export function useUsageStatisticsData() {
   const adminStatistics = computed<AdminStatistics | null>(
     () => statisticsQuery.data.value?.data ?? null,
   )
+  const isStatisticsSettled = computed(
+    () => statisticsQuery.isFetched.value || statisticsQuery.isError.value,
+  )
 
   return {
     adminStatistics,
+    isStatisticsSettled,
     timeRange,
     rangeOptions,
   }

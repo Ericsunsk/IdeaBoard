@@ -1,13 +1,12 @@
 package taskservice
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/sse"
 	"ideaboard/api/internal/tasks"
 
 	"github.com/gin-gonic/gin"
@@ -144,13 +143,7 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 		return
 	}
 
-	header := c.Writer.Header()
-	header.Set("Content-Type", "text/event-stream")
-	header.Set("Cache-Control", "no-cache")
-	header.Set("Connection", "keep-alive")
-	header.Set("X-Accel-Buffering", "no")
-	c.Status(http.StatusOK)
-	if err := http.NewResponseController(c.Writer).SetWriteDeadline(time.Time{}); err != nil {
+	if err := sse.Prepare(c); err != nil {
 		slog.Warn("clear SSE write deadline failed", "task_id", taskID, "err", err)
 	}
 
@@ -215,15 +208,7 @@ func writeTaskSSEvent(c *gin.Context, task *tasks.Task) bool {
 }
 
 func writeSSEvent(c *gin.Context, event string, data interface{}) bool {
-	payload, err := json.Marshal(data)
-	if err != nil {
-		return false
-	}
-	if _, err := fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", event, payload); err != nil {
-		return false
-	}
-	c.Writer.Flush()
-	return true
+	return sse.WriteEvent(c, event, data) == nil
 }
 
 func (h *Handler) DeleteUserTask(c *gin.Context) {

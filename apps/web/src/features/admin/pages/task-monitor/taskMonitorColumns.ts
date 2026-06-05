@@ -1,16 +1,13 @@
-import { h } from 'vue'
-import { Eye } from '@iconoir/vue'
-import { NButton, NIcon, NImage, NPopover, NTag } from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../../shared/api/task'
 import { calcDurationSeconds, formatAdminDateTime } from '../../../../shared/utils/dateTime'
 import { sanitizeTaskErrorMessage } from '../../../../shared/utils/errorMessages'
 import { getSafeTaskResultImageUrl } from './taskResultImages'
 
-type TaskStatusTagType = 'default' | 'warning' | 'success' | 'error'
+type TaskStatusTagSeverity = 'secondary' | 'warn' | 'success' | 'danger'
+type TaskDurationTone = 'success' | 'warning' | 'danger'
 
 interface TaskStatusConfig {
-  type: TaskStatusTagType
+  severity: TaskStatusTagSeverity
   text: string
   color: string
 }
@@ -24,8 +21,8 @@ type MonitorTaskRow = Task & {
   }
 }
 
-export const ERROR_TEXT_COLOR = 'var(--admin-danger)'
-export const DEFAULT_STATUS_COLOR = 'var(--admin-text-3)'
+export const ERROR_TEXT_COLOR = 'var(--color-admin-danger)'
+export const DEFAULT_STATUS_COLOR = 'var(--color-admin-text-3)'
 
 export const taskStatusOptions = [
   { label: '等待中', value: 'pending' },
@@ -35,218 +32,65 @@ export const taskStatusOptions = [
 ]
 
 const taskStatusConfigMap: Record<string, TaskStatusConfig> = {
-  pending: { type: 'default', text: '等待中', color: DEFAULT_STATUS_COLOR },
-  running: { type: 'warning', text: '执行中', color: '#f59e0b' },
-  completed: { type: 'success', text: '已完成', color: '#22c55e' },
-  failed: { type: 'error', text: '失败', color: ERROR_TEXT_COLOR },
+  pending: { severity: 'secondary', text: '等待中', color: DEFAULT_STATUS_COLOR },
+  running: { severity: 'warn', text: '执行中', color: 'var(--color-admin-warning)' },
+  completed: { severity: 'success', text: '已完成', color: 'var(--color-admin-success)' },
+  failed: { severity: 'danger', text: '失败', color: ERROR_TEXT_COLOR },
 }
 
 export function getTaskStatusConfig(status: string): TaskStatusConfig {
   return (
-    taskStatusConfigMap[status] || { type: 'default', text: status, color: DEFAULT_STATUS_COLOR }
+    taskStatusConfigMap[status] || {
+      severity: 'secondary',
+      text: status,
+      color: DEFAULT_STATUS_COLOR,
+    }
   )
 }
 
-export function createMonitorTaskColumns(options?: {
-  onShowDetail?: (row: Task) => void
-}): DataTableColumns<Task> {
-  return [
-    {
-      title: '创建时间',
-      key: 'created_at',
-      width: 130,
-      render: (row) => {
-        return h(
-          'span',
-          { style: { fontSize: '12px', color: 'var(--admin-text-1)', fontWeight: '500' } },
-          formatAdminDateTime(row.created_at, row.created_at),
-        )
-      },
-    },
-    {
-      title: '结果',
-      key: 'result',
-      width: 70,
-      align: 'center',
-      render: (row) => {
-        if (row.status === 'completed' && row.result) {
-          const imageUrl = getSafeTaskResultImageUrl(row.result)
-          if (!imageUrl) return '-'
-          return h(NImage, {
-            width: 42,
-            height: 42,
-            src: imageUrl,
-            style: { borderRadius: '4px', cursor: 'pointer', display: 'block' },
-            objectFit: 'cover',
-            previewDisabled: false,
-            lazy: true,
-          })
-        }
-        return '-'
-      },
-    },
-    {
-      title: '用户',
-      key: 'user',
-      width: 100,
-      render: (row) => {
-        const taskRow = row as MonitorTaskRow
-        const identifier =
-          taskRow.username ||
-          taskRow.email ||
-          taskRow.user?.username ||
-          taskRow.user?.email ||
-          taskRow.user_id
-        return h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
-          h(
-            'span',
-            {
-              style: {
-                fontWeight: '600',
-                color: 'var(--admin-text-1)',
-                fontSize: '12px',
-                maxWidth: '90px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              },
-            },
-            identifier,
-          ),
-        ])
-      },
-    },
-    {
-      title: '提示词',
-      key: 'prompt',
-      width: 120,
-      render: (row) => {
-        const text = row.prompt || '-'
-        return h(
-          NPopover,
-          { trigger: 'hover', placement: 'top', style: { maxWidth: '400px' } },
-          {
-            trigger: () =>
-              h(
-                'span',
-                {
-                  style: {
-                    color: 'var(--admin-text-2)',
-                    fontSize: '12px',
-                    cursor: 'help',
-                    display: '-webkit-box',
-                    '-webkit-line-clamp': '1',
-                    '-webkit-box-orient': 'vertical',
-                    overflow: 'hidden',
-                    'word-break': 'break-all',
-                  },
-                },
-                text,
-              ),
-            default: () => h('div', { style: { fontSize: '12px', lineHeight: '1.6' } }, text),
-          },
-        )
-      },
-    },
-    { title: '账号', key: 'account_id', width: 50, align: 'center' },
-    {
-      title: 'API调用',
-      key: 'api_call',
-      width: 110,
-      render: (row) => {
-        if (!row.result) return h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
-        try {
-          const r = JSON.parse(row.result)
-          if (r.platform) {
-            return h('span', { style: { fontSize: '12px' } }, [
-              h(
-                NTag,
-                { size: 'tiny', type: 'info', bordered: false, style: { borderRadius: '4px' } },
-                () => r.platform,
-              ),
-              r.model_set
-                ? h(
-                    'span',
-                    {
-                      style: { marginLeft: '4px', color: 'var(--admin-text-3)', fontSize: '10px' },
-                    },
-                    r.model_set,
-                  )
-                : null,
-            ])
-          }
-        } catch {
-          return h('span', { style: { color: 'var(--admin-text-3)', fontSize: '12px' } }, '-')
-        }
-        return h('span', { style: { color: 'var(--admin-text-3)', fontSize: '12px' } }, '-')
-      },
-    },
-    {
-      title: '状态',
-      key: 'status',
-      width: 80,
-      render: (row) => {
-        const config = getTaskStatusConfig(row.status)
-        return h(
-          NTag,
-          { type: config.type, size: 'small', bordered: false, style: { borderRadius: '6px' } },
-          () => config.text,
-        )
-      },
-    },
-    {
-      title: '耗时',
-      key: 'duration',
-      width: 60,
-      align: 'center',
-      render: (row) => {
-        if (!row.completed_at || !row.created_at)
-          return h('span', { style: { color: 'var(--admin-text-3)' } }, '-')
-        const sec = calcDurationSeconds(row.created_at, row.completed_at)
-        if (sec == null) return '-'
-        const color =
-          sec > 60
-            ? 'var(--admin-danger)'
-            : sec > 30
-              ? 'var(--admin-warning)'
-              : 'var(--admin-success)'
-        return h('span', { style: { fontSize: '12px', color, fontWeight: '500' } }, `${sec}s`)
-      },
-    },
-    {
-      title: '错误诊断',
-      key: 'info',
-      width: 140,
-      render: (row) => {
-        if (row.status === 'failed' && row.error_msg) {
-          return h(
-            'span',
-            { style: { color: ERROR_TEXT_COLOR, fontSize: '12px' } },
-            sanitizeTaskErrorMessage(row.error_msg),
-          )
-        }
-        return h('span', { style: { color: 'var(--admin-text-3)', fontSize: '12px' } }, '-')
-      },
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 70,
-      align: 'center',
-      render: (row) =>
-        h(
-          NButton,
-          {
-            size: 'tiny',
-            quaternary: true,
-            onClick: () => options?.onShowDetail?.(row),
-          },
-          {
-            icon: () => h(NIcon, null, () => h(Eye)),
-            default: () => '详情',
-          },
-        ),
-    },
-  ]
+export function formatTaskCreatedAt(row: Task) {
+  return formatAdminDateTime(row.created_at, row.created_at)
 }
 
+export function getTaskResultImageUrl(row: Task) {
+  if (row.status !== 'completed' || !row.result) return ''
+  return getSafeTaskResultImageUrl(row.result)
+}
+
+export function getTaskUserIdentifier(row: Task) {
+  const taskRow = row as MonitorTaskRow
+  return (
+    taskRow.username ||
+    taskRow.email ||
+    taskRow.user?.username ||
+    taskRow.user?.email ||
+    taskRow.user_id
+  )
+}
+
+export function getTaskApiCall(row: Task) {
+  if (!row.result) return null
+  try {
+    const result = JSON.parse(row.result) as { platform?: unknown; model_set?: unknown }
+    if (!result.platform) return null
+    return {
+      platform: String(result.platform),
+      modelSet: result.model_set ? String(result.model_set) : '',
+    }
+  } catch {
+    return null
+  }
+}
+
+export function getTaskDuration(row: Task) {
+  if (!row.completed_at || !row.created_at) return null
+  const seconds = calcDurationSeconds(row.created_at, row.completed_at)
+  if (seconds == null) return null
+  const tone: TaskDurationTone = seconds > 60 ? 'danger' : seconds > 30 ? 'warning' : 'success'
+  return { seconds, tone }
+}
+
+export function getTaskSanitizedError(row: Task) {
+  if (row.status !== 'failed' || !row.error_msg) return ''
+  return sanitizeTaskErrorMessage(row.error_msg)
+}

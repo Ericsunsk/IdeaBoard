@@ -1,248 +1,359 @@
 <template>
-  <div class="admin-page storage-page">
-    <div class="admin-card-grid is-2">
-      <article
+  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
+    <div class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+      <Card
         v-for="storage in storages"
         :key="storage.id"
-        class="storage-card admin-card-surface admin-card-interactive"
       >
-        <AdminCardHeader
-          :provider="providerLabel(storage.provider)"
-          :status="statusText(storage)"
-          :status-variant="toChipVariant(statusClass(storage))"
-          :title="storage.name"
-          :subtitle="storageSubtitle(storage)"
-        />
+        <template #content>
+          <div class="flex h-full min-h-[148px] flex-col gap-3.5">
+            <div class="min-w-0">
+              <div class="mb-1 flex flex-wrap items-center gap-2">
+                <Tag :value="providerLabel(storage.provider)" severity="contrast" rounded />
+                <Tag
+                  :value="statusText(storage)"
+                  :severity="getStorageStatusSeverity(statusClass(storage))"
+                  rounded
+                />
+              </div>
+              <div class="truncate text-admin-heading font-bold text-admin-title-color">
+                {{ storage.name }}
+              </div>
+              <div class="truncate text-admin-meta text-admin-subtitle-color">
+                {{ storageSubtitle(storage) }}
+              </div>
+            </div>
 
-        <div class="storage-meta-grid">
-          <div
-            v-for="item in storageMetaItems(storage)"
-            :key="`${storage.id}-${item.label}`"
-            class="meta-item"
-          >
-            <span class="meta-label">{{ item.label }}</span>
-            <span class="meta-value">{{ item.value }}</span>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div
+                v-for="item in storageMetaItems(storage)"
+                :key="`${storage.id}-${item.label}`"
+                class="flex min-w-0 flex-col gap-1"
+              >
+                <span class="text-admin-caption text-admin-text-3">{{ item.label }}</span>
+                <span class="break-all text-admin-body leading-admin-body text-admin-text-1">
+                  {{ item.value }}
+                </span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <Tag
+                v-for="chip in storageFeatureChips(storage)"
+                :key="`${storage.id}-${chip}`"
+                :value="chip"
+                severity="secondary"
+                rounded
+              />
+            </div>
+
+            <div class="mt-auto flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
+              <Button
+                size="small"
+                label="编辑"
+                severity="secondary"
+                outlined
+                @click="openEdit(storage.id)"
+              />
+              <Button
+                v-if="supportsTest(storage)"
+                size="small"
+                label="测试连接"
+                severity="secondary"
+                outlined
+                :loading="testingId === storage.id"
+                :disabled="!canTest(storage)"
+                @click="handleTest(storage)"
+              />
+              <Button
+                v-if="!storage.isCurrent"
+                size="small"
+                label="设为当前"
+                :loading="applyingId === storage.id"
+                :disabled="!canApply(storage)"
+                @click="applyStorage(storage.id)"
+              />
+              <Button
+                v-if="!storage.isCurrent && !storage.builtin"
+                size="small"
+                label="删除"
+                severity="danger"
+                text
+                @click="removeProfile(storage.id)"
+              />
+            </div>
           </div>
-        </div>
+        </template>
+      </Card>
 
-        <div class="feature-chips">
-          <AdminChip
-            v-for="chip in storageFeatureChips(storage)"
-            :key="`${storage.id}-${chip}`"
-            :label="chip"
-          />
-        </div>
-
-        <div class="storage-card-actions">
-          <n-button size="small" @click="openEdit(storage.id)">编辑</n-button>
-          <n-button
-            v-if="supportsTest(storage)"
-            size="small"
-            :loading="testingId === storage.id"
-            :disabled="!canTest(storage)"
-            @click="handleTest(storage)"
+      <Card>
+        <template #content>
+          <Button
+            severity="secondary"
+            outlined
+            class="!flex !min-h-[148px] !w-full !flex-col !items-center !justify-center !gap-2.5"
+            :disabled="creatableProviders.length === 0"
+            @click="openCreate"
           >
-            测试连接
-          </n-button>
-          <n-button
-            v-if="!storage.isCurrent"
-            size="small"
-            type="primary"
-            :loading="applyingId === storage.id"
-            :disabled="!canApply(storage)"
-            @click="applyStorage(storage.id)"
-          >
-            设为当前
-          </n-button>
-          <n-button
-            v-if="!storage.isCurrent && !storage.builtin"
-            size="small"
-            tertiary
-            type="error"
-            @click="removeProfile(storage.id)"
-          >
-            删除
-          </n-button>
-        </div>
-      </article>
-
-      <button
-        class="admin-add-card"
-        type="button"
-        :disabled="creatableProviders.length === 0"
-        @click="openCreate"
-      >
-        <n-icon class="add-mark"><Plus /></n-icon>
-        <span class="add-title">添加存储供应商</span>
-      </button>
+            <template #icon>
+              <Plus />
+            </template>
+            <span>添加存储供应商</span>
+          </Button>
+        </template>
+      </Card>
     </div>
   </div>
 
-  <AdminEditorModal
-    :show="editorOpen"
-    :eyebrow="form.isCurrent ? '当前存储' : '存储配置'"
-    :title="editorMode === 'create' ? '添加存储' : '编辑存储'"
-    :description="
-      editorMode === 'create'
-        ? ''
-        : selectedProviderMeta?.description || '维护上传存储配置，并切换系统当前生效的上传链路。'
-    "
-    :width="920"
-    @close="closeEditor"
+  <Dialog
+    :visible="editorOpen"
+    modal
+    dismissable-mask
+    :draggable="false"
+    :style="{ width: '920px', maxWidth: 'calc(100vw - 24px)' }"
+    @update:visible="handleEditorDialogVisibleUpdate"
   >
-    <template #header-copy-extra>
-      <div v-if="editorMode === 'create'" class="editor-provider-stack">
-        <div class="field vendor-select-field">
-          <div class="field-label-row">
-            <label>供应商</label>
-            <span class="field-hint-inline">仅已接入供应商可直接创建</span>
+    <template #header>
+      <div class="flex w-full flex-col gap-4 pr-4 md:flex-row md:items-start md:justify-between">
+        <div class="min-w-0 flex-1">
+          <div class="mb-3 flex flex-wrap gap-2">
+            <Tag :value="form.isCurrent ? '当前存储' : '存储配置'" severity="secondary" rounded />
           </div>
-          <n-select
-            :value="selectedVendorKey"
-            :options="vendorSelectOptions"
-            :render-label="renderVendorLabel"
-            :menu-props="{ class: 'admin-storage-vendor-menu' }"
-            :show-checkmark="false"
-            :theme-overrides="selectThemeOverrides"
-            placeholder="选择供应商"
-            @update:value="handleVendorSelect"
-          />
-        </div>
-        <div v-if="activeVendorPreset" class="editor-vendor-preview">
-          <img
-            :src="activeVendorPreset.logoSrc"
-            :alt="activeVendorPreset.label"
-            class="vendor-preview-logo"
-          />
-          <div class="editor-vendor-copy">
-            <div class="editor-vendor-row">
-              <span class="editor-vendor-name">{{ activeVendorPreset.label }}</span>
+          <h2 class="m-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color">
+            {{ editorMode === 'create' ? '添加存储' : '编辑存储' }}
+          </h2>
+          <p
+            v-if="editorMode !== 'create'"
+            class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-subtitle-color"
+          >
+            {{
+              selectedProviderMeta?.description ||
+              '维护上传存储配置，并切换系统当前生效的上传链路。'
+            }}
+          </p>
+
+          <div
+            v-if="editorMode === 'create'"
+            class="mt-3.5 grid items-end gap-3 md:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]"
+          >
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <div class="flex items-center justify-between gap-2">
+                <label class="text-admin-meta font-[680] text-admin-text-2">供应商</label>
+                <span class="text-admin-meta text-admin-text-3">仅已接入供应商可直接创建</span>
+              </div>
+              <Select
+                :model-value="selectedVendorKey"
+                :options="vendorSelectOptions"
+                option-label="label"
+                option-value="value"
+                option-disabled="disabled"
+                class="w-full"
+                placeholder="选择供应商"
+                @update:model-value="handleVendorSelect"
+              >
+                <template #value>
+                  <div v-if="activeVendorPreset" class="flex min-w-0 items-center gap-2 py-1">
+                    <div
+                      class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-b from-[#fcfcfd] to-[#ededf0] shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]"
+                    >
+                      <img
+                        :src="activeVendorPreset.logoSrc"
+                        :alt="activeVendorPreset.label"
+                        class="h-[18px] w-[18px] object-contain"
+                      />
+                    </div>
+                    <span class="truncate text-admin-content font-semibold text-admin-title-color">
+                      {{ activeVendorPreset.label }}
+                    </span>
+                  </div>
+                  <span v-else class="text-admin-text-3">选择供应商</span>
+                </template>
+                <template #option="{ option }">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <div
+                      class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-b from-[#fcfcfd] to-[#ededf0] shadow-[inset_0_0_0_1px_rgba(17,17,17,0.06)]"
+                    >
+                      <img
+                        :src="option.vendor.logoSrc"
+                        :alt="option.vendor.label"
+                        class="h-[18px] w-[18px] object-contain"
+                      />
+                    </div>
+                    <span class="truncate text-admin-body font-semibold text-admin-title-color">
+                      {{ option.vendor.label }}
+                    </span>
+                  </div>
+                </template>
+              </Select>
             </div>
-            <p class="editor-desc-tight">
-              {{ activeVendorPreset.description }}
-            </p>
+            <div
+              v-if="activeVendorPreset"
+              class="flex min-h-[68px] items-center gap-3.5 rounded-2xl border border-admin-border bg-admin-surface-muted px-3.5 py-3"
+            >
+              <img
+                :src="activeVendorPreset.logoSrc"
+                :alt="activeVendorPreset.label"
+                class="h-9 w-9 shrink-0 rounded-[10px] bg-admin-card object-contain p-1.5"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-admin-content font-semibold text-admin-title-color">
+                    {{ activeVendorPreset.label }}
+                  </span>
+                </div>
+                <p class="mt-1 text-admin-body leading-[1.55] text-admin-subtitle-color">
+                  {{ activeVendorPreset.description }}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
+
+        <Tag
+          v-if="editorMode !== 'create'"
+          :value="providerLabel(form.provider)"
+          severity="contrast"
+          rounded
+          class="mt-1"
+        />
       </div>
     </template>
 
-    <template #header-aside>
-      <div v-if="editorMode !== 'create'" class="admin-pill is-compact">
-        {{ providerLabel(form.provider) }}
-      </div>
-    </template>
-
-    <div class="editor-section">
-      <div class="field-group">
-        <div class="field-row">
-          <div class="field">
-            <label>存储名称</label>
-            <n-input v-model:value="form.name" placeholder="例如：生产存储 / 备用存储" />
+    <div class="mt-4 border-t border-admin-divider pt-4">
+      <div class="flex flex-col gap-[14px]">
+        <div class="flex flex-col gap-3 md:flex-row">
+          <div class="flex flex-1 flex-col gap-1.5">
+            <label class="text-admin-meta font-[680] text-admin-text-2">存储名称</label>
+            <InputText v-model="form.name" placeholder="例如：生产存储 / 备用存储" />
           </div>
-          <div class="field">
-            <label>启用状态</label>
-            <div class="switch-inline">
-              <span class="switch-text">{{ form.enabled ? '已启用' : '已关闭' }}</span>
-              <n-switch v-model:value="form.enabled" />
+          <div class="flex flex-1 flex-col gap-1.5">
+            <label class="text-admin-meta font-[680] text-admin-text-2">启用状态</label>
+            <div
+              class="flex min-h-10 items-center justify-between rounded-xl border border-admin-border bg-admin-surface-muted px-3"
+            >
+              <span class="text-admin-body text-admin-text-2">
+                {{ form.enabled ? '已启用' : '已关闭' }}
+              </span>
+              <ToggleSwitch v-model="form.enabled" />
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="editor-section">
-      <div class="section-title">基础配置</div>
-      <div v-if="textFields.length > 0" class="field-group">
-        <div class="field-row config-field-row">
+    <div class="mt-4 border-t border-admin-divider pt-4">
+      <div class="mb-3 text-admin-body font-semibold text-admin-title-color">基础配置</div>
+      <div v-if="textFields.length > 0" class="flex flex-col gap-[14px]">
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div
             v-for="field in textFields"
             :key="field.key"
-            :class="['field', { 'field-region': field.key === 'region_id' }]"
+            class="flex min-w-0 flex-1 flex-col gap-1.5"
           >
-            <div class="field-label-row">
-              <label>{{ field.label }}</label>
-              <n-button
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-admin-meta font-[680] text-admin-text-2">{{ field.label }}</label>
+              <Button
                 v-if="field.key === 'access_domain' && selectedProviderMeta?.supports_bucket_info"
                 text
-                type="primary"
                 size="tiny"
+                label="自动获取"
                 :loading="fetching"
                 @click="fetchBucketDomains"
-              >
-                自动获取
-              </n-button>
+              />
             </div>
-            <n-input
-              :value="configTextValue(field.key)"
+            <InputText
+              :model-value="configTextValue(field.key)"
+              :class="['w-full', { 'lg:!max-w-[220px]': field.key === 'region_id' }]"
               :type="field.type === 'password' ? 'password' : 'text'"
-              :show-password-on="field.type === 'password' ? 'click' : undefined"
               :placeholder="
                 field.secret && form.secretConfigured && !configTextValue(field.key)
                   ? '已配置，留空则保持不变'
                   : field.placeholder || `请输入${field.label}`
               "
-              @update:value="updateConfigValue(field.key, $event)"
+              @update:model-value="updateConfigValue(field.key, $event ?? '')"
             />
-            <span v-if="field.hint" class="field-hint">{{ field.hint }}</span>
+            <span v-if="field.hint" class="text-admin-caption text-admin-text-3">
+              {{ field.hint }}
+            </span>
             <div
               v-if="field.key === 'access_domain' && bucketDomains.length > 0"
-              class="domain-list"
+              class="mt-2 flex flex-wrap gap-2"
             >
-              <span class="domain-label">检测到的域名：</span>
-              <span
+              <span class="text-admin-caption text-admin-text-3">检测到的域名：</span>
+              <Button
                 v-for="domain in bucketDomains"
                 :key="domain"
-                class="admin-pill is-clickable"
+                :label="domain"
+                size="small"
+                severity="secondary"
+                text
+                rounded
                 @click="updateConfigValue(field.key, `https://${domain}`)"
-              >
-                {{ domain }}
-              </span>
+              />
             </div>
           </div>
         </div>
       </div>
-      <div v-else class="empty-config-note">当前存储类型无需额外密钥配置，保存后即可切换使用。</div>
+      <Message v-else severity="secondary" :closable="false">
+        当前存储类型无需额外密钥配置，保存后即可切换使用。
+      </Message>
     </div>
 
-    <div v-if="switchFields.length > 0" class="editor-section">
-      <div class="section-title">高级选项</div>
-      <div class="toggle-grid">
-        <div v-for="field in switchFields" :key="field.key" class="toggle-card">
+    <div v-if="switchFields.length > 0" class="mt-4 border-t border-admin-divider pt-4">
+      <div class="mb-3 text-admin-body font-semibold text-admin-title-color">高级选项</div>
+      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div
+          v-for="field in switchFields"
+          :key="field.key"
+          class="flex items-center justify-between gap-3.5 rounded-[14px] border border-admin-border bg-admin-surface-muted px-4 py-3.5"
+        >
           <div>
-            <div class="toggle-title">{{ field.label }}</div>
-            <div v-if="field.hint" class="toggle-desc">
+            <div class="text-admin-body font-semibold text-admin-title-color">{{ field.label }}</div>
+            <div v-if="field.hint" class="mt-1 text-admin-meta leading-[1.6] text-admin-subtitle-color">
               {{ field.hint }}
             </div>
           </div>
-          <n-switch
+          <ToggleSwitch
             :value="configBoolValue(field.key)"
-            @update:value="updateConfigValue(field.key, $event)"
+            @update:model-value="updateConfigValue(field.key, Boolean($event))"
           />
         </div>
       </div>
     </div>
 
-    <template #footer-note>
-      {{
-        form.isCurrent
-          ? '保存将直接更新系统当前使用中的上传存储。'
-          : '保存只更新这张卡片；点击“保存并设为当前”后才会切换系统上传链路。'
-      }}
+    <template #footer>
+      <div class="flex w-full flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div class="max-w-[480px] text-admin-meta leading-6 text-admin-text-3">
+          {{
+            form.isCurrent
+              ? '保存将直接更新系统当前使用中的上传存储。'
+              : '保存只更新这张卡片；点击“保存并设为当前”后才会切换系统上传链路。'
+          }}
+        </div>
+        <div class="flex flex-wrap justify-end gap-2">
+          <Button label="取消" severity="secondary" outlined @click="closeEditor" />
+          <Button label="仅保存卡片" severity="secondary" :loading="saving" @click="saveDraft" />
+          <Button
+            :label="form.isCurrent ? '保存当前配置' : '保存并设为当前'"
+            :loading="savingAndApplying"
+            @click="saveAndApply"
+          />
+        </div>
+      </div>
     </template>
-
-    <template #footer-actions>
-      <n-button @click="closeEditor">取消</n-button>
-      <n-button :loading="saving" @click="saveDraft">仅保存卡片</n-button>
-      <n-button type="primary" :loading="savingAndApplying" @click="saveAndApply">
-        {{ form.isCurrent ? '保存当前配置' : '保存并设为当前' }}
-      </n-button>
-    </template>
-  </AdminEditorModal>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
 import { Plus } from '@iconoir/vue'
-import { type GlobalThemeOverrides } from 'naive-ui'
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
+import Select from 'primevue/select'
+import Tag from 'primevue/tag'
+import ToggleSwitch from 'primevue/toggleswitch'
 import { useStorageManager } from './useStorageManager'
 
 const {
@@ -263,7 +374,6 @@ const {
   switchFields,
   activeVendorPreset,
   vendorSelectOptions,
-  toChipVariant,
   configTextValue,
   configBoolValue,
   updateConfigValue,
@@ -277,7 +387,6 @@ const {
   storageMetaItems,
   storageFeatureChips,
   handleVendorSelect,
-  renderVendorLabel,
   openCreate,
   openEdit,
   closeEditor,
@@ -289,468 +398,20 @@ const {
   removeProfile,
 } = useStorageManager()
 
-const selectThemeOverrides: NonNullable<GlobalThemeOverrides['Select']> = {
-  peers: {
-    InternalSelection: {
-      heightMedium: '60px',
-      borderRadius: '12px',
-      color: 'var(--admin-card)',
-      colorActive: 'var(--admin-card)',
-      border: '1px solid var(--admin-border)',
-      borderHover: '1px solid var(--admin-border)',
-      borderActive: '1px solid var(--admin-border)',
-      borderFocus: '1px solid var(--admin-border)',
-      boxShadowHover: 'none',
-      boxShadowActive: 'none',
-      boxShadowFocus: 'none',
-      textColor: 'var(--admin-text-1)',
-      placeholderColor: 'var(--admin-text-3)',
-      arrowColor: 'var(--admin-text-3)',
-      paddingSingle: '0 14px',
-    },
-  },
+function getStorageStatusSeverity(status: string) {
+  switch (status) {
+    case 'is-current':
+      return 'success'
+    case 'is-enabled':
+      return 'info'
+    case 'is-empty':
+      return 'warn'
+    default:
+      return 'secondary'
+  }
+}
+
+function handleEditorDialogVisibleUpdate(visible: boolean) {
+  if (!visible) closeEditor()
 }
 </script>
-
-<style scoped>
-@import '../../shared/styles/adminCommon.css';
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.storage-card {
-  min-height: 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.storage-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-}
-
-.meta-label {
-  color: var(--admin-text-3);
-  font-size: var(--admin-font-size-caption);
-}
-
-.meta-value {
-  color: var(--admin-text-1);
-  font-size: var(--admin-font-size-body);
-  line-height: 1.5;
-  word-break: break-all;
-}
-
-.feature-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.storage-card-actions {
-  margin-top: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* Add card styles now global */
-
-.editor-provider-stack {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  gap: 12px 16px;
-  align-items: end;
-}
-
-.vendor-select-field {
-  min-width: 0;
-}
-
-.field-hint-inline {
-  color: var(--admin-text-3);
-  font-size: var(--admin-font-size-meta);
-}
-
-.editor-vendor-preview {
-  border-radius: 16px;
-  border: 1px solid var(--admin-border);
-  background: var(--admin-surface-muted);
-  min-height: 68px;
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.vendor-preview-logo {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
-  object-fit: contain;
-  border-radius: 10px;
-  background: var(--admin-card);
-  padding: 5px;
-}
-
-.editor-vendor-copy {
-  min-width: 0;
-  flex: 1;
-}
-
-.editor-vendor-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.editor-vendor-name {
-  color: var(--admin-title-color);
-  font-size: var(--admin-font-size-content);
-  font-weight: 600;
-}
-
-.editor-desc-tight {
-  margin-top: 4px;
-  color: var(--admin-subtitle-color);
-  font-size: var(--admin-font-size-body);
-  line-height: 1.55;
-}
-
-:deep(.vendor-select-entry) {
-  min-width: 0;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-:deep(.vendor-select-entry-brand) {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  border-radius: 11px;
-  background: linear-gradient(180deg, #fcfcfd 0%, #ededf0 100%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.06);
-}
-
-:deep(.vendor-select-entry-logo) {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-}
-
-:deep(.vendor-select-entry-copy) {
-  min-width: 0;
-  flex: 1;
-}
-
-:deep(.vendor-select-entry-top) {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-}
-
-:deep(.vendor-select-entry-name) {
-  display: block;
-  color: var(--admin-title-color);
-  font-size: var(--admin-font-size-content);
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-:deep(.vendor-select-entry-family) {
-  display: none;
-}
-
-.editor-section {
-  border-top: 1px solid var(--admin-divider);
-  padding-top: 16px;
-  margin-top: 16px;
-}
-
-.section-title {
-  color: var(--admin-title-color);
-  font-size: var(--admin-font-size-body);
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-
-.switch-inline {
-  min-height: 40px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid var(--admin-border);
-  background: var(--admin-surface-muted);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.switch-text {
-  color: var(--admin-text-2);
-  font-size: var(--admin-font-size-body);
-}
-
-.toggle-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.toggle-card {
-  border-radius: 14px;
-  border: 1px solid var(--admin-border);
-  background: var(--admin-surface-muted);
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.toggle-title {
-  color: var(--admin-title-color);
-  font-size: var(--admin-font-size-body);
-  font-weight: 600;
-}
-
-.toggle-desc {
-  color: var(--admin-subtitle-color);
-  font-size: var(--admin-font-size-meta);
-  line-height: 1.6;
-  margin-top: 4px;
-}
-
-.field-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.config-field-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.config-field-row > .field {
-  min-width: 0;
-}
-
-.config-field-row .field-region :deep(.n-input) {
-  width: 100%;
-  max-width: 220px;
-}
-
-.empty-config-note {
-  min-height: 84px;
-  border-radius: 14px;
-  border: 1px dashed var(--admin-border);
-  background: var(--admin-surface-muted);
-  color: var(--admin-text-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 16px;
-  text-align: center;
-  font-size: var(--admin-font-size-body);
-  line-height: 1.7;
-}
-
-.domain-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.domain-label {
-  font-size: var(--admin-font-size-caption);
-  color: var(--admin-text-3);
-}
-
-@media (max-width: 980px) {
-  .storage-meta-grid,
-  .toggle-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .editor-provider-stack {
-    grid-template-columns: 1fr;
-  }
-
-  .config-field-row {
-    grid-template-columns: 1fr;
-  }
-
-  .config-field-row .field-region :deep(.n-input) {
-    max-width: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .storage-card {
-    min-height: unset;
-  }
-
-  .storage-card-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-</style>
-
-<style>
-.admin-storage-vendor-menu {
-  --n-height: min(360px, calc(100vh - 160px));
-  padding: 10px;
-  border-radius: 20px;
-  border: 1px solid var(--admin-border);
-  background: var(--admin-card);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
-}
-
-.admin-storage-vendor-menu .n-base-select-option {
-  min-height: auto;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-}
-
-.admin-storage-vendor-menu .n-base-select-option::before {
-  display: none;
-}
-
-.admin-storage-vendor-menu .n-base-select-option + .n-base-select-option {
-  margin-top: 6px;
-}
-
-.admin-storage-vendor-menu .n-base-select-option__content {
-  width: 100%;
-  overflow: visible;
-}
-
-.admin-storage-vendor-menu .n-base-select-option:hover,
-.admin-storage-vendor-menu .n-base-select-option.n-base-select-option--selected {
-  color: inherit;
-}
-
-.admin-storage-vendor-menu .n-base-select-option--disabled {
-  opacity: 1;
-}
-
-.admin-storage-vendor-menu .n-scrollbar-rail--vertical,
-.admin-storage-vendor-menu .n-scrollbar-rail--horizontal {
-  display: none !important;
-}
-
-.admin-storage-vendor-menu .vendor-select-entry {
-  width: 100%;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--admin-border);
-  background: var(--admin-surface-muted);
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.admin-storage-vendor-menu
-  .n-base-select-option:not(.n-base-select-option--disabled):hover
-  .vendor-select-entry,
-.admin-storage-vendor-menu .n-base-select-option--pending .vendor-select-entry {
-  border-color: var(--admin-border);
-  background: var(--admin-card);
-  box-shadow: inset 0 0 0 1px var(--admin-border-soft);
-}
-
-.admin-storage-vendor-menu .n-base-select-option--selected .vendor-select-entry {
-  border-color: var(--admin-border);
-  background: var(--admin-card-strong);
-  box-shadow: inset 0 0 0 1px var(--admin-border-soft);
-}
-
-.admin-storage-vendor-menu .n-base-select-option--disabled .vendor-select-entry {
-  opacity: 0.64;
-}
-
-.admin-storage-vendor-menu .vendor-select-entry-brand {
-  width: 32px;
-  height: 32px;
-  border-radius: 11px;
-  background: linear-gradient(180deg, #fcfcfd 0%, #ededf0 100%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(17, 17, 17, 0.06);
-}
-
-.admin-storage-vendor-menu .vendor-select-entry-logo {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-}
-
-.admin-storage-vendor-menu .vendor-select-entry-copy {
-  min-width: 0;
-}
-
-.admin-storage-vendor-menu .vendor-select-entry-top {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
-
-.admin-storage-vendor-menu .vendor-select-entry-name {
-  color: var(--admin-title-color);
-  min-width: 0;
-  font-size: var(--admin-font-size-body);
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.admin-storage-vendor-menu .vendor-select-entry-family {
-  min-height: 18px;
-  padding: 0 6px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  background: var(--admin-surface-muted);
-  color: var(--admin-text-3);
-  font-size: var(--admin-font-size-micro);
-  line-height: 1;
-  letter-spacing: 0.01em;
-  flex: 0 0 auto;
-}
-</style>

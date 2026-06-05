@@ -170,12 +170,25 @@ func (q *RiverQueue) countQueuedRiverJobs(ctx context.Context) (int64, error) {
 SELECT COUNT(*)
 FROM river_job
 WHERE queue = $1
-  AND state = ANY($2::text[])`, q.queueName, pq.Array(queuedRiverJobStates())).Scan(&count)
+  AND state = ANY($2::river_job_state[])`, q.queueName, pq.Array(queuedRiverJobStateValues())).Scan(&count)
 	return count, err
 }
 
-func queuedRiverJobStates() []string {
-	return []string{"available", "scheduled", "retryable"}
+func queuedRiverJobStates() []rivertype.JobState {
+	return []rivertype.JobState{
+		rivertype.JobStateAvailable,
+		rivertype.JobStateScheduled,
+		rivertype.JobStateRetryable,
+	}
+}
+
+func queuedRiverJobStateValues() []string {
+	states := queuedRiverJobStates()
+	values := make([]string, 0, len(states))
+	for _, state := range states {
+		values = append(values, string(state))
+	}
+	return values
 }
 
 func EncodeRiverPayload(task *queuetypes.TaskPayload) ([]byte, error) {

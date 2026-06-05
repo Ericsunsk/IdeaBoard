@@ -1,164 +1,286 @@
 <template>
-  <n-config-provider :theme-overrides="adminThemeOverrides">
-    <n-dialog-provider>
-      <n-notification-provider>
-        <n-message-provider>
-          <router-view v-if="isLoginRoute" />
-          <template v-else>
-            <div class="admin-layout-shell" :style="adminLayoutStyleVars">
-              <div class="admin-shell-frame">
-                <aside v-if="!isMobile" class="admin-shell-sider" :class="{ collapsed }">
-                  <div class="brand-area">
-                    <div class="brand-copy">
-                      <p class="brand-title">{{ collapsed ? 'B' : 'Dashboard' }}</p>
-                    </div>
-                  </div>
-                  <n-menu
-                    v-model:value="activeKey"
-                    class="admin-nav-menu"
-                    :collapsed="collapsed"
-                    :icon-size="22"
-                    :collapsed-width="60"
-                    :collapsed-icon-size="22"
-                    :options="menuOptions"
-                    @update:value="handleMenuUpdate"
-                  />
-                </aside>
+  <router-view v-if="isLoginRoute" />
+  <div v-else :class="layoutShellClass">
+    <aside :class="siderClass" aria-label="后台导航">
+      <router-link :class="brandMarkClass" :to="ADMIN_DEFAULT_PATH" aria-label="IdeaBoard Admin">
+        <span :class="brandTextClass">IB</span>
+      </router-link>
 
-                <main class="admin-shell-main">
-                  <header class="admin-shell-header">
-                    <div class="header-left">
-                      <n-button
-                        quaternary
-                        circle
-                        class="shell-action-btn"
-                        @click="handleToggleMenu"
-                      >
-                        <template #icon>
-                          <n-icon>
-                            <MenuIcon v-if="isMobile" />
-                            <SidebarExpand v-else-if="collapsed" />
-                            <SidebarCollapse v-else />
-                          </n-icon>
-                        </template>
-                      </n-button>
-                      <div class="title-wrap">
-                        <h1 class="page-title">
-                          {{ currentMeta.title }}
-                        </h1>
-                      </div>
-                    </div>
-                    <div class="header-right">
-                      <n-dropdown :options="userOptions" @select="handleUserAction">
-                        <div class="user-badge">
-                          <span class="user-avatar" aria-hidden="true">
-                            <img
-                              v-if="userStore.user?.avatar"
-                              :src="userStore.user.avatar"
-                              alt=""
-                            />
-                            <span v-else class="user-avatar-placeholder">
-                              <UserIcon class="user-avatar-icon" />
-                            </span>
-                          </span>
-                          <span class="user-name">{{ userStore.user?.username }}</span>
-                        </div>
-                      </n-dropdown>
-                    </div>
-                  </header>
-
-                  <section class="admin-shell-content">
-                    <router-view />
-                  </section>
-                </main>
-              </div>
-            </div>
-
-            <n-drawer
-              v-model:show="mobileMenuOpen"
-              :width="268"
-              placement="left"
-              class="admin-mobile-drawer"
-              :style="adminLayoutStyleVars"
-            >
-              <n-drawer-content title="Dashboard" closable>
-                <n-menu
-                  v-model:value="activeKey"
-                  class="admin-nav-menu"
-                  :icon-size="22"
-                  :options="menuOptions"
-                  @update:value="handleMobileMenuSelect"
-                />
-              </n-drawer-content>
-            </n-drawer>
+      <nav :class="navRailClass" aria-label="后台功能">
+        <Button
+          v-for="item in adminNavigationItems"
+          :key="item.key"
+          v-tooltip.right="item.label"
+          type="button"
+          :aria-label="item.label"
+          :aria-current="activeKey === item.key ? 'page' : undefined"
+          text
+          rounded
+          :class="[
+            railButtonClass,
+            activeKey === item.key ? railButtonActiveClass : railButtonIdleClass,
+          ]"
+          @click="handleMenuUpdate(item.key)"
+        >
+          <template #icon>
+            <component :is="item.icon" :class="navIconClass" />
           </template>
-        </n-message-provider>
-      </n-notification-provider>
-    </n-dialog-provider>
-  </n-config-provider>
+        </Button>
+      </nav>
+
+      <div :class="siderBottomClass">
+        <Button
+          v-tooltip.right="'个人中心'"
+          type="button"
+          text
+          rounded
+          :class="[railButtonClass, railButtonIdleClass, '!overflow-hidden !rounded-full']"
+          aria-haspopup="menu"
+          :aria-expanded="false"
+          @click="toggleUserMenu"
+        >
+          <template #icon>
+            <Avatar
+              v-if="userStore.user?.avatar"
+              :image="userStore.user.avatar"
+              shape="circle"
+              :class="avatarClass"
+            />
+            <Avatar
+              v-else
+              icon="pi pi-user"
+              shape="circle"
+              :class="[avatarClass, '!border !border-[var(--color-admin-border)]']"
+            />
+          </template>
+        </Button>
+      </div>
+    </aside>
+
+    <main :class="mainClass">
+      <header :class="headerClass">
+        <div class="flex min-w-0 items-start gap-3.5">
+          <Button
+            :class="mobileMenuButtonClass"
+            type="button"
+            text
+            rounded
+            aria-label="打开导航"
+            @click="mobileMenuOpen = true"
+          >
+            <template #icon>
+              <MenuIcon :class="shellIconClass" />
+            </template>
+          </Button>
+          <div class="min-w-0 pt-0.5">
+            <p class="m-0 mb-1 text-[13px] font-bold tracking-normal text-[#6f7c91] max-[1080px]:hidden">
+              Overview
+            </p>
+            <h1
+              class="m-0 text-[26px] leading-[1.05] font-[780] tracking-normal text-[#2d374c] max-[1080px]:text-2xl"
+            >
+              {{ currentMeta.title }}
+            </h1>
+          </div>
+        </div>
+
+        <div class="flex min-w-0 items-center gap-3.5">
+          <IconField class="w-[min(300px,30vw)] max-[720px]:hidden">
+            <InputIcon class="!text-[#8795aa]">
+              <SearchIcon class="size-4 stroke-2" />
+            </InputIcon>
+            <InputText :class="searchInputClass" placeholder="Search" aria-label="Search" />
+          </IconField>
+
+          <Button
+            v-tooltip.bottom="'通知'"
+            :class="notificationButtonClass"
+            type="button"
+            text
+            rounded
+            aria-label="通知"
+          >
+            <template #icon>
+              <BellIcon :class="shellIconClass" />
+            </template>
+            <span
+              class="absolute top-[7px] right-[7px] size-2 rounded-full border-2 border-white bg-[#e45656]"
+              aria-hidden="true"
+            ></span>
+          </Button>
+        </div>
+      </header>
+
+      <section :class="contentClass">
+        <router-view />
+      </section>
+    </main>
+
+    <Menu ref="userMenuRef" :model="userMenuItems" popup :pt="userMenuPt" />
+    <ConfirmDialog />
+
+    <Drawer
+      v-model:visible="mobileMenuOpen"
+      position="left"
+      :pt="mobileDrawerPt"
+      :show-close-icon="false"
+    >
+      <template #container="{ closeCallback }">
+        <div class="flex h-full flex-col gap-6 bg-[#f6f8fc] p-[22px]">
+          <div class="flex items-center justify-between">
+            <router-link
+              :class="[brandMarkClass, '!ml-0']"
+              :to="ADMIN_DEFAULT_PATH"
+              aria-label="IdeaBoard Admin"
+              @click="closeCallback"
+            >
+              <span :class="brandTextClass">IB</span>
+            </router-link>
+            <Button
+              :class="shellButtonClass"
+              type="button"
+              text
+              rounded
+              aria-label="关闭导航"
+              @click="closeCallback"
+            >
+              <template #icon>
+                <Xmark :class="shellIconClass" />
+              </template>
+            </Button>
+          </div>
+
+          <nav class="flex flex-col items-stretch gap-2" aria-label="后台功能">
+            <Button
+              v-for="item in adminNavigationItems"
+              :key="item.key"
+              type="button"
+              text
+              :label="item.label"
+              :class="[
+                mobileNavButtonClass,
+                activeKey === item.key ? mobileNavButtonActiveClass : mobileNavButtonIdleClass,
+              ]"
+              @click="handleMobileMenuSelect(item.key, closeCallback)"
+            >
+              <template #icon>
+                <component :is="item.icon" :class="navIconClass" />
+              </template>
+            </Button>
+          </nav>
+        </div>
+      </template>
+    </Drawer>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import {
-  NConfigProvider,
-  NMenu,
-  NDropdown,
-  NButton,
-  NIcon,
-  NDrawer,
-  NDrawerContent,
-  NDialogProvider,
-  NNotificationProvider,
-  NMessageProvider,
-} from 'naive-ui'
+import Avatar from 'primevue/avatar'
+import Button from 'primevue/button'
+import ConfirmDialog from 'primevue/confirmdialog'
+import Drawer from 'primevue/drawer'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
+import Tooltip from 'primevue/tooltip'
+import type { MenuItem } from 'primevue/menuitem'
 import type { AdminNavigationKey } from './adminNavigation'
-import { Menu as MenuIcon, SidebarCollapse, SidebarExpand, User as UserIcon } from '@iconoir/vue'
+import { Bell as BellIcon, Menu as MenuIcon, Search as SearchIcon, Xmark } from '@iconoir/vue'
 import {
   adminNavigationByKey,
   adminNavigationItems,
+  ADMIN_DEFAULT_PATH,
   ADMIN_LOGIN_PATH,
   findAdminNavigationItemByPath,
 } from './adminNavigation'
-import { adminThemeOverrides, adminThemeTokens } from '../shared/theme/adminThemeOverrides'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+
+const vTooltip = Tooltip
+
+type PrimePopupMenu = {
+  toggle: (event: Event) => void
+}
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
 
-const collapsed = ref(false)
 const activeKey = ref<AdminNavigationKey>('users')
 const mobileMenuOpen = ref(false)
-const isMobile = ref(false)
+const userMenuRef = ref<PrimePopupMenu | null>(null)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
 
-const adminLayoutStyleVars = {
-  '--admin-bg': adminThemeTokens.bg,
-  '--admin-card': adminThemeTokens.cardTranslucent,
-  '--admin-card-strong': adminThemeTokens.card,
-  '--admin-border': adminThemeTokens.border,
-  '--admin-border-soft': adminThemeTokens.borderSoft,
-  '--admin-border-hover': adminThemeTokens.borderHover,
-  '--admin-text-1': adminThemeTokens.textPrimary,
-  '--admin-text-2': adminThemeTokens.textSecondary,
-  '--admin-text-3': adminThemeTokens.textTertiary,
-  '--admin-text-inverse': adminThemeTokens.textInverse,
-  '--admin-title-color': adminThemeTokens.textPrimary,
-  '--admin-subtitle-color': adminThemeTokens.textTertiary,
-  '--admin-accent': adminThemeTokens.accent,
-  '--admin-accent-soft': adminThemeTokens.accentSoft,
-  '--admin-surface-muted': adminThemeTokens.surfaceMuted,
-  '--admin-surface-hover': adminThemeTokens.surfaceHover,
-  '--admin-surface-pressed': adminThemeTokens.surfacePressed,
-  '--admin-control-bg': adminThemeTokens.controlBg,
-  '--admin-control-bg-hover': adminThemeTokens.controlBgHover,
-  '--admin-control-border': adminThemeTokens.controlBorder,
-  '--admin-control-border-hover': adminThemeTokens.controlBorderHover,
-  '--admin-nav-active-bg': adminThemeTokens.navActiveBg,
-  '--admin-nav-active-bg-hover': adminThemeTokens.navActiveBgHover,
-} as Record<string, string>
+const layoutShellClass =
+  'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-white text-[var(--color-admin-text-1)] max-[1080px]:grid-cols-1'
+const siderClass =
+  "sticky top-0 flex h-screen self-start flex-col items-start bg-white py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[14px] before:border before:border-[#f1f5f9] before:bg-[#f8fafc] before:content-['']"
+const brandMarkClass =
+  'relative z-[1] ml-[42px] inline-flex size-10 flex-none items-center justify-center rounded-xl border-0 bg-white text-[#0f172a] no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
+const brandTextClass = 'text-xs font-[850] tracking-normal'
+const navRailClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
+const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'
+const focusRingClass =
+  'focus-visible:!outline-none focus-visible:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
+const railButtonClass = [
+  '!inline-flex !size-10 !items-center !justify-center !rounded-[10px] !border !border-transparent !bg-transparent !text-[#718096] !shadow-none !transition-colors !duration-200',
+  focusRingClass,
+].join(' ')
+const railButtonIdleClass =
+  'hover:!border-[#d7e0eb] hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]'
+const railButtonActiveClass =
+  '!border-[#040819] !bg-[#05091a] !text-white !shadow-[0_8px_18px_rgba(5,9,26,0.16)]'
+const shellButtonSkinClass = [
+  '!size-[42px] !items-center !justify-center !rounded-[9px] !border !border-transparent !bg-transparent !text-[#718096] !shadow-none !transition-colors !duration-200',
+  'hover:!border-[#d7e0eb] hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]',
+  focusRingClass,
+].join(' ')
+const shellButtonClass = ['!inline-flex', shellButtonSkinClass].join(' ')
+const mobileMenuButtonClass = [
+  '!hidden max-[1080px]:!inline-flex',
+  shellButtonSkinClass,
+  '!border-[var(--color-admin-border)] !bg-white',
+].join(' ')
+const notificationButtonClass = [
+  shellButtonClass,
+  'relative !rounded-lg !border-[#d6dee9] !bg-white !shadow-[0_3px_10px_rgba(45,64,89,0.05)]',
+].join(' ')
+const navIconClass = 'size-[17px] stroke-2'
+const shellIconClass = 'size-[19px] stroke-2'
+const avatarClass = '!size-[30px] !bg-white !text-[var(--color-admin-text-1)]'
+const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-white'
+const headerClass =
+  'flex min-h-[88px] items-start justify-between gap-6 bg-white py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
+const searchInputClass =
+  '!h-[38px] !w-full !rounded-lg !border-[#d6dee9] !bg-white !text-[15px] !text-[var(--color-admin-text-1)] !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]'
+const contentClass =
+  'min-h-0 flex-1 overflow-visible bg-white pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
+const mobileNavButtonClass = [
+  '!min-h-12 !w-full !justify-start !gap-3 !rounded-xl !border !border-transparent !bg-transparent !text-sm !font-bold !text-[var(--color-admin-text-2)]',
+  focusRingClass,
+].join(' ')
+const mobileNavButtonIdleClass =
+  'hover:!border-[var(--color-admin-border)] hover:!bg-white hover:!text-[var(--color-admin-text-1)]'
+const mobileNavButtonActiveClass = '!bg-[#05091a] !text-white'
+const userMenuPt = {
+  root: {
+    class:
+      'min-w-[180px] overflow-hidden rounded-[14px] border border-admin-border bg-white shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
+  },
+  list: { class: '!m-0 !p-1.5' },
+  itemContent: { class: 'rounded-[10px] hover:!bg-admin-surface-hover' },
+  itemLink: {
+    class:
+      '!px-3 !py-2.5 !text-admin-body !font-[650] !text-admin-text-2 hover:!text-admin-text-1',
+  },
+} as const
+const mobileDrawerPt = {
+  root: {
+    class: '!w-[min(320px,calc(100vw-32px))] !border-0 !bg-[#f6f8fc]',
+  },
+} as const
 
 watch(
   () => route.path,
@@ -167,61 +289,56 @@ watch(
     if (item) {
       activeKey.value = item.key
     }
+    mobileMenuOpen.value = false
   },
   { immediate: true },
 )
-
-const renderMenuIcon = (iconComp: any) => () =>
-  h(NIcon, { class: 'menu-icon', size: 22 }, { default: () => h(iconComp) })
-
-const menuOptions = adminNavigationItems.map((item) => ({
-  label: item.label,
-  key: item.key,
-  icon: renderMenuIcon(item.icon),
-})) as any
 
 const currentMeta = computed(() => {
   return adminNavigationByKey[activeKey.value] || { title: '管理后台' }
 })
 
-function handleMenuUpdate(key: string) {
-  const item = adminNavigationByKey[key as AdminNavigationKey]
+const userMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: userStore.user?.username || 'Admin',
+    disabled: true,
+  },
+  { separator: true },
+  {
+    label: '个人中心',
+    command: () => {
+      void handleUserAction('profile')
+    },
+  },
+  {
+    label: '退出登录',
+    command: () => {
+      void handleUserAction('logout')
+    },
+  },
+])
+
+function handleMenuUpdate(key: AdminNavigationKey) {
+  const item = adminNavigationByKey[key]
   if (item) {
     activeKey.value = item.key
     void router.push(item.path)
   }
 }
 
-function handleMobileMenuSelect(key: string) {
+function handleMobileMenuSelect(key: AdminNavigationKey, closeCallback: () => void) {
   handleMenuUpdate(key)
-  mobileMenuOpen.value = false
+  closeCallback()
 }
 
-function handleToggleMenu() {
-  if (isMobile.value) {
-    mobileMenuOpen.value = true
-    return
-  }
-  collapsed.value = !collapsed.value
+function toggleUserMenu(event: Event) {
+  userMenuRef.value?.toggle(event)
 }
 
-function syncViewport() {
-  isMobile.value = window.innerWidth < 1080
-  if (isMobile.value) {
-    collapsed.value = true
-  }
-}
-
-const userOptions = [
-  { label: '个人中心', key: 'profile' },
-  { type: 'divider', key: 'd1' },
-  { label: '退出登录', key: 'logout' },
-]
-
-async function handleUserAction(key: string) {
+async function handleUserAction(key: 'profile' | 'logout') {
   if (key === 'logout') {
     await logoutAndRedirect('/admin/login')
-  } else if (key === 'profile') {
+  } else {
     await router.push('/user/center')
   }
 }
@@ -232,333 +349,29 @@ function setAdminRouteClass(enabled: boolean) {
 
 onMounted(() => {
   setAdminRouteClass(true)
-  syncViewport()
-  window.addEventListener('resize', syncViewport)
 })
 
 onUnmounted(() => {
   setAdminRouteClass(false)
-  window.removeEventListener('resize', syncViewport)
 })
 </script>
 
-<style scoped>
-.admin-layout-shell {
-  min-height: 100vh;
-  height: 100vh;
-  background: var(--admin-bg);
-  padding: 12px;
-  overflow: hidden;
+<style>
+body.admin-route .p-tooltip .p-tooltip-text {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #2f3b4f;
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(47, 59, 79, 0.22);
+  font-size: 14px;
+  font-weight: 650;
 }
 
-.admin-shell-frame {
-  height: calc(100vh - 24px);
-  min-height: calc(100vh - 24px);
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
+body.admin-route .p-tooltip-right .p-tooltip-arrow {
+  border-right-color: #2f3b4f;
 }
 
-.admin-shell-sider {
-  width: 196px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--admin-border);
-  border-radius: 16px;
-  background: var(--admin-card);
-  transition: width 0.24s ease;
-  box-shadow: 0 12px 30px rgba(41, 48, 66, 0.08);
-}
-
-.admin-shell-sider.collapsed {
-  width: 76px;
-}
-
-.brand-area {
-  height: 68px;
-  padding: 0 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid var(--admin-border-soft);
-}
-
-.brand-copy {
-  min-width: 0;
-  width: 100%;
-  display: grid;
-  place-items: center;
-  text-align: center;
-}
-
-.brand-title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--admin-title-color);
-  white-space: nowrap;
-}
-
-.admin-shell-main {
-  min-width: 0;
-  min-height: 0;
-  border: 1px solid var(--admin-border);
-  border-radius: 16px;
-  background: var(--admin-card-strong);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 16px 38px rgba(41, 48, 66, 0.08);
-}
-
-.admin-shell-header {
-  height: 68px;
-  padding: 0 22px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--admin-border-soft);
-}
-
-.header-left,
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.shell-action-btn {
-  --n-border: none;
-  --n-border-hover: none;
-  --n-border-pressed: none;
-  --n-border-focus: none;
-  --n-color: transparent;
-  --n-color-hover: transparent;
-  --n-color-pressed: transparent;
-  --n-color-focus: transparent;
-  font-size: 16px;
-  color: var(--admin-text-2);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  transition: color 0.18s ease;
-}
-
-.shell-action-btn:hover {
-  color: var(--admin-text-1);
-}
-
-.title-wrap {
-  min-width: 0;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--admin-title-color);
-}
-
-.user-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 4px 10px 4px 4px;
-  border-radius: 999px;
-  border: 1px solid var(--admin-border);
-  background: rgba(255, 255, 255, 0.9);
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease;
-}
-
-.user-badge:hover {
-  background: var(--admin-surface-hover);
-  border-color: var(--admin-border-hover);
-}
-
-.user-name {
-  color: var(--admin-text-1);
-  font-size: 13px;
-  max-width: 120px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 1px solid var(--admin-border-soft);
-  background: var(--admin-surface-muted);
-  color: var(--admin-text-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    color 0.18s ease;
-}
-
-.user-badge:hover .user-avatar {
-  border-color: var(--admin-border-hover);
-  background: var(--admin-surface-hover);
-  color: var(--admin-text-1);
-}
-
-.user-avatar img,
-.user-avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-}
-
-.user-avatar img {
-  display: block;
-  object-fit: cover;
-}
-
-.user-avatar-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.user-avatar-icon {
-  width: 17px;
-  height: 17px;
-  stroke-width: 2;
-}
-
-.admin-shell-content {
-  flex: 1;
-  min-height: 0;
-  padding: 18px 20px 22px;
-  overflow-y: auto;
-  overflow-y: overlay;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(116, 126, 154, 0.4) transparent;
-}
-
-.admin-shell-content::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.admin-shell-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.admin-shell-content::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: rgba(116, 126, 154, 0.4);
-  background-clip: padding-box;
-}
-
-.admin-shell-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(116, 126, 154, 0.58);
-  background-clip: padding-box;
-}
-
-.admin-shell-content::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-:deep(.admin-nav-menu) {
-  padding: 10px 8px;
-  gap: 4px;
-}
-
-.admin-shell-sider :deep(.admin-nav-menu) {
-  flex: 1;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-:deep(.admin-nav-menu .n-menu-item-group-title) {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 11px;
-}
-
-:deep(
-  .admin-nav-menu
-    :is(
-      .n-menu-item-content,
-      .n-menu-item-content-header,
-      .n-menu-item-content-header a,
-      .n-menu-item-group-title
-    )
-) {
-  color: var(--admin-text-1);
-  font-weight: 400;
-}
-
-.menu-icon {
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  font-size: 22px;
-  line-height: 1;
-}
-
-:deep(.admin-mobile-drawer .n-drawer-content) {
-  --n-color: var(--admin-card-strong);
-  --n-border-color: var(--admin-border);
-}
-
-:deep(.admin-mobile-drawer .n-drawer-header) {
-  border-bottom: 1px solid var(--admin-border-soft);
-}
-
-:deep(.admin-mobile-drawer .n-drawer-header__main) {
-  color: var(--admin-text-1);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-:deep(.admin-mobile-drawer .n-drawer-body-content-wrapper) {
-  background: var(--admin-bg);
-}
-
-@media (max-width: 1079px) {
-  .admin-layout-shell {
-    height: auto;
-    padding: 10px;
-    overflow: visible;
-  }
-
-  .admin-shell-frame {
-    display: block;
-    height: auto;
-    min-height: calc(100vh - 20px);
-  }
-
-  .admin-shell-main {
-    min-height: unset;
-    border-radius: 14px;
-    overflow: visible;
-  }
-
-  .admin-shell-header {
-    padding: 0 14px;
-    height: 68px;
-  }
-
-  .admin-shell-content {
-    overflow-y: visible;
-    padding: 12px;
-    min-height: calc(100vh - 90px);
-  }
+body.admin-route .p-tooltip-bottom .p-tooltip-arrow {
+  border-bottom-color: #2f3b4f;
 }
 </style>

@@ -1,4 +1,4 @@
-import { computed, h, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type {
   StorageProfile,
   StorageProvider,
@@ -10,6 +10,7 @@ import {
   useListAdminStorageProviders,
 } from '../../../../shared/api/generated-query/admin-storage/admin-storage'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
+import { useAppToast } from '../../../../shared/composables/useAppToast'
 import {
   applyStorageProfile,
   deleteStorageProfile,
@@ -36,19 +37,8 @@ import {
   type StorageCard,
 } from './storageHelpers'
 
-type VendorSelectOption = {
-  label: string
-  value: string
-  disabled: boolean
-  vendor: VendorPresetOption
-}
-
-function vendorAccessLabel(vendor: VendorPresetOption) {
-  return vendor.provider === 'local' ? '本地目录' : 'S3-compatible'
-}
-
 export function useStorageManager() {
-  const message = useMessage()
+  const appToast = useAppToast()
   const queryClient = useQueryClient()
 
   const providersQuery = useListAdminStorageProviders()
@@ -126,35 +116,9 @@ export function useStorageManager() {
   watch(
     () => providersQuery.error.value || profilesQuery.error.value,
     (error) => {
-      if (error) message.error(formatDisplayErrorMessage(error, '加载存储配置失败'))
+      if (error) appToast.error(formatDisplayErrorMessage(error, '加载存储配置失败'))
     },
   )
-
-  function toChipVariant(status: string): 'neutral' | 'current' | 'enabled' | 'empty' {
-    switch (status) {
-      case 'is-current':
-        return 'current'
-      case 'is-enabled':
-        return 'enabled'
-      case 'is-empty':
-        return 'empty'
-      default:
-        return 'neutral'
-    }
-  }
-
-  function asVendorSelectOption(input: unknown): VendorSelectOption | null {
-    if (!input || typeof input !== 'object') return null
-    const candidate = input as Partial<VendorSelectOption>
-    if (
-      typeof candidate.label !== 'string' ||
-      typeof candidate.value !== 'string' ||
-      !candidate.vendor
-    ) {
-      return null
-    }
-    return candidate as VendorSelectOption
-  }
 
   function configTextValue(key: string) {
     const value = form.value.config[key]
@@ -230,11 +194,12 @@ export function useStorageManager() {
     return resolveStorageFeatureChips(storage)
   }
 
-  function handleVendorSelect(nextKey: string) {
+  function handleVendorSelect(nextKey: string | undefined) {
+    if (!nextKey) return
     const target = vendorPresets.value.find((item) => item.key === nextKey)
     if (!target) return
     if (!target.supported) {
-      message.info(`${target.label} 暂未接入后端，当前先作为预设展示`)
+      appToast.info(`${target.label} 暂未接入后端，当前先作为预设展示`)
       return
     }
     selectedVendorKey.value = target.key
@@ -242,31 +207,10 @@ export function useStorageManager() {
     bucketDomains.value = []
   }
 
-  function renderVendorLabel(option: unknown) {
-    const parsed = asVendorSelectOption(option)
-    if (!parsed) return ''
-    const vendor = parsed.vendor
-    return h('div', { class: 'vendor-select-entry' }, [
-      h('div', { class: 'vendor-select-entry-brand' }, [
-        h('img', {
-          src: vendor.logoSrc,
-          alt: vendor.label,
-          class: 'vendor-select-entry-logo',
-        }),
-      ]),
-      h('div', { class: 'vendor-select-entry-copy' }, [
-        h('div', { class: 'vendor-select-entry-top' }, [
-          h('span', { class: 'vendor-select-entry-name' }, vendor.label),
-          h('span', { class: 'vendor-select-entry-family' }, vendorAccessLabel(vendor)),
-        ]),
-      ]),
-    ])
-  }
-
   function openCreate() {
     const firstVendor = vendorPresets.value.find((vendor) => vendor.supported)
     if (!firstVendor) {
-      message.warning('当前没有可新增的存储类型')
+      appToast.warning('当前没有可新增的存储类型')
       return
     }
     openCreateWithVendor(firstVendor.key)
@@ -308,7 +252,7 @@ export function useStorageManager() {
     const payload = buildPayload(form.value, providerMap.value)
     const editId = editorMode.value === 'edit' ? editingId.value : undefined
     if (editorMode.value === 'edit' && !editId) {
-      message.error('未找到可编辑的存储配置')
+      appToast.error('未找到可编辑的存储配置')
       return null
     }
 
@@ -322,7 +266,7 @@ export function useStorageManager() {
     }
 
     if (showSuccess) {
-      message.success(response.message || '保存成功')
+      appToast.success(response.message || '保存成功')
     }
     return saved
   }
@@ -334,7 +278,7 @@ export function useStorageManager() {
       if (!saved) return
       closeEditor()
     } catch (error) {
-      message.error(formatDisplayErrorMessage(error, '保存失败'))
+      appToast.error(formatDisplayErrorMessage(error, '保存失败'))
     } finally {
       saving.value = false
     }
@@ -347,10 +291,10 @@ export function useStorageManager() {
       if (!saved) return
 
       const response = await applyProfileMutation.mutateAsync(saved.id)
-      message.success(response.message || '已设为当前存储')
+      appToast.success(response.message || '已设为当前存储')
       closeEditor()
     } catch (error) {
-      message.error(formatDisplayErrorMessage(error, '设为当前失败'))
+      appToast.error(formatDisplayErrorMessage(error, '设为当前失败'))
     } finally {
       savingAndApplying.value = false
     }
@@ -360,9 +304,9 @@ export function useStorageManager() {
     applyingId.value = id
     try {
       const response = await applyProfileMutation.mutateAsync(id)
-      message.success(response.message || '已设为当前存储')
+      appToast.success(response.message || '已设为当前存储')
     } catch (error) {
-      message.error(formatDisplayErrorMessage(error, '设为当前失败'))
+      appToast.error(formatDisplayErrorMessage(error, '设为当前失败'))
     } finally {
       applyingId.value = null
     }
@@ -372,9 +316,9 @@ export function useStorageManager() {
     testingId.value = storage.id
     try {
       const response = await testProfileMutation.mutateAsync(storage.id)
-      message.success(response.message || '连接成功')
+      appToast.success(response.message || '连接成功')
     } catch (error) {
-      message.error(formatDisplayErrorMessage(error, '连接失败'))
+      appToast.error(formatDisplayErrorMessage(error, '连接失败'))
     } finally {
       testingId.value = null
     }
@@ -391,12 +335,12 @@ export function useStorageManager() {
       const domains = await bucketDomainsMutation.mutateAsync(saved.id)
       if (domains.length > 0) {
         bucketDomains.value = domains
-        message.success(`检测到 ${bucketDomains.value.length} 个域名`)
+        appToast.success(`检测到 ${bucketDomains.value.length} 个域名`)
       } else {
-        message.warning('未检测到绑定域名')
+        appToast.warning('未检测到绑定域名')
       }
     } catch (error) {
-      message.error(formatDisplayErrorMessage(error, '获取失败'))
+      appToast.error(formatDisplayErrorMessage(error, '获取失败'))
     } finally {
       fetching.value = false
     }
@@ -405,10 +349,10 @@ export function useStorageManager() {
   async function removeProfile(id: string) {
     try {
       const response = await deleteProfileMutation.mutateAsync(id)
-      message.success(response.message || '删除成功')
+      appToast.success(response.message || '删除成功')
       if (editingId.value === id) closeEditor()
     } catch (error) {
-      message.error(formatDisplayErrorMessage(error, '删除失败'))
+      appToast.error(formatDisplayErrorMessage(error, '删除失败'))
     }
   }
 
@@ -430,7 +374,6 @@ export function useStorageManager() {
     switchFields,
     activeVendorPreset,
     vendorSelectOptions,
-    toChipVariant,
     configTextValue,
     configBoolValue,
     updateConfigValue,
@@ -444,7 +387,6 @@ export function useStorageManager() {
     storageMetaItems,
     storageFeatureChips,
     handleVendorSelect,
-    renderVendorLabel,
     openCreate,
     openEdit,
     closeEditor,

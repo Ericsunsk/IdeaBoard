@@ -79,16 +79,20 @@ func TestRiverQueueRejectsMissingTaskID(t *testing.T) {
 
 func TestQueuedRiverJobStatesExcludeRunning(t *testing.T) {
 	states := queuedRiverJobStates()
-	seen := make(map[string]bool, len(states))
+	seen := make(map[rivertype.JobState]bool, len(states))
 	for _, state := range states {
 		seen[state] = true
 	}
-	for _, state := range []string{"available", "scheduled", "retryable"} {
+	for _, state := range []rivertype.JobState{
+		rivertype.JobStateAvailable,
+		rivertype.JobStateScheduled,
+		rivertype.JobStateRetryable,
+	} {
 		if !seen[state] {
 			t.Fatalf("queued states missing %q: %v", state, states)
 		}
 	}
-	if seen["running"] {
+	if seen[rivertype.JobStateRunning] {
 		t.Fatalf("queued states should not include running: %v", states)
 	}
 }

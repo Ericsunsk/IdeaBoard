@@ -2,7 +2,11 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { MotionPlugin } from '@vueuse/motion'
+import PrimeVue from 'primevue/config'
+import ConfirmationService from 'primevue/confirmationservice'
 import { queryClient } from '../shared/query/queryClient'
+import { ideaBoardPrimePt } from './primePassThrough'
+import { ideaBoardPrimePreset } from './primeTheme'
 import router from './router'
 import App from './App.vue'
 import { useUserStore } from './stores/user'
@@ -15,6 +19,22 @@ app.use(pinia)
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
 app.use(MotionPlugin)
+app.use(PrimeVue, {
+  pt: ideaBoardPrimePt,
+  ptOptions: {
+    mergeSections: true,
+    mergeProps: true,
+  },
+  theme: {
+    preset: ideaBoardPrimePreset,
+    options: {
+      prefix: 'p',
+      darkModeSelector: false,
+      cssLayer: false,
+    },
+  },
+})
+app.use(ConfirmationService)
 
 const userStore = useUserStore(pinia)
 void userStore.fetchUserInfo()

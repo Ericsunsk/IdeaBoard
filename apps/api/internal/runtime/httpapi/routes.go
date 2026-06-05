@@ -276,6 +276,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.GET("/tasks/:task_id", h.TaskHandler.GetTask)
 	adminApi.GET("/tasks", h.TaskHandler.ListTasks)
 	adminApi.GET("/monitor", h.TaskStatsHandler.GetMonitor)
+	adminApi.GET("/monitor/stream", h.TaskStatsHandler.StreamMonitor)
 	adminApi.GET("/statistics", h.TaskStatsHandler.GetStatistics)
 	adminApi.POST("/statistics/backfill", h.TaskStatsHandler.BackfillStatistics)
 

@@ -1,23 +1,17 @@
-import type { DataTableColumns } from 'naive-ui'
 import type { Task } from '../../../../shared/api/task'
-import { createMonitorTaskColumns } from './taskMonitorColumns'
 import { useListAdminTasks } from '../../../../shared/api/generated-query/admin-tasks/admin-tasks'
 import { calcDurationSeconds } from '../../../../shared/utils/dateTime'
 import { useAdminQueryPolling } from '../../shared/composables/useAdminQueryPolling'
 
 const SLOW_TASK_SECONDS = 60
+export const TASK_MONITOR_PAGE_SIZE = 12
 type SlowTaskRow = { task: Task; seconds: number }
 
-export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
+export function useTaskMonitor() {
   const page = ref(1)
-  const TASK_MONITOR_PAGE_SIZE = 12
   const filterStatus = ref<string | null>(null)
   const searchKeyword = ref('')
   const appliedSearchKeyword = ref('')
-
-  const columns = computed<DataTableColumns<Task>>(() =>
-    createMonitorTaskColumns({ onShowDetail: options.onShowDetail }),
-  )
 
   function resolveParams() {
     const params: {
@@ -59,7 +53,6 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
   const tasks = computed(() => tasksQuery.data.value?.data?.list || [])
   const total = computed(() => tasksQuery.data.value?.data?.total || 0)
   const loading = computed(() => tasksQuery.isLoading.value)
-  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / TASK_MONITOR_PAGE_SIZE)))
   const pageStats = computed(() => {
     const stats = {
       running: 0,
@@ -114,7 +107,7 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
 
   function handleSearch() {
     page.value = 1
-    appliedSearchKeyword.value = searchKeyword.value
+    appliedSearchKeyword.value = searchKeyword.value.trim()
   }
 
   watch(filterStatus, () => {
@@ -134,14 +127,12 @@ export function useTaskMonitor(options: { onShowDetail: (row: Task) => void }) {
     total,
     loading,
     page,
-    pageCount,
     pageStats,
     failedTasks,
     activeTasks,
     slowTasks,
     filterStatus,
     searchKeyword,
-    columns,
     loadTasks,
     handleSearch,
   }

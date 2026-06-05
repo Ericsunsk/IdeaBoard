@@ -1,70 +1,106 @@
 <template>
-  <div class="login-page">
-    <div class="login-shell">
-      <section class="login-intro">
-        <h1>管理员控制台入口</h1>
-        <p>用于账户、渠道、资源与任务管理。</p>
-      </section>
-
-      <section class="login-card">
-        <h2>管理员登录</h2>
-
-        <n-form ref="formRef" :model="formValue" :rules="rules" size="large" label-placement="top">
-          <n-form-item path="username" label="账号">
-            <n-input v-model:value="formValue.username" placeholder="请输入管理员账号" />
-          </n-form-item>
-
-          <n-form-item path="password" label="密码">
-            <n-input
-              v-model:value="formValue.password"
-              type="password"
-              placeholder="请输入密码"
-              show-password-on="click"
-              @keyup.enter="handleLogin"
-            />
-          </n-form-item>
-        </n-form>
-
-        <n-button
-          type="primary"
-          block
-          size="large"
-          :loading="loading"
-          :disabled="loading"
-          @click="handleLogin"
+  <div class="grid min-h-screen place-items-center bg-admin-bg p-6 text-admin-text-1 max-[520px]:p-4">
+    <Card
+      class="admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[18px] border border-admin-border shadow-[0_24px_70px_rgba(45,64,89,0.12)]"
+      :pt="loginCardPt"
+    >
+      <template #header>
+        <router-link
+          class="inline-flex h-[52px] w-[52px] items-center justify-center rounded-[15px] border border-[#111827] bg-white text-sm font-black text-[#0f172a] shadow-[0_10px_22px_rgba(45,64,89,0.08)]"
+          to="/"
+          aria-label="IdeaBoard"
         >
-          {{ loading ? '登录中...' : '进入管理员后台' }}
-        </n-button>
+          IB
+        </router-link>
+      </template>
 
-        <div class="footer">
-          <router-link to="/user/login">用户登录</router-link>
-        </div>
-      </section>
-    </div>
+      <template #title>
+        <h1 class="m-0 text-[26px] leading-[1.2] font-bold text-admin-title-color">管理员登录</h1>
+      </template>
+
+      <template #content>
+        <form class="flex flex-col gap-4" novalidate @submit.prevent="handleLogin">
+          <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
+            <span>账号</span>
+            <IconField>
+              <InputIcon>
+                <User class="h-4 w-4" />
+              </InputIcon>
+              <InputText
+                v-model="formValue.username"
+                autocomplete="username"
+                class="!min-h-11"
+                fluid
+                placeholder="admin"
+              />
+            </IconField>
+          </label>
+
+          <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
+            <span>密码</span>
+            <Password
+              v-model="formValue.password"
+              autocomplete="current-password"
+              :input-props="{ autocomplete: 'current-password' }"
+              toggle-mask
+              :feedback="false"
+              class="w-full"
+              input-class="!min-h-11"
+              fluid
+              placeholder="password"
+            />
+          </label>
+
+          <p v-if="formError" class="m-0 text-admin-body font-semibold text-admin-danger">
+            {{ formError }}
+          </p>
+
+          <Button type="submit" :label="loading ? '登录中' : '进入后台'" :loading="loading" fluid />
+        </form>
+      </template>
+
+      <template #footer>
+        <Button label="用户登录" text severity="secondary" @click="goUserLogin" />
+      </template>
+    </Card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useUserStore } from '../../../../app/stores/user'
+import { User } from '@iconoir/vue'
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
+import Password from 'primevue/password'
+import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedirect'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
-const message = useMessage()
+const appToast = useAppToast()
 
-const formRef = ref()
 const loading = ref(false)
+const formError = ref('')
 const formValue = ref({
   username: '',
   password: '',
 })
-
-const rules = {
-  username: { required: true, message: '请输入账号', trigger: 'blur' },
-  password: { required: true, message: '请输入密码', trigger: 'blur' },
-}
+const loginCardPt = {
+  header: {
+    class: 'flex justify-center !px-8 !pt-8 !pb-2 max-[520px]:!px-6 max-[520px]:!pt-[26px]',
+  },
+  body: {
+    class: '!px-8 !pt-0 !pb-7 max-[520px]:!px-6 max-[520px]:!pb-6',
+  },
+  caption: { class: '!p-0 text-center' },
+  content: { class: '!pt-6 !pb-0' },
+  footer: { class: 'flex justify-center !pt-[18px] !pb-0' },
+} as const
 
 function resolveAdminRedirectPath() {
   const redirect = Array.isArray(route.query.redirect)
@@ -79,160 +115,38 @@ function resolveAdminRedirectPath() {
   return redirect
 }
 
+function goUserLogin() {
+  void router.push('/user/login')
+}
+
 async function handleLogin() {
+  formError.value = ''
+  const username = formValue.value.username.trim()
+  const password = formValue.value.password
+  if (!username || !password) {
+    formError.value = !username ? '请输入账号' : '请输入密码'
+    return
+  }
+
   try {
-    await formRef.value?.validate()
     loading.value = true
-    await userStore.login(formValue.value.username, formValue.value.password)
+    await userStore.login(username, password)
     if (userStore.isAdmin) {
-      message.success('管理员登录成功')
+      appToast.success('管理员登录成功')
       await router.replace(resolveAdminRedirectPath())
     } else {
       const logoutSuccess = await logoutAndRedirect('/admin/login', { replace: true })
       if (!logoutSuccess) {
-        message.warning('会话撤销失败，请稍后重试')
+        appToast.warning('会话撤销失败，请稍后重试')
       }
-      message.error('该账号不是管理员')
+      appToast.error('该账号不是管理员')
     }
-  } catch (error: any) {
-    if (error.message) {
-      message.error(error.message)
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message) {
+      appToast.error(error.message)
     }
   } finally {
     loading.value = false
   }
 }
 </script>
-
-<style scoped>
-.login-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: #f8f9fd;
-}
-
-.login-shell {
-  width: min(900px, 100%);
-  display: grid;
-  grid-template-columns: 1.02fr 1fr;
-  gap: 12px;
-}
-
-.login-intro,
-.login-card {
-  border: 1px solid #d9dfec;
-  border-radius: 18px;
-  padding: 30px;
-  box-shadow: 0 14px 34px rgba(41, 48, 66, 0.08);
-}
-
-.login-intro {
-  background: rgba(255, 255, 255, 0.94);
-}
-
-.login-intro h1 {
-  margin: 0;
-  font-size: 28px;
-  color: #293042;
-}
-
-.login-intro p {
-  margin: 14px 0 0;
-  color: #6e7487;
-  line-height: 1.72;
-  font-size: 14px;
-  max-width: 440px;
-}
-
-.login-card {
-  background: #ffffff;
-}
-
-.login-card h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #293042;
-}
-
-:deep(.n-form-item) {
-  margin-bottom: 18px;
-}
-
-:deep(.n-form-item-label__text) {
-  color: #4e5770;
-}
-
-:deep(.n-input) {
-  --n-border: 1px solid #d9dfec;
-  --n-border-hover: 1px solid #c8d0e4;
-  --n-border-focus: 1px solid #7a6bd5;
-  --n-box-shadow-focus: 0 0 0 2px rgba(122, 107, 213, 0.14);
-  --n-color: #ffffff;
-  --n-color-focus: #ffffff;
-  --n-text-color: #293042;
-  --n-placeholder-color: #8a90a3;
-  border-radius: 12px;
-}
-
-:deep(.n-input:focus),
-:deep(.n-input:focus-visible),
-:deep(.n-input.n-input--focus),
-:deep(.n-input .n-input__state-border) {
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-:deep(.n-button--primary-type) {
-  --n-color: #7a6bd5;
-  --n-color-hover: #6d5fd0;
-  --n-color-pressed: #6355c4;
-  --n-border: 1px solid #7a6bd5;
-  --n-ripple-color: transparent;
-  --n-text-color: #ffffff;
-  border-radius: 12px;
-  height: 48px;
-  margin-top: 6px;
-}
-
-:deep(.n-button:focus),
-:deep(.n-button:focus-visible),
-:deep(.n-button .n-button__state-border) {
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-.footer {
-  margin-top: 18px;
-  text-align: center;
-  font-size: 13px;
-}
-
-.footer a {
-  color: #7a6bd5;
-}
-
-@media (max-width: 900px) {
-  .login-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .login-intro,
-  .login-card {
-    padding: 24px;
-    border-radius: 16px;
-  }
-}
-
-@media (max-width: 480px) {
-  .login-page {
-    padding: 16px;
-  }
-
-  .login-intro h1 {
-    font-size: 24px;
-  }
-}
-</style>

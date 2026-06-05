@@ -1,110 +1,164 @@
 <template>
-  <div class="admin-page prompt-config-page">
-    <div v-if="featureGroups.length > 0" class="admin-card-grid is-3">
-      <section
+  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
+    <div
+      v-if="featureGroups.length > 0"
+      class="grid grid-cols-1 gap-3.5 lg:grid-cols-2 2xl:grid-cols-3"
+    >
+      <Card
         v-for="group in featureGroups"
         :key="group.key"
-        class="node-card admin-card-surface admin-card-interactive"
       >
-        <AdminCardHeader :title="group.title" size="small">
-          <template #extra>
-            <span class="admin-pill is-compact">{{ group.items.length }} 项配置</span>
-          </template>
-        </AdminCardHeader>
+        <template #content>
+          <div class="flex min-h-[208px] flex-col gap-3.5">
+            <div class="flex items-start justify-between gap-3">
+              <span class="min-w-0 truncate text-admin-title-sm font-bold text-admin-title-color">
+                {{ group.title }}
+              </span>
+              <Tag :value="`${group.items.length} 项配置`" severity="secondary" rounded />
+            </div>
 
-        <div class="node-card-meta">
-          <span class="admin-pill is-compact">{{ getGroupVariableCount(group) }} 个变量</span>
-          <span class="admin-pill is-compact"
-            >{{ getGroupFilledCount(group) }}/{{ group.items.length }} 已配置</span
-          >
-        </div>
+            <div class="flex flex-wrap gap-2">
+              <Tag :value="`${getGroupVariableCount(group)} 个变量`" severity="secondary" rounded />
+              <Tag
+                :value="`${getGroupFilledCount(group)}/${group.items.length} 已配置`"
+                severity="secondary"
+                rounded
+              />
+            </div>
 
-        <div class="node-feature-preview">
-          <span v-for="item in group.items" :key="item.slug" class="admin-pill">{{
-            item.title
-          }}</span>
-        </div>
+            <div class="flex flex-wrap content-start gap-2">
+              <Tag
+                v-for="item in group.items"
+                :key="item.slug"
+                :value="item.title"
+                severity="secondary"
+                rounded
+              />
+            </div>
 
-        <div class="node-card-actions">
-          <n-button size="small" type="primary" @click="openEditor(group.key)">编辑</n-button>
-        </div>
-      </section>
+            <div class="mt-auto flex justify-start">
+              <Button size="small" label="编辑" @click="openEditor(group.key)" />
+            </div>
+          </div>
+        </template>
+      </Card>
     </div>
-    <div v-else class="node-empty-state">
-      <div class="node-empty-title">未加载到节点配置</div>
-      <div class="node-empty-desc">请检查功能分组定义或刷新页面重试。</div>
+    <div
+      v-else
+      class="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-admin-border-soft bg-admin-card text-admin-text-2"
+    >
+      <div class="text-admin-title font-semibold text-admin-title-color">未加载到节点配置</div>
+      <div class="mt-2 text-admin-meta text-admin-subtitle-color">请检查功能分组定义或刷新页面重试。</div>
     </div>
   </div>
 
-  <AdminEditorModal
-    :show="Boolean(activeGroup)"
-    :eyebrow="activeGroup?.title || ''"
-    :title="activeGroup ? `编辑 ${activeGroup.title} 节点提示词` : ''"
-    :description="activeGroupDescription"
-    @close="closeEditor"
+  <Dialog
+    :visible="Boolean(activeGroup)"
+    modal
+    dismissable-mask
+    :draggable="false"
+    :style="{ width: '980px', maxWidth: 'calc(100vw - 24px)' }"
+    @update:visible="handleEditorDialogVisibleUpdate"
   >
-    <template #header-aside>
-      <div v-if="activeGroup" class="editor-meta">
-        <span class="admin-pill is-compact">{{ activeGroup.items.length }} 项配置</span>
-        <span class="admin-pill is-compact">{{ getGroupVariableCount(activeGroup) }} 个变量</span>
+    <template #header>
+      <div class="flex w-full flex-col gap-4 pr-4 md:flex-row md:items-start md:justify-between">
+        <div class="min-w-0">
+          <div v-if="activeGroup" class="mb-3 flex flex-wrap gap-2">
+            <Tag :value="activeGroup.title" severity="secondary" rounded />
+          </div>
+          <h2 class="m-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color">
+            {{ activeGroup ? `编辑 ${activeGroup.title} 节点提示词` : '' }}
+          </h2>
+          <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-subtitle-color">
+            {{ activeGroupDescription }}
+          </p>
+        </div>
+
+        <div v-if="activeGroup" class="flex flex-wrap gap-2">
+          <Tag :value="`${activeGroup.items.length} 项配置`" severity="secondary" rounded />
+          <Tag
+            :value="`${getGroupVariableCount(activeGroup)} 个变量`"
+            severity="secondary"
+            rounded
+          />
+        </div>
       </div>
     </template>
 
-    <div v-if="activeGroup" class="editor-feature-stack">
-      <article v-for="item in activeGroup.items" :key="item.slug" class="feature-block">
-        <div class="feature-header">
-          <div class="feature-title-row">
-            <span class="feature-title">{{ item.title }}</span>
-            <span class="feature-slug">{{ item.slug }}</span>
-          </div>
+    <div v-if="activeGroup" class="flex flex-col">
+      <article
+        v-for="item in activeGroup.items"
+        :key="item.slug"
+        class="flex flex-col gap-2.5 border-t border-admin-divider pt-3.5 first:border-t-0 first:pt-0"
+      >
+        <div class="flex flex-wrap items-center gap-2.5">
+          <span class="text-admin-content font-semibold text-admin-title-color">
+            {{ item.title }}
+          </span>
+          <span
+            class="max-w-full rounded-md border border-admin-border bg-admin-surface-muted px-2 py-0.5 font-mono text-admin-caption text-admin-text-3 [overflow-wrap:anywhere]"
+          >
+            {{ item.slug }}
+          </span>
         </div>
 
-        <div v-if="getVarsForSlug(item.slug).length > 0" class="var-buttons">
-          <span class="var-buttons-label">插入变量</span>
-          <button
+        <div
+          v-if="getVarsForSlug(item.slug).length > 0"
+          class="flex min-w-0 flex-wrap items-center gap-1.5"
+        >
+          <span class="shrink-0 text-admin-caption text-admin-text-2">插入变量</span>
+          <Button
             v-for="v in getVarsForSlug(item.slug)"
             :key="v.key"
-            :class="['var-btn', `is-${v.tone}`]"
+            type="button"
+            size="small"
+            outlined
+            rounded
+            :severity="getVariableButtonSeverity(v.tone)"
+            :label="v.key"
+            class="max-w-full font-mono [&_.p-button-label]:break-all [&_.p-button-label]:text-admin-caption"
             @click="insertVar(item.slug, v.key)"
-          >
-            <span class="var-btn-key">{{ v.key }}</span>
-          </button>
+          />
         </div>
 
-        <div v-if="getFeatureNote(item.slug)" class="var-note">
+        <div v-if="getFeatureNote(item.slug)" class="text-admin-caption text-admin-text-3">
           {{ getFeatureNote(item.slug) }}
         </div>
 
-        <n-input
+        <Textarea
           :ref="(el: unknown) => bindTextareaRef(item.slug, el)"
-          v-model:value="promptMap[item.slug]"
-          type="textarea"
+          v-model="promptMap[item.slug]"
+          auto-resize
+          class="w-full"
+          rows="4"
           :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
-          :autosize="{ minRows: 4, maxRows: 10 }"
-          :loading="saving[item.slug]"
+          :disabled="saving[item.slug]"
         />
 
-        <div class="feature-actions">
-          <span class="feature-count">{{ (promptMap[item.slug] || '').length }} 字</span>
-          <n-button
+        <div class="flex items-center justify-between gap-2.5">
+          <span class="shrink-0 text-admin-caption text-admin-text-3">
+            {{ (promptMap[item.slug] || '').length }} 字
+          </span>
+          <Button
             size="small"
-            type="primary"
+            label="保存"
             :loading="saving[item.slug]"
             @click="savePrompt(item.slug)"
-          >
-            保存
-          </n-button>
+          />
         </div>
       </article>
     </div>
-  </AdminEditorModal>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
-import { NButton, NInput } from 'naive-ui'
 import { computed, reactive, ref, watch } from 'vue'
-import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
-import AdminEditorModal from '../../shared/components/AdminEditorModal.vue'
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import Dialog from 'primevue/dialog'
+import Tag from 'primevue/tag'
+import Textarea from 'primevue/textarea'
+import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
 import { saveFeaturePrompt } from '../../shared/queries/adminActions'
 import {
@@ -120,13 +174,14 @@ import {
   getVarsForSlug,
   type FeatureGroup,
   type FeatureSlug,
+  type VarTone,
 } from './featurePromptMeta'
 
-const message = useMessage()
+const appToast = useAppToast()
 const queryClient = useQueryClient()
 
 // textarea 引用 + 插入逻辑
-type TextareaRefLike = { textareaElRef?: HTMLTextAreaElement; $el?: Element }
+type TextareaRefLike = HTMLTextAreaElement | { $el?: Element }
 const textareaRefs = reactive<Record<string, TextareaRefLike>>({})
 const activeGroupKey = ref<string | null>(null)
 const featureGroups = computed<FeatureGroup[]>(() =>
@@ -156,6 +211,10 @@ function closeEditor() {
   activeGroupKey.value = null
 }
 
+function handleEditorDialogVisibleUpdate(visible: boolean) {
+  if (!visible) closeEditor()
+}
+
 function getGroupVariableCount(group: FeatureGroup) {
   return calcGroupVariableCount(group)
 }
@@ -164,15 +223,28 @@ function getGroupFilledCount(group: FeatureGroup) {
   return calcGroupFilledCount(group, savedPromptMap)
 }
 
+function getVariableButtonSeverity(tone: VarTone) {
+  if (tone === 'control') return 'warn'
+  if (tone === 'context') return 'secondary'
+  return 'info'
+}
+
 function insertVar(slug: FeatureSlug, varKey: string) {
   const current = promptMap[slug] || ''
   const ref = textareaRefs[slug]
   let pos = current.length
-  const textareaEl = ref?.textareaElRef ?? ref?.$el?.querySelector?.('textarea')
+  const textareaEl = resolveTextareaElement(ref)
   if (textareaEl instanceof HTMLTextAreaElement) {
     pos = textareaEl.selectionStart ?? current.length
   }
   promptMap[slug] = current.slice(0, pos) + varKey + current.slice(pos)
+}
+
+function resolveTextareaElement(ref: TextareaRefLike | undefined) {
+  if (ref instanceof HTMLTextAreaElement) return ref
+  const root = ref?.$el
+  if (root instanceof HTMLTextAreaElement) return root
+  return root?.querySelector?.('textarea') ?? null
 }
 
 function bindTextareaRef(slug: FeatureSlug, el: unknown) {
@@ -194,7 +266,7 @@ const savePromptMutation = useMutation({
 watch(
   () => promptsQuery.error.value,
   (error) => {
-    if (error) message.error(formatDisplayErrorMessage(error, '加载提示词失败'))
+    if (error) appToast.error(formatDisplayErrorMessage(error, '加载提示词失败'))
   },
 )
 
@@ -227,213 +299,11 @@ async function savePrompt(slug: FeatureSlug) {
   saving[slug] = true
   try {
     await savePromptMutation.mutateAsync({ slug, prompt: promptMap[slug] || '' })
-    message.success(`「${featureMap[slug].title}」提示词已保存`)
+    appToast.success(`「${featureMap[slug].title}」提示词已保存`)
   } catch (error) {
-    message.error(formatDisplayErrorMessage(error, '保存失败'))
+    appToast.error(formatDisplayErrorMessage(error, '保存失败'))
   } finally {
     saving[slug] = false
   }
 }
 </script>
-
-<style scoped>
-@import '../../shared/styles/adminCommon.css';
-
-.prompt-config-page {
-  min-width: 0;
-}
-
-.node-empty-state {
-  display: flex;
-  min-height: 260px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--admin-border-soft);
-  border-radius: 16px;
-  background: var(--admin-card);
-  color: var(--admin-text-2);
-}
-
-.node-empty-title {
-  color: var(--admin-title-color);
-  font-size: var(--admin-font-size-title);
-  font-weight: 650;
-}
-
-.node-empty-desc {
-  margin-top: 8px;
-  color: var(--admin-subtitle-color);
-  font-size: var(--admin-font-size-meta);
-}
-
-.node-card {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-height: 244px;
-}
-
-.node-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.node-feature-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-content: flex-start;
-}
-
-.node-card-actions {
-  margin-top: auto;
-  display: flex;
-  justify-content: flex-start;
-}
-
-.editor-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.editor-feature-stack {
-  display: flex;
-  flex-direction: column;
-}
-
-.feature-block {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 0 0;
-  border-top: 1px solid var(--admin-divider);
-}
-
-.feature-block:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.feature-header,
-.feature-title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.feature-title {
-  font-size: var(--admin-font-size-content);
-  font-weight: 600;
-  color: var(--admin-title-color);
-}
-
-.feature-slug {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  font-size: var(--admin-font-size-caption);
-  color: var(--admin-text-3);
-  background: var(--admin-surface-muted);
-  border: 1px solid var(--admin-border);
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-family: monospace;
-}
-
-.feature-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.feature-count {
-  font-size: var(--admin-font-size-caption);
-  color: var(--admin-text-3);
-}
-
-.var-buttons {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  min-width: 0;
-}
-
-.var-buttons-label {
-  font-size: var(--admin-font-size-caption);
-  color: var(--admin-text-2);
-  flex-shrink: 0;
-}
-
-.var-note {
-  font-size: var(--admin-font-size-caption);
-  color: var(--admin-text-3);
-}
-
-.var-btn {
-  --var-bg: #115e59;
-  --var-bg-hover: #0f766e;
-  --var-key: #ccfbf1;
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 0;
-  background: var(--var-bg);
-  cursor: pointer;
-  box-shadow: none;
-  transition: background 0.15s ease;
-  max-width: 100%;
-}
-
-.var-btn.is-prompt {
-  --var-bg: #115e59;
-  --var-bg-hover: #0f766e;
-  --var-key: #ccfbf1;
-}
-
-.var-btn.is-control {
-  --var-bg: #92400e;
-  --var-bg-hover: #b45309;
-  --var-key: #fef3c7;
-}
-
-.var-btn.is-context {
-  --var-bg: #6d28d9;
-  --var-bg-hover: #7c3aed;
-  --var-key: #ede9fe;
-}
-
-.var-btn:hover {
-  background: var(--var-bg-hover);
-}
-
-.var-btn-key {
-  color: var(--var-key);
-  font-size: var(--admin-font-size-caption);
-  font-weight: 600;
-  font-family: monospace;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 720px) {
-  .node-card {
-    padding: 14px;
-    min-height: unset;
-  }
-
-  .feature-actions {
-    gap: 10px;
-  }
-
-  .feature-count {
-    flex-shrink: 0;
-  }
-}
-</style>
