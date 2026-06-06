@@ -24,38 +24,44 @@
             </p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-            <Tag :value="`${currentPageReservedUserCount} 管理员`" severity="info" rounded />
-            <Tag v-if="selectedUsers.length > 0" :value="`已选 ${selectedUsers.length}`" rounded />
+          <div class="flex w-full flex-col gap-3 lg:w-auto lg:items-end">
+            <IconField class="relative w-full sm:w-[300px]">
+              <InputIcon>
+                <Search class="size-4 text-admin-text-3" />
+              </InputIcon>
+              <InputText
+                v-model="searchKeyword"
+                placeholder="Search"
+                fluid
+                class="!h-[38px] !w-full !rounded-lg !bg-white !text-[15px] !text-admin-text-1 !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]"
+                @keydown.enter="loadUsers"
+              />
+              <Button
+                v-if="searchKeyword"
+                text
+                rounded
+                class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
+                aria-label="清空搜索"
+                @click="clearSearch"
+              >
+                <template #icon>
+                  <Xmark />
+                </template>
+              </Button>
+            </IconField>
+
+            <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+              <Tag :value="`${currentPageReservedUserCount} 管理员`" severity="info" rounded />
+              <Tag
+                v-if="selectedUsers.length > 0"
+                :value="`已选 ${selectedUsers.length}`"
+                rounded
+              />
+            </div>
           </div>
         </div>
 
-        <div class="mt-9 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <IconField class="relative w-full lg:max-w-[340px]">
-            <InputIcon>
-              <Search class="size-4 text-admin-text-3" />
-            </InputIcon>
-            <InputText
-              v-model="searchKeyword"
-              placeholder="搜索用户"
-              fluid
-              class="!rounded-xl !border-admin-border"
-              @keydown.enter="loadUsers"
-            />
-            <Button
-              v-if="searchKeyword"
-              text
-              rounded
-              class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
-              aria-label="清空搜索"
-              @click="clearSearch"
-            >
-              <template #icon>
-                <Xmark />
-              </template>
-            </Button>
-          </IconField>
-
+        <div class="mt-9 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
           <div class="flex flex-wrap items-center gap-2 lg:justify-end">
             <div
               class="flex items-center gap-2 rounded-xl border border-admin-border bg-admin-surface-muted px-3 py-2"

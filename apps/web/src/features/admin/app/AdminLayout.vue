@@ -73,7 +73,9 @@
             </template>
           </Button>
           <div class="min-w-0 pt-0.5">
-            <p class="m-0 mb-1 text-[13px] font-bold tracking-normal text-[#6f7c91] max-[1080px]:hidden">
+            <p
+              class="m-0 mb-1 text-[13px] font-bold tracking-normal text-[#6f7c91] max-[1080px]:hidden"
+            >
               Overview
             </p>
             <h1
@@ -85,21 +87,76 @@
         </div>
 
         <div class="flex min-w-0 items-center gap-3.5">
-          <IconField class="w-[min(300px,30vw)] max-[720px]:hidden">
-            <InputIcon>
-              <SearchIcon class="size-4 stroke-2" />
-            </InputIcon>
-            <InputText :class="searchInputClass" placeholder="Search" aria-label="Search" />
-          </IconField>
-
           <button
-            v-tooltip.bottom="'通知'"
+            v-tooltip.bottom="'异常雷达'"
             :class="[notificationButtonClass, 'cursor-pointer']"
             type="button"
-            aria-label="通知"
+            :aria-label="hasAnomalies ? `异常雷达，${anomalyCount} 项活跃异常` : '异常雷达'"
+            aria-haspopup="dialog"
+            @click="toggleAnomalyRadar"
           >
             <BellIcon :class="shellIconClass" />
+            <span
+              v-if="hasAnomalies"
+              class="absolute top-[7px] right-[7px] size-2.5 rounded-full bg-admin-danger ring-2 ring-white"
+              aria-hidden="true"
+            ></span>
           </button>
+          <Popover ref="anomalyRadarPopoverRef">
+            <div class="w-[340px] max-w-[calc(100vw_-_28px)] overflow-hidden bg-white">
+              <div
+                class="flex items-start justify-between gap-4 border-b border-admin-border px-4 py-3.5"
+              >
+                <div class="min-w-0">
+                  <div class="text-admin-content font-bold text-admin-title-color">异常雷达</div>
+                  <div class="mt-0.5 text-admin-meta text-admin-subtitle-color">
+                    活跃异常恢复后自动消失
+                  </div>
+                </div>
+                <Tag
+                  :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
+                  :severity="hasAnomalies ? 'danger' : 'success'"
+                  rounded
+                />
+              </div>
+
+              <div v-if="hasAnomalies" class="max-h-[420px] overflow-y-auto p-2">
+                <button
+                  v-for="item in anomalies"
+                  :key="item.id"
+                  type="button"
+                  class="flex w-full min-w-0 cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-admin-surface-muted"
+                  @click="handleAnomalySelect(item)"
+                >
+                  <span
+                    class="mt-[7px] size-2 shrink-0 rounded-full bg-admin-danger"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="flex min-w-0 items-center justify-between gap-3">
+                      <span class="truncate text-admin-body font-bold text-admin-text-1">
+                        {{ item.title }}
+                      </span>
+                      <span class="shrink-0 text-admin-caption font-bold text-admin-text-3">
+                        {{ item.metric || item.actionLabel }}
+                      </span>
+                    </span>
+                    <span class="mt-1 block text-admin-meta leading-5 text-admin-text-2">
+                      {{ item.summary }}
+                    </span>
+                    <span class="mt-1.5 block text-admin-caption font-bold text-admin-text-3">
+                      {{ item.actionLabel }}
+                    </span>
+                  </span>
+                </button>
+              </div>
+
+              <div v-else class="px-5 py-8 text-center">
+                <div class="text-admin-content font-bold text-admin-title-color">运行正常</div>
+                <div class="mt-1.5 text-admin-meta text-admin-subtitle-color">当前没有活跃异常</div>
+              </div>
+            </div>
+          </Popover>
         </div>
       </header>
 
@@ -172,14 +229,13 @@ import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Drawer from 'primevue/drawer'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
-import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
+import Popover from 'primevue/popover'
+import Tag from 'primevue/tag'
 import Tooltip from 'primevue/tooltip'
 import type { MenuItem } from 'primevue/menuitem'
 import type { AdminNavigationKey } from './adminNavigation'
-import { Bell as BellIcon, Menu as MenuIcon, Search as SearchIcon, Xmark } from '@iconoir/vue'
+import { Bell as BellIcon, Menu as MenuIcon, Xmark } from '@iconoir/vue'
 import {
   adminNavigationByKey,
   adminNavigationItems,
@@ -188,6 +244,8 @@ import {
   findAdminNavigationItemByPath,
 } from './adminNavigation'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
+import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
 
 const vTooltip = Tooltip
 
@@ -195,15 +253,24 @@ type PrimePopupMenu = {
   toggle: (event: Event) => void
 }
 
+type PrimePopupPanel = PrimePopupMenu & {
+  hide?: () => void
+}
+
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
 
-const activeKey = ref<AdminNavigationKey>('users')
+const activeKey = ref<AdminNavigationKey>('statistics')
 const mobileMenuOpen = ref(false)
 const userMenuRef = ref<PrimePopupMenu | null>(null)
+const anomalyRadarPopoverRef = ref<PrimePopupPanel | null>(null)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
+const isAnomalyRadarEnabled = computed(() => !isLoginRoute.value)
+const { anomalies, anomalyCount, hasAnomalies } = useAdminAnomalyRadar({
+  enabled: isAnomalyRadarEnabled,
+})
 
 const layoutShellClass =
   'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-white text-[var(--color-admin-text-1)] max-[1080px]:grid-cols-1'
@@ -212,7 +279,8 @@ const siderClass =
 const brandMarkClass =
   'relative z-[1] ml-[42px] inline-flex size-10 flex-none items-center justify-center rounded-xl border border-black bg-white text-[#0f172a] no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
 const brandTextClass = 'text-xs font-[850] tracking-normal'
-const navRailClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
+const navRailClass =
+  'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
 const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'
 const focusRingClass =
   'focus-visible:!outline-none focus-visible:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
@@ -222,14 +290,16 @@ const railButtonClass = [
 ].join(' ')
 const railButtonIdleClass =
   '!bg-transparent hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]'
-const railButtonActiveClass =
-  '!bg-black !text-white !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
+const railButtonActiveClass = '!bg-black !text-white !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
 const shellButtonSkinClass = [
   '!size-[42px] !items-center !justify-center !rounded-[9px] !text-[#718096] !transition-colors !duration-200',
   'hover:!border-[#d7e0eb] hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]',
   focusRingClass,
 ].join(' ')
-const shellButtonClass = ['!inline-flex !bg-transparent !border !border-transparent !shadow-none', shellButtonSkinClass].join(' ')
+const shellButtonClass = [
+  '!inline-flex !bg-transparent !border !border-transparent !shadow-none',
+  shellButtonSkinClass,
+].join(' ')
 const mobileMenuButtonClass = [
   '!hidden max-[1080px]:!inline-flex !bg-white !border !border-[var(--color-admin-border)] !shadow-none',
   shellButtonSkinClass,
@@ -245,8 +315,6 @@ const avatarClass = '!size-[30px] !bg-white !text-[var(--color-admin-text-1)]'
 const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-white'
 const headerClass =
   'flex min-h-[88px] items-start justify-between gap-6 bg-white py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
-const searchInputClass =
-  '!h-[38px] !w-full !rounded-lg !bg-white !text-[15px] !text-[var(--color-admin-text-1)] !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]'
 const contentClass =
   'min-h-0 flex-1 overflow-visible bg-white pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
 const mobileNavButtonClass = [
@@ -264,8 +332,7 @@ const userMenuPt = {
   list: { class: '!m-0 !p-1.5' },
   itemContent: { class: 'rounded-[10px] hover:!bg-admin-surface-hover' },
   itemLink: {
-    class:
-      '!px-3 !py-2.5 !text-admin-body !font-[650] !text-admin-text-2 hover:!text-admin-text-1',
+    class: '!px-3 !py-2.5 !text-admin-body !font-[650] !text-admin-text-2 hover:!text-admin-text-1',
   },
 } as const
 const mobileDrawerPt = {
@@ -325,6 +392,15 @@ function handleMobileMenuSelect(key: AdminNavigationKey, closeCallback: () => vo
 
 function toggleUserMenu(event: Event) {
   userMenuRef.value?.toggle(event)
+}
+
+function toggleAnomalyRadar(event: Event) {
+  anomalyRadarPopoverRef.value?.toggle(event)
+}
+
+function handleAnomalySelect(item: AdminAnomalyItem) {
+  anomalyRadarPopoverRef.value?.hide?.()
+  void router.push(item.route)
 }
 
 async function handleUserAction(key: 'profile' | 'logout') {

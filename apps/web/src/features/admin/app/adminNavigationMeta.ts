@@ -1,4 +1,4 @@
-export const ADMIN_DEFAULT_PATH = '/admin/users'
+export const ADMIN_DEFAULT_PATH = '/admin/statistics'
 export const ADMIN_LOGIN_PATH = '/admin/login'
 
 export type AdminNavigationKey =
@@ -20,12 +20,12 @@ export type AdminNavigationRouteDef = {
 
 export const adminNavigationRouteDefs: AdminNavigationRouteDef[] = [
   {
-    key: 'users',
-    path: '/admin/users',
-    childPath: 'users',
-    label: '用户管理',
-    title: '用户管理',
-    routeName: 'AdminUsers',
+    key: 'statistics',
+    path: '/admin/statistics',
+    childPath: 'statistics',
+    label: '数据仪表盘',
+    title: '数据仪表盘',
+    routeName: 'AdminStatistics',
   },
   {
     key: 'channels',
@@ -36,12 +36,12 @@ export const adminNavigationRouteDefs: AdminNavigationRouteDef[] = [
     routeName: 'AdminChannels',
   },
   {
-    key: 'statistics',
-    path: '/admin/statistics',
-    childPath: 'statistics',
-    label: '数据仪表盘',
-    title: '数据仪表盘',
-    routeName: 'AdminStatistics',
+    key: 'users',
+    path: '/admin/users',
+    childPath: 'users',
+    label: '用户管理',
+    title: '用户管理',
+    routeName: 'AdminUsers',
   },
   {
     key: 'task-monitor',

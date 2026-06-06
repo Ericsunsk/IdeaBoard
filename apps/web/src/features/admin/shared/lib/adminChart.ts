@@ -12,6 +12,9 @@ const adminChartBubbleRadiusMin = 5
 const adminChartBubbleRadiusMax = 18
 const adminChartBubbleHoverRadiusOffset = 2
 
+export const adminChartFontFamily =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+
 export const adminChartTheme = {
   tooltipBg: '#f8fafc',
   tooltipBorder: '#d9e2ef',
@@ -46,7 +49,7 @@ export const adminChartPlugins = markRaw<Plugin<ChartType>[]>([
 
       ctx.save()
       ctx.fillStyle = adminChartTheme.emptyText
-      ctx.font = '600 12px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont'
+      ctx.font = `600 12px ${adminChartFontFamily}`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(
@@ -92,6 +95,7 @@ export function adminChartLegend(position: 'top' | 'bottom' = 'top') {
       color: adminChartTheme.legendText,
       padding: 12,
       font: {
+        family: adminChartFontFamily,
         size: 12,
         weight: 500,
       },
@@ -176,7 +180,7 @@ export function defineAdminChartRadialPercentScale(input: AdminChartNumericScale
     angleLines: { color: input.gridColor ?? adminChartTheme.splitLine },
     pointLabels: {
       color: adminChartTheme.axisText,
-      font: { size: 12, weight: 600 },
+      font: { family: adminChartFontFamily, size: 12, weight: 600 },
     },
   }
 }
@@ -330,15 +334,81 @@ function toFiniteChartNumber(value: number) {
 }
 
 function withAdminChartDefaults(options: AdminChartOptions): AdminChartOptions {
+  applyAdminChartPluginTypography(options)
+
   if (!options.scales) return options
 
   Object.values(options.scales).forEach((scaleOptions) => {
     if (!scaleOptions || typeof scaleOptions !== 'object') return
-    const scale = scaleOptions as { title?: { display?: boolean } }
+    const scale = scaleOptions as AdminChartScaleTypographyOptions
     scale.title = { ...scale.title, ...adminHiddenScaleTitle }
+    scale.ticks = {
+      ...scale.ticks,
+      font: withAdminChartFont(scale.ticks?.font),
+    }
+    if (scale.pointLabels) {
+      scale.pointLabels = {
+        ...scale.pointLabels,
+        font: withAdminChartFont(scale.pointLabels.font),
+      }
+    }
   })
 
   return options
+}
+
+type AdminChartFontOptions = {
+  family?: string
+  size?: number
+  weight?: string | number
+}
+
+type AdminChartScaleTypographyOptions = {
+  title?: { display?: boolean }
+  ticks?: {
+    font?: AdminChartFontOptions
+  }
+  pointLabels?: {
+    font?: AdminChartFontOptions
+  }
+}
+
+type AdminChartPluginTypographyOptions = {
+  legend?:
+    | false
+    | {
+        labels?: {
+          font?: AdminChartFontOptions
+        }
+      }
+  tooltip?:
+    | false
+    | {
+        bodyFont?: AdminChartFontOptions
+        titleFont?: AdminChartFontOptions
+        footerFont?: AdminChartFontOptions
+      }
+}
+
+function applyAdminChartPluginTypography(options: AdminChartOptions) {
+  if (!options.plugins || typeof options.plugins !== 'object') return
+
+  const plugins = options.plugins as AdminChartPluginTypographyOptions
+  if (plugins.legend && typeof plugins.legend === 'object' && plugins.legend.labels) {
+    plugins.legend.labels.font = withAdminChartFont(plugins.legend.labels.font)
+  }
+  if (plugins.tooltip && typeof plugins.tooltip === 'object') {
+    plugins.tooltip.bodyFont = withAdminChartFont(plugins.tooltip.bodyFont)
+    plugins.tooltip.titleFont = withAdminChartFont(plugins.tooltip.titleFont)
+    plugins.tooltip.footerFont = withAdminChartFont(plugins.tooltip.footerFont)
+  }
+}
+
+function withAdminChartFont(font: AdminChartFontOptions | undefined): AdminChartFontOptions {
+  return {
+    ...font,
+    family: adminChartFontFamily,
+  }
 }
 
 function isChartDataEmpty(chart: Chart<ChartType>) {

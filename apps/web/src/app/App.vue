@@ -40,6 +40,34 @@ const toastOptions = {
   closeButtonPosition: 'top-right' as const,
 }
 
+let appScrollTimer: number | undefined
+
+function setAppScrollingClass(enabled: boolean) {
+  document.documentElement.classList.toggle('app-scrolling', enabled)
+}
+
+function handleAppScroll() {
+  setAppScrollingClass(true)
+  if (appScrollTimer) window.clearTimeout(appScrollTimer)
+  appScrollTimer = window.setTimeout(() => {
+    setAppScrollingClass(false)
+    appScrollTimer = undefined
+  }, 700)
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleAppScroll, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleAppScroll)
+  if (appScrollTimer) {
+    window.clearTimeout(appScrollTimer)
+    appScrollTimer = undefined
+  }
+  setAppScrollingClass(false)
+})
+
 const themeOverrides = {
   common: {
     primaryColor: '#26364f',

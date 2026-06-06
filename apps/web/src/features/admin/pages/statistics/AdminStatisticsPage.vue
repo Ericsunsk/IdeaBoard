@@ -3,7 +3,9 @@
     <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
       <Card>
         <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">今日调用</span>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >今日调用</span
+          >
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
@@ -14,7 +16,9 @@
       </Card>
       <Card>
         <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">今日失败</span>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >今日失败</span
+          >
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
@@ -25,7 +29,9 @@
       </Card>
       <Card>
         <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">今日成功率</span>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >今日成功率</span
+          >
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
@@ -36,7 +42,9 @@
       </Card>
       <Card>
         <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">本月调用</span>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >本月调用</span
+          >
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
@@ -150,7 +158,7 @@
             <AdminChartPanel size="compact">
               <Chart
                 v-if="isChartReady"
-                type="doughnut"
+                type="polarArea"
                 class="h-full w-full min-w-0"
                 :data="bottleneckSourceChartData"
                 :options="bottleneckSourceChartOptions"

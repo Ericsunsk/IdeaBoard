@@ -387,9 +387,12 @@ export function useUsageStatisticsCharts(options: {
     }),
   )
 
-  const qualityTrendRange = computed(() => options.qualityTimeRange?.value ?? options.timeRange.value)
+  const qualityTrendRange = computed(
+    () => options.qualityTimeRange?.value ?? options.timeRange.value,
+  )
   const qualityTrendRows = computed(() => {
-    const trend = (options.qualityStatistics?.value ?? options.adminStatistics.value)?.quality_trend || []
+    const trend =
+      (options.qualityStatistics?.value ?? options.adminStatistics.value)?.quality_trend || []
     const trendMap = new Map(trend.map((item) => [item.date, item]))
 
     return buildAdminTimeRangeBuckets(qualityTrendRange.value).map((bucket) => {
@@ -606,7 +609,7 @@ export function useUsageStatisticsCharts(options: {
       labels: bottleneckSourceRows.value.map((item) => item.label),
       datasets: [
         {
-          type: 'doughnut',
+          type: 'polarArea',
           label: '任务量',
           data: bottleneckSourceRows.value.map((item) => item.total),
           backgroundColor: bottleneckSourceRows.value.map((item) => item.color),
@@ -621,10 +624,9 @@ export function useUsageStatisticsCharts(options: {
   const bottleneckSourceChartOptions = computed<AdminChartOptions>(() =>
     defineAdminChartOptions({
       ...baseChartOptions(),
-      cutout: '58%',
       plugins: {
         ...baseChartOptions().plugins,
-        legend: adminChartLegend('bottom'),
+        legend: { display: false },
         tooltip: {
           ...baseTooltipOptions(),
           callbacks: {
@@ -638,6 +640,15 @@ export function useUsageStatisticsCharts(options: {
               ]
             },
           },
+        },
+      },
+      scales: {
+        r: {
+          ...defineAdminChartRadialCountScale({
+            values: bottleneckSourceRows.value.map((row) => row.total),
+            min: 5,
+            headroom: 1.1,
+          }),
         },
       },
     } as AdminChartOptions),
@@ -683,7 +694,7 @@ export function useUsageStatisticsCharts(options: {
       ...baseChartOptions(),
       plugins: {
         ...baseChartOptions().plugins,
-        legend: adminChartLegend('bottom'),
+        legend: { display: false },
         tooltip: {
           ...baseTooltipOptions(),
           callbacks: {
