@@ -19,16 +19,15 @@ export const ideaBoardPrimePt = {
   },
   inputnumber: {
     pcInputText: {
-      root: { class: '!shadow-none focus:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]' },
+      root: { class: '!shadow-none' },
     },
   },
   inputtext: {
-    root: { class: '!shadow-none focus:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]' },
+    root: { class: '!shadow-none' },
   },
   autocomplete: {
     root: {
-      class:
-        '[&.p-focus_.p-autocomplete-input-multiple]:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]',
+      class: '!shadow-none',
     },
     inputMultiple: { class: '!shadow-none' },
   },
@@ -36,12 +35,12 @@ export const ideaBoardPrimePt = {
     root: { class: '!gap-1 !border-0 !bg-transparent !p-0' },
   },
   select: {
-    root: { class: '!shadow-none [&.p-focus]:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]' },
+    root: { class: '!shadow-none' },
   },
   tag: {
     root: { class: '!rounded-full !font-[760]' },
   },
   textarea: {
-    root: { class: '!shadow-none focus:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]' },
+    root: { class: '!shadow-none' },
   },
 } satisfies PrimeVueConfiguration['pt']

@@ -35,8 +35,8 @@ export const ideaBoardPrimePreset = definePreset(Aura, {
         },
         formField: {
           borderColor: adminThemeTokens.controlBorder,
-          hoverBorderColor: adminThemeTokens.borderStrong,
-          focusBorderColor: '{primary.800}',
+          hoverBorderColor: adminThemeTokens.textTertiary,
+          focusBorderColor: '#000000',
         },
       },
     },

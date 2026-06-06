@@ -86,28 +86,20 @@
 
         <div class="flex min-w-0 items-center gap-3.5">
           <IconField class="w-[min(300px,30vw)] max-[720px]:hidden">
-            <InputIcon class="!text-[#8795aa]">
+            <InputIcon>
               <SearchIcon class="size-4 stroke-2" />
             </InputIcon>
             <InputText :class="searchInputClass" placeholder="Search" aria-label="Search" />
           </IconField>
 
-          <Button
+          <button
             v-tooltip.bottom="'通知'"
-            :class="notificationButtonClass"
+            :class="[notificationButtonClass, 'cursor-pointer']"
             type="button"
-            text
-            rounded
             aria-label="通知"
           >
-            <template #icon>
-              <BellIcon :class="shellIconClass" />
-            </template>
-            <span
-              class="absolute top-[7px] right-[7px] size-2 rounded-full border-2 border-white bg-[#e45656]"
-              aria-hidden="true"
-            ></span>
-          </Button>
+            <BellIcon :class="shellIconClass" />
+          </button>
         </div>
       </header>
 
@@ -216,36 +208,36 @@ const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
 const layoutShellClass =
   'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-white text-[var(--color-admin-text-1)] max-[1080px]:grid-cols-1'
 const siderClass =
-  "sticky top-0 flex h-screen self-start flex-col items-start bg-white py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[14px] before:border before:border-[#f1f5f9] before:bg-[#f8fafc] before:content-['']"
+  "sticky top-0 flex h-screen self-start flex-col items-start bg-white py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[14px] before:bg-[#f8fafc] before:content-['']"
 const brandMarkClass =
-  'relative z-[1] ml-[42px] inline-flex size-10 flex-none items-center justify-center rounded-xl border-0 bg-white text-[#0f172a] no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
+  'relative z-[1] ml-[42px] inline-flex size-10 flex-none items-center justify-center rounded-xl border border-black bg-white text-[#0f172a] no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
 const brandTextClass = 'text-xs font-[850] tracking-normal'
 const navRailClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
 const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'
 const focusRingClass =
   'focus-visible:!outline-none focus-visible:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
 const railButtonClass = [
-  '!inline-flex !size-10 !items-center !justify-center !rounded-[10px] !border !border-transparent !bg-transparent !text-[#718096] !shadow-none !transition-colors !duration-200',
+  '!inline-flex !size-10 !items-center !justify-center !rounded-[10px] !border !border-transparent !text-[#718096] !shadow-none !transition-colors !duration-200',
   focusRingClass,
 ].join(' ')
 const railButtonIdleClass =
-  'hover:!border-[#d7e0eb] hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]'
+  '!bg-transparent hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]'
 const railButtonActiveClass =
-  '!border-[#040819] !bg-[#05091a] !text-white !shadow-[0_8px_18px_rgba(5,9,26,0.16)]'
+  '!bg-black !text-white !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
 const shellButtonSkinClass = [
-  '!size-[42px] !items-center !justify-center !rounded-[9px] !border !border-transparent !bg-transparent !text-[#718096] !shadow-none !transition-colors !duration-200',
+  '!size-[42px] !items-center !justify-center !rounded-[9px] !text-[#718096] !transition-colors !duration-200',
   'hover:!border-[#d7e0eb] hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]',
   focusRingClass,
 ].join(' ')
-const shellButtonClass = ['!inline-flex', shellButtonSkinClass].join(' ')
+const shellButtonClass = ['!inline-flex !bg-transparent !border !border-transparent !shadow-none', shellButtonSkinClass].join(' ')
 const mobileMenuButtonClass = [
-  '!hidden max-[1080px]:!inline-flex',
+  '!hidden max-[1080px]:!inline-flex !bg-white !border !border-[var(--color-admin-border)] !shadow-none',
   shellButtonSkinClass,
-  '!border-[var(--color-admin-border)] !bg-white',
 ].join(' ')
 const notificationButtonClass = [
-  shellButtonClass,
-  'relative !rounded-lg !border-[#d6dee9] !bg-white !shadow-[0_3px_10px_rgba(45,64,89,0.05)]',
+  '!inline-flex !bg-white !border !border-[#d6dee9] !shadow-[0_3px_10px_rgba(45,64,89,0.05)]',
+  shellButtonSkinClass,
+  'relative',
 ].join(' ')
 const navIconClass = 'size-[17px] stroke-2'
 const shellIconClass = 'size-[19px] stroke-2'
@@ -254,7 +246,7 @@ const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-white'
 const headerClass =
   'flex min-h-[88px] items-start justify-between gap-6 bg-white py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
 const searchInputClass =
-  '!h-[38px] !w-full !rounded-lg !border-[#d6dee9] !bg-white !text-[15px] !text-[var(--color-admin-text-1)] !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]'
+  '!h-[38px] !w-full !rounded-lg !bg-white !text-[15px] !text-[var(--color-admin-text-1)] !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]'
 const contentClass =
   'min-h-0 flex-1 overflow-visible bg-white pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
 const mobileNavButtonClass = [

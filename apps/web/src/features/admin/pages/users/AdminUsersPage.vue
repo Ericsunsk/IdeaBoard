@@ -2,148 +2,213 @@
   <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
     <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
       <Card>
-        <template #subtitle>总用户</template>
-        <template #title>{{ users.length }}</template>
+        <template #subtitle>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >总用户</span
+          >
+        </template>
+        <template #title>
+          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
+            {{ totalRecords }}
+          </span>
+        </template>
       </Card>
       <Card>
-        <template #subtitle>正常</template>
-        <template #title>{{ activeUserCount }}</template>
+        <template #subtitle>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >当前页正常</span
+          >
+        </template>
+        <template #title>
+          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
+            {{ currentPageActiveUserCount }}
+          </span>
+        </template>
       </Card>
       <Card>
-        <template #subtitle>封禁</template>
-        <template #title>{{ bannedUserCount }}</template>
+        <template #subtitle>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >当前页封禁</span
+          >
+        </template>
+        <template #title>
+          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
+            {{ currentPageBannedUserCount }}
+          </span>
+        </template>
       </Card>
       <Card>
-        <template #subtitle>系统保留</template>
-        <template #title>{{ reservedUserCount }}</template>
+        <template #subtitle>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >当前页保留</span
+          >
+        </template>
+        <template #title>
+          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
+            {{ currentPageReservedUserCount }}
+          </span>
+        </template>
       </Card>
     </div>
 
-    <Toolbar>
-      <template #start>
-        <div class="flex flex-wrap items-center gap-2.5">
-          <IconField class="relative w-full sm:w-[300px]">
-            <InputIcon>
-              <Search />
-            </InputIcon>
-            <InputText
-              v-model="searchKeyword"
-              placeholder="搜索用户..."
-              fluid
-              @keydown.enter="loadUsers"
-            />
-            <Button
-              v-if="searchKeyword"
-              text
-              rounded
-              class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
-              aria-label="清空搜索"
-              @click="searchKeyword = ''"
-            >
-              <template #icon>
-                <Xmark />
-              </template>
-            </Button>
-          </IconField>
-          <Button text rounded aria-label="刷新用户" @click="loadUsers">
-            <template #icon>
-              <Refresh />
-            </template>
-          </Button>
-        </div>
-      </template>
-      <template #end>
-        <div class="flex flex-wrap items-center justify-end gap-2.5">
-          <div
-            class="flex items-center gap-2.5 rounded-full border border-admin-border bg-admin-surface-muted px-3.5 py-[7px]"
-          >
-            <span class="text-admin-body font-[650] text-admin-text-2">开放注册</span>
-            <ToggleSwitch
-              v-model="registrationEnabled"
-              size="small"
-              :disabled="registrationSettingLoading"
-              @update:model-value="handleToggleRegistration"
-            />
-          </div>
-
+    <div class="flex flex-wrap items-center justify-between gap-4 bg-transparent px-0 py-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <IconField class="relative w-full sm:w-[260px]">
+          <InputIcon>
+            <Search class="size-4 text-admin-text-3" />
+          </InputIcon>
+          <InputText
+            v-model="searchKeyword"
+            placeholder="搜索..."
+            fluid
+            class="!rounded-lg !border-admin-border"
+            @keydown.enter="loadUsers"
+          />
           <Button
+            v-if="searchKeyword"
             text
             rounded
-            class="!min-w-[38px] !rounded-xl"
-            aria-label="打开限流策略"
-            @click="toggleRateLimitPanel"
+            class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
+            aria-label="清空搜索"
+            @click="clearSearch"
           >
             <template #icon>
-              <Settings />
+              <Xmark />
             </template>
           </Button>
-          <Popover ref="rateLimitPopoverRef">
-            <div class="w-[280px] max-w-[calc(100vw_-_48px)] bg-admin-card">
-              <div class="border-b border-admin-border px-5 py-4">
-                <div class="text-admin-content font-semibold text-admin-title-color">限流策略</div>
-                <div class="mt-0.5 text-admin-meta text-admin-subtitle-color">
-                  API 请求频率全局控制
-                </div>
+        </IconField>
+
+        <div
+          class="flex items-center gap-2 rounded-full border border-admin-border bg-admin-surface-muted px-3 py-[5px]"
+        >
+          <span class="text-admin-caption font-bold text-admin-text-2">开放注册</span>
+          <ToggleSwitch
+            v-model="registrationEnabled"
+            size="small"
+            :disabled="registrationSettingLoading"
+            @update:model-value="handleToggleRegistration"
+          />
+        </div>
+
+        <Button
+          text
+          class="!h-9 !w-9 !rounded-lg border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
+          aria-label="打开限流策略"
+          @click="toggleRateLimitPanel"
+        >
+          <template #icon>
+            <Settings class="size-4 text-admin-text-2" />
+          </template>
+        </Button>
+        <Popover ref="rateLimitPopoverRef">
+          <div class="w-[280px] max-w-[calc(100vw_-_48px)] bg-admin-card">
+            <div class="border-b border-admin-border px-5 py-4">
+              <div class="text-admin-content font-semibold text-admin-title-color">限流策略</div>
+              <div class="mt-0.5 text-admin-meta text-admin-subtitle-color">
+                API 请求频率全局控制
               </div>
-              <div class="px-5 py-5">
-                <div class="flex flex-col gap-3.5">
-                  <div class="grid grid-cols-1 gap-3">
-                    <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-                      <span>最大请求 (次)</span>
-                      <InputNumber
-                        v-model="rateLimitForm.max_requests"
-                        :min="1"
-                        placeholder="100"
-                        fluid
-                      />
-                    </label>
-                    <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-                      <span>窗口周期 (秒)</span>
-                      <InputNumber
-                        v-model="rateLimitForm.window_seconds"
-                        :min="1"
-                        placeholder="60"
-                        fluid
-                      />
-                    </label>
-                  </div>
-                  <div class="mt-4">
-                    <Button
-                      label="保存配置"
-                      :loading="rateLimitSaving"
+            </div>
+            <div class="px-5 py-5">
+              <div class="flex flex-col gap-3.5">
+                <div class="grid grid-cols-1 gap-3">
+                  <label
+                    class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+                  >
+                    <span>最大请求 (次)</span>
+                    <InputNumber
+                      v-model="rateLimitForm.max_requests"
+                      :min="1"
+                      placeholder="100"
                       fluid
-                      @click="handleSaveRateLimit"
                     />
-                  </div>
+                  </label>
+                  <label
+                    class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+                  >
+                    <span>窗口周期 (秒)</span>
+                    <InputNumber
+                      v-model="rateLimitForm.window_seconds"
+                      :min="1"
+                      placeholder="60"
+                      fluid
+                    />
+                  </label>
+                </div>
+                <div class="mt-4">
+                  <Button
+                    label="保存配置"
+                    :loading="rateLimitSaving"
+                    fluid
+                    @click="handleSaveRateLimit"
+                  />
                 </div>
               </div>
             </div>
-          </Popover>
-        </div>
-      </template>
-    </Toolbar>
+          </div>
+        </Popover>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <Button
+          text
+          class="!h-9 !w-9 !rounded-lg border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
+          aria-label="当前页排序"
+          @click="toggleFilterPanel"
+        >
+          <template #icon>
+            <Filter class="size-4 text-admin-text-2" />
+          </template>
+        </Button>
+        <Popover ref="filterPopoverRef">
+          <div class="w-[232px] bg-admin-card">
+            <div class="border-b border-admin-border px-4 py-3">
+              <div class="text-admin-meta font-bold text-admin-title-color">当前页排序</div>
+            </div>
+            <div class="p-3">
+              <SelectButton
+                v-model="currentSorts"
+                :options="sortOptions"
+                option-label="label"
+                option-value="value"
+                option-disabled="disabled"
+                multiple
+                :allow-empty="false"
+                size="small"
+                class="w-full"
+              />
+            </div>
+          </div>
+        </Popover>
+
+        <div class="h-5 w-[1px] bg-admin-border-soft"></div>
+
+        <Button
+          text
+          class="!h-9 !w-9 !rounded-lg border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
+          aria-label="刷新用户"
+          @click="loadUsers"
+        >
+          <template #icon>
+            <Refresh class="size-4 text-admin-text-2" />
+          </template>
+        </Button>
+
+        <Paginator
+          :first="paginationFirst"
+          :rows="pageSize"
+          :total-records="totalRecords"
+          :rows-per-page-options="pageSizeOptions"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+          current-page-report-template="共 {totalRecords} 条"
+          class="max-w-full"
+          @page="handlePageChange"
+        />
+      </div>
+    </div>
 
     <div
-      class="min-w-0 overflow-visible rounded-[20px] border border-admin-border-soft bg-admin-card-strong p-0 shadow-none"
+      class="min-w-0 overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0 shadow-[0_4px_20px_-2px_rgba(45,64,89,0.02),_0_2px_6px_-1px_rgba(45,64,89,0.01)]"
     >
-      <Toolbar class="border-0 border-b border-admin-border-soft bg-transparent">
-        <template #start>
-          <span class="text-admin-title-sm font-bold text-admin-title-color">用户目录</span>
-        </template>
-        <template #end>
-          <SelectButton
-            v-model="currentSorts"
-            :options="sortOptions"
-            option-label="label"
-            option-value="value"
-            option-disabled="disabled"
-            multiple
-            :allow-empty="false"
-            size="small"
-            class="max-w-full"
-          />
-        </template>
-      </Toolbar>
       <DataTable
         :value="sortedUsers"
         :loading="loading"
@@ -156,12 +221,7 @@
           <template #body="{ data: user }">
             <div class="flex min-w-0 items-center gap-3">
               <div class="relative shrink-0">
-                <Avatar
-                  v-if="user.avatar"
-                  :image="user.avatar"
-                  shape="circle"
-                  class="!h-9 !w-9"
-                />
+                <Avatar v-if="user.avatar" :image="user.avatar" shape="circle" class="!h-9 !w-9" />
                 <Avatar
                   v-else
                   :label="getUserInitial(user)"
@@ -169,7 +229,7 @@
                   class="!h-9 !w-9 !bg-admin-surface-muted !font-bold !text-admin-accent"
                 />
                 <span
-                  class="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
+                  class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
                   :class="user.status === 1 ? 'bg-admin-success' : 'bg-admin-danger'"
                 />
               </div>
@@ -218,18 +278,19 @@
             <Button
               text
               rounded
+              class="!h-8 !w-8 !rounded-full border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center"
               aria-haspopup="menu"
               :aria-label="`${user.username} 操作菜单`"
               @click="toggleUserActionMenu($event, user)"
             >
               <template #icon>
-                <MoreHoriz />
+                <MoreHoriz class="size-4 text-admin-text-2" />
               </template>
             </Button>
           </template>
         </Column>
 
-        <template #empty>暂无匹配用户</template>
+        <template #empty>{{ emptyUserMessage }}</template>
         <template #loading>正在加载用户...</template>
       </DataTable>
       <Menu ref="userActionMenuRef" :model="userActionMenuItems" popup />
@@ -314,13 +375,14 @@ import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
+import Paginator from 'primevue/paginator'
+import type { PageState } from 'primevue/paginator'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
-import Toolbar from 'primevue/toolbar'
 import { useConfirm } from 'primevue/useconfirm'
 import type { User } from '../../../../shared/types'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
@@ -346,9 +408,16 @@ import {
   updateRateLimitSettings,
   updateRegistrationSetting,
 } from '../../shared/queries/adminActions'
-import { MoreHoriz, Refresh, Search, Settings, Xmark } from '@iconoir/vue'
+import { Filter, MoreHoriz, Refresh, Search, Settings, Xmark } from '@iconoir/vue'
 
 type UserActionKey = 'status' | 'revoke' | 'impersonate' | 'role' | 'delete'
+type UserSortKey = 'role' | 'status' | 'newest' | 'oldest'
+
+type UserSortOption = {
+  label: string
+  value: UserSortKey
+  disabled?: boolean
+}
 
 type UserActionItem = {
   key: UserActionKey
@@ -370,16 +439,50 @@ const confirm = useConfirm()
 
 const queryClient = useQueryClient()
 const rateLimitPopoverRef = ref<PrimePopupPanel | null>(null)
+const filterPopoverRef = ref<PrimePopupPanel | null>(null)
 const userActionMenuRef = ref<PrimePopupMenu | null>(null)
 const activeActionUser = ref<User | null>(null)
-const userListParams = { page: 1, page_size: 100 } as const
+
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizeOptions = [10, 20, 50]
 const searchKeyword = ref('')
 const appliedSearchKeyword = ref('')
+
 const userQueryParams = computed(() => ({
-  ...userListParams,
+  page: currentPage.value,
+  page_size: pageSize.value,
   keyword: appliedSearchKeyword.value || undefined,
 }))
 const usersQuery = useListAdminUsers(userQueryParams)
+
+const totalRecords = computed(() => usersQuery.data.value?.data?.total ?? 0)
+const totalPages = computed(() => Math.ceil(totalRecords.value / pageSize.value) || 1)
+const paginationFirst = computed(() => (currentPage.value - 1) * pageSize.value)
+const emptyUserMessage = computed(() => (appliedSearchKeyword.value ? '暂无匹配用户' : '暂无用户'))
+
+watch(totalPages, (newTotal) => {
+  if (currentPage.value > newTotal) {
+    currentPage.value = Math.max(1, newTotal)
+  }
+})
+
+function clearSearch() {
+  searchKeyword.value = ''
+  if (appliedSearchKeyword.value) {
+    appliedSearchKeyword.value = ''
+  }
+  currentPage.value = 1
+}
+
+function toggleFilterPanel(event: Event) {
+  filterPopoverRef.value?.toggle(event)
+}
+
+function handlePageChange(event: PageState) {
+  currentPage.value = event.page + 1
+  pageSize.value = event.rows
+}
 const registrationSettingQuery = useGetAdminRegistrationSetting()
 const rateLimitSettingsQuery = useGetAdminRateLimitSettings()
 
@@ -432,8 +535,8 @@ const updateRegistrationSettingMutation = useMutation({
 
 const users = computed<User[]>(() => usersQuery.data.value?.data?.list ?? [])
 const loading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
-const currentSorts = ref<string[]>(['role', 'status', 'newest'])
-const sortOptions = computed(() => [
+const currentSorts = ref<UserSortKey[]>(['role', 'status', 'newest'])
+const sortOptions = computed<UserSortOption[]>(() => [
   { label: '管理员优先', value: 'role' },
   { label: '正常状态优先', value: 'status' },
   { label: '最新加入', value: 'newest', disabled: currentSorts.value.includes('oldest') },
@@ -579,17 +682,7 @@ function handleBanDialogVisibleUpdate(visible: boolean) {
 }
 
 const sortedUsers = computed(() => {
-  const kw = searchKeyword.value.trim().toLowerCase()
-  const filtered = !kw
-    ? users.value
-    : users.value.filter(
-        (u) =>
-          u.username.toLowerCase().includes(kw) ||
-          u.uid.toLowerCase().includes(kw) ||
-          u.id.toString().includes(kw),
-      )
-
-  const withSort = [...filtered]
+  const withSort = [...users.value]
   withSort.sort((a, b) => {
     if (currentSorts.value.includes('role')) {
       const aRoleRank = a.role === 'admin' ? 0 : 1
@@ -619,6 +712,7 @@ const sortedUsers = computed(() => {
 function loadUsers() {
   const nextKeyword = searchKeyword.value.trim()
   if (appliedSearchKeyword.value !== nextKeyword) {
+    currentPage.value = 1
     appliedSearchKeyword.value = nextKeyword
     return
   }
@@ -812,7 +906,9 @@ function handleToggleRole(row: User) {
   })
 }
 
-const activeUserCount = computed(() => users.value.filter((u) => u.status === 1).length)
-const bannedUserCount = computed(() => users.value.filter((u) => u.status === 0).length)
-const reservedUserCount = computed(() => users.value.filter((u) => u.role === 'admin').length)
+const currentPageActiveUserCount = computed(() => users.value.filter((u) => u.status === 1).length)
+const currentPageBannedUserCount = computed(() => users.value.filter((u) => u.status === 0).length)
+const currentPageReservedUserCount = computed(
+  () => users.value.filter((u) => u.role === 'admin').length,
+)
 </script>

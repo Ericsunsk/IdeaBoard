@@ -45,10 +45,7 @@
     </div>
 
     <div v-else class="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-      <Card
-        v-for="channel in filteredChannels"
-        :key="channel.id"
-      >
+      <Card v-for="channel in filteredChannels" :key="channel.id">
         <template #content>
           <div class="flex min-h-[340px] flex-col gap-3.5">
             <Toolbar class="border-0 bg-transparent p-0">
@@ -81,9 +78,12 @@
               <Tag :value="getApiTypeLabel(channel.type)" severity="info" rounded />
             </div>
 
-            <div class="rounded-xl border border-admin-border bg-admin-surface-muted p-2.5">
-              <div class="mb-2 text-admin-caption font-bold text-admin-text-3">当前生效模型</div>
-              <div v-if="getChannelActiveModels(channel.id).length > 0" class="flex flex-wrap gap-1.5">
+            <div class="flex flex-col gap-2">
+              <div class="text-admin-caption font-bold text-admin-text-3">当前生效模型</div>
+              <div
+                v-if="getChannelActiveModels(channel.id).length > 0"
+                class="flex flex-wrap gap-1.5"
+              >
                 <Tag
                   v-for="model in getChannelActiveModels(channel.id)"
                   :key="model"
@@ -120,7 +120,7 @@
                 <div
                   v-for="account in getChannelAccounts(channel.id)"
                   :key="account.id"
-                  class="rounded-[10px] border border-admin-border bg-admin-surface-muted px-2.5 py-2"
+                  class="border-b border-admin-border-soft last:border-b-0 py-2.5 first:pt-0 last:pb-0"
                 >
                   <div class="mb-1.5 flex items-center justify-between">
                     <div class="flex items-center gap-2">
@@ -189,21 +189,13 @@
         </template>
       </Card>
 
-      <Card>
-        <template #content>
-          <Button
-            severity="secondary"
-            outlined
-            class="!flex !min-h-[340px] !w-full !flex-col !items-center !justify-center !gap-2.5"
-            @click="openAddChannelModal"
-          >
-            <template #icon>
-              <Plus />
-            </template>
-            <span>添加渠道商</span>
-          </Button>
-        </template>
-      </Card>
+      <button
+        type="button"
+        class="flex min-h-[340px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-admin-border bg-white transition-all duration-200 hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]"
+        @click="openAddChannelModal"
+      >
+        <Plus class="size-9 stroke-[1.5] text-admin-text-2" />
+      </button>
 
       <!-- Empty state -->
       <div
@@ -222,11 +214,19 @@
       :style="{ width: '480px' }"
     >
       <div class="flex flex-col gap-3.5">
-        <label class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2">
+        <label
+          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        >
           <span>渠道商名称</span>
-          <InputText v-model="channelForm.name" class="w-full" placeholder="例如：Nano Banana 官方" />
+          <InputText
+            v-model="channelForm.name"
+            class="w-full"
+            placeholder="例如：Nano Banana 官方"
+          />
         </label>
-        <label class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2">
+        <label
+          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        >
           <span>接口类型</span>
           <Select
             v-model="channelForm.type"
@@ -237,7 +237,9 @@
             placeholder="选择接口协议"
           />
         </label>
-        <label class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2">
+        <label
+          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        >
           <span>Base URL地址</span>
           <InputText
             v-model="channelForm.api_url"
@@ -271,7 +273,9 @@
           <code class="font-semibold text-admin-text-1">{{ selectedChannelForAccount.name }}</code>
         </div>
 
-        <label class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2">
+        <label
+          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        >
           <span>{{ isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)' }}</span>
           <InputText
             v-model="accountForm.api_key"
@@ -281,7 +285,9 @@
           />
         </label>
 
-        <label class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2">
+        <label
+          class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+        >
           <span>分配模型</span>
           <AutoComplete
             v-model="accountForm.model_values"
@@ -297,7 +303,9 @@
         </label>
 
         <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <label class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2">
+          <label
+            class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          >
             <span>最大并发数</span>
             <InputNumber
               v-model="accountForm.max_concurrent"
@@ -306,7 +314,9 @@
               fluid
             />
           </label>
-          <label class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2">
+          <label
+            class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          >
             <span>超时时间(秒)</span>
             <InputNumber
               v-model="accountForm.timeout"

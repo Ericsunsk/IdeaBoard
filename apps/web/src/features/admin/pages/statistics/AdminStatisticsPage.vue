@@ -2,23 +2,47 @@
   <div class="flex max-w-full min-w-0 flex-col gap-4 p-0 pb-6">
     <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
       <Card>
-        <template #subtitle>今日调用</template>
-        <template #title>{{ todayCalls }}</template>
+        <template #subtitle>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">今日调用</span>
+        </template>
+        <template #title>
+          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
+            {{ todayCalls }}
+          </span>
+        </template>
         <template #content>{{ todayCallsFoot }}</template>
       </Card>
       <Card>
-        <template #subtitle>今日失败</template>
-        <template #title>{{ todayFailed }}</template>
+        <template #subtitle>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">今日失败</span>
+        </template>
+        <template #title>
+          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
+            {{ todayFailed }}
+          </span>
+        </template>
         <template #content>{{ todayFailedFoot }}</template>
       </Card>
       <Card>
-        <template #subtitle>今日成功率</template>
-        <template #title>{{ todaySuccessRate }}</template>
+        <template #subtitle>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">今日成功率</span>
+        </template>
+        <template #title>
+          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
+            {{ todaySuccessRate }}
+          </span>
+        </template>
         <template #content>{{ todaySuccessRateFoot }}</template>
       </Card>
       <Card>
-        <template #subtitle>队列压力</template>
-        <template #title>{{ queuePressure }}</template>
+        <template #subtitle>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">队列压力</span>
+        </template>
+        <template #title>
+          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
+            {{ queuePressure }}
+          </span>
+        </template>
         <template #content>{{ queuePressureFoot }}</template>
       </Card>
     </div>
