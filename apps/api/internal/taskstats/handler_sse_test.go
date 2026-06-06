@@ -49,6 +49,14 @@ func (s fakeStatsStore) ListDailyStatsByDateRange(context.Context, string, strin
 	return nil, errors.New("not implemented")
 }
 
+func (s fakeStatsStore) ListExecutionBottleneckStatsByCreatedRange(context.Context, time.Time, time.Time) ([]taskstore.ExecutionBottleneckAggregate, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s fakeStatsStore) ListExecutionFailureCategoryStatsByCreatedRange(context.Context, time.Time, time.Time) ([]taskstore.ExecutionFailureCategoryAggregate, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s fakeStatsStore) ListStatEventLatencySamplesByDateRange(context.Context, string, string) ([]taskstore.StatEventLatencySample, error) {
 	return nil, errors.New("not implemented")
 }

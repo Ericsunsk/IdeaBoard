@@ -22,10 +22,11 @@ function parseMonitorSnapshot(raw: string): ApiResponseMonitor | null {
   return response as ApiResponseMonitor
 }
 
-export function useAdminMonitorStream() {
+export function useTaskMonitorStream() {
   const queryClient = useQueryClient()
   const visibility = useDocumentVisibility()
   const status = ref<AdminMonitorStreamStatus>('idle')
+  const snapshot = ref<ApiResponseMonitor | null>(null)
   const lastSnapshotAt = ref<number | null>(null)
   const isPageVisible = computed(() => visibility.value === 'visible')
   const isConnected = computed(() => status.value === 'connected')
@@ -56,12 +57,13 @@ export function useAdminMonitorStream() {
 
     source.addEventListener('snapshot', (event: MessageEvent) => {
       try {
-        const snapshot = parseMonitorSnapshot(event.data)
-        if (!snapshot) {
+        const nextSnapshot = parseMonitorSnapshot(event.data)
+        if (!nextSnapshot) {
           status.value = 'degraded'
           return
         }
-        queryClient.setQueryData(getGetAdminMonitorQueryKey(), snapshot)
+        queryClient.setQueryData(getGetAdminMonitorQueryKey(), nextSnapshot)
+        snapshot.value = nextSnapshot
         lastSnapshotAt.value = Date.now()
         status.value = 'connected'
       } catch {
@@ -100,6 +102,7 @@ export function useAdminMonitorStream() {
   return {
     isConnected,
     lastSnapshotAt,
+    snapshot,
     status,
   }
 }

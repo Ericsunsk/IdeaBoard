@@ -58,9 +58,9 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	assigner := &fakeAssigner{confirmErr: errors.New("lease confirmation failed")}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	providerCalled := false
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (providerCallOutput, error) {
 		providerCalled = true
-		return `{"image_url":"https://example.com/image.png"}`, nil
+		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
 
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
@@ -120,8 +120,8 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_completed();
 
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
-		return `{"image_url":"https://example.com/image.png"}`, nil
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (providerCallOutput, error) {
+		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
 
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
@@ -158,11 +158,11 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	cancelStore := newFakeCancelStoreForRiver()
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, task *queuetypes.TaskPayload) (string, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, task *queuetypes.TaskPayload) (providerCallOutput, error) {
 		if err := cancelStore.MarkCancelled(ctx, task.TaskID, time.Minute); err != nil {
 			t.Fatalf("mark cancelled failed: %v", err)
 		}
-		return `{"image_url":"https://example.com/image.png"}`, nil
+		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
 
 	assignment := taskqueue.TaskAssignment{
@@ -222,9 +222,9 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 	providerCalled := false
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (providerCallOutput, error) {
 		providerCalled = true
-		return `{"image_url":"https://example.com/image.png"}`, nil
+		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
 
 	assignment := taskqueue.TaskAssignment{
@@ -296,8 +296,8 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_failed();
 
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (string, error) {
-		return "", errors.New("provider boom")
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (providerCallOutput, error) {
+		return providerCallOutput{}, errors.New("provider boom")
 	})
 
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
@@ -315,4 +315,17 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_failed();
 func newTaskExecutionOrchestratorTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	return testdb.Open(t)
+}
+
+func providerOutputJSON(result string) providerCallOutput {
+	now := time.Now()
+	return providerCallOutput{
+		Result: result,
+		Timeline: providerCallTimeline{
+			ProviderStartedAt:  &now,
+			ProviderFinishedAt: &now,
+			FinalizeStartedAt:  &now,
+			FinalizeFinishedAt: &now,
+		},
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/tasks"
@@ -41,7 +42,7 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 		}
 	}()
 
-	status, currentAccountID, currentLeaseToken, err := getTaskStateForUpdate(ctx, tx, task.TaskID)
+	status, currentAccountID, currentLeaseToken, createdAt, err := getTaskStateForUpdate(ctx, tx, task.TaskID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			if commitErr := tx.Commit(); commitErr != nil {
@@ -104,6 +105,7 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 	if err != nil {
 		return TaskAssignment{}, err
 	}
+	assignedAt := time.Now()
 	updated, err := markTaskAssignedTx(ctx, tx, task.TaskID, accountID, leaseToken)
 	if err != nil {
 		return TaskAssignment{}, err
@@ -114,6 +116,9 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 		}
 		committed = true
 		return TaskAssignment{TaskID: task.TaskID, Status: AssignStatusDiscard}, nil
+	}
+	if err := patchTaskAssignmentMetricsTx(ctx, tx, task.TaskID, createdAt, assignedAt); err != nil {
+		return TaskAssignment{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return TaskAssignment{}, err
@@ -153,16 +158,17 @@ WHERE task_id = $1
 	return nil
 }
 
-func getTaskStateForUpdate(ctx context.Context, tx *sql.Tx, taskID string) (string, int64, string, error) {
+func getTaskStateForUpdate(ctx context.Context, tx *sql.Tx, taskID string) (string, int64, string, time.Time, error) {
 	var status string
 	var accountID int64
 	var leaseToken string
+	var createdAt time.Time
 	err := tx.QueryRowContext(ctx, `
-SELECT status, account_id, lease_token
+SELECT status, account_id, lease_token, created_at
 FROM tasks
 WHERE task_id = $1
-FOR UPDATE`, taskID).Scan(&status, &accountID, &leaseToken)
-	return status, accountID, leaseToken, err
+FOR UPDATE`, taskID).Scan(&status, &accountID, &leaseToken, &createdAt)
+	return status, accountID, leaseToken, createdAt, err
 }
 
 func markTaskAssignedTx(ctx context.Context, tx *sql.Tx, taskID string, accountID int64, leaseToken string) (int64, error) {
@@ -185,6 +191,33 @@ WHERE task_id = $4
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+func patchTaskAssignmentMetricsTx(ctx context.Context, tx *sql.Tx, taskID string, createdAt time.Time, assignedAt time.Time) error {
+	queueWaitMS := assignedAt.Sub(createdAt).Milliseconds()
+	if queueWaitMS < 0 {
+		queueWaitMS = 0
+	}
+	_, err := tx.ExecContext(ctx, `
+INSERT INTO task_execution_metrics (
+  task_id, current_stage, bottleneck_source, assigned_at, queue_wait_ms
+) VALUES (
+  $1, $2, $3, $4, $5
+)
+ON CONFLICT (task_id) DO UPDATE
+SET current_stage = EXCLUDED.current_stage,
+    bottleneck_source = EXCLUDED.bottleneck_source,
+    assigned_at = EXCLUDED.assigned_at,
+    queue_wait_ms = EXCLUDED.queue_wait_ms,
+    failure_stage = '',
+    failure_category = ''`,
+		taskID,
+		tasks.ExecutionStageAssigned,
+		tasks.BottleneckSourceQueue,
+		assignedAt,
+		queueWaitMS,
+	)
+	return err
 }
 
 func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []int64) (int64, error) {

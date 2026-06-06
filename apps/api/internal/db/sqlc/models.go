@@ -126,6 +126,26 @@ type TaskDailyStatBackfill struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type TaskExecutionMetric struct {
+	TaskID             string       `json:"task_id"`
+	CurrentStage       string       `json:"current_stage"`
+	BottleneckSource   string       `json:"bottleneck_source"`
+	FailureStage       string       `json:"failure_stage"`
+	FailureCategory    string       `json:"failure_category"`
+	AssignedAt         sql.NullTime `json:"assigned_at"`
+	ProviderStartedAt  sql.NullTime `json:"provider_started_at"`
+	ProviderFinishedAt sql.NullTime `json:"provider_finished_at"`
+	FinalizeStartedAt  sql.NullTime `json:"finalize_started_at"`
+	FinalizeFinishedAt sql.NullTime `json:"finalize_finished_at"`
+	QueueWaitMs        int64        `json:"queue_wait_ms"`
+	WorkerOverheadMs   int64        `json:"worker_overhead_ms"`
+	ProviderLatencyMs  int64        `json:"provider_latency_ms"`
+	FinalizeLatencyMs  int64        `json:"finalize_latency_ms"`
+	TotalLatencyMs     int64        `json:"total_latency_ms"`
+	CreatedAt          time.Time    `json:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at"`
+}
+
 type TaskOutput struct {
 	ID         int64     `json:"id"`
 	TaskID     string    `json:"task_id"`

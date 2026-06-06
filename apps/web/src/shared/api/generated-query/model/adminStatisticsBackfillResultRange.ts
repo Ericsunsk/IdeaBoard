@@ -9,6 +9,7 @@ export type AdminStatisticsBackfillResultRange =
   (typeof AdminStatisticsBackfillResultRange)[keyof typeof AdminStatisticsBackfillResultRange]
 
 export const AdminStatisticsBackfillResultRange = {
+  '1d': '1d',
   '7d': '7d',
   '30d': '30d',
   '1y': '1y',

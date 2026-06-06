@@ -192,7 +192,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		Params: `{"feature":"pattern-gen"}`,
 	}
 
-	result, err := c.callDrawingAPI(context.Background(), account, task)
+	output, err := c.callDrawingAPI(context.Background(), account, task)
 	if err != nil {
 		t.Fatalf("callDrawingAPI error: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 	if gotAuth != "" {
 		t.Fatalf("did not expect Authorization header, got %q", gotAuth)
 	}
-	if !strings.Contains(result, `"/uploads/tasks/42/task-google-native/`) {
-		t.Fatalf("expected google image_urls result, got %s", result)
+	if !strings.Contains(output.Result, `"/uploads/tasks/42/task-google-native/`) {
+		t.Fatalf("expected google image_urls result, got %s", output.Result)
 	}
 }

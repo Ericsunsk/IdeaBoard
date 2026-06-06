@@ -17,6 +17,8 @@ type Store interface {
 	CountAllTasks(ctx context.Context) (int64, error)
 	ListBackfilledDatesByRange(ctx context.Context, startDate, endDate string) ([]string, error)
 	ListDailyStatsByDateRange(ctx context.Context, startDate, endDate string) ([]taskstore.DailyStatAggregate, error)
+	ListExecutionBottleneckStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]taskstore.ExecutionBottleneckAggregate, error)
+	ListExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]taskstore.ExecutionFailureCategoryAggregate, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate string) ([]taskstore.StatEventLatencySample, error)
 	ListStatisticsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]taskstore.TaskStatisticLite, error)
 	ListSingleModelSetByAccountIDs(ctx context.Context, accountIDs []int64) (map[int64]string, error)
@@ -28,12 +30,23 @@ type Service struct {
 	store Store
 }
 
+type statisticsTrendBucket struct {
+	date    string
+	label   string
+	total   int64
+	success int64
+	fail    int64
+	models  map[string]int64
+}
+
 func NewService(store Store) *Service {
 	return &Service{store: store}
 }
 
 func normalizeStatisticsRange(raw string) (StatisticsRange, int) {
 	switch StatisticsRange(strings.TrimSpace(strings.ToLower(raw))) {
+	case StatisticsRange1D:
+		return StatisticsRange1D, 1
 	case StatisticsRange30D:
 		return StatisticsRange30D, 30
 	case StatisticsRange1Y:
@@ -70,7 +83,7 @@ func (s *Service) GetTaskStats(ctx context.Context) (map[string]int64, error) {
 }
 
 func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminStatisticsResponse, error) {
-	_, days := normalizeStatisticsRange(rawRange)
+	normalizedRange, days := normalizeStatisticsRange(rawRange)
 	now := time.Now()
 	loc := now.Location()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
@@ -110,6 +123,14 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	if err != nil {
 		return nil, err
 	}
+	bottleneckRows, err := s.store.ListExecutionBottleneckStatsByCreatedRange(ctx, rangeStart, todayStart.AddDate(0, 0, 1))
+	if err != nil {
+		return nil, err
+	}
+	failureCategoryRows, err := s.store.ListExecutionFailureCategoryStatsByCreatedRange(ctx, rangeStart, todayStart.AddDate(0, 0, 1))
+	if err != nil {
+		return nil, err
+	}
 
 	yesterdayDate := yesterdayStart.Format("2006-01-02")
 	monthStartDate := monthStart.Format("2006-01-02")
@@ -126,20 +147,12 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		}
 	}
 
-	type trendBucket struct {
-		date    string
-		label   string
-		total   int64
-		success int64
-		fail    int64
-		models  map[string]int64
-	}
-	buckets := make(map[string]*trendBucket, days)
+	buckets := make(map[string]*statisticsTrendBucket, days)
 	orderedDays := make([]string, 0, days)
 	for i := 0; i < days; i++ {
 		d := rangeStart.AddDate(0, 0, i)
 		dateKey := d.Format("2006-01-02")
-		buckets[dateKey] = &trendBucket{
+		buckets[dateKey] = &statisticsTrendBucket{
 			date:   dateKey,
 			label:  d.Format("01/02"),
 			total:  0,
@@ -148,12 +161,6 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		orderedDays = append(orderedDays, dateKey)
 	}
 
-	type userMetricAcc struct {
-		total     int64
-		completed int64
-		failed    int64
-	}
-	userMetrics := map[string]*userMetricAcc{}
 	type modelMetricAcc struct {
 		total        int64
 		completed    int64
@@ -167,7 +174,6 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	for _, row := range rangeDailyRows {
 		dateKey := row.StatDate
 		model := row.ModelName
-		user := row.UserKey
 		if bucket, ok := buckets[dateKey]; ok {
 			bucket.total += row.Total
 			bucket.success += row.Completed
@@ -182,14 +188,6 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		modelAcc.total += row.Total
 		modelAcc.completed += row.Completed
 		modelAcc.failed += row.Failed
-		userAcc := userMetrics[user]
-		if userAcc == nil {
-			userAcc = &userMetricAcc{}
-			userMetrics[user] = userAcc
-		}
-		userAcc.total += row.Total
-		userAcc.completed += row.Completed
-		userAcc.failed += row.Failed
 
 		if row.LatencyCount > 0 {
 			modelAcc.latencyTotal += row.LatencySecondsSum
@@ -210,75 +208,13 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		yesterdayFailed += row.Failed
 	}
 
-	trend := make([]AdminStatisticsTrendItem, 0, len(orderedDays))
-	for _, dayKey := range orderedDays {
-		b := buckets[dayKey]
-		segments := make([]AdminStatisticsTrendItemModel, 0, len(b.models))
-		for model, value := range b.models {
-			segments = append(segments, AdminStatisticsTrendItemModel{Label: model, Value: value})
+	trend := buildTrendItems(orderedDays, buckets)
+	qualityTrend := buildQualityTrendItems(orderedDays, buckets)
+	if normalizedRange == StatisticsRange1D {
+		trend, qualityTrend, err = s.buildIntradayTrendItems(ctx, todayStart, loc)
+		if err != nil {
+			return nil, fmt.Errorf("build intraday trend: %w", err)
 		}
-		sort.Slice(segments, func(i, j int) bool {
-			if segments[i].Value == segments[j].Value {
-				return segments[i].Label < segments[j].Label
-			}
-			return segments[i].Value > segments[j].Value
-		})
-		if len(segments) > 3 {
-			segments = segments[:3]
-		}
-		trend = append(trend, AdminStatisticsTrendItem{
-			Date:     b.date,
-			Label:    b.label,
-			Total:    b.total,
-			Segments: segments,
-		})
-	}
-
-	qualityTrend := make([]AdminStatisticsQualityTrendItem, 0, len(orderedDays))
-	for _, dayKey := range orderedDays {
-		b := buckets[dayKey]
-		successRate := 0.0
-		if b.total > 0 {
-			successRate = (float64(b.success) / float64(b.total)) * 100
-		}
-		qualityTrend = append(qualityTrend, AdminStatisticsQualityTrendItem{
-			Date:        b.date,
-			Label:       b.label,
-			Total:       b.total,
-			Success:     b.success,
-			Fail:        b.fail,
-			SuccessRate: successRate,
-		})
-	}
-
-	userRisk := make([]AdminStatisticsUserRiskItem, 0, len(userMetrics))
-	for name, acc := range userMetrics {
-		failureRate := 0.0
-		if acc.total > 0 {
-			failureRate = (float64(acc.failed) / float64(acc.total)) * 100
-		}
-		userRisk = append(userRisk, AdminStatisticsUserRiskItem{
-			Name:        name,
-			Total:       acc.total,
-			Completed:   acc.completed,
-			Failed:      acc.failed,
-			FailureRate: failureRate,
-		})
-	}
-	sort.Slice(userRisk, func(i, j int) bool {
-		if userRisk[i].Failed == userRisk[j].Failed {
-			if userRisk[i].FailureRate == userRisk[j].FailureRate {
-				if userRisk[i].Total == userRisk[j].Total {
-					return userRisk[i].Name < userRisk[j].Name
-				}
-				return userRisk[i].Total > userRisk[j].Total
-			}
-			return userRisk[i].FailureRate > userRisk[j].FailureRate
-		}
-		return userRisk[i].Failed > userRisk[j].Failed
-	})
-	if len(userRisk) > 6 {
-		userRisk = userRisk[:6]
 	}
 
 	latencyByModel := make(map[string][]float64)
@@ -329,6 +265,8 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	if len(slowModels) > 6 {
 		slowModels = slowModels[:6]
 	}
+	bottlenecks := buildBottleneckSources(bottleneckRows)
+	failures := buildFailureCategories(failureCategoryRows)
 	sort.Slice(modelHealth, func(i, j int) bool {
 		if modelHealth[i].FailureRate == modelHealth[j].FailureRate {
 			if modelHealth[i].AvgSeconds == modelHealth[j].AvgSeconds {
@@ -361,7 +299,8 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		ModelHealth:  modelHealth,
 		QualityTrend: qualityTrend,
 		SlowModels:   slowModels,
-		UserRisk:     userRisk,
+		Bottlenecks:  bottlenecks,
+		Failures:     failures,
 		Backfill: AdminStatisticsBackfillState{
 			RangeStart:     rangeStartDate,
 			RangeEnd:       rangeEndDate,
@@ -369,6 +308,114 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 			BackfilledDays: len(backfilledDates),
 		},
 	}, nil
+}
+
+func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Time, loc *time.Location) ([]AdminStatisticsTrendItem, []AdminStatisticsQualityTrendItem, error) {
+	const bucketHours = 4
+
+	dayEnd := dayStart.AddDate(0, 0, 1)
+	rows, err := s.store.ListStatisticsByCreatedAtRange(ctx, dayStart, dayEnd)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	accountIDs := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		if row.AccountID != 0 {
+			accountIDs = append(accountIDs, row.AccountID)
+		}
+	}
+	modelSetMap, err := s.store.ListSingleModelSetByAccountIDs(ctx, accountIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	buckets := make(map[string]*statisticsTrendBucket, 24/bucketHours)
+	orderedKeys := make([]string, 0, 24/bucketHours)
+	dayKey := dayStart.In(loc).Format("2006-01-02")
+	for hour := 0; hour < 24; hour += bucketHours {
+		key := fmt.Sprintf("%sT%02d", dayKey, hour)
+		buckets[key] = &statisticsTrendBucket{
+			date:   key,
+			label:  fmt.Sprintf("%02d:00", hour),
+			models: map[string]int64{},
+		}
+		orderedKeys = append(orderedKeys, key)
+	}
+
+	for _, row := range rows {
+		if row.Status != tasks.StatusCompleted && row.Status != tasks.StatusFailed {
+			continue
+		}
+		createdAt := row.CreatedAt.In(loc)
+		if createdAt.Before(dayStart) || !createdAt.Before(dayEnd) {
+			continue
+		}
+		bucketHour := (createdAt.Hour() / bucketHours) * bucketHours
+		key := fmt.Sprintf("%sT%02d", dayKey, bucketHour)
+		bucket := buckets[key]
+		if bucket == nil {
+			continue
+		}
+
+		bucket.total++
+		if row.Status == tasks.StatusCompleted {
+			bucket.success++
+		} else {
+			bucket.fail++
+		}
+		model := taskstore.ExtractTaskModelWithFallback(row.Result, modelSetMap[row.AccountID])
+		bucket.models[model]++
+	}
+
+	return buildTrendItems(orderedKeys, buckets), buildQualityTrendItems(orderedKeys, buckets), nil
+}
+
+func buildTrendItems(orderedKeys []string, buckets map[string]*statisticsTrendBucket) []AdminStatisticsTrendItem {
+	trend := make([]AdminStatisticsTrendItem, 0, len(orderedKeys))
+	for _, key := range orderedKeys {
+		b := buckets[key]
+		segments := make([]AdminStatisticsTrendItemModel, 0, len(b.models))
+		for model, value := range b.models {
+			segments = append(segments, AdminStatisticsTrendItemModel{Label: model, Value: value})
+		}
+		sort.Slice(segments, func(i, j int) bool {
+			if segments[i].Value == segments[j].Value {
+				return segments[i].Label < segments[j].Label
+			}
+			return segments[i].Value > segments[j].Value
+		})
+		if len(segments) > 3 {
+			segments = segments[:3]
+		}
+		trend = append(trend, AdminStatisticsTrendItem{
+			Date:     b.date,
+			Label:    b.label,
+			Total:    b.total,
+			Segments: segments,
+		})
+	}
+	return trend
+}
+
+func buildQualityTrendItems(orderedKeys []string, buckets map[string]*statisticsTrendBucket) []AdminStatisticsQualityTrendItem {
+	qualityTrend := make([]AdminStatisticsQualityTrendItem, 0, len(orderedKeys))
+	for _, key := range orderedKeys {
+		b := buckets[key]
+		successRate := 0.0
+		if b.total > 0 {
+			successRate = (float64(b.success) / float64(b.total)) * 100
+		}
+		qualityTrend = append(qualityTrend, AdminStatisticsQualityTrendItem{
+			Date:        b.date,
+			Label:       b.label,
+			Total:       b.total,
+			Success:     b.success,
+			Fail:        b.fail,
+			SuccessRate: successRate,
+		})
+	}
+	return qualityTrend
 }
 
 func percentile95(values []float64) float64 {
@@ -384,6 +431,89 @@ func percentile95(values []float64) float64 {
 		idx = len(values) - 1
 	}
 	return values[idx]
+}
+
+func buildBottleneckSources(rows []taskstore.ExecutionBottleneckAggregate) []AdminStatisticsBottleneckSource {
+	result := make([]AdminStatisticsBottleneckSource, 0, len(rows))
+	for _, row := range rows {
+		source := strings.TrimSpace(row.Source)
+		if source == "" {
+			source = tasks.BottleneckSourceUnknown
+		}
+		result = append(result, AdminStatisticsBottleneckSource{
+			Source:       source,
+			Label:        bottleneckSourceLabel(source),
+			Total:        row.Total,
+			Failed:       row.Failed,
+			AvgLatencyMS: row.AvgLatencyMS,
+		})
+	}
+	if len(result) > 6 {
+		result = result[:6]
+	}
+	return result
+}
+
+func buildFailureCategories(rows []taskstore.ExecutionFailureCategoryAggregate) []AdminStatisticsFailureCategory {
+	result := make([]AdminStatisticsFailureCategory, 0, len(rows))
+	for _, row := range rows {
+		category := strings.TrimSpace(row.Category)
+		if category == "" {
+			category = tasks.FailureCategoryUnknown
+		}
+		result = append(result, AdminStatisticsFailureCategory{
+			Category:     category,
+			Label:        failureCategoryLabel(category),
+			Total:        row.Total,
+			AvgLatencyMS: row.AvgLatencyMS,
+		})
+	}
+	if len(result) > 6 {
+		result = result[:6]
+	}
+	return result
+}
+
+func bottleneckSourceLabel(source string) string {
+	switch source {
+	case tasks.BottleneckSourceQueue:
+		return "队列等待"
+	case tasks.BottleneckSourceWorker:
+		return "Worker 调度"
+	case tasks.BottleneckSourceProvider:
+		return "上游模型"
+	case tasks.BottleneckSourceStorage:
+		return "存储链路"
+	case tasks.BottleneckSourceFinalize:
+		return "结果落库"
+	case tasks.BottleneckSourceInput:
+		return "输入校验"
+	default:
+		return "未知来源"
+	}
+}
+
+func failureCategoryLabel(category string) string {
+	switch category {
+	case tasks.FailureCategoryInputInvalid:
+		return "输入无效"
+	case tasks.FailureCategoryAuth:
+		return "认证失败"
+	case tasks.FailureCategoryQuota:
+		return "额度限制"
+	case tasks.FailureCategoryTimeout:
+		return "执行超时"
+	case tasks.FailureCategoryProviderError:
+		return "上游错误"
+	case tasks.FailureCategoryStorageError:
+		return "存储错误"
+	case tasks.FailureCategoryFinalizeError:
+		return "结果落库"
+	case tasks.FailureCategoryCancelled:
+		return "任务取消"
+	default:
+		return "未知错误"
+	}
 }
 
 func (s *Service) BackfillStatistics(ctx context.Context, rawRange string) (*AdminStatisticsBackfillResult, error) {

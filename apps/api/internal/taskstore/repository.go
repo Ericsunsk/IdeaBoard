@@ -49,6 +49,19 @@ type StatEventLatencySample struct {
 	LatencySeconds float64
 }
 
+type ExecutionBottleneckAggregate struct {
+	Source       string
+	Total        int64
+	Failed       int64
+	AvgLatencyMS float64
+}
+
+type ExecutionFailureCategoryAggregate struct {
+	Category     string
+	Total        int64
+	AvgLatencyMS float64
+}
+
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
@@ -91,6 +104,9 @@ func (r *Repository) GetByTaskID(ctx context.Context, taskID string) (*tasks.Tas
 		return nil, err
 	}
 	task := taskFromSQLC(row)
+	if err := r.attachExecutionMetrics(ctx, []*tasks.Task{&task}); err != nil {
+		return nil, err
+	}
 	return &task, nil
 }
 
@@ -246,6 +262,85 @@ func (r *Repository) ListOutputsByTaskIDs(ctx context.Context, taskIDs []string)
 	return result, nil
 }
 
+func (r *Repository) PatchExecutionMetrics(ctx context.Context, patch tasks.TaskExecutionMetricsPatch) error {
+	taskID := strings.TrimSpace(patch.TaskID)
+	if taskID == "" {
+		return fmt.Errorf("task_id is required")
+	}
+	return r.q.PatchTaskExecutionMetrics(ctx, dbsqlc.PatchTaskExecutionMetricsParams{
+		TaskID:             taskID,
+		CurrentStage:       optionalNonEmptyString(patch.CurrentStage),
+		BottleneckSource:   optionalNonEmptyString(patch.BottleneckSource),
+		FailureStage:       optionalString(patch.FailureStage),
+		FailureCategory:    optionalString(patch.FailureCategory),
+		AssignedAt:         dbutil.NullTime(patch.AssignedAt),
+		ProviderStartedAt:  dbutil.NullTime(patch.ProviderStartedAt),
+		ProviderFinishedAt: dbutil.NullTime(patch.ProviderFinishedAt),
+		FinalizeStartedAt:  dbutil.NullTime(patch.FinalizeStartedAt),
+		FinalizeFinishedAt: dbutil.NullTime(patch.FinalizeFinishedAt),
+		QueueWaitMs:        optionalInt64(patch.QueueWaitMS),
+		WorkerOverheadMs:   optionalInt64(patch.WorkerOverheadMS),
+		ProviderLatencyMs:  optionalInt64(patch.ProviderLatencyMS),
+		FinalizeLatencyMs:  optionalInt64(patch.FinalizeLatencyMS),
+		TotalLatencyMs:     optionalInt64(patch.TotalLatencyMS),
+	})
+}
+
+func (r *Repository) ListExecutionMetricsByTaskIDs(ctx context.Context, taskIDs []string) (map[string]*tasks.TaskExecutionMetrics, error) {
+	result := make(map[string]*tasks.TaskExecutionMetrics, len(taskIDs))
+	if len(taskIDs) == 0 {
+		return result, nil
+	}
+	rows, err := r.q.ListTaskExecutionMetricsByTaskIDs(ctx, taskIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		metrics := taskExecutionMetricsFromSQLC(row)
+		result[metrics.TaskID] = &metrics
+	}
+	return result, nil
+}
+
+func (r *Repository) ListExecutionBottleneckStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]ExecutionBottleneckAggregate, error) {
+	rows, err := r.q.ListTaskExecutionBottleneckStatsByCreatedRange(ctx, dbsqlc.ListTaskExecutionBottleneckStatsByCreatedRangeParams{
+		StartedAt: start,
+		EndedAt:   end,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]ExecutionBottleneckAggregate, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, ExecutionBottleneckAggregate{
+			Source:       row.BottleneckSource,
+			Total:        row.Total,
+			Failed:       row.Failed,
+			AvgLatencyMS: row.AvgLatencyMs,
+		})
+	}
+	return result, nil
+}
+
+func (r *Repository) ListExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]ExecutionFailureCategoryAggregate, error) {
+	rows, err := r.q.ListTaskExecutionFailureCategoryStatsByCreatedRange(ctx, dbsqlc.ListTaskExecutionFailureCategoryStatsByCreatedRangeParams{
+		StartedAt: start,
+		EndedAt:   end,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]ExecutionFailureCategoryAggregate, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, ExecutionFailureCategoryAggregate{
+			Category:     row.FailureCategory,
+			Total:        row.Total,
+			AvgLatencyMS: row.AvgLatencyMs,
+		})
+	}
+	return result, nil
+}
+
 func (r *Repository) List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error) {
 	hasUserID := userID > 0
 	hasAccountID := accountID > 0
@@ -282,7 +377,11 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 	if err != nil {
 		return nil, 0, err
 	}
-	return tasksFromSQLC(rows), total, nil
+	items := tasksFromSQLC(rows)
+	if err := r.attachExecutionMetrics(ctx, items); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 func (r *Repository) GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error) {
@@ -625,6 +724,36 @@ func taskFromSQLC(row dbsqlc.Task) tasks.Task {
 	}
 }
 
+func (r *Repository) attachExecutionMetrics(ctx context.Context, items []*tasks.Task) error {
+	if len(items) == 0 {
+		return nil
+	}
+	taskIDs := make([]string, 0, len(items))
+	byTaskID := make(map[string]*tasks.Task, len(items))
+	for _, task := range items {
+		if task == nil || task.TaskID == "" {
+			continue
+		}
+		taskIDs = append(taskIDs, task.TaskID)
+		byTaskID[task.TaskID] = task
+	}
+	if len(taskIDs) == 0 {
+		return nil
+	}
+	metricsByTaskID, err := r.ListExecutionMetricsByTaskIDs(ctx, taskIDs)
+	if err != nil {
+		return err
+	}
+	for taskID, metrics := range metricsByTaskID {
+		task := byTaskID[taskID]
+		if task == nil {
+			continue
+		}
+		task.ExecutionMetrics = metrics
+	}
+	return nil
+}
+
 func tasksFromSQLC(rows []dbsqlc.Task) []*tasks.Task {
 	result := make([]*tasks.Task, 0, len(rows))
 	for _, row := range rows {
@@ -632,6 +761,28 @@ func tasksFromSQLC(rows []dbsqlc.Task) []*tasks.Task {
 		result = append(result, &task)
 	}
 	return result
+}
+
+func taskExecutionMetricsFromSQLC(row dbsqlc.TaskExecutionMetric) tasks.TaskExecutionMetrics {
+	return tasks.TaskExecutionMetrics{
+		TaskID:             row.TaskID,
+		CurrentStage:       row.CurrentStage,
+		BottleneckSource:   row.BottleneckSource,
+		FailureStage:       row.FailureStage,
+		FailureCategory:    row.FailureCategory,
+		AssignedAt:         dbutil.TimePtr(row.AssignedAt),
+		ProviderStartedAt:  dbutil.TimePtr(row.ProviderStartedAt),
+		ProviderFinishedAt: dbutil.TimePtr(row.ProviderFinishedAt),
+		FinalizeStartedAt:  dbutil.TimePtr(row.FinalizeStartedAt),
+		FinalizeFinishedAt: dbutil.TimePtr(row.FinalizeFinishedAt),
+		QueueWaitMS:        row.QueueWaitMs,
+		WorkerOverheadMS:   row.WorkerOverheadMs,
+		ProviderLatencyMS:  row.ProviderLatencyMs,
+		FinalizeLatencyMS:  row.FinalizeLatencyMs,
+		TotalLatencyMS:     row.TotalLatencyMs,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
+	}
 }
 
 func taskOutputFromSQLC(row dbsqlc.TaskOutput) tasks.TaskOutput {
@@ -649,4 +800,26 @@ func taskOutputFromSQLC(row dbsqlc.TaskOutput) tasks.TaskOutput {
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
 	}
+}
+
+func optionalNonEmptyString(value *string) sql.NullString {
+	if value == nil {
+		return sql.NullString{}
+	}
+	v := strings.TrimSpace(*value)
+	return sql.NullString{String: v, Valid: v != ""}
+}
+
+func optionalString(value *string) sql.NullString {
+	if value == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: strings.TrimSpace(*value), Valid: true}
+}
+
+func optionalInt64(value *int64) sql.NullInt64 {
+	if value == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *value, Valid: true}
 }

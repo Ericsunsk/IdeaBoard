@@ -12,9 +12,10 @@ import (
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/runtime/taskruntime"
+	"ideaboard/api/internal/tasks"
 )
 
-type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (string, error)
+type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (providerCallOutput, error)
 
 type accountLookupStore interface {
 	GetByID(ctx context.Context, id int64) (*accounts.ApiAccount, error)
@@ -95,7 +96,16 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 
-	result, err := o.providerCall(taskCtx, account, task)
+	providerStartAt := time.Now()
+	o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
+		TaskID:            task.TaskID,
+		CurrentStage:      stringPtr(tasks.ExecutionStageProvider),
+		ProviderStartedAt: &providerStartAt,
+		WorkerOverheadMS:  int64Ptr(nonNegativeMilliseconds(providerStartAt.Sub(startTime))),
+	})
+
+	providerOutput, err := o.providerCall(taskCtx, account, task)
+	o.recordProviderTimeline(ctx, task.TaskID, startTime, providerOutput.Timeline)
 	if err != nil {
 		if isContextInterrupted(taskCtx.Err()) || isContextInterrupted(ctx.Err()) {
 			cancelled, checkErr := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
@@ -103,6 +113,13 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 				slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", checkErr)
 			}
 			if cancelled {
+				o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
+					TaskID:           task.TaskID,
+					CurrentStage:     stringPtr(tasks.ExecutionStageQueued),
+					FailureStage:     stringPtr(tasks.ExecutionStageProvider),
+					FailureCategory:  stringPtr(tasks.FailureCategoryCancelled),
+					BottleneckSource: stringPtr(tasks.BottleneckSourceProvider),
+				})
 				o.skipCancelledTask(ctx, task, assignment)
 				return nil
 			}
@@ -111,8 +128,9 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		slog.Warn("upstream provider call failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
 		elapsed := time.Since(startTime).Seconds()
 		reason := userFacingProviderError(err)
+		failureStage, failureCategory := classifyProviderFailure(err, providerOutput.Timeline)
 		if !shouldFailoverProviderError(err) {
-			if markErr := o.completeFailedTask(ctx, task, assignment, reason, elapsed); markErr != nil {
+			if markErr := o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, elapsed, failureStage, failureCategory); markErr != nil {
 				return markErr
 			}
 			return nil
@@ -124,15 +142,23 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 				return nil
 			}
 			slog.Warn("reset task for failover retry failed", "task_id", task.TaskID, "err", requeueErr)
-			if markErr := o.completeFailedTask(ctx, task, assignment, reason, elapsed); markErr != nil {
+			if markErr := o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, elapsed, failureStage, failureCategory); markErr != nil {
 				return markErr
 			}
 			return nil
 		}
 		if !requeued {
 			slog.Info("task reached failover retry limit", "task_id", task.TaskID)
+			o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, failureStage, failureCategory, time.Now())
 			return nil
 		}
+		o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
+			TaskID:           task.TaskID,
+			CurrentStage:     stringPtr(tasks.ExecutionStageQueued),
+			BottleneckSource: stringPtr(tasks.BottleneckSourceProvider),
+			FailureStage:     stringPtr(failureStage),
+			FailureCategory:  stringPtr(failureCategory),
+		})
 		disabled, failCount, statErr := o.taskRuntime.RecordAccountFailure(ctx, accountID)
 		if statErr != nil {
 			slog.Warn("record account failure state failed", "account_id", accountID, "err", statErr)
@@ -142,7 +168,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		}
 		task.AccountIDs = removeAccountCandidate(task.AccountIDs, accountID)
 		if len(task.AccountIDs) == 0 {
-			if markErr := o.completeFailedTask(ctx, task, taskqueue.TaskAssignment{}, reason, elapsed); markErr != nil {
+			if markErr := o.completeFailedTaskWithMetrics(ctx, task, taskqueue.TaskAssignment{}, reason, elapsed, failureStage, failureCategory); markErr != nil {
 				return markErr
 			}
 			return nil
@@ -167,11 +193,15 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	}
 
 	elapsed := time.Since(startTime).Seconds()
-	completed, completeErr := o.completeTask(ctx, task, assignment, result, elapsed)
+	completed, completeErr := o.completeTask(ctx, task, assignment, providerOutput.Result, elapsed)
 	if completeErr != nil {
+		o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, time.Now())
 		return completeErr
 	}
 	if completed {
+		finishedAt := time.Now()
+		o.recordFinalizeFinished(ctx, task.TaskID, providerOutput.Timeline, finishedAt)
+		o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageCompleted, "", "", finishedAt)
 		if err := o.taskRuntime.ResetAccountFailure(ctx, accountID); err != nil {
 			slog.Warn("reset account failure counter failed", "account_id", accountID, "err", err)
 		}
@@ -227,6 +257,18 @@ func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *queu
 }
 
 func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, reason string, elapsedSec float64) error {
+	return o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, elapsedSec, tasks.ExecutionStageAssigned, tasks.FailureCategoryUnknown)
+}
+
+func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
+	ctx context.Context,
+	task *queuetypes.TaskPayload,
+	assignment taskqueue.TaskAssignment,
+	reason string,
+	elapsedSec float64,
+	failureStage string,
+	failureCategory string,
+) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
@@ -244,6 +286,7 @@ func (o *taskExecutionOrchestrator) completeFailedTask(ctx context.Context, task
 		slog.Warn("mark task failed failed", "task_id", task.TaskID, "err", err)
 		return err
 	}
+	o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, failureStage, failureCategory, time.Now())
 	slog.Warn("task failed", "task_id", task.TaskID, "elapsed_sec", elapsedSec, "reason", reason)
 	return nil
 }
@@ -288,8 +331,114 @@ func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Conte
 	return execErr
 }
 
+func (o *taskExecutionOrchestrator) recordProviderTimeline(ctx context.Context, taskID string, executionStartedAt time.Time, timeline providerCallTimeline) {
+	if timeline.ProviderStartedAt != nil {
+		o.recordExecutionMetrics(ctx, taskID, tasks.TaskExecutionMetricsPatch{
+			TaskID:            taskID,
+			CurrentStage:      stringPtr(tasks.ExecutionStageProvider),
+			ProviderStartedAt: timeline.ProviderStartedAt,
+			WorkerOverheadMS:  int64Ptr(nonNegativeMilliseconds(timeline.ProviderStartedAt.Sub(executionStartedAt))),
+		})
+	}
+	if timeline.ProviderStartedAt != nil && timeline.ProviderFinishedAt != nil {
+		o.recordExecutionMetrics(ctx, taskID, tasks.TaskExecutionMetricsPatch{
+			TaskID:             taskID,
+			ProviderFinishedAt: timeline.ProviderFinishedAt,
+			ProviderLatencyMS:  int64Ptr(nonNegativeMilliseconds(timeline.ProviderFinishedAt.Sub(*timeline.ProviderStartedAt))),
+		})
+	}
+	if timeline.FinalizeStartedAt != nil {
+		o.recordExecutionMetrics(ctx, taskID, tasks.TaskExecutionMetricsPatch{
+			TaskID:            taskID,
+			CurrentStage:      stringPtr(tasks.ExecutionStageFinalizing),
+			FinalizeStartedAt: timeline.FinalizeStartedAt,
+		})
+	}
+	if timeline.FinalizeStartedAt != nil && timeline.FinalizeFinishedAt != nil {
+		o.recordExecutionMetrics(ctx, taskID, tasks.TaskExecutionMetricsPatch{
+			TaskID:             taskID,
+			FinalizeFinishedAt: timeline.FinalizeFinishedAt,
+			FinalizeLatencyMS:  int64Ptr(nonNegativeMilliseconds(timeline.FinalizeFinishedAt.Sub(*timeline.FinalizeStartedAt))),
+		})
+	}
+}
+
+func (o *taskExecutionOrchestrator) recordFinalizeFinished(ctx context.Context, taskID string, timeline providerCallTimeline, finishedAt time.Time) {
+	if timeline.FinalizeStartedAt == nil {
+		return
+	}
+	o.recordExecutionMetrics(ctx, taskID, tasks.TaskExecutionMetricsPatch{
+		TaskID:             taskID,
+		FinalizeFinishedAt: &finishedAt,
+		FinalizeLatencyMS:  int64Ptr(nonNegativeMilliseconds(finishedAt.Sub(*timeline.FinalizeStartedAt))),
+	})
+}
+
+func (o *taskExecutionOrchestrator) recordExecutionMetrics(ctx context.Context, taskID string, patch tasks.TaskExecutionMetricsPatch) {
+	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
+	defer cleanupCancel()
+	if err := o.taskRuntime.RecordExecutionMetrics(cleanupCtx, patch); err != nil {
+		slog.Warn("record task execution metrics failed", "task_id", taskID, "err", err)
+	}
+}
+
+func (o *taskExecutionOrchestrator) recordExecutionTerminal(ctx context.Context, taskID string, currentStage string, failureStage string, failureCategory string, finishedAt time.Time) {
+	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
+	defer cleanupCancel()
+	if err := o.taskRuntime.RecordExecutionTerminal(cleanupCtx, taskID, currentStage, failureStage, failureCategory, finishedAt); err != nil {
+		slog.Warn("record terminal task execution metrics failed", "task_id", taskID, "err", err)
+	}
+}
+
+func classifyProviderFailure(err error, timeline providerCallTimeline) (string, string) {
+	if errors.Is(err, context.Canceled) {
+		return tasks.ExecutionStageProvider, tasks.FailureCategoryCancelled
+	}
+	if stage, category, ok := executionFailureDetails(err); ok {
+		return stage, category
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return tasks.ExecutionStageProvider, tasks.FailureCategoryTimeout
+	}
+	if timeline.FinalizeStartedAt != nil {
+		return tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError
+	}
+	if status, ok := providerHTTPStatus(err); ok {
+		switch status {
+		case http.StatusBadRequest, http.StatusUnprocessableEntity:
+			return tasks.ExecutionStageProvider, tasks.FailureCategoryInputInvalid
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return tasks.ExecutionStageProvider, tasks.FailureCategoryAuth
+		case http.StatusPaymentRequired:
+			return tasks.ExecutionStageProvider, tasks.FailureCategoryQuota
+		case http.StatusRequestTimeout, http.StatusTooManyRequests:
+			return tasks.ExecutionStageProvider, tasks.FailureCategoryTimeout
+		}
+	}
+	if timeline.ProviderStartedAt != nil {
+		return tasks.ExecutionStageProvider, tasks.FailureCategoryProviderError
+	}
+	return tasks.ExecutionStageAssigned, tasks.FailureCategoryUnknown
+}
+
 func taskCleanupContext(parent context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.WithoutCancel(parent), taskCleanupTimeout)
+}
+
+func nonNegativeMilliseconds(duration time.Duration) int64 {
+	ms := duration.Milliseconds()
+	if ms < 0 {
+		return 0
+	}
+	return ms
+}
+
+func stringPtr(value string) *string {
+	return &value
+}
+
+func int64Ptr(value int64) *int64 {
+	return &value
 }
 
 func isContextInterrupted(err error) bool {
@@ -304,9 +453,6 @@ func userFacingProviderError(err error) string {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return "上游图像服务响应超时"
 	}
-	if strings.Contains(err.Error(), "持久化上游图片失败") {
-		return "图片结果保存失败，请检查存储配置"
-	}
 	if status, ok := providerHTTPStatus(err); ok {
 		switch status {
 		case http.StatusBadRequest, http.StatusUnprocessableEntity:
@@ -319,6 +465,20 @@ func userFacingProviderError(err error) string {
 			return "上游服务接口或模型不可用，请联系管理员"
 		case http.StatusTooManyRequests:
 			return "上游服务请求过于频繁，请稍后重试"
+		}
+	}
+	if _, category, ok := executionFailureDetails(err); ok {
+		switch category {
+		case tasks.FailureCategoryStorageError, tasks.FailureCategoryFinalizeError:
+			return "图片结果保存失败，请检查存储配置"
+		case tasks.FailureCategoryAuth:
+			return "上游服务鉴权失败，请联系管理员"
+		case tasks.FailureCategoryInputInvalid:
+			return "请求参数不合法，请检查输入后重试"
+		case tasks.FailureCategoryQuota:
+			return "上游服务额度不足或未开通，请联系管理员"
+		case tasks.FailureCategoryTimeout:
+			return "上游图像服务响应超时"
 		}
 	}
 	return "上游图像服务调用失败"

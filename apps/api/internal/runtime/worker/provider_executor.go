@@ -56,11 +56,27 @@ type providerCallResult struct {
 	Model     string
 }
 
-func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (string, error) {
+type providerCallTimeline struct {
+	ProviderStartedAt  *time.Time
+	ProviderFinishedAt *time.Time
+	FinalizeStartedAt  *time.Time
+	FinalizeFinishedAt *time.Time
+}
+
+type providerCallOutput struct {
+	Result   string
+	Timeline providerCallTimeline
+}
+
+func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (providerCallOutput, error) {
 	slog.Info("calling provider API", "account_name", account.Name, "channel_id", account.ChannelID, "task_id", task.TaskID)
 
 	if account.ApiKey == "" {
-		return "", fmt.Errorf("账号 %s 的 API Key 为空", account.Name)
+		return providerCallOutput{}, newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryAuth,
+			fmt.Errorf("账号 %s 的 API Key 为空", account.Name),
+		)
 	}
 
 	// 如果账号绑定了渠道商，使用渠道商的 API URL 作为 ProxyURL
@@ -68,11 +84,19 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	if account.ChannelID > 0 && c.channelRepo != nil {
 		channel, err := c.channelRepo.GetByID(ctx, account.ChannelID)
 		if err != nil {
-			return "", fmt.Errorf("渠道商(ID=%d)不存在: %v", account.ChannelID, err)
+			return providerCallOutput{}, newExecutionFailureError(
+				tasks.ExecutionStageAssigned,
+				tasks.FailureCategoryInputInvalid,
+				fmt.Errorf("渠道商(ID=%d)不存在: %v", account.ChannelID, err),
+			)
 		}
 		proxyURL, validateErr := outbound.ValidateConfiguredEndpoint(channel.ApiURL, outbound.AllowHostsFromEnv()...)
 		if validateErr != nil {
-			return "", fmt.Errorf("渠道商 API URL 不可用")
+			return providerCallOutput{}, newExecutionFailureError(
+				tasks.ExecutionStageAssigned,
+				tasks.FailureCategoryInputInvalid,
+				fmt.Errorf("渠道商 API URL 不可用"),
+			)
 		}
 		account.ProxyURL = proxyURL
 		channelName = channel.Name
@@ -90,14 +114,18 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 
 	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
 	if !ok {
-		return "", fmt.Errorf("账号 %s 的接口类型不支持: %s", account.Name, account.ApiType)
+		return providerCallOutput{}, newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryInputInvalid,
+			fmt.Errorf("账号 %s 的接口类型不支持: %s", account.Name, account.ApiType),
+		)
 	}
 
 	timeout := resolveAccountTimeout(account)
 
 	localRedrawCtx, redrawErr := c.prepareLocalRedrawPipeline(ctx, account, params, timeout)
 	if redrawErr != nil {
-		return "", redrawErr
+		return providerCallOutput{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, redrawErr)
 	}
 	localRedrawStored := false
 
@@ -109,9 +137,16 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 
 	resolvedModel := resolveRequestedModel(account.ModelSet, params)
 	if strings.TrimSpace(resolvedModel) == "" {
-		return "", fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name)
+		return providerCallOutput{}, newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryInputInvalid,
+			fmt.Errorf("账号 %s 未分配模型，请先在后台检测并选择模型", account.Name),
+		)
 	}
 	providerReq := newProviderRequest(task.Prompt, width, height, params, resolvedModel)
+	output := providerCallOutput{}
+	providerStartedAt := time.Now()
+	output.Timeline.ProviderStartedAt = &providerStartedAt
 	switch {
 	case workflow.IsGoogleNativeAPIType(apiType):
 		callResult, err = c.callGoogleAIWithRequest(ctx, account, providerReq, timeout)
@@ -119,26 +154,41 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		// OpenAI-compatible providers use the DALL-E style image endpoints.
 		callResult, err = c.callOpenAIWithRequest(ctx, account, providerReq, timeout)
 	}
+	providerFinishedAt := time.Now()
+	output.Timeline.ProviderFinishedAt = &providerFinishedAt
 
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			return "", err
+			return output, err
 		}
-		return "", fmt.Errorf("调用 API 失败 (渠道: %s): %w", channelName, err)
+		return output, newExecutionFailureError(
+			tasks.ExecutionStageProvider,
+			providerFailureCategory(err),
+			fmt.Errorf("调用 API 失败 (渠道: %s): %w", channelName, err),
+		)
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
 	if len(imageURLs) == 0 {
-		return "", fmt.Errorf("API 未返回图片")
+		return output, newExecutionFailureError(
+			tasks.ExecutionStageProvider,
+			tasks.FailureCategoryProviderError,
+			fmt.Errorf("API 未返回图片"),
+		)
 	}
 	imageURL := imageURLs[0]
 
+	finalizeStartedAt := time.Now()
+	output.Timeline.FinalizeStartedAt = &finalizeStartedAt
 	if localRedrawCtx != nil {
 		imageURL, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, task.UserID, task.TaskID, localRedrawCtx, imageURL, timeout)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				return "", err
+				return output, err
 			}
-			return "", err
+			if _, _, ok := executionFailureDetails(err); ok {
+				return output, err
+			}
+			return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
 		}
 		imageURLs = []string{imageURL}
 	}
@@ -147,12 +197,14 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		imageURLs, err = c.materializeProviderResultImages(ctx, task.UserID, task.TaskID, account, imageURLs)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				return "", err
+				return output, err
 			}
-			return "", err
+			return output, err
 		}
 		imageURL = imageURLs[0]
 	}
+	finalizeFinishedAt := time.Now()
+	output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 
 	result := map[string]interface{}{
 		"task_id":      task.TaskID,
@@ -173,7 +225,8 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	}
 
 	resultJSON, _ := json.Marshal(result)
-	return string(resultJSON), nil
+	output.Result = string(resultJSON)
+	return output, nil
 }
 
 func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, error) {
@@ -181,7 +234,11 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		return imageURLs, nil
 	}
 	if c.storageService == nil {
-		return nil, fmt.Errorf("持久化上游图片失败: 存储服务未初始化")
+		return nil, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryStorageError,
+			fmt.Errorf("持久化上游图片失败: 存储服务未初始化"),
+		)
 	}
 
 	slog.Info("provider result storage check", "object_storage", c.storageService.UsesObjectStorage(ctx), "image_count", len(imageURLs))
@@ -203,7 +260,11 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 		if errors.Is(storeErr, context.Canceled) {
 			return nil, storeErr
 		}
-		return nil, fmt.Errorf("持久化上游图片失败: %w", storeErr)
+		return nil, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryStorageError,
+			fmt.Errorf("持久化上游图片失败: %w", storeErr),
+		)
 	}
 	return next, nil
 }

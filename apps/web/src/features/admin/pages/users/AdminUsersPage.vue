@@ -1,300 +1,277 @@
 <template>
-  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
-    <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >总用户</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ totalRecords }}
-          </span>
-        </template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >当前页正常</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ currentPageActiveUserCount }}
-          </span>
-        </template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >当前页封禁</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ currentPageBannedUserCount }}
-          </span>
-        </template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >当前页保留</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ currentPageReservedUserCount }}
-          </span>
-        </template>
-      </Card>
-    </div>
-
-    <div class="flex flex-wrap items-center justify-between gap-4 bg-transparent px-0 py-1">
-      <div class="flex flex-wrap items-center gap-3">
-        <IconField class="relative w-full sm:w-[260px]">
-          <InputIcon>
-            <Search class="size-4 text-admin-text-3" />
-          </InputIcon>
-          <InputText
-            v-model="searchKeyword"
-            placeholder="搜索..."
-            fluid
-            class="!rounded-lg !border-admin-border"
-            @keydown.enter="loadUsers"
-          />
-          <Button
-            v-if="searchKeyword"
-            text
-            rounded
-            class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
-            aria-label="清空搜索"
-            @click="clearSearch"
-          >
-            <template #icon>
-              <Xmark />
-            </template>
-          </Button>
-        </IconField>
-
-        <div
-          class="flex items-center gap-2 rounded-full border border-admin-border bg-admin-surface-muted px-3 py-[5px]"
-        >
-          <span class="text-admin-caption font-bold text-admin-text-2">开放注册</span>
-          <ToggleSwitch
-            v-model="registrationEnabled"
-            size="small"
-            :disabled="registrationSettingLoading"
-            @update:model-value="handleToggleRegistration"
-          />
-        </div>
-
-        <Button
-          text
-          class="!h-9 !w-9 !rounded-lg border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-          aria-label="打开限流策略"
-          @click="toggleRateLimitPanel"
-        >
-          <template #icon>
-            <Settings class="size-4 text-admin-text-2" />
-          </template>
-        </Button>
-        <Popover ref="rateLimitPopoverRef">
-          <div class="w-[280px] max-w-[calc(100vw_-_48px)] bg-admin-card">
-            <div class="border-b border-admin-border px-5 py-4">
-              <div class="text-admin-content font-semibold text-admin-title-color">限流策略</div>
-              <div class="mt-0.5 text-admin-meta text-admin-subtitle-color">
-                API 请求频率全局控制
-              </div>
-            </div>
-            <div class="px-5 py-5">
-              <div class="flex flex-col gap-3.5">
-                <div class="grid grid-cols-1 gap-3">
-                  <label
-                    class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-                  >
-                    <span>最大请求 (次)</span>
-                    <InputNumber
-                      v-model="rateLimitForm.max_requests"
-                      :min="1"
-                      placeholder="100"
-                      fluid
-                    />
-                  </label>
-                  <label
-                    class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-                  >
-                    <span>窗口周期 (秒)</span>
-                    <InputNumber
-                      v-model="rateLimitForm.window_seconds"
-                      :min="1"
-                      placeholder="60"
-                      fluid
-                    />
-                  </label>
-                </div>
-                <div class="mt-4">
-                  <Button
-                    label="保存配置"
-                    :loading="rateLimitSaving"
-                    fluid
-                    @click="handleSaveRateLimit"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </Popover>
-      </div>
-
-      <div class="flex flex-wrap items-center justify-end gap-3">
-        <Button
-          text
-          class="!h-9 !w-9 !rounded-lg border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-          aria-label="当前页排序"
-          @click="toggleFilterPanel"
-        >
-          <template #icon>
-            <Filter class="size-4 text-admin-text-2" />
-          </template>
-        </Button>
-        <Popover ref="filterPopoverRef">
-          <div class="w-[232px] bg-admin-card">
-            <div class="border-b border-admin-border px-4 py-3">
-              <div class="text-admin-meta font-bold text-admin-title-color">当前页排序</div>
-            </div>
-            <div class="p-3">
-              <SelectButton
-                v-model="currentSorts"
-                :options="sortOptions"
-                option-label="label"
-                option-value="value"
-                option-disabled="disabled"
-                multiple
-                :allow-empty="false"
-                size="small"
-                class="w-full"
+  <div class="min-w-0">
+    <section
+      class="min-w-0 overflow-hidden rounded-[28px] border border-admin-border-soft bg-admin-card-strong"
+    >
+      <div class="px-5 pt-5 pb-4 md:px-6 md:pt-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="min-w-0">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+              <Tag :value="`${totalRecords} 用户`" severity="secondary" rounded />
+              <Tag :value="`${currentPageActiveUserCount} 正常`" severity="success" rounded />
+              <Tag
+                v-if="currentPageBannedUserCount > 0"
+                :value="`${currentPageBannedUserCount} 封禁`"
+                severity="danger"
+                rounded
               />
             </div>
+            <h1 class="m-0 text-[30px] leading-[1.1] font-[780] text-admin-title-color">
+              用户管理
+            </h1>
+            <p class="mt-2 mb-0 text-admin-content leading-6 text-admin-subtitle-color">
+              系统用户、权限角色与访问状态
+            </p>
           </div>
-        </Popover>
 
-        <div class="h-5 w-[1px] bg-admin-border-soft"></div>
+          <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+            <Tag :value="`${currentPageReservedUserCount} 管理员`" severity="info" rounded />
+            <Tag v-if="selectedUsers.length > 0" :value="`已选 ${selectedUsers.length}`" rounded />
+          </div>
+        </div>
 
-        <Button
-          text
-          class="!h-9 !w-9 !rounded-lg border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-          aria-label="刷新用户"
-          @click="loadUsers"
-        >
-          <template #icon>
-            <Refresh class="size-4 text-admin-text-2" />
-          </template>
-        </Button>
+        <div class="mt-9 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <IconField class="relative w-full lg:max-w-[340px]">
+            <InputIcon>
+              <Search class="size-4 text-admin-text-3" />
+            </InputIcon>
+            <InputText
+              v-model="searchKeyword"
+              placeholder="搜索用户"
+              fluid
+              class="!rounded-xl !border-admin-border"
+              @keydown.enter="loadUsers"
+            />
+            <Button
+              v-if="searchKeyword"
+              text
+              rounded
+              class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
+              aria-label="清空搜索"
+              @click="clearSearch"
+            >
+              <template #icon>
+                <Xmark />
+              </template>
+            </Button>
+          </IconField>
 
-        <Paginator
+          <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+            <div
+              class="flex items-center gap-2 rounded-xl border border-admin-border bg-admin-surface-muted px-3 py-2"
+            >
+              <span class="text-admin-caption font-bold text-admin-text-2">开放注册</span>
+              <ToggleSwitch
+                v-model="registrationEnabled"
+                size="small"
+                :disabled="registrationSettingLoading"
+                @update:model-value="handleToggleRegistration"
+              />
+            </div>
+
+            <Button
+              text
+              class="!h-10 !w-10 !rounded-xl border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
+              aria-label="打开限流策略"
+              @click="toggleRateLimitPanel"
+            >
+              <template #icon>
+                <Settings class="size-4 text-admin-text-2" />
+              </template>
+            </Button>
+            <Popover ref="rateLimitPopoverRef">
+              <div class="w-[280px] max-w-[calc(100vw_-_48px)] bg-admin-card">
+                <div class="border-b border-admin-border px-5 py-4">
+                  <div class="text-admin-content font-semibold text-admin-title-color">
+                    限流策略
+                  </div>
+                  <div class="mt-0.5 text-admin-meta text-admin-subtitle-color">
+                    API 请求频率全局控制
+                  </div>
+                </div>
+                <div class="px-5 py-5">
+                  <div class="flex flex-col gap-3.5">
+                    <div class="grid grid-cols-1 gap-3">
+                      <label
+                        class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+                      >
+                        <span>最大请求 (次)</span>
+                        <InputNumber
+                          v-model="rateLimitForm.max_requests"
+                          :min="1"
+                          placeholder="100"
+                          fluid
+                        />
+                      </label>
+                      <label
+                        class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+                      >
+                        <span>窗口周期 (秒)</span>
+                        <InputNumber
+                          v-model="rateLimitForm.window_seconds"
+                          :min="1"
+                          placeholder="60"
+                          fluid
+                        />
+                      </label>
+                    </div>
+                    <div class="mt-4">
+                      <Button
+                        label="保存配置"
+                        :loading="rateLimitSaving"
+                        fluid
+                        @click="handleSaveRateLimit"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Popover>
+
+            <Button
+              text
+              class="!h-10 !w-10 !rounded-xl border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
+              aria-label="刷新用户"
+              @click="loadUsers"
+            >
+              <template #icon>
+                <Refresh class="size-4 text-admin-text-2" />
+              </template>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div class="min-w-0 border-t border-admin-border-soft">
+        <DataTable
+          v-model:selection="selectedUsers"
+          :value="sortedUsers"
+          :loading="loading"
+          data-key="id"
+          size="small"
+          row-hover
+          lazy
+          paginator
+          removable-sort
+          scrollable
+          sort-mode="multiple"
+          :pt="adminDenseDataTablePt"
+          :multi-sort-meta="userTableSortMeta"
           :first="paginationFirst"
           :rows="pageSize"
           :total-records="totalRecords"
           :rows-per-page-options="pageSizeOptions"
-          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+          paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
           current-page-report-template="共 {totalRecords} 条"
-          class="max-w-full"
+          :table-style="{ minWidth: '920px' }"
           @page="handlePageChange"
-        />
-      </div>
-    </div>
+          @sort="handleTableSort"
+        >
+          <Column
+            selection-mode="multiple"
+            header-style="width: 3.5rem"
+            :body-style="{ width: '3.5rem' }"
+          />
 
-    <div
-      class="min-w-0 overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0 shadow-[0_4px_20px_-2px_rgba(45,64,89,0.02),_0_2px_6px_-1px_rgba(45,64,89,0.01)]"
-    >
-      <DataTable
-        :value="sortedUsers"
-        :loading="loading"
-        data-key="id"
-        row-hover
-        class="overflow-hidden rounded-b-[20px]"
-        :pt="adminDenseDataTablePt"
-      >
-        <Column header="用户" :style="{ minWidth: '240px' }">
-          <template #body="{ data: user }">
-            <div class="flex min-w-0 items-center gap-3">
-              <div class="relative shrink-0">
-                <Avatar v-if="user.avatar" :image="user.avatar" shape="circle" class="!h-9 !w-9" />
-                <Avatar
-                  v-else
-                  :label="getUserInitial(user)"
-                  shape="circle"
-                  class="!h-9 !w-9 !bg-admin-surface-muted !font-bold !text-admin-accent"
-                />
-                <span
-                  class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
-                  :class="user.status === 1 ? 'bg-admin-success' : 'bg-admin-danger'"
-                />
-              </div>
-              <div class="min-w-0">
-                <div class="truncate text-admin-content font-bold text-admin-text-1">
-                  {{ user.username }}
+          <Column field="username" header="用户" sortable :style="{ minWidth: '280px' }">
+            <template #body="{ data: user }">
+              <div class="flex min-w-0 items-center gap-3">
+                <div class="relative shrink-0">
+                  <Avatar
+                    v-if="user.avatar"
+                    :image="user.avatar"
+                    shape="circle"
+                    class="!h-10 !w-10"
+                  />
+                  <Avatar
+                    v-else
+                    :label="getUserInitial(user)"
+                    shape="circle"
+                    class="!h-10 !w-10 !bg-admin-surface-muted !font-bold !text-admin-accent"
+                  />
+                  <span
+                    class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
+                    :class="user.status === 1 ? 'bg-admin-success' : 'bg-admin-danger'"
+                  />
                 </div>
-                <div class="truncate font-mono text-admin-caption text-admin-text-3">
-                  ID: {{ user.uid }}
+                <div class="min-w-0">
+                  <div class="truncate text-admin-content font-bold text-admin-text-1">
+                    {{ user.username }}
+                  </div>
+                  <div class="mt-0.5 truncate font-mono text-admin-caption text-admin-text-3">
+                    {{ user.uid }}
+                  </div>
                 </div>
               </div>
+            </template>
+          </Column>
+
+          <Column field="role" header="角色" sortable :style="{ width: '124px' }">
+            <template #body="{ data: user }">
+              <Tag
+                :value="user.role === 'admin' ? 'Admin' : 'User'"
+                :severity="user.role === 'admin' ? 'danger' : 'secondary'"
+                rounded
+              />
+            </template>
+          </Column>
+
+          <Column header="认证 ID" :style="{ minWidth: '180px' }">
+            <template #body="{ data: user }">
+              <span
+                class="block max-w-[168px] truncate font-mono text-admin-caption text-admin-text-3"
+                :title="user.auth_user_id || '-'"
+              >
+                {{ user.auth_user_id || '-' }}
+              </span>
+            </template>
+          </Column>
+
+          <Column field="created_at" header="加入时间" sortable :style="{ width: '136px' }">
+            <template #body="{ data: user }">
+              <span class="text-admin-body text-admin-text-3">
+                {{ user.created_at ? formatDateOnly(user.created_at) : '-' }}
+              </span>
+            </template>
+          </Column>
+
+          <Column field="status" header="状态" sortable :style="{ width: '112px' }">
+            <template #body="{ data: user }">
+              <Tag
+                :value="user.status === 1 ? '正常' : '封禁'"
+                :severity="user.status === 1 ? 'success' : 'danger'"
+                rounded
+              />
+            </template>
+          </Column>
+
+          <Column header="" :style="{ width: '72px' }" :body-style="{ textAlign: 'right' }">
+            <template #body="{ data: user }">
+              <Button
+                text
+                rounded
+                class="!h-8 !w-8 !rounded-full border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center"
+                aria-haspopup="menu"
+                :aria-label="`${user.username} 操作菜单`"
+                @click="toggleUserActionMenu($event, user)"
+              >
+                <template #icon>
+                  <MoreHoriz class="size-4 text-admin-text-2" />
+                </template>
+              </Button>
+            </template>
+          </Column>
+
+          <template #empty>
+            <div class="py-8 text-center text-admin-body text-admin-text-3">
+              {{ emptyUserMessage }}
             </div>
           </template>
-        </Column>
-
-        <Column header="角色" :style="{ width: '112px' }">
-          <template #body="{ data: user }">
-            <Tag
-              :value="user.role === 'admin' ? 'Admin' : 'User'"
-              :severity="user.role === 'admin' ? 'danger' : 'secondary'"
-              rounded
-            />
-          </template>
-        </Column>
-
-        <Column header="状态" :style="{ width: '112px' }">
-          <template #body="{ data: user }">
-            <Tag
-              :value="user.status === 1 ? '正常' : '封禁'"
-              :severity="user.status === 1 ? 'success' : 'danger'"
-              rounded
-            />
-          </template>
-        </Column>
-
-        <Column header="加入时间" :style="{ width: '136px' }">
-          <template #body="{ data: user }">
-            <span class="text-admin-body text-admin-text-3">
-              {{ user.created_at ? formatDateOnly(user.created_at) : '-' }}
-            </span>
-          </template>
-        </Column>
-
-        <Column header="操作" :style="{ width: '72px' }" :body-style="{ textAlign: 'right' }">
-          <template #body="{ data: user }">
-            <Button
-              text
-              rounded
-              class="!h-8 !w-8 !rounded-full border border-admin-border bg-white hover:bg-admin-surface-muted transition-colors flex items-center justify-center"
-              aria-haspopup="menu"
-              :aria-label="`${user.username} 操作菜单`"
-              @click="toggleUserActionMenu($event, user)"
-            >
-              <template #icon>
-                <MoreHoriz class="size-4 text-admin-text-2" />
-              </template>
-            </Button>
-          </template>
-        </Column>
-
-        <template #empty>{{ emptyUserMessage }}</template>
-        <template #loading>正在加载用户...</template>
-      </DataTable>
-      <Menu ref="userActionMenuRef" :model="userActionMenuItems" popup />
-    </div>
+          <template #loading>正在加载用户...</template>
+        </DataTable>
+        <Menu ref="userActionMenuRef" :model="userActionMenuItems" popup />
+      </div>
+    </section>
   </div>
 
   <Dialog
@@ -367,7 +344,7 @@ import { authClient, extractBetterAuthErrorMessage } from '../../../../shared/au
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
+import DataTable, { type DataTableSortEvent } from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
@@ -375,11 +352,8 @@ import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
-import Paginator from 'primevue/paginator'
-import type { PageState } from 'primevue/paginator'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
-import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
@@ -388,7 +362,6 @@ import type { User } from '../../../../shared/types'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDateOnly } from '../../../../shared/utils/dateTime'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import {
   getListAdminUsersQueryKey,
   useListAdminUsers,
@@ -408,16 +381,10 @@ import {
   updateRateLimitSettings,
   updateRegistrationSetting,
 } from '../../shared/queries/adminActions'
-import { Filter, MoreHoriz, Refresh, Search, Settings, Xmark } from '@iconoir/vue'
+import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
+import { MoreHoriz, Refresh, Search, Settings, Xmark } from '@iconoir/vue'
 
 type UserActionKey = 'status' | 'revoke' | 'impersonate' | 'role' | 'delete'
-type UserSortKey = 'role' | 'status' | 'newest' | 'oldest'
-
-type UserSortOption = {
-  label: string
-  value: UserSortKey
-  disabled?: boolean
-}
 
 type UserActionItem = {
   key: UserActionKey
@@ -434,20 +401,35 @@ type PrimePopupMenu = PrimePopupPanel & {
   hide?: () => void
 }
 
+type UserTablePageEvent = {
+  page: number
+  rows: number
+}
+
+type UserTableSortMeta = {
+  field: string
+  order: 1 | -1
+}
+
 const appToast = useAppToast()
 const confirm = useConfirm()
 
 const queryClient = useQueryClient()
 const rateLimitPopoverRef = ref<PrimePopupPanel | null>(null)
-const filterPopoverRef = ref<PrimePopupPanel | null>(null)
 const userActionMenuRef = ref<PrimePopupMenu | null>(null)
 const activeActionUser = ref<User | null>(null)
+const selectedUsers = ref<User[]>([])
 
 const currentPage = ref(1)
 const pageSize = ref(10)
 const pageSizeOptions = [10, 20, 50]
 const searchKeyword = ref('')
 const appliedSearchKeyword = ref('')
+const userTableSortMeta = ref<UserTableSortMeta[]>([
+  { field: 'role', order: 1 },
+  { field: 'status', order: -1 },
+  { field: 'created_at', order: -1 },
+])
 
 const userQueryParams = computed(() => ({
   page: currentPage.value,
@@ -475,14 +457,15 @@ function clearSearch() {
   currentPage.value = 1
 }
 
-function toggleFilterPanel(event: Event) {
-  filterPopoverRef.value?.toggle(event)
-}
-
-function handlePageChange(event: PageState) {
+function handlePageChange(event: UserTablePageEvent) {
   currentPage.value = event.page + 1
   pageSize.value = event.rows
 }
+
+function handleTableSort(event: DataTableSortEvent) {
+  userTableSortMeta.value = normalizeUserTableSortMeta(event)
+}
+
 const registrationSettingQuery = useGetAdminRegistrationSetting()
 const rateLimitSettingsQuery = useGetAdminRateLimitSettings()
 
@@ -535,13 +518,12 @@ const updateRegistrationSettingMutation = useMutation({
 
 const users = computed<User[]>(() => usersQuery.data.value?.data?.list ?? [])
 const loading = computed(() => usersQuery.isLoading.value || usersQuery.isFetching.value)
-const currentSorts = ref<UserSortKey[]>(['role', 'status', 'newest'])
-const sortOptions = computed<UserSortOption[]>(() => [
-  { label: '管理员优先', value: 'role' },
-  { label: '正常状态优先', value: 'status' },
-  { label: '最新加入', value: 'newest', disabled: currentSorts.value.includes('oldest') },
-  { label: '最早加入', value: 'oldest', disabled: currentSorts.value.includes('newest') },
-])
+const sortedUsers = computed(() => {
+  const meta = userTableSortMeta.value
+  if (meta.length <= 0) return users.value
+
+  return [...users.value].sort((a, b) => compareUsersBySortMeta(a, b, meta))
+})
 const userActionMenuItems = computed<MenuItem[]>(() => {
   const user = activeActionUser.value
   if (!user) return []
@@ -681,33 +663,44 @@ function handleBanDialogVisibleUpdate(visible: boolean) {
   if (!visible) closeBanModal()
 }
 
-const sortedUsers = computed(() => {
-  const withSort = [...users.value]
-  withSort.sort((a, b) => {
-    if (currentSorts.value.includes('role')) {
-      const aRoleRank = a.role === 'admin' ? 0 : 1
-      const bRoleRank = b.role === 'admin' ? 0 : 1
-      if (aRoleRank !== bRoleRank) return aRoleRank - bRoleRank
-    }
+function normalizeUserTableSortMeta(event: DataTableSortEvent): UserTableSortMeta[] {
+  if (event.multiSortMeta?.length) {
+    return event.multiSortMeta
+      .filter((meta) => typeof meta.field === 'string' && (meta.order === 1 || meta.order === -1))
+      .map((meta) => ({
+        field: meta.field as string,
+        order: meta.order as 1 | -1,
+      }))
+  }
+  if (typeof event.sortField === 'string' && (event.sortOrder === 1 || event.sortOrder === -1)) {
+    return [{ field: event.sortField, order: event.sortOrder }]
+  }
+  return []
+}
 
-    if (currentSorts.value.includes('status') && a.status !== b.status) {
-      return b.status - a.status
-    }
+function compareUsersBySortMeta(a: User, b: User, meta: UserTableSortMeta[]) {
+  for (const sort of meta) {
+    const result = compareUserSortValue(
+      getUserSortValue(a, sort.field),
+      getUserSortValue(b, sort.field),
+    )
+    if (result !== 0) return result * sort.order
+  }
+  return b.id - a.id
+}
 
-    const aTime = new Date(a.created_at || 0).getTime()
-    const bTime = new Date(b.created_at || 0).getTime()
-    if (currentSorts.value.includes('newest') && aTime !== bTime) {
-      return bTime - aTime
-    }
-    if (currentSorts.value.includes('oldest') && aTime !== bTime) {
-      return aTime - bTime
-    }
+function getUserSortValue(user: User, field: string) {
+  if (field === 'created_at') return new Date(user.created_at || 0).getTime()
+  if (field === 'status') return Number(user.status || 0)
+  if (field === 'role') return user.role === 'admin' ? 0 : 1
+  if (field === 'username') return user.username || ''
+  return ''
+}
 
-    return b.id - a.id
-  })
-
-  return withSort
-})
+function compareUserSortValue(a: string | number, b: string | number) {
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  return String(a).localeCompare(String(b))
+}
 
 function loadUsers() {
   const nextKeyword = searchKeyword.value.trim()

@@ -233,7 +233,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		Params: string(paramsJSON),
 	}
 
-	resultJSON, err := c.callDrawingAPI(context.Background(), account, task)
+	output, err := c.callDrawingAPI(context.Background(), account, task)
 	if err != nil {
 		t.Fatalf("callDrawingAPI: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	}
 
 	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+	if err := json.Unmarshal([]byte(output.Result), &result); err != nil {
 		t.Fatalf("unmarshal result: %v", err)
 	}
 	imageURL, _ := result["image_url"].(string)

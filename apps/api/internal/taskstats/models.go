@@ -3,6 +3,7 @@ package taskstats
 type StatisticsRange string
 
 const (
+	StatisticsRange1D  StatisticsRange = "1d"
 	StatisticsRange7D  StatisticsRange = "7d"
 	StatisticsRange30D StatisticsRange = "30d"
 	StatisticsRange1Y  StatisticsRange = "1y"
@@ -14,7 +15,8 @@ type AdminStatisticsResponse struct {
 	ModelHealth  []AdminStatisticsModelHealth      `json:"model_health"`
 	QualityTrend []AdminStatisticsQualityTrendItem `json:"quality_trend"`
 	SlowModels   []AdminStatisticsSlowModel        `json:"slow_models"`
-	UserRisk     []AdminStatisticsUserRiskItem     `json:"user_risk"`
+	Bottlenecks  []AdminStatisticsBottleneckSource `json:"bottleneck_sources"`
+	Failures     []AdminStatisticsFailureCategory  `json:"failure_categories"`
 	Backfill     AdminStatisticsBackfillState      `json:"backfill_status,omitempty"`
 }
 
@@ -85,10 +87,17 @@ type AdminStatisticsSlowModel struct {
 	Samples    int64   `json:"samples"`
 }
 
-type AdminStatisticsUserRiskItem struct {
-	Name        string  `json:"name"`
-	Total       int64   `json:"total"`
-	Completed   int64   `json:"completed"`
-	Failed      int64   `json:"failed"`
-	FailureRate float64 `json:"failure_rate"`
+type AdminStatisticsBottleneckSource struct {
+	Source       string  `json:"source"`
+	Label        string  `json:"label"`
+	Total        int64   `json:"total"`
+	Failed       int64   `json:"failed"`
+	AvgLatencyMS float64 `json:"avg_latency_ms"`
+}
+
+type AdminStatisticsFailureCategory struct {
+	Category     string  `json:"category"`
+	Label        string  `json:"label"`
+	Total        int64   `json:"total"`
+	AvgLatencyMS float64 `json:"avg_latency_ms"`
 }

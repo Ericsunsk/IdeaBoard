@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/platform/mediarefs"
 	"ideaboard/api/internal/platform/safehttp"
 	"ideaboard/api/internal/storage"
+	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/workflow"
 	"image"
 	"image/color"
@@ -129,22 +130,38 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 	}
 	upstreamImage, err := loadImageFromRef(ctx, upstreamImageRef, timeout, redraw.allowHosts)
 	if err != nil {
-		return "", false, fmt.Errorf("local redraw 读取上游结果失败: feature=%s err=%w", redraw.featureSlug, err)
+		return "", false, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryFinalizeError,
+			fmt.Errorf("local redraw 读取上游结果失败: feature=%s err=%w", redraw.featureSlug, err),
+		)
 	}
 	roiWidth := redraw.roi.Dx()
 	roiHeight := redraw.roi.Dy()
 	if roiWidth <= 0 || roiHeight <= 0 {
-		return "", false, fmt.Errorf("local redraw 回贴 ROI 尺寸无效: feature=%s", redraw.featureSlug)
+		return "", false, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryFinalizeError,
+			fmt.Errorf("local redraw 回贴 ROI 尺寸无效: feature=%s", redraw.featureSlug),
+		)
 	}
 
 	upstreamScaled := scaleImageToNRGBA(upstreamImage, roiWidth, roiHeight)
 	composed, err := applyMaskedComposite(redraw.original, redraw.maskSampler, redraw.roi, upstreamScaled)
 	if err != nil {
-		return "", false, fmt.Errorf("local redraw 回贴失败: feature=%s err=%w", redraw.featureSlug, err)
+		return "", false, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryFinalizeError,
+			fmt.Errorf("local redraw 回贴失败: feature=%s err=%w", redraw.featureSlug, err),
+		)
 	}
 	composedBytes, err := encodeImagePNG(composed)
 	if err != nil {
-		return "", false, fmt.Errorf("local redraw 编码结果失败: feature=%s err=%w", redraw.featureSlug, err)
+		return "", false, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryFinalizeError,
+			fmt.Errorf("local redraw 编码结果失败: feature=%s err=%w", redraw.featureSlug, err),
+		)
 	}
 
 	if c.storageService == nil {
@@ -157,7 +174,11 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 	}
 	storedURL, err := c.storageService.StoreBytes(ctx, filename, composedBytes, storeOpts)
 	if err != nil {
-		return "", false, fmt.Errorf("local redraw 持久化失败: feature=%s err=%w", redraw.featureSlug, err)
+		return "", false, newExecutionFailureError(
+			tasks.ExecutionStageFinalizing,
+			tasks.FailureCategoryStorageError,
+			fmt.Errorf("local redraw 持久化失败: feature=%s err=%w", redraw.featureSlug, err),
+		)
 	}
 	return storedURL, true, nil
 }

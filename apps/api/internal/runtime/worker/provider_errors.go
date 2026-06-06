@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ideaboard/api/internal/tasks"
 	"net"
 	"net/http"
 )
@@ -32,12 +33,55 @@ func providerHTTPStatus(err error) (int, bool) {
 	return upstreamErr.statusCode, true
 }
 
+type executionFailureError struct {
+	stage    string
+	category string
+	err      error
+}
+
+func newExecutionFailureError(stage string, category string, err error) error {
+	return &executionFailureError{
+		stage:    stage,
+		category: category,
+		err:      err,
+	}
+}
+
+func (e *executionFailureError) Error() string {
+	if e == nil || e.err == nil {
+		return "task execution failed"
+	}
+	return e.err.Error()
+}
+
+func (e *executionFailureError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.err
+}
+
+func executionFailureDetails(err error) (string, string, bool) {
+	var failureErr *executionFailureError
+	if !errors.As(err, &failureErr) {
+		return "", "", false
+	}
+	return failureErr.stage, failureErr.category, true
+}
+
 func shouldFailoverProviderError(err error) bool {
 	if err == nil {
 		return false
 	}
 	if errors.Is(err, context.Canceled) {
 		return false
+	}
+	if _, category, ok := executionFailureDetails(err); ok {
+		switch category {
+		case tasks.FailureCategoryTimeout, tasks.FailureCategoryProviderError:
+		default:
+			return false
+		}
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return true
@@ -57,4 +101,25 @@ func shouldFailoverProviderError(err error) bool {
 
 	var networkErr net.Error
 	return errors.As(err, &networkErr)
+}
+
+func providerFailureCategory(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return tasks.FailureCategoryTimeout
+	}
+	if status, ok := providerHTTPStatus(err); ok {
+		switch status {
+		case http.StatusBadRequest, http.StatusUnprocessableEntity:
+			return tasks.FailureCategoryInputInvalid
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return tasks.FailureCategoryAuth
+		case http.StatusPaymentRequired:
+			return tasks.FailureCategoryQuota
+		case http.StatusRequestTimeout, http.StatusTooManyRequests:
+			return tasks.FailureCategoryTimeout
+		default:
+			return tasks.FailureCategoryProviderError
+		}
+	}
+	return tasks.FailureCategoryProviderError
 }

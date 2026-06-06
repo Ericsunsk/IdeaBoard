@@ -440,6 +440,155 @@ func (q *Queries) ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimi
 	return items, nil
 }
 
+const listTaskExecutionBottleneckStatsByCreatedRange = `-- name: ListTaskExecutionBottleneckStatsByCreatedRange :many
+SELECT COALESCE(NULLIF(m.bottleneck_source, ''), 'unknown')::text AS bottleneck_source,
+       COUNT(*)::bigint AS total,
+       COUNT(*) FILTER (WHERE t.status = 'failed')::bigint AS failed,
+       COALESCE(AVG(m.total_latency_ms), 0)::double precision AS avg_latency_ms
+FROM task_execution_metrics m
+JOIN tasks t ON t.task_id = m.task_id
+WHERE t.created_at >= $1 AND t.created_at < $2
+  AND t.status IN ('completed', 'failed')
+GROUP BY COALESCE(NULLIF(m.bottleneck_source, ''), 'unknown')
+ORDER BY total DESC, bottleneck_source ASC
+`
+
+type ListTaskExecutionBottleneckStatsByCreatedRangeParams struct {
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at"`
+}
+
+type ListTaskExecutionBottleneckStatsByCreatedRangeRow struct {
+	BottleneckSource string  `json:"bottleneck_source"`
+	Total            int64   `json:"total"`
+	Failed           int64   `json:"failed"`
+	AvgLatencyMs     float64 `json:"avg_latency_ms"`
+}
+
+func (q *Queries) ListTaskExecutionBottleneckStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionBottleneckStatsByCreatedRangeParams) ([]ListTaskExecutionBottleneckStatsByCreatedRangeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskExecutionBottleneckStatsByCreatedRange, arg.StartedAt, arg.EndedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTaskExecutionBottleneckStatsByCreatedRangeRow
+	for rows.Next() {
+		var i ListTaskExecutionBottleneckStatsByCreatedRangeRow
+		if err := rows.Scan(
+			&i.BottleneckSource,
+			&i.Total,
+			&i.Failed,
+			&i.AvgLatencyMs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaskExecutionFailureCategoryStatsByCreatedRange = `-- name: ListTaskExecutionFailureCategoryStatsByCreatedRange :many
+SELECT COALESCE(NULLIF(m.failure_category, ''), 'unknown')::text AS failure_category,
+       COUNT(*)::bigint AS total,
+       COALESCE(AVG(m.total_latency_ms), 0)::double precision AS avg_latency_ms
+FROM task_execution_metrics m
+JOIN tasks t ON t.task_id = m.task_id
+WHERE t.created_at >= $1 AND t.created_at < $2
+  AND t.status = 'failed'
+GROUP BY COALESCE(NULLIF(m.failure_category, ''), 'unknown')
+ORDER BY total DESC, failure_category ASC
+`
+
+type ListTaskExecutionFailureCategoryStatsByCreatedRangeParams struct {
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at"`
+}
+
+type ListTaskExecutionFailureCategoryStatsByCreatedRangeRow struct {
+	FailureCategory string  `json:"failure_category"`
+	Total           int64   `json:"total"`
+	AvgLatencyMs    float64 `json:"avg_latency_ms"`
+}
+
+func (q *Queries) ListTaskExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionFailureCategoryStatsByCreatedRangeParams) ([]ListTaskExecutionFailureCategoryStatsByCreatedRangeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskExecutionFailureCategoryStatsByCreatedRange, arg.StartedAt, arg.EndedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTaskExecutionFailureCategoryStatsByCreatedRangeRow
+	for rows.Next() {
+		var i ListTaskExecutionFailureCategoryStatsByCreatedRangeRow
+		if err := rows.Scan(&i.FailureCategory, &i.Total, &i.AvgLatencyMs); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaskExecutionMetricsByTaskIDs = `-- name: ListTaskExecutionMetricsByTaskIDs :many
+SELECT task_id, current_stage, bottleneck_source, failure_stage, failure_category,
+       assigned_at, provider_started_at, provider_finished_at, finalize_started_at, finalize_finished_at,
+       queue_wait_ms, worker_overhead_ms, provider_latency_ms, finalize_latency_ms, total_latency_ms,
+       created_at, updated_at
+FROM task_execution_metrics
+WHERE task_id = ANY($1::text[])
+`
+
+func (q *Queries) ListTaskExecutionMetricsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskExecutionMetric, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskExecutionMetricsByTaskIDs, pq.Array(taskIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TaskExecutionMetric
+	for rows.Next() {
+		var i TaskExecutionMetric
+		if err := rows.Scan(
+			&i.TaskID,
+			&i.CurrentStage,
+			&i.BottleneckSource,
+			&i.FailureStage,
+			&i.FailureCategory,
+			&i.AssignedAt,
+			&i.ProviderStartedAt,
+			&i.ProviderFinishedAt,
+			&i.FinalizeStartedAt,
+			&i.FinalizeFinishedAt,
+			&i.QueueWaitMs,
+			&i.WorkerOverheadMs,
+			&i.ProviderLatencyMs,
+			&i.FinalizeLatencyMs,
+			&i.TotalLatencyMs,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTaskIDsByAccountID = `-- name: ListTaskIDsByAccountID :many
 SELECT task_id
 FROM tasks
@@ -756,6 +905,85 @@ func (q *Queries) MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFaile
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const patchTaskExecutionMetrics = `-- name: PatchTaskExecutionMetrics :exec
+INSERT INTO task_execution_metrics (
+  task_id, current_stage, bottleneck_source, failure_stage, failure_category,
+  assigned_at, provider_started_at, provider_finished_at, finalize_started_at, finalize_finished_at,
+  queue_wait_ms, worker_overhead_ms, provider_latency_ms, finalize_latency_ms, total_latency_ms
+) VALUES (
+  $1,
+  COALESCE($2::text, 'queued'),
+  COALESCE($3::text, 'unknown'),
+  COALESCE($4::text, ''),
+  COALESCE($5::text, ''),
+  $6,
+  $7,
+  $8,
+  $9,
+  $10,
+  COALESCE($11::bigint, 0),
+  COALESCE($12::bigint, 0),
+  COALESCE($13::bigint, 0),
+  COALESCE($14::bigint, 0),
+  COALESCE($15::bigint, 0)
+)
+ON CONFLICT (task_id) DO UPDATE
+SET current_stage = COALESCE($2::text, task_execution_metrics.current_stage),
+    bottleneck_source = COALESCE($3::text, task_execution_metrics.bottleneck_source),
+    failure_stage = COALESCE($4::text, task_execution_metrics.failure_stage),
+    failure_category = COALESCE($5::text, task_execution_metrics.failure_category),
+    assigned_at = COALESCE($6, task_execution_metrics.assigned_at),
+    provider_started_at = COALESCE($7, task_execution_metrics.provider_started_at),
+    provider_finished_at = COALESCE($8, task_execution_metrics.provider_finished_at),
+    finalize_started_at = COALESCE($9, task_execution_metrics.finalize_started_at),
+    finalize_finished_at = COALESCE($10, task_execution_metrics.finalize_finished_at),
+    queue_wait_ms = COALESCE($11::bigint, task_execution_metrics.queue_wait_ms),
+    worker_overhead_ms = COALESCE($12::bigint, task_execution_metrics.worker_overhead_ms),
+    provider_latency_ms = COALESCE($13::bigint, task_execution_metrics.provider_latency_ms),
+    finalize_latency_ms = COALESCE($14::bigint, task_execution_metrics.finalize_latency_ms),
+    total_latency_ms = COALESCE($15::bigint, task_execution_metrics.total_latency_ms),
+    updated_at = now()
+`
+
+type PatchTaskExecutionMetricsParams struct {
+	TaskID             string         `json:"task_id"`
+	CurrentStage       sql.NullString `json:"current_stage"`
+	BottleneckSource   sql.NullString `json:"bottleneck_source"`
+	FailureStage       sql.NullString `json:"failure_stage"`
+	FailureCategory    sql.NullString `json:"failure_category"`
+	AssignedAt         sql.NullTime   `json:"assigned_at"`
+	ProviderStartedAt  sql.NullTime   `json:"provider_started_at"`
+	ProviderFinishedAt sql.NullTime   `json:"provider_finished_at"`
+	FinalizeStartedAt  sql.NullTime   `json:"finalize_started_at"`
+	FinalizeFinishedAt sql.NullTime   `json:"finalize_finished_at"`
+	QueueWaitMs        sql.NullInt64  `json:"queue_wait_ms"`
+	WorkerOverheadMs   sql.NullInt64  `json:"worker_overhead_ms"`
+	ProviderLatencyMs  sql.NullInt64  `json:"provider_latency_ms"`
+	FinalizeLatencyMs  sql.NullInt64  `json:"finalize_latency_ms"`
+	TotalLatencyMs     sql.NullInt64  `json:"total_latency_ms"`
+}
+
+func (q *Queries) PatchTaskExecutionMetrics(ctx context.Context, arg PatchTaskExecutionMetricsParams) error {
+	_, err := q.db.ExecContext(ctx, patchTaskExecutionMetrics,
+		arg.TaskID,
+		arg.CurrentStage,
+		arg.BottleneckSource,
+		arg.FailureStage,
+		arg.FailureCategory,
+		arg.AssignedAt,
+		arg.ProviderStartedAt,
+		arg.ProviderFinishedAt,
+		arg.FinalizeStartedAt,
+		arg.FinalizeFinishedAt,
+		arg.QueueWaitMs,
+		arg.WorkerOverheadMs,
+		arg.ProviderLatencyMs,
+		arg.FinalizeLatencyMs,
+		arg.TotalLatencyMs,
+	)
+	return err
 }
 
 const requeueTaskRunningWithLease = `-- name: RequeueTaskRunningWithLease :execrows

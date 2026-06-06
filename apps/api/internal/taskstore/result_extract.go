@@ -35,6 +35,10 @@ func extractTaskModel(rawResult string) string {
 	return extractTaskModelWithFallback(rawResult, "")
 }
 
+func ExtractTaskModelWithFallback(rawResult string, fallbackModelSet string) string {
+	return extractTaskModelWithFallback(rawResult, fallbackModelSet)
+}
+
 func extractTaskModelWithFallback(rawResult string, fallbackModelSet string) string {
 	result := parseResultMap(rawResult)
 	if result != nil {

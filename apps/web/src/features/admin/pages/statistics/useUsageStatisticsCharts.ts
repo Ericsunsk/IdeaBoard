@@ -1,14 +1,29 @@
 import { computed, type Ref } from 'vue'
 import {
+  adminChartLegend,
+  adminChartStrokeWidth,
   adminChartTheme,
+  defineAdminChartBubbleDatasetStyle,
+  defineAdminChartBubblePointStyle,
+  defineAdminChartCountScale,
   defineAdminChartData,
+  defineAdminChartDurationScale,
   defineAdminChartOptions,
+  defineAdminChartPercentScale,
+  defineAdminChartRadialCountScale,
+  getAdminChartBubbleHoverRadius,
+  getAdminChartBubbleRadius,
   getParsedY,
   type AdminChartData,
   type AdminChartOptions,
   type AdminTooltipItem,
   withAlpha,
 } from '../../shared/lib/adminChart'
+import {
+  buildAdminTimeRangeBuckets,
+  shouldShowAdminTimeRangeTick,
+} from '../../shared/lib/adminTimeRange'
+import type { AdminStatisticsRange } from '../../shared/queries/adminActions'
 
 type StatisticsLike = {
   summary?: {
@@ -19,6 +34,7 @@ type StatisticsLike = {
     yesterday_calls?: number
     yesterday_success?: number
     yesterday_failed?: number
+    this_month_calls?: number
   }
   trend?: Array<{
     date: string
@@ -48,19 +64,19 @@ type StatisticsLike = {
     p95_seconds: number
     samples: number
   }>
-  user_risk?: Array<{
-    name: string
+  bottleneck_sources?: Array<{
+    source: string
+    label: string
     total: number
-    completed: number
     failed: number
-    failure_rate: number
+    avg_latency_ms: number
   }>
-}
-type MonitorLike = {
-  global_queue_len: number
-  wait_queue_len: number
-  running_tasks: number
-  account_loads: Record<number, { current_concurrent: number; max_concurrent: number }>
+  failure_categories?: Array<{
+    category: string
+    label: string
+    total: number
+    avg_latency_ms: number
+  }>
 }
 
 type ModelRiskPoint = {
@@ -74,26 +90,13 @@ type ModelRiskPoint = {
 }
 
 type SlowModelPoint = {
-  value: number
+  x: number
+  y: number
+  r: number
   name: string
+  p95Seconds: number
   avgSeconds: number
   samples: number
-}
-
-type AccountLoadPoint = {
-  value: number
-  id: string
-  current: number
-  max: number
-}
-
-type UserRiskPoint = {
-  value: number
-  name: string
-  failed: number
-  completed: number
-  total: number
-  failureRate: number
 }
 
 const defaultModelColors = [
@@ -107,8 +110,9 @@ const defaultModelColors = [
 
 export function useUsageStatisticsCharts(options: {
   adminStatistics: Ref<StatisticsLike | null>
-  timeRange: Ref<string>
-  monitorData: Ref<MonitorLike | null>
+  qualityStatistics?: Ref<StatisticsLike | null>
+  timeRange: Ref<AdminStatisticsRange>
+  qualityTimeRange?: Ref<AdminStatisticsRange>
 }) {
   function getModelColorByName(name: string) {
     const key = normalizeModelName(name)
@@ -117,18 +121,15 @@ export function useUsageStatisticsCharts(options: {
   }
 
   const trendData = computed(() => {
-    const days = options.timeRange.value === '7d' ? 7 : options.timeRange.value === '30d' ? 30 : 365
-    const now = new Date()
     const trend = options.adminStatistics.value?.trend || []
     const trendMap = new Map(trend.map((day) => [day.date, day]))
-    const fallback = Array.from({ length: days }, (_, idx) => {
-      const d = new Date(now)
-      d.setDate(now.getDate() - (days - 1 - idx))
-      const date = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`
-      const label = `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}`
-      return trendMap.get(date) || { date, label, total: 0, segments: [] }
-    })
-    return fallback.map((day) => {
+    return buildAdminTimeRangeBuckets(options.timeRange.value).map((bucket) => {
+      const day = trendMap.get(bucket.date) || {
+        date: bucket.date,
+        label: bucket.label,
+        total: 0,
+        segments: [],
+      }
       const segments = day.segments.map((seg, idx) => {
         const color = getModelColorByName(seg.label)
         return {
@@ -139,11 +140,9 @@ export function useUsageStatisticsCharts(options: {
       })
       if (segments.length === 0)
         segments.push({ label: '无数据', value: 0, color: adminChartTheme.emptyText })
-      return { date: day.label || day.date, total: day.total, segments }
+      return { date: day.label || bucket.label, total: day.total, segments }
     })
   })
-
-  const totalCallsInRange = computed(() => trendData.value.reduce((sum, d) => sum + d.total, 0))
 
   const trendSeriesModelOrder = computed(() => {
     const byModel = new Map<string, { color: string; total: number }>()
@@ -166,17 +165,26 @@ export function useUsageStatisticsCharts(options: {
   })
 
   function shouldShowTrendLabel(index: number) {
-    const count = trendData.value.length
-    if (count <= 7) return true
-    if (options.timeRange.value === '30d')
-      return index === 0 || index === count - 1 || index % 6 === 0
-    if (options.timeRange.value === '1y') {
-      if (index === 0 || index === count - 1) return true
-      const day = trendData.value[index]
-      if (!day) return false
-      return isMonthStartLabel(day.date)
+    return shouldShowAdminTimeRangeTick({
+      index,
+      count: trendData.value.length,
+      range: options.timeRange.value,
+      label: trendData.value[index]?.date,
+    })
+  }
+
+  function getUsageTrendTooltipPoint(context: AdminTooltipItem | undefined) {
+    if (!context) return null
+    const label = context.dataset.label || ''
+    const day = trendData.value[context.dataIndex]
+    if (!day) return null
+    const segment = day.segments.find((seg) => seg.label === label)
+    const value = segment?.value || 0
+    const total = Math.max(0, day.total || 0)
+    return {
+      value,
+      total,
     }
-    return true
   }
 
   const trendChartData = computed<AdminChartData>(() =>
@@ -193,7 +201,7 @@ export function useUsageStatisticsCharts(options: {
         backgroundColor: withAlpha(model.color, 0.16),
         fill: true,
         tension: 0.38,
-        borderWidth: 2,
+        borderWidth: adminChartStrokeWidth,
         pointRadius: trendData.value.length <= 1 ? 3 : 0,
         pointHoverRadius: 4,
         pointBackgroundColor: model.color,
@@ -211,8 +219,16 @@ export function useUsageStatisticsCharts(options: {
         tooltip: {
           ...baseTooltipOptions(),
           callbacks: {
-            label: (context) =>
-              `${context.dataset.label || '调用'}: ${getParsedY(context).toLocaleString()}`,
+            label: (context) => {
+              const point = getUsageTrendTooltipPoint(context)
+              if (!point) return `${context.dataset.label || '调用'}: 0`
+              return `${context.dataset.label || '调用'}: ${point.value.toLocaleString()}`
+            },
+            afterBody: (items) => {
+              const point = getUsageTrendTooltipPoint(items[0])
+              if (!point) return []
+              return [`总调用: ${point.total.toLocaleString()} 次`]
+            },
           },
         },
       },
@@ -230,15 +246,12 @@ export function useUsageStatisticsCharts(options: {
           border: { color: adminChartTheme.axisLine },
         },
         y: {
-          stacked: true,
-          beginAtZero: true,
-          ticks: {
-            color: adminChartTheme.axisText,
-            precision: 0,
-            callback: (value) => Math.round(Number(value)).toString(),
-          },
-          grid: { color: adminChartTheme.splitLine },
-          border: { display: false },
+          ...defineAdminChartCountScale({
+            values: trendData.value.map((day) => day.total),
+            min: 10,
+            headroom: 1.15,
+            stacked: true,
+          }),
         },
       },
     }),
@@ -247,6 +260,7 @@ export function useUsageStatisticsCharts(options: {
   const todayCalls = computed(() => options.adminStatistics.value?.summary?.today_calls || 0)
   const todaySuccess = computed(() => options.adminStatistics.value?.summary?.today_success || 0)
   const todayFailed = computed(() => options.adminStatistics.value?.summary?.today_failed || 0)
+  const monthCalls = computed(() => options.adminStatistics.value?.summary?.this_month_calls || 0)
   const yesterdayCalls = computed(
     () => options.adminStatistics.value?.summary?.yesterday_calls || 0,
   )
@@ -277,22 +291,32 @@ export function useUsageStatisticsCharts(options: {
       todayAttemptedCalls.value === 0 ? 0 : todaySuccess.value / todayAttemptedCalls.value
     return `${formatSignedPercentPoint((currentRate - yesterdayRate) * 100)} 较昨日`
   })
+  const monthCallsFoot = computed(() => {
+    const totalCalls = options.adminStatistics.value?.summary?.total_calls || 0
+    if (totalCalls <= 0) return '累计无调用'
+    return `占总调用 ${formatPercentValue(monthCalls.value, totalCalls)}`
+  })
 
   const modelRiskRows = computed(() =>
     (options.adminStatistics.value?.model_health || [])
       .filter((item) => item.total > 0)
-      .slice(0, 12)
-      .map((item) => ({
+      .map((item, idx) => ({
         name: item.name === 'Unknown' ? '未识别模型' : item.name,
         total: item.total,
         failed: item.failed,
         failureRate: Math.max(0, Math.min(100, item.failure_rate || 0)),
         avgSeconds: Math.max(0, item.avg_seconds || 0),
-      })),
+        color:
+          getModelColorByName(item.name) ||
+          defaultModelColors[idx % defaultModelColors.length] ||
+          adminChartTheme.brand,
+      }))
+      .slice(0, 12),
   )
 
   const modelRiskChartData = computed<AdminChartData>(() => {
     const maxTotal = Math.max(1, ...modelRiskRows.value.map((item) => item.total))
+    const colors = modelRiskRows.value.map((item) => item.color)
     const points = modelRiskRows.value.map<ModelRiskPoint>((item) => ({
       x: item.avgSeconds,
       y: item.failureRate,
@@ -309,13 +333,13 @@ export function useUsageStatisticsCharts(options: {
           type: 'scatter',
           label: '模型风险',
           data: points,
-          pointRadius: modelRiskRows.value.map((item) => 7 + Math.sqrt(item.total / maxTotal) * 18),
-          pointHoverRadius: modelRiskRows.value.map(
-            (item) => 9 + Math.sqrt(item.total / maxTotal) * 20,
+          pointRadius: modelRiskRows.value.map((item) =>
+            getAdminChartBubbleRadius(item.total, maxTotal),
           ),
-          pointBackgroundColor: modelRiskRows.value.map((item) => riskColor(item.failureRate)),
-          pointBorderColor: adminChartTheme.cardBg,
-          pointBorderWidth: 1,
+          pointHoverRadius: modelRiskRows.value.map((item) =>
+            getAdminChartBubbleHoverRadius(item.total, maxTotal),
+          ),
+          ...defineAdminChartBubblePointStyle(colors),
         },
       ],
     })
@@ -350,64 +374,70 @@ export function useUsageStatisticsCharts(options: {
       },
       scales: {
         x: {
-          beginAtZero: true,
-          title: { display: true, text: '平均耗时', color: adminChartTheme.axisText },
-          ticks: {
-            color: adminChartTheme.axisText,
-            callback: (value) => `${Number(value).toFixed(1)}s`,
-          },
-          grid: { color: adminChartTheme.splitLine },
-          border: { display: false },
+          ...defineAdminChartDurationScale({
+            values: modelRiskRows.value.map((row) => row.avgSeconds),
+            min: 1,
+            headroom: 1.15,
+          }),
         },
         y: {
-          beginAtZero: true,
-          max: 100,
-          title: { display: true, text: '失败率', color: adminChartTheme.axisText },
-          ticks: {
-            color: adminChartTheme.axisText,
-            callback: (value) => `${Number(value)}%`,
-          },
-          grid: { color: adminChartTheme.splitLine },
-          border: { display: false },
+          ...defineAdminChartPercentScale(),
         },
       },
     }),
   )
 
-  const qualityTrendRows = computed(() =>
-    (options.adminStatistics.value?.quality_trend || []).map((item) => ({
-      label: item.label || item.date,
-      total: Math.max(0, Number(item.total) || 0),
-      success: Math.max(0, Number(item.success) || 0),
-      fail: Math.max(0, Number(item.fail) || 0),
-      successRate: normalizePercent(item.success_rate),
-    })),
-  )
+  const qualityTrendRange = computed(() => options.qualityTimeRange?.value ?? options.timeRange.value)
+  const qualityTrendRows = computed(() => {
+    const trend = (options.qualityStatistics?.value ?? options.adminStatistics.value)?.quality_trend || []
+    const trendMap = new Map(trend.map((item) => [item.date, item]))
+
+    return buildAdminTimeRangeBuckets(qualityTrendRange.value).map((bucket) => {
+      const item = trendMap.get(bucket.date)
+      const total = Math.max(0, Number(item?.total) || 0)
+      const success = Math.max(0, Number(item?.success) || 0)
+      const fail = Math.max(0, Number(item?.fail) || 0)
+
+      return {
+        label: item?.label || bucket.label,
+        total,
+        success,
+        fail,
+        successRate: normalizePercent(item?.success_rate || 0),
+        failureRate: total > 0 ? normalizePercent((fail / total) * 100) : 0,
+      }
+    })
+  })
 
   const qualityTrendChartData = computed<AdminChartData>(() =>
     defineAdminChartData({
       labels: qualityTrendRows.value.map((item) => item.label),
       datasets: [
         {
-          type: 'bar',
-          label: '失败',
-          data: qualityTrendRows.value.map((item) => item.fail),
-          backgroundColor: withAlpha(adminChartTheme.danger, 0.82),
-          borderRadius: 4,
-          maxBarThickness: 18,
+          type: 'line',
+          label: '成功率',
+          data: qualityTrendRows.value.map((item) => item.successRate),
+          borderColor: adminChartTheme.success,
+          backgroundColor: withAlpha(adminChartTheme.success, 0.12),
+          borderWidth: adminChartStrokeWidth,
+          fill: true,
+          tension: 0.36,
+          pointRadius: 2.5,
+          pointHoverRadius: 5,
           yAxisID: 'y',
         },
         {
           type: 'line',
-          label: '成功率',
-          data: qualityTrendRows.value.map((item) => item.successRate),
-          borderColor: adminChartTheme.brand,
-          backgroundColor: adminChartTheme.brand,
-          borderWidth: 2,
+          label: '失败率',
+          data: qualityTrendRows.value.map((item) => item.failureRate),
+          borderColor: adminChartTheme.danger,
+          backgroundColor: withAlpha(adminChartTheme.danger, 0.08),
+          borderWidth: adminChartStrokeWidth,
+          fill: true,
           tension: 0.36,
-          pointRadius: 3,
+          pointRadius: 2.5,
           pointHoverRadius: 5,
-          yAxisID: 'yRate',
+          yAxisID: 'y',
         },
       ],
     }),
@@ -425,7 +455,7 @@ export function useUsageStatisticsCharts(options: {
             label: (context) => {
               const label = context.dataset.label || ''
               const value = getParsedY(context)
-              return label === '成功率' ? `${label}: ${value.toFixed(1)}%` : `${label}: ${value}`
+              return `${label}: ${value.toFixed(1)}%`
             },
             afterBody: (items) => {
               const index = items[0]?.dataIndex ?? -1
@@ -434,6 +464,7 @@ export function useUsageStatisticsCharts(options: {
               return [
                 `总调用: ${row.total.toLocaleString()}`,
                 `成功: ${row.success.toLocaleString()}`,
+                `失败: ${row.fail.toLocaleString()}`,
               ]
             },
           },
@@ -446,7 +477,12 @@ export function useUsageStatisticsCharts(options: {
             maxRotation: 0,
             autoSkip: false,
             callback: (_value, index) =>
-              shouldShowAxisLabel(index, qualityTrendRows.value.length, options.timeRange.value)
+              shouldShowAdminTimeRangeTick({
+                index,
+                count: qualityTrendRows.value.length,
+                range: qualityTrendRange.value,
+                label: qualityTrendRows.value[index]?.label,
+              })
                 ? qualityTrendRows.value[index]?.label || ''
                 : '',
           },
@@ -454,21 +490,7 @@ export function useUsageStatisticsCharts(options: {
           border: { color: adminChartTheme.axisLine },
         },
         y: {
-          beginAtZero: true,
-          ticks: { color: adminChartTheme.axisText, precision: 0 },
-          grid: { color: adminChartTheme.splitLine },
-          border: { display: false },
-        },
-        yRate: {
-          beginAtZero: true,
-          max: 100,
-          position: 'right',
-          ticks: {
-            color: adminChartTheme.axisText,
-            callback: (value) => `${Number(value)}%`,
-          },
-          grid: { display: false },
-          border: { display: false },
+          ...defineAdminChartPercentScale(),
         },
       },
     }),
@@ -496,174 +518,201 @@ export function useUsageStatisticsCharts(options: {
       .slice(0, 6),
   )
 
-  const slowModelsChartData = computed<AdminChartData>(() =>
-    defineAdminChartData({
-      labels: slowModelRows.value.map((row) => truncateLabel(row.name, 18)),
+  const slowModelsChartData = computed<AdminChartData>(() => {
+    const maxSamples = Math.max(1, ...slowModelRows.value.map((row) => row.samples))
+    const colors = slowModelRows.value.map((row) => row.color)
+
+    return defineAdminChartData({
+      labels: slowModelRows.value.map((row) => row.name),
       datasets: [
         {
-          type: 'bar',
-          label: 'P95',
+          type: 'bubble',
+          label: '模型尾延迟',
           data: slowModelRows.value.map<SlowModelPoint>((row) => ({
-            value: row.p95Seconds,
+            x: row.p95Seconds,
+            y: row.avgSeconds,
+            r: getAdminChartBubbleRadius(row.samples, maxSamples),
             name: row.name,
+            p95Seconds: row.p95Seconds,
             avgSeconds: row.avgSeconds,
             samples: row.samples,
           })),
-          parsing: { xAxisKey: 'value' },
-          backgroundColor: slowModelRows.value.map((row) => row.color),
-          borderRadius: 5,
-          barThickness: 8,
+          ...defineAdminChartBubbleDatasetStyle(colors),
         },
       ],
-    }),
-  )
+    })
+  })
 
   const slowModelsChartOptions = computed<AdminChartOptions>(() =>
-    horizontalBarOptions({
-      tooltipTitle: (context) => getSlowModelPoint(context)?.name || '',
-      tooltipLines: (context) => {
-        const point = getSlowModelPoint(context)
-        if (!point) return []
-        return [
-          `P95: ${point.value.toFixed(2)}s`,
-          `平均: ${point.avgSeconds.toFixed(2)}s`,
-          `样本: ${point.samples.toLocaleString()}`,
-        ]
-      },
-      xTick: (value) => `${Number(value).toFixed(1)}s`,
-    }),
-  )
-
-  const monitorQueueTotal = computed(
-    () =>
-      (options.monitorData.value?.global_queue_len || 0) +
-      (options.monitorData.value?.wait_queue_len || 0),
-  )
-  const monitorRunningTotal = computed(() => options.monitorData.value?.running_tasks || 0)
-  const queuePressurePercent = computed(() => {
-    const pending = monitorQueueTotal.value
-    const running = monitorRunningTotal.value
-    const total = pending + running
-    if (total === 0) return 0
-    return Math.round((pending / total) * 100)
-  })
-  const queuePressure = computed(() => `${queuePressurePercent.value}%`)
-  const queuePressureFoot = computed(
-    () => `排队 ${monitorQueueTotal.value} / 执行 ${monitorRunningTotal.value}`,
-  )
-
-  const accountLoadRows = computed(() => {
-    const loads = options.monitorData.value?.account_loads || {}
-    return Object.entries(loads)
-      .map(([id, val]) => {
-        const current = val.current_concurrent || 0
-        const max = Math.max(1, val.max_concurrent || 0)
-        const percent = Math.min(100, Math.round((current / max) * 100))
-        return { id, current, max, percent, color: riskColor(percent, { warning: 70, danger: 90 }) }
-      })
-      .sort((a, b) => b.percent - a.percent)
-      .slice(0, 5)
-  })
-
-  const peakAccountLoad = computed(() => accountLoadRows.value[0] || null)
-  const peakAccountLoadPercent = computed(() => peakAccountLoad.value?.percent || 0)
-
-  const accountLoadChartData = computed<AdminChartData>(() =>
-    defineAdminChartData({
-      labels: accountLoadRows.value.map((item) => `#${item.id}`),
-      datasets: [
-        {
-          type: 'bar',
-          label: '并发负载',
-          data: accountLoadRows.value.map<AccountLoadPoint>((item) => ({
-            value: item.percent,
-            id: item.id,
-            current: item.current,
-            max: item.max,
-          })),
-          parsing: { xAxisKey: 'value' },
-          backgroundColor: accountLoadRows.value.map((item) => item.color),
-          borderRadius: 6,
-          barThickness: 10,
+    defineAdminChartOptions({
+      ...baseChartOptions(),
+      layout: { padding: { top: 10, right: 18 } },
+      plugins: {
+        ...baseChartOptions().plugins,
+        legend: { display: false },
+        tooltip: {
+          ...baseTooltipOptions(),
+          callbacks: {
+            title: (items) => getSlowModelPoint(items[0])?.name || '',
+            label: (context) => {
+              const point = getSlowModelPoint(context)
+              if (!point) return []
+              return [
+                `P95: ${point.p95Seconds.toFixed(2)}s`,
+                `平均: ${point.avgSeconds.toFixed(2)}s`,
+                `样本: ${point.samples.toLocaleString()}`,
+              ]
+            },
+          },
         },
-      ],
+      },
+      scales: {
+        x: {
+          ...defineAdminChartDurationScale({
+            values: slowModelRows.value.map((row) => row.p95Seconds),
+            min: 1,
+            headroom: 1.15,
+            borderColor: adminChartTheme.axisLine,
+          }),
+        },
+        y: {
+          ...defineAdminChartDurationScale({
+            values: slowModelRows.value.map((row) => row.avgSeconds),
+            min: 1,
+            headroom: 1.15,
+          }),
+        },
+      },
     }),
   )
 
-  const accountLoadChartOptions = computed<AdminChartOptions>(() =>
-    horizontalBarOptions({
-      tooltipTitle: (context) => {
-        const point = getAccountLoadPoint(context)
-        return point ? `#${point.id}` : ''
-      },
-      tooltipLines: (context) => {
-        const point = getAccountLoadPoint(context)
-        if (!point) return []
-        return [`并发: ${point.current}/${point.max}`, `负载: ${point.value}%`]
-      },
-      xTick: (value) => `${Number(value)}%`,
-      max: 100,
-    }),
-  )
-
-  const userRiskRows = computed(() =>
-    (options.adminStatistics.value?.user_risk || [])
-      .map((item) => ({
-        name: item.name || '未知用户',
+  const bottleneckSourceRows = computed(() =>
+    (options.adminStatistics.value?.bottleneck_sources || [])
+      .map((item, idx) => ({
+        source: item.source || 'unknown',
+        label: item.label || bottleneckSourceFallbackLabel(item.source),
         total: Math.max(0, Number(item.total) || 0),
-        completed: Math.max(0, Number(item.completed) || 0),
         failed: Math.max(0, Number(item.failed) || 0),
-        failureRate: normalizePercent(item.failure_rate),
+        avgLatencyMS: Math.max(0, Number(item.avg_latency_ms) || 0),
+        color: bottleneckSourceColor(item.source, idx),
       }))
-      .sort((a, b) => b.failed - a.failed)
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total)
       .slice(0, 6),
   )
 
-  const userRiskChartData = computed<AdminChartData>(() =>
+  const bottleneckSourceChartData = computed<AdminChartData>(() =>
     defineAdminChartData({
-      labels: userRiskRows.value.map((item) => truncateLabel(item.name, 16)),
+      labels: bottleneckSourceRows.value.map((item) => item.label),
       datasets: [
         {
-          type: 'bar',
-          label: '失败',
-          data: userRiskRows.value.map<UserRiskPoint>((item) => ({
-            value: item.failed,
-            name: item.name,
-            failed: item.failed,
-            completed: item.completed,
-            total: item.total,
-            failureRate: item.failureRate,
-          })),
-          parsing: { xAxisKey: 'value' },
-          backgroundColor: userRiskRows.value.map((item) =>
-            riskColor(item.failureRate, { warning: 8, danger: 20 }),
-          ),
-          borderRadius: 5,
-          barThickness: 8,
+          type: 'doughnut',
+          label: '任务量',
+          data: bottleneckSourceRows.value.map((item) => item.total),
+          backgroundColor: bottleneckSourceRows.value.map((item) => item.color),
+          borderColor: '#ffffff',
+          borderWidth: adminChartStrokeWidth,
+          hoverOffset: 4,
         },
       ],
     }),
   )
 
-  const userRiskChartOptions = computed<AdminChartOptions>(() =>
-    horizontalBarOptions({
-      tooltipTitle: (context) => getUserRiskPoint(context)?.name || '',
-      tooltipLines: (context) => {
-        const point = getUserRiskPoint(context)
-        if (!point) return []
-        return [
-          `失败: ${point.failed.toLocaleString()}`,
-          `成功: ${point.completed.toLocaleString()}`,
-          `总调用: ${point.total.toLocaleString()}`,
-          `失败率: ${point.failureRate.toFixed(1)}%`,
-        ]
+  const bottleneckSourceChartOptions = computed<AdminChartOptions>(() =>
+    defineAdminChartOptions({
+      ...baseChartOptions(),
+      cutout: '58%',
+      plugins: {
+        ...baseChartOptions().plugins,
+        legend: adminChartLegend('bottom'),
+        tooltip: {
+          ...baseTooltipOptions(),
+          callbacks: {
+            label: (context) => {
+              const point = bottleneckSourceRows.value[context.dataIndex]
+              if (!point) return ''
+              return [
+                `任务: ${point.total.toLocaleString()}`,
+                `失败: ${point.failed.toLocaleString()}`,
+                `平均耗时: ${(point.avgLatencyMS / 1000).toFixed(2)}s`,
+              ]
+            },
+          },
+        },
+      },
+    } as AdminChartOptions),
+  )
+
+  const failureCategoryRows = computed(() => {
+    const rows = (options.adminStatistics.value?.failure_categories || [])
+      .map((item, idx) => ({
+        category: item.category || 'unknown',
+        label: item.label || failureCategoryFallbackLabel(item.category),
+        total: Math.max(0, Number(item.total) || 0),
+        avgLatencyMS: Math.max(0, Number(item.avg_latency_ms) || 0),
+        color: failureCategoryColor(item.category, idx),
+      }))
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6)
+    const totalFailures = rows.reduce((sum, item) => sum + item.total, 0)
+    return rows.map((item) => ({
+      ...item,
+      sharePercent: totalFailures > 0 ? (item.total / totalFailures) * 100 : 0,
+    }))
+  })
+
+  const failureCategoryChartData = computed<AdminChartData>(() =>
+    defineAdminChartData({
+      labels: failureCategoryRows.value.map((item) => item.label),
+      datasets: [
+        {
+          type: 'polarArea',
+          label: '失败量',
+          data: failureCategoryRows.value.map((item) => item.total),
+          backgroundColor: failureCategoryRows.value.map((item) => withAlpha(item.color, 0.62)),
+          borderColor: failureCategoryRows.value.map((item) => item.color),
+          borderWidth: adminChartStrokeWidth,
+        },
+      ],
+    }),
+  )
+
+  const failureCategoryChartOptions = computed<AdminChartOptions>(() =>
+    defineAdminChartOptions({
+      ...baseChartOptions(),
+      plugins: {
+        ...baseChartOptions().plugins,
+        legend: adminChartLegend('bottom'),
+        tooltip: {
+          ...baseTooltipOptions(),
+          callbacks: {
+            label: (context) => {
+              const point = failureCategoryRows.value[context.dataIndex]
+              if (!point) return ''
+              return [
+                `失败: ${point.total.toLocaleString()}`,
+                `占比: ${point.sharePercent.toFixed(1)}%`,
+                `平均耗时: ${(point.avgLatencyMS / 1000).toFixed(2)}s`,
+              ]
+            },
+          },
+        },
+      },
+      scales: {
+        r: {
+          ...defineAdminChartRadialCountScale({
+            values: failureCategoryRows.value.map((row) => row.total),
+            min: 5,
+            headroom: 1.1,
+          }),
+        },
       },
     }),
   )
 
   return {
     trendData,
-    totalCallsInRange,
     trendChartData,
     trendChartOptions,
     todayCalls,
@@ -672,19 +721,18 @@ export function useUsageStatisticsCharts(options: {
     todayFailedFoot,
     todaySuccessRate,
     todaySuccessRateFoot,
-    queuePressure,
-    queuePressureFoot,
+    monthCalls,
+    monthCallsFoot,
     modelRiskChartData,
     modelRiskChartOptions,
     qualityTrendChartData,
     qualityTrendChartOptions,
     slowModelsChartData,
     slowModelsChartOptions,
-    accountLoadChartData,
-    accountLoadChartOptions,
-    peakAccountLoadPercent,
-    userRiskChartData,
-    userRiskChartOptions,
+    bottleneckSourceChartData,
+    bottleneckSourceChartOptions,
+    failureCategoryChartData,
+    failureCategoryChartOptions,
   }
 }
 
@@ -695,16 +743,7 @@ function baseChartOptions(): AdminChartOptions {
     resizeDelay: 80,
     animation: { duration: 260 },
     plugins: {
-      legend: {
-        position: 'top',
-        align: 'start',
-        labels: {
-          boxWidth: 10,
-          boxHeight: 6,
-          usePointStyle: true,
-          color: adminChartTheme.legendText,
-        },
-      },
+      legend: adminChartLegend(),
       tooltip: baseTooltipOptions(),
     },
   }
@@ -724,59 +763,12 @@ function baseTooltipOptions() {
   }
 }
 
-function horizontalBarOptions(config: {
-  tooltipTitle: (context: AdminTooltipItem) => string
-  tooltipLines: (context: AdminTooltipItem) => string[]
-  xTick?: (value: string | number) => string
-  max?: number
-}): AdminChartOptions {
-  return defineAdminChartOptions({
-    ...baseChartOptions(),
-    indexAxis: 'y',
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        ...baseTooltipOptions(),
-        callbacks: {
-          title: (items) => (items[0] ? config.tooltipTitle(items[0]) : ''),
-          label: (context) => config.tooltipLines(context),
-        },
-      },
-    },
-    scales: {
-      x: {
-        beginAtZero: true,
-        max: config.max,
-        ticks: {
-          color: adminChartTheme.axisText,
-          callback: (value) => (config.xTick ? config.xTick(value) : String(value)),
-        },
-        grid: { color: adminChartTheme.splitLine },
-        border: { display: false },
-      },
-      y: {
-        ticks: { color: adminChartTheme.axisText },
-        grid: { display: false },
-        border: { display: false },
-      },
-    },
-  })
-}
-
 function getModelRiskPoint(context: AdminTooltipItem | undefined) {
   return context?.raw as ModelRiskPoint | undefined
 }
 
 function getSlowModelPoint(context: AdminTooltipItem | undefined) {
   return context?.raw as SlowModelPoint | undefined
-}
-
-function getAccountLoadPoint(context: AdminTooltipItem | undefined) {
-  return context?.raw as AccountLoadPoint | undefined
-}
-
-function getUserRiskPoint(context: AdminTooltipItem | undefined) {
-  return context?.raw as UserRiskPoint | undefined
 }
 
 function normalizeModelName(name: string | null | undefined): string {
@@ -787,16 +779,6 @@ function colorForModel(name: string, palette: string[]) {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = (hash << 5) - hash + name.charCodeAt(i)
   return palette[Math.abs(hash) % palette.length]
-}
-
-function isMonthStartLabel(label: string): boolean {
-  const value = (label || '').trim()
-  if (!value) return false
-  const mmdd = /^(\d{2})\/(\d{2})$/.exec(value)
-  if (mmdd) return mmdd[2] === '01'
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  if (ymd) return ymd[3] === '01'
-  return false
 }
 
 function buildDeltaFoot(current: number, previous: number, label: string) {
@@ -812,26 +794,69 @@ function formatSignedPercentPoint(value: number) {
   return `${value > 0 ? '+' : '-'}${Math.abs(value).toFixed(1)}pp`
 }
 
+function formatPercentValue(value: number, total: number) {
+  if (total <= 0) return '0.0%'
+  return `${((value / total) * 100).toFixed(1)}%`
+}
+
 function normalizePercent(value: number): number {
   const parsed = Number(value) || 0
   const percent = parsed <= 1 ? parsed * 100 : parsed
   return Math.max(0, Math.min(100, percent))
 }
 
-function shouldShowAxisLabel(index: number, count: number, range: string) {
-  if (count <= 7) return true
-  if (range === '30d') return index === 0 || index === count - 1 || index % 6 === 0
-  if (range === '1y') return index === 0 || index === count - 1 || index % 30 === 0
-  return true
+function bottleneckSourceFallbackLabel(source: string | undefined) {
+  const labels: Record<string, string> = {
+    queue: '队列等待',
+    worker: 'Worker 调度',
+    provider: '上游模型',
+    storage: '存储链路',
+    finalize: '结果落库',
+    input: '输入校验',
+    unknown: '未知来源',
+  }
+  return labels[source || 'unknown'] || labels.unknown
 }
 
-function riskColor(value: number, thresholds = { warning: 5, danger: 20 }) {
-  if (value >= thresholds.danger) return adminChartTheme.danger
-  if (value >= thresholds.warning) return adminChartTheme.warning
-  return adminChartTheme.success
+function bottleneckSourceColor(source: string | undefined, index: number) {
+  const colors: Record<string, string> = {
+    queue: adminChartTheme.cyan,
+    worker: adminChartTheme.slate,
+    provider: adminChartTheme.brand,
+    storage: adminChartTheme.danger,
+    finalize: adminChartTheme.olive,
+    input: adminChartTheme.warning,
+    unknown: adminChartTheme.mist,
+  }
+  return colors[source || 'unknown'] || defaultModelColors[index % defaultModelColors.length]
 }
 
-function truncateLabel(value: string, maxLength: number) {
-  if (value.length <= maxLength) return value
-  return `${value.slice(0, maxLength - 1)}…`
+function failureCategoryFallbackLabel(category: string | undefined) {
+  const labels: Record<string, string> = {
+    input_invalid: '输入无效',
+    auth: '认证失败',
+    quota: '额度限制',
+    timeout: '执行超时',
+    provider_error: '上游错误',
+    storage_error: '存储错误',
+    finalize_error: '结果落库',
+    cancelled: '任务取消',
+    unknown: '未知错误',
+  }
+  return labels[category || 'unknown'] || labels.unknown
+}
+
+function failureCategoryColor(category: string | undefined, index: number) {
+  const colors: Record<string, string> = {
+    input_invalid: adminChartTheme.warning,
+    auth: adminChartTheme.mauve,
+    quota: adminChartTheme.olive,
+    timeout: adminChartTheme.danger,
+    provider_error: adminChartTheme.brand,
+    storage_error: adminChartTheme.cyan,
+    finalize_error: adminChartTheme.slate,
+    cancelled: adminChartTheme.mist,
+    unknown: adminChartTheme.emptyText,
+  }
+  return colors[category || 'unknown'] || defaultModelColors[index % defaultModelColors.length]
 }

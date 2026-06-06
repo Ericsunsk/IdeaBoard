@@ -69,6 +69,31 @@ CREATE INDEX idx_tasks_lease_token ON tasks (lease_token);
 CREATE INDEX idx_tasks_created_at ON tasks (created_at);
 CREATE INDEX idx_tasks_running_account ON tasks (account_id) WHERE status = 'running';
 
+CREATE TABLE task_execution_metrics (
+  task_id VARCHAR(64) PRIMARY KEY,
+  current_stage VARCHAR(32) NOT NULL DEFAULT 'queued',
+  bottleneck_source VARCHAR(32) NOT NULL DEFAULT 'unknown',
+  failure_stage VARCHAR(32) NOT NULL DEFAULT '',
+  failure_category VARCHAR(64) NOT NULL DEFAULT '',
+  assigned_at TIMESTAMPTZ(3),
+  provider_started_at TIMESTAMPTZ(3),
+  provider_finished_at TIMESTAMPTZ(3),
+  finalize_started_at TIMESTAMPTZ(3),
+  finalize_finished_at TIMESTAMPTZ(3),
+  queue_wait_ms BIGINT NOT NULL DEFAULT 0,
+  worker_overhead_ms BIGINT NOT NULL DEFAULT 0,
+  provider_latency_ms BIGINT NOT NULL DEFAULT 0,
+  finalize_latency_ms BIGINT NOT NULL DEFAULT 0,
+  total_latency_ms BIGINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT fk_task_execution_metrics_task_id FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_task_execution_metrics_current_stage ON task_execution_metrics (current_stage);
+CREATE INDEX idx_task_execution_metrics_bottleneck_source ON task_execution_metrics (bottleneck_source);
+CREATE INDEX idx_task_execution_metrics_failure_category ON task_execution_metrics (failure_category);
+
 CREATE TABLE task_cancellations (
   task_id VARCHAR(64) PRIMARY KEY,
   expires_at TIMESTAMPTZ(3) NOT NULL,

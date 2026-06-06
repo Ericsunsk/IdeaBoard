@@ -1,0 +1,72 @@
+package tasks
+
+import "time"
+
+const (
+	ExecutionStageQueued     = "queued"
+	ExecutionStageAssigned   = "assigned"
+	ExecutionStageProvider   = "provider"
+	ExecutionStageFinalizing = "finalizing"
+	ExecutionStageCompleted  = "completed"
+	ExecutionStageFailed     = "failed"
+)
+
+const (
+	BottleneckSourceQueue    = "queue"
+	BottleneckSourceWorker   = "worker"
+	BottleneckSourceProvider = "provider"
+	BottleneckSourceStorage  = "storage"
+	BottleneckSourceFinalize = "finalize"
+	BottleneckSourceInput    = "input"
+	BottleneckSourceUnknown  = "unknown"
+)
+
+const (
+	FailureCategoryInputInvalid  = "input_invalid"
+	FailureCategoryAuth          = "auth"
+	FailureCategoryQuota         = "quota"
+	FailureCategoryTimeout       = "timeout"
+	FailureCategoryProviderError = "provider_error"
+	FailureCategoryStorageError  = "storage_error"
+	FailureCategoryFinalizeError = "finalize_error"
+	FailureCategoryCancelled     = "cancelled"
+	FailureCategoryUnknown       = "unknown"
+)
+
+type TaskExecutionMetrics struct {
+	TaskID             string     `json:"task_id"`
+	CurrentStage       string     `json:"current_stage"`
+	BottleneckSource   string     `json:"bottleneck_source"`
+	FailureStage       string     `json:"failure_stage"`
+	FailureCategory    string     `json:"failure_category"`
+	AssignedAt         *time.Time `json:"assigned_at"`
+	ProviderStartedAt  *time.Time `json:"provider_started_at"`
+	ProviderFinishedAt *time.Time `json:"provider_finished_at"`
+	FinalizeStartedAt  *time.Time `json:"finalize_started_at"`
+	FinalizeFinishedAt *time.Time `json:"finalize_finished_at"`
+	QueueWaitMS        int64      `json:"queue_wait_ms"`
+	WorkerOverheadMS   int64      `json:"worker_overhead_ms"`
+	ProviderLatencyMS  int64      `json:"provider_latency_ms"`
+	FinalizeLatencyMS  int64      `json:"finalize_latency_ms"`
+	TotalLatencyMS     int64      `json:"total_latency_ms"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+type TaskExecutionMetricsPatch struct {
+	TaskID             string
+	CurrentStage       *string
+	BottleneckSource   *string
+	FailureStage       *string
+	FailureCategory    *string
+	AssignedAt         *time.Time
+	ProviderStartedAt  *time.Time
+	ProviderFinishedAt *time.Time
+	FinalizeStartedAt  *time.Time
+	FinalizeFinishedAt *time.Time
+	QueueWaitMS        *int64
+	WorkerOverheadMS   *int64
+	ProviderLatencyMS  *int64
+	FinalizeLatencyMS  *int64
+	TotalLatencyMS     *int64
+}

@@ -622,12 +622,12 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		Prompt: "prompt",
 		Params: `{"feature":"pattern-gen"}`,
 	}
-	resultJSON, err := c.callDrawingAPI(context.Background(), account, task)
+	output, err := c.callDrawingAPI(context.Background(), account, task)
 	if err != nil {
 		t.Fatalf("callDrawingAPI returned error: %v", err)
 	}
 	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+	if err := json.Unmarshal([]byte(output.Result), &result); err != nil {
 		t.Fatalf("unmarshal result: %v", err)
 	}
 	if result["model"] != "gpt-image-1" {

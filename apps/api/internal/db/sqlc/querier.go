@@ -82,6 +82,9 @@ type Querier interface {
 	ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimit int32) ([]ListRunningTasksMissingLeaseTokenRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
 	ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error)
+	ListTaskExecutionBottleneckStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionBottleneckStatsByCreatedRangeParams) ([]ListTaskExecutionBottleneckStatsByCreatedRangeRow, error)
+	ListTaskExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionFailureCategoryStatsByCreatedRangeParams) ([]ListTaskExecutionFailureCategoryStatsByCreatedRangeRow, error)
+	ListTaskExecutionMetricsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskExecutionMetric, error)
 	ListTaskIDsByAccountID(ctx context.Context, accountID int64) ([]string, error)
 	ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg ListTaskIDsByAccountIDAndStatusesParams) ([]string, error)
 	ListTaskStatisticsByCreatedRange(ctx context.Context, arg ListTaskStatisticsByCreatedRangeParams) ([]ListTaskStatisticsByCreatedRangeRow, error)
@@ -92,6 +95,7 @@ type Querier interface {
 	MarkDailyBackfillDone(ctx context.Context, statDate string) error
 	MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error)
 	MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFailedWithLeaseParams) (int64, error)
+	PatchTaskExecutionMetrics(ctx context.Context, arg PatchTaskExecutionMetricsParams) error
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
 	ResetAccountFailCount(ctx context.Context, id int64) error
 	ResetRunningMissingLeaseTasksByIDs(ctx context.Context, taskIds []string) (int64, error)

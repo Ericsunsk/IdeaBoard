@@ -82,3 +82,65 @@ export function useGetAdminMonitor<
 
   return query
 }
+
+export const getStreamAdminMonitorUrl = () => {
+  return `/admin/monitor/stream`
+}
+
+export const streamAdminMonitor = async (options?: RequestInit): Promise<string> => {
+  return orvalMutator<string>(getStreamAdminMonitorUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getStreamAdminMonitorQueryKey = () => {
+  return ['admin', 'monitor', 'stream'] as const
+}
+
+export const getStreamAdminMonitorQueryOptions = <
+  TData = Awaited<ReturnType<typeof streamAdminMonitor>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof streamAdminMonitor>>, TError, TData>>
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getStreamAdminMonitorQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof streamAdminMonitor>>> = ({ signal }) =>
+    streamAdminMonitor({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof streamAdminMonitor>>,
+    TError,
+    TData
+  >
+}
+
+export type StreamAdminMonitorQueryResult = NonNullable<
+  Awaited<ReturnType<typeof streamAdminMonitor>>
+>
+export type StreamAdminMonitorQueryError = ErrorType<unknown>
+
+export function useStreamAdminMonitor<
+  TData = Awaited<ReturnType<typeof streamAdminMonitor>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof streamAdminMonitor>>, TError, TData>>
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getStreamAdminMonitorQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}

@@ -11,6 +11,8 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AdminCardHeader: typeof import('./features/admin/shared/components/AdminCardHeader.vue')['default']
+    AdminChartPanel: typeof import('./features/admin/shared/components/AdminChartPanel.vue')['default']
     AuthModalCloseButton: typeof import('./features/auth/components/AuthModalCloseButton.vue')['default']
     BoardCard: typeof import('./features/boards/components/BoardCard.vue')['default']
     Card: typeof import('primevue/card')['default']
@@ -27,7 +29,6 @@ declare module 'vue' {
     ImageNode: typeof import('./features/workspace/components/nodes/ImageNode.vue')['default']
     ImageNodeStage: typeof import('./features/workspace/components/nodes/ImageNodeStage.vue')['default']
     LoginModal: typeof import('./features/auth/components/LoginModal.vue')['default']
-    Message: typeof import('primevue/message')['default']
     NButton: typeof import('naive-ui')['NButton']
     NConfigProvider: typeof import('naive-ui')['NConfigProvider']
     NForm: typeof import('naive-ui')['NForm']

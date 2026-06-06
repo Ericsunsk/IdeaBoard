@@ -74,9 +74,6 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	if stats.ModelHealth[1].Name != "model-a" || stats.ModelHealth[1].AvgSeconds != 14 {
 		t.Fatalf("model-a health should include avg latency, got %+v", stats.ModelHealth[1])
 	}
-	if len(stats.UserRisk) == 0 || stats.UserRisk[0].Name != "u2" || stats.UserRisk[0].Failed != 1 {
-		t.Fatalf("unexpected user risk ranking: %+v", stats.UserRisk)
-	}
 	foundSlowModel := false
 	for _, item := range stats.SlowModels {
 		if item.Name == "model-a" {
@@ -132,25 +129,107 @@ func TestGetStatisticsQualityTrendAggregatedByDate(t *testing.T) {
 	}
 }
 
-func TestGetStatisticsUserRiskRanksByFailureVolume(t *testing.T) {
+func TestGetStatisticsOneDayTrendUsesFourHourBuckets(t *testing.T) {
 	ctx := context.Background()
-	svc, _, db := newStatisticsTestService(t)
-	today := time.Now().Format("2006-01-02")
+	svc, taskRepo, _ := newStatisticsTestService(t)
+	loc := time.Now().Location()
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
-	seed := []taskDailyStatSeed{
-		{StatDate: today, ModelName: "m1", UserKey: "low-volume", Total: 1, Completed: 0, Failed: 1},
-		{StatDate: today, ModelName: "m1", UserKey: "high-volume", Total: 100, Completed: 50, Failed: 50},
+	seed := []struct {
+		id        string
+		status    string
+		model     string
+		createdAt time.Time
+	}{
+		{id: "bucket-00-completed", status: tasks.StatusCompleted, model: "model-a", createdAt: todayStart.Add(1 * time.Hour)},
+		{id: "bucket-04-failed", status: tasks.StatusFailed, model: "model-b", createdAt: todayStart.Add(5 * time.Hour)},
+		{id: "bucket-20-completed", status: tasks.StatusCompleted, model: "model-a", createdAt: todayStart.Add(21 * time.Hour)},
 	}
-	for i := range seed {
-		insertTaskDailyStat(t, db, seed[i])
+	for _, item := range seed {
+		completedAt := item.createdAt.Add(30 * time.Second)
+		if err := taskRepo.Create(ctx, &tasks.Task{
+			TaskID:      item.id,
+			UserID:      1,
+			ChannelID:   1,
+			AccountID:   1,
+			Status:      item.status,
+			Result:      `{"model":"` + item.model + `"}`,
+			CreatedAt:   item.createdAt,
+			CompletedAt: &completedAt,
+		}); err != nil {
+			t.Fatalf("seed task failed: %v", err)
+		}
+	}
+
+	stats, err := svc.GetStatistics(ctx, "1d")
+	if err != nil {
+		t.Fatalf("GetStatistics failed: %v", err)
+	}
+	if len(stats.QualityTrend) != 6 {
+		t.Fatalf("quality trend len=%d, want 6", len(stats.QualityTrend))
+	}
+	if stats.QualityTrend[0].Label != "00:00" || stats.QualityTrend[0].Total != 1 || stats.QualityTrend[0].Success != 1 {
+		t.Fatalf("00:00 bucket mismatch: %+v", stats.QualityTrend[0])
+	}
+	if stats.QualityTrend[1].Label != "04:00" || stats.QualityTrend[1].Total != 1 || stats.QualityTrend[1].Fail != 1 {
+		t.Fatalf("04:00 bucket mismatch: %+v", stats.QualityTrend[1])
+	}
+	if stats.QualityTrend[5].Label != "20:00" || stats.QualityTrend[5].Total != 1 || stats.QualityTrend[5].Success != 1 {
+		t.Fatalf("20:00 bucket mismatch: %+v", stats.QualityTrend[5])
+	}
+	if len(stats.Trend) != 6 || len(stats.Trend[0].Segments) != 1 || stats.Trend[0].Segments[0].Label != "model-a" {
+		t.Fatalf("trend model bucket mismatch: %+v", stats.Trend)
+	}
+}
+
+func TestGetStatisticsFailureCategoriesRankByFailureVolume(t *testing.T) {
+	ctx := context.Background()
+	svc, taskRepo, _ := newStatisticsTestService(t)
+	now := time.Now()
+	totalLatencyMS := int64(3000)
+	providerCategory := tasks.FailureCategoryProviderError
+	timeoutCategory := tasks.FailureCategoryTimeout
+
+	seed := []struct {
+		id       string
+		category string
+	}{
+		{id: "provider-1", category: providerCategory},
+		{id: "provider-2", category: providerCategory},
+		{id: "timeout-1", category: timeoutCategory},
+	}
+	for _, item := range seed {
+		if err := taskRepo.Create(ctx, &tasks.Task{
+			TaskID:    item.id,
+			UserID:    1,
+			ChannelID: 1,
+			Status:    tasks.StatusFailed,
+			CreatedAt: now,
+		}); err != nil {
+			t.Fatalf("seed failed task failed: %v", err)
+		}
+		if err := taskRepo.PatchExecutionMetrics(ctx, tasks.TaskExecutionMetricsPatch{
+			TaskID:          item.id,
+			FailureCategory: &item.category,
+			TotalLatencyMS:  &totalLatencyMS,
+		}); err != nil {
+			t.Fatalf("patch execution metrics failed: %v", err)
+		}
 	}
 
 	stats, err := svc.GetStatistics(ctx, "7d")
 	if err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
-	if len(stats.UserRisk) == 0 || stats.UserRisk[0].Name != "high-volume" {
-		t.Fatalf("user risk should prioritize failure volume, got %+v", stats.UserRisk)
+	if len(stats.Failures) < 2 {
+		t.Fatalf("expected failure category stats, got %+v", stats.Failures)
+	}
+	if stats.Failures[0].Category != providerCategory || stats.Failures[0].Total != 2 {
+		t.Fatalf("provider category should rank first by failures, got %+v", stats.Failures)
+	}
+	if stats.Failures[0].Label != "上游错误" {
+		t.Fatalf("provider category label mismatch: %+v", stats.Failures[0])
 	}
 }
 

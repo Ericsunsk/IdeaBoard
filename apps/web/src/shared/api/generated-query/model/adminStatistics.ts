@@ -5,12 +5,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdminStatisticsBackfillStatus } from './adminStatisticsBackfillStatus'
+import type { AdminStatisticsBottleneckSourcesItem } from './adminStatisticsBottleneckSourcesItem'
+import type { AdminStatisticsFailureCategoriesItem } from './adminStatisticsFailureCategoriesItem'
 import type { AdminStatisticsModelHealthItem } from './adminStatisticsModelHealthItem'
 import type { AdminStatisticsQualityTrendItem } from './adminStatisticsQualityTrendItem'
 import type { AdminStatisticsSlowModelsItem } from './adminStatisticsSlowModelsItem'
 import type { AdminStatisticsSummary } from './adminStatisticsSummary'
 import type { AdminStatisticsTrendItem } from './adminStatisticsTrendItem'
-import type { AdminStatisticsUserRiskItem } from './adminStatisticsUserRiskItem'
 
 export interface AdminStatistics {
   summary: AdminStatisticsSummary
@@ -18,6 +19,7 @@ export interface AdminStatistics {
   model_health: AdminStatisticsModelHealthItem[]
   quality_trend: AdminStatisticsQualityTrendItem[]
   slow_models: AdminStatisticsSlowModelsItem[]
-  user_risk: AdminStatisticsUserRiskItem[]
+  bottleneck_sources: AdminStatisticsBottleneckSourcesItem[]
+  failure_categories: AdminStatisticsFailureCategoriesItem[]
   backfill_status: AdminStatisticsBackfillStatus
 }

@@ -6,23 +6,24 @@ import (
 )
 
 type Task struct {
-	ID          int64        `json:"id"`
-	TaskID      string       `json:"task_id"`
-	UserID      int64        `json:"user_id"`
-	ChannelID   int64        `json:"channel_id"`
-	AccountID   int64        `json:"account_id"`
-	Prompt      string       `json:"prompt"`
-	UserPrompt  string       `json:"user_prompt"`
-	Params      string       `json:"params"`
-	Status      string       `json:"status"`
-	LeaseToken  string       `json:"lease_token"`
-	RetryCount  int          `json:"retry_count"`
-	ErrorMsg    string       `json:"error_msg"`
-	Result      string       `json:"result"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
-	CompletedAt *time.Time   `json:"completed_at"`
-	Outputs     []TaskOutput `json:"outputs,omitempty"`
+	ID               int64                 `json:"id"`
+	TaskID           string                `json:"task_id"`
+	UserID           int64                 `json:"user_id"`
+	ChannelID        int64                 `json:"channel_id"`
+	AccountID        int64                 `json:"account_id"`
+	Prompt           string                `json:"prompt"`
+	UserPrompt       string                `json:"user_prompt"`
+	Params           string                `json:"params"`
+	Status           string                `json:"status"`
+	LeaseToken       string                `json:"lease_token"`
+	RetryCount       int                   `json:"retry_count"`
+	ErrorMsg         string                `json:"error_msg"`
+	Result           string                `json:"result"`
+	CreatedAt        time.Time             `json:"created_at"`
+	UpdatedAt        time.Time             `json:"updated_at"`
+	CompletedAt      *time.Time            `json:"completed_at"`
+	Outputs          []TaskOutput          `json:"outputs,omitempty"`
+	ExecutionMetrics *TaskExecutionMetrics `json:"execution_metrics,omitempty"`
 }
 
 type TaskOutput struct {

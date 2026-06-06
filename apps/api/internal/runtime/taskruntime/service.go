@@ -44,6 +44,7 @@ type TaskStore interface {
 	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error)
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
+	PatchExecutionMetrics(ctx context.Context, patch tasks.TaskExecutionMetricsPatch) error
 }
 
 type Service struct {

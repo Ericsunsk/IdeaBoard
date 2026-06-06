@@ -36,45 +36,35 @@
       </Card>
       <Card>
         <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">队列压力</span>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">本月调用</span>
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ queuePressure }}
+            {{ monthCalls }}
           </span>
         </template>
-        <template #content>{{ queuePressureFoot }}</template>
+        <template #content>{{ monthCallsFoot }}</template>
       </Card>
     </div>
 
     <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
       <Card class="xl:col-span-12">
         <template #title>
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <span>调用量趋势</span>
-              <p class="mt-1 text-sm font-normal text-admin-text-3">
-                <span v-if="timeRange === '7d'">最近 7 天总计</span>
-                <span v-else-if="timeRange === '30d'">最近 30 天总计</span>
-                <span v-else>过去一年总计</span>
-                <span class="font-semibold text-admin-text-1">
-                  {{ totalCallsInRange.toLocaleString() }}
-                </span>
-                次
-              </p>
-            </div>
-            <SelectButton
-              v-model="timeRange"
-              :options="rangeOptions"
-              option-label="label"
-              option-value="key"
-              :allow-empty="false"
-              size="small"
-            />
-          </div>
+          <AdminCardHeader :title="usageCards.trend.title">
+            <template #actions>
+              <SelectButton
+                v-model="timeRange"
+                :options="rangeOptions"
+                option-label="label"
+                option-value="key"
+                :allow-empty="false"
+                size="small"
+              />
+            </template>
+          </AdminCardHeader>
         </template>
         <template #content>
-          <div class="h-[240px] min-w-0 md:h-[278px]">
+          <AdminChartPanel size="hero">
             <Chart
               v-if="isChartReady"
               type="line"
@@ -83,14 +73,16 @@
               :options="trendChartOptions"
               :plugins="adminChartPlugins"
             />
-          </div>
+          </AdminChartPanel>
         </template>
       </Card>
 
       <Card class="xl:col-span-7">
-        <template #title>模型风险矩阵</template>
+        <template #title>
+          <AdminCardHeader :title="usageCards.modelRisk.title" />
+        </template>
         <template #content>
-          <div class="h-[300px] min-w-0 md:h-[320px] xl:h-[360px]">
+          <AdminChartPanel>
             <Chart
               v-if="isChartReady"
               type="scatter"
@@ -99,78 +91,90 @@
               :options="modelRiskChartOptions"
               :plugins="adminChartPlugins"
             />
-          </div>
+          </AdminChartPanel>
         </template>
       </Card>
       <Card class="xl:col-span-5">
-        <template #title>服务质量趋势</template>
+        <template #title>
+          <AdminCardHeader :title="usageCards.qualityTrend.title">
+            <template #actions>
+              <SelectButton
+                v-model="qualityTimeRange"
+                :options="qualityRangeOptions"
+                option-label="label"
+                option-value="key"
+                :allow-empty="false"
+                size="small"
+              />
+            </template>
+          </AdminCardHeader>
+        </template>
         <template #content>
-          <div class="h-[240px] min-w-0 md:h-[300px] xl:h-[360px]">
+          <AdminChartPanel>
             <Chart
               v-if="isChartReady"
-              type="bar"
+              type="line"
               class="h-full w-full min-w-0"
               :data="qualityTrendChartData"
               :options="qualityTrendChartOptions"
               :plugins="adminChartPlugins"
             />
-          </div>
+          </AdminChartPanel>
         </template>
       </Card>
 
       <div class="grid grid-cols-1 gap-3.5 xl:col-span-12 xl:grid-cols-3">
         <Card>
-          <template #title>慢模型 P95</template>
+          <template #title>
+            <AdminCardHeader :title="usageCards.slowModels.title" />
+          </template>
           <template #content>
-            <div class="h-[178px] min-w-0 md:h-[164px]">
+            <AdminChartPanel size="compact">
               <Chart
                 v-if="isChartReady"
-                type="bar"
+                type="bubble"
                 class="h-full w-full min-w-0"
                 :data="slowModelsChartData"
                 :options="slowModelsChartOptions"
                 :plugins="adminChartPlugins"
               />
-            </div>
+            </AdminChartPanel>
           </template>
         </Card>
 
         <Card>
           <template #title>
-            <div class="flex items-start justify-between gap-3">
-              <span>渠道并发负载</span>
-              <span class="text-base font-semibold text-admin-text-1">
-                {{ peakAccountLoadPercent }}<span class="text-xs text-admin-text-3">% 峰值</span>
-              </span>
-            </div>
+            <AdminCardHeader :title="usageCards.bottleneckSource.title" />
           </template>
           <template #content>
-            <div class="h-[178px] min-w-0 md:h-[164px]">
+            <AdminChartPanel size="compact">
               <Chart
                 v-if="isChartReady"
-                type="bar"
+                type="doughnut"
                 class="h-full w-full min-w-0"
-                :data="accountLoadChartData"
-                :options="accountLoadChartOptions"
+                :data="bottleneckSourceChartData"
+                :options="bottleneckSourceChartOptions"
                 :plugins="adminChartPlugins"
               />
-            </div>
+            </AdminChartPanel>
           </template>
         </Card>
 
         <Card>
-          <template #title>异常用户排行</template>
+          <template #title>
+            <AdminCardHeader :title="usageCards.failureCategories.title" />
+          </template>
           <template #content>
-            <div class="h-[178px] min-w-0 md:h-[164px]">
+            <AdminChartPanel size="compact">
               <Chart
                 v-if="isChartReady"
-                type="bar"
+                type="polarArea"
                 class="h-full w-full min-w-0"
-                :data="userRiskChartData"
-                :options="userRiskChartOptions"
+                :data="failureCategoryChartData"
+                :options="failureCategoryChartOptions"
                 :plugins="adminChartPlugins"
               />
-            </div>
+            </AdminChartPanel>
           </template>
         </Card>
       </div>
@@ -180,17 +184,26 @@
 
 <script setup lang="ts">
 import Chart from 'primevue/chart'
+import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
+import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
+import { adminCards } from '../../shared/lib/adminCardMeta'
 import { adminChartPlugins, useAdminChartReady } from '../../shared/lib/adminChart'
-import { useAdminMonitorData } from './useAdminMonitorData'
 import { useUsageStatisticsData } from './useUsageStatisticsData'
 import { useUsageStatisticsCharts } from './useUsageStatisticsCharts'
 
-const { adminStatistics, isStatisticsSettled, timeRange, rangeOptions } = useUsageStatisticsData()
-const { monitorData } = useAdminMonitorData()
+const usageCards = adminCards.usageStatistics
+const {
+  adminStatistics,
+  qualityStatistics,
+  isStatisticsSettled,
+  timeRange,
+  qualityTimeRange,
+  rangeOptions,
+  qualityRangeOptions,
+} = useUsageStatisticsData()
 const isChartReady = useAdminChartReady(isStatisticsSettled)
 
 const {
-  totalCallsInRange,
   trendChartData,
   trendChartOptions,
   todayCalls,
@@ -199,22 +212,22 @@ const {
   todayFailedFoot,
   todaySuccessRate,
   todaySuccessRateFoot,
-  queuePressure,
-  queuePressureFoot,
+  monthCalls,
+  monthCallsFoot,
   modelRiskChartData,
   modelRiskChartOptions,
   qualityTrendChartData,
   qualityTrendChartOptions,
   slowModelsChartData,
   slowModelsChartOptions,
-  accountLoadChartData,
-  accountLoadChartOptions,
-  peakAccountLoadPercent,
-  userRiskChartData,
-  userRiskChartOptions,
+  bottleneckSourceChartData,
+  bottleneckSourceChartOptions,
+  failureCategoryChartData,
+  failureCategoryChartOptions,
 } = useUsageStatisticsCharts({
   adminStatistics,
+  qualityStatistics,
   timeRange,
-  monitorData,
+  qualityTimeRange,
 })
 </script>

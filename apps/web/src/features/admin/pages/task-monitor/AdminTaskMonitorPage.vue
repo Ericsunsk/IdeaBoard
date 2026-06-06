@@ -9,7 +9,7 @@
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ pageStats.running }}
+            {{ liveRunningCount }}
           </span>
         </template>
         <template #content>{{ runningFoot }}</template>
@@ -17,15 +17,15 @@
       <Card>
         <template #subtitle>
           <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >排队中</span
+            >队列等待</span
           >
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ pageStats.pending }}
+            {{ liveQueueTotal }}
           </span>
         </template>
-        <template #content>{{ pendingFoot }}</template>
+        <template #content>{{ queueFoot }}</template>
       </Card>
       <Card>
         <template #subtitle>
@@ -33,106 +33,91 @@
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ pageStats.failed }}
+            {{ liveFailedCount }}
           </span>
         </template>
         <template #content>{{ failedFoot }}</template>
       </Card>
       <Card>
         <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">其他</span>
+          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
+            >账号并发</span
+          >
         </template>
         <template #title>
           <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ summaryOtherCount }}
+            {{ peakAccountLoadPercent }}%
           </span>
         </template>
-        <template #content>{{ otherFoot }}</template>
+        <template #content>{{ accountLoadFoot }}</template>
       </Card>
     </div>
 
     <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-      <Card class="xl:col-span-5">
+      <Card class="xl:col-span-12">
         <template #title>
-          <div class="flex items-start justify-between gap-3">
-            <span>慢任务 Top</span>
-            <Tag :value="`${slowTasks.length} 条`" severity="secondary" rounded />
-          </div>
+          <AdminCardHeader :title="taskCards.executionPressure.title">
+            <template #actions>
+              <Tag
+                :value="`${activeExecutionPressurePoints.length} 类`"
+                severity="secondary"
+                rounded
+              />
+            </template>
+          </AdminCardHeader>
         </template>
-        <template #subtitle>当前页耗时超过 60s</template>
         <template #content>
-          <div v-if="slowTasks.length" class="h-[174px] min-w-0">
+          <AdminChartPanel size="monitor">
+            <Chart
+              type="bubble"
+              class="h-full w-full min-w-0"
+              :data="executionPressureChartData"
+              :options="executionPressureChartOptions"
+              :plugins="adminChartPlugins"
+            />
+          </AdminChartPanel>
+        </template>
+      </Card>
+
+      <Card class="xl:col-span-6">
+        <template #title>
+          <AdminCardHeader :title="taskCards.taskDistribution.title">
+            <template #actions>
+              <Tag :value="`${taskDistributionRows.length} 类`" severity="secondary" rounded />
+            </template>
+          </AdminCardHeader>
+        </template>
+        <template #content>
+          <AdminChartPanel size="monitor">
+            <Chart
+              type="radar"
+              class="h-full w-full min-w-0"
+              :data="taskDistributionChartData"
+              :options="taskDistributionChartOptions"
+              :plugins="adminChartPlugins"
+            />
+          </AdminChartPanel>
+        </template>
+      </Card>
+
+      <Card class="xl:col-span-6">
+        <template #title>
+          <AdminCardHeader :title="taskCards.accountConcurrency.title">
+            <template #actions>
+              <Tag :value="`${accountLoadRows.length} 账号`" severity="secondary" rounded />
+            </template>
+          </AdminCardHeader>
+        </template>
+        <template #content>
+          <AdminChartPanel size="monitor">
             <Chart
               type="bar"
               class="h-full w-full min-w-0"
-              :data="slowTaskChartData"
-              :options="slowTaskChartOptions"
+              :data="accountConcurrencyChartData"
+              :options="accountConcurrencyChartOptions"
               :plugins="adminChartPlugins"
-              @select="handleSlowTaskChartSelect"
             />
-          </div>
-          <Message v-else severity="secondary" :closable="false">暂无慢任务</Message>
-        </template>
-      </Card>
-
-      <Card class="xl:col-span-3">
-        <template #title>
-          <div class="flex items-start justify-between gap-3">
-            <span>活跃任务龄</span>
-            <Tag :value="`${activeTasks.length} 条`" severity="secondary" rounded />
-          </div>
-        </template>
-        <template #subtitle>排队与执行中的等待时间</template>
-        <template #content>
-          <div v-if="activeTasks.length" class="flex flex-col gap-2">
-            <Button
-              v-for="row in activeTasks"
-              :key="row.task.task_id"
-              type="button"
-              text
-              severity="secondary"
-              class="w-full justify-start"
-              @click="showDetail(row.task)"
-            >
-              <span class="min-w-0 truncate font-semibold">{{ row.task.task_id }}</span>
-              <span class="ml-auto shrink-0 text-xs text-admin-text-3">
-                {{ getTaskStatusConfig(row.task.status).text }}
-              </span>
-              <span class="shrink-0 font-mono text-xs text-admin-info">
-                {{ formatSeconds(row.seconds) }}
-              </span>
-            </Button>
-          </div>
-          <Message v-else severity="secondary" :closable="false">暂无活跃任务</Message>
-        </template>
-      </Card>
-
-      <Card class="xl:col-span-4">
-        <template #title>
-          <div class="flex items-start justify-between gap-3">
-            <span>失败样本</span>
-            <Tag :value="`${failedTasks.length} 条`" severity="danger" rounded />
-          </div>
-        </template>
-        <template #subtitle>当前页失败原因速览</template>
-        <template #content>
-          <div v-if="failedTasks.length" class="flex flex-col gap-2">
-            <Button
-              v-for="task in failedTasks.slice(0, 5)"
-              :key="task.task_id"
-              type="button"
-              text
-              severity="danger"
-              class="w-full justify-start"
-              @click="showDetail(task)"
-            >
-              <span class="min-w-0 truncate font-semibold">{{ task.task_id }}</span>
-              <span class="ml-auto min-w-0 truncate text-xs">
-                {{ getErrorReason(task) || '-' }}
-              </span>
-            </Button>
-          </div>
-          <Message v-else severity="secondary" :closable="false">暂无失败样本</Message>
+          </AdminChartPanel>
         </template>
       </Card>
     </div>
@@ -612,11 +597,20 @@ import {
   XmarkCircle,
 } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
+import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
+import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
+import { adminCards } from '../../shared/lib/adminCardMeta'
 import {
-  adminChartPlugins,
+  adminChartLegend,
+  adminChartStrokeWidth,
   adminChartTheme,
+  adminChartPlugins,
+  defineAdminChartBubbleDatasetStyle,
   defineAdminChartData,
   defineAdminChartOptions,
+  defineAdminChartPercentScale,
+  defineAdminChartRadialPercentScale,
+  getAdminChartBubbleRadius,
   type AdminChartData,
   type AdminChartOptions,
   withAlpha,
@@ -632,16 +626,17 @@ import {
   getTaskUserIdentifier,
   taskStatusOptions,
 } from './taskMonitorColumns'
+import {
+  buildTaskExecutionPressurePoints,
+  type TaskExecutionPressurePoint,
+  type TaskExecutionSignalKey,
+} from './taskMonitorExecutionPressure'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { TASK_MONITOR_PAGE_SIZE, useTaskMonitor } from './useTaskMonitor'
-
-type PrimeChartSelectEvent = {
-  element?: {
-    index?: number
-  }
-}
+import { useTaskRuntimeMonitor } from './useTaskRuntimeMonitor'
 
 const appToast = useAppToast()
+const taskCards = adminCards.taskMonitor
 const detailDialogPt = {
   root: {
     class:
@@ -717,14 +712,13 @@ const {
   loading,
   page,
   pageStats,
-  failedTasks,
   activeTasks,
-  slowTasks,
   filterStatus,
   searchKeyword,
   loadTasks,
   handleSearch,
 } = useTaskMonitor()
+const { monitorData, monitorStats, monitorStreamStatus } = useTaskRuntimeMonitor()
 
 const paginatorFirst = computed(() => Math.max(0, (page.value - 1) * TASK_MONITOR_PAGE_SIZE))
 const totalPages = computed(() => Math.ceil(total.value / TASK_MONITOR_PAGE_SIZE) || 1)
@@ -739,101 +733,360 @@ function handlePageChange(event: PageState) {
   if (loading.value) return
   page.value = event.page + 1
 }
-const summaryOtherCount = computed(() =>
-  Math.max(
-    0,
-    tasks.value.length - pageStats.value.running - pageStats.value.pending - pageStats.value.failed,
-  ),
-)
 
 const longestRunning = computed(() =>
   activeTasks.value.find((row) => row.task.status === 'running'),
 )
-const longestPending = computed(() =>
-  activeTasks.value.find((row) => row.task.status === 'pending'),
-)
 const currentPageCount = computed(() => tasks.value.length)
-const runningFoot = computed(() =>
-  longestRunning.value ? `最长 ${formatSeconds(longestRunning.value.seconds)}` : '当前页无执行任务',
+const statusTotalCount = computed(
+  () =>
+    (monitorStats.value?.pending ?? pageStats.value.pending) +
+    (monitorStats.value?.running ?? pageStats.value.running) +
+    (monitorStats.value?.completed ?? pageStats.value.completed) +
+    (monitorStats.value?.failed ?? pageStats.value.failed),
 )
-const pendingFoot = computed(() =>
-  longestPending.value ? `最长 ${formatSeconds(longestPending.value.seconds)}` : '当前页无排队任务',
+const liveRunningCount = computed(() => monitorStats.value?.running ?? pageStats.value.running)
+const liveFailedCount = computed(() => monitorStats.value?.failed ?? pageStats.value.failed)
+const globalQueueLength = computed(() => monitorData.value?.global_queue_len || 0)
+const waitQueueLength = computed(() => monitorData.value?.wait_queue_len || 0)
+const liveQueueTotal = computed(() => globalQueueLength.value + waitQueueLength.value)
+const runningFoot = computed(() =>
+  longestRunning.value
+    ? `最长 ${formatSeconds(longestRunning.value.seconds)} · ${formatMonitorStreamStatus(monitorStreamStatus.value)}`
+    : formatMonitorStreamStatus(monitorStreamStatus.value),
+)
+const queueFoot = computed(() =>
+  waitQueueLength.value > 0
+    ? `全局 ${globalQueueLength.value} / 等待 ${waitQueueLength.value}`
+    : `全局 ${globalQueueLength.value}`,
 )
 const failedFoot = computed(
-  () => `当前页失败率 ${formatPercent(pageStats.value.failed, currentPageCount.value)}`,
+  () => `状态占比 ${formatPercent(liveFailedCount.value, statusTotalCount.value)}`,
 )
-const otherFoot = computed(() => `当前页 ${currentPageCount.value} / 查询 ${total.value}`)
+const accountLoadFoot = computed(() =>
+  accountLoadRows.value.length > 0
+    ? `${accountLoadCurrent.value}/${accountLoadCapacity.value} 并发占用`
+    : `当前页 ${currentPageCount.value} / 查询 ${total.value}`,
+)
+type ExecutionPressureChartPoint = TaskExecutionPressurePoint & {
+  x: number
+  y: number
+  r: number
+}
+type TaskDistributionRow = TaskExecutionPressurePoint & {
+  detail: string
+}
 
-const slowTaskChartData = computed<AdminChartData>(() =>
-  defineAdminChartData({
-    labels: slowTasks.value.map((row) => row.task.task_id),
+type AccountLoadRow = {
+  id: string
+  current: number
+  max: number
+  available: number
+  percent: number
+}
+
+const accountLoadRows = computed<AccountLoadRow[]>(() =>
+  Object.entries(monitorData.value?.account_loads || {})
+    .map(([id, load]) => {
+      const current = Math.max(0, Number(load.current_concurrent) || 0)
+      const max = Math.max(1, Number(load.max_concurrent) || 0)
+      const percent = Math.min(100, Math.round((current / max) * 100))
+      const available = Math.max(0, max - current)
+      return {
+        id,
+        current,
+        max,
+        available,
+        percent,
+      }
+    })
+    .sort((a, b) => b.percent - a.percent)
+)
+const peakAccountLoadPercent = computed(() => accountLoadRows.value[0]?.percent || 0)
+const accountLoadCurrent = computed(() =>
+  accountLoadRows.value.reduce((sum, load) => sum + load.current, 0),
+)
+const accountLoadCapacity = computed(() =>
+  accountLoadRows.value.reduce((sum, load) => sum + load.max, 0),
+)
+const accountConcurrencyChartData = computed<AdminChartData>(() => {
+  if (accountLoadRows.value.length <= 0) {
+    return defineAdminChartData({
+      labels: ['无账号'],
+      datasets: [
+        {
+          type: 'bar',
+          label: '占用',
+          data: [0],
+          backgroundColor: [withAlpha(adminChartTheme.emptyText, 0.18)],
+          borderWidth: 0,
+        },
+        {
+          type: 'bar',
+          label: '可用',
+          data: [0],
+          backgroundColor: [withAlpha(adminChartTheme.mist, 0.12)],
+          borderWidth: 0,
+        },
+      ],
+    })
+  }
+
+  const rows = accountLoadRows.value
+  return defineAdminChartData({
+    labels: rows.map((row) => `账号 ${row.id}`),
     datasets: [
       {
         type: 'bar',
-        label: '耗时',
-        data: slowTasks.value.map((row) => row.seconds),
-        backgroundColor: withAlpha(adminChartTheme.info, 0.72),
-        hoverBackgroundColor: adminChartTheme.info,
-        borderRadius: 6,
-        barThickness: 12,
+        label: '占用',
+        data: rows.map((row) => row.percent),
+        backgroundColor: rows.map((row) => accountConcurrencyColor(row.percent)),
+        borderColor: rows.map((row) => accountConcurrencyColor(row.percent)),
+        borderWidth: adminChartStrokeWidth,
+        borderRadius: 5,
+        maxBarThickness: 14,
+      },
+      {
+        type: 'bar',
+        label: '可用',
+        data: rows.map((row) => Math.max(0, 100 - row.percent)),
+        backgroundColor: withAlpha(adminChartTheme.mist, 0.14),
+        borderColor: withAlpha(adminChartTheme.mist, 0.28),
+        borderWidth: adminChartStrokeWidth,
+        borderRadius: 5,
+        maxBarThickness: 14,
       },
     ],
-  }),
-)
-
-const slowTaskChartOptions = computed<AdminChartOptions>(() =>
+  })
+})
+const accountConcurrencyChartOptions = computed<AdminChartOptions>(() =>
   defineAdminChartOptions({
     responsive: true,
     maintainAspectRatio: false,
     indexAxis: 'y',
-    animation: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: 'rgba(255, 255, 255, 0.96)',
-        titleColor: 'var(--color-admin-text-1)',
-        bodyColor: 'var(--color-admin-text-1)',
-        bodyFont: { size: 12 },
-        titleFont: { size: 12, weight: 700 },
-        padding: 10,
-        displayColors: false,
-        borderWidth: 1,
-        borderColor: 'var(--color-admin-border-soft)',
-        callbacks: {
-          label: (context) => `耗时: ${Number(context.raw || 0)}s`,
-        },
-      },
-    },
     scales: {
       x: {
-        beginAtZero: true,
-        grid: { color: 'rgba(71, 117, 168, 0.12)' },
-        border: { display: false },
-        ticks: {
-          color: 'var(--color-admin-text-3)',
-          callback: (value) => `${Number(value)}s`,
-        },
+        ...defineAdminChartPercentScale({
+          stepSize: 20,
+          borderColor: adminChartTheme.axisLine,
+        }),
+        stacked: true,
       },
       y: {
+        stacked: true,
+        ticks: {
+          color: adminChartTheme.axisText,
+        },
         grid: { display: false },
         border: { display: false },
-        ticks: {
-          color: 'var(--color-admin-text-2)',
-          callback: (_value, index) =>
-            truncateChartLabel(slowTasks.value[index]?.task.task_id || '', 18),
+      },
+    },
+    plugins: {
+      legend: adminChartLegend('bottom'),
+      tooltip: {
+        backgroundColor: adminChartTheme.tooltipBg,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        titleColor: adminChartTheme.tooltipText,
+        bodyColor: adminChartTheme.tooltipText,
+        padding: 10,
+        callbacks: {
+          label: (context) => {
+            const row = accountLoadRows.value[context.dataIndex]
+            if (!row) return '暂无账号并发'
+            if (context.dataset.label === '可用') return `可用: ${row.available}/${row.max}`
+            return `占用: ${row.current}/${row.max}（${row.percent}%）`
+          },
         },
       },
     },
   }),
 )
 
-function handleSlowTaskChartSelect(event: PrimeChartSelectEvent) {
-  const index = event.element?.index
-  if (typeof index !== 'number') return
-  const row = slowTasks.value[index]
-  if (!row) return
-  showDetail(row.task)
+const executionPressureColorByKey: Record<TaskExecutionSignalKey, string> = {
+  fast_completed: adminChartTheme.success,
+  slow_completed: adminChartTheme.olive,
+  normal_pending: adminChartTheme.mist,
+  backlog_pending: adminChartTheme.warning,
+  normal_running: adminChartTheme.info,
+  stuck_running: adminChartTheme.mauve,
+  fast_failed: adminChartTheme.danger,
+  slow_failed: adminChartTheme.brand,
+  retrying: adminChartTheme.cyan,
+  other: adminChartTheme.emptyText,
 }
+const taskDistributionBuckets: Array<{
+  label: string
+  keys: TaskExecutionSignalKey[]
+}> = [
+  { label: '快速完成', keys: ['fast_completed'] },
+  { label: '慢速完成', keys: ['slow_completed'] },
+  { label: '排队中', keys: ['normal_pending', 'backlog_pending'] },
+  { label: '执行中', keys: ['normal_running', 'stuck_running'] },
+  { label: '失败', keys: ['fast_failed', 'slow_failed'] },
+  { label: '重试中', keys: ['retrying'] },
+]
+const executionPressurePoints = computed(() => buildTaskExecutionPressurePoints(tasks.value))
+const activeExecutionPressurePoints = computed(() =>
+  executionPressurePoints.value.filter((point) => point.count > 0),
+)
+const taskDistributionRows = computed<TaskDistributionRow[]>(() => {
+  const pointsByKey = new Map(executionPressurePoints.value.map((point) => [point.key, point]))
+  const totalCount = taskDistributionBuckets.reduce(
+    (sum, bucket) =>
+      sum + bucket.keys.reduce((bucketSum, key) => bucketSum + (pointsByKey.get(key)?.count || 0), 0),
+    0,
+  )
+
+  return taskDistributionBuckets.map((bucket) => {
+    const points = bucket.keys
+      .map((key) => pointsByKey.get(key))
+      .filter((point): point is TaskExecutionPressurePoint => !!point)
+    const count = points.reduce((sum, point) => sum + point.count, 0)
+    const detail = points.map((point) => `${point.label} ${point.count}`).join(' / ')
+    return {
+      key: bucket.keys[0],
+      label: bucket.label,
+      count,
+      sharePercent: totalCount > 0 ? (count / totalCount) * 100 : 0,
+      durationPressure: Math.max(0, ...points.map((point) => point.durationPressure)),
+      anomalyPressure: Math.max(0, ...points.map((point) => point.anomalyPressure)),
+      avgDurationSeconds: getWeightedAverage(points, 'avgDurationSeconds'),
+      maxDurationSeconds: Math.max(0, ...points.map((point) => point.maxDurationSeconds)),
+      failedCount: points.reduce((sum, point) => sum + point.failedCount, 0),
+      retryCount: points.reduce((sum, point) => sum + point.retryCount, 0),
+      detail,
+    }
+  })
+})
+const taskDistributionChartData = computed<AdminChartData>(() =>
+  defineAdminChartData({
+    labels: taskDistributionRows.value.map((point) => point.label),
+    datasets: [
+      {
+        type: 'radar',
+        label: '任务占比',
+        data: taskDistributionRows.value.map((point) => point.sharePercent),
+        backgroundColor: withAlpha(adminChartTheme.danger, 0.12),
+        borderColor: withAlpha(adminChartTheme.danger, 0.72),
+        borderWidth: adminChartStrokeWidth,
+        pointBackgroundColor: withAlpha(adminChartTheme.danger, 0.72),
+        pointBorderColor: withAlpha(adminChartTheme.danger, 0.72),
+        pointHoverBackgroundColor: adminChartTheme.danger,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+      },
+    ],
+  }),
+)
+const taskDistributionChartOptions = computed<AdminChartOptions>(() =>
+  defineAdminChartOptions({
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      r: {
+        ...defineAdminChartRadialPercentScale({ stepSize: 20 }),
+      },
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: adminChartTheme.tooltipBg,
+        titleColor: adminChartTheme.tooltipText,
+        bodyColor: adminChartTheme.tooltipText,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        padding: 10,
+        callbacks: {
+          title: (items) => taskDistributionRows.value[items[0]?.dataIndex ?? -1]?.label || '',
+          label: (context) => {
+            const point = taskDistributionRows.value[context.dataIndex]
+            if (!point) return []
+            return [
+              `占比: ${formatPercentValue(point.sharePercent)}`,
+              `任务量: ${point.count} 条`,
+              point.detail ? `包含: ${point.detail}` : '包含: 无任务',
+              `平均耗时: ${formatSeconds(Math.round(point.avgDurationSeconds))}`,
+              `最长耗时: ${formatSeconds(Math.round(point.maxDurationSeconds))}`,
+            ]
+          },
+        },
+      },
+    },
+  }),
+)
+const executionPressureChartData = computed<AdminChartData>(() => {
+  const maxCount = Math.max(1, ...executionPressurePoints.value.map((point) => point.count))
+
+  return defineAdminChartData({
+    datasets: executionPressurePoints.value.map((point) => ({
+      type: 'bubble' as const,
+      label: point.label,
+      data:
+        point.count > 0
+          ? ([
+              {
+                ...point,
+                x: point.durationPressure,
+                y: point.anomalyPressure,
+                r: getAdminChartBubbleRadius(point.count, maxCount),
+              },
+            ] satisfies ExecutionPressureChartPoint[])
+          : [],
+      ...defineAdminChartBubbleDatasetStyle(executionPressureColorByKey[point.key]),
+    })),
+  })
+})
+const executionPressureChartOptions = computed<AdminChartOptions>(() =>
+  defineAdminChartOptions({
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        ...defineAdminChartPercentScale({
+          stepSize: 10,
+          borderColor: adminChartTheme.axisLine,
+        }),
+      },
+      y: {
+        ...defineAdminChartPercentScale({
+          stepSize: 10,
+          borderColor: adminChartTheme.axisLine,
+        }),
+      },
+    },
+    plugins: {
+      legend: adminChartLegend(),
+      tooltip: {
+        backgroundColor: adminChartTheme.tooltipBg,
+        titleColor: adminChartTheme.tooltipText,
+        bodyColor: adminChartTheme.tooltipText,
+        borderColor: adminChartTheme.tooltipBorder,
+        borderWidth: 1,
+        padding: 10,
+        callbacks: {
+          title: (items) => {
+            const raw = items[0]?.raw as ExecutionPressureChartPoint | undefined
+            return raw?.label || ''
+          },
+          label: (context) => {
+            const raw = context.raw as ExecutionPressureChartPoint
+            return [
+              `任务量: ${raw.count} 条`,
+              `耗时压力: ${formatPercentValue(raw.durationPressure)}`,
+              `异常压力: ${formatPercentValue(raw.anomalyPressure)}`,
+              `影响占比: ${formatPercentValue(raw.sharePercent)}`,
+              `平均耗时: ${formatSeconds(Math.round(raw.avgDurationSeconds))}`,
+              `最长耗时: ${formatSeconds(Math.round(raw.maxDurationSeconds))}`,
+              `失败数: ${raw.failedCount} 条`,
+              `重试次数: ${raw.retryCount}`,
+            ]
+          },
+        },
+      },
+    },
+  }),
+)
 
 function clearSearch() {
   searchKeyword.value = ''
@@ -873,8 +1126,34 @@ function formatPercent(value: number, totalValue: number) {
   return `${((value / totalValue) * 100).toFixed(1)}%`
 }
 
-function truncateChartLabel(value: string, maxLength: number) {
-  if (value.length <= maxLength) return value
-  return `${value.slice(0, maxLength - 1)}…`
+function getWeightedAverage(
+  points: TaskExecutionPressurePoint[],
+  key: 'avgDurationSeconds',
+) {
+  const totalCount = points.reduce((sum, point) => sum + point.count, 0)
+  if (totalCount <= 0) return 0
+  return points.reduce((sum, point) => sum + point[key] * point.count, 0) / totalCount
 }
+
+function formatPercentValue(value: number) {
+  return `${value.toFixed(1)}%`
+}
+
+function formatMonitorStreamStatus(status: string) {
+  const textByStatus: Record<string, string> = {
+    idle: '实时流待命',
+    unsupported: '实时流不可用',
+    connecting: '实时流连接中',
+    connected: '实时流已连接',
+    degraded: '实时流降级',
+  }
+  return textByStatus[status] || '实时流未知'
+}
+
+function accountConcurrencyColor(percent: number) {
+  if (percent >= 90) return adminChartTheme.danger
+  if (percent >= 70) return adminChartTheme.warning
+  return adminChartTheme.info
+}
+
 </script>

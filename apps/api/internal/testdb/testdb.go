@@ -58,6 +58,7 @@ TRUNCATE TABLE
   channels,
   task_daily_stat_backfills,
   task_cancellations,
+  task_execution_metrics,
   task_stat_events,
   task_daily_stats,
   task_outputs,

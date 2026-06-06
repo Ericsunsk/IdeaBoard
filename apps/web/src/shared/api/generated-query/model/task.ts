@@ -4,6 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { TaskExecutionMetrics } from './taskExecutionMetrics'
 import type { TaskOutput } from './taskOutput'
 
 export interface Task {
@@ -19,6 +20,7 @@ export interface Task {
   error_msg?: string
   result?: string
   outputs?: TaskOutput[]
+  execution_metrics?: TaskExecutionMetrics
   created_at: string
   updated_at: string
   /** @nullable */

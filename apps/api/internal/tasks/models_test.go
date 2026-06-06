@@ -35,6 +35,16 @@ func TestTaskOutputCascadesWithTaskDelete(t *testing.T) {
 	}
 }
 
+func TestTaskExecutionMetricsCascadesWithTaskDelete(t *testing.T) {
+	schema := readDBSchema(t)
+	if !strings.Contains(schema, "CREATE TABLE task_execution_metrics") {
+		t.Fatalf("task_execution_metrics table must exist")
+	}
+	if !strings.Contains(schema, "CONSTRAINT fk_task_execution_metrics_task_id FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE") {
+		t.Fatalf("task_execution_metrics must cascade when parent task is deleted")
+	}
+}
+
 func readDBSchema(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "db", "schema", "schema.sql"))

@@ -9,6 +9,7 @@ export type GetAdminStatisticsRange =
   (typeof GetAdminStatisticsRange)[keyof typeof GetAdminStatisticsRange]
 
 export const GetAdminStatisticsRange = {
+  '1d': '1d',
   '7d': '7d',
   '30d': '30d',
   '1y': '1y',
