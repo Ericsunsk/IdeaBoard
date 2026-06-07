@@ -9,4 +9,9 @@ import type { Task } from './task'
 export type ApiResponseTaskListData = {
   list: Task[]
   total: number
+  pending_count: number
+  running_count: number
+  completed_count: number
+  failed_count: number
+  other_count: number
 }

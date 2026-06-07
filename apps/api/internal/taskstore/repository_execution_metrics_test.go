@@ -47,12 +47,12 @@ func TestListAttachesExecutionMetrics(t *testing.T) {
 		t.Fatalf("patch execution metrics update failed: %v", err)
 	}
 
-	items, total, err := taskRepo.List(ctx, 0, 0, "", "", 1, 20)
+	items, counts, err := taskRepo.List(ctx, 0, 0, "", "", 1, 20)
 	if err != nil {
 		t.Fatalf("list tasks failed: %v", err)
 	}
-	if total != 1 || len(items) != 1 {
-		t.Fatalf("list total=%d len=%d, want 1/1", total, len(items))
+	if counts.Total != 1 || len(items) != 1 {
+		t.Fatalf("list total=%d len=%d, want 1/1", counts.Total, len(items))
 	}
 	metrics := items[0].ExecutionMetrics
 	if metrics == nil {

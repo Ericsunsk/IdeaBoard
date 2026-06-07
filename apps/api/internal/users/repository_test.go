@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/testdb"
@@ -43,6 +44,42 @@ func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("used uid record count = %d, want 1", count)
+	}
+}
+
+func TestListUsersFiltersRoleAndStatusAcrossTotal(t *testing.T) {
+	ctx := context.Background()
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+
+	seedUsers := []*User{
+		{Username: "filter_full_banned_user_a", Role: "user", Status: 0},
+		{Username: "filter_full_banned_user_b", Role: "user", Status: 0},
+		{Username: "filter_full_active_user", Role: "user", Status: 1},
+		{Username: "filter_full_banned_admin", Role: "admin", Status: 0},
+		{Username: "outside_banned_user", Role: "user", Status: 0},
+	}
+	for _, user := range seedUsers {
+		if err := repo.Create(ctx, user); err != nil {
+			t.Fatalf("create user %q failed: %v", user.Username, err)
+		}
+	}
+
+	list, counts, err := repo.List(ctx, "filter_full", "user", 0, true, 1, 1)
+	if err != nil {
+		t.Fatalf("list users failed: %v", err)
+	}
+	if counts.Total != 2 {
+		t.Fatalf("total = %d, want 2", counts.Total)
+	}
+	if counts.ActiveCount != 0 || counts.BannedCount != 2 || counts.AdminCount != 0 {
+		t.Fatalf("counts = %+v, want active=0 banned=2 admin=0", counts)
+	}
+	if len(list) != 1 {
+		t.Fatalf("page list length = %d, want 1", len(list))
+	}
+	if list[0].Role != "user" || list[0].Status != 0 || !strings.Contains(list[0].Username, "filter_full") {
+		t.Fatalf("unexpected filtered user: %+v", list[0])
 	}
 }
 

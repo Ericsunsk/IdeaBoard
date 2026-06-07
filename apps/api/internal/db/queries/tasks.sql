@@ -22,8 +22,14 @@ SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params
 FROM tasks
 WHERE task_id = sqlc.arg(task_id) AND user_id = sqlc.arg(user_id);
 
--- name: CountTasks :one
-SELECT COUNT(*)
+-- name: SummarizeTasks :one
+SELECT
+  COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE status = 'pending') AS pending_count,
+  COUNT(*) FILTER (WHERE status = 'running') AS running_count,
+  COUNT(*) FILTER (WHERE status = 'completed') AS completed_count,
+  COUNT(*) FILTER (WHERE status = 'failed') AS failed_count,
+  COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running', 'completed', 'failed')) AS other_count
 FROM tasks
 WHERE (NOT sqlc.arg(has_user_id)::boolean OR user_id = sqlc.arg(user_id))
   AND (NOT sqlc.arg(has_account_id)::boolean OR account_id = sqlc.arg(account_id))

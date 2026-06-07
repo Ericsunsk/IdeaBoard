@@ -72,42 +72,6 @@ func (q *Queries) CountRunningTasksMissingLeaseToken(ctx context.Context) (int64
 	return count, err
 }
 
-const countTasks = `-- name: CountTasks :one
-SELECT COUNT(*)
-FROM tasks
-WHERE (NOT $1::boolean OR user_id = $2)
-  AND (NOT $3::boolean OR account_id = $4)
-  AND (NOT $5::boolean OR status = $6)
-  AND (NOT $7::boolean OR prompt ILIKE $8)
-`
-
-type CountTasksParams struct {
-	HasUserID    bool   `json:"has_user_id"`
-	UserID       int64  `json:"user_id"`
-	HasAccountID bool   `json:"has_account_id"`
-	AccountID    int64  `json:"account_id"`
-	HasStatus    bool   `json:"has_status"`
-	Status       string `json:"status"`
-	HasKeyword   bool   `json:"has_keyword"`
-	KeywordLike  string `json:"keyword_like"`
-}
-
-func (q *Queries) CountTasks(ctx context.Context, arg CountTasksParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countTasks,
-		arg.HasUserID,
-		arg.UserID,
-		arg.HasAccountID,
-		arg.AccountID,
-		arg.HasStatus,
-		arg.Status,
-		arg.HasKeyword,
-		arg.KeywordLike,
-	)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countTasksByStatus = `-- name: CountTasksByStatus :one
 SELECT COUNT(*)
 FROM tasks
@@ -1067,4 +1031,62 @@ func (q *Queries) ResetTaskRunningToPendingWithLease(ctx context.Context, arg Re
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const summarizeTasks = `-- name: SummarizeTasks :one
+SELECT
+  COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE status = 'pending') AS pending_count,
+  COUNT(*) FILTER (WHERE status = 'running') AS running_count,
+  COUNT(*) FILTER (WHERE status = 'completed') AS completed_count,
+  COUNT(*) FILTER (WHERE status = 'failed') AS failed_count,
+  COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running', 'completed', 'failed')) AS other_count
+FROM tasks
+WHERE (NOT $1::boolean OR user_id = $2)
+  AND (NOT $3::boolean OR account_id = $4)
+  AND (NOT $5::boolean OR status = $6)
+  AND (NOT $7::boolean OR prompt ILIKE $8)
+`
+
+type SummarizeTasksParams struct {
+	HasUserID    bool   `json:"has_user_id"`
+	UserID       int64  `json:"user_id"`
+	HasAccountID bool   `json:"has_account_id"`
+	AccountID    int64  `json:"account_id"`
+	HasStatus    bool   `json:"has_status"`
+	Status       string `json:"status"`
+	HasKeyword   bool   `json:"has_keyword"`
+	KeywordLike  string `json:"keyword_like"`
+}
+
+type SummarizeTasksRow struct {
+	Total          int64 `json:"total"`
+	PendingCount   int64 `json:"pending_count"`
+	RunningCount   int64 `json:"running_count"`
+	CompletedCount int64 `json:"completed_count"`
+	FailedCount    int64 `json:"failed_count"`
+	OtherCount     int64 `json:"other_count"`
+}
+
+func (q *Queries) SummarizeTasks(ctx context.Context, arg SummarizeTasksParams) (SummarizeTasksRow, error) {
+	row := q.db.QueryRowContext(ctx, summarizeTasks,
+		arg.HasUserID,
+		arg.UserID,
+		arg.HasAccountID,
+		arg.AccountID,
+		arg.HasStatus,
+		arg.Status,
+		arg.HasKeyword,
+		arg.KeywordLike,
+	)
+	var i SummarizeTasksRow
+	err := row.Scan(
+		&i.Total,
+		&i.PendingCount,
+		&i.RunningCount,
+		&i.CompletedCount,
+		&i.FailedCount,
+		&i.OtherCount,
+	)
+	return i, err
 }

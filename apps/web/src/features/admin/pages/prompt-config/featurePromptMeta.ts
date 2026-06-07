@@ -154,32 +154,8 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   ],
 }
 
-const featureNotes: Partial<Record<FeatureSlug, string>> = {
-  [WORKFLOW_FEATURE.sketchToImage]:
-    'Image 节点右键「草图成图」使用固定 system prompt，不使用 {{user_prompt}} 模板变量。',
-  [WORKFLOW_FEATURE.styleVariation]:
-    'Image 节点右键「风格延展」使用固定 system prompt，只使用 {{strength}} 控制延展幅度百分比（0-100）。',
-  [WORKFLOW_FEATURE.removeBg]:
-    'Image 节点右键「抠图」是快捷工具，不接收用户输入；请配置固定 system prompt，不要使用 {{user_prompt}} 模板变量。',
-  [WORKFLOW_FEATURE.partialEdit]:
-    '覆盖 Image 节点 Prompt 生成、Prompt 节点带图输入、右键「局部重绘」等以原图为输入的 partial-edit 任务。',
-  [WORKFLOW_FEATURE.patternGen]:
-    'Prompt 节点纯文本生成会携带 pattern-gen feature slug；这里的 system prompt 可选，未配置时只使用 Prompt 节点文本。{{user_prompt}} 是 Prompt 节点文本。',
-  [WORKFLOW_FEATURE.styleFusion]:
-    'Fusion 节点生成时会携带 style-fusion feature slug；blend point 会被转换为 {{image_weights}}，旧的 A/B 权重变量已下线。',
-  [WORKFLOW_FEATURE.virtual3d]:
-    'Display 节点生成时会携带 virtual-3d feature slug，可结合视角、光影和连接的 Prompt 文本做展示约束。',
-  [WORKFLOW_FEATURE.hdUpscale]: 'Image 节点右键「HD」使用这里的固定 system prompt 与整图高清参数；局部重绘请维护 partial-edit。',
-  [WORKFLOW_FEATURE.imageExtend]:
-    'Image 节点右键「扩图」会把扩图输入作为 {{user_prompt}}，未填写扩图 Prompt 时只使用固定 system prompt。',
-}
-
 export function getVarsForSlug(slug: FeatureSlug): VarDef[] {
   return featureVarMap[slug] || noVars
-}
-
-export function getFeatureNote(slug: FeatureSlug): string {
-  return featureNotes[slug] || ''
 }
 
 export function getGroupVariableCount(group: FeatureGroup): number {

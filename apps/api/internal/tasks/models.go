@@ -112,3 +112,12 @@ type TaskListRequest struct {
 	Page      int    `form:"page,default=1"`
 	PageSize  int    `form:"page_size,default=20"`
 }
+
+type TaskListCounts struct {
+	Total          int64 `json:"total"`
+	PendingCount   int64 `json:"pending_count"`
+	RunningCount   int64 `json:"running_count"`
+	CompletedCount int64 `json:"completed_count"`
+	FailedCount    int64 `json:"failed_count"`
+	OtherCount     int64 `json:"other_count"`
+}

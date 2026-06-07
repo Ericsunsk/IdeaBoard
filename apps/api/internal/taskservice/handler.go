@@ -81,12 +81,20 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	tasks, total, err := h.taskService.ListTasks(c.Request.Context(), &req)
+	taskItems, counts, err := h.taskService.ListTasks(c.Request.Context(), &req)
 	if err != nil {
 		response.InternalError(c, 500, "获取任务列表失败", err)
 		return
 	}
-	response.Success(c, gin.H{"total": total, "list": tasks})
+	response.Success(c, gin.H{
+		"total":           counts.Total,
+		"pending_count":   counts.PendingCount,
+		"running_count":   counts.RunningCount,
+		"completed_count": counts.CompletedCount,
+		"failed_count":    counts.FailedCount,
+		"other_count":     counts.OtherCount,
+		"list":            taskItems,
+	})
 }
 
 func (h *Handler) GetUserTasks(c *gin.Context) {

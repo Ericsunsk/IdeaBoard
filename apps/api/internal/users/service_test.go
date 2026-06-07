@@ -39,6 +39,52 @@ func TestListUsersRejectsOverlongKeyword(t *testing.T) {
 	}
 }
 
+func TestListUsersRejectsInvalidFilters(t *testing.T) {
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	service := NewUserService(repo)
+
+	tests := []struct {
+		name    string
+		request UserListRequest
+		want    string
+	}{
+		{
+			name: "invalid role",
+			request: UserListRequest{
+				Role:     "owner",
+				Page:     1,
+				PageSize: 10,
+			},
+			want: "role 仅支持 admin 或 user",
+		},
+		{
+			name: "invalid status",
+			request: UserListRequest{
+				Status:   "2",
+				Page:     1,
+				PageSize: 10,
+			},
+			want: "status 仅支持 0 或 1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := service.ListUsers(context.Background(), &tt.request)
+			if err == nil {
+				t.Fatal("expected validation error")
+			}
+			if !isUserListValidationError(err) {
+				t.Fatalf("error type = %T, want user list validation error", err)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %q, want contains %q", err.Error(), tt.want)
+			}
+		})
+	}
+}
+
 func TestDeleteUserCleansUploadsBeforeDeletingLocalRecords(t *testing.T) {
 	ctx := context.Background()
 	db := newUserRepoTestDB(t)

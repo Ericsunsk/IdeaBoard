@@ -1,9 +1,5 @@
 import { computed, ref, watch } from 'vue'
-import type {
-  StorageProfile,
-  StorageProvider,
-  StorageProviderMeta,
-} from '../../shared/api/storage'
+import type { StorageProfile, StorageProvider, StorageProviderMeta } from '../../shared/api/storage'
 import {
   getListAdminStorageProfilesQueryKey,
   useListAdminStorageProfiles,
@@ -74,6 +70,7 @@ export function useStorageManager() {
   const editorMode = ref<'create' | 'edit'>('create')
   const editingId = ref<string | null>(null)
   const selectedVendorKey = ref('aliyun-oss')
+  const loading = computed(() => providersQuery.isLoading.value || profilesQuery.isLoading.value)
 
   const providers = computed<StorageProviderMeta[]>(
     () => providersQuery.data.value?.data?.providers ?? [],
@@ -356,10 +353,19 @@ export function useStorageManager() {
     }
   }
 
+  async function loadData() {
+    try {
+      await Promise.all([providersQuery.refetch(), profilesQuery.refetch()])
+    } catch (error) {
+      appToast.error(formatDisplayErrorMessage(error, '刷新存储配置失败'))
+    }
+  }
+
   return {
     saving,
     savingAndApplying,
     fetching,
+    loading,
     applyingId,
     testingId,
     editorOpen,
@@ -396,5 +402,6 @@ export function useStorageManager() {
     handleTest,
     fetchBucketDomains,
     removeProfile,
+    loadData,
   }
 }

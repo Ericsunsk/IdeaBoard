@@ -81,6 +81,7 @@ func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.Task
 	}
 	featureSlug := accounts.ParseFeatureSlugFromParamsJSON(task.Params)
 	enabledAccounts = accounts.FilterAccountsByFeature(enabledAccounts, featureSlug)
+	enabledAccounts = accounts.FilterAccountsByRequestedModelJSON(enabledAccounts, task.Params)
 
 	hasScopedCandidates := task.AccountIDs != nil
 	scoped := make(map[int64]struct{}, len(task.AccountIDs))

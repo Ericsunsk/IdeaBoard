@@ -155,6 +155,10 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	result, err := h.userService.ListUsers(c.Request.Context(), &req)
 	if err != nil {
+		if isUserListValidationError(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "获取用户列表失败", err)
 		return
 	}

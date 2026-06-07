@@ -1,54 +1,63 @@
 <template>
-  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
+  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0 min-[1081px]:-mb-[17px]">
     <div
-      v-if="featureGroups.length > 0"
-      class="grid grid-cols-1 gap-3.5 lg:grid-cols-2 2xl:grid-cols-3"
+      class="min-w-0 overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0 min-[1081px]:h-[calc(100dvh-117px)]"
     >
-      <Card
-        v-for="group in featureGroups"
-        :key="group.key"
+      <div
+        v-if="featureGroups.length > 0"
+        class="app-scrollbar grid auto-rows-max grid-cols-1 content-start gap-3.5 p-6 min-[1081px]:h-full min-[1081px]:overflow-y-auto min-[1081px]:overscroll-contain lg:grid-cols-2 2xl:grid-cols-3"
+        :class="{ 'is-scrolling': isPromptPanelScrolling }"
+        @scroll.passive="handlePromptPanelScroll"
       >
-        <template #content>
-          <div class="flex min-h-[208px] flex-col gap-3.5">
-            <div class="flex items-start justify-between gap-3">
-              <span class="min-w-0 truncate text-admin-title-sm font-bold text-admin-title-color">
-                {{ group.title }}
-              </span>
-              <Tag :value="`${group.items.length} 项配置`" severity="secondary" rounded />
-            </div>
+        <Card v-for="group in featureGroups" :key="group.key" class="!rounded-lg">
+          <template #content>
+            <div class="flex min-h-[208px] flex-col gap-3.5">
+              <div class="flex items-start justify-between gap-3">
+                <span class="min-w-0 truncate text-admin-title-sm font-bold text-admin-title-color">
+                  {{ group.title }}
+                </span>
+                <Tag :value="`${group.items.length} 项配置`" severity="secondary" rounded />
+              </div>
 
-            <div class="flex flex-wrap gap-2">
-              <Tag :value="`${getGroupVariableCount(group)} 个变量`" severity="secondary" rounded />
-              <Tag
-                :value="`${getGroupFilledCount(group)}/${group.items.length} 已配置`"
-                severity="secondary"
-                rounded
-              />
-            </div>
+              <div class="flex flex-wrap gap-2">
+                <Tag
+                  :value="`${getGroupVariableCount(group)} 个变量`"
+                  severity="secondary"
+                  rounded
+                />
+                <Tag
+                  :value="`${getGroupFilledCount(group)}/${group.items.length} 已配置`"
+                  severity="secondary"
+                  rounded
+                />
+              </div>
 
-            <div class="flex flex-wrap content-start gap-2">
-              <Tag
-                v-for="item in group.items"
-                :key="item.slug"
-                :value="item.title"
-                severity="secondary"
-                rounded
-              />
-            </div>
+              <div class="flex flex-wrap content-start gap-2">
+                <Tag
+                  v-for="item in group.items"
+                  :key="item.slug"
+                  :value="item.title"
+                  severity="secondary"
+                  rounded
+                />
+              </div>
 
-            <div class="mt-auto flex justify-start">
-              <Button size="small" label="编辑" @click="openEditor(group.key)" />
+              <div class="mt-auto flex justify-start">
+                <Button size="small" label="编辑" @click="openEditor(group.key)" />
+              </div>
             </div>
-          </div>
-        </template>
-      </Card>
-    </div>
-    <div
-      v-else
-      class="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-admin-border-soft bg-admin-card text-admin-text-2"
-    >
-      <div class="text-admin-title font-semibold text-admin-title-color">未加载到节点配置</div>
-      <div class="mt-2 text-admin-meta text-admin-subtitle-color">请检查功能分组定义或刷新页面重试。</div>
+          </template>
+        </Card>
+      </div>
+      <div
+        v-else
+        class="m-6 flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-admin-text-2"
+      >
+        <div class="text-admin-title font-semibold text-admin-title-color">未加载到节点配置</div>
+        <div class="mt-2 text-admin-meta text-admin-subtitle-color">
+          请检查功能分组定义或刷新页面重试。
+        </div>
+      </div>
     </div>
   </div>
 
@@ -69,9 +78,6 @@
           <h2 class="m-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color">
             {{ activeGroup ? `编辑 ${activeGroup.title} 节点提示词` : '' }}
           </h2>
-          <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-subtitle-color">
-            {{ activeGroupDescription }}
-          </p>
         </div>
 
         <div v-if="activeGroup" class="flex flex-wrap gap-2">
@@ -85,69 +91,79 @@
       </div>
     </template>
 
-    <div v-if="activeGroup" class="flex flex-col">
-      <article
-        v-for="item in activeGroup.items"
-        :key="item.slug"
-        class="flex flex-col gap-2.5 border-t border-admin-divider pt-3.5 first:border-t-0 first:pt-0"
-      >
-        <div class="flex flex-wrap items-center gap-2.5">
-          <span class="text-admin-content font-semibold text-admin-title-color">
-            {{ item.title }}
-          </span>
-          <span
-            class="max-w-full rounded-md border border-admin-border bg-admin-surface-muted px-2 py-0.5 font-mono text-admin-caption text-admin-text-3 [overflow-wrap:anywhere]"
-          >
-            {{ item.slug }}
-          </span>
-        </div>
+    <div
+      v-if="activeGroup"
+      class="app-scrollbar h-[min(66vh,620px)] overflow-y-auto overscroll-contain pr-3"
+      :class="{ 'is-scrolling': isPromptDialogScrolling }"
+      @scroll.passive="handlePromptDialogScroll"
+    >
+      <div class="flex flex-col gap-3 pr-3">
+        <Panel v-for="item in activeGroup.items" :key="item.slug" :pt="promptEditorPanelPt">
+          <template #header>
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
+              <span class="text-admin-content font-semibold text-admin-title-color">
+                {{ item.title }}
+              </span>
+              <Tag
+                :value="item.slug"
+                severity="secondary"
+                rounded
+                class="!min-w-0 max-w-full font-mono !text-admin-caption [&_.p-tag-label]:truncate"
+              />
+            </div>
+          </template>
 
-        <div
-          v-if="getVarsForSlug(item.slug).length > 0"
-          class="flex min-w-0 flex-wrap items-center gap-1.5"
-        >
-          <span class="shrink-0 text-admin-caption text-admin-text-2">插入变量</span>
-          <Button
-            v-for="v in getVarsForSlug(item.slug)"
-            :key="v.key"
-            type="button"
-            size="small"
-            outlined
-            rounded
-            :severity="getVariableButtonSeverity(v.tone)"
-            :label="v.key"
-            class="max-w-full font-mono [&_.p-button-label]:break-all [&_.p-button-label]:text-admin-caption"
-            @click="insertVar(item.slug, v.key)"
-          />
-        </div>
+          <div class="flex flex-col gap-3">
+            <div
+              v-if="getVarsForSlug(item.slug).length > 0"
+              class="flex min-w-0 flex-wrap items-center gap-1.5"
+            >
+              <Tag value="插入变量" severity="secondary" rounded />
+              <Button
+                v-for="v in getVarsForSlug(item.slug)"
+                :key="v.key"
+                type="button"
+                size="small"
+                rounded
+                :label="v.key"
+                :class="getVariableTokenButtonClass(v.tone)"
+                @click="insertVar(item.slug, v.key)"
+              />
+            </div>
 
-        <div v-if="getFeatureNote(item.slug)" class="text-admin-caption text-admin-text-3">
-          {{ getFeatureNote(item.slug) }}
-        </div>
+            <Textarea
+              :ref="(el: unknown) => bindTextareaRef(item.slug, el)"
+              v-model="promptMap[item.slug]"
+              auto-resize
+              class="w-full"
+              rows="4"
+              :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
+              :disabled="saving[item.slug]"
+            />
 
-        <Textarea
-          :ref="(el: unknown) => bindTextareaRef(item.slug, el)"
-          v-model="promptMap[item.slug]"
-          auto-resize
-          class="w-full"
-          rows="4"
-          :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
-          :disabled="saving[item.slug]"
-        />
-
-        <div class="flex items-center justify-between gap-2.5">
-          <span class="shrink-0 text-admin-caption text-admin-text-3">
-            {{ (promptMap[item.slug] || '').length }} 字
-          </span>
-          <Button
-            size="small"
-            label="保存"
-            :loading="saving[item.slug]"
-            @click="savePrompt(item.slug)"
-          />
-        </div>
-      </article>
+            <div class="flex items-center justify-between gap-2.5">
+              <Tag
+                :value="`${(promptMap[item.slug] || '').length} 字`"
+                severity="secondary"
+                rounded
+              />
+              <Button
+                size="small"
+                label="保存"
+                :loading="saving[item.slug]"
+                @click="savePrompt(item.slug)"
+              />
+            </div>
+          </div>
+        </Panel>
+      </div>
     </div>
+
+    <template #footer>
+      <div class="flex justify-end">
+        <Button label="关闭" severity="secondary" outlined @click="closeEditor" />
+      </div>
+    </template>
   </Dialog>
 </template>
 
@@ -156,10 +172,12 @@ import { computed, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Dialog from 'primevue/dialog'
+import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
+import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { saveFeaturePrompt } from '../../shared/queries/adminActions'
 import {
   getListAdminFeaturePromptsQueryKey,
@@ -168,7 +186,6 @@ import {
 import {
   featureMap,
   groupedFeatureGroups,
-  getFeatureNote,
   getGroupFilledCount as calcGroupFilledCount,
   getGroupVariableCount as calcGroupVariableCount,
   getVarsForSlug,
@@ -179,6 +196,10 @@ import {
 
 const appToast = useAppToast()
 const queryClient = useQueryClient()
+const { isScrolling: isPromptPanelScrolling, handleScroll: handlePromptPanelScroll } =
+  useTransientScrolling()
+const { isScrolling: isPromptDialogScrolling, handleScroll: handlePromptDialogScroll } =
+  useTransientScrolling()
 
 // textarea 引用 + 插入逻辑
 type TextareaRefLike = HTMLTextAreaElement | { $el?: Element }
@@ -190,11 +211,24 @@ const featureGroups = computed<FeatureGroup[]>(() =>
 const activeGroup = computed<FeatureGroup | null>(() => {
   return featureGroups.value.find((group) => group.key === activeGroupKey.value) || null
 })
-const activeGroupDescription = computed(() => {
-  if (!activeGroup.value) return ''
-  const desc = activeGroup.value.desc?.trim()
-  return desc ? `编辑当前节点的提示词配置。${desc}` : '编辑当前节点的提示词配置。'
-})
+const promptEditorPanelPt = {
+  root: {
+    class: '!overflow-hidden !rounded-lg !border-admin-border-soft !bg-admin-card !shadow-none',
+  },
+  header: {
+    class: '!border-admin-border-soft !bg-transparent !px-4 !py-3 !text-admin-text-1',
+  },
+  content: {
+    class: '!border-admin-border-soft !bg-white/70 !px-4 !py-3',
+  },
+} as const
+const variableTokenButtonClass =
+  'max-w-full !h-7 !min-h-0 !rounded-full !border-transparent !px-2.5 !py-0 font-mono !text-[11px] !font-[760] !leading-4 [&_.p-button-label]:break-all [&_.p-button-label]:leading-4'
+const variableTokenButtonToneClass: Record<VarTone, string> = {
+  prompt: '!bg-[rgba(71,117,168,0.16)] !text-admin-info hover:!bg-[rgba(71,117,168,0.22)]',
+  control: '!bg-[rgba(212,136,48,0.16)] !text-admin-warning hover:!bg-[rgba(212,136,48,0.22)]',
+  context: '!bg-admin-surface-muted !text-admin-text-2-strong hover:!bg-admin-surface-hover',
+}
 
 function openEditor(groupKey: string) {
   const group = featureGroups.value.find((item) => item.key === groupKey)
@@ -223,10 +257,8 @@ function getGroupFilledCount(group: FeatureGroup) {
   return calcGroupFilledCount(group, savedPromptMap)
 }
 
-function getVariableButtonSeverity(tone: VarTone) {
-  if (tone === 'control') return 'warn'
-  if (tone === 'context') return 'secondary'
-  return 'info'
+function getVariableTokenButtonClass(tone: VarTone) {
+  return [variableTokenButtonClass, variableTokenButtonToneClass[tone]]
 }
 
 function insertVar(slug: FeatureSlug, varKey: string) {

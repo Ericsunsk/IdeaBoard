@@ -135,7 +135,8 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	var callResult providerCallResult
 	var err error
 
-	resolvedModel := resolveRequestedModel(account.ModelSet, params)
+	enabledModelSet := accounts.EnabledModelSet(account)
+	resolvedModel := resolveRequestedModel(enabledModelSet, params)
 	if strings.TrimSpace(resolvedModel) == "" {
 		return providerCallOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
@@ -217,8 +218,8 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		"image_url":    imageURL,
 		"image_urls":   imageURLs,
 	}
-	if strings.TrimSpace(account.ModelSet) != "" && !strings.Contains(account.ModelSet, ",") {
-		result["model_set"] = strings.TrimSpace(account.ModelSet)
+	if strings.TrimSpace(enabledModelSet) != "" && !strings.Contains(enabledModelSet, ",") {
+		result["model_set"] = strings.TrimSpace(enabledModelSet)
 	}
 	if strings.TrimSpace(callResult.Model) != "" {
 		result["model"] = strings.TrimSpace(callResult.Model)

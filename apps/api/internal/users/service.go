@@ -4,11 +4,27 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
 
 const maxUserKeywordLength = 64
+
+type userListValidationError string
+
+func (e userListValidationError) Error() string {
+	return string(e)
+}
+
+func newUserListValidationError(message string) error {
+	return userListValidationError(message)
+}
+
+func isUserListValidationError(err error) bool {
+	var target userListValidationError
+	return errors.As(err, &target)
+}
 
 type UserService struct {
 	repo          *UserRepository
@@ -38,8 +54,16 @@ func (s *UserService) GetByID(ctx context.Context, id int64) (*User, error) {
 // ListUsers 获取用户列表
 func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*UserListResponse, error) {
 	req.Keyword = strings.TrimSpace(req.Keyword)
+	req.Role = normalizeUserListRole(req.Role)
 	if utf8.RuneCountInString(req.Keyword) > maxUserKeywordLength {
-		return nil, errors.New("keyword 长度不能超过 64 个字符")
+		return nil, newUserListValidationError("keyword 长度不能超过 64 个字符")
+	}
+	if req.Role != "" && req.Role != "admin" && req.Role != "user" {
+		return nil, newUserListValidationError("role 仅支持 admin 或 user")
+	}
+	status, hasStatus, err := normalizeUserListStatus(req.Status)
+	if err != nil {
+		return nil, err
 	}
 	if req.Page < 1 {
 		req.Page = 1
@@ -48,15 +72,31 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 		req.PageSize = 10
 	}
 
-	users, total, err := s.repo.List(ctx, req.Keyword, req.Page, req.PageSize)
+	users, counts, err := s.repo.List(ctx, req.Keyword, req.Role, status, hasStatus, req.Page, req.PageSize)
 	if err != nil {
 		return nil, err
 	}
 
 	return &UserListResponse{
-		Total: total,
-		List:  users,
+		UserListCounts: counts,
+		List:           users,
 	}, nil
+}
+
+func normalizeUserListRole(role string) string {
+	return strings.ToLower(strings.TrimSpace(role))
+}
+
+func normalizeUserListStatus(raw string) (int16, bool, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return 0, false, nil
+	}
+	status, err := strconv.Atoi(value)
+	if err != nil || (status != 0 && status != 1) {
+		return 0, false, newUserListValidationError("status 仅支持 0 或 1")
+	}
+	return int16(status), true, nil
 }
 
 // UpdateStatus 更新用户状态

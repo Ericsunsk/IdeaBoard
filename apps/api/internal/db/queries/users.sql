@@ -41,15 +41,23 @@ WHERE id = sqlc.arg(id);
 DELETE FROM users
 WHERE id = sqlc.arg(id);
 
--- name: CountUsers :one
-SELECT COUNT(*)
+-- name: SummarizeUsers :one
+SELECT
+  COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE status = 1) AS active_count,
+  COUNT(*) FILTER (WHERE status = 0) AS banned_count,
+  COUNT(*) FILTER (WHERE role = 'admin') AS admin_count
 FROM users
-WHERE NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_like);
+WHERE (NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_like))
+  AND (NOT sqlc.arg(has_role)::boolean OR role = sqlc.arg(role))
+  AND (NOT sqlc.arg(has_status)::boolean OR status = sqlc.arg(status));
 
 -- name: ListUsers :many
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_like)
+WHERE (NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_like))
+  AND (NOT sqlc.arg(has_role)::boolean OR role = sqlc.arg(role))
+  AND (NOT sqlc.arg(has_status)::boolean OR status = sqlc.arg(status))
 ORDER BY id DESC
 LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 

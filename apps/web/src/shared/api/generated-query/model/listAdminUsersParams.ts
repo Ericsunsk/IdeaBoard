@@ -4,11 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListAdminUsersRole } from './listAdminUsersRole'
+import type { ListAdminUsersStatus } from './listAdminUsersStatus'
 import type { PageParameter } from './pageParameter'
 import type { PageSizeParameter } from './pageSizeParameter'
 
 export type ListAdminUsersParams = {
   keyword?: string
+  role?: ListAdminUsersRole
+  status?: ListAdminUsersStatus
   page?: PageParameter
   page_size?: PageSizeParameter
 }

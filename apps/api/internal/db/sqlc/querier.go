@@ -16,10 +16,8 @@ type Querier interface {
 	CountBoardNameConflicts(ctx context.Context, arg CountBoardNameConflictsParams) (int64, error)
 	CountBoardShareTokenByToken(ctx context.Context, token string) (int64, error)
 	CountRunningTasksMissingLeaseToken(ctx context.Context) (int64, error)
-	CountTasks(ctx context.Context, arg CountTasksParams) (int64, error)
 	CountTasksByStatus(ctx context.Context, status string) (int64, error)
 	CountTasksByUserID(ctx context.Context, userID int64) (int64, error)
-	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (int64, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
 	CreateChannel(ctx context.Context, arg CreateChannelParams) (int64, error)
@@ -101,6 +99,8 @@ type Querier interface {
 	ResetRunningMissingLeaseTasksByIDs(ctx context.Context, taskIds []string) (int64, error)
 	ResetTaskRunningToPendingWithLease(ctx context.Context, arg ResetTaskRunningToPendingWithLeaseParams) (int64, error)
 	RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShareTokenParams) error
+	SummarizeTasks(ctx context.Context, arg SummarizeTasksParams) (SummarizeTasksRow, error)
+	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) error
 	UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) error
 	UpdateChannel(ctx context.Context, arg UpdateChannelParams) error

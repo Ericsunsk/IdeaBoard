@@ -320,8 +320,8 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{ID: 101},
-		{ID: 202},
+		{ID: 101, ModelSet: "gpt-image-1"},
+		{ID: 202, ModelSet: "gpt-image-1"},
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	taskEvents := &recordingTaskStatusPublisher{}

@@ -45,7 +45,7 @@ type AccountStore interface {
 type TaskStore interface {
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
 	GetByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) (*tasks.Task, error)
-	List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error)
+	List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error)
 	GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error)
 	DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error
 	ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error)
@@ -214,6 +214,7 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 		}
 	}
 	apiAccounts = accounts.FilterAccountsByFeature(apiAccounts, featureSlug)
+	apiAccounts = accounts.FilterAccountsByRequestedModel(apiAccounts, req.Params)
 	if len(apiAccounts) == 0 {
 		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
@@ -252,7 +253,7 @@ func (s *Service) GetUserTask(ctx context.Context, taskID string, userID int64) 
 	return task, nil
 }
 
-func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]*tasks.Task, int64, error) {
+func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]*tasks.Task, tasks.TaskListCounts, error) {
 	if req.Page < 1 {
 		req.Page = 1
 	}
@@ -263,12 +264,12 @@ func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]
 	if len(req.Keyword) > maxTaskKeywordLength {
 		req.Keyword = req.Keyword[:maxTaskKeywordLength]
 	}
-	items, total, err := s.taskRepo.List(ctx, req.UserID, req.AccountID, req.Status, req.Keyword, req.Page, req.PageSize)
+	items, counts, err := s.taskRepo.List(ctx, req.UserID, req.AccountID, req.Status, req.Keyword, req.Page, req.PageSize)
 	if err != nil {
-		return nil, 0, err
+		return nil, tasks.TaskListCounts{}, err
 	}
 	s.attachOutputsForTasks(ctx, items)
-	return items, total, nil
+	return items, counts, nil
 }
 
 func (s *Service) DeleteUserTask(ctx context.Context, taskID string, userID int64) error {

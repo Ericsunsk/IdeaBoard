@@ -10,24 +10,6 @@ import (
 	"database/sql"
 )
 
-const countUsers = `-- name: CountUsers :one
-SELECT COUNT(*)
-FROM users
-WHERE NOT $1::boolean OR username ILIKE $2
-`
-
-type CountUsersParams struct {
-	HasKeyword  bool   `json:"has_keyword"`
-	KeywordLike string `json:"keyword_like"`
-}
-
-func (q *Queries) CountUsers(ctx context.Context, arg CountUsersParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countUsers, arg.HasKeyword, arg.KeywordLike)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
   username, auth_user_id, storage_uid, avatar, role, status
@@ -289,14 +271,20 @@ func (q *Queries) ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUID
 const listUsers = `-- name: ListUsers :many
 SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE NOT $1::boolean OR username ILIKE $2
+WHERE (NOT $1::boolean OR username ILIKE $2)
+  AND (NOT $3::boolean OR role = $4)
+  AND (NOT $5::boolean OR status = $6)
 ORDER BY id DESC
-LIMIT $4 OFFSET $3
+LIMIT $8 OFFSET $7
 `
 
 type ListUsersParams struct {
 	HasKeyword  bool   `json:"has_keyword"`
 	KeywordLike string `json:"keyword_like"`
+	HasRole     bool   `json:"has_role"`
+	Role        string `json:"role"`
+	HasStatus   bool   `json:"has_status"`
+	Status      int16  `json:"status"`
 	PageOffset  int32  `json:"page_offset"`
 	PageLimit   int32  `json:"page_limit"`
 }
@@ -305,6 +293,10 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	rows, err := q.db.QueryContext(ctx, listUsers,
 		arg.HasKeyword,
 		arg.KeywordLike,
+		arg.HasRole,
+		arg.Role,
+		arg.HasStatus,
+		arg.Status,
 		arg.PageOffset,
 		arg.PageLimit,
 	)
@@ -337,6 +329,53 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const summarizeUsers = `-- name: SummarizeUsers :one
+SELECT
+  COUNT(*) AS total,
+  COUNT(*) FILTER (WHERE status = 1) AS active_count,
+  COUNT(*) FILTER (WHERE status = 0) AS banned_count,
+  COUNT(*) FILTER (WHERE role = 'admin') AS admin_count
+FROM users
+WHERE (NOT $1::boolean OR username ILIKE $2)
+  AND (NOT $3::boolean OR role = $4)
+  AND (NOT $5::boolean OR status = $6)
+`
+
+type SummarizeUsersParams struct {
+	HasKeyword  bool   `json:"has_keyword"`
+	KeywordLike string `json:"keyword_like"`
+	HasRole     bool   `json:"has_role"`
+	Role        string `json:"role"`
+	HasStatus   bool   `json:"has_status"`
+	Status      int16  `json:"status"`
+}
+
+type SummarizeUsersRow struct {
+	Total       int64 `json:"total"`
+	ActiveCount int64 `json:"active_count"`
+	BannedCount int64 `json:"banned_count"`
+	AdminCount  int64 `json:"admin_count"`
+}
+
+func (q *Queries) SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error) {
+	row := q.db.QueryRowContext(ctx, summarizeUsers,
+		arg.HasKeyword,
+		arg.KeywordLike,
+		arg.HasRole,
+		arg.Role,
+		arg.HasStatus,
+		arg.Status,
+	)
+	var i SummarizeUsersRow
+	err := row.Scan(
+		&i.Total,
+		&i.ActiveCount,
+		&i.BannedCount,
+		&i.AdminCount,
+	)
+	return i, err
 }
 
 const updateUser = `-- name: UpdateUser :exec

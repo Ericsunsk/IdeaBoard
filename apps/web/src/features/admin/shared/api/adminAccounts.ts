@@ -9,7 +9,10 @@ import {
 } from '../../../../shared/api/generated-query/admin-accounts/admin-accounts'
 import type { AccountLimitRange, AccountLimits } from '../../../../shared/api/generated-query/model'
 
-export type { AdminAccount } from '../../../../shared/api/generated-query/model'
+export type {
+  AdminAccount,
+  AdminAccountUpdateRequest,
+} from '../../../../shared/api/generated-query/model'
 export type AdminAccountLimits = AccountLimits
 
 type AdminAccountLimitRange = AccountLimitRange

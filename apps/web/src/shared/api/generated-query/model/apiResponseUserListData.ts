@@ -8,5 +8,8 @@ import type { User } from './user'
 
 export type ApiResponseUserListData = {
   total: number
+  active_count: number
+  banned_count: number
+  admin_count: number
   list: User[]
 }

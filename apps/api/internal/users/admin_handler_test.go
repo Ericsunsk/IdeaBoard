@@ -49,6 +49,27 @@ func (f *fakeAdminAuthManager) RevokeUserSessions(_ context.Context, authUserID 
 	return f.revokeErr
 }
 
+func TestAdminListUsersRejectsInvalidFilters(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	handler := NewAdminHandler(NewUserService(repo), nil, nil)
+	router := gin.New()
+	router.GET("/admin/users", handler.ListUsers)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/users?role=owner", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "role 仅支持 admin 或 user") {
+		t.Fatalf("body = %s, want role validation message", rec.Body.String())
+	}
+}
+
 func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

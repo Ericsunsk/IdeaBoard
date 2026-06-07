@@ -465,6 +465,16 @@ paths:
         - name: keyword
           in: query
           schema: { type: string }
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, user]
+        - name: status
+          in: query
+          schema:
+            type: integer
+            enum: [0, 1]
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -1963,13 +1973,18 @@ components:
           properties:
             data:
               type: object
-              required: [list, total]
+              required: [list, total, pending_count, running_count, completed_count, failed_count, other_count]
               properties:
                 list:
                   type: array
                   items:
                     $ref: '#/components/schemas/Task'
                 total: { type: integer }
+                pending_count: { type: integer }
+                running_count: { type: integer }
+                completed_count: { type: integer }
+                failed_count: { type: integer }
+                other_count: { type: integer }
 
     ApiResponseTask:
       allOf:
@@ -2020,9 +2035,12 @@ components:
           properties:
             data:
               type: object
-              required: [total, list]
+              required: [total, active_count, banned_count, admin_count, list]
               properties:
                 total: { type: integer }
+                active_count: { type: integer }
+                banned_count: { type: integer }
+                admin_count: { type: integer }
                 list:
                   type: array
                   items:

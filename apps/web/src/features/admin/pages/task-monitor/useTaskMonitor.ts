@@ -62,16 +62,31 @@ export function useTaskMonitor() {
 
   const mockTasks = computed(() => createMockAdminTasks())
   const filteredMockTasks = computed(() =>
-    mockTasks.value.filter((task) => matchesMockTaskFilters(task, filterStatus.value, appliedSearchKeyword.value)),
+    mockTasks.value.filter((task) =>
+      matchesMockTaskFilters(task, filterStatus.value, appliedSearchKeyword.value),
+    ),
   )
   const tasks = computed(() =>
-    isMockMode.value ? paginateMockTasks(filteredMockTasks.value, page.value) : tasksQuery.data.value?.data?.list || [],
+    isMockMode.value
+      ? paginateMockTasks(filteredMockTasks.value, page.value)
+      : tasksQuery.data.value?.data?.list || [],
   )
   const total = computed(() =>
     isMockMode.value ? filteredMockTasks.value.length : tasksQuery.data.value?.data?.total || 0,
   )
   const loading = computed(() => !isMockMode.value && tasksQuery.isLoading.value)
   const pageStats = computed(() => buildPageTaskStats(tasks.value))
+  const taskStats = computed<PageTaskStats>(() => {
+    if (isMockMode.value) return buildPageTaskStats(filteredMockTasks.value)
+    const data = tasksQuery.data.value?.data
+    return {
+      pending: data?.pending_count ?? 0,
+      running: data?.running_count ?? 0,
+      completed: data?.completed_count ?? 0,
+      failed: data?.failed_count ?? 0,
+      other: data?.other_count ?? 0,
+    }
+  })
 
   const activeTasks = computed<TimedTaskRow[]>(() =>
     tasks.value
@@ -120,6 +135,7 @@ export function useTaskMonitor() {
     total,
     loading,
     page,
+    taskStats,
     pageStats,
     activeTasks,
     filterStatus,

@@ -131,30 +131,56 @@ func (r *UserRepository) Delete(ctx context.Context, id int64) error {
 }
 
 // List 获取用户列表
-func (r *UserRepository) List(ctx context.Context, keyword string, page, pageSize int) ([]*User, int64, error) {
+func (r *UserRepository) List(
+	ctx context.Context,
+	keyword string,
+	role string,
+	status int16,
+	hasStatus bool,
+	page int,
+	pageSize int,
+) ([]*User, UserListCounts, error) {
 	keyword = strings.TrimSpace(keyword)
+	role = strings.TrimSpace(role)
 	hasKeyword := keyword != ""
+	hasRole := role != ""
 	keywordLike := "%" + keyword + "%"
-	total, err := r.q.CountUsers(ctx, dbsqlc.CountUsersParams{HasKeyword: hasKeyword, KeywordLike: keywordLike})
+	summary, err := r.q.SummarizeUsers(ctx, dbsqlc.SummarizeUsersParams{
+		HasKeyword:  hasKeyword,
+		KeywordLike: keywordLike,
+		HasRole:     hasRole,
+		Role:        role,
+		HasStatus:   hasStatus,
+		Status:      status,
+	})
 	if err != nil {
-		return nil, 0, err
+		return nil, UserListCounts{}, err
 	}
 	offset := (page - 1) * pageSize
 	rows, err := r.q.ListUsers(ctx, dbsqlc.ListUsersParams{
 		HasKeyword:  hasKeyword,
 		KeywordLike: keywordLike,
+		HasRole:     hasRole,
+		Role:        role,
+		HasStatus:   hasStatus,
+		Status:      status,
 		PageLimit:   int32(pageSize),
 		PageOffset:  int32(offset),
 	})
 	if err != nil {
-		return nil, 0, err
+		return nil, UserListCounts{}, err
 	}
 	result := make([]*User, 0, len(rows))
 	for _, row := range rows {
 		user := userFromSQLC(row)
 		result = append(result, &user)
 	}
-	return result, total, nil
+	return result, UserListCounts{
+		Total:       summary.Total,
+		ActiveCount: summary.ActiveCount,
+		BannedCount: summary.BannedCount,
+		AdminCount:  summary.AdminCount,
+	}, nil
 }
 
 // UpdateStatus 更新用户状态

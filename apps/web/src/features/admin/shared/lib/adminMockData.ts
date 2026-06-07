@@ -1,5 +1,7 @@
 import { computed } from 'vue'
 import type {
+  AccountLimits,
+  AdminAccount,
   AdminStatistics,
   AdminStatisticsBottleneckSourcesItem,
   AdminStatisticsFailureCategoriesItem,
@@ -7,6 +9,7 @@ import type {
   AdminStatisticsQualityTrendItem,
   AdminStatisticsSlowModelsItem,
   AdminStatisticsTrendItem,
+  Channel,
   MonitorData,
   MonitorStats,
   Task,
@@ -77,6 +80,223 @@ export function createMockAdminTasks(now = new Date()): Task[] {
   ]
 }
 
+export function createMockAdminChannels(now = new Date()): Channel[] {
+  const timestamp = now.toISOString()
+  return [
+    {
+      id: 201,
+      type: 'openai-compatible',
+      name: 'OpenAI 主线路',
+      api_url: 'https://api.openai.com/v1',
+      status: 1,
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+    {
+      id: 202,
+      type: 'google-ai',
+      name: 'Google Gemini 官方',
+      api_url: 'https://generativelanguage.googleapis.com/v1beta',
+      status: 1,
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+    {
+      id: 203,
+      type: 'openai-compatible',
+      name: '火山 Seedream',
+      api_url: 'https://ark.cn-beijing.volces.com/api/v3',
+      status: 1,
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+    {
+      id: 204,
+      type: 'openai-compatible',
+      name: 'Black Forest Labs',
+      api_url: 'https://api.bfl.ai/v1',
+      status: 1,
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+    {
+      id: 205,
+      type: 'openai-compatible',
+      name: '备用聚合网关',
+      api_url: 'https://gateway.example.com/v1',
+      status: 1,
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+    {
+      id: 206,
+      type: 'google-ai',
+      name: 'Google 备用池',
+      api_url: 'https://backup-generativelanguage.example.com/v1beta',
+      status: 0,
+      created_at: timestamp,
+      updated_at: timestamp,
+    },
+  ]
+}
+
+export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
+  const timestamp = now.toISOString()
+  return [
+    createMockAdminAccount(
+      901,
+      201,
+      'OpenAI east key',
+      'openai-compatible',
+      'https://api.openai.com/v1',
+      'gpt-image-1',
+      10,
+      7,
+      0,
+      1,
+      timestamp,
+    ),
+    createMockAdminAccount(
+      902,
+      201,
+      'OpenAI backup key',
+      'openai-compatible',
+      'https://api.openai.com/v1',
+      'gpt-image-1,imagen-4-preview',
+      8,
+      2,
+      1,
+      1,
+      timestamp,
+      ['imagen-4-preview'],
+    ),
+    createMockAdminAccount(
+      903,
+      202,
+      'Gemini official key',
+      'google-ai',
+      'https://generativelanguage.googleapis.com/v1beta',
+      'gemini-2.5-flash-image',
+      12,
+      9,
+      0,
+      1,
+      timestamp,
+    ),
+    createMockAdminAccount(
+      904,
+      202,
+      'Gemini safety pool',
+      'google-ai',
+      'https://generativelanguage.googleapis.com/v1beta',
+      'gemini-2.5-flash-image,imagen-4-preview',
+      6,
+      0,
+      6,
+      0,
+      timestamp,
+    ),
+    createMockAdminAccount(
+      905,
+      203,
+      'Seedream visual pool',
+      'openai-compatible',
+      'https://ark.cn-beijing.volces.com/api/v3',
+      'seedream-4.0',
+      10,
+      4,
+      0,
+      1,
+      timestamp,
+    ),
+    createMockAdminAccount(
+      906,
+      203,
+      'Seedream burst pool',
+      'openai-compatible',
+      'https://ark.cn-beijing.volces.com/api/v3',
+      'seedream-4.0,seedream-4.0-edit',
+      8,
+      6,
+      2,
+      1,
+      timestamp,
+      ['seedream-4.0-edit'],
+    ),
+    createMockAdminAccount(
+      907,
+      204,
+      'Flux Kontext pro',
+      'openai-compatible',
+      'https://api.bfl.ai/v1',
+      'flux-kontext-pro',
+      6,
+      5,
+      1,
+      1,
+      timestamp,
+    ),
+    createMockAdminAccount(
+      908,
+      204,
+      'Flux Kontext failover',
+      'openai-compatible',
+      'https://api.bfl.ai/v1',
+      'flux-kontext-max,flux-kontext-pro',
+      6,
+      1,
+      0,
+      1,
+      timestamp,
+    ),
+    createMockAdminAccount(
+      909,
+      205,
+      'Gateway mixed pool',
+      'openai-compatible',
+      'https://gateway.example.com/v1',
+      'gpt-image-1,gemini-2.5-flash-image,seedream-4.0',
+      16,
+      11,
+      3,
+      1,
+      timestamp,
+      ['gemini-2.5-flash-image'],
+    ),
+    createMockAdminAccount(
+      910,
+      205,
+      'Gateway cold standby',
+      'openai-compatible',
+      'https://gateway.example.com/v1',
+      'flux-kontext-pro,imagen-4-preview',
+      8,
+      0,
+      0,
+      0,
+      timestamp,
+    ),
+    createMockAdminAccount(
+      911,
+      206,
+      'Gemini spare key',
+      'google-ai',
+      'https://backup-generativelanguage.example.com/v1beta',
+      'gemini-2.5-flash-image',
+      5,
+      0,
+      7,
+      0,
+      timestamp,
+    ),
+  ]
+}
+
+export const mockAdminAccountLimits: AccountLimits = {
+  max_concurrent: { min: 1, max: 64, default: 8 },
+  timeout_seconds: { min: 5, max: 600, default: 180 },
+}
+
 export const mockMonitorData: MonitorData = {
   global_queue_len: 31,
   wait_queue_len: 11,
@@ -88,6 +308,43 @@ export const mockMonitorData: MonitorData = {
     104: { current_concurrent: 7, max_concurrent: 12 },
     105: { current_concurrent: 1, max_concurrent: 5 },
   },
+}
+
+function createMockAdminAccount(
+  id: number,
+  channelId: number,
+  name: string,
+  apiType: string,
+  proxyUrl: string,
+  modelSet: string,
+  maxConcurrent: number,
+  currentConcurrent: number,
+  failCount: number,
+  status: number,
+  timestamp: string,
+  disabledModels: string[] = [],
+): AdminAccount {
+  return {
+    id,
+    name,
+    channel_id: channelId,
+    platform: apiType,
+    api_type: apiType,
+    proxy_url: proxyUrl,
+    model_set: modelSet,
+    max_concurrent: maxConcurrent,
+    current_concurrent: currentConcurrent,
+    wait_queue_count: Math.max(0, failCount - 1),
+    running_status: status === 1 ? 'running' : 'stopped',
+    fail_count: failCount,
+    weight: status === 1 ? 100 : 40,
+    timeout: 180,
+    extra_config:
+      disabledModels.length > 0 ? JSON.stringify({ disabled_models: disabledModels }) : '{}',
+    status,
+    created_at: timestamp,
+    updated_at: timestamp,
+  }
 }
 
 export const mockMonitorStats: MonitorStats = {
@@ -134,7 +391,14 @@ function createMockQualityTrend(range: AdminStatisticsRange): AdminStatisticsQua
 
 function createMockModelHealth(): AdminStatisticsModelHealthItem[] {
   return [
-    { name: 'gpt-image-1', total: 4820, completed: 4560, failed: 260, failure_rate: 5.4, avg_seconds: 21.6 },
+    {
+      name: 'gpt-image-1',
+      total: 4820,
+      completed: 4560,
+      failed: 260,
+      failure_rate: 5.4,
+      avg_seconds: 21.6,
+    },
     {
       name: 'gemini-2.5-flash-image',
       total: 3160,
@@ -143,7 +407,14 @@ function createMockModelHealth(): AdminStatisticsModelHealthItem[] {
       failure_rate: 9.1,
       avg_seconds: 34.2,
     },
-    { name: 'seedream-4.0', total: 2118, completed: 1890, failed: 228, failure_rate: 10.8, avg_seconds: 18.9 },
+    {
+      name: 'seedream-4.0',
+      total: 2118,
+      completed: 1890,
+      failed: 228,
+      failure_rate: 10.8,
+      avg_seconds: 18.9,
+    },
     {
       name: 'flux-kontext-pro',
       total: 1380,
@@ -152,7 +423,14 @@ function createMockModelHealth(): AdminStatisticsModelHealthItem[] {
       failure_rate: 15.1,
       avg_seconds: 46.8,
     },
-    { name: 'imagen-4-preview', total: 820, completed: 662, failed: 158, failure_rate: 19.3, avg_seconds: 58.5 },
+    {
+      name: 'imagen-4-preview',
+      total: 820,
+      completed: 662,
+      failed: 158,
+      failure_rate: 19.3,
+      avg_seconds: 58.5,
+    },
   ]
 }
 

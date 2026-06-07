@@ -341,13 +341,13 @@ func (r *Repository) ListExecutionFailureCategoryStatsByCreatedRange(ctx context
 	return result, nil
 }
 
-func (r *Repository) List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, int64, error) {
+func (r *Repository) List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error) {
 	hasUserID := userID > 0
 	hasAccountID := accountID > 0
 	hasStatus := status != ""
 	keywordLike := "%" + keyword + "%"
 	hasKeyword := keyword != ""
-	countParams := dbsqlc.CountTasksParams{
+	summaryParams := dbsqlc.SummarizeTasksParams{
 		HasUserID:    hasUserID,
 		UserID:       userID,
 		HasAccountID: hasAccountID,
@@ -357,9 +357,9 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 		HasKeyword:   hasKeyword,
 		KeywordLike:  keywordLike,
 	}
-	total, err := r.q.CountTasks(ctx, countParams)
+	summary, err := r.q.SummarizeTasks(ctx, summaryParams)
 	if err != nil {
-		return nil, 0, err
+		return nil, tasks.TaskListCounts{}, err
 	}
 	offset := (page - 1) * pageSize
 	rows, err := r.q.ListTasks(ctx, dbsqlc.ListTasksParams{
@@ -375,13 +375,20 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 		PageOffset:   int32(offset),
 	})
 	if err != nil {
-		return nil, 0, err
+		return nil, tasks.TaskListCounts{}, err
 	}
 	items := tasksFromSQLC(rows)
 	if err := r.attachExecutionMetrics(ctx, items); err != nil {
-		return nil, 0, err
+		return nil, tasks.TaskListCounts{}, err
 	}
-	return items, total, nil
+	return items, tasks.TaskListCounts{
+		Total:          summary.Total,
+		PendingCount:   summary.PendingCount,
+		RunningCount:   summary.RunningCount,
+		CompletedCount: summary.CompletedCount,
+		FailedCount:    summary.FailedCount,
+		OtherCount:     summary.OtherCount,
+	}, nil
 }
 
 func (r *Repository) GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error) {
