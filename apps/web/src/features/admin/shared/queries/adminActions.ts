@@ -14,15 +14,13 @@ import { backfillAdminStatistics } from '../../../../shared/api/generated-query/
 import type { ApiResponse } from '../../../../shared/types'
 import type {
   AdminStatisticsBackfillResult,
+  ApiResponseRegistrationSettingData,
   GetAdminStatisticsRange,
   RateLimitSetting,
+  UpdateAdminRegistrationSettingBody,
 } from '../../../../shared/api/generated-query/model'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import { storageApi, type StorageProfile, type StorageProfilePayload } from '../api/storage'
-
-export type AdminStatisticsRange = GetAdminStatisticsRange
-export type RateLimitSettings = { window_seconds: number; max_requests: number }
-export type RegistrationSetting = { enabled: boolean }
 
 type SaveFeaturePromptInput = { slug: string; prompt: string }
 type SaveStorageProfileInput = { id?: string; payload: StorageProfilePayload }
@@ -41,12 +39,14 @@ function requireApiOk<T>(res: ApiResponse<T>, fallback: string): T | undefined {
   return res.data
 }
 
-export async function updateRateLimitSettings(data: RateLimitSettings): Promise<RateLimitSettings> {
-  const res = await updateAdminRateLimitSettings(data as RateLimitSetting)
+export async function updateRateLimitSettings(data: RateLimitSetting): Promise<RateLimitSetting> {
+  const res = await updateAdminRateLimitSettings(data)
   return requireApiData(res, '保存限流配置失败')
 }
 
-export async function updateRegistrationSetting(enabled: boolean): Promise<RegistrationSetting> {
+export async function updateRegistrationSetting(
+  enabled: UpdateAdminRegistrationSettingBody['enabled'],
+): Promise<ApiResponseRegistrationSettingData> {
   const res = await updateAdminRegistrationSetting({ enabled })
   return requireApiData(res, '更新注册状态失败')
 }
@@ -94,7 +94,7 @@ export async function saveFeaturePrompt(
 }
 
 export async function triggerAdminStatisticsBackfill(
-  range: AdminStatisticsRange,
+  range: GetAdminStatisticsRange,
 ): Promise<AdminStatisticsBackfillResult> {
   const res = await backfillAdminStatistics({ range })
   return requireApiData(res, '补录失败')

@@ -13,8 +13,6 @@ const RESULT_ARRAY_PREVIEW_LENGTH = 5
 const SENSITIVE_KEY_PATTERN =
   /token|secret|password|cookie|authorization|api[-_]?key|signature|credential/i
 
-export { isAllowedResultImageUrl } from './taskResultImages'
-
 export function useTaskResultDetail(options: {
   message: { success: (content: string) => void; error: (content: string) => void }
 }) {

@@ -122,155 +122,131 @@
       </Card>
     </div>
 
-    <div
-      class="min-w-0 overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0"
-    >
-      <div class="flex flex-wrap items-center justify-between gap-4 bg-transparent px-6 py-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <IconField class="relative w-full sm:w-[260px]">
-            <InputIcon>
-              <Search class="size-4 text-admin-text-3" />
-            </InputIcon>
-            <InputText
-              v-model="searchKeyword"
-              placeholder="Search"
-              fluid
-              class="!h-[38px] !w-full !rounded-lg !bg-white !text-[15px] !text-admin-text-1 !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]"
-              @keydown.enter="handleTaskSearch"
+    <AdminTablePanel>
+      <template #toolbar-start>
+        <AdminToolbarSearch
+          v-model="searchKeyword"
+          @enter="handleTaskSearch"
+          @clear="clearSearch"
+        />
+        <Tag :value="`${total} 任务`" severity="secondary" rounded />
+        <Tag
+          v-if="taskStats.pending > 0"
+          :value="`${taskStats.pending} 等待中`"
+          severity="secondary"
+          rounded
+        />
+        <Tag
+          v-if="taskStats.running > 0"
+          :value="`${taskStats.running} 执行中`"
+          severity="warn"
+          rounded
+        />
+        <Tag
+          v-if="taskStats.failed > 0"
+          :value="`${taskStats.failed} 失败`"
+          severity="danger"
+          rounded
+        />
+        <Tag
+          v-if="taskStats.completed > 0"
+          :value="`${taskStats.completed} 已完成`"
+          severity="success"
+          rounded
+        />
+        <Tag v-if="selectedTasks.length > 0" :value="`已选 ${selectedTasks.length}`" rounded />
+      </template>
+
+      <template #toolbar-end>
+        <Button
+          text
+          :class="[adminToolbarIconButtonClass, hasTaskFilter ? '!border-admin-text-1' : '']"
+          aria-label="筛选任务"
+          :aria-pressed="hasTaskFilter"
+          @click="toggleTaskFilterPanel"
+        >
+          <template #icon>
+            <Filter
+              :class="['size-4', hasTaskFilter ? 'text-admin-text-1' : 'text-admin-text-2']"
             />
-            <Button
-              v-if="searchKeyword"
-              text
-              rounded
-              class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
-              aria-label="清空搜索"
-              @click="clearSearch"
+          </template>
+        </Button>
+        <Popover ref="taskFilterPopoverRef">
+          <div :class="adminFilterPopoverClass">
+            <div class="border-b border-admin-border pb-2">
+              <div :class="adminPopoverTitleClass">筛选</div>
+            </div>
+
+            <label
+              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
             >
-              <template #icon>
-                <Xmark />
-              </template>
-            </Button>
-          </IconField>
-          <Tag :value="`${total} 任务`" severity="secondary" rounded />
-          <Tag
-            v-if="taskStats.pending > 0"
-            :value="`${taskStats.pending} 等待中`"
-            severity="secondary"
-            rounded
-          />
-          <Tag
-            v-if="taskStats.running > 0"
-            :value="`${taskStats.running} 执行中`"
-            severity="warn"
-            rounded
-          />
-          <Tag
-            v-if="taskStats.failed > 0"
-            :value="`${taskStats.failed} 失败`"
-            severity="danger"
-            rounded
-          />
-          <Tag
-            v-if="taskStats.completed > 0"
-            :value="`${taskStats.completed} 已完成`"
-            severity="success"
-            rounded
-          />
-          <Tag v-if="selectedTasks.length > 0" :value="`已选 ${selectedTasks.length}`" rounded />
-        </div>
-
-        <div class="flex flex-wrap items-center justify-end gap-3">
-          <Button
-            text
-            class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-            :class="hasTaskFilter ? '!border-admin-text-1' : ''"
-            aria-label="筛选任务"
-            :aria-pressed="hasTaskFilter"
-            @click="toggleTaskFilterPanel"
-          >
-            <template #icon>
-              <Filter
-                :class="['size-4', hasTaskFilter ? 'text-admin-text-1' : 'text-admin-text-2']"
-              />
-            </template>
-          </Button>
-          <Popover ref="taskFilterPopoverRef">
-            <div class="flex w-[260px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4">
-              <div class="border-b border-admin-border pb-2">
-                <div class="text-admin-content font-bold text-admin-title-color">筛选</div>
-              </div>
-
-              <label
-                class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-              >
-                <span>状态</span>
-                <Select
-                  v-model="filterStatus"
-                  :options="taskStatusOptions"
-                  option-label="label"
-                  option-value="value"
-                  size="small"
-                  fluid
-                />
-              </label>
-
-              <Button
-                label="重置筛选"
+              <span>状态</span>
+              <Select
+                v-model="filterStatus"
+                :options="taskStatusOptions"
+                option-label="label"
+                option-value="value"
                 size="small"
-                severity="contrast"
-                :disabled="!hasTaskFilter"
-                @click="resetTaskFilters"
+                fluid
               />
-            </div>
-          </Popover>
+            </label>
 
-          <div class="h-5 w-[1px] bg-admin-border-soft"></div>
+            <Button
+              label="重置筛选"
+              size="small"
+              severity="contrast"
+              :disabled="!hasTaskFilter"
+              @click="resetTaskFilters"
+            />
+          </div>
+        </Popover>
 
+        <div class="h-5 w-[1px] bg-admin-border-soft"></div>
+
+        <Button
+          text
+          :class="adminToolbarIconButtonClass"
+          aria-label="刷新任务列表"
+          @click="loadTasks"
+        >
+          <template #icon>
+            <Refresh class="size-4 text-admin-text-2" />
+          </template>
+        </Button>
+
+        <div class="flex items-center gap-1.5">
+          <div :class="adminToolbarPageLabelClass">{{ page }} / {{ totalPages }}</div>
           <Button
             text
-            class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-            aria-label="刷新任务列表"
-            @click="loadTasks"
+            :class="adminToolbarPagerButtonClass"
+            :disabled="page === 1 || loading"
+            aria-label="上一页"
+            @click="handlePrevTaskPage"
           >
             <template #icon>
-              <Refresh class="size-4 text-admin-text-2" />
+              <NavArrowLeft class="size-4 text-admin-text-2" />
             </template>
           </Button>
-
-          <div class="flex items-center gap-1.5">
-            <div
-              class="flex h-9 items-center justify-center rounded-lg !border !border-admin-border !bg-white px-3 text-[12px] font-semibold text-admin-text-2"
-            >
-              {{ page }} / {{ totalPages }}
-            </div>
-            <Button
-              text
-              class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors disabled:!opacity-40 flex items-center justify-center p-0"
-              :disabled="page === 1 || loading"
-              aria-label="上一页"
-              @click="handlePrevTaskPage"
-            >
-              <template #icon>
-                <NavArrowLeft class="size-4 text-admin-text-2" />
-              </template>
-            </Button>
-            <Button
-              text
-              class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors disabled:!opacity-40 flex items-center justify-center p-0"
-              :disabled="page === totalPages || loading"
-              aria-label="下一页"
-              @click="handleNextTaskPage"
-            >
-              <template #icon>
-                <NavArrowRight class="size-4 text-admin-text-2" />
-              </template>
-            </Button>
-          </div>
+          <Button
+            text
+            :class="adminToolbarPagerButtonClass"
+            :disabled="page === totalPages || loading"
+            aria-label="下一页"
+            @click="handleNextTaskPage"
+          >
+            <template #icon>
+              <NavArrowRight class="size-4 text-admin-text-2" />
+            </template>
+          </Button>
         </div>
-      </div>
+      </template>
 
-      <div class="px-6 pb-6">
-        <AdminTableFrame>
+      <AdminTableFrame>
+        <div
+          class="app-scrollbar overflow-x-auto overscroll-contain"
+          :class="{ 'is-scrolling': isTaskTableScrolling }"
+          @scroll.passive="handleTaskTableScroll"
+        >
           <DataTable
             v-model:selection="selectedTasks"
             :value="tasks"
@@ -397,9 +373,9 @@
               </template>
             </Column>
           </DataTable>
-        </AdminTableFrame>
-      </div>
-    </div>
+        </div>
+      </AdminTableFrame>
+    </AdminTablePanel>
 
     <Dialog
       v-model:visible="detailModalVisible"
@@ -662,10 +638,7 @@ import Chart from 'primevue/chart'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
-import IconField from 'primevue/iconfield'
 import PrimeImage from 'primevue/image'
-import InputIcon from 'primevue/inputicon'
-import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
@@ -682,10 +655,8 @@ import {
   NavArrowLeft,
   NavArrowRight,
   Refresh,
-  Search,
   Terminal,
   WarningTriangle,
-  Xmark,
   XmarkCircle,
 } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
@@ -693,6 +664,8 @@ import type { Task } from '../../../../shared/api/task'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
+import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
+import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { adminCards } from '../../shared/lib/adminCardMeta'
 import {
   adminChartLegend,
@@ -710,6 +683,14 @@ import {
   withAlpha,
 } from '../../shared/lib/adminChart'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
+import {
+  adminFilterPopoverClass,
+  adminPopoverTitleClass,
+  adminToolbarIconButtonClass,
+  adminToolbarPageLabelClass,
+  adminToolbarPagerButtonClass,
+} from '../../shared/lib/adminUiClasses'
+import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import {
   formatTaskCreatedAt,
   getTaskApiCall,
@@ -734,6 +715,14 @@ const taskCards = adminCards.taskMonitor
 type PrimePopupPanel = {
   toggle: (event: Event) => void
 }
+const adminMonitorTooltipBase = {
+  backgroundColor: adminChartTheme.tooltipBg,
+  titleColor: adminChartTheme.tooltipText,
+  bodyColor: adminChartTheme.tooltipText,
+  borderColor: adminChartTheme.tooltipBorder,
+  borderWidth: 1,
+  padding: 10,
+} as const
 const detailDialogPt = {
   root: {
     class:
@@ -798,6 +787,8 @@ const { monitorData, monitorStats, monitorStreamStatus } = useTaskRuntimeMonitor
 
 const taskFilterPopoverRef = ref<PrimePopupPanel | null>(null)
 const selectedTasks = ref<Task[]>([])
+const { isScrolling: isTaskTableScrolling, handleScroll: handleTaskTableScroll } =
+  useTransientScrolling()
 const hasTaskFilter = computed(() => Boolean(filterStatus.value))
 const totalPages = computed(() => Math.ceil(total.value / TASK_MONITOR_PAGE_SIZE) || 1)
 
@@ -887,6 +878,7 @@ type AccountLoadRow = {
   max: number
   available: number
   percent: number
+  color: string
 }
 
 const accountLoadRows = computed<AccountLoadRow[]>(() =>
@@ -902,6 +894,7 @@ const accountLoadRows = computed<AccountLoadRow[]>(() =>
         max,
         available,
         percent,
+        color: getAccountConcurrencyColor(percent),
       }
     })
     .sort((a, b) => b.percent - a.percent),
@@ -944,8 +937,8 @@ const accountConcurrencyChartData = computed<AdminChartData>(() => {
         type: 'bar',
         label: '占用',
         data: rows.map((row) => row.percent),
-        backgroundColor: rows.map((row) => accountConcurrencyColor(row.percent)),
-        borderColor: rows.map((row) => accountConcurrencyColor(row.percent)),
+        backgroundColor: rows.map((row) => row.color),
+        borderColor: rows.map((row) => row.color),
         borderWidth: adminChartStrokeWidth,
         borderRadius: 5,
         maxBarThickness: 14,
@@ -988,12 +981,7 @@ const accountConcurrencyChartOptions = computed<AdminChartOptions>(() =>
     plugins: {
       legend: adminChartLegend('bottom'),
       tooltip: {
-        backgroundColor: adminChartTheme.tooltipBg,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        titleColor: adminChartTheme.tooltipText,
-        bodyColor: adminChartTheme.tooltipText,
-        padding: 10,
+        ...adminMonitorTooltipBase,
         callbacks: {
           label: (context) => {
             const row = accountLoadRows.value[context.dataIndex]
@@ -1056,7 +1044,7 @@ const taskDistributionRows = computed<TaskDistributionRow[]>(() => {
       sharePercent: totalCount > 0 ? (count / totalCount) * 100 : 0,
       durationPressure: Math.max(0, ...points.map((point) => point.durationPressure)),
       anomalyPressure: Math.max(0, ...points.map((point) => point.anomalyPressure)),
-      avgDurationSeconds: getWeightedAverage(points, 'avgDurationSeconds'),
+      avgDurationSeconds: getWeightedAverageDuration(points),
       maxDurationSeconds: Math.max(0, ...points.map((point) => point.maxDurationSeconds)),
       failedCount: points.reduce((sum, point) => sum + point.failedCount, 0),
       retryCount: points.reduce((sum, point) => sum + point.retryCount, 0),
@@ -1096,12 +1084,7 @@ const taskDistributionChartOptions = computed<AdminChartOptions>(() =>
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: adminChartTheme.tooltipBg,
-        titleColor: adminChartTheme.tooltipText,
-        bodyColor: adminChartTheme.tooltipText,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        padding: 10,
+        ...adminMonitorTooltipBase,
         callbacks: {
           title: (items) => taskDistributionRows.value[items[0]?.dataIndex ?? -1]?.label || '',
           label: (context) => {
@@ -1163,12 +1146,7 @@ const executionPressureChartOptions = computed<AdminChartOptions>(() =>
     plugins: {
       legend: adminChartLegend(),
       tooltip: {
-        backgroundColor: adminChartTheme.tooltipBg,
-        titleColor: adminChartTheme.tooltipText,
-        bodyColor: adminChartTheme.tooltipText,
-        borderColor: adminChartTheme.tooltipBorder,
-        borderWidth: 1,
-        padding: 10,
+        ...adminMonitorTooltipBase,
         callbacks: {
           title: (items) => {
             const raw = items[0]?.raw as ExecutionPressureChartPoint | undefined
@@ -1231,10 +1209,10 @@ function formatPercent(value: number, totalValue: number) {
   return `${((value / totalValue) * 100).toFixed(1)}%`
 }
 
-function getWeightedAverage(points: TaskExecutionPressurePoint[], key: 'avgDurationSeconds') {
+function getWeightedAverageDuration(points: TaskExecutionPressurePoint[]) {
   const totalCount = points.reduce((sum, point) => sum + point.count, 0)
   if (totalCount <= 0) return 0
-  return points.reduce((sum, point) => sum + point[key] * point.count, 0) / totalCount
+  return points.reduce((sum, point) => sum + point.avgDurationSeconds * point.count, 0) / totalCount
 }
 
 function formatPercentValue(value: number) {
@@ -1252,7 +1230,7 @@ function formatMonitorStreamStatus(status: string) {
   return textByStatus[status] || '实时流未知'
 }
 
-function accountConcurrencyColor(percent: number) {
+function getAccountConcurrencyColor(percent: number) {
   if (percent >= 90) return adminChartTheme.danger
   if (percent >= 70) return adminChartTheme.warning
   return adminChartTheme.info

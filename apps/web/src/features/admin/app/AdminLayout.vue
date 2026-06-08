@@ -34,25 +34,23 @@
           type="button"
           text
           rounded
-          :class="[railButtonClass, railButtonIdleClass, '!overflow-hidden !rounded-full']"
+          :class="userAvatarButtonClass"
           aria-haspopup="menu"
           :aria-expanded="false"
           @click="toggleUserMenu"
         >
-          <template #icon>
-            <Avatar
-              v-if="userStore.user?.avatar"
-              :image="userStore.user.avatar"
-              shape="circle"
-              :class="avatarClass"
-            />
-            <Avatar
-              v-else
-              icon="pi pi-user"
-              shape="circle"
-              :class="[avatarClass, '!border !border-[var(--color-admin-border)]']"
-            />
-          </template>
+          <Avatar
+            v-if="userStore.user?.avatar"
+            :image="userStore.user.avatar"
+            shape="circle"
+            :class="avatarClass"
+          />
+          <Avatar
+            v-else
+            icon="pi pi-user"
+            shape="circle"
+            :class="[avatarClass, '!border !border-[var(--color-admin-border)]']"
+          />
         </Button>
       </div>
     </aside>
@@ -276,8 +274,12 @@ const layoutShellClass =
   'grid min-h-screen grid-cols-[133px_minmax(0,1fr)] bg-white text-[var(--color-admin-text-1)] max-[1080px]:grid-cols-1'
 const siderClass =
   "sticky top-0 flex h-screen self-start flex-col items-start bg-white py-[42px] max-[1080px]:hidden before:absolute before:top-[21px] before:bottom-[21px] before:left-[21px] before:box-border before:w-[84px] before:rounded-[14px] before:bg-[#f8fafc] before:content-['']"
-const brandMarkClass =
-  'relative z-[1] ml-[42px] inline-flex size-10 flex-none items-center justify-center rounded-xl border border-black bg-white text-[#0f172a] no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
+const railItemSizeClass = 'size-10 min-w-[40px]'
+const railButtonSizeClass = '!size-10 !min-w-[40px]'
+const brandMarkClass = [
+  'relative z-[1] ml-[42px] inline-flex flex-none items-center justify-center rounded-xl border border-black bg-white text-[#0f172a] no-underline shadow-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)]',
+  railItemSizeClass,
+].join(' ')
 const brandTextClass = 'text-xs font-[850] tracking-normal'
 const navRailClass =
   'relative z-[1] ml-[21px] flex w-[84px] flex-1 flex-col items-center gap-3 pt-3.5'
@@ -285,12 +287,18 @@ const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-
 const focusRingClass =
   'focus-visible:!outline-none focus-visible:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
 const railButtonClass = [
-  '!inline-flex !size-10 !items-center !justify-center !rounded-[10px] !border !border-transparent !text-[#718096] !shadow-none !transition-colors !duration-200',
+  '!inline-flex !items-center !justify-center !rounded-[10px] !border !border-transparent !text-[#718096] !shadow-none !transition-colors !duration-200',
+  railButtonSizeClass,
   focusRingClass,
 ].join(' ')
 const railButtonIdleClass =
   '!bg-transparent hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]'
 const railButtonActiveClass = '!bg-black !text-white !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
+const userAvatarButtonClass = [
+  railButtonClass,
+  railButtonIdleClass,
+  '!overflow-hidden !rounded-full !p-0 hover:!shadow-none focus:!shadow-none active:!shadow-none',
+].join(' ')
 const shellButtonSkinClass = [
   '!size-[42px] !items-center !justify-center !rounded-[9px] !text-[#718096] !transition-colors !duration-200',
   'hover:!border-[#d7e0eb] hover:!bg-[#eef2f7] hover:!text-[var(--color-admin-text-1)]',
@@ -311,7 +319,7 @@ const notificationButtonClass = [
 ].join(' ')
 const navIconClass = 'size-[17px] stroke-2'
 const shellIconClass = 'size-[19px] stroke-2'
-const avatarClass = '!size-[30px] !bg-white !text-[var(--color-admin-text-1)]'
+const avatarClass = `${railButtonSizeClass} !rounded-full !bg-white !text-[var(--color-admin-text-1)] !shadow-none [&>img]:!h-full [&>img]:!w-full [&>img]:!rounded-full [&>img]:!object-cover`
 const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-white'
 const headerClass =
   'flex min-h-[88px] items-start justify-between gap-6 bg-white py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'

@@ -1,8 +1,8 @@
-import type { AdminStatisticsRange } from '../queries/adminActions'
+import type { GetAdminStatisticsRange } from '../../../../shared/api/generated-query/model'
 
 export type AdminTimeRangeOption = {
   label: string
-  key: AdminStatisticsRange
+  key: GetAdminStatisticsRange
   days: number
   bucketHours?: number
 }
@@ -12,7 +12,7 @@ export type AdminTimeRangeBucket = {
   label: string
 }
 
-export const adminTimeRangeOptions: readonly AdminTimeRangeOption[] = [
+const adminTimeRangeOptions: readonly AdminTimeRangeOption[] = [
   { label: '日', key: '1d', days: 1, bucketHours: 4 },
   { label: '周', key: '7d', days: 7 },
   { label: '月', key: '30d', days: 30 },
@@ -22,22 +22,18 @@ export const adminTimeRangeOptions: readonly AdminTimeRangeOption[] = [
 const adminTimeRangeByKey = new Map(adminTimeRangeOptions.map((option) => [option.key, option]))
 
 export function pickAdminTimeRangeOptions(
-  ranges: readonly AdminStatisticsRange[],
+  ranges: readonly GetAdminStatisticsRange[],
 ): AdminTimeRangeOption[] {
   const allowed = new Set(ranges)
   return adminTimeRangeOptions.filter((option) => allowed.has(option.key))
 }
 
-export function getAdminTimeRangeOption(range: AdminStatisticsRange): AdminTimeRangeOption {
+function getAdminTimeRangeOption(range: GetAdminStatisticsRange): AdminTimeRangeOption {
   return adminTimeRangeByKey.get(range) ?? adminTimeRangeByKey.get('7d')!
 }
 
-export function getAdminTimeRangeDays(range: AdminStatisticsRange): number {
-  return getAdminTimeRangeOption(range).days
-}
-
 export function buildAdminTimeRangeBuckets(
-  range: AdminStatisticsRange,
+  range: GetAdminStatisticsRange,
   now = new Date(),
 ): AdminTimeRangeBucket[] {
   const option = getAdminTimeRangeOption(range)
@@ -58,7 +54,7 @@ export function buildAdminTimeRangeBuckets(
 export function shouldShowAdminTimeRangeTick(input: {
   index: number
   count: number
-  range: AdminStatisticsRange
+  range: GetAdminStatisticsRange
   label?: string
 }): boolean {
   const { index, count, range, label } = input

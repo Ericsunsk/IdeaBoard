@@ -1,222 +1,176 @@
 <template>
-  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0 min-[1081px]:-mb-[17px]">
+  <AdminManagementFrame :is-scrolling="isStoragePanelScrolling" @scroll="handleStoragePanelScroll">
+    <template #toolbar-start>
+      <AdminToolbarSearch v-model="searchKeyword" />
+      <span :class="adminToolbarMetricClass">
+        <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
+        <span>{{ storageCountLabel }}</span>
+      </span>
+      <Tag
+        v-if="currentStorage"
+        :value="`当前 ${currentStorage.name}`"
+        severity="success"
+        rounded
+      />
+      <Tag :value="`${configuredStorageCount}/${storages.length} 已配置`" severity="info" rounded />
+    </template>
+
+    <template #toolbar-end>
+      <Button
+        text
+        :class="adminToolbarIconButtonClass"
+        aria-label="刷新存储"
+        :loading="loading"
+        @click="loadData"
+      >
+        <template #icon>
+          <Refresh class="size-4 text-admin-text-2" />
+        </template>
+      </Button>
+      <Button
+        label="新增存储"
+        class="!h-9 !rounded-lg"
+        :disabled="creatableProviders.length === 0"
+        @click="openCreate"
+      >
+        <template #icon>
+          <Plus class="size-4" />
+        </template>
+      </Button>
+    </template>
+
     <div
-      class="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0 min-[1081px]:h-[calc(100dvh-117px)]"
+      v-if="loading && storages.length === 0"
+      class="flex min-h-[260px] items-center justify-center text-admin-content text-admin-text-3"
     >
-      <div
-        class="flex shrink-0 flex-wrap items-center justify-between gap-4 bg-transparent px-6 py-4"
-      >
-        <div class="flex flex-wrap items-center gap-3">
-          <IconField class="relative w-full sm:w-[260px]">
-            <InputIcon>
-              <Search class="size-4 text-admin-text-3" />
-            </InputIcon>
-            <InputText
-              v-model="searchKeyword"
-              placeholder="Search"
-              fluid
-              class="!h-[38px] !w-full !rounded-lg !bg-white !text-[15px] !text-admin-text-1 !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]"
-            />
-            <Button
-              v-if="searchKeyword"
-              text
-              rounded
-              class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
-              aria-label="清空搜索"
-              @click="searchKeyword = ''"
-            >
-              <template #icon>
-                <Xmark />
-              </template>
-            </Button>
-          </IconField>
-          <span
-            class="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-white px-3 py-1.5 text-[13px] font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]"
-          >
-            <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
-            <span>{{ storageCountLabel }}</span>
-          </span>
-          <Tag
-            v-if="currentStorage"
-            :value="`当前 ${currentStorage.name}`"
-            severity="success"
-            rounded
-          />
-          <Tag
-            :value="`${configuredStorageCount}/${storages.length} 已配置`"
-            severity="info"
-            rounded
-          />
-        </div>
+      <ProgressSpinner class="!h-9 !w-9 text-admin-accent" stroke-width="4" />
+    </div>
 
-        <div class="flex flex-wrap items-center justify-end gap-3">
-          <Button
-            text
-            :class="framedIconButtonClass"
-            aria-label="刷新存储"
-            :loading="loading"
-            @click="loadData"
-          >
-            <template #icon>
-              <Refresh class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-          <Button
-            label="新增存储"
-            class="!h-9 !rounded-lg"
-            :disabled="creatableProviders.length === 0"
-            @click="openCreate"
-          >
-            <template #icon>
-              <Plus class="size-4" />
-            </template>
-          </Button>
-        </div>
+    <div
+      v-else-if="filteredStorageCards.length === 0"
+      class="flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-center text-admin-text-2"
+    >
+      <div class="text-admin-title font-semibold text-admin-title-color">
+        {{ emptyStorageMessage }}
       </div>
-
-      <div
-        class="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6"
-        :class="{ 'is-scrolling': isStoragePanelScrolling }"
-        @scroll.passive="handleStoragePanelScroll"
-      >
-        <div
-          v-if="loading && storages.length === 0"
-          class="flex min-h-[260px] items-center justify-center text-admin-content text-admin-text-3"
-        >
-          <ProgressSpinner class="!h-9 !w-9 text-admin-accent" stroke-width="4" />
-        </div>
-
-        <div
-          v-else-if="filteredStorages.length === 0"
-          class="flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-center text-admin-text-2"
-        >
-          <div class="text-admin-title font-semibold text-admin-title-color">
-            {{ emptyStorageMessage }}
-          </div>
-          <div class="mt-2 text-admin-meta text-admin-subtitle-color">
-            {{ hasStorageSearch ? '调整搜索关键词后重试。' : '点击右上角新增存储开始配置。' }}
-          </div>
-        </div>
-
-        <div v-else class="columns-1 gap-3.5 md:columns-2 xl:columns-3">
-          <Card
-            v-for="storage in filteredStorages"
-            :key="storage.id"
-            class="mb-3.5 break-inside-avoid !rounded-lg"
-          >
-            <template #title>
-              <div class="flex items-start gap-3">
-                <div class="flex min-w-0 items-center gap-3">
-                  <Avatar
-                    :image="storageVendorLogo(storage)"
-                    :label="
-                      storageVendorLogo(storage)
-                        ? undefined
-                        : providerLabel(storage.provider).slice(0, 2).toUpperCase()
-                    "
-                    shape="circle"
-                    :class="[
-                      '!h-10 !w-10 !shrink-0 !text-sm !font-bold',
-                      storageVendorLogo(storage)
-                        ? '!bg-admin-surface-muted !p-1'
-                        : '!bg-admin-accent !text-admin-text-inverse',
-                    ]"
-                  />
-                  <div class="min-w-0">
-                    <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
-                      {{ storage.name }}
-                    </div>
-                    <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
-                      {{ storageSubtitle(storage) }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <template #content>
-              <div class="flex h-full min-h-[148px] flex-col gap-3.5">
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <Tag
-                    :value="providerLabel(storage.provider)"
-                    severity="info"
-                    :class="storageCardTagClass"
-                    rounded
-                  />
-                  <Tag
-                    :value="statusText(storage)"
-                    :severity="getStorageStatusSeverity(statusClass(storage))"
-                    :class="storageCardTagClass"
-                    rounded
-                  />
-                </div>
-
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div
-                    v-for="item in storageMetaItems(storage)"
-                    :key="`${storage.id}-${item.label}`"
-                    class="flex min-w-0 flex-col gap-1"
-                  >
-                    <span class="text-admin-caption text-admin-text-3">{{ item.label }}</span>
-                    <span class="break-all text-admin-body leading-admin-body text-admin-text-1">
-                      {{ item.value }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="flex flex-wrap gap-1.5">
-                  <Tag
-                    v-for="chip in storageFeatureChips(storage)"
-                    :key="`${storage.id}-${chip}`"
-                    :value="chip"
-                    severity="secondary"
-                    :class="storageCardTagClass"
-                    rounded
-                  />
-                </div>
-
-                <div class="mt-auto flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
-                  <Button
-                    size="small"
-                    label="编辑"
-                    severity="contrast"
-                    @click="openEdit(storage.id)"
-                  />
-                  <Button
-                    v-if="supportsTest(storage)"
-                    size="small"
-                    label="测试连接"
-                    severity="contrast"
-                    outlined
-                    :loading="testingId === storage.id"
-                    :disabled="!canTest(storage)"
-                    @click="handleTest(storage)"
-                  />
-                  <Button
-                    v-if="!storage.isCurrent"
-                    size="small"
-                    label="设为当前"
-                    severity="contrast"
-                    :loading="applyingId === storage.id"
-                    :disabled="!canApply(storage)"
-                    @click="applyStorage(storage.id)"
-                  />
-                  <Button
-                    v-if="!storage.isCurrent && !storage.builtin"
-                    size="small"
-                    label="删除"
-                    severity="contrast"
-                    outlined
-                    @click="removeProfile(storage.id)"
-                  />
-                </div>
-              </div>
-            </template>
-          </Card>
-        </div>
+      <div class="mt-2 text-admin-meta text-admin-subtitle-color">
+        {{ hasStorageSearch ? '调整搜索关键词后重试。' : '点击右上角新增存储开始配置。' }}
       </div>
     </div>
-  </div>
+
+    <div v-else class="columns-1 gap-3.5 md:columns-2 xl:columns-3">
+      <Card
+        v-for="card in filteredStorageCards"
+        :key="card.storage.id"
+        class="mb-3.5 break-inside-avoid !rounded-lg"
+      >
+        <template #title>
+          <div class="flex items-start gap-3">
+            <div class="flex min-w-0 items-center gap-3">
+              <Avatar
+                :image="card.vendorLogo"
+                :label="card.avatarLabel"
+                shape="circle"
+                :class="[
+                  '!h-10 !w-10 !shrink-0 !text-sm !font-bold',
+                  card.vendorLogo
+                    ? '!bg-admin-surface-muted !p-1'
+                    : '!bg-admin-accent !text-admin-text-inverse',
+                ]"
+              />
+              <div class="min-w-0">
+                <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
+                  {{ card.storage.name }}
+                </div>
+                <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
+                  {{ card.subtitle }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template #content>
+          <div class="flex h-full min-h-[148px] flex-col gap-3.5">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <Tag
+                :value="card.providerLabel"
+                severity="info"
+                :class="adminCompactTagClass"
+                rounded
+              />
+              <Tag
+                :value="card.statusText"
+                :severity="card.statusSeverity"
+                :class="adminCompactTagClass"
+                rounded
+              />
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div
+                v-for="item in card.metaItems"
+                :key="`${card.storage.id}-${item.label}`"
+                class="flex min-w-0 flex-col gap-1"
+              >
+                <span class="text-admin-caption text-admin-text-3">{{ item.label }}</span>
+                <span class="break-all text-admin-body leading-admin-body text-admin-text-1">
+                  {{ item.value }}
+                </span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-1.5">
+              <Tag
+                v-for="chip in card.featureChips"
+                :key="`${card.storage.id}-${chip}`"
+                :value="chip"
+                severity="secondary"
+                :class="adminCompactTagClass"
+                rounded
+              />
+            </div>
+
+            <div class="mt-auto flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
+              <Button
+                size="small"
+                label="编辑"
+                severity="contrast"
+                @click="openEdit(card.storage.id)"
+              />
+              <Button
+                v-if="supportsTest(card.storage)"
+                size="small"
+                label="测试连接"
+                severity="contrast"
+                outlined
+                :loading="testingId === card.storage.id"
+                :disabled="!canTest(card.storage)"
+                @click="handleTest(card.storage)"
+              />
+              <Button
+                v-if="!card.storage.isCurrent"
+                size="small"
+                label="设为当前"
+                severity="contrast"
+                :loading="applyingId === card.storage.id"
+                :disabled="!canApply(card.storage)"
+                @click="applyStorage(card.storage.id)"
+              />
+              <Button
+                v-if="!card.storage.isCurrent && !card.storage.builtin"
+                size="small"
+                label="删除"
+                severity="contrast"
+                outlined
+                @click="removeProfile(card.storage.id)"
+              />
+            </div>
+          </div>
+        </template>
+      </Card>
+    </div>
+  </AdminManagementFrame>
 
   <Dialog
     :visible="editorOpen"
@@ -450,13 +404,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Plus, Refresh, Search, Xmark } from '@iconoir/vue'
+import { Plus, Refresh } from '@iconoir/vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Dialog from 'primevue/dialog'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -468,8 +420,16 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
+import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
+import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
+import {
+  adminCompactTagClass,
+  adminToolbarIconButtonClass,
+  adminToolbarMetricClass,
+} from '../../shared/lib/adminUiClasses'
 import { storageVendorLogo } from './storageMeta'
+import { storageStatusSeverity, type StorageCard } from './storageHelpers'
 import { useStorageManager } from './useStorageManager'
 
 const {
@@ -520,54 +480,56 @@ const { isScrolling: isStoragePanelScrolling, handleScroll: handleStoragePanelSc
 const { isScrolling: isStorageDialogScrolling, handleScroll: handleStorageDialogScroll } =
   useTransientScrolling()
 const searchKeyword = ref('')
-const currentStorage = computed(() => storages.value.find((storage) => storage.isCurrent) || null)
 const hasStorageSearch = computed(() => Boolean(searchKeyword.value.trim()))
-const filteredStorages = computed(() => {
+const storageCardViews = computed(() => storages.value.map(createStorageCardView))
+const filteredStorageCards = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
-  if (!keyword) return storages.value
-
-  return storages.value.filter((storage) => {
-    const metaText = storageMetaItems(storage)
-      .flatMap((item) => [item.label, item.value])
-      .join(' ')
-    const featureText = storageFeatureChips(storage).join(' ')
-    const searchableText = [
-      storage.name,
-      providerLabel(storage.provider),
-      storageSubtitle(storage),
-      statusText(storage),
-      metaText,
-      featureText,
-    ]
-      .join(' ')
-      .toLowerCase()
-
-    return searchableText.includes(keyword)
-  })
+  if (!keyword) return storageCardViews.value
+  return storageCardViews.value.filter((card) => card.searchableText.includes(keyword))
 })
+const currentStorage = computed(
+  () => storageCardViews.value.find((card) => card.storage.isCurrent)?.storage || null,
+)
 const configuredStorageCount = computed(
-  () => storages.value.filter((storage) => statusClass(storage) !== 'is-empty').length,
+  () => storageCardViews.value.filter((card) => card.statusClass !== 'is-empty').length,
 )
 const storageCountLabel = computed(() =>
   hasStorageSearch.value
-    ? `${filteredStorages.value.length} 匹配存储`
+    ? `${filteredStorageCards.value.length} 匹配存储`
     : `${storages.value.length} 存储`,
 )
 const emptyStorageMessage = computed(() => (hasStorageSearch.value ? '无匹配存储' : '暂无存储配置'))
-const framedIconButtonClass =
-  '!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0'
-const storageCardTagClass = '!px-2 !py-0.5 !text-[11px] !leading-4'
 
-function getStorageStatusSeverity(status: string) {
-  switch (status) {
-    case 'is-current':
-      return 'success'
-    case 'is-enabled':
-      return 'info'
-    case 'is-empty':
-      return 'warn'
-    default:
-      return 'secondary'
+function createStorageCardView(storage: StorageCard) {
+  const vendorLogo = storageVendorLogo(storage)
+  const providerName = providerLabel(storage.provider)
+  const storageStatusClass = statusClass(storage)
+  const metaItems = storageMetaItems(storage)
+  const featureChips = storageFeatureChips(storage)
+  const storageStatusText = statusText(storage)
+  const subtitle = storageSubtitle(storage)
+
+  return {
+    storage,
+    vendorLogo,
+    avatarLabel: vendorLogo ? undefined : providerName.slice(0, 2).toUpperCase(),
+    providerLabel: providerName,
+    subtitle,
+    statusText: storageStatusText,
+    statusClass: storageStatusClass,
+    statusSeverity: storageStatusSeverity(storageStatusClass),
+    metaItems,
+    featureChips,
+    searchableText: [
+      storage.name,
+      providerName,
+      subtitle,
+      storageStatusText,
+      ...metaItems.flatMap((item) => [item.label, item.value]),
+      ...featureChips,
+    ]
+      .join(' ')
+      .toLowerCase(),
   }
 }
 

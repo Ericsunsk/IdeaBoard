@@ -191,6 +191,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import Chart from 'primevue/chart'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
@@ -204,12 +205,16 @@ const {
   adminStatistics,
   qualityStatistics,
   isStatisticsSettled,
+  isQualityStatisticsSettled,
   timeRange,
   qualityTimeRange,
   rangeOptions,
   qualityRangeOptions,
 } = useUsageStatisticsData()
-const isChartReady = useAdminChartReady(isStatisticsSettled)
+const areStatisticsChartsSettled = computed(
+  () => isStatisticsSettled.value && isQualityStatisticsSettled.value,
+)
+const isChartReady = useAdminChartReady(areStatisticsChartsSettled)
 
 const {
   trendChartData,

@@ -5,6 +5,10 @@ import { getSafeTaskResultImageUrl } from './taskResultImages'
 
 type TaskStatusTagSeverity = 'secondary' | 'warn' | 'success' | 'danger'
 type TaskDurationTone = 'success' | 'warning' | 'danger'
+type TaskApiCallInfo = {
+  platform: string
+  modelSet: string
+}
 
 interface TaskStatusConfig {
   severity: TaskStatusTagSeverity
@@ -21,8 +25,9 @@ type MonitorTaskRow = Task & {
   }
 }
 
-export const ERROR_TEXT_COLOR = 'var(--color-admin-danger)'
-export const DEFAULT_STATUS_COLOR = 'var(--color-admin-text-3)'
+const ERROR_TEXT_COLOR = 'var(--color-admin-danger)'
+const DEFAULT_STATUS_COLOR = 'var(--color-admin-text-3)'
+const taskApiCallCache = new WeakMap<Task, { result: string; value: TaskApiCallInfo | null }>()
 
 export const taskStatusOptions = [
   { label: '等待中', value: 'pending' },
@@ -70,16 +75,23 @@ export function getTaskUserIdentifier(row: Task) {
 
 export function getTaskApiCall(row: Task) {
   if (!row.result) return null
+  const cached = taskApiCallCache.get(row)
+  if (cached?.result === row.result) return cached.value
+
+  let value: TaskApiCallInfo | null = null
   try {
     const result = JSON.parse(row.result) as { platform?: unknown; model_set?: unknown }
-    if (!result.platform) return null
-    return {
-      platform: String(result.platform),
-      modelSet: result.model_set ? String(result.model_set) : '',
+    if (result.platform) {
+      value = {
+        platform: String(result.platform),
+        modelSet: result.model_set ? String(result.model_set) : '',
+      }
     }
   } catch {
-    return null
+    value = null
   }
+  taskApiCallCache.set(row, { result: row.result, value })
+  return value
 }
 
 export function getTaskDuration(row: Task) {

@@ -1,17 +1,10 @@
 import { useDocumentVisibility } from '@vueuse/core'
 import { computed, onScopeDispose, ref, watch } from 'vue'
-import {
-  getGetAdminMonitorQueryKey,
-} from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
+import { getGetAdminMonitorQueryKey } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import type { ApiResponseMonitor } from '../../../../shared/api/generated-query/model'
 import { resolveApiUrl } from '../../../../shared/config/runtimeUrls'
 
-type AdminMonitorStreamStatus =
-  | 'idle'
-  | 'unsupported'
-  | 'connecting'
-  | 'connected'
-  | 'degraded'
+type AdminMonitorStreamStatus = 'idle' | 'unsupported' | 'connecting' | 'connected' | 'degraded'
 
 function parseMonitorSnapshot(raw: string): ApiResponseMonitor | null {
   const payload = JSON.parse(raw) as unknown
@@ -27,7 +20,6 @@ export function useTaskMonitorStream() {
   const visibility = useDocumentVisibility()
   const status = ref<AdminMonitorStreamStatus>('idle')
   const snapshot = ref<ApiResponseMonitor | null>(null)
-  const lastSnapshotAt = ref<number | null>(null)
   const isPageVisible = computed(() => visibility.value === 'visible')
   const isConnected = computed(() => status.value === 'connected')
   let eventSource: EventSource | null = null
@@ -64,7 +56,6 @@ export function useTaskMonitorStream() {
         }
         queryClient.setQueryData(getGetAdminMonitorQueryKey(), nextSnapshot)
         snapshot.value = nextSnapshot
-        lastSnapshotAt.value = Date.now()
         status.value = 'connected'
       } catch {
         status.value = 'degraded'
@@ -101,7 +92,6 @@ export function useTaskMonitorStream() {
 
   return {
     isConnected,
-    lastSnapshotAt,
     snapshot,
     status,
   }

@@ -1,4 +1,8 @@
 import { computed, type Ref } from 'vue'
+import type {
+  AdminStatistics,
+  GetAdminStatisticsRange,
+} from '../../../../shared/api/generated-query/model'
 import {
   adminChartLegend,
   adminChartStrokeWidth,
@@ -23,61 +27,6 @@ import {
   buildAdminTimeRangeBuckets,
   shouldShowAdminTimeRangeTick,
 } from '../../shared/lib/adminTimeRange'
-import type { AdminStatisticsRange } from '../../shared/queries/adminActions'
-
-type StatisticsLike = {
-  summary?: {
-    total_calls?: number
-    today_calls?: number
-    today_success?: number
-    today_failed?: number
-    yesterday_calls?: number
-    yesterday_success?: number
-    yesterday_failed?: number
-    this_month_calls?: number
-  }
-  trend?: Array<{
-    date: string
-    label: string
-    total: number
-    segments: Array<{ label: string; value: number }>
-  }>
-  model_health?: Array<{
-    name: string
-    total: number
-    completed: number
-    failed: number
-    failure_rate: number
-    avg_seconds: number
-  }>
-  quality_trend?: Array<{
-    date: string
-    label: string
-    total: number
-    success: number
-    fail: number
-    success_rate: number
-  }>
-  slow_models?: Array<{
-    name: string
-    avg_seconds: number
-    p95_seconds: number
-    samples: number
-  }>
-  bottleneck_sources?: Array<{
-    source: string
-    label: string
-    total: number
-    failed: number
-    avg_latency_ms: number
-  }>
-  failure_categories?: Array<{
-    category: string
-    label: string
-    total: number
-    avg_latency_ms: number
-  }>
-}
 
 type ModelRiskPoint = {
   x: number
@@ -109,10 +58,10 @@ const defaultModelColors = [
 ]
 
 export function useUsageStatisticsCharts(options: {
-  adminStatistics: Ref<StatisticsLike | null>
-  qualityStatistics?: Ref<StatisticsLike | null>
-  timeRange: Ref<AdminStatisticsRange>
-  qualityTimeRange?: Ref<AdminStatisticsRange>
+  adminStatistics: Ref<AdminStatistics | null>
+  qualityStatistics?: Ref<AdminStatistics | null>
+  timeRange: Ref<GetAdminStatisticsRange>
+  qualityTimeRange?: Ref<GetAdminStatisticsRange>
 }) {
   function getModelColorByName(name: string) {
     const key = normalizeModelName(name)
@@ -215,7 +164,7 @@ export function useUsageStatisticsCharts(options: {
       ...baseChartOptions(),
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        ...baseChartOptions().plugins,
+        ...baseChartPlugins(),
         tooltip: {
           ...baseTooltipOptions(),
           callbacks: {
@@ -390,23 +339,27 @@ export function useUsageStatisticsCharts(options: {
   const qualityTrendRange = computed(
     () => options.qualityTimeRange?.value ?? options.timeRange.value,
   )
+  const qualityTrendSource = computed(() => {
+    if (options.qualityStatistics?.value) return options.qualityStatistics.value
+    if (qualityTrendRange.value === options.timeRange.value) return options.adminStatistics.value
+    return null
+  })
   const qualityTrendRows = computed(() => {
-    const trend =
-      (options.qualityStatistics?.value ?? options.adminStatistics.value)?.quality_trend || []
+    const trend = qualityTrendSource.value?.quality_trend || []
     const trendMap = new Map(trend.map((item) => [item.date, item]))
 
     return buildAdminTimeRangeBuckets(qualityTrendRange.value).map((bucket) => {
       const item = trendMap.get(bucket.date)
-      const total = Math.max(0, Number(item?.total) || 0)
-      const success = Math.max(0, Number(item?.success) || 0)
-      const fail = Math.max(0, Number(item?.fail) || 0)
+      const total = toNonNegativeNumber(item?.total)
+      const success = toNonNegativeNumber(item?.success)
+      const fail = toNonNegativeNumber(item?.fail)
 
       return {
         label: item?.label || bucket.label,
         total,
         success,
         fail,
-        successRate: normalizePercent(item?.success_rate || 0),
+        successRate: normalizePercent(item?.success_rate),
         failureRate: total > 0 ? normalizePercent((fail / total) * 100) : 0,
       }
     })
@@ -451,7 +404,7 @@ export function useUsageStatisticsCharts(options: {
       ...baseChartOptions(),
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        ...baseChartOptions().plugins,
+        ...baseChartPlugins(),
         tooltip: {
           ...baseTooltipOptions(),
           callbacks: {
@@ -503,9 +456,9 @@ export function useUsageStatisticsCharts(options: {
     (options.adminStatistics.value?.slow_models || [])
       .map((item, idx) => {
         const modelName = item.name || '未知模型'
-        const p95Seconds = Math.max(0, Number(item.p95_seconds) || 0)
-        const avgSeconds = Math.max(0, Number(item.avg_seconds) || 0)
-        const samples = Math.max(0, Math.round(Number(item.samples) || 0))
+        const p95Seconds = toNonNegativeNumber(item.p95_seconds)
+        const avgSeconds = toNonNegativeNumber(item.avg_seconds)
+        const samples = toNonNegativeInteger(item.samples)
         return {
           name: modelName,
           p95Seconds,
@@ -551,7 +504,7 @@ export function useUsageStatisticsCharts(options: {
       ...baseChartOptions(),
       layout: { padding: { top: 10, right: 18 } },
       plugins: {
-        ...baseChartOptions().plugins,
+        ...baseChartPlugins(),
         legend: { display: false },
         tooltip: {
           ...baseTooltipOptions(),
@@ -594,9 +547,9 @@ export function useUsageStatisticsCharts(options: {
       .map((item, idx) => ({
         source: item.source || 'unknown',
         label: item.label || bottleneckSourceFallbackLabel(item.source),
-        total: Math.max(0, Number(item.total) || 0),
-        failed: Math.max(0, Number(item.failed) || 0),
-        avgLatencyMS: Math.max(0, Number(item.avg_latency_ms) || 0),
+        total: toNonNegativeNumber(item.total),
+        failed: toNonNegativeNumber(item.failed),
+        avgLatencyMS: toNonNegativeNumber(item.avg_latency_ms),
         color: bottleneckSourceColor(item.source, idx),
       }))
       .filter((item) => item.total > 0)
@@ -625,7 +578,7 @@ export function useUsageStatisticsCharts(options: {
     defineAdminChartOptions({
       ...baseChartOptions(),
       plugins: {
-        ...baseChartOptions().plugins,
+        ...baseChartPlugins(),
         legend: { display: false },
         tooltip: {
           ...baseTooltipOptions(),
@@ -659,8 +612,8 @@ export function useUsageStatisticsCharts(options: {
       .map((item, idx) => ({
         category: item.category || 'unknown',
         label: item.label || failureCategoryFallbackLabel(item.category),
-        total: Math.max(0, Number(item.total) || 0),
-        avgLatencyMS: Math.max(0, Number(item.avg_latency_ms) || 0),
+        total: toNonNegativeNumber(item.total),
+        avgLatencyMS: toNonNegativeNumber(item.avg_latency_ms),
         color: failureCategoryColor(item.category, idx),
       }))
       .filter((item) => item.total > 0)
@@ -693,7 +646,7 @@ export function useUsageStatisticsCharts(options: {
     defineAdminChartOptions({
       ...baseChartOptions(),
       plugins: {
-        ...baseChartOptions().plugins,
+        ...baseChartPlugins(),
         legend: { display: false },
         tooltip: {
           ...baseTooltipOptions(),
@@ -723,7 +676,6 @@ export function useUsageStatisticsCharts(options: {
   )
 
   return {
-    trendData,
     trendChartData,
     trendChartOptions,
     todayCalls,
@@ -753,10 +705,14 @@ function baseChartOptions(): AdminChartOptions {
     maintainAspectRatio: false,
     resizeDelay: 80,
     animation: { duration: 260 },
-    plugins: {
-      legend: adminChartLegend(),
-      tooltip: baseTooltipOptions(),
-    },
+    plugins: baseChartPlugins(),
+  }
+}
+
+function baseChartPlugins() {
+  return {
+    legend: adminChartLegend(),
+    tooltip: baseTooltipOptions(),
   }
 }
 
@@ -810,7 +766,16 @@ function formatPercentValue(value: number, total: number) {
   return `${((value / total) * 100).toFixed(1)}%`
 }
 
-function normalizePercent(value: number): number {
+function toNonNegativeNumber(value: number | null | undefined): number {
+  const parsed = Number(value) || 0
+  return Math.max(0, parsed)
+}
+
+function toNonNegativeInteger(value: number | null | undefined): number {
+  return Math.round(toNonNegativeNumber(value))
+}
+
+function normalizePercent(value: number | null | undefined): number {
   const parsed = Number(value) || 0
   const percent = parsed <= 1 ? parsed * 100 : parsed
   return Math.max(0, Math.min(100, percent))

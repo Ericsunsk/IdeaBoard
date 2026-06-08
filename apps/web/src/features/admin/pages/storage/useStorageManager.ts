@@ -22,7 +22,6 @@ import {
   createEmptyProfile as createEmptyStorageProfile,
   normalizeProfile as normalizeStorageProfile,
   providerLabel as resolveProviderLabel,
-  providerSupportsBucketInfo as providerHasBucketInfo,
   providerSupportsTest,
   statusClass as resolveStatusClass,
   statusText as resolveStatusText,
@@ -80,9 +79,7 @@ export function useStorageManager() {
   const creatableProviders = computed(() =>
     providers.value.filter((provider) => provider.create_allowed),
   )
-  const vendorPresets = computed(() =>
-    buildVendorPresets(providerMap.value, creatableProviders.value),
-  )
+  const vendorPresets = computed(() => buildVendorPresets(creatableProviders.value))
   const storages = computed<StorageCard[]>(() =>
     (profilesQuery.data.value?.data?.profiles ?? []).map((profile) =>
       normalizeProfile({ ...profile, secret_configured: profile.secret_configured ?? false }),
@@ -155,10 +152,6 @@ export function useStorageManager() {
     return resolveProviderLabel(provider, providerMap.value)
   }
 
-  function providerSupportsBucketInfo(provider: StorageProvider) {
-    return providerHasBucketInfo(provider, providerMap.value)
-  }
-
   function supportsTest(storage: StorageCard) {
     return providerSupportsTest(storage.provider, providerMap.value)
   }
@@ -210,17 +203,11 @@ export function useStorageManager() {
       appToast.warning('当前没有可新增的存储类型')
       return
     }
-    openCreateWithVendor(firstVendor.key)
-  }
-
-  function openCreateWithVendor(vendorKey: string) {
-    const vendor = vendorPresets.value.find((item) => item.key === vendorKey && item.supported)
-    if (!vendor) return
     editorMode.value = 'create'
     editingId.value = null
     bucketDomains.value = []
-    selectedVendorKey.value = vendor.key
-    form.value = profileFromVendorPreset(vendor)
+    selectedVendorKey.value = firstVendor.key
+    form.value = profileFromVendorPreset(firstVendor)
     editorOpen.value = true
   }
 
@@ -230,7 +217,6 @@ export function useStorageManager() {
     editorMode.value = 'edit'
     editingId.value = id
     bucketDomains.value = []
-    selectedVendorKey.value = 'aws-s3'
     form.value = {
       ...target,
       config: { ...target.config },
@@ -322,7 +308,7 @@ export function useStorageManager() {
   }
 
   async function fetchBucketDomains() {
-    if (!providerSupportsBucketInfo(form.value.provider)) return
+    if (!selectedProviderMeta.value?.supports_bucket_info) return
 
     fetching.value = true
     try {

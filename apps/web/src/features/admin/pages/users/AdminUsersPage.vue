@@ -1,382 +1,331 @@
 <template>
-  <div class="min-w-0 flex flex-col gap-4 min-[1081px]:-mb-[17px]">
-    <div
-      class="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0 min-[1081px]:h-[calc(100dvh-117px)]"
-    >
-      <div
-        class="flex shrink-0 flex-wrap items-center justify-between gap-4 bg-transparent px-6 py-4"
+  <AdminTablePanel viewport-height content-class="min-h-0 flex-1 overflow-hidden px-6 pb-6">
+    <template #toolbar-start>
+      <AdminToolbarSearch v-model="searchKeyword" @enter="loadUsers" @clear="clearSearch" />
+      <span :class="adminToolbarMetricClass">
+        <span class="h-2.5 w-2.5 rounded-full bg-admin-success"></span>
+        <span>{{ totalUsersLabel }}</span>
+      </span>
+      <Tag :value="`${activeUserCount} 正常`" severity="success" rounded />
+      <Tag
+        v-if="bannedUserCount > 0"
+        :value="`${bannedUserCount} 封禁`"
+        severity="danger"
+        rounded
+      />
+      <Tag :value="`${adminUserCount} 管理员`" severity="info" rounded />
+      <Tag v-if="selectedUsers.length > 0" :value="`已选 ${selectedUsers.length}`" rounded />
+    </template>
+
+    <template #toolbar-end>
+      <Button
+        text
+        :class="[adminToolbarIconButtonClass, hasUserFilter ? '!border-admin-text-1' : '']"
+        aria-label="筛选用户"
+        :aria-pressed="hasUserFilter"
+        @click="toggleUserFilterPanel"
       >
-        <div class="flex flex-wrap items-center gap-3">
-          <IconField class="relative w-full sm:w-[260px]">
-            <InputIcon>
-              <Search class="size-4 text-admin-text-3" />
-            </InputIcon>
-            <InputText
-              v-model="searchKeyword"
-              placeholder="Search"
-              fluid
-              class="!h-[38px] !w-full !rounded-lg !bg-white !text-[15px] !text-admin-text-1 !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]"
-              @keydown.enter="loadUsers"
-            />
-            <Button
-              v-if="searchKeyword"
-              text
-              rounded
-              class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
-              aria-label="清空搜索"
-              @click="clearSearch"
-            >
-              <template #icon>
-                <Xmark />
-              </template>
-            </Button>
-          </IconField>
-          <span
-            class="flex items-center gap-2 rounded-full border border-admin-border bg-white px-3 py-1.5 text-[13px] font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]"
-          >
-            <span class="h-2.5 w-2.5 rounded-full bg-admin-success"></span>
-            <span>{{ totalUsersLabel }}</span>
-          </span>
-          <Tag :value="`${activeUserCount} 正常`" severity="success" rounded />
-          <Tag
-            v-if="bannedUserCount > 0"
-            :value="`${bannedUserCount} 封禁`"
-            severity="danger"
-            rounded
-          />
-          <Tag :value="`${adminUserCount} 管理员`" severity="info" rounded />
-          <Tag v-if="selectedUsers.length > 0" :value="`已选 ${selectedUsers.length}`" rounded />
-        </div>
-
-        <div class="flex flex-wrap items-center justify-end gap-3">
-          <Button
-            text
-            class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-            :class="hasUserFilter ? '!border-admin-text-1' : ''"
-            aria-label="筛选用户"
-            :aria-pressed="hasUserFilter"
-            @click="toggleUserFilterPanel"
-          >
-            <template #icon>
-              <Filter
-                :class="['size-4', hasUserFilter ? 'text-admin-text-1' : 'text-admin-text-2']"
-              />
-            </template>
-          </Button>
-          <Popover ref="userFilterPopoverRef">
-            <div class="flex w-[260px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4">
-              <div class="border-b border-admin-border pb-2">
-                <div class="text-admin-content font-bold text-admin-title-color">筛选</div>
-              </div>
-
-              <label
-                class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-              >
-                <span>角色</span>
-                <Select
-                  v-model="userRoleFilter"
-                  :options="userRoleFilterOptions"
-                  option-label="label"
-                  option-value="value"
-                  size="small"
-                  fluid
-                />
-              </label>
-
-              <label
-                class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-              >
-                <span>状态</span>
-                <Select
-                  v-model="userStatusFilter"
-                  :options="userStatusFilterOptions"
-                  option-label="label"
-                  option-value="value"
-                  size="small"
-                  fluid
-                />
-              </label>
-
-              <Button
-                label="重置筛选"
-                size="small"
-                severity="contrast"
-                :disabled="!hasUserFilter"
-                @click="resetUserFilters"
-              />
-            </div>
-          </Popover>
-
-          <Button
-            text
-            class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-            aria-label="用户配置"
-            @click="toggleUserConfigPanel"
-          >
-            <template #icon>
-              <Settings class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-          <Popover ref="userConfigPopoverRef">
-            <div class="flex w-[280px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4">
-              <div class="border-b border-admin-border pb-2">
-                <div class="text-admin-content font-bold text-admin-title-color">用户配置</div>
-              </div>
-
-              <div
-                class="flex items-center justify-between rounded-lg border border-admin-border bg-admin-surface-muted px-3 py-2"
-              >
-                <span class="text-admin-caption font-bold text-admin-text-2">开放注册</span>
-                <ToggleSwitch
-                  v-model="registrationEnabled"
-                  size="small"
-                  :disabled="registrationSettingLoading"
-                  @update:model-value="handleToggleRegistration"
-                />
-              </div>
-
-              <div class="flex flex-col gap-2 rounded-lg border border-admin-border bg-white p-3">
-                <div class="flex items-center gap-1.5 text-admin-meta font-bold text-admin-text-2">
-                  <Settings class="size-4 text-admin-text-3" />
-                  <span>限流策略</span>
-                </div>
-                <div class="mt-1 grid grid-cols-1 gap-2.5">
-                  <label
-                    class="flex min-w-0 flex-col gap-1 text-admin-meta font-[650] text-admin-text-2"
-                  >
-                    <span>最大请求 (次)</span>
-                    <InputNumber
-                      v-model="rateLimitForm.max_requests"
-                      :min="1"
-                      placeholder="100"
-                      size="small"
-                      fluid
-                    />
-                  </label>
-                  <label
-                    class="flex min-w-0 flex-col gap-1 text-admin-meta font-[650] text-admin-text-2"
-                  >
-                    <span>窗口周期 (秒)</span>
-                    <InputNumber
-                      v-model="rateLimitForm.window_seconds"
-                      :min="1"
-                      placeholder="60"
-                      size="small"
-                      fluid
-                    />
-                  </label>
-                </div>
-                <Button
-                  label="保存配置"
-                  size="small"
-                  class="mt-2"
-                  :loading="rateLimitSaving"
-                  fluid
-                  @click="handleSaveRateLimit"
-                />
-              </div>
-            </div>
-          </Popover>
-
-          <div class="h-5 w-[1px] bg-admin-border-soft"></div>
-
-          <Button
-            text
-            class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-            aria-label="刷新用户"
-            @click="loadUsers"
-          >
-            <template #icon>
-              <Refresh class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-
-          <div class="flex items-center gap-1.5">
-            <div
-              class="flex h-9 items-center justify-center rounded-lg !border !border-admin-border !bg-white px-3 text-[12px] font-semibold text-admin-text-2"
-            >
-              {{ currentPage }} / {{ totalPages }}
-            </div>
-            <Button
-              text
-              class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors disabled:!opacity-40 flex items-center justify-center p-0"
-              :disabled="currentPage === 1 || loading"
-              aria-label="上一页"
-              @click="handlePrevPage"
-            >
-              <template #icon>
-                <NavArrowLeft class="size-4 text-admin-text-2" />
-              </template>
-            </Button>
-            <Button
-              text
-              class="!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors disabled:!opacity-40 flex items-center justify-center p-0"
-              :disabled="currentPage === totalPages || loading"
-              aria-label="下一页"
-              @click="handleNextPage"
-            >
-              <template #icon>
-                <NavArrowRight class="size-4 text-admin-text-2" />
-              </template>
-            </Button>
+        <template #icon>
+          <Filter :class="['size-4', hasUserFilter ? 'text-admin-text-1' : 'text-admin-text-2']" />
+        </template>
+      </Button>
+      <Popover ref="userFilterPopoverRef">
+        <div :class="adminFilterPopoverClass">
+          <div class="border-b border-admin-border pb-2">
+            <div :class="adminPopoverTitleClass">筛选</div>
           </div>
-        </div>
-      </div>
 
-      <div class="min-h-0 flex-1 overflow-hidden px-6 pb-6">
-        <AdminTableFrame class="h-full">
-          <div
-            class="app-scrollbar h-full overflow-y-auto overscroll-contain"
-            :class="{ 'is-scrolling': isUserTableScrolling }"
-            @scroll.passive="handleUserTableScroll"
-          >
-            <DataTable
-              v-model:selection="selectedUsers"
-              :value="users"
-              :loading="loading"
-              data-key="id"
+          <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+            <span>角色</span>
+            <Select
+              v-model="userRoleFilter"
+              :options="userRoleFilterOptions"
+              option-label="label"
+              option-value="value"
               size="small"
-              lazy
-              scrollable
-              :pt="adminDenseDataTablePt"
-              :table-style="{ minWidth: '920px' }"
-            >
-              <Column
-                selection-mode="multiple"
-                header-style="width: 3.5rem"
-                :body-style="{ width: '3.5rem' }"
-              />
+              fluid
+            />
+          </label>
 
-              <Column field="username" header="用户" :style="{ minWidth: '260px' }">
-                <template #body="{ data: user }">
-                  <div class="flex min-w-0 items-center gap-3">
-                    <div class="relative shrink-0">
-                      <Avatar
-                        v-if="user.avatar"
-                        :image="user.avatar"
-                        shape="circle"
-                        class="!h-9 !w-9"
-                      />
-                      <Avatar
-                        v-else
-                        :label="getUserInitial(user)"
-                        shape="circle"
-                        class="!h-9 !w-9 !bg-admin-surface-muted !font-bold !text-admin-accent"
-                      />
-                      <span
-                        class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
-                        :class="user.status === 1 ? 'bg-admin-success' : 'bg-admin-danger'"
-                      />
-                    </div>
-                    <div class="min-w-0">
-                      <div class="truncate text-admin-content font-bold text-admin-text-1">
-                        {{ user.username }}
-                      </div>
-                      <div class="mt-0.5 truncate font-mono text-admin-caption text-admin-text-3">
-                        {{ user.uid }}
-                      </div>
-                    </div>
-                  </div>
-                </template>
-              </Column>
+          <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+            <span>状态</span>
+            <Select
+              v-model="userStatusFilter"
+              :options="userStatusFilterOptions"
+              option-label="label"
+              option-value="value"
+              size="small"
+              fluid
+            />
+          </label>
 
-              <Column field="role" header="角色" :style="{ width: '124px' }">
-                <template #body="{ data: user }">
-                  <Tag
-                    :value="user.role === 'admin' ? 'Admin' : 'User'"
-                    :severity="user.role === 'admin' ? 'danger' : 'secondary'"
-                    rounded
-                  />
-                </template>
-              </Column>
+          <Button
+            label="重置筛选"
+            size="small"
+            severity="contrast"
+            :disabled="!hasUserFilter"
+            @click="resetUserFilters"
+          />
+        </div>
+      </Popover>
 
-              <Column header="认证 ID" :style="{ minWidth: '180px' }">
-                <template #body="{ data: user }">
-                  <span
-                    class="block max-w-[168px] truncate font-mono text-admin-caption text-admin-text-3"
-                    :title="user.auth_user_id || '-'"
-                  >
-                    {{ user.auth_user_id || '-' }}
-                  </span>
-                </template>
-              </Column>
-
-              <Column field="created_at" header="加入时间" :style="{ width: '136px' }">
-                <template #body="{ data: user }">
-                  <span class="text-admin-body text-admin-text-3">
-                    {{ user.created_at ? formatDateOnly(user.created_at) : '-' }}
-                  </span>
-                </template>
-              </Column>
-
-              <Column field="status" header="状态" :style="{ width: '112px' }">
-                <template #body="{ data: user }">
-                  <Tag
-                    :value="user.status === 1 ? '正常' : '封禁'"
-                    :severity="user.status === 1 ? 'success' : 'danger'"
-                    rounded
-                  />
-                </template>
-              </Column>
-
-              <Column header="更多" :style="{ width: '72px' }">
-                <template #body="{ data: user }">
-                  <Button
-                    text
-                    class="!h-9 !w-9 !rounded-full !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0"
-                    aria-haspopup="dialog"
-                    :aria-label="`${user.username} 操作菜单`"
-                    @click="toggleUserActionMenu($event, user)"
-                  >
-                    <template #icon>
-                      <Search class="size-4 text-admin-text-2" />
-                    </template>
-                  </Button>
-                </template>
-              </Column>
-
-              <template #empty>
-                <div class="py-8 text-center text-admin-body text-admin-text-3">
-                  {{ emptyUserMessage }}
-                </div>
-              </template>
-              <template #loading>正在加载用户...</template>
-            </DataTable>
-            <div
-              v-if="userPlaceholderRows > 0"
-              class="pointer-events-none min-w-[920px]"
-              aria-hidden="true"
-            >
-              <div
-                v-for="index in userPlaceholderRows"
-                :key="index"
-                class="h-[56px] border-t border-admin-border-soft bg-white"
-              ></div>
-            </div>
+      <Button
+        text
+        :class="adminToolbarIconButtonClass"
+        aria-label="用户配置"
+        @click="toggleUserConfigPanel"
+      >
+        <template #icon>
+          <Settings class="size-4 text-admin-text-2" />
+        </template>
+      </Button>
+      <Popover ref="userConfigPopoverRef">
+        <div :class="adminConfigPopoverClass">
+          <div class="border-b border-admin-border pb-2">
+            <div :class="adminPopoverTitleClass">用户配置</div>
           </div>
-        </AdminTableFrame>
-        <Popover
-          ref="userActionPopoverRef"
-          :pt="userActionPopoverPt"
-          @hide="handleUserActionPopoverHide"
+
+          <div
+            class="flex items-center justify-between rounded-lg border border-admin-border bg-admin-surface-muted px-3 py-2"
+          >
+            <span class="text-admin-caption font-bold text-admin-text-2">开放注册</span>
+            <ToggleSwitch
+              v-model="registrationEnabled"
+              size="small"
+              :disabled="registrationSettingLoading"
+              @update:model-value="handleToggleRegistration"
+            />
+          </div>
+
+          <div class="flex flex-col gap-2 rounded-lg border border-admin-border bg-white p-3">
+            <div class="flex items-center gap-1.5 text-admin-meta font-bold text-admin-text-2">
+              <Settings class="size-4 text-admin-text-3" />
+              <span>限流策略</span>
+            </div>
+            <div class="mt-1 grid grid-cols-1 gap-2.5">
+              <label
+                class="flex min-w-0 flex-col gap-1 text-admin-meta font-[650] text-admin-text-2"
+              >
+                <span>最大请求 (次)</span>
+                <InputNumber
+                  v-model="rateLimitForm.max_requests"
+                  :min="1"
+                  placeholder="100"
+                  size="small"
+                  fluid
+                />
+              </label>
+              <label
+                class="flex min-w-0 flex-col gap-1 text-admin-meta font-[650] text-admin-text-2"
+              >
+                <span>窗口周期 (秒)</span>
+                <InputNumber
+                  v-model="rateLimitForm.window_seconds"
+                  :min="1"
+                  placeholder="60"
+                  size="small"
+                  fluid
+                />
+              </label>
+            </div>
+            <Button
+              label="保存配置"
+              size="small"
+              class="mt-2"
+              :loading="rateLimitSaving"
+              fluid
+              @click="handleSaveRateLimit"
+            />
+          </div>
+        </div>
+      </Popover>
+
+      <div class="h-5 w-[1px] bg-admin-border-soft"></div>
+
+      <Button text :class="adminToolbarIconButtonClass" aria-label="刷新用户" @click="loadUsers">
+        <template #icon>
+          <Refresh class="size-4 text-admin-text-2" />
+        </template>
+      </Button>
+
+      <div class="flex items-center gap-1.5">
+        <div :class="adminToolbarPageLabelClass">{{ currentPage }} / {{ totalPages }}</div>
+        <Button
+          text
+          :class="adminToolbarPagerButtonClass"
+          :disabled="currentPage === 1 || loading"
+          aria-label="上一页"
+          @click="handlePrevPage"
         >
-          <div class="flex min-w-[176px] flex-col gap-1">
-            <template v-for="item in userActionItems" :key="item.key">
-              <div v-if="item.divided" class="my-1 h-px bg-admin-border-soft" aria-hidden="true" />
-              <Button
-                :label="item.label"
-                text
-                :severity="item.key === 'delete' ? 'danger' : 'secondary'"
-                :disabled="item.disabled"
-                class="!w-full !justify-start !rounded-md !px-3 !py-2.5 !text-admin-meta !font-[650]"
-                @click="handleActionSelect(item.key)"
+          <template #icon>
+            <NavArrowLeft class="size-4 text-admin-text-2" />
+          </template>
+        </Button>
+        <Button
+          text
+          :class="adminToolbarPagerButtonClass"
+          :disabled="currentPage === totalPages || loading"
+          aria-label="下一页"
+          @click="handleNextPage"
+        >
+          <template #icon>
+            <NavArrowRight class="size-4 text-admin-text-2" />
+          </template>
+        </Button>
+      </div>
+    </template>
+
+    <AdminTableFrame class="h-full">
+      <div
+        class="app-scrollbar h-full overflow-y-auto overscroll-contain"
+        :class="{ 'is-scrolling': isUserTableScrolling }"
+        @scroll.passive="handleUserTableScroll"
+      >
+        <DataTable
+          v-model:selection="selectedUsers"
+          :value="users"
+          :loading="loading"
+          data-key="id"
+          size="small"
+          lazy
+          scrollable
+          :pt="adminDenseDataTablePt"
+          :table-style="{ minWidth: '920px' }"
+        >
+          <Column
+            selection-mode="multiple"
+            header-style="width: 3.5rem"
+            :body-style="{ width: '3.5rem' }"
+          />
+
+          <Column field="username" header="用户" :style="{ minWidth: '260px' }">
+            <template #body="{ data: user }">
+              <div class="flex min-w-0 items-center gap-3">
+                <div class="relative shrink-0">
+                  <Avatar
+                    v-if="user.avatar"
+                    :image="user.avatar"
+                    shape="circle"
+                    class="!h-9 !w-9"
+                  />
+                  <Avatar
+                    v-else
+                    :label="getUserInitial(user)"
+                    shape="circle"
+                    class="!h-9 !w-9 !bg-admin-surface-muted !font-bold !text-admin-accent"
+                  />
+                  <span
+                    class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
+                    :class="user.status === 1 ? 'bg-admin-success' : 'bg-admin-danger'"
+                  />
+                </div>
+                <div class="min-w-0">
+                  <div class="truncate text-admin-content font-bold text-admin-text-1">
+                    {{ user.username }}
+                  </div>
+                  <div class="mt-0.5 truncate font-mono text-admin-caption text-admin-text-3">
+                    {{ user.uid }}
+                  </div>
+                </div>
+              </div>
+            </template>
+          </Column>
+
+          <Column field="role" header="角色" :style="{ width: '124px' }">
+            <template #body="{ data: user }">
+              <Tag
+                :value="user.role === 'admin' ? 'Admin' : 'User'"
+                :severity="user.role === 'admin' ? 'danger' : 'secondary'"
+                rounded
               />
             </template>
-          </div>
-        </Popover>
+          </Column>
+
+          <Column header="认证 ID" :style="{ minWidth: '180px' }">
+            <template #body="{ data: user }">
+              <span
+                class="block max-w-[168px] truncate font-mono text-admin-caption text-admin-text-3"
+                :title="user.auth_user_id || '-'"
+              >
+                {{ user.auth_user_id || '-' }}
+              </span>
+            </template>
+          </Column>
+
+          <Column field="created_at" header="加入时间" :style="{ width: '136px' }">
+            <template #body="{ data: user }">
+              <span class="text-admin-body text-admin-text-3">
+                {{ user.created_at ? formatDateOnly(user.created_at) : '-' }}
+              </span>
+            </template>
+          </Column>
+
+          <Column field="status" header="状态" :style="{ width: '112px' }">
+            <template #body="{ data: user }">
+              <Tag
+                :value="user.status === 1 ? '正常' : '封禁'"
+                :severity="user.status === 1 ? 'success' : 'danger'"
+                rounded
+              />
+            </template>
+          </Column>
+
+          <Column header="更多" :style="{ width: '72px' }">
+            <template #body="{ data: user }">
+              <Button
+                text
+                :class="adminRoundIconButtonClass"
+                aria-haspopup="dialog"
+                :aria-label="`${user.username} 操作菜单`"
+                @click="toggleUserActionMenu($event, user)"
+              >
+                <template #icon>
+                  <Search class="size-4 text-admin-text-2" />
+                </template>
+              </Button>
+            </template>
+          </Column>
+
+          <template #empty>
+            <div class="py-8 text-center text-admin-body text-admin-text-3">
+              {{ emptyUserMessage }}
+            </div>
+          </template>
+          <template #loading>正在加载用户...</template>
+        </DataTable>
+        <div
+          v-if="userPlaceholderRows > 0"
+          class="pointer-events-none min-w-[920px]"
+          aria-hidden="true"
+        >
+          <div
+            v-for="index in userPlaceholderRows"
+            :key="index"
+            class="h-[56px] border-t border-admin-border-soft bg-white"
+          ></div>
+        </div>
       </div>
-    </div>
-  </div>
+    </AdminTableFrame>
+    <Popover
+      ref="userActionPopoverRef"
+      :pt="userActionPopoverPt"
+      @hide="handleUserActionPopoverHide"
+    >
+      <div class="flex min-w-[176px] flex-col gap-1">
+        <template v-for="item in userActionItems" :key="item.key">
+          <div v-if="item.divided" class="my-1 h-px bg-admin-border-soft" aria-hidden="true" />
+          <Button
+            :label="item.label"
+            text
+            :severity="item.key === 'delete' ? 'danger' : 'secondary'"
+            :disabled="item.disabled"
+            class="!w-full !justify-start !rounded-md !px-3 !py-2.5 !text-admin-meta !font-[650]"
+            @click="handleActionSelect(item.key)"
+          />
+        </template>
+      </div>
+    </Popover>
+  </AdminTablePanel>
 
   <Dialog
     :visible="showBanModal"
@@ -450,10 +399,7 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
 import InputNumber from 'primevue/inputnumber'
-import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
 import Select from 'primevue/select'
@@ -485,10 +431,22 @@ import {
   updateRateLimitSettings,
   updateRegistrationSetting,
 } from '../../shared/queries/adminActions'
+import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
+import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
-import { Filter, NavArrowLeft, NavArrowRight, Refresh, Search, Settings, Xmark } from '@iconoir/vue'
+import {
+  adminConfigPopoverClass,
+  adminFilterPopoverClass,
+  adminPopoverTitleClass,
+  adminRoundIconButtonClass,
+  adminToolbarIconButtonClass,
+  adminToolbarMetricClass,
+  adminToolbarPageLabelClass,
+  adminToolbarPagerButtonClass,
+} from '../../shared/lib/adminUiClasses'
+import { Filter, NavArrowLeft, NavArrowRight, Refresh, Search, Settings } from '@iconoir/vue'
 
 type UserActionKey = 'status' | 'revoke' | 'impersonate' | 'role' | 'delete'
 

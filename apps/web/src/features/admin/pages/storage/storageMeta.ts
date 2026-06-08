@@ -20,8 +20,6 @@ export interface VendorPresetOption extends VendorPreset {
   supported: boolean
 }
 
-type ProviderMetaMap = Partial<Record<StorageProvider, StorageProviderMeta>>
-
 export const vendorLogoMap: Partial<Record<StorageProvider, string>> = {
   's3-compatible': logoAmazonS3,
   'tencent-cos': logoTencentCloud,
@@ -48,7 +46,7 @@ export const vendorPresetCatalog: VendorPreset[] = [
     key: 'tencent-cos',
     provider: 's3-compatible',
     label: '腾讯云 COS',
-    logoSrc: vendorLogoMap['tencent-cos'] as string,
+    logoSrc: logoTencentCloud,
     description: '适合腾讯云体系项目，常用于图片与静态资源托管。',
     defaultName: '腾讯云 COS 存储',
     defaultConfig: {
@@ -61,7 +59,7 @@ export const vendorPresetCatalog: VendorPreset[] = [
     key: 'aws-s3',
     provider: 's3-compatible',
     label: 'Amazon S3',
-    logoSrc: vendorLogoMap['aws-s3'] as string,
+    logoSrc: logoAmazonS3,
     description: '标准 S3 协议对象存储，适合作为通用默认模板。',
     defaultName: 'Amazon S3 存储',
     defaultConfig: {
@@ -74,7 +72,7 @@ export const vendorPresetCatalog: VendorPreset[] = [
     key: 'cloudflare-r2',
     provider: 's3-compatible',
     label: 'Cloudflare R2',
-    logoSrc: vendorLogoMap['cloudflare-r2'] as string,
+    logoSrc: logoCloudflare,
     description: '适合全球分发与低出口成本的对象存储场景。',
     defaultName: 'Cloudflare R2 存储',
     defaultConfig: {
@@ -87,7 +85,7 @@ export const vendorPresetCatalog: VendorPreset[] = [
     key: 'minio',
     provider: 's3-compatible',
     label: 'MinIO',
-    logoSrc: vendorLogoMap.minio as string,
+    logoSrc: logoMinio,
     description: '适合私有部署和本地自建的 S3 兼容存储方案。',
     defaultName: 'MinIO 存储',
     defaultConfig: {
@@ -137,7 +135,6 @@ export function storageVendorLogo(storage: StorageCard) {
 }
 
 export function buildVendorPresets(
-  _providerMap: ProviderMetaMap,
   creatableProviders: StorageProviderMeta[],
 ): VendorPresetOption[] {
   return vendorPresetCatalog.map((vendor) => {

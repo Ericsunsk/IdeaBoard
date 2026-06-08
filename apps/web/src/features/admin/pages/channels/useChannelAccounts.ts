@@ -39,7 +39,6 @@ export function useChannelAccounts(options: {
   onAfterMutation: () => Promise<void> | void
 }) {
   const accounts = ref<AdminAccount[]>([])
-  const accountLoading = ref(false)
   const isMockMode = useAdminMockMode()
   const showAccountModal = ref(false)
   const isEditAccount = ref(false)
@@ -115,19 +114,14 @@ export function useChannelAccounts(options: {
   }
 
   async function loadAccounts() {
-    accountLoading.value = true
-    try {
-      if (isMockMode.value) {
-        accounts.value = createMockAdminAccounts()
-        accountLimits.value = mockAdminAccountLimits
-        return
-      }
-
-      const [nextAccounts] = await Promise.all([loadAllAccounts(), loadAccountLimits()])
-      accounts.value = nextAccounts
-    } finally {
-      accountLoading.value = false
+    if (isMockMode.value) {
+      accounts.value = createMockAdminAccounts()
+      accountLimits.value = mockAdminAccountLimits
+      return
     }
+
+    const [nextAccounts] = await Promise.all([loadAllAccounts(), loadAccountLimits()])
+    accounts.value = nextAccounts
   }
 
   function getChannelAccounts(channelId: number) {
@@ -403,7 +397,6 @@ export function useChannelAccounts(options: {
 
   return {
     accounts,
-    accountLoading,
     showAccountModal,
     isEditAccount,
     accountSaveLoading,
@@ -412,7 +405,6 @@ export function useChannelAccounts(options: {
     accountForm,
     detectModelsLoading,
     modelSuggestions,
-    accountModelOptions,
     loadAccounts,
     getChannelAccounts,
     getAccountModelRows,

@@ -1,65 +1,56 @@
 <template>
-  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0 min-[1081px]:-mb-[17px]">
-    <div
-      class="min-w-0 overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0 min-[1081px]:h-[calc(100dvh-117px)]"
-    >
-      <div
-        v-if="featureGroups.length > 0"
-        class="app-scrollbar grid auto-rows-max grid-cols-1 content-start gap-3.5 p-6 min-[1081px]:h-full min-[1081px]:overflow-y-auto min-[1081px]:overscroll-contain lg:grid-cols-2 2xl:grid-cols-3"
-        :class="{ 'is-scrolling': isPromptPanelScrolling }"
-        @scroll.passive="handlePromptPanelScroll"
-      >
-        <Card v-for="group in featureGroups" :key="group.key" class="!rounded-lg">
-          <template #content>
-            <div class="flex min-h-[208px] flex-col gap-3.5">
-              <div class="flex items-start justify-between gap-3">
-                <span class="min-w-0 truncate text-admin-title-sm font-bold text-admin-title-color">
-                  {{ group.title }}
-                </span>
-                <Tag :value="`${group.items.length} 项配置`" severity="secondary" rounded />
-              </div>
-
-              <div class="flex flex-wrap gap-2">
-                <Tag
-                  :value="`${getGroupVariableCount(group)} 个变量`"
-                  severity="secondary"
-                  rounded
-                />
-                <Tag
-                  :value="`${getGroupFilledCount(group)}/${group.items.length} 已配置`"
-                  severity="secondary"
-                  rounded
-                />
-              </div>
-
-              <div class="flex flex-wrap content-start gap-2">
-                <Tag
-                  v-for="item in group.items"
-                  :key="item.slug"
-                  :value="item.title"
-                  severity="secondary"
-                  rounded
-                />
-              </div>
-
-              <div class="mt-auto flex justify-start">
-                <Button size="small" label="编辑" @click="openEditor(group.key)" />
-              </div>
+  <AdminManagementFrame
+    :content-class="promptPanelContentClass"
+    :is-scrolling="isPromptPanelScrolling"
+    @scroll="handlePromptPanelScroll"
+  >
+    <template v-if="featureGroups.length > 0">
+      <Card v-for="group in featureGroups" :key="group.key" class="!rounded-lg">
+        <template #content>
+          <div class="flex min-h-[208px] flex-col gap-3.5">
+            <div class="flex items-start justify-between gap-3">
+              <span class="min-w-0 truncate text-admin-title-sm font-bold text-admin-title-color">
+                {{ group.title }}
+              </span>
+              <Tag :value="`${group.items.length} 项配置`" severity="secondary" rounded />
             </div>
-          </template>
-        </Card>
-      </div>
-      <div
-        v-else
-        class="m-6 flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-admin-text-2"
-      >
-        <div class="text-admin-title font-semibold text-admin-title-color">未加载到节点配置</div>
-        <div class="mt-2 text-admin-meta text-admin-subtitle-color">
-          请检查功能分组定义或刷新页面重试。
-        </div>
+
+            <div class="flex flex-wrap gap-2">
+              <Tag :value="`${getGroupVariableCount(group)} 个变量`" severity="secondary" rounded />
+              <Tag
+                :value="`${getGroupFilledCount(group)}/${group.items.length} 已配置`"
+                severity="secondary"
+                rounded
+              />
+            </div>
+
+            <div class="flex flex-wrap content-start gap-2">
+              <Tag
+                v-for="item in group.items"
+                :key="item.slug"
+                :value="item.title"
+                severity="secondary"
+                rounded
+              />
+            </div>
+
+            <div class="mt-auto flex justify-start">
+              <Button size="small" label="编辑" @click="openEditor(group.key)" />
+            </div>
+          </div>
+        </template>
+      </Card>
+    </template>
+    <div
+      v-else
+      class="flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-admin-text-2"
+    >
+      <div class="text-admin-title font-semibold text-admin-title-color">未加载到节点配置</div>
+      <div class="mt-2 text-admin-meta text-admin-subtitle-color">
+        请检查功能分组定义或刷新页面重试。
       </div>
     </div>
-  </div>
+  </AdminManagementFrame>
 
   <Dialog
     :visible="Boolean(activeGroup)"
@@ -98,7 +89,7 @@
       @scroll.passive="handlePromptDialogScroll"
     >
       <div class="flex flex-col gap-3 pr-3">
-        <Panel v-for="item in activeGroup.items" :key="item.slug" :pt="promptEditorPanelPt">
+        <Panel v-for="item in activeGroup.items" :key="item.slug" :pt="adminPanelPt">
           <template #header>
             <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
               <span class="text-admin-content font-semibold text-admin-title-color">
@@ -177,7 +168,9 @@ import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
+import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
+import { adminPanelPt } from '../../shared/lib/adminPanelPt'
 import { saveFeaturePrompt } from '../../shared/queries/adminActions'
 import {
   getListAdminFeaturePromptsQueryKey,
@@ -208,20 +201,14 @@ const activeGroupKey = ref<string | null>(null)
 const featureGroups = computed<FeatureGroup[]>(() =>
   groupedFeatureGroups.filter((group) => group.items.length > 0),
 )
+const promptPanelContentClass = computed(() =>
+  featureGroups.value.length > 0
+    ? 'grid auto-rows-max grid-cols-1 content-start gap-3.5 p-6 lg:grid-cols-2 2xl:grid-cols-3'
+    : 'p-6',
+)
 const activeGroup = computed<FeatureGroup | null>(() => {
   return featureGroups.value.find((group) => group.key === activeGroupKey.value) || null
 })
-const promptEditorPanelPt = {
-  root: {
-    class: '!overflow-hidden !rounded-lg !border-admin-border-soft !bg-admin-card !shadow-none',
-  },
-  header: {
-    class: '!border-admin-border-soft !bg-transparent !px-4 !py-3 !text-admin-text-1',
-  },
-  content: {
-    class: '!border-admin-border-soft !bg-white/70 !px-4 !py-3',
-  },
-} as const
 const variableTokenButtonClass =
   'max-w-full !h-7 !min-h-0 !rounded-full !border-transparent !px-2.5 !py-0 font-mono !text-[11px] !font-[760] !leading-4 [&_.p-button-label]:break-all [&_.p-button-label]:leading-4'
 const variableTokenButtonToneClass: Record<VarTone, string> = {
@@ -280,7 +267,11 @@ function resolveTextareaElement(ref: TextareaRefLike | undefined) {
 }
 
 function bindTextareaRef(slug: FeatureSlug, el: unknown) {
-  if (el) textareaRefs[slug] = el as TextareaRefLike
+  if (el) {
+    textareaRefs[slug] = el as TextareaRefLike
+    return
+  }
+  delete textareaRefs[slug]
 }
 
 const promptMap = reactive<Record<string, string>>({})

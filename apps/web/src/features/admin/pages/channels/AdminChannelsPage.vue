@@ -1,264 +1,230 @@
 <template>
-  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0 min-[1081px]:-mb-[17px]">
-    <div
-      class="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-admin-border-soft bg-admin-card-strong p-0 min-[1081px]:h-[calc(100dvh-117px)]"
+  <div>
+    <AdminManagementFrame
+      :is-scrolling="isChannelPanelScrolling"
+      @scroll="handleChannelPanelScroll"
     >
-      <div
-        class="flex shrink-0 flex-wrap items-center justify-between gap-4 bg-transparent px-6 py-4"
-      >
-        <div class="flex flex-wrap items-center gap-3">
-          <IconField class="relative w-full sm:w-[260px]">
-            <InputIcon>
-              <Search class="size-4 text-admin-text-3" />
-            </InputIcon>
-            <InputText
-              v-model="searchKeyword"
-              placeholder="Search"
-              fluid
-              class="!h-[38px] !w-full !rounded-lg !bg-white !text-[15px] !text-admin-text-1 !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]"
-            />
-            <Button
-              v-if="searchKeyword"
-              text
-              rounded
-              class="absolute top-1/2 right-1 !h-8 !w-8 -translate-y-1/2"
-              aria-label="清空搜索"
-              @click="searchKeyword = ''"
-            >
-              <template #icon>
-                <Xmark />
-              </template>
-            </Button>
-          </IconField>
-          <span
-            class="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-white px-3 py-1.5 text-[13px] font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]"
-          >
-            <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
-            <span>{{ totalChannelsLabel }}</span>
-          </span>
-          <Tag :value="accountRunningLabel" severity="success" rounded />
-          <Tag :value="`${activeModelCount} 模型`" severity="info" rounded />
-        </div>
+      <template #toolbar-start>
+        <AdminToolbarSearch v-model="searchKeyword" />
+        <span :class="adminToolbarMetricClass">
+          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-admin-success"></span>
+          <span>{{ totalChannelsLabel }}</span>
+        </span>
+        <Tag :value="accountRunningLabel" severity="success" rounded />
+        <Tag :value="`${activeModelCount} 模型`" severity="info" rounded />
+      </template>
 
-        <div class="flex flex-wrap items-center justify-end gap-3">
-          <Button text :class="framedIconButtonClass" aria-label="刷新渠道商" @click="loadData">
-            <template #icon>
-              <Refresh class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-          <Button label="新增渠道商" class="!h-9 !rounded-lg" @click="openAddChannelModal">
-            <template #icon>
-              <Plus class="size-4" />
-            </template>
-          </Button>
-        </div>
+      <template #toolbar-end>
+        <Button text :class="adminToolbarIconButtonClass" aria-label="刷新渠道商" @click="loadData">
+          <template #icon>
+            <Refresh class="size-4 text-admin-text-2" />
+          </template>
+        </Button>
+        <Button label="新增渠道商" class="!h-9 !rounded-lg" @click="openAddChannelModal">
+          <template #icon>
+            <Plus class="size-4" />
+          </template>
+        </Button>
+      </template>
+
+      <div
+        v-if="loading && channels.length === 0"
+        class="flex min-h-[260px] items-center justify-center text-admin-content text-admin-text-3"
+      >
+        <ProgressSpinner class="!h-9 !w-9 text-admin-accent" stroke-width="4" />
       </div>
 
       <div
-        class="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6"
-        :class="{ 'is-scrolling': isChannelPanelScrolling }"
-        @scroll.passive="handleChannelPanelScroll"
+        v-else-if="filteredChannels.length === 0"
+        class="flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-center text-admin-text-2"
       >
-        <div
-          v-if="loading && channels.length === 0"
-          class="flex min-h-[260px] items-center justify-center text-admin-content text-admin-text-3"
-        >
-          <ProgressSpinner class="!h-9 !w-9 text-admin-accent" stroke-width="4" />
+        <div class="text-admin-title font-semibold text-admin-title-color">
+          {{ emptyChannelMessage }}
         </div>
-
-        <div
-          v-else-if="filteredChannels.length === 0"
-          class="flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-center text-admin-text-2"
-        >
-          <div class="text-admin-title font-semibold text-admin-title-color">
-            {{ emptyChannelMessage }}
-          </div>
-          <div class="mt-2 text-admin-meta text-admin-subtitle-color">
-            {{ hasChannelSearch ? '调整搜索关键词后重试。' : '点击右上角新增渠道商开始配置。' }}
-          </div>
+        <div class="mt-2 text-admin-meta text-admin-subtitle-color">
+          {{ hasChannelSearch ? '调整搜索关键词后重试。' : '点击右上角新增渠道商开始配置。' }}
         </div>
+      </div>
 
-        <div v-else class="columns-1 gap-3.5 md:columns-2 xl:columns-3">
-          <Card
-            v-for="channel in filteredChannels"
-            :key="channel.id"
-            class="mb-3.5 break-inside-avoid !rounded-lg"
-          >
-            <template #title>
-              <div class="flex items-start gap-3">
-                <div class="flex min-w-0 items-center gap-3">
-                  <Avatar
-                    :label="(channel.name || 'CH').substring(0, 2).toUpperCase()"
-                    shape="circle"
-                    class="!h-10 !w-10 !shrink-0 !bg-admin-accent !text-sm !font-bold !text-admin-text-inverse"
-                  />
-                  <div class="min-w-0">
-                    <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
-                      {{ channel.name }}
-                    </div>
-                    <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
-                      {{ channel.api_url }}
-                    </div>
+      <div v-else class="columns-1 gap-3.5 md:columns-2 xl:columns-3">
+        <Card
+          v-for="card in filteredChannelCards"
+          :key="card.channel.id"
+          class="mb-3.5 break-inside-avoid !rounded-lg"
+        >
+          <template #title>
+            <div class="flex items-start gap-3">
+              <div class="flex min-w-0 items-center gap-3">
+                <Avatar
+                  :label="(card.channel.name || 'CH').substring(0, 2).toUpperCase()"
+                  shape="circle"
+                  class="!h-10 !w-10 !shrink-0 !bg-admin-accent !text-sm !font-bold !text-admin-text-inverse"
+                />
+                <div class="min-w-0">
+                  <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
+                    {{ card.channel.name }}
+                  </div>
+                  <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
+                    {{ card.channel.api_url }}
                   </div>
                 </div>
               </div>
-            </template>
+            </div>
+          </template>
 
-            <template #content>
-              <div class="flex flex-col gap-3.5">
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <Tag
-                    :value="getApiTypeLabel(channel.type)"
-                    severity="info"
-                    :class="channelCardTagClass"
+          <template #content>
+            <div class="flex flex-col gap-3.5">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <Tag
+                  :value="getApiTypeLabel(card.channel.type)"
+                  severity="info"
+                  :class="adminCompactTagClass"
+                  rounded
+                />
+                <Tag
+                  :value="`${card.accounts.length} APIKey`"
+                  severity="secondary"
+                  :class="adminCompactTagClass"
+                  rounded
+                />
+                <Tag
+                  :value="`${card.modelCount} 模型`"
+                  severity="secondary"
+                  :class="adminCompactTagClass"
+                  rounded
+                />
+              </div>
+
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-admin-caption font-bold text-admin-text-3">
+                    关联 APIKey ({{ card.accounts.length }})
+                  </span>
+                  <Button
+                    text
                     rounded
-                  />
-                  <Tag
-                    :value="`${getChannelAccounts(channel.id).length} APIKey`"
-                    severity="secondary"
-                    :class="channelCardTagClass"
-                    rounded
-                  />
-                  <Tag
-                    :value="`${getChannelModelCount(channel.id)} 模型`"
-                    severity="secondary"
-                    :class="channelCardTagClass"
-                    rounded
-                  />
+                    size="small"
+                    aria-label="添加 APIKey"
+                    @click="openAddAccountModal(card.channel)"
+                  >
+                    <template #icon>
+                      <Plus />
+                    </template>
+                  </Button>
                 </div>
 
-                <div class="flex flex-col gap-3">
-                  <div class="flex items-center justify-between">
-                    <span class="text-admin-caption font-bold text-admin-text-3">
-                      关联 APIKey ({{ getChannelAccounts(channel.id).length }})
-                    </span>
-                    <Button
-                      text
-                      rounded
-                      size="small"
-                      aria-label="添加 APIKey"
-                      @click="openAddAccountModal(channel)"
-                    >
-                      <template #icon>
-                        <Plus />
-                      </template>
-                    </Button>
-                  </div>
-
-                  <div v-if="getChannelAccounts(channel.id).length > 0" class="flex flex-col gap-2">
-                    <Panel
-                      v-for="account in getChannelAccounts(channel.id)"
-                      :key="account.id"
-                      :pt="accountPanelPt"
-                    >
-                      <template #header>
-                        <div class="flex min-w-0 flex-1 items-center justify-between gap-2">
-                          <div class="flex min-w-0 items-center gap-2">
-                            <div
-                              class="h-1.5 w-1.5 shrink-0 rounded-full"
-                              :class="getAccountStatusDotClass(account)"
-                            ></div>
-                            <span
-                              class="truncate text-admin-meta font-semibold text-admin-title-color"
-                            >
-                              {{ account.name || 'APIKey' }}
-                            </span>
-                            <span
-                              class="shrink-0 font-mono text-admin-caption font-bold text-admin-text-3"
-                            >
-                              {{ account.current_concurrent || 0 }}/{{ account.max_concurrent }}
-                            </span>
-                          </div>
-                          <div class="flex shrink-0 items-center gap-1">
-                            <Button
-                              size="small"
-                              text
-                              :class="framedIconButtonClass"
-                              aria-label="编辑 APIKey"
-                              title="编辑 APIKey"
-                              @click="openEditAccountModal(account)"
-                            >
-                              <template #icon>
-                                <EditPencil class="size-4 text-admin-text-2" />
-                              </template>
-                            </Button>
-                            <Button
-                              size="small"
-                              text
-                              :class="framedIconButtonClass"
-                              aria-label="删除 APIKey"
-                              title="删除 APIKey"
-                              @click="handleDeleteAccount(account)"
-                            >
-                              <template #icon>
-                                <Trash class="size-4 text-admin-text-2" />
-                              </template>
-                            </Button>
-                          </div>
-                        </div>
-                      </template>
-
-                      <div class="flex flex-col gap-2">
-                        <ProgressBar
-                          :value="
-                            ((account.current_concurrent || 0) / (account.max_concurrent || 1)) *
-                            100
-                          "
-                          :show-value="false"
-                          class="!h-[3px] !rounded-full !bg-admin-border-soft"
-                          :pt="getAccountProgressPt(account)"
-                        />
-
-                        <div class="flex flex-col gap-1.5">
+                <div v-if="card.accounts.length > 0" class="flex flex-col gap-2">
+                  <Panel
+                    v-for="account in card.accounts"
+                    :key="account.id"
+                    :pt="adminCompactPanelPt"
+                  >
+                    <template #header>
+                      <div class="flex min-w-0 flex-1 items-center justify-between gap-2">
+                        <div class="flex min-w-0 items-center gap-2">
                           <div
-                            v-for="model in getAccountModelRows(account)"
-                            :key="`${account.id}:${model.name}`"
-                            class="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-admin-border-soft bg-white px-2 py-1.5"
+                            class="h-1.5 w-1.5 shrink-0 rounded-full"
+                            :class="getAccountStatusDotClass(account)"
+                          ></div>
+                          <span
+                            class="truncate text-admin-meta font-semibold text-admin-title-color"
                           >
-                            <Chip
-                              :label="model.name"
-                              :pt="modelChipPt"
-                              :class="[
-                                'min-w-0 !max-w-full !justify-start !overflow-hidden !rounded-none !bg-transparent !px-0 !py-0 !text-admin-meta !font-medium !text-admin-text-1',
-                                model.disabled ? '!opacity-55' : '',
-                              ]"
-                            />
-                            <ToggleSwitch
-                              :model-value="!model.disabled"
-                              size="small"
-                              class="!shrink-0"
-                              @update:model-value="toggleAccountModelStatus(account, model.name)"
-                            />
-                          </div>
+                            {{ account.name || 'APIKey' }}
+                          </span>
+                          <span
+                            class="shrink-0 font-mono text-admin-caption font-bold text-admin-text-3"
+                          >
+                            {{ account.current_concurrent || 0 }}/{{ account.max_concurrent }}
+                          </span>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-1">
+                          <Button
+                            size="small"
+                            text
+                            :class="adminFramedIconButtonClass"
+                            aria-label="编辑 APIKey"
+                            title="编辑 APIKey"
+                            @click="openEditAccountModal(account)"
+                          >
+                            <template #icon>
+                              <EditPencil class="size-4 text-admin-text-2" />
+                            </template>
+                          </Button>
+                          <Button
+                            size="small"
+                            text
+                            :class="adminFramedIconButtonClass"
+                            aria-label="删除 APIKey"
+                            title="删除 APIKey"
+                            @click="handleDeleteAccount(account)"
+                          >
+                            <template #icon>
+                              <Trash class="size-4 text-admin-text-2" />
+                            </template>
+                          </Button>
                         </div>
                       </div>
-                    </Panel>
-                  </div>
-                  <Message v-else severity="secondary" :closable="false">
-                    点击上方按钮添加 APIKey
-                  </Message>
+                    </template>
+
+                    <div class="flex flex-col gap-2">
+                      <ProgressBar
+                        :value="
+                          ((account.current_concurrent || 0) / (account.max_concurrent || 1)) * 100
+                        "
+                        :show-value="false"
+                        class="!h-[3px] !rounded-full !bg-admin-border-soft"
+                        :pt="getAccountProgressPt(account)"
+                      />
+
+                      <div class="flex flex-col gap-1.5">
+                        <div
+                          v-for="model in getAccountModelRows(account)"
+                          :key="`${account.id}:${model.name}`"
+                          class="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-admin-border-soft bg-white px-2 py-1.5"
+                        >
+                          <Chip
+                            :label="model.name"
+                            :pt="modelChipPt"
+                            :class="[
+                              'min-w-0 !max-w-full !justify-start !overflow-hidden !rounded-none !bg-transparent !px-0 !py-0 !text-admin-meta !font-medium !text-admin-text-1',
+                              model.disabled ? '!opacity-55' : '',
+                            ]"
+                          />
+                          <ToggleSwitch
+                            :model-value="!model.disabled"
+                            size="small"
+                            class="!shrink-0"
+                            @update:model-value="toggleAccountModelStatus(account, model.name)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Panel>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                  <Button
-                    size="small"
-                    label="编辑"
-                    severity="contrast"
-                    @click="openEditChannelModal(channel)"
-                  />
-                  <Button
-                    size="small"
-                    label="删除"
-                    severity="contrast"
-                    outlined
-                    @click="handleDeleteChannel(channel)"
-                  />
-                </div>
+                <Message v-else severity="secondary" :closable="false">
+                  点击上方按钮添加 APIKey
+                </Message>
               </div>
-            </template>
-          </Card>
-        </div>
+              <div class="flex flex-wrap gap-2">
+                <Button
+                  size="small"
+                  label="编辑"
+                  severity="contrast"
+                  @click="openEditChannelModal(card.channel)"
+                />
+                <Button
+                  size="small"
+                  label="删除"
+                  severity="contrast"
+                  outlined
+                  @click="handleDeleteChannel(card.channel)"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
       </div>
-    </div>
+    </AdminManagementFrame>
 
     <!-- 渠道商表单弹窗 -->
     <Dialog
@@ -401,8 +367,6 @@ import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Chip from 'primevue/chip'
 import Dialog from 'primevue/dialog'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -413,9 +377,18 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
-import { EditPencil, Plus, Refresh, Search, Trash, Xmark } from '@iconoir/vue'
+import { EditPencil, Plus, Refresh, Trash } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
+import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
+import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
+import { adminCompactPanelPt } from '../../shared/lib/adminPanelPt'
+import {
+  adminCompactTagClass,
+  adminFramedIconButtonClass,
+  adminToolbarIconButtonClass,
+  adminToolbarMetricClass,
+} from '../../shared/lib/adminUiClasses'
 import { createMockAdminChannels, useAdminMockMode } from '../../shared/lib/adminMockData'
 import { extractApiErrorMessage, splitCommaValues } from './channelModelUtils'
 import { useChannelAccounts } from './useChannelAccounts'
@@ -436,6 +409,21 @@ const filteredChannels = computed(() => {
   if (!keyword) return channels.value
   return channels.value.filter((item) => (item.name || '').toLowerCase().includes(keyword))
 })
+const filteredChannelCards = computed(() =>
+  filteredChannels.value.map((channel) => {
+    const channelAccounts = getChannelAccounts(channel.id)
+    const models = new Set<string>()
+    channelAccounts.forEach((account) => {
+      getAccountModelRows(account).forEach((model) => models.add(model.name))
+    })
+
+    return {
+      channel,
+      accounts: channelAccounts,
+      modelCount: models.size,
+    }
+  }),
+)
 const hasChannelSearch = computed(() => Boolean(searchKeyword.value.trim()))
 const totalChannelsLabel = computed(() =>
   hasChannelSearch.value
@@ -482,9 +470,6 @@ const apiTypeOptions = [
   { label: 'Google', value: 'google-ai' },
 ]
 const apiTypeLabelByValue = new Map(apiTypeOptions.map((item) => [item.value, item.label]))
-const framedIconButtonClass =
-  '!h-9 !w-9 !rounded-lg !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0'
-const channelCardTagClass = '!px-2 !py-0.5 !text-[11px] !leading-4'
 const modelSelectPt = {
   root: { class: 'w-full' },
   inputMultiple: { class: '!min-h-[42px] !w-full !rounded-xl' },
@@ -502,17 +487,6 @@ const modelChipPt = {
 } as const
 const activeProgressPt = { value: { class: '!bg-admin-success' } } as const
 const mutedProgressPt = { value: { class: '!bg-admin-text-3' } } as const
-const accountPanelPt = {
-  root: {
-    class: '!overflow-hidden !rounded-lg !border-admin-border-soft !bg-admin-card !shadow-none',
-  },
-  header: {
-    class: '!border-admin-border-soft !bg-transparent !px-3 !py-2 !text-admin-text-1',
-  },
-  content: {
-    class: '!border-admin-border-soft !bg-white/70 !px-3 !py-2.5',
-  },
-} as const
 
 function getApiTypeLabel(value: string) {
   return apiTypeLabelByValue.get(value) || value || '未配置'
@@ -526,14 +500,6 @@ function getAccountStatusDotClass(account: AdminAccount) {
 
 function getAccountProgressPt(account: AdminAccount) {
   return account.status === 1 ? activeProgressPt : mutedProgressPt
-}
-
-function getChannelModelCount(channelId: number) {
-  const models = new Set<string>()
-  getChannelAccounts(channelId).forEach((account) => {
-    getAccountModelRows(account).forEach((model) => models.add(model.name))
-  })
-  return models.size
 }
 
 function inferChannelApiTypeFromUrl() {

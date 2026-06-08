@@ -18,6 +18,7 @@ export interface StorageCard {
 }
 
 export type ProviderMetaMap = Partial<Record<StorageProvider, StorageProviderMeta>>
+export type StorageStatusClass = 'is-current' | 'is-enabled' | 'is-empty'
 
 export function toProviderMetaMap(providers: StorageProviderMeta[]): ProviderMetaMap {
   return Object.fromEntries(
@@ -27,13 +28,6 @@ export function toProviderMetaMap(providers: StorageProviderMeta[]): ProviderMet
 
 export function providerLabel(provider: StorageProvider, providerMap: ProviderMetaMap) {
   return providerMap[provider]?.label || provider
-}
-
-export function providerSupportsBucketInfo(
-  provider: StorageProvider,
-  providerMap: ProviderMetaMap,
-) {
-  return Boolean(providerMap[provider]?.supports_bucket_info)
 }
 
 export function providerSupportsTest(provider: StorageProvider, providerMap: ProviderMetaMap) {
@@ -151,10 +145,21 @@ export function statusText(storage: StorageCard, providerMap: ProviderMetaMap) {
   return '未配置'
 }
 
-export function statusClass(storage: StorageCard, providerMap: ProviderMetaMap) {
+export function statusClass(
+  storage: StorageCard,
+  providerMap: ProviderMetaMap,
+): StorageStatusClass {
   if (storage.isCurrent) return 'is-current'
   if (hasConfiguredProfile(storage, providerMap)) return 'is-enabled'
   return 'is-empty'
+}
+
+export function storageStatusSeverity(status: StorageStatusClass) {
+  return {
+    'is-current': 'success',
+    'is-enabled': 'info',
+    'is-empty': 'warn',
+  }[status]
 }
 
 export function storageSubtitle(storage: StorageCard) {

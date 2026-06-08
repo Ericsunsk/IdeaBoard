@@ -3,21 +3,19 @@ import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../../shared/domain/workflo
 
 export type VarTone = 'prompt' | 'control' | 'context'
 
-export interface VarDef {
+interface VarDef {
   key: string
-  desc: string
   tone: VarTone
 }
 
-const promptVars: VarDef[] = [
+const promptVars: readonly VarDef[] = [
   {
     key: '{{user_prompt}}',
-    desc: '当前节点或工具请求拼装后的用户提示词文本',
     tone: 'prompt',
   },
 ]
 
-const noVars: VarDef[] = []
+const noVars: readonly VarDef[] = []
 
 type RegistryFeatureItem = {
   slug: WorkflowFeature
@@ -26,13 +24,12 @@ type RegistryFeatureItem = {
 }
 
 export type FeatureSlug = RegistryFeatureItem['slug']
-export type FeatureItem = RegistryFeatureItem
+type FeatureItem = RegistryFeatureItem
 
 const featureGroupDefs = [
   {
     key: 'image',
     title: 'Image',
-    desc: 'Image 节点的右键快捷处理、局部重绘、扩图和 HD 配置。',
     order: 10,
     slugs: [
       WORKFLOW_FEATURE.sketchToImage,
@@ -46,28 +43,24 @@ const featureGroupDefs = [
   {
     key: 'prompt',
     title: 'Prompt',
-    desc: 'Prompt 节点的纯文本生成配置；system prompt 可选，用于后续补充辅助约束。',
     order: 20,
     slugs: [WORKFLOW_FEATURE.patternGen],
   },
   {
     key: 'fusion',
     title: 'Fusion',
-    desc: 'Fusion 节点的多图融合提示词、输入权重和融合语义配置。',
     order: 30,
     slugs: [WORKFLOW_FEATURE.styleFusion],
   },
   {
     key: 'display',
     title: 'Display',
-    desc: 'Display 节点的商品展示视角、光影和陈列语义配置。',
     order: 40,
     slugs: [WORKFLOW_FEATURE.virtual3d],
   },
 ] as const satisfies readonly {
   key: string
   title: string
-  desc: string
   order: number
   slugs: readonly FeatureSlug[]
 }[]
@@ -81,7 +74,7 @@ function toFeatureItem(slug: FeatureSlug, groupTitle: string): FeatureItem {
   }
 }
 
-export const featureList = featureGroupDefs.flatMap((group) =>
+const featureList = featureGroupDefs.flatMap((group) =>
   group.slugs.map((slug) => toFeatureItem(slug, group.title)),
 )
 
@@ -96,32 +89,26 @@ const sortedFeatureGroupDefs = featureGroupDefs
 export const groupedFeatureGroups = sortedFeatureGroupDefs.map((group) => ({
   key: group.key,
   title: group.title,
-  desc: group.desc,
   items: group.slugs.map((slug) => featureMap[slug]),
 }))
 
 export type FeatureGroup = (typeof groupedFeatureGroups)[number]
 
-const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
+const featureVarMap: Partial<Record<FeatureSlug, readonly VarDef[]>> = {
   [WORKFLOW_FEATURE.sketchToImage]: noVars,
   [WORKFLOW_FEATURE.partialEdit]: promptVars,
-  [WORKFLOW_FEATURE.styleVariation]: [
-    { key: '{{strength}}', desc: '风格延展强度百分比（0-100）', tone: 'control' },
-  ],
+  [WORKFLOW_FEATURE.styleVariation]: [{ key: '{{strength}}', tone: 'control' }],
   [WORKFLOW_FEATURE.virtual3d]: [
     {
       key: '{{viewpoint}}',
-      desc: 'Display 节点所选展示视角，系统会自动转换成中文描述（如：45° 侧视）',
       tone: 'context',
     },
     {
       key: '{{lighting}}',
-      desc: 'Display 节点光影，系统会自动转换成中文描述（如：高级暖白）',
       tone: 'context',
     },
     {
       key: '{{user_prompt}}',
-      desc: '连接的 Prompt 文本；未连接 Prompt 时为空，视角/光影由 {{viewpoint}} / {{lighting}} 表达',
       tone: 'prompt',
     },
   ],
@@ -130,31 +117,29 @@ const featureVarMap: Partial<Record<FeatureSlug, VarDef[]>> = {
   [WORKFLOW_FEATURE.styleFusion]: [
     {
       key: '{{user_prompt}}',
-      desc: 'Fusion 节点输入框或连接的 Prompt 文本，用于补充融合方向、质感、细节和氛围',
       tone: 'prompt',
     },
     {
       key: '{{image_weights}}',
-      desc: 'Fusion 根据 blend point 计算出的有序图片权重，支持 2-4 张输入图',
       tone: 'control',
     },
   ],
   [WORKFLOW_FEATURE.hdUpscale]: [
-    { key: '{{upscale_mode}}', desc: 'HD 模式（base / enhancement）', tone: 'control' },
-    { key: '{{upscale_factor}}', desc: '放大倍数（2 / 3 / 4）', tone: 'control' },
-    { key: '{{output_format}}', desc: '输出格式（jpg / png）', tone: 'control' },
-    { key: '{{output_quality}}', desc: '输出质量（30-100）', tone: 'control' },
+    { key: '{{upscale_mode}}', tone: 'control' },
+    { key: '{{upscale_factor}}', tone: 'control' },
+    { key: '{{output_format}}', tone: 'control' },
+    { key: '{{output_quality}}', tone: 'control' },
   ],
   [WORKFLOW_FEATURE.imageExtend]: [
     ...promptVars,
-    { key: '{{extend_top}}', desc: '基于原图高度向上扩展的百分比', tone: 'control' },
-    { key: '{{extend_right}}', desc: '基于原图宽度向右扩展的百分比', tone: 'control' },
-    { key: '{{extend_bottom}}', desc: '基于原图高度向下扩展的百分比', tone: 'control' },
-    { key: '{{extend_left}}', desc: '基于原图宽度向左扩展的百分比', tone: 'control' },
+    { key: '{{extend_top}}', tone: 'control' },
+    { key: '{{extend_right}}', tone: 'control' },
+    { key: '{{extend_bottom}}', tone: 'control' },
+    { key: '{{extend_left}}', tone: 'control' },
   ],
 }
 
-export function getVarsForSlug(slug: FeatureSlug): VarDef[] {
+export function getVarsForSlug(slug: FeatureSlug): readonly VarDef[] {
   return featureVarMap[slug] || noVars
 }
 

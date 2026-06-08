@@ -12,7 +12,7 @@ const adminChartBubbleRadiusMin = 5
 const adminChartBubbleRadiusMax = 18
 const adminChartBubbleHoverRadiusOffset = 2
 
-export const adminChartFontFamily =
+const adminChartFontFamily =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
 
 export const adminChartTheme = {
@@ -220,7 +220,7 @@ export function getAdminChartBubbleHoverRadius(value: number, maxValue: number) 
   return radius > 0 ? radius + adminChartBubbleHoverRadiusOffset : 0
 }
 
-export function getAdminChartNiceScaleMax(
+function getAdminChartNiceScaleMax(
   values: readonly number[],
   options: Pick<AdminChartNumericScaleInput, 'min' | 'headroom'> = {},
 ) {
@@ -228,7 +228,7 @@ export function getAdminChartNiceScaleMax(
   return getAdminChartNiceMax(peak, options)
 }
 
-export function getAdminChartNiceMax(
+function getAdminChartNiceMax(
   value: number,
   options: Pick<AdminChartNumericScaleInput, 'min' | 'headroom'> = {},
 ) {
@@ -237,18 +237,18 @@ export function getAdminChartNiceMax(
   return ceilToNiceChartMax(Math.max(min, toFiniteChartNumber(value) * headroom))
 }
 
-export function formatAdminChartCompactNumber(value: number) {
+function formatAdminChartCompactNumber(value: number) {
   const rounded = Math.round(toFiniteChartNumber(value))
   if (rounded >= 1_000_000) return formatCompactUnit(rounded / 1_000_000, 'm')
   if (rounded >= 1_000) return formatCompactUnit(rounded / 1_000, 'k')
   return rounded.toString()
 }
 
-export function formatAdminChartDurationSeconds(value: number) {
+function formatAdminChartDurationSeconds(value: number) {
   return `${toFiniteChartNumber(value).toFixed(1)}s`
 }
 
-export function formatAdminChartPercent(value: number, suffix = '%') {
+function formatAdminChartPercent(value: number, suffix = '%') {
   return `${Math.round(toFiniteChartNumber(value))}${suffix}`
 }
 

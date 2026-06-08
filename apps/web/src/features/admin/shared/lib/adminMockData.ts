@@ -14,9 +14,9 @@ import type {
   MonitorStats,
   Task,
   TaskExecutionMetrics,
+  GetAdminStatisticsRange,
 } from '../../../../shared/api/generated-query/model'
 import { buildAdminTimeRangeBuckets } from './adminTimeRange'
-import type { AdminStatisticsRange } from '../queries/adminActions'
 
 const mockModels = [
   'gpt-image-1',
@@ -29,7 +29,7 @@ export function useAdminMockMode() {
   return computed(() => import.meta.env.VITE_ADMIN_MOCK_DATA === '1')
 }
 
-export function createMockAdminStatistics(range: AdminStatisticsRange): AdminStatistics {
+export function createMockAdminStatistics(range: GetAdminStatisticsRange): AdminStatistics {
   const trend = createMockTrend(range)
   const qualityTrend = createMockQualityTrend(range)
 
@@ -354,7 +354,7 @@ export const mockMonitorStats: MonitorStats = {
   failed: 7532,
 }
 
-function createMockTrend(range: AdminStatisticsRange): AdminStatisticsTrendItem[] {
+function createMockTrend(range: GetAdminStatisticsRange): AdminStatisticsTrendItem[] {
   return buildAdminTimeRangeBuckets(range).map((bucket, index) => {
     const segments = mockModels.slice(0, 3).map((model, modelIndex) => ({
       label: model,
@@ -371,7 +371,7 @@ function createMockTrend(range: AdminStatisticsRange): AdminStatisticsTrendItem[
   })
 }
 
-function createMockQualityTrend(range: AdminStatisticsRange): AdminStatisticsQualityTrendItem[] {
+function createMockQualityTrend(range: GetAdminStatisticsRange): AdminStatisticsQualityTrendItem[] {
   return buildAdminTimeRangeBuckets(range).map((bucket, index) => {
     const total = mockWaveValue(index, 42, 18)
     const failureRate = Math.min(24, Math.max(4, 8 + Math.sin(index * 0.9) * 7 + (index % 5)))
