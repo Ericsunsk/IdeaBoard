@@ -272,6 +272,11 @@ type TaskCancellation struct {
 type TaskDailyStat struct {
 	ID                int64     `json:"id"`
 	StatDate          time.Time `json:"stat_date"`
+	UserID            int64     `json:"user_id"`
+	AccountID         int64     `json:"account_id"`
+	ChannelID         int64     `json:"channel_id"`
+	FeatureSlug       string    `json:"feature_slug"`
+	ApiType           string    `json:"api_type"`
 	ModelName         string    `json:"model_name"`
 	UserKey           string    `json:"user_key"`
 	Total             int64     `json:"total"`
@@ -335,6 +340,11 @@ type TaskStatEvent struct {
 	ID             int64     `json:"id"`
 	TaskID         string    `json:"task_id"`
 	StatDate       time.Time `json:"stat_date"`
+	UserID         int64     `json:"user_id"`
+	AccountID      int64     `json:"account_id"`
+	ChannelID      int64     `json:"channel_id"`
+	FeatureSlug    string    `json:"feature_slug"`
+	ApiType        string    `json:"api_type"`
 	ModelName      string    `json:"model_name"`
 	UserKey        string    `json:"user_key"`
 	Status         string    `json:"status"`

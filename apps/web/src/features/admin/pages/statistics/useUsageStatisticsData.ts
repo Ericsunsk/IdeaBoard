@@ -1,7 +1,8 @@
 import { useGetAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
-import type {
-  AdminStatistics,
+import {
   GetAdminStatisticsRange,
+  type AdminStatistics,
+  type GetAdminStatisticsRange as GetAdminStatisticsRangeValue,
 } from '../../../../shared/api/generated-query/model'
 import {
   pickAdminTimeRangeOptions,
@@ -9,13 +10,21 @@ import {
 } from '../../shared/lib/adminTimeRange'
 import { createMockAdminStatistics, useAdminMockMode } from '../../shared/lib/adminMockData'
 
-const usageTrendRanges = ['7d', '30d', '1y'] as const
-const qualityTrendRanges = ['1d', '7d', '30d'] as const
+const usageTrendRanges: readonly GetAdminStatisticsRangeValue[] = [
+  GetAdminStatisticsRange['7d'],
+  GetAdminStatisticsRange['30d'],
+  GetAdminStatisticsRange['1y'],
+]
+const qualityTrendRanges: readonly GetAdminStatisticsRangeValue[] = [
+  GetAdminStatisticsRange['1d'],
+  GetAdminStatisticsRange['7d'],
+  GetAdminStatisticsRange['30d'],
+]
 
 export function useUsageStatisticsData() {
   const isMockMode = useAdminMockMode()
-  const timeRange = ref<GetAdminStatisticsRange>('7d')
-  const qualityTimeRange = ref<GetAdminStatisticsRange>('7d')
+  const timeRange = ref<GetAdminStatisticsRangeValue>(GetAdminStatisticsRange['7d'])
+  const qualityTimeRange = ref<GetAdminStatisticsRangeValue>(GetAdminStatisticsRange['7d'])
   const rangeOptions: AdminTimeRangeOption[] = pickAdminTimeRangeOptions(usageTrendRanges)
   const qualityRangeOptions: AdminTimeRangeOption[] = pickAdminTimeRangeOptions(qualityTrendRanges)
 

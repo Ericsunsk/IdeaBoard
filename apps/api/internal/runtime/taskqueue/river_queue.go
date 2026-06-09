@@ -143,11 +143,9 @@ func (q *RiverQueue) MonitorInfo(ctx context.Context, accountIDs []int64) (*queu
 	if err != nil {
 		return nil, err
 	}
-	running := int64(0)
-	if q != nil && q.db != nil {
-		if err := q.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE status = $1`, tasks.StatusRunning).Scan(&running); err != nil {
-			return nil, fmt.Errorf("river monitor info running tasks: %w", err)
-		}
+	running, err := q.countRunningTaskAttempts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("river monitor info running attempts: %w", err)
 	}
 	loads := map[int64]*queuetypes.AccountLoad{}
 	if q != nil && q.accountLoadStore != nil {
@@ -157,10 +155,10 @@ func (q *RiverQueue) MonitorInfo(ctx context.Context, accountIDs []int64) (*queu
 		}
 	}
 	return &queuetypes.MonitorInfo{
-		GlobalQueueLen: global,
-		WaitQueueLen:   wait,
-		RunningTasks:   running,
-		AccountLoads:   loads,
+		GlobalQueueLen:  global,
+		WaitQueueLen:    wait,
+		RunningAttempts: running,
+		AccountLoads:    loads,
 	}, nil
 }
 
@@ -171,6 +169,18 @@ SELECT COUNT(*)
 FROM river_job
 WHERE queue = $1
   AND state = ANY($2::river_job_state[])`, q.queueName, pq.Array(queuedRiverJobStateValues())).Scan(&count)
+	return count, err
+}
+
+func (q *RiverQueue) countRunningTaskAttempts(ctx context.Context) (int64, error) {
+	if q == nil || q.db == nil {
+		return 0, nil
+	}
+	var count int64
+	err := q.db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM task_attempts
+WHERE status = $1`, tasks.TaskAttemptStatusRunning).Scan(&count)
 	return count, err
 }
 

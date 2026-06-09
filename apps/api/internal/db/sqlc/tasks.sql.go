@@ -549,6 +549,126 @@ func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTas
 	return i, err
 }
 
+const listMonitorExecutionPressureByRange = `-- name: ListMonitorExecutionPressureByRange :many
+WITH pending_tasks AS (
+  SELECT
+    CASE
+      WHEN GREATEST(EXTRACT(EPOCH FROM ($1::timestamptz - t.updated_at)), 0) >= 60 THEN 'backlog_pending'
+      ELSE 'normal_pending'
+    END AS bucket_key,
+    GREATEST(EXTRACT(EPOCH FROM ($1::timestamptz - t.updated_at)), 0)::double precision AS duration_seconds,
+    0::bigint AS failed,
+    0::bigint AS retry
+  FROM tasks t
+  WHERE t.status = 'pending'
+    AND t.updated_at <= $1
+),
+timed_attempts AS (
+  SELECT
+    ta.status,
+    ta.attempt_no,
+    CASE
+      WHEN ta.status = 'running'
+      THEN GREATEST(EXTRACT(EPOCH FROM ($1::timestamptz - ta.created_at)), 0)::double precision
+      WHEN ta.total_latency_ms > 0
+      THEN (ta.total_latency_ms::double precision / 1000)
+      WHEN ta.completed_at IS NOT NULL AND ta.completed_at > ta.created_at
+      THEN EXTRACT(EPOCH FROM (ta.completed_at - ta.created_at))::double precision
+      ELSE 0::double precision
+    END AS duration_seconds
+  FROM task_attempts ta
+  WHERE (
+      ta.status = 'running'
+      AND ta.created_at <= $1
+    )
+    OR (
+      ta.status IN ('completed', 'failed', 'requeued', 'cancelled')
+      AND ta.completed_at IS NOT NULL
+      AND ta.completed_at >= $2::timestamptz
+      AND ta.completed_at < $1
+    )
+),
+attempt_pressure AS (
+  SELECT
+    CASE
+      WHEN status = 'running' AND duration_seconds >= 120 THEN 'stuck_running'
+      WHEN status = 'running' THEN 'normal_running'
+      WHEN status = 'completed' AND duration_seconds >= 60 THEN 'slow_completed'
+      WHEN status = 'completed' THEN 'fast_completed'
+      WHEN status = 'failed' AND duration_seconds >= 60 THEN 'slow_failed'
+      WHEN status = 'failed' THEN 'fast_failed'
+      WHEN status = 'cancelled' THEN 'cancelled'
+      WHEN status = 'requeued' THEN 'retrying'
+      ELSE 'other'
+    END AS bucket_key,
+    duration_seconds,
+    CASE WHEN status = 'failed' THEN 1 ELSE 0 END::bigint AS failed,
+    CASE WHEN status = 'requeued' OR attempt_no > 1 THEN 1 ELSE 0 END::bigint AS retry
+  FROM timed_attempts
+),
+pressure_rows AS (
+  SELECT bucket_key, duration_seconds, failed, retry
+  FROM pending_tasks
+  UNION ALL
+  SELECT bucket_key, duration_seconds, failed, retry
+  FROM attempt_pressure
+)
+SELECT
+  bucket_key,
+  COUNT(*)::bigint AS total,
+  COALESCE(AVG(duration_seconds), 0)::double precision AS avg_duration_seconds,
+  COALESCE(MAX(duration_seconds), 0)::double precision AS max_duration_seconds,
+  COALESCE(SUM(failed), 0)::bigint AS failed,
+  COALESCE(SUM(retry), 0)::bigint AS retry
+FROM pressure_rows
+GROUP BY bucket_key
+ORDER BY bucket_key ASC
+`
+
+type ListMonitorExecutionPressureByRangeParams struct {
+	NowAt     time.Time `json:"now_at"`
+	StartedAt time.Time `json:"started_at"`
+}
+
+type ListMonitorExecutionPressureByRangeRow struct {
+	BucketKey          string  `json:"bucket_key"`
+	Total              int64   `json:"total"`
+	AvgDurationSeconds float64 `json:"avg_duration_seconds"`
+	MaxDurationSeconds float64 `json:"max_duration_seconds"`
+	Failed             int64   `json:"failed"`
+	Retry              int64   `json:"retry"`
+}
+
+func (q *Queries) ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMonitorExecutionPressureByRange, arg.NowAt, arg.StartedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMonitorExecutionPressureByRangeRow
+	for rows.Next() {
+		var i ListMonitorExecutionPressureByRangeRow
+		if err := rows.Scan(
+			&i.BucketKey,
+			&i.Total,
+			&i.AvgDurationSeconds,
+			&i.MaxDurationSeconds,
+			&i.Failed,
+			&i.Retry,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRunningMissingLeaseTaskIDs = `-- name: ListRunningMissingLeaseTaskIDs :many
 SELECT task_id
 FROM tasks

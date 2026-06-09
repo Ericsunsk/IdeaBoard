@@ -35,8 +35,16 @@ type Handler struct {
 }
 
 type adminMonitorSnapshot struct {
-	Monitor *queuetypes.MonitorInfo `json:"monitor"`
-	Stats   map[string]int64        `json:"stats"`
+	Monitor *adminMonitorData `json:"monitor"`
+	Stats   map[string]int64  `json:"stats"`
+}
+
+type adminMonitorData struct {
+	GlobalQueueLen    int64                             `json:"global_queue_len"`
+	WaitQueueLen      int64                             `json:"wait_queue_len"`
+	RunningAttempts   int64                             `json:"running_attempts"`
+	AccountLoads      map[int64]*queuetypes.AccountLoad `json:"account_loads"`
+	ExecutionPressure []MonitorExecutionPressurePoint   `json:"execution_pressure"`
 }
 
 func NewHandler(service *Service, monitor MonitorInfoProvider) *Handler {
@@ -110,7 +118,34 @@ func (h *Handler) buildMonitorSnapshot(ctx context.Context) (*adminMonitorSnapsh
 	if err != nil {
 		return nil, fmt.Errorf("get task stats: %w", err)
 	}
-	return &adminMonitorSnapshot{Monitor: info, Stats: stats}, nil
+	pressure, err := h.service.GetMonitorExecutionPressure(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get monitor execution pressure: %w", err)
+	}
+	return &adminMonitorSnapshot{Monitor: adminMonitorDataFromRuntime(info, pressure), Stats: stats}, nil
+}
+
+func adminMonitorDataFromRuntime(info *queuetypes.MonitorInfo, pressure []MonitorExecutionPressurePoint) *adminMonitorData {
+	if pressure == nil {
+		pressure = []MonitorExecutionPressurePoint{}
+	}
+	accountLoads := map[int64]*queuetypes.AccountLoad{}
+	if info == nil {
+		return &adminMonitorData{
+			AccountLoads:      accountLoads,
+			ExecutionPressure: pressure,
+		}
+	}
+	if info.AccountLoads != nil {
+		accountLoads = info.AccountLoads
+	}
+	return &adminMonitorData{
+		GlobalQueueLen:    info.GlobalQueueLen,
+		WaitQueueLen:      info.WaitQueueLen,
+		RunningAttempts:   info.RunningAttempts,
+		AccountLoads:      accountLoads,
+		ExecutionPressure: pressure,
+	}
 }
 
 func writeMonitorSnapshot(c *gin.Context, snapshot *adminMonitorSnapshot) bool {
@@ -124,6 +159,10 @@ func writeMonitorSnapshot(c *gin.Context, snapshot *adminMonitorSnapshot) bool {
 func (h *Handler) GetStatistics(c *gin.Context) {
 	stats, err := h.service.GetStatistics(c.Request.Context(), c.Query("range"))
 	if err != nil {
+		if isStatisticsRangeValidationError(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "获取统计数据失败", err)
 		return
 	}
@@ -147,6 +186,10 @@ func (h *Handler) BackfillStatistics(c *gin.Context) {
 
 	result, err := h.service.BackfillStatistics(c.Request.Context(), req.Range)
 	if err != nil {
+		if isStatisticsRangeValidationError(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "补录统计失败", err)
 		return
 	}

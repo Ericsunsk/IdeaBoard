@@ -216,7 +216,7 @@
                   />
                   <span
                     class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-admin-card-strong"
-                    :class="user.status === 1 ? 'bg-admin-success' : 'bg-admin-danger'"
+                    :class="isActiveUser(user) ? 'bg-admin-success' : 'bg-admin-danger'"
                   />
                 </div>
                 <div class="min-w-0">
@@ -234,8 +234,8 @@
           <Column field="role" header="角色" :style="{ width: '124px' }">
             <template #body="{ data: user }">
               <Tag
-                :value="user.role === 'admin' ? 'Admin' : 'User'"
-                :severity="user.role === 'admin' ? 'danger' : 'secondary'"
+                :value="isAdminUser(user) ? 'Admin' : 'User'"
+                :severity="isAdminUser(user) ? 'danger' : 'secondary'"
                 rounded
               />
             </template>
@@ -263,8 +263,8 @@
           <Column field="status" header="状态" :style="{ width: '112px' }">
             <template #body="{ data: user }">
               <Tag
-                :value="user.status === 1 ? '正常' : '封禁'"
-                :severity="user.status === 1 ? 'success' : 'danger'"
+                :value="isActiveUser(user) ? '正常' : '封禁'"
+                :severity="isActiveUser(user) ? 'success' : 'danger'"
                 rounded
               />
             </template>
@@ -415,7 +415,13 @@ import {
   getListAdminUsersQueryKey,
   useListAdminUsers,
 } from '../../../../shared/api/generated-query/admin-users/admin-users'
-import type { ListAdminUsersParams } from '../../../../shared/api/generated-query/model'
+import {
+  ListAdminUsersRole,
+  ListAdminUsersStatus,
+  type ListAdminUsersParams,
+  type ListAdminUsersRole as ListAdminUsersRoleValue,
+  type ListAdminUsersStatus as ListAdminUsersStatusValue,
+} from '../../../../shared/api/generated-query/model'
 import {
   getGetAdminRateLimitSettingsQueryKey,
   getGetAdminRegistrationSettingQueryKey,
@@ -462,8 +468,11 @@ type PrimePopupPanel = {
   hide?: () => void
 }
 
-type UserRoleFilter = 'all' | 'admin' | 'user'
-type UserStatusFilter = 'all' | 'active' | 'banned'
+const USER_ROLE_FILTER_ALL = 'all'
+const USER_STATUS_FILTER_ALL = 'all'
+
+type UserRoleFilter = typeof USER_ROLE_FILTER_ALL | ListAdminUsersRoleValue
+type UserStatusFilter = typeof USER_STATUS_FILTER_ALL | ListAdminUsersStatusValue
 
 const appToast = useAppToast()
 const confirm = useConfirm()
@@ -491,29 +500,39 @@ const userRoleFilter = ref<UserRoleFilter>('all')
 const userStatusFilter = ref<UserStatusFilter>('all')
 
 const userRoleFilterOptions: Array<{ label: string; value: UserRoleFilter }> = [
-  { label: '全部角色', value: 'all' },
-  { label: '管理员', value: 'admin' },
-  { label: '普通用户', value: 'user' },
+  { label: '全部角色', value: USER_ROLE_FILTER_ALL },
+  { label: '管理员', value: ListAdminUsersRole.admin },
+  { label: '普通用户', value: ListAdminUsersRole.user },
 ]
 const userStatusFilterOptions: Array<{ label: string; value: UserStatusFilter }> = [
-  { label: '全部状态', value: 'all' },
-  { label: '正常', value: 'active' },
-  { label: '封禁', value: 'banned' },
+  { label: '全部状态', value: USER_STATUS_FILTER_ALL },
+  { label: '正常', value: ListAdminUsersStatus.NUMBER_1 },
+  { label: '封禁', value: ListAdminUsersStatus.NUMBER_0 },
 ]
 
 const hasUserFilter = computed(
-  () => userRoleFilter.value !== 'all' || userStatusFilter.value !== 'all',
+  () =>
+    userRoleFilter.value !== USER_ROLE_FILTER_ALL ||
+    userStatusFilter.value !== USER_STATUS_FILTER_ALL,
 )
 const hasAppliedUserQuery = computed(
   () => Boolean(appliedSearchKeyword.value) || hasUserFilter.value,
 )
 const selectedUserRole = computed<ListAdminUsersParams['role']>(() =>
-  userRoleFilter.value === 'all' ? undefined : userRoleFilter.value,
+  userRoleFilter.value === USER_ROLE_FILTER_ALL ? undefined : userRoleFilter.value,
 )
 const selectedUserStatus = computed<ListAdminUsersParams['status']>(() => {
-  if (userStatusFilter.value === 'all') return undefined
-  return userStatusFilter.value === 'active' ? 1 : 0
+  if (userStatusFilter.value === USER_STATUS_FILTER_ALL) return undefined
+  return userStatusFilter.value
 })
+
+function isAdminUser(user: Pick<User, 'role'>) {
+  return user.role === ListAdminUsersRole.admin
+}
+
+function isActiveUser(user: Pick<User, 'status'>) {
+  return user.status === ListAdminUsersStatus.NUMBER_1
+}
 
 function toggleUserFilterPanel(event: Event) {
   userFilterPopoverRef.value?.toggle(event)
@@ -524,8 +543,8 @@ function toggleUserConfigPanel(event: Event) {
 }
 
 function resetUserFilters() {
-  userRoleFilter.value = 'all'
-  userStatusFilter.value = 'all'
+  userRoleFilter.value = USER_ROLE_FILTER_ALL
+  userStatusFilter.value = USER_STATUS_FILTER_ALL
 }
 
 function handlePrevPage() {
@@ -728,12 +747,12 @@ function handleUserActionPopoverHide() {
 }
 
 function getUserActionItems(row: User): UserActionItem[] {
-  const isAdmin = row.role === 'admin'
+  const isAdmin = isAdminUser(row)
   const hasAuthIdentity = Boolean(row.auth_user_id)
   return [
     {
       key: 'status',
-      label: row.status === 1 ? '用户封禁' : '解除封禁',
+      label: isActiveUser(row) ? '用户封禁' : '解除封禁',
       disabled: isAdmin,
     },
     { key: 'revoke', label: '吊销会话', disabled: !hasAuthIdentity },
@@ -849,12 +868,12 @@ function requireAdminConfirm(options: {
 }
 
 function handleToggleStatus(row: User) {
-  if (row.role === 'admin') {
+  if (isAdminUser(row)) {
     appToast.warning('管理员账号不可封禁或解封')
     return
   }
 
-  if (row.status === 1) {
+  if (isActiveUser(row)) {
     banUserContext.value = row
     banForm.value = { expiresInDays: 0, reason: '' }
     showBanModal.value = true
@@ -927,8 +946,8 @@ async function handleImpersonate(row: User) {
     if (error) throw error
     appToast.success(`正在以 ${row.username} 的身份登录...`)
     setTimeout(() => (window.location.href = '/'), 1000)
-  } catch (err: any) {
-    appToast.error(extractBetterAuthErrorMessage(err, '伪装失败'))
+  } catch (error: unknown) {
+    appToast.error(extractBetterAuthErrorMessage(error, '伪装失败'))
   }
 }
 
@@ -942,19 +961,19 @@ function handleDeleteUser(row: User) {
       try {
         await deleteUserMutation.mutateAsync(row.id)
         appToast.success('用户已受控彻底注销')
-      } catch (err: any) {
-        appToast.error(formatDisplayErrorMessage(err, '注销失败'))
+      } catch (error: unknown) {
+        appToast.error(formatDisplayErrorMessage(error, '注销失败'))
       }
     },
   })
 }
 
 function handleToggleRole(row: User) {
-  const nextRole: 'admin' | 'user' = row.role === 'admin' ? 'user' : 'admin'
+  const nextRole = isAdminUser(row) ? ListAdminUsersRole.user : ListAdminUsersRole.admin
   requireAdminConfirm({
-    header: nextRole === 'admin' ? '确认设为管理员' : '确认取消管理员',
+    header: nextRole === ListAdminUsersRole.admin ? '确认设为管理员' : '确认取消管理员',
     message:
-      nextRole === 'admin'
+      nextRole === ListAdminUsersRole.admin
         ? `确定要将用户 ${row.username} 设为管理员吗？该用户将获得后台访问权限。`
         : `确定要取消用户 ${row.username} 的管理员权限吗？`,
     acceptLabel: '确认',
@@ -962,9 +981,9 @@ function handleToggleRole(row: User) {
     accept: async () => {
       try {
         await updateUserRoleMutation.mutateAsync({ id: row.id, role: nextRole })
-        appToast.success(nextRole === 'admin' ? '已设为管理员' : '已取消管理员')
-      } catch (err: any) {
-        appToast.error(formatDisplayErrorMessage(err, '角色更新失败'))
+        appToast.success(nextRole === ListAdminUsersRole.admin ? '已设为管理员' : '已取消管理员')
+      } catch (error: unknown) {
+        appToast.error(formatDisplayErrorMessage(error, '角色更新失败'))
       }
     },
   })

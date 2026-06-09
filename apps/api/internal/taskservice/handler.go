@@ -108,8 +108,16 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
+	if err := validateTaskListQueryIDs(c, req.UserID, req.AccountID); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
 	taskItems, counts, err := h.taskService.ListTasks(c.Request.Context(), &req)
 	if err != nil {
+		if isTaskListValidationError(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "获取任务列表失败", err)
 		return
 	}
@@ -123,6 +131,16 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		"other_count":     counts.OtherCount,
 		"list":            toAdminTaskDTOs(taskItems),
 	})
+}
+
+func validateTaskListQueryIDs(c *gin.Context, userID int64, accountID int64) error {
+	if c.Query("user_id") != "" && userID <= 0 {
+		return newTaskListValidationError("user_id 必须大于 0")
+	}
+	if c.Query("account_id") != "" && accountID <= 0 {
+		return newTaskListValidationError("account_id 必须大于 0")
+	}
+	return nil
 }
 
 func (h *Handler) GetUserTasks(c *gin.Context) {

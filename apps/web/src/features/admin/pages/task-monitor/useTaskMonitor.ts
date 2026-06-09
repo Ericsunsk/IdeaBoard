@@ -1,14 +1,17 @@
 import { computed, ref, watch } from 'vue'
 import type { Task } from '../../../../shared/api/task'
 import { useListAdminTasks } from '../../../../shared/api/generated-query/admin-tasks/admin-tasks'
-import { calcDurationSeconds } from '../../../../shared/utils/dateTime'
+import {
+  ListAdminTasksStatus,
+  type ListAdminTasksParams,
+  type ListAdminTasksStatus as ListAdminTasksStatusValue,
+} from '../../../../shared/api/generated-query/model'
 import { useAdminQueryPolling } from '../../shared/composables/useAdminQueryPolling'
 import { createMockAdminTasks, useAdminMockMode } from '../../shared/lib/adminMockData'
 
 export const TASK_MONITOR_PAGE_SIZE = 12
 
-type TimedTaskRow = { task: Task; seconds: number }
-type PageTaskStats = {
+type TaskStatusStats = {
   running: number
   pending: number
   completed: number
@@ -20,20 +23,16 @@ type PageTaskStats = {
 export function useTaskMonitor() {
   const isMockMode = useAdminMockMode()
   const page = ref(1)
-  const filterStatus = ref<string | null>(null)
+  const filterStatus = ref<ListAdminTasksStatusValue | null>(null)
+  const accountIdFilter = ref<number | null>(null)
   const searchKeyword = ref('')
   const appliedSearchKeyword = ref('')
   const hasActiveTasks = ref(true)
 
-  function resolveParams() {
-    const params: {
-      status?: string
-      page: number
-      page_size: number
-      user_id?: number
-      keyword?: string
-    } = {
+  function resolveParams(): ListAdminTasksParams {
+    const params: ListAdminTasksParams = {
       status: filterStatus.value || undefined,
+      account_id: accountIdFilter.value || undefined,
       page: page.value,
       page_size: TASK_MONITOR_PAGE_SIZE,
     }
@@ -64,7 +63,12 @@ export function useTaskMonitor() {
   const mockTasks = computed(() => createMockAdminTasks())
   const filteredMockTasks = computed(() =>
     mockTasks.value.filter((task) =>
-      matchesMockTaskFilters(task, filterStatus.value, appliedSearchKeyword.value),
+      matchesMockTaskFilters(
+        task,
+        filterStatus.value,
+        accountIdFilter.value,
+        appliedSearchKeyword.value,
+      ),
     ),
   )
   const tasks = computed(() =>
@@ -76,9 +80,8 @@ export function useTaskMonitor() {
     isMockMode.value ? filteredMockTasks.value.length : tasksQuery.data.value?.data?.total || 0,
   )
   const loading = computed(() => !isMockMode.value && tasksQuery.isLoading.value)
-  const pageStats = computed(() => buildPageTaskStats(tasks.value))
-  const taskStats = computed<PageTaskStats>(() => {
-    if (isMockMode.value) return buildPageTaskStats(filteredMockTasks.value)
+  const taskStats = computed<TaskStatusStats>(() => {
+    if (isMockMode.value) return buildTaskStats(filteredMockTasks.value)
     const data = tasksQuery.data.value?.data
     return {
       pending: data?.pending_count ?? 0,
@@ -90,25 +93,13 @@ export function useTaskMonitor() {
     }
   })
 
-  const activeTasks = computed<TimedTaskRow[]>(() =>
-    tasks.value
-      .map((task) => {
-        if (task.status !== 'running' && task.status !== 'pending') return null
-        if (!task.created_at) return null
-        const seconds = calcDurationSeconds(task.created_at, new Date())
-        if (seconds == null) return null
-        return { task, seconds }
-      })
-      .filter((row): row is TimedTaskRow => !!row)
-      .sort((a, b) => b.seconds - a.seconds)
-      .slice(0, 5),
-  )
-
   watch(
     tasks,
     (rows) => {
       hasActiveTasks.value = rows.some(
-        (task) => task.status === 'pending' || task.status === 'running',
+        (task) =>
+          task.status === ListAdminTasksStatus.pending ||
+          task.status === ListAdminTasksStatus.running,
       )
     },
     { immediate: true },
@@ -119,7 +110,7 @@ export function useTaskMonitor() {
     appliedSearchKeyword.value = searchKeyword.value.trim()
   }
 
-  watch(filterStatus, () => {
+  watch([filterStatus, accountIdFilter], () => {
     page.value = 1
   })
 
@@ -138,23 +129,22 @@ export function useTaskMonitor() {
     loading,
     page,
     taskStats,
-    pageStats,
-    activeTasks,
     filterStatus,
+    accountIdFilter,
     searchKeyword,
     loadTasks,
     handleSearch,
   }
 }
 
-function buildPageTaskStats(tasks: Task[]): PageTaskStats {
-  return tasks.reduce<PageTaskStats>(
+function buildTaskStats(tasks: Task[]): TaskStatusStats {
+  return tasks.reduce<TaskStatusStats>(
     (stats, task) => {
-      if (task.status === 'running') stats.running += 1
-      else if (task.status === 'pending') stats.pending += 1
-      else if (task.status === 'completed') stats.completed += 1
-      else if (task.status === 'failed') stats.failed += 1
-      else if (task.status === 'cancelled') stats.cancelled += 1
+      if (task.status === ListAdminTasksStatus.running) stats.running += 1
+      else if (task.status === ListAdminTasksStatus.pending) stats.pending += 1
+      else if (task.status === ListAdminTasksStatus.completed) stats.completed += 1
+      else if (task.status === ListAdminTasksStatus.failed) stats.failed += 1
+      else if (task.status === ListAdminTasksStatus.cancelled) stats.cancelled += 1
       else stats.other += 1
       return stats
     },
@@ -167,8 +157,14 @@ function paginateMockTasks(tasks: Task[], page: number) {
   return tasks.slice(start, start + TASK_MONITOR_PAGE_SIZE)
 }
 
-function matchesMockTaskFilters(task: Task, status: string | null, keyword: string) {
+function matchesMockTaskFilters(
+  task: Task,
+  status: ListAdminTasksStatusValue | null,
+  accountId: number | null,
+  keyword: string,
+) {
   if (status && task.status !== status) return false
+  if (accountId != null && task.account_id !== accountId) return false
   if (!keyword) return true
 
   const value = keyword.toLowerCase()

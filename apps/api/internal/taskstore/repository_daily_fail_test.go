@@ -29,6 +29,8 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 		UserID:            10,
 		AssignedChannelID: tasks.IDPtr(accountID + 10000),
 		AccountID:         tasks.IDPtr(accountID),
+		FeatureSlug:       "image-generate",
+		APIType:           "openai-compatible",
 		Status:            tasks.StatusRunning,
 		Result:            `{"model":"model-stop","username":"user-stop"}`,
 		CreatedAt:         createdAt,
@@ -79,6 +81,21 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	}
 	if events != 2 {
 		t.Fatalf("event count=%d, want 2", events)
+	}
+
+	var userID, eventAccountID, channelID int64
+	var featureSlug, apiType string
+	if err := taskRepo.db.QueryRowContext(ctx, `
+SELECT user_id, account_id, channel_id, feature_slug, api_type
+FROM task_stat_events
+WHERE task_id = 'acc-fail-1'`,
+	).Scan(&userID, &eventAccountID, &channelID, &featureSlug, &apiType); err != nil {
+		t.Fatalf("read stat event dimensions failed: %v", err)
+	}
+	if userID != 10 || eventAccountID != accountID || channelID != accountID+10000 ||
+		featureSlug != "image-generate" || apiType != "openai-compatible" {
+		t.Fatalf("unexpected stat event dimensions: user=%d account=%d channel=%d feature=%q api=%q",
+			userID, eventAccountID, channelID, featureSlug, apiType)
 	}
 }
 

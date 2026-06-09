@@ -77,6 +77,15 @@ type ExecutionFailureCategoryAggregate struct {
 	AvgLatencyMS float64
 }
 
+type MonitorExecutionPressureAggregate struct {
+	Key                string
+	Total              int64
+	AvgDurationSeconds float64
+	MaxDurationSeconds float64
+	Failed             int64
+	Retry              int64
+}
+
 const (
 	defaultStorageProfileID = "builtin-local"
 )
@@ -673,6 +682,34 @@ func finishTaskAttemptParams(finish tasks.TaskAttemptFinish) dbsqlc.FinishTaskAt
 	}
 }
 
+func (r *Repository) ListMonitorExecutionPressureByRange(ctx context.Context, start, now time.Time) ([]MonitorExecutionPressureAggregate, error) {
+	if start.IsZero() || now.IsZero() {
+		return nil, fmt.Errorf("monitor execution pressure date range is required")
+	}
+	if !now.After(start) {
+		return nil, fmt.Errorf("monitor execution pressure now_at must be after started_at")
+	}
+	rows, err := r.q.ListMonitorExecutionPressureByRange(ctx, dbsqlc.ListMonitorExecutionPressureByRangeParams{
+		NowAt:     now,
+		StartedAt: start,
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]MonitorExecutionPressureAggregate, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, MonitorExecutionPressureAggregate{
+			Key:                row.BucketKey,
+			Total:              row.Total,
+			AvgDurationSeconds: row.AvgDurationSeconds,
+			MaxDurationSeconds: row.MaxDurationSeconds,
+			Failed:             row.Failed,
+			Retry:              row.Retry,
+		})
+	}
+	return result, nil
+}
+
 func (r *Repository) ListExecutionMetricsByTaskIDs(ctx context.Context, taskIDs []string) (map[string]*tasks.TaskExecutionMetrics, error) {
 	result := make(map[string]*tasks.TaskExecutionMetrics, len(taskIDs))
 	if len(taskIDs) == 0 {
@@ -997,6 +1034,11 @@ func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Que
 	statDate := taskStatDateFromTime(task.CreatedAt, loc)
 	model := taskStatModel(task, fallbackModel)
 	user := extractTaskUser(task.Result, task.UserID)
+	userID := nonNegativeIDValue(task.UserID)
+	accountID := positiveIDValue(task.AccountID)
+	channelID := positiveIDValue(task.AssignedChannelID)
+	featureSlug := normalizeStatFeature(task.FeatureSlug)
+	apiType := normalizeStatAPIType(task.APIType)
 
 	completedDelta := int64(0)
 	failedDelta := int64(0)
@@ -1022,6 +1064,11 @@ func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Que
 	inserted, err := q.InsertTaskStatEventIgnore(ctx, dbsqlc.InsertTaskStatEventIgnoreParams{
 		TaskID:         task.TaskID,
 		StatDate:       statDate,
+		UserID:         userID,
+		AccountID:      accountID,
+		ChannelID:      channelID,
+		FeatureSlug:    featureSlug,
+		ApiType:        apiType,
 		ModelName:      model,
 		UserKey:        user,
 		Status:         task.Status,
@@ -1033,6 +1080,11 @@ func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Que
 
 	return q.UpsertTaskDailyStatDelta(ctx, dbsqlc.UpsertTaskDailyStatDeltaParams{
 		StatDate:          statDate,
+		UserID:            userID,
+		AccountID:         accountID,
+		ChannelID:         channelID,
+		FeatureSlug:       featureSlug,
+		ApiType:           apiType,
 		ModelName:         model,
 		UserKey:           user,
 		Total:             1,
@@ -1042,6 +1094,20 @@ func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Que
 		LatencySecondsSum: latencySeconds,
 		LatencyCount:      latencyCountDelta,
 	})
+}
+
+func nonNegativeIDValue(value int64) int64 {
+	if value < 0 {
+		return 0
+	}
+	return value
+}
+
+func positiveIDValue(value *int64) int64 {
+	if value == nil || *value <= 0 {
+		return 0
+	}
+	return *value
 }
 
 func taskNeedsFallbackModel(task *tasks.Task) bool {

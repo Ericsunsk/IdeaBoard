@@ -1,4 +1,8 @@
 import type { Task } from '../../../../shared/api/task'
+import {
+  ListAdminTasksStatus,
+  type ListAdminTasksStatus as ListAdminTasksStatusValue,
+} from '../../../../shared/api/generated-query/model'
 import { calcDurationSeconds, formatAdminDateTime } from '../../../../shared/utils/dateTime'
 import { sanitizeTaskErrorMessage } from '../../../../shared/utils/errorMessages'
 import { getSafeTaskResultImageUrl } from './taskResultImages'
@@ -28,25 +32,41 @@ const ERROR_TEXT_COLOR = 'var(--color-admin-danger)'
 const DEFAULT_STATUS_COLOR = 'var(--color-admin-text-3)'
 const taskApiCallCache = new WeakMap<Task, { result: string; value: TaskApiCallInfo | null }>()
 
-export const taskStatusOptions = [
-  { label: '等待中', value: 'pending' },
-  { label: '执行中', value: 'running' },
-  { label: '已完成', value: 'completed' },
-  { label: '失败', value: 'failed' },
-  { label: '已取消', value: 'cancelled' },
+export const taskStatusOptions: Array<{ label: string; value: ListAdminTasksStatusValue }> = [
+  { label: '等待中', value: ListAdminTasksStatus.pending },
+  { label: '执行中', value: ListAdminTasksStatus.running },
+  { label: '已完成', value: ListAdminTasksStatus.completed },
+  { label: '失败', value: ListAdminTasksStatus.failed },
+  { label: '已取消', value: ListAdminTasksStatus.cancelled },
 ]
 
-const taskStatusConfigMap: Record<string, TaskStatusConfig> = {
-  pending: { severity: 'secondary', text: '等待中', color: DEFAULT_STATUS_COLOR },
-  running: { severity: 'warn', text: '执行中', color: 'var(--color-admin-warning)' },
-  completed: { severity: 'success', text: '已完成', color: 'var(--color-admin-success)' },
-  failed: { severity: 'danger', text: '失败', color: ERROR_TEXT_COLOR },
-  cancelled: { severity: 'secondary', text: '已取消', color: DEFAULT_STATUS_COLOR },
+const taskStatusConfigMap: Record<ListAdminTasksStatusValue, TaskStatusConfig> = {
+  [ListAdminTasksStatus.pending]: {
+    severity: 'secondary',
+    text: '等待中',
+    color: DEFAULT_STATUS_COLOR,
+  },
+  [ListAdminTasksStatus.running]: {
+    severity: 'warn',
+    text: '执行中',
+    color: 'var(--color-admin-warning)',
+  },
+  [ListAdminTasksStatus.completed]: {
+    severity: 'success',
+    text: '已完成',
+    color: 'var(--color-admin-success)',
+  },
+  [ListAdminTasksStatus.failed]: { severity: 'danger', text: '失败', color: ERROR_TEXT_COLOR },
+  [ListAdminTasksStatus.cancelled]: {
+    severity: 'secondary',
+    text: '已取消',
+    color: DEFAULT_STATUS_COLOR,
+  },
 }
 
 export function getTaskStatusConfig(status: string): TaskStatusConfig {
   return (
-    taskStatusConfigMap[status] || {
+    taskStatusConfigMap[status as ListAdminTasksStatusValue] || {
       severity: 'secondary',
       text: status,
       color: DEFAULT_STATUS_COLOR,
@@ -59,7 +79,7 @@ export function formatTaskCreatedAt(row: Task) {
 }
 
 export function getTaskResultImageUrl(row: Task) {
-  if (row.status !== 'completed' || !row.result) return ''
+  if (row.status !== ListAdminTasksStatus.completed || !row.result) return ''
   return getSafeTaskResultImageUrl(row.result)
 }
 
@@ -103,6 +123,6 @@ export function getTaskDuration(row: Task) {
 }
 
 export function getTaskSanitizedError(row: Task) {
-  if (row.status !== 'failed' || !row.error_msg) return ''
+  if (row.status !== ListAdminTasksStatus.failed || !row.error_msg) return ''
   return sanitizeTaskErrorMessage(row.error_msg)
 }

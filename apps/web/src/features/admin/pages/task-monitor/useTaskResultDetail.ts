@@ -4,6 +4,7 @@ import {
 } from '../../../../shared/utils/errorMessages'
 import { formatAdminDateTime, formatDurationSeconds } from '../../../../shared/utils/dateTime'
 import type { Task } from '../../../../shared/api/task'
+import { ListAdminTasksStatus } from '../../../../shared/api/generated-query/model'
 import { getSafeResultImageUrl, getSafeTaskResultImageUrl } from './taskResultImages'
 
 const RESULT_MAX_STRING_LENGTH = 300
@@ -107,9 +108,10 @@ export function useTaskResultDetail(options: {
     try {
       const r = JSON.parse(row.result)
       if (r.error) return sanitizeTaskErrorMessage(r.error)
-      if (r.status === 'failed' && r.error) return sanitizeTaskErrorMessage(r.error)
+      if (r.status === ListAdminTasksStatus.failed && r.error)
+        return sanitizeTaskErrorMessage(r.error)
     } catch {
-      if (row.status === 'failed') return sanitizeTaskErrorMessage(row.result)
+      if (row.status === ListAdminTasksStatus.failed) return sanitizeTaskErrorMessage(row.result)
     }
     return ''
   }

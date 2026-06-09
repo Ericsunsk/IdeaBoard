@@ -9,6 +9,8 @@ import (
 const (
 	unknownModelName     = "未识别模型"
 	maxStatDimensionSize = 128
+	maxStatFeatureSize   = 64
+	maxStatAPITypeSize   = 50
 )
 
 func parseResultMap(raw string) map[string]interface{} {
@@ -80,13 +82,25 @@ func extractTaskUser(rawResult string, fallbackUserID int64) string {
 }
 
 func normalizeStatDimension(value string) string {
+	return normalizeStatDimensionMax(value, maxStatDimensionSize)
+}
+
+func normalizeStatFeature(value string) string {
+	return normalizeStatDimensionMax(value, maxStatFeatureSize)
+}
+
+func normalizeStatAPIType(value string) string {
+	return normalizeStatDimensionMax(value, maxStatAPITypeSize)
+}
+
+func normalizeStatDimensionMax(value string, maxSize int) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return ""
 	}
 	runes := []rune(trimmed)
-	if len(runes) <= maxStatDimensionSize {
+	if len(runes) <= maxSize {
 		return trimmed
 	}
-	return string(runes[:maxStatDimensionSize])
+	return string(runes[:maxSize])
 }

@@ -535,6 +535,8 @@ func TestBackfillStatisticsUsesSingleEnabledAccountModelFallback(t *testing.T) {
 		UserID:            93,
 		AssignedChannelID: tasks.IDPtr(account.ChannelID),
 		AccountID:         tasks.IDPtr(account.ID),
+		FeatureSlug:       "fusion",
+		APIType:           "openai-compatible",
 		Status:            tasks.StatusCompleted,
 		Result:            `{}`,
 		CreatedAt:         created,
@@ -552,6 +554,21 @@ func TestBackfillStatisticsUsesSingleEnabledAccountModelFallback(t *testing.T) {
 	}
 	if len(rows) != 1 || rows[0].ModelName != "gpt-image-1" || rows[0].UserKey != "93" || rows[0].Total != 1 {
 		t.Fatalf("fallback model stats mismatch: %+v", rows)
+	}
+
+	var userID, accountID, channelID int64
+	var featureSlug, apiType string
+	if err := db.QueryRowContext(ctx, `
+SELECT user_id, account_id, channel_id, feature_slug, api_type
+FROM task_stat_events
+WHERE task_id = 'single-model-fallback'`,
+	).Scan(&userID, &accountID, &channelID, &featureSlug, &apiType); err != nil {
+		t.Fatalf("read backfill stat event dimensions failed: %v", err)
+	}
+	if userID != 93 || accountID != account.ID || channelID != account.ChannelID ||
+		featureSlug != "fusion" || apiType != "openai-compatible" {
+		t.Fatalf("unexpected backfill event dimensions: user=%d account=%d channel=%d feature=%q api=%q",
+			userID, accountID, channelID, featureSlug, apiType)
 	}
 }
 

@@ -104,6 +104,7 @@ type Querier interface {
 	ListMediaAssetsByOwner(ctx context.Context, arg ListMediaAssetsByOwnerParams) ([]MediaAsset, error)
 	ListMediaRefsByAssetID(ctx context.Context, mediaAssetID int64) ([]MediaRef, error)
 	ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsByBoardIDParams) ([]MediaRef, error)
+	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskOutput, error)
 	ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error)
 	ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimit int32) ([]ListRunningTasksMissingLeaseTokenRow, error)

@@ -12,8 +12,8 @@ import (
 
 const backfillDailyStatsByCreatedRange = `-- name: BackfillDailyStatsByCreatedRange :one
 WITH candidate_tasks AS (
-  SELECT t.task_id, t.user_id, t.account_id, t.status, t.result,
-         t.requested_model, t.resolved_model, t.created_at, t.completed_at
+  SELECT t.task_id, t.user_id, t.account_id, t.assigned_channel_id, t.status, t.result,
+         t.feature_slug, t.requested_model, t.resolved_model, t.api_type, t.created_at, t.completed_at
   FROM tasks AS t
   WHERE t.created_at >= $1
     AND t.created_at < $2
@@ -34,6 +34,11 @@ normalized_events AS (
   SELECT
     t.task_id,
     $3::date AS stat_date,
+    GREATEST(t.user_id, 0)::bigint AS user_id,
+    COALESCE(t.account_id, 0)::bigint AS account_id,
+    COALESCE(t.assigned_channel_id, 0)::bigint AS channel_id,
+    LEFT(COALESCE(NULLIF(trim(t.feature_slug), ''), ''), 64)::varchar(64) AS feature_slug,
+    LEFT(COALESCE(NULLIF(trim(t.api_type), ''), ''), 50)::varchar(50) AS api_type,
     LEFT(COALESCE(
       NULLIF(trim(t.resolved_model), ''),
       NULLIF(trim(t.requested_model), ''),
@@ -77,16 +82,24 @@ normalized_events AS (
 ),
 inserted_events AS (
   INSERT INTO task_stat_events (
-    task_id, stat_date, model_name, user_key, status, latency_seconds
+    task_id, stat_date, user_id, account_id, channel_id, feature_slug, api_type,
+    model_name, user_key, status, latency_seconds
   )
-  SELECT task_id, stat_date, model_name, user_key, status, latency_seconds
+  SELECT task_id, stat_date, user_id, account_id, channel_id, feature_slug, api_type,
+         model_name, user_key, status, latency_seconds
   FROM normalized_events
   ON CONFLICT (task_id) DO NOTHING
-  RETURNING stat_date, model_name, user_key, status, latency_seconds
+  RETURNING stat_date, user_id, account_id, channel_id, feature_slug, api_type,
+            model_name, user_key, status, latency_seconds
 ),
 daily_delta AS (
   SELECT
     stat_date,
+    user_id,
+    account_id,
+    channel_id,
+    feature_slug,
+    api_type,
     model_name,
     user_key,
     COUNT(*)::bigint AS total,
@@ -96,19 +109,19 @@ daily_delta AS (
     COALESCE(SUM(latency_seconds), 0)::double precision AS latency_seconds_sum,
     COUNT(*) FILTER (WHERE status = 'completed' AND latency_seconds > 0)::bigint AS latency_count
   FROM inserted_events
-  GROUP BY stat_date, model_name, user_key
+  GROUP BY stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key
 ),
 upserted_daily AS (
   INSERT INTO task_daily_stats (
-    stat_date, model_name, user_key,
+    stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key,
     total, completed, failed, cancelled,
     latency_seconds_sum, latency_count
   )
-  SELECT stat_date, model_name, user_key,
+  SELECT stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key,
          total, completed, failed, cancelled,
          latency_seconds_sum, latency_count
   FROM daily_delta
-  ON CONFLICT (stat_date, model_name, user_key) DO UPDATE
+  ON CONFLICT (stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key) DO UPDATE
   SET total = task_daily_stats.total + EXCLUDED.total,
       completed = task_daily_stats.completed + EXCLUDED.completed,
       failed = task_daily_stats.failed + EXCLUDED.failed,
@@ -157,10 +170,12 @@ func (q *Queries) BackfillDailyStatsByCreatedRange(ctx context.Context, arg Back
 
 const insertTaskStatEventIgnore = `-- name: InsertTaskStatEventIgnore :execrows
 INSERT INTO task_stat_events (
-  task_id, stat_date, model_name, user_key, status, latency_seconds
+  task_id, stat_date, user_id, account_id, channel_id, feature_slug, api_type,
+  model_name, user_key, status, latency_seconds
 ) VALUES (
   $1, $2, $3, $4,
-  $5, $6
+  $5, $6, $7, $8,
+  $9, $10, $11
 )
 ON CONFLICT (task_id) DO NOTHING
 `
@@ -168,6 +183,11 @@ ON CONFLICT (task_id) DO NOTHING
 type InsertTaskStatEventIgnoreParams struct {
 	TaskID         string    `json:"task_id"`
 	StatDate       time.Time `json:"stat_date"`
+	UserID         int64     `json:"user_id"`
+	AccountID      int64     `json:"account_id"`
+	ChannelID      int64     `json:"channel_id"`
+	FeatureSlug    string    `json:"feature_slug"`
+	ApiType        string    `json:"api_type"`
 	ModelName      string    `json:"model_name"`
 	UserKey        string    `json:"user_key"`
 	Status         string    `json:"status"`
@@ -178,6 +198,11 @@ func (q *Queries) InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskS
 	result, err := q.db.ExecContext(ctx, insertTaskStatEventIgnore,
 		arg.TaskID,
 		arg.StatDate,
+		arg.UserID,
+		arg.AccountID,
+		arg.ChannelID,
+		arg.FeatureSlug,
+		arg.ApiType,
 		arg.ModelName,
 		arg.UserKey,
 		arg.Status,
@@ -323,13 +348,15 @@ func (q *Queries) ListStatEventLatencySamplesByDateRange(ctx context.Context, ar
 
 const upsertTaskDailyStatDelta = `-- name: UpsertTaskDailyStatDelta :exec
 INSERT INTO task_daily_stats (
-  stat_date, model_name, user_key, total, completed, failed, cancelled, latency_seconds_sum, latency_count
+  stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key,
+  total, completed, failed, cancelled, latency_seconds_sum, latency_count
 ) VALUES (
   $1, $2, $3, $4,
-  $5, $6, $7,
-  $8, $9
+  $5, $6, $7, $8,
+  $9, $10, $11, $12,
+  $13, $14
 )
-ON CONFLICT (stat_date, model_name, user_key) DO UPDATE
+ON CONFLICT (stat_date, user_id, account_id, channel_id, feature_slug, api_type, model_name, user_key) DO UPDATE
 SET total = task_daily_stats.total + EXCLUDED.total,
     completed = task_daily_stats.completed + EXCLUDED.completed,
     failed = task_daily_stats.failed + EXCLUDED.failed,
@@ -340,6 +367,11 @@ SET total = task_daily_stats.total + EXCLUDED.total,
 
 type UpsertTaskDailyStatDeltaParams struct {
 	StatDate          time.Time `json:"stat_date"`
+	UserID            int64     `json:"user_id"`
+	AccountID         int64     `json:"account_id"`
+	ChannelID         int64     `json:"channel_id"`
+	FeatureSlug       string    `json:"feature_slug"`
+	ApiType           string    `json:"api_type"`
 	ModelName         string    `json:"model_name"`
 	UserKey           string    `json:"user_key"`
 	Total             int64     `json:"total"`
@@ -353,6 +385,11 @@ type UpsertTaskDailyStatDeltaParams struct {
 func (q *Queries) UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error {
 	_, err := q.db.ExecContext(ctx, upsertTaskDailyStatDelta,
 		arg.StatDate,
+		arg.UserID,
+		arg.AccountID,
+		arg.ChannelID,
+		arg.FeatureSlug,
+		arg.ApiType,
 		arg.ModelName,
 		arg.UserKey,
 		arg.Total,

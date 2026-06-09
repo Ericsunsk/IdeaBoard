@@ -13,6 +13,7 @@ import {
   mockAdminAccountLimits,
   useAdminMockMode,
 } from '../../shared/lib/adminMockData'
+import { DEFAULT_ADMIN_CHANNEL_API_TYPE } from './channelApiTypes'
 import { extractApiErrorMessage } from './channelModelUtils'
 
 const ACCOUNT_PAGE_SIZE = 100
@@ -194,7 +195,7 @@ export function useChannelAccounts(options: {
     }
     if (detectModelsLoading.value) return
 
-    const apiType = channel?.type || 'openai-compatible'
+    const apiType = channel?.type || DEFAULT_ADMIN_CHANNEL_API_TYPE
     const sessionKey = `${apiType}::${baseURL}::${secret}`
     if (detectedModelSessionCache.value.has(sessionKey)) return
     detectedModelSessionCache.value.add(sessionKey)
@@ -247,14 +248,16 @@ export function useChannelAccounts(options: {
         existingAccount?.models,
       )
       const channelId =
-        isEditAccount.value && existingAccount ? existingAccount.channel_id : accountForm.value.channel_id
+        isEditAccount.value && existingAccount
+          ? existingAccount.channel_id
+          : accountForm.value.channel_id
       const baseData = {
         models: modelInputs,
         max_concurrent: accountForm.value.max_concurrent,
         timeout: accountForm.value.timeout,
         name: ch?.name || 'Unknown',
-        platform: ch?.type || 'openai-compatible',
-        api_type: ch?.type || 'openai-compatible',
+        platform: ch?.type || DEFAULT_ADMIN_CHANNEL_API_TYPE,
+        api_type: ch?.type || DEFAULT_ADMIN_CHANNEL_API_TYPE,
         proxy_url: ch?.api_url || '',
       }
 
@@ -421,7 +424,9 @@ function accountModelInputsFromValues(
   values: string[],
   existingModels: AdminAccountModel[] = [],
 ): AdminAccountModelInput[] {
-  const existingByKey = new Map(existingModels.map((model) => [normalizeModelKey(model.name), model]))
+  const existingByKey = new Map(
+    existingModels.map((model) => [normalizeModelKey(model.name), model]),
+  )
   return uniqueTrimmedValues(values).map((name) => {
     const existing = existingByKey.get(normalizeModelKey(name))
     return {

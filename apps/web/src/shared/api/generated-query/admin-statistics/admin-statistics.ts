@@ -29,7 +29,7 @@ import type { ErrorType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-export const getGetAdminStatisticsUrl = (params: GetAdminStatisticsParams) => {
+export const getGetAdminStatisticsUrl = (params?: GetAdminStatisticsParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -46,7 +46,7 @@ export const getGetAdminStatisticsUrl = (params: GetAdminStatisticsParams) => {
 }
 
 export const getAdminStatistics = async (
-  params: GetAdminStatisticsParams,
+  params?: GetAdminStatisticsParams,
   options?: RequestInit,
 ): Promise<ApiResponseAdminStatistics> => {
   return orvalMutator<ApiResponseAdminStatistics>(getGetAdminStatisticsUrl(params), {
@@ -63,7 +63,7 @@ export const getGetAdminStatisticsQueryOptions = <
   TData = Awaited<ReturnType<typeof getAdminStatistics>>,
   TError = ErrorType<unknown>,
 >(
-  params: MaybeRef<GetAdminStatisticsParams>,
+  params?: MaybeRef<GetAdminStatisticsParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminStatistics>>, TError, TData>>
     request?: SecondParameter<typeof orvalMutator>
@@ -92,7 +92,7 @@ export function useGetAdminStatistics<
   TData = Awaited<ReturnType<typeof getAdminStatistics>>,
   TError = ErrorType<unknown>,
 >(
-  params: MaybeRef<GetAdminStatisticsParams>,
+  params?: MaybeRef<GetAdminStatisticsParams>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminStatistics>>, TError, TData>>
     request?: SecondParameter<typeof orvalMutator>

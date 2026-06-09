@@ -8,13 +8,19 @@
 export interface TaskOutput {
   id: number
   task_id: string
+  /** @nullable */
+  media_asset_id?: number | null
   role: string
   url: string
-  storage_key?: string
-  mime_type?: string
-  width?: number
-  height?: number
-  size_bytes?: number
+  storage_key: string
+  mime_type: string
+  width: number
+  height: number
+  size_bytes: number
+  source_url?: string
+  checksum_sha256?: string
+  storage_profile?: string
+  metadata?: string
   sort_index: number
   created_at: string
   updated_at: string

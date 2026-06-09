@@ -709,10 +709,19 @@ paths:
       parameters:
         - name: status
           in: query
-          schema: { type: string }
+          schema:
+            type: string
+            enum: [pending, running, completed, failed, cancelled]
         - name: user_id
           in: query
-          schema: { type: integer }
+          schema:
+            type: integer
+            minimum: 1
+        - name: account_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
         - name: keyword
           in: query
           schema: { type: string }
@@ -786,9 +795,9 @@ paths:
       parameters:
         - name: range
           in: query
-          required: true
           schema:
             type: string
+            default: 7d
             enum: [1d, 7d, 30d, 1y]
       responses:
         '200':
@@ -1449,10 +1458,25 @@ components:
 
     TaskOutput:
       type: object
-      required: [id, task_id, role, url, sort_index, created_at, updated_at]
+      required:
+        - id
+        - task_id
+        - role
+        - url
+        - storage_key
+        - mime_type
+        - width
+        - height
+        - size_bytes
+        - sort_index
+        - created_at
+        - updated_at
       properties:
         id: { type: integer }
         task_id: { type: string }
+        media_asset_id:
+          type: integer
+          nullable: true
         role: { type: string }
         url: { type: string }
         storage_key: { type: string }
@@ -1460,6 +1484,10 @@ components:
         width: { type: integer }
         height: { type: integer }
         size_bytes: { type: integer }
+        source_url: { type: string }
+        checksum_sha256: { type: string }
+        storage_profile: { type: string }
+        metadata: { type: string }
         sort_index: { type: integer }
         created_at: { type: string }
         updated_at: { type: string }
@@ -1595,12 +1623,55 @@ components:
       type: object
       required: [current_concurrent, max_concurrent]
       properties:
-        current_concurrent: { type: integer }
+        current_concurrent:
+          type: integer
+          description: Running task attempts currently assigned to this account.
         max_concurrent: { type: integer }
+
+    MonitorExecutionPressureKey:
+      type: string
+      enum:
+        - fast_completed
+        - slow_completed
+        - normal_pending
+        - backlog_pending
+        - normal_running
+        - stuck_running
+        - fast_failed
+        - slow_failed
+        - cancelled
+        - retrying
+        - other
+
+    MonitorExecutionPressurePoint:
+      type: object
+      required:
+        - key
+        - label
+        - count
+        - share_percent
+        - duration_pressure
+        - anomaly_pressure
+        - avg_duration_seconds
+        - max_duration_seconds
+        - failed_count
+        - retry_count
+      properties:
+        key:
+          $ref: '#/components/schemas/MonitorExecutionPressureKey'
+        label: { type: string }
+        count: { type: integer }
+        share_percent: { type: number }
+        duration_pressure: { type: number }
+        anomaly_pressure: { type: number }
+        avg_duration_seconds: { type: number }
+        max_duration_seconds: { type: number }
+        failed_count: { type: integer }
+        retry_count: { type: integer }
 
     MonitorData:
       type: object
-      required: [global_queue_len, wait_queue_len, running_tasks, account_loads]
+      required: [global_queue_len, wait_queue_len, running_attempts, account_loads, execution_pressure]
       properties:
         global_queue_len:
           type: integer
@@ -1608,13 +1679,17 @@ components:
         wait_queue_len:
           type: integer
           description: Reserved queue subcount; River-backed task queues report 0.
-        running_tasks:
+        running_attempts:
           type: integer
-          description: Tasks currently marked running in PostgreSQL.
+          description: Running task attempts currently recorded in PostgreSQL.
         account_loads:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/MonitorAccountLoad'
+        execution_pressure:
+          type: array
+          items:
+            $ref: '#/components/schemas/MonitorExecutionPressurePoint'
 
     MonitorStats:
       type: object
@@ -1749,6 +1824,7 @@ components:
       properties:
         range:
           type: string
+          default: 7d
           enum: [1d, 7d, 30d, 1y]
 
     AdminStatisticsBackfillResult:

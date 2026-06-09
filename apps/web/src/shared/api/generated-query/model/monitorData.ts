@@ -5,13 +5,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { MonitorDataAccountLoads } from './monitorDataAccountLoads'
+import type { MonitorExecutionPressurePoint } from './monitorExecutionPressurePoint'
 
 export interface MonitorData {
   /** River jobs waiting to be processed. */
   global_queue_len: number
   /** Reserved queue subcount; River-backed task queues report 0. */
   wait_queue_len: number
-  /** Tasks currently marked running in PostgreSQL. */
-  running_tasks: number
+  /** Running task attempts currently recorded in PostgreSQL. */
+  running_attempts: number
   account_loads: MonitorDataAccountLoads
+  execution_pressure: MonitorExecutionPressurePoint[]
 }

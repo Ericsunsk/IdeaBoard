@@ -2,6 +2,7 @@ package taskstats
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -21,6 +22,7 @@ type Store interface {
 	ListExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]taskstore.ExecutionFailureCategoryAggregate, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate time.Time) ([]taskstore.StatEventLatencySample, error)
 	ListStatisticsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]taskstore.TaskStatisticLite, error)
+	ListMonitorExecutionPressureByRange(ctx context.Context, start, now time.Time) ([]taskstore.MonitorExecutionPressureAggregate, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, startedAt, endedAt, statDate time.Time, markDone bool) (taskstore.BackfillDailyStatsResult, error)
 }
 
@@ -37,22 +39,53 @@ type statisticsTrendBucket struct {
 	models  map[string]int64
 }
 
+// MonitorExecutionPressurePoint is an admin-facing chart DTO. Runtime queue
+// packages should stay unaware of these presentation metrics.
+type MonitorExecutionPressurePoint struct {
+	Key                string  `json:"key"`
+	Label              string  `json:"label"`
+	Count              int64   `json:"count"`
+	SharePercent       float64 `json:"share_percent"`
+	DurationPressure   float64 `json:"duration_pressure"`
+	AnomalyPressure    float64 `json:"anomaly_pressure"`
+	AvgDurationSeconds float64 `json:"avg_duration_seconds"`
+	MaxDurationSeconds float64 `json:"max_duration_seconds"`
+	FailedCount        int64   `json:"failed_count"`
+	RetryCount         int64   `json:"retry_count"`
+}
+
 const statisticsDateLayout = "2006-01-02"
+const monitorExecutionPressureWindow = 6 * time.Hour
 
 func NewService(store Store) *Service {
 	return &Service{store: store}
 }
 
-func normalizeStatisticsRange(raw string) (StatisticsRange, int) {
-	switch StatisticsRange(strings.TrimSpace(strings.ToLower(raw))) {
+type statisticsRangeValidationError string
+
+func (e statisticsRangeValidationError) Error() string {
+	return string(e)
+}
+
+func isStatisticsRangeValidationError(err error) bool {
+	var target statisticsRangeValidationError
+	return errors.As(err, &target)
+}
+
+func normalizeStatisticsRange(raw string) (StatisticsRange, int, error) {
+	switch normalized := StatisticsRange(strings.TrimSpace(strings.ToLower(raw))); normalized {
 	case StatisticsRange1D:
-		return StatisticsRange1D, 1
+		return StatisticsRange1D, 1, nil
+	case "":
+		return StatisticsRange7D, 7, nil
+	case StatisticsRange7D:
+		return StatisticsRange7D, 7, nil
 	case StatisticsRange30D:
-		return StatisticsRange30D, 30
+		return StatisticsRange30D, 30, nil
 	case StatisticsRange1Y:
-		return StatisticsRange1Y, 365
+		return StatisticsRange1Y, 365, nil
 	default:
-		return StatisticsRange7D, 7
+		return "", 0, statisticsRangeValidationError("range 仅支持 1d、7d、30d 或 1y")
 	}
 }
 
@@ -87,8 +120,81 @@ func (s *Service) GetTaskStats(ctx context.Context) (map[string]int64, error) {
 	}, nil
 }
 
+type executionPressureBucket struct {
+	key          string
+	label        string
+	basePressure float64
+}
+
+var monitorExecutionPressureBuckets = []executionPressureBucket{
+	{key: "fast_completed", label: "快速完成", basePressure: 8},
+	{key: "slow_completed", label: "慢速完成", basePressure: 28},
+	{key: "normal_pending", label: "正常排队", basePressure: 22},
+	{key: "backlog_pending", label: "积压排队", basePressure: 58},
+	{key: "normal_running", label: "正常执行", basePressure: 32},
+	{key: "stuck_running", label: "卡住执行", basePressure: 82},
+	{key: "fast_failed", label: "快速失败", basePressure: 78},
+	{key: "slow_failed", label: "慢速失败", basePressure: 94},
+	{key: "cancelled", label: "已取消", basePressure: 34},
+	{key: "retrying", label: "重试中", basePressure: 68},
+	{key: "other", label: "其他状态", basePressure: 40},
+}
+
+func (s *Service) GetMonitorExecutionPressure(ctx context.Context) ([]MonitorExecutionPressurePoint, error) {
+	now := time.Now()
+	rows, err := s.store.ListMonitorExecutionPressureByRange(ctx, now.Add(-monitorExecutionPressureWindow), now)
+	if err != nil {
+		return nil, err
+	}
+	return buildMonitorExecutionPressure(rows), nil
+}
+
+func buildMonitorExecutionPressure(rows []taskstore.MonitorExecutionPressureAggregate) []MonitorExecutionPressurePoint {
+	byKey := make(map[string]taskstore.MonitorExecutionPressureAggregate, len(rows))
+	total := int64(0)
+	for _, row := range rows {
+		byKey[row.Key] = row
+		total += row.Total
+	}
+
+	points := make([]MonitorExecutionPressurePoint, 0, len(monitorExecutionPressureBuckets))
+	for _, bucket := range monitorExecutionPressureBuckets {
+		row := byKey[bucket.key]
+		point := MonitorExecutionPressurePoint{
+			Key:                bucket.key,
+			Label:              bucket.label,
+			Count:              row.Total,
+			SharePercent:       percentOf(float64(row.Total), float64(total)),
+			DurationPressure:   percentOf(row.MaxDurationSeconds, 60),
+			AvgDurationSeconds: row.AvgDurationSeconds,
+			MaxDurationSeconds: row.MaxDurationSeconds,
+			FailedCount:        row.Failed,
+			RetryCount:         row.Retry,
+		}
+		if row.Total > 0 {
+			point.AnomalyPressure = clampPercent(bucket.basePressure + math.Min(18, float64(row.Retry)*6))
+		}
+		points = append(points, point)
+	}
+	return points
+}
+
+func percentOf(value float64, total float64) float64 {
+	if total <= 0 {
+		return 0
+	}
+	return clampPercent((value / total) * 100)
+}
+
+func clampPercent(value float64) float64 {
+	return math.Min(100, math.Max(0, value))
+}
+
 func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminStatisticsResponse, error) {
-	normalizedRange, days := normalizeStatisticsRange(rawRange)
+	normalizedRange, days, err := normalizeStatisticsRange(rawRange)
+	if err != nil {
+		return nil, err
+	}
 	now := time.Now()
 	loc := now.Location()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
@@ -535,7 +641,10 @@ func failureCategoryLabel(category string) string {
 }
 
 func (s *Service) BackfillStatistics(ctx context.Context, rawRange string) (*AdminStatisticsBackfillResult, error) {
-	normalizedRange, days := normalizeStatisticsRange(rawRange)
+	normalizedRange, days, err := normalizeStatisticsRange(rawRange)
+	if err != nil {
+		return nil, err
+	}
 	now := time.Now()
 	loc := now.Location()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)

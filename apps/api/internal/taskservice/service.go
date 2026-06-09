@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
@@ -84,6 +85,21 @@ const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
 const maxSubmitTaskParamsDepth = 24
 const maxSubmitTaskMediaDataURLBytes = 10 * 1024 * 1024
 const noAvailableAPIAccountMessage = "没有可用的 API 账号，请先添加账号"
+
+type taskListValidationError string
+
+func (e taskListValidationError) Error() string {
+	return string(e)
+}
+
+func newTaskListValidationError(message string) error {
+	return taskListValidationError(message)
+}
+
+func isTaskListValidationError(err error) bool {
+	var target taskListValidationError
+	return errors.As(err, &target)
+}
 
 func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 	return &Service{
@@ -268,16 +284,36 @@ func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]
 	if req.PageSize < 1 || req.PageSize > 100 {
 		req.PageSize = 20
 	}
-	req.Keyword = strings.TrimSpace(req.Keyword)
-	if len(req.Keyword) > maxTaskKeywordLength {
-		req.Keyword = req.Keyword[:maxTaskKeywordLength]
+	status, err := normalizeTaskListStatus(req.Status)
+	if err != nil {
+		return nil, tasks.TaskListCounts{}, err
 	}
+	req.Status = status
+	req.Keyword = normalizeTaskListKeyword(req.Keyword)
 	items, counts, err := s.taskRepo.List(ctx, req.UserID, req.AccountID, req.Status, req.Keyword, req.Page, req.PageSize)
 	if err != nil {
 		return nil, tasks.TaskListCounts{}, err
 	}
 	s.attachOutputsForTasks(ctx, items)
 	return items, counts, nil
+}
+
+func normalizeTaskListStatus(status string) (string, error) {
+	switch normalized := strings.ToLower(strings.TrimSpace(status)); normalized {
+	case "", tasks.StatusPending, tasks.StatusRunning, tasks.StatusCompleted, tasks.StatusFailed, tasks.StatusCancelled:
+		return normalized, nil
+	default:
+		return "", newTaskListValidationError("status 仅支持 pending、running、completed、failed 或 cancelled")
+	}
+}
+
+func normalizeTaskListKeyword(keyword string) string {
+	keyword = strings.TrimSpace(keyword)
+	if utf8.RuneCountInString(keyword) <= maxTaskKeywordLength {
+		return keyword
+	}
+	runes := []rune(keyword)
+	return string(runes[:maxTaskKeywordLength])
 }
 
 func (s *Service) DeleteUserTask(ctx context.Context, taskID string, userID int64) error {

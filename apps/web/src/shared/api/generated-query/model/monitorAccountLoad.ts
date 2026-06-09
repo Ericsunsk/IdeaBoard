@@ -6,6 +6,7 @@
  */
 
 export interface MonitorAccountLoad {
+  /** Running task attempts currently assigned to this account. */
   current_concurrent: number
   max_concurrent: number
 }

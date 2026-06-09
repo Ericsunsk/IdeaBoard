@@ -4,12 +4,20 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListAdminTasksStatus } from './listAdminTasksStatus'
 import type { PageParameter } from './pageParameter'
 import type { PageSizeParameter } from './pageSizeParameter'
 
 export type ListAdminTasksParams = {
-  status?: string
+  status?: ListAdminTasksStatus
+  /**
+   * @minimum 1
+   */
   user_id?: number
+  /**
+   * @minimum 1
+   */
+  account_id?: number
   keyword?: string
   page?: PageParameter
   page_size?: PageSizeParameter

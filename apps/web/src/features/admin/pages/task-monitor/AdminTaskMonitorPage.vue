@@ -197,6 +197,20 @@
               />
             </label>
 
+            <label
+              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+            >
+              <span>账号 ID</span>
+              <InputNumber
+                v-model="accountIdFilter"
+                :min="1"
+                :use-grouping="false"
+                placeholder="Account ID"
+                size="small"
+                fluid
+              />
+            </label>
+
             <Button
               label="重置筛选"
               size="small"
@@ -391,9 +405,12 @@
               class="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[14px] border border-admin-border-soft bg-admin-surface-muted"
               :style="{ color: getTaskStatusConfig(detailTask?.status || '').color }"
             >
-              <CheckCircle v-if="detailTask?.status === 'completed'" />
+              <CheckCircle v-if="detailTask?.status === ListAdminTasksStatus.completed" />
               <XmarkCircle
-                v-else-if="detailTask?.status === 'failed' || detailTask?.status === 'cancelled'"
+                v-else-if="
+                  detailTask?.status === ListAdminTasksStatus.failed ||
+                  detailTask?.status === ListAdminTasksStatus.cancelled
+                "
               />
               <Clock v-else />
             </span>
@@ -441,7 +458,7 @@
             </span>
           </div>
           <div
-            v-if="detailTask.status === 'failed'"
+            v-if="detailTask.status === ListAdminTasksStatus.failed"
             class="flex items-start gap-2.5 rounded-xl border border-admin-danger/20 bg-admin-danger/10 px-3 py-2.5 text-admin-body leading-[1.55] text-admin-danger"
           >
             <WarningTriangle class="mt-0.5 shrink-0" />
@@ -640,6 +657,7 @@ import Chart from 'primevue/chart'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
+import InputNumber from 'primevue/inputnumber'
 import PrimeImage from 'primevue/image'
 import Popover from 'primevue/popover'
 import Select from 'primevue/select'
@@ -663,6 +681,10 @@ import {
 } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import type { Task } from '../../../../shared/api/task'
+import {
+  ListAdminTasksStatus,
+  type ListAdminTasksStatus as ListAdminTasksStatusValue,
+} from '../../../../shared/api/generated-query/model'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
@@ -704,7 +726,7 @@ import {
   taskStatusOptions,
 } from './taskMonitorColumns'
 import {
-  buildTaskExecutionPressurePoints,
+  normalizeMonitorExecutionPressurePoints,
   type TaskExecutionPressurePoint,
   type TaskExecutionSignalKey,
 } from './taskMonitorExecutionPressure'
@@ -741,23 +763,23 @@ const detailDialogPt = {
 } as const
 const detailBannerBaseClass =
   'relative flex flex-col gap-3 overflow-hidden rounded-[18px] border border-admin-border-soft bg-admin-surface-muted px-[18px] py-4 before:absolute before:top-3.5 before:bottom-3.5 before:left-0 before:w-1 before:rounded-full before:bg-admin-text-3'
-const detailStatusBannerClassByStatus: Record<string, string> = {
-  completed:
+const detailStatusBannerClassByStatus: Partial<Record<ListAdminTasksStatusValue, string>> = {
+  [ListAdminTasksStatus.completed]:
     'bg-[linear-gradient(135deg,rgba(47,158,115,0.1),rgba(255,255,255,0.74))] before:bg-admin-success',
-  failed:
+  [ListAdminTasksStatus.failed]:
     'bg-[linear-gradient(135deg,rgba(209,77,90,0.095),rgba(255,255,255,0.74))] before:bg-admin-danger',
-  cancelled:
+  [ListAdminTasksStatus.cancelled]:
     'bg-[linear-gradient(135deg,rgba(152,162,179,0.12),rgba(255,255,255,0.74))] before:bg-admin-text-3',
-  running:
+  [ListAdminTasksStatus.running]:
     'bg-[linear-gradient(135deg,rgba(212,136,48,0.1),rgba(255,255,255,0.74))] before:bg-admin-warning',
 }
 const detailStatusDotBaseClass =
   'h-[9px] w-[9px] shrink-0 rounded-full bg-admin-text-3 shadow-[0_0_0_4px_rgba(152,162,179,0.14)]'
-const detailStatusDotClassByStatus: Record<string, string> = {
-  completed: 'bg-admin-success shadow-[0_0_0_4px_rgba(47,158,115,0.14)]',
-  failed: 'bg-admin-danger shadow-[0_0_0_4px_rgba(209,77,90,0.14)]',
-  cancelled: 'bg-admin-text-3 shadow-[0_0_0_4px_rgba(152,162,179,0.14)]',
-  running: 'bg-admin-warning shadow-[0_0_0_4px_rgba(212,136,48,0.15)]',
+const detailStatusDotClassByStatus: Partial<Record<ListAdminTasksStatusValue, string>> = {
+  [ListAdminTasksStatus.completed]: 'bg-admin-success shadow-[0_0_0_4px_rgba(47,158,115,0.14)]',
+  [ListAdminTasksStatus.failed]: 'bg-admin-danger shadow-[0_0_0_4px_rgba(209,77,90,0.14)]',
+  [ListAdminTasksStatus.cancelled]: 'bg-admin-text-3 shadow-[0_0_0_4px_rgba(152,162,179,0.14)]',
+  [ListAdminTasksStatus.running]: 'bg-admin-warning shadow-[0_0_0_4px_rgba(212,136,48,0.15)]',
 }
 
 const {
@@ -781,9 +803,8 @@ const {
   loading,
   page,
   taskStats,
-  pageStats,
-  activeTasks,
   filterStatus,
+  accountIdFilter,
   searchKeyword,
   loadTasks,
   handleSearch: applyTaskSearch,
@@ -794,7 +815,7 @@ const taskFilterPopoverRef = ref<PrimePopupPanel | null>(null)
 const selectedTasks = ref<Task[]>([])
 const { isScrolling: isTaskTableScrolling, handleScroll: handleTaskTableScroll } =
   useTransientScrolling()
-const hasTaskFilter = computed(() => Boolean(filterStatus.value))
+const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))
 const totalPages = computed(() => Math.ceil(total.value / TASK_MONITOR_PAGE_SIZE) || 1)
 
 watch(totalPages, (newTotal) => {
@@ -828,34 +849,32 @@ function toggleTaskFilterPanel(event: Event) {
 
 function resetTaskFilters() {
   filterStatus.value = null
+  accountIdFilter.value = null
 }
 
-watch([page, filterStatus], () => {
+watch([page, filterStatus, accountIdFilter], () => {
   selectedTasks.value = []
 })
 
-const longestRunning = computed(() =>
-  activeTasks.value.find((row) => row.task.status === 'running'),
-)
 const currentPageCount = computed(() => tasks.value.length)
-const statusTotalCount = computed(
-  () =>
-    (monitorStats.value?.pending ?? pageStats.value.pending) +
-    (monitorStats.value?.running ?? pageStats.value.running) +
-    (monitorStats.value?.completed ?? pageStats.value.completed) +
-    (monitorStats.value?.failed ?? pageStats.value.failed) +
-    (monitorStats.value?.cancelled ?? pageStats.value.cancelled),
+const taskStatusSnapshot = computed(() => ({
+  [ListAdminTasksStatus.pending]: monitorStats.value?.pending ?? 0,
+  [ListAdminTasksStatus.running]: monitorStats.value?.running ?? 0,
+  [ListAdminTasksStatus.completed]: monitorStats.value?.completed ?? 0,
+  [ListAdminTasksStatus.failed]: monitorStats.value?.failed ?? 0,
+  [ListAdminTasksStatus.cancelled]: monitorStats.value?.cancelled ?? 0,
+}))
+const statusTotalCount = computed(() =>
+  Object.values(taskStatusSnapshot.value).reduce((sum, count) => sum + count, 0),
 )
-const liveRunningCount = computed(() => monitorStats.value?.running ?? pageStats.value.running)
-const liveFailedCount = computed(() => monitorStats.value?.failed ?? pageStats.value.failed)
+const liveRunningCount = computed(
+  () => monitorData.value?.running_attempts ?? 0,
+)
+const liveFailedCount = computed(() => taskStatusSnapshot.value[ListAdminTasksStatus.failed])
 const globalQueueLength = computed(() => monitorData.value?.global_queue_len || 0)
 const waitQueueLength = computed(() => monitorData.value?.wait_queue_len || 0)
 const liveQueueTotal = computed(() => globalQueueLength.value + waitQueueLength.value)
-const runningFoot = computed(() =>
-  longestRunning.value
-    ? `最长 ${formatSeconds(longestRunning.value.seconds)} · ${formatMonitorStreamStatus(monitorStreamStatus.value)}`
-    : formatMonitorStreamStatus(monitorStreamStatus.value),
-)
+const runningFoot = computed(() => formatMonitorStreamStatus(monitorStreamStatus.value))
 const queueFoot = computed(() =>
   waitQueueLength.value > 0
     ? `全局 ${globalQueueLength.value} / 等待 ${waitQueueLength.value}`
@@ -874,8 +893,11 @@ type ExecutionPressureChartPoint = TaskExecutionPressurePoint & {
   y: number
   r: number
 }
-type TaskDistributionRow = TaskExecutionPressurePoint & {
-  detail: string
+type TaskDistributionRow = {
+  key: ListAdminTasksStatusValue
+  label: string
+  count: number
+  sharePercent: number
 }
 
 type AccountLoadRow = {
@@ -1014,49 +1036,31 @@ const executionPressureColorByKey: Record<TaskExecutionSignalKey, string> = {
   retrying: adminChartTheme.cyan,
   other: adminChartTheme.emptyText,
 }
-const taskDistributionBuckets: Array<{
+const taskDistributionStatuses: Array<{
+  key: ListAdminTasksStatusValue
   label: string
-  keys: TaskExecutionSignalKey[]
 }> = [
-  { label: '快速完成', keys: ['fast_completed'] },
-  { label: '慢速完成', keys: ['slow_completed'] },
-  { label: '排队中', keys: ['normal_pending', 'backlog_pending'] },
-  { label: '执行中', keys: ['normal_running', 'stuck_running'] },
-  { label: '失败', keys: ['fast_failed', 'slow_failed'] },
-  { label: '已取消', keys: ['cancelled'] },
-  { label: '重试中', keys: ['retrying'] },
+  { key: ListAdminTasksStatus.pending, label: '等待中' },
+  { key: ListAdminTasksStatus.running, label: '执行中' },
+  { key: ListAdminTasksStatus.completed, label: '已完成' },
+  { key: ListAdminTasksStatus.failed, label: '失败' },
+  { key: ListAdminTasksStatus.cancelled, label: '已取消' },
 ]
-const executionPressurePoints = computed(() => buildTaskExecutionPressurePoints(tasks.value))
+const executionPressurePoints = computed(() =>
+  normalizeMonitorExecutionPressurePoints(monitorData.value?.execution_pressure ?? []),
+)
 const activeExecutionPressurePoints = computed(() =>
   executionPressurePoints.value.filter((point) => point.count > 0),
 )
 const taskDistributionRows = computed<TaskDistributionRow[]>(() => {
-  const pointsByKey = new Map(executionPressurePoints.value.map((point) => [point.key, point]))
-  const totalCount = taskDistributionBuckets.reduce(
-    (sum, bucket) =>
-      sum +
-      bucket.keys.reduce((bucketSum, key) => bucketSum + (pointsByKey.get(key)?.count || 0), 0),
-    0,
-  )
-
-  return taskDistributionBuckets.map((bucket) => {
-    const points = bucket.keys
-      .map((key) => pointsByKey.get(key))
-      .filter((point): point is TaskExecutionPressurePoint => !!point)
-    const count = points.reduce((sum, point) => sum + point.count, 0)
-    const detail = points.map((point) => `${point.label} ${point.count}`).join(' / ')
+  const totalCount = statusTotalCount.value
+  return taskDistributionStatuses.map((status) => {
+    const count = Math.max(0, Number(taskStatusSnapshot.value[status.key]) || 0)
     return {
-      key: bucket.keys[0],
-      label: bucket.label,
+      key: status.key,
+      label: status.label,
       count,
       sharePercent: totalCount > 0 ? (count / totalCount) * 100 : 0,
-      durationPressure: Math.max(0, ...points.map((point) => point.durationPressure)),
-      anomalyPressure: Math.max(0, ...points.map((point) => point.anomalyPressure)),
-      avgDurationSeconds: getWeightedAverageDuration(points),
-      maxDurationSeconds: Math.max(0, ...points.map((point) => point.maxDurationSeconds)),
-      failedCount: points.reduce((sum, point) => sum + point.failedCount, 0),
-      retryCount: points.reduce((sum, point) => sum + point.retryCount, 0),
-      detail,
     }
   })
 })
@@ -1101,9 +1105,6 @@ const taskDistributionChartOptions = computed<AdminChartOptions>(() =>
             return [
               `占比: ${formatPercentValue(point.sharePercent)}`,
               `任务量: ${point.count} 条`,
-              point.detail ? `包含: ${point.detail}` : '包含: 无任务',
-              `平均耗时: ${formatSeconds(Math.round(point.avgDurationSeconds))}`,
-              `最长耗时: ${formatSeconds(Math.round(point.maxDurationSeconds))}`,
             ]
           },
         },
@@ -1185,11 +1186,17 @@ function clearSearch() {
 }
 
 function getTaskStatusBannerClass(status: string) {
-  return [detailBannerBaseClass, detailStatusBannerClassByStatus[status]]
+  return [
+    detailBannerBaseClass,
+    detailStatusBannerClassByStatus[status as ListAdminTasksStatusValue],
+  ]
 }
 
 function getTaskStatusDotClass(status: string) {
-  return [detailStatusDotBaseClass, detailStatusDotClassByStatus[status]]
+  return [
+    detailStatusDotBaseClass,
+    detailStatusDotClassByStatus[status as ListAdminTasksStatusValue],
+  ]
 }
 
 function getTaskDurationClass(task: Parameters<typeof getTaskDuration>[0]) {
@@ -1215,12 +1222,6 @@ function formatSeconds(seconds: number) {
 function formatPercent(value: number, totalValue: number) {
   if (totalValue <= 0) return '0.0%'
   return `${((value / totalValue) * 100).toFixed(1)}%`
-}
-
-function getWeightedAverageDuration(points: TaskExecutionPressurePoint[]) {
-  const totalCount = points.reduce((sum, point) => sum + point.count, 0)
-  if (totalCount <= 0) return 0
-  return points.reduce((sum, point) => sum + point.avgDurationSeconds * point.count, 0) / totalCount
 }
 
 function formatPercentValue(value: number) {

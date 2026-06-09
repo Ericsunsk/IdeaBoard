@@ -7,5 +7,5 @@
 import type { GetAdminStatisticsRange } from './getAdminStatisticsRange'
 
 export type GetAdminStatisticsParams = {
-  range: GetAdminStatisticsRange
+  range?: GetAdminStatisticsRange
 }

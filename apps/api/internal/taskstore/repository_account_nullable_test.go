@@ -129,6 +129,148 @@ func TestTaskAttemptRequiresKnownAccountAndChannel(t *testing.T) {
 	}
 }
 
+func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 90)
+	channelID := accountID + 10000
+	now := time.Now().Truncate(time.Millisecond)
+
+	pendingTask := &tasks.Task{
+		TaskID:    "monitor-pressure-pending",
+		UserID:    1,
+		Status:    tasks.StatusPending,
+		CreatedAt: now.Add(-90 * time.Second),
+	}
+	if err := repo.Create(ctx, pendingTask); err != nil {
+		t.Fatalf("create pending task failed: %v", err)
+	}
+
+	requeuedPendingTask := &tasks.Task{
+		TaskID:     "monitor-pressure-requeued-pending",
+		UserID:     1,
+		Status:     tasks.StatusPending,
+		RetryCount: 2,
+		CreatedAt:  now.Add(-5 * time.Minute),
+	}
+	if err := repo.Create(ctx, requeuedPendingTask); err != nil {
+		t.Fatalf("create requeued pending task failed: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE tasks SET updated_at = $1 WHERE task_id = $2`, now.Add(-10*time.Second), requeuedPendingTask.TaskID); err != nil {
+		t.Fatalf("patch requeued pending updated_at failed: %v", err)
+	}
+
+	runningTask := &tasks.Task{
+		TaskID:            "attempt-pressure-running",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(channelID),
+		AccountID:         tasks.IDPtr(accountID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-attempt-pressure-running",
+	}
+	if err := repo.Create(ctx, runningTask); err != nil {
+		t.Fatalf("create running task failed: %v", err)
+	}
+	runningRef, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID:            runningTask.TaskID,
+		LeaseToken:        runningTask.LeaseToken,
+		AccountID:         accountID,
+		ChannelID:         channelID,
+		ProviderStartedAt: now.Add(-30 * time.Second),
+	})
+	if err != nil {
+		t.Fatalf("create running attempt failed: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE task_attempts SET created_at = $1 WHERE id = $2`, now.Add(-30*time.Second), runningRef.ID); err != nil {
+		t.Fatalf("patch running attempt created_at failed: %v", err)
+	}
+
+	failedTask := &tasks.Task{
+		TaskID:            "attempt-pressure-failed",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(channelID),
+		AccountID:         tasks.IDPtr(accountID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-attempt-pressure-failed",
+	}
+	if err := repo.Create(ctx, failedTask); err != nil {
+		t.Fatalf("create failed task failed: %v", err)
+	}
+	failedRef, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID:            failedTask.TaskID,
+		LeaseToken:        failedTask.LeaseToken,
+		AccountID:         accountID,
+		ChannelID:         channelID,
+		ProviderStartedAt: now.Add(-2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("create failed attempt failed: %v", err)
+	}
+	if _, err := repo.FinishTaskAttempt(ctx, tasks.TaskAttemptFinish{
+		ID:             failedRef.ID,
+		Status:         tasks.TaskAttemptStatusFailed,
+		TotalLatencyMS: 70_000,
+		CompletedAt:    now.Add(-time.Minute),
+	}); err != nil {
+		t.Fatalf("finish failed attempt failed: %v", err)
+	}
+
+	retryTask := &tasks.Task{
+		TaskID:            "attempt-pressure-requeued",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(channelID),
+		AccountID:         tasks.IDPtr(accountID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-attempt-pressure-requeued",
+	}
+	if err := repo.Create(ctx, retryTask); err != nil {
+		t.Fatalf("create retry task failed: %v", err)
+	}
+	retryRef, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID:            retryTask.TaskID,
+		LeaseToken:        retryTask.LeaseToken,
+		AccountID:         accountID,
+		ChannelID:         channelID,
+		ProviderStartedAt: now.Add(-45 * time.Second),
+	})
+	if err != nil {
+		t.Fatalf("create retry attempt failed: %v", err)
+	}
+	if _, err := repo.FinishTaskAttempt(ctx, tasks.TaskAttemptFinish{
+		ID:             retryRef.ID,
+		Status:         tasks.TaskAttemptStatusRequeued,
+		TotalLatencyMS: 45_000,
+		CompletedAt:    now.Add(-30 * time.Second),
+	}); err != nil {
+		t.Fatalf("finish retry attempt failed: %v", err)
+	}
+
+	rows, err := repo.ListMonitorExecutionPressureByRange(ctx, now.Add(-10*time.Minute), now)
+	if err != nil {
+		t.Fatalf("list monitor pressure failed: %v", err)
+	}
+	byKey := make(map[string]MonitorExecutionPressureAggregate, len(rows))
+	for _, row := range rows {
+		byKey[row.Key] = row
+	}
+	if byKey["backlog_pending"].Total != 1 {
+		t.Fatalf("backlog_pending=%+v, want total 1", byKey["backlog_pending"])
+	}
+	if byKey["normal_pending"].Total != 1 || byKey["normal_pending"].Retry != 0 {
+		t.Fatalf("normal_pending=%+v, want total 1 and retry 0", byKey["normal_pending"])
+	}
+	if byKey["normal_running"].Total != 1 {
+		t.Fatalf("normal_running=%+v, want total 1", byKey["normal_running"])
+	}
+	if byKey["slow_failed"].Total != 1 || byKey["slow_failed"].Failed != 1 {
+		t.Fatalf("slow_failed=%+v, want total/failed 1", byKey["slow_failed"])
+	}
+	if byKey["retrying"].Total != 1 || byKey["retrying"].Retry != 1 {
+		t.Fatalf("retrying=%+v, want total/retry 1", byKey["retrying"])
+	}
+}
+
 func TestCreateTaskAttemptRequiresCurrentLeaseIdentity(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)

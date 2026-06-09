@@ -33,15 +33,15 @@ func (s *PostgresTaskRuntimeStore) GetAccountLoadInfo(ctx context.Context, accou
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT a.id,
 		       a.max_concurrent,
-		       COUNT(t.id) AS running_count
+		       COUNT(ta.id) AS running_count
 		FROM api_accounts a
-		LEFT JOIN tasks t ON t.account_id = a.id
-		  AND t.status = $2
+		LEFT JOIN task_attempts ta ON ta.account_id = a.id
+		  AND ta.status = $2
 		WHERE a.deleted_at IS NULL
 		  AND a.id = ANY($1::bigint[])
 	GROUP BY a.id, a.max_concurrent`,
 		pq.Array(ids),
-		tasks.StatusRunning,
+		tasks.TaskAttemptStatusRunning,
 	)
 	if err != nil {
 		return nil, err

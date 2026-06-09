@@ -133,8 +133,9 @@ function createMonitorData(overrides: Partial<MonitorData> = {}): MonitorData {
   return {
     global_queue_len: 0,
     wait_queue_len: 0,
-    running_tasks: 0,
+    running_attempts: 0,
     account_loads: {},
+    execution_pressure: [],
     ...overrides,
   }
 }

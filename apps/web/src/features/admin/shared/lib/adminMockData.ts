@@ -1,4 +1,13 @@
 import { computed } from 'vue'
+import {
+  ListAdminTasksStatus,
+  MonitorExecutionPressureKey,
+  ProviderAPIType,
+  TaskExecutionMetricsBottleneckSource,
+  TaskExecutionMetricsCurrentStage,
+  TaskExecutionMetricsFailureCategory,
+  TaskExecutionMetricsFailureStage,
+} from '../../../../shared/api/generated-query/model'
 import type {
   AccountLimits,
   AdminAccount,
@@ -11,12 +20,35 @@ import type {
   AdminStatisticsTrendItem,
   Channel,
   MonitorData,
+  MonitorExecutionPressurePoint,
   MonitorStats,
   Task,
   TaskExecutionMetrics,
   GetAdminStatisticsRange,
+  ListAdminTasksStatus as ListAdminTasksStatusValue,
+  ProviderAPIType as ProviderAPITypeValue,
 } from '../../../../shared/api/generated-query/model'
 import { buildAdminTimeRangeBuckets } from './adminTimeRange'
+
+const mockProviderApiTypes = {
+  openaiCompatible: ProviderAPIType['openai-compatible'],
+  googleAi: ProviderAPIType['google-ai'],
+} as const
+
+const mockTaskStatuses = {
+  pending: ListAdminTasksStatus.pending,
+  running: ListAdminTasksStatus.running,
+  completed: ListAdminTasksStatus.completed,
+  failed: ListAdminTasksStatus.failed,
+  cancelled: ListAdminTasksStatus.cancelled,
+} as const
+
+const mockTaskMetricValues = {
+  currentStage: TaskExecutionMetricsCurrentStage,
+  bottleneckSource: TaskExecutionMetricsBottleneckSource,
+  failureStage: TaskExecutionMetricsFailureStage,
+  failureCategory: TaskExecutionMetricsFailureCategory,
+} as const
 
 const mockModels = [
   'gpt-image-1',
@@ -69,18 +101,18 @@ export function createMockAdminStatistics(range: GetAdminStatisticsRange): Admin
 
 export function createMockAdminTasks(now = new Date()): Task[] {
   return [
-    createMockTask(1001, 'completed', 960, 34, 0, 'gpt-image-1', now),
-    createMockTask(1002, 'completed', 1320, 118, 0, 'gemini-2.5-flash-image', now),
-    createMockTask(1003, 'pending', 28, null, 0, 'seedream-4.0', now),
-    createMockTask(1004, 'pending', 92, null, 0, 'flux-kontext-pro', now),
-    createMockTask(1005, 'running', 44, null, 0, 'gpt-image-1', now),
-    createMockTask(1006, 'running', 186, null, 0, 'gemini-2.5-flash-image', now),
-    createMockTask(1007, 'failed', 780, 22, 0, 'seedream-4.0', now),
-    createMockTask(1008, 'failed', 1440, 152, 0, 'flux-kontext-pro', now),
-    createMockTask(1009, 'running', 126, null, 2, 'gpt-image-1', now),
-    createMockTask(1010, 'pending', 74, null, 1, 'gemini-2.5-flash-image', now),
-    createMockTask(1011, 'cancelled', 360, null, 0, 'seedream-4.0', now),
-    createMockTask(1012, 'completed', 420, 48, 0, 'flux-kontext-pro', now),
+    createMockTask(1001, mockTaskStatuses.completed, 960, 34, 0, 'gpt-image-1', now),
+    createMockTask(1002, mockTaskStatuses.completed, 1320, 118, 0, 'gemini-2.5-flash-image', now),
+    createMockTask(1003, mockTaskStatuses.pending, 28, null, 0, 'seedream-4.0', now),
+    createMockTask(1004, mockTaskStatuses.pending, 92, null, 0, 'flux-kontext-pro', now),
+    createMockTask(1005, mockTaskStatuses.running, 44, null, 0, 'gpt-image-1', now),
+    createMockTask(1006, mockTaskStatuses.running, 186, null, 0, 'gemini-2.5-flash-image', now),
+    createMockTask(1007, mockTaskStatuses.failed, 780, 22, 0, 'seedream-4.0', now),
+    createMockTask(1008, mockTaskStatuses.failed, 1440, 152, 0, 'flux-kontext-pro', now),
+    createMockTask(1009, mockTaskStatuses.running, 126, null, 2, 'gpt-image-1', now),
+    createMockTask(1010, mockTaskStatuses.pending, 74, null, 1, 'gemini-2.5-flash-image', now),
+    createMockTask(1011, mockTaskStatuses.cancelled, 360, null, 0, 'seedream-4.0', now),
+    createMockTask(1012, mockTaskStatuses.completed, 420, 48, 0, 'flux-kontext-pro', now),
   ]
 }
 
@@ -89,7 +121,7 @@ export function createMockAdminChannels(now = new Date()): Channel[] {
   return [
     {
       id: 201,
-      type: 'openai-compatible',
+      type: mockProviderApiTypes.openaiCompatible,
       name: 'OpenAI 主线路',
       api_url: 'https://api.openai.com/v1',
       status: 1,
@@ -98,7 +130,7 @@ export function createMockAdminChannels(now = new Date()): Channel[] {
     },
     {
       id: 202,
-      type: 'google-ai',
+      type: mockProviderApiTypes.googleAi,
       name: 'Google Gemini 官方',
       api_url: 'https://generativelanguage.googleapis.com/v1beta',
       status: 1,
@@ -107,7 +139,7 @@ export function createMockAdminChannels(now = new Date()): Channel[] {
     },
     {
       id: 203,
-      type: 'openai-compatible',
+      type: mockProviderApiTypes.openaiCompatible,
       name: '火山 Seedream',
       api_url: 'https://ark.cn-beijing.volces.com/api/v3',
       status: 1,
@@ -116,7 +148,7 @@ export function createMockAdminChannels(now = new Date()): Channel[] {
     },
     {
       id: 204,
-      type: 'openai-compatible',
+      type: mockProviderApiTypes.openaiCompatible,
       name: 'Black Forest Labs',
       api_url: 'https://api.bfl.ai/v1',
       status: 1,
@@ -125,7 +157,7 @@ export function createMockAdminChannels(now = new Date()): Channel[] {
     },
     {
       id: 205,
-      type: 'openai-compatible',
+      type: mockProviderApiTypes.openaiCompatible,
       name: '备用聚合网关',
       api_url: 'https://gateway.example.com/v1',
       status: 1,
@@ -134,7 +166,7 @@ export function createMockAdminChannels(now = new Date()): Channel[] {
     },
     {
       id: 206,
-      type: 'google-ai',
+      type: mockProviderApiTypes.googleAi,
       name: 'Google 备用池',
       api_url: 'https://backup-generativelanguage.example.com/v1beta',
       status: 0,
@@ -151,7 +183,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       901,
       201,
       'OpenAI east key',
-      'openai-compatible',
+      mockProviderApiTypes.openaiCompatible,
       'https://api.openai.com/v1',
       'gpt-image-1',
       10,
@@ -164,7 +196,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       902,
       201,
       'OpenAI backup key',
-      'openai-compatible',
+      mockProviderApiTypes.openaiCompatible,
       'https://api.openai.com/v1',
       'gpt-image-1,imagen-4-preview',
       8,
@@ -178,7 +210,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       903,
       202,
       'Gemini official key',
-      'google-ai',
+      mockProviderApiTypes.googleAi,
       'https://generativelanguage.googleapis.com/v1beta',
       'gemini-2.5-flash-image',
       12,
@@ -191,7 +223,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       904,
       202,
       'Gemini safety pool',
-      'google-ai',
+      mockProviderApiTypes.googleAi,
       'https://generativelanguage.googleapis.com/v1beta',
       'gemini-2.5-flash-image,imagen-4-preview',
       6,
@@ -204,7 +236,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       905,
       203,
       'Seedream visual pool',
-      'openai-compatible',
+      mockProviderApiTypes.openaiCompatible,
       'https://ark.cn-beijing.volces.com/api/v3',
       'seedream-4.0',
       10,
@@ -217,7 +249,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       906,
       203,
       'Seedream burst pool',
-      'openai-compatible',
+      mockProviderApiTypes.openaiCompatible,
       'https://ark.cn-beijing.volces.com/api/v3',
       'seedream-4.0,seedream-4.0-edit',
       8,
@@ -231,7 +263,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       907,
       204,
       'Flux Kontext pro',
-      'openai-compatible',
+      mockProviderApiTypes.openaiCompatible,
       'https://api.bfl.ai/v1',
       'flux-kontext-pro',
       6,
@@ -244,7 +276,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       908,
       204,
       'Flux Kontext failover',
-      'openai-compatible',
+      mockProviderApiTypes.openaiCompatible,
       'https://api.bfl.ai/v1',
       'flux-kontext-max,flux-kontext-pro',
       6,
@@ -257,7 +289,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       909,
       205,
       'Gateway mixed pool',
-      'openai-compatible',
+      mockProviderApiTypes.openaiCompatible,
       'https://gateway.example.com/v1',
       'gpt-image-1,gemini-2.5-flash-image,seedream-4.0',
       16,
@@ -271,7 +303,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       910,
       205,
       'Gateway cold standby',
-      'openai-compatible',
+      mockProviderApiTypes.openaiCompatible,
       'https://gateway.example.com/v1',
       'flux-kontext-pro,imagen-4-preview',
       8,
@@ -284,7 +316,7 @@ export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
       911,
       206,
       'Gemini spare key',
-      'google-ai',
+      mockProviderApiTypes.googleAi,
       'https://backup-generativelanguage.example.com/v1beta',
       'gemini-2.5-flash-image',
       5,
@@ -304,7 +336,7 @@ export const mockAdminAccountLimits: AccountLimits = {
 export const mockMonitorData: MonitorData = {
   global_queue_len: 31,
   wait_queue_len: 11,
-  running_tasks: 18,
+  running_attempts: 18,
   account_loads: {
     101: { current_concurrent: 8, max_concurrent: 10 },
     102: { current_concurrent: 5, max_concurrent: 8 },
@@ -312,13 +344,70 @@ export const mockMonitorData: MonitorData = {
     104: { current_concurrent: 7, max_concurrent: 12 },
     105: { current_concurrent: 1, max_concurrent: 5 },
   },
+  execution_pressure: createMockMonitorExecutionPressure(),
+}
+
+function createMockMonitorExecutionPressure(): MonitorExecutionPressurePoint[] {
+  const rows: MockExecutionPressureRow[] = [
+    [MonitorExecutionPressureKey.fast_completed, '快速完成', 42, 29, 38, 8, 26, 42, 0, 0],
+    [MonitorExecutionPressureKey.slow_completed, '慢速完成', 15, 10, 92, 28, 74, 126, 0, 1],
+    [MonitorExecutionPressureKey.normal_pending, '正常排队', 0, 0, 0, 0, 0, 0, 0, 0],
+    [MonitorExecutionPressureKey.backlog_pending, '积压排队', 0, 0, 0, 0, 0, 0, 0, 0],
+    [MonitorExecutionPressureKey.normal_running, '正常执行', 18, 12, 48, 32, 38, 52, 0, 0],
+    [MonitorExecutionPressureKey.stuck_running, '卡住执行', 6, 4, 100, 82, 134, 210, 0, 2],
+    [MonitorExecutionPressureKey.fast_failed, '快速失败', 9, 6, 42, 78, 18, 36, 9, 1],
+    [MonitorExecutionPressureKey.slow_failed, '慢速失败', 7, 5, 100, 100, 98, 188, 7, 3],
+    [MonitorExecutionPressureKey.cancelled, '已取消', 3, 2, 28, 34, 22, 28, 0, 0],
+    [MonitorExecutionPressureKey.retrying, '重试中', 5, 3, 72, 86, 61, 92, 0, 5],
+    [MonitorExecutionPressureKey.other, '其他状态', 0, 0, 0, 0, 0, 0, 0, 0],
+  ]
+  return rows.map((row) => createMonitorExecutionPressurePoint(...row))
+}
+
+type MockExecutionPressureRow = [
+  key: MonitorExecutionPressurePoint['key'],
+  label: string,
+  count: number,
+  sharePercent: number,
+  durationPressure: number,
+  anomalyPressure: number,
+  avgDurationSeconds: number,
+  maxDurationSeconds: number,
+  failedCount: number,
+  retryCount: number,
+]
+
+function createMonitorExecutionPressurePoint(
+  key: MonitorExecutionPressurePoint['key'],
+  label: string,
+  count: number,
+  sharePercent: number,
+  durationPressure: number,
+  anomalyPressure: number,
+  avgDurationSeconds: number,
+  maxDurationSeconds: number,
+  failedCount: number,
+  retryCount: number,
+): MonitorExecutionPressurePoint {
+  return {
+    key,
+    label,
+    count,
+    share_percent: sharePercent,
+    duration_pressure: durationPressure,
+    anomaly_pressure: anomalyPressure,
+    avg_duration_seconds: avgDurationSeconds,
+    max_duration_seconds: maxDurationSeconds,
+    failed_count: failedCount,
+    retry_count: retryCount,
+  }
 }
 
 function createMockAdminAccount(
   id: number,
   channelId: number,
   name: string,
-  apiType: string,
+  apiType: ProviderAPITypeValue,
   proxyUrl: string,
   modelSet: string,
   maxConcurrent: number,
@@ -482,7 +571,7 @@ function createMockFailureCategories(): AdminStatisticsFailureCategoriesItem[] {
 
 function createMockTask(
   id: number,
-  status: string,
+  status: ListAdminTasksStatusValue,
   createdAgoSeconds: number,
   durationSeconds: number | null,
   retryCount: number,
@@ -498,14 +587,14 @@ function createMockTask(
     id,
     task_id: taskId,
     user_id: 9000 + (id % 5),
-    assigned_channel_id: status === 'pending' ? null : 20 + (id % 4),
-    account_id: status === 'pending' ? null : 100 + (id % 5),
+    assigned_channel_id: status === mockTaskStatuses.pending ? null : 20 + (id % 4),
+    account_id: status === mockTaskStatuses.pending ? null : 100 + (id % 5),
     prompt: `Mock ${model} visual regression sample ${id}`,
     params: JSON.stringify({ model, mock: true, aspect_ratio: id % 2 === 0 ? '16:9' : '1:1' }),
     status,
     retry_count: retryCount,
-    error_msg: status === 'failed' ? mockFailureMessage(id) : '',
-    result: status === 'completed' ? JSON.stringify({ model, mock: true }) : '',
+    error_msg: status === mockTaskStatuses.failed ? mockFailureMessage(id) : '',
+    result: status === mockTaskStatuses.completed ? JSON.stringify({ model, mock: true }) : '',
     outputs: [],
     execution_metrics: createMockExecutionMetrics(taskId, status, createdAt, completedAt, id),
     created_at: createdAt.toISOString(),
@@ -516,20 +605,34 @@ function createMockTask(
 
 function createMockExecutionMetrics(
   taskId: string,
-  status: string,
+  status: ListAdminTasksStatusValue,
   createdAt: Date,
   completedAt: Date | null,
   id: number,
 ): TaskExecutionMetrics {
   const totalLatency = completedAt ? completedAt.getTime() - createdAt.getTime() : 0
-  const isFailed = status === 'failed'
+  const isFailed = status === mockTaskStatuses.failed
 
   return {
     task_id: taskId,
-    current_stage: status === 'completed' ? 'completed' : isFailed ? 'failed' : 'provider',
-    bottleneck_source: id % 3 === 0 ? 'queue' : id % 3 === 1 ? 'provider' : 'storage',
-    failure_stage: isFailed ? 'provider' : '',
-    failure_category: isFailed ? (id % 2 === 0 ? 'timeout' : 'provider_error') : '',
+    current_stage:
+      status === mockTaskStatuses.completed
+        ? mockTaskMetricValues.currentStage.completed
+        : isFailed
+          ? mockTaskMetricValues.currentStage.failed
+          : mockTaskMetricValues.currentStage.provider,
+    bottleneck_source:
+      id % 3 === 0
+        ? mockTaskMetricValues.bottleneckSource.queue
+        : id % 3 === 1
+          ? mockTaskMetricValues.bottleneckSource.provider
+          : mockTaskMetricValues.bottleneckSource.storage,
+    failure_stage: isFailed ? mockTaskMetricValues.failureStage.provider : '',
+    failure_category: isFailed
+      ? id % 2 === 0
+        ? mockTaskMetricValues.failureCategory.timeout
+        : mockTaskMetricValues.failureCategory.provider_error
+      : '',
     assigned_at: new Date(createdAt.getTime() + 4000).toISOString(),
     provider_started_at: new Date(createdAt.getTime() + 8000).toISOString(),
     provider_finished_at: completedAt?.toISOString() || null,

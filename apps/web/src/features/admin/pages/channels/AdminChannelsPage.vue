@@ -390,6 +390,12 @@ import {
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
 import { createMockAdminChannels, useAdminMockMode } from '../../shared/lib/adminMockData'
+import {
+  ADMIN_CHANNEL_API_TYPE_OPTIONS,
+  DEFAULT_ADMIN_CHANNEL_API_TYPE,
+  GOOGLE_ADMIN_CHANNEL_API_TYPE,
+  getAdminChannelApiTypeLabel,
+} from './channelApiTypes'
 import { extractApiErrorMessage } from './channelModelUtils'
 import { useChannelAccounts } from './useChannelAccounts'
 
@@ -460,16 +466,12 @@ const isEditChannel = ref(false)
 const channelSaveLoading = ref(false)
 const currentChannelId = ref(0)
 const createEmptyChannelForm = (): ChannelFormData => ({
-  type: 'openai-compatible',
+  type: DEFAULT_ADMIN_CHANNEL_API_TYPE,
   name: '',
   api_url: '',
 })
 const channelForm = ref<ChannelFormData>(createEmptyChannelForm())
-const apiTypeOptions = [
-  { label: 'OpenAI Compatible', value: 'openai-compatible' },
-  { label: 'Google', value: 'google-ai' },
-]
-const apiTypeLabelByValue = new Map(apiTypeOptions.map((item) => [item.value, item.label]))
+const apiTypeOptions = ADMIN_CHANNEL_API_TYPE_OPTIONS
 const modelSelectPt = {
   root: { class: 'w-full' },
   inputMultiple: { class: '!min-h-[42px] !w-full !rounded-xl' },
@@ -489,7 +491,7 @@ const activeProgressPt = { value: { class: '!bg-admin-success' } } as const
 const mutedProgressPt = { value: { class: '!bg-admin-text-3' } } as const
 
 function getApiTypeLabel(value: string) {
-  return apiTypeLabelByValue.get(value) || value || '未配置'
+  return getAdminChannelApiTypeLabel(value)
 }
 
 function getAccountStatusDotClass(account: AdminAccount) {
@@ -506,11 +508,11 @@ function inferChannelApiTypeFromUrl() {
   const apiUrl = channelForm.value.api_url.trim().toLowerCase()
   if (!apiUrl) return
   if (apiUrl.includes('generativelanguage.googleapis.com')) {
-    channelForm.value.type = 'google-ai'
+    channelForm.value.type = GOOGLE_ADMIN_CHANNEL_API_TYPE
     return
   }
   if (apiUrl.includes('api.openai.com')) {
-    channelForm.value.type = 'openai-compatible'
+    channelForm.value.type = DEFAULT_ADMIN_CHANNEL_API_TYPE
   }
 }
 

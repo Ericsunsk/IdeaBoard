@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/boards"
@@ -80,6 +81,51 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			}
 			if strings.Contains(got, "【执行语义】") {
 				t.Fatalf("got unexpected hidden constraint in prompt: %q", got)
+			}
+		})
+	}
+}
+
+func TestNormalizeTaskListKeywordTruncatesByRune(t *testing.T) {
+	raw := strings.Repeat("画", maxTaskKeywordLength+8)
+
+	got := normalizeTaskListKeyword(raw)
+
+	if !utf8.ValidString(got) {
+		t.Fatalf("keyword is not valid utf8")
+	}
+	if gotRunes := utf8.RuneCountInString(got); gotRunes != maxTaskKeywordLength {
+		t.Fatalf("keyword rune count=%d, want %d", gotRunes, maxTaskKeywordLength)
+	}
+}
+
+func TestNormalizeTaskListStatus(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		want    string
+		wantErr bool
+	}{
+		{name: "empty", raw: "", want: ""},
+		{name: "trim and lower", raw: " Running ", want: tasks.StatusRunning},
+		{name: "completed", raw: tasks.StatusCompleted, want: tasks.StatusCompleted},
+		{name: "invalid", raw: "all", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeTaskListStatus(tt.raw)
+			if tt.wantErr {
+				if !isTaskListValidationError(err) {
+					t.Fatalf("err=%v, want task list validation error", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("normalize status failed: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("status=%q, want %q", got, tt.want)
 			}
 		})
 	}

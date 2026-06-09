@@ -1,8 +1,11 @@
-import type { GetAdminStatisticsRange } from '../../../../shared/api/generated-query/model'
+import {
+  GetAdminStatisticsRange,
+  type GetAdminStatisticsRange as GetAdminStatisticsRangeValue,
+} from '../../../../shared/api/generated-query/model'
 
 export type AdminTimeRangeOption = {
   label: string
-  key: GetAdminStatisticsRange
+  key: GetAdminStatisticsRangeValue
   days: number
   bucketHours?: number
 }
@@ -13,27 +16,27 @@ export type AdminTimeRangeBucket = {
 }
 
 const adminTimeRangeOptions: readonly AdminTimeRangeOption[] = [
-  { label: '日', key: '1d', days: 1, bucketHours: 4 },
-  { label: '周', key: '7d', days: 7 },
-  { label: '月', key: '30d', days: 30 },
-  { label: '年', key: '1y', days: 365 },
+  { label: '日', key: GetAdminStatisticsRange['1d'], days: 1, bucketHours: 4 },
+  { label: '周', key: GetAdminStatisticsRange['7d'], days: 7 },
+  { label: '月', key: GetAdminStatisticsRange['30d'], days: 30 },
+  { label: '年', key: GetAdminStatisticsRange['1y'], days: 365 },
 ]
 
 const adminTimeRangeByKey = new Map(adminTimeRangeOptions.map((option) => [option.key, option]))
 
 export function pickAdminTimeRangeOptions(
-  ranges: readonly GetAdminStatisticsRange[],
+  ranges: readonly GetAdminStatisticsRangeValue[],
 ): AdminTimeRangeOption[] {
   const allowed = new Set(ranges)
   return adminTimeRangeOptions.filter((option) => allowed.has(option.key))
 }
 
-function getAdminTimeRangeOption(range: GetAdminStatisticsRange): AdminTimeRangeOption {
-  return adminTimeRangeByKey.get(range) ?? adminTimeRangeByKey.get('7d')!
+function getAdminTimeRangeOption(range: GetAdminStatisticsRangeValue): AdminTimeRangeOption {
+  return adminTimeRangeByKey.get(range) ?? adminTimeRangeByKey.get(GetAdminStatisticsRange['7d'])!
 }
 
 export function buildAdminTimeRangeBuckets(
-  range: GetAdminStatisticsRange,
+  range: GetAdminStatisticsRangeValue,
   now = new Date(),
 ): AdminTimeRangeBucket[] {
   const option = getAdminTimeRangeOption(range)
@@ -54,13 +57,15 @@ export function buildAdminTimeRangeBuckets(
 export function shouldShowAdminTimeRangeTick(input: {
   index: number
   count: number
-  range: GetAdminStatisticsRange
+  range: GetAdminStatisticsRangeValue
   label?: string
 }): boolean {
   const { index, count, range, label } = input
   if (count <= 7) return true
-  if (range === '30d') return index === 0 || index === count - 1 || index % 6 === 0
-  if (range === '1y') return index === 0 || index === count - 1 || isMonthStartLabel(label)
+  if (range === GetAdminStatisticsRange['30d'])
+    return index === 0 || index === count - 1 || index % 6 === 0
+  if (range === GetAdminStatisticsRange['1y'])
+    return index === 0 || index === count - 1 || isMonthStartLabel(label)
   return true
 }
 

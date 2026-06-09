@@ -1,7 +1,10 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useGetAdminMonitor } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import { useGetAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
-import type { AdminStatistics } from '../../../../shared/api/generated-query/model'
+import {
+  GetAdminStatisticsRange,
+  type AdminStatistics,
+} from '../../../../shared/api/generated-query/model'
 import {
   buildAdminAnomalyItems,
   type AdminAnomalyItem,
@@ -49,7 +52,7 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
     },
   })
   const statisticsQuery = useGetAdminStatistics(
-    computed(() => ({ range: '1d' as const })),
+    computed(() => ({ range: GetAdminStatisticsRange['1d'] })),
     {
       query: {
         enabled: computed(() => isEnabled.value && !isMockMode.value),
@@ -68,7 +71,9 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
     isMockMode.value ? mockMonitorStats : monitorQuery.data.value?.data?.stats || null,
   )
   const statistics = computed<AdminStatistics | null>(() =>
-    isMockMode.value ? createMockAdminStatistics('1d') : (statisticsQuery.data.value?.data ?? null),
+    isMockMode.value
+      ? createMockAdminStatistics(GetAdminStatisticsRange['1d'])
+      : (statisticsQuery.data.value?.data ?? null),
   )
   const stableRecords = ref(new Map<string, StableAnomalyRecord>())
   const anomalies = ref<AdminAnomalyItem[]>([])
