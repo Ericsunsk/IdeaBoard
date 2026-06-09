@@ -11,6 +11,7 @@
     "format:check": "prettier . --check",
     "lint": "eslint .",
     "preview": "vite preview",
+    "smoke:admin-mock": "tsx scripts/admin-mock-smoke.ts",
     "css:audit": "tsx scripts/audit-css-migration.ts",
     "test": "vitest",
     "test:run": "vitest run"
