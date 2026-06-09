@@ -11,15 +11,7 @@
     @update:visible="handleVisibleChange"
   >
     <div
-      v-motion="{
-        initial: { opacity: 0, y: 20, scale: 0.96 },
-        enter: {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          transition: { duration: 260, easing: 'ease-out' },
-        },
-      }"
+      v-motion="authModalMotion"
       :class="authCompactModalShellClass"
     >
       <AuthModalCloseButton :disabled="loading" @click="handleClose" />
@@ -148,11 +140,18 @@ import Password from 'primevue/password'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import {
+  AUTH_PASSWORD_LIMIT,
+  AUTH_USERNAME_LIMIT,
+  getLengthError,
+  getRequiredError,
+} from './authFormUtils'
+import {
   authCompactModalShellClass,
   authDialogPt,
   authFieldClass,
   authFooterClass,
   authInputClass,
+  authModalMotion,
   authModalSubtitleClass,
   authModalTitleClass,
   authPrimaryButtonClass,
@@ -169,11 +168,6 @@ const emit = defineEmits<{
 }>()
 
 type RegisterField = 'username' | 'password' | 'confirmPassword'
-
-const USERNAME_MIN_LEN = 3
-const USERNAME_MAX_LEN = 50
-const PASSWORD_MIN_LEN = 6
-const PASSWORD_MAX_LEN = 50
 
 const userStore = useUserStore()
 const appToast = useAppToast()
@@ -203,41 +197,25 @@ function resetForm() {
   resetValidation()
 }
 
-function lengthError(value: string, min: number, max: number, label: string) {
-  if (value.length < min || value.length > max) {
-    return `${label}长度需为 ${min}-${max} 个字符`
-  }
-  return ''
-}
-
 function validateField(field: RegisterField) {
   if (field === 'username') {
     const username = formValue.value.username.trim()
-    errors.value.username = !username
-      ? '请输入账号'
-      : lengthError(username, USERNAME_MIN_LEN, USERNAME_MAX_LEN, '账号')
+    errors.value.username =
+      getRequiredError(username, '账号') || getLengthError(username, AUTH_USERNAME_LIMIT, '账号')
     return !errors.value.username
   }
 
   if (field === 'password') {
     const password = formValue.value.password
-    errors.value.password = !password
-      ? '请输入密码'
-      : lengthError(password, PASSWORD_MIN_LEN, PASSWORD_MAX_LEN, '密码')
+    errors.value.password =
+      getRequiredError(password, '密码') || getLengthError(password, AUTH_PASSWORD_LIMIT, '密码')
     return !errors.value.password
   }
 
   const confirmPassword = formValue.value.confirmPassword
-  if (!confirmPassword) {
-    errors.value.confirmPassword = '请确认密码'
-  } else {
-    errors.value.confirmPassword = lengthError(
-      confirmPassword,
-      PASSWORD_MIN_LEN,
-      PASSWORD_MAX_LEN,
-      '密码',
-    )
-  }
+  errors.value.confirmPassword =
+    getRequiredError(confirmPassword, '密码') ||
+    getLengthError(confirmPassword, AUTH_PASSWORD_LIMIT, '密码')
 
   if (!errors.value.confirmPassword && confirmPassword !== formValue.value.password) {
     errors.value.confirmPassword = '两次输入的密码不一致'

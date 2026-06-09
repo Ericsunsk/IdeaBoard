@@ -4,7 +4,7 @@
     rounded
     text
     severity="secondary"
-    class="!absolute !top-6 !right-6 !size-8 !p-0 !text-[#1d1d1f] !shadow-none hover:!bg-black/10 disabled:!cursor-not-allowed disabled:!opacity-50"
+    :class="authCloseButtonClass"
     :disabled="disabled"
     aria-label="关闭"
     @click="emit('click')"
@@ -18,6 +18,7 @@
 <script setup lang="ts">
 import { Xmark } from '@iconoir/vue'
 import Button from 'primevue/button'
+import { authCloseButtonClass } from './authModalUi'
 
 defineProps<{
   disabled?: boolean

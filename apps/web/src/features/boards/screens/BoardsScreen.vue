@@ -16,7 +16,11 @@
           :class="userAvatarButtonClass"
           @click="toggleUserMenu"
         >
-          <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :class="userAvatarClass" />
+          <img
+            v-if="userStore.user?.avatar"
+            :src="userStore.user.avatar"
+            :class="userAvatarClass"
+          />
           <div v-else :class="userAvatarPlaceholderClass">
             <User :class="avatarIconClass" />
           </div>
@@ -111,7 +115,10 @@
         />
       </section>
 
-      <p v-if="!isBoardsLoading && visibleBoards.length === 0 && searchKeyword" :class="emptyTipClass">
+      <p
+        v-if="!isBoardsLoading && visibleBoards.length === 0 && searchKeyword"
+        :class="emptyTipClass"
+      >
         No matching canvas
       </p>
     </main>
@@ -153,11 +160,7 @@ import Menu from 'primevue/menu'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import type { MenuItem } from 'primevue/menuitem'
-
-type PrimePopupMenu = {
-  toggle: (event: Event) => void
-  hide: () => void
-}
+import { userMenuPt, type PrimePopupMenuRef } from '../lib/menuStyles'
 
 const router = useRouter()
 const appToast = useAppToast()
@@ -173,7 +176,7 @@ const renameDraft = ref('')
 const suppressNextBoardOpen = ref(false)
 const activeMenuBoardId = ref<string | null>(null)
 const isUserMenuOpen = ref(false)
-const userMenuRef = ref<PrimePopupMenu | null>(null)
+const userMenuRef = ref<PrimePopupMenuRef | null>(null)
 
 const boardPreviewMap = ref<Record<string, string>>({})
 const previewRefreshQueue: string[] = []
@@ -229,19 +232,13 @@ const createMetaClass = 'px-3 pt-2.5 pb-3'
 const createTitleClass = 'text-sm font-bold text-[#394054]'
 const createDateClass = 'mt-[3px] text-xs text-[#7b8297]'
 const emptyTipClass = 'mt-[18px] text-[13px] text-[#7b8297]'
-const userMenuPt = {
-  root: {
-    class:
-      '!z-40 !w-32 !rounded-[10px] !border !border-[#d8ddea] !bg-white/98 !p-0 !shadow-none backdrop-blur-[10px]',
-  },
-  list: { class: '!m-0 !flex !flex-col !gap-0.5 !p-1.5' },
-  itemContent: { class: '!rounded-lg' },
-  itemLink: { class: '!p-0' },
-} as const
 const sortSelectPt = {
   label: { class: '!py-0 !pl-3.5 !pr-1 !leading-[40px]' },
   dropdown: { class: '!w-9' },
-  overlay: { class: '!rounded-xl !border !border-[#d8ddea] !bg-white !shadow-[0_18px_42px_rgba(45,64,89,0.14)]' },
+  overlay: {
+    class:
+      '!rounded-xl !border !border-[#d8ddea] !bg-white !shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
+  },
   list: { class: '!p-1.5' },
   option: { class: '!rounded-lg !px-3 !py-2 !text-[13px] !font-semibold' },
 } as const

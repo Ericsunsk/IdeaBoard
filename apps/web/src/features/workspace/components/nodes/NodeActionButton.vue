@@ -3,7 +3,7 @@
     type="button"
     class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width,1.2px)] border-solid border-[#d6dcec] bg-white px-2.5 text-[11px] leading-none font-medium text-[#5f6877] transition-[background-color,border-color,color,opacity] duration-200 ease-[ease] disabled:cursor-not-allowed disabled:opacity-[0.45]"
     :class="[
-      `variant-${variant}`,
+      variantClass,
       {
         active,
         'w-full': full,
@@ -27,7 +27,7 @@ import { computed } from 'vue'
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'stage' | 'stage-ghost' | 'tool' | 'chip' | 'primary'
+    variant?: NodeActionButtonVariant
     active?: boolean
     disabled?: boolean
     full?: boolean
@@ -50,32 +50,30 @@ const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void
 }>()
 
+type NodeActionButtonVariant = 'stage-ghost' | 'tool' | 'chip' | 'primary'
+
+const nodeActionButtonVariantClasses: Record<NodeActionButtonVariant, string> = {
+  'stage-ghost': 'variant-stage-ghost',
+  tool: 'variant-tool',
+  chip: 'variant-chip',
+  primary: 'variant-primary',
+}
+
 const resolvedTooltip = computed(() => props.tooltip ?? '')
 const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.value) || undefined)
+const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant])
 </script>
 
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
-.node-action-btn.variant-stage,
 .node-action-btn.variant-stage-ghost {
   border: none;
   border-radius: 8px;
+  background: rgba(75, 85, 99, 0.72);
   color: #f9fafb;
   min-height: 26px;
   padding: 0 10px;
   font-weight: 500;
-}
-
-.node-action-btn.variant-stage {
-  background: rgba(17, 24, 39, 0.74);
-}
-
-.node-action-btn.variant-stage:hover:not(:disabled) {
-  background: rgba(17, 24, 39, 0.9);
-}
-
-.node-action-btn.variant-stage-ghost {
-  background: rgba(75, 85, 99, 0.72);
 }
 
 .node-action-btn.variant-stage-ghost:hover:not(:disabled) {

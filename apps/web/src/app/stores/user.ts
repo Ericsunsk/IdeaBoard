@@ -7,7 +7,6 @@ import {
   getStoredUser,
   setStoredAuth,
   clearStoredAuth,
-  hasValidStoredAuth,
 } from '../../shared/utils/auth'
 import { clearAuthScopedQueryCache } from '../../shared/query/queryClient'
 import type { ErrorType } from '../../shared/api/orvalMutator'
@@ -36,13 +35,8 @@ function getUserIdentity(authUser: User | null): string | null {
 
 export const useUserStore = defineStore('user', () => {
   const storedUser = getStoredUser()
-  const hasValidAuth = hasValidStoredAuth()
 
-  if (!hasValidAuth && storedUser) {
-    clearStoredAuth()
-  }
-
-  const user = ref<User | null>(hasValidAuth ? storedUser : null)
+  const user = ref<User | null>(storedUser)
   const userInfoLoaded = ref(false)
   const sessionValidatedAt = ref(0)
 

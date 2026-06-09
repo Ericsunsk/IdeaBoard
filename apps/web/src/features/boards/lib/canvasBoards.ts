@@ -25,10 +25,6 @@ export function normalizeCanvasBoardName(name: string): string {
   return trimmed.slice(0, MAX_BOARD_NAME_LEN)
 }
 
-function normalizeBoardName(name: string): string {
-  return normalizeCanvasBoardName(name)
-}
-
 function toValidBoardMeta(item: unknown): CanvasBoardMeta | null {
   if (!item || typeof item !== 'object') return null
   const record = item as Record<string, unknown>
@@ -38,7 +34,7 @@ function toValidBoardMeta(item: unknown): CanvasBoardMeta | null {
   if (typeof record.updatedAt !== 'number') return null
   return {
     id: record.id,
-    name: normalizeBoardName(record.name) || 'Untitled',
+    name: normalizeCanvasBoardName(record.name) || 'Untitled',
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   }
@@ -96,18 +92,18 @@ export function getCanvasBoardById(boardId: string): CanvasBoardMeta | null {
 }
 
 export function isCanvasBoardNameTaken(name: string, excludeBoardId?: string): boolean {
-  const normalized = normalizeBoardName(name)
+  const normalized = normalizeCanvasBoardName(name)
   if (!normalized) return false
   const excludeId = excludeBoardId?.trim() || ''
   const normalizedLower = normalized.toLocaleLowerCase()
   return readRawBoards().some((board) => {
     if (excludeId && board.id === excludeId) return false
-    return normalizeBoardName(board.name).toLocaleLowerCase() === normalizedLower
+    return normalizeCanvasBoardName(board.name).toLocaleLowerCase() === normalizedLower
   })
 }
 
 function makeUniqueBoardName(baseName: string, excludeBoardId?: string): string {
-  const normalizedBase = normalizeBoardName(baseName) || 'Untitled'
+  const normalizedBase = normalizeCanvasBoardName(baseName) || 'Untitled'
   if (!isCanvasBoardNameTaken(normalizedBase, excludeBoardId)) {
     return normalizedBase
   }
@@ -115,7 +111,7 @@ function makeUniqueBoardName(baseName: string, excludeBoardId?: string): string 
     const suffix = ` ${index}`
     const maxBaseLen = Math.max(1, MAX_BOARD_NAME_LEN - suffix.length)
     const base = normalizedBase.slice(0, maxBaseLen).trimEnd()
-    return normalizeBoardName(`${base}${suffix}`)
+    return normalizeCanvasBoardName(`${base}${suffix}`)
   }
   let index = 2
   while (index < 10000) {
@@ -128,7 +124,7 @@ function makeUniqueBoardName(baseName: string, excludeBoardId?: string): string 
   const timestampSuffix = `${Date.now()}`.slice(-6)
   const maxBaseLen = Math.max(1, MAX_BOARD_NAME_LEN - timestampSuffix.length - 1)
   const base = normalizedBase.slice(0, maxBaseLen).trimEnd()
-  return normalizeBoardName(`${base} ${timestampSuffix}`)
+  return normalizeCanvasBoardName(`${base} ${timestampSuffix}`)
 }
 
 export function createCanvasBoard(name = 'Untitled'): CanvasBoardMeta {
@@ -147,7 +143,7 @@ export function createCanvasBoard(name = 'Untitled'): CanvasBoardMeta {
 
 export function renameCanvasBoard(boardId: string, nextName: string): CanvasBoardMeta | null {
   const id = boardId.trim()
-  const name = normalizeBoardName(nextName)
+  const name = normalizeCanvasBoardName(nextName)
   if (!id || !name) return null
   if (isCanvasBoardNameTaken(name, id)) return null
   const boards = readRawBoards()

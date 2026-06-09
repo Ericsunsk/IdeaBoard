@@ -26,10 +26,6 @@ export function clearStoredAuth() {
   localStorage.removeItem(USER_KEY)
 }
 
-export function hasValidStoredAuth(): boolean {
-  return !!getStoredUser()
-}
-
 function getRedirectBaseUrl(): string {
   if (typeof window === 'undefined') return REDIRECT_BASE_URL
   return window.location.origin || REDIRECT_BASE_URL
@@ -130,13 +126,17 @@ function clearAuthFailureState() {
   clearAuthScopedQueryCache()
 }
 
+function getPayloadCode(payload: unknown): unknown {
+  return payload && typeof payload === 'object' ? (payload as { code?: unknown }).code : undefined
+}
+
 export function handleAuthFailure(params: {
   status?: number
-  payload?: any
+  payload?: unknown
   requestUrl: string
 }): boolean {
   const { status, payload, requestUrl } = params
-  const code = payload?.code ?? status
+  const code = getPayloadCode(payload) ?? status
 
   if (code === 403 && isAdminApiRequest(requestUrl) && isAdminPage()) {
     clearAuthFailureState()

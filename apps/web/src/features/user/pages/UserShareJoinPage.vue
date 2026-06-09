@@ -1,17 +1,25 @@
 <template>
-  <div class="grid min-h-screen place-items-center bg-[#f7f8fb] p-6">
-    <Card class="w-[min(520px,100%)] rounded-2xl border border-[#e7e9ef] bg-white shadow-[0_12px_24px_rgba(18,30,54,0.08)]">
+  <div class="grid min-h-screen place-items-center bg-surface-50 p-6">
+    <Card
+      class="w-[min(520px,100%)] rounded-2xl border border-surface-200 bg-surface-0 shadow-[0_12px_24px_rgba(18,30,54,0.08)]"
+    >
       <template #content>
         <div class="flex flex-col items-start gap-4">
           <ProgressSpinner
             v-if="loading"
-            class="!h-8 !w-8"
+            class="h-8 w-8"
             stroke-width="4"
             aria-label="正在加入共享画布"
           />
-          <h1 class="m-0 text-[22px] font-bold text-[#1f2a44]">{{ titleText }}</h1>
-          <p class="m-0 text-[15px] leading-7 text-[#5b667f]">{{ statusText }}</p>
-          <Button v-if="failed" label="返回画布列表" severity="secondary" @click="goBoards" />
+          <h1 class="m-0 text-[22px] font-bold text-surface-900">{{ titleText }}</h1>
+          <p class="m-0 text-[15px] leading-7 text-surface-600">{{ statusText }}</p>
+          <Button
+            v-if="failed"
+            label="返回画布列表"
+            severity="secondary"
+            outlined
+            @click="goBoards"
+          />
         </div>
       </template>
     </Card>
@@ -71,11 +79,7 @@ async function joinSharedBoard() {
   await hydrateCanvasBoardsFromServer()
   await router.replace({
     path: '/user/workspace',
-    query: {
-      boardId,
-      board_id: boardId,
-    },
-    hash: `#board_id=${encodeURIComponent(boardId)}`,
+    query: { boardId },
   })
 }
 

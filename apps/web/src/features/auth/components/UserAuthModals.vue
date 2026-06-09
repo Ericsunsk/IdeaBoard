@@ -39,16 +39,15 @@ function goRegister() {
 
 function resolveLoginRedirectPath() {
   const redirect = route.query.redirect
-  const rawRedirectPath = Array.isArray(redirect) ? redirect[0] : redirect
-  const redirectPath =
-    typeof rawRedirectPath === 'string' ? rawRedirectPath.trim() : rawRedirectPath
-  if (!redirectPath || typeof redirectPath !== 'string') {
+  const redirectPath = Array.isArray(redirect) ? redirect[0] : redirect
+  const normalizedPath = typeof redirectPath === 'string' ? redirectPath.trim() : ''
+  if (!normalizedPath) {
     return '/user/home'
   }
-  if (!isSafeInternalRedirectPath(redirectPath)) {
+  if (!isSafeInternalRedirectPath(normalizedPath)) {
     return '/user/home'
   }
-  return redirectPath
+  return normalizedPath
 }
 
 function onLoginSuccess() {

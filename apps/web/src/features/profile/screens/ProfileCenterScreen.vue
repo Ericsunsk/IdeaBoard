@@ -1,5 +1,5 @@
 <template>
-  <div class="center-page relative h-screen w-full overflow-hidden bg-[#f8f9fd] text-[#1f2430]">
+  <div class="relative h-screen w-full overflow-hidden bg-[#f8f9fd] text-[#1f2430]">
     <div :class="profileGridBgClass"></div>
 
     <div
@@ -9,25 +9,27 @@
         class="flex w-[260px] shrink-0 flex-col border-r border-black/5 px-6 py-10 max-[760px]:w-[220px] max-[640px]:hidden"
       >
         <div class="mb-12">
-          <button
+          <Button
             type="button"
-            class="cursor-pointer border-0 bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)] bg-clip-text p-0 text-[22px] leading-none font-bold text-transparent"
+            text
+            class="!border-0 !bg-transparent !bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)] !bg-clip-text !p-0 !text-[22px] !leading-none !font-bold !text-transparent !shadow-none hover:!bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)]"
             @click="router.push('/user/home')"
           >
             IdeaBoard
-          </button>
+          </Button>
         </div>
 
         <nav class="flex flex-1 flex-col gap-2" aria-label="个人中心导航">
-          <button
+          <Button
             v-for="item in navItems"
             :key="item.key"
             type="button"
-            class="flex cursor-pointer items-center gap-3 rounded-[14px] border-0 px-4 py-3 text-left text-[15px] font-medium transition duration-200"
+            text
+            class="!flex !w-full !justify-start !gap-3 !rounded-[14px] !border-0 !px-4 !py-3 !text-left !text-[15px] !font-medium !shadow-none !transition !duration-200"
             :class="
               activeTab === item.key
-                ? 'bg-[#7a6bd5] text-white'
-                : 'bg-transparent text-[#86868b] hover:bg-[#eef1fa] hover:text-[#2c3448]'
+                ? '!bg-[#7a6bd5] !text-white'
+                : '!bg-transparent !text-[#86868b] hover:!bg-[#eef1fa] hover:!text-[#2c3448]'
             "
             @click="activeTab = item.key"
           >
@@ -35,37 +37,38 @@
               <component :is="item.icon" class="h-5 w-5 stroke-[2]" />
             </span>
             <span>{{ item.label }}</span>
-          </button>
+          </Button>
         </nav>
 
         <div class="mt-auto flex flex-col gap-3">
-          <button
+          <Button
             v-if="userStore.user?.role === 'admin'"
             type="button"
-            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border-0 bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)] px-4 py-3 text-[15px] font-semibold text-white transition duration-200 hover:bg-[linear-gradient(135deg,#6c54c4,#8b7ad6)]"
+            class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)] !px-4 !py-3 !text-[15px] !font-semibold !text-white !shadow-none !transition !duration-200 hover:!bg-[linear-gradient(135deg,#6c54c4,#8b7ad6)]"
             @click="router.push('/admin/users')"
           >
             <Shield class="h-[18px] w-[18px] stroke-[2.1]" />
             管理后台
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
-            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border-0 bg-[#f1f3f9] px-4 py-3 text-[15px] font-semibold text-[#4d556a] transition duration-200 hover:bg-[#e8ecf7] hover:text-[#2a3142]"
+            class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-[#f1f3f9] !px-4 !py-3 !text-[15px] !font-semibold !text-[#4d556a] !shadow-none !transition !duration-200 hover:!bg-[#e8ecf7] hover:!text-[#2a3142]"
             @click="router.back()"
           >
             <NavArrowLeft class="h-[18px] w-[18px] stroke-[2.4]" />
             返回上级
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
-            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border-0 bg-transparent px-4 py-3 text-[15px] font-semibold text-[#ff3b30] transition duration-200 hover:bg-[rgba(255,59,48,0.05)]"
+            text
+            class="!flex !w-full !justify-start !gap-2.5 !rounded-xl !border-0 !bg-transparent !px-4 !py-3 !text-[15px] !font-semibold !text-[#ff3b30] !shadow-none !transition !duration-200 hover:!bg-[rgba(255,59,48,0.05)]"
             @click="handleLogout"
           >
             <LogOut class="h-[18px] w-[18px] stroke-[2.1]" />
             退出登录
-          </button>
+          </Button>
         </div>
       </aside>
 
@@ -93,15 +96,17 @@
                   {{ userStore.user?.username?.[0]?.toUpperCase() }}
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
-                class="absolute right-[-4px] bottom-[-4px] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[#d9dfec] bg-white/[0.98] text-[#6b7290] transition duration-200 hover:border-[#c8d0e2] hover:bg-[#f8faff] hover:text-[#4a5169] disabled:cursor-not-allowed disabled:opacity-60"
+                text
+                rounded
+                class="!absolute !right-[-4px] !bottom-[-4px] !flex !h-7 !w-7 !min-w-7 !items-center !justify-center !rounded-full !border !border-[#d9dfec] !bg-white/[0.98] !p-0 !text-[#6b7290] !shadow-none !transition !duration-200 hover:!border-[#c8d0e2] hover:!bg-[#f8faff] hover:!text-[#4a5169] disabled:!cursor-not-allowed disabled:!opacity-60"
                 :disabled="avatarUploading"
                 title="更换头像"
                 @click="openAvatarPicker"
               >
                 <Camera class="h-[15px] w-[15px] stroke-[2]" />
-              </button>
+              </Button>
               <input
                 ref="avatarInputRef"
                 class="hidden"
@@ -112,7 +117,9 @@
               />
             </div>
             <div class="min-w-0">
-              <h1 class="m-0 truncate text-[28px] leading-tight font-bold tracking-normal text-[#1d1d1f]">
+              <h1
+                class="m-0 truncate text-[28px] leading-tight font-bold tracking-normal text-[#1d1d1f]"
+              >
                 {{ userStore.user?.username }}
               </h1>
               <p class="mt-1 mb-0 text-[15px] text-[#86868b]">
@@ -134,10 +141,10 @@
         <div class="flex-1">
           <Transition
             mode="out-in"
-            enter-active-class="transition-all duration-300 ease-out"
+            enter-active-class="transition-[opacity,transform] duration-300 ease-out"
             enter-from-class="translate-x-5 opacity-0"
             enter-to-class="translate-x-0 opacity-100"
-            leave-active-class="transition-all duration-300 ease-in"
+            leave-active-class="transition-[opacity,transform] duration-300 ease-in"
             leave-from-class="translate-x-0 opacity-100"
             leave-to-class="-translate-x-5 opacity-0"
           >
@@ -147,13 +154,17 @@
                   <h2 class="m-0 mb-8 text-xl font-semibold text-[#1d1d1f]">个人基本资料</h2>
                   <div class="grid grid-cols-2 gap-8 max-[720px]:grid-cols-1">
                     <div class="min-w-0">
-                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]">用户账号</label>
+                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]"
+                        >用户账号</label
+                      >
                       <div class="truncate text-base font-medium text-[#1d1d1f]">
                         {{ userStore.user?.username }}
                       </div>
                     </div>
                     <div>
-                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]">账号状态</label>
+                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]"
+                        >账号状态</label
+                      >
                       <div>
                         <Tag
                           :value="userStatusLabel"
@@ -164,7 +175,9 @@
                       </div>
                     </div>
                     <div>
-                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]">加入时间</label>
+                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]"
+                        >加入时间</label
+                      >
                       <div class="text-base font-medium text-[#1d1d1f]">
                         {{ formattedJoinedAt }}
                       </div>
@@ -178,7 +191,11 @@
               <Card :pt="profileCardPt">
                 <template #content>
                   <h2 class="m-0 mb-8 text-xl font-semibold text-[#1d1d1f]">账号安全设置</h2>
-                  <form class="flex flex-col gap-8" novalidate @submit.prevent="handleUpdatePassword">
+                  <form
+                    class="flex flex-col gap-8"
+                    novalidate
+                    @submit.prevent="handleUpdatePassword"
+                  >
                     <div class="flex flex-col gap-4">
                       <label :class="passwordFieldClass">
                         <span>当前原密码</span>

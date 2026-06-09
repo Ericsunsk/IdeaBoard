@@ -84,8 +84,8 @@
           <a
             v-bind="itemProps.action"
             :class="[
-              'flex h-8 w-full items-center rounded-lg px-2.5 text-[13px] font-semibold no-underline transition-colors hover:bg-[#eff3fb]',
-              item.key === 'delete' ? 'text-[#c23b42] hover:bg-[#fdeced]' : 'text-[#3f475d]',
+              boardMenuItemClass,
+              item.key === 'delete' ? boardMenuDangerItemClass : boardMenuDefaultItemClass,
             ]"
           >
             {{ item.label }}
@@ -103,6 +103,13 @@ import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import type { CanvasBoardMeta } from '../lib/canvasBoards'
+import {
+  boardMenuDangerItemClass,
+  boardMenuDefaultItemClass,
+  boardMenuItemClass,
+  boardMenuPt,
+  type PrimePopupMenuRef,
+} from '../lib/menuStyles'
 
 type RenameInputRef = HTMLInputElement | { $el?: HTMLInputElement } | null
 
@@ -128,16 +135,8 @@ const emit = defineEmits<{
 }>()
 
 const renameInputEl = ref<RenameInputRef>(null)
-const menuRef = ref<{ toggle: (event: Event) => void; hide: () => void } | null>(null)
-
-const menuPt = {
-  root: {
-    class: '!z-30 !min-w-[118px] !rounded-[10px] !border !border-[#d8ddea] !bg-white !p-0 !shadow-none',
-  },
-  list: { class: '!m-0 !flex !flex-col !gap-0.5 !p-1.5' },
-  itemContent: { class: '!rounded-lg' },
-  itemLink: { class: '!p-0' },
-} as const
+const menuRef = ref<PrimePopupMenuRef | null>(null)
+const menuPt = boardMenuPt
 
 const menuItems = computed<MenuItem[]>(() => [
   {

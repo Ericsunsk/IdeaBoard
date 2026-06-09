@@ -1,0 +1,24 @@
+export const AUTH_USERNAME_LIMIT = {
+  min: 3,
+  max: 50,
+} as const
+
+export const AUTH_PASSWORD_LIMIT = {
+  min: 6,
+  max: 50,
+} as const
+
+export function getRequiredError(value: string, label: string) {
+  return value ? '' : `请输入${label}`
+}
+
+export function getLengthError(
+  value: string,
+  limit: { min: number; max: number },
+  label: string,
+) {
+  if (value.length < limit.min || value.length > limit.max) {
+    return `${label}长度需为 ${limit.min}-${limit.max} 个字符`
+  }
+  return ''
+}

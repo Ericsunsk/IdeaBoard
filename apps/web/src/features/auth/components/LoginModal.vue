@@ -11,15 +11,7 @@
     @update:visible="handleVisibleChange"
   >
     <div
-      v-motion="{
-        initial: { opacity: 0, y: 20, scale: 0.96 },
-        enter: {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          transition: { duration: 260, easing: 'ease-out' },
-        },
-      }"
+      v-motion="authModalMotion"
       :class="authModalShellClass"
     >
       <AuthModalCloseButton :disabled="loading" @click="handleClose" />
@@ -118,11 +110,13 @@ import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
+import { getRequiredError } from './authFormUtils'
 import {
   authDialogPt,
   authFieldClass,
   authFooterClass,
   authInputClass,
+  authModalMotion,
   authModalShellClass,
   authModalSubtitleClass,
   authModalTitleClass,
@@ -144,6 +138,10 @@ type LoginField = 'username' | 'password'
 
 const userStore = useUserStore()
 const appToast = useAppToast()
+const loginFieldLabels: Record<LoginField, string> = {
+  username: '账号',
+  password: '密码',
+}
 
 const loading = ref(false)
 const formValue = ref({
@@ -168,7 +166,7 @@ function resetForm() {
 
 function validateField(field: LoginField) {
   const value = formValue.value[field].trim()
-  errors.value[field] = value ? '' : field === 'username' ? '请输入账号' : '请输入密码'
+  errors.value[field] = getRequiredError(value, loginFieldLabels[field])
   return !errors.value[field]
 }
 

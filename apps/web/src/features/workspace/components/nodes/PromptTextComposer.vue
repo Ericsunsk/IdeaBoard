@@ -2,7 +2,7 @@
   <div
     ref="rootRef"
     class="prompt-text-composer node-tool-surface flex min-w-0 flex-col gap-3"
-    :class="`variant-${variant}`"
+    :class="variantClass"
     @mousedown.stop
     @click.stop
     @contextmenu.stop.prevent
@@ -143,6 +143,13 @@ const emit = defineEmits<{
   (e: 'submit', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
 
+type PromptTextComposerVariant = 'node' | 'floating'
+
+const promptTextComposerVariantClasses: Record<PromptTextComposerVariant, string> = {
+  node: 'variant-node',
+  floating: 'variant-floating',
+}
+
 const rootRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
@@ -176,6 +183,7 @@ const toolPopovers = useNodeToolPopoverGroup({
 const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
 const outputCountPickerVisible = toolPopovers.isOpen('output-count')
 const shouldShowAspectRatioPicker = computed(() => shouldRenderAspectRatio.value)
+const variantClass = computed(() => promptTextComposerVariantClasses[props.variant])
 
 const textarea = useAutoResizeTextarea(inputRef, {
   watchSource: () => props.modelValue,

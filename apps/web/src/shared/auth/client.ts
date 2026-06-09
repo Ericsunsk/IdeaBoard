@@ -10,14 +10,36 @@ export const authClient = createAuthClient({
   },
 })
 
-export function extractBetterAuthErrorMessage(error: any, fallback: string) {
+type ErrorRecord = Record<string, unknown>
+
+function asErrorRecord(value: unknown): ErrorRecord | null {
+  return value && typeof value === 'object' ? (value as ErrorRecord) : null
+}
+
+function getTrimmedString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export function extractBetterAuthErrorMessage(error: unknown, fallback: string) {
   if (!error) return fallback
-  if (typeof error.message === 'string' && error.message.trim()) return error.message
-  if (typeof error.statusText === 'string' && error.statusText.trim()) return error.statusText
-  if (typeof error.error?.message === 'string' && error.error.message.trim())
-    return error.error.message
-  if (typeof error.data?.message === 'string' && error.data.message.trim())
-    return error.data.message
-  if (typeof error.data?.msg === 'string' && error.data.msg.trim()) return error.data.msg
+
+  const root = asErrorRecord(error)
+  const message = getTrimmedString(root?.message)
+  if (message) return message
+
+  const statusText = getTrimmedString(root?.statusText)
+  if (statusText) return statusText
+
+  const nestedError = asErrorRecord(root?.error)
+  const nestedErrorMessage = getTrimmedString(nestedError?.message)
+  if (nestedErrorMessage) return nestedErrorMessage
+
+  const data = asErrorRecord(root?.data)
+  const dataMessage = getTrimmedString(data?.message)
+  if (dataMessage) return dataMessage
+
+  const dataMsg = getTrimmedString(data?.msg)
+  if (dataMsg) return dataMsg
+
   return fallback
 }

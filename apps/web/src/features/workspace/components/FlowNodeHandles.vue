@@ -6,7 +6,7 @@
     type="target"
     :position="Position.Left"
     class="flow-canvas-node__handle-anchor"
-    :style="inputAnchorHandleStyle"
+    :style="leftCenteredHandleStyle"
   />
   <Handle
     v-if="hasInputPorts"
@@ -18,7 +18,7 @@
       'flow-canvas-node__handle-aggregate--input',
       { 'is-visible': props.showHandles },
     ]"
-    :style="inputAggregateHandleStyle"
+    :style="leftCenteredHandleStyle"
   >
     <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
   </Handle>
@@ -32,7 +32,7 @@
       'flow-canvas-node__handle-aggregate--output',
       { 'is-visible': props.showHandles },
     ]"
-    :style="outputAggregateHandleStyle"
+    :style="rightCenteredHandleStyle"
   >
     <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
   </Handle>
@@ -43,7 +43,7 @@
     type="source"
     :position="Position.Right"
     class="flow-canvas-node__handle-anchor"
-    :style="outputAnchorHandleStyle"
+    :style="rightCenteredHandleStyle"
   />
 </template>
 
@@ -92,22 +92,12 @@ const aggregateOutputHandleId = computed(() => {
 })
 const hiddenOutputAnchorPorts = computed(() => handleOutputPorts.value.slice(1))
 
-const inputAnchorHandleStyle = {
+const leftCenteredHandleStyle = {
   left: '0',
   top: '50%',
   transform: 'translateY(-50%)',
 }
-const outputAnchorHandleStyle = {
-  right: '0',
-  top: '50%',
-  transform: 'translateY(-50%)',
-}
-const inputAggregateHandleStyle = {
-  left: '0',
-  top: '50%',
-  transform: 'translateY(-50%)',
-}
-const outputAggregateHandleStyle = {
+const rightCenteredHandleStyle = {
   right: '0',
   top: '50%',
   transform: 'translateY(-50%)',
