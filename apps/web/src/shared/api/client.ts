@@ -9,18 +9,23 @@ export type ApiClientError = Error & {
   data?: unknown
 }
 
-export type ApiRequestConfig = Omit<FetchOptions<'json'>, 'params'>
+export type ApiRequestConfig = Omit<FetchOptions<'json'>, 'baseURL' | 'params'>
 
 function toObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
 }
 
+function getPayloadMessage(payload: unknown, data: Record<string, unknown> | null): string {
+  if (typeof data?.msg === 'string' && data.msg) return data.msg
+  if (typeof data?.message === 'string' && data.message) return data.message
+  if (payload instanceof Error && payload.message) return payload.message
+  if (typeof payload === 'string' && payload.trim()) return payload.trim()
+  return '请求失败'
+}
+
 export function createApiError(payload?: unknown, status?: number): ApiClientError {
   const data = toObject(payload)
-  const message =
-    (typeof data?.msg === 'string' && data.msg) ||
-    (typeof data?.message === 'string' && data.message) ||
-    '请求失败'
+  const message = getPayloadMessage(payload, data)
   const error = new Error(message) as ApiClientError
   error.code = (typeof data?.code === 'number' ? data.code : undefined) ?? status
   error.msg = (typeof data?.msg === 'string' && data.msg) || message

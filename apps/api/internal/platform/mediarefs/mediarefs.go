@@ -146,55 +146,56 @@ func ForEachParamMediaRef(params map[string]interface{}, onRef func(key string, 
 		if !ok {
 			continue
 		}
-		switch values := raw.(type) {
-		case []string:
-			for _, value := range values {
-				if err := onRef(key, value); err != nil {
-					return err
-				}
-			}
-		case []interface{}:
-			for _, item := range values {
-				value, ok := item.(string)
-				if !ok {
-					return fmt.Errorf("%s 必须是字符串数组", key)
-				}
-				if err := onRef(key, value); err != nil {
-					return err
-				}
-			}
-		default:
-			return fmt.Errorf("%s 必须是字符串数组", key)
+		if err := forEachStringList(raw, key, true, func(value string) error {
+			return onRef(key, value)
+		}); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 func CollectStringList(raw interface{}) []string {
+	out := make([]string, 0)
+	_ = forEachStringList(raw, "", false, func(value string) error {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			out = append(out, trimmed)
+		}
+		return nil
+	})
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func forEachStringList(raw interface{}, key string, strict bool, onValue func(string) error) error {
 	switch values := raw.(type) {
 	case []string:
-		out := make([]string, 0, len(values))
 		for _, value := range values {
-			if trimmed := strings.TrimSpace(value); trimmed != "" {
-				out = append(out, trimmed)
+			if err := onValue(value); err != nil {
+				return err
 			}
 		}
-		return out
 	case []interface{}:
-		out := make([]string, 0, len(values))
 		for _, item := range values {
 			value, ok := item.(string)
 			if !ok {
+				if strict {
+					return fmt.Errorf("%s 必须是字符串数组", key)
+				}
 				continue
 			}
-			if trimmed := strings.TrimSpace(value); trimmed != "" {
-				out = append(out, trimmed)
+			if err := onValue(value); err != nil {
+				return err
 			}
 		}
-		return out
 	default:
-		return nil
+		if strict {
+			return fmt.Errorf("%s 必须是字符串数组", key)
+		}
 	}
+	return nil
 }
 
 func CollectUniqueParamRefs(params map[string]interface{}, keys []string) []string {

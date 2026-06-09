@@ -27,6 +27,7 @@ type FileAudit = {
 const webRoot = process.cwd()
 const srcRoot = path.join(webRoot, 'src')
 const targetRoots = [path.join(srcRoot, 'features'), path.join(srcRoot, 'pages')]
+const sourceExtensions = /\.(vue|ts|tsx|js|jsx)$/
 const maxUnusedClassesToPrint = 12
 const runtimeClassPatterns = [
   /^n-/,
@@ -77,6 +78,19 @@ function walkFiles(dir: string): string[] {
     .sort()
 }
 
+function walkSourceFiles(dir: string): string[] {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .flatMap((entry) => {
+      const fullPath = path.join(dir, entry)
+      const stat = statSync(fullPath)
+      if (stat.isDirectory()) return walkSourceFiles(fullPath)
+      if (sourceExtensions.test(entry)) return [fullPath]
+      return []
+    })
+    .sort()
+}
+
 function relativeFile(file: string): string {
   return path.relative(webRoot, file)
 }
@@ -103,8 +117,9 @@ function stripStyleBlocks(source: string): string {
 
 function extractCssClasses(css: string): string[] {
   const classes = new Set<string>()
+  const normalizedCss = stripCssComments(css)
   const selectorPattern = /(^|[,{]\s*)([^{}@]+)\{/g
-  for (const match of css.matchAll(selectorPattern)) {
+  for (const match of normalizedCss.matchAll(selectorPattern)) {
     const selector = match[2] ?? ''
     for (const classMatch of selector.matchAll(/\.([A-Za-z_-][\w-]*)/g)) {
       classes.add(classMatch[1])
@@ -113,18 +128,26 @@ function extractCssClasses(css: string): string[] {
   return [...classes].sort()
 }
 
+function stripCssComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
 function isClassReferenced(className: string, source: string, template: string): boolean {
   if (runtimeClassPatterns.some((pattern) => pattern.test(className))) return true
   const escaped = escapeRegExp(className)
   const classAttrPattern = new RegExp(`\\bclass=["'][^"']*\\b${escaped}\\b`, 'm')
   const dynamicClassPattern = new RegExp(`['"\`]${escaped}['"\`]`, 'm')
   const objectClassPattern = new RegExp(`\\b${escaped}\\b\\s*:`, 'm')
+  const domQueryPattern = new RegExp(
+    `\\b(?:closest|querySelector|querySelectorAll)\\(["']\\.${escaped}\\b`,
+    'm',
+  )
   return (
     classAttrPattern.test(template) ||
     dynamicClassPattern.test(source) ||
     objectClassPattern.test(source) ||
-    source.includes(`.${className}`) ||
-    source.includes(`closest('${className.startsWith('.') ? className : `.${className}`}`)
+    domQueryPattern.test(source) ||
+    source.includes(`.${className}`)
   )
 }
 
@@ -263,8 +286,10 @@ function printFileAudit(audit: FileAudit) {
 const files = targetRoots.flatMap(walkFiles)
 const vueFiles = files.filter((file) => file.endsWith('.vue'))
 const cssFiles = files.filter((file) => file.endsWith('.css'))
-const allVueSource = vueFiles.map((file) => readFileSync(file, 'utf8')).join('\n')
+const allSource = walkSourceFiles(srcRoot)
+  .map((file) => readFileSync(file, 'utf8'))
+  .join('\n')
 const vueAudits = vueFiles.map(auditVue).filter((audit): audit is FileAudit => Boolean(audit))
-const cssAudits = cssFiles.map((file) => auditCss(file, allVueSource))
+const cssAudits = cssFiles.map((file) => auditCss(file, allSource))
 
 printAudit([...vueAudits, ...cssAudits])

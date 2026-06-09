@@ -1126,7 +1126,7 @@ func taskStatModel(task *tasks.Task, fallbackModel string) string {
 	if model := normalizeStatDimension(task.RequestedModel); model != "" {
 		return model
 	}
-	if model := extractTaskModel(task.Result); model != unknownModelName {
+	if model := ExtractTaskModel(task.Result); model != unknownModelName {
 		return model
 	}
 	if fallbackModel = normalizeStatDimension(fallbackModel); fallbackModel != "" {

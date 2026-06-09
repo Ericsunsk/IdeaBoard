@@ -24,12 +24,8 @@ func parseResultMap(raw string) map[string]interface{} {
 	return result
 }
 
-func extractTaskModel(rawResult string) string {
+func ExtractTaskModel(rawResult string) string {
 	return extractTaskModelWithFallback(rawResult, "")
-}
-
-func ExtractTaskModelWithFallback(rawResult string, fallbackModel string) string {
-	return extractTaskModelWithFallback(rawResult, fallbackModel)
 }
 
 func extractTaskModelWithFallback(rawResult string, fallbackModel string) string {

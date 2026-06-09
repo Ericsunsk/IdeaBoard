@@ -26,6 +26,11 @@ export function clearStoredAuth() {
   localStorage.removeItem(USER_KEY)
 }
 
+export function clearStoredAuthState() {
+  clearStoredAuth()
+  clearAuthScopedQueryCache()
+}
+
 function getRedirectBaseUrl(): string {
   if (typeof window === 'undefined') return REDIRECT_BASE_URL
   return window.location.origin || REDIRECT_BASE_URL
@@ -121,11 +126,6 @@ function buildLoginRedirectPath() {
   return loginPath + '?redirect=' + encodeURIComponent(currentPath)
 }
 
-function clearAuthFailureState() {
-  clearStoredAuth()
-  clearAuthScopedQueryCache()
-}
-
 function getPayloadCode(payload: unknown): unknown {
   return payload && typeof payload === 'object' ? (payload as { code?: unknown }).code : undefined
 }
@@ -139,13 +139,13 @@ export function handleAuthFailure(params: {
   const code = getPayloadCode(payload) ?? status
 
   if (code === 403 && isAdminApiRequest(requestUrl) && isAdminPage()) {
-    clearAuthFailureState()
+    clearStoredAuthState()
     window.location.href = '/user/home'
     return true
   }
 
   if (code === 401 && isSessionProbeRequest(requestUrl)) {
-    clearAuthFailureState()
+    clearStoredAuthState()
     return false
   }
 
@@ -153,7 +153,8 @@ export function handleAuthFailure(params: {
     return false
   }
 
-  clearAuthFailureState()
+  clearStoredAuthState()
+  if (typeof window === 'undefined') return false
   window.location.href = buildLoginRedirectPath()
   return true
 }

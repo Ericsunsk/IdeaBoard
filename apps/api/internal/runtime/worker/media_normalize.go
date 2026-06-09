@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"sort"
 	"strings"
 
 	"ideaboard/api/internal/storage"
@@ -168,6 +169,7 @@ func (c *ProviderExecutor) normalizeUpstreamMediaParams(params map[string]interf
 		for key := range unresolvedKeys {
 			keys = append(keys, key)
 		}
+		sort.Strings(keys)
 		slog.Warn("upstream media URLs remain relative; configure APP_PUBLIC_ASSET_BASE_URL", "feature", featureSlug, "keys", strings.Join(keys, ","))
 	}
 }

@@ -84,7 +84,7 @@ jobs:
 
       - name: Install auth dependencies
         working-directory: apps/auth
-        run: npm ci --no-audit --fund=false
+        run: npm ci --omit=optional --no-audit --fund=false
 
       - name: Audit web production dependencies
         working-directory: apps/web
@@ -97,6 +97,10 @@ jobs:
       - name: Test Go API migrations
         working-directory: apps/api
         run: go test ./internal/db/migrations -run TestMigrations -count=1
+
+      - name: Build auth service
+        working-directory: apps/auth
+        run: npm run build
 
       - name: Smoke API then Auth migrations
         shell: bash
@@ -116,7 +120,6 @@ jobs:
           NODE_ENV: production
         run: |
           (cd apps/api && go run ./cmd migrate)
-          (cd apps/auth && npm run build)
           (cd apps/auth && npm run migrate:dist)
           (cd apps/api && go run ./cmd migrate)
           (cd apps/auth && npm run migrate:dist)
@@ -151,10 +154,6 @@ jobs:
           cd apps/web
           npm run build
           tar -czf "../../release/$TAG/${WEB_ARCHIVE}" dist
-
-      - name: Build auth service
-        working-directory: apps/auth
-        run: npm run build
 
       - name: Build api binaries
         shell: bash

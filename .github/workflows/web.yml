@@ -41,7 +41,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/web
-        run: npm ci
+        run: npm ci --no-audit --fund=false
 
       - name: Generate API client
         working-directory: apps/web
@@ -53,6 +53,10 @@ jobs:
       - name: Lint
         working-directory: apps/web
         run: npm run lint
+
+      - name: Lint styles
+        working-directory: apps/web
+        run: npm run lint:style
 
       - name: Test
         working-directory: apps/web

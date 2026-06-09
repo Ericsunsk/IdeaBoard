@@ -6,10 +6,9 @@ import { authClient, extractBetterAuthErrorMessage } from '../../shared/auth/cli
 import {
   getStoredUser,
   setStoredAuth,
-  clearStoredAuth,
+  clearStoredAuthState,
 } from '../../shared/utils/auth'
 import { clearAuthScopedQueryCache } from '../../shared/query/queryClient'
-import type { ErrorType } from '../../shared/api/orvalMutator'
 import { resolveAuthUrl } from '../../shared/config/runtimeUrls'
 
 const SESSION_CACHE_TTL_MS = 30_000
@@ -33,6 +32,14 @@ function getUserIdentity(authUser: User | null): string | null {
   return null
 }
 
+function getErrorStatusCode(error: unknown): number {
+  const errorRecord =
+    error && typeof error === 'object'
+      ? (error as { status?: unknown; code?: unknown })
+      : null
+  return Number(errorRecord?.status ?? errorRecord?.code)
+}
+
 export const useUserStore = defineStore('user', () => {
   const storedUser = getStoredUser()
 
@@ -54,11 +61,10 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function resetAuth() {
-    clearAuthScopedQueryCache()
     user.value = null
     userInfoLoaded.value = false
     sessionValidatedAt.value = 0
-    clearStoredAuth()
+    clearStoredAuthState()
   }
 
   async function login(username: string, password: string) {
@@ -121,8 +127,7 @@ export const useUserStore = defineStore('user', () => {
         return user.value
       }
     } catch (e) {
-      const error = e as Partial<ErrorType<unknown>> & { code?: number }
-      const code = Number(error.status ?? error.code)
+      const code = getErrorStatusCode(e)
       if (code === 401 || code === 403) {
         resetAuth()
         return null
@@ -171,12 +176,8 @@ export const useUserStore = defineStore('user', () => {
     if (!response.ok) {
       let errorMessage = '密码更新失败'
       try {
-        const payload = await response.json()
-        errorMessage =
-          extractBetterAuthErrorMessage(payload, errorMessage) ||
-          payload?.message ||
-          payload?.msg ||
-          errorMessage
+        const payload: unknown = await response.json()
+        errorMessage = extractBetterAuthErrorMessage(payload, errorMessage)
       } catch {
         // keep fallback error message
       }

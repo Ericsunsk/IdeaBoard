@@ -19,11 +19,12 @@ type SmokePage = {
 
 const WEB_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const HOST = process.env.ADMIN_MOCK_SMOKE_HOST || '127.0.0.1'
-const PREFERRED_PORT = Number(process.env.ADMIN_MOCK_SMOKE_PORT || 5173)
+const PREFERRED_PORT = readPortEnv(process.env.ADMIN_MOCK_SMOKE_PORT, 5173)
 const SESSION_NAME = `ams${process.pid}`
 const ADMIN_API_RE = /\/api\/admin(?:[/?#]|$)/
 const DEV_SERVER_TIMEOUT_MS = 45_000
 const COMMAND_BUFFER_SIZE = 1024 * 1024 * 20
+const IS_VERBOSE = /^(1|true|yes)$/i.test(process.env.ADMIN_MOCK_SMOKE_VERBOSE || '')
 
 const AUTH_SESSION = {
   session: { id: 'admin-mock-smoke-session' },
@@ -54,6 +55,13 @@ let devServer: ChildProcessWithoutNullStreams | null = null
 let smokePort = PREFERRED_PORT
 let baseUrl = `http://${HOST}:${smokePort}`
 const devServerLogs: string[] = []
+
+function readPortEnv(rawValue: string | undefined, fallback: number): number {
+  if (!rawValue) return fallback
+  const port = Number(rawValue)
+  if (Number.isInteger(port) && port > 0 && port <= 65_535) return port
+  throw new Error(`Invalid ADMIN_MOCK_SMOKE_PORT: ${rawValue}`)
+}
 
 function recordDevServerOutput(chunk: Buffer, streamName: 'stdout' | 'stderr') {
   const lines = chunk
@@ -119,7 +127,8 @@ async function resolveSmokePort(): Promise<number> {
 }
 
 function runCommand(spec: CommandSpec, args: string[], options: { allowFailure?: boolean } = {}) {
-  const result = spawnSync(spec.command, [...spec.args, '--session', SESSION_NAME, ...args], {
+  const fullArgs = [...spec.args, '--session', SESSION_NAME, ...args]
+  const result = spawnSync(spec.command, fullArgs, {
     cwd: WEB_ROOT,
     encoding: 'utf8',
     env: process.env,
@@ -135,7 +144,7 @@ function runCommand(spec: CommandSpec, args: string[], options: { allowFailure?:
   if (result.status !== 0 && !options.allowFailure) {
     throw new Error(
       [
-        `Command failed: ${spec.command} ${[...spec.args, ...args].join(' ')}`,
+        `Command failed: ${spec.command} ${fullArgs.join(' ')}`,
         stdout.trim(),
         stderr.trim(),
       ]
@@ -253,7 +262,9 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
   const requestsOutput = runCommand(playwrightCli, ['requests']).stdout
   assertNoAdminApiRequests(requestsOutput, page)
 
-  console.log(`ok ${page.path}`)
+  if (IS_VERBOSE) {
+    console.log(`ok ${page.path}`)
+  }
 }
 
 async function stopDevServer() {
@@ -265,6 +276,10 @@ async function stopDevServer() {
   ])
   if (devServer.exitCode == null) {
     devServer.kill('SIGTERM')
+    await Promise.race([
+      new Promise<void>((resolve) => devServer?.once('exit', () => resolve())),
+      delay(1000),
+    ])
   }
 }
 

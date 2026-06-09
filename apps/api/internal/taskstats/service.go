@@ -90,34 +90,22 @@ func normalizeStatisticsRange(raw string) (StatisticsRange, int, error) {
 }
 
 func (s *Service) GetTaskStats(ctx context.Context) (map[string]int64, error) {
-	pending, err := s.store.CountByStatus(ctx, tasks.StatusPending)
-	if err != nil {
-		return nil, err
+	statuses := []string{
+		tasks.StatusPending,
+		tasks.StatusRunning,
+		tasks.StatusCompleted,
+		tasks.StatusFailed,
+		tasks.StatusCancelled,
 	}
-	running, err := s.store.CountByStatus(ctx, tasks.StatusRunning)
-	if err != nil {
-		return nil, err
+	stats := make(map[string]int64, len(statuses))
+	for _, status := range statuses {
+		count, err := s.store.CountByStatus(ctx, status)
+		if err != nil {
+			return nil, fmt.Errorf("count tasks by status %s: %w", status, err)
+		}
+		stats[status] = count
 	}
-	completed, err := s.store.CountByStatus(ctx, tasks.StatusCompleted)
-	if err != nil {
-		return nil, err
-	}
-	failed, err := s.store.CountByStatus(ctx, tasks.StatusFailed)
-	if err != nil {
-		return nil, err
-	}
-	cancelled, err := s.store.CountByStatus(ctx, tasks.StatusCancelled)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]int64{
-		tasks.StatusPending:   pending,
-		tasks.StatusRunning:   running,
-		tasks.StatusCompleted: completed,
-		tasks.StatusFailed:    failed,
-		tasks.StatusCancelled: cancelled,
-	}, nil
+	return stats, nil
 }
 
 type executionPressureBucket struct {
@@ -491,7 +479,7 @@ func statisticLiteModel(row taskstore.TaskStatisticLite) string {
 	if model := strings.TrimSpace(row.RequestedModel); model != "" {
 		return model
 	}
-	return taskstore.ExtractTaskModelWithFallback(row.Result, "")
+	return taskstore.ExtractTaskModel(row.Result)
 }
 
 func buildTrendItems(orderedKeys []string, buckets map[string]*statisticsTrendBucket) []AdminStatisticsTrendItem {
