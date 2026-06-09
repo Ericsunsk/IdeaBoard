@@ -1,30 +1,34 @@
 <template>
-  <div class="user-layout">
-    <div v-if="isImpersonating" class="impersonation-banner">
-      <div class="impersonation-copy">
-        <span class="impersonation-icon-wrap">
-          <n-icon size="14">
-            <Shield />
-          </n-icon>
+  <div class="flex h-screen w-full flex-col overflow-hidden">
+    <div
+      v-if="isImpersonating"
+      class="fixed left-1/2 top-2.5 z-[1200] flex min-h-10 w-max max-w-[calc(100vw-20px)] -translate-x-1/2 items-center justify-between gap-2.5 rounded-[14px] border border-[#7a6bd5]/25 bg-[#f6f7ff]/90 px-2.5 py-1.5 text-[#2f3750] backdrop-blur-[10px] max-[720px]:top-2 max-[720px]:max-w-[calc(100vw-12px)] max-[720px]:rounded-xl max-[720px]:px-2 max-[720px]:py-1"
+    >
+      <div class="inline-flex min-w-0 items-center gap-2">
+        <span
+          class="inline-flex size-[22px] shrink-0 items-center justify-center rounded-[7px] bg-[#7a6bd5]/15 text-[#5d4ec3]"
+        >
+          <Shield class="size-3.5" />
         </span>
-        <span class="impersonation-title">伪装预览中</span>
+        <span class="whitespace-nowrap text-xs font-semibold text-[#2f3750]">伪装预览中</span>
       </div>
-      <n-button
-        size="small"
-        circle
-        quaternary
-        class="impersonation-exit"
+      <Button
+        type="button"
+        rounded
+        text
+        class="!size-[26px] !min-w-[26px] !shrink-0 !border !border-[#7a6bd5]/35 !bg-[#7a6bd5]/5 !p-0 !text-[#5d4ec3] !shadow-none hover:!border-[#7a6bd5]/50 hover:!bg-[#7a6bd5]/10 hover:!text-[#5244b4] active:!border-[#7a6bd5]/55 active:!bg-[#7a6bd5]/15 active:!text-[#4a3ca7] disabled:!cursor-wait disabled:!opacity-70 max-[720px]:!size-6 max-[720px]:!min-w-6"
+        aria-label="退出伪装身份"
+        :aria-busy="stopImpersonatingLoading"
+        :disabled="stopImpersonatingLoading"
         :loading="stopImpersonatingLoading"
         @click="handleStopImpersonating"
       >
         <template #icon>
-          <n-icon>
-            <Xmark />
-          </n-icon>
+          <Xmark class="size-3.5 max-[720px]:size-[13px]" aria-hidden="true" />
         </template>
-      </n-button>
+      </Button>
     </div>
-    <div class="layout-content">
+    <div class="min-h-0 flex-1 overflow-hidden bg-transparent">
       <router-view :key="route.path === '/user/picture' ? route.path : route.fullPath" />
     </div>
 
@@ -34,6 +38,7 @@
 
 <script setup lang="ts">
 import { Shield, Xmark } from '@iconoir/vue'
+import Button from 'primevue/button'
 import { useUserStore } from '../../../app/stores/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
 import { useAppToast } from '../../../shared/composables/useAppToast'
@@ -71,115 +76,3 @@ async function handleStopImpersonating() {
   }
 }
 </script>
-
-<style scoped>
-.user-layout {
-  width: 100%;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.impersonation-banner {
-  min-height: 40px;
-  padding: 6px 10px;
-  background: rgba(246, 247, 255, 0.92);
-  border: 1px solid rgba(122, 107, 213, 0.24);
-  border-radius: 14px;
-  color: #2f3750;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: max-content;
-  max-width: calc(100vw - 20px);
-  box-shadow: none;
-  backdrop-filter: blur(10px);
-  z-index: 1200;
-}
-
-.impersonation-copy {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.impersonation-icon-wrap {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  background: rgba(122, 107, 213, 0.15);
-  color: #5d4ec3;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.impersonation-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #2f3750;
-  white-space: nowrap;
-}
-
-.impersonation-exit {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  min-height: 26px;
-  border-radius: 999px;
-  --n-border: 1px solid rgba(122, 107, 213, 0.34);
-  --n-border-hover: 1px solid rgba(122, 107, 213, 0.48);
-  --n-border-pressed: 1px solid rgba(122, 107, 213, 0.56);
-  --n-color: rgba(122, 107, 213, 0.04);
-  --n-color-hover: rgba(122, 107, 213, 0.1);
-  --n-color-pressed: rgba(122, 107, 213, 0.14);
-  --n-padding: 0;
-  --n-icon-size: 14px;
-  --n-ripple-color: transparent;
-}
-
-:deep(.impersonation-exit.n-button) {
-  color: #5d4ec3 !important;
-  --n-text-color: #5d4ec3 !important;
-  --n-text-color-hover: #5244b4 !important;
-  --n-text-color-pressed: #4a3ca7 !important;
-}
-
-:deep(.impersonation-exit .n-button__content),
-:deep(.impersonation-exit .n-button__icon),
-:deep(.impersonation-exit .n-icon) {
-  color: inherit !important;
-}
-
-@media (max-width: 720px) {
-  .impersonation-banner {
-    top: 8px;
-    max-width: calc(100vw - 12px);
-    border-radius: 12px;
-    padding: 5px 8px;
-  }
-  .impersonation-exit {
-    width: 24px;
-    height: 24px;
-    min-width: 24px;
-    min-height: 24px;
-    --n-icon-size: 13px;
-  }
-}
-
-.layout-content {
-  flex: 1;
-  min-height: 0;
-  background: transparent;
-  overflow: hidden;
-}
-</style>

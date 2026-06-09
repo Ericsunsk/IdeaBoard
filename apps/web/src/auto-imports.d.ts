@@ -58,10 +58,8 @@ declare global {
   const useAttrs: typeof import('vue').useAttrs
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
-  const useDialog: typeof import('naive-ui').useDialog
   const useId: typeof import('vue').useId
   const useLink: typeof import('vue-router').useLink
-  const useMessage: typeof import('naive-ui').useMessage
   const useModel: typeof import('vue').useModel
   const useMutation: typeof import('@tanstack/vue-query').useMutation
   const useQuery: typeof import('@tanstack/vue-query').useQuery
@@ -139,10 +137,8 @@ declare module 'vue' {
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>
     readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
-    readonly useDialog: UnwrapRef<typeof import('naive-ui')['useDialog']>
     readonly useId: UnwrapRef<typeof import('vue')['useId']>
     readonly useLink: UnwrapRef<typeof import('vue-router')['useLink']>
-    readonly useMessage: UnwrapRef<typeof import('naive-ui')['useMessage']>
     readonly useModel: UnwrapRef<typeof import('vue')['useModel']>
     readonly useMutation: UnwrapRef<typeof import('@tanstack/vue-query')['useMutation']>
     readonly useQuery: UnwrapRef<typeof import('@tanstack/vue-query')['useQuery']>

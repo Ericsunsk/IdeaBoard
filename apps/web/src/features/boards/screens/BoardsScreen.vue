@@ -1,64 +1,94 @@
 <template>
-  <div class="boards-page">
-    <div class="boards-bg"></div>
+  <div :class="pageClass">
+    <div :class="pageBackgroundClass"></div>
 
-    <header class="boards-header">
-      <div class="brand">
-        <span class="brand-name">IdeaBoard</span>
+    <header :class="headerClass">
+      <div :class="brandClass">
+        <span :class="brandNameClass">IdeaBoard</span>
       </div>
-      <div class="user-menu-wrap" @pointerdown.stop @mousedown.stop @click.stop>
-        <button class="user-avatar-wrap" type="button" title="账户菜单" @click="toggleUserMenu">
-          <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="user-avatar" />
-          <div v-else class="user-avatar-placeholder">
-            <User class="boards-icon boards-icon-avatar" />
-          </div>
-        </button>
-        <div
-          v-if="isUserMenuOpen"
-          v-motion="{
-            initial: { opacity: 0, y: 6, scale: 0.98 },
-            enter: {
-              opacity: 1,
-              y: 0,
-              scale: 1,
-              transition: { duration: 160, easing: 'ease-out' },
-            },
-          }"
-          class="user-menu"
+      <div :class="userMenuWrapClass" @pointerdown.stop @mousedown.stop @click.stop>
+        <Button
+          unstyled
+          type="button"
+          title="账户菜单"
+          aria-haspopup="menu"
+          :aria-expanded="isUserMenuOpen"
+          :class="userAvatarButtonClass"
+          @click="toggleUserMenu"
         >
-          <button class="user-menu-item" type="button" @click="openCenter">个人中心</button>
-          <button class="user-menu-item" type="button" @click="goHome">返回首页</button>
-          <button class="user-menu-item danger" type="button" @click="logout">退出登录</button>
-        </div>
+          <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :class="userAvatarClass" />
+          <div v-else :class="userAvatarPlaceholderClass">
+            <User :class="avatarIconClass" />
+          </div>
+        </Button>
+        <Menu
+          ref="userMenuRef"
+          :model="userMenuItems"
+          popup
+          append-to="self"
+          :pt="userMenuPt"
+          @show="handleUserMenuShow"
+          @hide="handleUserMenuHide"
+        >
+          <template #item="{ item, props }">
+            <a
+              v-bind="props.action"
+              :class="[userMenuItemClass, item.key === 'logout' ? userMenuDangerItemClass : '']"
+            >
+              <span>{{ item.label }}</span>
+            </a>
+          </template>
+        </Menu>
       </div>
     </header>
 
-    <main class="boards-main">
-      <h1 class="page-title">Welcome to IdeaBoard!</h1>
-      <p class="page-subtitle">Explore, expand, and refine your ideas</p>
+    <main :class="mainClass">
+      <h1 :class="pageTitleClass">Welcome to IdeaBoard!</h1>
+      <p :class="pageSubtitleClass">Explore, expand, and refine your ideas</p>
 
-      <section class="boards-toolbar">
-        <button class="create-btn" type="button" @click="createAndOpenBoard">+ New Canvas</button>
-        <label class="search-wrap">
-          <Search class="search-icon boards-icon" />
-          <input v-model.trim="searchKeyword" type="text" placeholder="Search canvases..." />
+      <section :class="toolbarClass">
+        <Button
+          type="button"
+          label="New Canvas"
+          :class="createButtonClass"
+          @click="createAndOpenBoard"
+        />
+        <label :class="searchWrapClass">
+          <Search :class="searchIconClass" />
+          <InputText
+            :model-value="searchKeyword"
+            unstyled
+            type="text"
+            placeholder="Search canvases..."
+            :class="searchInputClass"
+            @update:model-value="onSearchInput"
+          />
         </label>
-        <select v-model="sortMode" class="sort-select">
-          <option value="recent">Recent</option>
-          <option value="name">Name</option>
-        </select>
+        <Select
+          v-model="sortMode"
+          :options="sortOptions"
+          option-label="label"
+          option-value="value"
+          :class="sortSelectClass"
+          :pt="sortSelectPt"
+          aria-label="Sort canvases"
+        />
       </section>
 
-      <section class="boards-grid">
-        <button class="board-card board-create-card" type="button" @click="createAndOpenBoard">
-          <div class="create-preview">
-            <div class="create-preview-icon">+</div>
+      <section v-if="isBoardsLoading" :class="loadingStateClass" aria-live="polite">
+        <ProgressSpinner class="!h-9 !w-9 text-[#7a6bd5]" stroke-width="4" />
+      </section>
+
+      <section v-else :class="boardsGridClass">
+        <Button unstyled type="button" :class="createCardClass" @click="createAndOpenBoard">
+          <div :class="createPreviewClass">
+            <div :class="createPreviewIconClass">+</div>
           </div>
-          <div class="board-meta board-create-meta">
-            <div class="board-title">Create New Canvas</div>
-            <div class="board-date">Start from an empty board</div>
+          <div :class="createMetaClass">
+            <div :class="createTitleClass">Create New Canvas</div>
+            <div :class="createDateClass">Start from an empty board</div>
           </div>
-        </button>
+        </Button>
 
         <BoardCard
           v-for="board in visibleBoards"
@@ -77,10 +107,13 @@
           @rename-input="onRenameInput"
           @commit-rename="commitRename"
           @cancel-rename="cancelRename"
+          @menu-hidden="handleBoardMenuHidden(board.id)"
         />
       </section>
 
-      <p v-if="visibleBoards.length === 0 && searchKeyword" class="empty-tip">No matching canvas</p>
+      <p v-if="!isBoardsLoading && visibleBoards.length === 0 && searchKeyword" :class="emptyTipClass">
+        No matching canvas
+      </p>
     </main>
   </div>
 </template>
@@ -114,6 +147,17 @@ import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useUserStore } from '../../../app/stores/user'
 import { Search, User } from '@iconoir/vue'
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
+import ProgressSpinner from 'primevue/progressspinner'
+import Select from 'primevue/select'
+import type { MenuItem } from 'primevue/menuitem'
+
+type PrimePopupMenu = {
+  toggle: (event: Event) => void
+  hide: () => void
+}
 
 const router = useRouter()
 const appToast = useAppToast()
@@ -121,6 +165,7 @@ const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
 
 const boards = ref<CanvasBoardMeta[]>([])
+const isBoardsLoading = ref(true)
 const searchKeyword = ref('')
 const sortMode = ref<'recent' | 'name'>('recent')
 const renamingBoardId = ref<string | null>(null)
@@ -128,11 +173,102 @@ const renameDraft = ref('')
 const suppressNextBoardOpen = ref(false)
 const activeMenuBoardId = ref<string | null>(null)
 const isUserMenuOpen = ref(false)
+const userMenuRef = ref<PrimePopupMenu | null>(null)
 
 const boardPreviewMap = ref<Record<string, string>>({})
 const previewRefreshQueue: string[] = []
 const queuedPreviewBoardIds = new Set<string>()
 let previewRefreshInFlight = false
+
+const sortOptions = [
+  { label: 'Recent', value: 'recent' },
+  { label: 'Name', value: 'name' },
+]
+
+const pageClass =
+  'relative h-full w-full overflow-y-auto overflow-x-hidden bg-[#f8f9fd] px-7 pt-4 pb-16 text-[#1f2430] [box-sizing:border-box] [-webkit-overflow-scrolling:touch] [scrollbar-color:#c8d0e4_transparent] [scrollbar-width:thin] max-[860px]:px-3.5 max-[860px]:pt-3.5 max-[860px]:pb-10'
+const pageBackgroundClass =
+  'pointer-events-none fixed inset-0 bg-[radial-gradient(55%_35%_at_45%_45%,rgba(150,120,230,0.24)_0%,rgba(150,120,230,0)_100%),radial-gradient(circle,#e2e4e8_1.5px,transparent_1.5px)] [background-position:center_center,center_center] [background-size:100%_100%,24px_24px]'
+const headerClass = 'relative z-[1] flex items-center justify-between'
+const brandClass = 'inline-flex items-center gap-2'
+const brandNameClass = 'text-[32px] font-bold tracking-normal'
+const userMenuWrapClass = 'relative'
+const userAvatarButtonClass =
+  'flex size-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-[#e2e4e8] bg-white p-0 text-[var(--ib-control-icon)] transition-colors duration-200 hover:border-[#d8ddea] hover:bg-[var(--ib-control-bg-hover)] hover:text-[var(--ib-control-icon-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(122,107,213,0.16)]'
+const userAvatarClass = 'h-full w-full object-cover'
+const userAvatarPlaceholderClass = 'flex h-full w-full items-center justify-center'
+const avatarIconClass = 'size-5 stroke-2'
+const userMenuItemClass =
+  'flex w-full items-center rounded-lg px-2.5 py-2 text-[13px] font-semibold text-[#4b5565] no-underline transition-colors hover:bg-[rgba(146,120,230,0.12)]'
+const userMenuDangerItemClass = '!text-[#d14343] hover:!bg-[rgba(209,67,67,0.1)]'
+const mainClass = 'relative z-[1] mx-auto mt-[46px] max-w-[1080px]'
+const pageTitleClass =
+  'm-0 text-center text-[62px] leading-[1.05] font-bold tracking-normal max-[860px]:text-[40px]'
+const pageSubtitleClass =
+  'mt-4 mb-[34px] text-center text-[19px] tracking-normal text-[#6e7487] max-[860px]:text-[15px]'
+const toolbarClass =
+  'mb-6 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 max-[860px]:grid-cols-1'
+const createButtonClass =
+  '!h-[42px] !rounded-full !border-0 !bg-[#7a6bd5] !px-5 !text-sm !font-bold !tracking-normal !text-white !shadow-none hover:!bg-[#6d5fd0] focus-visible:!shadow-[0_0_0_3px_rgba(122,107,213,0.18)] max-[860px]:!w-full'
+const searchWrapClass =
+  'flex h-[42px] min-w-0 items-center gap-2 rounded-full border border-[#d9dfec] bg-white/90 px-3'
+const searchIconClass = 'size-3.5 shrink-0 text-[#8a90a3] stroke-2'
+const searchInputClass = 'min-w-0 flex-1 bg-transparent text-[13px] text-[#2f3446] outline-none'
+const sortSelectClass =
+  '!h-[42px] !min-w-[120px] !rounded-full !border-[#d9dfec] !bg-white/90 !text-[13px] !font-semibold !text-[#3e4457] !shadow-none max-[860px]:!w-full'
+const boardsGridClass = 'grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3.5'
+const loadingStateClass =
+  'flex min-h-[244px] items-center justify-center rounded-xl border border-dashed border-[#d9dfec] bg-white/60'
+const createCardClass =
+  'relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-[#d9dfec] bg-white/90 p-0 text-left transition-colors hover:border-[#cdd4e6] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(122,107,213,0.16)]'
+const createPreviewClass =
+  'flex h-[186px] items-center justify-center border-b border-[#e7ebf3] bg-[radial-gradient(circle,#dfe4ef_1px,transparent_1px),linear-gradient(#fbfcff,#fbfcff)] [background-size:10px_10px,cover]'
+const createPreviewIconClass =
+  'flex size-[54px] items-center justify-center rounded-[14px] border border-[#cfd7ea] bg-white text-[28px] font-medium text-[#69708a]'
+const createMetaClass = 'px-3 pt-2.5 pb-3'
+const createTitleClass = 'text-sm font-bold text-[#394054]'
+const createDateClass = 'mt-[3px] text-xs text-[#7b8297]'
+const emptyTipClass = 'mt-[18px] text-[13px] text-[#7b8297]'
+const userMenuPt = {
+  root: {
+    class:
+      '!z-40 !w-32 !rounded-[10px] !border !border-[#d8ddea] !bg-white/98 !p-0 !shadow-none backdrop-blur-[10px]',
+  },
+  list: { class: '!m-0 !flex !flex-col !gap-0.5 !p-1.5' },
+  itemContent: { class: '!rounded-lg' },
+  itemLink: { class: '!p-0' },
+} as const
+const sortSelectPt = {
+  label: { class: '!py-0 !pl-3.5 !pr-1 !leading-[40px]' },
+  dropdown: { class: '!w-9' },
+  overlay: { class: '!rounded-xl !border !border-[#d8ddea] !bg-white !shadow-[0_18px_42px_rgba(45,64,89,0.14)]' },
+  list: { class: '!p-1.5' },
+  option: { class: '!rounded-lg !px-3 !py-2 !text-[13px] !font-semibold' },
+} as const
+
+const userMenuItems = computed<MenuItem[]>(() => [
+  {
+    key: 'center',
+    label: '个人中心',
+    command: () => {
+      void openCenter()
+    },
+  },
+  {
+    key: 'home',
+    label: '返回首页',
+    command: () => {
+      void goHome()
+    },
+  },
+  {
+    key: 'logout',
+    label: '退出登录',
+    command: () => {
+      void logout()
+    },
+  },
+])
 
 const visibleBoards = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
@@ -159,6 +295,10 @@ function formatDate(ts: number): string {
     month: '2-digit',
     day: '2-digit',
   }).format(new Date(ts))
+}
+
+function onSearchInput(value: string | undefined) {
+  searchKeyword.value = (value || '').trim()
 }
 
 function refreshBoardPreviews() {
@@ -352,6 +492,12 @@ function toggleBoardMenu(boardId: string) {
   activeMenuBoardId.value = boardId
 }
 
+function handleBoardMenuHidden(boardId: string) {
+  if (activeMenuBoardId.value === boardId) {
+    activeMenuBoardId.value = null
+  }
+}
+
 function handleRenameAction(board: CanvasBoardMeta) {
   startRename(board)
 }
@@ -406,25 +552,21 @@ async function handleDeleteAction(board: CanvasBoardMeta) {
   appToast.success('已删除画布')
 }
 
-function handleWindowMouseDown(e: MouseEvent) {
-  const target = e.target as HTMLElement | null
-  if (
-    target?.closest('.board-menu-btn') ||
-    target?.closest('.board-action-menu') ||
-    target?.closest('.user-menu-wrap')
-  ) {
-    return
-  }
-  activeMenuBoardId.value = null
+function handleUserMenuShow() {
+  isUserMenuOpen.value = true
+}
+
+function handleUserMenuHide() {
   isUserMenuOpen.value = false
 }
 
 function closeUserMenu() {
   isUserMenuOpen.value = false
+  userMenuRef.value?.hide()
 }
 
-function toggleUserMenu() {
-  isUserMenuOpen.value = !isUserMenuOpen.value
+function toggleUserMenu(event: Event) {
+  userMenuRef.value?.toggle(event)
 }
 
 function openCenter() {
@@ -443,364 +585,11 @@ async function logout() {
 }
 
 onMounted(async () => {
-  await hydrateCanvasBoardsFromServer()
-  reloadBoards()
-  window.addEventListener('mousedown', handleWindowMouseDown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('mousedown', handleWindowMouseDown)
+  try {
+    await hydrateCanvasBoardsFromServer()
+    reloadBoards()
+  } finally {
+    isBoardsLoading.value = false
+  }
 })
 </script>
-
-<style scoped>
-.boards-page {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  padding: 16px 28px 64px;
-  box-sizing: border-box;
-  background: #f8f9fd;
-  color: #1f2430;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: #c8d0e4 transparent;
-}
-
-.boards-page::-webkit-scrollbar {
-  width: 10px;
-}
-
-.boards-page::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.boards-page::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background: rgba(116, 126, 154, 0.38);
-  background-clip: padding-box;
-}
-
-.boards-page::-webkit-scrollbar-thumb:hover {
-  background: rgba(116, 126, 154, 0.58);
-  background-clip: padding-box;
-}
-
-.boards-page::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.boards-bg {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(55% 35% at 45% 45%, rgba(150, 120, 230, 0.24) 0%, rgba(150, 120, 230, 0) 100%),
-    radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size:
-    100% 100%,
-    24px 24px;
-  background-position:
-    center center,
-    center center;
-}
-
-.boards-header {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.brand-name {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.user-menu-wrap {
-  position: relative;
-}
-
-.user-avatar-wrap {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid #e2e4e8;
-  border-radius: 50%;
-  background: #ffffff;
-  color: var(--ib-control-icon);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
-}
-
-.user-avatar-wrap:hover {
-  border-color: #d8ddea;
-  background: var(--ib-control-bg-hover);
-  color: var(--ib-control-icon-hover);
-}
-
-.user-avatar,
-.user-avatar-placeholder {
-  width: 100%;
-  height: 100%;
-}
-
-.user-avatar {
-  object-fit: cover;
-}
-
-.user-avatar-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.user-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 40;
-  width: 128px;
-  padding: 6px;
-  border: 1px solid #d8ddea;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(10px);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.user-menu-item {
-  width: 100%;
-  height: 34px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #4b5565;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-  transition: background-color 0.18s ease;
-}
-
-.user-menu-item:hover {
-  background: rgba(146, 120, 230, 0.12);
-}
-
-.user-menu-item.danger {
-  color: #d14343;
-}
-
-.user-menu-item.danger:hover {
-  background: rgba(209, 67, 67, 0.1);
-}
-
-.boards-main {
-  position: relative;
-  z-index: 1;
-  max-width: 1080px;
-  margin: 46px auto 0;
-}
-
-.page-title {
-  margin: 0;
-  text-align: center;
-  font-size: 62px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-}
-
-.page-subtitle {
-  margin: 16px 0 34px;
-  text-align: center;
-  color: #6e7487;
-  font-size: 19px;
-  letter-spacing: 0.01em;
-}
-
-.boards-toolbar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 14px;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.create-btn {
-  height: 42px;
-  border: none;
-  border-radius: 999px;
-  padding: 0 20px;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  background: #7a6bd5;
-  color: #fff;
-  cursor: pointer;
-}
-
-.create-btn:hover {
-  background: #6d5fd0;
-}
-
-.search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 42px;
-  border-radius: 999px;
-  border: 1px solid #d9dfec;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0 12px;
-}
-.boards-icon {
-  stroke-width: 2;
-}
-.boards-icon-avatar {
-  width: 20px;
-  height: 20px;
-}
-
-.search-icon {
-  width: 14px;
-  height: 14px;
-  color: #8a90a3;
-}
-
-.search-wrap input {
-  width: 100%;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 13px;
-  color: #2f3446;
-}
-
-.sort-select {
-  height: 42px;
-  border-radius: 999px;
-  border: 1px solid #d9dfec;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #3e4457;
-}
-
-.boards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
-}
-
-.board-card {
-  border: 1px solid #d9dfec;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  overflow: hidden;
-  height: 244px;
-  text-align: left;
-}
-
-.board-create-card {
-  padding: 0;
-  cursor: pointer;
-}
-
-.create-preview {
-  height: 186px;
-  background: radial-gradient(circle, #dfe4ef 1px, transparent 1px), #fbfcff;
-  background-size:
-    10px 10px,
-    cover;
-  border-bottom: 1px solid #e7ebf3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.create-preview-icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
-  border: 1px solid #cfd7ea;
-  background: #ffffff;
-  color: #69708a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  font-weight: 500;
-}
-
-.board-create-meta .board-title {
-  color: #394054;
-}
-
-.board-meta {
-  padding: 10px 12px 12px;
-}
-
-.board-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #2b3142;
-}
-
-.board-date {
-  margin-top: 3px;
-  font-size: 12px;
-  color: #7b8297;
-}
-
-.empty-tip {
-  margin-top: 18px;
-  font-size: 13px;
-  color: #7b8297;
-}
-
-@media (max-width: 860px) {
-  .boards-page {
-    padding: 14px 14px 40px;
-  }
-
-  .page-title {
-    font-size: 40px;
-  }
-
-  .page-subtitle {
-    font-size: 15px;
-  }
-
-  .boards-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .create-btn,
-  .sort-select {
-    width: 100%;
-  }
-}
-</style>

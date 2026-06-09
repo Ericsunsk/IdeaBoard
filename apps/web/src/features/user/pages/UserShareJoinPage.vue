@@ -1,14 +1,27 @@
 <template>
-  <div class="share-page">
-    <div class="share-card">
-      <h1>正在加入共享画布</h1>
-      <p>{{ statusText }}</p>
-      <button v-if="failed" type="button" class="share-btn" @click="goBoards">返回画布列表</button>
-    </div>
+  <div class="grid min-h-screen place-items-center bg-[#f7f8fb] p-6">
+    <Card class="w-[min(520px,100%)] rounded-2xl border border-[#e7e9ef] bg-white shadow-[0_12px_24px_rgba(18,30,54,0.08)]">
+      <template #content>
+        <div class="flex flex-col items-start gap-4">
+          <ProgressSpinner
+            v-if="loading"
+            class="!h-8 !w-8"
+            stroke-width="4"
+            aria-label="正在加入共享画布"
+          />
+          <h1 class="m-0 text-[22px] font-bold text-[#1f2a44]">{{ titleText }}</h1>
+          <p class="m-0 text-[15px] leading-7 text-[#5b667f]">{{ statusText }}</p>
+          <Button v-if="failed" label="返回画布列表" severity="secondary" @click="goBoards" />
+        </div>
+      </template>
+    </Card>
   </div>
 </template>
 
 <script setup lang="ts">
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import ProgressSpinner from 'primevue/progressspinner'
 import boardApi from '../../../shared/api/board'
 import { hydrateCanvasBoardsFromServer } from '../../boards/lib/boardSync'
 
@@ -18,6 +31,12 @@ const router = useRouter()
 const loading = ref(true)
 const failed = ref(false)
 const errorMessage = ref('')
+
+const titleText = computed(() => {
+  if (loading.value) return '正在加入共享画布'
+  if (failed.value) return '加入共享画布失败'
+  return '加入共享画布成功'
+})
 
 const statusText = computed(() => {
   if (loading.value) return '请稍候，系统正在校验分享令牌并同步画布...'
@@ -63,58 +82,11 @@ async function joinSharedBoard() {
 onMounted(async () => {
   try {
     await joinSharedBoard()
-  } catch (error: any) {
+  } catch (error: unknown) {
     failed.value = true
-    errorMessage.value = String(error?.message || '加入画布失败，请稍后再试')
+    errorMessage.value = error instanceof Error ? error.message : '加入画布失败，请稍后再试'
   } finally {
     loading.value = false
   }
 })
 </script>
-
-<style scoped>
-.share-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: #f7f8fb;
-}
-
-.share-card {
-  width: min(520px, 100%);
-  background: #fff;
-  border: 1px solid #e7e9ef;
-  border-radius: 16px;
-  padding: 28px;
-  box-shadow: 0 12px 24px rgba(18, 30, 54, 0.08);
-}
-
-.share-card h1 {
-  margin: 0;
-  font-size: 22px;
-  color: #1f2a44;
-}
-
-.share-card p {
-  margin: 14px 0 0;
-  color: #5b667f;
-  line-height: 1.6;
-}
-
-.share-btn {
-  margin-top: 20px;
-  border: none;
-  border-radius: 10px;
-  background: #1f2a44;
-  color: #fff;
-  font-size: 14px;
-  padding: 10px 16px;
-  cursor: pointer;
-}
-
-.share-btn:hover {
-  background: #162039;
-}
-</style>

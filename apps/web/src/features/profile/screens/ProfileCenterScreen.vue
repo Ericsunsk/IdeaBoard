@@ -1,170 +1,289 @@
 <template>
-  <div class="center-page">
-    <div class="mesh-bg">
-      <div class="mesh-blob blob-1"></div>
-      <div class="mesh-blob blob-2"></div>
-    </div>
+  <div class="center-page relative h-screen w-full overflow-hidden bg-[#f8f9fd] text-[#1f2430]">
+    <div :class="profileGridBgClass"></div>
 
-    <div class="center-container">
-      <aside class="center-sidebar">
-        <div class="sidebar-header">
-          <div class="logo-text" @click="router.push('/user/home')">IdeaBoard</div>
+    <div
+      class="relative z-[1] mx-auto my-[5vh] flex h-[90vh] max-w-[1200px] overflow-hidden rounded-[24px] border border-[#d9dfec] bg-white/[0.82] shadow-[0_24px_80px_rgba(50,62,96,0.08)] backdrop-blur-[16px] max-[900px]:my-0 max-[900px]:h-screen max-[900px]:max-w-none max-[900px]:rounded-none"
+    >
+      <aside
+        class="flex w-[260px] shrink-0 flex-col border-r border-black/5 px-6 py-10 max-[760px]:w-[220px] max-[640px]:hidden"
+      >
+        <div class="mb-12">
+          <button
+            type="button"
+            class="cursor-pointer border-0 bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)] bg-clip-text p-0 text-[22px] leading-none font-bold text-transparent"
+            @click="router.push('/user/home')"
+          >
+            IdeaBoard
+          </button>
         </div>
 
-        <nav class="sidebar-nav">
-          <div
+        <nav class="flex flex-1 flex-col gap-2" aria-label="个人中心导航">
+          <button
             v-for="item in navItems"
             :key="item.key"
-            class="nav-item"
-            :class="{ active: activeTab === item.key }"
+            type="button"
+            class="flex cursor-pointer items-center gap-3 rounded-[14px] border-0 px-4 py-3 text-left text-[15px] font-medium transition duration-200"
+            :class="
+              activeTab === item.key
+                ? 'bg-[#7a6bd5] text-white'
+                : 'bg-transparent text-[#86868b] hover:bg-[#eef1fa] hover:text-[#2c3448]'
+            "
             @click="activeTab = item.key"
           >
-            <div class="nav-icon">
-              <component :is="item.icon" class="profile-nav-icon" />
-            </div>
+            <span class="flex h-5 w-5 items-center justify-center">
+              <component :is="item.icon" class="h-5 w-5 stroke-[2]" />
+            </span>
             <span>{{ item.label }}</span>
-          </div>
+          </button>
         </nav>
 
-        <div class="sidebar-footer">
+        <div class="mt-auto flex flex-col gap-3">
           <button
             v-if="userStore.user?.role === 'admin'"
-            class="action-btn admin-btn"
+            type="button"
+            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border-0 bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)] px-4 py-3 text-[15px] font-semibold text-white transition duration-200 hover:bg-[linear-gradient(135deg,#6c54c4,#8b7ad6)]"
             @click="router.push('/admin/users')"
           >
-            <Shield class="profile-action-icon" />
+            <Shield class="h-[18px] w-[18px] stroke-[2.1]" />
             管理后台
           </button>
 
-          <button class="action-btn back-btn" @click="router.back()">
-            <NavArrowLeft class="profile-action-icon profile-action-icon-back" />
+          <button
+            type="button"
+            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border-0 bg-[#f1f3f9] px-4 py-3 text-[15px] font-semibold text-[#4d556a] transition duration-200 hover:bg-[#e8ecf7] hover:text-[#2a3142]"
+            @click="router.back()"
+          >
+            <NavArrowLeft class="h-[18px] w-[18px] stroke-[2.4]" />
             返回上级
           </button>
 
-          <button class="action-btn logout-btn" @click="handleLogout">
-            <LogOut class="profile-action-icon" />
+          <button
+            type="button"
+            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border-0 bg-transparent px-4 py-3 text-[15px] font-semibold text-[#ff3b30] transition duration-200 hover:bg-[rgba(255,59,48,0.05)]"
+            @click="handleLogout"
+          >
+            <LogOut class="h-[18px] w-[18px] stroke-[2.1]" />
             退出登录
           </button>
         </div>
       </aside>
 
-      <main class="center-main">
-        <div class="main-header">
-          <div class="user-brief">
-            <div class="avatar-big">
-              <div class="avatar-face">
-                <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" />
-                <div v-else class="avatar-placeholder">
+      <main
+        class="flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-[52px] py-11 [scrollbar-color:rgba(146,120,230,0.38)_transparent] [scrollbar-width:thin] max-[900px]:px-8 max-[640px]:px-5 max-[640px]:py-6"
+      >
+        <div
+          class="mb-10 flex items-center justify-between gap-6 max-[720px]:flex-col max-[720px]:items-start"
+        >
+          <div class="flex items-center gap-5">
+            <div
+              class="relative h-20 w-20 overflow-visible rounded-full border-4 border-white bg-white max-[520px]:h-[72px] max-[520px]:w-[72px]"
+            >
+              <div class="h-full w-full overflow-hidden rounded-full">
+                <img
+                  v-if="userStore.user?.avatar"
+                  :src="userStore.user.avatar"
+                  class="h-full w-full object-cover"
+                  alt="用户头像"
+                />
+                <div
+                  v-else
+                  class="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#9278e6,#c084fc)] text-[32px] font-bold text-white"
+                >
                   {{ userStore.user?.username?.[0]?.toUpperCase() }}
                 </div>
               </div>
               <button
-                class="avatar-edit-btn"
+                type="button"
+                class="absolute right-[-4px] bottom-[-4px] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[#d9dfec] bg-white/[0.98] text-[#6b7290] transition duration-200 hover:border-[#c8d0e2] hover:bg-[#f8faff] hover:text-[#4a5169] disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="avatarUploading"
                 title="更换头像"
                 @click="openAvatarPicker"
               >
-                <Camera class="profile-camera-icon" />
+                <Camera class="h-[15px] w-[15px] stroke-[2]" />
               </button>
               <input
                 ref="avatarInputRef"
-                class="hidden-file-input"
+                class="hidden"
                 type="file"
                 accept="image/*"
                 :disabled="avatarUploading"
                 @change="onAvatarFileChange"
               />
             </div>
-            <div class="user-info-text">
-              <h1>{{ userStore.user?.username }}</h1>
-              <p>{{ userStore.user?.role === 'admin' ? '管理员' : '创作者' }}</p>
+            <div class="min-w-0">
+              <h1 class="m-0 truncate text-[28px] leading-tight font-bold tracking-normal text-[#1d1d1f]">
+                {{ userStore.user?.username }}
+              </h1>
+              <p class="mt-1 mb-0 text-[15px] text-[#86868b]">
+                {{ userStore.user?.role === 'admin' ? '管理员' : '创作者' }}
+              </p>
             </div>
           </div>
-          <div class="stats-row">
-            <div class="stat-card">
-              <span class="stat-value">{{ userStore.user?.uid || '-' }}</span>
-              <span class="stat-label">会员编号</span>
+
+          <div class="flex gap-6">
+            <div
+              class="flex min-w-[100px] flex-col rounded-2xl border border-white/80 bg-white/50 px-5 py-3"
+            >
+              <span class="text-xl font-bold text-[#1d1d1f]">{{ userStore.user?.uid || '-' }}</span>
+              <span class="text-[13px] text-[#86868b]">会员编号</span>
             </div>
           </div>
         </div>
 
-        <div class="main-body">
-          <Transition name="fade-slide" mode="out-in">
-            <div v-if="activeTab === 'profile'" key="profile" class="tab-content">
-              <div class="content-card">
-                <h2 class="section-title">个人基本资料</h2>
-                <div class="profile-grid">
-                  <div class="profile-field">
-                    <label>用户账号</label>
-                    <div class="field-value">{{ userStore.user?.username }}</div>
-                  </div>
-                  <div class="profile-field">
-                    <label>账号状态</label>
-                    <div class="field-value">
-                      <n-tag
-                        :type="userStore.user?.status === 1 ? 'success' : 'warning'"
-                        size="small"
-                        round
-                        ghost
-                      >
-                        {{ userStore.user?.status === 1 ? '正常使用中' : '已封禁' }}
-                      </n-tag>
-                    </div>
-                  </div>
-                  <div class="profile-field">
-                    <label>加入时间</label>
-                    <div class="field-value">
-                      {{ formattedJoinedAt }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div v-else-if="activeTab === 'security'" key="security" class="tab-content">
-              <div class="content-card">
-                <h2 class="section-title">账号安全设置</h2>
-                <n-config-provider :theme-overrides="profileThemeOverrides">
-                  <n-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-placement="top">
-                    <div class="security-grid">
-                      <n-form-item label="当前原密码" path="oldPassword">
-                        <n-input
-                          v-model:value="pwdForm.oldPassword"
-                          type="password"
-                          placeholder="请输入当前使用的密码"
-                          show-password-on="click"
-                        />
-                      </n-form-item>
-                      <div class="new-password-row">
-                        <n-form-item label="设置新密码" path="newPassword">
-                          <n-input
-                            v-model:value="pwdForm.newPassword"
-                            type="password"
-                            placeholder="不少于6位字符"
-                            show-password-on="click"
-                          />
-                        </n-form-item>
-                        <n-form-item label="重复新密码" path="confirmPassword">
-                          <n-input
-                            v-model:value="pwdForm.confirmPassword"
-                            type="password"
-                            placeholder="请再次输入新密码"
-                            show-password-on="click"
-                          />
-                        </n-form-item>
+        <div class="flex-1">
+          <Transition
+            mode="out-in"
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="translate-x-5 opacity-0"
+            enter-to-class="translate-x-0 opacity-100"
+            leave-active-class="transition-all duration-300 ease-in"
+            leave-from-class="translate-x-0 opacity-100"
+            leave-to-class="-translate-x-5 opacity-0"
+          >
+            <div v-if="activeTab === 'profile'" key="profile">
+              <Card :pt="profileCardPt">
+                <template #content>
+                  <h2 class="m-0 mb-8 text-xl font-semibold text-[#1d1d1f]">个人基本资料</h2>
+                  <div class="grid grid-cols-2 gap-8 max-[720px]:grid-cols-1">
+                    <div class="min-w-0">
+                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]">用户账号</label>
+                      <div class="truncate text-base font-medium text-[#1d1d1f]">
+                        {{ userStore.user?.username }}
                       </div>
                     </div>
-                    <n-button
-                      type="primary"
-                      block
+                    <div>
+                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]">账号状态</label>
+                      <div>
+                        <Tag
+                          :value="userStatusLabel"
+                          :severity="userStatusSeverity"
+                          rounded
+                          class="!bg-white"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]">加入时间</label>
+                      <div class="text-base font-medium text-[#1d1d1f]">
+                        {{ formattedJoinedAt }}
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+
+            <div v-else-if="activeTab === 'security'" key="security">
+              <Card :pt="profileCardPt">
+                <template #content>
+                  <h2 class="m-0 mb-8 text-xl font-semibold text-[#1d1d1f]">账号安全设置</h2>
+                  <form class="flex flex-col gap-8" novalidate @submit.prevent="handleUpdatePassword">
+                    <div class="flex flex-col gap-4">
+                      <label :class="passwordFieldClass">
+                        <span>当前原密码</span>
+                        <Password
+                          v-model="pwdForm.oldPassword"
+                          autocomplete="current-password"
+                          :feedback="false"
+                          fluid
+                          :input-props="{
+                            autocomplete: 'current-password',
+                            'aria-describedby': 'profile-old-password-error',
+                          }"
+                          :invalid="Boolean(pwdErrors.oldPassword)"
+                          :input-class="passwordInputClass"
+                          placeholder="请输入当前使用的密码"
+                          toggle-mask
+                          @blur="validatePasswordField('oldPassword')"
+                          @update:model-value="clearPasswordFieldError('oldPassword')"
+                        />
+                        <Message
+                          v-if="pwdErrors.oldPassword"
+                          id="profile-old-password-error"
+                          class="!mt-1 !rounded-xl"
+                          severity="error"
+                          size="small"
+                          :closable="false"
+                        >
+                          {{ pwdErrors.oldPassword }}
+                        </Message>
+                      </label>
+
+                      <div class="grid grid-cols-2 gap-5 max-[720px]:grid-cols-1">
+                        <label :class="passwordFieldClass">
+                          <span>设置新密码</span>
+                          <Password
+                            v-model="pwdForm.newPassword"
+                            autocomplete="new-password"
+                            :feedback="false"
+                            fluid
+                            :input-props="{
+                              autocomplete: 'new-password',
+                              'aria-describedby': 'profile-new-password-error',
+                            }"
+                            :invalid="Boolean(pwdErrors.newPassword)"
+                            :input-class="passwordInputClass"
+                            placeholder="不少于6位字符"
+                            toggle-mask
+                            @blur="validatePasswordField('newPassword')"
+                            @update:model-value="handleNewPasswordInput"
+                          />
+                          <Message
+                            v-if="pwdErrors.newPassword"
+                            id="profile-new-password-error"
+                            class="!mt-1 !rounded-xl"
+                            severity="error"
+                            size="small"
+                            :closable="false"
+                          >
+                            {{ pwdErrors.newPassword }}
+                          </Message>
+                        </label>
+
+                        <label :class="passwordFieldClass">
+                          <span>重复新密码</span>
+                          <Password
+                            v-model="pwdForm.confirmPassword"
+                            autocomplete="new-password"
+                            :feedback="false"
+                            fluid
+                            :input-props="{
+                              autocomplete: 'new-password',
+                              'aria-describedby': 'profile-confirm-password-error',
+                            }"
+                            :invalid="Boolean(pwdErrors.confirmPassword)"
+                            :input-class="passwordInputClass"
+                            placeholder="请再次输入新密码"
+                            toggle-mask
+                            @blur="validatePasswordField('confirmPassword')"
+                            @update:model-value="clearPasswordFieldError('confirmPassword')"
+                          />
+                          <Message
+                            v-if="pwdErrors.confirmPassword"
+                            id="profile-confirm-password-error"
+                            class="!mt-1 !rounded-xl"
+                            severity="error"
+                            size="small"
+                            :closable="false"
+                          >
+                            {{ pwdErrors.confirmPassword }}
+                          </Message>
+                        </label>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      :label="pwdLoading ? '更新中...' : '确认更新密码'"
                       :loading="pwdLoading"
-                      @click="handleUpdatePassword"
-                    >
-                      确认更新密码
-                    </n-button>
-                  </n-form>
-                </n-config-provider>
-              </div>
+                      :disabled="pwdLoading"
+                      fluid
+                      class="!h-12 !rounded-[14px] !border-0 !bg-[#7a6bd5] !text-[15px] !font-semibold !text-white !shadow-[0_8px_24px_rgba(122,107,213,0.24)] transition hover:!-translate-y-0.5 hover:!bg-[#6d5fd0] hover:!shadow-[0_12px_32px_rgba(122,107,213,0.32)] active:!translate-y-0"
+                    />
+                  </form>
+                </template>
+              </Card>
             </div>
           </Transition>
         </div>
@@ -178,48 +297,33 @@ import { useUserStore } from '../../../app/stores/user'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { uploadApi } from '../../../shared/api/upload'
-import { NTag, NConfigProvider, type GlobalThemeOverrides } from 'naive-ui'
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import Message from 'primevue/message'
+import Password from 'primevue/password'
+import Tag from 'primevue/tag'
 import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import type { Component } from 'vue'
 import { Camera, Lock, LogOut, NavArrowLeft, Shield, User } from '@iconoir/vue'
-
-const router = useRouter()
-const userStore = useUserStore()
-const appToast = useAppToast()
-const { logoutAndRedirect } = useLogoutRedirect()
-
-const activeTab = ref('profile')
-
-const profileThemeOverrides: GlobalThemeOverrides = {
-  Input: {
-    border: '1px solid #d2d2d7',
-    borderHover: '1px solid #9278e6',
-    borderFocus: '1px solid #9278e6',
-    color: '#f5f5f7',
-    colorFocus: '#ffffff',
-    textColor: '#1d1d1f',
-    placeholderColor: '#86868b',
-    caretColor: '#9278e6',
-    borderRadius: '12px',
-    heightMedium: '48px',
-  },
-  Button: {
-    colorPressedPrimary: '#7a6bd5',
-    colorHoverPrimary: '#a38df2',
-    colorPrimary: '#9278e6',
-    textColorPrimary: '#ffffff',
-    borderRadiusMedium: '14px',
-    heightMedium: '48px',
-    fontWeight: '600',
-    fontSizeMedium: '15px',
-  },
-}
 
 type NavItem = {
   key: 'profile' | 'security'
   label: string
   icon: Component
 }
+
+type PasswordField = 'oldPassword' | 'newPassword' | 'confirmPassword'
+type PasswordForm = Record<PasswordField, string>
+
+const router = useRouter()
+const userStore = useUserStore()
+const appToast = useAppToast()
+const { logoutAndRedirect } = useLogoutRedirect()
+
+const activeTab = ref<NavItem['key']>('profile')
+const avatarInputRef = ref<HTMLInputElement | null>(null)
+const avatarUploading = ref(false)
+const pwdLoading = ref(false)
 
 const navItems = [
   {
@@ -233,28 +337,37 @@ const navItems = [
     icon: Lock,
   },
 ] satisfies NavItem[]
-const avatarInputRef = ref<HTMLInputElement | null>(null)
-const avatarUploading = ref(false)
-const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
 
-const pwdFormRef = ref()
-const pwdLoading = ref(false)
-const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
-const pwdRules = {
-  oldPassword: { required: true, message: '请输入当前原密码', trigger: 'blur' },
-  newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, message: '密码至少6个字符', trigger: 'blur' },
-  ],
-  confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
-    {
-      validator: (_rule: any, value: string) => value === pwdForm.value.newPassword,
-      message: '两次输入密码不一致',
-      trigger: 'blur',
-    },
-  ],
-}
+const profileCardPt = {
+  root: {
+    class: 'overflow-hidden rounded-[18px] border border-[#e2e7f3] bg-white shadow-none',
+  },
+  body: {
+    class: '!p-[34px] max-[640px]:!p-6',
+  },
+  content: {
+    class: '!p-0',
+  },
+} as const
+
+const profileGridBgClass =
+  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,rgba(122,107,213,0.08)_0%,rgba(122,107,213,0)_42%),radial-gradient(circle,#e2e4e8_1.5px,transparent_1.5px)] [background-size:100%_100%,24px_24px]'
+
+const passwordFieldClass = 'flex min-w-0 flex-col gap-2 text-sm font-medium text-[#1d1d1f]'
+const passwordInputClass =
+  '!h-12 !w-full !rounded-xl !border-[#d2d2d7] !bg-white/90 !px-3 !text-[15px] !text-[#1d1d1f] !shadow-none placeholder:!text-[#86868b] enabled:hover:!border-[#9278e6] enabled:focus:!border-[#9278e6]'
+
+const emptyPasswordForm = (): PasswordForm => ({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+})
+
+const pwdForm = ref<PasswordForm>(emptyPasswordForm())
+const pwdErrors = ref<Record<PasswordField, string>>(emptyPasswordForm())
+const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
+const userStatusLabel = computed(() => (userStore.user?.status === 1 ? '正常使用中' : '已封禁'))
+const userStatusSeverity = computed(() => (userStore.user?.status === 1 ? 'success' : 'warn'))
 
 function formatDateWithDots(value?: string) {
   const datePart = value?.trim().split(/[T\s]/)[0]
@@ -264,16 +377,62 @@ function formatDateWithDots(value?: string) {
   return `${year}.${month}.${day}`
 }
 
+function resolvePasswordFieldError(field: PasswordField) {
+  const value = pwdForm.value[field]
+
+  if (field === 'oldPassword' && !value.trim()) {
+    return '请输入当前原密码'
+  }
+  if (field === 'newPassword') {
+    if (!value.trim()) return '请输入新密码'
+    if (value.length < 6) return '密码至少6个字符'
+  }
+  if (field === 'confirmPassword') {
+    if (!value.trim()) return '请确认新密码'
+    if (value !== pwdForm.value.newPassword) return '两次输入密码不一致'
+  }
+  return ''
+}
+
+function validatePasswordField(field: PasswordField) {
+  pwdErrors.value[field] = resolvePasswordFieldError(field)
+  return !pwdErrors.value[field]
+}
+
+function validatePasswordForm() {
+  const fields: PasswordField[] = ['oldPassword', 'newPassword', 'confirmPassword']
+  return fields.map((field) => validatePasswordField(field)).every(Boolean)
+}
+
+function clearPasswordFieldError(field: PasswordField) {
+  if (pwdErrors.value[field]) {
+    pwdErrors.value[field] = ''
+  }
+}
+
+function handleNewPasswordInput() {
+  clearPasswordFieldError('newPassword')
+  if (pwdForm.value.confirmPassword && pwdErrors.value.confirmPassword) {
+    validatePasswordField('confirmPassword')
+  }
+}
+
+function resetPasswordForm() {
+  pwdForm.value = emptyPasswordForm()
+  pwdErrors.value = emptyPasswordForm()
+}
+
 async function handleUpdatePassword() {
+  if (!validatePasswordForm()) return
+
   try {
-    await pwdFormRef.value?.validate()
     pwdLoading.value = true
     await userStore.updatePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
     appToast.success('密码更新成功，请重新登录')
-    pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+    resetPasswordForm()
     await router.push('/user/login')
-  } catch (error: any) {
-    if (error.message) appToast.error(error.message)
+  } catch (error: unknown) {
+    appToast.error(error instanceof Error && error.message ? error.message : '密码更新失败')
   } finally {
     pwdLoading.value = false
   }
@@ -313,421 +472,6 @@ async function onAvatarFileChange(event: Event) {
 }
 
 onMounted(() => {
-  userStore.fetchUserInfo()
+  void userStore.fetchUserInfo()
 })
 </script>
-
-<style scoped>
-.center-page {
-  width: 100%;
-  height: 100vh;
-  background: #f8f9fd;
-  color: #1f2430;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif;
-  overflow: hidden;
-  position: relative;
-}
-
-.mesh-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-  background:
-    radial-gradient(50% 35% at 30% 18%, rgba(146, 120, 230, 0.14) 0%, rgba(146, 120, 230, 0) 100%),
-    radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size:
-    100% 100%,
-    24px 24px;
-}
-.mesh-blob {
-  display: none;
-}
-
-.center-container {
-  max-width: 1200px;
-  height: 90vh;
-  margin: 5vh auto;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(16px);
-  border-radius: 24px;
-  border: 1px solid #d9dfec;
-  display: flex;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-}
-
-/* Sidebar */
-.center-sidebar {
-  width: 260px;
-  border-right: 1px solid rgba(0, 0, 0, 0.05);
-  padding: 40px 24px;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-header {
-  margin-bottom: 48px;
-}
-.logo-text {
-  font-size: 22px;
-  font-weight: 700;
-  color: #2a3142;
-  cursor: pointer;
-  background: linear-gradient(135deg, #7f68d5, #9f8fe6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.sidebar-nav {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  cursor: pointer;
-  color: #86868b;
-  font-size: 15px;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.nav-item:hover {
-  background: #eef1fa;
-  color: #2c3448;
-}
-.nav-item.active {
-  background: #7a6bd5;
-  color: #fff;
-}
-.nav-icon {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.profile-nav-icon {
-  width: 20px;
-  height: 20px;
-  stroke-width: 2;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.action-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border: none;
-  background: transparent;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 12px;
-  transition: all 0.2s;
-}
-.profile-action-icon {
-  width: 18px;
-  height: 18px;
-  stroke-width: 2.1;
-}
-.profile-action-icon-back {
-  stroke-width: 2.4;
-}
-
-.back-btn {
-  color: #4d556a;
-  background: #f1f3f9;
-}
-.back-btn:hover {
-  background: #e8ecf7;
-  color: #2a3142;
-}
-
-.admin-btn {
-  color: #fff;
-  background: linear-gradient(135deg, #7f68d5, #9f8fe6);
-}
-.admin-btn:hover {
-  background: linear-gradient(135deg, #6c54c4, #8b7ad6);
-}
-
-.logout-btn {
-  color: #ff3b30;
-}
-.logout-btn:hover {
-  background: rgba(255, 59, 48, 0.05);
-}
-
-/* Main Content */
-.center-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 44px 52px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(146, 120, 230, 0.38) transparent;
-}
-
-.center-main::-webkit-scrollbar {
-  width: 8px;
-}
-
-.center-main::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.center-main::-webkit-scrollbar-thumb {
-  background: rgba(146, 120, 230, 0.34);
-  border-radius: 999px;
-}
-
-.center-main::-webkit-scrollbar-thumb:hover {
-  background: rgba(122, 107, 213, 0.5);
-}
-
-.main-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 40px;
-}
-
-.user-brief {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.avatar-big {
-  position: relative;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #fff;
-  border: 4px solid #fff;
-  overflow: visible;
-}
-.avatar-face {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  overflow: hidden;
-}
-.avatar-edit-btn {
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid #d9dfec;
-  background: rgba(255, 255, 255, 0.98);
-  color: #6b7290;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    color 0.2s ease,
-    border-color 0.2s ease,
-    background-color 0.2s ease;
-}
-.avatar-edit-btn:hover:not(:disabled) {
-  border-color: #c8d0e2;
-  background: #f8faff;
-  color: #4a5169;
-}
-.avatar-edit-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-.profile-camera-icon {
-  width: 15px;
-  height: 15px;
-  stroke-width: 2;
-}
-.hidden-file-input {
-  display: none;
-}
-.avatar-face img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #9278e6, #c084fc);
-  color: #fff;
-  font-size: 32px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.user-info-text h1 {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-.user-info-text p {
-  color: #86868b;
-  margin: 4px 0 0;
-  font-size: 15px;
-}
-
-.stats-row {
-  display: flex;
-  gap: 24px;
-}
-.stat-card {
-  background: rgba(255, 255, 255, 0.5);
-  padding: 12px 20px;
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-  min-width: 100px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-}
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1d1d1f;
-}
-.stat-label {
-  font-size: 13px;
-  color: #86868b;
-}
-
-.main-body {
-  flex: 1;
-}
-
-.content-card {
-  background: #ffffff;
-  padding: 34px;
-  border-radius: 18px;
-  border: 1px solid #e2e7f3;
-}
-
-.section-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 32px;
-  color: #1d1d1f;
-}
-
-/* Fields */
-.profile-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 32px;
-}
-.profile-field label {
-  display: block;
-  font-size: 13px;
-  color: #86868b;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-.field-value {
-  font-size: 16px;
-  color: #1d1d1f;
-  font-weight: 500;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-.card-header .section-title {
-  margin-bottom: 0;
-}
-
-.refresh-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #f5f5f7;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
-  color: #1d1d1f;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.refresh-btn:hover {
-  background: #e8e8ed;
-}
-.refresh-btn:disabled {
-  opacity: 0.6;
-}
-.spinning {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.security-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-.new-password-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-/* Custom Naive UI Styles */
-:deep(.n-form-item-label) {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1d1d1f;
-  margin-left: 4px;
-}
-
-/* Transitions */
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: all 0.3s ease;
-}
-.fade-slide-enter-from {
-  opacity: 0;
-  transform: translateX(20px);
-}
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-</style>

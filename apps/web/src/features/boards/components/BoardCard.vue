@@ -14,30 +14,40 @@
         transition: { duration: 160, easing: 'ease-out' },
       },
     }"
-    class="board-card board-item"
+    class="relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-[#d9dfec] bg-white/90 text-left transition-colors hover:border-[#cdd4e6]"
     role="button"
     tabindex="0"
     @keydown.enter.self.prevent="emit('click-board')"
     @keydown.space.self.prevent="emit('click-board')"
     @click="emit('click-board')"
   >
-    <div class="board-preview">
+    <div
+      class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#f7f8ff_0%,#eff2fb_100%)]"
+    >
       <img
         v-if="previewSnapshotDataUrl"
         :src="previewSnapshotDataUrl"
-        class="board-preview-image"
+        class="block h-full w-full object-cover"
         alt=""
       />
-      <div v-else class="preview-avatar">{{ board.name.slice(0, 1).toUpperCase() }}</div>
-      <div class="board-preview-fade"></div>
+      <div
+        v-else
+        class="flex size-[58px] items-center justify-center rounded-2xl bg-[linear-gradient(145deg,#7a6bd5,#8b7bdd)] text-[28px] font-bold text-white"
+      >
+        {{ board.name.slice(0, 1).toUpperCase() }}
+      </div>
+      <div
+        class="pointer-events-none absolute inset-x-0 bottom-0 h-[92px] bg-[linear-gradient(to_top,rgba(245,248,255,0.88)_0%,rgba(245,248,255,0)_100%)]"
+      ></div>
     </div>
 
-    <div class="board-meta">
-      <input
+    <div class="pointer-events-none absolute right-14 bottom-3 left-3 z-[2]">
+      <InputText
         v-if="isRenaming"
         ref="renameInputEl"
         :value="renameDraft"
-        class="rename-input"
+        unstyled
+        class="pointer-events-auto h-[30px] w-full rounded-lg border border-[rgba(224,230,245,0.75)] bg-white/80 px-2 text-[13px] text-[#2b3142] outline-none"
         maxlength="60"
         @click.stop
         @input="onRenameInput"
@@ -45,38 +55,56 @@
         @keyup.enter.stop.prevent="emit('commit-rename')"
         @keyup.esc.stop.prevent="emit('cancel-rename')"
       />
-      <div v-else class="board-title">{{ board.name }}</div>
-      <div class="board-date">Edited {{ displayDate }}</div>
+      <div v-else class="truncate text-sm font-[650] text-[#293042]">{{ board.name }}</div>
+      <div class="mt-[3px] text-xs text-[#7b8297]">Edited {{ displayDate }}</div>
     </div>
 
-    <div class="board-menu-anchor">
-      <button
-        class="board-menu-btn"
+    <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
+      <Button
+        unstyled
         type="button"
         title="More actions"
         aria-label="More actions"
-        @click.stop="emit('toggle-menu')"
+        aria-haspopup="menu"
+        :aria-expanded="isMenuOpen"
+        class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-[#4e556b] hover:text-[#2b3142]"
+        @click="toggleMenu"
       >
-        <MoreHoriz class="board-menu-icon" />
-      </button>
-      <div v-if="isMenuOpen" class="board-action-menu" @click.stop>
-        <button type="button" class="board-action-item" @click.stop="emit('rename-action')">
-          Rename
-        </button>
-        <button type="button" class="board-action-item" @click.stop="emit('duplicate-action')">
-          Duplicate
-        </button>
-        <button type="button" class="board-action-item danger" @click.stop="emit('delete-action')">
-          Delete
-        </button>
-      </div>
+        <MoreHoriz class="size-[18px] stroke-[2.2]" />
+      </Button>
+      <Menu
+        ref="menuRef"
+        :model="menuItems"
+        popup
+        append-to="body"
+        :pt="menuPt"
+        @hide="emit('menu-hidden')"
+      >
+        <template #item="{ item, props: itemProps }">
+          <a
+            v-bind="itemProps.action"
+            :class="[
+              'flex h-8 w-full items-center rounded-lg px-2.5 text-[13px] font-semibold no-underline transition-colors hover:bg-[#eff3fb]',
+              item.key === 'delete' ? 'text-[#c23b42] hover:bg-[#fdeced]' : 'text-[#3f475d]',
+            ]"
+          >
+            {{ item.label }}
+          </a>
+        </template>
+      </Menu>
     </div>
   </article>
 </template>
 
 <script setup lang="ts">
 import { MoreHoriz } from '@iconoir/vue'
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
+import Menu from 'primevue/menu'
+import type { MenuItem } from 'primevue/menuitem'
 import type { CanvasBoardMeta } from '../lib/canvasBoards'
+
+type RenameInputRef = HTMLInputElement | { $el?: HTMLInputElement } | null
 
 const props = defineProps<{
   board: CanvasBoardMeta
@@ -96,18 +124,50 @@ const emit = defineEmits<{
   (e: 'rename-input', value: string): void
   (e: 'commit-rename'): void
   (e: 'cancel-rename'): void
+  (e: 'menu-hidden'): void
 }>()
 
-const renameInputEl = ref<HTMLInputElement | null>(null)
+const renameInputEl = ref<RenameInputRef>(null)
+const menuRef = ref<{ toggle: (event: Event) => void; hide: () => void } | null>(null)
+
+const menuPt = {
+  root: {
+    class: '!z-30 !min-w-[118px] !rounded-[10px] !border !border-[#d8ddea] !bg-white !p-0 !shadow-none',
+  },
+  list: { class: '!m-0 !flex !flex-col !gap-0.5 !p-1.5' },
+  itemContent: { class: '!rounded-lg' },
+  itemLink: { class: '!p-0' },
+} as const
+
+const menuItems = computed<MenuItem[]>(() => [
+  {
+    key: 'rename',
+    label: 'Rename',
+    command: () => emit('rename-action'),
+  },
+  {
+    key: 'duplicate',
+    label: 'Duplicate',
+    command: () => emit('duplicate-action'),
+  },
+  {
+    key: 'delete',
+    label: 'Delete',
+    command: () => emit('delete-action'),
+  },
+])
 
 watch(
   () => props.isRenaming,
   (isRenaming) => {
     if (!isRenaming) return
     void nextTick(() => {
-      if (!renameInputEl.value) return
-      renameInputEl.value.focus()
-      renameInputEl.value.select()
+      const input =
+        renameInputEl.value instanceof HTMLInputElement
+          ? renameInputEl.value
+          : renameInputEl.value?.$el
+      input?.focus()
+      input?.select()
     })
   },
 )
@@ -115,168 +175,18 @@ watch(
 function onRenameInput(event: Event) {
   emit('rename-input', (event.target as HTMLInputElement).value)
 }
+
+function toggleMenu(event: Event) {
+  emit('toggle-menu')
+  menuRef.value?.toggle(event)
+}
+
+watch(
+  () => props.isMenuOpen,
+  (isMenuOpen) => {
+    if (!isMenuOpen) {
+      menuRef.value?.hide()
+    }
+  },
+)
 </script>
-
-<style scoped>
-.board-card {
-  position: relative;
-  border: 1px solid #d9dfec;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  overflow: hidden;
-  height: 244px;
-  text-align: left;
-}
-
-.board-item {
-  cursor: pointer;
-  transition: border-color 0.14s ease;
-}
-
-.board-item:hover {
-  border-color: #cdd4e6;
-}
-
-.board-preview {
-  position: relative;
-  z-index: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f7f8ff 0%, #eff2fb 100%);
-  overflow: hidden;
-}
-
-.board-preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.board-preview-fade {
-  position: absolute;
-  inset: auto 0 0;
-  height: 92px;
-  pointer-events: none;
-  background: linear-gradient(to top, rgba(245, 248, 255, 0.88) 0%, rgba(245, 248, 255, 0) 100%);
-}
-
-.preview-avatar {
-  width: 58px;
-  height: 58px;
-  border-radius: 16px;
-  background: linear-gradient(145deg, #7a6bd5, #8b7bdd);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.board-meta {
-  position: absolute;
-  left: 12px;
-  right: 56px;
-  bottom: 12px;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.board-title {
-  font-size: 14px;
-  font-weight: 650;
-  color: #293042;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.rename-input {
-  width: 100%;
-  border: 1px solid rgba(224, 230, 245, 0.75);
-  border-radius: 8px;
-  height: 30px;
-  padding: 0 8px;
-  font-size: 13px;
-  color: #2b3142;
-  background: rgba(255, 255, 255, 0.82);
-  outline: none;
-  pointer-events: auto;
-}
-
-.board-menu-btn {
-  width: 34px;
-  height: 34px;
-  border: none;
-  background: transparent;
-  color: #4e556b;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.board-menu-icon {
-  width: 18px;
-  height: 18px;
-  stroke-width: 2.2;
-}
-
-.board-menu-btn:hover {
-  color: #2b3142;
-}
-
-.board-menu-anchor {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 3;
-}
-
-.board-action-menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  z-index: 30;
-  min-width: 118px;
-  padding: 6px;
-  border-radius: 10px;
-  border: 1px solid #d8ddea;
-  background: #ffffff;
-}
-
-.board-action-item {
-  width: 100%;
-  height: 32px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  text-align: left;
-  padding: 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #3f475d;
-  cursor: pointer;
-}
-
-.board-action-item:hover {
-  background: #eff3fb;
-}
-
-.board-action-item.danger {
-  color: #c23b42;
-}
-
-.board-action-item.danger:hover {
-  background: #fdeced;
-}
-
-.board-date {
-  margin-top: 3px;
-  font-size: 12px;
-  color: #7b8297;
-}
-</style>

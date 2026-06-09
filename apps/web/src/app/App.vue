@@ -1,9 +1,6 @@
 <template>
   <IconoirProvider :icon-props="iconoirProps">
-    <router-view v-if="isAdminRoute" />
-    <n-config-provider v-else :theme-overrides="themeOverrides" :locale="naiveLocale">
-      <router-view />
-    </n-config-provider>
+    <router-view />
   </IconoirProvider>
   <Toaster
     class="ideaboard-toaster"
@@ -21,12 +18,7 @@
 
 <script setup lang="ts">
 import { IconoirProvider } from '@iconoir/vue'
-import { zhCN } from 'naive-ui'
 import { Toaster } from 'vue-sonner'
-
-const naiveLocale = zhCN
-const route = useRoute()
-const isAdminRoute = computed(() => route.path.startsWith('/admin'))
 
 const iconoirProps = {
   color: 'currentColor',
@@ -67,20 +59,4 @@ onUnmounted(() => {
   }
   setAppScrollingClass(false)
 })
-
-const themeOverrides = {
-  common: {
-    primaryColor: '#26364f',
-    primaryColorHover: '#1d2a3f',
-    primaryColorPressed: '#111827',
-    primaryColorSuppl: '#26364f',
-    borderRadius: '8px',
-  },
-  Card: {
-    borderRadius: '12px',
-  },
-  Table: {
-    borderRadius: '12px',
-  },
-}
 </script>
