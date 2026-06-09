@@ -482,9 +482,6 @@ onMounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 44px 52px;
-}
-
-.center-main {
   scrollbar-width: thin;
   scrollbar-color: rgba(146, 120, 230, 0.38) transparent;
 }
