@@ -1,12 +1,14 @@
 <template>
-  <div class="grid min-h-screen place-items-center bg-admin-bg p-6 text-admin-text-1 max-[520px]:p-4">
+  <div
+    class="grid min-h-screen place-items-center bg-admin-bg p-6 text-admin-text-1 max-[520px]:p-4"
+  >
     <Card
       class="admin-login-card w-[min(420px,100%)] overflow-hidden rounded-[18px] border border-admin-border shadow-[0_24px_70px_rgba(45,64,89,0.12)]"
       :pt="loginCardPt"
     >
       <template #header>
         <router-link
-          class="inline-flex h-[52px] w-[52px] items-center justify-center rounded-[15px] border border-[#111827] bg-white text-sm font-black text-[#0f172a] shadow-[0_10px_22px_rgba(45,64,89,0.08)]"
+          class="inline-flex h-[52px] w-[52px] items-center justify-center rounded-[15px] border border-admin-accent-pressed bg-white text-sm font-black text-admin-accent-pressed shadow-[0_10px_22px_rgba(45,64,89,0.08)]"
           to="/"
           aria-label="IdeaBoard"
         >
@@ -15,7 +17,9 @@
       </template>
 
       <template #title>
-        <h1 class="m-0 text-[26px] leading-[1.2] font-bold text-admin-title-color">管理员登录</h1>
+        <h1 class="m-0 text-admin-modal-title leading-[1.2] font-bold text-admin-title-color">
+          管理员登录
+        </h1>
       </template>
 
       <template #content>

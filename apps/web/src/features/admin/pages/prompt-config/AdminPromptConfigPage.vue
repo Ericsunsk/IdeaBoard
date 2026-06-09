@@ -224,7 +224,7 @@ const activeGroup = computed<FeatureGroup | null>(() => {
   return featureGroups.value.find((group) => group.key === activeGroupKey.value) || null
 })
 const variableTokenButtonClass =
-  'max-w-full !h-7 !min-h-0 !rounded-full !border-transparent !px-2.5 !py-0 font-mono !text-[11px] !font-[760] !leading-4 [&_.p-button-label]:break-all [&_.p-button-label]:leading-4'
+  'max-w-full !h-7 !min-h-0 !rounded-full !border-transparent !px-2.5 !py-0 font-mono !text-admin-caption !font-[760] !leading-4 [&_.p-button-label]:break-all [&_.p-button-label]:leading-4'
 const variableTokenButtonToneClass: Record<FeaturePromptVariableTone, string> = {
   prompt: '!bg-[rgba(71,117,168,0.16)] !text-admin-info hover:!bg-[rgba(71,117,168,0.22)]',
   control: '!bg-[rgba(212,136,48,0.16)] !text-admin-warning hover:!bg-[rgba(212,136,48,0.22)]',

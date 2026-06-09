@@ -27,17 +27,11 @@
         </Button>
       </template>
 
-      <div
-        v-if="loading && channels.length === 0"
-        class="flex min-h-[260px] items-center justify-center text-admin-content text-admin-text-3"
-      >
+      <div v-if="loading && channels.length === 0" :class="adminLoadingStateClass">
         <ProgressSpinner class="!h-9 !w-9 text-admin-accent" stroke-width="4" />
       </div>
 
-      <div
-        v-else-if="filteredChannels.length === 0"
-        class="flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-center text-admin-text-2"
-      >
+      <div v-else-if="filteredChannels.length === 0" :class="adminEmptyStateClass">
         <div class="text-admin-title font-semibold text-admin-title-color">
           {{ emptyChannelMessage }}
         </div>
@@ -46,11 +40,11 @@
         </div>
       </div>
 
-      <div v-else class="columns-1 gap-3.5 md:columns-2 xl:columns-3">
+      <div v-else :class="adminMasonryGridClass">
         <Card
           v-for="card in filteredChannelCards"
           :key="card.channel.id"
-          class="mb-3.5 break-inside-avoid !rounded-lg"
+          :class="adminMasonryCardClass"
         >
           <template #title>
             <div class="flex items-start gap-3">
@@ -385,7 +379,11 @@ import { useTransientScrolling } from '../../shared/composables/useTransientScro
 import { adminCompactPanelPt } from '../../shared/lib/adminPanelPt'
 import {
   adminCompactTagClass,
+  adminEmptyStateClass,
   adminFramedIconButtonClass,
+  adminLoadingStateClass,
+  adminMasonryCardClass,
+  adminMasonryGridClass,
   adminToolbarIconButtonClass,
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'

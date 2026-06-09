@@ -1,58 +1,14 @@
 <template>
   <div class="flex max-w-full min-w-0 flex-col gap-4 p-0 pb-6">
     <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >今日调用</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ todayCalls }}
-          </span>
-        </template>
-        <template #content>{{ todayCallsFoot }}</template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >今日失败</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ todayFailed }}
-          </span>
-        </template>
-        <template #content>{{ todayFailedFoot }}</template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >今日成功率</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ todaySuccessRate }}
-          </span>
-        </template>
-        <template #content>{{ todaySuccessRateFoot }}</template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >本月调用</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ monthCalls }}
-          </span>
-        </template>
-        <template #content>{{ monthCallsFoot }}</template>
-      </Card>
+      <AdminSummaryCard label="今日调用" :value="todayCalls" :footer="todayCallsFoot" />
+      <AdminSummaryCard label="今日失败" :value="todayFailed" :footer="todayFailedFoot" />
+      <AdminSummaryCard
+        label="今日成功率"
+        :value="todaySuccessRate"
+        :footer="todaySuccessRateFoot"
+      />
+      <AdminSummaryCard label="本月调用" :value="monthCalls" :footer="monthCallsFoot" />
     </div>
 
     <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
@@ -195,6 +151,7 @@ import { computed } from 'vue'
 import Chart from 'primevue/chart'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
+import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import { adminCards } from '../../shared/lib/adminCardMeta'
 import { adminChartPlugins, useAdminChartReady } from '../../shared/lib/adminChart'
 import { useUsageStatisticsData } from './useUsageStatisticsData'

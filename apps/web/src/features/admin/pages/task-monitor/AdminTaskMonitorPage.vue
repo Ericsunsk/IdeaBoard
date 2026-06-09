@@ -1,56 +1,14 @@
 <template>
   <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
     <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >执行中</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ liveRunningCount }}
-          </span>
-        </template>
-        <template #content>{{ runningFoot }}</template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >队列等待</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ liveQueueTotal }}
-          </span>
-        </template>
-        <template #content>{{ queueFoot }}</template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal">失败</span>
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ liveFailedCount }}
-          </span>
-        </template>
-        <template #content>{{ failedFoot }}</template>
-      </Card>
-      <Card>
-        <template #subtitle>
-          <span class="text-[13px] font-bold text-admin-subtitle-color tracking-normal"
-            >账号并发</span
-          >
-        </template>
-        <template #title>
-          <span class="text-[26px] font-[780] text-admin-title-color leading-[1.05]">
-            {{ peakAccountLoadPercent }}%
-          </span>
-        </template>
-        <template #content>{{ accountLoadFoot }}</template>
-      </Card>
+      <AdminSummaryCard label="执行中" :value="liveRunningCount" :footer="runningFoot" />
+      <AdminSummaryCard label="队列等待" :value="liveQueueTotal" :footer="queueFoot" />
+      <AdminSummaryCard label="失败" :value="liveFailedCount" :footer="failedFoot" />
+      <AdminSummaryCard
+        label="账号并发"
+        :value="`${peakAccountLoadPercent}%`"
+        :footer="accountLoadFoot"
+      />
     </div>
 
     <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
@@ -687,6 +645,7 @@ import {
 } from '../../../../shared/api/generated-query/model'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
+import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
@@ -867,9 +826,7 @@ const taskStatusSnapshot = computed(() => ({
 const statusTotalCount = computed(() =>
   Object.values(taskStatusSnapshot.value).reduce((sum, count) => sum + count, 0),
 )
-const liveRunningCount = computed(
-  () => monitorData.value?.running_attempts ?? 0,
-)
+const liveRunningCount = computed(() => monitorData.value?.running_attempts ?? 0)
 const liveFailedCount = computed(() => taskStatusSnapshot.value[ListAdminTasksStatus.failed])
 const globalQueueLength = computed(() => monitorData.value?.global_queue_len || 0)
 const waitQueueLength = computed(() => monitorData.value?.wait_queue_len || 0)
@@ -1102,10 +1059,7 @@ const taskDistributionChartOptions = computed<AdminChartOptions>(() =>
           label: (context) => {
             const point = taskDistributionRows.value[context.dataIndex]
             if (!point) return []
-            return [
-              `占比: ${formatPercentValue(point.sharePercent)}`,
-              `任务量: ${point.count} 条`,
-            ]
+            return [`占比: ${formatPercentValue(point.sharePercent)}`, `任务量: ${point.count} 条`]
           },
         },
       },

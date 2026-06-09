@@ -12,11 +12,21 @@ export const adminSurfaceToolbarClass =
 export const adminSurfaceScrollContentClass =
   'app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain'
 
+export const adminLoadingStateClass =
+  'flex min-h-[260px] items-center justify-center text-admin-content text-admin-text-3'
+
+export const adminEmptyStateClass =
+  'flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-center text-admin-text-2'
+
+export const adminMasonryGridClass = 'columns-1 gap-3.5 md:columns-2 xl:columns-3'
+
+export const adminMasonryCardClass = 'mb-3.5 break-inside-avoid !rounded-lg'
+
 export const adminToolbarSearchInputClass =
-  '!h-[38px] !w-full !rounded-lg !bg-white !text-[15px] !text-admin-text-1 !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-[#7a8798]'
+  '!h-[38px] !w-full !rounded-lg !bg-white !text-admin-title-sm !text-admin-text-1 !shadow-[0_3px_10px_rgba(45,64,89,0.05)] placeholder:!text-admin-text-2'
 
 export const adminToolbarMetricClass =
-  'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-white px-3 py-1.5 text-[13px] font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]'
+  'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-white px-3 py-1.5 text-admin-body font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]'
 
 export const adminFramedIconButtonBaseClass =
   '!h-9 !w-9 !border !border-admin-border !bg-white hover:!bg-admin-surface-muted transition-colors flex items-center justify-center p-0'
@@ -30,7 +40,7 @@ export const adminToolbarIconButtonClass = adminFramedIconButtonClass
 export const adminToolbarPagerButtonClass = `${adminToolbarIconButtonClass} disabled:!opacity-40`
 
 export const adminToolbarPageLabelClass =
-  'flex h-9 items-center justify-center rounded-lg !border !border-admin-border !bg-white px-3 text-[12px] font-semibold text-admin-text-2'
+  'flex h-9 items-center justify-center rounded-lg !border !border-admin-border !bg-white px-3 text-admin-meta font-semibold text-admin-text-2'
 
 export const adminFilterPopoverClass =
   'flex w-[260px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4'
@@ -40,4 +50,4 @@ export const adminConfigPopoverClass =
 
 export const adminPopoverTitleClass = 'text-admin-content font-bold text-admin-title-color'
 
-export const adminCompactTagClass = '!px-2 !py-0.5 !text-[11px] !leading-4'
+export const adminCompactTagClass = '!px-2 !py-0.5 !text-admin-caption !leading-4'

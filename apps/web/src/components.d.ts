@@ -14,6 +14,7 @@ declare module 'vue' {
     AdminCardHeader: typeof import('./features/admin/shared/components/AdminCardHeader.vue')['default']
     AdminChartPanel: typeof import('./features/admin/shared/components/AdminChartPanel.vue')['default']
     AdminManagementFrame: typeof import('./features/admin/shared/components/AdminManagementFrame.vue')['default']
+    AdminSummaryCard: typeof import('./features/admin/shared/components/AdminSummaryCard.vue')['default']
     AdminTableFrame: typeof import('./features/admin/shared/components/AdminTableFrame.vue')['default']
     AdminTablePanel: typeof import('./features/admin/shared/components/AdminTablePanel.vue')['default']
     AdminToolbarSearch: typeof import('./features/admin/shared/components/AdminToolbarSearch.vue')['default']
