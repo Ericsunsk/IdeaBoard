@@ -1,5 +1,7 @@
 import { computed } from 'vue'
 import {
+  ListAdminUsersRole,
+  ListAdminUsersStatus,
   ListAdminTasksStatus,
   MonitorExecutionPressureKey,
   ProviderAPIType,
@@ -18,17 +20,28 @@ import type {
   AdminStatisticsQualityTrendItem,
   AdminStatisticsSlowModelsItem,
   AdminStatisticsTrendItem,
+  ApiResponseUserListData,
   Channel,
+  FeaturePrompt,
+  FeaturePromptVariable,
+  ListAdminUsersParams,
   MonitorData,
   MonitorExecutionPressurePoint,
   MonitorStats,
+  RateLimitSetting,
+  StorageProfile,
+  StorageProviderMeta,
   Task,
   TaskExecutionMetrics,
   GetAdminStatisticsRange,
+  ListAdminUsersRole as ListAdminUsersRoleValue,
+  ListAdminUsersStatus as ListAdminUsersStatusValue,
   ListAdminTasksStatus as ListAdminTasksStatusValue,
   ProviderAPIType as ProviderAPITypeValue,
+  User,
 } from '../../../../shared/api/generated-query/model'
 import { buildAdminTimeRangeBuckets } from './adminTimeRange'
+import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
 
 const mockProviderApiTypes = {
   openaiCompatible: ProviderAPIType['openai-compatible'],
@@ -49,6 +62,8 @@ const mockTaskMetricValues = {
   failureStage: TaskExecutionMetricsFailureStage,
   failureCategory: TaskExecutionMetricsFailureCategory,
 } as const
+const mockUserRoles = ListAdminUsersRole
+const mockUserStatuses = ListAdminUsersStatus
 
 const mockModels = [
   'gpt-image-1',
@@ -174,6 +189,39 @@ export function createMockAdminChannels(now = new Date()): Channel[] {
       updated_at: timestamp,
     },
   ]
+}
+
+export function createMockAdminUsers(params: ListAdminUsersParams = {}): ApiResponseUserListData {
+  const page = Math.max(1, Number(params.page || 1))
+  const pageSize = Math.max(1, Number(params.page_size || 10))
+  const filteredUsers = createMockAdminUserRows().filter((user) =>
+    matchesMockAdminUserFilters(user, params),
+  )
+  const start = (page - 1) * pageSize
+  const activeCount = filteredUsers.filter(
+    (user) => user.status === mockUserStatuses.NUMBER_1,
+  ).length
+  const adminCount = filteredUsers.filter((user) => user.role === mockUserRoles.admin).length
+
+  return {
+    total: filteredUsers.length,
+    active_count: activeCount,
+    banned_count: filteredUsers.length - activeCount,
+    admin_count: adminCount,
+    list: filteredUsers.slice(start, start + pageSize),
+  }
+}
+
+export function createMockFeaturePrompts(slugs: readonly string[]): FeaturePrompt[] {
+  return slugs.map((slug) => ({
+    slug,
+    prompt: '',
+    enabled: true,
+    variables: defaultMockFeaturePromptVariables(slug),
+    schema_version: 1,
+    published_at: null,
+    updated_at: null,
+  }))
 }
 
 export function createMockAdminAccounts(now = new Date()): AdminAccount[] {
@@ -333,6 +381,132 @@ export const mockAdminAccountLimits: AccountLimits = {
   timeout_seconds: { min: 5, max: 600, default: 180 },
 }
 
+export const mockRegistrationSetting = { enabled: true }
+
+export const mockRateLimitSettings: RateLimitSetting = {
+  window_seconds: 60,
+  max_requests: 100,
+}
+
+export const mockStorageProviders: StorageProviderMeta[] = [
+  {
+    provider: 'local',
+    label: '本地存储',
+    description: '使用服务器本地 /uploads 目录保存文件。',
+    builtin: true,
+    create_allowed: false,
+    supports_test: false,
+    supports_bucket_info: false,
+    fields: [],
+  },
+  {
+    provider: 's3-compatible',
+    label: 'S3 兼容存储',
+    description: '统一接入 Amazon S3、阿里云 OSS、腾讯云 COS、Cloudflare R2、MinIO 等对象存储。',
+    builtin: false,
+    create_allowed: true,
+    supports_test: true,
+    supports_bucket_info: true,
+    fields: [
+      {
+        key: 'access_key_id',
+        label: 'Access Key ID',
+        type: 'text',
+        placeholder: '请输入 Access Key ID',
+        required: true,
+      },
+      {
+        key: 'secret_access_key',
+        label: 'Secret Access Key',
+        type: 'password',
+        placeholder: '请输入 Secret Access Key',
+        required: true,
+        secret: true,
+      },
+      {
+        key: 'bucket_name',
+        label: 'Bucket 名称',
+        type: 'text',
+        placeholder: '请输入 Bucket 名称',
+        required: true,
+      },
+      {
+        key: 'endpoint',
+        label: 'Endpoint',
+        type: 'text',
+        placeholder: '例如：s3.us-east-1.amazonaws.com / <account>.r2.cloudflarestorage.com',
+        required: true,
+      },
+      {
+        key: 'region_id',
+        label: '地域 / Region',
+        type: 'text',
+        placeholder: '例如：us-east-1，可留空',
+      },
+      {
+        key: 'access_domain',
+        label: '访问域名',
+        type: 'text',
+        placeholder: '例如：https://bucket.s3.us-east-1.amazonaws.com',
+        required: true,
+      },
+      {
+        key: 'force_path_style',
+        label: 'Path Style',
+        type: 'switch',
+        hint: '部分兼容存储需要使用 path-style 访问。',
+      },
+    ],
+  },
+]
+
+export const mockStorageProfiles: StorageProfile[] = [
+  {
+    id: 'builtin-local',
+    name: '本地存储',
+    provider: 'local',
+    enabled: true,
+    is_current: true,
+    builtin: true,
+    secret_configured: false,
+    config: {},
+  },
+  {
+    id: 'mock-aliyun-oss',
+    name: '阿里云 OSS 生产存储',
+    provider: 's3-compatible',
+    enabled: true,
+    is_current: false,
+    builtin: false,
+    secret_configured: true,
+    config: {
+      access_key_id: 'mock-ak-prod',
+      bucket_name: 'ideaboard-prod-assets',
+      endpoint: 'oss-cn-shanghai.aliyuncs.com',
+      region_id: 'cn-shanghai',
+      access_domain: 'https://assets.example.com',
+      force_path_style: false,
+    },
+  },
+  {
+    id: 'mock-r2',
+    name: 'Cloudflare R2 备用存储',
+    provider: 's3-compatible',
+    enabled: false,
+    is_current: false,
+    builtin: false,
+    secret_configured: true,
+    config: {
+      access_key_id: 'mock-r2-ak',
+      bucket_name: 'ideaboard-backup',
+      endpoint: 'demo.r2.cloudflarestorage.com',
+      region_id: 'auto',
+      access_domain: 'https://r2-assets.example.com',
+      force_path_style: false,
+    },
+  },
+]
+
 export const mockMonitorData: MonitorData = {
   global_queue_len: 31,
   wait_queue_len: 11,
@@ -401,6 +575,118 @@ function createMonitorExecutionPressurePoint(
     failed_count: failedCount,
     retry_count: retryCount,
   }
+}
+
+function createMockAdminUserRows(now = new Date()): User[] {
+  const timestamp = now.toISOString()
+  return [
+    createMockAdminUser(1, 'ADMIN1', 'admin', 'auth-admin', mockUserRoles.admin, 1, timestamp),
+    createMockAdminUser(2, 'USR001', 'mika', 'auth-mika', mockUserRoles.user, 1, timestamp),
+    createMockAdminUser(3, 'USR002', 'noah', 'auth-noah', mockUserRoles.user, 1, timestamp),
+    createMockAdminUser(4, 'USR003', 'sora', 'auth-sora', mockUserRoles.user, 0, timestamp),
+    createMockAdminUser(5, 'USR004', 'lin', 'auth-lin', mockUserRoles.user, 1, timestamp),
+    createMockAdminUser(6, 'USR005', 'ops', 'auth-ops', mockUserRoles.admin, 1, timestamp),
+    createMockAdminUser(
+      7,
+      'USR006',
+      'guest_review',
+      'auth-guest-review',
+      mockUserRoles.user,
+      0,
+      timestamp,
+    ),
+    createMockAdminUser(8, 'USR007', 'kepler', 'auth-kepler', mockUserRoles.user, 1, timestamp),
+    createMockAdminUser(9, 'USR008', 'aurora', 'auth-aurora', mockUserRoles.user, 1, timestamp),
+    createMockAdminUser(10, 'USR009', 'sandbox', 'auth-sandbox', mockUserRoles.user, 1, timestamp),
+    createMockAdminUser(
+      11,
+      'USR010',
+      'designer',
+      'auth-designer',
+      mockUserRoles.user,
+      1,
+      timestamp,
+    ),
+  ]
+}
+
+function createMockAdminUser(
+  id: number,
+  uid: string,
+  username: string,
+  authUserID: string,
+  role: ListAdminUsersRoleValue,
+  status: ListAdminUsersStatusValue,
+  timestamp: string,
+): User {
+  return {
+    id,
+    uid,
+    username,
+    auth_user_id: authUserID,
+    avatar: '',
+    role,
+    status,
+    created_at: timestamp,
+    updated_at: timestamp,
+  }
+}
+
+function matchesMockAdminUserFilters(user: User, params: ListAdminUsersParams) {
+  if (params.role && user.role !== params.role) return false
+  if (params.status != null && user.status !== params.status) return false
+
+  const keyword = String(params.keyword || '')
+    .trim()
+    .toLowerCase()
+  if (!keyword) return true
+
+  return [user.uid, user.username, user.auth_user_id || '', user.role, String(user.status)].some(
+    (field) => field.toLowerCase().includes(keyword),
+  )
+}
+
+function defaultMockFeaturePromptVariables(slug: string): FeaturePromptVariable[] {
+  const featureSlug = slug as WorkflowFeature
+  switch (featureSlug) {
+    case WORKFLOW_FEATURE.partialEdit:
+    case WORKFLOW_FEATURE.patternGen:
+      return promptVariables('{{user_prompt}}')
+    case WORKFLOW_FEATURE.styleVariation:
+      return [{ key: '{{strength}}', tone: 'control' }]
+    case WORKFLOW_FEATURE.virtual3d:
+      return [
+        { key: '{{viewpoint}}', tone: 'context' },
+        { key: '{{lighting}}', tone: 'context' },
+        { key: '{{user_prompt}}', tone: 'prompt' },
+      ]
+    case WORKFLOW_FEATURE.styleFusion:
+      return [
+        { key: '{{user_prompt}}', tone: 'prompt' },
+        { key: '{{image_weights}}', tone: 'control' },
+      ]
+    case WORKFLOW_FEATURE.hdUpscale:
+      return [
+        { key: '{{upscale_mode}}', tone: 'control' },
+        { key: '{{upscale_factor}}', tone: 'control' },
+        { key: '{{output_format}}', tone: 'control' },
+        { key: '{{output_quality}}', tone: 'control' },
+      ]
+    case WORKFLOW_FEATURE.imageExtend:
+      return [
+        { key: '{{user_prompt}}', tone: 'prompt' },
+        { key: '{{extend_top}}', tone: 'control' },
+        { key: '{{extend_right}}', tone: 'control' },
+        { key: '{{extend_bottom}}', tone: 'control' },
+        { key: '{{extend_left}}', tone: 'control' },
+      ]
+    default:
+      return []
+  }
+}
+
+function promptVariables(...keys: string[]): FeaturePromptVariable[] {
+  return keys.map((key) => ({ key, tone: 'prompt' }))
 }
 
 function createMockAdminAccount(
