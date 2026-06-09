@@ -3,6 +3,7 @@ package taskservice
 import (
 	"context"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -503,11 +504,12 @@ RETURNING id`).Scan(&channelID); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
+	taskOutputPath := "uploads/tasks/" + strconv.FormatInt(task.UserID, 10) + "/delete-with-outputs/2026/06/03/result.png"
 	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ChannelID, task.LeaseToken, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
 		{
 			Role:       "image",
-			URL:        "/uploads/tasks/42/delete-with-outputs/2026/06/03/result.png",
-			StorageKey: "uploads/tasks/42/delete-with-outputs/2026/06/03/result.png",
+			URL:        "/" + taskOutputPath,
+			StorageKey: taskOutputPath,
 			MIMEType:   "image/png",
 			Width:      1024,
 			Height:     1024,

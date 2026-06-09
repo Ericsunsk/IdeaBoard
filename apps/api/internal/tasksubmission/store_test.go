@@ -3,8 +3,6 @@ package tasksubmission
 import (
 	"context"
 	"errors"
-	"os"
-	"strings"
 	"testing"
 
 	"ideaboard/api/internal/runtime/queuetypes"
@@ -12,15 +10,13 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
 
 func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 	ctx := context.Background()
-	db := testdb.Open(t)
-	pool := openSubmitStoreTestPool(t)
+	db, pool := testdb.OpenWithPool(t)
 
 	task := &tasks.Task{
 		TaskID:     "task_rollback_on_river_failure",
@@ -50,28 +46,6 @@ func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 	if count != 0 {
 		t.Fatalf("task row count=%d, want 0", count)
 	}
-}
-
-func openSubmitStoreTestPool(t testing.TB) *pgxpool.Pool {
-	t.Helper()
-	raw := strings.TrimSpace(os.Getenv("API_TEST_DATABASE_DSN"))
-	if raw == "" {
-		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
-	}
-	cfg, err := pgxpool.ParseConfig(raw)
-	if err != nil {
-		t.Fatalf("parse PostgreSQL test dsn failed: %v", err)
-	}
-	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
-	pool, err := pgxpool.NewWithConfig(t.Context(), cfg)
-	if err != nil {
-		t.Fatalf("open PostgreSQL test pool failed: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	if err := pool.Ping(t.Context()); err != nil {
-		t.Fatalf("ping PostgreSQL test pool failed: %v", err)
-	}
-	return pool
 }
 
 type failingRiverTxClient struct {

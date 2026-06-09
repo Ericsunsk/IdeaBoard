@@ -123,8 +123,6 @@ jobs:
 
       - name: Test Go API
         working-directory: apps/api
-        env:
-          GOFLAGS: -p=1
         run: go test ./...
 
       - name: Check sqlc generated code
@@ -135,8 +133,6 @@ jobs:
 
       - name: Test Go API with race detector
         working-directory: apps/api
-        env:
-          GOFLAGS: -p=1
         run: go test -race ./...
 
       - name: Lint Go API

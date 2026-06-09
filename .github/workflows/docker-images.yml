@@ -80,14 +80,10 @@ jobs:
 
       - name: Test API
         working-directory: apps/api
-        env:
-          GOFLAGS: -p=1
         run: go test ./...
 
       - name: Test API with race detector
         working-directory: apps/api
-        env:
-          GOFLAGS: -p=1
         run: go test -race ./...
 
       - name: Lint API

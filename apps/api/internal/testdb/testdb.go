@@ -4,17 +4,46 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"ideaboard/api/internal/db/migrations"
-	"ideaboard/api/internal/platform/database"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
+var schemaCounter uint64
+
 func Open(t testing.TB) *sql.DB {
+	t.Helper()
+
+	env := createIsolatedEnv(t)
+	db := openIsolatedSQLDB(t, env)
+	migrateAndSeed(t, db)
+	return db
+}
+
+func OpenWithPool(t testing.TB) (*sql.DB, *pgxpool.Pool) {
+	t.Helper()
+
+	env := createIsolatedEnv(t)
+	db := openIsolatedSQLDB(t, env)
+	migrateAndSeed(t, db)
+	pool := openIsolatedPool(t, env)
+	return db, pool
+}
+
+type isolatedEnv struct {
+	rawDSN     string
+	schemaName string
+}
+
+func createIsolatedEnv(t testing.TB) isolatedEnv {
 	t.Helper()
 
 	raw := strings.TrimSpace(os.Getenv("API_TEST_DATABASE_DSN"))
@@ -22,65 +51,96 @@ func Open(t testing.TB) *sql.DB {
 		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
 	}
 
-	db, err := sql.Open("pgx", raw)
+	adminDB, err := sql.Open("pgx", raw)
 	if err != nil {
 		t.Fatalf("open PostgreSQL test db failed: %v", err)
 	}
+
+	schemaName := nextSchemaName()
+	quotedSchema := pgx.Identifier{schemaName}.Sanitize()
+	schemaCreated := false
 	t.Cleanup(func() {
-		cleanup(t, db)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if schemaCreated {
+			_, _ = adminDB.ExecContext(ctx, `DROP SCHEMA IF EXISTS `+quotedSchema+` CASCADE`)
+		}
+		_ = adminDB.Close()
+	})
+
+	if err := adminDB.Ping(); err != nil {
+		t.Fatalf("ping PostgreSQL test db failed: %v", err)
+	}
+	if _, err := adminDB.ExecContext(t.Context(), `CREATE SCHEMA `+quotedSchema); err != nil {
+		t.Fatalf("create PostgreSQL test schema failed: %v", err)
+	}
+	schemaCreated = true
+
+	return isolatedEnv{
+		rawDSN:     raw,
+		schemaName: schemaName,
+	}
+}
+
+func openIsolatedSQLDB(t testing.TB, env isolatedEnv) *sql.DB {
+	t.Helper()
+
+	cfg, err := pgx.ParseConfig(env.rawDSN)
+	if err != nil {
+		t.Fatalf("parse PostgreSQL test dsn failed: %v", err)
+	}
+	cfg.RuntimeParams["search_path"] = searchPathForSchema(env.schemaName)
+
+	db := stdlib.OpenDB(*cfg)
+	t.Cleanup(func() {
 		_ = db.Close()
 	})
 	if err := db.Ping(); err != nil {
-		t.Fatalf("ping PostgreSQL test db failed: %v", err)
+		t.Fatalf("ping isolated PostgreSQL test db failed: %v", err)
 	}
-	if err := migrations.Up(t.Context(), db); err != nil {
-		t.Fatalf("migrate PostgreSQL test db failed: %v", err)
-	}
-	cleanup(t, db)
 	return db
 }
 
-func cleanup(t testing.TB, db *sql.DB) {
+func openIsolatedPool(t testing.TB, env isolatedEnv) *pgxpool.Pool {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	_, err := db.ExecContext(ctx, `
-DROP TRIGGER IF EXISTS fail_mark_completed ON tasks;
-DROP TRIGGER IF EXISTS fail_mark_failed ON tasks;
-DROP FUNCTION IF EXISTS fail_mark_completed();
-DROP FUNCTION IF EXISTS fail_mark_failed();
-TRUNCATE TABLE
-  storage_profile_secrets,
-  storage_profiles,
-  feature_prompt_revisions,
-  feature_prompts,
-  media_refs,
-  media_assets,
-  task_attempts,
-  api_account_secrets,
-  api_account_models,
-  board_share_tokens,
-  board_members,
-  user_boards,
-  line_draft_modes,
-  system_configs,
-  channels,
-  task_daily_stat_backfills,
-  task_cancellations,
-  task_execution_metrics,
-  task_stat_events,
-  task_daily_stats,
-  task_outputs,
-  tasks,
-  api_accounts,
-  users_used_uids,
-  users
-RESTART IDENTITY CASCADE;
-`)
-	if err != nil && !database.IsMissingTableError(err) {
-		t.Fatalf("cleanup PostgreSQL test db failed: %v", err)
+
+	cfg, err := pgxpool.ParseConfig(env.rawDSN)
+	if err != nil {
+		t.Fatalf("parse PostgreSQL test pool dsn failed: %v", err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = searchPathForSchema(env.schemaName)
+	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+
+	pool, err := pgxpool.NewWithConfig(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf("open isolated PostgreSQL test pool failed: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	if err := pool.Ping(t.Context()); err != nil {
+		t.Fatalf("ping isolated PostgreSQL test pool failed: %v", err)
+	}
+	return pool
+}
+
+func migrateAndSeed(t testing.TB, db *sql.DB) {
+	t.Helper()
+
+	if err := migrations.Up(t.Context(), db); err != nil {
+		t.Fatalf("migrate PostgreSQL test db failed: %v", err)
 	}
 	seedDefaults(t, db)
+}
+
+func nextSchemaName() string {
+	counter := atomic.AddUint64(&schemaCounter, 1)
+	return "ideaboard_test_" +
+		strconv.FormatInt(int64(os.Getpid()), 36) + "_" +
+		strconv.FormatInt(time.Now().UnixNano(), 36) + "_" +
+		strconv.FormatUint(counter, 36)
+}
+
+func searchPathForSchema(schemaName string) string {
+	return pgx.Identifier{schemaName}.Sanitize() + ",public"
 }
 
 func seedDefaults(t testing.TB, db *sql.DB) {
@@ -92,7 +152,7 @@ INSERT INTO storage_profiles (profile_id, name, provider, enabled, is_current, b
 VALUES ('builtin-local', '本地存储', 'local', TRUE, TRUE, TRUE, 'active', '{}'::jsonb)
 ON CONFLICT (profile_id) DO NOTHING;
 `)
-	if err != nil && !database.IsMissingTableError(err) {
+	if err != nil {
 		t.Fatalf("seed PostgreSQL test defaults failed: %v", err)
 	}
 	seedTaskFixtureUsers(t, db)
@@ -115,6 +175,11 @@ WITH seed_users (id, username, storage_uid) AS (
     (42, 'test-fixture-user-42', 'T00042'),
     (88, 'test-fixture-user-88', 'T00088'),
     (90, 'test-fixture-user-90', 'T00090'),
+    (91, 'test-fixture-user-91', 'T00091'),
+    (92, 'test-fixture-user-92', 'T00092'),
+    (93, 'test-fixture-user-93', 'T00093'),
+    (94, 'test-fixture-user-94', 'T00094'),
+    (95, 'test-fixture-user-95', 'T00095'),
     (99, 'test-fixture-user-99', 'T00099'),
     (101, 'test-fixture-user-101', 'T00101')
 )
@@ -135,6 +200,11 @@ WITH seed_uids (storage_uid) AS (
     ('T00042'),
     ('T00088'),
     ('T00090'),
+    ('T00091'),
+    ('T00092'),
+    ('T00093'),
+    ('T00094'),
+    ('T00095'),
     ('T00099'),
     ('T00101')
 )
@@ -145,7 +215,7 @@ ON CONFLICT (storage_uid) DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT COALESCE(MAX(id), 1) FROM users), true);
 `)
-	if err != nil && !database.IsMissingTableError(err) {
+	if err != nil {
 		t.Fatalf("seed PostgreSQL test fixture users failed: %v", err)
 	}
 }

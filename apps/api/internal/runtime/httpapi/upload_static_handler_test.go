@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,8 +22,9 @@ import (
 )
 
 type uploadStaticTestEnv struct {
-	router *gin.Engine
-	auth   *httptest.Server
+	router        *gin.Engine
+	auth          *httptest.Server
+	taskOutputURL string
 }
 
 func TestUploadStaticHandlerWorkspaceRequiresLogin(t *testing.T) {
@@ -123,12 +125,12 @@ func TestUploadStaticHandlerRejectsUnsupportedProfileSubdirectory(t *testing.T) 
 func TestUploadStaticHandlerTaskOutputAllowsOwnerOnly(t *testing.T) {
 	env := newUploadStaticTestEnv(t)
 
-	ownerRec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/tasks/1/task-demo/output.png", "session=owner")
+	ownerRec := performUploadStaticRequest(env.router, http.MethodGet, env.taskOutputURL, "session=owner")
 	if ownerRec.Code != http.StatusOK {
 		t.Fatalf("owner status = %d, want %d; body=%s", ownerRec.Code, http.StatusOK, ownerRec.Body.String())
 	}
 
-	memberRec := performUploadStaticRequest(env.router, http.MethodGet, "/uploads/tasks/1/task-demo/output.png", "session=member")
+	memberRec := performUploadStaticRequest(env.router, http.MethodGet, env.taskOutputURL, "session=member")
 	if memberRec.Code != http.StatusForbidden {
 		t.Fatalf("member status = %d, want %d; body=%s", memberRec.Code, http.StatusForbidden, memberRec.Body.String())
 	}
@@ -182,7 +184,6 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "content", "demo.txt"), "workspace content")
 	mustWriteTestFile(t, filepath.Join("uploads", "workspace", "OWNR1A", "board-1", "thumb", "demo.txt"), "workspace thumb")
 	mustWriteTestFile(t, filepath.Join("uploads", "profile", "OWNR1A", "avatar", "avatar.txt"), "profile avatar")
-	mustWriteTestFile(t, filepath.Join("uploads", "tasks", "1", "task-demo", "output.png"), "task output")
 	mustWriteTestFile(t, filepath.Join("uploads", "2026", "05", "13", "legacy.txt"), "legacy upload")
 
 	db := testdb.Open(t)
@@ -190,6 +191,9 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	owner := mustCreateUploadStaticUser(t, userRepo, "owner", "owner-auth", "OWNR1A")
 	member := mustCreateUploadStaticUser(t, userRepo, "member", "member-auth", "MEMB1A")
 	mustCreateUploadStaticUser(t, userRepo, "outsider", "outsider-auth", "OUTS1A")
+	ownerIDPath := strconv.FormatInt(owner.ID, 10)
+	taskOutputURL := "/uploads/tasks/" + ownerIDPath + "/task-demo/output.png"
+	mustWriteTestFile(t, filepath.Join("uploads", "tasks", ownerIDPath, "task-demo", "output.png"), "task output")
 
 	boardRepo := boards.NewBoardRepository(db)
 	now := time.Now()
@@ -218,7 +222,7 @@ func newUploadStaticTestEnv(t *testing.T) uploadStaticTestEnv {
 	router.GET("/uploads/*filepath", handler)
 	router.HEAD("/uploads/*filepath", handler)
 
-	return uploadStaticTestEnv{router: router, auth: authServer}
+	return uploadStaticTestEnv{router: router, auth: authServer, taskOutputURL: taskOutputURL}
 }
 
 func newUploadStaticAuthServer(t *testing.T) *httptest.Server {
