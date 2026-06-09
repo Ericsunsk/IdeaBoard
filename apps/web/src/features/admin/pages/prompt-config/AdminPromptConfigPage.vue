@@ -61,12 +61,12 @@
     @update:visible="handleEditorDialogVisibleUpdate"
   >
     <template #header>
-      <div class="flex w-full flex-col gap-4 pr-4 md:flex-row md:items-start md:justify-between">
-        <div class="min-w-0">
+      <div :class="adminDialogHeaderSplitClass">
+        <div :class="adminDialogHeaderContentClass">
           <div v-if="activeGroup" class="mb-3 flex flex-wrap gap-2">
             <Tag :value="activeGroup.title" severity="secondary" rounded />
           </div>
-          <h2 class="m-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color">
+          <h2 :class="adminDialogTitleClass">
             {{ activeGroup ? `编辑 ${activeGroup.title} 节点提示词` : '' }}
           </h2>
         </div>
@@ -84,8 +84,11 @@
 
     <div
       v-if="activeGroup"
-      class="app-scrollbar h-[min(66vh,620px)] overflow-y-auto overscroll-contain pr-3"
-      :class="{ 'is-scrolling': isPromptDialogScrolling }"
+      :class="[
+        adminDialogScrollableBodyClass,
+        'h-[min(66vh,620px)]',
+        { 'is-scrolling': isPromptDialogScrolling },
+      ]"
       @scroll.passive="handlePromptDialogScroll"
     >
       <div class="flex flex-col gap-3 pr-3">
@@ -160,7 +163,7 @@
     </div>
 
     <template #footer>
-      <div class="flex justify-end">
+      <div :class="adminDialogFooterActionsClass">
         <Button label="关闭" severity="secondary" outlined @click="closeEditor" />
       </div>
     </template>
@@ -181,6 +184,13 @@ import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessage
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminPanelPt } from '../../shared/lib/adminPanelPt'
+import {
+  adminDialogFooterActionsClass,
+  adminDialogHeaderContentClass,
+  adminDialogHeaderSplitClass,
+  adminDialogScrollableBodyClass,
+  adminDialogTitleClass,
+} from '../../shared/lib/adminUiClasses'
 import { createMockFeaturePrompts, useAdminMockMode } from '../../shared/lib/adminMockData'
 import { saveFeaturePrompt } from '../../shared/queries/adminActions'
 import {

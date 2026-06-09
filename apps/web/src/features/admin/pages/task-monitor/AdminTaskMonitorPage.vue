@@ -137,7 +137,7 @@
         </Button>
         <Popover ref="taskFilterPopoverRef">
           <div :class="adminFilterPopoverClass">
-            <div class="border-b border-admin-border pb-2">
+            <div :class="adminPopoverSectionHeaderClass">
               <div :class="adminPopoverTitleClass">筛选</div>
             </div>
 
@@ -353,7 +353,7 @@
       v-model:visible="detailModalVisible"
       modal
       :style="{ width: '680px', maxWidth: '95vw' }"
-      :pt="detailDialogPt"
+      :pt="taskDetailDialogPt"
       :draggable="false"
     >
       <template #header>
@@ -668,6 +668,7 @@ import {
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import {
   adminFilterPopoverClass,
+  adminPopoverSectionHeaderClass,
   adminPopoverTitleClass,
   adminToolbarIconButtonClass,
   adminToolbarPageLabelClass,
@@ -706,7 +707,7 @@ const adminMonitorTooltipBase = {
   borderWidth: 1,
   padding: 10,
 } as const
-const detailDialogPt = {
+const taskDetailDialogPt = {
   root: {
     class:
       '!overflow-hidden !border !border-[rgba(215,224,235,0.92)] !bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(247,250,253,0.96))] !shadow-[0_24px_60px_rgba(45,64,89,0.16)]',

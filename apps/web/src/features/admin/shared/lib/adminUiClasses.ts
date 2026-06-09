@@ -48,6 +48,25 @@ export const adminFilterPopoverClass =
 export const adminConfigPopoverClass =
   'flex w-[280px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4'
 
+export const adminPopoverSectionHeaderClass = 'border-b border-admin-border pb-2'
+
 export const adminPopoverTitleClass = 'text-admin-content font-bold text-admin-title-color'
+
+export const adminDialogHeaderSplitClass =
+  'flex w-full flex-col gap-4 pr-4 md:flex-row md:items-start md:justify-between'
+
+export const adminDialogHeaderContentClass = 'min-w-0'
+
+export const adminDialogTitleClass =
+  'm-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color'
+
+export const adminDialogScrollableBodyClass =
+  'app-scrollbar overflow-y-auto overscroll-contain pr-3'
+
+export const adminDialogFormBodyClass = 'flex flex-col gap-3.5'
+
+export const adminDialogFooterActionsClass = 'flex flex-wrap justify-end gap-2'
+
+export const adminDialogCompactFooterActionsClass = 'flex justify-end gap-2.5'
 
 export const adminCompactTagClass = '!px-2 !py-0.5 !text-admin-caption !leading-4'

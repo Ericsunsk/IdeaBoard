@@ -175,12 +175,12 @@
     @update:visible="handleEditorDialogVisibleUpdate"
   >
     <template #header>
-      <div class="flex w-full flex-col gap-4 pr-4 md:flex-row md:items-start md:justify-between">
-        <div class="min-w-0 flex-1">
+      <div :class="adminDialogHeaderSplitClass">
+        <div :class="[adminDialogHeaderContentClass, 'flex-1']">
           <div class="mb-3 flex flex-wrap gap-2">
             <Tag :value="form.isCurrent ? '当前存储' : '存储配置'" severity="secondary" rounded />
           </div>
-          <h2 class="m-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color">
+          <h2 :class="adminDialogTitleClass">
             {{ editorMode === 'create' ? '添加存储' : '编辑存储' }}
           </h2>
         </div>
@@ -196,8 +196,11 @@
     </template>
 
     <div
-      class="app-scrollbar max-h-[min(68vh,640px)] overflow-y-auto overscroll-contain pr-3"
-      :class="{ 'is-scrolling': isStorageDialogScrolling }"
+      :class="[
+        adminDialogScrollableBodyClass,
+        'max-h-[min(68vh,640px)]',
+        { 'is-scrolling': isStorageDialogScrolling },
+      ]"
       @scroll.passive="handleStorageDialogScroll"
     >
       <Tabs value="basic" class="min-w-0 pr-3">
@@ -383,7 +386,7 @@
     </div>
 
     <template #footer>
-      <div class="flex w-full flex-wrap justify-end gap-2">
+      <div :class="['w-full', adminDialogFooterActionsClass]">
         <Button label="取消" severity="secondary" outlined @click="closeEditor" />
         <Button label="保存" severity="secondary" :loading="saving" @click="saveDraft" />
         <Button
@@ -419,6 +422,11 @@ import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import {
   adminCompactTagClass,
+  adminDialogFooterActionsClass,
+  adminDialogHeaderContentClass,
+  adminDialogHeaderSplitClass,
+  adminDialogScrollableBodyClass,
+  adminDialogTitleClass,
   adminEmptyStateClass,
   adminLoadingStateClass,
   adminMasonryCardClass,

@@ -31,7 +31,7 @@
       </Button>
       <Popover ref="userFilterPopoverRef">
         <div :class="adminFilterPopoverClass">
-          <div class="border-b border-admin-border pb-2">
+          <div :class="adminPopoverSectionHeaderClass">
             <div :class="adminPopoverTitleClass">筛选</div>
           </div>
 
@@ -81,7 +81,7 @@
       </Button>
       <Popover ref="userConfigPopoverRef">
         <div :class="adminConfigPopoverClass">
-          <div class="border-b border-admin-border pb-2">
+          <div :class="adminPopoverSectionHeaderClass">
             <div :class="adminPopoverTitleClass">用户配置</div>
           </div>
 
@@ -311,7 +311,7 @@
       :pt="userActionPopoverPt"
       @hide="handleUserActionPopoverHide"
     >
-      <div class="flex min-w-[176px] flex-col gap-1">
+      <div :class="userActionPopoverClass">
         <template v-for="item in userActionItems" :key="item.key">
           <div v-if="item.divided" class="my-1 h-px bg-admin-border-soft" aria-hidden="true" />
           <Button
@@ -336,12 +336,12 @@
     @update:visible="handleBanDialogVisibleUpdate"
   >
     <template #header>
-      <div class="min-w-0 pr-4">
+      <div :class="[adminDialogHeaderContentClass, 'pr-4']">
         <div class="mb-3 flex flex-wrap gap-2">
           <Tag value="访问控制" severity="secondary" rounded />
           <Tag value="强制限制" severity="danger" rounded />
         </div>
-        <h2 class="m-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color">
+        <h2 :class="adminDialogTitleClass">
           高级访问限制
         </h2>
         <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-subtitle-color">
@@ -350,7 +350,7 @@
       </div>
     </template>
 
-    <div class="flex flex-col gap-3.5">
+    <div :class="adminDialogFormBodyClass">
       <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
         <span>封禁时长 (Duration)</span>
         <Select
@@ -378,7 +378,7 @@
         <div class="max-w-[480px] text-admin-meta leading-6 text-admin-text-3">
           封禁会立即断开该用户所有连接，封禁期间无法重新登录。
         </div>
-        <div class="flex flex-wrap justify-end gap-2">
+        <div :class="adminDialogFooterActionsClass">
           <Button label="取消" severity="secondary" outlined @click="closeBanModal" />
           <Button
             label="确认封禁"
@@ -401,7 +401,6 @@ import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import Popover from 'primevue/popover'
-import type { PopoverPassThroughOptions } from 'primevue/popover'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
@@ -450,7 +449,12 @@ import { useTransientScrolling } from '../../shared/composables/useTransientScro
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
 import {
   adminConfigPopoverClass,
+  adminDialogFormBodyClass,
+  adminDialogFooterActionsClass,
+  adminDialogHeaderContentClass,
+  adminDialogTitleClass,
   adminFilterPopoverClass,
+  adminPopoverSectionHeaderClass,
   adminPopoverTitleClass,
   adminRoundIconButtonClass,
   adminToolbarIconButtonClass,
@@ -469,6 +473,15 @@ type UserActionItem = {
   divided?: boolean
 }
 
+const userActionPopoverClass = 'flex min-w-[176px] flex-col gap-1'
+
+const userActionPopoverPt = {
+  root: {
+    class: '!rounded-lg !border-admin-border !bg-admin-card !shadow-none',
+  },
+  content: { class: '!p-1.5' },
+} as const
+
 type PrimePopupPanel = {
   toggle: (event: Event) => void
   hide?: () => void
@@ -483,12 +496,6 @@ type UserStatusFilter = typeof USER_STATUS_FILTER_ALL | ListAdminUsersStatusValu
 const appToast = useAppToast()
 const confirm = useConfirm()
 const isMockMode = useAdminMockMode()
-const userActionPopoverPt = {
-  root: {
-    class: '!rounded-lg !border-admin-border !bg-admin-card !shadow-none',
-  },
-  content: { class: '!p-1.5' },
-} satisfies PopoverPassThroughOptions
 
 const queryClient = useQueryClient()
 const userFilterPopoverRef = ref<PrimePopupPanel | null>(null)

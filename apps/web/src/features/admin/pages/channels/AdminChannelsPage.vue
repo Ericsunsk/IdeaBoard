@@ -227,7 +227,7 @@
       :header="isEditChannel ? '编辑渠道商' : '新增渠道商'"
       :style="{ width: '480px' }"
     >
-      <div class="flex flex-col gap-3.5">
+      <div :class="adminDialogFormBodyClass">
         <label
           class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
         >
@@ -264,7 +264,7 @@
         </label>
       </div>
       <template #footer>
-        <div class="flex justify-end gap-2.5">
+        <div :class="adminDialogCompactFooterActionsClass">
           <Button label="取消" severity="secondary" outlined @click="showChannelModal = false" />
           <Button label="确定" :loading="channelSaveLoading" @click="handleSaveChannel" />
         </div>
@@ -278,7 +278,7 @@
       :header="isEditAccount ? '编辑 APIKey' : '新增 APIKey'"
       :style="{ width: '500px' }"
     >
-      <div class="flex flex-col gap-3.5">
+      <div :class="adminDialogFormBodyClass">
         <div
           v-if="selectedChannelForAccount"
           class="mb-4 flex items-center gap-1.5 rounded-xl border border-admin-border bg-admin-surface-muted px-3 py-2 text-admin-meta text-admin-text-2"
@@ -342,7 +342,7 @@
         </div>
       </div>
       <template #footer>
-        <div class="flex justify-end gap-2.5">
+        <div :class="adminDialogCompactFooterActionsClass">
           <Button label="取消" severity="secondary" outlined @click="showAccountModal = false" />
           <Button label="确定" :loading="accountSaveLoading" @click="handleSaveAccount" />
         </div>
@@ -379,6 +379,8 @@ import { useTransientScrolling } from '../../shared/composables/useTransientScro
 import { adminCompactPanelPt } from '../../shared/lib/adminPanelPt'
 import {
   adminCompactTagClass,
+  adminDialogCompactFooterActionsClass,
+  adminDialogFormBodyClass,
   adminEmptyStateClass,
   adminFramedIconButtonClass,
   adminLoadingStateClass,

@@ -9,6 +9,7 @@ export default tseslint.config(
     ignores: [
       'dist/**',
       'node_modules/**',
+      'output/**',
       'src/auto-imports.d.ts',
       'src/components.d.ts',
       'src/shared/api/generated-query/**',
