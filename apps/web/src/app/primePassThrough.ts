@@ -1,8 +1,29 @@
 import type { PrimeVueConfiguration } from 'primevue/config'
 
+function classValueContains(value: unknown, needle: string): boolean {
+  if (!value) return false
+  if (typeof value === 'string') return value.includes(needle)
+  if (Array.isArray(value)) return value.some((item) => classValueContains(item, needle))
+  if (typeof value === 'object') {
+    return Object.keys(value).some((key) => key.includes(needle))
+  }
+  return false
+}
+
+function isTextButton(props: { text?: boolean; variant?: string }) {
+  return props.text || props.variant === 'text'
+}
+
 export const ideaBoardPrimePt = {
   button: {
-    root: { class: '!shadow-none font-[650]' },
+    root: ({ props }) => ({
+      class: [
+        '!shadow-none font-[650]',
+        isTextButton(props) && !classValueContains(props.class, 'active')
+          ? '[body.admin-route_&]:!text-[#718096] hover:[body.admin-route_&]:!text-admin-text-1'
+          : '',
+      ],
+    }),
   },
   dialog: {
     header: { class: '!items-start !gap-3 !px-6 !pt-5 !pb-3.5' },
@@ -34,6 +55,9 @@ export const ideaBoardPrimePt = {
   },
   inputtext: {
     root: { class: '!shadow-none' },
+  },
+  inputicon: {
+    root: { class: '[body.admin-route_&]:!text-[#718096]' },
   },
   autocomplete: {
     root: {

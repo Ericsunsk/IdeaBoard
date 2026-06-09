@@ -12,7 +12,7 @@
     </div>
 
     <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-      <Card class="xl:col-span-12">
+      <Card class="xl:col-span-12" :pt="adminCardPt">
         <template #title>
           <AdminCardHeader :title="taskCards.executionPressure.title">
             <template #actions>
@@ -37,7 +37,7 @@
         </template>
       </Card>
 
-      <Card class="xl:col-span-6">
+      <Card class="xl:col-span-6" :pt="adminCardPt">
         <template #title>
           <AdminCardHeader :title="taskCards.taskDistribution.title">
             <template #actions>
@@ -58,7 +58,7 @@
         </template>
       </Card>
 
-      <Card class="xl:col-span-6">
+      <Card class="xl:col-span-6" :pt="adminCardPt">
         <template #title>
           <AdminCardHeader :title="taskCards.accountConcurrency.title">
             <template #actions>
@@ -649,6 +649,7 @@ import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
+import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCards } from '../../shared/lib/adminCardMeta'
 import {
   adminChartLegend,

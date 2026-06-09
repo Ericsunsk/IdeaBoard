@@ -431,23 +431,3 @@ onUnmounted(() => {
   setAdminRouteClass(false)
 })
 </script>
-
-<style>
-body.admin-route .p-tooltip .p-tooltip-text {
-  padding: 8px 14px;
-  border-radius: 8px;
-  background: #2f3b4f;
-  color: #ffffff;
-  box-shadow: 0 14px 28px rgba(47, 59, 79, 0.22);
-  font-size: 14px;
-  font-weight: 650;
-}
-
-body.admin-route .p-tooltip-right .p-tooltip-arrow {
-  border-right-color: #2f3b4f;
-}
-
-body.admin-route .p-tooltip-bottom .p-tooltip-arrow {
-  border-bottom-color: #2f3b4f;
-}
-</style>

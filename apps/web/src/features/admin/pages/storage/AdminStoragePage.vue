@@ -57,6 +57,7 @@
         v-for="card in filteredStorageCards"
         :key="card.storage.id"
         :class="adminMasonryCardClass"
+        :pt="adminCardPt"
       >
         <template #title>
           <div class="flex items-start gap-3">
@@ -420,6 +421,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
+import { adminCardPt } from '../../shared/lib/adminCardPt'
 import {
   adminCompactTagClass,
   adminDialogFooterActionsClass,

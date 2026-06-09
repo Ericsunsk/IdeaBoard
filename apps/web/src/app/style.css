@@ -293,25 +293,20 @@ body.admin-route
   font-feature-settings: 'tnum' 1;
 }
 
-body.admin-route .p-card {
-  border-radius: 16px !important;
-  border: 1px solid var(--color-admin-border-soft) !important;
-  background: var(--color-admin-card-strong) !important;
-  box-shadow:
-    0 4px 20px -2px rgba(45, 64, 89, 0.02),
-    0 2px 6px -1px rgba(45, 64, 89, 0.01) !important;
-  overflow: hidden;
+body.admin-route .p-tooltip .p-tooltip-text {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #2f3b4f;
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(47, 59, 79, 0.22);
+  font-size: 14px;
+  font-weight: 650;
 }
 
-body.admin-route .p-card .p-card-body {
-  padding: 20px 24px !important;
+body.admin-route .p-tooltip-right .p-tooltip-arrow {
+  border-right-color: #2f3b4f;
 }
 
-body.admin-route .p-button-text:not(.p-button-active):not([class*='active']),
-body.admin-route .p-inputicon {
-  color: #718096 !important;
-}
-
-body.admin-route .p-button-text:not(.p-button-active):not([class*='active']):hover {
-  color: var(--color-admin-text-1) !important;
+body.admin-route .p-tooltip-bottom .p-tooltip-arrow {
+  border-bottom-color: #2f3b4f;
 }

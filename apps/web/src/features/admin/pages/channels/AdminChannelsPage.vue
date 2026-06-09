@@ -45,6 +45,7 @@
           v-for="card in filteredChannelCards"
           :key="card.channel.id"
           :class="adminMasonryCardClass"
+          :pt="adminCardPt"
         >
           <template #title>
             <div class="flex items-start gap-3">
@@ -376,6 +377,7 @@ import { useAppToast } from '../../../../shared/composables/useAppToast'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
+import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCompactPanelPt } from '../../shared/lib/adminPanelPt'
 import {
   adminCompactTagClass,

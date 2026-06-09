@@ -1,5 +1,5 @@
 <template>
-  <Card>
+  <Card :pt="adminCardPt">
     <template #subtitle>
       <span class="text-admin-body font-bold text-admin-subtitle-color tracking-normal">
         {{ label }}
@@ -15,6 +15,8 @@
 </template>
 
 <script setup lang="ts">
+import { adminCardPt } from '../lib/adminCardPt'
+
 defineProps<{
   label: string
   value: string | number

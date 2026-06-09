@@ -5,7 +5,7 @@
     @scroll="handlePromptPanelScroll"
   >
     <template v-if="featureGroups.length > 0">
-      <Card v-for="group in featureGroups" :key="group.key" class="!rounded-lg">
+      <Card v-for="group in featureGroups" :key="group.key" class="!rounded-lg" :pt="adminCardPt">
         <template #content>
           <div class="flex min-h-[208px] flex-col gap-3.5">
             <div class="flex items-start justify-between gap-3">
@@ -183,6 +183,7 @@ import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
+import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminPanelPt } from '../../shared/lib/adminPanelPt'
 import {
   adminDialogFooterActionsClass,

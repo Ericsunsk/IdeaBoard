@@ -12,7 +12,7 @@
     </div>
 
     <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-      <Card class="xl:col-span-12">
+      <Card class="xl:col-span-12" :pt="adminCardPt">
         <template #title>
           <AdminCardHeader :title="usageCards.trend.title">
             <template #actions>
@@ -41,7 +41,7 @@
         </template>
       </Card>
 
-      <Card class="xl:col-span-7">
+      <Card class="xl:col-span-7" :pt="adminCardPt">
         <template #title>
           <AdminCardHeader :title="usageCards.modelRisk.title" />
         </template>
@@ -58,7 +58,7 @@
           </AdminChartPanel>
         </template>
       </Card>
-      <Card class="xl:col-span-5">
+      <Card class="xl:col-span-5" :pt="adminCardPt">
         <template #title>
           <AdminCardHeader :title="usageCards.qualityTrend.title">
             <template #actions>
@@ -88,7 +88,7 @@
       </Card>
 
       <div class="grid grid-cols-1 gap-3.5 xl:col-span-12 xl:grid-cols-3">
-        <Card>
+        <Card :pt="adminCardPt">
           <template #title>
             <AdminCardHeader :title="usageCards.slowModels.title" />
           </template>
@@ -106,7 +106,7 @@
           </template>
         </Card>
 
-        <Card>
+        <Card :pt="adminCardPt">
           <template #title>
             <AdminCardHeader :title="usageCards.bottleneckSource.title" />
           </template>
@@ -124,7 +124,7 @@
           </template>
         </Card>
 
-        <Card>
+        <Card :pt="adminCardPt">
           <template #title>
             <AdminCardHeader :title="usageCards.failureCategories.title" />
           </template>
@@ -152,6 +152,7 @@ import Chart from 'primevue/chart'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
+import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCards } from '../../shared/lib/adminCardMeta'
 import { adminChartPlugins, useAdminChartReady } from '../../shared/lib/adminChart'
 import { useUsageStatisticsData } from './useUsageStatisticsData'
