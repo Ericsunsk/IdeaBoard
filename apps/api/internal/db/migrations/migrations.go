@@ -735,7 +735,7 @@ func validateStatementIndexName(name string) error {
 		return fmt.Errorf("index name is required")
 	}
 	for i, r := range name {
-		if i == 0 && !((r >= 'a' && r <= 'z') || r == '_') {
+		if i == 0 && (r < 'a' || r > 'z') && r != '_' {
 			return fmt.Errorf("must start with a letter or underscore")
 		}
 		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {

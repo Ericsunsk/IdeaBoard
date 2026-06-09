@@ -22,17 +22,6 @@ func parseResultMap(raw string) map[string]interface{} {
 	return result
 }
 
-func resultContainsModel(rawResult string) bool {
-	result := parseResultMap(rawResult)
-	if result == nil {
-		return false
-	}
-	if readResultString(result, "model") != "" {
-		return true
-	}
-	return false
-}
-
 func extractTaskModel(rawResult string) string {
 	return extractTaskModelWithFallback(rawResult, "")
 }
