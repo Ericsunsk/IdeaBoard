@@ -49,7 +49,7 @@
         :nodes-connectable="!isFlowCanvasLocked && activeTool !== 'hand'"
         :elements-selectable="!isFlowCanvasLocked && activeTool !== 'hand'"
         :select-nodes-on-drag="!isFlowCanvasLocked && activeTool === 'select'"
-        :selection-key-code="!isFlowCanvasLocked && activeTool === 'select' ? 'Shift' : false"
+        :selection-key-code="!isFlowCanvasLocked && activeTool === 'select'"
         :multi-selection-key-code="!isFlowCanvasLocked && activeTool === 'select' ? 'Shift' : null"
         :delete-key-code="null"
         :default-edge-options="{ animated: false, updatable: true }"
@@ -979,13 +979,6 @@ onMounted(async () => {
   background-image: radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
   background-size: 24px 24px;
   background-position: 0 0;
-}
-
-.toolbar-divider {
-  width: 24px;
-  height: 1px;
-  background: #f1f3f9;
-  margin: 4px auto;
 }
 
 .workspace-flow-canvas-wrap {

@@ -1,6 +1,9 @@
 <template>
-  <span class="action-logo">
-    <component :is="resolvedIcon" class="action-logo-icon" />
+  <span class="flex items-center justify-center">
+    <component
+      :is="resolvedIcon"
+      class="size-[21px] [stroke-width:var(--node-tool-icon-stroke,1.5)]"
+    />
   </span>
 </template>
 
@@ -24,17 +27,3 @@ const iconMap: Record<ImageActionMenuIcon, Component> = {
 
 const resolvedIcon = computed<Component>(() => iconMap[props.icon])
 </script>
-
-<style scoped>
-.action-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-logo-icon {
-  width: 21px;
-  height: 21px;
-  stroke-width: var(--node-tool-icon-stroke, 1.5);
-}
-</style>

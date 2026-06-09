@@ -1,15 +1,23 @@
 <template>
-  <div class="node-aspect-ratio-wrap node-tool-output-count-wrap">
+  <div
+    class="node-aspect-ratio-wrap relative h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)]"
+  >
     <button
-      class="node-aspect-ratio-trigger node-tool-output-count node-tool-button node-tool-tooltip-trigger"
+      class="node-aspect-ratio-trigger node-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-white p-0 text-xs leading-none font-bold text-[#505766] outline-none transition-colors duration-[160ms] ease-[ease] disabled:cursor-wait disabled:opacity-[0.55]"
       type="button"
       :class="{ active: visible }"
       :disabled="disabled"
       :aria-label="ariaLabel"
       @click.stop="emit('toggle')"
     >
-      <span class="node-aspect-ratio-icon" :data-ratio="ratio">
-        <span aria-hidden="true"></span>
+      <span
+        class="node-aspect-ratio-icon grid h-full w-full place-items-center"
+        :data-ratio="ratio"
+      >
+        <span
+          class="grid h-5 w-5 place-items-center rounded border border-[#cbd5e1] text-[#94a3b8] transition-colors duration-[160ms] ease-[ease]"
+          aria-hidden="true"
+        ></span>
       </span>
       <span class="node-tool-tooltip" aria-hidden="true">{{ resolvedTooltip }}</span>
     </button>
@@ -18,14 +26,20 @@
         v-for="option in PROMPT_ASPECT_RATIO_OPTIONS"
         :key="option"
         type="button"
-        class="node-aspect-ratio-option node-tool-tooltip-trigger"
+        class="node-aspect-ratio-option node-tool-tooltip-trigger relative h-[var(--node-tool-popover-option-height)] w-[var(--node-tool-button-size)] cursor-pointer rounded-none border-0 bg-transparent p-0 text-[#5f6878] transition-colors duration-[160ms] ease-[ease]"
         :class="{ active: option === ratio }"
         :disabled="disabled"
         :aria-label="option"
         @click.stop="emit('select', option)"
       >
-        <span class="node-aspect-ratio-icon" :data-ratio="option">
-          <span aria-hidden="true"></span>
+        <span
+          class="node-aspect-ratio-icon grid h-full w-full place-items-center"
+          :data-ratio="option"
+        >
+          <span
+            class="grid h-5 w-5 place-items-center rounded border border-[#cbd5e1] text-[#94a3b8] transition-colors duration-[160ms] ease-[ease]"
+            aria-hidden="true"
+          ></span>
         </span>
         <span class="node-tool-tooltip" aria-hidden="true">{{ option }}</span>
       </button>
@@ -68,31 +82,6 @@ const resolvedTooltip = computed(() => props.tooltip || '选择尺寸比例')
 
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
-.node-aspect-ratio-trigger {
-  flex: 0 0 var(--node-tool-button-size);
-  position: relative;
-}
-
-.node-aspect-ratio-icon {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-}
-
-.node-aspect-ratio-icon > span {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  color: #94a3b8;
-  transition:
-    border-color 0.16s ease,
-    color 0.16s ease;
-}
-
 .node-aspect-ratio-icon[data-ratio='3:4'] > span {
   width: 17px;
   height: 22px;
@@ -117,20 +106,12 @@ const resolvedTooltip = computed(() => props.tooltip || '选择尺寸比例')
   right: 0;
 }
 
-.node-aspect-ratio-option {
-  position: relative;
-  width: var(--node-tool-button-size);
-  height: var(--node-tool-popover-option-height);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #5f6878;
-  cursor: pointer;
-  padding: 0;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
+.node-aspect-ratio-trigger:hover:not(:disabled),
+.node-aspect-ratio-trigger:focus,
+.node-aspect-ratio-trigger.active {
+  background: #f8f7ff;
+  border-color: var(--node-tool-button-accent);
+  color: #272932;
 }
 
 .node-aspect-ratio-option:hover,

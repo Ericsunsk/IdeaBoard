@@ -16,7 +16,7 @@
       @pointerdown.stop
       @click.stop="emit('remove')"
     >
-      <Xmark class="node-input-remove-icon" />
+      <Xmark class="size-2.5 [stroke-width:2.4]" />
     </button>
   </div>
 </template>
@@ -57,13 +57,5 @@ defineOptions({
   inheritAttrs: false,
 })
 </script>
-
-<style scoped>
-.node-input-remove-icon {
-  width: 10px;
-  height: 10px;
-  stroke-width: 2.4;
-}
-</style>
 
 <style src="./styles/node-input-thumbnails.css"></style>

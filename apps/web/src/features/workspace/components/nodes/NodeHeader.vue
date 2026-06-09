@@ -1,17 +1,20 @@
 <template>
   <div
     class="workflow-node-header"
-    :class="{ 'workflow-node-header--rounded': rounded }"
+    :class="{ 'rounded-t-xl': rounded }"
     @mousedown="onHeaderMouseDown"
   >
     <div class="node-header-title">
-      <span v-if="$slots.icon" class="node-header-icon">
+      <span
+        v-if="$slots.icon"
+        class="inline-flex size-5 flex-none items-center justify-center opacity-95 [&_svg]:block [&_svg]:size-5 [&_svg]:stroke-2"
+      >
         <slot name="icon" />
       </span>
       <span
         ref="titleTextRef"
-        class="node-header-title-text"
-        :class="{ 'is-editing': isEditing }"
+        class="min-w-0 max-w-[220px] cursor-text overflow-hidden truncate outline-none"
+        :class="{ 'text-clip': isEditing }"
         :contenteditable="isEditing ? 'plaintext-only' : 'false'"
         spellcheck="false"
         title="单击重命名"
@@ -100,41 +103,3 @@ function onTitleInput() {
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>
-<style scoped>
-.node-header-icon {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  opacity: 0.95;
-}
-
-.node-header-icon :deep(svg) {
-  display: block;
-  width: 20px;
-  height: 20px;
-  stroke-width: 2;
-}
-
-.node-header-title-text {
-  min-width: 0;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: text;
-  outline: none;
-}
-
-.node-header-title-text.is-editing {
-  max-width: 220px;
-  text-overflow: clip;
-}
-
-.workflow-node-header--rounded {
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-}
-</style>

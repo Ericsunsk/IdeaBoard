@@ -1,6 +1,6 @@
 <template>
   <div
-    class="workflow-node prompt-node"
+    class="workflow-node prompt-node flex flex-col gap-0.5 border-0 bg-transparent shadow-none"
     data-node-kind="prompt"
     :data-node-id="node.id"
     :class="{ active, dragging, 'copy-mode': copyMode }"
@@ -16,16 +16,20 @@
         <ChatLines />
       </template>
     </NodeHeader>
-    <div class="prompt-node-shell" data-flow-handle-frame>
-      <div class="prompt-node-content">
+    <div
+      class="relative min-h-[280px] overflow-visible rounded-2xl border-[1.5px] bg-white transition-colors"
+      :class="active ? 'border-[#9278e6]' : 'border-[#e2e8f0]'"
+      data-flow-handle-frame
+    >
+      <div class="box-border flex min-h-[280px] flex-col gap-3 p-5">
         <div
           ref="thumbsRef"
-          class="prompt-node-thumbs node-tool-surface node-input-thumbnail-contract variant-standard"
+          class="node-tool-surface node-input-thumbnail-contract variant-standard relative z-[3] grid justify-between gap-[var(--prompt-thumb-gap)] overflow-visible [--node-tool-button-radius:8px] [--node-tool-button-size:var(--node-input-thumbnail-size)] [--prompt-thumb-gap:6px] [grid-template-columns:repeat(4,var(--node-input-thumbnail-size))]"
         >
           <NodeInputThumbnail
             v-for="item in sortableInputImages"
             :key="item.id"
-            class="prompt-node-thumb prompt-node-thumb-item"
+            class="prompt-node-thumb-item aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)] flex-none cursor-grab"
             :src="item.url"
             removable
             :data-image-id="item.id"
@@ -35,8 +39,11 @@
           />
           <button
             v-if="canAcceptMoreImages"
-            class="prompt-node-thumb prompt-node-thumb-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
-            :class="{ 'is-drop-target': addSlotDragOver }"
+            class="node-tool-output-count node-tool-button node-tool-tooltip-trigger aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)] cursor-copy border-dashed text-[#64748b] hover:border-[var(--node-tool-button-accent)] hover:bg-[#f8f7ff] hover:text-[var(--node-tool-button-accent)] focus:border-[var(--node-tool-button-accent)] focus:bg-[#f8f7ff] focus:text-[var(--node-tool-button-accent)]"
+            :class="{
+              '!border-[var(--node-tool-button-accent)] !bg-[#f8f7ff] !text-[var(--node-tool-button-accent)]':
+                addSlotDragOver,
+            }"
             type="button"
             aria-label="添加图片输入"
             @mousedown.stop
@@ -47,7 +54,7 @@
             @dragleave.stop="onAddSlotDragLeave"
             @drop.stop.prevent="onAddSlotDrop"
           >
-            <Plus class="node-action-icon" />
+            <Plus class="size-4 stroke-[var(--node-tool-icon-stroke)]" />
             <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
           </button>
         </div>
@@ -56,7 +63,7 @@
           :output-count="outputCount"
           :aspect-ratio="aspectRatio"
           :submit-disabled="!canGenerate"
-          class="prompt-node-composer"
+          class="flex-auto"
           @update:model-value="emit('update:text', $event)"
           @update:output-count="emit('update:output-count', $event)"
           @update:aspect-ratio="emit('update:aspect-ratio', $event)"
@@ -143,78 +150,7 @@ function onAddSlotDrop(event: DragEvent) {
 <style scoped src="./styles/node-shared.css"></style>
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
-.workflow-node.prompt-node {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.prompt-node-shell {
-  position: relative;
-  min-height: 280px;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 16px;
-  background: #ffffff;
-  overflow: visible;
-  transition: border-color 0.2s ease;
-}
-.prompt-node-content {
-  display: flex;
-  min-height: 280px;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.workflow-node.prompt-node.active .prompt-node-shell {
-  border-color: #9278e6;
-}
-.node-action-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: var(--node-tool-icon-stroke);
-}
-.prompt-node-thumbs {
-  --node-tool-button-size: var(--node-input-thumbnail-size);
-  --node-tool-button-radius: 8px;
-  --prompt-thumb-gap: 6px;
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(4, var(--node-input-thumbnail-size));
-  gap: var(--prompt-thumb-gap);
-  justify-content: space-between;
-  overflow: visible;
-  z-index: 3;
-}
-.prompt-node-thumb {
-  width: var(--node-input-thumbnail-size);
-  height: var(--node-input-thumbnail-size);
-  flex: 0 0 var(--node-input-thumbnail-size);
-  cursor: grab;
-}
-.prompt-node-thumbs .prompt-node-thumb {
-  aspect-ratio: 1 / 1;
-}
 :global(.prompt-node-sortable-fallback) {
   opacity: 0 !important;
-}
-.prompt-node-thumb-add {
-  color: #64748b;
-  border-style: dashed;
-  cursor: copy;
-}
-.prompt-node-thumb-add:hover,
-.prompt-node-thumb-add:focus,
-.prompt-node-thumb-add.is-drop-target {
-  color: var(--node-tool-button-accent);
-  border-color: var(--node-tool-button-accent);
-  background: #f8f7ff;
-}
-.prompt-node-composer {
-  flex: 1 1 auto;
 }
 </style>

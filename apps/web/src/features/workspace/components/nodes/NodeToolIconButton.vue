@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="node-tool-icon-button"
+    class="node-tool-icon-button inline-grid cursor-pointer place-items-center p-0 shadow-none disabled:cursor-not-allowed disabled:opacity-[0.46]"
     :class="{
       active,
       primary,
@@ -13,7 +13,7 @@
     :aria-label="resolvedAriaLabel"
     @click="emit('click', $event)"
   >
-    <span class="node-tool-icon-button__icon">
+    <span class="node-tool-icon-button__icon inline-grid place-items-center">
       <slot />
     </span>
     <span v-if="resolvedTooltip" class="node-tool-tooltip" aria-hidden="true">
@@ -76,11 +76,6 @@ const resolvedAriaLabel = computed(
   border-radius: var(--node-tool-icon-button-radius, var(--node-tool-button-radius, 10px));
   background: var(--node-tool-icon-button-bg, #ffffff);
   color: var(--node-tool-icon-button-color, #6f61c6);
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  box-shadow: none;
-  cursor: pointer;
   transition:
     border-color 0.16s ease,
     background-color 0.16s ease,
@@ -114,16 +109,9 @@ const resolvedAriaLabel = computed(
   background: var(--node-tool-icon-button-primary-hover-bg, #6c5cb8);
 }
 
-.node-tool-icon-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.46;
-}
-
 .node-tool-icon-button__icon {
   width: var(--node-tool-icon-button-icon-size, var(--node-tool-icon-size, 21px));
   height: var(--node-tool-icon-button-icon-size, var(--node-tool-icon-size, 21px));
-  display: inline-grid;
-  place-items: center;
 }
 
 .node-tool-icon-button__icon :deep(svg) {

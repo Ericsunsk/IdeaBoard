@@ -1,6 +1,6 @@
 <template>
   <form
-    class="image-node-prompt-composer node-tool-surface"
+    class="image-node-prompt-composer node-tool-surface absolute right-0 left-0 z-[42] grid grid-cols-[minmax(0,1fr)_auto] items-end gap-[var(--node-tool-button-gap)] rounded-[13px] bg-white/[0.96] py-[5px] pr-[5px] pl-[13px] backdrop-blur-[10px] [border:var(--node-tool-border-width)_solid_rgba(122,107,213,0.28)] [top:calc(100%_+_var(--node-prompt-composer-offset))]"
     :class="{ 'count-stacked': shouldStackOutputCount, 'has-text': draft.trim() }"
     :style="{ '--node-prompt-composer-offset': offset }"
     @submit.prevent="submitPrompt"
@@ -11,13 +11,16 @@
     <textarea
       ref="promptInputRef"
       v-model="draft"
-      class="image-node-prompt-input"
+      class="image-node-prompt-input min-w-0 cursor-text self-end resize-none overflow-hidden border-0 bg-transparent px-0 py-1.5 text-xs leading-[18px] text-[#272932] outline-none placeholder:text-[#9aa4b2] disabled:cursor-wait"
       rows="1"
       :placeholder="placeholder"
       :disabled="disabled"
       @keydown.enter.exact="onPromptEnter"
     />
-    <div ref="actionsRef" class="image-node-prompt-actions">
+    <div
+      ref="actionsRef"
+      class="image-node-prompt-actions flex self-end items-center gap-[var(--node-tool-button-gap)]"
+    >
       <NodeAspectRatioPicker
         v-if="showAspectRatio"
         :model-value="aspectRatioValue"
@@ -41,7 +44,9 @@
         :disabled="submitButtonDisabled"
         aria-label="发送"
       >
-        <SendDiagonalSolid class="node-send-icon" />
+        <SendDiagonalSolid
+          class="size-4 translate-x-[0.5px] stroke-[var(--node-tool-icon-stroke)]"
+        />
         <span class="node-tool-tooltip" aria-hidden="true">发送</span>
       </button>
     </div>
@@ -153,20 +158,6 @@ function selectAspectRatio(value: PromptAspectRatio) {
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
 .image-node-prompt-composer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + var(--node-prompt-composer-offset));
-  z-index: 42;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: var(--node-tool-button-gap);
-  padding: 5px 5px 5px 13px;
-  border: var(--node-tool-border-width) solid rgba(122, 107, 213, 0.28);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
   animation: image-node-prompt-rise 0.16s ease-out;
 }
 
@@ -182,49 +173,12 @@ function selectAspectRatio(value: PromptAspectRatio) {
   min-height: 73px;
 }
 
-.image-node-prompt-input {
-  align-self: end;
-  min-width: 0;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: #272932;
-  cursor: text;
-  font-size: 12px;
-  line-height: 18px;
-  resize: none;
-  overflow: hidden;
-  padding: 6px 0;
-}
-
 .image-node-prompt-composer.count-stacked .image-node-prompt-input {
   min-height: 73px;
 }
 
-.image-node-prompt-input::placeholder {
-  color: #9aa4b2;
-}
-
-.image-node-prompt-input:disabled {
-  cursor: wait;
-}
-
-.image-node-prompt-actions {
-  align-self: end;
-  display: flex;
-  align-items: center;
-  gap: var(--node-tool-button-gap);
-}
-.node-send-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: var(--node-tool-icon-stroke);
-  transform: translateX(0.5px);
-}
-
 .image-node-prompt-composer.count-stacked .image-node-prompt-actions {
   flex-direction: column;
-  gap: var(--node-tool-button-gap);
 }
 
 @keyframes image-node-prompt-rise {

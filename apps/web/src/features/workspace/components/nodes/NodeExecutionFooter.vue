@@ -2,7 +2,7 @@
   <div class="node-primary-action-slot">
     <NodeActionButton variant="primary" :disabled="disabled" full @click="emit('generate')">
       <span>{{ label }}</span>
-      <SendDiagonalSolid class="node-primary-action-icon" />
+      <SendDiagonalSolid class="ml-1.5 size-[15px] translate-x-[0.5px] [stroke-width:1.5]" />
     </NodeActionButton>
   </div>
 </template>
@@ -19,18 +19,3 @@ const emit = defineEmits<{
   (e: 'generate'): void
 }>()
 </script>
-
-<style scoped>
-.node-primary-action-slot {
-  --node-tool-icon-stroke: 1.5;
-  padding-top: 0;
-}
-
-.node-primary-action-icon {
-  width: 15px;
-  height: 15px;
-  margin-left: 6px;
-  stroke-width: var(--node-tool-icon-stroke, 1.5);
-  transform: translateX(0.5px);
-}
-</style>

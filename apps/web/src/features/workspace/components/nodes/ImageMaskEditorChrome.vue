@@ -639,10 +639,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.image-mask-editor-field-label-muted {
-  color: #97a2b2;
-}
-
 .image-mask-editor-segmented {
   display: flex;
   gap: 6px;
@@ -658,7 +654,10 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .image-mask-editor-segmented-btn:hover:not(:disabled):not(.active) {
@@ -706,34 +705,6 @@ onBeforeUnmount(() => {
   min-width: 0;
   background: transparent;
   cursor: pointer;
-}
-
-.image-mask-editor-field-disabled .image-mask-editor-range-wrap input[type='range'] {
-  cursor: not-allowed;
-}
-
-.image-mask-editor-field-disabled
-  .image-mask-editor-range-wrap
-  input[type='range']::-webkit-slider-runnable-track {
-  background: #f1f3f6;
-}
-
-.image-mask-editor-field-disabled
-  .image-mask-editor-range-wrap
-  input[type='range']::-webkit-slider-thumb {
-  background: #cbd3df;
-}
-
-.image-mask-editor-field-disabled
-  .image-mask-editor-range-wrap
-  input[type='range']::-moz-range-track {
-  background: #f1f3f6;
-}
-
-.image-mask-editor-field-disabled
-  .image-mask-editor-range-wrap
-  input[type='range']::-moz-range-thumb {
-  background: #cbd3df;
 }
 
 .image-mask-editor-range-wrap input[type='range']::-webkit-slider-runnable-track {

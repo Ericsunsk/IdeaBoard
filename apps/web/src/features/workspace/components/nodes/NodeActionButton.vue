@@ -1,10 +1,15 @@
 <template>
   <button
     type="button"
-    class="node-action-btn"
+    class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width,1.2px)] border-solid border-[#d6dcec] bg-white px-2.5 text-[11px] leading-none font-medium text-[#5f6877] transition-[background-color,border-color,color,opacity] duration-200 ease-[ease] disabled:cursor-not-allowed disabled:opacity-[0.45]"
     :class="[
       `variant-${variant}`,
-      { active, full, 'push-right': pushRight, 'node-tool-tooltip-trigger': !!resolvedTooltip },
+      {
+        active,
+        'w-full': full,
+        'ml-auto': pushRight,
+        'node-tool-tooltip-trigger': !!resolvedTooltip,
+      },
     ]"
     :disabled="disabled"
     :aria-label="resolvedAriaLabel"
@@ -51,40 +56,18 @@ const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.val
 
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
-.node-action-btn {
-  border: var(--node-tool-border-width, 1.2px) solid #d6dcec;
-  background: #ffffff;
-  color: #5f6877;
-  border-radius: 999px;
-  min-height: 28px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.node-action-btn.full {
-  width: 100%;
-}
-
-.node-action-btn.push-right {
-  margin-left: auto;
-}
-
-.node-action-btn.variant-stage {
+.node-action-btn.variant-stage,
+.node-action-btn.variant-stage-ghost {
   border: none;
   border-radius: 8px;
-  background: rgba(17, 24, 39, 0.74);
   color: #f9fafb;
   min-height: 26px;
   padding: 0 10px;
   font-weight: 500;
+}
+
+.node-action-btn.variant-stage {
+  background: rgba(17, 24, 39, 0.74);
 }
 
 .node-action-btn.variant-stage:hover:not(:disabled) {
@@ -92,25 +75,21 @@ const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.val
 }
 
 .node-action-btn.variant-stage-ghost {
-  border: none;
-  border-radius: 8px;
   background: rgba(75, 85, 99, 0.72);
-  color: #f9fafb;
-  min-height: 26px;
-  padding: 0 10px;
-  font-weight: 500;
 }
 
 .node-action-btn.variant-stage-ghost:hover:not(:disabled) {
   background: rgba(75, 85, 99, 0.88);
 }
 
-.node-action-btn.variant-tool:hover:not(:disabled) {
+.node-action-btn.variant-tool:hover:not(:disabled),
+.node-action-btn.variant-chip:hover:not(:disabled) {
   border-color: var(--node-tool-button-accent, #9278e6);
   color: #272932;
 }
 
-.node-action-btn.variant-tool.active {
+.node-action-btn.variant-tool.active,
+.node-action-btn.variant-chip.active {
   border-color: var(--node-tool-button-accent, #9278e6);
   background: #f8f7ff;
   color: #272932;
@@ -123,17 +102,6 @@ const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.val
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0;
-}
-
-.node-action-btn.variant-chip:hover:not(:disabled) {
-  border-color: var(--node-tool-button-accent, #9278e6);
-  color: #272932;
-}
-
-.node-action-btn.variant-chip.active {
-  border-color: var(--node-tool-button-accent, #9278e6);
-  background: #f8f7ff;
-  color: #272932;
 }
 
 .node-action-btn.variant-primary {
@@ -151,10 +119,5 @@ const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.val
 .node-action-btn.variant-primary:hover:not(:disabled) {
   background: #7f68db;
   border-color: #7f68db;
-}
-
-.node-action-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
 }
 </style>

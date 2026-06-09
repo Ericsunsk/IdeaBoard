@@ -1,6 +1,6 @@
 <template>
   <div
-    class="workflow-node image-node"
+    class="workflow-node image-node overflow-visible"
     data-node-kind="image"
     :data-node-id="node.id"
     :class="{
@@ -13,8 +13,7 @@
     :style="nodeStyle"
   >
     <NodeHeader
-      class="image-node-header-shell"
-      :class="{ 'is-hidden': !!expandModeActive || !!maskEditorModeActive }"
+      :class="{ 'invisible pointer-events-none': !!expandModeActive || !!maskEditorModeActive }"
       :title="node.title || 'Image'"
       rounded
       @node-mousedown="emit('node-mousedown', $event)"
@@ -25,7 +24,11 @@
         <MediaImage />
       </template>
     </NodeHeader>
-    <div class="image-node-body" @contextmenu.stop>
+    <div
+      class="relative flex flex-col gap-2 overflow-visible rounded-[11px] p-0"
+      :class="expandModeActive || maskEditorModeActive ? 'bg-transparent' : 'bg-white'"
+      @contextmenu.stop
+    >
       <ImageNodeStage
         ref="imageStageRef"
         :node-id="node.id"
@@ -212,30 +215,6 @@ function onImageStageContextMenu(event: MouseEvent) {
 
 <style scoped src="./styles/node-shared.css"></style>
 <style scoped>
-.workflow-node.image-node {
-  overflow: visible;
-}
-.image-node-body {
-  position: relative;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-radius: 11px;
-  background: #ffffff;
-  overflow: visible;
-}
-
-.image-node-header-shell.is-hidden {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.workflow-node.image-node.is-expand-mode .image-node-body,
-.workflow-node.image-node.is-mask-editor-mode .image-node-body {
-  background: transparent;
-}
-
 .workflow-node.image-node.is-expand-mode .image-node-stage,
 .workflow-node.image-node.is-expand-mode.active .image-node-stage,
 .workflow-node.image-node.is-mask-editor-mode .image-node-stage,

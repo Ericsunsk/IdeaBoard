@@ -1,6 +1,6 @@
 <template>
   <div
-    class="workflow-node fusion-node"
+    class="workflow-node fusion-node overflow-visible"
     data-node-kind="fusion"
     :data-node-id="node.id"
     :class="{ active, dragging, 'copy-mode': copyMode }"
@@ -18,7 +18,10 @@
       </template>
     </NodeHeader>
 
-    <div class="fusion-node-body" @contextmenu.stop>
+    <div
+      class="relative box-border flex flex-col gap-2 overflow-visible rounded-[11px] bg-white p-0"
+      @contextmenu.stop
+    >
       <FusionStage
         :active="active"
         :blend-point="node.blendPoint"
@@ -109,20 +112,3 @@ function selectOutputCount(value: number) {
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>
-<style scoped>
-.workflow-node.fusion-node {
-  overflow: visible;
-}
-
-.fusion-node-body {
-  position: relative;
-  padding: 0;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-radius: 11px;
-  background: #ffffff;
-  overflow: visible;
-}
-</style>

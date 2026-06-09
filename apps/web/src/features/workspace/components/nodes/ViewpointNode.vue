@@ -18,12 +18,12 @@
       </template>
     </NodeHeader>
 
-    <div class="viewpoint-node-body node-execution-body" @mousedown.stop @contextmenu.stop>
-      <div class="viewpoint-mode-card node-mode-card">
-        <div class="viewpoint-control-row node-control-head">
+    <div class="node-execution-body !gap-2" @mousedown.stop @contextmenu.stop>
+      <div class="node-mode-card">
+        <div class="node-control-head">
           <span class="node-control-label">Garment</span>
         </div>
-        <div class="viewpoint-category-row node-option-row">
+        <div class="node-option-row">
           <NodeActionButton
             v-for="option in categoryOptions"
             :key="option.value"
@@ -34,10 +34,10 @@
             {{ option.label }}
           </NodeActionButton>
         </div>
-        <div class="viewpoint-control-row node-control-head">
+        <div class="node-control-head">
           <span class="node-control-label">Angle</span>
         </div>
-        <div class="viewpoint-option-row node-option-row">
+        <div class="node-option-row">
           <NodeActionButton
             v-for="option in currentViewOptions"
             :key="option.key"
@@ -48,10 +48,10 @@
             {{ option.label }}
           </NodeActionButton>
         </div>
-        <div class="viewpoint-control-row node-control-head viewpoint-lighting-head">
+        <div class="node-control-head mt-0.5">
           <span class="node-control-label">Light</span>
         </div>
-        <div class="viewpoint-lighting-row node-option-row">
+        <div class="node-option-row">
           <NodeActionButton
             v-for="option in lightingOptions"
             :key="option.value"
@@ -112,12 +112,3 @@ const currentViewOptions = computed(
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>
-<style scoped>
-.viewpoint-node-body {
-  gap: 8px;
-}
-
-.viewpoint-lighting-head {
-  margin-top: 2px;
-}
-</style>

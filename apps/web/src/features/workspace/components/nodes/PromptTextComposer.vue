@@ -1,7 +1,7 @@
 <template>
   <div
     ref="rootRef"
-    class="prompt-text-composer node-tool-surface"
+    class="prompt-text-composer node-tool-surface flex min-w-0 flex-col gap-3"
     :class="`variant-${variant}`"
     @mousedown.stop
     @click.stop
@@ -9,12 +9,12 @@
   >
     <div
       v-if="shouldShowImageInputRow"
-      class="prompt-text-composer-image-row node-tool-surface node-input-thumbnail-contract variant-standard"
+      class="prompt-text-composer-image-row node-tool-surface node-input-thumbnail-contract variant-standard relative z-[3] grid justify-between gap-1.5 overflow-visible [grid-template-columns:repeat(4,var(--node-input-thumbnail-size))]"
     >
       <NodeInputThumbnail
         v-for="item in visibleImageInputs"
         :key="item.id"
-        class="prompt-text-composer-image-thumb"
+        class="prompt-text-composer-image-thumb aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)]"
         :src="item.url"
         :removable="!disabled"
         :data-image-id="item.id"
@@ -30,13 +30,15 @@
         aria-label="添加图片输入"
         @click="emit('image-input-open')"
       >
-        <Plus class="prompt-text-composer-image-add-icon" />
+        <Plus
+          class="prompt-text-composer-image-add-icon size-4 stroke-[var(--node-tool-icon-stroke)]"
+        />
         <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
       </button>
     </div>
     <textarea
       ref="inputRef"
-      class="prompt-text-composer-input"
+      class="prompt-text-composer-input box-border min-h-0 w-full flex-auto cursor-text resize-none overflow-hidden border-0 bg-transparent p-0 font-[inherit] text-[14px] leading-[1.6] text-[#334155] outline-none placeholder:text-[#94a3b8] disabled:cursor-wait"
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
@@ -44,7 +46,10 @@
       @focus="emit('focus')"
       @keydown.enter.exact="onEnter"
     />
-    <div ref="actionsRef" class="prompt-text-composer-actions">
+    <div
+      ref="actionsRef"
+      class="prompt-text-composer-actions flex self-end gap-[var(--node-tool-button-gap)]"
+    >
       <NodeAspectRatioPicker
         v-if="shouldShowAspectRatioPicker"
         :model-value="aspectRatioValue"
@@ -69,7 +74,9 @@
         aria-label="发送"
         @click="submit"
       >
-        <SendDiagonalSolid class="prompt-text-composer-send-icon" />
+        <SendDiagonalSolid
+          class="size-4 translate-x-[0.5px] stroke-[var(--node-tool-icon-stroke)]"
+        />
         <span class="node-tool-tooltip" aria-hidden="true">发送</span>
       </button>
     </div>
@@ -222,67 +229,13 @@ function selectOutputCount(value: number) {
 <style scoped src="./styles/node-input-thumbnails.css"></style>
 <style scoped src="./styles/node-tool-buttons.css"></style>
 <style scoped>
-.prompt-text-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-.prompt-text-composer-input {
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 0;
-  cursor: text;
-  border: 0;
-  resize: none;
-  outline: none;
-  padding: 0;
-  box-sizing: border-box;
-  background: transparent;
-  color: #334155;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.6;
-  overflow: hidden;
-}
-
-.prompt-text-composer-input::placeholder {
-  color: #94a3b8;
-}
-
-.prompt-text-composer-input:disabled {
-  cursor: wait;
-}
-
-.prompt-text-composer-actions {
-  align-self: flex-end;
-  display: flex;
-  gap: var(--node-tool-button-gap);
-}
-
-.prompt-text-composer-actions.node-tool-surface,
 .prompt-text-composer.node-tool-surface {
   --node-tool-button-border: #e2e8f0;
-}
-
-.prompt-text-composer-send-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: var(--node-tool-icon-stroke);
-  transform: translateX(0.5px);
 }
 
 .prompt-text-composer-image-row {
   --node-tool-button-size: var(--node-input-thumbnail-size);
   --node-tool-button-radius: 8px;
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(4, var(--node-input-thumbnail-size));
-  gap: 6px;
-  justify-content: space-between;
-  overflow: visible;
-  z-index: 3;
 }
 
 .prompt-text-composer-image-add {
@@ -299,18 +252,6 @@ function selectOutputCount(value: number) {
   color: var(--node-tool-button-accent);
   border-color: var(--node-tool-button-accent);
   background: #f8f7ff;
-}
-
-.prompt-text-composer-image-thumb {
-  width: var(--node-input-thumbnail-size);
-  height: var(--node-input-thumbnail-size);
-  aspect-ratio: 1 / 1;
-}
-
-.prompt-text-composer-image-add-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: var(--node-tool-icon-stroke);
 }
 
 .prompt-text-composer.variant-floating {

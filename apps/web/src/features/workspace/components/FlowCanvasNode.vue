@@ -34,7 +34,7 @@
     </template>
     <template v-else-if="isImageNode && imageSnapshot">
       <div
-        class="flow-canvas-node__image-wrap flow-canvas-node__drag-surface"
+        class="flow-canvas-node__drag-surface relative overflow-visible"
         @mousedown="onNodeMouseDown"
         @click.stop
         @contextmenu.stop
@@ -97,7 +97,7 @@
     </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
       <div
-        class="flow-canvas-node__fusion-wrap flow-canvas-node__drag-surface"
+        class="flow-canvas-node__drag-surface relative overflow-visible"
         @mousedown="onNodeMouseDown"
         @click.stop
         @contextmenu.stop
@@ -631,16 +631,6 @@ function noopMouse() {}
   min-width: 96px;
 }
 
-.flow-canvas-node__image-wrap {
-  position: relative;
-  overflow: visible;
-}
-
-.flow-canvas-node__fusion-wrap {
-  position: relative;
-  overflow: visible;
-}
-
 .flow-canvas-node__drag-surface {
   cursor: grab;
 }
@@ -714,9 +704,5 @@ function noopMouse() {}
 .flow-canvas-node :deep(.image-action-menu) {
   top: calc(100% + 10px);
   z-index: 30;
-}
-
-.flow-canvas-node :deep(.image-action-menu.strength-mode) {
-  top: calc(100% + 10px);
 }
 </style>

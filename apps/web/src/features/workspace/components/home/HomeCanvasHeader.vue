@@ -1,20 +1,26 @@
 <template>
-  <header class="floating-header" @wheel.prevent.stop>
-    <div class="header-shell" @mousedown.stop>
+  <header
+    class="pointer-events-none absolute top-4 right-4 left-4 z-[100] flex items-start justify-between gap-4 [--canvas-control-border-width:1.2px] [--canvas-control-icon-stroke:1.5]"
+    @wheel.prevent.stop
+  >
+    <div
+      class="pointer-events-auto relative box-border flex h-[39px] w-[min(200px,calc(100vw-32px))] items-center gap-2 rounded-full bg-white/[0.94] p-1 [border:var(--canvas-control-border-width)_solid_#d8ddea]"
+      @mousedown.stop
+    >
       <button
         type="button"
-        class="header-back-btn canvas-icon-button"
+        class="canvas-icon-button !m-0 !flex !size-[29px] !cursor-pointer !items-center !justify-center !rounded-full !border-0 !bg-transparent !p-0 !text-[var(--ib-control-icon)] hover:!bg-[var(--ib-control-bg-hover)] hover:!text-[var(--ib-control-icon-hover)]"
         aria-label="返回画布列表"
         @click.stop="emit('navigate-back')"
       >
-        <ArrowLeft class="header-icon header-icon-back" />
+        <ArrowLeft class="size-4 [stroke-width:var(--canvas-control-icon-stroke)]" />
       </button>
 
-      <div class="header-title-slot">
+      <div class="relative flex min-w-0 flex-1 items-center gap-2">
         <span
           :ref="bindBoardNameInputRef"
-          class="file-name-btn"
-          :class="{ 'is-editing': isRenamingBoard }"
+          class="m-0 w-full max-w-none cursor-text overflow-hidden truncate p-0 text-[15px] leading-[1.2] font-normal text-[#202124] outline-none"
+          :class="{ 'text-clip': isRenamingBoard }"
           :contenteditable="isRenamingBoard ? 'plaintext-only' : 'false'"
           spellcheck="false"
           title="点击重命名画布"
@@ -29,14 +35,14 @@
         </span>
       </div>
 
-      <div class="header-actions">
+      <div class="h-[29px] w-[29px] flex-none">
         <button
           type="button"
-          class="board-switch-btn canvas-icon-button"
+          class="canvas-icon-button !m-0 !flex !size-[29px] !cursor-pointer !items-center !justify-center !rounded-full !border-0 !bg-transparent !p-0 !text-[var(--ib-control-icon)] hover:!bg-[var(--ib-control-bg-hover)] hover:!text-[var(--ib-control-icon-hover)]"
           aria-label="选择画布"
           @click.stop="emit('toggle-board-menu')"
         >
-          <SquareCursor class="board-switch-icon header-icon" />
+          <SquareCursor class="size-4 [stroke-width:var(--canvas-control-icon-stroke)]" />
         </button>
         <div
           v-if="isBoardMenuOpen"
@@ -49,7 +55,7 @@
               transition: { duration: 160, easing: 'ease-out' },
             },
           }"
-          class="board-switch-menu"
+          class="absolute top-[calc(100%+10px)] left-0 z-[140] max-h-[280px] min-w-[220px] max-w-[280px] overflow-y-auto rounded-[10px] bg-white/[0.98] p-1.5 backdrop-blur-[10px] [border:var(--canvas-control-border-width)_solid_#d8ddea]"
           @mousedown.stop
           @click.stop
         >
@@ -57,17 +63,24 @@
             v-for="board in boardOptions"
             :key="board.id"
             type="button"
-            class="board-switch-item"
-            :class="{ active: board.id === currentBoardId }"
+            class="h-[34px] w-full cursor-pointer overflow-hidden rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-ellipsis whitespace-nowrap text-[#4b5565] hover:bg-[rgba(146,120,230,0.12)] hover:text-[#6757c8]"
+            :class="{
+              '!bg-[rgba(146,120,230,0.16)] !text-[#6757c8]': board.id === currentBoardId,
+            }"
             @click="emit('select-board', board.id)"
           >
             {{ board.name }}
           </button>
-          <div v-if="boardOptions.length === 0" class="board-switch-empty">No canvas</div>
+          <div
+            v-if="boardOptions.length === 0"
+            class="flex h-[34px] items-center px-2.5 text-xs text-[#8a91a3]"
+          >
+            No canvas
+          </div>
         </div>
       </div>
     </div>
-    <div class="header-right canvas-control-group">
+    <div class="canvas-control-group pointer-events-auto">
       <button type="button" class="canvas-icon-button share-btn" aria-label="分享" @mousedown.stop>
         <span class="canvas-icon-swap" aria-hidden="true">
           <ShareAndroid class="canvas-control-icon canvas-icon-swap-default" />
@@ -75,7 +88,7 @@
         </span>
       </button>
       <button
-        class="canvas-icon-button export-btn"
+        class="canvas-icon-button enabled:!border-[#9278e6] enabled:!bg-[#9278e6] enabled:!text-white enabled:hover:!border-[#8067d8] enabled:hover:!bg-[#8067d8] enabled:hover:!text-white"
         type="button"
         aria-label="导出"
         :disabled="exportDisabled"
@@ -84,16 +97,19 @@
       >
         <Download class="canvas-control-icon" />
       </button>
-      <div class="user-menu-wrap" @pointerdown.stop @mousedown.stop @click.stop>
+      <div class="relative" @pointerdown.stop @mousedown.stop @click.stop>
         <button
           type="button"
-          class="user-avatar-wrap canvas-icon-button"
+          class="canvas-icon-button !flex !size-10 !shrink-0 !cursor-pointer !items-center !justify-center !overflow-visible !rounded-full !border-[var(--canvas-control-border-width)] !border-[#e2e4e8] !bg-[#f1f3f9] !text-[var(--ib-control-icon)] hover:!border-[#d8ddea] hover:!bg-[var(--ib-control-bg-hover)] hover:!text-[var(--ib-control-icon-hover)]"
           aria-label="账户菜单"
           @click="toggleUserMenu"
         >
-          <img v-if="avatarUrl" :src="avatarUrl" class="user-avatar" />
-          <div v-else class="user-avatar-placeholder">
-            <User class="header-icon header-icon-avatar" />
+          <img v-if="avatarUrl" :src="avatarUrl" class="h-full w-full rounded-[inherit] object-cover" />
+          <div
+            v-else
+            class="flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit]"
+          >
+            <User class="size-5 [stroke-width:var(--canvas-control-icon-stroke)]" />
           </div>
         </button>
         <div
@@ -107,10 +123,20 @@
               transition: { duration: 160, easing: 'ease-out' },
             },
           }"
-          class="user-menu"
+          class="absolute top-[calc(100%+8px)] right-0 z-[140] flex w-32 flex-col gap-0.5 rounded-[10px] bg-white/[0.98] p-1.5 backdrop-blur-[10px] [border:var(--canvas-control-border-width)_solid_#d8ddea]"
         >
-          <button class="user-menu-item" @click="onOpenCenter">个人中心</button>
-          <button class="user-menu-item danger" @click="onLogout">退出登录</button>
+          <button
+            class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[#4b5565] hover:bg-[rgba(146,120,230,0.12)]"
+            @click="onOpenCenter"
+          >
+            个人中心
+          </button>
+          <button
+            class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[#d14343] hover:bg-[rgba(209,67,67,0.1)]"
+            @click="onLogout"
+          >
+            退出登录
+          </button>
         </div>
       </div>
     </div>
@@ -191,263 +217,4 @@ function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null
 
 <style scoped>
 @import '../styles/canvas-controls.css';
-
-.floating-header {
-  --canvas-control-border-width: 1.2px;
-  --canvas-control-icon-stroke: 1.5;
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
-  z-index: 100;
-  pointer-events: none;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-.header-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: var(--canvas-control-icon-stroke);
-}
-
-.header-icon-back,
-.board-switch-icon {
-  width: 16px;
-  height: 16px;
-  stroke-width: var(--canvas-control-icon-stroke);
-}
-
-.header-icon-avatar {
-  width: 20px;
-  height: 20px;
-}
-.header-shell {
-  position: relative;
-  width: min(200px, calc(100vw - 32px));
-  box-sizing: border-box;
-  height: 39px;
-  padding: 4px;
-  border-radius: 999px;
-  border: var(--canvas-control-border-width) solid #d8ddea;
-  background: rgba(255, 255, 255, 0.94);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  pointer-events: auto;
-}
-.header-right {
-  pointer-events: auto;
-}
-.header-title-slot {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.header-back-btn {
-  width: 29px;
-  height: 29px;
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ib-control-icon);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background-color 0.18s ease,
-    color 0.18s ease;
-}
-.header-back-btn:hover {
-  background: var(--ib-control-bg-hover);
-  color: var(--ib-control-icon-hover);
-}
-.file-name-btn {
-  padding: 0;
-  margin: 0;
-  color: #202124;
-  font-size: 15px;
-  font-weight: 400;
-  cursor: text;
-  outline: none;
-  line-height: 1.2;
-  width: 100%;
-  max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.file-name-btn.is-editing {
-  text-overflow: clip;
-}
-.header-actions {
-  flex: 0 0 auto;
-  width: 29px;
-  height: 29px;
-}
-.board-switch-btn {
-  width: 29px;
-  height: 29px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ib-control-icon);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-.board-switch-btn:hover {
-  background: var(--ib-control-bg-hover);
-  color: var(--ib-control-icon-hover);
-}
-.board-switch-menu {
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 0;
-  min-width: 220px;
-  max-width: 280px;
-  max-height: 280px;
-  overflow-y: auto;
-  padding: 6px;
-  border-radius: 10px;
-  border: var(--canvas-control-border-width) solid #d8ddea;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(10px);
-  z-index: 140;
-}
-.board-switch-item {
-  width: 100%;
-  height: 34px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  text-align: left;
-  padding: 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #4b5565;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.board-switch-item:hover {
-  background: rgba(146, 120, 230, 0.12);
-  color: #6757c8;
-}
-.board-switch-item.active {
-  background: rgba(146, 120, 230, 0.16);
-  color: #6757c8;
-}
-.board-switch-empty {
-  height: 34px;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  font-size: 12px;
-  color: #8a91a3;
-}
-.export-btn:not(:disabled) {
-  border-color: #9278e6;
-  background: #9278e6;
-  color: #fff;
-}
-.export-btn:hover:not(:disabled) {
-  border-color: #8067d8;
-  background: #8067d8;
-  color: #fff;
-}
-.user-avatar-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: visible;
-  cursor: pointer;
-  border: var(--canvas-control-border-width) solid #e2e4e8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f1f3f9;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
-  flex-shrink: 0;
-  color: var(--ib-control-icon);
-}
-.user-menu-wrap {
-  position: relative;
-}
-.user-avatar-wrap:hover {
-  border-color: #d8ddea;
-  background: var(--ib-control-bg-hover);
-  color: var(--ib-control-icon-hover);
-}
-.user-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 128px;
-  border: var(--canvas-control-border-width) solid #d8ddea;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(10px);
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  z-index: 140;
-}
-.user-menu-item {
-  width: 100%;
-  border: none;
-  height: 34px;
-  border-radius: 8px;
-  background: transparent;
-  color: #4b5565;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-  padding: 0 10px;
-  cursor: pointer;
-  transition: background-color 0.18s ease;
-}
-.user-menu-item:hover {
-  background: rgba(146, 120, 230, 0.12);
-}
-.user-menu-item.danger {
-  color: #d14343;
-}
-.user-menu-item.danger:hover {
-  background: rgba(209, 67, 67, 0.1);
-}
-.user-avatar {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  object-fit: cover;
-}
-.user-avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 </style>

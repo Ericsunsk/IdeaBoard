@@ -1,6 +1,6 @@
 <template>
   <aside
-    class="floating-toolbar canvas-chrome canvas-chrome-left canvas-control-group canvas-control-group--vertical"
+    class="canvas-chrome canvas-chrome-left canvas-control-group canvas-control-group--vertical absolute top-1/2 left-4 z-[100] rounded-none border-0 bg-transparent p-0 [transform:translateY(-50%)]"
     :inert="inert"
     @wheel.prevent.stop
   >
@@ -52,16 +52,4 @@ const emit = defineEmits<{
 
 <style scoped>
 @import './styles/canvas-controls.css';
-
-.floating-toolbar {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: transparent;
-  padding: 0;
-  border-radius: 0;
-  border: none;
-  z-index: 100;
-}
 </style>
