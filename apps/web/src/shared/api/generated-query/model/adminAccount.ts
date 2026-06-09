@@ -4,6 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminAccountModel } from './adminAccountModel'
 
 export interface AdminAccount {
   id: number
@@ -12,7 +13,8 @@ export interface AdminAccount {
   platform: string
   api_type: string
   proxy_url: string
-  model_set: string
+  models: AdminAccountModel[]
+  secret_configured: boolean
   max_concurrent: number
   current_concurrent?: number
   wait_queue_count?: number

@@ -237,7 +237,16 @@ APP_HOST=127.0.0.1
 
 这样 `ideaboard-server` 只监听本机回环地址，避免被绕过代理直接访问。
 
-### 3. 启动 Auth 服务
+### 3. 初始化 API 业务库
+
+```bash
+cd apps/api
+go run ./cmd migrate
+```
+
+API 启动时仍会自动补跑 migration；显式执行一次能让本地、Docker 和生产部署都保持 “API baseline first, Auth migration second” 的顺序。非空数据库迁入、reset 与 restore 规则见 [DEPLOYMENT.md#api-database-baseline](./DEPLOYMENT.md#api-database-baseline)。
+
+### 4. 启动 Auth 服务
 
 ```bash
 cd apps/auth
@@ -261,14 +270,14 @@ npm run dev
 
 </details>
 
-### 4. 启动后端（Go API）
+### 5. 启动后端（Go API）
 
 ```bash
 cd apps/api
 go run ./cmd
 ```
 
-### 5. 启动前端
+### 6. 启动前端
 
 ```bash
 cd apps/web
@@ -284,7 +293,7 @@ npm run dev
 
 </details>
 
-### 6. 初始化管理员账号
+### 7. 初始化管理员账号
 
 ```bash
 cd apps/api
@@ -341,7 +350,7 @@ curl -fsSL \
 GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 ```
 
-把 `REF` 换成明确的发布 tag 或 commit SHA。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。
+把 `REF` 换成明确的发布 tag 或 commit SHA。VPS 需要预先安装 `cosign` 用于默认镜像验签；强制重装可加 `IDEABOARD_FORCE=1`，脚本会备份旧目录并恢复 `docker/.env`。
 
 后续部署 / 升级：
 

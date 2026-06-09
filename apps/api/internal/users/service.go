@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"ideaboard/api/internal/platform/database"
 )
 
 const maxUserKeywordLength = 64
@@ -105,7 +107,13 @@ func (s *UserService) UpdateStatus(ctx context.Context, userID int64, status int
 		return errors.New("状态值无效，仅支持0或1")
 	}
 
-	return s.repo.UpdateStatus(ctx, userID, status)
+	if err := s.repo.UpdateStatus(ctx, userID, status); err != nil {
+		if database.IsNotFound(err) {
+			return errors.New("用户不存在")
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *UserService) UpdateRole(ctx context.Context, userID int64, role string) error {
@@ -114,7 +122,13 @@ func (s *UserService) UpdateRole(ctx context.Context, userID int64, role string)
 		return errors.New("角色值无效，仅支持 admin 或 user")
 	}
 
-	return s.repo.UpdateRoleByID(ctx, userID, normalizedRole)
+	if err := s.repo.UpdateRoleByID(ctx, userID, normalizedRole); err != nil {
+		if database.IsNotFound(err) {
+			return errors.New("用户不存在")
+		}
+		return err
+	}
+	return nil
 }
 
 // DeleteUser 删除用户
@@ -131,5 +145,11 @@ func (s *UserService) DeleteUser(ctx context.Context, userID int64) error {
 		}
 	}
 
-	return s.repo.Delete(ctx, userID)
+	if err := s.repo.Delete(ctx, userID); err != nil {
+		if database.IsNotFound(err) {
+			return errors.New("用户不存在")
+		}
+		return err
+	}
+	return nil
 }

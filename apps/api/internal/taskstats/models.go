@@ -36,18 +36,22 @@ type AdminStatisticsBackfillResult struct {
 }
 
 type AdminStatisticsSummary struct {
-	TotalCalls       int64 `json:"total_calls"`
-	TodayCalls       int64 `json:"today_calls"`
-	TodaySuccess     int64 `json:"today_success"`
-	TodayFailed      int64 `json:"today_failed"`
-	YesterdayCalls   int64 `json:"yesterday_calls"`
-	YesterdaySuccess int64 `json:"yesterday_success"`
-	YesterdayFailed  int64 `json:"yesterday_failed"`
-	ThisMonthCalls   int64 `json:"this_month_calls"`
-	Pending          int64 `json:"pending"`
-	Running          int64 `json:"running"`
-	Completed        int64 `json:"completed"`
-	Failed           int64 `json:"failed"`
+	TotalCalls         int64 `json:"total_calls"`
+	TodayCalls         int64 `json:"today_calls"`
+	TodaySuccess       int64 `json:"today_success"`
+	TodayFailed        int64 `json:"today_failed"`
+	TodayCancelled     int64 `json:"today_cancelled"`
+	YesterdayCalls     int64 `json:"yesterday_calls"`
+	YesterdaySuccess   int64 `json:"yesterday_success"`
+	YesterdayFailed    int64 `json:"yesterday_failed"`
+	YesterdayCancelled int64 `json:"yesterday_cancelled"`
+	ThisMonthCalls     int64 `json:"this_month_calls"`
+	ThisMonthCancelled int64 `json:"this_month_cancelled"`
+	Pending            int64 `json:"pending"`
+	Running            int64 `json:"running"`
+	Completed          int64 `json:"completed"`
+	Failed             int64 `json:"failed"`
+	Cancelled          int64 `json:"cancelled"`
 }
 
 type AdminStatisticsTrendItem struct {

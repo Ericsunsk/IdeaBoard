@@ -4,14 +4,15 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminAccountModelInput } from './adminAccountModelInput'
 
 export interface AdminAccountCreateRequest {
   name: string
   channel_id: number
   platform: string
   api_type: string
-  api_key: string
-  model_set: string
+  secret: string
+  models: AdminAccountModelInput[]
   proxy_url?: string
   max_concurrent?: number
   timeout?: number

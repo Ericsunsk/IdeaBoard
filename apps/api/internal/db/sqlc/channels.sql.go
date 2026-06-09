@@ -9,6 +9,20 @@ import (
 	"context"
 )
 
+const countAccountsByChannelID = `-- name: CountAccountsByChannelID :one
+SELECT COUNT(*)
+FROM api_accounts
+WHERE channel_id = $1
+  AND deleted_at IS NULL
+`
+
+func (q *Queries) CountAccountsByChannelID(ctx context.Context, channelID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAccountsByChannelID, channelID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createChannel = `-- name: CreateChannel :one
 INSERT INTO channels (type, name, api_url, status)
 VALUES ($1, $2, $3, $4)
@@ -34,14 +48,17 @@ func (q *Queries) CreateChannel(ctx context.Context, arg CreateChannelParams) (i
 	return id, err
 }
 
-const deleteChannel = `-- name: DeleteChannel :exec
+const deleteChannel = `-- name: DeleteChannel :execrows
 DELETE FROM channels
 WHERE id = $1
 `
 
-func (q *Queries) DeleteChannel(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteChannel, id)
-	return err
+func (q *Queries) DeleteChannel(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteChannel, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getChannelByID = `-- name: GetChannelByID :one
@@ -102,7 +119,7 @@ func (q *Queries) ListChannels(ctx context.Context) ([]Channel, error) {
 	return items, nil
 }
 
-const updateChannel = `-- name: UpdateChannel :exec
+const updateChannel = `-- name: UpdateChannel :execrows
 UPDATE channels
 SET type = $1,
     name = $2,
@@ -119,13 +136,16 @@ type UpdateChannelParams struct {
 	ID     int64  `json:"id"`
 }
 
-func (q *Queries) UpdateChannel(ctx context.Context, arg UpdateChannelParams) error {
-	_, err := q.db.ExecContext(ctx, updateChannel,
+func (q *Queries) UpdateChannel(ctx context.Context, arg UpdateChannelParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateChannel,
 		arg.Type,
 		arg.Name,
 		arg.ApiUrl,
 		arg.Status,
 		arg.ID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
 	"image"
 	"image/color"
 	"image/png"
@@ -138,7 +139,7 @@ func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
 		"feature":      "image-extend",
@@ -203,7 +204,7 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
 		"feature": "pattern-gen",
@@ -244,7 +245,7 @@ func TestCallOpenAIIgnoresOutputCountAndReturnsMultipleImagesWhenUpstreamDoes(t 
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
 		"feature":      "pattern-gen",
@@ -291,7 +292,7 @@ func TestCallOpenAIGenerationMapsImageURLsToStringImageField(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
 		"feature":    "style-variation",
@@ -353,7 +354,7 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
 		"feature":    "style-fusion",
@@ -395,7 +396,7 @@ func TestCallOpenAIStyleVariationDataURLDropsRedundantImageCopies(t *testing.T) 
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	dataURL := "data:image/png;base64,aGVsbG8="
 	params := map[string]interface{}{
@@ -436,7 +437,7 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	maskDataURL := buildTinyPNGDataURL(t)
 	sourceDataURL := buildTinyPNGDataURL(t)
@@ -480,7 +481,7 @@ func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) 
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	sourceWebPDataURL := "data:image/webp;base64," + tinyWebPBase64
 	maskDataURL := buildTinyPNGDataURL(t)
@@ -534,7 +535,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	sourceURL := server.URL + "/source.webp"
 	maskDataURL := buildTinyPNGDataURL(t)
@@ -567,7 +568,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIUsesFirstModelWhenAccountHasMultiModelSet(t *testing.T) {
+func TestCallOpenAIUsesFirstModelWhenAccountHasMultipleModels(t *testing.T) {
 	var gotBody map[string]interface{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -586,12 +587,15 @@ func TestCallOpenAIUsesFirstModelWhenAccountHasMultiModelSet(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1,gpt-image-2",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}, {Name: "gpt-image-2", Enabled: true}},
 	}
 	params := map[string]interface{}{"feature": "pattern-gen"}
 
-	resolved := resolveRequestedModel(account.ModelSet, params)
-	if _, err := c.callOpenAI(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, params, resolved); err != nil {
+	resolved, ok := accounts.ResolveAccountModelForParams(account, "", params)
+	if !ok {
+		t.Fatalf("expected account model to resolve")
+	}
+	if _, err := c.callOpenAI(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, params, resolved.Name); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotBody["model"] != "gpt-image-1" {
@@ -615,7 +619,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		ApiType:  workflow.ProviderOpenAICompatible,
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	task := &queuetypes.TaskPayload{
 		TaskID: "task-model-field",
@@ -632,6 +636,56 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 	}
 	if result["model"] != "gpt-image-1" {
 		t.Fatalf("expected result.model gpt-image-1, got %#v", result["model"])
+	}
+}
+
+func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
+	outputData := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
+	var gotBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &gotBody); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + outputData + `"}]}`))
+	}))
+	defer server.Close()
+
+	c := newTestProviderExecutorWithLocalStorage(t)
+	account := &accounts.ApiAccount{
+		ID:       1,
+		Name:     "test",
+		Platform: "openai-compatible",
+		ApiType:  workflow.ProviderOpenAICompatible,
+		ProxyURL: server.URL,
+		ApiKey:   "test-key",
+		Models: []accounts.AccountModel{
+			{Name: "gpt-image-1", Enabled: true},
+			{Name: "imagen-4", Enabled: true},
+		},
+	}
+	task := &queuetypes.TaskPayload{
+		TaskID: "task-assignment-model",
+		Prompt: "prompt",
+		Params: `{"feature":"pattern-gen"}`,
+	}
+	output, err := c.callDrawingAPIWithAssignment(context.Background(), account, task, taskqueue.TaskAssignment{ResolvedModel: "imagen-4"})
+	if err != nil {
+		t.Fatalf("callDrawingAPIWithAssignment returned error: %v", err)
+	}
+	if gotBody["model"] != "imagen-4" {
+		t.Fatalf("request model=%#v, want imagen-4", gotBody["model"])
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(output.Result), &result); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if result["model"] != "imagen-4" {
+		t.Fatalf("result model=%#v, want imagen-4", result["model"])
 	}
 }
 
@@ -657,7 +711,7 @@ func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testin
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	sourceDataURL := buildTinyPNGDataURL(t)
 	maskDataURL := buildTinyPNGDataURL(t)

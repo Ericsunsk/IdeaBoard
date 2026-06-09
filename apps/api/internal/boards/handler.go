@@ -3,6 +3,7 @@ package boards
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 
 	"ideaboard/api/internal/platform/response"
@@ -16,22 +17,30 @@ type BoardHandler struct {
 }
 
 type boardDTO struct {
-	BoardID    string      `json:"board_id"`
-	Name       string      `json:"name"`
-	State      interface{} `json:"state"`
-	AccessRole string      `json:"access_role"`
-	CreatedAt  int64       `json:"created_at"`
-	UpdatedAt  int64       `json:"updated_at"`
+	BoardID            string      `json:"board_id"`
+	Name               string      `json:"name"`
+	State              interface{} `json:"state"`
+	AccessRole         string      `json:"access_role"`
+	Revision           int64       `json:"revision"`
+	StateSchemaVersion int32       `json:"state_schema_version"`
+	CreatedAt          int64       `json:"created_at"`
+	UpdatedAt          int64       `json:"updated_at"`
 }
 
 type boardShareTokenDTO struct {
-	Token     string `json:"token"`
-	Role      string `json:"role"`
-	Revoked   bool   `json:"revoked"`
-	ExpiresAt *int64 `json:"expires_at"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
-	ShareURL  string `json:"share_url"`
+	ID          int64  `json:"id"`
+	Token       string `json:"token,omitempty"`
+	TokenPrefix string `json:"token_prefix"`
+	Role        string `json:"role"`
+	Revoked     bool   `json:"revoked"`
+	UsageCount  int64  `json:"usage_count"`
+	MaxUses     *int32 `json:"max_uses,omitempty"`
+	LastUsedAt  *int64 `json:"last_used_at"`
+	RevokedAt   *int64 `json:"revoked_at"`
+	ExpiresAt   *int64 `json:"expires_at"`
+	CreatedAt   int64  `json:"created_at"`
+	UpdatedAt   int64  `json:"updated_at"`
+	ShareURL    string `json:"share_url,omitempty"`
 }
 
 func NewBoardHandler(service *BoardService) *BoardHandler {
@@ -255,16 +264,16 @@ func (h *BoardHandler) ListShareTokens(c *gin.Context) {
 func (h *BoardHandler) RevokeShareToken(c *gin.Context) {
 	userID := c.GetInt64("user_id")
 	boardID := strings.TrimSpace(c.Param("board_id"))
-	token := strings.TrimSpace(c.Param("token"))
+	tokenID, err := strconv.ParseInt(strings.TrimSpace(c.Param("token_id")), 10, 64)
 	if userID == 0 {
 		response.Error(c, 401, "未登录")
 		return
 	}
-	if token == "" {
+	if err != nil || tokenID <= 0 {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	if err := h.service.RevokeShareToken(c.Request.Context(), userID, boardID, token); err != nil {
+	if err := h.service.RevokeShareToken(c.Request.Context(), userID, boardID, tokenID); err != nil {
 		h.respondShareTokenError(c, err, "撤销分享链接失败")
 		return
 	}
@@ -334,29 +343,51 @@ func (h *BoardHandler) respondShareTokenError(c *gin.Context, err error, interna
 
 func toBoardDTO(board UserBoard, role BoardAccessRole) boardDTO {
 	return boardDTO{
-		BoardID:    board.BoardID,
-		Name:       board.Name,
-		State:      parseBoardState(board.State),
-		AccessRole: string(role),
-		CreatedAt:  board.CreatedAt.UnixMilli(),
-		UpdatedAt:  board.UpdatedAt.UnixMilli(),
+		BoardID:            board.BoardID,
+		Name:               board.Name,
+		State:              parseBoardState(board.State),
+		AccessRole:         string(role),
+		Revision:           board.Revision,
+		StateSchemaVersion: board.StateSchemaVersion,
+		CreatedAt:          board.CreatedAt.UnixMilli(),
+		UpdatedAt:          board.UpdatedAt.UnixMilli(),
 	}
 }
 
 func toBoardShareTokenDTO(token BoardShareToken, baseURL string) boardShareTokenDTO {
+	var lastUsedAt *int64
+	if token.LastUsedAt != nil {
+		v := token.LastUsedAt.UnixMilli()
+		lastUsedAt = &v
+	}
+	var revokedAt *int64
+	if token.RevokedAt != nil {
+		v := token.RevokedAt.UnixMilli()
+		revokedAt = &v
+	}
 	var expiresAt *int64
 	if token.ExpiresAt != nil {
 		v := token.ExpiresAt.UnixMilli()
 		expiresAt = &v
 	}
+	shareURL := ""
+	if token.Token != "" {
+		shareURL = BuildBoardShareURL(baseURL, token.Token)
+	}
 	return boardShareTokenDTO{
-		Token:     token.Token,
-		Role:      token.Role,
-		Revoked:   token.Revoked,
-		ExpiresAt: expiresAt,
-		CreatedAt: token.CreatedAt.UnixMilli(),
-		UpdatedAt: token.UpdatedAt.UnixMilli(),
-		ShareURL:  BuildBoardShareURL(baseURL, token.Token),
+		ID:          token.ID,
+		Token:       token.Token,
+		TokenPrefix: token.TokenPrefix,
+		Role:        token.Role,
+		Revoked:     token.Revoked,
+		UsageCount:  token.UsageCount,
+		MaxUses:     token.MaxUses,
+		LastUsedAt:  lastUsedAt,
+		RevokedAt:   revokedAt,
+		ExpiresAt:   expiresAt,
+		CreatedAt:   token.CreatedAt.UnixMilli(),
+		UpdatedAt:   token.UpdatedAt.UnixMilli(),
+		ShareURL:    shareURL,
 	}
 }
 

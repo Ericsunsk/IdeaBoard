@@ -25,6 +25,9 @@ func Run(args []string) {
 		case "init-admin":
 			runInitAdmin()
 			return
+		case "migrate":
+			runMigrate()
+			return
 		case "preflight":
 			runPreflight(args[2:])
 			return
@@ -57,6 +60,24 @@ func Run(args []string) {
 	if err := app.shutdown(); err != nil {
 		fatal("server forced to shutdown", "err", err)
 	}
+}
+
+func runMigrate() {
+	cfg := config.Load()
+	configureRuntimeLogging(cfg)
+	db, err := database.NewPostgres(cfg.Database)
+	if err != nil {
+		fatal("failed to connect to database", "err", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Warn("failed to close database", "err", err)
+		}
+	}()
+	if err := migrations.Up(context.Background(), db); err != nil {
+		fatal("failed to migrate database schema", "err", err)
+	}
+	slog.Info("database schema migration completed")
 }
 
 func runInitAdmin() {

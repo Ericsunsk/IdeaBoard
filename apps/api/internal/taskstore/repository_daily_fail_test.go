@@ -3,6 +3,8 @@ package taskstore
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,29 +20,29 @@ func newRepositoryTestDB(t *testing.T) (*Repository, *sql.DB) {
 
 func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	ctx := context.Background()
-	taskRepo, _ := newRepositoryTestDB(t)
-	accountID := int64(66)
+	taskRepo, db := newRepositoryTestDB(t)
+	accountID := seedRepositoryTestAccount(t, db, 66)
 	createdAt := time.Now().Add(-10 * time.Minute)
 
 	if err := taskRepo.Create(ctx, &tasks.Task{
-		TaskID:    "acc-fail-1",
-		UserID:    10,
-		ChannelID: 1,
-		AccountID: accountID,
-		Status:    tasks.StatusRunning,
-		Result:    `{"model":"model-stop","username":"user-stop"}`,
-		CreatedAt: createdAt,
+		TaskID:            "acc-fail-1",
+		UserID:            10,
+		AssignedChannelID: tasks.IDPtr(accountID + 10000),
+		AccountID:         tasks.IDPtr(accountID),
+		Status:            tasks.StatusRunning,
+		Result:            `{"model":"model-stop","username":"user-stop"}`,
+		CreatedAt:         createdAt,
 	}); err != nil {
 		t.Fatalf("seed task1 failed: %v", err)
 	}
 	if err := taskRepo.Create(ctx, &tasks.Task{
-		TaskID:    "acc-fail-2",
-		UserID:    10,
-		ChannelID: 1,
-		AccountID: accountID,
-		Status:    tasks.StatusPending,
-		Result:    `{"model":"model-stop","username":"user-stop"}`,
-		CreatedAt: createdAt,
+		TaskID:            "acc-fail-2",
+		UserID:            10,
+		AssignedChannelID: tasks.IDPtr(accountID + 10000),
+		AccountID:         tasks.IDPtr(accountID),
+		Status:            tasks.StatusRunning,
+		Result:            `{"model":"model-stop","username":"user-stop"}`,
+		CreatedAt:         createdAt,
 	}); err != nil {
 		t.Fatalf("seed task2 failed: %v", err)
 	}
@@ -60,8 +62,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("failedTaskIDs=%v, want acc-fail-1 and acc-fail-2", failedTaskIDs)
 	}
 
-	day := createdAt.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -89,7 +90,6 @@ func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:    "mark-failed-stat",
 		UserID:    11,
-		ChannelID: 1,
 		Status:    tasks.StatusPending,
 		Result:    `{"model":"model-fail","username":"user-fail"}`,
 		CreatedAt: createdAt,
@@ -98,7 +98,7 @@ func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	rowsAffected, err := taskRepo.MarkTaskFailed(ctx, task.TaskID, []string{tasks.StatusPending}, "failed", task.Result, completedAt)
+	rowsAffected, err := taskRepo.MarkTaskFailed(ctx, task.TaskID, []string{tasks.StatusPending}, "failed", task.Result, completedAt, nil)
 	if err != nil {
 		t.Fatalf("MarkTaskFailed failed: %v", err)
 	}
@@ -106,13 +106,49 @@ func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("rows=%d, want 1", rowsAffected)
 	}
 
-	day := createdAt.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
 	if len(rows) != 1 || rows[0].Failed != 1 || rows[0].Total != 1 || rows[0].Completed != 0 {
 		t.Fatalf("unexpected failed daily row: %+v", rows)
+	}
+}
+
+func TestMarkTaskCancelledUpsertsDailyStats(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, _ := newRepositoryTestDB(t)
+	createdAt := time.Now().Add(-5 * time.Minute)
+	cancelledAt := createdAt.Add(45 * time.Second)
+	task := &tasks.Task{
+		TaskID:    "mark-cancelled-stat",
+		UserID:    12,
+		Status:    tasks.StatusPending,
+		Result:    `{"model":"model-cancel","username":"user-cancel"}`,
+		CreatedAt: createdAt,
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	rowsAffected, err := taskRepo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{
+		TaskID:      task.TaskID,
+		CancelledAt: cancelledAt,
+		Reason:      "user cancelled",
+	}, nil)
+	if err != nil {
+		t.Fatalf("MarkTaskCancelled failed: %v", err)
+	}
+	if rowsAffected != 1 {
+		t.Fatalf("rows=%d, want 1", rowsAffected)
+	}
+
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
+	if err != nil {
+		t.Fatalf("list daily stats failed: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Cancelled != 1 || rows[0].Total != 1 || rows[0].Completed != 0 || rows[0].Failed != 0 {
+		t.Fatalf("unexpected cancelled daily row: %+v", rows)
 	}
 }
 
@@ -137,13 +173,43 @@ func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 		t.Fatalf("second upsert failed: %v", err)
 	}
 
-	day := createdAt.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
 	if len(rows) != 1 || rows[0].Total != 1 || rows[0].Completed != 1 {
 		t.Fatalf("idempotent aggregate expected 1 row/1 total: %+v", rows)
+	}
+}
+
+func TestUpsertDailyStatByCancelledTaskIsIdempotentByTaskID(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, _ := newRepositoryTestDB(t)
+	createdAt := time.Now().Add(-1 * time.Minute)
+	cancelledAt := createdAt.Add(10 * time.Second)
+	task := &tasks.Task{
+		TaskID:      "idem-cancelled-1",
+		UserID:      4,
+		Status:      tasks.StatusCancelled,
+		Result:      `{"model":"idem-cancelled-model","username":"idem-cancelled-user"}`,
+		CreatedAt:   createdAt,
+		CompletedAt: &cancelledAt,
+		CancelledAt: &cancelledAt,
+	}
+
+	if err := taskRepo.UpsertDailyStatByTask(ctx, task); err != nil {
+		t.Fatalf("first upsert failed: %v", err)
+	}
+	if err := taskRepo.UpsertDailyStatByTask(ctx, task); err != nil {
+		t.Fatalf("second upsert failed: %v", err)
+	}
+
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
+	if err != nil {
+		t.Fatalf("list daily stats failed: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Total != 1 || rows[0].Cancelled != 1 || rows[0].Failed != 0 || rows[0].Completed != 0 {
+		t.Fatalf("idempotent cancelled aggregate expected 1 row/1 cancelled: %+v", rows)
 	}
 }
 
@@ -155,7 +221,7 @@ func TestUpsertDailyStatByTaskWithFallbackModelUsesProvidedSingleModel(t *testin
 	task := &tasks.Task{
 		TaskID:      "fallback-1",
 		UserID:      7,
-		AccountID:   12345,
+		AccountID:   tasks.IDPtr(12345),
 		Status:      tasks.StatusCompleted,
 		Result:      `{}`,
 		CreatedAt:   createdAt,
@@ -166,8 +232,7 @@ func TestUpsertDailyStatByTaskWithFallbackModelUsesProvidedSingleModel(t *testin
 		t.Fatalf("upsert with fallback failed: %v", err)
 	}
 
-	day := createdAt.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -176,5 +241,70 @@ func TestUpsertDailyStatByTaskWithFallbackModelUsesProvidedSingleModel(t *testin
 	}
 	if rows[0].ModelName != "model-fallback" {
 		t.Fatalf("model_name=%q, want model-fallback", rows[0].ModelName)
+	}
+}
+
+func TestUpsertDailyStatByTaskNormalizesLongDimensions(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, _ := newRepositoryTestDB(t)
+	createdAt := time.Now().Add(-2 * time.Minute)
+	completedAt := createdAt.Add(20 * time.Second)
+	longModel := strings.Repeat("模", maxStatDimensionSize+10)
+	longUser := strings.Repeat("用", maxStatDimensionSize+10)
+	task := &tasks.Task{
+		TaskID:      "long-stat-dimensions",
+		UserID:      17,
+		Status:      tasks.StatusCompleted,
+		Result:      fmt.Sprintf(`{"model":%q,"username":%q}`, longModel, longUser),
+		CreatedAt:   createdAt,
+		CompletedAt: &completedAt,
+	}
+
+	if err := taskRepo.UpsertDailyStatByTask(ctx, task); err != nil {
+		t.Fatalf("upsert with long dimensions failed: %v", err)
+	}
+
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
+	if err != nil {
+		t.Fatalf("list daily stats failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows=%d, want 1", len(rows))
+	}
+	if want := strings.Repeat("模", maxStatDimensionSize); rows[0].ModelName != want {
+		t.Fatalf("model_name length/content mismatch: got %q want %q", rows[0].ModelName, want)
+	}
+	if want := strings.Repeat("用", maxStatDimensionSize); rows[0].UserKey != want {
+		t.Fatalf("user_key length/content mismatch: got %q want %q", rows[0].UserKey, want)
+	}
+}
+
+func TestUpsertDailyStatByTaskIgnoresZeroLatencySample(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, _ := newRepositoryTestDB(t)
+	createdAt := time.Now().Add(-2 * time.Minute)
+	completedAt := createdAt
+	task := &tasks.Task{
+		TaskID:      "zero-latency-stat",
+		UserID:      18,
+		Status:      tasks.StatusCompleted,
+		Result:      `{"model":"zero-latency-model","username":"zero-latency-user"}`,
+		CreatedAt:   createdAt,
+		CompletedAt: &completedAt,
+	}
+
+	if err := taskRepo.UpsertDailyStatByTask(ctx, task); err != nil {
+		t.Fatalf("upsert zero latency task failed: %v", err)
+	}
+
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
+	if err != nil {
+		t.Fatalf("list daily stats failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows=%d, want 1", len(rows))
+	}
+	if rows[0].Completed != 1 || rows[0].LatencyCount != 0 || rows[0].LatencySecondsSum != 0 {
+		t.Fatalf("zero latency should not contribute latency sample: %+v", rows[0])
 	}
 }

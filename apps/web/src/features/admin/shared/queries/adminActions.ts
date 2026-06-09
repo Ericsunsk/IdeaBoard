@@ -15,15 +15,35 @@ import type { ApiResponse } from '../../../../shared/types'
 import type {
   AdminStatisticsBackfillResult,
   ApiResponseRegistrationSettingData,
+  CreateAdminStorageProfileParams,
+  FeaturePrompt,
   GetAdminStatisticsRange,
   RateLimitSetting,
+  SetAdminFeaturePromptBody,
+  UpdateAdminStorageProfileParams,
   UpdateAdminRegistrationSettingBody,
 } from '../../../../shared/api/generated-query/model'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
-import { storageApi, type StorageProfile, type StorageProfilePayload } from '../api/storage'
+import {
+  storageApi,
+  type StorageProfile,
+  type StorageProfilePayload,
+} from '../api/storage'
 
-type SaveFeaturePromptInput = { slug: string; prompt: string }
-type SaveStorageProfileInput = { id?: string; payload: StorageProfilePayload }
+type SaveFeaturePromptInput = {
+  slug: string
+} & SetAdminFeaturePromptBody
+type SaveStorageProfileInput =
+  | {
+      id?: undefined
+      payload: StorageProfilePayload
+      options?: CreateAdminStorageProfileParams
+    }
+  | {
+      id: string
+      payload: StorageProfilePayload
+      options?: UpdateAdminStorageProfileParams
+    }
 
 function requireApiData<T>(res: ApiResponse<T>, fallback: string): T {
   if (res.code !== 0 || res.data == null) {
@@ -88,8 +108,9 @@ export async function deleteAdminUser(id: number): Promise<void> {
 
 export async function saveFeaturePrompt(
   input: SaveFeaturePromptInput,
-): Promise<{ slug: string; prompt: string }> {
-  const res = await setAdminFeaturePrompt(input.slug, { prompt: input.prompt })
+): Promise<FeaturePrompt> {
+  const { slug, ...payload } = input
+  const res = await setAdminFeaturePrompt(slug, payload)
   return requireApiData(res, '保存提示词失败')
 }
 
@@ -104,8 +125,8 @@ export async function saveStorageProfile(
   input: SaveStorageProfileInput,
 ): Promise<{ profile: StorageProfile; message: string }> {
   const res = input.id
-    ? await storageApi.updateProfile(input.id, input.payload)
-    : await storageApi.createProfile(input.payload)
+    ? await storageApi.updateProfile(input.id, input.payload, input.options)
+    : await storageApi.createProfile(input.payload, input.options)
   return requireApiData(res, '保存存储配置失败')
 }
 

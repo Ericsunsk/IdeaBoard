@@ -231,7 +231,7 @@ export function useStorageManager() {
     bucketDomains.value = []
   }
 
-  async function persistForm(showSuccess = true) {
+  async function persistForm(showSuccess = true, apply = false) {
     const payload = buildPayload(form.value, providerMap.value)
     const editId = editorMode.value === 'edit' ? editingId.value : undefined
     if (editorMode.value === 'edit' && !editId) {
@@ -239,7 +239,11 @@ export function useStorageManager() {
       return null
     }
 
-    const response = await saveProfileMutation.mutateAsync({ id: editId || undefined, payload })
+    const response = await saveProfileMutation.mutateAsync({
+      id: editId || undefined,
+      payload,
+      options: apply ? { apply: true } : undefined,
+    })
     const saved = normalizeProfile(response.profile)
     editorMode.value = 'edit'
     editingId.value = saved.id
@@ -270,11 +274,10 @@ export function useStorageManager() {
   async function saveAndApply() {
     savingAndApplying.value = true
     try {
-      const saved = await persistForm(false)
+      const saved = await persistForm(false, true)
       if (!saved) return
 
-      const response = await applyProfileMutation.mutateAsync(saved.id)
-      appToast.success(response.message || '已设为当前存储')
+      appToast.success('已保存并设为当前存储')
       closeEditor()
     } catch (error) {
       appToast.error(formatDisplayErrorMessage(error, '设为当前失败'))

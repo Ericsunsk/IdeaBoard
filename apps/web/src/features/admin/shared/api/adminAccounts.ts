@@ -11,6 +11,8 @@ import type { AccountLimitRange, AccountLimits } from '../../../../shared/api/ge
 
 export type {
   AdminAccount,
+  AdminAccountModel,
+  AdminAccountModelInput,
   AdminAccountUpdateRequest,
 } from '../../../../shared/api/generated-query/model'
 export type AdminAccountLimits = AccountLimits

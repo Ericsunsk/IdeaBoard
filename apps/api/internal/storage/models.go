@@ -58,7 +58,3 @@ type StorageProfile struct {
 	SecretConfigured bool                   `json:"secret_configured,omitempty"`
 	Config           map[string]interface{} `json:"config"`
 }
-
-type StorageProfilesConfig struct {
-	Profiles []StorageProfile `json:"profiles"`
-}

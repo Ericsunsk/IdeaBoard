@@ -7,7 +7,147 @@ package dbsqlc
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 )
+
+const clearCurrentStorageProfiles = `-- name: ClearCurrentStorageProfiles :exec
+UPDATE storage_profiles
+SET is_current = FALSE
+WHERE is_current
+`
+
+func (q *Queries) ClearCurrentStorageProfiles(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, clearCurrentStorageProfiles)
+	return err
+}
+
+const createFeaturePromptRevision = `-- name: CreateFeaturePromptRevision :one
+INSERT INTO feature_prompt_revisions (
+  feature_slug, prompt, enabled, variables, schema_version, updated_by, published_at
+)
+VALUES (
+  $1, $2, $3, $4,
+  $5, $6, $7
+)
+RETURNING id
+`
+
+type CreateFeaturePromptRevisionParams struct {
+	FeatureSlug   string          `json:"feature_slug"`
+	Prompt        string          `json:"prompt"`
+	Enabled       bool            `json:"enabled"`
+	Variables     json.RawMessage `json:"variables"`
+	SchemaVersion int32           `json:"schema_version"`
+	UpdatedBy     sql.NullInt64   `json:"updated_by"`
+	PublishedAt   sql.NullTime    `json:"published_at"`
+}
+
+func (q *Queries) CreateFeaturePromptRevision(ctx context.Context, arg CreateFeaturePromptRevisionParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, createFeaturePromptRevision,
+		arg.FeatureSlug,
+		arg.Prompt,
+		arg.Enabled,
+		arg.Variables,
+		arg.SchemaVersion,
+		arg.UpdatedBy,
+		arg.PublishedAt,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getFeaturePrompt = `-- name: GetFeaturePrompt :one
+SELECT
+  feature_slug, prompt, enabled, variables,
+  schema_version, updated_by, published_at, created_at, updated_at
+FROM feature_prompts
+WHERE feature_slug = $1
+`
+
+func (q *Queries) GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error) {
+	row := q.db.QueryRowContext(ctx, getFeaturePrompt, featureSlug)
+	var i FeaturePrompt
+	err := row.Scan(
+		&i.FeatureSlug,
+		&i.Prompt,
+		&i.Enabled,
+		&i.Variables,
+		&i.SchemaVersion,
+		&i.UpdatedBy,
+		&i.PublishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getStorageProfile = `-- name: GetStorageProfile :one
+SELECT
+  profile_id, name, provider, enabled, is_current, builtin,
+  status, config, created_by, updated_by, created_at, updated_at, deleted_at
+FROM storage_profiles
+WHERE profile_id = $1
+`
+
+func (q *Queries) GetStorageProfile(ctx context.Context, profileID string) (StorageProfile, error) {
+	row := q.db.QueryRowContext(ctx, getStorageProfile, profileID)
+	var i StorageProfile
+	err := row.Scan(
+		&i.ProfileID,
+		&i.Name,
+		&i.Provider,
+		&i.Enabled,
+		&i.IsCurrent,
+		&i.Builtin,
+		&i.Status,
+		&i.Config,
+		&i.CreatedBy,
+		&i.UpdatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getStorageProfileSecret = `-- name: GetStorageProfileSecret :one
+SELECT
+  id, profile_id, secret_name, secret_material_kind, secret_ref, secret_payload, fingerprint,
+  key_version, status, rotated_at, expires_at, retired_at, created_at, updated_at
+FROM storage_profile_secrets
+WHERE profile_id = $1
+  AND secret_name = $2
+  AND status = 'active'
+`
+
+type GetStorageProfileSecretParams struct {
+	ProfileID  string `json:"profile_id"`
+	SecretName string `json:"secret_name"`
+}
+
+func (q *Queries) GetStorageProfileSecret(ctx context.Context, arg GetStorageProfileSecretParams) (StorageProfileSecret, error) {
+	row := q.db.QueryRowContext(ctx, getStorageProfileSecret, arg.ProfileID, arg.SecretName)
+	var i StorageProfileSecret
+	err := row.Scan(
+		&i.ID,
+		&i.ProfileID,
+		&i.SecretName,
+		&i.SecretMaterialKind,
+		&i.SecretRef,
+		&i.SecretPayload,
+		&i.Fingerprint,
+		&i.KeyVersion,
+		&i.Status,
+		&i.RotatedAt,
+		&i.ExpiresAt,
+		&i.RetiredAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
 
 const getSystemConfig = `-- name: GetSystemConfig :one
 SELECT id, config_key, value, created_at, updated_at
@@ -26,6 +166,157 @@ func (q *Queries) GetSystemConfig(ctx context.Context, configKey string) (System
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const hasStorageProfileSecret = `-- name: HasStorageProfileSecret :one
+SELECT EXISTS (
+  SELECT 1
+  FROM storage_profile_secrets
+  WHERE profile_id = $1
+    AND secret_name = $2
+    AND status = 'active'
+    AND (btrim(secret_payload) <> '' OR btrim(secret_ref) <> '')
+)::boolean
+`
+
+type HasStorageProfileSecretParams struct {
+	ProfileID  string `json:"profile_id"`
+	SecretName string `json:"secret_name"`
+}
+
+func (q *Queries) HasStorageProfileSecret(ctx context.Context, arg HasStorageProfileSecretParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, hasStorageProfileSecret, arg.ProfileID, arg.SecretName)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const listFeaturePromptRevisions = `-- name: ListFeaturePromptRevisions :many
+SELECT
+  id, feature_slug, prompt, enabled, variables, schema_version, updated_by, published_at, created_at
+FROM feature_prompt_revisions
+WHERE feature_slug = $1
+ORDER BY schema_version DESC, id DESC
+`
+
+func (q *Queries) ListFeaturePromptRevisions(ctx context.Context, featureSlug string) ([]FeaturePromptRevision, error) {
+	rows, err := q.db.QueryContext(ctx, listFeaturePromptRevisions, featureSlug)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FeaturePromptRevision
+	for rows.Next() {
+		var i FeaturePromptRevision
+		if err := rows.Scan(
+			&i.ID,
+			&i.FeatureSlug,
+			&i.Prompt,
+			&i.Enabled,
+			&i.Variables,
+			&i.SchemaVersion,
+			&i.UpdatedBy,
+			&i.PublishedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFeaturePrompts = `-- name: ListFeaturePrompts :many
+SELECT
+  feature_slug, prompt, enabled, variables,
+  schema_version, updated_by, published_at, created_at, updated_at
+FROM feature_prompts
+ORDER BY feature_slug ASC
+`
+
+func (q *Queries) ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error) {
+	rows, err := q.db.QueryContext(ctx, listFeaturePrompts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FeaturePrompt
+	for rows.Next() {
+		var i FeaturePrompt
+		if err := rows.Scan(
+			&i.FeatureSlug,
+			&i.Prompt,
+			&i.Enabled,
+			&i.Variables,
+			&i.SchemaVersion,
+			&i.UpdatedBy,
+			&i.PublishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStorageProfiles = `-- name: ListStorageProfiles :many
+SELECT
+  profile_id, name, provider, enabled, is_current, builtin,
+  status, config, created_by, updated_by, created_at, updated_at, deleted_at
+FROM storage_profiles
+WHERE ($1::boolean OR status <> 'deleted')
+ORDER BY builtin DESC, created_at ASC, profile_id ASC
+`
+
+func (q *Queries) ListStorageProfiles(ctx context.Context, includeDeleted bool) ([]StorageProfile, error) {
+	rows, err := q.db.QueryContext(ctx, listStorageProfiles, includeDeleted)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StorageProfile
+	for rows.Next() {
+		var i StorageProfile
+		if err := rows.Scan(
+			&i.ProfileID,
+			&i.Name,
+			&i.Provider,
+			&i.Enabled,
+			&i.IsCurrent,
+			&i.Builtin,
+			&i.Status,
+			&i.Config,
+			&i.CreatedBy,
+			&i.UpdatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listSystemConfigsByPrefix = `-- name: ListSystemConfigsByPrefix :many
@@ -62,6 +353,194 @@ func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, configKeyLike s
 		return nil, err
 	}
 	return items, nil
+}
+
+const markStorageProfileDeleted = `-- name: MarkStorageProfileDeleted :execrows
+UPDATE storage_profiles
+SET enabled = FALSE,
+    is_current = FALSE,
+    status = 'deleted',
+    deleted_at = COALESCE(deleted_at, now())
+WHERE profile_id = $1
+  AND NOT builtin
+  AND NOT is_current
+  AND status <> 'deleted'
+`
+
+func (q *Queries) MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markStorageProfileDeleted, profileID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const setCurrentStorageProfile = `-- name: SetCurrentStorageProfile :execrows
+UPDATE storage_profiles
+SET is_current = TRUE,
+    updated_by = $1
+WHERE profile_id = $2
+  AND enabled
+  AND status = 'active'
+`
+
+type SetCurrentStorageProfileParams struct {
+	UpdatedBy sql.NullInt64 `json:"updated_by"`
+	ProfileID string        `json:"profile_id"`
+}
+
+func (q *Queries) SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, setCurrentStorageProfile, arg.UpdatedBy, arg.ProfileID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const upsertFeaturePrompt = `-- name: UpsertFeaturePrompt :one
+INSERT INTO feature_prompts (
+  feature_slug, prompt, enabled, variables,
+  schema_version, updated_by, published_at
+)
+VALUES (
+  $1, $2, $3, $4,
+  1, $5, $6
+)
+ON CONFLICT (feature_slug) DO UPDATE
+SET prompt = EXCLUDED.prompt,
+    enabled = EXCLUDED.enabled,
+    variables = EXCLUDED.variables,
+    schema_version = feature_prompts.schema_version + 1,
+    updated_by = EXCLUDED.updated_by,
+    published_at = EXCLUDED.published_at
+RETURNING schema_version
+`
+
+type UpsertFeaturePromptParams struct {
+	FeatureSlug string          `json:"feature_slug"`
+	Prompt      string          `json:"prompt"`
+	Enabled     bool            `json:"enabled"`
+	Variables   json.RawMessage `json:"variables"`
+	UpdatedBy   sql.NullInt64   `json:"updated_by"`
+	PublishedAt sql.NullTime    `json:"published_at"`
+}
+
+func (q *Queries) UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (int32, error) {
+	row := q.db.QueryRowContext(ctx, upsertFeaturePrompt,
+		arg.FeatureSlug,
+		arg.Prompt,
+		arg.Enabled,
+		arg.Variables,
+		arg.UpdatedBy,
+		arg.PublishedAt,
+	)
+	var schema_version int32
+	err := row.Scan(&schema_version)
+	return schema_version, err
+}
+
+const upsertStorageProfile = `-- name: UpsertStorageProfile :exec
+INSERT INTO storage_profiles (
+  profile_id, name, provider, enabled, is_current,
+  builtin, status, config, created_by, updated_by
+)
+VALUES (
+  $1, $2, $3, $4, $5,
+  $6, $7, $8, $9, $10
+)
+ON CONFLICT (profile_id) DO UPDATE
+SET name = EXCLUDED.name,
+    enabled = EXCLUDED.enabled,
+    is_current = EXCLUDED.is_current,
+    builtin = EXCLUDED.builtin,
+    status = EXCLUDED.status,
+    config = EXCLUDED.config,
+    updated_by = EXCLUDED.updated_by,
+    deleted_at = CASE WHEN EXCLUDED.status = 'deleted' THEN COALESCE(storage_profiles.deleted_at, now()) ELSE NULL END
+`
+
+type UpsertStorageProfileParams struct {
+	ProfileID string          `json:"profile_id"`
+	Name      string          `json:"name"`
+	Provider  string          `json:"provider"`
+	Enabled   bool            `json:"enabled"`
+	IsCurrent bool            `json:"is_current"`
+	Builtin   bool            `json:"builtin"`
+	Status    string          `json:"status"`
+	Config    json.RawMessage `json:"config"`
+	CreatedBy sql.NullInt64   `json:"created_by"`
+	UpdatedBy sql.NullInt64   `json:"updated_by"`
+}
+
+func (q *Queries) UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) error {
+	_, err := q.db.ExecContext(ctx, upsertStorageProfile,
+		arg.ProfileID,
+		arg.Name,
+		arg.Provider,
+		arg.Enabled,
+		arg.IsCurrent,
+		arg.Builtin,
+		arg.Status,
+		arg.Config,
+		arg.CreatedBy,
+		arg.UpdatedBy,
+	)
+	return err
+}
+
+const upsertStorageProfileSecret = `-- name: UpsertStorageProfileSecret :exec
+INSERT INTO storage_profile_secrets (
+  profile_id, secret_name, secret_material_kind, secret_ref, secret_payload, fingerprint,
+  key_version, status, rotated_at, expires_at, retired_at
+)
+VALUES (
+  $1, $2, $3, $4, $5, $6,
+  $7, $8, COALESCE($9, now()), $10, $11
+)
+ON CONFLICT (profile_id, secret_name) WHERE status = 'active' DO UPDATE
+SET secret_material_kind = EXCLUDED.secret_material_kind,
+    secret_ref = EXCLUDED.secret_ref,
+    secret_payload = EXCLUDED.secret_payload,
+    fingerprint = EXCLUDED.fingerprint,
+    key_version = EXCLUDED.key_version,
+    status = EXCLUDED.status,
+    rotated_at = CASE
+      WHEN storage_profile_secrets.fingerprint IS DISTINCT FROM EXCLUDED.fingerprint THEN EXCLUDED.rotated_at
+      ELSE storage_profile_secrets.rotated_at
+    END,
+    expires_at = EXCLUDED.expires_at,
+    retired_at = EXCLUDED.retired_at
+`
+
+type UpsertStorageProfileSecretParams struct {
+	ProfileID          string       `json:"profile_id"`
+	SecretName         string       `json:"secret_name"`
+	SecretMaterialKind string       `json:"secret_material_kind"`
+	SecretRef          string       `json:"secret_ref"`
+	SecretPayload      string       `json:"secret_payload"`
+	Fingerprint        string       `json:"fingerprint"`
+	KeyVersion         string       `json:"key_version"`
+	Status             string       `json:"status"`
+	RotatedAt          interface{}  `json:"rotated_at"`
+	ExpiresAt          sql.NullTime `json:"expires_at"`
+	RetiredAt          sql.NullTime `json:"retired_at"`
+}
+
+func (q *Queries) UpsertStorageProfileSecret(ctx context.Context, arg UpsertStorageProfileSecretParams) error {
+	_, err := q.db.ExecContext(ctx, upsertStorageProfileSecret,
+		arg.ProfileID,
+		arg.SecretName,
+		arg.SecretMaterialKind,
+		arg.SecretRef,
+		arg.SecretPayload,
+		arg.Fingerprint,
+		arg.KeyVersion,
+		arg.Status,
+		arg.RotatedAt,
+		arg.ExpiresAt,
+		arg.RetiredAt,
+	)
+	return err
 }
 
 const upsertSystemConfig = `-- name: UpsertSystemConfig :exec

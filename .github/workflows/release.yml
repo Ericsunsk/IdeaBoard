@@ -94,6 +94,33 @@ jobs:
         working-directory: apps/auth
         run: npm audit --omit=dev
 
+      - name: Test Go API migrations
+        working-directory: apps/api
+        run: go test ./internal/db/migrations -run TestMigrations -count=1
+
+      - name: Smoke API then Auth migrations
+        shell: bash
+        env:
+          APP_ENV: production
+          APP_LOG_FILE: none
+          DB_HOST: 127.0.0.1
+          DB_PORT: "5432"
+          DB_USER: ideaboard
+          DB_PASSWORD: ideaboard_test
+          DB_NAME: ideaboard_test
+          DB_SSLMODE: disable
+          AUTH_INTERNAL_KEY: 0123456789abcdef0123456789abcdef
+          AUTH_TRUSTED_ORIGINS: https://app.example.com
+          BETTER_AUTH_SECRET: abcdef0123456789abcdef0123456789
+          BETTER_AUTH_URL: https://api.example.com
+          NODE_ENV: production
+        run: |
+          (cd apps/api && go run ./cmd migrate)
+          (cd apps/auth && npm run build)
+          (cd apps/auth && npm run migrate:dist)
+          (cd apps/api && go run ./cmd migrate)
+          (cd apps/auth && npm run migrate:dist)
+
       - name: Test Go API
         working-directory: apps/api
         env:

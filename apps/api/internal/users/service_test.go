@@ -103,8 +103,8 @@ func TestDeleteUserCleansUploadsBeforeDeletingLocalRecords(t *testing.T) {
 	}
 	if _, err := db.ExecContext(
 		ctx,
-		`INSERT INTO tasks (task_id, user_id, channel_id, prompt, user_prompt, params, status, error_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		"delete-user-cleanup-task", user.ID, 1, "", "", "", "pending", "", "",
+		`INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		"delete-user-cleanup-task", user.ID, "", "", "", "pending", "", "",
 	); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}

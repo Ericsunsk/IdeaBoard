@@ -4,6 +4,8 @@ import adminAccountApi, {
   normalizeAdminAccountLimits,
   type AdminAccount,
   type AdminAccountLimits,
+  type AdminAccountModel,
+  type AdminAccountModelInput,
   type AdminAccountUpdateRequest,
 } from '../../shared/api/adminAccounts'
 import {
@@ -11,11 +13,10 @@ import {
   mockAdminAccountLimits,
   useAdminMockMode,
 } from '../../shared/lib/adminMockData'
-import { extractApiErrorMessage, splitCommaValues } from './channelModelUtils'
+import { extractApiErrorMessage } from './channelModelUtils'
 
 const ACCOUNT_PAGE_SIZE = 100
 const MAX_DETECTED_MODELS = 100
-const DISABLED_MODELS_CONFIG_KEY = 'disabled_models'
 
 export type AccountModelRow = {
   name: string
@@ -51,7 +52,7 @@ export function useChannelAccounts(options: {
     return {
       channel_id: channelId,
       model_values: [] as string[],
-      api_key: '',
+      secret: '',
       max_concurrent: accountLimits.value.max_concurrent.default,
       timeout: accountLimits.value.timeout_seconds.default,
     }
@@ -129,10 +130,9 @@ export function useChannelAccounts(options: {
   }
 
   function getAccountModelRows(account: AdminAccount): AccountModelRow[] {
-    const disabledModels = readDisabledModelKeys(account)
-    return splitCommaValues(account.model_set).map((model) => ({
-      name: model,
-      disabled: disabledModels.has(normalizeModelKey(model)),
+    return account.models.map((model) => ({
+      name: model.name,
+      disabled: !model.enabled,
     }))
   }
 
@@ -168,8 +168,8 @@ export function useChannelAccounts(options: {
     selectedChannelForAccount.value = channel || null
     accountForm.value = {
       channel_id: account.channel_id,
-      model_values: splitCommaValues(account.model_set),
-      api_key: '',
+      model_values: account.models.map((model) => model.name),
+      secret: '',
       max_concurrent: account.max_concurrent,
       timeout: account.timeout,
     }
@@ -181,11 +181,11 @@ export function useChannelAccounts(options: {
 
   async function handleDetectModelsOnSelectOpen() {
     const channel = selectedChannelForAccount.value
-    const apiKey = (accountForm.value.api_key || '').trim()
+    const secret = (accountForm.value.secret || '').trim()
     const baseURL = (channel?.api_url || '').trim()
 
     if (!baseURL) return
-    if (!apiKey) {
+    if (!secret) {
       if (!hasShownApiKeyHint.value) {
         hasShownApiKeyHint.value = true
         options.message.warning('请输入 API 密钥后再检测模型')
@@ -195,7 +195,7 @@ export function useChannelAccounts(options: {
     if (detectModelsLoading.value) return
 
     const apiType = channel?.type || 'openai-compatible'
-    const sessionKey = `${apiType}::${baseURL}::${apiKey}`
+    const sessionKey = `${apiType}::${baseURL}::${secret}`
     if (detectedModelSessionCache.value.has(sessionKey)) return
     detectedModelSessionCache.value.add(sessionKey)
 
@@ -203,7 +203,7 @@ export function useChannelAccounts(options: {
     try {
       const res = await channelApi.detectModels({
         base_url: baseURL,
-        api_key: apiKey,
+        api_key: secret,
         api_type: apiType,
       })
       const models = (res.data?.models || [])
@@ -232,16 +232,24 @@ export function useChannelAccounts(options: {
         options.message.warning('请至少选择或输入一个模型')
         return
       }
-      if (!isEditAccount.value && !accountForm.value.api_key) {
+      if (!isEditAccount.value && !accountForm.value.secret) {
         options.message.warning('新增账号必须输入 API 密钥')
         return
       }
 
       accountSaveLoading.value = true
       const ch = selectedChannelForAccount.value
+      const existingAccount = isEditAccount.value
+        ? accounts.value.find((account) => account.id === currentAccountId.value)
+        : undefined
+      const modelInputs = accountModelInputsFromValues(
+        accountForm.value.model_values,
+        existingAccount?.models,
+      )
+      const channelId =
+        isEditAccount.value && existingAccount ? existingAccount.channel_id : accountForm.value.channel_id
       const baseData = {
-        channel_id: accountForm.value.channel_id,
-        model_set: accountForm.value.model_values.join(','),
+        models: modelInputs,
         max_concurrent: accountForm.value.max_concurrent,
         timeout: accountForm.value.timeout,
         name: ch?.name || 'Unknown',
@@ -249,13 +257,6 @@ export function useChannelAccounts(options: {
         api_type: ch?.type || 'openai-compatible',
         proxy_url: ch?.api_url || '',
       }
-      const existingAccount = isEditAccount.value
-        ? accounts.value.find((account) => account.id === currentAccountId.value)
-        : undefined
-      const nextExtraConfig = reconcileDisabledModels(
-        existingAccount,
-        accountForm.value.model_values,
-      )
 
       if (isMockMode.value) {
         const now = new Date().toISOString()
@@ -264,11 +265,12 @@ export function useChannelAccounts(options: {
             existingAccount?.id ??
             Math.max(900, ...accounts.value.map((account) => account.id)) + 1,
           name: baseData.name,
-          channel_id: baseData.channel_id,
+          channel_id: channelId,
           platform: baseData.platform,
           api_type: baseData.api_type,
           proxy_url: baseData.proxy_url,
-          model_set: baseData.model_set,
+          models: mockAccountModelsFromInputs(modelInputs),
+          secret_configured: existingAccount?.secret_configured ?? true,
           max_concurrent: baseData.max_concurrent,
           current_concurrent: existingAccount?.current_concurrent ?? 0,
           wait_queue_count: existingAccount?.wait_queue_count ?? 0,
@@ -276,7 +278,7 @@ export function useChannelAccounts(options: {
           fail_count: existingAccount?.fail_count ?? 0,
           weight: existingAccount?.weight ?? 100,
           timeout: baseData.timeout,
-          extra_config: nextExtraConfig,
+          extra_config: existingAccount?.extra_config ?? '{}',
           status: existingAccount?.status ?? 1,
           created_at: existingAccount?.created_at ?? now,
           updated_at: now,
@@ -292,19 +294,20 @@ export function useChannelAccounts(options: {
       }
 
       if (isEditAccount.value) {
-        const updateData = {
+        const updateData: AdminAccountUpdateRequest = {
           ...baseData,
           weight: existingAccount?.weight ?? 100,
-          status: existingAccount?.status ?? 1,
-          extra_config: nextExtraConfig,
-          ...(accountForm.value.api_key ? { api_key: accountForm.value.api_key } : {}),
+          extra_config: existingAccount?.extra_config ?? '{}',
+          ...(accountForm.value.secret ? { secret: accountForm.value.secret } : {}),
         }
         await adminAccountApi.update(currentAccountId.value, updateData)
         options.message.success('账号已更新')
       } else {
         await adminAccountApi.create({
           ...baseData,
-          api_key: accountForm.value.api_key,
+          channel_id: channelId,
+          secret: accountForm.value.secret,
+          extra_config: '{}',
         })
         options.message.success('账号已创建')
       }
@@ -319,18 +322,19 @@ export function useChannelAccounts(options: {
   }
 
   async function toggleAccountModelStatus(account: AdminAccount, model: string) {
-    const currentDisabledModels = readDisabledModelNames(account)
     const modelKey = normalizeModelKey(model)
-    const isDisabled = currentDisabledModels.some((item) => normalizeModelKey(item) === modelKey)
-    const nextDisabledModels = isDisabled
-      ? currentDisabledModels.filter((item) => normalizeModelKey(item) !== modelKey)
-      : [...currentDisabledModels, model]
+    const target = account.models.find((item) => normalizeModelKey(item.name) === modelKey)
+    if (!target) return
+    const nextEnabled = !target.enabled
+    const nextModels = account.models.map((item) =>
+      normalizeModelKey(item.name) === modelKey ? { ...item, enabled: nextEnabled } : item,
+    )
 
     try {
       await updateAccountModelConfig(account, {
-        extra_config: writeDisabledModels(account, nextDisabledModels),
+        models: nextModels,
       })
-      options.message.success(isDisabled ? '模型已启动' : '模型已停止')
+      options.message.success(nextEnabled ? '模型已启动' : '模型已停止')
     } catch (error) {
       options.message.error(extractApiErrorMessage(error, '模型状态修改失败'))
     }
@@ -338,7 +342,7 @@ export function useChannelAccounts(options: {
 
   async function updateAccountModelConfig(
     account: AdminAccount,
-    patch: Partial<Pick<AdminAccountUpdateRequest, 'model_set' | 'extra_config'>>,
+    patch: Partial<Pick<AdminAccount, 'models' | 'extra_config'>>,
   ) {
     const updatedAt = new Date().toISOString()
     const nextAccount: AdminAccount = {
@@ -357,23 +361,21 @@ export function useChannelAccounts(options: {
   function createAccountUpdatePayload(account: AdminAccount): AdminAccountUpdateRequest {
     return {
       name: account.name,
-      channel_id: account.channel_id,
       platform: account.platform,
       api_type: account.api_type,
-      model_set: account.model_set,
+      models: accountModelInputsFromModels(account.models),
       proxy_url: account.proxy_url,
       max_concurrent: account.max_concurrent,
       timeout: account.timeout,
       weight: account.weight,
       extra_config: account.extra_config || '{}',
-      status: account.status,
     }
   }
 
   function handleDeleteAccount(account: AdminAccount) {
     options.dialog.warning({
       title: '确认删除 APIKey',
-      content: '确定删除该 APIKey 吗？删除前会自动停用该账号。',
+      content: '确定删除该 APIKey 吗？关联的执行中任务会由后端统一结束。',
       onConfirm: async () => {
         try {
           if (isMockMode.value) {
@@ -382,9 +384,6 @@ export function useChannelAccounts(options: {
             return
           }
 
-          if (account.status === 1) {
-            await adminAccountApi.stop(account.id)
-          }
           await adminAccountApi.delete(account.id)
           options.message.success('账号已删除')
           await options.onAfterMutation()
@@ -418,51 +417,43 @@ export function useChannelAccounts(options: {
   }
 }
 
-function readAccountExtraConfig(account: AdminAccount): Record<string, unknown> {
-  try {
-    const payload: unknown = JSON.parse(account.extra_config || '{}')
-    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-      return { ...(payload as Record<string, unknown>) }
+function accountModelInputsFromValues(
+  values: string[],
+  existingModels: AdminAccountModel[] = [],
+): AdminAccountModelInput[] {
+  const existingByKey = new Map(existingModels.map((model) => [normalizeModelKey(model.name), model]))
+  return uniqueTrimmedValues(values).map((name) => {
+    const existing = existingByKey.get(normalizeModelKey(name))
+    return {
+      name,
+      enabled: existing?.enabled ?? true,
+      weight: existing?.weight ?? 1,
+      max_concurrent: existing?.max_concurrent,
+      feature_slugs: existing?.feature_slugs,
     }
-  } catch {
-    return {}
-  }
-  return {}
+  })
 }
 
-function readDisabledModelNames(account: AdminAccount): string[] {
-  const payload = readAccountExtraConfig(account)
-  return readStringList(payload[DISABLED_MODELS_CONFIG_KEY])
+function accountModelInputsFromModels(models: AdminAccountModel[]): AdminAccountModelInput[] {
+  return models.map((model) => ({
+    name: model.name,
+    enabled: model.enabled,
+    weight: model.weight,
+    max_concurrent: model.max_concurrent,
+    feature_slugs: model.feature_slugs,
+  }))
 }
 
-function readDisabledModelKeys(account: AdminAccount) {
-  return new Set(readDisabledModelNames(account).map(normalizeModelKey))
-}
-
-function writeDisabledModels(account: AdminAccount, disabledModels: string[]) {
-  const payload = readAccountExtraConfig(account)
-  const normalizedModels = uniqueTrimmedValues(disabledModels)
-  if (normalizedModels.length > 0) {
-    payload[DISABLED_MODELS_CONFIG_KEY] = normalizedModels
-  } else {
-    delete payload[DISABLED_MODELS_CONFIG_KEY]
-  }
-  return JSON.stringify(payload)
-}
-
-function reconcileDisabledModels(account: AdminAccount | undefined, modelValues: string[]) {
-  if (!account) return '{}'
-  const activeModelKeys = new Set(modelValues.map(normalizeModelKey))
-  const disabledModels = readDisabledModelNames(account).filter((model) =>
-    activeModelKeys.has(normalizeModelKey(model)),
-  )
-  return writeDisabledModels(account, disabledModels)
-}
-
-function readStringList(value: unknown): string[] {
-  if (typeof value === 'string') return splitCommaValues(value)
-  if (!Array.isArray(value)) return []
-  return uniqueTrimmedValues(value.map((item) => (typeof item === 'string' ? item : '')))
+function mockAccountModelsFromInputs(models: AdminAccountModelInput[]): AdminAccountModel[] {
+  return models.map((model, index) => ({
+    id: index + 1,
+    name: model.name,
+    enabled: model.enabled ?? true,
+    weight: model.weight ?? 1,
+    max_concurrent: model.max_concurrent,
+    feature_slugs: model.feature_slugs,
+    sort_order: index,
+  }))
 }
 
 function uniqueTrimmedValues(values: string[]) {

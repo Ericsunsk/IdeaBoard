@@ -4,7 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { FeaturePromptVariable } from './featurePromptVariable'
 
 export type SetAdminFeaturePromptBody = {
   prompt: string
+  enabled?: boolean
+  variables?: FeaturePromptVariable[]
 }

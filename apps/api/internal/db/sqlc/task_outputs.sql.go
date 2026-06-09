@@ -7,36 +7,46 @@ package dbsqlc
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 
 	"github.com/lib/pq"
 )
 
 const createTaskOutput = `-- name: CreateTaskOutput :one
 INSERT INTO task_outputs (
-  task_id, role, url, storage_key, mime_type, width, height, size_bytes, sort_index
+  task_id, media_asset_id, role, url, storage_key, mime_type, width, height, size_bytes,
+  source_url, checksum_sha256, storage_profile, metadata, sort_index
 ) VALUES (
-  $1, $2, $3, $4,
-  $5, $6, $7, $8,
-  $9
+  $1, $2, $3, $4, $5,
+  $6, $7, $8, $9,
+  $10, $11, $12, $13,
+  $14
 )
 RETURNING id
 `
 
 type CreateTaskOutputParams struct {
-	TaskID     string `json:"task_id"`
-	Role       string `json:"role"`
-	Url        string `json:"url"`
-	StorageKey string `json:"storage_key"`
-	MimeType   string `json:"mime_type"`
-	Width      int32  `json:"width"`
-	Height     int32  `json:"height"`
-	SizeBytes  int64  `json:"size_bytes"`
-	SortIndex  int32  `json:"sort_index"`
+	TaskID         string          `json:"task_id"`
+	MediaAssetID   sql.NullInt64   `json:"media_asset_id"`
+	Role           string          `json:"role"`
+	Url            string          `json:"url"`
+	StorageKey     string          `json:"storage_key"`
+	MimeType       string          `json:"mime_type"`
+	Width          int32           `json:"width"`
+	Height         int32           `json:"height"`
+	SizeBytes      int64           `json:"size_bytes"`
+	SourceUrl      string          `json:"source_url"`
+	ChecksumSha256 string          `json:"checksum_sha256"`
+	StorageProfile string          `json:"storage_profile"`
+	Metadata       json.RawMessage `json:"metadata"`
+	SortIndex      int32           `json:"sort_index"`
 }
 
 func (q *Queries) CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, createTaskOutput,
 		arg.TaskID,
+		arg.MediaAssetID,
 		arg.Role,
 		arg.Url,
 		arg.StorageKey,
@@ -44,6 +54,10 @@ func (q *Queries) CreateTaskOutput(ctx context.Context, arg CreateTaskOutputPara
 		arg.Width,
 		arg.Height,
 		arg.SizeBytes,
+		arg.SourceUrl,
+		arg.ChecksumSha256,
+		arg.StorageProfile,
+		arg.Metadata,
 		arg.SortIndex,
 	)
 	var id int64
@@ -62,8 +76,8 @@ func (q *Queries) DeleteOutputsByTaskID(ctx context.Context, taskID string) erro
 }
 
 const listOutputsByTaskIDs = `-- name: ListOutputsByTaskIDs :many
-SELECT id, task_id, role, url, storage_key, mime_type, width, height, size_bytes,
-       sort_index, created_at, updated_at
+SELECT id, task_id, media_asset_id, role, url, storage_key, mime_type, width, height, size_bytes,
+       source_url, checksum_sha256, storage_profile, metadata, sort_index, created_at, updated_at
 FROM task_outputs
 WHERE task_id = ANY($1::text[])
 ORDER BY task_id ASC, sort_index ASC, id ASC
@@ -81,6 +95,7 @@ func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([
 		if err := rows.Scan(
 			&i.ID,
 			&i.TaskID,
+			&i.MediaAssetID,
 			&i.Role,
 			&i.Url,
 			&i.StorageKey,
@@ -88,6 +103,10 @@ func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([
 			&i.Width,
 			&i.Height,
 			&i.SizeBytes,
+			&i.SourceUrl,
+			&i.ChecksumSha256,
+			&i.StorageProfile,
+			&i.Metadata,
 			&i.SortIndex,
 			&i.CreatedAt,
 			&i.UpdatedAt,

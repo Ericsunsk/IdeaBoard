@@ -20,14 +20,16 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 	service := &AccountService{
 		accountRepo: repo,
 	}
+	channelID := createAccountTestChannel(t, db, "timeout")
 
 	account := &ApiAccount{
 		Name:          "demo",
-		ChannelID:     1,
+		ChannelID:     channelID,
 		Platform:      "openai-compatible",
 		ApiType:       "openai-compatible",
-		ModelSet:      "gpt-image-1",
+		Models:        []AccountModel{{Name: "gpt-image-1", Enabled: true}},
 		ApiKey:        "test-key",
+		ProxyURL:      "https://example.com/timeout",
 		MaxConcurrent: 1,
 		Timeout:       30,
 		Weight:        1,
@@ -39,16 +41,14 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 
 	err := service.UpdateAccount(ctx, account.ID, &UpdateAccountRequest{
 		Name:          account.Name,
-		ChannelID:     account.ChannelID,
 		Platform:      account.Platform,
 		ApiType:       account.ApiType,
-		ModelSet:      account.ModelSet,
+		Models:        []AccountModelInput{{Name: "gpt-image-1"}},
 		ProxyURL:      account.ProxyURL,
 		MaxConcurrent: account.MaxConcurrent,
 		Timeout:       -30,
 		ExtraConfig:   account.ExtraConfig,
 		Weight:        account.Weight,
-		Status:        account.Status,
 	})
 	if err != nil {
 		t.Fatalf("update account failed: %v", err)
@@ -60,6 +60,9 @@ func TestUpdateAccountNormalizesTimeout(t *testing.T) {
 	}
 	if updated.Timeout != defaultAccountTimeoutSeconds {
 		t.Fatalf("timeout = %d, want %d", updated.Timeout, defaultAccountTimeoutSeconds)
+	}
+	if updated.Status != account.Status {
+		t.Fatalf("status = %d, want unchanged %d", updated.Status, account.Status)
 	}
 }
 

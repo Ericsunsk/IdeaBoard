@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -10,12 +11,19 @@ import (
 	"ideaboard/api/internal/runtime/taskqueue"
 )
 
-type fakeRequeuer struct{}
+type fakeRequeuer struct {
+	calls int
+}
 
-func (f *fakeRequeuer) Enqueue(context.Context, *queuetypes.TaskPayload) error { return nil }
+func (f *fakeRequeuer) Enqueue(context.Context, *queuetypes.TaskPayload) error {
+	f.calls++
+	return nil
+}
 
 type fakeAssigner struct {
 	assignAccount  int64
+	assignChannel  int64
+	assignModel    string
 	assignStatus   string
 	assignToken    string
 	assignErr      error
@@ -29,11 +37,17 @@ func (f *fakeAssigner) Assign(_ context.Context, _ []int64, task *queuetypes.Tas
 		return taskqueue.TaskAssignment{}, f.assignErr
 	}
 	f.lastRiverJobID = task.RiverJobID
+	channelID := f.assignChannel
+	if channelID == 0 && f.assignAccount != 0 {
+		channelID = f.assignAccount * 10
+	}
 	return taskqueue.TaskAssignment{
-		TaskID:     task.TaskID,
-		AccountID:  f.assignAccount,
-		Status:     f.assignStatus,
-		LeaseToken: f.leaseToken(),
+		TaskID:        task.TaskID,
+		AccountID:     f.assignAccount,
+		ChannelID:     channelID,
+		ResolvedModel: f.assignModel,
+		Status:        f.assignStatus,
+		LeaseToken:    f.leaseToken(),
 	}, nil
 }
 
@@ -100,15 +114,17 @@ func (f *fakeCancelStoreForRiver) ClearCancelled(_ context.Context, taskID strin
 	return nil
 }
 
-func createRiverTestAccount(t *testing.T, repo *accounts.AccountRepository, name string) *accounts.ApiAccount {
+func createRiverTestAccount(t *testing.T, db testDB, repo *accounts.AccountRepository, name string) *accounts.ApiAccount {
 	t.Helper()
+	channelID := createRiverTestChannel(t, db, name)
 	acc := &accounts.ApiAccount{
 		Name:          name,
-		ChannelID:     1,
+		ChannelID:     channelID,
 		Platform:      "openai-compatible",
 		ApiType:       "openai-compatible",
-		ModelSet:      "gpt-image-1",
+		Models:        []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 		ApiKey:        "k",
+		ProxyURL:      "https://example.com/" + name,
 		MaxConcurrent: 3,
 		Timeout:       120,
 		Weight:        1,
@@ -118,4 +134,24 @@ func createRiverTestAccount(t *testing.T, repo *accounts.AccountRepository, name
 		t.Fatalf("create account failed: %v", err)
 	}
 	return acc
+}
+
+type testDB interface {
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
+func createRiverTestChannel(t *testing.T, db testDB, suffix string) int64 {
+	t.Helper()
+	var id int64
+	err := db.QueryRowContext(context.Background(), `
+INSERT INTO channels (type, name, api_url, status)
+VALUES ('openai-compatible', $1, $2, 1)
+RETURNING id`,
+		"river-test-channel-"+suffix,
+		"https://example.com/"+suffix,
+	).Scan(&id)
+	if err != nil {
+		t.Fatalf("create river test channel failed: %v", err)
+	}
+	return id
 }

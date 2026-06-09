@@ -30,10 +30,16 @@ type TaskAssigner interface {
 }
 
 type TaskAssignment struct {
-	TaskID     string
-	AccountID  int64
-	Status     string
-	LeaseToken string
+	TaskID        string
+	AccountID     int64
+	ChannelID     int64
+	ResolvedModel string
+	Status        string
+	LeaseToken    string
+}
+
+func (a TaskAssignment) HasLeaseIdentity() bool {
+	return a.TaskID != "" && a.AccountID > 0 && a.ChannelID > 0 && a.LeaseToken != ""
 }
 
 type AccountConcurrencyStore interface {

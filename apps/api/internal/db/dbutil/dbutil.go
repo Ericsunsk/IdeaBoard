@@ -46,6 +46,21 @@ func TimePtr(value sql.NullTime) *time.Time {
 	return &v
 }
 
+func NullInt64(value *int64) sql.NullInt64 {
+	if value == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *value, Valid: true}
+}
+
+func Int64Ptr(value sql.NullInt64) *int64 {
+	if !value.Valid {
+		return nil
+	}
+	v := value.Int64
+	return &v
+}
+
 func NullString(value *string) sql.NullString {
 	if value == nil {
 		return sql.NullString{}

@@ -298,7 +298,7 @@
         >
           <span>{{ isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)' }}</span>
           <InputText
-            v-model="accountForm.api_key"
+            v-model="accountForm.secret"
             class="w-full"
             type="password"
             :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此渠道商的 API Key'"
@@ -390,7 +390,7 @@ import {
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
 import { createMockAdminChannels, useAdminMockMode } from '../../shared/lib/adminMockData'
-import { extractApiErrorMessage, splitCommaValues } from './channelModelUtils'
+import { extractApiErrorMessage } from './channelModelUtils'
 import { useChannelAccounts } from './useChannelAccounts'
 
 const appToast = useAppToast()
@@ -683,7 +683,7 @@ const accountRunningLabel = computed(() =>
 const activeModelCount = computed(() => {
   const models = new Set<string>()
   accounts.value.forEach((account) => {
-    splitCommaValues(account.model_set).forEach((model) => models.add(model))
+    account.models.forEach((model) => models.add(model.name))
   })
   return models.size
 })

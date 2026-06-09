@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/runtime/queuetypes"
+	"ideaboard/api/internal/runtime/taskqueue"
 	"io"
 	"log/slog"
 	"net/url"
@@ -69,6 +70,10 @@ type providerCallOutput struct {
 }
 
 func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (providerCallOutput, error) {
+	return c.callDrawingAPIWithAssignment(ctx, account, task, taskqueue.TaskAssignment{})
+}
+
+func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
 	slog.Info("calling provider API", "account_name", account.Name, "channel_id", account.ChannelID, "task_id", task.TaskID)
 
 	if account.ApiKey == "" {
@@ -135,9 +140,15 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	var callResult providerCallResult
 	var err error
 
-	enabledModelSet := accounts.EnabledModelSet(account)
-	resolvedModel := resolveRequestedModel(enabledModelSet, params)
-	if strings.TrimSpace(resolvedModel) == "" {
+	featureSlug := ""
+	if params != nil {
+		if slug, err := workflow.ResolveWorkflowFeatureSlug(params); err == nil {
+			featureSlug = slug
+		}
+	}
+	resolvedAccountModel, ok := resolveAccountModelForExecution(account, featureSlug, params, assignment.ResolvedModel)
+	resolvedModel := strings.TrimSpace(resolvedAccountModel.Name)
+	if !ok || resolvedModel == "" {
 		return providerCallOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
 			tasks.FailureCategoryInputInvalid,
@@ -218,9 +229,6 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 		"image_url":    imageURL,
 		"image_urls":   imageURLs,
 	}
-	if strings.TrimSpace(enabledModelSet) != "" && !strings.Contains(enabledModelSet, ",") {
-		result["model_set"] = strings.TrimSpace(enabledModelSet)
-	}
 	if strings.TrimSpace(callResult.Model) != "" {
 		result["model"] = strings.TrimSpace(callResult.Model)
 	}
@@ -228,6 +236,13 @@ func (c *ProviderExecutor) callDrawingAPI(ctx context.Context, account *accounts
 	resultJSON, _ := json.Marshal(result)
 	output.Result = string(resultJSON)
 	return output, nil
+}
+
+func resolveAccountModelForExecution(account *accounts.ApiAccount, featureSlug string, params map[string]interface{}, assignedModel string) (accounts.AccountModel, bool) {
+	if model := strings.TrimSpace(assignedModel); model != "" {
+		return accounts.ResolveAccountModel(account, featureSlug, model)
+	}
+	return accounts.ResolveAccountModelForParams(account, featureSlug, params)
 }
 
 func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, account *accounts.ApiAccount, imageURLs []string) ([]string, error) {
@@ -309,37 +324,6 @@ func normalizeProviderResultImageURLs(result providerCallResult) []string {
 		urls = append(urls, url)
 	}
 	return urls
-}
-
-func resolveRequestedModel(accountModelSet string, params map[string]interface{}) string {
-	candidates := splitModelSet(accountModelSet)
-	if len(candidates) == 0 {
-		return ""
-	}
-	if modelFromParams, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
-		modelFromParams = strings.TrimSpace(modelFromParams)
-		if modelFromParams != "" {
-			for _, candidate := range candidates {
-				if strings.EqualFold(candidate, modelFromParams) {
-					return candidate
-				}
-			}
-		}
-	}
-	return candidates[0]
-}
-
-func splitModelSet(modelSet string) []string {
-	items := strings.Split(modelSet, ",")
-	result := make([]string, 0, len(items))
-	for _, item := range items {
-		model := strings.TrimSpace(item)
-		if model == "" {
-			continue
-		}
-		result = append(result, model)
-	}
-	return result
 }
 
 func resolveAccountTimeout(account *accounts.ApiAccount) time.Duration {

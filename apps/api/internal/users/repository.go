@@ -31,12 +31,16 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 			return err
 		}
 		user.StorageUID = uid
+		role := strings.ToLower(strings.TrimSpace(user.Role))
+		if role == "" {
+			role = "user"
+		}
 		id, err := q.CreateUser(ctx, dbsqlc.CreateUserParams{
 			Username:   user.Username,
 			AuthUserID: dbutil.NullString(user.AuthUserID),
 			StorageUid: user.StorageUID,
 			Avatar:     user.Avatar,
-			Role:       user.Role,
+			Role:       role,
 			Status:     user.Status,
 		})
 		if err != nil {
@@ -93,7 +97,7 @@ func (r *UserRepository) GetByStorageUID(ctx context.Context, storageUID string)
 
 // Update 更新用户
 func (r *UserRepository) Update(ctx context.Context, user *User) error {
-	return r.q.UpdateUser(ctx, dbsqlc.UpdateUserParams{
+	updated, err := r.q.UpdateUser(ctx, dbsqlc.UpdateUserParams{
 		Username:   user.Username,
 		AuthUserID: dbutil.NullString(user.AuthUserID),
 		StorageUid: user.StorageUID,
@@ -102,6 +106,10 @@ func (r *UserRepository) Update(ctx context.Context, user *User) error {
 		Status:     user.Status,
 		ID:         user.ID,
 	})
+	if err != nil {
+		return err
+	}
+	return requireOneUserRow(updated)
 }
 
 // Delete 删除用户及关联资产
@@ -126,7 +134,11 @@ func (r *UserRepository) Delete(ctx context.Context, id int64) error {
 		if err := q.DeleteTasksByUserID(ctx, id); err != nil {
 			return err
 		}
-		return q.DeleteUserByID(ctx, id)
+		updated, err := q.DeleteUserByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		return requireOneUserRow(updated)
 	})
 }
 
@@ -185,15 +197,27 @@ func (r *UserRepository) List(
 
 // UpdateStatus 更新用户状态
 func (r *UserRepository) UpdateStatus(ctx context.Context, id int64, status int16) error {
-	return r.q.UpdateUserStatus(ctx, dbsqlc.UpdateUserStatusParams{Status: status, ID: id})
+	updated, err := r.q.UpdateUserStatus(ctx, dbsqlc.UpdateUserStatusParams{Status: status, ID: id})
+	if err != nil {
+		return err
+	}
+	return requireOneUserRow(updated)
 }
 
 func (r *UserRepository) UpdateRoleByID(ctx context.Context, id int64, role string) error {
-	return r.q.UpdateUserRole(ctx, dbsqlc.UpdateUserRoleParams{Role: role, ID: id})
+	updated, err := r.q.UpdateUserRole(ctx, dbsqlc.UpdateUserRoleParams{Role: role, ID: id})
+	if err != nil {
+		return err
+	}
+	return requireOneUserRow(updated)
 }
 
 func (r *UserRepository) UpdateAvatarByID(ctx context.Context, id int64, avatar string) error {
-	return r.q.UpdateUserAvatar(ctx, dbsqlc.UpdateUserAvatarParams{Avatar: strings.TrimSpace(avatar), ID: id})
+	updated, err := r.q.UpdateUserAvatar(ctx, dbsqlc.UpdateUserAvatarParams{Avatar: strings.TrimSpace(avatar), ID: id})
+	if err != nil {
+		return err
+	}
+	return requireOneUserRow(updated)
 }
 
 func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
@@ -224,7 +248,11 @@ func (r *UserRepository) EnsureStorageUIDs(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			if err := q.UpdateUserStorageUID(ctx, dbsqlc.UpdateUserStorageUIDParams{StorageUid: uniqueUID, ID: row.ID}); err != nil {
+			updated, err := q.UpdateUserStorageUID(ctx, dbsqlc.UpdateUserStorageUIDParams{StorageUid: uniqueUID, ID: row.ID})
+			if err != nil {
+				return err
+			}
+			if err := requireOneUserRow(updated); err != nil {
 				return err
 			}
 			seen[uniqueUID] = row.ID
@@ -321,6 +349,13 @@ func recordUsedUID(ctx context.Context, q *dbsqlc.Queries, storageUID string) (b
 func ensureUsedUIDRecorded(ctx context.Context, q *dbsqlc.Queries, storageUID string) error {
 	_, err := recordUsedUID(ctx, q, storageUID)
 	return err
+}
+
+func requireOneUserRow(rows int64) error {
+	if rows == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }
 
 func IsDuplicateConstraintError(err error) bool {

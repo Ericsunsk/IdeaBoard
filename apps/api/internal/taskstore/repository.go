@@ -2,8 +2,12 @@ package taskstore
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,13 +22,17 @@ type Repository struct {
 }
 
 type TaskStatisticLite struct {
-	TaskID      string
-	UserID      int64
-	AccountID   int64
-	Status      string
-	Result      string
-	CreatedAt   time.Time
-	CompletedAt *time.Time
+	TaskID         string
+	UserID         int64
+	AccountID      *int64
+	Status         string
+	Result         string
+	FeatureSlug    string
+	RequestedModel string
+	ResolvedModel  string
+	APIType        string
+	CreatedAt      time.Time
+	CompletedAt    *time.Time
 }
 
 type RunningTaskLease struct {
@@ -34,14 +42,21 @@ type RunningTaskLease struct {
 }
 
 type DailyStatAggregate struct {
-	StatDate          string
+	StatDate          time.Time
 	ModelName         string
 	UserKey           string
 	Total             int64
 	Completed         int64
 	Failed            int64
+	Cancelled         int64
 	LatencySecondsSum float64
 	LatencyCount      int64
+}
+
+type BackfillDailyStatsResult struct {
+	InsertedEvents int64
+	TouchedGroups  int64
+	MarkedDays     int64
 }
 
 type StatEventLatencySample struct {
@@ -62,6 +77,10 @@ type ExecutionFailureCategoryAggregate struct {
 	AvgLatencyMS float64
 }
 
+const (
+	defaultStorageProfileID = "builtin-local"
+)
+
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db, q: dbsqlc.New(db)}
 }
@@ -75,21 +94,28 @@ func (r *Repository) Create(ctx context.Context, task *tasks.Task) error {
 		task.UpdatedAt = task.CreatedAt
 	}
 	id, err := r.q.CreateTask(ctx, dbsqlc.CreateTaskParams{
-		TaskID:      task.TaskID,
-		UserID:      task.UserID,
-		ChannelID:   task.ChannelID,
-		AccountID:   task.AccountID,
-		Prompt:      task.Prompt,
-		UserPrompt:  task.UserPrompt,
-		Params:      task.Params,
-		Status:      task.Status,
-		LeaseToken:  task.LeaseToken,
-		RetryCount:  int32(task.RetryCount),
-		ErrorMsg:    task.ErrorMsg,
-		Result:      task.Result,
-		CreatedAt:   task.CreatedAt,
-		UpdatedAt:   task.UpdatedAt,
-		CompletedAt: dbutil.NullTime(task.CompletedAt),
+		TaskID:            task.TaskID,
+		UserID:            task.UserID,
+		AssignedChannelID: dbutil.NullInt64(task.AssignedChannelID),
+		AccountID:         dbutil.NullInt64(task.AccountID),
+		Prompt:            task.Prompt,
+		UserPrompt:        task.UserPrompt,
+		Params:            task.Params,
+		FeatureSlug:       task.FeatureSlug,
+		RequestedModel:    task.RequestedModel,
+		ResolvedModel:     task.ResolvedModel,
+		ApiType:           task.APIType,
+		Status:            task.Status,
+		LeaseToken:        task.LeaseToken,
+		RetryCount:        int32(task.RetryCount),
+		ErrorMsg:          task.ErrorMsg,
+		Result:            task.Result,
+		CreatedAt:         task.CreatedAt,
+		UpdatedAt:         task.UpdatedAt,
+		CompletedAt:       dbutil.NullTime(task.CompletedAt),
+		CancelledAt:       dbutil.NullTime(task.CancelledAt),
+		CancelledBy:       dbutil.NullInt64(task.CancelledBy),
+		CancelReason:      task.CancelReason,
 	})
 	if err != nil {
 		return err
@@ -119,7 +145,7 @@ func (r *Repository) GetByTaskIDAndUserID(ctx context.Context, taskID string, us
 	return &task, nil
 }
 
-func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time) (int64, error) {
+func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
@@ -132,96 +158,185 @@ func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses
 		if err != nil || updated == 0 {
 			return err
 		}
+		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID); err != nil {
+			return err
+		}
+		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+			return err
+		}
+		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
+			return err
+		}
 		rowsAffected = updated
-		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
+		return nil
 	})
 	return rowsAffected, err
 }
 
-func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error) {
+func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.MarkTaskFailedWithLease(ctx, dbsqlc.MarkTaskFailedWithLeaseParams{
-			ErrorMsg:    errMsg,
-			Result:      result,
-			CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-			TaskID:      taskID,
-			Statuses:    statuses,
-			LeaseToken:  leaseToken,
+			ErrorMsg:          errMsg,
+			Result:            result,
+			CompletedAt:       sql.NullTime{Time: completedAt, Valid: true},
+			TaskID:            taskID,
+			Statuses:          statuses,
+			AccountID:         sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+			AssignedChannelID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+			LeaseToken:        leaseToken,
 		})
 		if err != nil || updated == 0 {
 			return err
 		}
+		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID); err != nil {
+			return err
+		}
+		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+			return err
+		}
+		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
+			return err
+		}
 		rowsAffected = updated
-		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
+		return nil
 	})
 	return rowsAffected, err
 }
 
-func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error) {
-	return r.q.ResetTaskRunningToPendingWithLease(ctx, dbsqlc.ResetTaskRunningToPendingWithLeaseParams{
-		ErrorMsg:   errMsg,
-		TaskID:     taskID,
-		Statuses:   statuses,
-		LeaseToken: leaseToken,
+func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+	params := dbsqlc.ResetTaskRunningToPendingWithLeaseParams{
+		ErrorMsg:          errMsg,
+		TaskID:            taskID,
+		Statuses:          statuses,
+		AccountID:         sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+		AssignedChannelID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+		LeaseToken:        leaseToken,
+	}
+	if attemptFinish == nil || attemptFinish.ID == 0 {
+		return r.q.ResetTaskRunningToPendingWithLease(ctx, params)
+	}
+	var rowsAffected int64
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.ResetTaskRunningToPendingWithLease(ctx, params)
+		if err != nil || updated == 0 {
+			return err
+		}
+		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+			return err
+		}
+		rowsAffected = updated
+		return nil
 	})
+	return rowsAffected, err
 }
 
-func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error) {
-	return r.q.RequeueTaskRunningWithLease(ctx, dbsqlc.RequeueTaskRunningWithLeaseParams{
-		ErrorMsg:   errMsg,
-		TaskID:     taskID,
-		Statuses:   statuses,
-		LeaseToken: leaseToken,
+func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+	params := dbsqlc.RequeueTaskRunningWithLeaseParams{
+		ErrorMsg:          errMsg,
+		TaskID:            taskID,
+		Statuses:          statuses,
+		AccountID:         sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+		AssignedChannelID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+		LeaseToken:        leaseToken,
+	}
+	if attemptFinish == nil || attemptFinish.ID == 0 {
+		return r.q.RequeueTaskRunningWithLease(ctx, params)
+	}
+	var rowsAffected int64
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.RequeueTaskRunningWithLease(ctx, params)
+		if err != nil || updated == 0 {
+			return err
+		}
+		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+			return err
+		}
+		rowsAffected = updated
+		return nil
 	})
+	return rowsAffected, err
 }
 
-func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error) {
+func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.FinalFailTaskRunningWithLease(ctx, dbsqlc.FinalFailTaskRunningWithLeaseParams{
-			ErrorMsg:    errMsg,
-			Result:      result,
-			CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-			TaskID:      taskID,
-			Statuses:    statuses,
-			LeaseToken:  leaseToken,
+			ErrorMsg:          errMsg,
+			Result:            result,
+			CompletedAt:       sql.NullTime{Time: completedAt, Valid: true},
+			TaskID:            taskID,
+			Statuses:          statuses,
+			AccountID:         sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+			AssignedChannelID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+			LeaseToken:        leaseToken,
 		})
 		if err != nil || updated == 0 {
 			return err
 		}
+		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID); err != nil {
+			return err
+		}
+		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+			return err
+		}
+		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
+			return err
+		}
 		rowsAffected = updated
-		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
+		return nil
 	})
 	return rowsAffected, err
 }
 
-func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error) {
+func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	var rowsAffected int64
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
-			Result:      result,
-			CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-			TaskID:      taskID,
-			Statuses:    statuses,
-			LeaseToken:  leaseToken,
+			Result:            result,
+			CompletedAt:       sql.NullTime{Time: completedAt, Valid: true},
+			TaskID:            taskID,
+			Statuses:          statuses,
+			AccountID:         sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+			AssignedChannelID: sql.NullInt64{Int64: channelID, Valid: channelID > 0},
+			LeaseToken:        leaseToken,
 		})
 		if err != nil || updated == 0 {
 			return err
 		}
-		rowsAffected = updated
+		if err := q.DeleteTaskOutputMediaRefsByTaskID(ctx, taskID); err != nil {
+			return err
+		}
 		if err := q.DeleteOutputsByTaskID(ctx, taskID); err != nil {
 			return err
 		}
-		if err := insertTaskOutputs(ctx, q, taskID, outputs); err != nil {
+		taskRow, err := q.GetTaskByTaskID(ctx, taskID)
+		if err != nil {
 			return err
 		}
-		return upsertDailyStatByTaskIDTx(ctx, q, taskID)
+		if err := insertTaskOutputs(ctx, q, taskID, taskRow.UserID, outputs); err != nil {
+			return err
+		}
+		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID); err != nil {
+			return err
+		}
+		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+			return err
+		}
+		metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, []string{taskID})
+		if err != nil {
+			return err
+		}
+		if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.CreatedAt, metricsByTaskID[taskID], tasks.ExecutionStageCompleted, "", "", completedAt); err != nil {
+			return err
+		}
+		rowsAffected = updated
+		return nil
 	})
 	return rowsAffected, err
 }
 
-func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, outputs []tasks.TaskOutput) error {
+func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ownerUserID int64, outputs []tasks.TaskOutput) error {
 	for i := range outputs {
 		output := outputs[i]
 		output.TaskID = taskID
@@ -229,21 +344,81 @@ func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ou
 		if strings.TrimSpace(output.Role) == "" {
 			output.Role = "image"
 		}
-		if _, err := q.CreateTaskOutput(ctx, dbsqlc.CreateTaskOutputParams{
-			TaskID:     output.TaskID,
-			Role:       output.Role,
-			Url:        output.URL,
-			StorageKey: output.StorageKey,
-			MimeType:   output.MIMEType,
-			Width:      int32(output.Width),
-			Height:     int32(output.Height),
-			SizeBytes:  output.SizeBytes,
-			SortIndex:  int32(output.SortIndex),
-		}); err != nil {
+		mediaAssetID, err := upsertTaskOutputMediaAsset(ctx, q, ownerUserID, output)
+		if err != nil {
 			return err
+		}
+		output.MediaAssetID = mediaAssetID
+		taskOutputID, err := q.CreateTaskOutput(ctx, dbsqlc.CreateTaskOutputParams{
+			TaskID:         output.TaskID,
+			MediaAssetID:   nullInt64Ptr(output.MediaAssetID),
+			Role:           output.Role,
+			Url:            output.URL,
+			StorageKey:     output.StorageKey,
+			MimeType:       output.MIMEType,
+			Width:          int32(output.Width),
+			Height:         int32(output.Height),
+			SizeBytes:      output.SizeBytes,
+			SourceUrl:      output.SourceURL,
+			ChecksumSha256: output.ChecksumSHA256,
+			StorageProfile: output.StorageProfile,
+			Metadata:       outputMetadataJSON(output.Metadata),
+			SortIndex:      int32(output.SortIndex),
+		})
+		if err != nil {
+			return err
+		}
+		if output.MediaAssetID != nil {
+			if _, err := q.UpsertMediaRef(ctx, dbsqlc.UpsertMediaRefParams{
+				MediaAssetID: *output.MediaAssetID,
+				OwnerUserID:  ownerUserID,
+				RefType:      "task_output",
+				RefID:        strconv.FormatInt(taskOutputID, 10),
+				BoardID:      "",
+				TaskID:       taskID,
+				Role:         output.Role,
+				Metadata:     mediaRefMetadataJSON(taskOutputID),
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func upsertTaskOutputMediaAsset(ctx context.Context, q *dbsqlc.Queries, ownerUserID int64, output tasks.TaskOutput) (*int64, error) {
+	storageKey := strings.TrimSpace(output.StorageKey)
+	if ownerUserID == 0 || storageKey == "" {
+		return nil, nil
+	}
+	assetID, err := newMediaAssetID()
+	if err != nil {
+		return nil, err
+	}
+	storageProfileID := strings.TrimSpace(output.StorageProfile)
+	if storageProfileID == "" {
+		storageProfileID = defaultStorageProfileID
+	}
+	id, err := q.UpsertMediaAsset(ctx, dbsqlc.UpsertMediaAssetParams{
+		AssetID:          assetID,
+		OwnerUserID:      ownerUserID,
+		StorageProfileID: storageProfileID,
+		StorageKey:       storageKey,
+		Url:              strings.TrimSpace(output.URL),
+		SourceUrl:        strings.TrimSpace(output.SourceURL),
+		MediaKind:        "image",
+		MimeType:         strings.TrimSpace(output.MIMEType),
+		Width:            int32(output.Width),
+		Height:           int32(output.Height),
+		SizeBytes:        output.SizeBytes,
+		ChecksumSha256:   strings.TrimSpace(output.ChecksumSHA256),
+		Status:           "ready",
+		Metadata:         mediaAssetMetadataJSON(output),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 func (r *Repository) ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error) {
@@ -284,6 +459,218 @@ func (r *Repository) PatchExecutionMetrics(ctx context.Context, patch tasks.Task
 		FinalizeLatencyMs:  optionalInt64(patch.FinalizeLatencyMS),
 		TotalLatencyMs:     optionalInt64(patch.TotalLatencyMS),
 	})
+}
+
+func patchTerminalExecutionMetricsTx(ctx context.Context, q *dbsqlc.Queries, taskID string, currentStage string, failureStage string, failureCategory string, finishedAt time.Time) error {
+	taskRow, err := q.GetTaskByTaskID(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, []string{taskID})
+	if err != nil {
+		return err
+	}
+	return patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.CreatedAt, metricsByTaskID[taskID], currentStage, failureStage, failureCategory, finishedAt)
+}
+
+func patchTerminalExecutionMetricsForTaskTx(
+	ctx context.Context,
+	q *dbsqlc.Queries,
+	taskID string,
+	createdAt time.Time,
+	metrics *tasks.TaskExecutionMetrics,
+	currentStage string,
+	failureStage string,
+	failureCategory string,
+	finishedAt time.Time,
+) error {
+	currentStage = strings.TrimSpace(currentStage)
+	if taskID == "" || currentStage == "" {
+		return nil
+	}
+	if finishedAt.IsZero() {
+		finishedAt = time.Now()
+	}
+	totalLatencyMS := finishedAt.Sub(createdAt).Milliseconds()
+	if totalLatencyMS < 0 {
+		totalLatencyMS = 0
+	}
+	bottleneckSource := tasks.ResolveExecutionBottleneck(metrics, failureStage, failureCategory)
+	if currentStage == tasks.ExecutionStageCancelled {
+		bottleneckSource = tasks.BottleneckSourceUnknown
+	}
+	if currentStage != tasks.ExecutionStageFailed && currentStage != tasks.ExecutionStageCancelled {
+		failureStage = ""
+		failureCategory = ""
+	}
+	return q.PatchTaskExecutionMetrics(ctx, dbsqlc.PatchTaskExecutionMetricsParams{
+		TaskID:           taskID,
+		CurrentStage:     optionalNonEmptyString(&currentStage),
+		BottleneckSource: optionalNonEmptyString(&bottleneckSource),
+		FailureStage:     optionalString(&failureStage),
+		FailureCategory:  optionalString(&failureCategory),
+		TotalLatencyMs:   optionalInt64(&totalLatencyMS),
+	})
+}
+
+func listExecutionMetricsByTaskIDsTx(ctx context.Context, q *dbsqlc.Queries, taskIDs []string) (map[string]*tasks.TaskExecutionMetrics, error) {
+	result := make(map[string]*tasks.TaskExecutionMetrics, len(taskIDs))
+	if len(taskIDs) == 0 {
+		return result, nil
+	}
+	rows, err := q.ListTaskExecutionMetricsByTaskIDs(ctx, taskIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		metrics := taskExecutionMetricsFromSQLC(row)
+		result[metrics.TaskID] = &metrics
+	}
+	return result, nil
+}
+
+func taskAttemptFailureStage(attemptFinish *tasks.TaskAttemptFinish, fallback string) string {
+	if attemptFinish != nil {
+		if stage := strings.TrimSpace(attemptFinish.FailureStage); stage != "" {
+			return stage
+		}
+	}
+	return fallback
+}
+
+func taskAttemptFailureCategory(attemptFinish *tasks.TaskAttemptFinish, fallback string) string {
+	if attemptFinish != nil {
+		if category := strings.TrimSpace(attemptFinish.FailureCategory); category != "" {
+			return category
+		}
+	}
+	return fallback
+}
+
+func (r *Repository) PatchExecutionSnapshot(ctx context.Context, snapshot tasks.TaskExecutionSnapshot) (int64, error) {
+	taskID := strings.TrimSpace(snapshot.TaskID)
+	if taskID == "" {
+		return 0, fmt.Errorf("task_id is required")
+	}
+	return r.q.PatchTaskExecutionSnapshot(ctx, dbsqlc.PatchTaskExecutionSnapshotParams{
+		TaskID:         taskID,
+		FeatureSlug:    strings.TrimSpace(snapshot.FeatureSlug),
+		RequestedModel: strings.TrimSpace(snapshot.RequestedModel),
+		ResolvedModel:  strings.TrimSpace(snapshot.ResolvedModel),
+		ApiType:        strings.TrimSpace(snapshot.APIType),
+	})
+}
+
+func (r *Repository) MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+	taskID := strings.TrimSpace(snapshot.TaskID)
+	if taskID == "" {
+		return 0, fmt.Errorf("task_id is required")
+	}
+	cancelledAt := snapshot.CancelledAt
+	if cancelledAt.IsZero() {
+		cancelledAt = time.Now()
+	}
+	var rowsAffected int64
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.MarkTaskCancelled(ctx, dbsqlc.MarkTaskCancelledParams{
+			CancelledAt:  sql.NullTime{Time: cancelledAt, Valid: true},
+			CancelledBy:  dbutil.NullInt64(snapshot.CancelledBy),
+			CancelReason: strings.TrimSpace(snapshot.Reason),
+			TaskID:       taskID,
+		})
+		if err != nil || updated == 0 {
+			return err
+		}
+		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+			return err
+		}
+		cancelStage := tasks.ExecutionStageQueued
+		if attemptFinish != nil && strings.TrimSpace(attemptFinish.FailureStage) != "" {
+			cancelStage = strings.TrimSpace(attemptFinish.FailureStage)
+		}
+		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageCancelled, cancelStage, tasks.FailureCategoryCancelled, cancelledAt); err != nil {
+			return err
+		}
+		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID); err != nil {
+			return err
+		}
+		rowsAffected = updated
+		return nil
+	})
+	return rowsAffected, err
+}
+
+func (r *Repository) CreateTaskAttempt(ctx context.Context, start tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error) {
+	taskID := strings.TrimSpace(start.TaskID)
+	if taskID == "" {
+		return tasks.TaskAttemptRef{}, fmt.Errorf("task_id is required")
+	}
+	providerStartedAt := start.ProviderStartedAt
+	if providerStartedAt.IsZero() {
+		providerStartedAt = time.Now()
+	}
+	row, err := r.q.CreateTaskAttempt(ctx, dbsqlc.CreateTaskAttemptParams{
+		TaskID:            taskID,
+		RiverJobID:        start.RiverJobID,
+		LeaseToken:        strings.TrimSpace(start.LeaseToken),
+		AccountID:         start.AccountID,
+		ChannelID:         start.ChannelID,
+		FeatureSlug:       strings.TrimSpace(start.FeatureSlug),
+		RequestedModel:    strings.TrimSpace(start.RequestedModel),
+		ResolvedModel:     strings.TrimSpace(start.ResolvedModel),
+		ApiType:           strings.TrimSpace(start.APIType),
+		ProviderStartedAt: sql.NullTime{Time: providerStartedAt, Valid: true},
+	})
+	if err != nil {
+		return tasks.TaskAttemptRef{}, err
+	}
+	return tasks.TaskAttemptRef{ID: row.ID, AttemptNo: int(row.AttemptNo)}, nil
+}
+
+func (r *Repository) FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) (int64, error) {
+	if finish.ID == 0 {
+		return 0, fmt.Errorf("task_attempt id is required")
+	}
+	return r.q.FinishTaskAttempt(ctx, finishTaskAttemptParams(finish))
+}
+
+func finishTaskAttemptTx(ctx context.Context, q *dbsqlc.Queries, finish *tasks.TaskAttemptFinish) error {
+	if finish == nil || finish.ID == 0 {
+		return nil
+	}
+	updated, err := q.FinishTaskAttempt(ctx, finishTaskAttemptParams(*finish))
+	if err != nil {
+		return err
+	}
+	if updated != 1 {
+		return fmt.Errorf("finish task attempt affected %d rows, want 1", updated)
+	}
+	return nil
+}
+
+func finishTaskAttemptParams(finish tasks.TaskAttemptFinish) dbsqlc.FinishTaskAttemptParams {
+	status := strings.TrimSpace(finish.Status)
+	if status == "" {
+		status = tasks.TaskAttemptStatusFailed
+	}
+	completedAt := finish.CompletedAt
+	if completedAt.IsZero() {
+		completedAt = time.Now()
+	}
+	return dbsqlc.FinishTaskAttemptParams{
+		Status:             status,
+		FailureStage:       strings.TrimSpace(finish.FailureStage),
+		FailureCategory:    strings.TrimSpace(finish.FailureCategory),
+		ErrorMsg:           strings.TrimSpace(finish.ErrorMsg),
+		ProviderFinishedAt: dbutil.NullTime(finish.ProviderFinishedAt),
+		FinalizeStartedAt:  dbutil.NullTime(finish.FinalizeStartedAt),
+		FinalizeFinishedAt: dbutil.NullTime(finish.FinalizeFinishedAt),
+		ProviderLatencyMs:  finish.ProviderLatencyMS,
+		FinalizeLatencyMs:  finish.FinalizeLatencyMS,
+		TotalLatencyMs:     finish.TotalLatencyMS,
+		CompletedAt:        sql.NullTime{Time: completedAt, Valid: true},
+		ID:                 finish.ID,
+	}
 }
 
 func (r *Repository) ListExecutionMetricsByTaskIDs(ctx context.Context, taskIDs []string) (map[string]*tasks.TaskExecutionMetrics, error) {
@@ -351,7 +738,7 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 		HasUserID:    hasUserID,
 		UserID:       userID,
 		HasAccountID: hasAccountID,
-		AccountID:    accountID,
+		AccountID:    sql.NullInt64{Int64: accountID, Valid: hasAccountID},
 		HasStatus:    hasStatus,
 		Status:       status,
 		HasKeyword:   hasKeyword,
@@ -366,7 +753,7 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 		HasUserID:    hasUserID,
 		UserID:       userID,
 		HasAccountID: hasAccountID,
-		AccountID:    accountID,
+		AccountID:    sql.NullInt64{Int64: accountID, Valid: hasAccountID},
 		HasStatus:    hasStatus,
 		Status:       status,
 		HasKeyword:   hasKeyword,
@@ -387,6 +774,7 @@ func (r *Repository) List(ctx context.Context, userID int64, accountID int64, st
 		RunningCount:   summary.RunningCount,
 		CompletedCount: summary.CompletedCount,
 		FailedCount:    summary.FailedCount,
+		CancelledCount: summary.CancelledCount,
 		OtherCount:     summary.OtherCount,
 	}, nil
 }
@@ -410,10 +798,10 @@ func (r *Repository) GetByUserID(ctx context.Context, userID int64, page, pageSi
 
 func (r *Repository) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, accountID int64, statuses ...string) ([]string, error) {
 	if len(statuses) == 0 {
-		return r.q.ListTaskIDsByAccountID(ctx, accountID)
+		return r.q.ListTaskIDsByAccountID(ctx, sql.NullInt64{Int64: accountID, Valid: accountID > 0})
 	}
 	return r.q.ListTaskIDsByAccountIDAndStatuses(ctx, dbsqlc.ListTaskIDsByAccountIDAndStatusesParams{
-		AccountID: accountID,
+		AccountID: sql.NullInt64{Int64: accountID, Valid: accountID > 0},
 		Statuses:  statuses,
 	})
 }
@@ -432,7 +820,7 @@ func (r *Repository) ListRunningTasksMissingLeaseToken(ctx context.Context, limi
 	}
 	result := make([]RunningTaskLease, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, RunningTaskLease{TaskID: row.TaskID, AccountID: row.AccountID, LeaseToken: row.LeaseToken})
+		result = append(result, RunningTaskLease{TaskID: row.TaskID, AccountID: nullableAccountIDValue(row.AccountID), LeaseToken: row.LeaseToken})
 	}
 	return result, nil
 }
@@ -460,52 +848,81 @@ func (r *Repository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string,
 	})
 }
 
-// FailRunningByAccountID 将指定账号下所有 running/pending 状态的任务标记为 failed
+// FailRunningByAccountID 将指定账号下所有 running 状态的任务标记为 failed
 func (r *Repository) FailRunningByAccountID(ctx context.Context, accountID int64, errMsg string) ([]string, error) {
 	now := time.Now()
-	var failedTasks []dbsqlc.FailRunningTasksByAccountIDRow
+	var taskIDs []string
 	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		updated, err := q.FailRunningTasksByAccountID(ctx, dbsqlc.FailRunningTasksByAccountIDParams{
-			ErrorMsg:    errMsg,
-			CompletedAt: sql.NullTime{Time: now, Valid: true},
-			AccountID:   accountID,
-		})
-		if err != nil || len(updated) == 0 {
-			return err
-		}
-		failedTasks = updated
-		modelSetMap, err := listSingleModelSetByAccountIDsTx(ctx, q, []int64{accountID})
-		if err != nil {
-			return err
-		}
-		fallbackModelSet := modelSetMap[accountID]
-		for _, c := range updated {
-			completedAt := dbutil.TimePtr(c.CompletedAt)
-			if completedAt == nil {
-				fallback := now
-				completedAt = &fallback
-			}
-			task := &tasks.Task{
-				TaskID:      c.TaskID,
-				UserID:      c.UserID,
-				AccountID:   c.AccountID,
-				Status:      tasks.StatusFailed,
-				Result:      c.Result,
-				CreatedAt:   c.CreatedAt,
-				CompletedAt: completedAt,
-			}
-			if err := upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModelSet); err != nil {
-				return fmt.Errorf("upsert daily stat for task %s: %w", c.TaskID, err)
-			}
-		}
-		return nil
+		var err error
+		taskIDs, err = r.FailRunningByAccountIDTx(ctx, q, accountID, errMsg, now)
+		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	taskIDs := make([]string, 0, len(failedTasks))
-	for _, task := range failedTasks {
+	return taskIDs, nil
+}
+
+func (r *Repository) FailRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Queries, accountID int64, errMsg string, completedAt time.Time) ([]string, error) {
+	if q == nil {
+		return nil, fmt.Errorf("queries is nil")
+	}
+	if completedAt.IsZero() {
+		completedAt = time.Now()
+	}
+	updated, err := q.FailRunningTasksByAccountID(ctx, dbsqlc.FailRunningTasksByAccountIDParams{
+		ErrorMsg:    errMsg,
+		CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+		AccountID:   sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+	})
+	if err != nil || len(updated) == 0 {
+		return nil, err
+	}
+
+	taskIDs := make([]string, 0, len(updated))
+	for _, task := range updated {
 		taskIDs = append(taskIDs, task.TaskID)
+	}
+	if _, err := q.FailRunningTaskAttemptsByAccountID(ctx, dbsqlc.FailRunningTaskAttemptsByAccountIDParams{
+		FailureStage:    tasks.ExecutionStageAssigned,
+		FailureCategory: tasks.FailureCategoryCancelled,
+		ErrorMsg:        errMsg,
+		CompletedAt:     sql.NullTime{Time: completedAt, Valid: true},
+		AccountID:       accountID,
+		TaskIds:         taskIDs,
+	}); err != nil {
+		return nil, err
+	}
+
+	singleModelByAccountID, err := listSingleEnabledModelByAccountIDsTx(ctx, q, []int64{accountID})
+	if err != nil {
+		return nil, err
+	}
+	fallbackModel := singleModelByAccountID[accountID]
+	metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, taskIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range updated {
+		task := &tasks.Task{
+			TaskID:         c.TaskID,
+			UserID:         c.UserID,
+			AccountID:      dbutil.Int64Ptr(c.AccountID),
+			Status:         tasks.StatusFailed,
+			Result:         c.Result,
+			FeatureSlug:    c.FeatureSlug,
+			RequestedModel: c.RequestedModel,
+			ResolvedModel:  c.ResolvedModel,
+			APIType:        c.ApiType,
+			CreatedAt:      c.CreatedAt,
+			CompletedAt:    &completedAt,
+		}
+		if err := upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModel); err != nil {
+			return nil, fmt.Errorf("upsert daily stat for task %s: %w", c.TaskID, err)
+		}
+		if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, c.TaskID, c.CreatedAt, metricsByTaskID[c.TaskID], tasks.ExecutionStageFailed, tasks.ExecutionStageAssigned, tasks.FailureCategoryCancelled, completedAt); err != nil {
+			return nil, fmt.Errorf("patch terminal execution metrics for task %s: %w", c.TaskID, err)
+		}
 	}
 	return taskIDs, nil
 }
@@ -526,13 +943,17 @@ func (r *Repository) ListStatisticsByCreatedAtRange(ctx context.Context, start, 
 	result := make([]TaskStatisticLite, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, TaskStatisticLite{
-			TaskID:      row.TaskID,
-			UserID:      row.UserID,
-			AccountID:   row.AccountID,
-			Status:      row.Status,
-			Result:      row.Result,
-			CreatedAt:   row.CreatedAt,
-			CompletedAt: dbutil.TimePtr(row.CompletedAt),
+			TaskID:         row.TaskID,
+			UserID:         row.UserID,
+			AccountID:      dbutil.Int64Ptr(row.AccountID),
+			Status:         row.Status,
+			Result:         row.Result,
+			FeatureSlug:    row.FeatureSlug,
+			RequestedModel: row.RequestedModel,
+			ResolvedModel:  row.ResolvedModel,
+			APIType:        row.ApiType,
+			CreatedAt:      row.CreatedAt,
+			CompletedAt:    dbutil.TimePtr(row.CompletedAt),
 		})
 	}
 	return result, nil
@@ -542,12 +963,12 @@ func (r *Repository) UpsertDailyStatByTask(ctx context.Context, task *tasks.Task
 	return r.UpsertDailyStatByTaskWithFallbackModel(ctx, task, "")
 }
 
-func (r *Repository) UpsertDailyStatByTaskWithFallbackModel(ctx context.Context, task *tasks.Task, fallbackModelSet string) error {
+func (r *Repository) UpsertDailyStatByTaskWithFallbackModel(ctx context.Context, task *tasks.Task, fallbackModel string) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		if task != nil && strings.TrimSpace(fallbackModelSet) == "" && !resultContainsModel(task.Result) {
-			fallbackModelSet = resolveAccountSingleModelSetTx(ctx, q, task.AccountID)
+		if task != nil && strings.TrimSpace(fallbackModel) == "" && taskNeedsFallbackModel(task) {
+			fallbackModel = resolveAccountSingleEnabledModelTx(ctx, q, task.AccountID)
 		}
-		return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModelSet)
+		return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModel)
 	})
 }
 
@@ -557,42 +978,45 @@ func upsertDailyStatByTaskIDTx(ctx context.Context, q *dbsqlc.Queries, taskID st
 		return err
 	}
 	task := taskFromSQLC(row)
-	fallbackModelSet := ""
-	if !resultContainsModel(task.Result) {
-		fallbackModelSet = resolveAccountSingleModelSetTx(ctx, q, task.AccountID)
+	fallbackModel := ""
+	if taskNeedsFallbackModel(&task) {
+		fallbackModel = resolveAccountSingleEnabledModelTx(ctx, q, task.AccountID)
 	}
-	return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, &task, fallbackModelSet)
+	return upsertDailyStatByTaskWithFallbackModelTx(ctx, q, &task, fallbackModel)
 }
 
-func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, fallbackModelSet string) error {
+func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, fallbackModel string) error {
 	if task == nil || task.Status == "" || task.TaskID == "" {
 		return nil
 	}
-	if task.Status != tasks.StatusCompleted && task.Status != tasks.StatusFailed {
+	if task.Status != tasks.StatusCompleted && task.Status != tasks.StatusFailed && task.Status != tasks.StatusCancelled {
 		return nil
 	}
 	loc := time.Now().Location()
 	createdLocal := task.CreatedAt.In(loc)
-	statDate := createdLocal.Format("2006-01-02")
-	model := extractTaskModelWithFallback(task.Result, fallbackModelSet)
+	statDate := taskStatDateFromTime(task.CreatedAt, loc)
+	model := taskStatModel(task, fallbackModel)
 	user := extractTaskUser(task.Result, task.UserID)
 
 	completedDelta := int64(0)
 	failedDelta := int64(0)
+	cancelledDelta := int64(0)
 	latencySeconds := float64(0)
 	latencyCountDelta := int64(0)
-	if task.Status == tasks.StatusCompleted {
+	switch task.Status {
+	case tasks.StatusCompleted:
 		completedDelta = 1
 		if task.CompletedAt != nil {
 			end := task.CompletedAt.In(loc)
-			if !end.Before(createdLocal) {
+			if end.After(createdLocal) {
 				latencySeconds = end.Sub(createdLocal).Seconds()
 				latencyCountDelta = 1
 			}
 		}
-	}
-	if task.Status == tasks.StatusFailed {
+	case tasks.StatusFailed:
 		failedDelta = 1
+	case tasks.StatusCancelled:
+		cancelledDelta = 1
 	}
 
 	inserted, err := q.InsertTaskStatEventIgnore(ctx, dbsqlc.InsertTaskStatEventIgnoreParams{
@@ -614,27 +1038,56 @@ func upsertDailyStatByTaskWithFallbackModelTx(ctx context.Context, q *dbsqlc.Que
 		Total:             1,
 		Completed:         completedDelta,
 		Failed:            failedDelta,
+		Cancelled:         cancelledDelta,
 		LatencySecondsSum: latencySeconds,
 		LatencyCount:      latencyCountDelta,
 	})
 }
 
-func resolveAccountSingleModelSetTx(ctx context.Context, q *dbsqlc.Queries, accountID int64) string {
-	if accountID == 0 {
+func taskNeedsFallbackModel(task *tasks.Task) bool {
+	return task != nil &&
+		strings.TrimSpace(task.ResolvedModel) == "" &&
+		strings.TrimSpace(task.RequestedModel) == ""
+}
+
+func taskStatModel(task *tasks.Task, fallbackModel string) string {
+	if task == nil {
+		return unknownModelName
+	}
+	if model := normalizeStatDimension(task.ResolvedModel); model != "" {
+		return model
+	}
+	if model := normalizeStatDimension(task.RequestedModel); model != "" {
+		return model
+	}
+	if model := extractTaskModel(task.Result); model != unknownModelName {
+		return model
+	}
+	if fallbackModel = normalizeStatDimension(fallbackModel); fallbackModel != "" {
+		return fallbackModel
+	}
+	return unknownModelName
+}
+
+func resolveAccountSingleEnabledModelTx(ctx context.Context, q *dbsqlc.Queries, accountID *int64) string {
+	if accountID == nil || *accountID <= 0 {
 		return ""
 	}
-	modelSet, err := q.GetAccountModelSetByID(ctx, accountID)
+	model, err := q.GetSingleEnabledModelByAccountID(ctx, *accountID)
 	if err != nil {
 		return ""
 	}
-	return singleModelFromSet(modelSet)
+	return strings.TrimSpace(model)
 }
 
-func (r *Repository) ListSingleModelSetByAccountIDs(ctx context.Context, accountIDs []int64) (map[int64]string, error) {
-	return listSingleModelSetByAccountIDsTx(ctx, r.q, accountIDs)
+func nullableAccountIDValue(value sql.NullInt64) int64 {
+	if !value.Valid {
+		return 0
+	}
+	return value.Int64
 }
 
-func listSingleModelSetByAccountIDsTx(ctx context.Context, q *dbsqlc.Queries, accountIDs []int64) (map[int64]string, error) {
+func listSingleEnabledModelByAccountIDsTx(ctx context.Context, q *dbsqlc.Queries, accountIDs []int64) (map[int64]string, error) {
 	result := make(map[int64]string)
 	if len(accountIDs) == 0 {
 		return result, nil
@@ -656,18 +1109,23 @@ func listSingleModelSetByAccountIDsTx(ctx context.Context, q *dbsqlc.Queries, ac
 		return result, nil
 	}
 
-	rows, err := q.ListAccountModelSetsByIDs(ctx, ids)
+	rows, err := q.ListSingleEnabledModelsByAccountIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 	for _, row := range rows {
-		result[row.ID] = singleModelFromSet(row.ModelSet)
+		result[row.ID] = strings.TrimSpace(row.ModelName)
 	}
 	return result, nil
 }
 
-func (r *Repository) ListDailyStatsByDateRange(ctx context.Context, startDate, endDate string) ([]DailyStatAggregate, error) {
-	rows, err := r.q.ListDailyStatsByDateRange(ctx, dbsqlc.ListDailyStatsByDateRangeParams{StartDate: startDate, EndDate: endDate})
+func (r *Repository) ListDailyStatsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]DailyStatAggregate, error) {
+	if startDate.IsZero() || endDate.IsZero() {
+		return nil, fmt.Errorf("stat date range is required")
+	}
+	start := normalizeTaskStatDate(startDate)
+	end := normalizeTaskStatDate(endDate)
+	rows, err := r.q.ListDailyStatsByDateRange(ctx, dbsqlc.ListDailyStatsByDateRangeParams{StartDate: start, EndDate: end})
 	if err != nil {
 		return nil, err
 	}
@@ -680,6 +1138,7 @@ func (r *Repository) ListDailyStatsByDateRange(ctx context.Context, startDate, e
 			Total:             row.Total,
 			Completed:         row.Completed,
 			Failed:            row.Failed,
+			Cancelled:         row.Cancelled,
 			LatencySecondsSum: row.LatencySecondsSum,
 			LatencyCount:      row.LatencyCount,
 		})
@@ -687,8 +1146,13 @@ func (r *Repository) ListDailyStatsByDateRange(ctx context.Context, startDate, e
 	return result, nil
 }
 
-func (r *Repository) ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate string) ([]StatEventLatencySample, error) {
-	rows, err := r.q.ListStatEventLatencySamplesByDateRange(ctx, dbsqlc.ListStatEventLatencySamplesByDateRangeParams{StartDate: startDate, EndDate: endDate})
+func (r *Repository) ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate time.Time) ([]StatEventLatencySample, error) {
+	if startDate.IsZero() || endDate.IsZero() {
+		return nil, fmt.Errorf("stat date range is required")
+	}
+	start := normalizeTaskStatDate(startDate)
+	end := normalizeTaskStatDate(endDate)
+	rows, err := r.q.ListStatEventLatencySamplesByDateRange(ctx, dbsqlc.ListStatEventLatencySamplesByDateRangeParams{StartDate: start, EndDate: end})
 	if err != nil {
 		return nil, err
 	}
@@ -699,35 +1163,81 @@ func (r *Repository) ListStatEventLatencySamplesByDateRange(ctx context.Context,
 	return result, nil
 }
 
-func (r *Repository) ListBackfilledDatesByRange(ctx context.Context, startDate, endDate string) ([]string, error) {
-	return r.q.ListBackfilledDatesByRange(ctx, dbsqlc.ListBackfilledDatesByRangeParams{StartDate: startDate, EndDate: endDate})
+func (r *Repository) ListBackfilledDatesByRange(ctx context.Context, startDate, endDate time.Time) ([]time.Time, error) {
+	if startDate.IsZero() || endDate.IsZero() {
+		return nil, fmt.Errorf("stat date range is required")
+	}
+	start := normalizeTaskStatDate(startDate)
+	end := normalizeTaskStatDate(endDate)
+	return r.q.ListBackfilledDatesByRange(ctx, dbsqlc.ListBackfilledDatesByRangeParams{StartDate: start, EndDate: end})
 }
 
-func (r *Repository) MarkDailyBackfillDone(ctx context.Context, statDate string) error {
-	if statDate == "" {
-		return nil
+func (r *Repository) BackfillDailyStatsByCreatedRange(ctx context.Context, startedAt, endedAt, statDate time.Time, markDone bool) (BackfillDailyStatsResult, error) {
+	if startedAt.IsZero() || endedAt.IsZero() || statDate.IsZero() {
+		return BackfillDailyStatsResult{}, fmt.Errorf("backfill date range is required")
 	}
-	return r.q.MarkDailyBackfillDone(ctx, statDate)
+	if !endedAt.After(startedAt) {
+		return BackfillDailyStatsResult{}, fmt.Errorf("backfill ended_at must be after started_at")
+	}
+
+	var result BackfillDailyStatsResult
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		row, err := q.BackfillDailyStatsByCreatedRange(ctx, dbsqlc.BackfillDailyStatsByCreatedRangeParams{
+			StartedAt: startedAt,
+			EndedAt:   endedAt,
+			StatDate:  normalizeTaskStatDate(statDate),
+			MarkDone:  markDone,
+		})
+		if err != nil {
+			return err
+		}
+		result = BackfillDailyStatsResult{
+			InsertedEvents: row.InsertedEvents,
+			TouchedGroups:  row.TouchedGroups,
+			MarkedDays:     row.MarkedDays,
+		}
+		return nil
+	})
+	return result, err
+}
+
+func taskStatDateFromTime(value time.Time, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.Local
+	}
+	local := value.In(loc)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func normalizeTaskStatDate(value time.Time) time.Time {
+	return taskStatDateFromTime(value, value.Location())
 }
 
 func taskFromSQLC(row dbsqlc.Task) tasks.Task {
 	return tasks.Task{
-		ID:          row.ID,
-		TaskID:      row.TaskID,
-		UserID:      row.UserID,
-		ChannelID:   row.ChannelID,
-		AccountID:   row.AccountID,
-		Prompt:      row.Prompt,
-		UserPrompt:  row.UserPrompt,
-		Params:      row.Params,
-		Status:      row.Status,
-		LeaseToken:  row.LeaseToken,
-		RetryCount:  int(row.RetryCount),
-		ErrorMsg:    row.ErrorMsg,
-		Result:      row.Result,
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
-		CompletedAt: dbutil.TimePtr(row.CompletedAt),
+		ID:                row.ID,
+		TaskID:            row.TaskID,
+		UserID:            row.UserID,
+		AssignedChannelID: dbutil.Int64Ptr(row.AssignedChannelID),
+		AccountID:         dbutil.Int64Ptr(row.AccountID),
+		Prompt:            row.Prompt,
+		UserPrompt:        row.UserPrompt,
+		Params:            row.Params,
+		FeatureSlug:       row.FeatureSlug,
+		RequestedModel:    row.RequestedModel,
+		ResolvedModel:     row.ResolvedModel,
+		APIType:           row.ApiType,
+		Status:            row.Status,
+		LeaseToken:        row.LeaseToken,
+		RetryCount:        int(row.RetryCount),
+		ErrorMsg:          row.ErrorMsg,
+		Result:            row.Result,
+		CreatedAt:         row.CreatedAt,
+		UpdatedAt:         row.UpdatedAt,
+		CompletedAt:       dbutil.TimePtr(row.CompletedAt),
+		CancelledAt:       dbutil.TimePtr(row.CancelledAt),
+		CancelledBy:       dbutil.Int64Ptr(row.CancelledBy),
+		CancelReason:      row.CancelReason,
 	}
 }
 
@@ -794,19 +1304,79 @@ func taskExecutionMetricsFromSQLC(row dbsqlc.TaskExecutionMetric) tasks.TaskExec
 
 func taskOutputFromSQLC(row dbsqlc.TaskOutput) tasks.TaskOutput {
 	return tasks.TaskOutput{
-		ID:         row.ID,
-		TaskID:     row.TaskID,
-		Role:       row.Role,
-		URL:        row.Url,
-		StorageKey: row.StorageKey,
-		MIMEType:   row.MimeType,
-		Width:      int(row.Width),
-		Height:     int(row.Height),
-		SizeBytes:  row.SizeBytes,
-		SortIndex:  int(row.SortIndex),
-		CreatedAt:  row.CreatedAt,
-		UpdatedAt:  row.UpdatedAt,
+		ID:             row.ID,
+		TaskID:         row.TaskID,
+		MediaAssetID:   int64Ptr(row.MediaAssetID),
+		Role:           row.Role,
+		URL:            row.Url,
+		StorageKey:     row.StorageKey,
+		MIMEType:       row.MimeType,
+		Width:          int(row.Width),
+		Height:         int(row.Height),
+		SizeBytes:      row.SizeBytes,
+		SourceURL:      row.SourceUrl,
+		ChecksumSHA256: row.ChecksumSha256,
+		StorageProfile: row.StorageProfile,
+		Metadata:       string(row.Metadata),
+		SortIndex:      int(row.SortIndex),
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
 	}
+}
+
+func nullInt64Ptr(value *int64) sql.NullInt64 {
+	if value == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *value, Valid: true}
+}
+
+func int64Ptr(value sql.NullInt64) *int64 {
+	if !value.Valid {
+		return nil
+	}
+	v := value.Int64
+	return &v
+}
+
+func outputMetadataJSON(value string) json.RawMessage {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return json.RawMessage("{}")
+	}
+	return json.RawMessage(value)
+}
+
+func mediaAssetMetadataJSON(output tasks.TaskOutput) json.RawMessage {
+	metadata := map[string]interface{}{
+		"task_id":    strings.TrimSpace(output.TaskID),
+		"role":       strings.TrimSpace(output.Role),
+		"sort_index": output.SortIndex,
+	}
+	if strings.TrimSpace(output.Metadata) != "" {
+		metadata["output_metadata"] = json.RawMessage(output.Metadata)
+	}
+	raw, err := json.Marshal(metadata)
+	if err != nil {
+		return json.RawMessage("{}")
+	}
+	return raw
+}
+
+func mediaRefMetadataJSON(taskOutputID int64) json.RawMessage {
+	raw, err := json.Marshal(map[string]interface{}{"task_output_id": taskOutputID})
+	if err != nil {
+		return json.RawMessage("{}")
+	}
+	return raw
+}
+
+func newMediaAssetID() (string, error) {
+	var buf [12]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", fmt.Errorf("generate media asset id: %w", err)
+	}
+	return "asset_" + hex.EncodeToString(buf[:]), nil
 }
 
 func optionalNonEmptyString(value *string) sql.NullString {

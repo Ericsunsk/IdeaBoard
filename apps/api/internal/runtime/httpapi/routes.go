@@ -238,7 +238,7 @@ func registerUserRoutes(userApi *gin.RouterGroup, h UserRouteDeps) {
 	userApi.DELETE("/boards/:board_id/members/:member_uid", h.BoardHandler.RemoveMember)
 	userApi.GET("/boards/:board_id/share-tokens", h.BoardHandler.ListShareTokens)
 	userApi.POST("/boards/:board_id/share-tokens", h.BoardHandler.CreateShareToken)
-	userApi.POST("/boards/:board_id/share-tokens/:token/revoke", h.BoardHandler.RevokeShareToken)
+	userApi.POST("/boards/:board_id/share-tokens/:token_id/revoke", h.BoardHandler.RevokeShareToken)
 	userApi.POST("/boards/share-tokens/join", h.BoardHandler.JoinByShareToken)
 
 	userApi.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
@@ -303,6 +303,7 @@ func registerAdminRoutes(adminApi *gin.RouterGroup, h AdminRouteDeps) {
 	adminApi.DELETE("/line-draft-modes/:id", h.LineDraftHandler.Delete)
 
 	adminApi.GET("/feature-prompts", h.FeaturePromptHandler.ListPrompts)
+	adminApi.GET("/feature-prompts/:slug/revisions", h.FeaturePromptHandler.ListRevisions)
 	adminApi.GET("/feature-prompts/:slug", h.FeaturePromptHandler.GetPrompt)
 	adminApi.PUT("/feature-prompts/:slug", h.FeaturePromptHandler.SetPrompt)
 }

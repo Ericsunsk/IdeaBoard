@@ -41,11 +41,11 @@ func (s fakeStatsStore) CountAllTasks(context.Context) (int64, error) {
 	return 0, nil
 }
 
-func (s fakeStatsStore) ListBackfilledDatesByRange(context.Context, string, string) ([]string, error) {
+func (s fakeStatsStore) ListBackfilledDatesByRange(context.Context, time.Time, time.Time) ([]time.Time, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s fakeStatsStore) ListDailyStatsByDateRange(context.Context, string, string) ([]taskstore.DailyStatAggregate, error) {
+func (s fakeStatsStore) ListDailyStatsByDateRange(context.Context, time.Time, time.Time) ([]taskstore.DailyStatAggregate, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -57,7 +57,7 @@ func (s fakeStatsStore) ListExecutionFailureCategoryStatsByCreatedRange(context.
 	return nil, errors.New("not implemented")
 }
 
-func (s fakeStatsStore) ListStatEventLatencySamplesByDateRange(context.Context, string, string) ([]taskstore.StatEventLatencySample, error) {
+func (s fakeStatsStore) ListStatEventLatencySamplesByDateRange(context.Context, time.Time, time.Time) ([]taskstore.StatEventLatencySample, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -65,16 +65,8 @@ func (s fakeStatsStore) ListStatisticsByCreatedAtRange(context.Context, time.Tim
 	return nil, errors.New("not implemented")
 }
 
-func (s fakeStatsStore) ListSingleModelSetByAccountIDs(context.Context, []int64) (map[int64]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (s fakeStatsStore) UpsertDailyStatByTaskWithFallbackModel(context.Context, *tasks.Task, string) error {
-	return errors.New("not implemented")
-}
-
-func (s fakeStatsStore) MarkDailyBackfillDone(context.Context, string) error {
-	return errors.New("not implemented")
+func (s fakeStatsStore) BackfillDailyStatsByCreatedRange(context.Context, time.Time, time.Time, time.Time, bool) (taskstore.BackfillDailyStatsResult, error) {
+	return taskstore.BackfillDailyStatsResult{}, errors.New("not implemented")
 }
 
 func TestStreamMonitorSendsInitialSnapshot(t *testing.T) {

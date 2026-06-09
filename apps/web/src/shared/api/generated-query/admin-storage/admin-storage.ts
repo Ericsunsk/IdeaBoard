@@ -23,7 +23,9 @@ import type {
   ApiResponseStorageProfileList,
   ApiResponseStorageProfileWithMessage,
   ApiResponseStorageProviderList,
+  CreateAdminStorageProfileParams,
   StorageProfilePayload,
+  UpdateAdminStorageProfileParams,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -169,26 +171,50 @@ export function useListAdminStorageProfiles<
   return query
 }
 
-export const getCreateAdminStorageProfileUrl = () => {
-  return `/admin/storage/profiles`
+export const getCreateAdminStorageProfileUrl = (params?: CreateAdminStorageProfileParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/storage/profiles?${stringifiedParams}`
+    : `/admin/storage/profiles`
 }
 
 export const createAdminStorageProfile = async (
   storageProfilePayload: StorageProfilePayload,
+  params?: CreateAdminStorageProfileParams,
   options?: RequestInit,
 ): Promise<ApiResponseStorageProfileWithMessage> => {
-  return orvalMutator<ApiResponseStorageProfileWithMessage>(getCreateAdminStorageProfileUrl(), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(storageProfilePayload),
-  })
+  return orvalMutator<ApiResponseStorageProfileWithMessage>(
+    getCreateAdminStorageProfileUrl(params),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      body: JSON.stringify(storageProfilePayload),
+    },
+  )
 }
 
 export const getCreateAdminStorageProfileQueryKey = (
   storageProfilePayload?: MaybeRef<StorageProfilePayload>,
+  params?: MaybeRef<CreateAdminStorageProfileParams>,
 ) => {
-  return ['POST', 'admin', 'storage', 'profiles', storageProfilePayload] as const
+  return [
+    'POST',
+    'admin',
+    'storage',
+    'profiles',
+    ...(params ? [params] : []),
+    storageProfilePayload,
+  ] as const
 }
 
 export const getCreateAdminStorageProfileQueryOptions = <
@@ -196,6 +222,7 @@ export const getCreateAdminStorageProfileQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   storageProfilePayload: MaybeRef<StorageProfilePayload>,
+  params?: MaybeRef<CreateAdminStorageProfileParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof createAdminStorageProfile>>, TError, TData>
@@ -205,11 +232,15 @@ export const getCreateAdminStorageProfileQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getCreateAdminStorageProfileQueryKey(storageProfilePayload)
+  const queryKey = getCreateAdminStorageProfileQueryKey(storageProfilePayload, params)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof createAdminStorageProfile>>> = ({
     signal,
-  }) => createAdminStorageProfile(unref(storageProfilePayload), { signal, ...requestOptions })
+  }) =>
+    createAdminStorageProfile(unref(storageProfilePayload), unref(params), {
+      signal,
+      ...requestOptions,
+    })
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof createAdminStorageProfile>>,
@@ -228,6 +259,7 @@ export function useCreateAdminStorageProfile<
   TError = ErrorType<unknown>,
 >(
   storageProfilePayload: MaybeRef<StorageProfilePayload>,
+  params?: MaybeRef<CreateAdminStorageProfileParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof createAdminStorageProfile>>, TError, TData>
@@ -236,7 +268,11 @@ export function useCreateAdminStorageProfile<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getCreateAdminStorageProfileQueryOptions(storageProfilePayload, options)
+  const queryOptions = getCreateAdminStorageProfileQueryOptions(
+    storageProfilePayload,
+    params,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -247,28 +283,56 @@ export function useCreateAdminStorageProfile<
   return query
 }
 
-export const getUpdateAdminStorageProfileUrl = (id: string) => {
-  return `/admin/storage/profiles/${encodeURIComponent(String(id))}`
+export const getUpdateAdminStorageProfileUrl = (
+  id: string,
+  params?: UpdateAdminStorageProfileParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/storage/profiles/${encodeURIComponent(String(id))}?${stringifiedParams}`
+    : `/admin/storage/profiles/${encodeURIComponent(String(id))}`
 }
 
 export const updateAdminStorageProfile = async (
   id: string,
   storageProfilePayload: StorageProfilePayload,
+  params?: UpdateAdminStorageProfileParams,
   options?: RequestInit,
 ): Promise<ApiResponseStorageProfileWithMessage> => {
-  return orvalMutator<ApiResponseStorageProfileWithMessage>(getUpdateAdminStorageProfileUrl(id), {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(storageProfilePayload),
-  })
+  return orvalMutator<ApiResponseStorageProfileWithMessage>(
+    getUpdateAdminStorageProfileUrl(id, params),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      body: JSON.stringify(storageProfilePayload),
+    },
+  )
 }
 
 export const getUpdateAdminStorageProfileQueryKey = (
   id: MaybeRef<string>,
   storageProfilePayload?: MaybeRef<StorageProfilePayload>,
+  params?: MaybeRef<UpdateAdminStorageProfileParams>,
 ) => {
-  return ['PUT', 'admin', 'storage', 'profiles', id, storageProfilePayload] as const
+  return [
+    'PUT',
+    'admin',
+    'storage',
+    'profiles',
+    id,
+    ...(params ? [params] : []),
+    storageProfilePayload,
+  ] as const
 }
 
 export const getUpdateAdminStorageProfileQueryOptions = <
@@ -277,6 +341,7 @@ export const getUpdateAdminStorageProfileQueryOptions = <
 >(
   id: MaybeRef<string>,
   storageProfilePayload: MaybeRef<StorageProfilePayload>,
+  params?: MaybeRef<UpdateAdminStorageProfileParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof updateAdminStorageProfile>>, TError, TData>
@@ -286,12 +351,12 @@ export const getUpdateAdminStorageProfileQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getUpdateAdminStorageProfileQueryKey(id, storageProfilePayload)
+  const queryKey = getUpdateAdminStorageProfileQueryKey(id, storageProfilePayload, params)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminStorageProfile>>> = ({
     signal,
   }) =>
-    updateAdminStorageProfile(unref(id), unref(storageProfilePayload), {
+    updateAdminStorageProfile(unref(id), unref(storageProfilePayload), unref(params), {
       signal,
       ...requestOptions,
     })
@@ -315,6 +380,7 @@ export function useUpdateAdminStorageProfile<
 >(
   id: MaybeRef<string>,
   storageProfilePayload: MaybeRef<StorageProfilePayload>,
+  params?: MaybeRef<UpdateAdminStorageProfileParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof updateAdminStorageProfile>>, TError, TData>
@@ -323,7 +389,12 @@ export function useUpdateAdminStorageProfile<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminStorageProfileQueryOptions(id, storageProfilePayload, options)
+  const queryOptions = getUpdateAdminStorageProfileQueryOptions(
+    id,
+    storageProfilePayload,
+    params,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

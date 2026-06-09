@@ -12,7 +12,6 @@ import (
 
 	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/runtime/queuetypes"
 	"ideaboard/api/internal/runtime/taskqueue"
@@ -26,7 +25,7 @@ type Service struct {
 	taskRepo          TaskStore
 	submissionStore   TaskSubmissionStore
 	cancelStore       taskqueue.TaskCancellationStore
-	systemConfigRepo  *settings.SystemConfigRepository
+	featurePrompts    FeaturePromptStore
 	uploadBoards      storage.UploadBoardAccessResolver
 	uploadOwners      storage.UploadOwnerStorageUIDResolver
 	taskOutputCleaner TaskOutputObjectCleaner
@@ -55,12 +54,16 @@ type TaskSubmissionStore interface {
 	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *queuetypes.TaskPayload) error
 }
 
+type FeaturePromptStore interface {
+	GetPrompt(ctx context.Context, slug string) (string, error)
+}
+
 type ServiceDeps struct {
 	AccountRepo       AccountStore
 	TaskRepo          TaskStore
 	SubmissionStore   TaskSubmissionStore
 	CancelStore       taskqueue.TaskCancellationStore
-	SystemConfigRepo  *settings.SystemConfigRepository
+	FeaturePrompts    FeaturePromptStore
 	UploadBoards      storage.UploadBoardAccessResolver
 	UploadOwners      storage.UploadOwnerStorageUIDResolver
 	TaskOutputCleaner TaskOutputObjectCleaner
@@ -88,7 +91,7 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		taskRepo:          deps.TaskRepo,
 		submissionStore:   deps.SubmissionStore,
 		cancelStore:       deps.CancelStore,
-		systemConfigRepo:  deps.SystemConfigRepo,
+		featurePrompts:    deps.FeaturePrompts,
 		uploadBoards:      deps.UploadBoards,
 		uploadOwners:      deps.UploadOwners,
 		taskOutputCleaner: deps.TaskOutputCleaner,
@@ -111,7 +114,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	if req == nil {
 		return "", fmt.Errorf("请求参数错误")
 	}
-	apiAccounts, params, _, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
+	apiAccounts, params, featureSlug, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
@@ -123,14 +126,20 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		return "", err
 	}
 
+	requestedModel := ""
+	if model, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
+		requestedModel = strings.TrimSpace(model)
+	}
+
 	task := &tasks.Task{
-		TaskID:     taskID,
-		UserID:     userID,
-		ChannelID:  0,
-		Prompt:     fullPrompt,
-		UserPrompt: req.Prompt,
-		Params:     paramsJSON,
-		Status:     tasks.StatusPending,
+		TaskID:         taskID,
+		UserID:         userID,
+		Prompt:         fullPrompt,
+		UserPrompt:     req.Prompt,
+		Params:         paramsJSON,
+		FeatureSlug:    featureSlug,
+		RequestedModel: requestedModel,
+		Status:         tasks.StatusPending,
 	}
 
 	accountIDs := make([]int64, len(apiAccounts))
@@ -213,17 +222,16 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 			req.Params["feature"] = featureSlug
 		}
 	}
-	apiAccounts = accounts.FilterAccountsByFeature(apiAccounts, featureSlug)
-	apiAccounts = accounts.FilterAccountsByRequestedModel(apiAccounts, req.Params)
+	apiAccounts = accounts.FilterAccountsForRequest(apiAccounts, featureSlug, req.Params)
 	if len(apiAccounts) == 0 {
 		return nil, nil, "", "", errors.New(noAvailableAPIAccountMessage)
 	}
 
 	fullPrompt := applyTaskSystemPrompt(req.Prompt, req.Prompt, featureSlug, req.Params, func(slug string) (string, error) {
-		if s.systemConfigRepo == nil {
-			return "", fmt.Errorf("system config repo 未配置")
+		if s.featurePrompts == nil {
+			return "", fmt.Errorf("feature prompt repo 未配置")
 		}
-		return s.systemConfigRepo.Get(ctx, prompts.FeaturePromptConfigKey(slug))
+		return s.featurePrompts.GetPrompt(ctx, slug)
 	})
 	if err := validateExecutablePrompt(fullPrompt); err != nil {
 		return nil, nil, "", "", err

@@ -13,6 +13,7 @@ export type TaskExecutionSignalKey =
   | 'stuck_running'
   | 'fast_failed'
   | 'slow_failed'
+  | 'cancelled'
   | 'retrying'
   | 'other'
 
@@ -43,6 +44,7 @@ const TASK_EXECUTION_LIFECYCLE_BUCKETS: TaskExecutionLifecycleDefinition[] = [
   { key: 'stuck_running', label: '卡住执行' },
   { key: 'fast_failed', label: '快速失败' },
   { key: 'slow_failed', label: '慢速失败' },
+  { key: 'cancelled', label: '已取消' },
   { key: 'retrying', label: '重试中' },
   { key: 'other', label: '其他状态' },
 ]
@@ -100,6 +102,10 @@ function resolveTaskLifecycleKey(
       : 'fast_failed'
   }
 
+  if (task.status === 'cancelled') {
+    return 'cancelled'
+  }
+
   if (task.status === 'pending') {
     return durationSeconds != null && durationSeconds >= TASK_EXECUTION_SLOW_SECONDS
       ? 'backlog_pending'
@@ -144,6 +150,7 @@ function getLifecycleBasePressure(key: TaskExecutionSignalKey) {
     stuck_running: 82,
     fast_failed: 78,
     slow_failed: 94,
+    cancelled: 34,
     retrying: 68,
     other: 40,
   }

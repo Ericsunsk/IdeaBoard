@@ -34,12 +34,12 @@ func (h *StorageHandler) CreateProfile(c *gin.Context) {
 		return
 	}
 
-	profile, err := h.storageService.SaveProfile(c.Request.Context(), &req)
+	profile, err := h.saveProfile(c, &req)
 	if err != nil {
 		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
 		return
 	}
-	response.Success(c, gin.H{"profile": profile, "message": "保存成功"})
+	response.Success(c, gin.H{"profile": profile, "message": storageSaveProfileMessage(c)})
 }
 
 func (h *StorageHandler) UpdateProfile(c *gin.Context) {
@@ -50,12 +50,12 @@ func (h *StorageHandler) UpdateProfile(c *gin.Context) {
 	}
 	req.ID = c.Param("id")
 
-	profile, err := h.storageService.SaveProfile(c.Request.Context(), &req)
+	profile, err := h.saveProfile(c, &req)
 	if err != nil {
 		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
 		return
 	}
-	response.Success(c, gin.H{"profile": profile, "message": "保存成功"})
+	response.Success(c, gin.H{"profile": profile, "message": storageSaveProfileMessage(c)})
 }
 
 func (h *StorageHandler) DeleteProfile(c *gin.Context) {
@@ -90,4 +90,22 @@ func (h *StorageHandler) GetBucketInfo(c *gin.Context) {
 		return
 	}
 	response.Success(c, gin.H{"info": info})
+}
+
+func (h *StorageHandler) saveProfile(c *gin.Context, req *StorageProfile) (*StorageProfile, error) {
+	if storageShouldApplyProfile(c) {
+		return h.storageService.SaveAndApplyProfile(c.Request.Context(), req)
+	}
+	return h.storageService.SaveProfile(c.Request.Context(), req)
+}
+
+func storageShouldApplyProfile(c *gin.Context) bool {
+	return c.Query("apply") == "true" || c.Query("apply") == "1"
+}
+
+func storageSaveProfileMessage(c *gin.Context) string {
+	if storageShouldApplyProfile(c) {
+		return "已保存并设为当前存储"
+	}
+	return "保存成功"
 }

@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"ideaboard/api/internal/runtime/queuetypes"
 	"log/slog"
@@ -13,12 +14,13 @@ import (
 	"ideaboard/api/internal/runtime/taskqueue"
 	"ideaboard/api/internal/runtime/taskruntime"
 	"ideaboard/api/internal/tasks"
+	"ideaboard/api/internal/workflow"
 )
 
-type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload) (providerCallOutput, error)
+type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error)
 
 type accountLookupStore interface {
-	GetByID(ctx context.Context, id int64) (*accounts.ApiAccount, error)
+	GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*accounts.ApiAccount, error)
 }
 
 type taskExecutionOrchestrator struct {
@@ -49,7 +51,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 	slog.Info("worker executing task", "task_id", task.TaskID, "account_id", accountID)
 	startTime := time.Now()
 
-	account, err := o.accountRepo.GetByID(ctx, accountID)
+	account, err := o.accountRepo.GetRuntimeByIDWithSecret(ctx, accountID)
 	if err != nil {
 		if requeueErr := o.requeueTask(ctx, task, assignment, "账号不存在，重新调度"); requeueErr != nil {
 			return requeueErr
@@ -62,6 +64,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		}
 		return nil
 	}
+	account.ChannelID = assignment.ChannelID
 
 	cancelled, err := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
 	if err != nil {
@@ -72,7 +75,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 	if cancelled {
-		o.skipCancelledTask(ctx, task, assignment)
+		o.skipCancelledTask(ctx, task, nil)
 		return nil
 	}
 
@@ -83,7 +86,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		slog.Warn("confirm task running lease failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
 		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 		defer cleanupCancel()
-		if resetErr := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, accountID, assignment.LeaseToken, "确认任务运行租约失败"); resetErr != nil {
+		if resetErr := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, assignment, "确认任务运行租约失败"); resetErr != nil {
 			if isTaskConvergedError(resetErr) {
 				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
 				return nil
@@ -96,7 +99,27 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 
+	snapshot := taskExecutionSnapshot(task, account, assignment)
+	o.recordExecutionSnapshot(ctx, task.TaskID, snapshot)
+
 	providerStartAt := time.Now()
+	attemptRef, err := o.startTaskAttempt(ctx, task, assignment, snapshot, providerStartAt)
+	if err != nil {
+		slog.Warn("start task attempt failed", "task_id", task.TaskID, "err", err)
+		cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
+		defer cleanupCancel()
+		if resetErr := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, assignment, "记录任务执行尝试失败"); resetErr != nil {
+			if isTaskConvergedError(resetErr) {
+				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
+				return nil
+			}
+			return resetErr
+		}
+		if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, "记录任务执行尝试失败"); requeueErr != nil {
+			return requeueErr
+		}
+		return nil
+	}
 	o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
 		TaskID:            task.TaskID,
 		CurrentStage:      stringPtr(tasks.ExecutionStageProvider),
@@ -104,7 +127,7 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		WorkerOverheadMS:  int64Ptr(nonNegativeMilliseconds(providerStartAt.Sub(startTime))),
 	})
 
-	providerOutput, err := o.providerCall(taskCtx, account, task)
+	providerOutput, err := o.providerCall(taskCtx, account, task, assignment)
 	o.recordProviderTimeline(ctx, task.TaskID, startTime, providerOutput.Timeline)
 	if err != nil {
 		if isContextInterrupted(taskCtx.Err()) || isContextInterrupted(ctx.Err()) {
@@ -113,52 +136,26 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 				slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", checkErr)
 			}
 			if cancelled {
-				o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
-					TaskID:           task.TaskID,
-					CurrentStage:     stringPtr(tasks.ExecutionStageQueued),
-					FailureStage:     stringPtr(tasks.ExecutionStageProvider),
-					FailureCategory:  stringPtr(tasks.FailureCategoryCancelled),
-					BottleneckSource: stringPtr(tasks.BottleneckSourceProvider),
-				})
-				o.skipCancelledTask(ctx, task, assignment)
+				cancelFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusCancelled, "任务已取消", tasks.ExecutionStageProvider, tasks.FailureCategoryCancelled, startTime, providerOutput.Timeline, time.Now())
+				o.skipCancelledTask(ctx, task, &cancelFinish)
 				return nil
 			}
-			return o.handleExecutionInterrupted(ctx, task, assignment, err)
+			requeueFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusRequeued, err.Error(), tasks.ExecutionStageProvider, tasks.FailureCategoryUnknown, startTime, providerOutput.Timeline, time.Now())
+			return o.handleExecutionInterrupted(ctx, task, assignment, err, &requeueFinish)
 		}
 		slog.Warn("upstream provider call failed", "task_id", task.TaskID, "account_id", accountID, "err", err)
 		elapsed := time.Since(startTime).Seconds()
 		reason := userFacingProviderError(err)
 		failureStage, failureCategory := classifyProviderFailure(err, providerOutput.Timeline)
 		if !shouldFailoverProviderError(err) {
-			if markErr := o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, elapsed, failureStage, failureCategory); markErr != nil {
+			failFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
+			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, elapsed, failureStage, failureCategory, &failFinish); markErr != nil {
 				return markErr
 			}
 			return nil
 		}
-		requeued, requeueErr := o.taskRuntime.RequeueTaskForFailover(ctx, task.TaskID, accountID, assignment.LeaseToken, reason)
-		if requeueErr != nil {
-			if errors.Is(requeueErr, taskruntime.ErrTaskNotFound) || errors.Is(requeueErr, taskruntime.ErrTaskTerminal) || errors.Is(requeueErr, taskruntime.ErrTaskStateConflict) {
-				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
-				return nil
-			}
-			slog.Warn("reset task for failover retry failed", "task_id", task.TaskID, "err", requeueErr)
-			if markErr := o.completeFailedTaskWithMetrics(ctx, task, assignment, reason, elapsed, failureStage, failureCategory); markErr != nil {
-				return markErr
-			}
-			return nil
-		}
-		if !requeued {
-			slog.Info("task reached failover retry limit", "task_id", task.TaskID)
-			o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, failureStage, failureCategory, time.Now())
-			return nil
-		}
-		o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
-			TaskID:           task.TaskID,
-			CurrentStage:     stringPtr(tasks.ExecutionStageQueued),
-			BottleneckSource: stringPtr(tasks.BottleneckSourceProvider),
-			FailureStage:     stringPtr(failureStage),
-			FailureCategory:  stringPtr(failureCategory),
-		})
+		finalFailFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
+		requeueFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusRequeued, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
 		disabled, failCount, statErr := o.taskRuntime.RecordAccountFailure(ctx, accountID)
 		if statErr != nil {
 			slog.Warn("record account failure state failed", "account_id", accountID, "err", statErr)
@@ -168,12 +165,38 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		}
 		task.AccountIDs = removeAccountCandidate(task.AccountIDs, accountID)
 		if len(task.AccountIDs) == 0 {
-			if markErr := o.completeFailedTaskWithMetrics(ctx, task, taskqueue.TaskAssignment{}, reason, elapsed, failureStage, failureCategory); markErr != nil {
+			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, elapsed, failureStage, failureCategory, &finalFailFinish); markErr != nil {
 				return markErr
 			}
 			return nil
 		}
+		requeued, requeueErr := o.taskRuntime.RequeueTaskForFailoverWithAttempts(ctx, assignment, reason, requeueFinish, finalFailFinish)
+		if requeueErr != nil {
+			if errors.Is(requeueErr, taskruntime.ErrTaskNotFound) || errors.Is(requeueErr, taskruntime.ErrTaskTerminal) || errors.Is(requeueErr, taskruntime.ErrTaskStateConflict) {
+				o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
+				o.dropTask(ctx, task, "任务状态已收敛，丢弃脏队列任务")
+				return nil
+			}
+			slog.Warn("reset task for failover retry failed", "task_id", task.TaskID, "err", requeueErr)
+			if markErr := o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, elapsed, failureStage, failureCategory, &finalFailFinish); markErr != nil {
+				return markErr
+			}
+			return nil
+		}
+		if !requeued {
+			slog.Info("task reached failover retry limit", "task_id", task.TaskID)
+			o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, failureStage, failureCategory, finalFailFinish.CompletedAt)
+			return nil
+		}
+		o.recordExecutionMetrics(ctx, task.TaskID, tasks.TaskExecutionMetricsPatch{
+			TaskID:           task.TaskID,
+			CurrentStage:     stringPtr(tasks.ExecutionStageQueued),
+			BottleneckSource: stringPtr(tasks.BottleneckSourceProvider),
+			FailureStage:     stringPtr(failureStage),
+			FailureCategory:  stringPtr(failureCategory),
+		})
 		if requeueErr := o.requeueTask(ctx, task, taskqueue.TaskAssignment{}, reason); requeueErr != nil {
+			o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, reason, failureStage, failureCategory, startTime, providerOutput.Timeline, time.Now())
 			return requeueErr
 		}
 		return nil
@@ -188,18 +211,24 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *queuetype
 		return nil
 	}
 	if cancelled {
-		o.skipCancelledTask(ctx, task, assignment)
+		cancelFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusCancelled, "任务已取消", tasks.ExecutionStageFinalizing, tasks.FailureCategoryCancelled, startTime, providerOutput.Timeline, time.Now())
+		o.skipCancelledTask(ctx, task, &cancelFinish)
 		return nil
 	}
 
 	elapsed := time.Since(startTime).Seconds()
-	completed, completeErr := o.completeTask(ctx, task, assignment, providerOutput.Result, elapsed)
+	completedFinish, _ := buildTaskAttemptFinish(attemptRef, tasks.TaskAttemptStatusCompleted, "", "", "", startTime, providerOutput.Timeline, time.Now())
+	completed, completeErr := o.completeTask(ctx, task, assignment, providerOutput.Result, elapsed, &completedFinish)
 	if completeErr != nil {
+		o.finishTaskAttempt(ctx, attemptRef, tasks.TaskAttemptStatusFailed, "任务结果保存失败，请稍后重试", tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, startTime, providerOutput.Timeline, time.Now())
 		o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, time.Now())
 		return completeErr
 	}
+	finishedAt := completedFinish.CompletedAt
+	if finishedAt.IsZero() {
+		finishedAt = time.Now()
+	}
 	if completed {
-		finishedAt := time.Now()
 		o.recordFinalizeFinished(ctx, task.TaskID, providerOutput.Timeline, finishedAt)
 		o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageCompleted, "", "", finishedAt)
 		if err := o.taskRuntime.ResetAccountFailure(ctx, accountID); err != nil {
@@ -213,16 +242,23 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *queue
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if assignment.AccountID != 0 && assignment.LeaseToken != "" {
-		if err := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, assignment.AccountID, assignment.LeaseToken, reason); err != nil && !isTaskConvergedError(err) {
-			slog.Warn("reset task running to pending failed", "task_id", task.TaskID, "account_id", assignment.AccountID, "err", err)
-		}
-	}
 	cancelled, err := o.taskRuntime.IsTaskCancelled(cleanupCtx, task.TaskID)
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", err)
 	} else if cancelled {
-		o.skipCancelledTask(cleanupCtx, task, assignment)
+		o.skipCancelledTask(cleanupCtx, task, nil)
+		return nil
+	}
+	if assignment.AccountID != 0 && assignment.LeaseToken != "" {
+		if err := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, assignment, reason); err != nil && !isTaskConvergedError(err) {
+			slog.Warn("reset task running to pending failed", "task_id", task.TaskID, "account_id", assignment.AccountID, "err", err)
+		}
+	}
+	cancelled, err = o.taskRuntime.IsTaskCancelled(cleanupCtx, task.TaskID)
+	if err != nil {
+		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "err", err)
+	} else if cancelled {
+		o.skipCancelledTask(cleanupCtx, task, nil)
 		return nil
 	}
 	if err := o.taskRuntime.RefreshTaskAccounts(ctx, task); err != nil {
@@ -237,17 +273,23 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *queue
 	return nil
 }
 
-func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, result string, elapsedSec float64) (bool, error) {
+func (o *taskExecutionOrchestrator) completeTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, result string, elapsedSec float64, attemptFinish *tasks.TaskAttemptFinish) (bool, error) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if err := o.taskRuntime.MarkTaskCompleted(cleanupCtx, task.TaskID, assignment.LeaseToken, result); err != nil {
+	var err error
+	if attemptFinish != nil {
+		err = o.taskRuntime.MarkTaskCompletedWithAttempt(cleanupCtx, assignment, result, *attemptFinish)
+	} else {
+		err = o.taskRuntime.MarkTaskCompleted(cleanupCtx, assignment, result)
+	}
+	if err != nil {
 		if isTaskConvergedError(err) {
 			slog.Info("task converged before completion writeback", "task_id", task.TaskID, "err", err)
 			return false, nil
 		}
 		slog.Warn("mark task completed failed", "task_id", task.TaskID, "err", err)
-		if failErr := o.taskRuntime.MarkTaskFailedWithLease(cleanupCtx, task.TaskID, assignment.LeaseToken, "任务结果保存失败，请稍后重试"); failErr != nil {
+		if failErr := o.taskRuntime.MarkTaskFailedWithLease(cleanupCtx, assignment, "任务结果保存失败，请稍后重试"); failErr != nil {
 			slog.Warn("mark task failed after completion writeback failed", "task_id", task.TaskID, "err", failErr)
 		}
 		return false, err
@@ -269,12 +311,31 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
 	failureStage string,
 	failureCategory string,
 ) error {
+	return o.completeFailedTaskWithMetricsAndAttempt(ctx, task, assignment, reason, elapsedSec, failureStage, failureCategory, nil)
+}
+
+func (o *taskExecutionOrchestrator) completeFailedTaskWithMetricsAndAttempt(
+	ctx context.Context,
+	task *queuetypes.TaskPayload,
+	assignment taskqueue.TaskAssignment,
+	reason string,
+	elapsedSec float64,
+	failureStage string,
+	failureCategory string,
+	attemptFinish *tasks.TaskAttemptFinish,
+) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
 	var err error
-	if assignment.LeaseToken != "" {
-		err = o.taskRuntime.MarkTaskFailedWithLease(cleanupCtx, task.TaskID, assignment.LeaseToken, reason)
+	if assignment.HasLeaseIdentity() {
+		if attemptFinish != nil {
+			err = o.taskRuntime.MarkTaskFailedWithLeaseAndAttempt(cleanupCtx, assignment, reason, *attemptFinish)
+		} else {
+			err = o.taskRuntime.MarkTaskFailedWithLease(cleanupCtx, assignment, reason)
+		}
+	} else if attemptFinish != nil {
+		err = o.taskRuntime.MarkTaskFailedWithAttempt(cleanupCtx, task.TaskID, reason, *attemptFinish)
 	} else {
 		err = o.taskRuntime.MarkTaskFailed(cleanupCtx, task.TaskID, reason)
 	}
@@ -286,7 +347,11 @@ func (o *taskExecutionOrchestrator) completeFailedTaskWithMetrics(
 		slog.Warn("mark task failed failed", "task_id", task.TaskID, "err", err)
 		return err
 	}
-	o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, failureStage, failureCategory, time.Now())
+	terminalAt := time.Now()
+	if attemptFinish != nil && !attemptFinish.CompletedAt.IsZero() {
+		terminalAt = attemptFinish.CompletedAt
+	}
+	o.recordExecutionTerminal(ctx, task.TaskID, tasks.ExecutionStageFailed, failureStage, failureCategory, terminalAt)
 	slog.Warn("task failed", "task_id", task.TaskID, "elapsed_sec", elapsedSec, "reason", reason)
 	return nil
 }
@@ -295,14 +360,27 @@ func (o *taskExecutionOrchestrator) failTask(ctx context.Context, task *queuetyp
 	return o.completeFailedTask(ctx, task, taskqueue.TaskAssignment{}, reason, 0)
 }
 
-func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment) {
+func (o *taskExecutionOrchestrator) skipCancelledTask(ctx context.Context, task *queuetypes.TaskPayload, attemptFinish *tasks.TaskAttemptFinish) {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if assignment.AccountID != 0 && strings.TrimSpace(assignment.LeaseToken) != "" {
-		if err := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, assignment.AccountID, assignment.LeaseToken, "任务已取消，释放运行租约"); err != nil && !isTaskConvergedError(err) {
-			slog.Warn("reset cancelled task running lease failed", "task_id", task.TaskID, "account_id", assignment.AccountID, "err", err)
-		}
+	cancelledAt := time.Now()
+	if attemptFinish != nil && !attemptFinish.CompletedAt.IsZero() {
+		cancelledAt = attemptFinish.CompletedAt
+	}
+	snapshot := tasks.TaskCancellationSnapshot{
+		TaskID:      task.TaskID,
+		CancelledAt: cancelledAt,
+		Reason:      "任务已取消",
+	}
+	var err error
+	if attemptFinish != nil {
+		err = o.taskRuntime.RecordTaskCancelledWithAttempt(cleanupCtx, snapshot, *attemptFinish)
+	} else {
+		err = o.taskRuntime.RecordTaskCancelled(cleanupCtx, snapshot)
+	}
+	if err != nil {
+		slog.Warn("record task cancellation snapshot failed", "task_id", task.TaskID, "err", err)
 	}
 	if err := o.taskRuntime.ClearTaskCancelled(cleanupCtx, task.TaskID); err != nil {
 		slog.Warn("clear task cancellation marker failed", "task_id", task.TaskID, "err", err)
@@ -314,11 +392,17 @@ func (o *taskExecutionOrchestrator) dropTask(ctx context.Context, task *queuetyp
 	slog.Info("task dropped", "task_id", task.TaskID, "reason", reason)
 }
 
-func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, execErr error) error {
+func (o *taskExecutionOrchestrator) handleExecutionInterrupted(ctx context.Context, task *queuetypes.TaskPayload, assignment taskqueue.TaskAssignment, execErr error, attemptFinish *tasks.TaskAttemptFinish) error {
 	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
 	defer cleanupCancel()
 
-	if err := o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, task.TaskID, assignment.AccountID, assignment.LeaseToken, "worker context interrupted, waiting retry"); err != nil {
+	var err error
+	if attemptFinish != nil {
+		err = o.taskRuntime.ResetTaskRunningToPendingWithAttempt(cleanupCtx, assignment, "worker context interrupted, waiting retry", *attemptFinish)
+	} else {
+		err = o.taskRuntime.ResetTaskRunningToPending(cleanupCtx, assignment, "worker context interrupted, waiting retry")
+	}
+	if err != nil {
 		if errors.Is(err, taskruntime.ErrTaskNotFound) || errors.Is(err, taskruntime.ErrTaskTerminal) || errors.Is(err, taskruntime.ErrTaskStateConflict) {
 			slog.Info("interrupted task already converged", "task_id", task.TaskID, "err", err)
 		} else {
@@ -388,6 +472,153 @@ func (o *taskExecutionOrchestrator) recordExecutionTerminal(ctx context.Context,
 	if err := o.taskRuntime.RecordExecutionTerminal(cleanupCtx, taskID, currentStage, failureStage, failureCategory, finishedAt); err != nil {
 		slog.Warn("record terminal task execution metrics failed", "task_id", taskID, "err", err)
 	}
+}
+
+func (o *taskExecutionOrchestrator) recordExecutionSnapshot(ctx context.Context, taskID string, snapshot tasks.TaskExecutionSnapshot) {
+	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
+	defer cleanupCancel()
+	if err := o.taskRuntime.RecordExecutionSnapshot(cleanupCtx, snapshot); err != nil {
+		slog.Warn("record task execution snapshot failed", "task_id", taskID, "err", err)
+	}
+}
+
+func (o *taskExecutionOrchestrator) startTaskAttempt(
+	ctx context.Context,
+	task *queuetypes.TaskPayload,
+	assignment taskqueue.TaskAssignment,
+	snapshot tasks.TaskExecutionSnapshot,
+	providerStartedAt time.Time,
+) (tasks.TaskAttemptRef, error) {
+	if task == nil || strings.TrimSpace(task.TaskID) == "" {
+		return tasks.TaskAttemptRef{}, nil
+	}
+	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
+	defer cleanupCancel()
+	ref, err := o.taskRuntime.StartTaskAttempt(cleanupCtx, tasks.TaskAttemptStart{
+		TaskID:            task.TaskID,
+		RiverJobID:        task.RiverJobID,
+		LeaseToken:        assignment.LeaseToken,
+		AccountID:         assignment.AccountID,
+		ChannelID:         assignment.ChannelID,
+		FeatureSlug:       snapshot.FeatureSlug,
+		RequestedModel:    snapshot.RequestedModel,
+		ResolvedModel:     snapshot.ResolvedModel,
+		APIType:           snapshot.APIType,
+		ProviderStartedAt: providerStartedAt,
+	})
+	if err != nil {
+		return tasks.TaskAttemptRef{}, err
+	}
+	return ref, nil
+}
+
+func buildTaskAttemptFinish(
+	ref tasks.TaskAttemptRef,
+	status string,
+	reason string,
+	failureStage string,
+	failureCategory string,
+	executionStartedAt time.Time,
+	timeline providerCallTimeline,
+	completedAt time.Time,
+) (tasks.TaskAttemptFinish, bool) {
+	if ref.ID == 0 {
+		return tasks.TaskAttemptFinish{}, false
+	}
+	if completedAt.IsZero() {
+		completedAt = time.Now()
+	}
+	providerLatencyMS := int64(0)
+	if timeline.ProviderStartedAt != nil && timeline.ProviderFinishedAt != nil {
+		providerLatencyMS = nonNegativeMilliseconds(timeline.ProviderFinishedAt.Sub(*timeline.ProviderStartedAt))
+	}
+	finalizeLatencyMS := int64(0)
+	if timeline.FinalizeStartedAt != nil && timeline.FinalizeFinishedAt != nil {
+		finalizeLatencyMS = nonNegativeMilliseconds(timeline.FinalizeFinishedAt.Sub(*timeline.FinalizeStartedAt))
+	}
+	totalLatencyMS := int64(0)
+	if !executionStartedAt.IsZero() {
+		totalLatencyMS = nonNegativeMilliseconds(completedAt.Sub(executionStartedAt))
+	}
+	return tasks.TaskAttemptFinish{
+		ID:                 ref.ID,
+		Status:             status,
+		FailureStage:       failureStage,
+		FailureCategory:    failureCategory,
+		ErrorMsg:           truncateErrorBody(reason),
+		ProviderFinishedAt: timeline.ProviderFinishedAt,
+		FinalizeStartedAt:  timeline.FinalizeStartedAt,
+		FinalizeFinishedAt: timeline.FinalizeFinishedAt,
+		ProviderLatencyMS:  providerLatencyMS,
+		FinalizeLatencyMS:  finalizeLatencyMS,
+		TotalLatencyMS:     totalLatencyMS,
+		CompletedAt:        completedAt,
+	}, true
+}
+
+func (o *taskExecutionOrchestrator) finishTaskAttempt(
+	ctx context.Context,
+	ref tasks.TaskAttemptRef,
+	status string,
+	reason string,
+	failureStage string,
+	failureCategory string,
+	executionStartedAt time.Time,
+	timeline providerCallTimeline,
+	completedAt time.Time,
+) {
+	finish, ok := buildTaskAttemptFinish(ref, status, reason, failureStage, failureCategory, executionStartedAt, timeline, completedAt)
+	if !ok {
+		return
+	}
+	cleanupCtx, cleanupCancel := taskCleanupContext(ctx)
+	defer cleanupCancel()
+	if err := o.taskRuntime.FinishTaskAttempt(cleanupCtx, finish); err != nil {
+		if isTaskConvergedError(err) {
+			slog.Info("task attempt already converged before finish", "attempt_id", ref.ID, "err", err)
+			return
+		}
+		slog.Warn("finish task attempt failed", "attempt_id", ref.ID, "err", err)
+	}
+}
+
+func taskExecutionSnapshot(task *queuetypes.TaskPayload, account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) tasks.TaskExecutionSnapshot {
+	snapshot := tasks.TaskExecutionSnapshot{}
+	if task == nil {
+		return snapshot
+	}
+	snapshot.TaskID = task.TaskID
+	snapshot.FeatureSlug = accounts.ParseFeatureSlugFromParamsJSON(task.Params)
+	params := taskParamsMap(task.Params)
+	if requestedModel, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
+		snapshot.RequestedModel = strings.TrimSpace(requestedModel)
+	}
+	if account == nil {
+		return snapshot
+	}
+	if apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL); ok {
+		snapshot.APIType = apiType
+	}
+	if resolvedModel := strings.TrimSpace(assignment.ResolvedModel); resolvedModel != "" {
+		snapshot.ResolvedModel = resolvedModel
+		return snapshot
+	}
+	if model, ok := accounts.ResolveAccountModelForParams(account, snapshot.FeatureSlug, params); ok {
+		snapshot.ResolvedModel = strings.TrimSpace(model.Name)
+	}
+	return snapshot
+}
+
+func taskParamsMap(paramsJSON string) map[string]interface{} {
+	paramsJSON = strings.TrimSpace(paramsJSON)
+	if paramsJSON == "" {
+		return nil
+	}
+	var params map[string]interface{}
+	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
+		return nil
+	}
+	return params
 }
 
 func classifyProviderFailure(err error, timeline providerCallTimeline) (string, string) {

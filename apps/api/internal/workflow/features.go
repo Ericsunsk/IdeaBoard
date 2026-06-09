@@ -20,16 +20,32 @@ const (
 	FeatureSlugImageExtend    = "image-extend"
 )
 
-var supportedTaskFeatureSlugs = map[string]struct{}{
-	FeatureSlugSketchToImage:  {},
-	FeatureSlugStyleVariation: {},
-	FeatureSlugPartialEdit:    {},
-	FeatureSlugRemoveBg:       {},
-	FeatureSlugStyleFusion:    {},
-	FeatureSlugVirtual3D:      {},
-	FeatureSlugPatternGen:     {},
-	FeatureSlugHDUpscale:      {},
-	FeatureSlugImageExtend:    {},
+var supportedWorkflowFeatureSlugs = []string{
+	FeatureSlugSketchToImage,
+	FeatureSlugStyleVariation,
+	FeatureSlugPartialEdit,
+	FeatureSlugRemoveBg,
+	FeatureSlugStyleFusion,
+	FeatureSlugVirtual3D,
+	FeatureSlugPatternGen,
+	FeatureSlugHDUpscale,
+	FeatureSlugImageExtend,
+}
+
+var supportedTaskFeatureSlugs = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
+
+func SupportedFeatureSlugs() []string {
+	slugs := make([]string, len(supportedWorkflowFeatureSlugs))
+	copy(slugs, supportedWorkflowFeatureSlugs)
+	return slugs
+}
+
+func supportedFeatureSlugSet(slugs []string) map[string]struct{} {
+	result := make(map[string]struct{}, len(slugs))
+	for _, slug := range slugs {
+		result[slug] = struct{}{}
+	}
+	return result
 }
 
 func normalizeWorkflowFeatureSlug(raw string) string {

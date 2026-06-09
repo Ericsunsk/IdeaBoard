@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasks"
 )
 
@@ -13,6 +14,64 @@ func (s *Service) RecordExecutionMetrics(ctx context.Context, patch tasks.TaskEx
 		return fmt.Errorf("task runtime metrics store not configured")
 	}
 	return s.taskRepo.PatchExecutionMetrics(ctx, patch)
+}
+
+func (s *Service) RecordExecutionSnapshot(ctx context.Context, snapshot tasks.TaskExecutionSnapshot) error {
+	if s == nil || s.taskRepo == nil {
+		return fmt.Errorf("task runtime snapshot store not configured")
+	}
+	_, err := s.taskRepo.PatchExecutionSnapshot(ctx, snapshot)
+	return err
+}
+
+func (s *Service) StartTaskAttempt(ctx context.Context, start tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error) {
+	if s == nil || s.taskRepo == nil {
+		return tasks.TaskAttemptRef{}, fmt.Errorf("task runtime attempt store not configured")
+	}
+	ref, err := s.taskRepo.CreateTaskAttempt(ctx, start)
+	if database.IsNotFound(err) {
+		return tasks.TaskAttemptRef{}, ErrTaskStateConflict
+	}
+	return ref, err
+}
+
+func (s *Service) FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) error {
+	if s == nil || s.taskRepo == nil {
+		return fmt.Errorf("task runtime attempt store not configured")
+	}
+	updated, err := s.taskRepo.FinishTaskAttempt(ctx, finish)
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return ErrTaskStateConflict
+	}
+	if updated != 1 {
+		return fmt.Errorf("finish task attempt affected %d rows, want 1", updated)
+	}
+	return nil
+}
+
+func (s *Service) RecordTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot) error {
+	return s.recordTaskCancelled(ctx, snapshot, nil)
+}
+
+func (s *Service) RecordTaskCancelledWithAttempt(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, finish tasks.TaskAttemptFinish) error {
+	return s.recordTaskCancelled(ctx, snapshot, &finish)
+}
+
+func (s *Service) recordTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, attemptFinish *tasks.TaskAttemptFinish) error {
+	if s == nil || s.taskRepo == nil {
+		return fmt.Errorf("task runtime cancellation store not configured")
+	}
+	rows, err := s.taskRepo.MarkTaskCancelled(ctx, snapshot, attemptFinish)
+	if err != nil {
+		return err
+	}
+	if rows > 0 {
+		s.publishTaskStatusEvent(ctx, snapshot.TaskID, tasks.StatusCancelled)
+	}
+	return nil
 }
 
 func (s *Service) RecordExecutionTerminal(ctx context.Context, taskID string, currentStage string, failureStage string, failureCategory string, finishedAt time.Time) error {
@@ -29,7 +88,7 @@ func (s *Service) RecordExecutionTerminal(ctx context.Context, taskID string, cu
 		totalLatencyMS = 0
 	}
 
-	bottleneckSource := resolveExecutionBottleneck(metrics, failureStage, failureCategory)
+	bottleneckSource := tasks.ResolveExecutionBottleneck(metrics, failureStage, failureCategory)
 	patch := tasks.TaskExecutionMetricsPatch{
 		TaskID:           taskID,
 		CurrentStage:     stringPtr(currentStage),
@@ -45,44 +104,6 @@ func (s *Service) RecordExecutionTerminal(ctx context.Context, taskID string, cu
 		patch.FailureCategory = &empty
 	}
 	return s.taskRepo.PatchExecutionMetrics(ctx, patch)
-}
-
-func resolveExecutionBottleneck(metrics *tasks.TaskExecutionMetrics, failureStage string, failureCategory string) string {
-	switch failureCategory {
-	case tasks.FailureCategoryStorageError:
-		return tasks.BottleneckSourceStorage
-	case tasks.FailureCategoryFinalizeError:
-		return tasks.BottleneckSourceFinalize
-	case tasks.FailureCategoryInputInvalid:
-		if failureStage == tasks.ExecutionStageAssigned || failureStage == tasks.ExecutionStageQueued {
-			return tasks.BottleneckSourceInput
-		}
-	case tasks.FailureCategoryAuth, tasks.FailureCategoryQuota, tasks.FailureCategoryTimeout, tasks.FailureCategoryProviderError:
-		return tasks.BottleneckSourceProvider
-	}
-	if metrics == nil {
-		return tasks.BottleneckSourceUnknown
-	}
-	type stageLatency struct {
-		source string
-		value  int64
-	}
-	latencies := []stageLatency{
-		{source: tasks.BottleneckSourceQueue, value: metrics.QueueWaitMS},
-		{source: tasks.BottleneckSourceWorker, value: metrics.WorkerOverheadMS},
-		{source: tasks.BottleneckSourceProvider, value: metrics.ProviderLatencyMS},
-		{source: tasks.BottleneckSourceFinalize, value: metrics.FinalizeLatencyMS},
-	}
-	best := stageLatency{source: tasks.BottleneckSourceUnknown}
-	for _, latency := range latencies {
-		if latency.value > best.value {
-			best = latency
-		}
-	}
-	if best.value <= 0 {
-		return tasks.BottleneckSourceUnknown
-	}
-	return best.source
 }
 
 func stringPtr(value string) *string {

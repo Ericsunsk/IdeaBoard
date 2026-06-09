@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/tasks"
 	"ideaboard/api/internal/taskstore"
 	"ideaboard/api/internal/testdb"
@@ -27,8 +28,6 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:     "task-sse-terminal",
 		UserID:     7,
-		ChannelID:  9,
-		AccountID:  11,
 		Prompt:     "internal prompt",
 		UserPrompt: "user prompt",
 		Status:     tasks.StatusCompleted,
@@ -67,23 +66,44 @@ func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	}
 }
 
-func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
+func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := testdb.Open(t)
 	taskRepo := taskstore.NewRepository(db)
+	accountRepo := accounts.NewAccountRepository(db)
 	ctx := context.Background()
 	hub := NewEventHub()
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: hub})
+	var channelID int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO channels (type, name, api_url, status)
+VALUES ('openai-compatible', 'taskservice-sse-channel', 'https://example.com/taskservice-sse', 1)
+RETURNING id`).Scan(&channelID); err != nil {
+		t.Fatalf("create channel failed: %v", err)
+	}
+	account := &accounts.ApiAccount{
+		Name:      "taskservice-sse-account",
+		ChannelID: channelID,
+		Platform:  "openai-compatible",
+		ApiType:   "openai-compatible",
+		Models:    []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:    "test",
+		ProxyURL:  "https://example.com/taskservice-sse",
+		Status:    1,
+	}
+	if err := accountRepo.Create(ctx, account); err != nil {
+		t.Fatalf("create account failed: %v", err)
+	}
 
 	task := &tasks.Task{
-		TaskID:     "task-sse-live",
-		UserID:     8,
-		ChannelID:  99,
-		AccountID:  21,
-		Prompt:     "internal prompt",
-		UserPrompt: "user prompt",
-		Status:     tasks.StatusPending,
-		LeaseToken: "lease-sse-live",
+		TaskID:            "task-sse-live",
+		UserID:            8,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Prompt:            "internal prompt",
+		UserPrompt:        "user prompt",
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-sse-live",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -117,7 +137,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 	go func() {
 		time.Sleep(80 * time.Millisecond)
 		now := time.Now()
-		rows, updateErr := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusPending}, task.LeaseToken, `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`, now, nil)
+		rows, updateErr := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ChannelID, task.LeaseToken, `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"channel_id":99}`, now, nil, nil)
 		if updateErr != nil {
 			done <- updateErr
 			return
@@ -146,7 +166,7 @@ func TestStreamUserTaskStreamsPendingThenCompletedEvent(t *testing.T) {
 		}
 		payload.WriteString(line)
 		body := payload.String()
-		if strings.Contains(body, `"status":"pending"`) && strings.Contains(body, `"status":"completed"`) {
+		if strings.Contains(body, `"status":"running"`) && strings.Contains(body, `"status":"completed"`) {
 			if strings.Contains(body, "internal prompt") || strings.Contains(body, "account_id") || strings.Contains(body, "channel_id") {
 				t.Fatalf("stream leaked internal task fields: %s", body)
 			}

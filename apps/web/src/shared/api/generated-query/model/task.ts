@@ -11,10 +11,17 @@ export interface Task {
   id: number
   task_id: string
   user_id: number
-  channel_id?: number
-  account_id?: number
+  /** @nullable */
+  assigned_channel_id?: number | null
+  /** @nullable */
+  account_id?: number | null
   prompt: string
+  user_prompt?: string
   params?: string
+  feature_slug?: string
+  requested_model?: string
+  resolved_model?: string
+  api_type?: string
   status: string
   retry_count?: number
   error_msg?: string
@@ -25,4 +32,9 @@ export interface Task {
   updated_at: string
   /** @nullable */
   completed_at?: string | null
+  /** @nullable */
+  cancelled_at?: string | null
+  /** @nullable */
+  cancelled_by?: number | null
+  cancel_reason?: string
 }

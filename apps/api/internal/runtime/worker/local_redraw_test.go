@@ -225,7 +225,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	task := &queuetypes.TaskPayload{
 		TaskID: "task-local-redraw",

@@ -95,6 +95,10 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 		return
 	}
 	if err := h.accountService.DeleteAccount(c.Request.Context(), id); err != nil {
+		if err.Error() == "账号不存在" {
+			response.Error(c, 404, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "删除失败", err)
 		return
 	}
@@ -109,6 +113,10 @@ func (h *AccountHandler) StartAccount(c *gin.Context) {
 		return
 	}
 	if err := h.accountService.StartAccount(c.Request.Context(), id); err != nil {
+		if err.Error() == "账号不存在" {
+			response.Error(c, 404, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "启动失败", err)
 		return
 	}
@@ -123,6 +131,10 @@ func (h *AccountHandler) StopAccount(c *gin.Context) {
 		return
 	}
 	if err := h.accountService.StopAccount(c.Request.Context(), id); err != nil {
+		if err.Error() == "账号不存在" {
+			response.Error(c, 404, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "停止失败", err)
 		return
 	}

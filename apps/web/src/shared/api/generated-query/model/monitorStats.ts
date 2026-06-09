@@ -10,4 +10,5 @@ export interface MonitorStats {
   running: number
   completed: number
   failed: number
+  cancelled: number
 }

@@ -15,10 +15,9 @@ func TestRepositoryCanceledContextAffectsQueryAndWrite(t *testing.T) {
 	repo := NewRepository(db)
 
 	if err := repo.Create(context.Background(), &tasks.Task{
-		TaskID:    "ctx-cancel-task",
-		UserID:    1,
-		ChannelID: 1,
-		Status:    tasks.StatusPending,
+		TaskID: "ctx-cancel-task",
+		UserID: 1,
+		Status: tasks.StatusPending,
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
@@ -30,7 +29,7 @@ func TestRepositoryCanceledContextAffectsQueryAndWrite(t *testing.T) {
 		t.Fatalf("GetByTaskID error=%v, want context.Canceled", err)
 	}
 
-	_, err := repo.MarkTaskFailed(ctx, "ctx-cancel-task", []string{tasks.StatusPending}, "context canceled", "", time.Now())
+	_, err := repo.MarkTaskFailed(ctx, "ctx-cancel-task", []string{tasks.StatusPending}, "context canceled", "", time.Now(), nil)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("MarkTaskFailed error=%v, want context.Canceled", err)
 	}

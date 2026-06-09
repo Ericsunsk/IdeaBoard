@@ -15,4 +15,5 @@ export const TaskExecutionMetricsCurrentStage = {
   finalizing: 'finalizing',
   completed: 'completed',
   failed: 'failed',
+  cancelled: 'cancelled',
 } as const

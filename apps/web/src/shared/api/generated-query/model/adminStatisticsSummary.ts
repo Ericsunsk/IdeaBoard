@@ -10,12 +10,16 @@ export type AdminStatisticsSummary = {
   today_calls: number
   today_success: number
   today_failed: number
+  today_cancelled: number
   yesterday_calls: number
   yesterday_success: number
   yesterday_failed: number
+  yesterday_cancelled: number
   this_month_calls: number
+  this_month_cancelled: number
   pending: number
   running: number
   completed: number
   failed: number
+  cancelled: number
 }

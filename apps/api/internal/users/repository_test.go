@@ -101,22 +101,26 @@ func TestDeleteUserThenRecreateDoesNotReuseUID(t *testing.T) {
 	if _, err := db.ExecContext(context.Background(), `INSERT INTO user_boards (board_id, user_id, name, state) VALUES ($1, $2, $3, $4)`, ownedBoardID, first.ID, "Owned", "{}"); err != nil {
 		t.Fatalf("seed user_boards failed: %v", err)
 	}
+	sharedBoardID := "board-shared"
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO user_boards (board_id, user_id, name, state) VALUES ($1, $2, $3, $4)`, sharedBoardID, first.ID, "Shared", "{}"); err != nil {
+		t.Fatalf("seed shared user_boards failed: %v", err)
+	}
 	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (owner_user_id, board_id, user_id, role) VALUES ($1, $2, $3, $4)`, first.ID, ownedBoardID, first.ID, "viewer"); err != nil {
 		t.Fatalf("seed board_members owned failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (owner_user_id, board_id, user_id, role) VALUES ($1, $2, $3, $4)`, first.ID, "board-shared", first.ID, "viewer"); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_members (owner_user_id, board_id, user_id, role) VALUES ($1, $2, $3, $4)`, first.ID, sharedBoardID, first.ID, "viewer"); err != nil {
 		t.Fatalf("seed board_members shared failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token, role, created_by) VALUES ($1, $2, $3, $4)`, ownedBoardID, "owned-token", "viewer", first.ID); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token_hash, token_prefix, role, created_by) VALUES ($1, $2, $3, $4, $5)`, ownedBoardID, "owned-token-hash", "owned", "viewer", first.ID); err != nil {
 		t.Fatalf("seed board_share_tokens owned failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token, role, created_by) VALUES ($1, $2, $3, $4)`, "board-shared", "shared-token", "viewer", first.ID); err != nil {
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO board_share_tokens (board_id, token_hash, token_prefix, role, created_by) VALUES ($1, $2, $3, $4, $5)`, sharedBoardID, "shared-token-hash", "shared", "viewer", first.ID); err != nil {
 		t.Fatalf("seed board_share_tokens shared failed: %v", err)
 	}
 	if _, err := db.ExecContext(
 		context.Background(),
-		`INSERT INTO tasks (task_id, user_id, channel_id, prompt, user_prompt, params, status, error_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		"delete-user-task", first.ID, 1, "", "", "", "pending", "", "",
+		`INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, status, error_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		"delete-user-task", first.ID, "", "", "", "pending", "", "",
 	); err != nil {
 		t.Fatalf("seed tasks failed: %v", err)
 	}

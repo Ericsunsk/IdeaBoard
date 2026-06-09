@@ -586,8 +586,18 @@ verify_image_signatures() {
   verify_image_signature "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
 }
 
+prepare_stack_images() {
+  login_ghcr_if_configured
+  verify_image_signatures
+  docker_compose --profile tools pull
+}
+
 run_auth_migration() {
   docker_compose run --rm auth-migrate
+}
+
+run_api_migration() {
+  docker_compose run --rm api-migrate
 }
 
 ensure_env_file
@@ -605,13 +615,12 @@ validate_env_file || exit 1
 
 case "$command" in
   deploy)
-    login_ghcr_if_configured
-    verify_image_signatures
-    docker_compose --profile tools pull
+    prepare_stack_images
     docker_compose up -d postgres
     wait_for_postgres
     backup_postgres
     backup_api_uploads
+    run_api_migration
     run_auth_migration
     docker_compose up -d
     run_backend_smoke_checks
@@ -636,14 +645,18 @@ case "$command" in
     docker_compose logs -f "$@"
     ;;
   pull)
-    login_ghcr_if_configured
-    verify_image_signatures
-    docker_compose --profile tools pull
+    prepare_stack_images
     ;;
   up)
     docker_compose up -d
     ;;
   migrate)
+    prepare_stack_images
+    docker_compose up -d postgres
+    wait_for_postgres
+    backup_postgres
+    backup_api_uploads
+    run_api_migration
     run_auth_migration
     ;;
   ps)

@@ -3,7 +3,9 @@ package boards
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -102,6 +104,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 		board := existing.Board
 		board.Name = name
 		board.State = state
+		board.LastSavedBy = &userID
 		board.UpdatedAt = updatedAt
 		return s.saveAndReloadBoardForActor(ctx, userID, &board)
 	} else if !errors.Is(err, ErrBoardNotFound) {
@@ -117,6 +120,7 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 		}
 		board := accessible.Board
 		board.State = state
+		board.LastSavedBy = &userID
 		board.UpdatedAt = updatedAt
 		return s.saveAndReloadBoardForActor(ctx, userID, &board)
 	} else if !errors.Is(err, ErrBoardNotFound) {
@@ -130,12 +134,15 @@ func (s *BoardService) UpsertBoard(ctx context.Context, userID int64, boardID st
 		return nil, err
 	}
 	board := &UserBoard{
-		BoardID:   normalizedID,
-		UserID:    userID,
-		Name:      name,
-		State:     state,
-		CreatedAt: createdAt,
-		UpdatedAt: updatedAt,
+		BoardID:            normalizedID,
+		UserID:             userID,
+		Name:               name,
+		State:              state,
+		Revision:           1,
+		StateSchemaVersion: 1,
+		LastSavedBy:        &userID,
+		CreatedAt:          createdAt,
+		UpdatedAt:          updatedAt,
 	}
 	return s.saveAndReloadBoardForActor(ctx, userID, board)
 }
@@ -273,13 +280,16 @@ func (s *BoardService) CreateShareToken(ctx context.Context, ownerUserID int64, 
 	if err != nil {
 		return nil, err
 	}
+	tokenHash := boardShareTokenHash(token)
 	shareToken := &BoardShareToken{
-		BoardID:   board.BoardID,
-		Token:     token,
-		Role:      string(targetRole),
-		CreatedBy: board.UserID,
-		Revoked:   false,
-		ExpiresAt: expiresAtTime,
+		BoardID:     board.BoardID,
+		Token:       token,
+		TokenHash:   tokenHash,
+		TokenPrefix: boardShareTokenPrefix(token),
+		Role:        string(targetRole),
+		CreatedBy:   board.UserID,
+		Revoked:     false,
+		ExpiresAt:   expiresAtTime,
 	}
 	if err := s.repo.CreateShareToken(ctx, shareToken); err != nil {
 		return nil, err
@@ -295,29 +305,15 @@ func (s *BoardService) ListShareTokens(ctx context.Context, ownerUserID int64, b
 	return s.repo.ListShareTokens(ctx, board.UserID, board.BoardID)
 }
 
-func (s *BoardService) RevokeShareToken(ctx context.Context, ownerUserID int64, boardID, token string) error {
+func (s *BoardService) RevokeShareToken(ctx context.Context, ownerUserID int64, boardID string, tokenID int64) error {
 	board, err := s.requireOwnerBoard(ctx, ownerUserID, boardID)
 	if err != nil {
 		return err
 	}
-	normalizedToken := strings.TrimSpace(token)
-	if normalizedToken == "" {
+	if tokenID <= 0 {
 		return ErrInvalidBoardInput
 	}
-	shareToken, err := s.repo.GetShareTokenByToken(ctx, normalizedToken)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return ErrShareTokenNotFound
-		}
-		return err
-	}
-	if shareToken.BoardID != board.BoardID {
-		return ErrShareTokenNotFound
-	}
-	if shareToken.CreatedBy != board.UserID {
-		return ErrShareTokenNotFound
-	}
-	if err := s.repo.RevokeShareToken(ctx, board.UserID, board.BoardID, normalizedToken); err != nil {
+	if err := s.repo.RevokeShareTokenByID(ctx, board.UserID, board.BoardID, tokenID); err != nil {
 		if database.IsNotFound(err) {
 			return ErrShareTokenNotFound
 		}
@@ -331,18 +327,16 @@ func (s *BoardService) JoinBoardByShareToken(ctx context.Context, userID int64, 
 	if normalizedToken == "" {
 		return nil, ErrInvalidBoardInput
 	}
-	shareToken, err := s.repo.GetShareTokenByToken(ctx, normalizedToken)
+	tokenHash := boardShareTokenHash(normalizedToken)
+	shareToken, err := s.repo.GetShareTokenByHash(ctx, tokenHash)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return nil, ErrShareTokenNotFound
 		}
 		return nil, err
 	}
-	if shareToken.Revoked {
-		return nil, ErrShareTokenRevoked
-	}
-	if shareToken.ExpiresAt != nil && shareToken.ExpiresAt.Before(time.Now()) {
-		return nil, ErrShareTokenExpired
+	if err := validateShareTokenForJoin(*shareToken); err != nil {
+		return nil, err
 	}
 	role := normalizeBoardMemberRole(shareToken.Role)
 	if role == "" {
@@ -356,10 +350,45 @@ func (s *BoardService) JoinBoardByShareToken(ctx context.Context, userID int64, 
 	if board.UserID == userID {
 		return &BoardWithRole{Board: board, Role: BoardAccessRoleOwner}, nil
 	}
-	if err := s.repo.UpsertMember(ctx, board.UserID, board.BoardID, userID, role); err != nil {
+	consumedToken, err := s.repo.ConsumeShareTokenAndUpsertMember(ctx, tokenHash, userID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil, s.classifyShareTokenConsumeError(ctx, tokenHash)
+		}
 		return nil, err
 	}
+	role = normalizeBoardMemberRole(consumedToken.Role)
+	if role == "" {
+		return nil, ErrShareTokenInvalid
+	}
 	return &BoardWithRole{Board: board, Role: role}, nil
+}
+
+func validateShareTokenForJoin(shareToken BoardShareToken) error {
+	if shareToken.Revoked {
+		return ErrShareTokenRevoked
+	}
+	if shareToken.ExpiresAt != nil && shareToken.ExpiresAt.Before(time.Now()) {
+		return ErrShareTokenExpired
+	}
+	if shareToken.MaxUses != nil && shareToken.UsageCount >= int64(*shareToken.MaxUses) {
+		return ErrShareTokenExpired
+	}
+	return nil
+}
+
+func (s *BoardService) classifyShareTokenConsumeError(ctx context.Context, tokenHash string) error {
+	shareToken, err := s.repo.GetShareTokenByHash(ctx, tokenHash)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return ErrShareTokenNotFound
+		}
+		return err
+	}
+	if err := validateShareTokenForJoin(*shareToken); err != nil {
+		return err
+	}
+	return ErrShareTokenExpired
 }
 
 func BuildBoardShareURL(baseURL, token string) string {
@@ -575,7 +604,7 @@ func generateBoardShareToken(ctx context.Context, repo *BoardRepository) (string
 			return "", fmt.Errorf("生成分享令牌失败: %v", err)
 		}
 		token := base64.RawURLEncoding.EncodeToString(buf)
-		exists, err := repo.ShareTokenExists(ctx, token)
+		exists, err := repo.ShareTokenHashExists(ctx, boardShareTokenHash(token))
 		if err != nil {
 			return "", err
 		}
@@ -584,4 +613,17 @@ func generateBoardShareToken(ctx context.Context, repo *BoardRepository) (string
 		}
 	}
 	return "", fmt.Errorf("生成分享令牌失败")
+}
+
+func boardShareTokenHash(token string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(token)))
+	return hex.EncodeToString(sum[:])
+}
+
+func boardShareTokenPrefix(token string) string {
+	trimmed := strings.TrimSpace(token)
+	if len(trimmed) <= 8 {
+		return trimmed
+	}
+	return trimmed[:8]
 }

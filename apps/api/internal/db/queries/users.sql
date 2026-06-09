@@ -27,7 +27,7 @@ SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at
 FROM users
 WHERE storage_uid = sqlc.arg(storage_uid);
 
--- name: UpdateUser :exec
+-- name: UpdateUser :execrows
 UPDATE users
 SET username = sqlc.arg(username),
     auth_user_id = sqlc.arg(auth_user_id),
@@ -37,7 +37,7 @@ SET username = sqlc.arg(username),
     status = sqlc.arg(status)
 WHERE id = sqlc.arg(id);
 
--- name: DeleteUserByID :exec
+-- name: DeleteUserByID :execrows
 DELETE FROM users
 WHERE id = sqlc.arg(id);
 
@@ -61,22 +61,22 @@ WHERE (NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_lik
 ORDER BY id DESC
 LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 
--- name: UpdateUserStatus :exec
+-- name: UpdateUserStatus :execrows
 UPDATE users
 SET status = sqlc.arg(status)
 WHERE id = sqlc.arg(id);
 
--- name: UpdateUserRole :exec
+-- name: UpdateUserRole :execrows
 UPDATE users
 SET role = sqlc.arg(role)
 WHERE id = sqlc.arg(id);
 
--- name: UpdateUserAvatar :exec
+-- name: UpdateUserAvatar :execrows
 UPDATE users
 SET avatar = sqlc.arg(avatar)
 WHERE id = sqlc.arg(id);
 
--- name: UpdateUserStorageUID :exec
+-- name: UpdateUserStorageUID :execrows
 UPDATE users
 SET storage_uid = sqlc.arg(storage_uid)
 WHERE id = sqlc.arg(id);

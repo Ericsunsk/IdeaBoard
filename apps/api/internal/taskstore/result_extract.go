@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+const (
+	unknownModelName     = "未识别模型"
+	maxStatDimensionSize = 128
+)
+
 func parseResultMap(raw string) map[string]interface{} {
 	if strings.TrimSpace(raw) == "" {
 		return nil
@@ -25,9 +30,6 @@ func resultContainsModel(rawResult string) bool {
 	if readResultString(result, "model") != "" {
 		return true
 	}
-	if readResultString(result, "model_set") != "" {
-		return true
-	}
 	return false
 }
 
@@ -35,32 +37,21 @@ func extractTaskModel(rawResult string) string {
 	return extractTaskModelWithFallback(rawResult, "")
 }
 
-func ExtractTaskModelWithFallback(rawResult string, fallbackModelSet string) string {
-	return extractTaskModelWithFallback(rawResult, fallbackModelSet)
+func ExtractTaskModelWithFallback(rawResult string, fallbackModel string) string {
+	return extractTaskModelWithFallback(rawResult, fallbackModel)
 }
 
-func extractTaskModelWithFallback(rawResult string, fallbackModelSet string) string {
+func extractTaskModelWithFallback(rawResult string, fallbackModel string) string {
 	result := parseResultMap(rawResult)
 	if result != nil {
 		if model := readResultString(result, "model"); model != "" {
 			return model
 		}
-		if modelSet := singleModelFromSet(readResultString(result, "model_set")); modelSet != "" {
-			return modelSet
-		}
 	}
-	if fallback := singleModelFromSet(fallbackModelSet); fallback != "" {
-		return fallback
+	if fallbackModel = normalizeStatDimension(fallbackModel); fallbackModel != "" {
+		return fallbackModel
 	}
-	return "未识别模型"
-}
-
-func singleModelFromSet(modelSet string) string {
-	model := strings.TrimSpace(modelSet)
-	if model == "" || strings.Contains(model, ",") {
-		return ""
-	}
-	return model
+	return unknownModelName
 }
 
 func readResultString(result map[string]interface{}, key string) string {
@@ -72,7 +63,7 @@ func readResultString(result map[string]interface{}, key string) string {
 	if !ok {
 		return ""
 	}
-	return strings.TrimSpace(s)
+	return normalizeStatDimension(s)
 }
 
 func extractTaskUser(rawResult string, fallbackUserID int64) string {
@@ -82,12 +73,12 @@ func extractTaskUser(rawResult string, fallbackUserID int64) string {
 			if v, ok := result[key]; ok {
 				switch vv := v.(type) {
 				case string:
-					if strings.TrimSpace(vv) != "" {
-						return strings.TrimSpace(vv)
+					if userKey := normalizeStatDimension(vv); userKey != "" {
+						return userKey
 					}
 				case float64:
 					if vv > 0 {
-						return fmt.Sprintf("%.0f", vv)
+						return normalizeStatDimension(fmt.Sprintf("%.0f", vv))
 					}
 				}
 			}
@@ -96,5 +87,17 @@ func extractTaskUser(rawResult string, fallbackUserID int64) string {
 	if fallbackUserID == 0 {
 		return "unknown"
 	}
-	return fmt.Sprintf("%d", fallbackUserID)
+	return normalizeStatDimension(fmt.Sprintf("%d", fallbackUserID))
+}
+
+func normalizeStatDimension(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	runes := []rune(trimmed)
+	if len(runes) <= maxStatDimensionSize {
+		return trimmed
+	}
+	return string(runes[:maxStatDimensionSize])
 }

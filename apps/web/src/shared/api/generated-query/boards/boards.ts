@@ -749,16 +749,16 @@ export function useCreateBoardShareToken<
   return query
 }
 
-export const getRevokeBoardShareTokenUrl = (boardId: string, token: string) => {
-  return `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens/${encodeURIComponent(String(token))}/revoke`
+export const getRevokeBoardShareTokenUrl = (boardId: string, tokenId: number) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/share-tokens/${encodeURIComponent(String(tokenId))}/revoke`
 }
 
 export const revokeBoardShareToken = async (
   boardId: string,
-  token: string,
+  tokenId: number,
   options?: RequestInit,
 ): Promise<ApiResponseRevoked> => {
-  return orvalMutator<ApiResponseRevoked>(getRevokeBoardShareTokenUrl(boardId, token), {
+  return orvalMutator<ApiResponseRevoked>(getRevokeBoardShareTokenUrl(boardId, tokenId), {
     ...options,
     method: 'POST',
   })
@@ -766,9 +766,9 @@ export const revokeBoardShareToken = async (
 
 export const getRevokeBoardShareTokenQueryKey = (
   boardId: MaybeRef<string>,
-  token: MaybeRef<string>,
+  tokenId: MaybeRef<number>,
 ) => {
-  return ['POST', 'user', 'boards', boardId, 'share-tokens', token, 'revoke'] as const
+  return ['POST', 'user', 'boards', boardId, 'share-tokens', tokenId, 'revoke'] as const
 }
 
 export const getRevokeBoardShareTokenQueryOptions = <
@@ -776,7 +776,7 @@ export const getRevokeBoardShareTokenQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   boardId: MaybeRef<string>,
-  token: MaybeRef<string>,
+  tokenId: MaybeRef<number>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
@@ -786,10 +786,10 @@ export const getRevokeBoardShareTokenQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getRevokeBoardShareTokenQueryKey(boardId, token)
+  const queryKey = getRevokeBoardShareTokenQueryKey(boardId, tokenId)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof revokeBoardShareToken>>> = ({ signal }) =>
-    revokeBoardShareToken(unref(boardId), unref(token), { signal, ...requestOptions })
+    revokeBoardShareToken(unref(boardId), unref(tokenId), { signal, ...requestOptions })
 
   return {
     queryKey,
@@ -798,8 +798,8 @@ export const getRevokeBoardShareTokenQueryOptions = <
       () =>
         unref(boardId) !== null &&
         unref(boardId) !== undefined &&
-        unref(token) !== null &&
-        unref(token) !== undefined,
+        unref(tokenId) !== null &&
+        unref(tokenId) !== undefined,
     ),
     ...queryOptions,
   } as UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
@@ -815,7 +815,7 @@ export function useRevokeBoardShareToken<
   TError = ErrorType<unknown>,
 >(
   boardId: MaybeRef<string>,
-  token: MaybeRef<string>,
+  tokenId: MaybeRef<number>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof revokeBoardShareToken>>, TError, TData>
@@ -824,7 +824,7 @@ export function useRevokeBoardShareToken<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getRevokeBoardShareTokenQueryOptions(boardId, token, options)
+  const queryOptions = getRevokeBoardShareTokenQueryOptions(boardId, tokenId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

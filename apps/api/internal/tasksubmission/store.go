@@ -85,25 +85,48 @@ func insertTask(ctx context.Context, tx pgx.Tx, task *tasks.Task) error {
 	if task.CompletedAt != nil {
 		completedAt = *task.CompletedAt
 	}
+	var cancelledAt interface{}
+	if task.CancelledAt != nil {
+		cancelledAt = *task.CancelledAt
+	}
+	var accountID interface{}
+	if task.AccountID != nil {
+		accountID = *task.AccountID
+	}
+	var assignedChannelID interface{}
+	if task.AssignedChannelID != nil {
+		assignedChannelID = *task.AssignedChannelID
+	}
+	var cancelledBy interface{}
+	if task.CancelledBy != nil {
+		cancelledBy = *task.CancelledBy
+	}
 
 	err := tx.QueryRow(ctx, `
 INSERT INTO tasks (
-  task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
-  status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
+  task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params,
+  feature_slug, requested_model, resolved_model, api_type,
+  status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
+  cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
   $1, $2, $3, $4,
-  $5, $6, $7, $8,
-  $9, $10, $11, $12,
-  $13, $14, $15
+  $5, $6, $7,
+  $8, $9, $10, $11,
+  $12, $13, $14, $15, $16, $17, $18, $19,
+  $20, $21, $22
 )
 RETURNING id`,
 		task.TaskID,
 		task.UserID,
-		task.ChannelID,
-		task.AccountID,
+		assignedChannelID,
+		accountID,
 		task.Prompt,
 		task.UserPrompt,
 		task.Params,
+		task.FeatureSlug,
+		task.RequestedModel,
+		task.ResolvedModel,
+		task.APIType,
 		task.Status,
 		task.LeaseToken,
 		int32(task.RetryCount),
@@ -112,6 +135,9 @@ RETURNING id`,
 		task.CreatedAt,
 		task.UpdatedAt,
 		completedAt,
+		cancelledAt,
+		cancelledBy,
+		task.CancelReason,
 	).Scan(&task.ID)
 	if err != nil {
 		return fmt.Errorf("submit task: insert task: %w", err)

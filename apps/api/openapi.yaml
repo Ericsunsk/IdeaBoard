@@ -242,13 +242,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBoardShareToken'
-  /user/boards/{board_id}/share-tokens/{token}/revoke:
+  /user/boards/{board_id}/share-tokens/{token_id}/revoke:
     post:
       tags: [Boards]
       operationId: revokeBoardShareToken
       parameters:
         - $ref: '#/components/parameters/BoardId'
-        - $ref: '#/components/parameters/ShareToken'
+        - $ref: '#/components/parameters/ShareTokenID'
       responses:
         '200':
           description: OK
@@ -942,6 +942,11 @@ paths:
     post:
       tags: [AdminStorage]
       operationId: createAdminStorageProfile
+      parameters:
+        - name: apply
+          in: query
+          required: false
+          schema: { type: boolean }
       requestBody:
         required: true
         content:
@@ -961,6 +966,10 @@ paths:
       operationId: updateAdminStorageProfile
       parameters:
         - $ref: '#/components/parameters/StorageProfileId'
+        - name: apply
+          in: query
+          required: false
+          schema: { type: boolean }
       requestBody:
         required: true
         content:
@@ -1103,7 +1112,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseFeaturePromptMap'
+                $ref: '#/components/schemas/ApiResponseFeaturePromptList'
+  /admin/feature-prompts/{slug}/revisions:
+    get:
+      tags: [AdminFeaturePrompts]
+      operationId: listAdminFeaturePromptRevisions
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseFeaturePromptRevisions'
   /admin/feature-prompts/{slug}:
     get:
       tags: [AdminFeaturePrompts]
@@ -1138,6 +1163,12 @@ paths:
               properties:
                 prompt:
                   type: string
+                enabled:
+                  type: boolean
+                variables:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FeaturePromptVariable'
       responses:
         '200':
           description: OK
@@ -1184,11 +1215,11 @@ components:
       in: path
       required: true
       schema: { type: string }
-    ShareToken:
-      name: token
+    ShareTokenID:
+      name: token_id
       in: path
       required: true
-      schema: { type: string }
+      schema: { type: integer }
     Page:
       name: page
       in: query
@@ -1261,13 +1292,25 @@ components:
 
     BoardShareTokenItem:
       type: object
-      required: [token, role, revoked, created_at, updated_at, share_url]
+      required: [id, token_prefix, role, revoked, usage_count, created_at, updated_at]
       properties:
+        id: { type: integer }
         token: { type: string }
+        token_prefix: { type: string }
         role:
           type: string
           enum: [editor, viewer]
         revoked: { type: boolean }
+        usage_count: { type: integer }
+        max_uses:
+          type: integer
+          nullable: true
+        last_used_at:
+          type: number
+          nullable: true
+        revoked_at:
+          type: number
+          nullable: true
         expires_at:
           type: number
           nullable: true
@@ -1316,10 +1359,19 @@ components:
         id: { type: integer }
         task_id: { type: string }
         user_id: { type: integer }
-        channel_id: { type: integer }
-        account_id: { type: integer }
+        assigned_channel_id:
+          type: integer
+          nullable: true
+        account_id:
+          type: integer
+          nullable: true
         prompt: { type: string }
+        user_prompt: { type: string }
         params: { type: string }
+        feature_slug: { type: string }
+        requested_model: { type: string }
+        resolved_model: { type: string }
+        api_type: { type: string }
         status: { type: string }
         retry_count: { type: integer }
         error_msg: { type: string }
@@ -1335,6 +1387,13 @@ components:
         completed_at:
           type: string
           nullable: true
+        cancelled_at:
+          type: string
+          nullable: true
+        cancelled_by:
+          type: integer
+          nullable: true
+        cancel_reason: { type: string }
 
     TaskExecutionMetrics:
       type: object
@@ -1355,13 +1414,13 @@ components:
         task_id: { type: string }
         current_stage:
           type: string
-          enum: [queued, assigned, provider, finalizing, completed, failed]
+          enum: [queued, assigned, provider, finalizing, completed, failed, cancelled]
         bottleneck_source:
           type: string
           enum: [queue, worker, provider, storage, finalize, input, unknown]
         failure_stage:
           type: string
-          enum: ['', queued, assigned, provider, finalizing, completed, failed]
+          enum: ['', queued, assigned, provider, finalizing, completed, failed, cancelled]
         failure_category:
           type: string
           enum: ['', input_invalid, auth, quota, timeout, provider_error, storage_error, finalize_error, cancelled, unknown]
@@ -1427,7 +1486,7 @@ components:
 
     AdminAccount:
       type: object
-      required: [id, name, channel_id, platform, api_type, proxy_url, model_set, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
+      required: [id, name, channel_id, platform, api_type, proxy_url, models, secret_configured, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -1435,7 +1494,11 @@ components:
         platform: { type: string }
         api_type: { type: string }
         proxy_url: { type: string }
-        model_set: { type: string }
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminAccountModel'
+        secret_configured: { type: boolean }
         max_concurrent: { type: integer }
         current_concurrent: { type: integer }
         wait_queue_count: { type: integer }
@@ -1448,16 +1511,45 @@ components:
         created_at: { type: string }
         updated_at: { type: string }
 
+    AdminAccountModel:
+      type: object
+      required: [name, enabled, weight, sort_order]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        enabled: { type: boolean }
+        weight: { type: integer }
+        max_concurrent: { type: integer }
+        feature_slugs:
+          type: array
+          items: { type: string }
+        sort_order: { type: integer }
+
+    AdminAccountModelInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        enabled: { type: boolean }
+        weight: { type: integer }
+        max_concurrent: { type: integer }
+        feature_slugs:
+          type: array
+          items: { type: string }
+
     AdminAccountCreateRequest:
       type: object
-      required: [name, channel_id, platform, api_type, api_key, model_set]
+      required: [name, channel_id, platform, api_type, secret, models]
       properties:
         name: { type: string }
         channel_id: { type: integer }
         platform: { type: string }
         api_type: { type: string }
-        api_key: { type: string }
-        model_set: { type: string }
+        secret: { type: string }
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminAccountModelInput'
         proxy_url: { type: string }
         max_concurrent: { type: integer }
         timeout: { type: integer }
@@ -1466,20 +1558,21 @@ components:
 
     AdminAccountUpdateRequest:
       type: object
-      required: [model_set]
+      required: [models]
       properties:
         name: { type: string }
-        channel_id: { type: integer }
         platform: { type: string }
         api_type: { type: string }
-        api_key: { type: string }
-        model_set: { type: string }
+        secret: { type: string }
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminAccountModelInput'
         proxy_url: { type: string }
         max_concurrent: { type: integer }
         timeout: { type: integer }
         weight: { type: integer }
         extra_config: { type: string }
-        status: { type: integer }
 
     AccountLimitRange:
       type: object
@@ -1525,12 +1618,13 @@ components:
 
     MonitorStats:
       type: object
-      required: [pending, running, completed, failed]
+      required: [pending, running, completed, failed, cancelled]
       properties:
         pending: { type: integer }
         running: { type: integer }
         completed: { type: integer }
         failed: { type: integer }
+        cancelled: { type: integer }
 
     MonitorResponse:
       type: object
@@ -1547,20 +1641,24 @@ components:
       properties:
         summary:
           type: object
-          required: [total_calls, today_calls, today_success, today_failed, yesterday_calls, yesterday_success, yesterday_failed, this_month_calls, pending, running, completed, failed]
+          required: [total_calls, today_calls, today_success, today_failed, today_cancelled, yesterday_calls, yesterday_success, yesterday_failed, yesterday_cancelled, this_month_calls, this_month_cancelled, pending, running, completed, failed, cancelled]
           properties:
             total_calls: { type: integer }
             today_calls: { type: integer }
             today_success: { type: integer }
             today_failed: { type: integer }
+            today_cancelled: { type: integer }
             yesterday_calls: { type: integer }
             yesterday_success: { type: integer }
             yesterday_failed: { type: integer }
+            yesterday_cancelled: { type: integer }
             this_month_calls: { type: integer }
+            this_month_cancelled: { type: integer }
             pending: { type: integer }
             running: { type: integer }
             completed: { type: integer }
             failed: { type: integer }
+            cancelled: { type: integer }
         trend:
           type: array
           items:
@@ -1823,10 +1921,49 @@ components:
 
     FeaturePrompt:
       type: object
-      required: [slug, prompt]
+      required: [slug, prompt, enabled, variables, schema_version]
       properties:
         slug: { type: string }
         prompt: { type: string }
+        enabled: { type: boolean }
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeaturePromptVariable'
+        schema_version: { type: integer }
+        published_at:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          nullable: true
+
+    FeaturePromptRevision:
+      type: object
+      required: [id, slug, prompt, enabled, variables, schema_version, created_at]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        prompt: { type: string }
+        enabled: { type: boolean }
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeaturePromptVariable'
+        schema_version: { type: integer }
+        published_at:
+          type: string
+          nullable: true
+        created_at: { type: string }
+
+    FeaturePromptVariable:
+      type: object
+      required: [key]
+      properties:
+        key: { type: string }
+        tone:
+          type: string
+          enum: [prompt, control, context]
 
     ApiResponseUserInfo:
       allOf:
@@ -1973,7 +2110,7 @@ components:
           properties:
             data:
               type: object
-              required: [list, total, pending_count, running_count, completed_count, failed_count, other_count]
+              required: [list, total, pending_count, running_count, completed_count, failed_count, cancelled_count, other_count]
               properties:
                 list:
                   type: array
@@ -1984,6 +2121,7 @@ components:
                 running_count: { type: integer }
                 completed_count: { type: integer }
                 failed_count: { type: integer }
+                cancelled_count: { type: integer }
                 other_count: { type: integer }
 
     ApiResponseTask:
@@ -2271,7 +2409,7 @@ components:
                 mode:
                   $ref: '#/components/schemas/LineDraftMode'
 
-    ApiResponseFeaturePromptMap:
+    ApiResponseFeaturePromptList:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
@@ -2281,9 +2419,23 @@ components:
               required: [prompts]
               properties:
                 prompts:
-                  type: object
-                  additionalProperties:
-                    type: string
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FeaturePrompt'
+
+    ApiResponseFeaturePromptRevisions:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [revisions]
+              properties:
+                revisions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FeaturePromptRevision'
 
     ApiResponseFeaturePrompt:
       allOf:

@@ -7,12 +7,21 @@
 import type { BoardShareTokenItemRole } from './boardShareTokenItemRole'
 
 export interface BoardShareTokenItem {
-  token: string
+  id: number
+  token?: string
+  token_prefix: string
   role: BoardShareTokenItemRole
   revoked: boolean
+  usage_count: number
+  /** @nullable */
+  max_uses?: number | null
+  /** @nullable */
+  last_used_at?: number | null
+  /** @nullable */
+  revoked_at?: number | null
   /** @nullable */
   expires_at?: number | null
   created_at: number
   updated_at: number
-  share_url: string
+  share_url?: string
 }

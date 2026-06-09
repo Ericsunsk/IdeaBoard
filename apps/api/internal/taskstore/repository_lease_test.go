@@ -25,13 +25,17 @@ func TestRunningTasksMissingLeaseTokenPreflightOnlyMatchesRunningMissingLeaseTok
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	account11 := seedRepositoryTestAccount(t, db, 11)
+	account22 := seedRepositoryTestAccount(t, db, 22)
+	account33 := seedRepositoryTestAccount(t, db, 33)
+	account55 := seedRepositoryTestAccount(t, db, 55)
 
 	seedTasks(t, repo, ctx,
-		&tasks.Task{TaskID: "running-missing-1", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
-		&tasks.Task{TaskID: "running-missing-2", UserID: 1, ChannelID: 1, AccountID: 22, Status: tasks.StatusRunning},
-		&tasks.Task{TaskID: "running-with-token", UserID: 1, ChannelID: 1, AccountID: 33, Status: tasks.StatusRunning, LeaseToken: "lease-token"},
-		&tasks.Task{TaskID: "pending-missing-token", UserID: 1, ChannelID: 1, AccountID: 44, Status: tasks.StatusPending},
-		&tasks.Task{TaskID: "failed-missing-token", UserID: 1, ChannelID: 1, AccountID: 55, Status: tasks.StatusFailed},
+		&tasks.Task{TaskID: "running-missing-1", UserID: 1, AccountID: tasks.IDPtr(account11), Status: tasks.StatusRunning},
+		&tasks.Task{TaskID: "running-missing-2", UserID: 1, AccountID: tasks.IDPtr(account22), Status: tasks.StatusRunning},
+		&tasks.Task{TaskID: "running-with-token", UserID: 1, AccountID: tasks.IDPtr(account33), Status: tasks.StatusRunning, LeaseToken: "lease-token"},
+		&tasks.Task{TaskID: "pending-missing-token", UserID: 1, Status: tasks.StatusPending},
+		&tasks.Task{TaskID: "failed-missing-token", UserID: 1, AccountID: tasks.IDPtr(account55), Status: tasks.StatusFailed},
 	)
 
 	count, err := repo.CountRunningTasksMissingLeaseToken(ctx)
@@ -61,9 +65,10 @@ func TestRunningTasksMissingLeaseTokenPreflightDoesNotMutate(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 11)
 
 	seedTasks(t, repo, ctx,
-		&tasks.Task{TaskID: "running-missing-token", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
+		&tasks.Task{TaskID: "running-missing-token", UserID: 1, AccountID: tasks.IDPtr(accountID), Status: tasks.StatusRunning},
 	)
 
 	if _, err := repo.CountRunningTasksMissingLeaseToken(ctx); err != nil {
@@ -77,8 +82,8 @@ func TestRunningTasksMissingLeaseTokenPreflightDoesNotMutate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load task failed: %v", err)
 	}
-	if task.Status != tasks.StatusRunning || task.AccountID != 11 || task.LeaseToken != "" {
-		t.Fatalf("task mutated by preflight: status=%q account_id=%d lease_token=%q", task.Status, task.AccountID, task.LeaseToken)
+	if task.Status != tasks.StatusRunning || tasks.IDValue(task.AccountID) != accountID || task.LeaseToken != "" {
+		t.Fatalf("task mutated by preflight: status=%q account_id=%d lease_token=%q", task.Status, tasks.IDValue(task.AccountID), task.LeaseToken)
 	}
 }
 
@@ -86,12 +91,15 @@ func TestResetRunningTasksMissingLeaseTokenToPendingRepairsOnlyTargets(t *testin
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	account11 := seedRepositoryTestAccount(t, db, 11)
+	account22 := seedRepositoryTestAccount(t, db, 22)
+	account33 := seedRepositoryTestAccount(t, db, 33)
 
 	seedTasks(t, repo, ctx,
-		&tasks.Task{TaskID: "running-missing-1", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
-		&tasks.Task{TaskID: "running-missing-2", UserID: 1, ChannelID: 1, AccountID: 22, Status: tasks.StatusRunning},
-		&tasks.Task{TaskID: "running-with-token", UserID: 1, ChannelID: 1, AccountID: 33, Status: tasks.StatusRunning, LeaseToken: "lease-token"},
-		&tasks.Task{TaskID: "pending-missing-token", UserID: 1, ChannelID: 1, AccountID: 44, Status: tasks.StatusPending},
+		&tasks.Task{TaskID: "running-missing-1", UserID: 1, AccountID: tasks.IDPtr(account11), Status: tasks.StatusRunning},
+		&tasks.Task{TaskID: "running-missing-2", UserID: 1, AccountID: tasks.IDPtr(account22), Status: tasks.StatusRunning},
+		&tasks.Task{TaskID: "running-with-token", UserID: 1, AccountID: tasks.IDPtr(account33), Status: tasks.StatusRunning, LeaseToken: "lease-token"},
+		&tasks.Task{TaskID: "pending-missing-token", UserID: 1, Status: tasks.StatusPending},
 	)
 
 	rows, err := repo.ResetRunningTasksMissingLeaseTokenToPending(ctx, 10)
@@ -107,17 +115,19 @@ func TestResetRunningTasksMissingLeaseTokenToPendingRepairsOnlyTargets(t *testin
 	assertTaskRepairNote(t, repo, ctx, "running-missing-1")
 	assertTaskRepairNote(t, repo, ctx, "running-missing-2")
 	assertTaskState(t, repo, ctx, "running-with-token", tasks.StatusRunning, 33, "lease-token")
-	assertTaskState(t, repo, ctx, "pending-missing-token", tasks.StatusPending, 44, "")
+	assertTaskState(t, repo, ctx, "pending-missing-token", tasks.StatusPending, 0, "")
 }
 
 func TestResetRunningTasksMissingLeaseTokenToPendingHonorsLimit(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	account11 := seedRepositoryTestAccount(t, db, 11)
+	account22 := seedRepositoryTestAccount(t, db, 22)
 
 	seedTasks(t, repo, ctx,
-		&tasks.Task{TaskID: "running-missing-1", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
-		&tasks.Task{TaskID: "running-missing-2", UserID: 1, ChannelID: 1, AccountID: 22, Status: tasks.StatusRunning},
+		&tasks.Task{TaskID: "running-missing-1", UserID: 1, AccountID: tasks.IDPtr(account11), Status: tasks.StatusRunning},
+		&tasks.Task{TaskID: "running-missing-2", UserID: 1, AccountID: tasks.IDPtr(account22), Status: tasks.StatusRunning},
 	)
 
 	rows, err := repo.ResetRunningTasksMissingLeaseTokenToPending(ctx, 1)
@@ -145,9 +155,10 @@ func TestResetRunningTasksMissingLeaseTokenToPendingRequiresPositiveLimit(t *tes
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 11)
 
 	seedTasks(t, repo, ctx,
-		&tasks.Task{TaskID: "running-missing-token", UserID: 1, ChannelID: 1, AccountID: 11, Status: tasks.StatusRunning},
+		&tasks.Task{TaskID: "running-missing-token", UserID: 1, AccountID: tasks.IDPtr(accountID), Status: tasks.StatusRunning},
 	)
 
 	rows, err := repo.ResetRunningTasksMissingLeaseTokenToPending(ctx, 0)
@@ -163,6 +174,9 @@ func TestResetRunningTasksMissingLeaseTokenToPendingRequiresPositiveLimit(t *tes
 func seedTasks(t *testing.T, repo *Repository, ctx context.Context, items ...*tasks.Task) {
 	t.Helper()
 	for _, item := range items {
+		if item.AccountID != nil && item.AssignedChannelID == nil {
+			item.AssignedChannelID = tasks.IDPtr(tasks.IDValue(item.AccountID) + 10000)
+		}
 		if err := repo.Create(ctx, item); err != nil {
 			t.Fatalf("seed task %q failed: %v", item.TaskID, err)
 		}
@@ -175,9 +189,9 @@ func assertTaskState(t *testing.T, repo *Repository, ctx context.Context, taskID
 	if err != nil {
 		t.Fatalf("load task %q failed: %v", taskID, err)
 	}
-	if task.Status != status || task.AccountID != accountID || task.LeaseToken != leaseToken {
+	if task.Status != status || tasks.IDValue(task.AccountID) != accountID || task.LeaseToken != leaseToken {
 		t.Fatalf("task %q state = status=%q account_id=%d lease_token=%q, want status=%q account_id=%d lease_token=%q",
-			taskID, task.Status, task.AccountID, task.LeaseToken, status, accountID, leaseToken)
+			taskID, task.Status, tasks.IDValue(task.AccountID), task.LeaseToken, status, accountID, leaseToken)
 	}
 }
 

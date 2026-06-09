@@ -7,14 +7,35 @@ package dbsqlc
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"time"
 
 	"github.com/lib/pq"
 )
 
+const archiveAccount = `-- name: ArchiveAccount :execrows
+UPDATE api_accounts
+SET status = 0,
+    fail_count = 0,
+    deleted_at = COALESCE(deleted_at, now())
+WHERE id = $1
+  AND deleted_at IS NULL
+`
+
+func (q *Queries) ArchiveAccount(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, archiveAccount, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const countAccounts = `-- name: CountAccounts :one
 SELECT COUNT(*)
 FROM api_accounts
-WHERE (NOT $1::boolean OR name ILIKE $2 OR platform ILIKE $2 OR api_type ILIKE $2)
+WHERE deleted_at IS NULL
+  AND (NOT $1::boolean OR name ILIKE $2 OR platform ILIKE $2 OR api_type ILIKE $2)
   AND (NOT $3::boolean OR platform = $4)
 `
 
@@ -39,13 +60,13 @@ func (q *Queries) CountAccounts(ctx context.Context, arg CountAccountsParams) (i
 
 const createAccount = `-- name: CreateAccount :one
 INSERT INTO api_accounts (
-  name, channel_id, platform, api_type, model_set, api_key, proxy_url,
+  name, channel_id, platform, api_type, proxy_url,
   max_concurrent, timeout, extra_config, status, fail_count, weight
 ) VALUES (
   $1, $2, $3, $4,
-  $5, $6, $7,
-  $8, $9, $10,
-  $11, $12, $13
+  $5,
+  $6, $7, $8,
+  $9, $10, $11
 )
 RETURNING id
 `
@@ -55,8 +76,6 @@ type CreateAccountParams struct {
 	ChannelID     int64  `json:"channel_id"`
 	Platform      string `json:"platform"`
 	ApiType       string `json:"api_type"`
-	ModelSet      string `json:"model_set"`
-	ApiKey        string `json:"api_key"`
 	ProxyUrl      string `json:"proxy_url"`
 	MaxConcurrent int32  `json:"max_concurrent"`
 	Timeout       int32  `json:"timeout"`
@@ -72,8 +91,6 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (i
 		arg.ChannelID,
 		arg.Platform,
 		arg.ApiType,
-		arg.ModelSet,
-		arg.ApiKey,
 		arg.ProxyUrl,
 		arg.MaxConcurrent,
 		arg.Timeout,
@@ -87,35 +104,130 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (i
 	return id, err
 }
 
-const deleteAccount = `-- name: DeleteAccount :exec
-DELETE FROM api_accounts
-WHERE id = $1
+const createAccountSecret = `-- name: CreateAccountSecret :one
+INSERT INTO api_account_secrets (
+  account_id, secret_material_kind, secret_ref, secret_payload, key_version, fingerprint, status, rotated_at, expires_at
+) SELECT
+  $1, $2, $3, $4,
+  $5, $6, $7, now(), $8
+WHERE EXISTS (
+  SELECT 1 FROM api_accounts
+  WHERE id = $1
+    AND deleted_at IS NULL
+)
+RETURNING id
 `
 
-func (q *Queries) DeleteAccount(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteAccount, id)
+type CreateAccountSecretParams struct {
+	AccountID          int64        `json:"account_id"`
+	SecretMaterialKind string       `json:"secret_material_kind"`
+	SecretRef          string       `json:"secret_ref"`
+	SecretPayload      string       `json:"secret_payload"`
+	KeyVersion         string       `json:"key_version"`
+	Fingerprint        string       `json:"fingerprint"`
+	Status             string       `json:"status"`
+	ExpiresAt          sql.NullTime `json:"expires_at"`
+}
+
+func (q *Queries) CreateAccountSecret(ctx context.Context, arg CreateAccountSecretParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, createAccountSecret,
+		arg.AccountID,
+		arg.SecretMaterialKind,
+		arg.SecretRef,
+		arg.SecretPayload,
+		arg.KeyVersion,
+		arg.Fingerprint,
+		arg.Status,
+		arg.ExpiresAt,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const deleteAccountModel = `-- name: DeleteAccountModel :execrows
+DELETE FROM api_account_models
+WHERE account_id = $1
+  AND lower(model_name) = lower($2)
+  AND EXISTS (
+    SELECT 1 FROM api_accounts
+    WHERE id = $1
+      AND deleted_at IS NULL
+  )
+`
+
+type DeleteAccountModelParams struct {
+	AccountID int64  `json:"account_id"`
+	ModelName string `json:"model_name"`
+}
+
+func (q *Queries) DeleteAccountModel(ctx context.Context, arg DeleteAccountModelParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAccountModel, arg.AccountID, arg.ModelName)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteAccountModelsByAccountID = `-- name: DeleteAccountModelsByAccountID :exec
+DELETE FROM api_account_models
+WHERE account_id = $1
+  AND EXISTS (
+    SELECT 1 FROM api_accounts
+    WHERE id = $1
+      AND deleted_at IS NULL
+  )
+`
+
+func (q *Queries) DeleteAccountModelsByAccountID(ctx context.Context, accountID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteAccountModelsByAccountID, accountID)
 	return err
 }
 
 const getAccountByID = `-- name: GetAccountByID :one
-SELECT id, name, channel_id, platform, api_type, model_set, api_key, proxy_url,
-       max_concurrent, timeout, extra_config, status, fail_count, weight,
-       created_at, updated_at
-FROM api_accounts
-WHERE id = $1
+SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+       ''::text AS api_key,
+       EXISTS (
+         SELECT 1 FROM api_account_secrets AS active_secret
+         WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
+       ) AS secret_configured,
+       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       a.fail_count, a.weight, a.created_at, a.updated_at
+FROM api_accounts AS a
+WHERE a.id = $1
+  AND a.deleted_at IS NULL
 `
 
-func (q *Queries) GetAccountByID(ctx context.Context, id int64) (ApiAccount, error) {
+type GetAccountByIDRow struct {
+	ID               int64     `json:"id"`
+	Name             string    `json:"name"`
+	ChannelID        int64     `json:"channel_id"`
+	Platform         string    `json:"platform"`
+	ApiType          string    `json:"api_type"`
+	ApiKey           string    `json:"api_key"`
+	SecretConfigured bool      `json:"secret_configured"`
+	ProxyUrl         string    `json:"proxy_url"`
+	MaxConcurrent    int32     `json:"max_concurrent"`
+	Timeout          int32     `json:"timeout"`
+	ExtraConfig      string    `json:"extra_config"`
+	Status           int16     `json:"status"`
+	FailCount        int32     `json:"fail_count"`
+	Weight           int32     `json:"weight"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetAccountByID(ctx context.Context, id int64) (GetAccountByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getAccountByID, id)
-	var i ApiAccount
+	var i GetAccountByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.ChannelID,
 		&i.Platform,
 		&i.ApiType,
-		&i.ModelSet,
 		&i.ApiKey,
+		&i.SecretConfigured,
 		&i.ProxyUrl,
 		&i.MaxConcurrent,
 		&i.Timeout,
@@ -129,33 +241,136 @@ func (q *Queries) GetAccountByID(ctx context.Context, id int64) (ApiAccount, err
 	return i, err
 }
 
-const getAccountModelSetByID = `-- name: GetAccountModelSetByID :one
-SELECT model_set
-FROM api_accounts
-WHERE id = $1
+const getActiveAccountSecretByAccountID = `-- name: GetActiveAccountSecretByAccountID :one
+SELECT id, account_id, secret_material_kind, secret_ref, secret_payload, key_version, fingerprint,
+       status, rotated_at, expires_at, retired_at, created_at, updated_at
+FROM api_account_secrets
+WHERE account_id = $1
+  AND status = 'active'
+ORDER BY rotated_at DESC, id DESC
+LIMIT 1
 `
 
-func (q *Queries) GetAccountModelSetByID(ctx context.Context, id int64) (string, error) {
-	row := q.db.QueryRowContext(ctx, getAccountModelSetByID, id)
-	var model_set string
-	err := row.Scan(&model_set)
-	return model_set, err
+func (q *Queries) GetActiveAccountSecretByAccountID(ctx context.Context, accountID int64) (ApiAccountSecret, error) {
+	row := q.db.QueryRowContext(ctx, getActiveAccountSecretByAccountID, accountID)
+	var i ApiAccountSecret
+	err := row.Scan(
+		&i.ID,
+		&i.AccountID,
+		&i.SecretMaterialKind,
+		&i.SecretRef,
+		&i.SecretPayload,
+		&i.KeyVersion,
+		&i.Fingerprint,
+		&i.Status,
+		&i.RotatedAt,
+		&i.ExpiresAt,
+		&i.RetiredAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
-const incrementAccountFailCount = `-- name: IncrementAccountFailCount :exec
+const getRuntimeAccountByIDWithSecret = `-- name: GetRuntimeAccountByIDWithSecret :one
+SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+       secret.secret_payload::text AS api_key,
+       TRUE::boolean AS secret_configured,
+       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       a.fail_count, a.weight, a.created_at, a.updated_at
+FROM api_accounts AS a
+INNER JOIN LATERAL (
+  SELECT secret_payload
+  FROM api_account_secrets
+  WHERE account_id = a.id
+    AND status = 'active'
+    AND btrim(secret_payload) <> ''
+  ORDER BY rotated_at DESC, id DESC
+  LIMIT 1
+) AS secret ON TRUE
+WHERE a.id = $1
+  AND a.status = 1
+  AND a.deleted_at IS NULL
+`
+
+type GetRuntimeAccountByIDWithSecretRow struct {
+	ID               int64     `json:"id"`
+	Name             string    `json:"name"`
+	ChannelID        int64     `json:"channel_id"`
+	Platform         string    `json:"platform"`
+	ApiType          string    `json:"api_type"`
+	ApiKey           string    `json:"api_key"`
+	SecretConfigured bool      `json:"secret_configured"`
+	ProxyUrl         string    `json:"proxy_url"`
+	MaxConcurrent    int32     `json:"max_concurrent"`
+	Timeout          int32     `json:"timeout"`
+	ExtraConfig      string    `json:"extra_config"`
+	Status           int16     `json:"status"`
+	FailCount        int32     `json:"fail_count"`
+	Weight           int32     `json:"weight"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error) {
+	row := q.db.QueryRowContext(ctx, getRuntimeAccountByIDWithSecret, id)
+	var i GetRuntimeAccountByIDWithSecretRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.ChannelID,
+		&i.Platform,
+		&i.ApiType,
+		&i.ApiKey,
+		&i.SecretConfigured,
+		&i.ProxyUrl,
+		&i.MaxConcurrent,
+		&i.Timeout,
+		&i.ExtraConfig,
+		&i.Status,
+		&i.FailCount,
+		&i.Weight,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getSingleEnabledModelByAccountID = `-- name: GetSingleEnabledModelByAccountID :one
+SELECT (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
+FROM api_account_models AS m
+INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.deleted_at IS NULL
+WHERE m.account_id = $1
+  AND m.enabled = TRUE
+HAVING COUNT(*) = 1
+`
+
+func (q *Queries) GetSingleEnabledModelByAccountID(ctx context.Context, id int64) (string, error) {
+	row := q.db.QueryRowContext(ctx, getSingleEnabledModelByAccountID, id)
+	var model_name string
+	err := row.Scan(&model_name)
+	return model_name, err
+}
+
+const incrementAccountFailCount = `-- name: IncrementAccountFailCount :execrows
 UPDATE api_accounts
 SET fail_count = fail_count + 1
 WHERE id = $1
+  AND deleted_at IS NULL
 `
 
-func (q *Queries) IncrementAccountFailCount(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, incrementAccountFailCount, id)
-	return err
+func (q *Queries) IncrementAccountFailCount(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, incrementAccountFailCount, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const listAccountIDs = `-- name: ListAccountIDs :many
 SELECT id
 FROM api_accounts
+WHERE deleted_at IS NULL
 ORDER BY id ASC
 `
 
@@ -182,28 +397,89 @@ func (q *Queries) ListAccountIDs(ctx context.Context) ([]int64, error) {
 	return items, nil
 }
 
-const listAccountModelSetsByIDs = `-- name: ListAccountModelSetsByIDs :many
-SELECT id, model_set
-FROM api_accounts
-WHERE id = ANY($1::bigint[])
-ORDER BY id ASC
+const listAccountModelsByAccountID = `-- name: ListAccountModelsByAccountID :many
+SELECT id, account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order, created_at, updated_at
+FROM api_account_models AS m
+WHERE m.account_id = $1
+  AND EXISTS (
+    SELECT 1
+    FROM api_accounts AS a
+    WHERE a.id = m.account_id
+      AND a.deleted_at IS NULL
+  )
+ORDER BY m.sort_order ASC, m.id ASC
 `
 
-type ListAccountModelSetsByIDsRow struct {
-	ID       int64  `json:"id"`
-	ModelSet string `json:"model_set"`
-}
-
-func (q *Queries) ListAccountModelSetsByIDs(ctx context.Context, ids []int64) ([]ListAccountModelSetsByIDsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listAccountModelSetsByIDs, pq.Array(ids))
+func (q *Queries) ListAccountModelsByAccountID(ctx context.Context, accountID int64) ([]ApiAccountModel, error) {
+	rows, err := q.db.QueryContext(ctx, listAccountModelsByAccountID, accountID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListAccountModelSetsByIDsRow
+	var items []ApiAccountModel
 	for rows.Next() {
-		var i ListAccountModelSetsByIDsRow
-		if err := rows.Scan(&i.ID, &i.ModelSet); err != nil {
+		var i ApiAccountModel
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccountID,
+			&i.ModelName,
+			&i.Enabled,
+			&i.Weight,
+			&i.MaxConcurrent,
+			&i.FeatureSlugs,
+			&i.Metadata,
+			&i.SortOrder,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAccountModelsByAccountIDs = `-- name: ListAccountModelsByAccountIDs :many
+SELECT id, account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order, created_at, updated_at
+FROM api_account_models AS m
+WHERE m.account_id = ANY($1::bigint[])
+  AND EXISTS (
+    SELECT 1
+    FROM api_accounts AS a
+    WHERE a.id = m.account_id
+      AND a.deleted_at IS NULL
+  )
+ORDER BY m.account_id ASC, m.sort_order ASC, m.id ASC
+`
+
+func (q *Queries) ListAccountModelsByAccountIDs(ctx context.Context, accountIds []int64) ([]ApiAccountModel, error) {
+	rows, err := q.db.QueryContext(ctx, listAccountModelsByAccountIDs, pq.Array(accountIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ApiAccountModel
+	for rows.Next() {
+		var i ApiAccountModel
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccountID,
+			&i.ModelName,
+			&i.Enabled,
+			&i.Weight,
+			&i.MaxConcurrent,
+			&i.FeatureSlugs,
+			&i.Metadata,
+			&i.SortOrder,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -218,13 +494,19 @@ func (q *Queries) ListAccountModelSetsByIDs(ctx context.Context, ids []int64) ([
 }
 
 const listAccounts = `-- name: ListAccounts :many
-SELECT id, name, channel_id, platform, api_type, model_set, api_key, proxy_url,
-       max_concurrent, timeout, extra_config, status, fail_count, weight,
-       created_at, updated_at
-FROM api_accounts
-WHERE (NOT $1::boolean OR name ILIKE $2 OR platform ILIKE $2 OR api_type ILIKE $2)
-  AND (NOT $3::boolean OR platform = $4)
-ORDER BY id DESC
+SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+       ''::text AS api_key,
+       EXISTS (
+         SELECT 1 FROM api_account_secrets AS active_secret
+         WHERE active_secret.account_id = a.id AND active_secret.status = 'active'
+       ) AS secret_configured,
+       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       a.fail_count, a.weight, a.created_at, a.updated_at
+FROM api_accounts AS a
+WHERE a.deleted_at IS NULL
+  AND (NOT $1::boolean OR a.name ILIKE $2 OR a.platform ILIKE $2 OR a.api_type ILIKE $2)
+  AND (NOT $3::boolean OR a.platform = $4)
+ORDER BY a.id DESC
 LIMIT $6 OFFSET $5
 `
 
@@ -237,7 +519,26 @@ type ListAccountsParams struct {
 	PageLimit   int32  `json:"page_limit"`
 }
 
-func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ApiAccount, error) {
+type ListAccountsRow struct {
+	ID               int64     `json:"id"`
+	Name             string    `json:"name"`
+	ChannelID        int64     `json:"channel_id"`
+	Platform         string    `json:"platform"`
+	ApiType          string    `json:"api_type"`
+	ApiKey           string    `json:"api_key"`
+	SecretConfigured bool      `json:"secret_configured"`
+	ProxyUrl         string    `json:"proxy_url"`
+	MaxConcurrent    int32     `json:"max_concurrent"`
+	Timeout          int32     `json:"timeout"`
+	ExtraConfig      string    `json:"extra_config"`
+	Status           int16     `json:"status"`
+	FailCount        int32     `json:"fail_count"`
+	Weight           int32     `json:"weight"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAccounts,
 		arg.HasKeyword,
 		arg.KeywordLike,
@@ -250,17 +551,17 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]A
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ApiAccount
+	var items []ListAccountsRow
 	for rows.Next() {
-		var i ApiAccount
+		var i ListAccountsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
 			&i.ChannelID,
 			&i.Platform,
 			&i.ApiType,
-			&i.ModelSet,
 			&i.ApiKey,
+			&i.SecretConfigured,
 			&i.ProxyUrl,
 			&i.MaxConcurrent,
 			&i.Timeout,
@@ -285,31 +586,60 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]A
 }
 
 const listEnabledAccounts = `-- name: ListEnabledAccounts :many
-SELECT id, name, channel_id, platform, api_type, model_set, api_key, proxy_url,
-       max_concurrent, timeout, extra_config, status, fail_count, weight,
-       created_at, updated_at
-FROM api_accounts
-WHERE status = 1
-ORDER BY id ASC
+SELECT a.id, a.name, a.channel_id, a.platform, a.api_type,
+       ''::text AS api_key,
+       TRUE::boolean AS secret_configured,
+       a.proxy_url, a.max_concurrent, a.timeout, a.extra_config, a.status,
+       a.fail_count, a.weight, a.created_at, a.updated_at
+FROM api_accounts AS a
+WHERE a.status = 1
+  AND a.deleted_at IS NULL
+  AND EXISTS (
+    SELECT 1
+    FROM api_account_secrets AS active_secret
+    WHERE active_secret.account_id = a.id
+      AND active_secret.status = 'active'
+      AND btrim(active_secret.secret_payload) <> ''
+  )
+ORDER BY a.id ASC
 `
 
-func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ApiAccount, error) {
+type ListEnabledAccountsRow struct {
+	ID               int64     `json:"id"`
+	Name             string    `json:"name"`
+	ChannelID        int64     `json:"channel_id"`
+	Platform         string    `json:"platform"`
+	ApiType          string    `json:"api_type"`
+	ApiKey           string    `json:"api_key"`
+	SecretConfigured bool      `json:"secret_configured"`
+	ProxyUrl         string    `json:"proxy_url"`
+	MaxConcurrent    int32     `json:"max_concurrent"`
+	Timeout          int32     `json:"timeout"`
+	ExtraConfig      string    `json:"extra_config"`
+	Status           int16     `json:"status"`
+	FailCount        int32     `json:"fail_count"`
+	Weight           int32     `json:"weight"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listEnabledAccounts)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ApiAccount
+	var items []ListEnabledAccountsRow
 	for rows.Next() {
-		var i ApiAccount
+		var i ListEnabledAccountsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
 			&i.ChannelID,
 			&i.Platform,
 			&i.ApiType,
-			&i.ModelSet,
 			&i.ApiKey,
+			&i.SecretConfigured,
 			&i.ProxyUrl,
 			&i.MaxConcurrent,
 			&i.Timeout,
@@ -333,76 +663,173 @@ func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ApiAccount, error)
 	return items, nil
 }
 
-const resetAccountFailCount = `-- name: ResetAccountFailCount :exec
+const listSingleEnabledModelsByAccountIDs = `-- name: ListSingleEnabledModelsByAccountIDs :many
+SELECT
+  m.account_id AS id,
+  (array_agg(m.model_name ORDER BY m.sort_order, m.id))[1]::text AS model_name
+FROM api_account_models AS m
+INNER JOIN api_accounts AS a ON a.id = m.account_id AND a.deleted_at IS NULL
+WHERE m.account_id = ANY($1::bigint[])
+  AND m.enabled = TRUE
+GROUP BY m.account_id
+HAVING COUNT(*) = 1
+ORDER BY m.account_id ASC
+`
+
+type ListSingleEnabledModelsByAccountIDsRow struct {
+	ID        int64  `json:"id"`
+	ModelName string `json:"model_name"`
+}
+
+func (q *Queries) ListSingleEnabledModelsByAccountIDs(ctx context.Context, ids []int64) ([]ListSingleEnabledModelsByAccountIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSingleEnabledModelsByAccountIDs, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSingleEnabledModelsByAccountIDsRow
+	for rows.Next() {
+		var i ListSingleEnabledModelsByAccountIDsRow
+		if err := rows.Scan(&i.ID, &i.ModelName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resetAccountFailCount = `-- name: ResetAccountFailCount :execrows
 UPDATE api_accounts
 SET fail_count = 0
 WHERE id = $1
+  AND deleted_at IS NULL
 `
 
-func (q *Queries) ResetAccountFailCount(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, resetAccountFailCount, id)
+func (q *Queries) ResetAccountFailCount(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, resetAccountFailCount, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const retireActiveAccountSecrets = `-- name: RetireActiveAccountSecrets :exec
+UPDATE api_account_secrets
+SET status = 'retired',
+    retired_at = now()
+WHERE account_id = $1
+  AND status = 'active'
+  AND EXISTS (
+    SELECT 1 FROM api_accounts
+    WHERE id = $1
+      AND deleted_at IS NULL
+  )
+`
+
+func (q *Queries) RetireActiveAccountSecrets(ctx context.Context, accountID int64) error {
+	_, err := q.db.ExecContext(ctx, retireActiveAccountSecrets, accountID)
 	return err
 }
 
-const updateAccount = `-- name: UpdateAccount :exec
+const revokeAccountSecretsForArchive = `-- name: RevokeAccountSecretsForArchive :exec
+UPDATE api_account_secrets
+SET status = 'revoked',
+    secret_ref = '',
+    secret_payload = '',
+    retired_at = COALESCE(retired_at, now())
+WHERE account_id = $1
+  AND status = 'active'
+`
+
+func (q *Queries) RevokeAccountSecretsForArchive(ctx context.Context, accountID int64) error {
+	_, err := q.db.ExecContext(ctx, revokeAccountSecretsForArchive, accountID)
+	return err
+}
+
+const updateAccount = `-- name: UpdateAccount :execrows
 UPDATE api_accounts
 SET name = $1,
-    channel_id = $2,
-    platform = $3,
-    api_type = $4,
-    model_set = $5,
-    api_key = $6,
-    proxy_url = $7,
-    max_concurrent = $8,
-    timeout = $9,
-    extra_config = $10,
-    status = $11,
-    fail_count = $12,
-    weight = $13
-WHERE id = $14
+    platform = $2,
+    api_type = $3,
+    proxy_url = $4,
+    max_concurrent = $5,
+    timeout = $6,
+    extra_config = $7,
+    fail_count = $8,
+    weight = $9
+WHERE id = $10
+  AND deleted_at IS NULL
 `
 
 type UpdateAccountParams struct {
 	Name          string `json:"name"`
-	ChannelID     int64  `json:"channel_id"`
 	Platform      string `json:"platform"`
 	ApiType       string `json:"api_type"`
-	ModelSet      string `json:"model_set"`
-	ApiKey        string `json:"api_key"`
 	ProxyUrl      string `json:"proxy_url"`
 	MaxConcurrent int32  `json:"max_concurrent"`
 	Timeout       int32  `json:"timeout"`
 	ExtraConfig   string `json:"extra_config"`
-	Status        int16  `json:"status"`
 	FailCount     int32  `json:"fail_count"`
 	Weight        int32  `json:"weight"`
 	ID            int64  `json:"id"`
 }
 
-func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) error {
-	_, err := q.db.ExecContext(ctx, updateAccount,
+func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateAccount,
 		arg.Name,
-		arg.ChannelID,
 		arg.Platform,
 		arg.ApiType,
-		arg.ModelSet,
-		arg.ApiKey,
 		arg.ProxyUrl,
 		arg.MaxConcurrent,
 		arg.Timeout,
 		arg.ExtraConfig,
-		arg.Status,
 		arg.FailCount,
 		arg.Weight,
 		arg.ID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateAccountStatus = `-- name: UpdateAccountStatus :exec
+const updateAccountModelEnabled = `-- name: UpdateAccountModelEnabled :execrows
+UPDATE api_account_models
+SET enabled = $1
+WHERE account_id = $2
+  AND lower(model_name) = lower($3)
+  AND EXISTS (
+    SELECT 1 FROM api_accounts
+    WHERE id = $2
+      AND deleted_at IS NULL
+  )
+`
+
+type UpdateAccountModelEnabledParams struct {
+	Enabled   bool   `json:"enabled"`
+	AccountID int64  `json:"account_id"`
+	ModelName string `json:"model_name"`
+}
+
+func (q *Queries) UpdateAccountModelEnabled(ctx context.Context, arg UpdateAccountModelEnabledParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateAccountModelEnabled, arg.Enabled, arg.AccountID, arg.ModelName)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateAccountStatus = `-- name: UpdateAccountStatus :execrows
 UPDATE api_accounts
 SET status = $1
 WHERE id = $2
+  AND deleted_at IS NULL
 `
 
 type UpdateAccountStatusParams struct {
@@ -410,7 +837,59 @@ type UpdateAccountStatusParams struct {
 	ID     int64 `json:"id"`
 }
 
-func (q *Queries) UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) error {
-	_, err := q.db.ExecContext(ctx, updateAccountStatus, arg.Status, arg.ID)
-	return err
+func (q *Queries) UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateAccountStatus, arg.Status, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const upsertAccountModel = `-- name: UpsertAccountModel :one
+INSERT INTO api_account_models (
+  account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order
+) SELECT
+  $1, $2, $3, $4,
+  $5, $6::jsonb, $7::jsonb,
+  $8
+WHERE EXISTS (
+  SELECT 1 FROM api_accounts
+  WHERE id = $1
+    AND deleted_at IS NULL
+)
+ON CONFLICT (account_id, lower(model_name)) DO UPDATE
+SET enabled = EXCLUDED.enabled,
+    weight = EXCLUDED.weight,
+    max_concurrent = EXCLUDED.max_concurrent,
+    feature_slugs = EXCLUDED.feature_slugs,
+    metadata = EXCLUDED.metadata,
+    sort_order = EXCLUDED.sort_order
+RETURNING id
+`
+
+type UpsertAccountModelParams struct {
+	AccountID     int64           `json:"account_id"`
+	ModelName     string          `json:"model_name"`
+	Enabled       bool            `json:"enabled"`
+	Weight        int32           `json:"weight"`
+	MaxConcurrent sql.NullInt32   `json:"max_concurrent"`
+	FeatureSlugs  json.RawMessage `json:"feature_slugs"`
+	Metadata      json.RawMessage `json:"metadata"`
+	SortOrder     int32           `json:"sort_order"`
+}
+
+func (q *Queries) UpsertAccountModel(ctx context.Context, arg UpsertAccountModelParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, upsertAccountModel,
+		arg.AccountID,
+		arg.ModelName,
+		arg.Enabled,
+		arg.Weight,
+		arg.MaxConcurrent,
+		arg.FeatureSlugs,
+		arg.Metadata,
+		arg.SortOrder,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }

@@ -4,8 +4,16 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { FeaturePromptVariable } from './featurePromptVariable'
 
 export interface FeaturePrompt {
   slug: string
   prompt: string
+  enabled: boolean
+  variables: FeaturePromptVariable[]
+  schema_version: number
+  /** @nullable */
+  published_at?: string | null
+  /** @nullable */
+  updated_at?: string | null
 }

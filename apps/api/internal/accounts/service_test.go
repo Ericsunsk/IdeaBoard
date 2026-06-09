@@ -59,6 +59,21 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 	}
 }
 
+func TestNormalizeAccountModelInputsRejectsInvalidFeatureSlug(t *testing.T) {
+	enabled := true
+	_, err := normalizeAccountModelInputs([]AccountModelInput{{
+		Name:         "gpt-image-1",
+		Enabled:      &enabled,
+		FeatureSlugs: []string{"style-fusion", "style fusion"},
+	}})
+	if err == nil {
+		t.Fatal("expected invalid feature slug error")
+	}
+	if !strings.Contains(err.Error(), "feature_slug") {
+		t.Fatalf("error=%q, want feature slug validation context", err.Error())
+	}
+}
+
 func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	params := map[string]interface{}{
 		"upscale_mode": "enhancement",

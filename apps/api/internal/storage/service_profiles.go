@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -33,11 +32,19 @@ func (s *StorageService) GetProfile(ctx context.Context, id string) (*StoragePro
 }
 
 func (s *StorageService) SaveProfile(ctx context.Context, profile *StorageProfile) (*StorageProfile, error) {
+	return s.saveProfile(ctx, profile, false)
+}
+
+func (s *StorageService) SaveAndApplyProfile(ctx context.Context, profile *StorageProfile) (*StorageProfile, error) {
+	return s.saveProfile(ctx, profile, true)
+}
+
+func (s *StorageService) saveProfile(ctx context.Context, profile *StorageProfile, apply bool) (*StorageProfile, error) {
 	if profile == nil {
 		return nil, fmt.Errorf("存储配置不能为空")
 	}
 
-	profiles, err := s.loadProfiles(ctx)
+	profiles, err := s.loadProfilesWithSecrets(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -76,18 +83,32 @@ func (s *StorageService) SaveProfile(ctx context.Context, profile *StorageProfil
 	}
 
 	next := s.normalizeProfile(*existing, *profile)
+	if apply {
+		next.IsCurrent = true
+	}
 	if err := s.validateProfile(next); err != nil {
 		return nil, err
 	}
-
-	if existingIndex >= 0 {
-		profiles[existingIndex] = next
-	} else {
-		profiles = append(profiles, next)
+	if next.IsCurrent && !next.Enabled {
+		return nil, fmt.Errorf("当前存储不允许停用")
+	}
+	if apply {
+		if err := s.ensureProfileReadyForRuntime(next); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := s.persistProfiles(ctx, profiles); err != nil {
-		return nil, err
+	if existingIndex < 0 && next.IsCurrent && !apply {
+		next.IsCurrent = false
+	}
+	if apply {
+		if err := s.profileRepo.SaveAndApplyProfile(ctx, next); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.profileRepo.SaveProfile(ctx, next); err != nil {
+			return nil, err
+		}
 	}
 
 	masked := s.maskProfile(next)
@@ -95,16 +116,14 @@ func (s *StorageService) SaveProfile(ctx context.Context, profile *StorageProfil
 }
 
 func (s *StorageService) DeleteProfile(ctx context.Context, id string) error {
+	id = strings.TrimSpace(id)
 	profiles, err := s.loadProfiles(ctx)
 	if err != nil {
 		return err
 	}
 
-	next := make([]StorageProfile, 0, len(profiles))
-	removed := false
 	for _, profile := range profiles {
 		if profile.ID != id {
-			next = append(next, profile)
 			continue
 		}
 		if profile.Builtin {
@@ -113,16 +132,14 @@ func (s *StorageService) DeleteProfile(ctx context.Context, id string) error {
 		if profile.IsCurrent {
 			return fmt.Errorf("当前存储不允许删除")
 		}
-		removed = true
+		return s.profileRepo.DeleteProfile(ctx, id)
 	}
-	if !removed {
-		return database.ErrNotFound
-	}
-	return s.persistProfiles(ctx, next)
+	return database.ErrNotFound
 }
 
 func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*StorageProfile, error) {
-	profiles, err := s.loadProfiles(ctx)
+	id = strings.TrimSpace(id)
+	profiles, err := s.loadProfilesWithSecrets(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -142,150 +159,85 @@ func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*StorageP
 		return nil, err
 	}
 
-	for i := range profiles {
-		profiles[i].IsCurrent = profiles[i].ID == id
-	}
-
-	if err := s.persistProfiles(ctx, profiles); err != nil {
+	if err := s.profileRepo.ApplyProfile(ctx, id); err != nil {
 		return nil, err
 	}
 
+	target.IsCurrent = true
 	masked := s.maskProfile(*target)
 	return &masked, nil
 }
 
 func (s *StorageService) loadProfiles(ctx context.Context) ([]StorageProfile, error) {
-	val, err := s.configRepo.Get(ctx, StorageProfilesConfigKey)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return s.initializeProfilesConfig(ctx)
-		}
-		return nil, err
-	}
-
-	var cfg StorageProfilesConfig
-	if err := json.Unmarshal([]byte(val), &cfg); err != nil {
-		return nil, fmt.Errorf("解析存储配置失败: %v", err)
-	}
-
-	profiles, changed := s.ensureBuiltinProfiles(cfg.Profiles)
-	if changed {
-		if err := s.persistProfiles(ctx, profiles); err != nil {
-			return nil, err
-		}
-	}
-	return profiles, nil
+	return s.loadProfilesBySecretPolicy(ctx, false)
 }
 
-func (s *StorageService) persistProfiles(ctx context.Context, profiles []StorageProfile) error {
-	normalizedProfiles, _ := s.ensureBuiltinProfiles(profiles)
-	cfg := StorageProfilesConfig{Profiles: normalizedProfiles}
-	b, err := json.Marshal(cfg)
+func (s *StorageService) loadProfilesWithSecrets(ctx context.Context) ([]StorageProfile, error) {
+	return s.loadProfilesBySecretPolicy(ctx, true)
+}
+
+func (s *StorageService) loadProfilesBySecretPolicy(ctx context.Context, includeSecrets bool) ([]StorageProfile, error) {
+	var (
+		profiles []StorageProfile
+		err      error
+	)
+	if includeSecrets {
+		profiles, err = s.profileRepo.ListProfilesWithSecrets(ctx, false)
+	} else {
+		profiles, err = s.profileRepo.ListProfiles(ctx, false)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(profiles) == 0 {
+		return []StorageProfile{defaultLocalStorageProfile(true)}, nil
+	}
+	return normalizeLoadedProfiles(profiles), nil
+}
+
+func (s *StorageService) EnsureDefaultProfiles(ctx context.Context) error {
+	profiles, err := s.profileRepo.ListProfiles(ctx, false)
 	if err != nil {
 		return err
 	}
-	if err := s.configRepo.Set(ctx, StorageProfilesConfigKey, string(b)); err != nil {
-		return err
+
+	currentExists := false
+	localProfile := defaultLocalStorageProfile(false)
+	for _, profile := range profiles {
+		if profile.IsCurrent {
+			currentExists = true
+		}
+		if profile.ID == builtinLocalProfileID() {
+			localProfile = defaultLocalStorageProfile(profile.IsCurrent)
+		}
 	}
-	return nil
+
+	if !currentExists {
+		localProfile.IsCurrent = true
+		return s.profileRepo.SaveAndApplyProfile(ctx, localProfile)
+	}
+	return s.profileRepo.SaveProfile(ctx, localProfile)
 }
 
-func (s *StorageService) initializeProfilesConfig(ctx context.Context) ([]StorageProfile, error) {
-	profiles := []StorageProfile{
-		{
-			ID:        builtinLocalProfileID(),
-			Name:      "本地存储",
-			Provider:  StorageProviderLocal,
-			Enabled:   true,
-			IsCurrent: true,
-			Builtin:   true,
-			Config:    map[string]interface{}{},
-		},
+func defaultLocalStorageProfile(isCurrent bool) StorageProfile {
+	return StorageProfile{
+		ID:        builtinLocalProfileID(),
+		Name:      "本地存储",
+		Provider:  StorageProviderLocal,
+		Enabled:   true,
+		IsCurrent: isCurrent,
+		Builtin:   true,
+		Config:    map[string]interface{}{},
 	}
-
-	if err := s.persistProfiles(ctx, profiles); err != nil {
-		return nil, err
-	}
-	return profiles, nil
 }
 
-func (s *StorageService) ensureBuiltinProfiles(profiles []StorageProfile) ([]StorageProfile, bool) {
-	changed := false
-	seenLocal := false
-	currentID := ""
-	nextProfiles := make([]StorageProfile, 0, len(profiles))
-
+func normalizeLoadedProfiles(profiles []StorageProfile) []StorageProfile {
 	for i := range profiles {
 		if profiles[i].Config == nil {
 			profiles[i].Config = map[string]interface{}{}
-			changed = true
-		}
-		canonicalProvider, migratedConfig, providerChanged := canonicalizeStorageProfile(profiles[i].Provider, profiles[i].Config)
-		if providerChanged {
-			profiles[i].Provider = canonicalProvider
-			profiles[i].Config = migratedConfig
-			changed = true
-		}
-		if _, ok := s.providerMeta[profiles[i].Provider]; !ok {
-			changed = true
-			continue
-		}
-		switch profiles[i].ID {
-		case builtinLocalProfileID():
-			if !profiles[i].Builtin {
-				profiles[i].Builtin = true
-				changed = true
-			}
-			if profiles[i].Provider != StorageProviderLocal {
-				profiles[i].Provider = StorageProviderLocal
-				changed = true
-			}
-			if !profiles[i].Enabled {
-				profiles[i].Enabled = true
-				changed = true
-			}
-			if strings.TrimSpace(profiles[i].Name) == "" {
-				profiles[i].Name = "本地存储"
-				changed = true
-			}
-			seenLocal = true
-		}
-		if profiles[i].IsCurrent {
-			currentID = profiles[i].ID
-		}
-		nextProfiles = append(nextProfiles, profiles[i])
-	}
-	profiles = nextProfiles
-
-	if !seenLocal {
-		profiles = append(profiles, StorageProfile{
-			ID:        builtinLocalProfileID(),
-			Name:      "本地存储",
-			Provider:  StorageProviderLocal,
-			Enabled:   true,
-			IsCurrent: currentID == "",
-			Builtin:   true,
-			Config:    map[string]interface{}{},
-		})
-		if currentID == "" {
-			currentID = builtinLocalProfileID()
-		}
-		changed = true
-	}
-
-	if currentID == "" || s.indexOfProfile(profiles, currentID) < 0 {
-		currentID = builtinLocalProfileID()
-	}
-
-	for i := range profiles {
-		nextIsCurrent := profiles[i].ID == currentID
-		if profiles[i].IsCurrent != nextIsCurrent {
-			profiles[i].IsCurrent = nextIsCurrent
-			changed = true
 		}
 	}
-
-	return profiles, changed
+	return profiles
 }
 
 func (s *StorageService) normalizeProfile(existing StorageProfile, incoming StorageProfile) StorageProfile {
@@ -324,15 +276,15 @@ func (s *StorageService) normalizeProfile(existing StorageProfile, incoming Stor
 	case StorageProviderLocal:
 		next.Config = map[string]interface{}{}
 	case StorageProviderS3Compatible:
-		secret := strings.TrimSpace(configString(incoming.Config, "secret_access_key"))
+		secret := strings.TrimSpace(configString(incoming.Config, storageSecretAccessKeyName))
 		if secret == "" || strings.Contains(secret, "*") {
-			if oldSecret := configString(existing.Config, "secret_access_key"); oldSecret != "" {
-				cfg["secret_access_key"] = oldSecret
+			if oldSecret := configString(existing.Config, storageSecretAccessKeyName); oldSecret != "" {
+				cfg[storageSecretAccessKeyName] = oldSecret
 			} else {
-				cfg["secret_access_key"] = ""
+				cfg[storageSecretAccessKeyName] = ""
 			}
 		} else {
-			cfg["secret_access_key"] = secret
+			cfg[storageSecretAccessKeyName] = secret
 		}
 		cfg["access_key_id"] = strings.TrimSpace(configString(cfg, "access_key_id"))
 		cfg["bucket_name"] = strings.TrimSpace(configString(cfg, "bucket_name"))
@@ -367,15 +319,6 @@ func (s *StorageService) findProfile(profiles []StorageProfile, id string) (*Sto
 	return nil, database.ErrNotFound
 }
 
-func (s *StorageService) indexOfProfile(profiles []StorageProfile, id string) int {
-	for i := range profiles {
-		if profiles[i].ID == id {
-			return i
-		}
-	}
-	return -1
-}
-
 func (s *StorageService) maskProfiles(profiles []StorageProfile) []StorageProfile {
 	result := make([]StorageProfile, 0, len(profiles))
 	for _, profile := range profiles {
@@ -389,10 +332,10 @@ func (s *StorageService) maskProfile(profile StorageProfile) StorageProfile {
 	masked.Config = cloneConfig(profile.Config)
 	switch masked.Provider {
 	case StorageProviderS3Compatible:
-		secret := configString(masked.Config, "secret_access_key")
-		masked.SecretConfigured = secret != ""
+		secret := configString(masked.Config, storageSecretAccessKeyName)
+		masked.SecretConfigured = masked.SecretConfigured || secret != ""
 		if secret != "" {
-			masked.Config["secret_access_key"] = maskSecret(secret)
+			masked.Config[storageSecretAccessKeyName] = maskSecret(secret)
 		}
 	}
 	return masked

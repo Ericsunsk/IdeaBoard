@@ -15,15 +15,13 @@ import (
 type Store interface {
 	CountByStatus(ctx context.Context, status string) (int64, error)
 	CountAllTasks(ctx context.Context) (int64, error)
-	ListBackfilledDatesByRange(ctx context.Context, startDate, endDate string) ([]string, error)
-	ListDailyStatsByDateRange(ctx context.Context, startDate, endDate string) ([]taskstore.DailyStatAggregate, error)
+	ListBackfilledDatesByRange(ctx context.Context, startDate, endDate time.Time) ([]time.Time, error)
+	ListDailyStatsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]taskstore.DailyStatAggregate, error)
 	ListExecutionBottleneckStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]taskstore.ExecutionBottleneckAggregate, error)
 	ListExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]taskstore.ExecutionFailureCategoryAggregate, error)
-	ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate string) ([]taskstore.StatEventLatencySample, error)
+	ListStatEventLatencySamplesByDateRange(ctx context.Context, startDate, endDate time.Time) ([]taskstore.StatEventLatencySample, error)
 	ListStatisticsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]taskstore.TaskStatisticLite, error)
-	ListSingleModelSetByAccountIDs(ctx context.Context, accountIDs []int64) (map[int64]string, error)
-	UpsertDailyStatByTaskWithFallbackModel(ctx context.Context, task *tasks.Task, fallbackModelSet string) error
-	MarkDailyBackfillDone(ctx context.Context, statDate string) error
+	BackfillDailyStatsByCreatedRange(ctx context.Context, startedAt, endedAt, statDate time.Time, markDone bool) (taskstore.BackfillDailyStatsResult, error)
 }
 
 type Service struct {
@@ -38,6 +36,8 @@ type statisticsTrendBucket struct {
 	fail    int64
 	models  map[string]int64
 }
+
+const statisticsDateLayout = "2006-01-02"
 
 func NewService(store Store) *Service {
 	return &Service{store: store}
@@ -73,12 +73,17 @@ func (s *Service) GetTaskStats(ctx context.Context) (map[string]int64, error) {
 	if err != nil {
 		return nil, err
 	}
+	cancelled, err := s.store.CountByStatus(ctx, tasks.StatusCancelled)
+	if err != nil {
+		return nil, err
+	}
 
 	return map[string]int64{
 		tasks.StatusPending:   pending,
 		tasks.StatusRunning:   running,
 		tasks.StatusCompleted: completed,
 		tasks.StatusFailed:    failed,
+		tasks.StatusCancelled: cancelled,
 	}, nil
 }
 
@@ -101,9 +106,9 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		return nil, err
 	}
 
-	rangeStartDate := rangeStart.Format("2006-01-02")
-	rangeEndDate := todayStart.Format("2006-01-02")
-	backfilledDates, err := s.store.ListBackfilledDatesByRange(ctx, rangeStartDate, rangeEndDate)
+	rangeStartDate := statisticsDateKey(rangeStart)
+	rangeEndDate := statisticsDateKey(todayStart)
+	backfilledDates, err := s.store.ListBackfilledDatesByRange(ctx, rangeStart, todayStart)
 	if err != nil {
 		return nil, err
 	}
@@ -115,11 +120,11 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	if rangeStart.Before(monthStart) {
 		queryStart = rangeStart
 	}
-	allDailyRows, err := s.store.ListDailyStatsByDateRange(ctx, queryStart.Format("2006-01-02"), rangeEndDate)
+	allDailyRows, err := s.store.ListDailyStatsByDateRange(ctx, queryStart, todayStart)
 	if err != nil {
 		return nil, err
 	}
-	latencySamples, err := s.store.ListStatEventLatencySamplesByDateRange(ctx, rangeStartDate, rangeEndDate)
+	latencySamples, err := s.store.ListStatEventLatencySamplesByDateRange(ctx, rangeStart, todayStart)
 	if err != nil {
 		return nil, err
 	}
@@ -132,17 +137,18 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		return nil, err
 	}
 
-	yesterdayDate := yesterdayStart.Format("2006-01-02")
-	monthStartDate := monthStart.Format("2006-01-02")
+	yesterdayDate := statisticsDateKey(yesterdayStart)
+	monthStartDate := statisticsDateKey(monthStart)
 	var rangeDailyRows, yesterdayRows, monthRows []taskstore.DailyStatAggregate
 	for _, row := range allDailyRows {
-		if row.StatDate >= rangeStartDate && row.StatDate <= rangeEndDate {
+		dateKey := statisticsDateKey(row.StatDate)
+		if dateKey >= rangeStartDate && dateKey <= rangeEndDate {
 			rangeDailyRows = append(rangeDailyRows, row)
 		}
-		if row.StatDate == yesterdayDate {
+		if dateKey == yesterdayDate {
 			yesterdayRows = append(yesterdayRows, row)
 		}
-		if row.StatDate >= monthStartDate {
+		if dateKey >= monthStartDate {
 			monthRows = append(monthRows, row)
 		}
 	}
@@ -151,7 +157,7 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	orderedDays := make([]string, 0, days)
 	for i := 0; i < days; i++ {
 		d := rangeStart.AddDate(0, 0, i)
-		dateKey := d.Format("2006-01-02")
+		dateKey := statisticsDateKey(d)
 		buckets[dateKey] = &statisticsTrendBucket{
 			date:   dateKey,
 			label:  d.Format("01/02"),
@@ -170,9 +176,9 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	}
 	modelMetrics := map[string]*modelMetricAcc{}
 
-	var todayCalls, todaySuccess, todayFailed int64
+	var todayCalls, todaySuccess, todayFailed, todayCancelled int64
 	for _, row := range rangeDailyRows {
-		dateKey := row.StatDate
+		dateKey := statisticsDateKey(row.StatDate)
 		model := row.ModelName
 		if bucket, ok := buckets[dateKey]; ok {
 			bucket.total += row.Total
@@ -194,18 +200,20 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 			modelAcc.latencyCount += row.LatencyCount
 		}
 
-		if dateKey == todayStart.Format("2006-01-02") {
+		if dateKey == rangeEndDate {
 			todayCalls += row.Total
 			todaySuccess += row.Completed
 			todayFailed += row.Failed
+			todayCancelled += row.Cancelled
 		}
 	}
 
-	var yesterdayCalls, yesterdaySuccess, yesterdayFailed int64
+	var yesterdayCalls, yesterdaySuccess, yesterdayFailed, yesterdayCancelled int64
 	for _, row := range yesterdayRows {
 		yesterdayCalls += row.Total
 		yesterdaySuccess += row.Completed
 		yesterdayFailed += row.Failed
+		yesterdayCancelled += row.Cancelled
 	}
 
 	trend := buildTrendItems(orderedDays, buckets)
@@ -241,12 +249,17 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 		if acc.total == 0 {
 			continue
 		}
+		attempted := acc.completed + acc.failed
+		failureRate := 0.0
+		if attempted > 0 {
+			failureRate = (float64(acc.failed) / float64(attempted)) * 100
+		}
 		modelHealth = append(modelHealth, AdminStatisticsModelHealth{
 			Name:        name,
 			Total:       acc.total,
 			Completed:   acc.completed,
 			Failed:      acc.failed,
-			FailureRate: (float64(acc.failed) / float64(acc.total)) * 100,
+			FailureRate: failureRate,
 			AvgSeconds:  avgSeconds,
 		})
 	}
@@ -282,18 +295,22 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 
 	return &AdminStatisticsResponse{
 		Summary: AdminStatisticsSummary{
-			TotalCalls:       totalCalls,
-			TodayCalls:       todayCalls,
-			TodaySuccess:     todaySuccess,
-			TodayFailed:      todayFailed,
-			YesterdayCalls:   yesterdayCalls,
-			YesterdaySuccess: yesterdaySuccess,
-			YesterdayFailed:  yesterdayFailed,
-			ThisMonthCalls:   sumDailyTotal(monthRows),
-			Pending:          stats[tasks.StatusPending],
-			Running:          stats[tasks.StatusRunning],
-			Completed:        stats[tasks.StatusCompleted],
-			Failed:           stats[tasks.StatusFailed],
+			TotalCalls:         totalCalls,
+			TodayCalls:         todayCalls,
+			TodaySuccess:       todaySuccess,
+			TodayFailed:        todayFailed,
+			TodayCancelled:     todayCancelled,
+			YesterdayCalls:     yesterdayCalls,
+			YesterdaySuccess:   yesterdaySuccess,
+			YesterdayFailed:    yesterdayFailed,
+			YesterdayCancelled: yesterdayCancelled,
+			ThisMonthCalls:     sumDailyTotal(monthRows),
+			ThisMonthCancelled: sumDailyCancelled(monthRows),
+			Pending:            stats[tasks.StatusPending],
+			Running:            stats[tasks.StatusRunning],
+			Completed:          stats[tasks.StatusCompleted],
+			Failed:             stats[tasks.StatusFailed],
+			Cancelled:          stats[tasks.StatusCancelled],
 		},
 		Trend:        trend,
 		ModelHealth:  modelHealth,
@@ -319,20 +336,9 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 		return nil, nil, err
 	}
 
-	accountIDs := make([]int64, 0, len(rows))
-	for _, row := range rows {
-		if row.AccountID != 0 {
-			accountIDs = append(accountIDs, row.AccountID)
-		}
-	}
-	modelSetMap, err := s.store.ListSingleModelSetByAccountIDs(ctx, accountIDs)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	buckets := make(map[string]*statisticsTrendBucket, 24/bucketHours)
 	orderedKeys := make([]string, 0, 24/bucketHours)
-	dayKey := dayStart.In(loc).Format("2006-01-02")
+	dayKey := statisticsDateKey(dayStart.In(loc))
 	for hour := 0; hour < 24; hour += bucketHours {
 		key := fmt.Sprintf("%sT%02d", dayKey, hour)
 		buckets[key] = &statisticsTrendBucket{
@@ -344,7 +350,7 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 	}
 
 	for _, row := range rows {
-		if row.Status != tasks.StatusCompleted && row.Status != tasks.StatusFailed {
+		if row.Status != tasks.StatusCompleted && row.Status != tasks.StatusFailed && row.Status != tasks.StatusCancelled {
 			continue
 		}
 		createdAt := row.CreatedAt.In(loc)
@@ -359,16 +365,27 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 		}
 
 		bucket.total++
-		if row.Status == tasks.StatusCompleted {
+		switch row.Status {
+		case tasks.StatusCompleted:
 			bucket.success++
-		} else {
+		case tasks.StatusFailed:
 			bucket.fail++
 		}
-		model := taskstore.ExtractTaskModelWithFallback(row.Result, modelSetMap[row.AccountID])
+		model := statisticLiteModel(row)
 		bucket.models[model]++
 	}
 
 	return buildTrendItems(orderedKeys, buckets), buildQualityTrendItems(orderedKeys, buckets), nil
+}
+
+func statisticLiteModel(row taskstore.TaskStatisticLite) string {
+	if model := strings.TrimSpace(row.ResolvedModel); model != "" {
+		return model
+	}
+	if model := strings.TrimSpace(row.RequestedModel); model != "" {
+		return model
+	}
+	return taskstore.ExtractTaskModelWithFallback(row.Result, "")
 }
 
 func buildTrendItems(orderedKeys []string, buckets map[string]*statisticsTrendBucket) []AdminStatisticsTrendItem {
@@ -403,8 +420,9 @@ func buildQualityTrendItems(orderedKeys []string, buckets map[string]*statistics
 	for _, key := range orderedKeys {
 		b := buckets[key]
 		successRate := 0.0
-		if b.total > 0 {
-			successRate = (float64(b.success) / float64(b.total)) * 100
+		attempted := b.success + b.fail
+		if attempted > 0 {
+			successRate = (float64(b.success) / float64(attempted)) * 100
 		}
 		qualityTrend = append(qualityTrend, AdminStatisticsQualityTrendItem{
 			Date:        b.date,
@@ -522,10 +540,10 @@ func (s *Service) BackfillStatistics(ctx context.Context, rawRange string) (*Adm
 	loc := now.Location()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	rangeStart := todayStart.AddDate(0, 0, -(days - 1))
-	rangeStartDate := rangeStart.Format("2006-01-02")
-	rangeEndDate := todayStart.Format("2006-01-02")
+	rangeStartDate := statisticsDateKey(rangeStart)
+	rangeEndDate := statisticsDateKey(todayStart)
 
-	backfilledDates, err := s.store.ListBackfilledDatesByRange(ctx, rangeStartDate, rangeEndDate)
+	backfilledDates, err := s.store.ListBackfilledDatesByRange(ctx, rangeStart, todayStart)
 	if err != nil {
 		return nil, fmt.Errorf("list backfilled dates: %w", err)
 	}
@@ -552,24 +570,32 @@ func sumDailyTotal(rows []taskstore.DailyStatAggregate) int64 {
 	return total
 }
 
-func buildMissingStatisticsDaysByMarker(rangeStart, todayStart time.Time, days int, markerDates []string) []time.Time {
+func sumDailyCancelled(rows []taskstore.DailyStatAggregate) int64 {
+	var total int64
+	for _, row := range rows {
+		total += row.Cancelled
+	}
+	return total
+}
+
+func buildMissingStatisticsDaysByMarker(rangeStart, todayStart time.Time, days int, markerDates []time.Time) []time.Time {
 	return buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart, days, markerDates, true)
 }
 
-func buildMissingStatisticsDaysByMarkerForStatus(rangeStart, todayStart time.Time, days int, markerDates []string) []time.Time {
+func buildMissingStatisticsDaysByMarkerForStatus(rangeStart, todayStart time.Time, days int, markerDates []time.Time) []time.Time {
 	return buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart, days, markerDates, false)
 }
 
-func buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart time.Time, days int, markerDates []string, includeToday bool) []time.Time {
+func buildMissingStatisticsDaysByMarkerCore(rangeStart, todayStart time.Time, days int, markerDates []time.Time, includeToday bool) []time.Time {
 	markers := make(map[string]struct{}, len(markerDates))
 	for _, date := range markerDates {
-		markers[date] = struct{}{}
+		markers[statisticsDateKey(date)] = struct{}{}
 	}
 	missing := make([]time.Time, 0)
 	for i := 0; i < days; i++ {
 		dayStart := rangeStart.AddDate(0, 0, i)
-		dayKey := dayStart.Format("2006-01-02")
-		if dayKey == todayStart.Format("2006-01-02") {
+		dayKey := statisticsDateKey(dayStart)
+		if dayKey == statisticsDateKey(todayStart) {
 			if includeToday {
 				// 今天始终允许回填，覆盖部署前同一天历史终态任务；事件幂等保证不会重复计数。
 				missing = append(missing, dayStart)
@@ -589,48 +615,22 @@ func (s *Service) backfillDailyStatsByMissingDays(ctx context.Context, days []ti
 		return 0, nil
 	}
 	loc := time.Now().Location()
-	todayDate := time.Now().In(loc).Format("2006-01-02")
+	todayDate := statisticsDateKey(time.Now().In(loc))
 	backfilledCount := 0
 	for _, dayStart := range days {
 		dayEnd := dayStart.AddDate(0, 0, 1)
-		rows, err := s.store.ListStatisticsByCreatedAtRange(ctx, dayStart, dayEnd)
-		if err != nil {
+		dayDate := statisticsDateKey(dayStart.In(loc))
+		markDone := dayDate != todayDate
+		if _, err := s.store.BackfillDailyStatsByCreatedRange(ctx, dayStart, dayEnd, dayStart, markDone); err != nil {
 			return backfilledCount, err
 		}
-		accountIDs := make([]int64, 0, len(rows))
-		for _, row := range rows {
-			if row.AccountID != 0 {
-				accountIDs = append(accountIDs, row.AccountID)
-			}
-		}
-		modelSetMap, err := s.store.ListSingleModelSetByAccountIDs(ctx, accountIDs)
-		if err != nil {
-			return backfilledCount, err
-		}
-		for _, row := range rows {
-			if row.Status != tasks.StatusCompleted && row.Status != tasks.StatusFailed {
-				continue
-			}
-			task := &tasks.Task{
-				TaskID:      row.TaskID,
-				UserID:      row.UserID,
-				AccountID:   row.AccountID,
-				Status:      row.Status,
-				Result:      row.Result,
-				CreatedAt:   row.CreatedAt.In(loc),
-				CompletedAt: row.CompletedAt,
-			}
-			if err := s.store.UpsertDailyStatByTaskWithFallbackModel(ctx, task, modelSetMap[row.AccountID]); err != nil {
-				return backfilledCount, err
-			}
-		}
-		dayDate := dayStart.In(loc).Format("2006-01-02")
-		if dayDate != todayDate {
-			if err := s.store.MarkDailyBackfillDone(ctx, dayDate); err != nil {
-				return backfilledCount, err
-			}
+		if markDone {
 			backfilledCount++
 		}
 	}
 	return backfilledCount, nil
+}
+
+func statisticsDateKey(value time.Time) string {
+	return value.Format(statisticsDateLayout)
 }

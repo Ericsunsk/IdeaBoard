@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"ideaboard/api/internal/accounts"
 	"ideaboard/api/internal/channels"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/runtime/taskqueue"
@@ -24,8 +25,13 @@ type RiverTaskWorker struct {
 	noCapacityRetryDelay time.Duration
 }
 
+type WorkerAccountStore interface {
+	taskruntime.AccountStore
+	GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*accounts.ApiAccount, error)
+}
+
 func NewRiverTaskWorker(
-	accountRepo taskruntime.AccountStore,
+	accountRepo WorkerAccountStore,
 	channelRepo *channels.ChannelRepository,
 	taskRepo taskruntime.TaskStore,
 	enqueuer taskqueue.TaskEnqueuer,
@@ -40,7 +46,7 @@ func NewRiverTaskWorker(
 	}
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 	taskRuntime.SetTaskStatusPublisher(taskEvents)
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, enqueuer, taskRuntime, executor.callDrawingAPI)
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, enqueuer, taskRuntime, executor.callDrawingAPIWithAssignment)
 	return newRiverTaskWorkerWithProcessor(newTaskProcessor(assigner, taskRuntime, orchestrator.execute))
 }
 

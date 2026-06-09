@@ -3,9 +3,13 @@ package accounts
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
+	"time"
 
+	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/database"
 )
 
 type AccountRepository struct {
@@ -13,31 +17,40 @@ type AccountRepository struct {
 	q  *dbsqlc.Queries
 }
 
+type RunningTaskFinalizerTx func(ctx context.Context, q *dbsqlc.Queries, completedAt time.Time) ([]string, error)
+
 func NewAccountRepository(db *sql.DB) *AccountRepository {
 	return &AccountRepository{db: db, q: dbsqlc.New(db)}
 }
 
 func (r *AccountRepository) Create(ctx context.Context, account *ApiAccount) error {
-	id, err := r.q.CreateAccount(ctx, dbsqlc.CreateAccountParams{
-		Name:          account.Name,
-		ChannelID:     account.ChannelID,
-		Platform:      account.Platform,
-		ApiType:       account.ApiType,
-		ModelSet:      account.ModelSet,
-		ApiKey:        account.ApiKey,
-		ProxyUrl:      account.ProxyURL,
-		MaxConcurrent: int32(account.MaxConcurrent),
-		Timeout:       int32(account.Timeout),
-		ExtraConfig:   account.ExtraConfig,
-		Status:        account.Status,
-		FailCount:     int32(account.FailCount),
-		Weight:        int32(account.Weight),
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		writeAccount := accountForWrite(account)
+		id, err := q.CreateAccount(ctx, dbsqlc.CreateAccountParams{
+			Name:          writeAccount.Name,
+			ChannelID:     writeAccount.ChannelID,
+			Platform:      writeAccount.Platform,
+			ApiType:       writeAccount.ApiType,
+			ProxyUrl:      writeAccount.ProxyURL,
+			MaxConcurrent: int32(writeAccount.MaxConcurrent),
+			Timeout:       int32(writeAccount.Timeout),
+			ExtraConfig:   writeAccount.ExtraConfig,
+			Status:        writeAccount.Status,
+			FailCount:     int32(writeAccount.FailCount),
+			Weight:        int32(writeAccount.Weight),
+		})
+		if err != nil {
+			return err
+		}
+		writeAccount.ID = int64(id)
+		if account != nil {
+			account.ID = writeAccount.ID
+		}
+		if err := replaceAccountModels(ctx, q, writeAccount.ID, accountModelsForWrite(writeAccount)); err != nil {
+			return err
+		}
+		return rotateAccountSecret(ctx, q, writeAccount.ID, writeAccount.ApiKey)
 	})
-	if err != nil {
-		return err
-	}
-	account.ID = int64(id)
-	return nil
 }
 
 func (r *AccountRepository) GetByID(ctx context.Context, id int64) (*ApiAccount, error) {
@@ -45,7 +58,22 @@ func (r *AccountRepository) GetByID(ctx context.Context, id int64) (*ApiAccount,
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromSQLC(row)
+	account := accountFromProjection(accountProjectionFromGet(row))
+	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
+
+func (r *AccountRepository) GetRuntimeByIDWithSecret(ctx context.Context, id int64) (*ApiAccount, error) {
+	row, err := r.q.GetRuntimeAccountByIDWithSecret(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	account := accountFromProjection(accountProjectionFromRuntimeGet(row))
+	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
+		return nil, err
+	}
 	return &account, nil
 }
 
@@ -77,7 +105,11 @@ func (r *AccountRepository) List(ctx context.Context, keyword, platform string, 
 	if err != nil {
 		return nil, 0, err
 	}
-	return accountsFromSQLC(rows), total, nil
+	accounts := accountsFromListRows(rows)
+	if err := r.attachAccountModels(ctx, accounts); err != nil {
+		return nil, 0, err
+	}
+	return accounts, total, nil
 }
 
 func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, error) {
@@ -85,7 +117,11 @@ func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, e
 	if err != nil {
 		return nil, err
 	}
-	return accountsFromSQLC(rows), nil
+	accounts := accountsFromEnabledRows(rows)
+	if err := r.attachAccountModels(ctx, accounts); err != nil {
+		return nil, err
+	}
+	return accounts, nil
 }
 
 func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]int64, error) {
@@ -93,66 +129,412 @@ func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]int64, error)
 }
 
 func (r *AccountRepository) Update(ctx context.Context, account *ApiAccount) error {
-	return r.q.UpdateAccount(ctx, dbsqlc.UpdateAccountParams{
-		Name:          account.Name,
-		ChannelID:     account.ChannelID,
-		Platform:      account.Platform,
-		ApiType:       account.ApiType,
-		ModelSet:      account.ModelSet,
-		ApiKey:        account.ApiKey,
-		ProxyUrl:      account.ProxyURL,
-		MaxConcurrent: int32(account.MaxConcurrent),
-		Timeout:       int32(account.Timeout),
-		ExtraConfig:   account.ExtraConfig,
-		Status:        account.Status,
-		FailCount:     int32(account.FailCount),
-		Weight:        int32(account.Weight),
-		ID:            account.ID,
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		writeAccount := accountForWrite(account)
+		updated, err := q.UpdateAccount(ctx, dbsqlc.UpdateAccountParams{
+			Name:          writeAccount.Name,
+			Platform:      writeAccount.Platform,
+			ApiType:       writeAccount.ApiType,
+			ProxyUrl:      writeAccount.ProxyURL,
+			MaxConcurrent: int32(writeAccount.MaxConcurrent),
+			Timeout:       int32(writeAccount.Timeout),
+			ExtraConfig:   writeAccount.ExtraConfig,
+			FailCount:     int32(writeAccount.FailCount),
+			Weight:        int32(writeAccount.Weight),
+			ID:            writeAccount.ID,
+		})
+		if err != nil {
+			return err
+		}
+		if updated == 0 {
+			return database.ErrNotFound
+		}
+		if err := replaceAccountModels(ctx, q, writeAccount.ID, accountModelsForWrite(writeAccount)); err != nil {
+			return err
+		}
+		if strings.TrimSpace(writeAccount.ApiKey) == "" {
+			return nil
+		}
+		return rotateAccountSecret(ctx, q, writeAccount.ID, writeAccount.ApiKey)
 	})
 }
 
 func (r *AccountRepository) Delete(ctx context.Context, id int64) error {
-	return r.q.DeleteAccount(ctx, id)
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.ArchiveAccount(ctx, id)
+		if err != nil {
+			return err
+		}
+		if updated == 0 {
+			return database.ErrNotFound
+		}
+		return q.RevokeAccountSecretsForArchive(ctx, id)
+	})
+}
+
+func (r *AccountRepository) ArchiveAccountAndFinalizeRunningTasks(ctx context.Context, id int64, finalizer RunningTaskFinalizerTx) ([]string, error) {
+	var failedTaskIDs []string
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.ArchiveAccount(ctx, id)
+		if err != nil {
+			return err
+		}
+		if updated == 0 {
+			return database.ErrNotFound
+		}
+		if err := q.RevokeAccountSecretsForArchive(ctx, id); err != nil {
+			return err
+		}
+		if finalizer == nil {
+			return nil
+		}
+		failedTaskIDs, err = finalizer(ctx, q, time.Now())
+		return err
+	})
+	return failedTaskIDs, err
 }
 
 func (r *AccountRepository) UpdateStatus(ctx context.Context, id int64, status int16) error {
-	return r.q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: status, ID: id})
+	updated, err := r.q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: status, ID: id})
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return database.ErrNotFound
+	}
+	return nil
+}
+
+func (r *AccountRepository) StopAccountAndFinalizeRunningTasks(ctx context.Context, id int64, finalizer RunningTaskFinalizerTx) ([]string, error) {
+	var failedTaskIDs []string
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.UpdateAccountStatus(ctx, dbsqlc.UpdateAccountStatusParams{Status: 0, ID: id})
+		if err != nil {
+			return err
+		}
+		if updated == 0 {
+			return database.ErrNotFound
+		}
+		if finalizer == nil {
+			return nil
+		}
+		failedTaskIDs, err = finalizer(ctx, q, time.Now())
+		return err
+	})
+	return failedTaskIDs, err
 }
 
 func (r *AccountRepository) IncrementFailCount(ctx context.Context, id int64) error {
-	return r.q.IncrementAccountFailCount(ctx, id)
+	updated, err := r.q.IncrementAccountFailCount(ctx, id)
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }
 
 func (r *AccountRepository) ResetFailCount(ctx context.Context, id int64) error {
-	return r.q.ResetAccountFailCount(ctx, id)
+	updated, err := r.q.ResetAccountFailCount(ctx, id)
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }
 
-func accountFromSQLC(row dbsqlc.ApiAccount) ApiAccount {
+type accountProjection struct {
+	ID               int64
+	Name             string
+	ChannelID        int64
+	Platform         string
+	ApiType          string
+	ApiKey           string
+	SecretConfigured bool
+	ProxyURL         string
+	MaxConcurrent    int32
+	Timeout          int32
+	ExtraConfig      string
+	Status           int16
+	FailCount        int32
+	Weight           int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+func accountFromProjection(row accountProjection) ApiAccount {
 	return ApiAccount{
-		ID:            row.ID,
-		Name:          row.Name,
-		ChannelID:     row.ChannelID,
-		Platform:      row.Platform,
-		ApiType:       row.ApiType,
-		ModelSet:      row.ModelSet,
-		ApiKey:        row.ApiKey,
-		ProxyURL:      row.ProxyUrl,
-		MaxConcurrent: int(row.MaxConcurrent),
-		Timeout:       int(row.Timeout),
-		ExtraConfig:   row.ExtraConfig,
-		Status:        row.Status,
-		FailCount:     int(row.FailCount),
-		Weight:        int(row.Weight),
-		CreatedAt:     row.CreatedAt,
-		UpdatedAt:     row.UpdatedAt,
+		ID:               row.ID,
+		Name:             row.Name,
+		ChannelID:        row.ChannelID,
+		Platform:         row.Platform,
+		ApiType:          row.ApiType,
+		ApiKey:           row.ApiKey,
+		SecretConfigured: row.SecretConfigured,
+		ProxyURL:         row.ProxyURL,
+		MaxConcurrent:    int(row.MaxConcurrent),
+		Timeout:          int(row.Timeout),
+		ExtraConfig:      row.ExtraConfig,
+		Status:           row.Status,
+		FailCount:        int(row.FailCount),
+		Weight:           int(row.Weight),
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
 	}
 }
 
-func accountsFromSQLC(rows []dbsqlc.ApiAccount) []*ApiAccount {
+func accountProjectionFromGet(row dbsqlc.GetAccountByIDRow) accountProjection {
+	return accountProjection{
+		ID:               row.ID,
+		Name:             row.Name,
+		ChannelID:        row.ChannelID,
+		Platform:         row.Platform,
+		ApiType:          row.ApiType,
+		ApiKey:           row.ApiKey,
+		SecretConfigured: row.SecretConfigured,
+		ProxyURL:         row.ProxyUrl,
+		MaxConcurrent:    row.MaxConcurrent,
+		Timeout:          row.Timeout,
+		ExtraConfig:      row.ExtraConfig,
+		Status:           row.Status,
+		FailCount:        row.FailCount,
+		Weight:           row.Weight,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
+	}
+}
+
+func accountProjectionFromRuntimeGet(row dbsqlc.GetRuntimeAccountByIDWithSecretRow) accountProjection {
+	return accountProjection{
+		ID:               row.ID,
+		Name:             row.Name,
+		ChannelID:        row.ChannelID,
+		Platform:         row.Platform,
+		ApiType:          row.ApiType,
+		ApiKey:           row.ApiKey,
+		SecretConfigured: row.SecretConfigured,
+		ProxyURL:         row.ProxyUrl,
+		MaxConcurrent:    row.MaxConcurrent,
+		Timeout:          row.Timeout,
+		ExtraConfig:      row.ExtraConfig,
+		Status:           row.Status,
+		FailCount:        row.FailCount,
+		Weight:           row.Weight,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
+	}
+}
+
+func accountProjectionFromList(row dbsqlc.ListAccountsRow) accountProjection {
+	return accountProjection{
+		ID:               row.ID,
+		Name:             row.Name,
+		ChannelID:        row.ChannelID,
+		Platform:         row.Platform,
+		ApiType:          row.ApiType,
+		ApiKey:           row.ApiKey,
+		SecretConfigured: row.SecretConfigured,
+		ProxyURL:         row.ProxyUrl,
+		MaxConcurrent:    row.MaxConcurrent,
+		Timeout:          row.Timeout,
+		ExtraConfig:      row.ExtraConfig,
+		Status:           row.Status,
+		FailCount:        row.FailCount,
+		Weight:           row.Weight,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
+	}
+}
+
+func accountProjectionFromEnabled(row dbsqlc.ListEnabledAccountsRow) accountProjection {
+	return accountProjection{
+		ID:               row.ID,
+		Name:             row.Name,
+		ChannelID:        row.ChannelID,
+		Platform:         row.Platform,
+		ApiType:          row.ApiType,
+		ApiKey:           row.ApiKey,
+		SecretConfigured: row.SecretConfigured,
+		ProxyURL:         row.ProxyUrl,
+		MaxConcurrent:    row.MaxConcurrent,
+		Timeout:          row.Timeout,
+		ExtraConfig:      row.ExtraConfig,
+		Status:           row.Status,
+		FailCount:        row.FailCount,
+		Weight:           row.Weight,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
+	}
+}
+
+func accountsFromListRows(rows []dbsqlc.ListAccountsRow) []*ApiAccount {
+	return accountsFromRows(rows, accountProjectionFromList)
+}
+
+func accountsFromEnabledRows(rows []dbsqlc.ListEnabledAccountsRow) []*ApiAccount {
+	return accountsFromRows(rows, accountProjectionFromEnabled)
+}
+
+func accountsFromRows[T any](rows []T, project func(T) accountProjection) []*ApiAccount {
 	result := make([]*ApiAccount, 0, len(rows))
 	for _, row := range rows {
-		account := accountFromSQLC(row)
+		account := accountFromProjection(project(row))
 		result = append(result, &account)
 	}
 	return result
+}
+
+func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []*ApiAccount) error {
+	accountIDs := make([]int64, 0, len(accounts))
+	for _, account := range accounts {
+		if account != nil {
+			accountIDs = append(accountIDs, account.ID)
+		}
+	}
+	if len(accountIDs) == 0 {
+		return nil
+	}
+	rows, err := r.q.ListAccountModelsByAccountIDs(ctx, accountIDs)
+	if err != nil {
+		return err
+	}
+	modelsByAccountID := make(map[int64][]AccountModel, len(accountIDs))
+	for _, row := range rows {
+		modelsByAccountID[row.AccountID] = append(modelsByAccountID[row.AccountID], accountModelFromSQLC(row))
+	}
+	for _, account := range accounts {
+		if account != nil {
+			account.Models = modelsByAccountID[account.ID]
+		}
+	}
+	return nil
+}
+
+func accountModelFromSQLC(row dbsqlc.ApiAccountModel) AccountModel {
+	var slugs []string
+	if len(row.FeatureSlugs) > 0 {
+		_ = json.Unmarshal(row.FeatureSlugs, &slugs)
+	}
+	return AccountModel{
+		ID:            row.ID,
+		Name:          row.ModelName,
+		Enabled:       row.Enabled,
+		Weight:        int(row.Weight),
+		MaxConcurrent: intPtr(row.MaxConcurrent),
+		FeatureSlugs:  slugs,
+		SortOrder:     int(row.SortOrder),
+	}
+}
+
+func accountModelsForWrite(account *ApiAccount) []AccountModel {
+	if account == nil {
+		return nil
+	}
+	return account.Models
+}
+
+func accountForWrite(account *ApiAccount) *ApiAccount {
+	if account == nil {
+		return &ApiAccount{}
+	}
+	normalized := *account
+	if normalized.MaxConcurrent <= 0 {
+		normalized.MaxConcurrent = 3
+	}
+	if normalized.Timeout <= 0 {
+		normalized.Timeout = 120
+	}
+	if normalized.Weight <= 0 {
+		normalized.Weight = 1
+	}
+	if normalized.FailCount < 0 {
+		normalized.FailCount = 0
+	}
+	if normalized.Status != 0 && normalized.Status != 1 {
+		normalized.Status = 1
+	}
+	return &normalized
+}
+
+func replaceAccountModels(ctx context.Context, q *dbsqlc.Queries, accountID int64, models []AccountModel) error {
+	if err := q.DeleteAccountModelsByAccountID(ctx, accountID); err != nil {
+		return err
+	}
+	for i, model := range models {
+		name := strings.TrimSpace(model.Name)
+		if name == "" {
+			continue
+		}
+		weight := model.Weight
+		if weight <= 0 {
+			weight = 1
+		}
+		featureSlugs, err := accountModelFeatureSlugsJSON(model.FeatureSlugs)
+		if err != nil {
+			return err
+		}
+		sortOrder := model.SortOrder
+		if sortOrder < 0 {
+			sortOrder = i
+		}
+		if _, err := q.UpsertAccountModel(ctx, dbsqlc.UpsertAccountModelParams{
+			AccountID:     accountID,
+			ModelName:     name,
+			Enabled:       model.Enabled,
+			Weight:        int32(weight),
+			MaxConcurrent: nullInt32Ptr(model.MaxConcurrent),
+			FeatureSlugs:  featureSlugs,
+			Metadata:      json.RawMessage("{}"),
+			SortOrder:     int32(sortOrder),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func accountModelFeatureSlugsJSON(slugs []string) (json.RawMessage, error) {
+	if slugs == nil {
+		slugs = []string{}
+	}
+	return json.Marshal(slugs)
+}
+
+func rotateAccountSecret(ctx context.Context, q *dbsqlc.Queries, accountID int64, apiKey string) error {
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		return nil
+	}
+	if err := q.RetireActiveAccountSecrets(ctx, accountID); err != nil {
+		return err
+	}
+	_, err := q.CreateAccountSecret(ctx, dbsqlc.CreateAccountSecretParams{
+		AccountID:          accountID,
+		SecretMaterialKind: "stored",
+		SecretRef:          "",
+		SecretPayload:      apiKey,
+		KeyVersion:         "",
+		Fingerprint:        "",
+		Status:             "active",
+		ExpiresAt:          sql.NullTime{},
+	})
+	return err
+}
+
+func nullInt32Ptr(value *int) sql.NullInt32 {
+	if value == nil {
+		return sql.NullInt32{}
+	}
+	return sql.NullInt32{Int32: int32(*value), Valid: true}
+}
+
+func intPtr(value sql.NullInt32) *int {
+	if !value.Valid {
+		return nil
+	}
+	v := int(value.Int32)
+	return &v
 }

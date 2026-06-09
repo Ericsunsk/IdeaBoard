@@ -22,7 +22,7 @@ func TestCallOpenAINon200ReturnsTypedUpstreamHTTPError(t *testing.T) {
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
-		ModelSet: "gpt-image-1",
+		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{"feature": "pattern-gen"}
 

@@ -42,15 +42,15 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	account := createRiverTestAccount(t, accountRepo, "confirm-fail-account")
+	account := createRiverTestAccount(t, db, accountRepo, "confirm-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
-		TaskID:     "confirm-fail-task",
-		UserID:     1,
-		ChannelID:  1,
-		AccountID:  account.ID,
-		Status:     tasks.StatusRunning,
-		LeaseToken: "lease-confirm-fail",
+		TaskID:            "confirm-fail-task",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-confirm-fail",
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	assigner := &fakeAssigner{confirmErr: errors.New("lease confirmation failed")}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	providerCalled := false
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
 		providerCalled = true
 		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
@@ -66,7 +66,7 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
 		TaskID:     "confirm-fail-task",
 		AccountIDs: []int64{account.ID},
-	}, taskqueue.TaskAssignment{TaskID: "confirm-fail-task", AccountID: account.ID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-confirm-fail"})
+	}, taskqueue.TaskAssignment{TaskID: "confirm-fail-task", AccountID: account.ID, ChannelID: account.ChannelID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-confirm-fail"})
 	if err != nil {
 		t.Fatalf("execute returned error: %v", err)
 	}
@@ -80,8 +80,14 @@ func TestExecuteRequeuesTaskWhenLeaseConfirmationFails(t *testing.T) {
 	if updated.Status != tasks.StatusPending {
 		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
 	}
-	if updated.AccountID != 0 {
-		t.Fatalf("account_id = %d, want 0", updated.AccountID)
+	if updated.CancelledAt != nil {
+		t.Fatalf("cancelled_at = %v, want nil", updated.CancelledAt)
+	}
+	if updated.AccountID != nil {
+		t.Fatalf("account_id = %d, want nil", tasks.IDValue(updated.AccountID))
+	}
+	if updated.AssignedChannelID != nil {
+		t.Fatalf("assigned_channel_id = %d, want nil", tasks.IDValue(updated.AssignedChannelID))
 	}
 }
 
@@ -89,15 +95,15 @@ func TestExecuteReturnsErrorWhenMarkCompletedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	account := createRiverTestAccount(t, accountRepo, "complete-fail-account")
+	account := createRiverTestAccount(t, db, accountRepo, "complete-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
-		TaskID:     "complete-fail-task",
-		UserID:     1,
-		ChannelID:  1,
-		AccountID:  account.ID,
-		Status:     tasks.StatusRunning,
-		LeaseToken: "lease-direct-complete",
+		TaskID:            "complete-fail-task",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-direct-complete",
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
@@ -120,14 +126,17 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_completed();
 
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(_ context.Context, runtimeAccount *accounts.ApiAccount, _ *queuetypes.TaskPayload, _ taskqueue.TaskAssignment) (providerCallOutput, error) {
+		if runtimeAccount.ApiKey != "k" {
+			t.Fatalf("runtime account api key = %q, want secret", runtimeAccount.ApiKey)
+		}
 		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
 
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
 		TaskID:     "complete-fail-task",
 		AccountIDs: []int64{account.ID},
-	}, taskqueue.TaskAssignment{TaskID: "complete-fail-task", AccountID: account.ID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-direct-complete"})
+	}, taskqueue.TaskAssignment{TaskID: "complete-fail-task", AccountID: account.ID, ChannelID: account.ChannelID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-direct-complete"})
 	if err == nil {
 		t.Fatal("expected execute to return error when mark completed persistence fails")
 	}
@@ -141,15 +150,15 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	account := createRiverTestAccount(t, accountRepo, "cancel-after-provider-account")
+	account := createRiverTestAccount(t, db, accountRepo, "cancel-after-provider-account")
 
 	task := &tasks.Task{
-		TaskID:     "cancel-after-provider-task",
-		UserID:     1,
-		ChannelID:  1,
-		AccountID:  account.ID,
-		Status:     tasks.StatusRunning,
-		LeaseToken: "lease-cancel-after-provider",
+		TaskID:            "cancel-after-provider-task",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-cancel-after-provider",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -158,7 +167,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	cancelStore := newFakeCancelStoreForRiver()
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, task *queuetypes.TaskPayload) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(ctx context.Context, _ *accounts.ApiAccount, task *queuetypes.TaskPayload, _ taskqueue.TaskAssignment) (providerCallOutput, error) {
 		if err := cancelStore.MarkCancelled(ctx, task.TaskID, time.Minute); err != nil {
 			t.Fatalf("mark cancelled failed: %v", err)
 		}
@@ -168,6 +177,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	assignment := taskqueue.TaskAssignment{
 		TaskID:     task.TaskID,
 		AccountID:  account.ID,
+		ChannelID:  account.ChannelID,
 		Status:     taskqueue.AssignStatusAssigned,
 		LeaseToken: "lease-cancel-after-provider",
 	}
@@ -182,11 +192,17 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 	if err != nil {
 		t.Fatalf("reload task failed: %v", err)
 	}
-	if updated.Status != tasks.StatusPending {
-		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	if updated.Status != tasks.StatusCancelled {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusCancelled)
 	}
-	if updated.AccountID != 0 {
-		t.Fatalf("account_id = %d, want 0", updated.AccountID)
+	if updated.CancelledAt == nil {
+		t.Fatal("cancelled_at should be set")
+	}
+	if tasks.IDValue(updated.AccountID) != account.ID {
+		t.Fatalf("account_id = %d, want %d", tasks.IDValue(updated.AccountID), account.ID)
+	}
+	if tasks.IDValue(updated.AssignedChannelID) != account.ChannelID {
+		t.Fatalf("assigned_channel_id = %d, want %d", tasks.IDValue(updated.AssignedChannelID), account.ChannelID)
 	}
 	if updated.LeaseToken != "" {
 		t.Fatalf("lease_token = %q, want empty", updated.LeaseToken)
@@ -201,15 +217,15 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	account := createRiverTestAccount(t, accountRepo, "cancel-before-provider-account")
+	account := createRiverTestAccount(t, db, accountRepo, "cancel-before-provider-account")
 
 	task := &tasks.Task{
-		TaskID:     "cancel-before-provider-task",
-		UserID:     1,
-		ChannelID:  1,
-		AccountID:  account.ID,
-		Status:     tasks.StatusRunning,
-		LeaseToken: "lease-cancel-before-provider",
+		TaskID:            "cancel-before-provider-task",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-cancel-before-provider",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -222,7 +238,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, cancelStore)
 	providerCalled := false
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
 		providerCalled = true
 		return providerOutputJSON(`{"image_url":"https://example.com/image.png"}`), nil
 	})
@@ -230,6 +246,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 	assignment := taskqueue.TaskAssignment{
 		TaskID:     task.TaskID,
 		AccountID:  account.ID,
+		ChannelID:  account.ChannelID,
 		Status:     taskqueue.AssignStatusAssigned,
 		LeaseToken: task.LeaseToken,
 	}
@@ -247,11 +264,17 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload task failed: %v", err)
 	}
-	if updated.Status != tasks.StatusPending {
-		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusPending)
+	if updated.Status != tasks.StatusCancelled {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusCancelled)
 	}
-	if updated.AccountID != 0 {
-		t.Fatalf("account_id = %d, want 0", updated.AccountID)
+	if updated.CancelledAt == nil {
+		t.Fatal("cancelled_at should be set")
+	}
+	if tasks.IDValue(updated.AccountID) != account.ID {
+		t.Fatalf("account_id = %d, want %d", tasks.IDValue(updated.AccountID), account.ID)
+	}
+	if tasks.IDValue(updated.AssignedChannelID) != account.ChannelID {
+		t.Fatalf("assigned_channel_id = %d, want %d", tasks.IDValue(updated.AssignedChannelID), account.ChannelID)
 	}
 	if updated.LeaseToken != "" {
 		t.Fatalf("lease_token = %q, want empty", updated.LeaseToken)
@@ -265,15 +288,15 @@ func TestExecuteReturnsErrorWhenMarkFailedPersistenceFails(t *testing.T) {
 	db := newTaskExecutionOrchestratorTestDB(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	account := createRiverTestAccount(t, accountRepo, "failed-fail-account")
+	account := createRiverTestAccount(t, db, accountRepo, "failed-fail-account")
 
 	if err := taskRepo.Create(context.Background(), &tasks.Task{
-		TaskID:     "failed-fail-task",
-		UserID:     1,
-		ChannelID:  1,
-		AccountID:  account.ID,
-		Status:     tasks.StatusRunning,
-		LeaseToken: "lease-direct-failed",
+		TaskID:            "failed-fail-task",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-direct-failed",
 	}); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
@@ -296,19 +319,74 @@ FOR EACH ROW EXECUTE FUNCTION fail_mark_failed();
 
 	assigner := &fakeAssigner{}
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
 		return providerCallOutput{}, errors.New("provider boom")
 	})
 
 	err := orchestrator.execute(context.Background(), &queuetypes.TaskPayload{
 		TaskID:     "failed-fail-task",
 		AccountIDs: []int64{account.ID},
-	}, taskqueue.TaskAssignment{TaskID: "failed-fail-task", AccountID: account.ID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-direct-failed"})
+	}, taskqueue.TaskAssignment{TaskID: "failed-fail-task", AccountID: account.ID, ChannelID: account.ChannelID, Status: taskqueue.AssignStatusAssigned, LeaseToken: "lease-direct-failed"})
 	if err == nil {
 		t.Fatal("expected execute to return error when mark failed persistence fails")
 	}
 	if !strings.Contains(err.Error(), "forced mark failed failure") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecuteFailsImmediatelyWhenFailoverHasNoCandidates(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskExecutionOrchestratorTestDB(t)
+	accountRepo := accounts.NewAccountRepository(db)
+	taskRepo := taskstore.NewRepository(db)
+	account := createRiverTestAccount(t, db, accountRepo, "failover-exhausted-account")
+
+	task := &tasks.Task{
+		TaskID:            "failover-exhausted-task",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-failover-exhausted",
+	}
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	assigner := &fakeAssigner{}
+	requeuer := &fakeRequeuer{}
+	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, requeuer, runtime, func(context.Context, *accounts.ApiAccount, *queuetypes.TaskPayload, taskqueue.TaskAssignment) (providerCallOutput, error) {
+		return providerOutputJSON(""), newUpstreamHTTPError(429, "rate limited")
+	})
+
+	err := orchestrator.execute(ctx, &queuetypes.TaskPayload{
+		TaskID:     task.TaskID,
+		AccountIDs: []int64{account.ID},
+	}, taskqueue.TaskAssignment{TaskID: task.TaskID, AccountID: account.ID, ChannelID: account.ChannelID, Status: taskqueue.AssignStatusAssigned, LeaseToken: task.LeaseToken})
+	if err != nil {
+		t.Fatalf("execute returned error: %v", err)
+	}
+	if requeuer.calls != 0 {
+		t.Fatalf("requeue calls = %d, want 0", requeuer.calls)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusFailed {
+		t.Fatalf("status = %s, want %s", updated.Status, tasks.StatusFailed)
+	}
+	if updated.LeaseToken != "" {
+		t.Fatalf("lease_token = %q, want empty", updated.LeaseToken)
+	}
+	if updated.CompletedAt == nil {
+		t.Fatal("completed_at should be set")
+	}
+	if tasks.IDValue(updated.AccountID) != account.ID {
+		t.Fatalf("account_id = %d, want %d", tasks.IDValue(updated.AccountID), account.ID)
 	}
 }
 

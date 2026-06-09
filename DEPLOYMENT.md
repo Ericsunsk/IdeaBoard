@@ -176,7 +176,7 @@ ignore:
       type: deb
 ```
 
-`ideaboard update` 默认会在 pull 前执行 Cosign keyless 验签。未显式设置 `COSIGN_CERTIFICATE_IDENTITY_REGEXP` 时，脚本会从 `IDEABOARD_API_IMAGE` / `IDEABOARD_AUTH_IMAGE` / `IDEABOARD_AUTH_MIGRATE_IMAGE` 的 `ghcr.io/<owner>/<repo>/...` 自动派生签名身份，只接受同仓库 `docker-images.yml` workflow 的 branch/tag 发布；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
+`ideaboard update` 默认会在 pull 前执行 Cosign keyless 验签，VPS 必须先安装 `cosign`。未显式设置 `COSIGN_CERTIFICATE_IDENTITY_REGEXP` 时，脚本会从 `IDEABOARD_API_IMAGE` / `IDEABOARD_AUTH_IMAGE` / `IDEABOARD_AUTH_MIGRATE_IMAGE` 的 `ghcr.io/<owner>/<repo>/...` 自动派生签名身份，只接受同仓库 `docker-images.yml` workflow 的 branch/tag 发布；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
 
 ```bash
 cosign verify \
@@ -196,7 +196,7 @@ curl -fsSL \
 GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 ```
 
-把 `REF` 换成明确的发布 tag 或 commit SHA。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。
+把 `REF` 换成明确的发布 tag 或 commit SHA。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。Bootstrap 会在部署前检查 `cosign`，除非你已经在 `docker/.env` 里显式设置 `COSIGN_VERIFY=false`。
 
 至少修改：
 
@@ -218,9 +218,19 @@ GITHUB_TOKEN=your-github-token bash /tmp/bootstrap-vps.sh --ref "${REF}"
 ideaboard update
 ```
 
-`ideaboard update` 会在执行 Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 Gateway 的 `/api/health`、`/api/auth/health` 或公网 `${API_BASE_URL}/api/health` health gate 失败都会中止部署并打印相关容器日志。
+`ideaboard update` 会在执行 API / Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 Gateway 的 `/api/health`、`/api/auth/health` 或公网 `${API_BASE_URL}/api/health` health gate 失败都会中止部署并打印相关容器日志。
 
 当前 Docker stack 只管理 PostgreSQL 数据库；`ideaboard update` 不会自动转换或导入其他数据库形态的数据。首次部署或切换部署形态前，请先确认目标 PostgreSQL 中已有需要保留的数据，或明确按空库初始化。
+
+<a id="api-database-baseline"></a>
+
+#### API 业务库 baseline
+
+Go API 业务表使用单 baseline migration。空 PostgreSQL 库会在 API migration 或 API 启动时自动初始化业务 schema，并写入当前 baseline 版本 `20260609000000`。Docker 部署会先运行 `api-migrate`，再运行 Auth migration。
+
+非空数据库不能直接套用该 baseline。若你从旧部署或其他形态迁入数据，标准做法是先导出需要保留的数据，再在空库上初始化当前 baseline，最后用受控脚本导入业务数据；不要手动修改 `schema_migrations` 绕过 baseline 校验。
+
+当前 API migration 保护会拒绝三类风险状态：`schema_migrations` 里存在当前二进制不认识的历史版本；baseline 未应用但 schema 已经有 API-owned 业务表；baseline 已标记应用但当前 schema 缺少 baseline 业务表。Better Auth 的 `"user"`、`"session"`、`"account"`、`"verification"` 等认证表可以先存在，不计入 API baseline 冲突；不过标准部署顺序仍是 API baseline first、Better Auth migration second。CI 会用 PostgreSQL 17 执行 `go test ./internal/db/migrations -run TestMigrations -count=1`，覆盖 fresh replay、重复执行、Auth 表先存在、seed、trigger、constraint 和上述保护场景；同时会串行执行 `go run ./cmd migrate`、`npm run migrate:dist`，再重复一次，验证真实 API/Auth migration 顺序和幂等性。
 
 常用运维：
 
@@ -434,6 +444,8 @@ CREATE DATABASE ideaboard OWNER ideaboard;
 GRANT ALL PRIVILEGES ON DATABASE ideaboard TO ideaboard;
 ```
 
+业务 schema 由 Go API 启动时按 [API 业务库 baseline](#api-database-baseline) 初始化；Auth 服务表由后续 `npm run migrate:dist` 维护。源码部署同样不要手写业务 DDL，非空库迁入前先确认 reset、restore 或受控导入策略。
+
 <a id="runtime-config"></a>
 
 ## 运行配置
@@ -465,6 +477,13 @@ nano /opt/ideaboard/apps/api/.env
 - 若前面有 Nginx / 其他反向代理，建议设置 `APP_HOST=127.0.0.1`
 - 生产环境请固定设置 `APP_ENV=production`，不要依赖默认值；发布包 systemd 已设置该值，不要在 `.env` 中写回 `development`
 - `AUTH_INTERNAL_KEY` 建议使用足够长的随机字符串，并只在 API 与 Auth Service 两侧共享
+
+首次部署或更新业务 schema 时，先运行 API migration：
+
+```bash
+cd /opt/ideaboard/apps/api
+./ideaboard-server migrate
+```
 
 完整字段说明见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
@@ -655,9 +674,10 @@ nginx -t && systemctl reload nginx
 2. 解压到 `/opt/ideaboard/releases/`。
 3. 用新版本覆盖 `/opt/ideaboard/apps`、`/opt/ideaboard/deploy`。
 4. 保留原有 `/opt/ideaboard/apps/api/.env` 与 `/opt/ideaboard/apps/auth/.env`。
-5. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci --omit=dev --omit=optional --no-audit --fund=false && npm run migrate:dist`。
-6. 执行 `systemctl restart ideaboard-auth ideaboard`。
-7. 再次执行健康检查与页面验证。
+5. 在 `/opt/ideaboard/apps/api` 执行 `./ideaboard-server migrate`。
+6. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci --omit=dev --omit=optional --no-audit --fund=false && npm run migrate:dist`。
+7. 执行 `systemctl restart ideaboard-auth ideaboard`。
+8. 再次执行健康检查与页面验证。
 
 升级时不要删除：
 
@@ -671,10 +691,12 @@ nginx -t && systemctl reload nginx
 
 1. 回到 `/opt/ideaboard/releases/` 中上一个版本目录。
 2. 重新复制上一版本的 `apps`、`deploy`。
-3. 在 `/opt/ideaboard/apps/auth` 执行 `npm ci --omit=dev --omit=optional --no-audit --fund=false && npm run migrate:dist`。
-4. 执行 `systemctl restart ideaboard-auth ideaboard`。
-5. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
+3. 先确认当前数据库 schema 与上一版本兼容；若新版本 migration 已改动数据结构，优先从升级前 backup 做受控 restore。
+4. 仅在确认数据库兼容时，在 `/opt/ideaboard/apps/api` 执行 `./ideaboard-server migrate`。
+5. 仅在确认 Auth schema 兼容时，在 `/opt/ideaboard/apps/auth` 执行 `npm ci --omit=dev --omit=optional --no-audit --fund=false && npm run migrate:dist`。
+6. 执行 `systemctl restart ideaboard-auth ideaboard`。
+7. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
 
-Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 改回上一版 digest 并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup 和 `api-uploads` tar，再运行 migration 和 health gate；历史 backup 默认位于 `/opt/stacks/ideaboard-backups/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 改回上一版 digest 并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup 和 `api-uploads` tar，再运行 API / Auth migration 和 health gate；历史 backup 默认位于 `/opt/stacks/ideaboard-backups/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
 
 Docker stack 的数据面以 PostgreSQL volume 为准；回滚镜像不会自动转换、导入或恢复非 PostgreSQL 数据。

@@ -320,8 +320,8 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{ID: 101, ModelSet: "gpt-image-1"},
-		{ID: 202, ModelSet: "gpt-image-1"},
+		{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
+		{ID: 202, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
@@ -467,20 +467,43 @@ func TestDeleteUserTaskCleansOutputsAndTaskOutputObjects(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	taskRepo := taskstore.NewRepository(db)
+	accountRepo := accounts.NewAccountRepository(db)
+	userRepo := users.NewUserRepository(db)
+	owner := mustCreateTaskUploadUser(t, userRepo, "delete-output-owner", "auth-delete-output-owner", "DTO042")
+	var channelID int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO channels (type, name, api_url, status)
+VALUES ('openai-compatible', 'taskservice-delete-channel', 'https://example.com/taskservice-delete', 1)
+RETURNING id`).Scan(&channelID); err != nil {
+		t.Fatalf("create channel failed: %v", err)
+	}
+	account := &accounts.ApiAccount{
+		Name:      "taskservice-delete-account",
+		ChannelID: channelID,
+		Platform:  "openai-compatible",
+		ApiType:   "openai-compatible",
+		Models:    []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:    "test",
+		ProxyURL:  "https://example.com/taskservice-delete",
+		Status:    1,
+	}
+	if err := accountRepo.Create(ctx, account); err != nil {
+		t.Fatalf("create account failed: %v", err)
+	}
 
 	task := &tasks.Task{
-		TaskID:     "delete-with-outputs",
-		UserID:     42,
-		ChannelID:  1,
-		AccountID:  7,
-		Status:     tasks.StatusRunning,
-		LeaseToken: "lease-delete",
+		TaskID:            "delete-with-outputs",
+		UserID:            owner.ID,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-delete",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 
-	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, task.LeaseToken, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
+	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ChannelID, task.LeaseToken, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
 		{
 			Role:       "image",
 			URL:        "/uploads/tasks/42/delete-with-outputs/2026/06/03/result.png",
@@ -489,7 +512,7 @@ func TestDeleteUserTaskCleansOutputsAndTaskOutputObjects(t *testing.T) {
 			Width:      1024,
 			Height:     1024,
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("complete with outputs failed: %v", err)
 	}

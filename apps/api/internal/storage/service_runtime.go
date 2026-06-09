@@ -25,7 +25,7 @@ const (
 )
 
 func (s *StorageService) TestProfile(ctx context.Context, id string) error {
-	profiles, err := s.loadProfiles(ctx)
+	profiles, err := s.loadProfilesWithSecrets(ctx)
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func (s *StorageService) TestProfile(ctx context.Context, id string) error {
 }
 
 func (s *StorageService) GetBucketInfo(ctx context.Context, id string) (map[string]interface{}, error) {
-	profiles, err := s.loadProfiles(ctx)
+	profiles, err := s.loadProfilesWithSecrets(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +245,7 @@ func (s *StorageService) ensureProfileReadyForRuntime(profile StorageProfile) er
 }
 
 func (s *StorageService) resolveActiveProfile(ctx context.Context) (*StorageProfile, error) {
-	profiles, err := s.loadProfiles(ctx)
+	profiles, err := s.loadProfilesWithSecrets(ctx)
 	if err != nil {
 		return nil, err
 	}

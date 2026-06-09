@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accounts"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/storage"
 	"ideaboard/api/internal/testdb"
 )
@@ -57,7 +56,7 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	db := testdb.Open(t)
 
 	return &ProviderExecutor{
-		storageService: storage.NewStorageService(settings.NewSystemConfigRepository(db)),
+		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db)),
 	}
 }
 
@@ -94,7 +93,7 @@ func TestMaterializeProviderResultImagesFailsWhenRemoteCannotBeStored(t *testing
 
 	db := testdb.Open(t)
 	executor := &ProviderExecutor{
-		storageService: storage.NewStorageService(settings.NewSystemConfigRepository(db)),
+		storageService: storage.NewStorageService(storage.NewStorageProfileRepository(db)),
 	}
 
 	_, err := executor.materializeProviderResultImages(context.Background(), 42, "task-fail", &accounts.ApiAccount{ProxyURL: server.URL}, []string{server.URL + "/image.png"})

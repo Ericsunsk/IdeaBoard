@@ -9,6 +9,7 @@ const (
 	ExecutionStageFinalizing = "finalizing"
 	ExecutionStageCompleted  = "completed"
 	ExecutionStageFailed     = "failed"
+	ExecutionStageCancelled  = "cancelled"
 )
 
 const (
@@ -32,6 +33,62 @@ const (
 	FailureCategoryCancelled     = "cancelled"
 	FailureCategoryUnknown       = "unknown"
 )
+
+const (
+	TaskAttemptStatusRunning   = "running"
+	TaskAttemptStatusCompleted = "completed"
+	TaskAttemptStatusFailed    = "failed"
+	TaskAttemptStatusRequeued  = "requeued"
+	TaskAttemptStatusCancelled = "cancelled"
+)
+
+type TaskExecutionSnapshot struct {
+	TaskID         string
+	FeatureSlug    string
+	RequestedModel string
+	ResolvedModel  string
+	APIType        string
+}
+
+type TaskAttemptStart struct {
+	TaskID            string
+	RiverJobID        int64
+	LeaseToken        string
+	AccountID         int64
+	ChannelID         int64
+	FeatureSlug       string
+	RequestedModel    string
+	ResolvedModel     string
+	APIType           string
+	ProviderStartedAt time.Time
+}
+
+type TaskAttemptRef struct {
+	ID        int64
+	AttemptNo int
+}
+
+type TaskAttemptFinish struct {
+	ID                 int64
+	Status             string
+	FailureStage       string
+	FailureCategory    string
+	ErrorMsg           string
+	ProviderFinishedAt *time.Time
+	FinalizeStartedAt  *time.Time
+	FinalizeFinishedAt *time.Time
+	ProviderLatencyMS  int64
+	FinalizeLatencyMS  int64
+	TotalLatencyMS     int64
+	CompletedAt        time.Time
+}
+
+type TaskCancellationSnapshot struct {
+	TaskID      string
+	CancelledAt time.Time
+	CancelledBy *int64
+	Reason      string
+}
 
 type TaskExecutionMetrics struct {
 	TaskID             string     `json:"task_id"`
@@ -69,4 +126,44 @@ type TaskExecutionMetricsPatch struct {
 	ProviderLatencyMS  *int64
 	FinalizeLatencyMS  *int64
 	TotalLatencyMS     *int64
+}
+
+func ResolveExecutionBottleneck(metrics *TaskExecutionMetrics, failureStage string, failureCategory string) string {
+	switch failureCategory {
+	case FailureCategoryStorageError:
+		return BottleneckSourceStorage
+	case FailureCategoryFinalizeError:
+		return BottleneckSourceFinalize
+	case FailureCategoryInputInvalid:
+		if failureStage == ExecutionStageAssigned || failureStage == ExecutionStageQueued {
+			return BottleneckSourceInput
+		}
+	case FailureCategoryAuth, FailureCategoryQuota, FailureCategoryTimeout, FailureCategoryProviderError:
+		return BottleneckSourceProvider
+	case FailureCategoryCancelled:
+		return BottleneckSourceUnknown
+	}
+	if metrics == nil {
+		return BottleneckSourceUnknown
+	}
+	type stageLatency struct {
+		source string
+		value  int64
+	}
+	latencies := []stageLatency{
+		{source: BottleneckSourceQueue, value: metrics.QueueWaitMS},
+		{source: BottleneckSourceWorker, value: metrics.WorkerOverheadMS},
+		{source: BottleneckSourceProvider, value: metrics.ProviderLatencyMS},
+		{source: BottleneckSourceFinalize, value: metrics.FinalizeLatencyMS},
+	}
+	best := stageLatency{source: BottleneckSourceUnknown}
+	for _, latency := range latencies {
+		if latency.value > best.value {
+			best = latency
+		}
+	}
+	if best.value <= 0 {
+		return BottleneckSourceUnknown
+	}
+	return best.source
 }

@@ -25,8 +25,6 @@ func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:     "task_rollback_on_river_failure",
 		UserID:     42,
-		ChannelID:  0,
-		AccountID:  0,
 		Prompt:     "draw a chair",
 		UserPrompt: "draw a chair",
 		Params:     `{"size":"1024x1024"}`,

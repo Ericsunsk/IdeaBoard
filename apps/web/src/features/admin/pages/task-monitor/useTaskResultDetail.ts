@@ -43,7 +43,6 @@ export function useTaskResultDetail(options: {
     const preferredKeys = [
       'status',
       'platform',
-      'model_set',
       'model',
       'request_id',
       'task_id',

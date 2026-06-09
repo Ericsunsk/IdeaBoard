@@ -7,7 +7,6 @@ type TaskStatusTagSeverity = 'secondary' | 'warn' | 'success' | 'danger'
 type TaskDurationTone = 'success' | 'warning' | 'danger'
 type TaskApiCallInfo = {
   platform: string
-  modelSet: string
 }
 
 interface TaskStatusConfig {
@@ -34,6 +33,7 @@ export const taskStatusOptions = [
   { label: '执行中', value: 'running' },
   { label: '已完成', value: 'completed' },
   { label: '失败', value: 'failed' },
+  { label: '已取消', value: 'cancelled' },
 ]
 
 const taskStatusConfigMap: Record<string, TaskStatusConfig> = {
@@ -41,6 +41,7 @@ const taskStatusConfigMap: Record<string, TaskStatusConfig> = {
   running: { severity: 'warn', text: '执行中', color: 'var(--color-admin-warning)' },
   completed: { severity: 'success', text: '已完成', color: 'var(--color-admin-success)' },
   failed: { severity: 'danger', text: '失败', color: ERROR_TEXT_COLOR },
+  cancelled: { severity: 'secondary', text: '已取消', color: DEFAULT_STATUS_COLOR },
 }
 
 export function getTaskStatusConfig(status: string): TaskStatusConfig {
@@ -80,11 +81,10 @@ export function getTaskApiCall(row: Task) {
 
   let value: TaskApiCallInfo | null = null
   try {
-    const result = JSON.parse(row.result) as { platform?: unknown; model_set?: unknown }
+    const result = JSON.parse(row.result) as { platform?: unknown }
     if (result.platform) {
       value = {
         platform: String(result.platform),
-        modelSet: result.model_set ? String(result.model_set) : '',
       }
     }
   } catch {

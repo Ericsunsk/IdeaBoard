@@ -83,14 +83,17 @@ func (q *Queries) DeleteUserBoardsByUserID(ctx context.Context, userID int64) er
 	return err
 }
 
-const deleteUserByID = `-- name: DeleteUserByID :exec
+const deleteUserByID = `-- name: DeleteUserByID :execrows
 DELETE FROM users
 WHERE id = $1
 `
 
-func (q *Queries) DeleteUserByID(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUserByID, id)
-	return err
+func (q *Queries) DeleteUserByID(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUserByID, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getUsedUIDForUpdate = `-- name: GetUsedUIDForUpdate :one
@@ -378,7 +381,7 @@ func (q *Queries) SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) 
 	return i, err
 }
 
-const updateUser = `-- name: UpdateUser :exec
+const updateUser = `-- name: UpdateUser :execrows
 UPDATE users
 SET username = $1,
     auth_user_id = $2,
@@ -399,8 +402,8 @@ type UpdateUserParams struct {
 	ID         int64          `json:"id"`
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
-	_, err := q.db.ExecContext(ctx, updateUser,
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUser,
 		arg.Username,
 		arg.AuthUserID,
 		arg.StorageUid,
@@ -409,10 +412,13 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 		arg.Status,
 		arg.ID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateUserAvatar = `-- name: UpdateUserAvatar :exec
+const updateUserAvatar = `-- name: UpdateUserAvatar :execrows
 UPDATE users
 SET avatar = $1
 WHERE id = $2
@@ -423,12 +429,15 @@ type UpdateUserAvatarParams struct {
 	ID     int64  `json:"id"`
 }
 
-func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) error {
-	_, err := q.db.ExecContext(ctx, updateUserAvatar, arg.Avatar, arg.ID)
-	return err
+func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUserAvatar, arg.Avatar, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateUserRole = `-- name: UpdateUserRole :exec
+const updateUserRole = `-- name: UpdateUserRole :execrows
 UPDATE users
 SET role = $1
 WHERE id = $2
@@ -439,12 +448,15 @@ type UpdateUserRoleParams struct {
 	ID   int64  `json:"id"`
 }
 
-func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
-	_, err := q.db.ExecContext(ctx, updateUserRole, arg.Role, arg.ID)
-	return err
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUserRole, arg.Role, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateUserStatus = `-- name: UpdateUserStatus :exec
+const updateUserStatus = `-- name: UpdateUserStatus :execrows
 UPDATE users
 SET status = $1
 WHERE id = $2
@@ -455,12 +467,15 @@ type UpdateUserStatusParams struct {
 	ID     int64 `json:"id"`
 }
 
-func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error {
-	_, err := q.db.ExecContext(ctx, updateUserStatus, arg.Status, arg.ID)
-	return err
+func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUserStatus, arg.Status, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
-const updateUserStorageUID = `-- name: UpdateUserStorageUID :exec
+const updateUserStorageUID = `-- name: UpdateUserStorageUID :execrows
 UPDATE users
 SET storage_uid = $1
 WHERE id = $2
@@ -471,7 +486,10 @@ type UpdateUserStorageUIDParams struct {
 	ID         int64  `json:"id"`
 }
 
-func (q *Queries) UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) error {
-	_, err := q.db.ExecContext(ctx, updateUserStorageUID, arg.StorageUid, arg.ID)
-	return err
+func (q *Queries) UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUserStorageUID, arg.StorageUid, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

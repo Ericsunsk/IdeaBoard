@@ -21,6 +21,32 @@ func newStatisticsTestService(t *testing.T) (*Service, *taskstore.Repository, *s
 	return svc, taskRepo, db
 }
 
+func seedStatisticsAccount(t testing.TB, ctx context.Context, db *sql.DB, name string) *accounts.ApiAccount {
+	t.Helper()
+	accountRepo := accounts.NewAccountRepository(db)
+	var channelID int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO channels (type, name, api_url, status)
+VALUES ('openai-compatible', $1, $2, 1)
+RETURNING id`, name+"-channel", "https://example.com/"+name).Scan(&channelID); err != nil {
+		t.Fatalf("create channel failed: %v", err)
+	}
+	account := &accounts.ApiAccount{
+		Name:      name,
+		ChannelID: channelID,
+		Platform:  "openai-compatible",
+		ApiType:   "openai-compatible",
+		Models:    []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:    "test",
+		ProxyURL:  "https://example.com/" + name,
+		Status:    1,
+	}
+	if err := accountRepo.Create(ctx, account); err != nil {
+		t.Fatalf("create account failed: %v", err)
+	}
+	return account
+}
+
 func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	ctx := context.Background()
 	svc, taskRepo, db := newStatisticsTestService(t)
@@ -30,7 +56,7 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 
 	seed := []taskDailyStatSeed{
 		{StatDate: today, ModelName: "model-a", UserKey: "u1", Total: 2, Completed: 2, Failed: 0, LatencySecondsSum: 30, LatencyCount: 2},
-		{StatDate: today, ModelName: "model-b", UserKey: "u2", Total: 1, Completed: 0, Failed: 1, LatencySecondsSum: 0, LatencyCount: 0},
+		{StatDate: today, ModelName: "model-b", UserKey: "u2", Total: 2, Completed: 0, Failed: 1, Cancelled: 1, LatencySecondsSum: 0, LatencyCount: 0},
 		{StatDate: yesterday, ModelName: "model-a", UserKey: "u1", Total: 1, Completed: 1, Failed: 0, LatencySecondsSum: 12, LatencyCount: 1},
 	}
 	for i := range seed {
@@ -45,10 +71,17 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	for i := range events {
 		insertTaskStatEvent(t, db, events[i])
 	}
-	if err := taskRepo.Create(ctx, &tasks.Task{TaskID: "p1", UserID: 1, ChannelID: 1, Status: tasks.StatusPending}); err != nil {
+	if err := taskRepo.Create(ctx, &tasks.Task{TaskID: "p1", UserID: 1, Status: tasks.StatusPending}); err != nil {
 		t.Fatalf("seed pending task failed: %v", err)
 	}
-	if err := taskRepo.Create(ctx, &tasks.Task{TaskID: "r1", UserID: 1, ChannelID: 1, Status: tasks.StatusRunning}); err != nil {
+	runningAccount := seedStatisticsAccount(t, ctx, db, "stats-running-account")
+	if err := taskRepo.Create(ctx, &tasks.Task{
+		TaskID:            "r1",
+		UserID:            1,
+		AssignedChannelID: tasks.IDPtr(runningAccount.ChannelID),
+		AccountID:         tasks.IDPtr(runningAccount.ID),
+		Status:            tasks.StatusRunning,
+	}); err != nil {
 		t.Fatalf("seed running task failed: %v", err)
 	}
 
@@ -56,14 +89,17 @@ func TestGetStatisticsReadsFromDailySnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
-	if stats.Summary.TodayCalls != 3 {
-		t.Fatalf("today_calls = %d, want 3", stats.Summary.TodayCalls)
+	if stats.Summary.TodayCalls != 4 {
+		t.Fatalf("today_calls = %d, want 4", stats.Summary.TodayCalls)
 	}
-	if stats.Summary.TodaySuccess != 2 || stats.Summary.TodayFailed != 1 {
-		t.Fatalf("today success/failed = %d/%d", stats.Summary.TodaySuccess, stats.Summary.TodayFailed)
+	if stats.Summary.TodaySuccess != 2 || stats.Summary.TodayFailed != 1 || stats.Summary.TodayCancelled != 1 {
+		t.Fatalf("today success/failed/cancelled = %d/%d/%d", stats.Summary.TodaySuccess, stats.Summary.TodayFailed, stats.Summary.TodayCancelled)
 	}
 	if stats.Summary.YesterdayCalls != 1 || stats.Summary.YesterdaySuccess != 1 {
 		t.Fatalf("yesterday calls/success = %d/%d", stats.Summary.YesterdayCalls, stats.Summary.YesterdaySuccess)
+	}
+	if stats.Summary.ThisMonthCancelled != 1 {
+		t.Fatalf("this_month_cancelled = %d, want 1", stats.Summary.ThisMonthCancelled)
 	}
 	if len(stats.ModelHealth) < 2 {
 		t.Fatalf("expected model health rows, got %+v", stats.ModelHealth)
@@ -100,7 +136,7 @@ func TestGetStatisticsQualityTrendAggregatedByDate(t *testing.T) {
 
 	seed := []taskDailyStatSeed{
 		{StatDate: today, ModelName: "m1", UserKey: "u1", Total: 2, Completed: 2, Failed: 0},
-		{StatDate: today, ModelName: "m2", UserKey: "u2", Total: 3, Completed: 1, Failed: 2},
+		{StatDate: today, ModelName: "m2", UserKey: "u2", Total: 4, Completed: 1, Failed: 2, Cancelled: 1},
 		{StatDate: yesterday, ModelName: "m1", UserKey: "u1", Total: 1, Completed: 1, Failed: 0},
 	}
 	for i := range seed {
@@ -119,7 +155,7 @@ func TestGetStatisticsQualityTrendAggregatedByDate(t *testing.T) {
 	for _, item := range stats.QualityTrend {
 		if item.Date == today {
 			foundToday = true
-			if item.Total != 5 || item.Success != 3 || item.Fail != 2 || item.SuccessRate != 60 {
+			if item.Total != 6 || item.Success != 3 || item.Fail != 2 || item.SuccessRate != 60 {
 				t.Fatalf("today quality trend mismatch: %+v", item)
 			}
 		}
@@ -151,8 +187,6 @@ func TestGetStatisticsOneDayTrendUsesFourHourBuckets(t *testing.T) {
 		if err := taskRepo.Create(ctx, &tasks.Task{
 			TaskID:      item.id,
 			UserID:      1,
-			ChannelID:   1,
-			AccountID:   1,
 			Status:      item.status,
 			Result:      `{"model":"` + item.model + `"}`,
 			CreatedAt:   item.createdAt,
@@ -203,7 +237,6 @@ func TestGetStatisticsFailureCategoriesRankByFailureVolume(t *testing.T) {
 		if err := taskRepo.Create(ctx, &tasks.Task{
 			TaskID:    item.id,
 			UserID:    1,
-			ChannelID: 1,
 			Status:    tasks.StatusFailed,
 			CreatedAt: now,
 		}); err != nil {
@@ -244,7 +277,6 @@ func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
 	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "c1",
 		UserID:      99,
-		ChannelID:   1,
 		Status:      tasks.StatusCompleted,
 		Result:      `{"model":"m-backfill","username":"bf-user"}`,
 		CreatedAt:   created,
@@ -255,7 +287,6 @@ func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
 	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "f1",
 		UserID:      99,
-		ChannelID:   1,
 		Status:      tasks.StatusFailed,
 		Result:      `{"model":"m-backfill","username":"bf-user"}`,
 		CreatedAt:   created,
@@ -271,8 +302,7 @@ func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
 	if stats.Summary.TodayCalls != 0 {
 		t.Fatalf("today_calls = %d, want 0 before explicit backfill", stats.Summary.TodayCalls)
 	}
-	day := created.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, created, created)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -283,7 +313,7 @@ func TestGetStatisticsDoesNotBackfillWhenSnapshotEmpty(t *testing.T) {
 
 func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 	ctx := context.Background()
-	svc, taskRepo, _ := newStatisticsTestService(t)
+	svc, taskRepo, db := newStatisticsTestService(t)
 	loc := time.Now().Location()
 	todayStart := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, loc)
 	missingDayStart := todayStart.AddDate(0, 0, -1)
@@ -292,7 +322,6 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 	alreadyCounted := &tasks.Task{
 		TaskID:      "same-day-counted",
 		UserID:      88,
-		ChannelID:   1,
 		Status:      tasks.StatusCompleted,
 		Result:      `{"model":"model-missing","username":"u-missing"}`,
 		CreatedAt:   missingDayStart.Add(20 * time.Second),
@@ -309,7 +338,6 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "same-day-missing",
 		UserID:      88,
-		ChannelID:   1,
 		Status:      tasks.StatusCompleted,
 		Result:      `{"model":"model-missing","username":"u-missing"}`,
 		CreatedAt:   missingDayStart.Add(30 * time.Second),
@@ -318,13 +346,16 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 		t.Fatalf("seed missing-day task failed: %v", err)
 	}
 
-	day := missingDayStart.Format("2006-01-02")
-	beforeRows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	beforeRows, err := taskRepo.ListDailyStatsByDateRange(ctx, missingDayStart, missingDayStart)
 	if err != nil {
 		t.Fatalf("list day before failed: %v", err)
 	}
 	if len(beforeRows) != 1 || beforeRows[0].Total != 1 {
 		t.Fatalf("unexpected day rows before: %+v", beforeRows)
+	}
+	beforeEvents := countTaskStatEventsByDate(t, db, missingDayStart)
+	if beforeEvents != 1 {
+		t.Fatalf("stat events before=%d, want 1", beforeEvents)
 	}
 
 	result, err := svc.BackfillStatistics(ctx, "7d")
@@ -335,12 +366,16 @@ func TestBackfillStatisticsBackfillsOnlyMissingTasksForSameDate(t *testing.T) {
 		t.Fatalf("expected scanned_days >= 1, got %+v", result)
 	}
 
-	afterRows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	afterRows, err := taskRepo.ListDailyStatsByDateRange(ctx, missingDayStart, missingDayStart)
 	if err != nil {
 		t.Fatalf("list day after failed: %v", err)
 	}
 	if len(afterRows) != 1 || afterRows[0].Total != 2 || afterRows[0].Completed != 2 {
 		t.Fatalf("same-day backfill should only add missing task once, rows=%+v", afterRows)
+	}
+	afterEvents := countTaskStatEventsByDate(t, db, missingDayStart)
+	if afterEvents != 2 {
+		t.Fatalf("stat events after=%d, want 2", afterEvents)
 	}
 }
 
@@ -355,7 +390,6 @@ func TestBackfillStatisticsMarkerSkipsPastDateOnSecondRun(t *testing.T) {
 	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "marker-task-1",
 		UserID:      90,
-		ChannelID:   1,
 		Status:      tasks.StatusCompleted,
 		Result:      `{"model":"marker-model","username":"marker-user"}`,
 		CreatedAt:   pastDay.Add(15 * time.Second),
@@ -380,7 +414,7 @@ func TestBackfillStatisticsMarkerSkipsPastDateOnSecondRun(t *testing.T) {
 	}
 
 	day := pastDay.Format("2006-01-02")
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, pastDay, pastDay)
 	if err != nil {
 		t.Fatalf("list marker day rows failed: %v", err)
 	}
@@ -388,12 +422,204 @@ func TestBackfillStatisticsMarkerSkipsPastDateOnSecondRun(t *testing.T) {
 		t.Fatalf("marker day should remain stable after second run, rows=%+v", rows)
 	}
 
-	markers, err := taskRepo.ListBackfilledDatesByRange(ctx, day, day)
+	markers, err := taskRepo.ListBackfilledDatesByRange(ctx, pastDay, pastDay)
 	if err != nil {
 		t.Fatalf("list backfill markers failed: %v", err)
 	}
-	if len(markers) != 1 || markers[0] != day {
+	if len(markers) != 1 || statisticsDateKey(markers[0]) != day {
 		t.Fatalf("unexpected marker rows: %+v", markers)
+	}
+}
+
+func TestBackfillStatisticsAlwaysScansTodayButDoesNotDuplicateEvents(t *testing.T) {
+	ctx := context.Background()
+	svc, taskRepo, db := newStatisticsTestService(t)
+	loc := time.Now().Location()
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	created := todayStart.Add(2 * time.Hour)
+	completed := created.Add(25 * time.Second)
+	if err := taskRepo.Create(ctx, &tasks.Task{
+		TaskID:      "today-backfill-idempotent",
+		UserID:      91,
+		Status:      tasks.StatusCompleted,
+		Result:      `{"model":"today-model","username":"today-user"}`,
+		CreatedAt:   created,
+		CompletedAt: &completed,
+	}); err != nil {
+		t.Fatalf("seed today task failed: %v", err)
+	}
+
+	first, err := svc.BackfillStatistics(ctx, "1d")
+	if err != nil {
+		t.Fatalf("first BackfillStatistics failed: %v", err)
+	}
+	second, err := svc.BackfillStatistics(ctx, "1d")
+	if err != nil {
+		t.Fatalf("second BackfillStatistics failed: %v", err)
+	}
+	if first.ScannedDays != 1 || second.ScannedDays != 1 {
+		t.Fatalf("today should be scanned every run, first=%+v second=%+v", first, second)
+	}
+	if first.BackfilledDays != 0 || second.BackfilledDays != 0 {
+		t.Fatalf("today should not be marked done, first=%+v second=%+v", first, second)
+	}
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, todayStart, todayStart)
+	if err != nil {
+		t.Fatalf("list today rows failed: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Total != 1 || rows[0].Completed != 1 {
+		t.Fatalf("today daily stats should not duplicate, rows=%+v", rows)
+	}
+	if events := countTaskStatEventsByDate(t, db, todayStart); events != 1 {
+		t.Fatalf("today stat events=%d, want 1", events)
+	}
+}
+
+func TestBackfillStatisticsIncludesCancelledWithoutFailure(t *testing.T) {
+	ctx := context.Background()
+	svc, taskRepo, _ := newStatisticsTestService(t)
+	loc := time.Now().Location()
+	todayStart := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, loc)
+	pastDay := todayStart.AddDate(0, 0, -1)
+	cancelledAt := pastDay.Add(90 * time.Second)
+	if err := taskRepo.Create(ctx, &tasks.Task{
+		TaskID:      "cancelled-backfill-1",
+		UserID:      92,
+		Status:      tasks.StatusCancelled,
+		Result:      `{"model":"cancelled-model","username":"cancelled-user"}`,
+		CreatedAt:   pastDay.Add(30 * time.Second),
+		CompletedAt: &cancelledAt,
+	}); err != nil {
+		t.Fatalf("seed cancelled task failed: %v", err)
+	}
+
+	if _, err := svc.BackfillStatistics(ctx, "7d"); err != nil {
+		t.Fatalf("BackfillStatistics failed: %v", err)
+	}
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, pastDay, pastDay)
+	if err != nil {
+		t.Fatalf("list cancelled day rows failed: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Total != 1 || rows[0].Cancelled != 1 || rows[0].Completed != 0 || rows[0].Failed != 0 {
+		t.Fatalf("cancelled task stats mismatch: %+v", rows)
+	}
+
+	stats, err := svc.GetStatistics(ctx, "7d")
+	if err != nil {
+		t.Fatalf("GetStatistics failed: %v", err)
+	}
+	day := statisticsDateKey(pastDay)
+	for _, item := range stats.QualityTrend {
+		if item.Date == day {
+			if item.Total != 1 || item.Success != 0 || item.Fail != 0 || item.SuccessRate != 0 {
+				t.Fatalf("cancelled quality trend mismatch: %+v", item)
+			}
+			return
+		}
+	}
+	t.Fatalf("quality trend missing cancelled day %s: %+v", day, stats.QualityTrend)
+}
+
+func TestBackfillStatisticsUsesSingleEnabledAccountModelFallback(t *testing.T) {
+	ctx := context.Background()
+	svc, taskRepo, db := newStatisticsTestService(t)
+	account := seedStatisticsAccount(t, ctx, db, "stats-single-model-fallback")
+	loc := time.Now().Location()
+	todayStart := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, loc)
+	pastDay := todayStart.AddDate(0, 0, -1)
+	created := pastDay.Add(45 * time.Second)
+	completed := created.Add(8 * time.Second)
+	if err := taskRepo.Create(ctx, &tasks.Task{
+		TaskID:            "single-model-fallback",
+		UserID:            93,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusCompleted,
+		Result:            `{}`,
+		CreatedAt:         created,
+		CompletedAt:       &completed,
+	}); err != nil {
+		t.Fatalf("seed fallback task failed: %v", err)
+	}
+
+	if _, err := svc.BackfillStatistics(ctx, "7d"); err != nil {
+		t.Fatalf("BackfillStatistics failed: %v", err)
+	}
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, pastDay, pastDay)
+	if err != nil {
+		t.Fatalf("list fallback day rows failed: %v", err)
+	}
+	if len(rows) != 1 || rows[0].ModelName != "gpt-image-1" || rows[0].UserKey != "93" || rows[0].Total != 1 {
+		t.Fatalf("fallback model stats mismatch: %+v", rows)
+	}
+}
+
+func TestBackfillStatisticsIgnoresInvalidResultJSON(t *testing.T) {
+	ctx := context.Background()
+	svc, taskRepo, _ := newStatisticsTestService(t)
+	loc := time.Now().Location()
+	todayStart := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, loc)
+	pastDay := todayStart.AddDate(0, 0, -1)
+	created := pastDay.Add(65 * time.Second)
+	completed := created.Add(9 * time.Second)
+	if err := taskRepo.Create(ctx, &tasks.Task{
+		TaskID:      "invalid-json-backfill",
+		UserID:      94,
+		Status:      tasks.StatusCompleted,
+		Result:      `{bad-json`,
+		CreatedAt:   created,
+		CompletedAt: &completed,
+	}); err != nil {
+		t.Fatalf("seed invalid json task failed: %v", err)
+	}
+
+	if _, err := svc.BackfillStatistics(ctx, "7d"); err != nil {
+		t.Fatalf("BackfillStatistics should ignore invalid result JSON: %v", err)
+	}
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, pastDay, pastDay)
+	if err != nil {
+		t.Fatalf("list invalid-json day rows failed: %v", err)
+	}
+	if len(rows) != 1 || rows[0].ModelName != "未识别模型" || rows[0].UserKey != "94" || rows[0].Total != 1 {
+		t.Fatalf("invalid result JSON fallback mismatch: %+v", rows)
+	}
+}
+
+func TestBackfillStatisticsMatchesRealtimeDimensionExtraction(t *testing.T) {
+	ctx := context.Background()
+	svc, taskRepo, _ := newStatisticsTestService(t)
+	loc := time.Now().Location()
+	todayStart := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, loc)
+	pastDay := todayStart.AddDate(0, 0, -1)
+	created := pastDay.Add(75 * time.Second)
+	completed := created
+	if err := taskRepo.Create(ctx, &tasks.Task{
+		TaskID:      "non-string-result-dimensions",
+		UserID:      95,
+		Status:      tasks.StatusCompleted,
+		Result:      `{"model":{"name":"bad"},"username":["bad"],"email":false,"user_id":0}`,
+		CreatedAt:   created,
+		CompletedAt: &completed,
+	}); err != nil {
+		t.Fatalf("seed non-string result task failed: %v", err)
+	}
+
+	if _, err := svc.BackfillStatistics(ctx, "7d"); err != nil {
+		t.Fatalf("BackfillStatistics failed: %v", err)
+	}
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, pastDay, pastDay)
+	if err != nil {
+		t.Fatalf("list non-string-result day rows failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows=%d, want 1: %+v", len(rows), rows)
+	}
+	if rows[0].ModelName != "未识别模型" || rows[0].UserKey != "95" {
+		t.Fatalf("non-string result dimensions should fall back like realtime path: %+v", rows[0])
+	}
+	if rows[0].Completed != 1 || rows[0].LatencyCount != 0 || rows[0].LatencySecondsSum != 0 {
+		t.Fatalf("zero latency backfill should not contribute latency sample: %+v", rows[0])
 	}
 }
 
@@ -406,7 +632,6 @@ func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
 	if err := taskRepo.Create(ctx, &tasks.Task{
 		TaskID:      "status-task-1",
 		UserID:      101,
-		ChannelID:   1,
 		Status:      tasks.StatusCompleted,
 		Result:      `{"model":"status-model","username":"status-user"}`,
 		CreatedAt:   created,
@@ -436,19 +661,30 @@ func TestGetStatisticsBackfillStatusReportsMissingDays(t *testing.T) {
 	}
 }
 
-func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
+func TestGetStatisticsKeepsUnknownWhenAccountHasMultipleModels(t *testing.T) {
 	ctx := context.Background()
 	svc, taskRepo, db := newStatisticsTestService(t)
 	accountRepo := accounts.NewAccountRepository(db)
+	var channelID int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO channels (type, name, api_url, status)
+VALUES ('openai-compatible', 'stats-channel-multi', 'https://example.com/stats-multi', 1)
+RETURNING id`).Scan(&channelID); err != nil {
+		t.Fatalf("create channel failed: %v", err)
+	}
 
 	account := &accounts.ApiAccount{
 		Name:      "acc-multi",
-		ChannelID: 1,
+		ChannelID: channelID,
 		Platform:  "openai-compatible",
 		ApiType:   "openai-compatible",
-		ModelSet:  "a,b",
-		ApiKey:    "test",
-		Status:    1,
+		Models: []accounts.AccountModel{
+			{Name: "a", Enabled: true},
+			{Name: "b", Enabled: true},
+		},
+		ApiKey:   "test",
+		ProxyURL: "https://example.com/multi",
+		Status:   1,
 	}
 	if err := accountRepo.Create(ctx, account); err != nil {
 		t.Fatalf("create account failed: %v", err)
@@ -457,14 +693,14 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 	created := time.Now().Add(-3 * time.Hour)
 	completed := created.Add(8 * time.Second)
 	task := &tasks.Task{
-		TaskID:      "repair-multi-1",
-		UserID:      12,
-		ChannelID:   1,
-		AccountID:   account.ID,
-		Status:      tasks.StatusCompleted,
-		Result:      `{}`,
-		CreatedAt:   created,
-		CompletedAt: &completed,
+		TaskID:            "repair-multi-1",
+		UserID:            12,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		Status:            tasks.StatusCompleted,
+		Result:            `{}`,
+		CreatedAt:         created,
+		CompletedAt:       &completed,
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("create task failed: %v", err)
@@ -484,7 +720,7 @@ func TestGetStatisticsKeepsUnknownWhenAccountModelSetIsMulti(t *testing.T) {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
 
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, day, day)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, created, created)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -506,6 +742,7 @@ type taskDailyStatSeed struct {
 	Total             int64
 	Completed         int64
 	Failed            int64
+	Cancelled         int64
 	LatencySecondsSum float64
 	LatencyCount      int64
 }
@@ -523,9 +760,9 @@ func insertTaskDailyStat(t *testing.T, db *sql.DB, stat taskDailyStatSeed) {
 	t.Helper()
 	_, err := db.ExecContext(
 		context.Background(),
-		`INSERT INTO task_daily_stats (stat_date, model_name, user_key, total, completed, failed, latency_seconds_sum, latency_count)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		stat.StatDate, stat.ModelName, stat.UserKey, stat.Total, stat.Completed, stat.Failed, stat.LatencySecondsSum, stat.LatencyCount,
+		`INSERT INTO task_daily_stats (stat_date, model_name, user_key, total, completed, failed, cancelled, latency_seconds_sum, latency_count)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		stat.StatDate, stat.ModelName, stat.UserKey, stat.Total, stat.Completed, stat.Failed, stat.Cancelled, stat.LatencySecondsSum, stat.LatencyCount,
 	)
 	if err != nil {
 		t.Fatalf("seed daily stat failed: %v", err)
@@ -543,4 +780,17 @@ func insertTaskStatEvent(t *testing.T, db *sql.DB, event taskStatEventSeed) {
 	if err != nil {
 		t.Fatalf("seed stat event failed: %v", err)
 	}
+}
+
+func countTaskStatEventsByDate(t *testing.T, db *sql.DB, statDate time.Time) int64 {
+	t.Helper()
+	var count int64
+	if err := db.QueryRowContext(
+		context.Background(),
+		`SELECT count(*) FROM task_stat_events WHERE stat_date = $1`,
+		statDate.Format(statisticsDateLayout),
+	).Scan(&count); err != nil {
+		t.Fatalf("count stat events failed: %v", err)
+	}
+	return count
 }

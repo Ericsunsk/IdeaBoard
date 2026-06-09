@@ -13,7 +13,13 @@ SELECT id, type, name, api_url, status, created_at, updated_at
 FROM channels
 ORDER BY id ASC;
 
--- name: UpdateChannel :exec
+-- name: CountAccountsByChannelID :one
+SELECT COUNT(*)
+FROM api_accounts
+WHERE channel_id = sqlc.arg(channel_id)
+  AND deleted_at IS NULL;
+
+-- name: UpdateChannel :execrows
 UPDATE channels
 SET type = sqlc.arg(type),
     name = sqlc.arg(name),
@@ -21,6 +27,6 @@ SET type = sqlc.arg(type),
     status = sqlc.arg(status)
 WHERE id = sqlc.arg(id);
 
--- name: DeleteChannel :exec
+-- name: DeleteChannel :execrows
 DELETE FROM channels
 WHERE id = sqlc.arg(id);

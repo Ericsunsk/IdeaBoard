@@ -1,22 +1,6 @@
 import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
 import { WORKFLOW_FEATURE_REGISTRY_MAP } from '../../../../shared/domain/workflowFeatureRegistry'
 
-export type VarTone = 'prompt' | 'control' | 'context'
-
-interface VarDef {
-  key: string
-  tone: VarTone
-}
-
-const promptVars: readonly VarDef[] = [
-  {
-    key: '{{user_prompt}}',
-    tone: 'prompt',
-  },
-]
-
-const noVars: readonly VarDef[] = []
-
 type RegistryFeatureItem = {
   slug: WorkflowFeature
   title: string
@@ -93,59 +77,6 @@ export const groupedFeatureGroups = sortedFeatureGroupDefs.map((group) => ({
 }))
 
 export type FeatureGroup = (typeof groupedFeatureGroups)[number]
-
-const featureVarMap: Partial<Record<FeatureSlug, readonly VarDef[]>> = {
-  [WORKFLOW_FEATURE.sketchToImage]: noVars,
-  [WORKFLOW_FEATURE.partialEdit]: promptVars,
-  [WORKFLOW_FEATURE.styleVariation]: [{ key: '{{strength}}', tone: 'control' }],
-  [WORKFLOW_FEATURE.virtual3d]: [
-    {
-      key: '{{viewpoint}}',
-      tone: 'context',
-    },
-    {
-      key: '{{lighting}}',
-      tone: 'context',
-    },
-    {
-      key: '{{user_prompt}}',
-      tone: 'prompt',
-    },
-  ],
-  [WORKFLOW_FEATURE.removeBg]: noVars,
-  [WORKFLOW_FEATURE.patternGen]: promptVars,
-  [WORKFLOW_FEATURE.styleFusion]: [
-    {
-      key: '{{user_prompt}}',
-      tone: 'prompt',
-    },
-    {
-      key: '{{image_weights}}',
-      tone: 'control',
-    },
-  ],
-  [WORKFLOW_FEATURE.hdUpscale]: [
-    { key: '{{upscale_mode}}', tone: 'control' },
-    { key: '{{upscale_factor}}', tone: 'control' },
-    { key: '{{output_format}}', tone: 'control' },
-    { key: '{{output_quality}}', tone: 'control' },
-  ],
-  [WORKFLOW_FEATURE.imageExtend]: [
-    ...promptVars,
-    { key: '{{extend_top}}', tone: 'control' },
-    { key: '{{extend_right}}', tone: 'control' },
-    { key: '{{extend_bottom}}', tone: 'control' },
-    { key: '{{extend_left}}', tone: 'control' },
-  ],
-}
-
-export function getVarsForSlug(slug: FeatureSlug): readonly VarDef[] {
-  return featureVarMap[slug] || noVars
-}
-
-export function getGroupVariableCount(group: FeatureGroup): number {
-  return new Set(group.items.flatMap((item) => getVarsForSlug(item.slug).map((v) => v.key))).size
-}
 
 export function getGroupFilledCount(
   group: FeatureGroup,

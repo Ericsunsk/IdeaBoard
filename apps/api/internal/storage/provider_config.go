@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-const (
-	StorageProfilesConfigKey = "storage_profiles_v1"
-)
-
 func (s *StorageService) s3CompatibleConfigFromProfile(profile *StorageProfile) *S3CompatibleConfig {
 	if profile == nil {
 		return &S3CompatibleConfig{}

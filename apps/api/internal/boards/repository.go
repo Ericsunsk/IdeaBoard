@@ -3,6 +3,7 @@ package boards
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 
 	"ideaboard/api/internal/db/dbutil"
@@ -36,13 +37,16 @@ func (r *BoardRepository) ListAccessibleByUserID(ctx context.Context, userID int
 		}
 		result = append(result, BoardWithRole{
 			Board: UserBoard{
-				ID:        row.ID,
-				BoardID:   row.BoardID,
-				UserID:    row.UserID,
-				Name:      row.Name,
-				State:     row.State,
-				CreatedAt: row.CreatedAt,
-				UpdatedAt: row.UpdatedAt,
+				ID:                 row.ID,
+				BoardID:            row.BoardID,
+				UserID:             row.UserID,
+				Name:               row.Name,
+				State:              boardStateString(row.State),
+				Revision:           row.Revision,
+				StateSchemaVersion: row.StateSchemaVersion,
+				LastSavedBy:        int64Ptr(row.LastSavedBy),
+				CreatedAt:          row.CreatedAt,
+				UpdatedAt:          row.UpdatedAt,
 			},
 			Role: role,
 		})
@@ -57,13 +61,16 @@ func (r *BoardRepository) GetAccessibleByBoardID(ctx context.Context, userID int
 	}
 	board := BoardWithRole{
 		Board: UserBoard{
-			ID:        row.ID,
-			BoardID:   row.BoardID,
-			UserID:    row.UserID,
-			Name:      row.Name,
-			State:     row.State,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
+			ID:                 row.ID,
+			BoardID:            row.BoardID,
+			UserID:             row.UserID,
+			Name:               row.Name,
+			State:              boardStateString(row.State),
+			Revision:           row.Revision,
+			StateSchemaVersion: row.StateSchemaVersion,
+			LastSavedBy:        int64Ptr(row.LastSavedBy),
+			CreatedAt:          row.CreatedAt,
+			UpdatedAt:          row.UpdatedAt,
 		},
 		Role: BoardAccessRoleOwner,
 	}
@@ -84,12 +91,21 @@ func (r *BoardRepository) GetByOwnerAndBoardID(ctx context.Context, ownerUserID 
 
 func (r *BoardRepository) Upsert(ctx context.Context, board *UserBoard) error {
 	return r.q.UpsertBoard(ctx, dbsqlc.UpsertBoardParams{
-		BoardID:   board.BoardID,
-		UserID:    board.UserID,
-		Name:      board.Name,
-		State:     board.State,
-		CreatedAt: board.CreatedAt,
-		UpdatedAt: board.UpdatedAt,
+		BoardID: board.BoardID,
+		UserID:  board.UserID,
+		Name:    board.Name,
+		State:   boardStateJSON(board.State),
+		Revision: sql.NullInt64{
+			Int64: board.Revision,
+			Valid: board.Revision > 0,
+		},
+		StateSchemaVersion: sql.NullInt32{
+			Int32: board.StateSchemaVersion,
+			Valid: board.StateSchemaVersion > 0,
+		},
+		LastSavedBy: nullInt64(board.LastSavedBy),
+		CreatedAt:   board.CreatedAt,
+		UpdatedAt:   board.UpdatedAt,
 	})
 }
 
@@ -132,7 +148,14 @@ func (r *BoardRepository) GetMemberRole(ctx context.Context, ownerUserID int64, 
 }
 
 func (r *BoardRepository) DeleteByBoardID(ctx context.Context, ownerUserID int64, boardID string) error {
-	return r.q.DeleteBoardByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
+	rows, err := r.q.DeleteBoardByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }
 
 func (r *BoardRepository) DeleteMembersByBoardID(ctx context.Context, ownerUserID int64, boardID string) error {
@@ -151,7 +174,14 @@ func (r *BoardRepository) DeleteBoardCascade(ctx context.Context, ownerUserID in
 		if err := q.DeleteBoardMembersByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardMembersByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID}); err != nil {
 			return err
 		}
-		return q.DeleteBoardByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
+		rows, err := q.DeleteBoardByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return database.ErrNotFound
+		}
+		return nil
 	})
 }
 
@@ -186,7 +216,14 @@ func (r *BoardRepository) UpsertMember(ctx context.Context, ownerUserID int64, b
 }
 
 func (r *BoardRepository) DeleteMember(ctx context.Context, ownerUserID int64, boardID string, userID int64) error {
-	return r.q.DeleteBoardMember(ctx, dbsqlc.DeleteBoardMemberParams{OwnerUserID: ownerUserID, BoardID: boardID, UserID: userID})
+	rows, err := r.q.DeleteBoardMember(ctx, dbsqlc.DeleteBoardMemberParams{OwnerUserID: ownerUserID, BoardID: boardID, UserID: userID})
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }
 
 func (r *BoardRepository) GetMemberByUserID(ctx context.Context, ownerUserID int64, boardID string, userID int64) (*BoardMember, error) {
@@ -208,12 +245,14 @@ func (r *BoardRepository) GetMemberByUserID(ctx context.Context, ownerUserID int
 
 func (r *BoardRepository) CreateShareToken(ctx context.Context, token *BoardShareToken) error {
 	id, err := r.q.CreateBoardShareToken(ctx, dbsqlc.CreateBoardShareTokenParams{
-		BoardID:   token.BoardID,
-		Token:     token.Token,
-		Role:      token.Role,
-		CreatedBy: token.CreatedBy,
-		Revoked:   token.Revoked,
-		ExpiresAt: dbutil.NullTime(token.ExpiresAt),
+		BoardID:     token.BoardID,
+		TokenHash:   token.TokenHash,
+		TokenPrefix: token.TokenPrefix,
+		Role:        token.Role,
+		CreatedBy:   token.CreatedBy,
+		Revoked:     token.Revoked,
+		ExpiresAt:   dbutil.NullTime(token.ExpiresAt),
+		MaxUses:     nullInt32(token.MaxUses),
 	})
 	if err != nil {
 		return err
@@ -234,8 +273,8 @@ func (r *BoardRepository) ListShareTokens(ctx context.Context, ownerUserID int64
 	return result, nil
 }
 
-func (r *BoardRepository) GetShareTokenByToken(ctx context.Context, token string) (*BoardShareToken, error) {
-	row, err := r.q.GetBoardShareTokenByToken(ctx, token)
+func (r *BoardRepository) GetShareTokenByHash(ctx context.Context, tokenHash string) (*BoardShareToken, error) {
+	row, err := r.q.GetBoardShareTokenByHash(ctx, tokenHash)
 	if err != nil {
 		return nil, err
 	}
@@ -243,15 +282,13 @@ func (r *BoardRepository) GetShareTokenByToken(ctx context.Context, token string
 	return &shareToken, nil
 }
 
-func (r *BoardRepository) RevokeShareToken(ctx context.Context, ownerUserID int64, boardID, token string) error {
-	result, err := r.db.ExecContext(ctx, `
-UPDATE board_share_tokens
-SET revoked = TRUE
-WHERE created_by = $1 AND board_id = $2 AND token = $3`, ownerUserID, boardID, token)
-	if err != nil {
-		return err
-	}
-	rows, err := result.RowsAffected()
+func (r *BoardRepository) RevokeShareTokenByID(ctx context.Context, ownerUserID int64, boardID string, tokenID int64) error {
+	rows, err := r.q.RevokeBoardShareTokenByID(ctx, dbsqlc.RevokeBoardShareTokenByIDParams{
+		OwnerUserID: ownerUserID,
+		BoardID:     boardID,
+		TokenID:     tokenID,
+		RevokedBy:   sql.NullInt64{Int64: ownerUserID, Valid: true},
+	})
 	if err != nil {
 		return err
 	}
@@ -261,8 +298,33 @@ WHERE created_by = $1 AND board_id = $2 AND token = $3`, ownerUserID, boardID, t
 	return nil
 }
 
-func (r *BoardRepository) ShareTokenExists(ctx context.Context, token string) (bool, error) {
-	count, err := r.q.CountBoardShareTokenByToken(ctx, token)
+func (r *BoardRepository) ConsumeShareTokenAndUpsertMember(ctx context.Context, tokenHash string, userID int64) (*BoardShareToken, error) {
+	var shareToken BoardShareToken
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		row, err := q.ConsumeBoardShareToken(ctx, tokenHash)
+		if err != nil {
+			return err
+		}
+		shareToken = boardShareTokenFromSQLC(row)
+		role := normalizeBoardMemberRole(shareToken.Role)
+		if role == "" {
+			return ErrShareTokenInvalid
+		}
+		return q.UpsertBoardMember(ctx, dbsqlc.UpsertBoardMemberParams{
+			OwnerUserID: shareToken.CreatedBy,
+			BoardID:     shareToken.BoardID,
+			UserID:      userID,
+			Role:        string(role),
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &shareToken, nil
+}
+
+func (r *BoardRepository) ShareTokenHashExists(ctx context.Context, tokenHash string) (bool, error) {
+	count, err := r.q.CountBoardShareTokenByHash(ctx, tokenHash)
 	if err != nil {
 		return false, err
 	}
@@ -285,26 +347,80 @@ func IsBoardIDUniqueConstraintError(err error) bool {
 
 func userBoardFromSQLC(row dbsqlc.UserBoard) UserBoard {
 	return UserBoard{
-		ID:        row.ID,
-		BoardID:   row.BoardID,
-		UserID:    row.UserID,
-		Name:      row.Name,
-		State:     row.State,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:                 row.ID,
+		BoardID:            row.BoardID,
+		UserID:             row.UserID,
+		Name:               row.Name,
+		State:              boardStateString(row.State),
+		Revision:           row.Revision,
+		StateSchemaVersion: row.StateSchemaVersion,
+		LastSavedBy:        int64Ptr(row.LastSavedBy),
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
 	}
+}
+
+func boardStateJSON(state string) json.RawMessage {
+	state = strings.TrimSpace(state)
+	if state == "" {
+		return json.RawMessage("null")
+	}
+	return json.RawMessage(state)
+}
+
+func boardStateString(state json.RawMessage) string {
+	if len(state) == 0 {
+		return "null"
+	}
+	return string(state)
 }
 
 func boardShareTokenFromSQLC(row dbsqlc.BoardShareToken) BoardShareToken {
 	return BoardShareToken{
-		ID:        row.ID,
-		BoardID:   row.BoardID,
-		Token:     row.Token,
-		Role:      row.Role,
-		CreatedBy: row.CreatedBy,
-		Revoked:   row.Revoked,
-		ExpiresAt: dbutil.TimePtr(row.ExpiresAt),
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:          row.ID,
+		BoardID:     row.BoardID,
+		TokenHash:   row.TokenHash,
+		TokenPrefix: row.TokenPrefix,
+		Role:        row.Role,
+		CreatedBy:   row.CreatedBy,
+		Revoked:     row.Revoked,
+		UsageCount:  row.UsageCount,
+		MaxUses:     int32Ptr(row.MaxUses),
+		LastUsedAt:  dbutil.TimePtr(row.LastUsedAt),
+		RevokedAt:   dbutil.TimePtr(row.RevokedAt),
+		RevokedBy:   int64Ptr(row.RevokedBy),
+		ExpiresAt:   dbutil.TimePtr(row.ExpiresAt),
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
 	}
+}
+
+func nullInt64(value *int64) sql.NullInt64 {
+	if value == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *value, Valid: true}
+}
+
+func int64Ptr(value sql.NullInt64) *int64 {
+	if !value.Valid {
+		return nil
+	}
+	v := value.Int64
+	return &v
+}
+
+func nullInt32(value *int32) sql.NullInt32 {
+	if value == nil {
+		return sql.NullInt32{}
+	}
+	return sql.NullInt32{Int32: *value, Valid: true}
+}
+
+func int32Ptr(value sql.NullInt32) *int32 {
+	if !value.Valid {
+		return nil
+	}
+	v := value.Int32
+	return &v
 }

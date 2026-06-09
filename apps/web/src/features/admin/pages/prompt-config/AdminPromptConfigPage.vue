@@ -105,6 +105,15 @@
           </template>
 
           <div class="flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-2.5">
+              <Tag
+                :value="enabledMap[item.slug] ? '已启用' : '已停用'"
+                :severity="enabledMap[item.slug] ? 'success' : 'secondary'"
+                rounded
+              />
+              <ToggleSwitch v-model="enabledMap[item.slug]" :disabled="saving[item.slug]" />
+            </div>
+
             <div
               v-if="getVarsForSlug(item.slug).length > 0"
               class="flex min-w-0 flex-wrap items-center gap-1.5"
@@ -166,6 +175,7 @@ import Dialog from 'primevue/dialog'
 import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
+import ToggleSwitch from 'primevue/toggleswitch'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
@@ -176,15 +186,17 @@ import {
   getListAdminFeaturePromptsQueryKey,
   useListAdminFeaturePrompts,
 } from '../../../../shared/api/generated-query/admin-feature-prompts/admin-feature-prompts'
+import type {
+  FeaturePrompt,
+  FeaturePromptVariable,
+  FeaturePromptVariableTone,
+} from '../../../../shared/api/generated-query/model'
 import {
   featureMap,
   groupedFeatureGroups,
   getGroupFilledCount as calcGroupFilledCount,
-  getGroupVariableCount as calcGroupVariableCount,
-  getVarsForSlug,
   type FeatureGroup,
   type FeatureSlug,
-  type VarTone,
 } from './featurePromptMeta'
 
 const appToast = useAppToast()
@@ -211,7 +223,7 @@ const activeGroup = computed<FeatureGroup | null>(() => {
 })
 const variableTokenButtonClass =
   'max-w-full !h-7 !min-h-0 !rounded-full !border-transparent !px-2.5 !py-0 font-mono !text-[11px] !font-[760] !leading-4 [&_.p-button-label]:break-all [&_.p-button-label]:leading-4'
-const variableTokenButtonToneClass: Record<VarTone, string> = {
+const variableTokenButtonToneClass: Record<FeaturePromptVariableTone, string> = {
   prompt: '!bg-[rgba(71,117,168,0.16)] !text-admin-info hover:!bg-[rgba(71,117,168,0.22)]',
   control: '!bg-[rgba(212,136,48,0.16)] !text-admin-warning hover:!bg-[rgba(212,136,48,0.22)]',
   context: '!bg-admin-surface-muted !text-admin-text-2-strong hover:!bg-admin-surface-hover',
@@ -237,15 +249,19 @@ function handleEditorDialogVisibleUpdate(visible: boolean) {
 }
 
 function getGroupVariableCount(group: FeatureGroup) {
-  return calcGroupVariableCount(group)
+  return new Set(group.items.flatMap((item) => getVarsForSlug(item.slug).map((v) => v.key))).size
 }
 
 function getGroupFilledCount(group: FeatureGroup) {
   return calcGroupFilledCount(group, savedPromptMap)
 }
 
-function getVariableTokenButtonClass(tone: VarTone) {
-  return [variableTokenButtonClass, variableTokenButtonToneClass[tone]]
+function getVariableTokenButtonClass(tone?: FeaturePromptVariableTone) {
+  return [variableTokenButtonClass, variableTokenButtonToneClass[tone || 'context']]
+}
+
+function getVarsForSlug(slug: FeatureSlug): FeaturePromptVariable[] {
+  return promptConfigMap[slug]?.variables ?? []
 }
 
 function insertVar(slug: FeatureSlug, varKey: string) {
@@ -276,13 +292,17 @@ function bindTextareaRef(slug: FeatureSlug, el: unknown) {
 
 const promptMap = reactive<Record<string, string>>({})
 const savedPromptMap = reactive<Record<string, string>>({})
+const enabledMap = reactive<Record<string, boolean>>({})
+const promptConfigMap = reactive<Record<string, FeaturePrompt>>({})
 const saving = reactive<Record<string, boolean>>({})
 const promptsQuery = useListAdminFeaturePrompts()
 const savePromptMutation = useMutation({
   mutationFn: saveFeaturePrompt,
-  onSuccess: async ({ slug, prompt }) => {
-    savedPromptMap[slug] = prompt
-    promptMap[slug] = prompt
+  onSuccess: async (config) => {
+    promptConfigMap[config.slug] = config
+    savedPromptMap[config.slug] = config.prompt
+    promptMap[config.slug] = config.prompt
+    enabledMap[config.slug] = config.enabled
     await queryClient.invalidateQueries({ queryKey: getListAdminFeaturePromptsQueryKey() })
   },
 })
@@ -296,6 +316,7 @@ watch(
 function resetGroupDraftFromSaved(group: FeatureGroup) {
   for (const item of group.items) {
     promptMap[item.slug] = savedPromptMap[item.slug] || ''
+    enabledMap[item.slug] = promptConfigMap[item.slug]?.enabled ?? true
   }
 }
 
@@ -304,14 +325,17 @@ watch(
   (response) => {
     const prompts = response?.data?.prompts
     if (!prompts) return
-    for (const [slug, prompt] of Object.entries(prompts)) {
-      const val = prompt || ''
+    for (const config of prompts) {
+      const slug = config.slug
+      promptConfigMap[slug] = config
+      const val = config.prompt || ''
       const hadDraft = Object.prototype.hasOwnProperty.call(promptMap, slug)
       const currentDraft = promptMap[slug] || ''
       const previousSaved = savedPromptMap[slug] || ''
       savedPromptMap[slug] = val
       if (!hadDraft || currentDraft === previousSaved) {
         promptMap[slug] = val
+        enabledMap[slug] = config.enabled
       }
     }
   },
@@ -321,7 +345,11 @@ watch(
 async function savePrompt(slug: FeatureSlug) {
   saving[slug] = true
   try {
-    await savePromptMutation.mutateAsync({ slug, prompt: promptMap[slug] || '' })
+    await savePromptMutation.mutateAsync({
+      slug,
+      prompt: promptMap[slug] || '',
+      enabled: enabledMap[slug] ?? true,
+    })
     appToast.success(`「${featureMap[slug].title}」提示词已保存`)
   } catch (error) {
     appToast.error(formatDisplayErrorMessage(error, '保存失败'))

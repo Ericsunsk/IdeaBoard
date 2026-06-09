@@ -80,10 +80,17 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 	taskRepo := taskstore.NewRepository(db)
 	channelRepo := channels.NewChannelRepository(db)
 	systemConfigRepo := settings.NewSystemConfigRepository(db)
+	featurePromptRepo := prompts.NewFeaturePromptRepository(db)
+	storageProfileRepo := storage.NewStorageProfileRepository(db)
 	lineDraftModeRepo := assets.NewLineDraftModeRepository(db)
 	boardRepo := boards.NewBoardRepository(db)
 
-	storageService := storage.NewStorageService(systemConfigRepo)
+	storageService := storage.NewStorageService(storageProfileRepo)
+	if err := storageService.EnsureDefaultProfiles(context.Background()); err != nil {
+		riverPool.Close()
+		_ = db.Close()
+		return nil, fmt.Errorf("failed to ensure default storage profiles: %w", err)
+	}
 	userService := users.NewUserService(userRepo, storageService)
 	boardService := boards.NewBoardService(boardRepo, userRepo, storageService)
 	taskEventHub := taskservice.NewEventHub()
@@ -136,7 +143,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 		TaskRepo:          taskRepo,
 		SubmissionStore:   submissionStore,
 		CancelStore:       postgresRuntimeStore,
-		SystemConfigRepo:  systemConfigRepo,
+		FeaturePrompts:    featurePromptRepo,
 		UploadBoards:      uploadBoardAccessResolver{service: boardService},
 		UploadOwners:      uploadOwnerStorageUIDResolver{repo: userRepo},
 		TaskOutputCleaner: storageService,
@@ -176,7 +183,7 @@ func newAppContainer(cfg *config.Config) (*appContainer, error) {
 			ChannelHandler:       channels.NewChannelHandler(channelRepo, cfg.App.Env),
 			StorageHandler:       storage.NewStorageHandler(storageService),
 			LineDraftHandler:     assets.NewLineDraftHandler(lineDraftModeRepo),
-			FeaturePromptHandler: prompts.NewFeaturePromptHandler(systemConfigRepo),
+			FeaturePromptHandler: prompts.NewFeaturePromptHandler(featurePromptRepo),
 			StorageService:       storageService,
 		},
 		StaticUploads: httpapi.StaticUploadDeps{

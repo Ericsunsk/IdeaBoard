@@ -41,7 +41,11 @@ func TestCallGoogleGeminiGenerateContent(t *testing.T) {
 	defer server.Close()
 
 	c := &ProviderExecutor{}
-	account := &accounts.ApiAccount{ProxyURL: server.URL, ApiKey: "google-key", ModelSet: "gemini-2.5-flash-image"}
+	account := &accounts.ApiAccount{
+		ProxyURL: server.URL,
+		ApiKey:   "google-key",
+		Models:   []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
+	}
 	params := map[string]interface{}{
 		"image_urls": []interface{}{inputDataURL},
 	}
@@ -183,7 +187,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		ApiType:  workflow.ProviderGoogleAI,
 		ProxyURL: server.URL,
 		ApiKey:   "google-key",
-		ModelSet: "gemini-2.5-flash-image",
+		Models:   []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
 	}
 	task := &queuetypes.TaskPayload{
 		TaskID: "task-google-native",

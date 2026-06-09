@@ -1,24 +1,33 @@
 -- name: CreateTask :one
 INSERT INTO tasks (
-  task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
-  status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
+  task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params,
+  feature_slug, requested_model, resolved_model, api_type,
+  status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
+  cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
-  sqlc.arg(task_id), sqlc.arg(user_id), sqlc.arg(channel_id), sqlc.arg(account_id),
-  sqlc.arg(prompt), sqlc.arg(user_prompt), sqlc.arg(params), sqlc.arg(status),
+  sqlc.arg(task_id), sqlc.arg(user_id), sqlc.narg(assigned_channel_id), sqlc.narg(account_id),
+  sqlc.arg(prompt), sqlc.arg(user_prompt), sqlc.arg(params),
+  sqlc.arg(feature_slug), sqlc.arg(requested_model), sqlc.arg(resolved_model), sqlc.arg(api_type),
+  sqlc.arg(status),
   sqlc.arg(lease_token), sqlc.arg(retry_count), sqlc.arg(error_msg), sqlc.arg(result),
-  sqlc.arg(created_at), sqlc.arg(updated_at), sqlc.arg(completed_at)
+  sqlc.arg(created_at), sqlc.arg(updated_at), sqlc.arg(completed_at),
+  sqlc.arg(cancelled_at), sqlc.narg(cancelled_by), sqlc.arg(cancel_reason)
 )
 RETURNING id;
 
 -- name: GetTaskByTaskID :one
-SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
-       status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
+SELECT id, task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params,
+       feature_slug, requested_model, resolved_model, api_type,
+       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
+       cancelled_at, cancelled_by, cancel_reason
 FROM tasks
 WHERE task_id = sqlc.arg(task_id);
 
 -- name: GetTaskByTaskIDAndUserID :one
-SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
-       status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
+SELECT id, task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params,
+       feature_slug, requested_model, resolved_model, api_type,
+       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
+       cancelled_at, cancelled_by, cancel_reason
 FROM tasks
 WHERE task_id = sqlc.arg(task_id) AND user_id = sqlc.arg(user_id);
 
@@ -29,7 +38,8 @@ SELECT
   COUNT(*) FILTER (WHERE status = 'running') AS running_count,
   COUNT(*) FILTER (WHERE status = 'completed') AS completed_count,
   COUNT(*) FILTER (WHERE status = 'failed') AS failed_count,
-  COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running', 'completed', 'failed')) AS other_count
+  COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_count,
+  COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running', 'completed', 'failed', 'cancelled')) AS other_count
 FROM tasks
 WHERE (NOT sqlc.arg(has_user_id)::boolean OR user_id = sqlc.arg(user_id))
   AND (NOT sqlc.arg(has_account_id)::boolean OR account_id = sqlc.arg(account_id))
@@ -37,8 +47,10 @@ WHERE (NOT sqlc.arg(has_user_id)::boolean OR user_id = sqlc.arg(user_id))
   AND (NOT sqlc.arg(has_keyword)::boolean OR prompt ILIKE sqlc.arg(keyword_like));
 
 -- name: ListTasks :many
-SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
-       status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
+SELECT id, task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params,
+       feature_slug, requested_model, resolved_model, api_type,
+       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
+       cancelled_at, cancelled_by, cancel_reason
 FROM tasks
 WHERE (NOT sqlc.arg(has_user_id)::boolean OR user_id = sqlc.arg(user_id))
   AND (NOT sqlc.arg(has_account_id)::boolean OR account_id = sqlc.arg(account_id))
@@ -59,9 +71,9 @@ WHERE task_id = ANY(sqlc.arg(task_ids)::text[]);
 SELECT COALESCE(NULLIF(m.bottleneck_source, ''), 'unknown')::text AS bottleneck_source,
        COUNT(*)::bigint AS total,
        COUNT(*) FILTER (WHERE t.status = 'failed')::bigint AS failed,
-       COALESCE(AVG(m.total_latency_ms), 0)::double precision AS avg_latency_ms
-FROM task_execution_metrics m
-JOIN tasks t ON t.task_id = m.task_id
+       COALESCE(AVG(COALESCE(m.total_latency_ms, 0)), 0)::double precision AS avg_latency_ms
+FROM tasks t
+LEFT JOIN task_execution_metrics m ON m.task_id = t.task_id
 WHERE t.created_at >= sqlc.arg(started_at) AND t.created_at < sqlc.arg(ended_at)
   AND t.status IN ('completed', 'failed')
 GROUP BY COALESCE(NULLIF(m.bottleneck_source, ''), 'unknown')
@@ -70,9 +82,9 @@ ORDER BY total DESC, bottleneck_source ASC;
 -- name: ListTaskExecutionFailureCategoryStatsByCreatedRange :many
 SELECT COALESCE(NULLIF(m.failure_category, ''), 'unknown')::text AS failure_category,
        COUNT(*)::bigint AS total,
-       COALESCE(AVG(m.total_latency_ms), 0)::double precision AS avg_latency_ms
-FROM task_execution_metrics m
-JOIN tasks t ON t.task_id = m.task_id
+       COALESCE(AVG(COALESCE(m.total_latency_ms, 0)), 0)::double precision AS avg_latency_ms
+FROM tasks t
+LEFT JOIN task_execution_metrics m ON m.task_id = t.task_id
 WHERE t.created_at >= sqlc.arg(started_at) AND t.created_at < sqlc.arg(ended_at)
   AND t.status = 'failed'
 GROUP BY COALESCE(NULLIF(m.failure_category, ''), 'unknown')
@@ -101,10 +113,22 @@ INSERT INTO task_execution_metrics (
   COALESCE(sqlc.narg(total_latency_ms)::bigint, 0)
 )
 ON CONFLICT (task_id) DO UPDATE
-SET current_stage = COALESCE(sqlc.narg(current_stage)::text, task_execution_metrics.current_stage),
-    bottleneck_source = COALESCE(sqlc.narg(bottleneck_source)::text, task_execution_metrics.bottleneck_source),
-    failure_stage = COALESCE(sqlc.narg(failure_stage)::text, task_execution_metrics.failure_stage),
-    failure_category = COALESCE(sqlc.narg(failure_category)::text, task_execution_metrics.failure_category),
+SET current_stage = CASE
+      WHEN task_execution_metrics.current_stage IN ('completed', 'failed', 'cancelled') THEN task_execution_metrics.current_stage
+      ELSE COALESCE(sqlc.narg(current_stage)::text, task_execution_metrics.current_stage)
+    END,
+    bottleneck_source = CASE
+      WHEN task_execution_metrics.current_stage IN ('completed', 'failed', 'cancelled') THEN task_execution_metrics.bottleneck_source
+      ELSE COALESCE(sqlc.narg(bottleneck_source)::text, task_execution_metrics.bottleneck_source)
+    END,
+    failure_stage = CASE
+      WHEN task_execution_metrics.current_stage IN ('completed', 'failed', 'cancelled') THEN task_execution_metrics.failure_stage
+      ELSE COALESCE(sqlc.narg(failure_stage)::text, task_execution_metrics.failure_stage)
+    END,
+    failure_category = CASE
+      WHEN task_execution_metrics.current_stage IN ('completed', 'failed', 'cancelled') THEN task_execution_metrics.failure_category
+      ELSE COALESCE(sqlc.narg(failure_category)::text, task_execution_metrics.failure_category)
+    END,
     assigned_at = COALESCE(sqlc.narg(assigned_at), task_execution_metrics.assigned_at),
     provider_started_at = COALESCE(sqlc.narg(provider_started_at), task_execution_metrics.provider_started_at),
     provider_finished_at = COALESCE(sqlc.narg(provider_finished_at), task_execution_metrics.provider_finished_at),
@@ -114,8 +138,82 @@ SET current_stage = COALESCE(sqlc.narg(current_stage)::text, task_execution_metr
     worker_overhead_ms = COALESCE(sqlc.narg(worker_overhead_ms)::bigint, task_execution_metrics.worker_overhead_ms),
     provider_latency_ms = COALESCE(sqlc.narg(provider_latency_ms)::bigint, task_execution_metrics.provider_latency_ms),
     finalize_latency_ms = COALESCE(sqlc.narg(finalize_latency_ms)::bigint, task_execution_metrics.finalize_latency_ms),
-    total_latency_ms = COALESCE(sqlc.narg(total_latency_ms)::bigint, task_execution_metrics.total_latency_ms),
+    total_latency_ms = CASE
+      WHEN task_execution_metrics.current_stage IN ('completed', 'failed', 'cancelled') THEN task_execution_metrics.total_latency_ms
+      ELSE COALESCE(sqlc.narg(total_latency_ms)::bigint, task_execution_metrics.total_latency_ms)
+    END,
     updated_at = now();
+
+-- name: PatchTaskExecutionSnapshot :execrows
+UPDATE tasks
+SET feature_slug = sqlc.arg(feature_slug),
+    requested_model = sqlc.arg(requested_model),
+    resolved_model = sqlc.arg(resolved_model),
+    api_type = sqlc.arg(api_type)
+WHERE task_id = sqlc.arg(task_id);
+
+-- name: MarkTaskCancelled :execrows
+UPDATE tasks
+SET status = 'cancelled',
+    lease_token = '',
+    completed_at = sqlc.arg(cancelled_at),
+    cancelled_at = sqlc.arg(cancelled_at),
+    cancelled_by = sqlc.narg(cancelled_by),
+    cancel_reason = sqlc.arg(cancel_reason),
+    updated_at = now()
+WHERE task_id = sqlc.arg(task_id)
+  AND status IN ('pending', 'running');
+
+-- name: CreateTaskAttempt :one
+WITH next_attempt AS (
+  UPDATE tasks
+  SET attempt_seq = attempt_seq + 1,
+      updated_at = now()
+  WHERE task_id = sqlc.arg(task_id)
+    AND status = 'running'
+    AND account_id = sqlc.arg(account_id)
+    AND assigned_channel_id = sqlc.arg(channel_id)
+    AND lease_token = sqlc.arg(lease_token)
+  RETURNING attempt_seq AS attempt_no
+)
+INSERT INTO task_attempts (
+  task_id, attempt_no, river_job_id, lease_token, account_id, channel_id,
+  feature_slug, requested_model, resolved_model, api_type, status,
+  provider_started_at
+)
+SELECT
+  sqlc.arg(task_id), next_attempt.attempt_no, sqlc.arg(river_job_id), sqlc.arg(lease_token),
+  sqlc.arg(account_id), sqlc.arg(channel_id), sqlc.arg(feature_slug), sqlc.arg(requested_model),
+  sqlc.arg(resolved_model), sqlc.arg(api_type), 'running', sqlc.arg(provider_started_at)
+FROM next_attempt
+RETURNING id, attempt_no;
+
+-- name: FinishTaskAttempt :execrows
+UPDATE task_attempts
+SET status = sqlc.arg(status),
+    failure_stage = sqlc.arg(failure_stage),
+    failure_category = sqlc.arg(failure_category),
+    error_msg = sqlc.arg(error_msg),
+    provider_finished_at = sqlc.arg(provider_finished_at),
+    finalize_started_at = sqlc.arg(finalize_started_at),
+    finalize_finished_at = sqlc.arg(finalize_finished_at),
+    provider_latency_ms = sqlc.arg(provider_latency_ms),
+    finalize_latency_ms = sqlc.arg(finalize_latency_ms),
+    total_latency_ms = sqlc.arg(total_latency_ms),
+    completed_at = sqlc.arg(completed_at)
+WHERE id = sqlc.arg(id)
+  AND status = 'running';
+
+-- name: ListTaskAttemptsByTaskID :many
+SELECT id, task_id, attempt_no, river_job_id, lease_token, account_id, channel_id,
+       feature_slug, requested_model, resolved_model, api_type, status,
+       failure_stage, failure_category, error_msg,
+       provider_started_at, provider_finished_at, finalize_started_at, finalize_finished_at,
+       provider_latency_ms, finalize_latency_ms, total_latency_ms,
+       completed_at, created_at, updated_at
+FROM task_attempts
+WHERE task_id = sqlc.arg(task_id)
+ORDER BY attempt_no ASC;
 
 -- name: CountTasksByUserID :one
 SELECT COUNT(*)
@@ -123,8 +221,10 @@ FROM tasks
 WHERE user_id = sqlc.arg(user_id);
 
 -- name: ListTasksByUserID :many
-SELECT id, task_id, user_id, channel_id, account_id, prompt, user_prompt, params,
-       status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at
+SELECT id, task_id, user_id, assigned_channel_id, account_id, prompt, user_prompt, params,
+       feature_slug, requested_model, resolved_model, api_type,
+       status, lease_token, retry_count, attempt_seq, error_msg, result, created_at, updated_at, completed_at,
+       cancelled_at, cancelled_by, cancel_reason
 FROM tasks
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY created_at DESC
@@ -164,7 +264,8 @@ LIMIT sqlc.arg(row_limit);
 -- name: ResetRunningMissingLeaseTasksByIDs :execrows
 UPDATE tasks
 SET status = 'pending',
-    account_id = 0,
+    account_id = NULL,
+    assigned_channel_id = NULL,
     lease_token = '',
     error_msg = 'lease_token missing; reset to pending by task lease repair',
     completed_at = NULL
@@ -181,6 +282,8 @@ SET status = 'completed',
     completed_at = sqlc.arg(completed_at)
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
+  AND account_id = sqlc.arg(account_id)
+  AND assigned_channel_id = sqlc.arg(assigned_channel_id)
   AND lease_token = sqlc.arg(lease_token);
 
 -- name: MarkTaskFailed :execrows
@@ -202,33 +305,40 @@ SET status = 'failed',
     completed_at = sqlc.arg(completed_at)
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
+  AND account_id = sqlc.arg(account_id)
+  AND assigned_channel_id = sqlc.arg(assigned_channel_id)
   AND lease_token = sqlc.arg(lease_token);
 
 -- name: ResetTaskRunningToPendingWithLease :execrows
 UPDATE tasks
 SET status = 'pending',
-    account_id = 0,
+    account_id = NULL,
+    assigned_channel_id = NULL,
     lease_token = '',
     error_msg = sqlc.arg(error_msg)
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
+  AND account_id = sqlc.arg(account_id)
+  AND assigned_channel_id = sqlc.arg(assigned_channel_id)
   AND lease_token = sqlc.arg(lease_token);
 
 -- name: RequeueTaskRunningWithLease :execrows
 UPDATE tasks
 SET status = 'pending',
-    account_id = 0,
+    account_id = NULL,
+    assigned_channel_id = NULL,
     lease_token = '',
     error_msg = sqlc.arg(error_msg),
     retry_count = retry_count + 1
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
+  AND account_id = sqlc.arg(account_id)
+  AND assigned_channel_id = sqlc.arg(assigned_channel_id)
   AND lease_token = sqlc.arg(lease_token);
 
 -- name: FinalFailTaskRunningWithLease :execrows
 UPDATE tasks
 SET status = 'failed',
-    account_id = 0,
     lease_token = '',
     error_msg = sqlc.arg(error_msg),
     result = sqlc.arg(result),
@@ -236,6 +346,8 @@ SET status = 'failed',
     completed_at = sqlc.arg(completed_at)
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[])
+  AND account_id = sqlc.arg(account_id)
+  AND assigned_channel_id = sqlc.arg(assigned_channel_id)
   AND lease_token = sqlc.arg(lease_token);
 
 -- name: DeleteTaskByTaskIDAndUserID :exec
@@ -249,10 +361,24 @@ WHERE user_id = sqlc.arg(user_id);
 -- name: FailRunningTasksByAccountID :many
 UPDATE tasks
 SET status = 'failed',
+    lease_token = '',
     error_msg = sqlc.arg(error_msg),
     completed_at = sqlc.arg(completed_at)
-WHERE account_id = sqlc.arg(account_id) AND status IN ('running', 'pending')
-RETURNING task_id, user_id, account_id, result, created_at, completed_at;
+WHERE account_id = sqlc.arg(account_id) AND status = 'running'
+RETURNING task_id, user_id, assigned_channel_id, account_id, result,
+          feature_slug, requested_model, resolved_model, api_type,
+          created_at, completed_at;
+
+-- name: FailRunningTaskAttemptsByAccountID :execrows
+UPDATE task_attempts
+SET status = 'failed',
+    failure_stage = sqlc.arg(failure_stage),
+    failure_category = sqlc.arg(failure_category),
+    error_msg = sqlc.arg(error_msg),
+    completed_at = sqlc.arg(completed_at)
+WHERE account_id = sqlc.arg(account_id)
+  AND status = 'running'
+  AND task_id = ANY(sqlc.arg(task_ids)::text[]);
 
 -- name: CountTasksByStatus :one
 SELECT COUNT(*)
@@ -264,7 +390,9 @@ SELECT COUNT(*)
 FROM tasks;
 
 -- name: ListTaskStatisticsByCreatedRange :many
-SELECT task_id, user_id, account_id, status, result, created_at, completed_at
+SELECT task_id, user_id, account_id, status, result,
+       feature_slug, requested_model, resolved_model, api_type,
+       created_at, completed_at
 FROM tasks
 WHERE created_at >= sqlc.arg(started_at) AND created_at < sqlc.arg(ended_at)
 ORDER BY created_at ASC;

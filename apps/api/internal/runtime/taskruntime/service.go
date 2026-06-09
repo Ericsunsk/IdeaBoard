@@ -37,14 +37,18 @@ type AccountStore interface {
 }
 
 type TaskStore interface {
-	CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput) (int64, error)
-	MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time) (int64, error)
-	MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error)
-	ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error)
-	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string) (int64, error)
-	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, leaseToken string, errMsg string, result string, completedAt time.Time) (int64, error)
+	CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, channelID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
 	PatchExecutionMetrics(ctx context.Context, patch tasks.TaskExecutionMetricsPatch) error
+	PatchExecutionSnapshot(ctx context.Context, snapshot tasks.TaskExecutionSnapshot) (int64, error)
+	CreateTaskAttempt(ctx context.Context, start tasks.TaskAttemptStart) (tasks.TaskAttemptRef, error)
+	FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) (int64, error)
+	MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 }
 
 type Service struct {
@@ -80,8 +84,7 @@ func (s *Service) RefreshTaskAccounts(ctx context.Context, task *queuetypes.Task
 		return err
 	}
 	featureSlug := accounts.ParseFeatureSlugFromParamsJSON(task.Params)
-	enabledAccounts = accounts.FilterAccountsByFeature(enabledAccounts, featureSlug)
-	enabledAccounts = accounts.FilterAccountsByRequestedModelJSON(enabledAccounts, task.Params)
+	enabledAccounts = accounts.FilterAccountsForRequestJSON(enabledAccounts, featureSlug, task.Params)
 
 	hasScopedCandidates := task.AccountIDs != nil
 	scoped := make(map[int64]struct{}, len(task.AccountIDs))
@@ -152,25 +155,33 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 	}
 }
 
-func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseToken string, result string) error {
-	if strings.TrimSpace(leaseToken) == "" {
+func (s *Service) MarkTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string) error {
+	return s.markTaskCompleted(ctx, assignment, result, nil)
+}
+
+func (s *Service) MarkTaskCompletedWithAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, result string, finish tasks.TaskAttemptFinish) error {
+	return s.markTaskCompleted(ctx, assignment, result, &finish)
+}
+
+func (s *Service) markTaskCompleted(ctx context.Context, assignment taskqueue.TaskAssignment, result string, attemptFinish *tasks.TaskAttemptFinish) error {
+	if !assignment.HasLeaseIdentity() {
 		return ErrTaskStateConflict
 	}
-	now := time.Now()
-	outputs, err := taskOutputsFromResult(taskID, result)
+	now := taskTerminalTime(attemptFinish)
+	outputs, err := taskOutputsFromResult(assignment.TaskID, result)
 	if err != nil {
 		return err
 	}
-	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, result, now, outputs)
+	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, result, now, outputs, attemptFinish)
 	if err != nil {
 		return err
 	}
 	if rows > 0 {
-		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusCompleted)
+		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusCompleted)
 		return nil
 	}
 
-	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return ErrTaskNotFound
@@ -184,25 +195,30 @@ func (s *Service) MarkTaskCompleted(ctx context.Context, taskID string, leaseTok
 }
 
 func (s *Service) MarkTaskFailed(ctx context.Context, taskID string, reason string) error {
-	return s.markTaskFailed(ctx, taskID, "", false, reason)
+	return s.markTaskFailed(ctx, taskID, reason, nil)
 }
 
-func (s *Service) MarkTaskFailedWithLease(ctx context.Context, taskID string, leaseToken string, reason string) error {
-	if strings.TrimSpace(leaseToken) == "" {
+func (s *Service) MarkTaskFailedWithAttempt(ctx context.Context, taskID string, reason string, finish tasks.TaskAttemptFinish) error {
+	return s.markTaskFailed(ctx, taskID, reason, &finish)
+}
+
+func (s *Service) MarkTaskFailedWithLease(ctx context.Context, assignment taskqueue.TaskAssignment, reason string) error {
+	if !assignment.HasLeaseIdentity() {
 		return ErrTaskStateConflict
 	}
-	return s.markTaskFailed(ctx, taskID, leaseToken, true, reason)
+	return s.markTaskFailedWithAssignment(ctx, assignment, reason, nil)
 }
 
-func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken string, requireLeaseToken bool, reason string) error {
-	now := time.Now()
-	var rows int64
-	var err error
-	if requireLeaseToken {
-		rows, err = s.taskRepo.MarkTaskFailedWithLease(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, reason, formatTaskFailureResult(taskID, reason), now)
-	} else {
-		rows, err = s.taskRepo.MarkTaskFailed(ctx, taskID, []string{tasks.StatusPending}, reason, formatTaskFailureResult(taskID, reason), now)
+func (s *Service) MarkTaskFailedWithLeaseAndAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, finish tasks.TaskAttemptFinish) error {
+	if !assignment.HasLeaseIdentity() {
+		return ErrTaskStateConflict
 	}
+	return s.markTaskFailedWithAssignment(ctx, assignment, reason, &finish)
+}
+
+func (s *Service) markTaskFailed(ctx context.Context, taskID string, reason string, attemptFinish *tasks.TaskAttemptFinish) error {
+	now := taskTerminalTime(attemptFinish)
+	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, []string{tasks.StatusPending}, reason, formatTaskFailureResult(taskID, reason), now, attemptFinish)
 	if err != nil {
 		return err
 	}
@@ -227,11 +243,46 @@ func (s *Service) markTaskFailed(ctx context.Context, taskID string, leaseToken 
 	return ErrTaskStateConflict
 }
 
-func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, accountID int64, leaseToken string, reason string) error {
-	if accountID == 0 {
+func (s *Service) markTaskFailedWithAssignment(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, attemptFinish *tasks.TaskAttemptFinish) error {
+	if !assignment.HasLeaseIdentity() {
 		return ErrTaskStateConflict
 	}
-	if strings.TrimSpace(leaseToken) == "" {
+	now := taskTerminalTime(attemptFinish)
+	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, reason, formatTaskFailureResult(assignment.TaskID, reason), now, attemptFinish)
+	if err != nil {
+		return err
+	}
+	if rows > 0 {
+		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusFailed)
+		return nil
+	}
+
+	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return ErrTaskNotFound
+		}
+		return err
+	}
+	if task.Status == tasks.StatusFailed {
+		return nil
+	}
+	if task.Status == tasks.StatusCompleted {
+		return ErrTaskTerminal
+	}
+	return ErrTaskStateConflict
+}
+
+func (s *Service) ResetTaskRunningToPending(ctx context.Context, assignment taskqueue.TaskAssignment, reason string) error {
+	return s.resetTaskRunningToPending(ctx, assignment, reason, nil)
+}
+
+func (s *Service) ResetTaskRunningToPendingWithAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, finish tasks.TaskAttemptFinish) error {
+	return s.resetTaskRunningToPending(ctx, assignment, reason, &finish)
+}
+
+func (s *Service) resetTaskRunningToPending(ctx context.Context, assignment taskqueue.TaskAssignment, reason string, attemptFinish *tasks.TaskAttemptFinish) error {
+	if !assignment.HasLeaseIdentity() {
 		return ErrTaskStateConflict
 	}
 
@@ -240,16 +291,16 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 		errMsg = reason
 	}
 
-	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, errMsg)
+	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, errMsg, attemptFinish)
 	if err != nil {
 		return err
 	}
 	if rows > 0 {
-		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusPending)
+		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusPending)
 		return nil
 	}
 
-	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return ErrTaskNotFound
@@ -265,14 +316,23 @@ func (s *Service) ResetTaskRunningToPending(ctx context.Context, taskID string, 
 	return ErrTaskStateConflict
 }
 
-func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, accountID int64, leaseToken string, errMsg string) (bool, error) {
-	if accountID == 0 {
+func (s *Service) RequeueTaskForFailover(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string) (bool, error) {
+	return s.requeueTaskForFailover(ctx, assignment, errMsg, nil, nil)
+}
+
+func (s *Service) RequeueTaskForFailoverWithFinalAttempt(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string, finish tasks.TaskAttemptFinish) (bool, error) {
+	return s.requeueTaskForFailover(ctx, assignment, errMsg, nil, &finish)
+}
+
+func (s *Service) RequeueTaskForFailoverWithAttempts(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string, requeuedFinish tasks.TaskAttemptFinish, finalFinish tasks.TaskAttemptFinish) (bool, error) {
+	return s.requeueTaskForFailover(ctx, assignment, errMsg, &requeuedFinish, &finalFinish)
+}
+
+func (s *Service) requeueTaskForFailover(ctx context.Context, assignment taskqueue.TaskAssignment, errMsg string, requeuedAttemptFinish *tasks.TaskAttemptFinish, finalAttemptFinish *tasks.TaskAttemptFinish) (bool, error) {
+	if !assignment.HasLeaseIdentity() {
 		return false, ErrTaskStateConflict
 	}
-	if strings.TrimSpace(leaseToken) == "" {
-		return false, ErrTaskStateConflict
-	}
-	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return false, ErrTaskNotFound
@@ -288,33 +348,33 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 		}
 		return false, ErrTaskStateConflict
 	}
-	if task.LeaseToken != leaseToken {
+	if tasks.IDValue(task.AccountID) != assignment.AccountID || tasks.IDValue(task.AssignedChannelID) != assignment.ChannelID || task.LeaseToken != assignment.LeaseToken {
 		return false, ErrTaskStateConflict
 	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, errMsg)
+		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, errMsg, requeuedAttemptFinish)
 		if err != nil {
 			return false, err
 		}
 		if rows > 0 {
-			s.publishTaskStatusEvent(ctx, taskID, tasks.StatusPending)
+			s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusPending)
 			return true, nil
 		}
 		return false, ErrTaskStateConflict
 	}
 
-	now := time.Now()
-	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, taskID, []string{tasks.StatusRunning}, leaseToken, errMsg, formatTaskFailureResult(taskID, errMsg), now)
+	now := taskTerminalTime(finalAttemptFinish)
+	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, []string{tasks.StatusRunning}, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken, errMsg, formatTaskFailureResult(assignment.TaskID, errMsg), now, finalAttemptFinish)
 	if err != nil {
 		return false, err
 	}
 	if rows > 0 {
-		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
+		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusFailed)
 		return false, nil
 	}
 
-	latest, err := s.taskRepo.GetByTaskID(ctx, taskID)
+	latest, err := s.taskRepo.GetByTaskID(ctx, assignment.TaskID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return false, ErrTaskNotFound
@@ -328,6 +388,13 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, taskID string, acc
 		return false, ErrTaskTerminal
 	}
 	return false, ErrTaskStateConflict
+}
+
+func taskTerminalTime(attemptFinish *tasks.TaskAttemptFinish) time.Time {
+	if attemptFinish != nil && !attemptFinish.CompletedAt.IsZero() {
+		return attemptFinish.CompletedAt
+	}
+	return time.Now()
 }
 
 func (s *Service) RecordAccountFailure(ctx context.Context, accountID int64) (disabled bool, failCount int, err error) {

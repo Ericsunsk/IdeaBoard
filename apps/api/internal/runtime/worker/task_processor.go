@@ -67,8 +67,8 @@ func (p *taskProcessor) Process(ctx context.Context, task *queuetypes.TaskPayloa
 	case taskqueue.AssignStatusNoCapacity:
 		return fmt.Errorf("%w: task=%s", taskqueue.ErrNoAccountCapacity, task.TaskID)
 	case taskqueue.AssignStatusAssigned:
-		if assignment.AccountID == 0 || assignment.LeaseToken == "" {
-			return fmt.Errorf("invalid assignment for task=%s account=%d has_token=%v", task.TaskID, assignment.AccountID, assignment.LeaseToken != "")
+		if assignment.AccountID == 0 || assignment.ChannelID == 0 || assignment.LeaseToken == "" {
+			return fmt.Errorf("invalid assignment for task=%s account=%d channel=%d has_token=%v", task.TaskID, assignment.AccountID, assignment.ChannelID, assignment.LeaseToken != "")
 		}
 	default:
 		return fmt.Errorf("unexpected assign status %q for task=%s", assignment.Status, task.TaskID)

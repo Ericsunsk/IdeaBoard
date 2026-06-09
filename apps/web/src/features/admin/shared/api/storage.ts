@@ -14,6 +14,8 @@ import type {
   StorageProfilePayload as GeneratedStorageProfilePayload,
   StorageProviderField as GeneratedStorageProviderField,
   StorageProviderMeta as GeneratedStorageProviderMeta,
+  CreateAdminStorageProfileParams,
+  UpdateAdminStorageProfileParams,
 } from '../../../../shared/api/generated-query/model'
 
 export type StorageProvider = string
@@ -56,8 +58,9 @@ export const storageApi = {
   },
   createProfile: async (
     data: StorageProfilePayload,
+    options?: CreateAdminStorageProfileParams,
   ): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> => {
-    const res = await createAdminStorageProfile(data)
+    const res = await createAdminStorageProfile(data, options)
     return {
       ...res,
       data: res.data && {
@@ -69,8 +72,9 @@ export const storageApi = {
   updateProfile: async (
     id: string,
     data: StorageProfilePayload,
+    options?: UpdateAdminStorageProfileParams,
   ): Promise<ApiResponse<{ profile: StorageProfile; message: string }>> => {
-    const res = await updateAdminStorageProfile(id, data)
+    const res = await updateAdminStorageProfile(id, data, options)
     return {
       ...res,
       data: res.data && {

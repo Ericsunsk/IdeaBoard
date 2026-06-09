@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/database"
 )
 
 type ChannelRepository struct {
@@ -68,15 +69,29 @@ func (r *ChannelRepository) List(ctx context.Context) ([]*Channel, error) {
 }
 
 func (r *ChannelRepository) Update(ctx context.Context, channel *Channel) error {
-	return r.q.UpdateChannel(ctx, dbsqlc.UpdateChannelParams{
+	updated, err := r.q.UpdateChannel(ctx, dbsqlc.UpdateChannelParams{
 		Type:   channel.Type,
 		Name:   channel.Name,
 		ApiUrl: channel.ApiURL,
 		Status: channel.Status,
 		ID:     channel.ID,
 	})
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }
 
 func (r *ChannelRepository) Delete(ctx context.Context, id int64) error {
-	return r.q.DeleteChannel(ctx, id)
+	updated, err := r.q.DeleteChannel(ctx, id)
+	if err != nil {
+		return err
+	}
+	if updated == 0 {
+		return database.ErrNotFound
+	}
+	return nil
 }

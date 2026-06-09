@@ -6,26 +6,56 @@ package dbsqlc
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 )
 
 type ApiAccount struct {
-	ID            int64     `json:"id"`
-	Name          string    `json:"name"`
-	ChannelID     int64     `json:"channel_id"`
-	Platform      string    `json:"platform"`
-	ApiType       string    `json:"api_type"`
-	ModelSet      string    `json:"model_set"`
-	ApiKey        string    `json:"api_key"`
-	ProxyUrl      string    `json:"proxy_url"`
-	MaxConcurrent int32     `json:"max_concurrent"`
-	Timeout       int32     `json:"timeout"`
-	ExtraConfig   string    `json:"extra_config"`
-	Status        int16     `json:"status"`
-	FailCount     int32     `json:"fail_count"`
-	Weight        int32     `json:"weight"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID            int64        `json:"id"`
+	Name          string       `json:"name"`
+	ChannelID     int64        `json:"channel_id"`
+	Platform      string       `json:"platform"`
+	ApiType       string       `json:"api_type"`
+	ProxyUrl      string       `json:"proxy_url"`
+	MaxConcurrent int32        `json:"max_concurrent"`
+	Timeout       int32        `json:"timeout"`
+	ExtraConfig   string       `json:"extra_config"`
+	Status        int16        `json:"status"`
+	FailCount     int32        `json:"fail_count"`
+	Weight        int32        `json:"weight"`
+	CreatedAt     time.Time    `json:"created_at"`
+	UpdatedAt     time.Time    `json:"updated_at"`
+	DeletedAt     sql.NullTime `json:"deleted_at"`
+}
+
+type ApiAccountModel struct {
+	ID            int64           `json:"id"`
+	AccountID     int64           `json:"account_id"`
+	ModelName     string          `json:"model_name"`
+	Enabled       bool            `json:"enabled"`
+	Weight        int32           `json:"weight"`
+	MaxConcurrent sql.NullInt32   `json:"max_concurrent"`
+	FeatureSlugs  json.RawMessage `json:"feature_slugs"`
+	Metadata      json.RawMessage `json:"metadata"`
+	SortOrder     int32           `json:"sort_order"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+}
+
+type ApiAccountSecret struct {
+	ID                 int64        `json:"id"`
+	AccountID          int64        `json:"account_id"`
+	SecretMaterialKind string       `json:"secret_material_kind"`
+	SecretRef          string       `json:"secret_ref"`
+	SecretPayload      string       `json:"secret_payload"`
+	KeyVersion         string       `json:"key_version"`
+	Fingerprint        string       `json:"fingerprint"`
+	Status             string       `json:"status"`
+	RotatedAt          time.Time    `json:"rotated_at"`
+	ExpiresAt          sql.NullTime `json:"expires_at"`
+	RetiredAt          sql.NullTime `json:"retired_at"`
+	CreatedAt          time.Time    `json:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at"`
 }
 
 type BoardMember struct {
@@ -39,15 +69,21 @@ type BoardMember struct {
 }
 
 type BoardShareToken struct {
-	ID        int64        `json:"id"`
-	BoardID   string       `json:"board_id"`
-	Token     string       `json:"token"`
-	Role      string       `json:"role"`
-	CreatedBy int64        `json:"created_by"`
-	Revoked   bool         `json:"revoked"`
-	ExpiresAt sql.NullTime `json:"expires_at"`
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
+	ID          int64         `json:"id"`
+	BoardID     string        `json:"board_id"`
+	TokenHash   string        `json:"token_hash"`
+	TokenPrefix string        `json:"token_prefix"`
+	Role        string        `json:"role"`
+	CreatedBy   int64         `json:"created_by"`
+	Revoked     bool          `json:"revoked"`
+	UsageCount  int64         `json:"usage_count"`
+	MaxUses     sql.NullInt32 `json:"max_uses"`
+	LastUsedAt  sql.NullTime  `json:"last_used_at"`
+	RevokedAt   sql.NullTime  `json:"revoked_at"`
+	RevokedBy   sql.NullInt64 `json:"revoked_by"`
+	ExpiresAt   sql.NullTime  `json:"expires_at"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
 }
 
 type Channel struct {
@@ -58,6 +94,30 @@ type Channel struct {
 	Status    int16     `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type FeaturePrompt struct {
+	FeatureSlug   string          `json:"feature_slug"`
+	Prompt        string          `json:"prompt"`
+	Enabled       bool            `json:"enabled"`
+	Variables     json.RawMessage `json:"variables"`
+	SchemaVersion int32           `json:"schema_version"`
+	UpdatedBy     sql.NullInt64   `json:"updated_by"`
+	PublishedAt   sql.NullTime    `json:"published_at"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+}
+
+type FeaturePromptRevision struct {
+	ID            int64           `json:"id"`
+	FeatureSlug   string          `json:"feature_slug"`
+	Prompt        string          `json:"prompt"`
+	Enabled       bool            `json:"enabled"`
+	Variables     json.RawMessage `json:"variables"`
+	SchemaVersion int32           `json:"schema_version"`
+	UpdatedBy     sql.NullInt64   `json:"updated_by"`
+	PublishedAt   sql.NullTime    `json:"published_at"`
+	CreatedAt     time.Time       `json:"created_at"`
 }
 
 type LineDraftMode struct {
@@ -71,6 +131,74 @@ type LineDraftMode struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+type MediaAsset struct {
+	ID               int64           `json:"id"`
+	AssetID          string          `json:"asset_id"`
+	OwnerUserID      int64           `json:"owner_user_id"`
+	StorageProfileID string          `json:"storage_profile_id"`
+	StorageKey       string          `json:"storage_key"`
+	Url              string          `json:"url"`
+	SourceUrl        string          `json:"source_url"`
+	MediaKind        string          `json:"media_kind"`
+	MimeType         string          `json:"mime_type"`
+	Width            int32           `json:"width"`
+	Height           int32           `json:"height"`
+	SizeBytes        int64           `json:"size_bytes"`
+	ChecksumSha256   string          `json:"checksum_sha256"`
+	Status           string          `json:"status"`
+	Metadata         json.RawMessage `json:"metadata"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
+	DeletedAt        sql.NullTime    `json:"deleted_at"`
+}
+
+type MediaRef struct {
+	ID           int64           `json:"id"`
+	MediaAssetID int64           `json:"media_asset_id"`
+	OwnerUserID  int64           `json:"owner_user_id"`
+	RefType      string          `json:"ref_type"`
+	RefID        string          `json:"ref_id"`
+	BoardID      string          `json:"board_id"`
+	TaskID       string          `json:"task_id"`
+	Role         string          `json:"role"`
+	Metadata     json.RawMessage `json:"metadata"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+}
+
+type StorageProfile struct {
+	ProfileID string          `json:"profile_id"`
+	Name      string          `json:"name"`
+	Provider  string          `json:"provider"`
+	Enabled   bool            `json:"enabled"`
+	IsCurrent bool            `json:"is_current"`
+	Builtin   bool            `json:"builtin"`
+	Status    string          `json:"status"`
+	Config    json.RawMessage `json:"config"`
+	CreatedBy sql.NullInt64   `json:"created_by"`
+	UpdatedBy sql.NullInt64   `json:"updated_by"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	DeletedAt sql.NullTime    `json:"deleted_at"`
+}
+
+type StorageProfileSecret struct {
+	ID                 int64        `json:"id"`
+	ProfileID          string       `json:"profile_id"`
+	SecretName         string       `json:"secret_name"`
+	SecretMaterialKind string       `json:"secret_material_kind"`
+	SecretRef          string       `json:"secret_ref"`
+	SecretPayload      string       `json:"secret_payload"`
+	Fingerprint        string       `json:"fingerprint"`
+	KeyVersion         string       `json:"key_version"`
+	Status             string       `json:"status"`
+	RotatedAt          time.Time    `json:"rotated_at"`
+	ExpiresAt          sql.NullTime `json:"expires_at"`
+	RetiredAt          sql.NullTime `json:"retired_at"`
+	CreatedAt          time.Time    `json:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at"`
+}
+
 type SystemConfig struct {
 	ID        int64     `json:"id"`
 	ConfigKey string    `json:"config_key"`
@@ -80,22 +208,58 @@ type SystemConfig struct {
 }
 
 type Task struct {
-	ID          int64        `json:"id"`
-	TaskID      string       `json:"task_id"`
-	UserID      int64        `json:"user_id"`
-	ChannelID   int64        `json:"channel_id"`
-	AccountID   int64        `json:"account_id"`
-	Prompt      string       `json:"prompt"`
-	UserPrompt  string       `json:"user_prompt"`
-	Params      string       `json:"params"`
-	Status      string       `json:"status"`
-	LeaseToken  string       `json:"lease_token"`
-	RetryCount  int32        `json:"retry_count"`
-	ErrorMsg    string       `json:"error_msg"`
-	Result      string       `json:"result"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
-	CompletedAt sql.NullTime `json:"completed_at"`
+	ID                int64         `json:"id"`
+	TaskID            string        `json:"task_id"`
+	UserID            int64         `json:"user_id"`
+	AssignedChannelID sql.NullInt64 `json:"assigned_channel_id"`
+	AccountID         sql.NullInt64 `json:"account_id"`
+	Prompt            string        `json:"prompt"`
+	UserPrompt        string        `json:"user_prompt"`
+	Params            string        `json:"params"`
+	FeatureSlug       string        `json:"feature_slug"`
+	RequestedModel    string        `json:"requested_model"`
+	ResolvedModel     string        `json:"resolved_model"`
+	ApiType           string        `json:"api_type"`
+	Status            string        `json:"status"`
+	LeaseToken        string        `json:"lease_token"`
+	RetryCount        int32         `json:"retry_count"`
+	AttemptSeq        int32         `json:"attempt_seq"`
+	ErrorMsg          string        `json:"error_msg"`
+	Result            string        `json:"result"`
+	CreatedAt         time.Time     `json:"created_at"`
+	UpdatedAt         time.Time     `json:"updated_at"`
+	CompletedAt       sql.NullTime  `json:"completed_at"`
+	CancelledAt       sql.NullTime  `json:"cancelled_at"`
+	CancelledBy       sql.NullInt64 `json:"cancelled_by"`
+	CancelReason      string        `json:"cancel_reason"`
+}
+
+type TaskAttempt struct {
+	ID                 int64        `json:"id"`
+	TaskID             string       `json:"task_id"`
+	AttemptNo          int32        `json:"attempt_no"`
+	RiverJobID         int64        `json:"river_job_id"`
+	LeaseToken         string       `json:"lease_token"`
+	AccountID          int64        `json:"account_id"`
+	ChannelID          int64        `json:"channel_id"`
+	FeatureSlug        string       `json:"feature_slug"`
+	RequestedModel     string       `json:"requested_model"`
+	ResolvedModel      string       `json:"resolved_model"`
+	ApiType            string       `json:"api_type"`
+	Status             string       `json:"status"`
+	FailureStage       string       `json:"failure_stage"`
+	FailureCategory    string       `json:"failure_category"`
+	ErrorMsg           string       `json:"error_msg"`
+	ProviderStartedAt  sql.NullTime `json:"provider_started_at"`
+	ProviderFinishedAt sql.NullTime `json:"provider_finished_at"`
+	FinalizeStartedAt  sql.NullTime `json:"finalize_started_at"`
+	FinalizeFinishedAt sql.NullTime `json:"finalize_finished_at"`
+	ProviderLatencyMs  int64        `json:"provider_latency_ms"`
+	FinalizeLatencyMs  int64        `json:"finalize_latency_ms"`
+	TotalLatencyMs     int64        `json:"total_latency_ms"`
+	CompletedAt        sql.NullTime `json:"completed_at"`
+	CreatedAt          time.Time    `json:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at"`
 }
 
 type TaskCancellation struct {
@@ -107,12 +271,13 @@ type TaskCancellation struct {
 
 type TaskDailyStat struct {
 	ID                int64     `json:"id"`
-	StatDate          string    `json:"stat_date"`
+	StatDate          time.Time `json:"stat_date"`
 	ModelName         string    `json:"model_name"`
 	UserKey           string    `json:"user_key"`
 	Total             int64     `json:"total"`
 	Completed         int64     `json:"completed"`
 	Failed            int64     `json:"failed"`
+	Cancelled         int64     `json:"cancelled"`
 	LatencySecondsSum float64   `json:"latency_seconds_sum"`
 	LatencyCount      int64     `json:"latency_count"`
 	CreatedAt         time.Time `json:"created_at"`
@@ -121,7 +286,7 @@ type TaskDailyStat struct {
 
 type TaskDailyStatBackfill struct {
 	ID        int64     `json:"id"`
-	StatDate  string    `json:"stat_date"`
+	StatDate  time.Time `json:"stat_date"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -147,24 +312,29 @@ type TaskExecutionMetric struct {
 }
 
 type TaskOutput struct {
-	ID         int64     `json:"id"`
-	TaskID     string    `json:"task_id"`
-	Role       string    `json:"role"`
-	Url        string    `json:"url"`
-	StorageKey string    `json:"storage_key"`
-	MimeType   string    `json:"mime_type"`
-	Width      int32     `json:"width"`
-	Height     int32     `json:"height"`
-	SizeBytes  int64     `json:"size_bytes"`
-	SortIndex  int32     `json:"sort_index"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID             int64           `json:"id"`
+	TaskID         string          `json:"task_id"`
+	MediaAssetID   sql.NullInt64   `json:"media_asset_id"`
+	Role           string          `json:"role"`
+	Url            string          `json:"url"`
+	StorageKey     string          `json:"storage_key"`
+	MimeType       string          `json:"mime_type"`
+	Width          int32           `json:"width"`
+	Height         int32           `json:"height"`
+	SizeBytes      int64           `json:"size_bytes"`
+	SourceUrl      string          `json:"source_url"`
+	ChecksumSha256 string          `json:"checksum_sha256"`
+	StorageProfile string          `json:"storage_profile"`
+	Metadata       json.RawMessage `json:"metadata"`
+	SortIndex      int32           `json:"sort_index"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 type TaskStatEvent struct {
 	ID             int64     `json:"id"`
 	TaskID         string    `json:"task_id"`
-	StatDate       string    `json:"stat_date"`
+	StatDate       time.Time `json:"stat_date"`
 	ModelName      string    `json:"model_name"`
 	UserKey        string    `json:"user_key"`
 	Status         string    `json:"status"`
@@ -186,13 +356,16 @@ type User struct {
 }
 
 type UserBoard struct {
-	ID        int64     `json:"id"`
-	BoardID   string    `json:"board_id"`
-	UserID    int64     `json:"user_id"`
-	Name      string    `json:"name"`
-	State     string    `json:"state"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID                 int64           `json:"id"`
+	BoardID            string          `json:"board_id"`
+	UserID             int64           `json:"user_id"`
+	Name               string          `json:"name"`
+	State              json.RawMessage `json:"state"`
+	Revision           int64           `json:"revision"`
+	StateSchemaVersion int32           `json:"state_schema_version"`
+	LastSavedBy        sql.NullInt64   `json:"last_saved_by"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
 }
 
 type UsersUsedUid struct {

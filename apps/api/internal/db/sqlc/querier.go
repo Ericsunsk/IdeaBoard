@@ -7,50 +7,72 @@ package dbsqlc
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 type Querier interface {
+	ArchiveAccount(ctx context.Context, id int64) (int64, error)
+	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
+	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWithLeaseParams) (int64, error)
+	ConsumeBoardShareToken(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	CountAccounts(ctx context.Context, arg CountAccountsParams) (int64, error)
+	CountAccountsByChannelID(ctx context.Context, channelID int64) (int64, error)
 	CountAllTasks(ctx context.Context) (int64, error)
 	CountBoardNameConflicts(ctx context.Context, arg CountBoardNameConflictsParams) (int64, error)
-	CountBoardShareTokenByToken(ctx context.Context, token string) (int64, error)
+	CountBoardShareTokenByHash(ctx context.Context, tokenHash string) (int64, error)
+	CountMediaRefsByAssetID(ctx context.Context, mediaAssetID int64) (int64, error)
 	CountRunningTasksMissingLeaseToken(ctx context.Context) (int64, error)
 	CountTasksByStatus(ctx context.Context, status string) (int64, error)
 	CountTasksByUserID(ctx context.Context, userID int64) (int64, error)
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (int64, error)
+	CreateAccountSecret(ctx context.Context, arg CreateAccountSecretParams) (int64, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
 	CreateChannel(ctx context.Context, arg CreateChannelParams) (int64, error)
+	CreateFeaturePromptRevision(ctx context.Context, arg CreateFeaturePromptRevisionParams) (int64, error)
 	CreateLineDraftMode(ctx context.Context, arg CreateLineDraftModeParams) (int64, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
+	CreateTaskAttempt(ctx context.Context, arg CreateTaskAttemptParams) (CreateTaskAttemptRow, error)
 	CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (int64, error)
-	DeleteAccount(ctx context.Context, id int64) error
-	DeleteBoardByOwnerAndBoardID(ctx context.Context, arg DeleteBoardByOwnerAndBoardIDParams) error
-	DeleteBoardMember(ctx context.Context, arg DeleteBoardMemberParams) error
+	DeleteAccountModel(ctx context.Context, arg DeleteAccountModelParams) (int64, error)
+	DeleteAccountModelsByAccountID(ctx context.Context, accountID int64) error
+	DeleteBoardByOwnerAndBoardID(ctx context.Context, arg DeleteBoardByOwnerAndBoardIDParams) (int64, error)
+	DeleteBoardMember(ctx context.Context, arg DeleteBoardMemberParams) (int64, error)
 	DeleteBoardMembersByOwnerAndBoardID(ctx context.Context, arg DeleteBoardMembersByOwnerAndBoardIDParams) error
 	DeleteBoardMembersByOwnerUserID(ctx context.Context, ownerUserID int64) error
 	DeleteBoardMembersByUserID(ctx context.Context, userID int64) error
 	DeleteBoardShareTokensByCreatedBy(ctx context.Context, createdBy int64) error
 	DeleteBoardShareTokensByOwnerAndBoardID(ctx context.Context, arg DeleteBoardShareTokensByOwnerAndBoardIDParams) error
-	DeleteChannel(ctx context.Context, id int64) error
+	DeleteChannel(ctx context.Context, id int64) (int64, error)
 	DeleteLineDraftMode(ctx context.Context, id int64) error
+	DeleteMediaRef(ctx context.Context, arg DeleteMediaRefParams) error
 	DeleteOutputsByTaskID(ctx context.Context, taskID string) error
 	DeleteTaskByTaskIDAndUserID(ctx context.Context, arg DeleteTaskByTaskIDAndUserIDParams) error
+	DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error
 	DeleteTasksByUserID(ctx context.Context, userID int64) error
 	DeleteUserBoardsByUserID(ctx context.Context, userID int64) error
-	DeleteUserByID(ctx context.Context, id int64) error
+	DeleteUserByID(ctx context.Context, id int64) (int64, error)
+	FailRunningTaskAttemptsByAccountID(ctx context.Context, arg FailRunningTaskAttemptsByAccountIDParams) (int64, error)
 	FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) ([]FailRunningTasksByAccountIDRow, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFailTaskRunningWithLeaseParams) (int64, error)
+	FinishTaskAttempt(ctx context.Context, arg FinishTaskAttemptParams) (int64, error)
 	GetAccessibleBoardByBoardID(ctx context.Context, arg GetAccessibleBoardByBoardIDParams) (GetAccessibleBoardByBoardIDRow, error)
-	GetAccountByID(ctx context.Context, id int64) (ApiAccount, error)
-	GetAccountModelSetByID(ctx context.Context, id int64) (string, error)
+	GetAccountByID(ctx context.Context, id int64) (GetAccountByIDRow, error)
+	GetActiveAccountSecretByAccountID(ctx context.Context, accountID int64) (ApiAccountSecret, error)
 	GetBoardByOwnerAndBoardID(ctx context.Context, arg GetBoardByOwnerAndBoardIDParams) (UserBoard, error)
 	GetBoardMemberByUserID(ctx context.Context, arg GetBoardMemberByUserIDParams) (BoardMember, error)
 	GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error)
-	GetBoardShareTokenByToken(ctx context.Context, token string) (BoardShareToken, error)
+	GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	GetChannelByID(ctx context.Context, id int64) (Channel, error)
+	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error)
+	GetMediaAssetByAssetID(ctx context.Context, assetID string) (MediaAsset, error)
+	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
+	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
+	GetSingleEnabledModelByAccountID(ctx context.Context, id int64) (string, error)
+	GetStorageProfile(ctx context.Context, profileID string) (StorageProfile, error)
+	GetStorageProfileSecret(ctx context.Context, arg GetStorageProfileSecretParams) (StorageProfileSecret, error)
 	GetSystemConfig(ctx context.Context, configKey string) (SystemConfig, error)
 	GetTaskByTaskID(ctx context.Context, taskID string) (Task, error)
 	GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTaskIDAndUserIDParams) (Task, error)
@@ -60,58 +82,81 @@ type Querier interface {
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
-	IncrementAccountFailCount(ctx context.Context, id int64) error
+	HasStorageProfileSecret(ctx context.Context, arg HasStorageProfileSecretParams) (bool, error)
+	IncrementAccountFailCount(ctx context.Context, id int64) (int64, error)
 	InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskStatEventIgnoreParams) (int64, error)
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
 	ListAccessibleBoardsByUserID(ctx context.Context, userID int64) ([]ListAccessibleBoardsByUserIDRow, error)
 	ListAccountIDs(ctx context.Context) ([]int64, error)
-	ListAccountModelSetsByIDs(ctx context.Context, ids []int64) ([]ListAccountModelSetsByIDsRow, error)
-	ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ApiAccount, error)
-	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]string, error)
+	ListAccountModelsByAccountID(ctx context.Context, accountID int64) ([]ApiAccountModel, error)
+	ListAccountModelsByAccountIDs(ctx context.Context, accountIds []int64) ([]ApiAccountModel, error)
+	ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error)
+	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]time.Time, error)
 	ListBoardMembers(ctx context.Context, arg ListBoardMembersParams) ([]ListBoardMembersRow, error)
 	ListBoardShareTokens(ctx context.Context, arg ListBoardShareTokensParams) ([]BoardShareToken, error)
 	ListChannels(ctx context.Context) ([]Channel, error)
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
-	ListEnabledAccounts(ctx context.Context) ([]ApiAccount, error)
+	ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error)
 	ListEnabledLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
+	ListFeaturePromptRevisions(ctx context.Context, featureSlug string) ([]FeaturePromptRevision, error)
+	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
 	ListLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
+	ListMediaAssetsByOwner(ctx context.Context, arg ListMediaAssetsByOwnerParams) ([]MediaAsset, error)
+	ListMediaRefsByAssetID(ctx context.Context, mediaAssetID int64) ([]MediaRef, error)
+	ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsByBoardIDParams) ([]MediaRef, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskOutput, error)
 	ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error)
 	ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimit int32) ([]ListRunningTasksMissingLeaseTokenRow, error)
+	ListSingleEnabledModelsByAccountIDs(ctx context.Context, ids []int64) ([]ListSingleEnabledModelsByAccountIDsRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
+	ListStorageProfiles(ctx context.Context, includeDeleted bool) ([]StorageProfile, error)
 	ListSystemConfigsByPrefix(ctx context.Context, configKeyLike string) ([]SystemConfig, error)
+	ListTaskAttemptsByTaskID(ctx context.Context, taskID string) ([]TaskAttempt, error)
 	ListTaskExecutionBottleneckStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionBottleneckStatsByCreatedRangeParams) ([]ListTaskExecutionBottleneckStatsByCreatedRangeRow, error)
 	ListTaskExecutionFailureCategoryStatsByCreatedRange(ctx context.Context, arg ListTaskExecutionFailureCategoryStatsByCreatedRangeParams) ([]ListTaskExecutionFailureCategoryStatsByCreatedRangeRow, error)
 	ListTaskExecutionMetricsByTaskIDs(ctx context.Context, taskIds []string) ([]TaskExecutionMetric, error)
-	ListTaskIDsByAccountID(ctx context.Context, accountID int64) ([]string, error)
+	ListTaskIDsByAccountID(ctx context.Context, accountID sql.NullInt64) ([]string, error)
 	ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg ListTaskIDsByAccountIDAndStatusesParams) ([]string, error)
 	ListTaskStatisticsByCreatedRange(ctx context.Context, arg ListTaskStatisticsByCreatedRangeParams) ([]ListTaskStatisticsByCreatedRangeRow, error)
 	ListTasks(ctx context.Context, arg ListTasksParams) ([]Task, error)
 	ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDParams) ([]Task, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
-	MarkDailyBackfillDone(ctx context.Context, statDate string) error
+	MarkMediaAssetDeleted(ctx context.Context, arg MarkMediaAssetDeletedParams) error
+	MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error)
+	MarkTaskCancelled(ctx context.Context, arg MarkTaskCancelledParams) (int64, error)
 	MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error)
 	MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFailedWithLeaseParams) (int64, error)
 	PatchTaskExecutionMetrics(ctx context.Context, arg PatchTaskExecutionMetricsParams) error
+	PatchTaskExecutionSnapshot(ctx context.Context, arg PatchTaskExecutionSnapshotParams) (int64, error)
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
-	ResetAccountFailCount(ctx context.Context, id int64) error
+	ResetAccountFailCount(ctx context.Context, id int64) (int64, error)
 	ResetRunningMissingLeaseTasksByIDs(ctx context.Context, taskIds []string) (int64, error)
 	ResetTaskRunningToPendingWithLease(ctx context.Context, arg ResetTaskRunningToPendingWithLeaseParams) (int64, error)
-	RevokeBoardShareToken(ctx context.Context, arg RevokeBoardShareTokenParams) error
+	RetireActiveAccountSecrets(ctx context.Context, accountID int64) error
+	RevokeAccountSecretsForArchive(ctx context.Context, accountID int64) error
+	RevokeBoardShareTokenByID(ctx context.Context, arg RevokeBoardShareTokenByIDParams) (int64, error)
+	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
 	SummarizeTasks(ctx context.Context, arg SummarizeTasksParams) (SummarizeTasksRow, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
-	UpdateAccount(ctx context.Context, arg UpdateAccountParams) error
-	UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) error
-	UpdateChannel(ctx context.Context, arg UpdateChannelParams) error
+	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (int64, error)
+	UpdateAccountModelEnabled(ctx context.Context, arg UpdateAccountModelEnabledParams) (int64, error)
+	UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) (int64, error)
+	UpdateChannel(ctx context.Context, arg UpdateChannelParams) (int64, error)
 	UpdateLineDraftMode(ctx context.Context, arg UpdateLineDraftModeParams) error
-	UpdateUser(ctx context.Context, arg UpdateUserParams) error
-	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) error
-	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
-	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error
-	UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) error
+	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
+	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error)
+	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (int64, error)
+	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error)
+	UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error)
+	UpsertAccountModel(ctx context.Context, arg UpsertAccountModelParams) (int64, error)
 	UpsertBoard(ctx context.Context, arg UpsertBoardParams) error
 	UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error
+	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (int32, error)
+	UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetParams) (int64, error)
+	UpsertMediaRef(ctx context.Context, arg UpsertMediaRefParams) (int64, error)
+	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) error
+	UpsertStorageProfileSecret(ctx context.Context, arg UpsertStorageProfileSecretParams) error
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/safehttp"
@@ -117,6 +118,10 @@ func (h *ChannelHandler) Update(c *gin.Context) {
 	channel.ApiURL = apiURL
 
 	if err := h.channelRepo.Update(c.Request.Context(), channel); err != nil {
+		if database.IsNotFound(err) {
+			response.Error(c, 404, "渠道商不存在")
+			return
+		}
 		response.InternalError(c, 500, "更新渠道商失败", err)
 		return
 	}
@@ -132,6 +137,10 @@ func (h *ChannelHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.channelRepo.Delete(c.Request.Context(), id); err != nil {
+		if database.IsNotFound(err) {
+			response.Error(c, 404, "渠道商不存在")
+			return
+		}
 		response.InternalError(c, 500, "删除渠道商失败", err)
 		return
 	}

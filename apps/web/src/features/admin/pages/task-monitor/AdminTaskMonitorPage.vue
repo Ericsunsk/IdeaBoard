@@ -154,6 +154,12 @@
           severity="success"
           rounded
         />
+        <Tag
+          v-if="taskStats.cancelled > 0"
+          :value="`${taskStats.cancelled} 已取消`"
+          severity="secondary"
+          rounded
+        />
         <Tag v-if="selectedTasks.length > 0" :value="`已选 ${selectedTasks.length}`" rounded />
       </template>
 
@@ -320,12 +326,6 @@
               <template #body="{ data }">
                 <span v-if="getTaskApiCall(data)" class="inline-flex max-w-32 items-center gap-1.5">
                   <Tag :value="getTaskApiCall(data)?.platform" severity="info" rounded />
-                  <span
-                    v-if="getTaskApiCall(data)?.modelSet"
-                    class="block max-w-[70px] truncate text-admin-caption text-admin-text-3"
-                  >
-                    {{ getTaskApiCall(data)?.modelSet }}
-                  </span>
                 </span>
                 <span v-else class="text-admin-meta text-admin-text-3">-</span>
               </template>
@@ -392,7 +392,9 @@
               :style="{ color: getTaskStatusConfig(detailTask?.status || '').color }"
             >
               <CheckCircle v-if="detailTask?.status === 'completed'" />
-              <XmarkCircle v-else-if="detailTask?.status === 'failed'" />
+              <XmarkCircle
+                v-else-if="detailTask?.status === 'failed' || detailTask?.status === 'cancelled'"
+              />
               <Clock v-else />
             </span>
             <div class="flex min-w-0 flex-col">
@@ -744,6 +746,8 @@ const detailStatusBannerClassByStatus: Record<string, string> = {
     'bg-[linear-gradient(135deg,rgba(47,158,115,0.1),rgba(255,255,255,0.74))] before:bg-admin-success',
   failed:
     'bg-[linear-gradient(135deg,rgba(209,77,90,0.095),rgba(255,255,255,0.74))] before:bg-admin-danger',
+  cancelled:
+    'bg-[linear-gradient(135deg,rgba(152,162,179,0.12),rgba(255,255,255,0.74))] before:bg-admin-text-3',
   running:
     'bg-[linear-gradient(135deg,rgba(212,136,48,0.1),rgba(255,255,255,0.74))] before:bg-admin-warning',
 }
@@ -752,6 +756,7 @@ const detailStatusDotBaseClass =
 const detailStatusDotClassByStatus: Record<string, string> = {
   completed: 'bg-admin-success shadow-[0_0_0_4px_rgba(47,158,115,0.14)]',
   failed: 'bg-admin-danger shadow-[0_0_0_4px_rgba(209,77,90,0.14)]',
+  cancelled: 'bg-admin-text-3 shadow-[0_0_0_4px_rgba(152,162,179,0.14)]',
   running: 'bg-admin-warning shadow-[0_0_0_4px_rgba(212,136,48,0.15)]',
 }
 
@@ -838,7 +843,8 @@ const statusTotalCount = computed(
     (monitorStats.value?.pending ?? pageStats.value.pending) +
     (monitorStats.value?.running ?? pageStats.value.running) +
     (monitorStats.value?.completed ?? pageStats.value.completed) +
-    (monitorStats.value?.failed ?? pageStats.value.failed),
+    (monitorStats.value?.failed ?? pageStats.value.failed) +
+    (monitorStats.value?.cancelled ?? pageStats.value.cancelled),
 )
 const liveRunningCount = computed(() => monitorStats.value?.running ?? pageStats.value.running)
 const liveFailedCount = computed(() => monitorStats.value?.failed ?? pageStats.value.failed)
@@ -1004,6 +1010,7 @@ const executionPressureColorByKey: Record<TaskExecutionSignalKey, string> = {
   stuck_running: adminChartTheme.mauve,
   fast_failed: adminChartTheme.danger,
   slow_failed: adminChartTheme.brand,
+  cancelled: adminChartTheme.emptyText,
   retrying: adminChartTheme.cyan,
   other: adminChartTheme.emptyText,
 }
@@ -1016,6 +1023,7 @@ const taskDistributionBuckets: Array<{
   { label: '排队中', keys: ['normal_pending', 'backlog_pending'] },
   { label: '执行中', keys: ['normal_running', 'stuck_running'] },
   { label: '失败', keys: ['fast_failed', 'slow_failed'] },
+  { label: '已取消', keys: ['cancelled'] },
   { label: '重试中', keys: ['retrying'] },
 ]
 const executionPressurePoints = computed(() => buildTaskExecutionPressurePoints(tasks.value))

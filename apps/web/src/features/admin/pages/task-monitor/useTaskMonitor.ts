@@ -13,6 +13,7 @@ type PageTaskStats = {
   pending: number
   completed: number
   failed: number
+  cancelled: number
   other: number
 }
 
@@ -84,6 +85,7 @@ export function useTaskMonitor() {
       running: data?.running_count ?? 0,
       completed: data?.completed_count ?? 0,
       failed: data?.failed_count ?? 0,
+      cancelled: data?.cancelled_count ?? 0,
       other: data?.other_count ?? 0,
     }
   })
@@ -152,10 +154,11 @@ function buildPageTaskStats(tasks: Task[]): PageTaskStats {
       else if (task.status === 'pending') stats.pending += 1
       else if (task.status === 'completed') stats.completed += 1
       else if (task.status === 'failed') stats.failed += 1
+      else if (task.status === 'cancelled') stats.cancelled += 1
       else stats.other += 1
       return stats
     },
-    { running: 0, pending: 0, completed: 0, failed: 0, other: 0 },
+    { running: 0, pending: 0, completed: 0, failed: 0, cancelled: 0, other: 0 },
   )
 }
 
@@ -175,6 +178,6 @@ function matchesMockTaskFilters(task: Task, status: string | null, keyword: stri
     task.status,
     String(task.user_id),
     String(task.account_id || ''),
-    String(task.channel_id || ''),
+    String(task.assigned_channel_id || ''),
   ].some((field) => field.toLowerCase().includes(value))
 }

@@ -13,5 +13,6 @@ export type ApiResponseTaskListData = {
   running_count: number
   completed_count: number
   failed_count: number
+  cancelled_count: number
   other_count: number
 }

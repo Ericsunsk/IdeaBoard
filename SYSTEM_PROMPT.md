@@ -1,6 +1,6 @@
 # Feature System Prompt 运营手册
 
-本文用于管理后台 `feature_prompt:<slug>` 的配置、评审与上线检查。它不是模型能力说明，也不是产品文案；它的目标是让每个 workflow feature 的系统提示词稳定、可执行、可审计。
+本文用于管理后台 `feature_prompts.feature_slug` 的配置、评审与上线检查。它不是模型能力说明，也不是产品文案；它的目标是让每个 workflow feature 的系统提示词稳定、可执行、可审计。
 
 ## 一句话原则
 
@@ -17,9 +17,17 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 | Fusion 节点 | `fusion` | `fusion` | `style-fusion` | 2 到 4 张输入图融合，blend point 会转为有序图片权重 |
 | Display 节点 | `viewpoint` | `viewpoint` | `virtual-3d` | 商品展示图，使用视角、光影和可选 Prompt |
 
+## 后台配置合约
+
+- 后台配置事实源是 `feature_prompts`；Admin API 返回所有支持的 feature 配置，运行时只读取 `enabled = true` 的配置。
+- `enabled = false` 表示配置在后台可见、可编辑、可审计，但运行时视为未配置。
+- `variables` 是后台展示用的稳定变量清单，格式为 `{ key: string, tone?: "prompt" | "control" | "context" }[]`；运行时实际替换能力仍以后端模板绑定为准。
+- `schema_version` 每次保存递增；`published_at` 只在启用配置时写入，禁用配置保持为空。
+- `feature_prompt_revisions` 保存每次提交的 `prompt`、`enabled`、`variables`、`schema_version`、`published_at` 快照，用于后续审计和回滚设计。
+
 ## 模板装配规则
 
-- 后端从 `feature_prompt:<slug>` 读取后台配置；为空或读取失败时直接返回当前请求的 `basePrompt`，不再拼接后端默认模板链。
+- 后端从 `feature_prompts` 表按 `feature_slug` 读取后台配置；为空或读取失败时直接返回当前请求的 `basePrompt`，不再拼接后端默认模板链。
 - `{{user_prompt}}` 始终会被替换为字符串，用户没有输入时替换为空字符串。
 - 模板中存在但后端不支持或运行时没有提供的变量会原样保留，所以不要写不属于当前 feature 的变量。
 - 除 `style-variation` 外，如果模板没有显式写 `{{user_prompt}}`，运行时可能把用户输入追加到模板末尾。

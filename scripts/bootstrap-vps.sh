@@ -110,6 +110,21 @@ need_command() {
   }
 }
 
+env_file_value() {
+  local file="$1"
+  local key="$2"
+  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file"
+}
+
+cosign_verify_disabled() {
+  local env_file="$STACK_DIR/docker/.env"
+  local value
+  [[ -f "$env_file" ]] || return 1
+  value="$(env_file_value "$env_file" COSIGN_VERIFY)"
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  [[ "$value" == "false" || "$value" == "0" || "$value" == "no" || "$value" == "off" ]]
+}
+
 need_command git
 need_command docker
 
@@ -173,6 +188,12 @@ fi
 
 if [[ -t 0 || -e /dev/tty ]]; then
   "$EDITOR_BIN" "$STACK_DIR/docker/.env" </dev/tty >/dev/tty
+fi
+
+if ! command -v cosign >/dev/null 2>&1 && ! cosign_verify_disabled; then
+  echo "Missing command: cosign" >&2
+  echo "Install cosign before running the signed-image deployment, or set COSIGN_VERIFY=false in docker/.env only for temporary offline recovery." >&2
+  exit 1
 fi
 
 if [[ -n "$GIT_TOKEN" && -z "${GHCR_TOKEN:-}" ]]; then

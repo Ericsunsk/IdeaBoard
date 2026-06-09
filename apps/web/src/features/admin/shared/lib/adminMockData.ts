@@ -39,14 +39,18 @@ export function createMockAdminStatistics(range: GetAdminStatisticsRange): Admin
       today_calls: 248,
       today_success: 222,
       today_failed: 26,
+      today_cancelled: 8,
       yesterday_calls: 214,
       yesterday_success: 196,
       yesterday_failed: 18,
+      yesterday_cancelled: 6,
       this_month_calls: 18492,
+      this_month_cancelled: 214,
       pending: 42,
       running: 18,
       completed: 120846,
       failed: 7532,
+      cancelled: 214,
     },
     trend,
     model_health: createMockModelHealth(),
@@ -331,7 +335,17 @@ function createMockAdminAccount(
     platform: apiType,
     api_type: apiType,
     proxy_url: proxyUrl,
-    model_set: modelSet,
+    models: modelSet.split(',').map((model, index) => {
+      const name = model.trim()
+      return {
+        id: id * 100 + index,
+        name,
+        enabled: !disabledModels.includes(name),
+        weight: 1,
+        sort_order: index,
+      }
+    }),
+    secret_configured: true,
     max_concurrent: maxConcurrent,
     current_concurrent: currentConcurrent,
     wait_queue_count: Math.max(0, failCount - 1),
@@ -339,8 +353,7 @@ function createMockAdminAccount(
     fail_count: failCount,
     weight: status === 1 ? 100 : 40,
     timeout: 180,
-    extra_config:
-      disabledModels.length > 0 ? JSON.stringify({ disabled_models: disabledModels }) : '{}',
+    extra_config: '{}',
     status,
     created_at: timestamp,
     updated_at: timestamp,
@@ -352,6 +365,7 @@ export const mockMonitorStats: MonitorStats = {
   running: 18,
   completed: 120846,
   failed: 7532,
+  cancelled: 214,
 }
 
 function createMockTrend(range: GetAdminStatisticsRange): AdminStatisticsTrendItem[] {
@@ -377,11 +391,12 @@ function createMockQualityTrend(range: GetAdminStatisticsRange): AdminStatistics
     const failureRate = Math.min(24, Math.max(4, 8 + Math.sin(index * 0.9) * 7 + (index % 5)))
     const fail = Math.round((total * failureRate) / 100)
     const success = Math.max(0, total - fail)
+    const cancelled = index % 4 === 0 ? Math.round(total * 0.04) : 0
 
     return {
       date: bucket.date,
       label: bucket.label,
-      total,
+      total: total + cancelled,
       success,
       fail,
       success_rate: total > 0 ? (success / total) * 100 : 0,
@@ -483,8 +498,8 @@ function createMockTask(
     id,
     task_id: taskId,
     user_id: 9000 + (id % 5),
-    channel_id: 20 + (id % 4),
-    account_id: 100 + (id % 5),
+    assigned_channel_id: status === 'pending' ? null : 20 + (id % 4),
+    account_id: status === 'pending' ? null : 100 + (id % 5),
     prompt: `Mock ${model} visual regression sample ${id}`,
     params: JSON.stringify({ model, mock: true, aspect_ratio: id % 2 === 0 ? '16:9' : '1:1' }),
     status,

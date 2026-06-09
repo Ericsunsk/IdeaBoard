@@ -1,11 +1,18 @@
 package accounts
 
-import "testing"
+import (
+	"testing"
 
-func TestEnabledModelsRemovesDisabledModels(t *testing.T) {
+	"ideaboard/api/internal/workflow"
+)
+
+func TestEnabledModelsUsesStructuredModels(t *testing.T) {
 	account := &ApiAccount{
-		ModelSet:    "gpt-image-1, imagen-4-preview, gpt-image-1",
-		ExtraConfig: `{"disabled_models":["imagen-4-preview"]}`,
+		Models: []AccountModel{
+			{Name: "gpt-image-1", Enabled: true},
+			{Name: "imagen-4-preview", Enabled: false},
+			{Name: "gpt-image-1", Enabled: true},
+		},
 	}
 
 	got := EnabledModels(account)
@@ -14,39 +21,46 @@ func TestEnabledModelsRemovesDisabledModels(t *testing.T) {
 	}
 }
 
-func TestFilterAccountsByRequestedModelSkipsDisabledModel(t *testing.T) {
+func TestFilterAccountsForRequestMatchesRequestedModel(t *testing.T) {
 	accounts := []*ApiAccount{
-		{ID: 1, ModelSet: "gpt-image-1,imagen-4-preview", ExtraConfig: `{"disabled_models":["gpt-image-1"]}`},
-		{ID: 2, ModelSet: "gpt-image-1"},
+		{ID: 1, Models: []AccountModel{{Name: "gpt-image-1", Enabled: false}}},
+		{ID: 2, Models: []AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 	}
 
-	got := FilterAccountsByRequestedModel(accounts, map[string]interface{}{"model": "gpt-image-1"})
+	got := FilterAccountsForRequest(accounts, "", map[string]interface{}{"model": "gpt-image-1"})
 	if len(got) != 1 || got[0].ID != 2 {
-		t.Fatalf("FilterAccountsByRequestedModel() ids=%v, want [2]", accountIDsForTest(got))
+		t.Fatalf("FilterAccountsForRequest() ids=%v, want [2]", accountIDsForTest(got))
 	}
 }
 
-func TestFilterAccountsByRequestedModelDropsAccountsWithoutEnabledModels(t *testing.T) {
+func TestFilterAccountsForRequestDropsAccountsWithoutEnabledModels(t *testing.T) {
 	accounts := []*ApiAccount{
-		{ID: 1, ModelSet: "gpt-image-1", ExtraConfig: `{"disabled_models":["gpt-image-1"]}`},
-		{ID: 2, ModelSet: "imagen-4-preview"},
+		{ID: 1, Models: []AccountModel{{Name: "gpt-image-1", Enabled: false}}},
+		{ID: 2, Models: []AccountModel{{Name: "imagen-4-preview", Enabled: true}}},
 	}
 
-	got := FilterAccountsByRequestedModel(accounts, nil)
+	got := FilterAccountsForRequest(accounts, "", nil)
 	if len(got) != 1 || got[0].ID != 2 {
-		t.Fatalf("FilterAccountsByRequestedModel() ids=%v, want [2]", accountIDsForTest(got))
+		t.Fatalf("FilterAccountsForRequest() ids=%v, want [2]", accountIDsForTest(got))
 	}
 }
 
-func TestDisabledModelsSupportsMapAndNestedConfig(t *testing.T) {
+func TestResolveAccountModelMatchesFeatureAndRequestedModelOnSameModel(t *testing.T) {
 	account := &ApiAccount{
-		ModelSet:    "a,b,c",
-		ExtraConfig: `{"routing":{"disabled_models":{"a":true,"b":false}},"disabled_models":"c"}`,
+		Models: []AccountModel{
+			{Name: "gpt-image-1", Enabled: true, FeatureSlugs: []string{workflow.FeatureSlugImageExtend}},
+			{Name: "imagen-4-preview", Enabled: true, FeatureSlugs: []string{workflow.FeatureSlugStyleFusion}},
+		},
 	}
 
-	got := EnabledModelSet(account)
-	if got != "b" {
-		t.Fatalf("EnabledModelSet()=%q, want %q", got, "b")
+	_, ok := ResolveAccountModel(account, workflow.FeatureSlugStyleFusion, "gpt-image-1")
+	if ok {
+		t.Fatalf("expected no model when requested model does not support feature")
+	}
+
+	model, ok := ResolveAccountModel(account, workflow.FeatureSlugStyleFusion, "imagen-4-preview")
+	if !ok || model.Name != "imagen-4-preview" {
+		t.Fatalf("ResolveAccountModel()=%+v ok=%v, want imagen-4-preview", model, ok)
 	}
 }
 

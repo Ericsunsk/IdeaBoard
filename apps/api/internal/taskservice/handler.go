@@ -16,6 +16,33 @@ type Handler struct {
 	taskService *Service
 }
 
+type adminTaskDTO struct {
+	ID                int64                       `json:"id"`
+	TaskID            string                      `json:"task_id"`
+	UserID            int64                       `json:"user_id"`
+	AssignedChannelID *int64                      `json:"assigned_channel_id"`
+	AccountID         *int64                      `json:"account_id"`
+	Prompt            string                      `json:"prompt"`
+	UserPrompt        string                      `json:"user_prompt"`
+	Params            string                      `json:"params"`
+	FeatureSlug       string                      `json:"feature_slug"`
+	RequestedModel    string                      `json:"requested_model"`
+	ResolvedModel     string                      `json:"resolved_model"`
+	APIType           string                      `json:"api_type"`
+	Status            string                      `json:"status"`
+	RetryCount        int                         `json:"retry_count"`
+	ErrorMsg          string                      `json:"error_msg"`
+	Result            string                      `json:"result"`
+	Outputs           []tasks.TaskOutput          `json:"outputs,omitempty"`
+	ExecutionMetrics  *tasks.TaskExecutionMetrics `json:"execution_metrics,omitempty"`
+	CreatedAt         time.Time                   `json:"created_at"`
+	UpdatedAt         time.Time                   `json:"updated_at"`
+	CompletedAt       *time.Time                  `json:"completed_at"`
+	CancelledAt       *time.Time                  `json:"cancelled_at"`
+	CancelledBy       *int64                      `json:"cancelled_by"`
+	CancelReason      string                      `json:"cancel_reason"`
+}
+
 func NewHandler(taskService *Service) *Handler {
 	return &Handler{taskService: taskService}
 }
@@ -72,7 +99,7 @@ func (h *Handler) GetTask(c *gin.Context) {
 		response.Error(c, 404, "任务不存在")
 		return
 	}
-	response.Success(c, gin.H{"task": task})
+	response.Success(c, gin.H{"task": toAdminTaskDTO(task)})
 }
 
 func (h *Handler) ListTasks(c *gin.Context) {
@@ -92,8 +119,9 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		"running_count":   counts.RunningCount,
 		"completed_count": counts.CompletedCount,
 		"failed_count":    counts.FailedCount,
+		"cancelled_count": counts.CancelledCount,
 		"other_count":     counts.OtherCount,
-		"list":            taskItems,
+		"list":            toAdminTaskDTOs(taskItems),
 	})
 }
 
@@ -208,6 +236,46 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 				return
 			}
 		}
+	}
+}
+
+func toAdminTaskDTOs(items []*tasks.Task) []adminTaskDTO {
+	result := make([]adminTaskDTO, 0, len(items))
+	for _, item := range items {
+		result = append(result, toAdminTaskDTO(item))
+	}
+	return result
+}
+
+func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
+	if task == nil {
+		return adminTaskDTO{}
+	}
+	return adminTaskDTO{
+		ID:                task.ID,
+		TaskID:            task.TaskID,
+		UserID:            task.UserID,
+		AssignedChannelID: task.AssignedChannelID,
+		AccountID:         task.AccountID,
+		Prompt:            task.Prompt,
+		UserPrompt:        task.UserPrompt,
+		Params:            task.Params,
+		FeatureSlug:       task.FeatureSlug,
+		RequestedModel:    task.RequestedModel,
+		ResolvedModel:     task.ResolvedModel,
+		APIType:           task.APIType,
+		Status:            task.Status,
+		RetryCount:        task.RetryCount,
+		ErrorMsg:          task.ErrorMsg,
+		Result:            task.Result,
+		Outputs:           task.Outputs,
+		ExecutionMetrics:  task.ExecutionMetrics,
+		CreatedAt:         task.CreatedAt,
+		UpdatedAt:         task.UpdatedAt,
+		CompletedAt:       task.CompletedAt,
+		CancelledAt:       task.CancelledAt,
+		CancelledBy:       task.CancelledBy,
+		CancelReason:      task.CancelReason,
 	}
 }
 
