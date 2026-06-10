@@ -139,7 +139,7 @@
         :kind="data.kind"
         :snapshot-node="data.snapshotNode"
         :ui-state="props.uiState"
-        :show-handles="showHandleControls"
+        :show-handles="showHandleControlsGated"
         @request-internals-update="emit('request-internals-update')"
       />
     </div>
@@ -148,13 +148,14 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction, ImageStrengthAction } from '../types/imageActions'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import { resolveImageNodeStageHeight } from '../utils/imageNodeSizing'
+import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 
 const props = withDefaults(
   defineProps<{
@@ -263,32 +264,33 @@ const disableHandleRailInteraction = computed(
 const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
 )
-const isPointerOverNode = ref(false)
-const isKeyboardFocusWithinNode = ref(false)
-const isTouchHandleHintActive = ref(false)
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
-const handleRailBounds = reactive({
-  left: 0,
-  top: 0,
-  width: 0,
-  height: 0,
-})
-let handleRailMeasureFrame = 0
-let touchHandleHintTimer: ReturnType<typeof setTimeout> | null = null
-let handleRailResizeObserver: ResizeObserver | null = null
-let observedHandleRailRoot: HTMLElement | null = null
-let observedHandleRailFrame: HTMLElement | null = null
 
-const handleRailStyle = computed(() => ({
-  left: `${handleRailBounds.left}px`,
-  top: `${handleRailBounds.top}px`,
-  width: `${handleRailBounds.width}px`,
-  height: `${handleRailBounds.height}px`,
-}))
-const showHandleControls = computed(
-  () =>
-    !disableHandleRailInteraction.value &&
-    (isPointerOverNode.value || isKeyboardFocusWithinNode.value || isTouchHandleHintActive.value),
+const {
+  handleRailStyle,
+  showHandleControls,
+  refreshTransientHandleVisibility,
+  onNodeMouseEnter,
+  onNodeMouseLeave,
+  onNodeFocusIn,
+  onNodeFocusOut,
+  onNodePointerDown,
+} = useFlowCanvasNodeHandleRail(flowCanvasNodeRef)
+
+// Notify parent when the handle rail geometry changes (was in setHandleRailBounds)
+watch(handleRailStyle, () => {
+  void nextTick(() => emit('request-internals-update'))
+})
+
+watch(
+  () => props.handleVisibilityRefreshToken,
+  () => {
+    refreshTransientHandleVisibility()
+  },
+)
+
+const showHandleControlsGated = computed(
+  () => !disableHandleRailInteraction.value && showHandleControls.value,
 )
 
 function resolveSnapshotNode<T>() {
@@ -347,208 +349,6 @@ const stageHeight = computed(() => {
         : 1
   return resolveImageNodeStageHeight(imageSnapshot.value.width, ratio, hasImageFrame)
 })
-
-function getNodeHandleFrameElement(): HTMLElement | null {
-  const root = flowCanvasNodeRef.value
-  const explicitFrame = root?.querySelector<HTMLElement>('[data-flow-handle-frame]')
-  if (explicitFrame) return explicitFrame
-
-  const workflowNode = root?.querySelector<HTMLElement>('.workflow-node')
-  if (!workflowNode) return null
-
-  for (const child of Array.from(workflowNode.children)) {
-    if (!(child instanceof HTMLElement)) continue
-    if (child.classList.contains('workflow-node-header')) continue
-    return child
-  }
-  return null
-}
-
-function getLayoutOffsetWithinRoot(element: HTMLElement, root: HTMLElement) {
-  let left = 0
-  let top = 0
-  let current: HTMLElement | null = element
-
-  while (current && current !== root) {
-    left += current.offsetLeft
-    top += current.offsetTop
-    current = current.offsetParent as HTMLElement | null
-  }
-
-  return current === root ? { left, top } : null
-}
-
-function refreshHandleRailObserver() {
-  if (typeof ResizeObserver === 'undefined') return
-
-  if (!handleRailResizeObserver) {
-    handleRailResizeObserver = new ResizeObserver(() => requestHandleRailMeasure())
-  }
-
-  const root = flowCanvasNodeRef.value
-  const frame = getNodeHandleFrameElement()
-
-  if (observedHandleRailRoot !== root) {
-    if (observedHandleRailRoot) handleRailResizeObserver.unobserve(observedHandleRailRoot)
-    observedHandleRailRoot = root
-    if (observedHandleRailRoot) handleRailResizeObserver.observe(observedHandleRailRoot)
-  }
-
-  if (observedHandleRailFrame !== frame) {
-    if (observedHandleRailFrame) handleRailResizeObserver.unobserve(observedHandleRailFrame)
-    observedHandleRailFrame = frame
-    if (observedHandleRailFrame) handleRailResizeObserver.observe(observedHandleRailFrame)
-  }
-}
-
-function setHandleRailBounds(next: { left: number; top: number; width: number; height: number }) {
-  const changed =
-    handleRailBounds.left !== next.left ||
-    handleRailBounds.top !== next.top ||
-    handleRailBounds.width !== next.width ||
-    handleRailBounds.height !== next.height
-
-  if (!changed) return
-
-  handleRailBounds.left = next.left
-  handleRailBounds.top = next.top
-  handleRailBounds.width = next.width
-  handleRailBounds.height = next.height
-  void nextTick(() => emit('request-internals-update'))
-}
-
-function updateHandleRailBounds() {
-  handleRailMeasureFrame = 0
-  const root = flowCanvasNodeRef.value
-  const frame = getNodeHandleFrameElement()
-
-  if (!root) {
-    return
-  }
-
-  if (!frame) {
-    setHandleRailBounds({
-      left: 0,
-      top: 0,
-      width: Math.max(1, root.offsetWidth),
-      height: Math.max(1, root.offsetHeight),
-    })
-    return
-  }
-
-  const offset = getLayoutOffsetWithinRoot(frame, root)
-  if (!offset) return
-
-  setHandleRailBounds({
-    left: Math.round(offset.left),
-    top: Math.round(offset.top),
-    width: Math.max(1, Math.round(frame.offsetWidth)),
-    height: Math.max(1, Math.round(frame.offsetHeight)),
-  })
-}
-
-function requestHandleRailMeasure() {
-  if (typeof requestAnimationFrame === 'undefined') {
-    refreshHandleRailObserver()
-    updateHandleRailBounds()
-    return
-  }
-
-  if (handleRailMeasureFrame) cancelAnimationFrame(handleRailMeasureFrame)
-  handleRailMeasureFrame = requestAnimationFrame(() => {
-    refreshHandleRailObserver()
-    updateHandleRailBounds()
-  })
-}
-
-onMounted(() => {
-  void nextTick(requestHandleRailMeasure)
-})
-
-onUpdated(() => {
-  requestHandleRailMeasure()
-})
-
-onBeforeUnmount(() => {
-  if (handleRailMeasureFrame) cancelAnimationFrame(handleRailMeasureFrame)
-  if (touchHandleHintTimer) clearTimeout(touchHandleHintTimer)
-  handleRailResizeObserver?.disconnect()
-})
-
-watch(
-  () => props.handleVisibilityRefreshToken,
-  () => {
-    refreshTransientHandleVisibility()
-  },
-)
-
-function clearTouchHandleHint() {
-  isTouchHandleHintActive.value = false
-  if (!touchHandleHintTimer) return
-  clearTimeout(touchHandleHintTimer)
-  touchHandleHintTimer = null
-}
-
-function refreshTransientHandleVisibility() {
-  clearTouchHandleHint()
-
-  const activeElement = document.activeElement
-  if (
-    activeElement instanceof HTMLElement &&
-    activeElement.classList.contains('flow-canvas-node__handle-aggregate')
-  ) {
-    activeElement.blur()
-  }
-
-  requestAnimationFrame(() => {
-    const root = flowCanvasNodeRef.value
-    if (!root) return
-    isPointerOverNode.value = root.matches(':hover')
-    syncKeyboardFocusWithinNode()
-  })
-}
-
-function syncKeyboardFocusWithinNode() {
-  const root = flowCanvasNodeRef.value
-  isKeyboardFocusWithinNode.value = !!root?.querySelector(':focus-visible')
-}
-
-function scheduleKeyboardFocusSync() {
-  requestAnimationFrame(() => {
-    syncKeyboardFocusWithinNode()
-  })
-}
-
-function onNodeMouseEnter() {
-  isPointerOverNode.value = true
-}
-
-function onNodeMouseLeave() {
-  isPointerOverNode.value = false
-}
-
-function onNodeFocusIn() {
-  scheduleKeyboardFocusSync()
-}
-
-function onNodeFocusOut(event: FocusEvent) {
-  const nextTarget = event.relatedTarget
-  if (nextTarget instanceof Node && flowCanvasNodeRef.value?.contains(nextTarget)) {
-    scheduleKeyboardFocusSync()
-    return
-  }
-  isKeyboardFocusWithinNode.value = false
-}
-
-function onNodePointerDown(event: PointerEvent) {
-  if (event.pointerType === 'mouse') return
-  isTouchHandleHintActive.value = true
-  if (touchHandleHintTimer) clearTimeout(touchHandleHintTimer)
-  touchHandleHintTimer = setTimeout(() => {
-    isTouchHandleHintActive.value = false
-    touchHandleHintTimer = null
-  }, 2400)
-}
 
 function onPromptTextUpdate(value: string) {
   emit('update-prompt-text', value)
@@ -742,9 +542,9 @@ function noopMouse() {}
     .workflow-node:not(.prompt-node):not(.image-node):not(.fusion-node)
       > :not(.workflow-node-header):first-of-type
   ) {
-  border: var(--node-tool-border-width, 1.2px) solid #e2e8f0;
+  border: var(--node-tool-border-width, 1.2px) solid var(--color-canvas-node-border-alt);
   border-radius: 14px;
-  background: #ffffff;
+  background: var(--color-canvas-node-bg);
   transition: border-color 0.2s ease;
 }
 
@@ -753,7 +553,7 @@ function noopMouse() {}
     .workflow-node:not(.prompt-node):not(.image-node):not(.fusion-node).active
       > :not(.workflow-node-header):first-of-type
   ) {
-  border-color: #9278e6;
+  border-color: var(--color-canvas-accent);
 }
 
 .flow-canvas-node :deep(.workflow-node.dragging) {

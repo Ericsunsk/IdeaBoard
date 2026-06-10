@@ -67,9 +67,14 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
   const isAdminRoute = to.path.startsWith('/admin')
-  const shouldRefreshSession = isAdminRoute || !!to.meta.requiresAuth || !!to.meta.guest
+  // Only force-refresh session when >25 s have elapsed since last validation;
+  // this honours the 30 s TTL instead of bypassing it on every navigation.
+  const SESSION_FRESH_THRESHOLD_MS = 25_000
+  const needsFreshSession =
+    isAdminRoute && Date.now() - userStore.sessionValidatedAt > SESSION_FRESH_THRESHOLD_MS
+  const shouldRefreshSession = needsFreshSession || !!to.meta.requiresAuth || !!to.meta.guest
   const user = shouldRefreshSession
-    ? await userStore.ensureSession({ fresh: isAdminRoute })
+    ? await userStore.ensureSession({ fresh: needsFreshSession })
     : userStore.user
 
   const isLoggedIn = !!user

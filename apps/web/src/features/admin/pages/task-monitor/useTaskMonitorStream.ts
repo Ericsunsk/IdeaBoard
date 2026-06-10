@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/vue-query'
 import { useDocumentVisibility } from '@vueuse/core'
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import { getGetAdminMonitorQueryKey } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'

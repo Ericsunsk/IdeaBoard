@@ -16,7 +16,9 @@ import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransaction
 export type FlowCreatableNodeKind = 'prompt' | 'image' | 'fusion'
 
 type UseFlowNodeMutationsOptions = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   nodes: Ref<Array<Record<string, any>>>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
   createNodeKind: Ref<FlowCreatableNodeKind>
   commitGraphMutation: FlowTransactions['commitGraphMutation']
@@ -156,6 +158,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
 
   function updateSnapshotNode(
     nodeId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- snapshotNode is a union of 3 node shapes; patcher is a generic transformer that can't be narrowed here
     patcher: (snapshotNode: Record<string, any>) => Record<string, any>,
     mutationOptions: UpdateSnapshotNodeOptions = {},
   ) {
@@ -169,6 +172,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         const node = nextNodes[index]
         const data = (node.data ?? {}) as { snapshotNode?: unknown; title?: string }
         if (!data.snapshotNode || typeof data.snapshotNode !== 'object') return items
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- narrowed to object above; cast needed to match patcher's parameter type
         const snapshotNode = data.snapshotNode as Record<string, any>
         const nextSnapshotNode = patcher(snapshotNode)
         if (nextSnapshotNode === snapshotNode) return items

@@ -7,9 +7,9 @@
   --node-tool-icon-stroke: 1.5;
   --node-tool-popover-option-height: 33px;
   --node-tool-tooltip-delay: 200ms;
-  --node-tool-button-border: rgba(122, 107, 213, 0.28);
-  --node-tool-button-accent: #9278e6;
-  --node-tool-button-brand: #7a6bd5;
+  --node-tool-button-border: var(--color-canvas-accent-border);
+  --node-tool-button-accent: var(--color-canvas-accent);
+  --node-tool-button-brand: var(--color-canvas-accent-hover);
 }
 
 .node-tool-button {
@@ -31,8 +31,8 @@
 
 .node-tool-output-count {
   border: var(--node-tool-border-width) solid var(--node-tool-button-border);
-  background: #ffffff;
-  color: #505766;
+  background: var(--color-canvas-node-bg);
+  color: var(--color-canvas-text-control);
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
@@ -50,9 +50,9 @@
 .node-tool-output-count:hover:not(:disabled),
 .node-tool-output-count:focus,
 .node-tool-output-count.active {
-  background: #f8f7ff;
+  background: var(--color-canvas-accent-soft);
   border-color: var(--node-tool-button-accent);
-  color: #272932;
+  color: var(--color-canvas-text-primary);
 }
 
 .node-tool-output-count:disabled {
@@ -66,9 +66,9 @@
   bottom: calc(100% + 8px);
   transform: translate(-50%, 2px);
   white-space: nowrap;
-  background: rgba(24, 24, 27, 0.94);
-  color: #f4f4f5;
-  border: var(--node-tool-border-width) solid rgba(122, 107, 213, 0.26);
+  background: var(--color-canvas-tooltip-bg);
+  color: var(--color-canvas-tooltip-text);
+  border: var(--node-tool-border-width) solid var(--color-canvas-accent-tooltip-border);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;
@@ -118,7 +118,7 @@
   right: 0;
   bottom: calc(100% + var(--node-tool-button-gap));
   z-index: 43;
-  border: var(--node-tool-border-width) solid rgba(122, 107, 213, 0.22);
+  border: var(--node-tool-border-width) solid var(--color-canvas-accent-border-soft);
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
@@ -141,10 +141,10 @@
 .node-tool-output-count-option {
   width: var(--node-tool-button-size);
   height: var(--node-tool-popover-option-height);
-  border: var(--node-tool-border-width) solid #e8ecf4;
+  border: var(--node-tool-border-width) solid var(--color-canvas-node-border);
   border-radius: 9px;
-  background: #ffffff;
-  color: #5f6878;
+  background: var(--color-canvas-node-bg);
+  color: var(--color-canvas-text-option);
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
@@ -153,6 +153,6 @@
 .node-tool-output-count-option:hover,
 .node-tool-output-count-option.active {
   border-color: var(--node-tool-button-accent);
-  background: #f5f2ff;
+  background: var(--color-canvas-accent-soft);
   color: var(--node-tool-button-accent);
 }

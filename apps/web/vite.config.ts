@@ -10,7 +10,7 @@ export default defineConfig({
     vue(),
     tailwindcss(),
     AutoImport({
-      include: [/\.[tj]sx?$/, /\.vue$/, /\.vue\?vue/],
+      include: [/\.vue$/, /\.vue\?vue/],
       imports: [
         'vue',
         'vue-router',

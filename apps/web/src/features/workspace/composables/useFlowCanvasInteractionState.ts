@@ -1,3 +1,5 @@
+import { computed, ref } from 'vue'
+
 export type CanvasInteractionKey = 'image-mask-editor'
 
 export function useFlowCanvasInteractionState() {

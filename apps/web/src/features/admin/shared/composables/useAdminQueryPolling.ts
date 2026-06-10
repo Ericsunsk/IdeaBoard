@@ -1,4 +1,5 @@
 import { useDocumentVisibility } from '@vueuse/core'
+import { computed } from 'vue'
 
 type PollingInterval = number | false
 

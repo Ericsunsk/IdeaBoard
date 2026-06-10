@@ -8,7 +8,7 @@
   font-weight: 700;
   text-transform: none;
   letter-spacing: 0.04em;
-  color: #64748b;
+  color: var(--color-canvas-text-secondary);
   background: transparent;
   border-bottom: 0;
   cursor: grab;
@@ -19,7 +19,7 @@
 }
 
 .workflow-node.active .workflow-node-header {
-  color: #9278e6;
+  color: var(--color-canvas-accent);
 }
 
 .workflow-node.copy-mode .workflow-node-header {
@@ -40,7 +40,12 @@
   inset: -1.5px;
   border-radius: inherit;
   padding: 1.5px;
-  background: linear-gradient(120deg, #9278e6 0%, #6dbef7 50%, #9278e6 100%);
+  background: linear-gradient(
+    120deg,
+    var(--color-canvas-running-from) 0%,
+    var(--color-canvas-running-to) 50%,
+    var(--color-canvas-running-from) 100%
+  );
   background-size: 220% 100%;
   animation: node-running-border-flow 2.4s linear infinite;
   pointer-events: none;
@@ -69,8 +74,8 @@
 
 .node-execution-body {
   --node-tool-border-width: 1.2px;
-  --node-tool-button-accent: #9278e6;
-  --node-tool-button-brand: #7a6bd5;
+  --node-tool-button-accent: var(--color-canvas-accent);
+  --node-tool-button-brand: var(--color-canvas-accent-hover);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -95,9 +100,9 @@
   flex-direction: column;
   gap: 6px;
   padding: 7px 8px;
-  border: var(--node-tool-border-width) solid #e8ecf4;
+  border: var(--node-tool-border-width) solid var(--color-canvas-node-border);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--color-canvas-node-bg);
 }
 
 .node-control-head {
@@ -116,7 +121,7 @@
 .node-control-label {
   font-size: 11px;
   font-weight: 600;
-  color: #7b8798;
+  color: var(--color-canvas-text-muted);
   letter-spacing: 0;
 }
 
@@ -127,6 +132,8 @@
   -webkit-appearance: none;
   background: transparent;
   cursor: pointer;
+  /* accent-color provides cross-browser slider fill without moz-range-progress */
+  accent-color: var(--color-canvas-accent);
 }
 
 .node-inline-range::-webkit-slider-runnable-track {
@@ -134,10 +141,10 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    #9278e6 0%,
-    #9278e6 var(--slider-pct),
-    #eef2f5 var(--slider-pct),
-    #eef2f5 100%
+    var(--color-canvas-accent) 0%,
+    var(--color-canvas-accent) var(--slider-pct),
+    var(--color-canvas-track-bg) var(--slider-pct),
+    var(--color-canvas-track-bg) 100%
   );
 }
 
@@ -149,7 +156,7 @@
   margin-top: -4px;
   border: 0;
   border-radius: 999px;
-  background: #9278e6;
+  background: var(--color-canvas-accent);
   box-shadow: none;
 }
 
@@ -157,14 +164,7 @@
   height: 6px;
   border: 0;
   border-radius: 999px;
-  background: #eef2f5;
-}
-
-.node-inline-range::-moz-range-progress {
-  height: 6px;
-  border: 0;
-  border-radius: 999px;
-  background: #9278e6;
+  background: var(--color-canvas-track-bg);
 }
 
 .node-inline-range::-moz-range-thumb {
@@ -172,12 +172,19 @@
   height: 14px;
   border: 0;
   border-radius: 999px;
-  background: #9278e6;
+  background: var(--color-canvas-accent);
   box-shadow: none;
 }
 
+/* suppress default focus ring; show accessible ring only for keyboard nav */
 .node-inline-range:focus {
   outline: none;
+}
+
+.node-inline-range:focus-visible {
+  outline: 2px solid var(--color-canvas-accent);
+  outline-offset: 3px;
+  border-radius: 3px;
 }
 
 .node-inline-range:disabled {
@@ -186,7 +193,6 @@
 }
 
 .node-inline-range:active,
-.node-inline-range:focus,
 .node-inline-range::-webkit-slider-runnable-track:active,
 .node-inline-range::-moz-range-track:active,
 .node-inline-range::-moz-range-thumb:active {

@@ -1,3 +1,5 @@
+import { nextTick } from 'vue'
+
 type UpdateNodeInternals = (nodeIds: string[]) => void
 
 type UseFlowNodeInternalsRefreshQueueOptions = {

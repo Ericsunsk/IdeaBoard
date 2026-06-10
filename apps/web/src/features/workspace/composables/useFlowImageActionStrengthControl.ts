@@ -1,4 +1,11 @@
-import type { ComponentPublicInstance } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  reactive,
+  ref,
+  type ComponentPublicInstance,
+} from 'vue'
 import {
   DEFAULT_IMAGE_ACTION_STRENGTH,
   DEFAULT_IMAGE_ACTION_STRENGTHS,

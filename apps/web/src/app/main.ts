@@ -29,7 +29,7 @@ app.use(PrimeVue, {
     preset: ideaBoardPrimePreset,
     options: {
       prefix: 'p',
-      darkModeSelector: false,
+      darkModeSelector: '.dark',
       cssLayer: false,
     },
   },

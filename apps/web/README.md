@@ -55,6 +55,8 @@ API_BASE_URL=https://api.example.com
 - 开发环境通过 `vite.config.ts` 将 `/api/auth` 代理到 `http://localhost:6001`
 - 开发环境通过 `vite.config.ts` 将其余 `/api` 和 `/uploads` 代理到 `http://localhost:6000`
 - 如果需要切换本地后端地址，请修改 `vite.config.ts` 或设置对应 `VITE_*` 环境变量
+- Auto-import 仅用于 Vue SFC/template；普通 `.ts/.tsx` 文件必须显式 import Vue、Vue Router 与 TanStack Query helper
+- `.ts/.tsx` 文件中类型依赖优先使用 `import type`；ESLint 会阻止在普通 TS 模块中依赖 auto-import 全局
 
 ## 主要目录
 

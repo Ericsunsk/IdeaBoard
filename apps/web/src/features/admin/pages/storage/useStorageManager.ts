@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import type {
   StorageProfile,
@@ -463,12 +464,9 @@ export function useStorageManager() {
 
   async function loadData() {
     if (isMockMode.value) return
-    await runAsyncAction(
-      () => Promise.all([providersQuery.refetch(), profilesQuery.refetch()]),
-      {
-        errorMessage: '刷新存储配置失败',
-      },
-    )
+    await runAsyncAction(() => Promise.all([providersQuery.refetch(), profilesQuery.refetch()]), {
+      errorMessage: '刷新存储配置失败',
+    })
   }
 
   return {

@@ -3,6 +3,7 @@ import type { Connection, Edge, EdgeUpdateEvent } from '@vue-flow/core'
 import type { FlowTransactions } from './useFlowTransactions'
 
 type UseFlowConnectionMutationsOptions = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow edge data is an open Record; narrowing breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
   isValidConnection: (connection: Connection) => boolean
   normalizeConnection?: (

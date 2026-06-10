@@ -4,7 +4,7 @@
   --canvas-control-gap: 12px;
   --canvas-control-icon-size: 19px;
   --canvas-control-icon-stroke: 1.5;
-  --canvas-control-active-color: #9278e6;
+  --canvas-control-active-color: var(--color-canvas-accent);
   display: flex;
   gap: var(--canvas-control-gap);
 }

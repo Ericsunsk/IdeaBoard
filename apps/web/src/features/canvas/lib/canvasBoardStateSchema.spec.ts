@@ -90,6 +90,7 @@ describe('canvasBoardStateSchema', () => {
   })
 
   it('accepts pending task metadata on image nodes', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test needs to mutate fields not exposed by the typed interface
     const state = createValidState() as Record<string, any>
     state.imageNodes[0] = {
       ...state.imageNodes[0]!,
@@ -107,12 +108,14 @@ describe('canvasBoardStateSchema', () => {
 
   it('rejects invalid state', () => {
     const invalid = createValidState()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- intentionally passing invalid value to test schema rejection
     invalid.connections[0]!.toNodeType = 'unknown' as any
     const parsed = v.safeParse(canvasBoardStateSchema, invalid)
     expect(parsed.success).toBe(false)
   })
 
   it('applies fusion defaults', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test mutates fields not exposed by the typed interface to simulate partial data
     const state = createValidState() as Record<string, any>
     state.fusionNodes = [{ ...state.fusionNodes[0] }]
     delete state.fusionNodes[0].blendPoint

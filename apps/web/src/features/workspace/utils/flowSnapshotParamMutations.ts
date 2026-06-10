@@ -56,8 +56,10 @@ function arePromptInputImagesEqual(a: unknown, b: PromptNodeInputImage[]): boole
   )
 }
 export function patchFlowSnapshotParam(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- snapshotNode is a union of 3 node shapes handled via switch(key); can't be statically narrowed at this boundary
   snapshotNode: Record<string, any>,
   payload: { key: string; value: unknown },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- return type mirrors input shape
 ): Record<string, any> {
   const { key, value } = payload
   switch (key) {

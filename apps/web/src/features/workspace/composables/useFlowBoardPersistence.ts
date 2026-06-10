@@ -1,3 +1,4 @@
+import { computed } from 'vue'
 import { renderBoardPreviewDataUrl } from '../../canvas/lib/boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas/lib/boardPreviewVersion'
 import { setCanvasBoardPreviewSnapshot } from '../../canvas/lib/canvasBoardState'
@@ -79,10 +80,7 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
       const pendingTaskId =
         typeof snapshotNode.pendingTaskId === 'string' ? snapshotNode.pendingTaskId.trim() : ''
       return (
-        snapshotNode.outputStatus === 'running' &&
-        !sourceUrl &&
-        !hasOutputImage &&
-        !pendingTaskId
+        snapshotNode.outputStatus === 'running' && !sourceUrl && !hasOutputImage && !pendingTaskId
       )
     })
   }

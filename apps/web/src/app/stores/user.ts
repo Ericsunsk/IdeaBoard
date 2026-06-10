@@ -209,6 +209,7 @@ export const useUserStore = defineStore('user', () => {
     user,
     isLoggedIn,
     isAdmin,
+    sessionValidatedAt,
     setAuth: updateAuth,
     clearAuth: resetAuth,
     login,
