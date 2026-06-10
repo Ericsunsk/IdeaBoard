@@ -86,6 +86,7 @@ const imageNodeItemSchema = v.strictObject({
   sourceImageUrl: v.string(),
   sourceImageRatio: positiveFiniteNumberSchema,
   outputCount: v.optional(outputCountSchema),
+  pendingTaskId: v.optional(nonEmptyStringSchema),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: v.array(imageNodeOutputItemSchema),
 })

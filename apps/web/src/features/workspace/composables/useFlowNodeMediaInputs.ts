@@ -30,6 +30,7 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
       width: IMAGE_NODE_EMPTY_SIZE,
       sourceImageUrl: '',
       sourceImageRatio: 1,
+      pendingTaskId: undefined,
       outputStatus: 'idle',
       outputImages: [],
     }))

@@ -110,6 +110,7 @@ export interface ImageNodeItem {
   sourceImageUrl: string
   sourceImageRatio: number
   outputCount?: number
+  pendingTaskId?: string
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }

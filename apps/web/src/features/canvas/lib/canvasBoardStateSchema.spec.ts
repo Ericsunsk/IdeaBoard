@@ -104,6 +104,22 @@ describe('canvasBoardStateSchema', () => {
     }
   })
 
+  it('accepts pending task metadata on image nodes', () => {
+    const state = createValidState() as Record<string, any>
+    state.imageNodes[0] = {
+      ...state.imageNodes[0]!,
+      sourceImageUrl: '',
+      pendingTaskId: 'task_pending_2',
+      outputStatus: 'running',
+      outputImages: [],
+    }
+    const parsed = v.safeParse(canvasBoardStateSchema, state)
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.output.imageNodes[0]?.pendingTaskId).toBe('task_pending_2')
+    }
+  })
+
   it('rejects invalid state', () => {
     const invalid = createValidState()
     invalid.connections[0]!.toNodeType = 'unknown' as any
@@ -142,5 +158,16 @@ describe('canvasBoardStateSchema', () => {
       ],
     })
     expect(nestedParsed.success).toBe(false)
+
+    const imageNestedParsed = v.safeParse(canvasBoardStateSchema, {
+      ...createValidState(),
+      imageNodes: [
+        {
+          ...createValidState().imageNodes[0],
+          futureImageField: 'unexpected',
+        },
+      ],
+    })
+    expect(imageNestedParsed.success).toBe(false)
   })
 })

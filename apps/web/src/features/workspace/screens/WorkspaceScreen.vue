@@ -540,6 +540,7 @@ const { onFlowViewpointGenerate, isFlowExecutionNodeRunning } = useFlowGeneratio
 
 const {
   isNodeDirectActionRunning,
+  reattachPendingImageResults,
   runImageDirectAction,
   runCanvasExtendAction,
   runImageInpaintAction,
@@ -554,6 +555,7 @@ const {
   commitNodeMutation: flowTransactions.commitNodeMutation,
   commitEdgeMutation: flowTransactions.commitEdgeMutation,
   commitDirty: flowTransactions.commitDirty,
+  flushAutosave,
   refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
   getCurrentBoardId: () => currentBoardId.value ?? '',
   onSuccess: (text) => {
@@ -870,6 +872,7 @@ watch(
   () => route.query.boardId,
   async () => {
     await loadInitialOrRouteBoard()
+    void reattachPendingImageResults()
     refreshBoardMetas()
   },
 )
@@ -903,6 +906,7 @@ useFlowLeaveGuard({
 
 onMounted(async () => {
   await loadInitialOrRouteBoard()
+  void reattachPendingImageResults()
   refreshBoardMetas()
   refreshSnapshot()
 })

@@ -83,6 +83,7 @@ type UseFlowImageDirectActionsOptions = {
   commitEdgeMutation: FlowTransactions['commitEdgeMutation']
   commitDirty: FlowTransactions['commitDirty']
   refreshNodeInternals?: (nodeIds: string[]) => void
+  flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   getCurrentBoardId?: () => string
@@ -100,9 +101,11 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
   const {
     appendPendingImageResultNode,
     appendPendingImageResultNodes,
+    markPendingImageResultTask,
     updatePendingImageResultNode,
     removePendingImageResultNode,
   } = usePendingImageResultNodes(options)
+  const activeReattachKeys = new Set<string>()
 
   function setNodeRunning(nodeId: string, running: boolean) {
     const next = new Set(runningNodeIds.value)
@@ -114,19 +117,102 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     runningNodeIds.value = next
   }
 
+  function readCurrentBoardId(): string {
+    return `${options.getCurrentBoardId?.() ?? ''}`.trim()
+  }
+
+  function isBoardStillCurrent(boardId: string): boolean {
+    return !boardId || readCurrentBoardId() === boardId
+  }
+
+  function removePendingImageResultNodesIfCurrent(boardId: string, resultNodeIds: string[]) {
+    if (!isBoardStillCurrent(boardId)) return
+    for (const resultNodeId of resultNodeIds) removePendingImageResultNode(resultNodeId)
+  }
+
+  function warnIfBoardCurrent(boardId: string, message: string) {
+    if (isBoardStillCurrent(boardId)) options.onWarning(message)
+  }
+
+  async function flushPendingTaskSnapshot() {
+    try {
+      await options.flushAutosave?.({ silent: true })
+    } catch (error) {
+      console.warn('[workspace] flush pending task snapshot failed', error)
+    }
+  }
+
+  async function persistPendingImageTaskId(boardId: string, nodeId: string, taskId: string) {
+    if (!isBoardStillCurrent(boardId)) return
+    markPendingImageResultTask(nodeId, taskId)
+    await flushPendingTaskSnapshot()
+  }
+
+  function getPendingImageSnapshot(nodeId: string): ImageNodeItem | null {
+    const node = options.nodes.value.find((item) => item.id === nodeId)
+    if (!node || node.data?.kind !== 'image') return null
+    const snapshot = node.data.snapshotNode
+    if (!snapshot || typeof snapshot !== 'object') return null
+    return snapshot as ImageNodeItem
+  }
+
+  function hasRenderableImageResult(snapshot: ImageNodeItem): boolean {
+    const sourceUrl = `${snapshot.sourceImageUrl ?? ''}`.trim()
+    if (sourceUrl) return true
+    const outputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
+    return outputImages.some((item) => `${item?.url ?? ''}`.trim().length > 0)
+  }
+
+  function isPendingImageTaskSnapshot(snapshot: ImageNodeItem, taskId?: string): boolean {
+    const pendingTaskId = `${snapshot.pendingTaskId ?? ''}`.trim()
+    if (!pendingTaskId) return false
+    if (taskId && pendingTaskId !== taskId) return false
+    return snapshot.outputStatus === 'running' && !hasRenderableImageResult(snapshot)
+  }
+
+  function isPendingImageTaskStillCurrent(nodeId: string, taskId: string): boolean {
+    const snapshot = getPendingImageSnapshot(nodeId)
+    return !!snapshot && isPendingImageTaskSnapshot(snapshot, taskId)
+  }
+
+  function collectPendingImageTasks(): Array<{
+    nodeId: string
+    taskId: string
+    fallbackRatio: number
+  }> {
+    return options.nodes.value.flatMap((node) => {
+      if (node.data?.kind !== 'image') return []
+      const snapshot = node.data.snapshotNode
+      if (!snapshot || typeof snapshot !== 'object') return []
+      const imageSnapshot = snapshot as ImageNodeItem
+      if (!isPendingImageTaskSnapshot(imageSnapshot)) return []
+      const fallbackRatio = Number(imageSnapshot.sourceImageRatio)
+      return [
+        {
+          nodeId: node.id,
+          taskId: imageSnapshot.pendingTaskId!.trim(),
+          fallbackRatio: Number.isFinite(fallbackRatio) && fallbackRatio > 0 ? fallbackRatio : 1,
+        },
+      ]
+    })
+  }
+
   async function runPendingImageBatchGeneration(params: {
     resultNodeIds: string[]
     submitTask: (resultNodeId: string) => Promise<{ taskId: string }>
     resolveResult: (taskId: string) => Promise<{ url: string; ratio: number }>
     totalCount: number
+    boardId: string
   }) {
     const results = await Promise.allSettled(
       params.resultNodeIds.map(async (resultNodeId) => {
         const { taskId } = await params.submitTask(resultNodeId)
+        await persistPendingImageTaskId(params.boardId, resultNodeId, taskId)
         const resolved = await params.resolveResult(taskId)
         return { resultNodeId, ...resolved }
       }),
     )
+    if (!isBoardStillCurrent(params.boardId)) return
     let successCount = 0
     let firstFailure: unknown = null
     results.forEach((result) => {
@@ -150,6 +236,50 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       options.onWarning(`生成完成 ${successCount}/${params.totalCount} 张，部分任务失败`)
     } else {
       options.onSuccess(successCount > 1 ? `生成完成（${successCount} 张）` : '生成完成')
+    }
+  }
+
+  async function reattachPendingImageResults(): Promise<void> {
+    const boardId = readCurrentBoardId()
+    const pendingTasks = collectPendingImageTasks()
+    if (pendingTasks.length === 0) return
+    let successCount = 0
+    let failureCount = 0
+    await Promise.allSettled(
+      pendingTasks.map(async ({ nodeId, taskId, fallbackRatio }) => {
+        const reattachKey = `${boardId}:${nodeId}:${taskId}`
+        if (activeReattachKeys.has(reattachKey) || runningNodeIds.value.has(nodeId)) return
+        activeReattachKeys.add(reattachKey)
+        setNodeRunning(nodeId, true)
+        try {
+          const urls = normalizeTaskImageUrls(await waitExistingOrLiveTaskResult(taskId))
+          const url = urls[0]
+          if (!url) throw new Error('任务完成但未返回图片')
+          const ratio = await resolveTaskImageRatio(url, fallbackRatio, loadImageSizeFromUrl)
+          if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
+            return
+          }
+          updatePendingImageResultNode(nodeId, url, ratio)
+          successCount += 1
+        } catch (error) {
+          if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
+            return
+          }
+          console.warn('[workspace] reattach pending image task failed', error)
+          failureCount += 1
+        } finally {
+          activeReattachKeys.delete(reattachKey)
+          setNodeRunning(nodeId, false)
+        }
+      }),
+    )
+    if (!isBoardStillCurrent(boardId)) return
+    if (successCount > 0) {
+      options.onSuccess(successCount > 1 ? `已恢复 ${successCount} 个生成结果` : '已恢复生成结果')
+      await flushPendingTaskSnapshot()
+    }
+    if (failureCount > 0) {
+      options.onWarning(failureCount > 1 ? `${failureCount} 个生成任务恢复失败` : '生成任务恢复失败')
     }
   }
 
@@ -185,6 +315,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     }
 
     let resultNodeId: string | null = null
+    const boardId = readCurrentBoardId()
     try {
       if (action === IMAGE_NODE_ACTION.hdUpscale) {
         await assertHdUpscaleSubmitReady()
@@ -197,18 +328,20 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         action === IMAGE_NODE_ACTION.hdUpscale
           ? await submitHdUpscaleTask(source, loadImageSizeFromUrl, runOptions?.strength)
           : await submitDirectActionTask(source, action, loadImageSizeFromUrl, runOptions?.strength)
+      await persistPendingImageTaskId(boardId, resultNodeId, taskId)
       const urls = await waitExistingOrLiveTaskResult(taskId)
+      if (!isBoardStillCurrent(boardId)) return
       const firstUrl = pickFirstValidUrl(urls)
       if (!firstUrl) throw new Error('任务完成但未返回图片')
       const ratio = await resolveTaskImageRatio(firstUrl, source.ratio, loadImageSizeFromUrl)
       updatePendingImageResultNode(resultNodeId, firstUrl, ratio)
       options.onSuccess('处理完成')
     } catch (error) {
-      if (resultNodeId) {
+      if (resultNodeId && isBoardStillCurrent(boardId)) {
         removePendingImageResultNode(resultNodeId)
       }
       const msg = error instanceof Error ? error.message : '执行失败'
-      options.onWarning(msg)
+      warnIfBoardCurrent(boardId, msg)
     } finally {
       if (resultNodeId) {
         setNodeRunning(resultNodeId, false)
@@ -234,6 +367,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
 
     const normalizedPrompt = `${intent.prompt ?? ''}`.trim()
     const resolvedOutputCount = clampImageNodeOutputCount(intent.outputCount ?? 1)
+    const boardId = readCurrentBoardId()
     let resultNodeIds: string[] = []
     try {
       await assertCanvasExtendSubmitReady()
@@ -244,6 +378,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await runPendingImageBatchGeneration({
         resultNodeIds,
         totalCount: resolvedOutputCount,
+        boardId,
         submitTask: async () => {
           const taskId = await submitCanvasExtendTask({
             source,
@@ -261,9 +396,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         },
       })
     } catch (error) {
-      for (const resultNodeId of resultNodeIds) removePendingImageResultNode(resultNodeId)
+      removePendingImageResultNodesIfCurrent(boardId, resultNodeIds)
       const msg = error instanceof Error ? error.message : '扩图失败'
-      options.onWarning(msg)
+      warnIfBoardCurrent(boardId, msg)
     } finally {
       for (const resultNodeId of resultNodeIds) setNodeRunning(resultNodeId, false)
     }
@@ -293,7 +428,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
     let resultNodeIds: string[] = []
     let localInpaint: FlowLocalInpaintCropResult | null = null
     let temporaryMaskUrl = ''
-    const boardId = `${options.getCurrentBoardId?.() ?? ''}`.trim()
+    const boardId = readCurrentBoardId()
     try {
       await assertPromptImageSubmitReady()
       const normalizedMaskUrl = await ensureFlowMaskImageUrl(rawMaskDataUrl, { boardId })
@@ -308,6 +443,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await runPendingImageBatchGeneration({
         resultNodeIds,
         totalCount: resolvedOutputCount,
+        boardId,
         submitTask: async () => {
           const taskId = await submitImageInpaintTask({
             prompt: normalizedPrompt,
@@ -334,8 +470,8 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         },
       })
     } catch (error) {
-      for (const resultNodeId of resultNodeIds) removePendingImageResultNode(resultNodeId)
-      options.onWarning(error instanceof Error ? error.message : '局部重绘失败')
+      removePendingImageResultNodesIfCurrent(boardId, resultNodeIds)
+      warnIfBoardCurrent(boardId, error instanceof Error ? error.message : '局部重绘失败')
     } finally {
       await cleanupFlowLocalInpaintAssets(localInpaint, boardId)
       if (temporaryMaskUrl && boardId) {
@@ -390,6 +526,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       return
     }
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
+    const boardId = readCurrentBoardId()
     let resultNodeIds: string[] = []
     try {
       await assertPromptImageSubmitReady()
@@ -400,6 +537,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await runPendingImageBatchGeneration({
         resultNodeIds,
         totalCount: resolvedOutputCount,
+        boardId,
         submitTask: async () => {
           const taskId = await submitPromptImageGenerationTask(
             source,
@@ -418,11 +556,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         },
       })
     } catch (error) {
-      for (const resultNodeId of resultNodeIds) {
-        removePendingImageResultNode(resultNodeId)
-      }
+      removePendingImageResultNodesIfCurrent(boardId, resultNodeIds)
       const msg = error instanceof Error ? error.message : '生成失败'
-      options.onWarning(msg)
+      warnIfBoardCurrent(boardId, msg)
     } finally {
       for (const resultNodeId of resultNodeIds) {
         setNodeRunning(resultNodeId, false)
@@ -451,6 +587,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       width: Number(snapshot?.width) > 0 ? Number(snapshot?.width) : 280,
     }
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
+    const boardId = readCurrentBoardId()
     let resultNodeIds: string[] = []
     try {
       resultNodeIds = appendPendingImageResultNodes(source, anchorNodeId, resolvedOutputCount, {
@@ -460,6 +597,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await runPendingImageBatchGeneration({
         resultNodeIds,
         totalCount: resolvedOutputCount,
+        boardId,
         submitTask: async () => {
           const taskId = await submitPromptTextGenerationTask(
             normalizedPrompt,
@@ -476,11 +614,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         },
       })
     } catch (error) {
-      for (const resultNodeId of resultNodeIds) {
-        removePendingImageResultNode(resultNodeId)
-      }
+      removePendingImageResultNodesIfCurrent(boardId, resultNodeIds)
       const msg = error instanceof Error ? error.message : '生成失败'
-      options.onWarning(msg)
+      warnIfBoardCurrent(boardId, msg)
     } finally {
       for (const resultNodeId of resultNodeIds) {
         setNodeRunning(resultNodeId, false)
@@ -540,6 +676,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       ? `${EXECUTION_FUSION_META.promptPrefix} ${promptText}`
       : EXECUTION_FUSION_META.promptPrefix
     const resolvedOutputCount = clampImageNodeOutputCount(outputCount)
+    const boardId = readCurrentBoardId()
     let resultNodeIds: string[] = []
     try {
       await assertTaskSubmitReady(
@@ -578,6 +715,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await runPendingImageBatchGeneration({
         resultNodeIds,
         totalCount: resolvedOutputCount,
+        boardId,
         submitTask: async () => {
           const submitRes = await taskApi.submit(
             buildExecutionTaskRequest({
@@ -605,12 +743,12 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
         },
       })
     } catch (error) {
-      for (const resultNodeId of resultNodeIds) removePendingImageResultNode(resultNodeId)
+      removePendingImageResultNodesIfCurrent(boardId, resultNodeIds)
       const msg =
         error instanceof Error
           ? sanitizeApiErrorMessage(error.message, 'Fusion 生成失败')
           : 'Fusion 生成失败'
-      options.onWarning(msg)
+      warnIfBoardCurrent(boardId, msg)
     } finally {
       for (const resultNodeId of resultNodeIds) setNodeRunning(resultNodeId, false)
     }
@@ -622,6 +760,7 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
 
   return {
     isNodeDirectActionRunning,
+    reattachPendingImageResults,
     runImageDirectAction,
     runCanvasExtendAction,
     runImagePromptGeneration,

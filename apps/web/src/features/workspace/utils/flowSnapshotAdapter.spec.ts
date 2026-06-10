@@ -11,8 +11,22 @@ function makeImageFlowNode(params: {
   id: number
   outputStatus: 'idle' | 'running' | 'ready' | 'stale'
   sourceImageUrl: string
+  pendingTaskId?: string
   outputImages?: Array<{ url: string; ratio: number }>
 }): FlowAdapterNode {
+  const snapshotNode = {
+    id: params.id,
+    type: 'image-node',
+    x: 100,
+    y: 80,
+    width: 320,
+    sourceImageUrl: params.sourceImageUrl,
+    sourceImageRatio: 1,
+    outputStatus: params.outputStatus,
+    outputImages: params.outputImages ?? [],
+    ...(params.pendingTaskId ? { pendingTaskId: params.pendingTaskId } : {}),
+  }
+
   return {
     id: params.flowId,
     type: 'canvas',
@@ -22,17 +36,7 @@ function makeImageFlowNode(params: {
       nodeType: 'image',
       title: `Image #${params.id}`,
       summary: 'Canvas image node',
-      snapshotNode: {
-        id: params.id,
-        type: 'image-node',
-        x: 100,
-        y: 80,
-        width: 320,
-        sourceImageUrl: params.sourceImageUrl,
-        sourceImageRatio: 1,
-        outputStatus: params.outputStatus,
-        outputImages: params.outputImages ?? [],
-      },
+      snapshotNode,
     },
   }
 }
@@ -92,7 +96,29 @@ function makeFusionFlowNode(params: {
 }
 
 describe('flowSnapshotAdapter', () => {
-  it('does not persist transient running image nodes', () => {
+  it('persists pending running image nodes without image sources', () => {
+    const nodes: FlowAdapterNode[] = [
+      makeImageFlowNode({
+        flowId: 'image-2',
+        id: 2,
+        outputStatus: 'running',
+        sourceImageUrl: '',
+        pendingTaskId: 'task_pending_2',
+      }),
+    ]
+
+    const snapshot = flowToCanvasBoardSnapshot({ nodes, edges: [] })
+    expect(snapshot.imageNodes.length).toBe(1)
+    expect(snapshot.imageNodes[0]?.id).toBe(2)
+    expect(snapshot.imageNodes[0]?.pendingTaskId).toBe('task_pending_2')
+
+    const flow = canvasBoardSnapshotToFlow(snapshot)
+    const savedAgain = flowToCanvasBoardSnapshot(flow)
+    expect(savedAgain.imageNodes[0]?.pendingTaskId).toBe('task_pending_2')
+    expect(savedAgain.imageNodes[0]?.outputStatus).toBe('running')
+  })
+
+  it('does not persist legacy empty running image nodes without pending task metadata', () => {
     const nodes: FlowAdapterNode[] = [
       makeImageFlowNode({
         flowId: 'image-1',

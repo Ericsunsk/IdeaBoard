@@ -26,6 +26,7 @@ type FlowNodeLike = {
     snapshotNode?: {
       type?: unknown
       sourceImageUrl?: unknown
+      pendingTaskId?: unknown
       outputStatus?: unknown
       outputImages?: unknown
     }
@@ -75,7 +76,14 @@ export function useFlowBoardPersistence(options: UseFlowBoardPersistenceOptions)
           typeof (item as { url?: unknown })?.url === 'string' &&
           ((item as { url: string }).url ?? '').trim().length > 0,
       )
-      return snapshotNode.outputStatus === 'running' && !sourceUrl && !hasOutputImage
+      const pendingTaskId =
+        typeof snapshotNode.pendingTaskId === 'string' ? snapshotNode.pendingTaskId.trim() : ''
+      return (
+        snapshotNode.outputStatus === 'running' &&
+        !sourceUrl &&
+        !hasOutputImage &&
+        !pendingTaskId
+      )
     })
   }
 

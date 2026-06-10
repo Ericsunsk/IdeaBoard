@@ -259,6 +259,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
                   sourceImageUrl: '',
                   sourceImageRatio: imageNode.sourceImageRatio,
                   width: imageNode.width,
+                  pendingTaskId: undefined,
                   outputStatus: 'running',
                   outputImages: [],
                 },
@@ -331,6 +332,34 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     )
   }
 
+  function markPendingImageResultTask(nodeId: string, taskId: string) {
+    const normalizedTaskId = taskId.trim()
+    if (!normalizedTaskId) return
+    options.commitNodeMutation(
+      (items) => {
+        let didUpdate = false
+        const nextItems = items.map((item) => {
+          if (item.id !== nodeId || item.data?.kind !== 'image') return item
+          const snapshot = item.data.snapshotNode
+          if (!snapshot || typeof snapshot !== 'object') return item
+          didUpdate = true
+          return {
+            ...item,
+            data: {
+              ...item.data,
+              snapshotNode: {
+                ...(snapshot as ImageNodeItem),
+                pendingTaskId: normalizedTaskId,
+              },
+            },
+          }
+        })
+        return didUpdate ? nextItems : items
+      },
+      { recordHistory: false },
+    )
+  }
+
   function updatePendingImageResultNode(nodeId: string, url: string, ratio: number) {
     const frameSize = resolveImageNodeFrameSize(ratio, true)
     options.commitGraphMutation(
@@ -348,6 +377,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
                 width: frameSize.width,
                 sourceImageUrl: url,
                 sourceImageRatio: ratio > 0 ? ratio : 1,
+                pendingTaskId: undefined,
                 outputStatus: 'ready',
                 outputImages: [],
               },
@@ -381,6 +411,7 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
   return {
     appendPendingImageResultNode,
     appendPendingImageResultNodes,
+    markPendingImageResultTask,
     updatePendingImageResultNode,
     removePendingImageResultNode,
   }
