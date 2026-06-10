@@ -218,6 +218,7 @@ import { useUserStore } from '../../../app/stores/user'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
 import type { Edge, Node } from '@vue-flow/core'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
@@ -478,6 +479,25 @@ const {
 
 const { nodeContextMenu, canvasNodeMenuItems, closeNodeContextMenu, openNodeContextMenu } =
   useFlowNodeContextMenu()
+const hasWorkspaceDismissableLayer = computed(
+  () =>
+    nodeContextMenu.value.visible ||
+    activeImageActionNodeId.value !== null ||
+    activeImagePromptNodeId.value !== null ||
+    activeFusionPromptNodeId.value !== null,
+)
+
+useDismissableLayer({
+  enabled: hasWorkspaceDismissableLayer,
+  ignore: ['.node-tool-surface', '.workspace-node-context-menu', '[data-image-mask-editor]'],
+  ownerDocument: () =>
+    canvasWrapRef.value?.ownerDocument ?? (typeof document === 'undefined' ? null : document),
+  onDismiss: () => {
+    closeNodeContextMenu()
+    clearActiveNodePanels()
+    hideStrengthControl()
+  },
+})
 
 const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
   nodes: nodes as Ref<Node[]>,
@@ -919,8 +939,9 @@ onMounted(async () => {
 .canvas-layout {
   --canvas-control-border-width: 1.2px;
   --canvas-control-icon-stroke: 1.5;
-  --canvas-chrome-slide-duration: 0.2s;
-  --canvas-chrome-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --canvas-chrome-fade-duration: 0.18s;
+  --canvas-chrome-slide-duration: 0.28s;
+  --canvas-chrome-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --flow-edge-color: rgb(177 177 183 / 50%);
   --flow-edge-active-color: rgb(146 120 230 / 50%);
   --flow-edge-selected-color: rgb(123 135 152 / 50%);
@@ -936,29 +957,43 @@ onMounted(async () => {
   overscroll-behavior-x: none;
 }
 
-.canvas-chrome {
-  transition: transform var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease);
-  will-change: transform;
+.canvas-layout :deep(.canvas-chrome) {
+  opacity: 1;
+  filter: blur(0);
+  transform-origin: center;
+  transition:
+    opacity var(--canvas-chrome-fade-duration) ease,
+    filter var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease),
+    transform var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease);
+  will-change: transform, opacity, filter;
 }
 
-.canvas-layout.is-mask-editing .canvas-chrome {
+.canvas-layout.is-mask-editing :deep(.canvas-chrome) {
+  opacity: 0;
+  filter: blur(5px);
   pointer-events: none;
 }
 
-.canvas-layout.is-mask-editing .canvas-chrome * {
+.canvas-layout.is-mask-editing :deep(.canvas-chrome *) {
   pointer-events: none;
 }
 
-.canvas-layout.is-mask-editing .canvas-chrome-header {
-  transform: translateY(-72px);
+.canvas-layout.is-mask-editing :deep(.canvas-chrome-header) {
+  transform: translateY(-82px) scale(0.985);
 }
 
-.canvas-layout.is-mask-editing .canvas-chrome-left {
-  transform: translate(-72px, -50%);
+.canvas-layout.is-mask-editing :deep(.canvas-chrome-left) {
+  transform: translate(-76px, -50%) scale(0.985);
 }
 
-.canvas-layout.is-mask-editing .canvas-chrome-status {
-  transform: translateY(72px);
+.canvas-layout.is-mask-editing :deep(.canvas-chrome-status) {
+  transform: translateY(76px) scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-layout :deep(.canvas-chrome) {
+    transition-duration: 1ms;
+  }
 }
 
 .canvas-layout.interaction-lite :deep(.workflow-node),

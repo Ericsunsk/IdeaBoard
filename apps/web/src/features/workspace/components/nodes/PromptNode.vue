@@ -39,10 +39,9 @@
           />
           <button
             v-if="canAcceptMoreImages"
-            class="node-tool-output-count node-tool-button node-tool-tooltip-trigger aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)] cursor-copy border-dashed text-[#64748b] hover:border-[var(--node-tool-button-accent)] hover:bg-[#f8f7ff] hover:text-[var(--node-tool-button-accent)] focus:border-[var(--node-tool-button-accent)] focus:bg-[#f8f7ff] focus:text-[var(--node-tool-button-accent)]"
+            class="prompt-node-thumb-add node-input-thumbnail-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
             :class="{
-              '!border-[var(--node-tool-button-accent)] !bg-[#f8f7ff] !text-[var(--node-tool-button-accent)]':
-                addSlotDragOver,
+              'is-drag-over': addSlotDragOver,
             }"
             type="button"
             aria-label="添加图片输入"
@@ -139,8 +138,10 @@ const {
 
 <style scoped src="./styles/node-shared.css"></style>
 <style scoped src="./styles/node-tool-buttons.css"></style>
+<style scoped src="./styles/node-input-thumbnails.css"></style>
 <style scoped>
 :global(.prompt-node-sortable-fallback) {
   opacity: 0 !important;
 }
+
 </style>

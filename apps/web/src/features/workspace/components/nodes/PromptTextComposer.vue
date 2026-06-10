@@ -24,7 +24,7 @@
       />
       <button
         v-if="canAddImageInput"
-        class="prompt-text-composer-image-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
+        class="prompt-text-composer-image-add node-input-thumbnail-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
         type="button"
         :disabled="disabled"
         aria-label="添加图片输入"
@@ -244,22 +244,6 @@ function selectOutputCount(value: number) {
 .prompt-text-composer-image-row {
   --node-tool-button-size: var(--node-input-thumbnail-size);
   --node-tool-button-radius: 8px;
-}
-
-.prompt-text-composer-image-add {
-  width: var(--node-input-thumbnail-size);
-  height: var(--node-input-thumbnail-size);
-  color: #64748b;
-  border-style: dashed;
-  cursor: copy;
-}
-
-.prompt-text-composer-image-add:hover,
-.prompt-text-composer-image-add:focus,
-.prompt-text-composer-image-add:active {
-  color: var(--node-tool-button-accent);
-  border-color: var(--node-tool-button-accent);
-  background: #f8f7ff;
 }
 
 .prompt-text-composer.variant-floating {

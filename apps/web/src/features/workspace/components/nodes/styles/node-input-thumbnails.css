@@ -75,3 +75,20 @@
 .node-input-thumbnail:focus-within .node-input-thumbnail-remove {
   opacity: 1;
 }
+
+.node-tool-button.node-input-thumbnail-add {
+  width: var(--node-input-thumbnail-size);
+  height: var(--node-input-thumbnail-size);
+  border-style: dashed;
+  color: #64748b;
+  cursor: copy;
+}
+
+.node-tool-output-count.node-input-thumbnail-add:hover:not(:disabled),
+.node-tool-output-count.node-input-thumbnail-add:focus,
+.node-tool-output-count.node-input-thumbnail-add:active,
+.node-tool-output-count.node-input-thumbnail-add.is-drag-over {
+  border-color: var(--node-tool-button-accent);
+  background: #f8f7ff;
+  color: var(--node-tool-button-accent);
+}

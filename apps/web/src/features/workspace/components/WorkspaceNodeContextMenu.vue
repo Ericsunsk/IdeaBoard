@@ -10,7 +10,7 @@
         transition: { duration: 150, easing: 'ease-out' },
       },
     }"
-    class="absolute z-[160] w-40 min-w-40 max-w-40 rounded-[10px] bg-white/[0.96] p-1.5 backdrop-blur-[10px] [border:var(--canvas-control-border-width,1.2px)_solid_#d8ddea]"
+    class="workspace-node-context-menu absolute z-[160] w-40 min-w-40 max-w-40 rounded-[10px] bg-white/[0.96] p-1.5 backdrop-blur-[10px] [border:var(--canvas-control-border-width,1.2px)_solid_#d8ddea]"
     :style="{ left: `${x}px`, top: `${y}px` }"
     @mousedown.stop
     @click.stop
