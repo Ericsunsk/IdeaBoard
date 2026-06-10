@@ -49,11 +49,11 @@ graph LR
     Browser["浏览器 (SPA)"] --> Vite["Vite / 前端"]
     Browser --> Auth["Better Auth (apps/auth)"]
     Browser --> Gin["Gin API (Go)"]
-    
+
     Gin --> Postgres[("PostgreSQL<br>业务数据 + River 队列")]
     Gin --> NATS["NATS JetStream<br>任务状态事件"]
     Auth --> Postgres
-    
+
     Postgres --> Worker["Worker 消费者"]
     Worker --> NATS
     NATS --> Gin
@@ -110,7 +110,6 @@ graph LR
 | `partial-edit` | 局部重绘 |
 | `remove-bg` | 抠图 |
 | `style-fusion` | 多图融合 |
-| `virtual-3d` | 虚拟 3D 展示 |
 | `pattern-gen` | 图案生成 |
 | `hd-upscale` | HD |
 | `image-extend` | 扩图 |
@@ -169,7 +168,7 @@ sequenceDiagram
     API->>API: 标准化参数 & 模板装配
     API->>DB: 写入任务表 & 推入队列
     API-->>FE: 返回任务 ID (建立 SSE 事件流)
-    
+
     DB->>WK: 消费任务
     WK->>WK: 调度可用账号
     WK->>AI: 调用接口
@@ -177,7 +176,7 @@ sequenceDiagram
     WK->>WK: 持久化存储 (OSS/Local)
     WK->>DB: 更新状态为 Success/Failed
     WK->>NATS: 发布 task.status_changed
-    
+
     NATS-->>API: 桥接任务状态事件到本地 SSE hub
     API-->>FE: SSE 推送任务状态与最终结果
 ```
@@ -208,10 +207,9 @@ sequenceDiagram
 | 变量 | 说明 |
 |------|------|
 | `{{user_prompt}}` | 用户输入文本 |
+| `{{strength}}` | 风格延展强度百分比 |
 | `{{image_weights}}` | Fusion 有序图片权重，例如 `Image 1: 60%, Image 2: 40%` |
 | `{{extend_top}}` `{{extend_right}}` `{{extend_bottom}}` `{{extend_left}}` | 扩图参数 |
-| `{{viewpoint}}` | 展示视角描述 |
-| `{{lighting}}` | 打光描述 |
 | `{{upscale_mode}}` | HD 增强模式 |
 | `{{upscale_factor}}` | HD 倍数 |
 | `{{output_format}}` | HD 输出格式 |

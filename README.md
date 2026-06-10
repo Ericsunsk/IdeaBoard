@@ -155,8 +155,8 @@ flowchart TB
   </tr>
   <tr>
     <td valign="top">
-      <strong>展示与视角</strong><br/>
-      单视角展示、商品展示
+      <strong>画板与结果</strong><br/>
+      结果预览、画板管理
     </td>
     <td valign="top">
       <strong>运营统计</strong><br/>

@@ -254,6 +254,7 @@ import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromp
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
 import { useFlowMaskEditorChromeActions } from '../composables/useFlowMaskEditorChromeActions'
 import { useFlowWorkspaceNodeHandlers } from '../composables/useFlowWorkspaceNodeHandlers'
+import { useFlowTransientUiDismissal } from '../composables/useFlowTransientUiDismissal'
 import { useFlowSnapshotNodeUpdater } from '../composables/useFlowSnapshotNodeUpdater'
 import { useFlowImageNodeSnapshots } from '../composables/useFlowImageNodeSnapshots'
 import { useFlowImageUploadActions } from '../composables/useFlowImageUploadActions'
@@ -487,18 +488,6 @@ const hasWorkspaceDismissableLayer = computed(
     activeFusionPromptNodeId.value !== null,
 )
 
-useDismissableLayer({
-  enabled: hasWorkspaceDismissableLayer,
-  ignore: ['.node-tool-surface', '.workspace-node-context-menu', '[data-image-mask-editor]'],
-  ownerDocument: () =>
-    canvasWrapRef.value?.ownerDocument ?? (typeof document === 'undefined' ? null : document),
-  onDismiss: () => {
-    closeNodeContextMenu()
-    clearActiveNodePanels()
-    hideStrengthControl()
-  },
-})
-
 const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
   nodes: nodes as Ref<Node[]>,
 })
@@ -619,6 +608,24 @@ const {
   },
 })
 
+const { dismissTransientWorkspaceUi } = useFlowTransientUiDismissal({
+  cancelFlowExpandMode,
+  closeBoardHeaderEditing,
+  closeNodeContextMenu,
+  clearActiveNodePanels,
+  hideStrengthControl,
+})
+
+useDismissableLayer({
+  enabled: hasWorkspaceDismissableLayer,
+  ignore: ['.node-tool-surface', '.workspace-node-context-menu', '[data-image-mask-editor]'],
+  ownerDocument: () =>
+    canvasWrapRef.value?.ownerDocument ?? (typeof document === 'undefined' ? null : document),
+  onDismiss: () => {
+    dismissTransientWorkspaceUi({ closeContextMenu: true })
+  },
+})
+
 const {
   maskEditorNodeId: flowMaskEditorNodeId,
   maskEditorOverlayStyle: flowMaskEditorOverlayStyle,
@@ -670,9 +677,7 @@ const {
 
 const { onFlowDeleteNode, onFlowPromptTextUpdate, onFlowNodeParamUpdate, onFlowImageReset } =
   useFlowWorkspaceNodeHandlers({
-    clearActiveNodePanels,
-    hideStrengthControl,
-    closeNodeContextMenu,
+    dismissTransientWorkspaceUi,
     clearFlowMaskEditorCommittedData,
     _onFlowDeleteNode,
     _onFlowPromptTextUpdate,
@@ -761,14 +766,7 @@ const {
   deleteSelectedFlowElements,
 } = useFlowSelectionController({
   activeTool: activeTool as Ref<string>,
-  activeImageActionNodeId,
-  activeImagePromptNodeId,
-  activeFusionPromptNodeId,
-  closeImagePromptComposer: closeActiveImagePromptComposer,
-  cancelFlowExpandMode,
-  hideStrengthControl,
-  closeBoardHeaderEditing,
-  closeNodeContextMenu,
+  dismissTransientWorkspaceUi,
   _deleteSelectedFlowElements: () => {
     flowNodeMutations.deleteSelectedFlowElements()
   },
@@ -800,12 +798,7 @@ const { onNodeDragStart, onNodeDragStop: stopNodeDragInteraction } = useFlowNode
   duplicateModifierPressed,
   beginFlowNodeDragDuplicateTracking,
   finishFlowNodeDragDuplicateTracking,
-  activeImageActionNodeId,
-  activeImagePromptNodeId,
-  activeFusionPromptNodeId,
-  closeImagePromptComposer: closeActiveImagePromptComposer,
-  cancelFlowExpandMode,
-  hideStrengthControl,
+  dismissTransientWorkspaceUi,
 })
 
 function onNodeDragStop() {
@@ -834,12 +827,8 @@ const {
   activeTool,
   screenToFlowCoordinate,
   openNodeContextMenu,
-  closeNodeContextMenu,
   createNodeAtPosition,
-  cancelFlowExpandMode,
-  closeBoardHeaderEditing,
-  clearActiveNodePanels,
-  hideStrengthControl,
+  dismissTransientWorkspaceUi,
   clearFlowSelection,
   toastInfo: (message) => appToast.info(message),
   onCanvasDropDragOver: (event) => canvasDrop.onCanvasDragOver(event),

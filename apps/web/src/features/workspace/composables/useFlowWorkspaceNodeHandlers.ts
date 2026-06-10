@@ -1,9 +1,9 @@
+import type { DismissTransientWorkspaceUi } from './useFlowTransientUiDismissal'
+
 type NodeParamPayload = { key: string; value: unknown }
 
 type UseFlowWorkspaceNodeHandlersOptions = {
-  clearActiveNodePanels: () => void
-  hideStrengthControl: () => void
-  closeNodeContextMenu: () => void
+  dismissTransientWorkspaceUi: DismissTransientWorkspaceUi
   clearFlowMaskEditorCommittedData: (nodeId: string) => void
   _onFlowDeleteNode: (nodeId: string) => void
   _onFlowPromptTextUpdate: (nodeId: string, value: string) => void
@@ -14,10 +14,8 @@ type UseFlowWorkspaceNodeHandlersOptions = {
 
 export function useFlowWorkspaceNodeHandlers(options: UseFlowWorkspaceNodeHandlersOptions) {
   function onFlowDeleteNode(nodeId: string) {
-    options.clearActiveNodePanels()
+    options.dismissTransientWorkspaceUi({ closeContextMenu: true })
     options.clearFlowMaskEditorCommittedData(nodeId)
-    options.hideStrengthControl()
-    options.closeNodeContextMenu()
     options._onFlowDeleteNode(nodeId)
   }
 

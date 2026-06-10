@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import type { DismissTransientWorkspaceUi } from './useFlowTransientUiDismissal'
 
 type UseFlowNodeDragInteractionsOptions = {
   beginNodeDragTransaction: () => void
@@ -6,28 +7,22 @@ type UseFlowNodeDragInteractionsOptions = {
   duplicateModifierPressed: Ref<boolean>
   beginFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
   finishFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
-  activeImageActionNodeId: { value: string | null }
-  activeImagePromptNodeId?: { value: string | null }
-  activeFusionPromptNodeId?: { value: string | null }
-  closeImagePromptComposer?: () => void
-  cancelFlowExpandMode?: () => void
-  hideStrengthControl: () => void
+  dismissTransientWorkspaceUi: DismissTransientWorkspaceUi
 }
 
 export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractionsOptions) {
   function onNodeDragStart() {
-    options.cancelFlowExpandMode?.()
-    options.activeImageActionNodeId.value = null
-    if (options.closeImagePromptComposer) options.closeImagePromptComposer()
-    else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
-    if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-    options.hideStrengthControl()
+    options.dismissTransientWorkspaceUi({ closeExpand: true })
     options.beginNodeDragTransaction()
     options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
   }
 
   function onNodeDragStop() {
-    options.cancelFlowExpandMode?.()
+    options.dismissTransientWorkspaceUi({
+      closeExpand: true,
+      clearNodePanels: false,
+      hideStrength: false,
+    })
     options.finishFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
     options.commitNodeDragTransaction()
   }

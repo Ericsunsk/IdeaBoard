@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-type ClearActiveNodePanelsOptions = {
+export type ClearActiveNodePanelsOptions = {
   keepImageAction?: boolean
   keepImagePrompt?: boolean
   keepFusionPrompt?: boolean

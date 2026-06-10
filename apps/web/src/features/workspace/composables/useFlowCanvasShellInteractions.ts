@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { FlowCreatableNodeKind } from './useFlowNodeMutations'
+import type { DismissTransientWorkspaceUi } from './useFlowTransientUiDismissal'
 
 type FlowTool = 'select' | 'hand' | 'text'
 
@@ -9,12 +10,8 @@ type UseFlowCanvasShellInteractionsOptions = {
   activeTool: Ref<FlowTool>
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   openNodeContextMenu: (x: number, y: number, flowX: number, flowY: number) => void
-  closeNodeContextMenu: () => void
   createNodeAtPosition: (kind: FlowCreatableNodeKind, flowX: number, flowY: number) => void
-  cancelFlowExpandMode: () => void
-  closeBoardHeaderEditing: () => void
-  clearActiveNodePanels: () => void
-  hideStrengthControl: () => void
+  dismissTransientWorkspaceUi: DismissTransientWorkspaceUi
   clearFlowSelection: () => boolean
   toastInfo: (message: string) => void
   onCanvasDropDragOver: (event: DragEvent) => void
@@ -25,10 +22,7 @@ type UseFlowCanvasShellInteractionsOptions = {
 export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellInteractionsOptions) {
   function onPaneContextMenu(event: MouseEvent) {
     event.preventDefault()
-    options.cancelFlowExpandMode()
-    options.closeBoardHeaderEditing()
-    options.clearActiveNodePanels()
-    options.hideStrengthControl()
+    options.dismissTransientWorkspaceUi({ closeExpand: true, closeBoardHeader: true })
     options.clearFlowSelection()
     const flowPoint = options.screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
     const rect = options.canvasWrapRef.value?.getBoundingClientRect()
@@ -43,17 +37,11 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
       options.nodeContextMenu.value.flowX,
       options.nodeContextMenu.value.flowY,
     )
-    options.cancelFlowExpandMode()
-    options.closeNodeContextMenu()
-    options.clearActiveNodePanels()
-    options.hideStrengthControl()
+    options.dismissTransientWorkspaceUi({ closeExpand: true, closeContextMenu: true })
   }
 
   function setActiveTool(tool: FlowTool) {
-    options.cancelFlowExpandMode()
-    options.closeBoardHeaderEditing()
-    options.clearActiveNodePanels()
-    options.hideStrengthControl()
+    options.dismissTransientWorkspaceUi({ closeExpand: true, closeBoardHeader: true })
     if (tool === 'text') {
       options.toastInfo('文本工具稍后接入')
       return
@@ -63,21 +51,27 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
 
   function onEscapeShortcut() {
     if (options.isFlowExpandActive()) {
-      options.cancelFlowExpandMode()
+      options.dismissTransientWorkspaceUi({
+        closeExpand: true,
+        clearNodePanels: false,
+        hideStrength: false,
+      })
       return true
     }
     if (options.isBoardHeaderEditingActive()) {
-      options.closeBoardHeaderEditing()
+      options.dismissTransientWorkspaceUi({
+        closeBoardHeader: true,
+        clearNodePanels: false,
+        hideStrength: false,
+      })
       return true
     }
-    options.clearActiveNodePanels()
-    options.hideStrengthControl()
+    options.dismissTransientWorkspaceUi()
     return options.clearFlowSelection()
   }
 
   function onCanvasDragOver(event: DragEvent) {
-    options.clearActiveNodePanels()
-    options.hideStrengthControl()
+    options.dismissTransientWorkspaceUi()
     options.onCanvasDropDragOver(event)
   }
 

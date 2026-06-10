@@ -1,16 +1,10 @@
 import { type Ref } from 'vue'
 import { useVueFlow, type Elements } from '@vue-flow/core'
+import type { DismissTransientWorkspaceUi } from './useFlowTransientUiDismissal'
 
 type UseFlowSelectionControllerOptions = {
   activeTool: Ref<string>
-  activeImageActionNodeId: Ref<string | null>
-  activeImagePromptNodeId?: Ref<string | null>
-  activeFusionPromptNodeId?: Ref<string | null>
-  closeImagePromptComposer?: () => void
-  cancelFlowExpandMode?: () => void
-  hideStrengthControl: () => void
-  closeBoardHeaderEditing: () => void
-  closeNodeContextMenu: () => void
+  dismissTransientWorkspaceUi: DismissTransientWorkspaceUi
   _deleteSelectedFlowElements: () => void
 }
 
@@ -50,24 +44,16 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
   }
 
   function onPaneClick() {
-    options.cancelFlowExpandMode?.()
-    options.closeBoardHeaderEditing()
-    options.closeNodeContextMenu()
-    options.activeImageActionNodeId.value = null
-    if (options.closeImagePromptComposer) options.closeImagePromptComposer()
-    else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
-    if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-    options.hideStrengthControl()
+    options.dismissTransientWorkspaceUi({
+      closeExpand: true,
+      closeBoardHeader: true,
+      closeContextMenu: true,
+    })
   }
 
   function onFlowNodeClick() {
     if (options.activeTool.value === 'hand') return
-    options.cancelFlowExpandMode?.()
-    options.activeImageActionNodeId.value = null
-    if (options.closeImagePromptComposer) options.closeImagePromptComposer()
-    else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
-    if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-    options.hideStrengthControl()
+    options.dismissTransientWorkspaceUi({ closeExpand: true })
   }
 
   function onFlowNodeMouseDown(...args: [string, MouseEvent]) {
@@ -77,23 +63,12 @@ export function useFlowSelectionController(options: UseFlowSelectionControllerOp
       if (options.activeTool.value !== 'hand') {
         selectFlowNode(nodeId, { keepExisting: event.shiftKey })
       }
-      options.cancelFlowExpandMode?.()
-      options.activeImageActionNodeId.value = null
-      if (options.closeImagePromptComposer) options.closeImagePromptComposer()
-      else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
-      if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-      options.hideStrengthControl()
+      options.dismissTransientWorkspaceUi({ closeExpand: true })
     }
   }
 
   function deleteSelectedFlowElements() {
-    options.cancelFlowExpandMode?.()
-    options.activeImageActionNodeId.value = null
-    if (options.closeImagePromptComposer) options.closeImagePromptComposer()
-    else if (options.activeImagePromptNodeId) options.activeImagePromptNodeId.value = null
-    if (options.activeFusionPromptNodeId) options.activeFusionPromptNodeId.value = null
-    options.hideStrengthControl()
-    options.closeNodeContextMenu()
+    options.dismissTransientWorkspaceUi({ closeExpand: true, closeContextMenu: true })
     options._deleteSelectedFlowElements()
   }
 
