@@ -90,7 +90,7 @@ import {
 import { useFusionBlendControl } from './composables/useFusionBlendControl'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
-import { useSortableMediaInputs } from './composables/useSortableMediaInputs'
+import { useImageInputSlots } from './composables/useImageInputSlots'
 
 const props = defineProps<{
   active: boolean
@@ -109,7 +109,6 @@ const emit = defineEmits<{
 
 const thumbsRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
-const addSlotDragOver = ref(false)
 const maxInputImages = FUSION_SLOT_LAYOUT.maxSlots
 const fusionSlotMotion = {
   initial: { opacity: 0 },
@@ -141,21 +140,30 @@ const fusionHandleMotion = {
   },
 }
 
-const visibleInputImages = computed(() => props.inputImages.slice(0, maxInputImages))
-const canAcceptMoreImages = computed(() => visibleInputImages.value.length < maxInputImages)
+const {
+  addSlotDragOver,
+  onAddSlotDragLeave,
+  onAddSlotDragOver,
+  onAddSlotDrop,
+  removeInputImage,
+  sortableInputImages,
+  visibleInputImages,
+} = useImageInputSlots({
+  containerRef: thumbsRef,
+  inputImages: () => props.inputImages,
+  maxImages: maxInputImages,
+  draggableSelector: '.node-input-thumbnail-item',
+  filterSelector: '.node-input-thumbnail-remove',
+  fallbackClass: 'fusion-node-sortable-fallback',
+  onUpdate: (next) => emit('update:input-images', next),
+  onDrop: (event) => emit('input-image-drop', event),
+  onRemove: (item) => emit('input-image-remove', item),
+})
 const imageCount = computed(() => Math.min(visibleInputImages.value.length || 0, maxInputImages))
 const showBlendPad = computed(() => imageCount.value >= 2)
 const showEmptyFusionMark = computed(() => imageCount.value === 0)
 const nodeWidth = computed(() => props.width)
 const sourceBlendPoint = computed(() => props.blendPoint)
-const { sortableItems: sortableInputImages } = useSortableMediaInputs({
-  containerRef: thumbsRef,
-  sourceItems: visibleInputImages,
-  draggableSelector: '.node-input-thumbnail-item',
-  filterSelector: '.node-input-thumbnail-remove',
-  fallbackClass: 'fusion-node-sortable-fallback',
-  onUpdate: (next) => emit('update:input-images', next),
-})
 const {
   activeBlendPoint,
   blendDragging,
@@ -248,27 +256,6 @@ function getBlendWeightBadgeStyle(index: number) {
   }
 }
 
-function removeInputImage(imageId: string) {
-  const item = visibleInputImages.value.find((inputImage) => inputImage.id === imageId)
-  if (!item) return
-  emit('input-image-remove', item)
-}
-
-function onAddSlotDragOver(event: DragEvent) {
-  if (!canAcceptMoreImages.value) return
-  addSlotDragOver.value = true
-  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
-}
-
-function onAddSlotDragLeave() {
-  addSlotDragOver.value = false
-}
-
-function onAddSlotDrop(event: DragEvent) {
-  addSlotDragOver.value = false
-  if (!canAcceptMoreImages.value) return
-  emit('input-image-drop', event)
-}
 </script>
 
 <style scoped src="./styles/node-tool-buttons.css"></style>

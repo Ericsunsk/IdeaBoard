@@ -461,6 +461,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
 import { EditPencil, Plus, Refresh, Trash } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
+import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
@@ -486,6 +487,7 @@ import { extractApiErrorMessage } from './channelModelUtils'
 import { useChannelAccounts } from './useChannelAccounts'
 
 const appToast = useAppToast()
+const { runAsyncAction } = useAsyncAction()
 const confirm = useConfirm()
 const isMockMode = useAdminMockMode()
 
@@ -526,23 +528,24 @@ const emptyChannelMessage = computed(() => (hasChannelSearch.value ? '无匹配�
 
 // Data Loading
 async function loadData() {
-  loading.value = true
-  try {
-    if (isMockMode.value) {
-      channels.value = createMockAdminChannels()
+  await runAsyncAction(
+    async () => {
+      if (isMockMode.value) {
+        channels.value = createMockAdminChannels()
+        await loadAccounts()
+        return
+      }
+
+      const chRes = await channelApi.list()
+
+      if (chRes.code === 0) channels.value = chRes.data?.list || []
       await loadAccounts()
-      return
-    }
-
-    const chRes = await channelApi.list()
-
-    if (chRes.code === 0) channels.value = chRes.data?.list || []
-    await loadAccounts()
-  } catch (error) {
-    appToast.error(extractApiErrorMessage(error, '加载数据失败'))
-  } finally {
-    loading.value = false
-  }
+    },
+    {
+      loading,
+      onError: (error) => showChannelActionError(error, '加载数据失败'),
+    },
+  )
 }
 
 // Helpers
@@ -635,60 +638,66 @@ function closeChannelModal() {
 }
 
 async function handleSaveChannel() {
-  try {
-    if (!validateChannelForm()) {
-      appToast.warning('请修正渠道商表单错误')
-      return
-    }
-    channelSaveLoading.value = true
-    const submitData = { ...channelForm.value }
+  if (!validateChannelForm()) {
+    appToast.warning('请修正渠道商表单错误')
+    return
+  }
 
-    if (isMockMode.value) {
-      const now = new Date().toISOString()
+  await runAsyncAction(
+    async () => {
+      const submitData = { ...channelForm.value }
+
+      if (isMockMode.value) {
+        const now = new Date().toISOString()
+        if (isEditChannel.value) {
+          channels.value = channels.value.map((channel) =>
+            channel.id === currentChannelId.value
+              ? {
+                  ...channel,
+                  ...submitData,
+                  updated_at: now,
+                }
+              : channel,
+          )
+          appToast.success('渠道商已更新')
+        } else {
+          channels.value = [
+            {
+              id: Math.max(200, ...channels.value.map((channel) => channel.id)) + 1,
+              ...submitData,
+              status: 1,
+              created_at: now,
+              updated_at: now,
+            },
+            ...channels.value,
+          ]
+          appToast.success('渠道商已创建')
+        }
+        showChannelModal.value = false
+        resetChannelFormErrors()
+        return
+      }
+
       if (isEditChannel.value) {
-        channels.value = channels.value.map((channel) =>
-          channel.id === currentChannelId.value
-            ? {
-                ...channel,
-                ...submitData,
-                updated_at: now,
-              }
-            : channel,
-        )
+        await channelApi.update(currentChannelId.value, submitData)
         appToast.success('渠道商已更新')
       } else {
-        channels.value = [
-          {
-            id: Math.max(200, ...channels.value.map((channel) => channel.id)) + 1,
-            ...submitData,
-            status: 1,
-            created_at: now,
-            updated_at: now,
-          },
-          ...channels.value,
-        ]
+        await channelApi.create(submitData)
         appToast.success('渠道商已创建')
       }
       showChannelModal.value = false
       resetChannelFormErrors()
-      return
-    }
+      loadData()
+    },
+    {
+      loading: channelSaveLoading,
+      onError: (error) => showChannelActionError(error, '保存渠道商失败'),
+    },
+  )
+}
 
-    if (isEditChannel.value) {
-      await channelApi.update(currentChannelId.value, submitData)
-      appToast.success('渠道商已更新')
-    } else {
-      await channelApi.create(submitData)
-      appToast.success('渠道商已创建')
-    }
-    showChannelModal.value = false
-    resetChannelFormErrors()
-    loadData()
-  } catch (error) {
-    appToast.error(extractApiErrorMessage(error, '保存渠道商失败'))
-  } finally {
-    channelSaveLoading.value = false
-  }
+function showChannelActionError(error: unknown, fallback: string) {
+  appToast.error(extractApiErrorMessage(error, fallback))
 }
 
 function validateChannelForm() {

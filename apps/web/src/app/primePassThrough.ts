@@ -1,4 +1,7 @@
 import type { PrimeVueConfiguration } from 'primevue/config'
+import { adminPrimeDialogPt } from '../features/admin/shared/lib/adminOverlayPt'
+
+const adminRouteMutedTextClass = '[body.admin-route_&]:!text-[#718096]'
 
 function classValueContains(value: unknown, needle: string): boolean {
   if (!value) return false
@@ -20,22 +23,12 @@ export const ideaBoardPrimePt = {
       class: [
         '!shadow-none font-[650]',
         isTextButton(props) && !classValueContains(props.class, 'active')
-          ? '[body.admin-route_&]:!text-[#718096] hover:[body.admin-route_&]:!text-admin-text-1'
+          ? `${adminRouteMutedTextClass} hover:[body.admin-route_&]:!text-admin-text-1`
           : '',
       ],
     }),
   },
-  dialog: {
-    header: { class: '!items-start !gap-3 !px-6 !pt-5 !pb-3.5' },
-    headerActions: { class: '!mt-1 !shrink-0' },
-    pcCloseButton: {
-      root: {
-        class:
-          '!h-8 !w-8 !rounded-lg !border-0 !bg-transparent !p-0 !text-admin-text-3 !shadow-none hover:!bg-admin-surface-muted hover:!text-admin-text-1 focus:!shadow-none focus-visible:!outline-none focus-visible:!ring-0',
-      },
-      icon: { class: '!h-4 !w-4' },
-    },
-  },
+  dialog: adminPrimeDialogPt,
   datatable: {
     root: { class: 'overflow-hidden rounded-2xl' },
     column: {
@@ -57,7 +50,7 @@ export const ideaBoardPrimePt = {
     root: { class: '!shadow-none' },
   },
   inputicon: {
-    root: { class: '[body.admin-route_&]:!text-[#718096]' },
+    root: { class: adminRouteMutedTextClass },
   },
   autocomplete: {
     root: {

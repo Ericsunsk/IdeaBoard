@@ -566,7 +566,7 @@ export function useUsageStatisticsCharts(options: {
           label: '任务量',
           data: bottleneckSourceRows.value.map((item) => item.total),
           backgroundColor: bottleneckSourceRows.value.map((item) => item.color),
-          borderColor: '#ffffff',
+          borderColor: adminChartTheme.segmentBorder,
           borderWidth: adminChartStrokeWidth,
           hoverOffset: 4,
         },

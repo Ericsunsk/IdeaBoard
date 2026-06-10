@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminCardHeader: typeof import('./features/admin/shared/components/AdminCardHeader.vue')['default']
+    AdminChartCard: typeof import('./features/admin/shared/components/AdminChartCard.vue')['default']
     AdminChartPanel: typeof import('./features/admin/shared/components/AdminChartPanel.vue')['default']
     AdminFilterPopover: typeof import('./features/admin/shared/components/AdminFilterPopover.vue')['default']
     AdminManagementFrame: typeof import('./features/admin/shared/components/AdminManagementFrame.vue')['default']

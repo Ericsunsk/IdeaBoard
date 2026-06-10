@@ -18,6 +18,14 @@ export const adminLoadingStateClass =
 export const adminEmptyStateClass =
   'flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-center text-admin-text-2'
 
+export const adminDashboardRootClass = 'flex max-w-full min-w-0 flex-col gap-4 p-0'
+
+export const adminSummaryGridClass = 'grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4'
+
+export const adminChartGridClass = 'grid grid-cols-1 gap-3.5 xl:grid-cols-12'
+
+export const adminChartCanvasClass = 'h-full w-full min-w-0'
+
 export const adminMasonryGridClass = 'columns-1 gap-3.5 md:columns-2 xl:columns-3'
 
 export const adminMasonryCardClass = 'mb-3.5 break-inside-avoid !rounded-lg'
@@ -47,6 +55,9 @@ export const adminFilterPopoverClass =
 
 export const adminConfigPopoverClass =
   'flex w-[280px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-admin-card p-4'
+
+export const adminAnomalyPopoverClass =
+  'w-[340px] max-w-[calc(100vw_-_28px)] overflow-hidden bg-white'
 
 export const adminPopoverSectionHeaderClass = 'border-b border-admin-border pb-2'
 

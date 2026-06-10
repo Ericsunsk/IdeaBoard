@@ -100,8 +100,8 @@
               aria-hidden="true"
             ></span>
           </button>
-          <Popover ref="anomalyRadarPopoverRef">
-            <div class="w-[340px] max-w-[calc(100vw_-_28px)] overflow-hidden bg-white">
+          <Popover ref="anomalyRadarPopoverRef" :pt="anomalyRadarPopoverPt">
+            <div :class="adminAnomalyPopoverClass">
               <div
                 class="flex items-start justify-between gap-4 border-b border-admin-border px-4 py-3.5"
               >
@@ -251,6 +251,8 @@ import {
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
+import { createAdminMenuPt, createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
+import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
 
 const vTooltip = Tooltip
 
@@ -340,17 +342,11 @@ const mobileNavButtonClass = [
 const mobileNavButtonIdleClass =
   'hover:!border-admin-border hover:!bg-white hover:!text-admin-text-1'
 const mobileNavButtonActiveClass = '!bg-admin-accent-pressed !text-admin-text-inverse'
-const userMenuPt = {
-  root: {
-    class:
-      'min-w-[180px] overflow-hidden rounded-[14px] border border-admin-border bg-white shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
-  },
-  list: { class: '!m-0 !p-1.5' },
-  itemContent: { class: 'rounded-[10px] hover:!bg-admin-surface-hover' },
-  itemLink: {
-    class: '!px-3 !py-2.5 !text-admin-body !font-[650] !text-admin-text-2 hover:!text-admin-text-1',
-  },
-} as const
+const userMenuPt = createAdminMenuPt({
+  rootClass:
+    'min-w-[180px] overflow-hidden rounded-[14px] border border-admin-border bg-white shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
+})
+const anomalyRadarPopoverPt = createAdminPopoverPt({ contentClass: '!p-0' })
 const mobileDrawerPt = {
   root: {
     class: '!w-[min(320px,calc(100vw-32px))] !border-0 !bg-admin-control-bg',

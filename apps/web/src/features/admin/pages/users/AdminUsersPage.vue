@@ -410,6 +410,7 @@ import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
+import { createAdminPopoverPt } from '../../shared/lib/adminOverlayPt'
 import {
   adminConfigPopoverClass,
   adminDialogFormBodyClass,
@@ -435,12 +436,7 @@ type UserActionItem = {
 
 const userActionPopoverClass = 'flex min-w-[176px] flex-col gap-1'
 
-const userActionPopoverPt = {
-  root: {
-    class: '!rounded-lg !border-admin-border !bg-admin-card !shadow-none',
-  },
-  content: { class: '!p-1.5' },
-} as const
+const userActionPopoverPt = createAdminPopoverPt({ contentClass: '!p-1.5' })
 
 type PrimePopupPanel = {
   toggle: (event: Event) => void

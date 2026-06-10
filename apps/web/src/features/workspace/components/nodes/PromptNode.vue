@@ -83,7 +83,7 @@ import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import PromptTextComposer from './PromptTextComposer.vue'
 import { useCanvasNodeStyle } from './composables/useCanvasNodeStyle'
-import { useSortableMediaInputs } from './composables/useSortableMediaInputs'
+import { useImageInputSlots } from './composables/useImageInputSlots'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../config/promptAspectRatio'
 
 const props = defineProps<{
@@ -112,39 +112,29 @@ const emit = defineEmits<{
 
 const nodeStyle = useCanvasNodeStyle(() => props.node)
 const thumbsRef = ref<HTMLElement | null>(null)
-const addSlotDragOver = ref(false)
 const maxInputImages = 4
 const outputCount = computed(() => clampImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
-const visibleInputImages = computed(() => props.node.inputImages.slice(0, maxInputImages))
-const canAcceptMoreImages = computed(() => visibleInputImages.value.length < maxInputImages)
 const canGenerate = computed(() => props.node.text.trim().length > 0)
-const { sortableItems: sortableInputImages } = useSortableMediaInputs({
+const {
+  addSlotDragOver,
+  canAcceptMoreImages,
+  onAddSlotDragLeave,
+  onAddSlotDragOver,
+  onAddSlotDrop,
+  removeInputImage,
+  sortableInputImages,
+} = useImageInputSlots({
   containerRef: thumbsRef,
-  sourceItems: visibleInputImages,
+  inputImages: () => props.node.inputImages,
+  maxImages: maxInputImages,
   draggableSelector: '.node-input-thumbnail-item',
   filterSelector: '.prompt-node-thumb-add, .node-input-thumbnail-remove',
   fallbackClass: 'prompt-node-sortable-fallback',
   onUpdate: (next) => emit('update:input-images', next),
+  onDrop: (event) => emit('input-image-drop', event),
+  onRemove: (item) => emit('input-image-remove', item),
 })
-function removeInputImage(imageId: string) {
-  const item = visibleInputImages.value.find((inputImage) => inputImage.id === imageId)
-  if (!item) return
-  emit('input-image-remove', item)
-}
-function onAddSlotDragOver(event: DragEvent) {
-  if (!canAcceptMoreImages.value) return
-  addSlotDragOver.value = true
-  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
-}
-function onAddSlotDragLeave() {
-  addSlotDragOver.value = false
-}
-function onAddSlotDrop(event: DragEvent) {
-  addSlotDragOver.value = false
-  if (!canAcceptMoreImages.value) return
-  emit('input-image-drop', event)
-}
 </script>
 
 <style scoped src="./styles/node-shared.css"></style>

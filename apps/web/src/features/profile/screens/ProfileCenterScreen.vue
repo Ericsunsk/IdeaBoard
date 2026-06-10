@@ -336,6 +336,7 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
+import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { uploadApi } from '../../../shared/api/upload'
@@ -344,7 +345,6 @@ import Card from 'primevue/card'
 import Message from 'primevue/message'
 import Password from 'primevue/password'
 import Tag from 'primevue/tag'
-import { formatDisplayErrorMessage } from '../../../shared/utils/errorMessages'
 import type { Component } from 'vue'
 import { Camera, Lock, LogOut, NavArrowLeft, Shield, User } from '@iconoir/vue'
 
@@ -360,6 +360,7 @@ type PasswordForm = Record<PasswordField, string>
 const router = useRouter()
 const userStore = useUserStore()
 const appToast = useAppToast()
+const { runAsyncAction } = useAsyncAction()
 const { logoutAndRedirect } = useLogoutRedirect()
 
 const activeTab = ref<NavItem['key']>('profile')
@@ -467,17 +468,19 @@ function resetPasswordForm() {
 async function handleUpdatePassword() {
   if (!validatePasswordForm()) return
 
-  try {
-    pwdLoading.value = true
-    await userStore.updatePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
-    appToast.success('密码更新成功，请重新登录')
-    resetPasswordForm()
-    await router.push('/user/login')
-  } catch (error: unknown) {
-    appToast.error(error instanceof Error && error.message ? error.message : '密码更新失败')
-  } finally {
-    pwdLoading.value = false
-  }
+  await runAsyncAction(
+    async () => {
+      await userStore.updatePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
+      appToast.success('密码更新成功，请重新登录')
+      resetPasswordForm()
+      await router.push('/user/login')
+    },
+    {
+      loading: pwdLoading,
+      errorMessage: (error) =>
+        error instanceof Error && error.message ? error.message : '密码更新失败',
+    },
+  )
 }
 
 async function handleLogout() {
@@ -497,20 +500,21 @@ async function onAvatarFileChange(event: Event) {
     appToast.warning('仅支持上传图片文件')
     return
   }
-  try {
-    avatarUploading.value = true
-    const uploadRes = await uploadApi.uploadAvatar(file)
-    const avatarUrl = uploadRes.data?.avatar?.trim()
-    if (!avatarUrl) {
-      throw new Error('头像上传失败，请稍后重试')
-    }
-    userStore.setAvatarLocal(avatarUrl)
-    appToast.success('头像已更新')
-  } catch (error) {
-    appToast.error(formatDisplayErrorMessage(error, '头像更新失败'))
-  } finally {
-    avatarUploading.value = false
-  }
+  await runAsyncAction(
+    async () => {
+      const uploadRes = await uploadApi.uploadAvatar(file)
+      const avatarUrl = uploadRes.data?.avatar?.trim()
+      if (!avatarUrl) {
+        throw new Error('头像上传失败，请稍后重试')
+      }
+      userStore.setAvatarLocal(avatarUrl)
+      appToast.success('头像已更新')
+    },
+    {
+      loading: avatarUploading,
+      errorMessage: '头像更新失败',
+    },
+  )
 }
 
 onMounted(() => {

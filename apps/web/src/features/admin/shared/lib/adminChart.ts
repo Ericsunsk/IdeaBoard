@@ -25,6 +25,7 @@ export const adminChartTheme = {
   legendText: '#475569',
   emptyText: '#98a2b3',
   cardBg: '#f8fafc',
+  segmentBorder: '#ffffff',
   mainText: '#1d2939',
   brand: '#26364f',
   slate: '#4f6f9f',

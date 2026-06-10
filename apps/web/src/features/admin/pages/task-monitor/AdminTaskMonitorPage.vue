@@ -1,6 +1,6 @@
 <template>
-  <div class="flex max-w-full min-w-0 flex-col gap-4 p-0">
-    <div class="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
+  <div :class="adminDashboardRootClass">
+    <div :class="adminSummaryGridClass">
       <AdminSummaryCard label="执行中" :value="liveRunningCount" :footer="runningFoot" />
       <AdminSummaryCard label="队列等待" :value="liveQueueTotal" :footer="queueFoot" />
       <AdminSummaryCard label="失败" :value="liveFailedCount" :footer="failedFoot" />
@@ -11,73 +11,57 @@
       />
     </div>
 
-    <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-      <Card class="xl:col-span-12" :pt="adminCardPt">
-        <template #title>
-          <AdminCardHeader :title="taskCards.executionPressure.title">
-            <template #actions>
-              <Tag
-                :value="`${activeExecutionPressurePoints.length} 类`"
-                severity="secondary"
-                rounded
-              />
-            </template>
-          </AdminCardHeader>
+    <div :class="adminChartGridClass">
+      <AdminChartCard
+        :title="taskCards.executionPressure.title"
+        span-class="xl:col-span-12"
+        chart-size="monitor"
+      >
+        <template #actions>
+          <Tag :value="`${activeExecutionPressurePoints.length} 类`" severity="secondary" rounded />
         </template>
-        <template #content>
-          <AdminChartPanel size="monitor">
-            <Chart
-              type="bubble"
-              class="h-full w-full min-w-0"
-              :data="executionPressureChartData"
-              :options="executionPressureChartOptions"
-              :plugins="adminChartPlugins"
-            />
-          </AdminChartPanel>
-        </template>
-      </Card>
+        <Chart
+          type="bubble"
+          :class="adminChartCanvasClass"
+          :data="executionPressureChartData"
+          :options="executionPressureChartOptions"
+          :plugins="adminChartPlugins"
+        />
+      </AdminChartCard>
 
-      <Card class="xl:col-span-6" :pt="adminCardPt">
-        <template #title>
-          <AdminCardHeader :title="taskCards.taskDistribution.title">
-            <template #actions>
-              <Tag :value="`${taskDistributionRows.length} 类`" severity="secondary" rounded />
-            </template>
-          </AdminCardHeader>
+      <AdminChartCard
+        :title="taskCards.taskDistribution.title"
+        span-class="xl:col-span-6"
+        chart-size="monitor"
+      >
+        <template #actions>
+          <Tag :value="`${taskDistributionRows.length} 类`" severity="secondary" rounded />
         </template>
-        <template #content>
-          <AdminChartPanel size="monitor">
-            <Chart
-              type="radar"
-              class="h-full w-full min-w-0"
-              :data="taskDistributionChartData"
-              :options="taskDistributionChartOptions"
-              :plugins="adminChartPlugins"
-            />
-          </AdminChartPanel>
-        </template>
-      </Card>
+        <Chart
+          type="radar"
+          :class="adminChartCanvasClass"
+          :data="taskDistributionChartData"
+          :options="taskDistributionChartOptions"
+          :plugins="adminChartPlugins"
+        />
+      </AdminChartCard>
 
-      <Card class="xl:col-span-6" :pt="adminCardPt">
-        <template #title>
-          <AdminCardHeader :title="taskCards.accountConcurrency.title">
-            <template #actions>
-              <Tag :value="`${accountLoadRows.length} 账号`" severity="secondary" rounded />
-            </template>
-          </AdminCardHeader>
+      <AdminChartCard
+        :title="taskCards.accountConcurrency.title"
+        span-class="xl:col-span-6"
+        chart-size="monitor"
+      >
+        <template #actions>
+          <Tag :value="`${accountLoadRows.length} 账号`" severity="secondary" rounded />
         </template>
-        <template #content>
-          <AdminChartPanel size="monitor">
-            <Chart
-              type="bar"
-              class="h-full w-full min-w-0"
-              :data="accountConcurrencyChartData"
-              :options="accountConcurrencyChartOptions"
-              :plugins="adminChartPlugins"
-            />
-          </AdminChartPanel>
-        </template>
-      </Card>
+        <Chart
+          type="bar"
+          :class="adminChartCanvasClass"
+          :data="accountConcurrencyChartData"
+          :options="accountConcurrencyChartOptions"
+          :plugins="adminChartPlugins"
+        />
+      </AdminChartCard>
     </div>
 
     <AdminTablePanel>
@@ -595,15 +579,13 @@ import {
   ListAdminTasksStatus,
   type ListAdminTasksStatus as ListAdminTasksStatusValue,
 } from '../../../../shared/api/generated-query/model'
-import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
-import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
+import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
-import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCards } from '../../shared/lib/adminCardMeta'
 import {
   adminChartLegend,
@@ -621,7 +603,14 @@ import {
   withAlpha,
 } from '../../shared/lib/adminChart'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
-import { adminToolbarIconButtonClass } from '../../shared/lib/adminUiClasses'
+import { createAdminDialogPt } from '../../shared/lib/adminOverlayPt'
+import {
+  adminChartCanvasClass,
+  adminChartGridClass,
+  adminDashboardRootClass,
+  adminSummaryGridClass,
+  adminToolbarIconButtonClass,
+} from '../../shared/lib/adminUiClasses'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import {
   formatTaskCreatedAt,
@@ -652,20 +641,14 @@ const adminMonitorTooltipBase = {
   borderWidth: 1,
   padding: 10,
 } as const
-const taskDetailDialogPt = {
-  root: {
-    class:
-      '!overflow-hidden !border !border-[rgba(215,224,235,0.92)] !bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(247,250,253,0.96))] !shadow-[0_24px_60px_rgba(45,64,89,0.16)]',
-  },
-  header: {
-    class:
-      '!border-b !border-admin-border-soft !px-6 !pt-5 !pb-3.5 max-[720px]:!px-[18px] max-[720px]:!pt-4 max-[720px]:!pb-3',
-  },
-  content: {
-    class:
-      '!max-h-[75vh] !overflow-y-auto !px-6 !pt-[18px] !pb-6 max-[720px]:!px-[18px] max-[720px]:!pt-3.5 max-[720px]:!pb-5',
-  },
-} as const
+const taskDetailDialogPt = createAdminDialogPt({
+  rootClass:
+    '!overflow-hidden !border !border-[rgba(215,224,235,0.92)] !bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(247,250,253,0.96))] !shadow-[0_24px_60px_rgba(45,64,89,0.16)]',
+  headerClass:
+    '!border-b !border-admin-border-soft !px-6 !pt-5 !pb-3.5 max-[720px]:!px-[18px] max-[720px]:!pt-4 max-[720px]:!pb-3',
+  contentClass:
+    '!max-h-[75vh] !overflow-y-auto !px-6 !pt-[18px] !pb-6 max-[720px]:!px-[18px] max-[720px]:!pt-3.5 max-[720px]:!pb-5',
+})
 const detailBannerBaseClass =
   'relative flex flex-col gap-3 overflow-hidden rounded-[18px] border border-admin-border-soft bg-admin-surface-muted px-[18px] py-4 before:absolute before:top-3.5 before:bottom-3.5 before:left-0 before:w-1 before:rounded-full before:bg-admin-text-3'
 const detailStatusBannerClassByStatus: Partial<Record<ListAdminTasksStatusValue, string>> = {

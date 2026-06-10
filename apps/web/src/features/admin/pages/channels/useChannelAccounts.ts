@@ -1,4 +1,5 @@
 import channelApi, { type Channel } from '../../../../shared/api/channel'
+import { useAsyncAction } from '../../../../shared/composables/useAsyncAction'
 import adminAccountApi, {
   FALLBACK_ADMIN_ACCOUNT_LIMITS,
   normalizeAdminAccountLimits,
@@ -40,6 +41,7 @@ export function useChannelAccounts(options: {
   }
   onAfterMutation: () => Promise<void> | void
 }) {
+  const { runAsyncAction } = useAsyncAction()
   const accounts = ref<AdminAccount[]>([])
   const isMockMode = useAdminMockMode()
   const showAccountModal = ref(false)
@@ -77,6 +79,14 @@ export function useChannelAccounts(options: {
     })
     return grouped
   })
+
+  function showAccountActionError(error: unknown, fallback: string) {
+    options.message.error(extractApiErrorMessage(error, fallback))
+  }
+
+  function showAccountActionWarning(error: unknown, fallback: string) {
+    options.message.warning(extractApiErrorMessage(error, fallback))
+  }
 
   async function loadAccountLimits() {
     if (isMockMode.value) {
@@ -200,128 +210,128 @@ export function useChannelAccounts(options: {
     if (detectedModelSessionCache.value.has(sessionKey)) return
     detectedModelSessionCache.value.add(sessionKey)
 
-    detectModelsLoading.value = true
-    try {
-      const res = await channelApi.detectModels({
-        base_url: baseURL,
-        api_key: secret,
-        api_type: apiType,
-      })
-      const models = (res.data?.models || [])
-        .map((m) => (m || '').trim())
-        .filter(Boolean)
-        .slice(0, MAX_DETECTED_MODELS)
+    await runAsyncAction(
+      async () => {
+        const res = await channelApi.detectModels({
+          base_url: baseURL,
+          api_key: secret,
+          api_type: apiType,
+        })
+        const models = (res.data?.models || [])
+          .map((m) => (m || '').trim())
+          .filter(Boolean)
+          .slice(0, MAX_DETECTED_MODELS)
 
-      if (models.length > 0) {
-        const merged = new Set([...detectedModelValues.value, ...models])
-        detectedModelValues.value = Array.from(merged).slice(0, MAX_DETECTED_MODELS)
-      }
-    } catch (error) {
-      options.message.warning(extractApiErrorMessage(error, '自动检测模型失败'))
-    } finally {
-      detectModelsLoading.value = false
-    }
+        if (models.length > 0) {
+          const merged = new Set([...detectedModelValues.value, ...models])
+          detectedModelValues.value = Array.from(merged).slice(0, MAX_DETECTED_MODELS)
+        }
+      },
+      {
+        loading: detectModelsLoading,
+        onError: (error) => showAccountActionWarning(error, '自动检测模型失败'),
+      },
+    )
   }
 
   async function handleSaveAccount() {
-    try {
-      const selectedModels = accountForm.value.model_values
-        .map((item) => item.trim())
-        .filter(Boolean)
-      accountForm.value.model_values = Array.from(new Set(selectedModels))
-      if (accountForm.value.model_values.length === 0) {
-        options.message.warning('请至少选择或输入一个模型')
-        return
-      }
-      if (!isEditAccount.value && !accountForm.value.secret) {
-        options.message.warning('新增账号必须输入 API 密钥')
-        return
-      }
-
-      accountSaveLoading.value = true
-      const ch = selectedChannelForAccount.value
-      const existingAccount = isEditAccount.value
-        ? accounts.value.find((account) => account.id === currentAccountId.value)
-        : undefined
-      const modelInputs = accountModelInputsFromValues(
-        accountForm.value.model_values,
-        existingAccount?.models,
-      )
-      const channelId =
-        isEditAccount.value && existingAccount
-          ? existingAccount.channel_id
-          : accountForm.value.channel_id
-      const baseData = {
-        models: modelInputs,
-        max_concurrent: accountForm.value.max_concurrent,
-        timeout: accountForm.value.timeout,
-        name: ch?.name || 'Unknown',
-        platform: ch?.type || DEFAULT_ADMIN_CHANNEL_API_TYPE,
-        api_type: ch?.type || DEFAULT_ADMIN_CHANNEL_API_TYPE,
-        proxy_url: ch?.api_url || '',
-      }
-
-      if (isMockMode.value) {
-        const now = new Date().toISOString()
-        const nextAccount: AdminAccount = {
-          id:
-            existingAccount?.id ??
-            Math.max(900, ...accounts.value.map((account) => account.id)) + 1,
-          name: baseData.name,
-          channel_id: channelId,
-          platform: baseData.platform,
-          api_type: baseData.api_type,
-          proxy_url: baseData.proxy_url,
-          models: mockAccountModelsFromInputs(modelInputs),
-          secret_configured: existingAccount?.secret_configured ?? true,
-          max_concurrent: baseData.max_concurrent,
-          current_concurrent: existingAccount?.current_concurrent ?? 0,
-          wait_queue_count: existingAccount?.wait_queue_count ?? 0,
-          running_status: existingAccount?.running_status ?? 'running',
-          fail_count: existingAccount?.fail_count ?? 0,
-          weight: existingAccount?.weight ?? 100,
-          timeout: baseData.timeout,
-          extra_config: existingAccount?.extra_config ?? '{}',
-          status: existingAccount?.status ?? 1,
-          created_at: existingAccount?.created_at ?? now,
-          updated_at: now,
-        }
-        accounts.value = isEditAccount.value
-          ? accounts.value.map((account) =>
-              account.id === currentAccountId.value ? nextAccount : account,
-            )
-          : [nextAccount, ...accounts.value]
-        options.message.success(isEditAccount.value ? '账号已更新' : '账号已创建')
-        showAccountModal.value = false
-        return
-      }
-
-      if (isEditAccount.value) {
-        const updateData: AdminAccountUpdateRequest = {
-          ...baseData,
-          weight: existingAccount?.weight ?? 100,
-          extra_config: existingAccount?.extra_config ?? '{}',
-          ...(accountForm.value.secret ? { secret: accountForm.value.secret } : {}),
-        }
-        await adminAccountApi.update(currentAccountId.value, updateData)
-        options.message.success('账号已更新')
-      } else {
-        await adminAccountApi.create({
-          ...baseData,
-          channel_id: channelId,
-          secret: accountForm.value.secret,
-          extra_config: '{}',
-        })
-        options.message.success('账号已创建')
-      }
-
-      showAccountModal.value = false
-      await options.onAfterMutation()
-    } catch (error) {
-      options.message.error(extractApiErrorMessage(error, '保存账号失败'))
-    } finally {
-      accountSaveLoading.value = false
+    const selectedModels = accountForm.value.model_values.map((item) => item.trim()).filter(Boolean)
+    accountForm.value.model_values = Array.from(new Set(selectedModels))
+    if (accountForm.value.model_values.length === 0) {
+      options.message.warning('请至少选择或输入一个模型')
+      return
     }
+    if (!isEditAccount.value && !accountForm.value.secret) {
+      options.message.warning('新增账号必须输入 API 密钥')
+      return
+    }
+
+    await runAsyncAction(
+      async () => {
+        const ch = selectedChannelForAccount.value
+        const existingAccount = isEditAccount.value
+          ? accounts.value.find((account) => account.id === currentAccountId.value)
+          : undefined
+        const modelInputs = accountModelInputsFromValues(
+          accountForm.value.model_values,
+          existingAccount?.models,
+        )
+        const channelId =
+          isEditAccount.value && existingAccount
+            ? existingAccount.channel_id
+            : accountForm.value.channel_id
+        const baseData = {
+          models: modelInputs,
+          max_concurrent: accountForm.value.max_concurrent,
+          timeout: accountForm.value.timeout,
+          name: ch?.name || 'Unknown',
+          platform: ch?.type || DEFAULT_ADMIN_CHANNEL_API_TYPE,
+          api_type: ch?.type || DEFAULT_ADMIN_CHANNEL_API_TYPE,
+          proxy_url: ch?.api_url || '',
+        }
+
+        if (isMockMode.value) {
+          const now = new Date().toISOString()
+          const nextAccount: AdminAccount = {
+            id:
+              existingAccount?.id ??
+              Math.max(900, ...accounts.value.map((account) => account.id)) + 1,
+            name: baseData.name,
+            channel_id: channelId,
+            platform: baseData.platform,
+            api_type: baseData.api_type,
+            proxy_url: baseData.proxy_url,
+            models: mockAccountModelsFromInputs(modelInputs),
+            secret_configured: existingAccount?.secret_configured ?? true,
+            max_concurrent: baseData.max_concurrent,
+            current_concurrent: existingAccount?.current_concurrent ?? 0,
+            wait_queue_count: existingAccount?.wait_queue_count ?? 0,
+            running_status: existingAccount?.running_status ?? 'running',
+            fail_count: existingAccount?.fail_count ?? 0,
+            weight: existingAccount?.weight ?? 100,
+            timeout: baseData.timeout,
+            extra_config: existingAccount?.extra_config ?? '{}',
+            status: existingAccount?.status ?? 1,
+            created_at: existingAccount?.created_at ?? now,
+            updated_at: now,
+          }
+          accounts.value = isEditAccount.value
+            ? accounts.value.map((account) =>
+                account.id === currentAccountId.value ? nextAccount : account,
+              )
+            : [nextAccount, ...accounts.value]
+          options.message.success(isEditAccount.value ? '账号已更新' : '账号已创建')
+          showAccountModal.value = false
+          return
+        }
+
+        if (isEditAccount.value) {
+          const updateData: AdminAccountUpdateRequest = {
+            ...baseData,
+            weight: existingAccount?.weight ?? 100,
+            extra_config: existingAccount?.extra_config ?? '{}',
+            ...(accountForm.value.secret ? { secret: accountForm.value.secret } : {}),
+          }
+          await adminAccountApi.update(currentAccountId.value, updateData)
+          options.message.success('账号已更新')
+        } else {
+          await adminAccountApi.create({
+            ...baseData,
+            channel_id: channelId,
+            secret: accountForm.value.secret,
+            extra_config: '{}',
+          })
+          options.message.success('账号已创建')
+        }
+
+        showAccountModal.value = false
+        await options.onAfterMutation()
+      },
+      {
+        loading: accountSaveLoading,
+        onError: (error) => showAccountActionError(error, '保存账号失败'),
+      },
+    )
   }
 
   async function toggleAccountModelStatus(account: AdminAccount, model: string) {
@@ -333,14 +343,17 @@ export function useChannelAccounts(options: {
       normalizeModelKey(item.name) === modelKey ? { ...item, enabled: nextEnabled } : item,
     )
 
-    try {
-      await updateAccountModelConfig(account, {
-        models: nextModels,
-      })
-      options.message.success(nextEnabled ? '模型已启动' : '模型已停止')
-    } catch (error) {
-      options.message.error(extractApiErrorMessage(error, '模型状态修改失败'))
-    }
+    await runAsyncAction(
+      async () => {
+        await updateAccountModelConfig(account, {
+          models: nextModels,
+        })
+        options.message.success(nextEnabled ? '模型已启动' : '模型已停止')
+      },
+      {
+        onError: (error) => showAccountActionError(error, '模型状态修改失败'),
+      },
+    )
   }
 
   async function updateAccountModelConfig(

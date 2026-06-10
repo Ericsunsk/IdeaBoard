@@ -10,7 +10,7 @@
       <Filter :class="['size-4', active ? 'text-admin-text-1' : 'text-admin-text-2']" />
     </template>
   </Button>
-  <Popover ref="popoverRef">
+  <Popover ref="popoverRef" :pt="filterPopoverPt">
     <div :class="adminFilterPopoverClass">
       <div :class="adminPopoverSectionHeaderClass">
         <div :class="adminPopoverTitleClass">{{ title }}</div>
@@ -40,6 +40,7 @@ import {
   adminPopoverTitleClass,
   adminToolbarIconButtonClass,
 } from '../lib/adminUiClasses'
+import { createAdminPopoverPt } from '../lib/adminOverlayPt'
 
 type PrimePopupPanel = {
   toggle: (event: Event) => void
@@ -64,6 +65,7 @@ defineEmits<{
 }>()
 
 const popoverRef = ref<PrimePopupPanel | null>(null)
+const filterPopoverPt = createAdminPopoverPt({ contentClass: '!p-0' })
 
 function toggle(event: Event) {
   popoverRef.value?.toggle(event)
