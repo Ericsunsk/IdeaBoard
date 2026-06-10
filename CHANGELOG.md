@@ -15,7 +15,7 @@
 - Better Auth 生产环境强制配置 `BETTER_AUTH_SECRET` 与 `BETTER_AUTH_URL`。
 - 生产环境拒绝 Auth internal key 与 Better Auth secret 使用占位值。
 - Auth 登录/注册限流改为依赖可信代理解析后的客户端 IP，避免直接信任请求头。
-- Express 5 auth 路由迁移到命名 wildcard，避免 `/api/auth/*` 在新版 path parser 下启动失败。
+- Auth 服务使用 Fastify 5 承载 Better Auth handler，`/api/auth/*` 由 Fastify 路由统一转发。
 - Go API CORS 改为 allowlist；生产配置 `APP_CORS_ALLOWED_ORIGINS` 时同样生效。
 - 任务提交与画布保存增加大小、数量和嵌套层级限制。
 - 任务参数字段调整为 `MEDIUMTEXT`，与 2MB 参数校验上限保持一致。
@@ -25,7 +25,7 @@
 ### 依赖与构建
 
 - 前端升级到 ECharts 6、vue-echarts 8、Vue Router 5 与 TypeScript 6，图表注册仅保留当前使用的 `line/bar/scatter`。
-- Auth 服务升级到 Express 5、dotenv 17 与 TypeScript 6。
+- Auth 服务升级到 Fastify 5、Better Auth、dotenv 17 与 TypeScript 6。
 - Auth Docker 镜像固定升级到 npm 11.16.0，避免 `ideaboard update` 执行 migration 时由容器内旧 npm 触发 major update notice。
 - 退出登录导航从 user store 移到共享 composable，消除 router 与 store 的循环依赖。
 

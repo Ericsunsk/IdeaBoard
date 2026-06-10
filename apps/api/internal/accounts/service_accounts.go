@@ -156,7 +156,11 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 	account.MaxConcurrent = normalizeMaxConcurrent(req.MaxConcurrent)
 	account.Timeout = NormalizeAccountTimeout(req.Timeout)
 	account.ExtraConfig = req.ExtraConfig
-	account.Weight = req.Weight
+	if req.Weight <= 0 {
+		account.Weight = 1
+	} else {
+		account.Weight = req.Weight
+	}
 
 	if req.Secret != "" {
 		account.ApiKey = req.Secret

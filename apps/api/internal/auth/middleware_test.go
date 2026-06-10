@@ -3,11 +3,16 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/users"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
@@ -49,5 +54,39 @@ func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
 
 	if _, err := userRepo.GetByAuthUserID(context.Background(), "auth-missing-123"); !errors.Is(err, database.ErrNotFound) {
 		t.Fatalf("missing auth user should not be auto-created, got err=%v", err)
+	}
+}
+
+func TestAuthMiddlewareReturnsServiceUnavailableWhenLocalLookupFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-db-error","username":"alice"}}}`))
+	}))
+	defer authServer.Close()
+
+	db := testdb.Open(t)
+	userRepo := users.NewUserRepository(db)
+	if err := db.Close(); err != nil {
+		t.Fatalf("close test db failed: %v", err)
+	}
+
+	router := gin.New()
+	router.Use(AuthMiddleware(NewServiceClient(config.AuthServiceConfig{
+		BaseURL:        authServer.URL,
+		TimeoutSeconds: 1,
+	}), userRepo))
+	router.GET("/api/user/info", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/user/info", nil)
+	req.Header.Set("Cookie", "better-auth.session_token=test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusServiceUnavailable, rec.Body.String())
 	}
 }

@@ -27,7 +27,7 @@
 > [!IMPORTANT]
 > 本文档仅供 IdeaBoard 授权成员在内部部署与运维场景下使用。项目为闭源私有项目，未经授权不得复制、分发或对外传播。
 >
-> 账号安全与业务运维的职责边界请同时参考 [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)。
+> 账号安全与业务运维的职责边界请同时参考 [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)；PostgreSQL backup / restore 的密钥材料处理规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
 
 <a id="deployment-profile"></a>
 ## 部署概览
@@ -220,6 +220,9 @@ ideaboard update
 
 `ideaboard update` 会在执行 API / Auth migration 前自动导出 PostgreSQL backup 和 `api-uploads` tar，默认写到 `/opt/stacks/ideaboard-backups/`，文件名带时间戳，默认保留最近 5 份。Backup 或 deploy 后 Gateway 的 `/api/health`、`/api/auth/health` 或公网 `${API_BASE_URL}/api/health` health gate 失败都会中止部署并打印相关容器日志。
 
+> [!IMPORTANT]
+> PostgreSQL backup 包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能含有上游 API key、S3 access key/secret、endpoint 与 bucket 配置。`postgres-*.sql` 必须按 secret artifact 处理：建议加密落盘，只允许受控传输和最小必要人员访问；完成 restore 后按受影响范围轮换上游 API key 与对象存储凭据，并清理临时副本。
+
 当前 Docker stack 只管理 PostgreSQL 数据库；`ideaboard update` 不会自动转换或导入其他数据库形态的数据。首次部署或切换部署形态前，请先确认目标 PostgreSQL 中已有需要保留的数据，或明确按空库初始化。
 
 <a id="api-database-baseline"></a>
@@ -298,7 +301,7 @@ ls -lh /opt/stacks/ideaboard-backups/
 docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env logs --tail=200 gateway api auth postgres nats
 ```
 
-当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。数据库 backup 与 `api-uploads` tar 分别保留在同一备份目录下。
+当前脚本不会自动 restore database。需要 DB 回滚时，先人工评估 migration 影响，再使用对应时间点的 backup 做受控恢复。数据库 backup 与 `api-uploads` tar 分别保留在同一备份目录下；其中 PostgreSQL backup 含密钥材料，恢复完成后必须执行凭据轮换计划。
 
 数据保存在 Docker volumes：`postgres-data`、`nats-data`、`api-uploads`。不要使用 `docker compose down -v`，除非你明确要删除生产数据。
 
@@ -697,6 +700,6 @@ nginx -t && systemctl reload nginx
 6. 执行 `systemctl restart ideaboard-auth ideaboard`。
 7. 再次验证 `curl http://127.0.0.1:6000/api/health` 与 `curl http://127.0.0.1:6001/api/health`。
 
-Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 改回上一版 digest 并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup 和 `api-uploads` tar，再运行 API / Auth migration 和 health gate；历史 backup 默认位于 `/opt/stacks/ideaboard-backups/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复。
+Docker stack 回滚时，把 `/opt/stacks/ideaboard/docker/.env` 中的 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 改回上一版 digest 并执行 `ideaboard update`。脚本会先创建新的 PostgreSQL backup 和 `api-uploads` tar，再运行 API / Auth migration 和 health gate；历史 backup 默认位于 `/opt/stacks/ideaboard-backups/`，默认保留最近 5 份。DB restore 不自动执行，只有在确认 migration 需要回退数据时再人工按 backup 恢复；restore 后按 secret artifact 规则轮换上游 API key 与对象存储凭据。
 
 Docker stack 的数据面以 PostgreSQL volume 为准；回滚镜像不会自动转换、导入或恢复非 PostgreSQL 数据。

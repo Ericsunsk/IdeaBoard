@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -121,6 +122,47 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	}
 	if taskCount != 0 {
 		t.Fatalf("task count = %d, want 0", taskCount)
+	}
+}
+
+func TestAdminDeleteUserSkipsAuthDeleteWhenLocalCleanupFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	authUserID := "auth-user-kept"
+	targetUser := &User{
+		Username:   "cleanup_fail_user",
+		AuthUserID: &authUserID,
+		StorageUID: "FAIL42",
+		Role:       "user",
+		Status:     1,
+	}
+	if err := repo.Create(context.Background(), targetUser); err != nil {
+		t.Fatalf("create target user failed: %v", err)
+	}
+
+	authManager := &fakeAdminAuthManager{}
+	userService := NewUserService(repo, &recordingUserUploadCleaner{err: errors.New("storage down")})
+	handler := NewAdminHandler(userService, nil, authManager)
+	router := gin.New()
+	router.DELETE("/admin/users/:id", func(c *gin.Context) {
+		c.Set("user_id", int64(999))
+		handler.DeleteUser(c)
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10), nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	if authManager.deletedAuthUserID != "" {
+		t.Fatalf("auth delete was called for %q, want skipped", authManager.deletedAuthUserID)
+	}
+	if _, err := repo.GetByID(context.Background(), targetUser.ID); err != nil {
+		t.Fatalf("target user should remain after cleanup failure: %v", err)
 	}
 }
 

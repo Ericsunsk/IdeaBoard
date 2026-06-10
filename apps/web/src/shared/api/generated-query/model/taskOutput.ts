@@ -12,7 +12,7 @@ export interface TaskOutput {
   media_asset_id?: number | null
   role: string
   url: string
-  storage_key: string
+  storage_key?: string
   mime_type: string
   width: number
   height: number

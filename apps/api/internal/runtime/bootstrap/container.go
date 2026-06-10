@@ -245,6 +245,27 @@ func (p taskEventHubPublisher) PublishTaskStatus(_ context.Context, event events
 	return nil
 }
 
+type compositeTaskStatusPublisher struct {
+	local  events.TaskStatusPublisher
+	remote events.TaskStatusPublisher
+}
+
+func (p compositeTaskStatusPublisher) PublishTaskStatus(ctx context.Context, event events.TaskStatusEvent) error {
+	event = events.NormalizeTaskStatusEvent(event)
+	var firstErr error
+	if p.local != nil {
+		if err := p.local.PublishTaskStatus(ctx, event); err != nil {
+			firstErr = err
+		}
+	}
+	if p.remote != nil {
+		if err := p.remote.PublishTaskStatus(ctx, event); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
 func newTaskStatusEventPublisher(
 	ctx context.Context,
 	cfg config.EventBusConfig,
@@ -278,7 +299,7 @@ func newTaskStatusEventPublisher(
 		return nil, nil, err
 	}
 	slog.Info("NATS JetStream task events enabled", "stream", cfg.NATSStreamName, "subject_prefix", cfg.NATSSubjectPrefix)
-	return bus, bus, nil
+	return compositeTaskStatusPublisher{local: localPublisher, remote: bus}, bus, nil
 }
 
 type uploadBoardAccessResolver struct {

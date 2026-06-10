@@ -34,11 +34,34 @@ export function useTaskRuntimeMonitor() {
     if (isVisible && !wasVisible) void monitorQuery.refetch()
   })
 
+  watch(
+    stream.status,
+    (status) => {
+      if (status === 'connected') return
+      stream.snapshot.value = null
+      if (polling.isPageVisible.value && status !== 'connecting') void monitorQuery.refetch()
+    },
+    { flush: 'sync' },
+  )
+
+  watch(
+    () => monitorQuery.data.value,
+    (data) => {
+      if (data && !stream.isConnected.value) stream.snapshot.value = null
+    },
+  )
+
   const monitorData = computed(
-    () => stream.snapshot.value?.data?.monitor || monitorQuery.data.value?.data?.monitor || null,
+    () =>
+      (stream.isConnected.value ? stream.snapshot.value?.data?.monitor : null) ||
+      monitorQuery.data.value?.data?.monitor ||
+      null,
   )
   const monitorStats = computed(
-    () => stream.snapshot.value?.data?.stats || monitorQuery.data.value?.data?.stats || null,
+    () =>
+      (stream.isConnected.value ? stream.snapshot.value?.data?.stats : null) ||
+      monitorQuery.data.value?.data?.stats ||
+      null,
   )
 
   return {

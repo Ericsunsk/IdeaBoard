@@ -47,7 +47,7 @@ func AuthMiddleware(authService *ServiceClient, userRepo *users.UserRepository) 
 			if database.IsNotFound(err) {
 				response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
 			} else {
-				response.InternalError(c, http.StatusUnauthorized, "用户不存在或已停用", err)
+				response.InternalError(c, http.StatusServiceUnavailable, "用户服务暂不可用", err)
 			}
 			c.Abort()
 			return

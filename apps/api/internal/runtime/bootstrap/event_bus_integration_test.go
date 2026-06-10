@@ -65,14 +65,55 @@ func TestNATSJetStreamTaskEventBridgeSmoke(t *testing.T) {
 		t.Fatalf("PublishTaskStatus failed: %v", err)
 	}
 
+	for received := 0; received < 2; received++ {
+		select {
+		case event := <-taskEvents:
+			if event.TaskID != taskID || event.Status != tasks.StatusRunning {
+				t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, taskID, tasks.StatusRunning)
+			}
+		case <-ctx.Done():
+			t.Fatalf("timeout waiting for local and bridged task events after %d events: %v", received, ctx.Err())
+		}
+	}
+}
+
+func TestCompositeTaskStatusPublisherKeepsLocalHubOnRemoteFailure(t *testing.T) {
+	ctx := context.Background()
+	hub := taskservice.NewEventHub()
+	taskID := "task-local-fallback"
+	taskEvents, unsubscribe, ok := hub.Subscribe(taskID, 99)
+	if !ok {
+		t.Fatal("hub subscribe rejected unexpectedly")
+	}
+	defer unsubscribe()
+
+	remoteErr := errors.New("nats unavailable")
+	publisher := compositeTaskStatusPublisher{
+		local:  taskEventHubPublisher{hub: hub},
+		remote: failingTaskStatusPublisher{err: remoteErr},
+	}
+
+	err := publisher.PublishTaskStatus(ctx, events.NewTaskStatusEvent(taskID, tasks.StatusRunning))
+	if !errors.Is(err, remoteErr) {
+		t.Fatalf("err = %v, want remote error", err)
+	}
+
 	select {
 	case event := <-taskEvents:
 		if event.TaskID != taskID || event.Status != tasks.StatusRunning {
 			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, taskID, tasks.StatusRunning)
 		}
-	case <-ctx.Done():
-		t.Fatalf("timeout waiting for bridged task event: %v", ctx.Err())
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for local fallback event")
 	}
+}
+
+type failingTaskStatusPublisher struct {
+	err error
+}
+
+func (p failingTaskStatusPublisher) PublishTaskStatus(context.Context, events.TaskStatusEvent) error {
+	return p.err
 }
 
 func deleteNATSTestStream(t *testing.T, natsURL, streamName string) {

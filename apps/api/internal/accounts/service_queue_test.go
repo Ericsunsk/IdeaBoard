@@ -199,6 +199,43 @@ func TestGetAccountQueueInfoUsesConcurrencyStore(t *testing.T) {
 	}
 }
 
+func TestUpdateAccountNormalizesZeroWeight(t *testing.T) {
+	db := newQueueServiceTestDB(t)
+	accountRepo := NewAccountRepository(db)
+	taskRepo := taskstore.NewRepository(db)
+	acc := createTestAccount(t, accountRepo, "update-zero-weight", 1)
+	svc := NewAccountService(AccountServiceDeps{
+		AccountRepo:      accountRepo,
+		TaskRepo:         taskRepo,
+		QueueStats:       &fakeQueueForService{},
+		AccountLoadStore: &fakeAccountLoadStore{},
+		ConcurrencyStore: &fakeConcurrencyStore{},
+		CancelStore:      &fakeCancelStore{},
+		MonitorStore:     &fakeMonitorStore{},
+	}, AccountServiceOptions{})
+
+	err := svc.UpdateAccount(context.Background(), acc.ID, &UpdateAccountRequest{
+		Name:          acc.Name,
+		Platform:      acc.Platform,
+		ApiType:       acc.ApiType,
+		Models:        []AccountModelInput{{Name: "gpt-image-1"}},
+		MaxConcurrent: acc.MaxConcurrent,
+		Timeout:       acc.Timeout,
+		Weight:        0,
+	})
+	if err != nil {
+		t.Fatalf("UpdateAccount failed: %v", err)
+	}
+
+	updated, err := accountRepo.GetByID(context.Background(), acc.ID)
+	if err != nil {
+		t.Fatalf("reload account failed: %v", err)
+	}
+	if updated.Weight != 1 {
+		t.Fatalf("weight = %d, want 1", updated.Weight)
+	}
+}
+
 func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	db := newQueueServiceTestDB(t)
 	accountRepo := NewAccountRepository(db)

@@ -72,17 +72,18 @@ func (t *Task) ToUserView() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"id":           t.ID,
-		"task_id":      t.TaskID,
-		"user_id":      t.UserID,
-		"prompt":       t.UserPrompt,
-		"status":       t.Status,
-		"error_msg":    t.ErrorMsg,
-		"result":       safeResult,
-		"outputs":      taskOutputsUserView(t.Outputs),
-		"created_at":   t.CreatedAt,
-		"updated_at":   t.UpdatedAt,
-		"completed_at": t.CompletedAt,
+		"id":            t.ID,
+		"task_id":       t.TaskID,
+		"user_id":       t.UserID,
+		"prompt":        t.UserPrompt,
+		"status":        t.Status,
+		"error_msg":     t.ErrorMsg,
+		"cancel_reason": t.CancelReason,
+		"result":        safeResult,
+		"outputs":       taskOutputsUserView(t.Outputs),
+		"created_at":    t.CreatedAt,
+		"updated_at":    t.UpdatedAt,
+		"completed_at":  t.CompletedAt,
 	}
 }
 

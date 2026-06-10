@@ -35,6 +35,22 @@ func TestTaskOutputCascadesWithTaskDelete(t *testing.T) {
 	}
 }
 
+func TestTaskUserViewIncludesCancelReason(t *testing.T) {
+	task := &Task{
+		ID:           1,
+		TaskID:       "task-cancelled",
+		UserID:       42,
+		UserPrompt:   "draw",
+		Status:       StatusCancelled,
+		CancelReason: "用户取消",
+	}
+
+	view := task.ToUserView()
+	if got := view["cancel_reason"]; got != "用户取消" {
+		t.Fatalf("cancel_reason = %#v, want 用户取消", got)
+	}
+}
+
 func TestTaskExecutionMetricsCascadesWithTaskDelete(t *testing.T) {
 	schema := readDBSchema(t)
 	if !strings.Contains(schema, "CREATE TABLE task_execution_metrics") {

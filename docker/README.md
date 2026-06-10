@@ -102,6 +102,9 @@ IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-stack.sh update
 
 推荐生产环境使用 `ideaboard update`，它会在 API / Auth migrations 前把 PostgreSQL dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.sql`，并在启动后检查 PostgreSQL、NATS JetStream、Gateway API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。已启动的 stack 也可以随时执行 `ideaboard smoke` 复验。如果 health gate 失败，请先查看 `gateway/cloudflared/api/auth/postgres/nats` 日志，再决定是否把三张镜像 digest 改回上一版重跑 `ideaboard update`；DB restore 需要基于 backup 人工确认后执行。
 
+> [!IMPORTANT]
+> `postgres-*.sql` 会包含 `api_account_secrets`、`storage_profile_secrets` 等表中的上游 API key 与 S3 secret，必须按 secret artifact 处理：建议加密保存、限制传输与下载，restore 后轮换受影响的上游 API key 和对象存储凭据。
+
 直接运行 `docker compose pull && docker compose up -d` 只适合本地排障；这条路径不会自动执行 Cosign 验签、API / Auth migrations、数据备份和 smoke gate。
 
 生产数据在 Docker volumes 中持久化：`postgres-data`、`nats-data`、`api-uploads`。不要对生产 stack 执行 `docker compose down -v`。

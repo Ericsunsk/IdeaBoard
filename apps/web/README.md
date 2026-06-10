@@ -1,6 +1,6 @@
 # IdeaBoard 前端项目
 
-这是 IdeaBoard 的前端项目，基于 `Vue 3 + Vite + TypeScript + Naive UI`，包含用户画布、用户中心与管理后台。
+这是 IdeaBoard 的前端项目，基于 `Vue 3 + Vite + TypeScript + PrimeVue v4 + Tailwind CSS v4`，包含用户画布、用户中心与管理后台。
 
 ## 启动
 

@@ -94,13 +94,14 @@ export function useTaskMonitor() {
   })
 
   watch(
-    tasks,
-    (rows) => {
-      hasActiveTasks.value = rows.some(
-        (task) =>
-          task.status === ListAdminTasksStatus.pending ||
-          task.status === ListAdminTasksStatus.running,
-      )
+    () => {
+      if (isMockMode.value) return hasActiveTaskRows(tasks.value)
+      const data = tasksQuery.data.value?.data
+      if (!data) return true
+      return (data.pending_count ?? 0) > 0 || (data.running_count ?? 0) > 0
+    },
+    (nextHasActiveTasks) => {
+      hasActiveTasks.value = nextHasActiveTasks
     },
     { immediate: true },
   )
@@ -155,6 +156,13 @@ function buildTaskStats(tasks: Task[]): TaskStatusStats {
 function paginateMockTasks(tasks: Task[], page: number) {
   const start = Math.max(0, page - 1) * TASK_MONITOR_PAGE_SIZE
   return tasks.slice(start, start + TASK_MONITOR_PAGE_SIZE)
+}
+
+function hasActiveTaskRows(tasks: Task[]) {
+  return tasks.some(
+    (task) =>
+      task.status === ListAdminTasksStatus.pending || task.status === ListAdminTasksStatus.running,
+  )
 }
 
 function matchesMockTaskFilters(

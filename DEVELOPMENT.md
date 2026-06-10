@@ -35,7 +35,7 @@ IdeaBoard 以画布工作流为中心组织产品语义。开发时应优先遵�
 
 | 维度 | 当前配置 |
 |------|----------|
-| 前端 | `Vue 3` + `Vite` + `TypeScript` + `Naive UI` + `Pinia` |
+| 前端 | `Vue 3` + `Vite` + `TypeScript` + `PrimeVue v4` + `Tailwind CSS v4` + `Pinia` |
 | 后端 | `Go` + `Gin` + `sqlc` + `Better Auth (Fastify/Node.js/TypeScript)` |
 | 基础设施 | `PostgreSQL 17+`（业务数据与 River 任务队列）+ `NATS JetStream`（事件层） |
 | 本地端口 | 前端 `5173`，Go API `6000`，Auth Service `6001`，NATS `4222/8222` |
@@ -256,8 +256,8 @@ sequenceDiagram
 
 | 组件 | 建议版本 |
 |------|----------|
-| Node.js | `20+` |
-| Go | `1.26.3+` |
+| Node.js | `22.18+` |
+| Go | `1.26.4+` |
 | PostgreSQL | `17+` |
 
 ### 启动步骤
@@ -388,8 +388,12 @@ git diff --exit-code -- internal/db/sqlc
 | `APP_HOST` | 空 | 后端监听地址；反向代理部署建议设为 `127.0.0.1` |
 | `APP_GIN_MODE` | `release` | Gin 运行模式，可选 `debug/release/test` |
 | `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | CORS allowlist，多个 origin 用逗号分隔；生产同源访问通常留空，跨源直连 API 时必须显式配置 |
+| `APP_PUBLIC_BASE_URL` | 空 | 对外前端地址，用于生成分享链接；Docker stack 默认由 `APP_BASE_URL` 注入 |
+| `APP_PUBLIC_ASSET_BASE_URL` | 空 | 对外素材/API 地址，用于 `/uploads/*` 与上游模型可访问图片；Docker stack 默认由 `API_BASE_URL` 注入 |
 | `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:6001` | Go 调用 auth service 的地址 |
 | `AUTH_INTERNAL_KEY` | 空 | Go 调用 auth service internal endpoint 的保护密钥；必须与 Auth 服务同名变量一致 |
+
+Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是输入变量，不是 API runtime 直接读取项。生产 stack 会把 `APP_BASE_URL` 映射到 `APP_PUBLIC_BASE_URL`、`APP_CORS_ALLOWED_ORIGINS` 与 `AUTH_TRUSTED_ORIGINS`，把 `API_BASE_URL` 映射到 `APP_PUBLIC_ASSET_BASE_URL` 与 `BETTER_AUTH_URL`。
 
 Auth 服务关键变量：
 

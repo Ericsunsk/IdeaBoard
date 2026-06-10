@@ -29,6 +29,9 @@ func TestBuildCORSMiddlewareProductionAllowlist(t *testing.T) {
 	if got := res.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example.com" {
 		t.Fatalf("Access-Control-Allow-Origin = %q, want %q", got, "https://app.example.com")
 	}
+	if got := res.Header().Get("Vary"); got != "Origin" {
+		t.Fatalf("Vary = %q, want Origin", got)
+	}
 }
 
 func TestBuildCORSMiddlewareProductionNoAllowlistIsNoop(t *testing.T) {

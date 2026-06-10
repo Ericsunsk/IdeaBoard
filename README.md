@@ -28,7 +28,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/web-Vue_3-42b883?style=flat-square&logo=vuedotjs&logoColor=white" alt="Web: Vue 3" />
   <img src="https://img.shields.io/badge/language-TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="Language: TypeScript" />
-  <img src="https://img.shields.io/badge/ui-Naive_UI-18a058?style=flat-square" alt="UI: Naive UI" />
+  <img src="https://img.shields.io/badge/ui-PrimeVue_v4-41b883?style=flat-square" alt="UI: PrimeVue v4" />
+  <img src="https://img.shields.io/badge/style-Tailwind_CSS_v4-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white" alt="Style: Tailwind CSS v4" />
   <img src="https://img.shields.io/badge/canvas-Vue_Flow-ff0072?style=flat-square" alt="Canvas: Vue Flow" />
   <img src="https://img.shields.io/badge/state-Pinia-ffd859?style=flat-square&logo=pinia&logoColor=1f2937" alt="State: Pinia" />
   <br/>
@@ -190,7 +191,7 @@ flowchart TB
 | 组件    | 版本     |
 | ------- | -------- |
 | Node.js | `22.18+` |
-| Go      | `1.26.3+` |
+| Go      | `1.26.4+` |
 | PostgreSQL | `17+` |
 
 ### 1. 启动本地依赖
@@ -395,6 +396,8 @@ Pages 配置：
 
 VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api.example.com` 与 `CLOUDFLARE_TUNNEL_TOKEN`；Cloudflare Tunnel 的 Public Hostname 将 `api.example.com` 转发到 compose 内部 Gateway：`http://gateway:80`。
 
+PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能落有上游 API key、S3 access key/secret 等敏感材料。所有 `postgres-*.sql` 都必须按 secret artifact 处理：建议加密保存，限制下载、传输与共享范围；完成 restore 后按受影响渠道轮换上游 API key 与对象存储凭据。详细规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
+
 ### 传统 Linux 部署
 
 仍保留 `systemd + Nginx` 发布包方式，适合不使用 Docker 的服务器环境。
@@ -415,6 +418,7 @@ VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api
 | [DEVELOPMENT.md](./DEVELOPMENT.md)                                     | 架构、contract、本地开发与目录边界                       |
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)                                 | Feature System Prompt 配置手册与推荐模板                 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md)                                       | Cloudflare + Docker Compose、传统 Linux 部署、升级与回滚 |
+| [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)   | PostgreSQL backup、restore 与密钥材料处理规则            |
 | [docs/river_migration.md](./docs/river_migration.md)                   | River + PostgreSQL 任务队列迁移决策                      |
 | [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)     | Auth 运维边界与应急流程                                  |
 | [docs/architecture-constraints.md](./docs/architecture-constraints.md) | 目录边界与命名约束                                       |
