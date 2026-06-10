@@ -32,10 +32,10 @@
       />
       <div
         v-else
-        class="flex size-[58px] items-center justify-center rounded-2xl bg-[linear-gradient(145deg,#7a6bd5,#8b7bdd)] text-[28px] font-bold text-white"
-      >
-        {{ board.name.slice(0, 1).toUpperCase() }}
-      </div>
+        class="h-full w-full"
+        :class="blankBoardPreviewSurfaceClass"
+        aria-hidden="true"
+      ></div>
       <div
         class="pointer-events-none absolute inset-x-0 bottom-0 h-[92px] bg-[linear-gradient(to_top,rgba(245,248,255,0.88)_0%,rgba(245,248,255,0)_100%)]"
       ></div>
@@ -102,6 +102,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
+import { blankBoardPreviewSurfaceClass } from '../../canvas/lib/boardPreviewStyle'
 import type { CanvasBoardMeta } from '../lib/canvasBoards'
 import {
   boardMenuDangerItemClass,

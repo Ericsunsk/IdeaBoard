@@ -142,6 +142,7 @@ import {
   getCanvasBoardState,
   setCanvasBoardPreviewSnapshot,
 } from '../../canvas/lib/canvasBoardState'
+import { blankBoardPreviewSurfaceClass } from '../../canvas/lib/boardPreviewStyle'
 import { renderBoardPreviewDataUrl } from '../../canvas/lib/boardPreviewSerializer'
 import { BOARD_PREVIEW_RENDERER_VERSION } from '../../canvas/lib/boardPreviewVersion'
 import {
@@ -223,8 +224,7 @@ const loadingStateClass =
   'flex min-h-[244px] items-center justify-center rounded-xl border border-dashed border-[#d9dfec] bg-white/60'
 const createCardClass =
   'relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-[#d9dfec] bg-white/90 p-0 text-left transition-colors hover:border-[#cdd4e6] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(122,107,213,0.16)]'
-const createPreviewClass =
-  'flex h-[186px] items-center justify-center border-b border-[#e7ebf3] bg-[radial-gradient(circle,#dfe4ef_1px,transparent_1px),linear-gradient(#fbfcff,#fbfcff)] [background-size:10px_10px,cover]'
+const createPreviewClass = `flex h-[186px] items-center justify-center border-b border-[#e7ebf3] ${blankBoardPreviewSurfaceClass}`
 const createPreviewIconClass =
   'flex size-[54px] items-center justify-center rounded-[14px] border border-[#cfd7ea] bg-white text-[28px] font-medium text-[#69708a]'
 const createMetaClass = 'px-3 pt-2.5 pb-3'

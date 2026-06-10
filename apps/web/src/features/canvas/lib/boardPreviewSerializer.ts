@@ -11,6 +11,13 @@ import {
 } from '../../workspace/utils/fusionBlend'
 import { resolveImageNodeStageHeight } from '../../workspace/utils/imageNodeSizing'
 import { resolveApiUrl, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
+import {
+  BLANK_BOARD_PREVIEW_BACKGROUND,
+  BLANK_BOARD_PREVIEW_DOT_COLOR,
+  BLANK_BOARD_PREVIEW_DOT_OFFSET,
+  BLANK_BOARD_PREVIEW_DOT_RADIUS,
+  BLANK_BOARD_PREVIEW_DOT_SPACING,
+} from './boardPreviewStyle'
 
 export interface BoardPreviewFrame {
   key: string
@@ -354,6 +361,28 @@ function drawDotBackground(ctx: CanvasRenderingContext2D) {
     for (let y = 14; y < PREVIEW_VIEWPORT_HEIGHT; y += 24) {
       ctx.beginPath()
       ctx.arc(x, y, 1.25, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+}
+
+function drawBlankBoardPreviewBackground(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = BLANK_BOARD_PREVIEW_BACKGROUND
+  ctx.fillRect(0, 0, PREVIEW_VIEWPORT_WIDTH, PREVIEW_VIEWPORT_HEIGHT)
+
+  ctx.fillStyle = BLANK_BOARD_PREVIEW_DOT_COLOR
+  for (
+    let x = BLANK_BOARD_PREVIEW_DOT_OFFSET;
+    x < PREVIEW_VIEWPORT_WIDTH;
+    x += BLANK_BOARD_PREVIEW_DOT_SPACING
+  ) {
+    for (
+      let y = BLANK_BOARD_PREVIEW_DOT_OFFSET;
+      y < PREVIEW_VIEWPORT_HEIGHT;
+      y += BLANK_BOARD_PREVIEW_DOT_SPACING
+    ) {
+      ctx.beginPath()
+      ctx.arc(x, y, BLANK_BOARD_PREVIEW_DOT_RADIUS, 0, Math.PI * 2)
       ctx.fill()
     }
   }
@@ -760,14 +789,17 @@ export async function renderBoardPreviewDataUrl(
   const canvas = createPreviewCanvas()
   if (!canvas) return ''
 
-  const frames = collectBoardPreviewFrames(state)
-  const bounds = resolveBounds(frames)
-  if (!bounds) return ''
-
   const ctx = canvas.getContext('2d')
   if (!ctx) return ''
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
+
+  const frames = collectBoardPreviewFrames(state)
+  const bounds = resolveBounds(frames)
+  if (!bounds) {
+    drawBlankBoardPreviewBackground(ctx)
+    return encodePreviewCanvas(canvas, false)
+  }
 
   const connections = collectBoardPreviewConnections(state, frames)
   const { scale, offsetX, offsetY } = scaleBounds(bounds)
