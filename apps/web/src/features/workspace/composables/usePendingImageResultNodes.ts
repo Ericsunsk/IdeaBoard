@@ -185,6 +185,21 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     )
   }
 
+  function buildPendingImageNodeSnapshot(
+    base: ImageNodeItem,
+    params: { sourceImageRatio: number; width: number },
+  ): ImageNodeItem {
+    return {
+      ...base,
+      sourceImageUrl: '',
+      sourceImageRatio: params.sourceImageRatio,
+      width: params.width,
+      pendingTaskId: undefined,
+      outputStatus: 'running',
+      outputImages: [],
+    }
+  }
+
   async function appendPendingImageResultEdge(anchorNodeId: string, resultNodeId: string) {
     await waitForFlowRenderFrame()
     if (cancelledResultNodeIds.has(resultNodeId)) return
@@ -237,11 +252,10 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
       Number.isFinite(optionsOverride?.targetWidth) && (optionsOverride?.targetWidth as number) > 0
         ? Math.max(1, Math.round(optionsOverride?.targetWidth as number))
         : resolveImageNodeFrameSize(resolvedRatio, true).width
-    imageNode.sourceImageUrl = ''
-    imageNode.sourceImageRatio = resolvedRatio
-    imageNode.width = resolvedWidth
-    imageNode.outputStatus = 'running'
-    imageNode.outputImages = []
+    const pendingImageNode = buildPendingImageNodeSnapshot(imageNode, {
+      sourceImageRatio: resolvedRatio,
+      width: resolvedWidth,
+    })
 
     if (preferredNodeId) {
       options.commitNodeMutation(
@@ -254,15 +268,10 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
               ...item,
               data: {
                 ...item.data,
-                snapshotNode: {
-                  ...(snapshot as ImageNodeItem),
-                  sourceImageUrl: '',
-                  sourceImageRatio: imageNode.sourceImageRatio,
-                  width: imageNode.width,
-                  pendingTaskId: undefined,
-                  outputStatus: 'running',
-                  outputImages: [],
-                },
+                snapshotNode: buildPendingImageNodeSnapshot(snapshot as ImageNodeItem, {
+                  sourceImageRatio: pendingImageNode.sourceImageRatio,
+                  width: pendingImageNode.width,
+                }),
               },
             }
           }),
@@ -271,26 +280,26 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
       cancelledResultNodeIds.delete(preferredNodeId)
       rememberResultNodeLayout(anchorNodeId, preferredNodeId, {
         url: '',
-        ratio: imageNode.sourceImageRatio,
+        ratio: pendingImageNode.sourceImageRatio,
         x: position.x,
         y: position.y,
-        width: imageNode.width,
+        width: pendingImageNode.width,
       })
       options.refreshNodeInternals?.([anchorNodeId, preferredNodeId])
       return preferredNodeId
     }
 
     const nextNode: Node<FlowNodeData> = {
-      id: `image-${imageNode.id}`,
+      id: `image-${pendingImageNode.id}`,
       type: 'canvas',
       dragHandle: resolveFlowNodeDragHandle('image'),
-      position: { x: imageNode.x, y: imageNode.y },
+      position: { x: pendingImageNode.x, y: pendingImageNode.y },
       data: {
         kind: 'image',
         nodeType: 'image',
-        title: `Image #${imageNode.id}`,
+        title: `Image #${pendingImageNode.id}`,
         summary: 'Canvas image node',
-        snapshotNode: imageNode,
+        snapshotNode: pendingImageNode,
       },
     }
 
@@ -298,10 +307,10 @@ export function usePendingImageResultNodes(options: UsePendingImageResultNodesOp
     cancelledResultNodeIds.delete(nextNode.id)
     rememberResultNodeLayout(anchorNodeId, nextNode.id, {
       url: '',
-      ratio: imageNode.sourceImageRatio,
-      x: imageNode.x,
-      y: imageNode.y,
-      width: imageNode.width,
+      ratio: pendingImageNode.sourceImageRatio,
+      x: pendingImageNode.x,
+      y: pendingImageNode.y,
+      width: pendingImageNode.width,
     })
     options.refreshNodeInternals?.([anchorNodeId, nextNode.id])
     void appendPendingImageResultEdge(anchorNodeId, nextNode.id)
