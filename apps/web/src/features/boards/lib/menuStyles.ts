@@ -1,5 +1,5 @@
 export type PrimePopupMenuRef = {
-  toggle: (event: Event) => void
+  toggle: (event: Event, target?: HTMLElement) => void
   hide: () => void
   container?: HTMLElement | null
 }

@@ -78,7 +78,7 @@
         popup
         append-to="body"
         :pt="menuPt"
-        @show="positionMenuToTriggerTopLeft"
+        @show="startMenuFloatingPosition"
         @hide="handleMenuHidden"
       >
         <template #item="{ item, props: itemProps }">
@@ -95,6 +95,7 @@
 </template>
 
 <script setup lang="ts">
+import { autoUpdate, computePosition, flip, offset, shift, type Placement } from '@floating-ui/dom'
 import { MoreHoriz } from '@iconoir/vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -138,6 +139,8 @@ const menuTriggerEl = ref<HTMLElement | null>(null)
 const menuPt = boardMenuPt
 const menuViewportGutter = 8
 const menuTriggerGap = 6
+const menuPreferredPlacement: Placement = 'top-end'
+let stopMenuFloatingPosition: (() => void) | null = null
 
 const menuItems = computed<MenuItem[]>(() => [
   {
@@ -177,35 +180,72 @@ function onRenameInput(event: Event) {
 }
 
 function toggleMenu(event: Event) {
-  menuTriggerEl.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  const triggerEl = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  menuTriggerEl.value = triggerEl
   emit('toggle-menu')
-  menuRef.value?.toggle(event)
+  menuRef.value?.toggle(event, triggerEl ?? undefined)
 }
 
-function positionMenuToTriggerTopLeft() {
+function startMenuFloatingPosition() {
   void nextTick(() => {
     const triggerEl = menuTriggerEl.value
     const menuEl = menuRef.value?.container
     if (!triggerEl || !menuEl) return
 
-    const triggerRect = triggerEl.getBoundingClientRect()
-    const menuRect = menuEl.getBoundingClientRect()
-    const viewportWidth = window.innerWidth
+    stopMenuFloatingPositioning()
+    const updateMenuPosition = () => {
+      void updateMenuFloatingPosition(triggerEl, menuEl)
+    }
 
-    const left = Math.min(
-      Math.max(menuViewportGutter, triggerRect.right - menuRect.width),
-      Math.max(menuViewportGutter, viewportWidth - menuRect.width - menuViewportGutter),
-    )
-    const top = Math.max(menuViewportGutter, triggerRect.top - menuRect.height - menuTriggerGap)
-
-    menuEl.style.insetInlineStart = `${left + window.scrollX}px`
-    menuEl.style.top = `${top + window.scrollY}px`
-    menuEl.style.marginTop = '0'
-    menuEl.style.transformOrigin = 'bottom right'
+    menuEl.style.position = 'fixed'
+    stopMenuFloatingPosition = autoUpdate(triggerEl, menuEl, updateMenuPosition)
+    updateMenuPosition()
   })
 }
 
+async function updateMenuFloatingPosition(triggerEl: HTMLElement, menuEl: HTMLElement) {
+  const { x, y, placement } = await computePosition(triggerEl, menuEl, {
+    placement: menuPreferredPlacement,
+    strategy: 'fixed',
+    middleware: [
+      offset(menuTriggerGap),
+      flip({
+        padding: menuViewportGutter,
+        fallbackPlacements: ['bottom-end', 'top-start', 'bottom-start'],
+      }),
+      shift({ padding: menuViewportGutter }),
+    ],
+  })
+
+  if (menuTriggerEl.value !== triggerEl || menuRef.value?.container !== menuEl) return
+
+  Object.assign(menuEl.style, {
+    position: 'fixed',
+    left: `${Math.round(x)}px`,
+    top: `${Math.round(y)}px`,
+    right: 'auto',
+    bottom: 'auto',
+    insetInlineStart: 'auto',
+    insetInlineEnd: 'auto',
+    marginTop: '0',
+    transformOrigin: resolveMenuTransformOrigin(placement),
+  })
+}
+
+function resolveMenuTransformOrigin(placement: Placement): string {
+  const [side, align] = placement.split('-')
+  const vertical = side === 'top' ? 'bottom' : side === 'bottom' ? 'top' : 'center'
+  const horizontal = align === 'end' ? 'right' : align === 'start' ? 'left' : 'center'
+  return `${vertical} ${horizontal}`
+}
+
+function stopMenuFloatingPositioning() {
+  stopMenuFloatingPosition?.()
+  stopMenuFloatingPosition = null
+}
+
 function handleMenuHidden() {
+  stopMenuFloatingPositioning()
   menuTriggerEl.value = null
   emit('menu-hidden')
 }
@@ -218,4 +258,8 @@ watch(
     }
   },
 )
+
+onBeforeUnmount(() => {
+  stopMenuFloatingPositioning()
+})
 </script>
