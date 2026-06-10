@@ -66,11 +66,49 @@ function readRawStateMap(): Record<string, CanvasBoardState> {
   }
 }
 
-function writeRawStateMap(stateMap: Record<string, CanvasBoardState>) {
-  if (typeof window === 'undefined') return
+function stripPreviewSnapshot(state: CanvasBoardState): CanvasBoardState {
+  return {
+    imageNodes: state.imageNodes,
+    promptNodes: state.promptNodes,
+    viewpointNodes: state.viewpointNodes,
+    fusionNodes: state.fusionNodes,
+    connections: state.connections,
+    viewport: state.viewport,
+    updatedAt: state.updatedAt,
+  }
+}
+
+function stripPreviewSnapshotsFromStateMap(
+  stateMap: Record<string, CanvasBoardState>,
+): Record<string, CanvasBoardState> {
+  return Object.fromEntries(
+    Object.entries(stateMap).map(([boardId, state]) => [boardId, stripPreviewSnapshot(state)]),
+  )
+}
+
+function tryWriteRawStateMap(stateMap: Record<string, CanvasBoardState>): boolean {
+  if (typeof window === 'undefined') return true
   const scopedKey = getScopedStorageKey()
-  if (!scopedKey) return
-  localStorage.setItem(scopedKey, JSON.stringify(stateMap))
+  if (!scopedKey) return true
+  try {
+    localStorage.setItem(scopedKey, JSON.stringify(stateMap))
+    return true
+  } catch (error) {
+    console.warn('[canvas] persist board state failed', error)
+    return false
+  }
+}
+
+function writeRawStateMap(stateMap: Record<string, CanvasBoardState>): boolean {
+  return tryWriteRawStateMap(stateMap)
+}
+
+function writeRawStateMapWithPreviewFallback(
+  stateMap: Record<string, CanvasBoardState>,
+): Record<string, CanvasBoardState> | null {
+  if (tryWriteRawStateMap(stateMap)) return stateMap
+  const compactStateMap = stripPreviewSnapshotsFromStateMap(stateMap)
+  return tryWriteRawStateMap(compactStateMap) ? compactStateMap : null
 }
 
 export function replaceCanvasBoardStateMap(stateMap: Record<string, CanvasBoardState>) {
@@ -145,8 +183,8 @@ export function setCanvasBoardState(
   })
   if (!validState) return null
   stateMap[id] = validState
-  writeRawStateMap(stateMap)
-  return validState
+  const persistedStateMap = writeRawStateMapWithPreviewFallback(stateMap)
+  return persistedStateMap?.[id] ?? stripPreviewSnapshot(validState)
 }
 
 export function setCanvasBoardPreviewSnapshot(

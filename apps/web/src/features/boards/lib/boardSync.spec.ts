@@ -91,7 +91,7 @@ describe('boardSync', () => {
     expect(getCanvasBoardState('board-1')?.viewport.zoomLevel).toBe(220)
   })
 
-  it('drops local-only boards while adding remote boards during hydrate', async () => {
+  it('preserves local-only boards while adding remote boards during hydrate', async () => {
     replaceCanvasBoards([
       { id: 'local-only', name: 'Unsynced Local', createdAt: 100, updatedAt: 2_000 },
     ])
@@ -112,9 +112,56 @@ describe('boardSync', () => {
 
     await hydrateCanvasBoardsFromServer()
 
-    expect(listCanvasBoards().map((board) => board.id)).toEqual(['remote-only'])
-    expect(getCanvasBoardState('local-only')).toBeNull()
+    expect(listCanvasBoards().map((board) => board.id)).toEqual(['local-only', 'remote-only'])
+    expect(getCanvasBoardState('local-only')?.viewport.zoomLevel).toBe(220)
     expect(getCanvasBoardState('remote-only')?.viewport.zoomLevel).toBe(150)
+  })
+
+  it('rolls back only the conflict target while preserving other local newer and local-only boards', async () => {
+    replaceCanvasBoards([
+      { id: 'board-a', name: 'Conflicting Local', createdAt: 100, updatedAt: 4_000 },
+      { id: 'board-b', name: 'Local Newer', createdAt: 100, updatedAt: 5_000 },
+      { id: 'board-c', name: 'Local Only', createdAt: 100, updatedAt: 6_000 },
+    ])
+    replaceCanvasBoardStateMap({
+      'board-a': makeState(4_000, 400),
+      'board-b': makeState(5_000, 500),
+      'board-c': makeState(6_000, 600),
+    })
+    mocks.boardApi.upsert.mockRejectedValueOnce({ status: 409, msg: '画布名称已存在' })
+
+    await expect(syncCanvasBoardToServer('board-a')).rejects.toMatchObject({ status: 409 })
+
+    mocks.boardApi.list.mockResolvedValue({
+      data: {
+        list: [
+          makeRemoteBoard({
+            id: 'board-a',
+            name: 'Remote Winner',
+            createdAt: 100,
+            updatedAt: 1_000,
+            state: makeState(1_000, 100),
+          }),
+          makeRemoteBoard({
+            id: 'board-b',
+            name: 'Remote Older',
+            createdAt: 100,
+            updatedAt: 1_000,
+            state: makeState(1_000, 110),
+          }),
+        ],
+      },
+    })
+
+    await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
+
+    const boardNames = new Map(listCanvasBoards().map((board) => [board.id, board.name]))
+    expect(boardNames.get('board-a')).toBe('Remote Winner')
+    expect(boardNames.get('board-b')).toBe('Local Newer')
+    expect(boardNames.get('board-c')).toBe('Local Only')
+    expect(getCanvasBoardState('board-a')?.viewport.zoomLevel).toBe(100)
+    expect(getCanvasBoardState('board-b')?.viewport.zoomLevel).toBe(500)
+    expect(getCanvasBoardState('board-c')?.viewport.zoomLevel).toBe(600)
   })
 
   it('can replace local newer boards when explicitly requested for conflict recovery', async () => {

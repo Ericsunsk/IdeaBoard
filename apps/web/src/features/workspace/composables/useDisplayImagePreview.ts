@@ -1,4 +1,5 @@
 import type { MaybeRefOrGetter } from 'vue'
+import { resolveFetchUrl } from '../services/flowMediaIO'
 
 interface PreviewOptions {
   maxSide?: number
@@ -65,7 +66,9 @@ function enqueuePreviewTask<T>(taskFactory: () => Promise<T>): Promise<T> {
 }
 
 async function createPreviewObjectUrl(sourceUrl: string, maxSide: number): Promise<string | null> {
-  const response = await fetch(sourceUrl)
+  const fetchUrl = resolveFetchUrl(sourceUrl)
+  if (!fetchUrl) return null
+  const response = await fetch(fetchUrl, { credentials: 'include' })
   if (!response.ok) return null
   const sourceBlob = await response.blob()
   if (!sourceBlob.type.startsWith('image/')) return null

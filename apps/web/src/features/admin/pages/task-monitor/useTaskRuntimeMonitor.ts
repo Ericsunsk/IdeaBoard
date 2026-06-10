@@ -12,6 +12,8 @@ export function useTaskRuntimeMonitor() {
       monitorData: computed(() => mockMonitorData),
       monitorStats: computed(() => mockMonitorStats),
       monitorStreamStatus: computed(() => 'connected'),
+      isError: computed(() => false),
+      error: computed(() => null),
     }
   }
 
@@ -63,10 +65,14 @@ export function useTaskRuntimeMonitor() {
       monitorQuery.data.value?.data?.stats ||
       null,
   )
+  const isError = computed(() => !stream.isConnected.value && monitorQuery.isError.value)
+  const error = computed(() => (isError.value ? (monitorQuery.error.value ?? null) : null))
 
   return {
     monitorData,
     monitorStats,
     monitorStreamStatus: stream.status,
+    isError,
+    error,
   }
 }

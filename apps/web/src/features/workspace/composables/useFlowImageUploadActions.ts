@@ -44,20 +44,42 @@ type UseFlowImageUploadActionsOptions = {
 
 export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOptions) {
   const uploadCache = new Map<string, Promise<FlowImageUploadResult>>()
+  const nodeUploadRequests = new Map<string, number>()
+  let uploadRequestSequence = 0
 
   function buildUploadCacheKey(boardId: string, file: File): string {
     return `${boardId}::${file.name}::${file.size}::${file.lastModified}`
+  }
+
+  function readCurrentBoardId(): string {
+    return `${options.currentBoardId.value ?? ''}`.trim()
+  }
+
+  function isBoardStillCurrent(boardId: string): boolean {
+    return readCurrentBoardId() === boardId
+  }
+
+  function startNodeUploadRequest(nodeId: string): number {
+    const requestId = ++uploadRequestSequence
+    nodeUploadRequests.set(nodeId, requestId)
+    return requestId
+  }
+
+  function isNodeUploadRequestCurrent(nodeId: string, requestId: number): boolean {
+    return nodeUploadRequests.get(nodeId) === requestId
   }
 
   function resolveImageFileTitle(file: File): string {
     return file.name.trim()
   }
 
-  async function uploadImageToBoard(file: File): Promise<FlowImageUploadResult> {
+  async function uploadImageToBoardForBoard(
+    file: File,
+    boardId: string,
+  ): Promise<FlowImageUploadResult> {
     if (!isSupportedUploadImageFile(file)) {
       throw new Error(unsupportedUploadImageMessage())
     }
-    const boardId = `${options.currentBoardId.value ?? ''}`.trim()
     if (!boardId) {
       throw new Error('缺少 boardId，无法上传图片')
     }
@@ -91,14 +113,32 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     return uploadTask
   }
 
+  async function uploadImageToBoard(file: File): Promise<FlowImageUploadResult> {
+    const boardId = readCurrentBoardId()
+    const uploaded = await uploadImageToBoardForBoard(file, boardId)
+    if (!isBoardStillCurrent(boardId)) {
+      throw new Error('上传结果已过期，请重新选择图片')
+    }
+    return uploaded
+  }
+
   async function applyImageFileToImageNode(nodeId: string, file: File): Promise<boolean> {
     const snapshotNode = options.getImageNodeSnapshot(nodeId)
     if (!snapshotNode) {
       options.onWarning('Image 节点不存在')
       return false
     }
+    const boardId = readCurrentBoardId()
+    const requestId = startNodeUploadRequest(nodeId)
     try {
-      const uploaded = await uploadImageToBoard(file)
+      const uploaded = await uploadImageToBoardForBoard(file, boardId)
+      if (
+        !isBoardStillCurrent(boardId) ||
+        !isNodeUploadRequestCurrent(nodeId, requestId) ||
+        !options.getImageNodeSnapshot(nodeId)
+      ) {
+        return false
+      }
       options.updateSnapshotNode(nodeId, (prev) => ({
         ...prev,
         title: resolveImageFileTitle(file) || prev.title,
@@ -115,6 +155,10 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       const msg = error instanceof Error ? error.message : '上传失败'
       options.onWarning(msg)
       return false
+    } finally {
+      if (isNodeUploadRequestCurrent(nodeId, requestId)) {
+        nodeUploadRequests.delete(nodeId)
+      }
     }
   }
 
@@ -145,7 +189,9 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       options.onWarning(unsupportedUploadImageMessage())
       return null
     }
-    const uploaded = await uploadImageToBoard(file)
+    const boardId = readCurrentBoardId()
+    const uploaded = await uploadImageToBoardForBoard(file, boardId)
+    if (!isBoardStillCurrent(boardId)) return null
     return createImageNodeFromPayload(point, uploaded, resolveImageFileTitle(file))
   }
 

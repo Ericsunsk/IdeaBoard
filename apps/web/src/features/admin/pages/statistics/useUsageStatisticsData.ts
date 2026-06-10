@@ -1,3 +1,4 @@
+import { computed, ref } from 'vue'
 import { useGetAdminStatistics } from '../../../../shared/api/generated-query/admin-statistics/admin-statistics'
 import {
   GetAdminStatisticsRange,
@@ -68,12 +69,34 @@ export function useUsageStatisticsData() {
         ? isStatisticsSettled.value
         : qualityStatisticsQuery.isFetched.value || qualityStatisticsQuery.isError.value,
   )
+  const isStatisticsError = computed(() => !isMockMode.value && statisticsQuery.isError.value)
+  const statisticsError = computed(() =>
+    isStatisticsError.value ? (statisticsQuery.error.value ?? null) : null,
+  )
+  const isQualityStatisticsError = computed(() =>
+    isMockMode.value
+      ? false
+      : isQualityRangeShared.value
+        ? isStatisticsError.value
+        : qualityStatisticsQuery.isError.value,
+  )
+  const qualityStatisticsError = computed(() =>
+    isQualityStatisticsError.value
+      ? isQualityRangeShared.value
+        ? statisticsError.value
+        : (qualityStatisticsQuery.error.value ?? null)
+      : null,
+  )
 
   return {
     adminStatistics,
     qualityStatistics,
     isStatisticsSettled,
     isQualityStatisticsSettled,
+    isStatisticsError,
+    statisticsError,
+    isQualityStatisticsError,
+    qualityStatisticsError,
     timeRange,
     qualityTimeRange,
     rangeOptions,

@@ -5,7 +5,7 @@ import { extractImageUrlsFromTaskResult } from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { taskApi } from './task'
 import type { Task } from './task'
-import { resolveApiUrl } from '../config/runtimeUrls'
+import { resolveApiUrl, resolveAssetUrl } from '../config/runtimeUrls'
 
 type TaskEventPayload = Pick<
   Task,
@@ -209,6 +209,7 @@ function extractImageUrlsFromTaskEvent(task: TaskEventPayload): string[] {
         .filter((output) => output?.role === 'image' && typeof output.url === 'string')
         .map((output) => output.url.trim())
         .filter((url) => url.length > 0)
+        .map(resolveAssetUrl)
     : []
   if (outputUrls.length > 0) return outputUrls
   return extractImageUrlsFromTaskResult(task.result)

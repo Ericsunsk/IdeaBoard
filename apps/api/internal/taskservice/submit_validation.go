@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"os"
+	"path"
 	"strings"
 
 	"ideaboard/api/internal/platform/jsonlimit"
@@ -95,14 +98,15 @@ func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}
 }
 
 func validateSubmitTaskMediaRef(raw string) error {
-	return mediarefs.ValidateMediaRef(raw, outbound.AllowHostsFromEnv(), maxSubmitTaskMediaDataURLBytes)
+	return mediarefs.ValidateMediaRef(canonicalizeConfiguredPublicUploadRef(raw), outbound.AllowHostsFromEnv(), maxSubmitTaskMediaDataURLBytes)
 }
 
 func (s *Service) validateSubmitTaskMediaRef(ctx context.Context, userID int64, raw string) error {
-	if err := validateSubmitTaskMediaRef(raw); err != nil {
+	normalized := canonicalizeConfiguredPublicUploadRef(raw)
+	if err := validateSubmitTaskMediaRef(normalized); err != nil {
 		return err
 	}
-	trimmed := strings.TrimSpace(raw)
+	trimmed := strings.TrimSpace(normalized)
 	if !strings.HasPrefix(trimmed, "/uploads/") {
 		return nil
 	}
@@ -126,6 +130,47 @@ func (s *Service) validateSubmitTaskMediaRef(ctx context.Context, userID int64, 
 		return fmt.Errorf("无权使用该工作区上传资源")
 	}
 	return nil
+}
+
+func canonicalizeConfiguredPublicUploadRef(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || strings.HasPrefix(trimmed, "/uploads/") || !strings.Contains(trimmed, "://") {
+		return trimmed
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return trimmed
+	}
+	cleanedPath := path.Clean(parsed.Path)
+	if !strings.HasPrefix(cleanedPath, "/uploads/") {
+		return trimmed
+	}
+	for _, base := range configuredPublicUploadBaseURLs() {
+		if sameURLOrigin(parsed, base) {
+			return cleanedPath
+		}
+	}
+	return trimmed
+}
+
+func configuredPublicUploadBaseURLs() []*url.URL {
+	out := make([]*url.URL, 0, 2)
+	for _, key := range []string{"APP_PUBLIC_ASSET_BASE_URL", "APP_PUBLIC_BASE_URL"} {
+		raw := strings.TrimSpace(os.Getenv(key))
+		if raw == "" {
+			continue
+		}
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			continue
+		}
+		out = append(out, parsed)
+	}
+	return out
+}
+
+func sameURLOrigin(a *url.URL, b *url.URL) bool {
+	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Host, b.Host)
 }
 
 func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {

@@ -111,7 +111,11 @@ export function useFlowBoardHeaderActions(options: UseFlowBoardHeaderActionsOpti
     try {
       await syncCanvasBoardToServer(boardId)
     } catch (error) {
-      await hydrateCanvasBoardsFromServer({ preserveLocalNewer: false })
+      await hydrateCanvasBoardsFromServer(
+        isBoardNameConflictError(error)
+          ? { preserveLocalNewer: false, rollbackBoardIds: [boardId] }
+          : undefined,
+      )
       refreshBoardMetas()
       options.message.error?.(
         isBoardNameConflictError(error) ? '名称已存在，请更换后再试' : '重命名同步失败，请稍后重试',

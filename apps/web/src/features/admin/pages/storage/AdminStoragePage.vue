@@ -153,7 +153,7 @@
               label="删除"
               severity="contrast"
               outlined
-              @click="removeProfile(card.storage.id)"
+              @click="requestRemoveProfile(card.storage)"
             />
           </div>
         </div>
@@ -411,6 +411,7 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
+import { useConfirm } from 'primevue/useconfirm'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
@@ -473,6 +474,7 @@ const {
   removeProfile,
   loadData,
 } = useStorageManager()
+const confirm = useConfirm()
 const { isScrolling: isStoragePanelScrolling, handleScroll: handleStoragePanelScroll } =
   useTransientScrolling()
 const { isScrolling: isStorageDialogScrolling, handleScroll: handleStorageDialogScroll } =
@@ -533,5 +535,24 @@ function createStorageCardView(storage: StorageCard) {
 
 function handleEditorDialogVisibleUpdate(visible: boolean) {
   if (!visible) closeEditor()
+}
+
+function requestRemoveProfile(storage: StorageCard) {
+  confirm.require({
+    header: '确认删除存储',
+    message: `确定删除存储「${storage.name}」吗？此操作不可恢复。`,
+    rejectLabel: '取消',
+    acceptLabel: '确定删除',
+    acceptProps: {
+      severity: 'danger',
+    },
+    rejectProps: {
+      severity: 'secondary',
+      outlined: true,
+    },
+    accept: () => {
+      void removeProfile(storage.id)
+    },
+  })
 }
 </script>

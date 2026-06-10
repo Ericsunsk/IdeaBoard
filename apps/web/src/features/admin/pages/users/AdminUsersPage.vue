@@ -18,11 +18,7 @@
     </template>
 
     <template #toolbar-end>
-      <AdminFilterPopover
-        :active="hasUserFilter"
-        filter-label="筛选用户"
-        @reset="resetUserFilters"
-      >
+      <AdminFilterPopover :active="hasUserFilter" filter-label="筛选用户" @reset="resetUserFilters">
         <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
           <span>角色</span>
           <Select
@@ -90,6 +86,7 @@
                 <InputNumber
                   v-model="rateLimitForm.max_requests"
                   :min="1"
+                  :max="RATE_LIMIT_MAX_REQUESTS"
                   placeholder="100"
                   size="small"
                   fluid
@@ -102,6 +99,7 @@
                 <InputNumber
                   v-model="rateLimitForm.window_seconds"
                   :min="1"
+                  :max="RATE_LIMIT_MAX_WINDOW_SECONDS"
                   placeholder="60"
                   size="small"
                   fluid
@@ -367,6 +365,7 @@ import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useConfirm } from 'primevue/useconfirm'
+import { useUserStore } from '../../../../app/stores/user'
 import type { User } from '../../../../shared/types'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import { formatDateOnly } from '../../../../shared/utils/dateTime'
@@ -437,6 +436,8 @@ type UserActionItem = {
 const userActionPopoverClass = 'flex min-w-[176px] flex-col gap-1'
 
 const userActionPopoverPt = createAdminPopoverPt({ contentClass: '!p-1.5' })
+const RATE_LIMIT_MAX_REQUESTS = 10_000
+const RATE_LIMIT_MAX_WINDOW_SECONDS = 3_600
 
 type PrimePopupPanel = {
   toggle: (event: Event) => void
@@ -452,6 +453,7 @@ type UserStatusFilter = typeof USER_STATUS_FILTER_ALL | ListAdminUsersStatusValu
 const appToast = useAppToast()
 const confirm = useConfirm()
 const isMockMode = useAdminMockMode()
+const userStore = useUserStore()
 
 const queryClient = useQueryClient()
 const userConfigPopoverRef = ref<PrimePopupPanel | null>(null)
@@ -786,6 +788,12 @@ function loadUsers() {
 }
 
 async function handleSaveRateLimit() {
+  const validationError = validateRateLimitSettings()
+  if (validationError) {
+    appToast.error(validationError)
+    return
+  }
+
   if (isMockMode.value) {
     appToast.success('限流配置已保存')
     return
@@ -799,6 +807,24 @@ async function handleSaveRateLimit() {
   } catch (error) {
     appToast.error(formatDisplayErrorMessage(error, '保存失败'))
   }
+}
+
+function validateRateLimitSettings() {
+  const maxRequests = Number(rateLimitForm.value.max_requests)
+  const windowSeconds = Number(rateLimitForm.value.window_seconds)
+  if (!Number.isInteger(maxRequests) || maxRequests < 1) {
+    return '最大请求需为大于 0 的整数'
+  }
+  if (maxRequests > RATE_LIMIT_MAX_REQUESTS) {
+    return `最大请求不能超过 ${RATE_LIMIT_MAX_REQUESTS}`
+  }
+  if (!Number.isInteger(windowSeconds) || windowSeconds < 1) {
+    return '窗口周期需为大于 0 的整数秒'
+  }
+  if (windowSeconds > RATE_LIMIT_MAX_WINDOW_SECONDS) {
+    return `窗口周期不能超过 ${RATE_LIMIT_MAX_WINDOW_SECONDS} 秒`
+  }
+  return ''
 }
 
 async function handleToggleRegistration(newValue: boolean) {
@@ -945,6 +971,7 @@ async function handleImpersonate(row: User) {
   try {
     const { error } = await authClient.admin.impersonateUser({ userId: row.auth_user_id! })
     if (error) throw error
+    userStore.clearAuth()
     appToast.success(`正在以 ${row.username} 的身份登录...`)
     setTimeout(() => (window.location.href = '/'), 1000)
   } catch (error: unknown) {

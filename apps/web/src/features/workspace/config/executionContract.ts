@@ -1,4 +1,5 @@
 import type { SubmitTaskData } from '../../../shared/api/task'
+import { canonicalizeRuntimeUploadRef } from '../../../shared/config/runtimeUrls'
 import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../shared/domain/workflowFeatures'
 
 export const EXECUTION_FEATURE = WORKFLOW_FEATURE
@@ -74,6 +75,21 @@ interface BuildExecutionTaskRequestOptions {
   params?: Record<string, unknown>
 }
 
+const MEDIA_STRING_PARAM_KEYS = new Set(['image_url', 'original_image_url', 'mask_image_url'])
+const MEDIA_LIST_PARAM_KEYS = new Set(['image_urls', 'mask_image_urls', 'reference_image_urls'])
+
+function canonicalizeTaskMediaParam(key: string, value: unknown): unknown {
+  if (MEDIA_STRING_PARAM_KEYS.has(key) && typeof value === 'string') {
+    return canonicalizeRuntimeUploadRef(value)
+  }
+  if (MEDIA_LIST_PARAM_KEYS.has(key) && Array.isArray(value)) {
+    return value.map((item) =>
+      typeof item === 'string' ? canonicalizeRuntimeUploadRef(item) : item,
+    )
+  }
+  return value
+}
+
 export function buildExecutionTaskRequest(
   options: BuildExecutionTaskRequestOptions,
 ): SubmitTaskData {
@@ -85,10 +101,15 @@ export function buildExecutionTaskRequest(
     request.feature = options.feature
   }
   if (options.imageUrls && options.imageUrls.length > 0) {
-    request.image_urls = options.imageUrls
+    request.image_urls = options.imageUrls.map(canonicalizeRuntimeUploadRef)
   }
 
-  const nextParams = { ...(options.params ?? {}) }
+  const nextParams = Object.fromEntries(
+    Object.entries(options.params ?? {}).map(([key, value]) => [
+      key,
+      canonicalizeTaskMediaParam(key, value),
+    ]),
+  )
   delete nextParams.feature
   delete nextParams.image_urls
   if (Object.keys(nextParams).length > 0) {

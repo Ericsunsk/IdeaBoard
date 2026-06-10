@@ -80,6 +80,22 @@ describe('useUserStore auth cache handling', () => {
     expect(queryClient.getQueryData(['user', 'boards'])).toEqual({ owner: 1 })
   })
 
+  it('fails closed for fresh session probes when user info returns a server error', async () => {
+    const store = useUserStore()
+    store.setAuth(makeUser({ id: 1, role: 'admin' }))
+    queryClient.setQueryData(['admin', 'users'], [{ id: 1 }])
+    vi.mocked(authClient.getSession).mockResolvedValue({
+      data: { session: { id: 'session-1' } },
+    } as never)
+    vi.mocked(getUserInfoApi).mockRejectedValue({ status: 500 })
+
+    await expect(store.ensureSession({ fresh: true })).resolves.toBeNull()
+
+    expect(store.user).toBeNull()
+    expect(localStorage.getItem('user')).toBeNull()
+    expect(queryClient.getQueryData(['admin', 'users'])).toBeUndefined()
+  })
+
   it('registers and stores the created session user', async () => {
     const store = useUserStore()
     const registeredUser = makeUser({ id: 2, uid: 'USER02', username: 'alice' })

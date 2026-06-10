@@ -87,6 +87,8 @@ describe('useTaskMonitor polling', () => {
     const data = ref<ApiResponseTaskList>()
     mockState.listAdminTasksReturn = {
       data,
+      error: ref(null),
+      isError: ref(false),
       isLoading: ref(false),
       refetch: vi.fn(),
     }
@@ -115,6 +117,8 @@ describe('useTaskMonitor polling', () => {
     mockState.adminMockMode = ref(true)
     mockState.listAdminTasksReturn = {
       data: ref<ApiResponseTaskList>(),
+      error: ref(null),
+      isError: ref(false),
       isLoading: ref(false),
       refetch: vi.fn(),
     }
@@ -135,6 +139,22 @@ describe('useTaskMonitor polling', () => {
 
     expect(polling.isEnabled()).toBe(true)
   })
+
+  it('exposes task list API errors so the page does not render them as an empty list', () => {
+    const error = new Error('task list failed')
+    mockState.listAdminTasksReturn = {
+      data: ref<ApiResponseTaskList>(),
+      error: ref(error),
+      isError: ref(true),
+      isLoading: ref(false),
+      refetch: vi.fn(),
+    }
+
+    const monitor = useTaskMonitor()
+
+    expect(monitor.isError.value).toBe(true)
+    expect(monitor.error.value).toBe(error)
+  })
 })
 
 describe('useTaskRuntimeMonitor SSE fallback', () => {
@@ -147,6 +167,8 @@ describe('useTaskRuntimeMonitor SSE fallback', () => {
     const streamSnapshot = ref<ApiResponseMonitor | null>(sseResponse)
     mockState.getAdminMonitorReturn = {
       data: monitorData,
+      error: ref(null),
+      isError: ref(false),
       refetch,
     }
     mockState.streamReturn = {
@@ -168,6 +190,27 @@ describe('useTaskRuntimeMonitor SSE fallback', () => {
     expect(refetch).toHaveBeenCalledTimes(1)
     expect(monitor.monitorData.value?.global_queue_len).toBe(4)
     expect(monitor.monitorStats.value?.pending).toBe(2)
+  })
+
+  it('exposes REST monitor errors when the stream cannot provide live data', () => {
+    const error = new Error('monitor failed')
+    const streamStatus = ref('degraded')
+    mockState.getAdminMonitorReturn = {
+      data: ref<ApiResponseMonitor>(),
+      error: ref(error),
+      isError: ref(true),
+      refetch: vi.fn(),
+    }
+    mockState.streamReturn = {
+      isConnected: computed(() => streamStatus.value === 'connected'),
+      snapshot: ref<ApiResponseMonitor | null>(null),
+      status: streamStatus,
+    }
+
+    const monitor = useTaskRuntimeMonitor()
+
+    expect(monitor.isError.value).toBe(true)
+    expect(monitor.error.value).toBe(error)
   })
 })
 

@@ -80,6 +80,8 @@ export function useTaskMonitor() {
     isMockMode.value ? filteredMockTasks.value.length : tasksQuery.data.value?.data?.total || 0,
   )
   const loading = computed(() => !isMockMode.value && tasksQuery.isLoading.value)
+  const isError = computed(() => !isMockMode.value && tasksQuery.isError.value)
+  const error = computed(() => (isError.value ? (tasksQuery.error.value ?? null) : null))
   const taskStats = computed<TaskStatusStats>(() => {
     if (isMockMode.value) return buildTaskStats(filteredMockTasks.value)
     const data = tasksQuery.data.value?.data
@@ -128,6 +130,8 @@ export function useTaskMonitor() {
     tasks,
     total,
     loading,
+    isError,
+    error,
     page,
     taskStats,
     filterStatus,

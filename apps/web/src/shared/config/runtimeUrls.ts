@@ -70,6 +70,26 @@ export function resolveAssetUrl(raw: string): string {
   return raw
 }
 
+export function canonicalizeRuntimeUploadRef(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed || PASSTHROUGH_URL_RE.test(trimmed)) return raw
+  if (trimmed.startsWith('/uploads/')) return trimmed
+  if (!HTTP_URL_RE.test(trimmed)) return raw
+
+  try {
+    const url = new URL(trimmed)
+    if (!url.pathname.startsWith('/uploads/')) return raw
+    const assetBase = PUBLIC_ASSET_BASE_URL ? new URL(PUBLIC_ASSET_BASE_URL) : null
+    const isPublicAssetOrigin = assetBase
+      ? url.origin === assetBase.origin
+      : typeof window !== 'undefined' && url.origin === window.location.origin
+    if (!isPublicAssetOrigin) return raw
+    return `${url.pathname}${url.search}`
+  } catch {
+    return raw
+  }
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]'
 }

@@ -121,7 +121,7 @@ export const useUserStore = defineStore('user', () => {
     return true
   }
 
-  async function fetchUserInfo(force = false) {
+  async function fetchUserInfo(force = false, options: { failClosedOnError?: boolean } = {}) {
     if (userInfoLoaded.value && !force) return user.value
     try {
       const res = await getUserInfoApi()
@@ -129,9 +129,17 @@ export const useUserStore = defineStore('user', () => {
         updateAuth(res.data.user)
         return user.value
       }
+      if (options.failClosedOnError) {
+        resetAuth()
+        return null
+      }
     } catch (e) {
       const code = getErrorStatusCode(e)
       if (code === 401 || code === 403) {
+        resetAuth()
+        return null
+      }
+      if (options.failClosedOnError) {
         resetAuth()
         return null
       }
@@ -159,7 +167,7 @@ export const useUserStore = defineStore('user', () => {
       resetAuth()
       return null
     }
-    return await fetchUserInfo(true)
+    return await fetchUserInfo(true, { failClosedOnError: options.fresh })
   }
 
   async function updatePassword(oldPassword: string, newPassword: string) {

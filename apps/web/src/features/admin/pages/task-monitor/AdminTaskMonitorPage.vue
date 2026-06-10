@@ -1,70 +1,84 @@
 <template>
   <div :class="adminDashboardRootClass">
-    <div :class="adminSummaryGridClass">
-      <AdminSummaryCard label="执行中" :value="liveRunningCount" :footer="runningFoot" />
-      <AdminSummaryCard label="队列等待" :value="liveQueueTotal" :footer="queueFoot" />
-      <AdminSummaryCard label="失败" :value="liveFailedCount" :footer="failedFoot" />
-      <AdminSummaryCard
-        label="账号并发"
-        :value="`${peakAccountLoadPercent}%`"
-        :footer="accountLoadFoot"
-      />
-    </div>
+    <Message v-if="isMonitorError" severity="error" :closable="false">
+      {{ monitorErrorMessage }}
+    </Message>
 
-    <div :class="adminChartGridClass">
-      <AdminChartCard
-        :title="taskCards.executionPressure.title"
-        span-class="xl:col-span-12"
-        chart-size="monitor"
-      >
-        <template #actions>
-          <Tag :value="`${activeExecutionPressurePoints.length} 类`" severity="secondary" rounded />
-        </template>
-        <Chart
-          type="bubble"
-          :class="adminChartCanvasClass"
-          :data="executionPressureChartData"
-          :options="executionPressureChartOptions"
-          :plugins="adminChartPlugins"
+    <template v-else>
+      <div :class="adminSummaryGridClass">
+        <AdminSummaryCard label="执行中" :value="liveRunningCount" :footer="runningFoot" />
+        <AdminSummaryCard label="队列等待" :value="liveQueueTotal" :footer="queueFoot" />
+        <AdminSummaryCard label="失败" :value="liveFailedCount" :footer="failedFoot" />
+        <AdminSummaryCard
+          label="账号并发"
+          :value="`${peakAccountLoadPercent}%`"
+          :footer="accountLoadFoot"
         />
-      </AdminChartCard>
+      </div>
 
-      <AdminChartCard
-        :title="taskCards.taskDistribution.title"
-        span-class="xl:col-span-6"
-        chart-size="monitor"
-      >
-        <template #actions>
-          <Tag :value="`${taskDistributionRows.length} 类`" severity="secondary" rounded />
-        </template>
-        <Chart
-          type="radar"
-          :class="adminChartCanvasClass"
-          :data="taskDistributionChartData"
-          :options="taskDistributionChartOptions"
-          :plugins="adminChartPlugins"
-        />
-      </AdminChartCard>
+      <div :class="adminChartGridClass">
+        <AdminChartCard
+          :title="taskCards.executionPressure.title"
+          span-class="xl:col-span-12"
+          chart-size="monitor"
+        >
+          <template #actions>
+            <Tag
+              :value="`${activeExecutionPressurePoints.length} 类`"
+              severity="secondary"
+              rounded
+            />
+          </template>
+          <Chart
+            type="bubble"
+            :class="adminChartCanvasClass"
+            :data="executionPressureChartData"
+            :options="executionPressureChartOptions"
+            :plugins="adminChartPlugins"
+          />
+        </AdminChartCard>
 
-      <AdminChartCard
-        :title="taskCards.accountConcurrency.title"
-        span-class="xl:col-span-6"
-        chart-size="monitor"
-      >
-        <template #actions>
-          <Tag :value="`${accountLoadRows.length} 账号`" severity="secondary" rounded />
-        </template>
-        <Chart
-          type="bar"
-          :class="adminChartCanvasClass"
-          :data="accountConcurrencyChartData"
-          :options="accountConcurrencyChartOptions"
-          :plugins="adminChartPlugins"
-        />
-      </AdminChartCard>
-    </div>
+        <AdminChartCard
+          :title="taskCards.taskDistribution.title"
+          span-class="xl:col-span-6"
+          chart-size="monitor"
+        >
+          <template #actions>
+            <Tag :value="`${taskDistributionRows.length} 类`" severity="secondary" rounded />
+          </template>
+          <Chart
+            type="radar"
+            :class="adminChartCanvasClass"
+            :data="taskDistributionChartData"
+            :options="taskDistributionChartOptions"
+            :plugins="adminChartPlugins"
+          />
+        </AdminChartCard>
 
-    <AdminTablePanel>
+        <AdminChartCard
+          :title="taskCards.accountConcurrency.title"
+          span-class="xl:col-span-6"
+          chart-size="monitor"
+        >
+          <template #actions>
+            <Tag :value="`${accountLoadRows.length} 账号`" severity="secondary" rounded />
+          </template>
+          <Chart
+            type="bar"
+            :class="adminChartCanvasClass"
+            :data="accountConcurrencyChartData"
+            :options="accountConcurrencyChartOptions"
+            :plugins="adminChartPlugins"
+          />
+        </AdminChartCard>
+      </div>
+    </template>
+
+    <Message v-if="isTaskListError" severity="error" :closable="false">
+      {{ taskListErrorMessage }}
+    </Message>
+
+    <AdminTablePanel v-else>
       <template #toolbar-start>
         <AdminToolbarSearch
           v-model="searchKeyword"
@@ -556,6 +570,7 @@ import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
+import Message from 'primevue/message'
 import PrimeImage from 'primevue/image'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
@@ -575,6 +590,7 @@ import {
 } from '@iconoir/vue'
 import { useAppToast } from '../../../../shared/composables/useAppToast'
 import type { Task } from '../../../../shared/api/task'
+import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
 import {
   ListAdminTasksStatus,
   type ListAdminTasksStatus as ListAdminTasksStatusValue,
@@ -689,6 +705,8 @@ const {
   tasks,
   total,
   loading,
+  isError: isTaskListError,
+  error: taskListError,
   page,
   taskStats,
   filterStatus,
@@ -697,13 +715,25 @@ const {
   loadTasks,
   handleSearch: applyTaskSearch,
 } = useTaskMonitor()
-const { monitorData, monitorStats, monitorStreamStatus } = useTaskRuntimeMonitor()
+const {
+  monitorData,
+  monitorStats,
+  monitorStreamStatus,
+  isError: isMonitorError,
+  error: monitorError,
+} = useTaskRuntimeMonitor()
 
 const selectedTasks = ref<Task[]>([])
 const { isScrolling: isTaskTableScrolling, handleScroll: handleTaskTableScroll } =
   useTransientScrolling()
 const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))
 const totalPages = computed(() => Math.ceil(total.value / TASK_MONITOR_PAGE_SIZE) || 1)
+const taskListErrorMessage = computed(() =>
+  formatDisplayErrorMessage(taskListError.value, '加载任务列表失败'),
+)
+const monitorErrorMessage = computed(() =>
+  formatDisplayErrorMessage(monitorError.value, '加载任务运行监控失败'),
+)
 
 watch(totalPages, (newTotal) => {
   if (page.value > newTotal) {

@@ -23,5 +23,5 @@ export async function saveBoardSnapshotFromFlow(
   if (!touched) {
     throw new Error('TOUCH_BOARD_FAILED')
   }
-  await syncCanvasBoardToServer(normalized)
+  await syncCanvasBoardToServer(normalized, saved)
 }

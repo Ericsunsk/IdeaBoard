@@ -350,6 +350,14 @@ func TestSubmitTaskWorkspaceUploadRefsRequireBoardAccess(t *testing.T) {
 	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, allowed); err != nil {
 		t.Fatalf("expected member to use workspace upload: %v", err)
 	}
+	t.Setenv("APP_PUBLIC_ASSET_BASE_URL", "https://assets.example.com")
+	absoluteAllowed := "https://assets.example.com/uploads/workspace/OWNR1A/board-1/content/demo.png"
+	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, absoluteAllowed); err != nil {
+		t.Fatalf("expected member to use public workspace upload URL: %v", err)
+	}
+	if err := svc.validateSubmitTaskMediaRef(ctx, outsider.ID, absoluteAllowed); err == nil {
+		t.Fatalf("expected outsider to be rejected for public workspace upload URL")
+	}
 	if err := svc.validateSubmitTaskMediaRef(ctx, outsider.ID, allowed); err == nil {
 		t.Fatalf("expected outsider to be rejected")
 	}
