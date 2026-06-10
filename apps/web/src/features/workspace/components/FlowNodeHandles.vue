@@ -13,6 +13,7 @@
     id="in:__auto"
     type="target"
     :position="Position.Left"
+    :connectable="areAggregateHandlesConnectable"
     :class="[
       'flow-canvas-node__handle-aggregate',
       'flow-canvas-node__handle-aggregate--input',
@@ -31,6 +32,7 @@
     :id="aggregateOutputHandleId"
     type="source"
     :position="Position.Right"
+    :connectable="areAggregateHandlesConnectable"
     :class="[
       'flow-canvas-node__handle-aggregate',
       'flow-canvas-node__handle-aggregate--output',
@@ -94,6 +96,7 @@ function getCanvasNodeVisiblePortsForKind(direction: 'input' | 'output'): Canvas
 const handleInputPorts = computed(() => getCanvasNodeVisiblePortsForKind('input'))
 const handleOutputPorts = computed(() => getCanvasNodeVisiblePortsForKind('output'))
 const hasInputPorts = computed(() => handleInputPorts.value.length > 0)
+const areAggregateHandlesConnectable = computed(() => props.showHandles === true)
 const nodeKindLabel = computed(() => {
   const labels: Record<FlowNodeData['kind'], string> = {
     prompt: '提示词节点',
@@ -164,8 +167,9 @@ watch(
   background: transparent;
   color: var(--handle-ring-color);
   opacity: 0;
+  visibility: hidden;
   box-shadow: none;
-  pointer-events: all;
+  pointer-events: none;
   z-index: 24;
   cursor: crosshair;
   touch-action: none;
@@ -206,7 +210,7 @@ watch(
   background: #ffffff;
   box-shadow: none;
   transform: translate(-50%, -50%);
-  pointer-events: auto;
+  pointer-events: none;
   transition:
     left 0.18s ease,
     border-color 0.14s ease;
@@ -229,7 +233,7 @@ watch(
   transform: translate(-50%, -50%) rotate(90deg);
 }
 
-.flow-canvas-node__handle-aggregate:hover,
+.flow-canvas-node__handle-aggregate.is-visible:hover,
 .flow-canvas-node__handle-aggregate.connecting,
 .flow-canvas-node__handle-aggregate:focus-visible {
   --handle-ring-color: #c4ccd8;
@@ -242,6 +246,8 @@ watch(
 .flow-canvas-node__handle-aggregate:focus-visible {
   --handle-plus-x: var(--handle-plus-active-x);
   opacity: 1;
+  visibility: visible;
+  pointer-events: all;
 }
 
 .flow-canvas-node__handle-aggregate:focus-visible .flow-canvas-node__handle-plus {

@@ -61,6 +61,7 @@
         :only-render-visible-elements="FLOW_ENABLE_VISIBLE_ELEMENTS_CULLING"
         :is-valid-connection="isValidConnection"
         @connect="onConnect"
+        @connect-end="onFlowConnectEnd"
         @edge-update="onEdgeUpdate"
         @move-start="closeBoardHeaderEditing"
         @move="onFlowMove"
@@ -128,6 +129,7 @@
             :image-layer-visible="true"
             :mask-editor-brush-size="flowMaskEditorBrushSize"
             :mask-editor-brush-shape="flowMaskEditorBrushShape"
+            :handle-visibility-refresh-token="flowHandleVisibilityRefreshToken"
             :set-mask-canvas-ref="setFlowMaskEditorCanvasRef"
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
@@ -302,6 +304,7 @@ const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const boardBaseSnapshot = ref<CanvasBoardSnapshot>(createEmptyCanvasBoardSnapshot())
+const flowHandleVisibilityRefreshToken = ref(0)
 
 const isLoadingBoardSnapshot = ref(false)
 const isSavingBoard = ref(false)
@@ -460,6 +463,14 @@ const hasSelectedFlowNodes = computed(() => selectionExport.hasSelectedNodes())
 
 function onExportSelectedImages() {
   selectionExport.exportSelectedImages()
+}
+
+function onFlowConnectEnd() {
+  refreshFlowHandleVisibility()
+}
+
+function refreshFlowHandleVisibility() {
+  flowHandleVisibilityRefreshToken.value += 1
 }
 
 const {
@@ -786,7 +797,7 @@ const {
   commitNodeMutation: flowTransactions.commitNodeMutation,
 })
 
-const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
+const { onNodeDragStart, onNodeDragStop: stopNodeDragInteraction } = useFlowNodeDragInteractions({
   beginNodeDragTransaction: flowTransactions.beginNodeDragTransaction,
   commitNodeDragTransaction: flowTransactions.commitNodeDragTransaction,
   duplicateModifierPressed,
@@ -799,6 +810,14 @@ const { onNodeDragStart, onNodeDragStop } = useFlowNodeDragInteractions({
   cancelFlowExpandMode,
   hideStrengthControl,
 })
+
+function onNodeDragStop() {
+  try {
+    stopNodeDragInteraction()
+  } finally {
+    refreshFlowHandleVisibility()
+  }
+}
 
 const canvasDrop = useFlowCanvasDrop({
   screenToFlowCoordinate,

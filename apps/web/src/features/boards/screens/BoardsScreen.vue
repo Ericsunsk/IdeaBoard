@@ -29,7 +29,7 @@
           ref="userMenuRef"
           :model="userMenuItems"
           popup
-          append-to="self"
+          append-to="body"
           :pt="userMenuPt"
           @show="handleUserMenuShow"
           @hide="handleUserMenuHide"
@@ -196,10 +196,9 @@ const headerClass = 'relative z-[1] flex items-center justify-between'
 const brandClass = 'inline-flex items-center gap-2'
 const brandNameClass = 'text-[32px] font-bold tracking-normal'
 const userMenuWrapClass = 'relative'
-const userAvatarButtonClass =
-  'flex size-10 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-[#e2e4e8] bg-white p-0 text-[var(--ib-control-icon)] transition-colors duration-200 hover:border-[#d8ddea] hover:bg-[var(--ib-control-bg-hover)] hover:text-[var(--ib-control-icon-hover)] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(122,107,213,0.16)]'
-const userAvatarClass = 'h-full w-full object-cover'
-const userAvatarPlaceholderClass = 'flex h-full w-full items-center justify-center'
+const userAvatarButtonClass = 'ib-user-avatar-button'
+const userAvatarClass = 'ib-user-avatar-button__image'
+const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
 const avatarIconClass = 'size-5 stroke-2'
 const userMenuItemClass =
   'flex w-full items-center rounded-lg px-2.5 py-2 text-[13px] font-semibold text-[#4b5565] no-underline transition-colors hover:bg-[rgba(146,120,230,0.12)]'

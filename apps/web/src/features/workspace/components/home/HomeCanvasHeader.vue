@@ -107,7 +107,7 @@
       <div class="relative" @pointerdown.stop @mousedown.stop @click.stop>
         <button
           type="button"
-          class="canvas-icon-button !flex !size-10 !shrink-0 !cursor-pointer !items-center !justify-center !overflow-visible !rounded-full !border-[var(--canvas-control-border-width)] !border-[#e2e4e8] !bg-[#f1f3f9] !text-[var(--ib-control-icon)] hover:!border-[#d8ddea] hover:!bg-[var(--ib-control-bg-hover)] hover:!text-[var(--ib-control-icon-hover)]"
+          class="ib-user-avatar-button workspace-user-avatar-button"
           aria-label="账户菜单"
           aria-haspopup="menu"
           :aria-expanded="isUserMenuOpen"
@@ -117,12 +117,12 @@
           <img
             v-if="avatarUrl"
             :src="avatarUrl"
-            class="h-full w-full rounded-[inherit] object-cover"
+            class="ib-user-avatar-button__image"
             alt="用户头像"
           />
           <div
             v-else
-            class="flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit]"
+            class="ib-user-avatar-button__placeholder"
           >
             <User class="size-5 [stroke-width:var(--canvas-control-icon-stroke)]" />
           </div>

@@ -3,9 +3,9 @@
     ref="flowCanvasNodeRef"
     class="flow-canvas-node"
     :class="[`is-${data.kind}`, { 'is-selected': selected }]"
-    @mouseenter="isPointerOverNode = true"
-    @mouseleave="isPointerOverNode = false"
-    @focusin="isFocusWithinNode = true"
+    @mouseenter="onNodeMouseEnter"
+    @mouseleave="onNodeMouseLeave"
+    @focusin="onNodeFocusIn"
     @focusout="onNodeFocusOut"
     @pointerdown.capture="onNodePointerDown"
   >
@@ -164,7 +164,7 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type {
   FusionNodeItem,
   ImageNodeItem,
@@ -207,6 +207,7 @@ const props = withDefaults(
     maskEditorBrushSize?: number
     maskEditorBrushShape?: 'round' | 'square'
     setMaskCanvasRef?: (nodeId: string, element: Element | null) => void
+    handleVisibilityRefreshToken?: number
   }>(),
   {
     selected: false,
@@ -235,6 +236,7 @@ const props = withDefaults(
     maskEditorBrushSize: 18,
     maskEditorBrushShape: 'round',
     setMaskCanvasRef: () => undefined,
+    handleVisibilityRefreshToken: 0,
   },
 )
 
@@ -285,7 +287,7 @@ const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
 )
 const isPointerOverNode = ref(false)
-const isFocusWithinNode = ref(false)
+const isKeyboardFocusWithinNode = ref(false)
 const isTouchHandleHintActive = ref(false)
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
 const handleRailBounds = reactive({
@@ -310,8 +312,7 @@ const showHandleControls = computed(
   () =>
     !disableHandleRailInteraction.value &&
     (isPointerOverNode.value ||
-      props.selected ||
-      isFocusWithinNode.value ||
+      isKeyboardFocusWithinNode.value ||
       isTouchHandleHintActive.value),
 )
 
@@ -502,10 +503,69 @@ onBeforeUnmount(() => {
   handleRailResizeObserver?.disconnect()
 })
 
+watch(
+  () => props.handleVisibilityRefreshToken,
+  () => {
+    refreshTransientHandleVisibility()
+  },
+)
+
+function clearTouchHandleHint() {
+  isTouchHandleHintActive.value = false
+  if (!touchHandleHintTimer) return
+  clearTimeout(touchHandleHintTimer)
+  touchHandleHintTimer = null
+}
+
+function refreshTransientHandleVisibility() {
+  clearTouchHandleHint()
+
+  const activeElement = document.activeElement
+  if (
+    activeElement instanceof HTMLElement &&
+    activeElement.classList.contains('flow-canvas-node__handle-aggregate')
+  ) {
+    activeElement.blur()
+  }
+
+  requestAnimationFrame(() => {
+    const root = flowCanvasNodeRef.value
+    if (!root) return
+    isPointerOverNode.value = root.matches(':hover')
+    syncKeyboardFocusWithinNode()
+  })
+}
+
+function syncKeyboardFocusWithinNode() {
+  const root = flowCanvasNodeRef.value
+  isKeyboardFocusWithinNode.value = !!root?.querySelector(':focus-visible')
+}
+
+function scheduleKeyboardFocusSync() {
+  requestAnimationFrame(() => {
+    syncKeyboardFocusWithinNode()
+  })
+}
+
+function onNodeMouseEnter() {
+  isPointerOverNode.value = true
+}
+
+function onNodeMouseLeave() {
+  isPointerOverNode.value = false
+}
+
+function onNodeFocusIn() {
+  scheduleKeyboardFocusSync()
+}
+
 function onNodeFocusOut(event: FocusEvent) {
   const nextTarget = event.relatedTarget
-  if (nextTarget instanceof Node && flowCanvasNodeRef.value?.contains(nextTarget)) return
-  isFocusWithinNode.value = false
+  if (nextTarget instanceof Node && flowCanvasNodeRef.value?.contains(nextTarget)) {
+    scheduleKeyboardFocusSync()
+    return
+  }
+  isKeyboardFocusWithinNode.value = false
 }
 
 function onNodePointerDown(event: PointerEvent) {

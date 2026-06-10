@@ -3,12 +3,12 @@ export type PrimePopupMenuRef = {
   hide: () => void
 }
 
-function createBoardPopupMenuPt(rootClass: string) {
+function createBoardPopupMenuPt(rootClass: string, itemLinkClass = '!p-0') {
   return {
     root: { class: rootClass },
     list: { class: '!m-0 !flex !flex-col !gap-0.5 !p-1.5' },
     itemContent: { class: '!rounded-lg' },
-    itemLink: { class: '!p-0' },
+    itemLink: { class: itemLinkClass },
   } as const
 }
 
@@ -17,7 +17,8 @@ export const boardMenuPt = createBoardPopupMenuPt(
 )
 
 export const userMenuPt = createBoardPopupMenuPt(
-  '!z-40 !w-32 !rounded-[10px] !border !border-[#d8ddea] !bg-white/98 !p-0 !shadow-none backdrop-blur-[10px]',
+  '!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !rounded-[10px] !border !border-[#d8ddea] !bg-white/98 !p-0 !shadow-none backdrop-blur-[10px]',
+  '',
 )
 
 export const boardMenuItemClass =

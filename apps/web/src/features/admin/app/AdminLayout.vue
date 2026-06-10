@@ -7,51 +7,46 @@
       </router-link>
 
       <nav :class="navRailClass" aria-label="后台功能">
-        <Button
+        <router-link
           v-for="item in adminNavigationItems"
           :key="item.key"
           v-tooltip.right="item.label"
-          type="button"
+          :to="item.path"
           :aria-label="item.label"
           :aria-current="activeKey === item.key ? 'page' : undefined"
-          text
-          rounded
           :class="[
             railButtonClass,
             activeKey === item.key ? railButtonActiveClass : railButtonIdleClass,
           ]"
-          @click="handleMenuUpdate(item.key)"
         >
-          <template #icon>
-            <component :is="item.icon" :class="navIconClass" />
-          </template>
-        </Button>
+          <component :is="item.icon" :class="navIconClass" />
+        </router-link>
       </nav>
 
       <div :class="siderBottomClass">
-        <Button
+        <button
           v-tooltip.right="'个人中心'"
           type="button"
-          text
-          rounded
           :class="userAvatarButtonClass"
+          aria-label="账户菜单"
           aria-haspopup="menu"
           :aria-expanded="userMenuOpen"
           @click="toggleUserMenu"
         >
-          <Avatar
+          <img
             v-if="userStore.user?.avatar"
-            :image="userStore.user.avatar"
-            shape="circle"
-            :class="avatarClass"
+            :src="userStore.user.avatar"
+            :class="userAvatarImageClass"
+            alt="用户头像"
           />
-          <Avatar
+          <span
             v-else
-            icon="pi pi-user"
-            shape="circle"
-            :class="[avatarClass, '!border !border-admin-border']"
-          />
-        </Button>
+            :class="userAvatarPlaceholderClass"
+            aria-hidden="true"
+          >
+            <UserIcon :class="userAvatarIconClass" />
+          </span>
+        </button>
       </div>
     </aside>
 
@@ -205,22 +200,20 @@
           </div>
 
           <nav class="flex flex-col items-stretch gap-2" aria-label="后台功能">
-            <Button
+            <router-link
               v-for="item in adminNavigationItems"
               :key="item.key"
-              type="button"
-              text
-              :label="item.label"
+              :to="item.path"
+              :aria-current="activeKey === item.key ? 'page' : undefined"
               :class="[
                 mobileNavButtonClass,
                 activeKey === item.key ? mobileNavButtonActiveClass : mobileNavButtonIdleClass,
               ]"
-              @click="handleMobileMenuSelect(item.key, closeCallback)"
+              @click="closeCallback"
             >
-              <template #icon>
-                <component :is="item.icon" :class="navIconClass" />
-              </template>
-            </Button>
+              <component :is="item.icon" :class="navIconClass" />
+              <span>{{ item.label }}</span>
+            </router-link>
           </nav>
         </div>
       </template>
@@ -230,7 +223,6 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Drawer from 'primevue/drawer'
@@ -239,8 +231,7 @@ import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import Tooltip from 'primevue/tooltip'
 import type { MenuItem } from 'primevue/menuitem'
-import type { AdminNavigationKey } from './adminNavigation'
-import { Bell as BellIcon, Menu as MenuIcon, Xmark } from '@iconoir/vue'
+import { Bell as BellIcon, Menu as MenuIcon, User as UserIcon, Xmark } from '@iconoir/vue'
 import {
   adminNavigationByKey,
   adminNavigationItems,
@@ -269,7 +260,6 @@ const route = useRoute()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect()
 
-const activeKey = ref<AdminNavigationKey>('statistics')
 const mobileMenuOpen = ref(false)
 const userMenuOpen = ref(false)
 const userMenuRef = ref<PrimePopupMenu | null>(null)
@@ -297,18 +287,17 @@ const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-
 const focusRingClass =
   'focus-visible:!outline-none focus-visible:!shadow-[0_0_0_3px_var(--color-admin-focus-ring)]'
 const railButtonClass = [
-  '!inline-flex !items-center !justify-center !rounded-[10px] !border !border-transparent !text-admin-text-2 !shadow-none !transition-colors !duration-200',
+  '!inline-flex !items-center !justify-center !rounded-[10px] !border !border-transparent !text-admin-text-2 !no-underline !shadow-none !transition-colors !duration-200',
   railButtonSizeClass,
   focusRingClass,
 ].join(' ')
 const railButtonIdleClass = '!bg-transparent hover:!bg-admin-surface-hover hover:!text-admin-text-1'
 const railButtonActiveClass =
   '!bg-admin-accent-pressed !text-admin-text-inverse !shadow-[0_8px_18px_rgba(0,0,0,0.15)]'
-const userAvatarButtonClass = [
-  railButtonClass,
-  railButtonIdleClass,
-  '!overflow-hidden !rounded-full !p-0 hover:!shadow-none focus:!shadow-none active:!shadow-none',
-].join(' ')
+const userAvatarButtonClass = 'ib-user-avatar-button admin-user-avatar-button'
+const userAvatarImageClass = 'ib-user-avatar-button__image'
+const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
+const userAvatarIconClass = 'size-[17px] stroke-2'
 const shellButtonSkinClass = [
   '!size-[42px] !items-center !justify-center !rounded-[9px] !text-admin-text-2 !transition-colors !duration-200',
   'hover:!border-admin-border hover:!bg-admin-surface-hover hover:!text-admin-text-1',
@@ -329,19 +318,18 @@ const notificationButtonClass = [
 ].join(' ')
 const navIconClass = 'size-[17px] stroke-2'
 const shellIconClass = 'size-[19px] stroke-2'
-const avatarClass = `${railButtonSizeClass} !rounded-full !bg-white !text-admin-text-1 !shadow-none [&>img]:!h-full [&>img]:!w-full [&>img]:!rounded-full [&>img]:!object-cover`
 const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-white'
 const headerClass =
   'flex min-h-[88px] items-start justify-between gap-6 bg-white py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
 const contentClass =
   'min-h-0 flex-1 overflow-visible bg-white pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
 const mobileNavButtonClass = [
-  '!min-h-12 !w-full !justify-start !gap-3 !rounded-xl !border !border-transparent !bg-transparent !text-sm !font-bold !text-admin-text-2',
+  'flex min-h-12 w-full items-center justify-start gap-3 rounded-xl border border-transparent px-4 text-sm font-bold no-underline transition-colors duration-200',
   focusRingClass,
 ].join(' ')
 const mobileNavButtonIdleClass =
-  'hover:!border-admin-border hover:!bg-white hover:!text-admin-text-1'
-const mobileNavButtonActiveClass = '!bg-admin-accent-pressed !text-admin-text-inverse'
+  'bg-transparent text-admin-text-2 hover:border-admin-border hover:bg-white hover:text-admin-text-1'
+const mobileNavButtonActiveClass = 'bg-admin-accent-pressed text-admin-text-inverse'
 const userMenuPt = createAdminMenuPt({
   rootClass:
     'min-w-[180px] overflow-hidden rounded-[14px] border border-admin-border bg-white shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
@@ -355,18 +343,19 @@ const mobileDrawerPt = {
 
 watch(
   () => route.path,
-  (path) => {
-    const item = findAdminNavigationItemByPath(path)
-    if (item) {
-      activeKey.value = item.key
-    }
+  () => {
     mobileMenuOpen.value = false
   },
-  { immediate: true },
 )
 
+const activeItem = computed(() => {
+  return findAdminNavigationItemByPath(route.path) || adminNavigationByKey.statistics
+})
+
+const activeKey = computed(() => activeItem.value.key)
+
 const currentMeta = computed(() => {
-  return adminNavigationByKey[activeKey.value] || { title: '管理后台' }
+  return activeItem.value || { title: '管理后台' }
 })
 
 const userMenuItems = computed<MenuItem[]>(() => [
@@ -388,19 +377,6 @@ const userMenuItems = computed<MenuItem[]>(() => [
     },
   },
 ])
-
-function handleMenuUpdate(key: AdminNavigationKey) {
-  const item = adminNavigationByKey[key]
-  if (item) {
-    activeKey.value = item.key
-    void router.push(item.path)
-  }
-}
-
-function handleMobileMenuSelect(key: AdminNavigationKey, closeCallback: () => void) {
-  handleMenuUpdate(key)
-  closeCallback()
-}
 
 function toggleUserMenu(event: Event) {
   userMenuOpen.value = !userMenuOpen.value
