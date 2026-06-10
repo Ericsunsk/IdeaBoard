@@ -24,7 +24,6 @@ declare module 'vue' {
     AdminToolbarSearch: typeof import('./features/admin/shared/components/AdminToolbarSearch.vue')['default']
     AuthFormField: typeof import('./features/auth/components/AuthFormField.vue')['default']
     AuthModalCloseButton: typeof import('./features/auth/components/AuthModalCloseButton.vue')['default']
-    Avatar: typeof import('primevue/avatar')['default']
     BoardCard: typeof import('./features/boards/components/BoardCard.vue')['default']
     Card: typeof import('primevue/card')['default']
     FlowCanvasNode: typeof import('./features/workspace/components/FlowCanvasNode.vue')['default']
