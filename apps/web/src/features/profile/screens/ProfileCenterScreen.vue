@@ -8,11 +8,11 @@
       <aside
         class="flex w-[260px] shrink-0 flex-col border-r border-black/5 px-6 py-10 max-[760px]:w-[220px] max-[640px]:hidden"
       >
-        <div class="mb-12">
+        <div class="mb-12 flex justify-center">
           <Button
             type="button"
             text
-            class="!border-0 !bg-transparent !bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)] !bg-clip-text !p-0 !text-[22px] !leading-none !font-bold !text-transparent !shadow-none hover:!bg-[linear-gradient(135deg,#7f68d5,#9f8fe6)]"
+            class="!border-0 !bg-transparent !p-0 !text-[33px] !leading-none !font-bold !text-[#1d1d1f] !shadow-none hover:!bg-transparent hover:!text-[#1d1d1f]"
             @click="router.push('/user/home')"
           >
             IdeaBoard
@@ -74,7 +74,8 @@
       </aside>
 
       <main
-        class="flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-[52px] py-11 [scrollbar-color:rgba(146,120,230,0.38)_transparent] [scrollbar-width:thin] max-[900px]:px-8 max-[640px]:px-5 max-[640px]:py-6"
+        :class="[mainContentClass, { 'is-scrolling': isProfileMainScrolling }]"
+        @scroll.passive="handleProfileMainScroll"
       >
         <nav
           class="mb-6 hidden grid-cols-2 gap-2 rounded-2xl border border-[#e2e7f3] bg-white/80 p-1.5 max-[640px]:grid"
@@ -104,22 +105,20 @@
         >
           <div class="flex items-center gap-5">
             <div
-              class="relative h-20 w-20 overflow-visible rounded-full border-4 border-white bg-white max-[520px]:h-[72px] max-[520px]:w-[72px]"
+              class="relative h-20 w-20 overflow-visible rounded-full bg-white shadow-[0_10px_26px_rgba(71,82,118,0.1)] max-[520px]:h-[72px] max-[520px]:w-[72px]"
             >
-              <div class="h-full w-full overflow-hidden rounded-full">
-                <img
-                  v-if="userStore.user?.avatar"
-                  :src="userStore.user.avatar"
-                  class="h-full w-full object-cover"
-                  alt="用户头像"
-                />
-                <div
-                  v-else
-                  class="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#9278e6,#c084fc)] text-[32px] font-bold text-white"
-                >
-                  {{ userStore.user?.username?.[0]?.toUpperCase() }}
-                </div>
-              </div>
+              <Avatar
+                v-if="userStore.user?.avatar"
+                :image="userStore.user.avatar"
+                shape="circle"
+                class="!h-full !w-full"
+              />
+              <Avatar
+                v-else
+                :label="userInitial"
+                shape="circle"
+                class="!h-full !w-full !bg-[linear-gradient(135deg,#9278e6,#c084fc)] !text-[32px] !font-bold !text-white"
+              />
               <Button
                 type="button"
                 text
@@ -148,7 +147,7 @@
                 {{ userStore.user?.username }}
               </h1>
               <p class="mt-1 mb-0 text-[15px] text-[#86868b]">
-                {{ userStore.user?.role === 'admin' ? '管理员' : '创作者' }}
+                {{ userRoleLabel }}
               </p>
             </div>
           </div>
@@ -163,51 +162,49 @@
           </div>
         </div>
 
-        <div class="flex-1">
+        <div class="relative flex-1">
           <Transition
             mode="out-in"
-            enter-active-class="transition-[opacity,transform] duration-300 ease-out"
-            enter-from-class="translate-x-5 opacity-0"
-            enter-to-class="translate-x-0 opacity-100"
-            leave-active-class="transition-[opacity,transform] duration-300 ease-in"
-            leave-from-class="translate-x-0 opacity-100"
-            leave-to-class="-translate-x-5 opacity-0"
+            enter-active-class="transition-opacity duration-150 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition-opacity duration-100 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
           >
             <div v-if="activeTab === 'profile'" key="profile">
               <Card :pt="profileCardPt">
                 <template #content>
                   <h2 class="m-0 mb-8 text-xl font-semibold text-[#1d1d1f]">个人基本资料</h2>
-                  <div class="grid grid-cols-2 gap-8 max-[720px]:grid-cols-1">
-                    <div class="min-w-0">
-                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]"
-                        >用户账号</label
-                      >
-                      <div class="truncate text-base font-medium text-[#1d1d1f]">
-                        {{ userStore.user?.username }}
-                      </div>
-                    </div>
-                    <div>
-                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]"
-                        >账号状态</label
-                      >
-                      <div>
+                  <dl class="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">
+                    <div
+                      v-for="field in profileFields"
+                      :key="field.label"
+                      class="min-w-0 rounded-2xl border border-[#edf1f7] bg-[#fbfcff] px-4 py-3.5"
+                      :class="field.full ? 'col-span-2 max-[720px]:col-span-1' : ''"
+                    >
+                      <dt class="mb-2 block text-[13px] font-medium text-[#86868b]">
+                        {{ field.label }}
+                      </dt>
+                      <dd class="m-0 min-w-0">
                         <Tag
-                          :value="userStatusLabel"
-                          :severity="userStatusSeverity"
+                          v-if="field.kind === 'tag'"
+                          :value="field.value"
+                          :severity="field.severity"
                           rounded
                           class="!bg-white"
                         />
-                      </div>
+                        <span
+                          v-else
+                          class="block truncate text-base font-medium text-[#1d1d1f]"
+                          :class="field.mono ? 'font-mono text-[15px]' : ''"
+                          :title="field.value"
+                        >
+                          {{ field.value }}
+                        </span>
+                      </dd>
                     </div>
-                    <div>
-                      <label class="mb-2 block text-[13px] font-medium text-[#86868b]"
-                        >加入时间</label
-                      >
-                      <div class="text-base font-medium text-[#1d1d1f]">
-                        {{ formattedJoinedAt }}
-                      </div>
-                    </div>
-                  </div>
+                  </dl>
                 </template>
               </Card>
             </div>
@@ -340,6 +337,7 @@ import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { uploadApi } from '../../../shared/api/upload'
+import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Message from 'primevue/message'
@@ -356,6 +354,15 @@ type NavItem = {
 
 type PasswordField = 'oldPassword' | 'newPassword' | 'confirmPassword'
 type PasswordForm = Record<PasswordField, string>
+type TagSeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary'
+type ProfileField = {
+  label: string
+  value: string
+  kind?: 'tag'
+  severity?: TagSeverity
+  mono?: boolean
+  full?: boolean
+}
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -367,6 +374,8 @@ const activeTab = ref<NavItem['key']>('profile')
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 const avatarUploading = ref(false)
 const pwdLoading = ref(false)
+const isProfileMainScrolling = ref(false)
+let profileMainScrollTimer: number | undefined
 
 const navItems = [
   {
@@ -394,8 +403,10 @@ const profileCardPt = {
 } as const
 
 const profileGridBgClass =
-  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,rgba(122,107,213,0.08)_0%,rgba(122,107,213,0)_42%),radial-gradient(circle,#e2e4e8_1.5px,transparent_1.5px)] [background-size:100%_100%,24px_24px]'
+  'pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[linear-gradient(135deg,rgba(122,107,213,0.08)_0%,rgba(122,107,213,0)_42%),radial-gradient(circle,#e2e4e8_1px,transparent_1px)] [background-size:100%_100%,12px_12px]'
 
+const mainContentClass =
+  'app-scrollbar flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-[52px] py-11 max-[900px]:px-8 max-[640px]:px-5 max-[640px]:py-6'
 const passwordFieldClass = 'flex min-w-0 flex-col gap-2 text-sm font-medium text-[#1d1d1f]'
 const passwordInputClass =
   '!h-12 !w-full !rounded-xl !border-[#d2d2d7] !bg-white/90 !px-3 !text-[15px] !text-[#1d1d1f] !shadow-none placeholder:!text-[#86868b] enabled:hover:!border-[#9278e6] enabled:focus:!border-[#9278e6]'
@@ -409,8 +420,56 @@ const emptyPasswordForm = (): PasswordForm => ({
 const pwdForm = ref<PasswordForm>(emptyPasswordForm())
 const pwdErrors = ref<Record<PasswordField, string>>(emptyPasswordForm())
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
+const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))
 const userStatusLabel = computed(() => (userStore.user?.status === 1 ? '正常使用中' : '已封禁'))
-const userStatusSeverity = computed(() => (userStore.user?.status === 1 ? 'success' : 'warn'))
+const userStatusSeverity = computed<TagSeverity>(() =>
+  userStore.user?.status === 1 ? 'success' : 'danger',
+)
+const userRoleLabel = computed(() => (userStore.user?.role === 'admin' ? '管理员' : '创作者'))
+const userRoleSeverity = computed<TagSeverity>(() =>
+  userStore.user?.role === 'admin' ? 'info' : 'secondary',
+)
+const userInitial = computed(() => {
+  const username = userStore.user?.username?.trim()
+  return username?.[0]?.toUpperCase() || 'U'
+})
+const profileFields = computed<ProfileField[]>(() => [
+  {
+    label: '用户账号',
+    value: userStore.user?.username || '-',
+  },
+  {
+    label: '账号状态',
+    value: userStatusLabel.value,
+    kind: 'tag',
+    severity: userStatusSeverity.value,
+  },
+  {
+    label: '用户 UID',
+    value: userStore.user?.uid || '-',
+    mono: true,
+  },
+  {
+    label: '角色',
+    value: userRoleLabel.value,
+    kind: 'tag',
+    severity: userRoleSeverity.value,
+  },
+  {
+    label: '认证 ID',
+    value: userStore.user?.auth_user_id?.trim() || '-',
+    mono: true,
+    full: true,
+  },
+  {
+    label: '加入时间',
+    value: formattedJoinedAt.value,
+  },
+  {
+    label: '最近更新',
+    value: formattedUpdatedAt.value,
+  },
+])
 
 function formatDateWithDots(value?: string) {
   const datePart = value?.trim().split(/[T\s]/)[0]
@@ -517,7 +576,23 @@ async function onAvatarFileChange(event: Event) {
   )
 }
 
+function handleProfileMainScroll() {
+  isProfileMainScrolling.value = true
+  if (profileMainScrollTimer) window.clearTimeout(profileMainScrollTimer)
+  profileMainScrollTimer = window.setTimeout(() => {
+    isProfileMainScrolling.value = false
+    profileMainScrollTimer = undefined
+  }, 700)
+}
+
 onMounted(() => {
   void userStore.fetchUserInfo()
+})
+
+onUnmounted(() => {
+  if (profileMainScrollTimer) {
+    window.clearTimeout(profileMainScrollTimer)
+    profileMainScrollTimer = undefined
+  }
 })
 </script>

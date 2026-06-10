@@ -1,6 +1,6 @@
 <template>
   <div
-    class="relative h-full w-full overflow-hidden bg-white bg-[radial-gradient(circle,#e2e4e8_1.5px,transparent_1.5px)] bg-[length:24px_24px] bg-center bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
+    class="relative h-full w-full overflow-hidden bg-white bg-[radial-gradient(circle,#e2e4e8_1px,transparent_1px)] bg-[length:12px_12px] bg-center bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
   >
     <!-- 苹果风 Mesh Gradient 动态背景 -->
     <div

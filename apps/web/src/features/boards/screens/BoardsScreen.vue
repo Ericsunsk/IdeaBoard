@@ -89,7 +89,7 @@
       <section v-else :class="boardsGridClass">
         <Button unstyled type="button" :class="createCardClass" @click="createAndOpenBoard">
           <div :class="createPreviewClass">
-            <div :class="createPreviewIconClass">+</div>
+            <div :class="createPreviewIconClass" aria-hidden="true"></div>
           </div>
           <div :class="createMetaClass">
             <div :class="createTitleClass">Create New Canvas</div>
@@ -245,7 +245,7 @@ const sortOptions = [
 const pageClass =
   'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-[#f8f9fd] px-7 pt-4 pb-16 text-[#1f2430] [box-sizing:border-box] [-webkit-overflow-scrolling:touch] max-[860px]:px-3.5 max-[860px]:pt-3.5 max-[860px]:pb-10'
 const pageBackgroundClass =
-  'pointer-events-none fixed inset-0 bg-[radial-gradient(55%_35%_at_45%_45%,rgba(150,120,230,0.24)_0%,rgba(150,120,230,0)_100%),radial-gradient(circle,#e2e4e8_1.5px,transparent_1.5px)] [background-position:center_center,center_center] [background-size:100%_100%,24px_24px]'
+  'pointer-events-none fixed inset-0 bg-[radial-gradient(55%_35%_at_45%_45%,rgba(150,120,230,0.24)_0%,rgba(150,120,230,0)_100%),radial-gradient(circle,#e2e4e8_1px,transparent_1px)] [background-position:center_center,center_center] [background-size:100%_100%,12px_12px]'
 const headerClass = 'relative z-[1] flex items-center justify-between'
 const brandClass = 'inline-flex items-center gap-2'
 const brandNameClass = 'text-[32px] font-bold tracking-normal'
@@ -276,7 +276,7 @@ const createCardClass =
   'relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-[#d9dfec] bg-white/90 p-0 text-left transition-colors hover:border-[#cdd4e6] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(122,107,213,0.16)]'
 const createPreviewClass = `flex h-[186px] items-center justify-center border-b border-[#e7ebf3] ${blankBoardPreviewSurfaceClass}`
 const createPreviewIconClass =
-  'flex size-[54px] items-center justify-center rounded-[14px] border border-[#cfd7ea] bg-white text-[28px] font-medium text-[#69708a]'
+  "relative flex size-[54px] items-center justify-center rounded-[14px] border border-[#cfd7ea] bg-white before:absolute before:top-1/2 before:left-1/2 before:h-[25px] before:w-[2.5px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-[#cfd7ea] before:content-[''] after:absolute after:top-1/2 after:left-1/2 after:h-[2.5px] after:w-[25px] after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bg-[#cfd7ea] after:content-['']"
 const createMetaClass = 'px-3 pt-2.5 pb-3'
 const createTitleClass = 'text-sm font-bold text-[#394054]'
 const createDateClass = 'mt-[3px] text-xs text-[#7b8297]'

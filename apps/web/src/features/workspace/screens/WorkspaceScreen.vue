@@ -975,8 +975,8 @@ onMounted(async () => {
   filter: none !important;
 }
 .workspace-flow-canvas-wrap :deep(.vue-flow__viewport) {
-  background-image: radial-gradient(circle, #e2e4e8 1.5px, transparent 1.5px);
-  background-size: 24px 24px;
+  background-image: radial-gradient(circle, #e2e4e8 1px, transparent 1px);
+  background-size: 12px 12px;
   background-position: 0 0;
 }
 
