@@ -122,62 +122,35 @@
       </template>
 
       <template #toolbar-end>
-        <Button
-          text
-          :class="[adminToolbarIconButtonClass, hasTaskFilter ? '!border-admin-text-1' : '']"
-          aria-label="筛选任务"
-          :aria-pressed="hasTaskFilter"
-          @click="toggleTaskFilterPanel"
+        <AdminFilterPopover
+          :active="hasTaskFilter"
+          filter-label="筛选任务"
+          @reset="resetTaskFilters"
         >
-          <template #icon>
-            <Filter
-              :class="['size-4', hasTaskFilter ? 'text-admin-text-1' : 'text-admin-text-2']"
-            />
-          </template>
-        </Button>
-        <Popover ref="taskFilterPopoverRef">
-          <div :class="adminFilterPopoverClass">
-            <div :class="adminPopoverSectionHeaderClass">
-              <div :class="adminPopoverTitleClass">筛选</div>
-            </div>
-
-            <label
-              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-            >
-              <span>状态</span>
-              <Select
-                v-model="filterStatus"
-                :options="taskStatusOptions"
-                option-label="label"
-                option-value="value"
-                size="small"
-                fluid
-              />
-            </label>
-
-            <label
-              class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
-            >
-              <span>账号 ID</span>
-              <InputNumber
-                v-model="accountIdFilter"
-                :min="1"
-                :use-grouping="false"
-                placeholder="Account ID"
-                size="small"
-                fluid
-              />
-            </label>
-
-            <Button
-              label="重置筛选"
+          <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+            <span>状态</span>
+            <Select
+              v-model="filterStatus"
+              :options="taskStatusOptions"
+              option-label="label"
+              option-value="value"
               size="small"
-              severity="contrast"
-              :disabled="!hasTaskFilter"
-              @click="resetTaskFilters"
+              fluid
             />
-          </div>
-        </Popover>
+          </label>
+
+          <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+            <span>账号 ID</span>
+            <InputNumber
+              v-model="accountIdFilter"
+              :min="1"
+              :use-grouping="false"
+              placeholder="Account ID"
+              size="small"
+              fluid
+            />
+          </label>
+        </AdminFilterPopover>
 
         <div class="h-5 w-[1px] bg-admin-border-soft"></div>
 
@@ -192,31 +165,14 @@
           </template>
         </Button>
 
-        <div class="flex items-center gap-1.5">
-          <div :class="adminToolbarPageLabelClass">{{ page }} / {{ totalPages }}</div>
-          <Button
-            text
-            :class="adminToolbarPagerButtonClass"
-            :disabled="page === 1 || loading"
-            aria-label="上一页"
-            @click="handlePrevTaskPage"
-          >
-            <template #icon>
-              <NavArrowLeft class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-          <Button
-            text
-            :class="adminToolbarPagerButtonClass"
-            :disabled="page === totalPages || loading"
-            aria-label="下一页"
-            @click="handleNextTaskPage"
-          >
-            <template #icon>
-              <NavArrowRight class="size-4 text-admin-text-2" />
-            </template>
-          </Button>
-        </div>
+        <AdminPagerControls
+          :current-page="page"
+          :total-pages="totalPages"
+          :prev-disabled="page === 1 || loading"
+          :next-disabled="page === totalPages || loading"
+          @prev="handlePrevTaskPage"
+          @next="handleNextTaskPage"
+        />
       </template>
 
       <AdminTableFrame>
@@ -617,7 +573,6 @@ import DataTable from 'primevue/datatable'
 import Dialog from 'primevue/dialog'
 import InputNumber from 'primevue/inputnumber'
 import PrimeImage from 'primevue/image'
-import Popover from 'primevue/popover'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import {
@@ -627,11 +582,8 @@ import {
   CodeBrackets,
   Copy,
   Eye,
-  Filter,
   Fingerprint,
   MediaImage,
-  NavArrowLeft,
-  NavArrowRight,
   Refresh,
   Terminal,
   WarningTriangle,
@@ -645,6 +597,8 @@ import {
 } from '../../../../shared/api/generated-query/model'
 import AdminCardHeader from '../../shared/components/AdminCardHeader.vue'
 import AdminChartPanel from '../../shared/components/AdminChartPanel.vue'
+import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
+import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
@@ -667,14 +621,7 @@ import {
   withAlpha,
 } from '../../shared/lib/adminChart'
 import { adminDenseDataTablePt } from '../../shared/lib/adminDataTablePt'
-import {
-  adminFilterPopoverClass,
-  adminPopoverSectionHeaderClass,
-  adminPopoverTitleClass,
-  adminToolbarIconButtonClass,
-  adminToolbarPageLabelClass,
-  adminToolbarPagerButtonClass,
-} from '../../shared/lib/adminUiClasses'
+import { adminToolbarIconButtonClass } from '../../shared/lib/adminUiClasses'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import {
   formatTaskCreatedAt,
@@ -697,9 +644,6 @@ import { useTaskRuntimeMonitor } from './useTaskRuntimeMonitor'
 
 const appToast = useAppToast()
 const taskCards = adminCards.taskMonitor
-type PrimePopupPanel = {
-  toggle: (event: Event) => void
-}
 const adminMonitorTooltipBase = {
   backgroundColor: adminChartTheme.tooltipBg,
   titleColor: adminChartTheme.tooltipText,
@@ -772,7 +716,6 @@ const {
 } = useTaskMonitor()
 const { monitorData, monitorStats, monitorStreamStatus } = useTaskRuntimeMonitor()
 
-const taskFilterPopoverRef = ref<PrimePopupPanel | null>(null)
 const selectedTasks = ref<Task[]>([])
 const { isScrolling: isTaskTableScrolling, handleScroll: handleTaskTableScroll } =
   useTransientScrolling()
@@ -802,10 +745,6 @@ function handleNextTaskPage() {
 function handleTaskSearch() {
   selectedTasks.value = []
   applyTaskSearch()
-}
-
-function toggleTaskFilterPanel(event: Event) {
-  taskFilterPopoverRef.value?.toggle(event)
 }
 
 function resetTaskFilters() {

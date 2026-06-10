@@ -18,56 +18,35 @@
     </template>
 
     <template #toolbar-end>
-      <Button
-        text
-        :class="[adminToolbarIconButtonClass, hasUserFilter ? '!border-admin-text-1' : '']"
-        aria-label="筛选用户"
-        :aria-pressed="hasUserFilter"
-        @click="toggleUserFilterPanel"
+      <AdminFilterPopover
+        :active="hasUserFilter"
+        filter-label="筛选用户"
+        @reset="resetUserFilters"
       >
-        <template #icon>
-          <Filter :class="['size-4', hasUserFilter ? 'text-admin-text-1' : 'text-admin-text-2']" />
-        </template>
-      </Button>
-      <Popover ref="userFilterPopoverRef">
-        <div :class="adminFilterPopoverClass">
-          <div :class="adminPopoverSectionHeaderClass">
-            <div :class="adminPopoverTitleClass">筛选</div>
-          </div>
-
-          <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-            <span>角色</span>
-            <Select
-              v-model="userRoleFilter"
-              :options="userRoleFilterOptions"
-              option-label="label"
-              option-value="value"
-              size="small"
-              fluid
-            />
-          </label>
-
-          <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
-            <span>状态</span>
-            <Select
-              v-model="userStatusFilter"
-              :options="userStatusFilterOptions"
-              option-label="label"
-              option-value="value"
-              size="small"
-              fluid
-            />
-          </label>
-
-          <Button
-            label="重置筛选"
+        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+          <span>角色</span>
+          <Select
+            v-model="userRoleFilter"
+            :options="userRoleFilterOptions"
+            option-label="label"
+            option-value="value"
             size="small"
-            severity="contrast"
-            :disabled="!hasUserFilter"
-            @click="resetUserFilters"
+            fluid
           />
-        </div>
-      </Popover>
+        </label>
+
+        <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+          <span>状态</span>
+          <Select
+            v-model="userStatusFilter"
+            :options="userStatusFilterOptions"
+            option-label="label"
+            option-value="value"
+            size="small"
+            fluid
+          />
+        </label>
+      </AdminFilterPopover>
 
       <Button
         text
@@ -149,31 +128,14 @@
         </template>
       </Button>
 
-      <div class="flex items-center gap-1.5">
-        <div :class="adminToolbarPageLabelClass">{{ currentPage }} / {{ totalPages }}</div>
-        <Button
-          text
-          :class="adminToolbarPagerButtonClass"
-          :disabled="currentPage === 1 || loading"
-          aria-label="上一页"
-          @click="handlePrevPage"
-        >
-          <template #icon>
-            <NavArrowLeft class="size-4 text-admin-text-2" />
-          </template>
-        </Button>
-        <Button
-          text
-          :class="adminToolbarPagerButtonClass"
-          :disabled="currentPage === totalPages || loading"
-          aria-label="下一页"
-          @click="handleNextPage"
-        >
-          <template #icon>
-            <NavArrowRight class="size-4 text-admin-text-2" />
-          </template>
-        </Button>
-      </div>
+      <AdminPagerControls
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :prev-disabled="currentPage === 1 || loading"
+        :next-disabled="currentPage === totalPages || loading"
+        @prev="handlePrevPage"
+        @next="handleNextPage"
+      />
     </template>
 
     <AdminTableFrame class="h-full">
@@ -441,6 +403,8 @@ import {
   mockRegistrationSetting,
   useAdminMockMode,
 } from '../../shared/lib/adminMockData'
+import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
+import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import AdminTableFrame from '../../shared/components/AdminTableFrame.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
@@ -452,16 +416,13 @@ import {
   adminDialogFooterActionsClass,
   adminDialogHeaderContentClass,
   adminDialogTitleClass,
-  adminFilterPopoverClass,
   adminPopoverSectionHeaderClass,
   adminPopoverTitleClass,
   adminRoundIconButtonClass,
   adminToolbarIconButtonClass,
   adminToolbarMetricClass,
-  adminToolbarPageLabelClass,
-  adminToolbarPagerButtonClass,
 } from '../../shared/lib/adminUiClasses'
-import { Filter, NavArrowLeft, NavArrowRight, Refresh, Search, Settings } from '@iconoir/vue'
+import { Refresh, Search, Settings } from '@iconoir/vue'
 
 type UserActionKey = 'status' | 'revoke' | 'impersonate' | 'role' | 'delete'
 
@@ -497,7 +458,6 @@ const confirm = useConfirm()
 const isMockMode = useAdminMockMode()
 
 const queryClient = useQueryClient()
-const userFilterPopoverRef = ref<PrimePopupPanel | null>(null)
 const userConfigPopoverRef = ref<PrimePopupPanel | null>(null)
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
 const activeActionUser = ref<User | null>(null)
@@ -545,10 +505,6 @@ function isAdminUser(user: Pick<User, 'role'>) {
 
 function isActiveUser(user: Pick<User, 'status'>) {
   return user.status === ListAdminUsersStatus.NUMBER_1
-}
-
-function toggleUserFilterPanel(event: Event) {
-  userFilterPopoverRef.value?.toggle(event)
 }
 
 function toggleUserConfigPanel(event: Event) {

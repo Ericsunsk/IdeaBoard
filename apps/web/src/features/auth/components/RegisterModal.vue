@@ -19,31 +19,30 @@
       </div>
 
       <form class="flex flex-col gap-4" novalidate @submit.prevent="handleRegister">
-        <label :class="authFieldClass">
-          <span>账号</span>
+        <AuthFormField
+          v-slot="{ describedbyId, invalid }"
+          label="账号"
+          :error="errors.username"
+          error-id="register-username-error"
+        >
           <InputText
             v-model="formValue.username"
             autocomplete="username"
             :class="authInputClass"
-            :invalid="Boolean(errors.username)"
+            :invalid="invalid"
             placeholder="设置你的账号"
-            aria-describedby="register-username-error"
+            :aria-describedby="describedbyId"
             @blur="validateField('username')"
             @update:model-value="clearFieldError('username')"
           />
-          <Message
-            v-if="errors.username"
-            id="register-username-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ errors.username }}
-          </Message>
-        </label>
+        </AuthFormField>
 
-        <label :class="authFieldClass">
-          <span>密码</span>
+        <AuthFormField
+          v-slot="{ describedbyId, invalid }"
+          label="密码"
+          :error="errors.password"
+          error-id="register-password-error"
+        >
           <Password
             v-model="formValue.password"
             autocomplete="new-password"
@@ -51,28 +50,23 @@
             fluid
             :input-props="{
               autocomplete: 'new-password',
-              'aria-describedby': 'register-password-error',
+              'aria-describedby': describedbyId,
             }"
-            :invalid="Boolean(errors.password)"
+            :invalid="invalid"
             :input-class="authInputClass"
             placeholder="设置登录密码"
             toggle-mask
             @blur="validateField('password')"
             @update:model-value="handlePasswordInput"
           />
-          <Message
-            v-if="errors.password"
-            id="register-password-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ errors.password }}
-          </Message>
-        </label>
+        </AuthFormField>
 
-        <label :class="authFieldClass">
-          <span>确认密码</span>
+        <AuthFormField
+          v-slot="{ describedbyId, invalid }"
+          label="确认密码"
+          :error="errors.confirmPassword"
+          error-id="register-confirm-password-error"
+        >
           <Password
             v-model="formValue.confirmPassword"
             autocomplete="new-password"
@@ -80,25 +74,16 @@
             fluid
             :input-props="{
               autocomplete: 'new-password',
-              'aria-describedby': 'register-confirm-password-error',
+              'aria-describedby': describedbyId,
             }"
-            :invalid="Boolean(errors.confirmPassword)"
+            :invalid="invalid"
             :input-class="authInputClass"
             placeholder="再次输入密码"
             toggle-mask
             @blur="validateField('confirmPassword')"
             @update:model-value="clearFieldError('confirmPassword')"
           />
-          <Message
-            v-if="errors.confirmPassword"
-            id="register-confirm-password-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ errors.confirmPassword }}
-          </Message>
-        </label>
+        </AuthFormField>
 
         <Button
           :class="authPrimaryButtonClass"
@@ -130,9 +115,9 @@ import { useUserStore } from '../../../app/stores/user'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import AuthFormField from './AuthFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import {
   AUTH_PASSWORD_LIMIT,
@@ -143,7 +128,6 @@ import {
 import {
   authCompactModalShellClass,
   authDialogPt,
-  authFieldClass,
   authFooterClass,
   authInputClass,
   authModalMotion,

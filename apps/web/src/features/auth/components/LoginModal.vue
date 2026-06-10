@@ -19,31 +19,30 @@
       </div>
 
       <form class="flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
-        <label :class="authFieldClass">
-          <span>账号</span>
+        <AuthFormField
+          v-slot="{ describedbyId, invalid }"
+          label="账号"
+          :error="errors.username"
+          error-id="login-username-error"
+        >
           <InputText
             v-model="formValue.username"
             autocomplete="username"
             :class="authInputClass"
-            :invalid="Boolean(errors.username)"
+            :invalid="invalid"
             placeholder="请输入账号"
-            aria-describedby="login-username-error"
+            :aria-describedby="describedbyId"
             @blur="validateField('username')"
             @update:model-value="clearFieldError('username')"
           />
-          <Message
-            v-if="errors.username"
-            id="login-username-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ errors.username }}
-          </Message>
-        </label>
+        </AuthFormField>
 
-        <label :class="authFieldClass">
-          <span>密码</span>
+        <AuthFormField
+          v-slot="{ describedbyId, invalid }"
+          label="密码"
+          :error="errors.password"
+          error-id="login-password-error"
+        >
           <Password
             v-model="formValue.password"
             autocomplete="current-password"
@@ -51,25 +50,16 @@
             fluid
             :input-props="{
               autocomplete: 'current-password',
-              'aria-describedby': 'login-password-error',
+              'aria-describedby': describedbyId,
             }"
-            :invalid="Boolean(errors.password)"
+            :invalid="invalid"
             :input-class="authInputClass"
             placeholder="请输入密码"
             toggle-mask
             @blur="validateField('password')"
             @update:model-value="clearFieldError('password')"
           />
-          <Message
-            v-if="errors.password"
-            id="login-password-error"
-            severity="error"
-            size="small"
-            :closable="false"
-          >
-            {{ errors.password }}
-          </Message>
-        </label>
+        </AuthFormField>
 
         <Button
           :class="authPrimaryButtonClass"
@@ -101,14 +91,13 @@ import { useUserStore } from '../../../app/stores/user'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import Message from 'primevue/message'
 import Password from 'primevue/password'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import AuthFormField from './AuthFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
 import {
   authDialogPt,
-  authFieldClass,
   authFooterClass,
   authInputClass,
   authModalMotion,

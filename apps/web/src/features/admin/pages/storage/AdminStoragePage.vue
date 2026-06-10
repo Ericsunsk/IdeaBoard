@@ -1,5 +1,14 @@
 <template>
-  <AdminManagementFrame :is-scrolling="isStoragePanelScrolling" @scroll="handleStoragePanelScroll">
+  <AdminResourceGridFrame
+    :empty-description="
+      hasStorageSearch ? '调整搜索关键词后重试。' : '点击右上角新增存储开始配置。'
+    "
+    :empty-title="emptyStorageMessage"
+    :is-empty="filteredStorageCards.length === 0"
+    :is-loading="loading && storages.length === 0"
+    :is-scrolling="isStoragePanelScrolling"
+    @scroll="handleStoragePanelScroll"
+  >
     <template #toolbar-start>
       <AdminToolbarSearch v-model="searchKeyword" />
       <span :class="adminToolbarMetricClass">
@@ -39,133 +48,118 @@
       </Button>
     </template>
 
-    <div v-if="loading && storages.length === 0" :class="adminLoadingStateClass">
-      <ProgressSpinner class="!h-9 !w-9 text-admin-accent" stroke-width="4" />
-    </div>
-
-    <div v-else-if="filteredStorageCards.length === 0" :class="adminEmptyStateClass">
-      <div class="text-admin-title font-semibold text-admin-title-color">
-        {{ emptyStorageMessage }}
-      </div>
-      <div class="mt-2 text-admin-meta text-admin-subtitle-color">
-        {{ hasStorageSearch ? '调整搜索关键词后重试。' : '点击右上角新增存储开始配置。' }}
-      </div>
-    </div>
-
-    <div v-else :class="adminMasonryGridClass">
-      <Card
-        v-for="card in filteredStorageCards"
-        :key="card.storage.id"
-        :class="adminMasonryCardClass"
-        :pt="adminCardPt"
-      >
-        <template #title>
-          <div class="flex items-start gap-3">
-            <div class="flex min-w-0 items-center gap-3">
-              <Avatar
-                :image="card.vendorLogo"
-                :label="card.avatarLabel"
-                shape="circle"
-                :class="[
-                  '!h-10 !w-10 !shrink-0 !text-sm !font-bold',
-                  card.vendorLogo
-                    ? '!bg-admin-surface-muted !p-1'
-                    : '!bg-admin-accent !text-admin-text-inverse',
-                ]"
-              />
-              <div class="min-w-0">
-                <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
-                  {{ card.storage.name }}
-                </div>
-                <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
-                  {{ card.subtitle }}
-                </div>
+    <Card
+      v-for="card in filteredStorageCards"
+      :key="card.storage.id"
+      :class="adminMasonryCardClass"
+      :pt="adminCardPt"
+    >
+      <template #title>
+        <div class="flex items-start gap-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <Avatar
+              :image="card.vendorLogo"
+              :label="card.avatarLabel"
+              shape="circle"
+              :class="[
+                '!h-10 !w-10 !shrink-0 !text-sm !font-bold',
+                card.vendorLogo
+                  ? '!bg-admin-surface-muted !p-1'
+                  : '!bg-admin-accent !text-admin-text-inverse',
+              ]"
+            />
+            <div class="min-w-0">
+              <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
+                {{ card.storage.name }}
+              </div>
+              <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
+                {{ card.subtitle }}
               </div>
             </div>
           </div>
-        </template>
+        </div>
+      </template>
 
-        <template #content>
-          <div class="flex h-full min-h-[148px] flex-col gap-3.5">
-            <div class="flex flex-wrap items-center gap-1.5">
-              <Tag
-                :value="card.providerLabel"
-                severity="info"
-                :class="adminCompactTagClass"
-                rounded
-              />
-              <Tag
-                :value="card.statusText"
-                :severity="card.statusSeverity"
-                :class="adminCompactTagClass"
-                rounded
-              />
-            </div>
+      <template #content>
+        <div class="flex h-full min-h-[148px] flex-col gap-3.5">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <Tag
+              :value="card.providerLabel"
+              severity="info"
+              :class="adminCompactTagClass"
+              rounded
+            />
+            <Tag
+              :value="card.statusText"
+              :severity="card.statusSeverity"
+              :class="adminCompactTagClass"
+              rounded
+            />
+          </div>
 
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div
-                v-for="item in card.metaItems"
-                :key="`${card.storage.id}-${item.label}`"
-                class="flex min-w-0 flex-col gap-1"
-              >
-                <span class="text-admin-caption text-admin-text-3">{{ item.label }}</span>
-                <span class="break-all text-admin-body leading-admin-body text-admin-text-1">
-                  {{ item.value }}
-                </span>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-1.5">
-              <Tag
-                v-for="chip in card.featureChips"
-                :key="`${card.storage.id}-${chip}`"
-                :value="chip"
-                severity="secondary"
-                :class="adminCompactTagClass"
-                rounded
-              />
-            </div>
-
-            <div class="mt-auto flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
-              <Button
-                size="small"
-                label="编辑"
-                severity="contrast"
-                @click="openEdit(card.storage.id)"
-              />
-              <Button
-                v-if="supportsTest(card.storage)"
-                size="small"
-                label="测试连接"
-                severity="contrast"
-                outlined
-                :loading="testingId === card.storage.id"
-                :disabled="!canTest(card.storage)"
-                @click="handleTest(card.storage)"
-              />
-              <Button
-                v-if="!card.storage.isCurrent"
-                size="small"
-                label="设为当前"
-                severity="contrast"
-                :loading="applyingId === card.storage.id"
-                :disabled="!canApply(card.storage)"
-                @click="applyStorage(card.storage.id)"
-              />
-              <Button
-                v-if="!card.storage.isCurrent && !card.storage.builtin"
-                size="small"
-                label="删除"
-                severity="contrast"
-                outlined
-                @click="removeProfile(card.storage.id)"
-              />
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div
+              v-for="item in card.metaItems"
+              :key="`${card.storage.id}-${item.label}`"
+              class="flex min-w-0 flex-col gap-1"
+            >
+              <span class="text-admin-caption text-admin-text-3">{{ item.label }}</span>
+              <span class="break-all text-admin-body leading-admin-body text-admin-text-1">
+                {{ item.value }}
+              </span>
             </div>
           </div>
-        </template>
-      </Card>
-    </div>
-  </AdminManagementFrame>
+
+          <div class="flex flex-wrap gap-1.5">
+            <Tag
+              v-for="chip in card.featureChips"
+              :key="`${card.storage.id}-${chip}`"
+              :value="chip"
+              severity="secondary"
+              :class="adminCompactTagClass"
+              rounded
+            />
+          </div>
+
+          <div class="mt-auto flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
+            <Button
+              size="small"
+              label="编辑"
+              severity="contrast"
+              @click="openEdit(card.storage.id)"
+            />
+            <Button
+              v-if="supportsTest(card.storage)"
+              size="small"
+              label="测试连接"
+              severity="contrast"
+              outlined
+              :loading="testingId === card.storage.id"
+              :disabled="!canTest(card.storage)"
+              @click="handleTest(card.storage)"
+            />
+            <Button
+              v-if="!card.storage.isCurrent"
+              size="small"
+              label="设为当前"
+              severity="contrast"
+              :loading="applyingId === card.storage.id"
+              :disabled="!canApply(card.storage)"
+              @click="applyStorage(card.storage.id)"
+            />
+            <Button
+              v-if="!card.storage.isCurrent && !card.storage.builtin"
+              size="small"
+              label="删除"
+              severity="contrast"
+              outlined
+              @click="removeProfile(card.storage.id)"
+            />
+          </div>
+        </div>
+      </template>
+    </Card>
+  </AdminResourceGridFrame>
 
   <Dialog
     :visible="editorOpen"
@@ -409,7 +403,6 @@ import Card from 'primevue/card'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
-import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -418,7 +411,7 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
-import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
+import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useTransientScrolling } from '../../shared/composables/useTransientScrolling'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
@@ -429,10 +422,7 @@ import {
   adminDialogHeaderSplitClass,
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
-  adminEmptyStateClass,
-  adminLoadingStateClass,
   adminMasonryCardClass,
-  adminMasonryGridClass,
   adminToolbarIconButtonClass,
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
