@@ -1,6 +1,7 @@
 export type PrimePopupMenuRef = {
   toggle: (event: Event) => void
   hide: () => void
+  container?: HTMLElement | null
 }
 
 function createBoardPopupMenuPt(rootClass: string, itemLinkClass = '!p-0') {
@@ -12,16 +13,12 @@ function createBoardPopupMenuPt(rootClass: string, itemLinkClass = '!p-0') {
   } as const
 }
 
-export const boardMenuPt = createBoardPopupMenuPt(
-  '!z-30 !min-w-[118px] !rounded-[10px] !border !border-[#d8ddea] !bg-white !p-0 !shadow-none',
-)
+const boardsDropdownRootClass =
+  '!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !rounded-[10px] !border !border-[#d8ddea] !bg-white/98 !p-0 !shadow-none backdrop-blur-[10px]'
 
-export const userMenuPt = createBoardPopupMenuPt(
-  '!z-40 !w-32 !min-w-[8rem] !max-w-[8rem] !rounded-[10px] !border !border-[#d8ddea] !bg-white/98 !p-0 !shadow-none backdrop-blur-[10px]',
-  '',
-)
+export const userMenuPt = createBoardPopupMenuPt(boardsDropdownRootClass, '')
+export const boardMenuPt = userMenuPt
 
-export const boardMenuItemClass =
-  'flex h-8 w-full items-center rounded-lg px-2.5 text-[13px] font-semibold no-underline transition-colors hover:bg-[#eff3fb]'
-export const boardMenuDangerItemClass = 'text-[#c23b42] hover:bg-[#fdeced]'
-export const boardMenuDefaultItemClass = 'text-[#3f475d]'
+export const popupMenuItemClass =
+  'flex w-full items-center rounded-lg px-2.5 py-2 text-[13px] font-semibold text-[#4b5565] no-underline transition-colors hover:bg-[rgba(146,120,230,0.12)]'
+export const popupMenuDangerItemClass = '!text-[#d14343] hover:!bg-[rgba(209,67,67,0.1)]'

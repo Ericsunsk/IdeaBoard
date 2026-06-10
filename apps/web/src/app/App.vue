@@ -6,7 +6,7 @@
     class="ideaboard-toaster"
     position="top-center"
     :visible-toasts="4"
-    :close-button="true"
+    :close-button="false"
     :rich-colors="false"
     :expand="true"
     :duration="2600"
@@ -29,7 +29,6 @@ const iconoirProps = {
 
 const toastOptions = {
   class: 'ideaboard-toast',
-  closeButtonPosition: 'top-right' as const,
 }
 
 let appScrollTimer: number | undefined

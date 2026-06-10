@@ -1,5 +1,8 @@
 <template>
-  <div :class="pageClass">
+  <div
+    :class="[pageClass, { 'is-scrolling': isBoardsPageScrolling }]"
+    @scroll.passive="handleBoardsPageScroll"
+  >
     <div :class="pageBackgroundClass"></div>
 
     <header :class="headerClass">
@@ -37,7 +40,7 @@
           <template #item="{ item, props }">
             <a
               v-bind="props.action"
-              :class="[userMenuItemClass, item.key === 'logout' ? userMenuDangerItemClass : '']"
+              :class="[popupMenuItemClass, item.key === 'logout' ? popupMenuDangerItemClass : '']"
             >
               <span>{{ item.label }}</span>
             </a>
@@ -122,6 +125,45 @@
         No matching canvas
       </p>
     </main>
+
+    <Dialog
+      v-model:visible="deleteDialogVisible"
+      modal
+      :dismissable-mask="!isDeleteBoardPending"
+      :closable="!isDeleteBoardPending"
+      :draggable="false"
+      :show-header="false"
+      :style="{ width: '360px', maxWidth: 'calc(100vw - 28px)' }"
+      :pt="deleteDialogPt"
+      aria-labelledby="board-delete-dialog-title"
+      @hide="handleDeleteDialogHide"
+    >
+      <div :class="deleteDialogShellClass">
+        <h2 id="board-delete-dialog-title" :class="deleteDialogTitleClass">删除画布</h2>
+        <p :class="deleteDialogDescriptionClass">
+          确认删除「{{ pendingDeleteBoard?.name || 'Untitled' }}」？此操作不可撤销。
+        </p>
+
+        <div :class="deleteDialogFooterClass">
+          <Button
+            unstyled
+            type="button"
+            label="取消"
+            :disabled="isDeleteBoardPending"
+            :class="deleteCancelButtonClass"
+            @click="closeDeleteDialog"
+          />
+          <Button
+            unstyled
+            type="button"
+            :label="isDeleteBoardPending ? '删除中...' : '删除'"
+            :disabled="isDeleteBoardPending"
+            :class="deleteConfirmButtonClass"
+            @click="confirmDeleteBoard"
+          />
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -156,12 +198,18 @@ import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect
 import { useUserStore } from '../../../app/stores/user'
 import { Search, User } from '@iconoir/vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import type { MenuItem } from 'primevue/menuitem'
-import { userMenuPt, type PrimePopupMenuRef } from '../lib/menuStyles'
+import {
+  popupMenuDangerItemClass,
+  popupMenuItemClass,
+  userMenuPt,
+  type PrimePopupMenuRef,
+} from '../lib/menuStyles'
 
 const router = useRouter()
 const appToast = useAppToast()
@@ -178,11 +226,16 @@ const suppressNextBoardOpen = ref(false)
 const activeMenuBoardId = ref<string | null>(null)
 const isUserMenuOpen = ref(false)
 const userMenuRef = ref<PrimePopupMenuRef | null>(null)
+const deleteDialogVisible = ref(false)
+const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
+const isDeleteBoardPending = ref(false)
+const isBoardsPageScrolling = ref(false)
 
 const boardPreviewMap = ref<Record<string, string>>({})
 const previewRefreshQueue: string[] = []
 const queuedPreviewBoardIds = new Set<string>()
 let previewRefreshInFlight = false
+let boardsPageScrollTimer: number | undefined
 
 const sortOptions = [
   { label: 'Recent', value: 'recent' },
@@ -190,7 +243,7 @@ const sortOptions = [
 ]
 
 const pageClass =
-  'relative h-full w-full overflow-y-auto overflow-x-hidden bg-[#f8f9fd] px-7 pt-4 pb-16 text-[#1f2430] [box-sizing:border-box] [-webkit-overflow-scrolling:touch] [scrollbar-color:#c8d0e4_transparent] [scrollbar-width:thin] max-[860px]:px-3.5 max-[860px]:pt-3.5 max-[860px]:pb-10'
+  'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-[#f8f9fd] px-7 pt-4 pb-16 text-[#1f2430] [box-sizing:border-box] [-webkit-overflow-scrolling:touch] max-[860px]:px-3.5 max-[860px]:pt-3.5 max-[860px]:pb-10'
 const pageBackgroundClass =
   'pointer-events-none fixed inset-0 bg-[radial-gradient(55%_35%_at_45%_45%,rgba(150,120,230,0.24)_0%,rgba(150,120,230,0)_100%),radial-gradient(circle,#e2e4e8_1.5px,transparent_1.5px)] [background-position:center_center,center_center] [background-size:100%_100%,24px_24px]'
 const headerClass = 'relative z-[1] flex items-center justify-between'
@@ -201,9 +254,6 @@ const userAvatarButtonClass = 'ib-user-avatar-button'
 const userAvatarClass = 'ib-user-avatar-button__image'
 const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
 const avatarIconClass = 'size-5 stroke-2'
-const userMenuItemClass =
-  'flex w-full items-center rounded-lg px-2.5 py-2 text-[13px] font-semibold text-[#4b5565] no-underline transition-colors hover:bg-[rgba(146,120,230,0.12)]'
-const userMenuDangerItemClass = '!text-[#d14343] hover:!bg-[rgba(209,67,67,0.1)]'
 const mainClass = 'relative z-[1] mx-auto mt-[46px] max-w-[1080px]'
 const pageTitleClass =
   'm-0 text-center text-[62px] leading-[1.05] font-bold tracking-normal max-[860px]:text-[40px]'
@@ -218,7 +268,7 @@ const searchWrapClass =
 const searchIconClass = 'size-3.5 shrink-0 text-[#8a90a3] stroke-2'
 const searchInputClass = 'min-w-0 flex-1 bg-transparent text-[13px] text-[#2f3446] outline-none'
 const sortSelectClass =
-  '!h-[42px] !min-w-[120px] !rounded-full !border-[#d9dfec] !bg-white/90 !text-[13px] !font-semibold !text-[#3e4457] !shadow-none max-[860px]:!w-full'
+  '!inline-flex !h-[42px] !w-[108px] !min-w-[108px] !items-center !justify-center !gap-2 !rounded-full !border-[#d9dfec] !bg-white/90 !text-[13px] !font-semibold !text-[#3e4457] !shadow-none max-[860px]:!w-full'
 const boardsGridClass = 'grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3.5'
 const loadingStateClass =
   'flex min-h-[244px] items-center justify-center rounded-xl border border-dashed border-[#d9dfec] bg-white/60'
@@ -232,8 +282,8 @@ const createTitleClass = 'text-sm font-bold text-[#394054]'
 const createDateClass = 'mt-[3px] text-xs text-[#7b8297]'
 const emptyTipClass = 'mt-[18px] text-[13px] text-[#7b8297]'
 const sortSelectPt = {
-  label: { class: '!py-0 !pl-3.5 !pr-1 !leading-[40px]' },
-  dropdown: { class: '!w-9' },
+  label: { class: '!w-auto !flex-none !py-0 !pr-0 !pl-0 !leading-[40px]' },
+  dropdown: { class: '!w-auto !flex-none' },
   overlay: {
     class:
       '!rounded-xl !border !border-[#d8ddea] !bg-white !shadow-[0_18px_42px_rgba(45,64,89,0.14)]',
@@ -241,6 +291,23 @@ const sortSelectPt = {
   list: { class: '!p-1.5' },
   option: { class: '!rounded-lg !px-3 !py-2 !text-[13px] !font-semibold' },
 } as const
+const deleteDialogPt = {
+  mask: { class: '!bg-[rgba(31,36,48,0.34)]' },
+  root: {
+    class:
+      '!overflow-hidden !rounded-[20px] !border !border-[#d8ddea] !bg-white !shadow-[0_22px_58px_rgba(30,39,60,0.18)]',
+  },
+  content: { class: '!bg-transparent !p-0' },
+} as const
+const deleteDialogShellClass = 'p-5'
+const deleteDialogTitleClass =
+  'm-0 text-[18px] leading-[1.2] font-bold tracking-normal text-[#2f3446]'
+const deleteDialogDescriptionClass = 'mt-3 mb-0 text-[13px] leading-6 text-[#6e7487]'
+const deleteDialogFooterClass = 'mt-6 flex justify-end gap-2'
+const deleteCancelButtonClass =
+  'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-3.5 text-sm font-bold text-[#6e7487] transition-colors hover:bg-[#f1f4fb] disabled:cursor-not-allowed disabled:opacity-60'
+const deleteConfirmButtonClass =
+  'inline-flex h-9 min-w-[72px] cursor-pointer items-center justify-center rounded-full border-0 bg-[#d14343] px-3.5 text-sm font-bold text-white transition-colors hover:bg-[#bd333a] disabled:cursor-not-allowed disabled:opacity-70'
 
 const userMenuItems = computed<MenuItem[]>(() => [
   {
@@ -286,15 +353,24 @@ function reloadBoards() {
 
 function formatDate(ts: number): string {
   if (!Number.isFinite(ts)) return '-'
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(ts))
+  const date = new Date(ts)
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}.${month}.${day}`
 }
 
 function onSearchInput(value: string | undefined) {
   searchKeyword.value = (value || '').trim()
+}
+
+function handleBoardsPageScroll() {
+  isBoardsPageScrolling.value = true
+  if (boardsPageScrollTimer) window.clearTimeout(boardsPageScrollTimer)
+  boardsPageScrollTimer = window.setTimeout(() => {
+    isBoardsPageScrolling.value = false
+    boardsPageScrollTimer = undefined
+  }, 700)
 }
 
 function refreshBoardPreviews() {
@@ -538,9 +614,27 @@ async function handleDuplicateAction(board: CanvasBoardMeta) {
   appToast.success('已复制画布')
 }
 
-async function handleDeleteAction(board: CanvasBoardMeta) {
+function handleDeleteAction(board: CanvasBoardMeta) {
   activeMenuBoardId.value = null
-  if (!window.confirm(`确认删除画布「${board.name}」？`)) return
+  pendingDeleteBoard.value = board
+  deleteDialogVisible.value = true
+}
+
+function closeDeleteDialog() {
+  if (isDeleteBoardPending.value) return
+  deleteDialogVisible.value = false
+}
+
+function handleDeleteDialogHide() {
+  if (!isDeleteBoardPending.value) {
+    pendingDeleteBoard.value = null
+  }
+}
+
+async function confirmDeleteBoard() {
+  const board = pendingDeleteBoard.value
+  if (!board || isDeleteBoardPending.value) return
+  isDeleteBoardPending.value = true
   try {
     await syncDeleteCanvasBoardToServer(board.id)
   } catch (error) {
@@ -549,12 +643,14 @@ async function handleDeleteAction(board: CanvasBoardMeta) {
     } else {
       appToast.error('删除失败，请稍后重试')
       console.warn('[boards] failed to sync deleted board', error)
+      isDeleteBoardPending.value = false
       return
     }
   }
   const ok = deleteCanvasBoard(board.id)
   if (!ok) {
     appToast.error('删除失败')
+    isDeleteBoardPending.value = false
     return
   }
   deleteCanvasBoardState(board.id)
@@ -562,6 +658,9 @@ async function handleDeleteAction(board: CanvasBoardMeta) {
     cancelRename()
   }
   reloadBoards()
+  deleteDialogVisible.value = false
+  pendingDeleteBoard.value = null
+  isDeleteBoardPending.value = false
   appToast.success('已删除画布')
 }
 
@@ -603,6 +702,13 @@ onMounted(async () => {
     reloadBoards()
   } finally {
     isBoardsLoading.value = false
+  }
+})
+
+onBeforeUnmount(() => {
+  if (boardsPageScrollTimer) {
+    window.clearTimeout(boardsPageScrollTimer)
+    boardsPageScrollTimer = undefined
   }
 })
 </script>

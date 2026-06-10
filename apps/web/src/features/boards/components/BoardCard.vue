@@ -78,15 +78,13 @@
         popup
         append-to="body"
         :pt="menuPt"
-        @hide="emit('menu-hidden')"
+        @show="positionMenuToTriggerTopLeft"
+        @hide="handleMenuHidden"
       >
         <template #item="{ item, props: itemProps }">
           <a
             v-bind="itemProps.action"
-            :class="[
-              boardMenuItemClass,
-              item.key === 'delete' ? boardMenuDangerItemClass : boardMenuDefaultItemClass,
-            ]"
+            :class="[popupMenuItemClass, item.key === 'delete' ? popupMenuDangerItemClass : '']"
           >
             {{ item.label }}
           </a>
@@ -105,10 +103,9 @@ import type { MenuItem } from 'primevue/menuitem'
 import { blankBoardPreviewSurfaceClass } from '../../canvas/lib/boardPreviewStyle'
 import type { CanvasBoardMeta } from '../lib/canvasBoards'
 import {
-  boardMenuDangerItemClass,
-  boardMenuDefaultItemClass,
-  boardMenuItemClass,
   boardMenuPt,
+  popupMenuDangerItemClass,
+  popupMenuItemClass,
   type PrimePopupMenuRef,
 } from '../lib/menuStyles'
 
@@ -137,7 +134,10 @@ const emit = defineEmits<{
 
 const renameInputEl = ref<RenameInputRef>(null)
 const menuRef = ref<PrimePopupMenuRef | null>(null)
+const menuTriggerEl = ref<HTMLElement | null>(null)
 const menuPt = boardMenuPt
+const menuViewportGutter = 8
+const menuTriggerGap = 6
 
 const menuItems = computed<MenuItem[]>(() => [
   {
@@ -177,8 +177,37 @@ function onRenameInput(event: Event) {
 }
 
 function toggleMenu(event: Event) {
+  menuTriggerEl.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
   emit('toggle-menu')
   menuRef.value?.toggle(event)
+}
+
+function positionMenuToTriggerTopLeft() {
+  void nextTick(() => {
+    const triggerEl = menuTriggerEl.value
+    const menuEl = menuRef.value?.container
+    if (!triggerEl || !menuEl) return
+
+    const triggerRect = triggerEl.getBoundingClientRect()
+    const menuRect = menuEl.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+
+    const left = Math.min(
+      Math.max(menuViewportGutter, triggerRect.right - menuRect.width),
+      Math.max(menuViewportGutter, viewportWidth - menuRect.width - menuViewportGutter),
+    )
+    const top = Math.max(menuViewportGutter, triggerRect.top - menuRect.height - menuTriggerGap)
+
+    menuEl.style.insetInlineStart = `${left + window.scrollX}px`
+    menuEl.style.top = `${top + window.scrollY}px`
+    menuEl.style.marginTop = '0'
+    menuEl.style.transformOrigin = 'bottom right'
+  })
+}
+
+function handleMenuHidden() {
+  menuTriggerEl.value = null
+  emit('menu-hidden')
 }
 
 watch(

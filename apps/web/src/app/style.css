@@ -288,23 +288,6 @@
   line-height: 1.45;
 }
 
-[data-sonner-toaster].ideaboard-toaster [data-sonner-toast].ideaboard-toast [data-close-button] {
-  width: 22px;
-  height: 22px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: #7d86a0;
-  box-shadow: none;
-}
-
-[data-sonner-toaster].ideaboard-toaster
-  [data-sonner-toast].ideaboard-toast
-  [data-close-button]:hover {
-  background: rgba(38, 54, 79, 0.08);
-  color: #5f6780;
-}
-
 @media (max-width: 640px) {
   [data-sonner-toaster].ideaboard-toaster {
     width: min(300px, calc(100vw - 20px));
