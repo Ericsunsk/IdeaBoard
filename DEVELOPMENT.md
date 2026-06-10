@@ -336,6 +336,9 @@ go run ./cmd init-admin
 
 ```bash
 cd apps/web
+npm run lint -- --no-fix
+npm run lint:style
+npm run test:run
 npm run build
 ```
 
