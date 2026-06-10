@@ -288,7 +288,7 @@
                     <span class="text-admin-body text-admin-text-2">
                       {{ form.enabled ? '已启用' : '已关闭' }}
                     </span>
-                    <ToggleSwitch v-model="form.enabled" />
+                    <ToggleSwitch v-model="form.enabled" aria-label="存储启用状态" />
                   </div>
                 </div>
               </div>

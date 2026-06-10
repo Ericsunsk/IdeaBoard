@@ -10,16 +10,11 @@
     :pt="authDialogPt"
     @update:visible="handleVisibleChange"
   >
-    <div
-      v-motion="authModalMotion"
-      :class="authModalShellClass"
-    >
+    <div v-motion="authModalMotion" :class="authModalShellClass">
       <AuthModalCloseButton :disabled="loading" @click="handleClose" />
 
       <div class="mb-8 text-center">
-        <h2 :class="authModalTitleClass">
-          欢迎回来
-        </h2>
+        <h2 :class="authModalTitleClass">欢迎回来</h2>
         <p :class="authModalSubtitleClass">登录 IdeaBoard，继续你的创作</p>
       </div>
 

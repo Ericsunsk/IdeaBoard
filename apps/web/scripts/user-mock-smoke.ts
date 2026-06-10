@@ -1,9 +1,5 @@
 import type { User, UserBoardItem } from '../src/shared/api/generated-query/model'
-import {
-  assertNoConsoleErrors,
-  createMockSmokeRuntime,
-  type CommandSpec,
-} from './mock-smoke-utils'
+import { assertNoConsoleErrors, createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
 
 type SmokePage = {
   label: string
@@ -227,7 +223,7 @@ function assertWorkspaceDom(playwrightCli: CommandSpec, page: SmokePage) {
       `await page.getByText(${JSON.stringify(MOCK_BOARD_NAME)}).waitFor({ timeout: 10000 })`,
       "await page.getByText('100%').waitFor({ timeout: 10000 })",
       "const flowCount = await page.locator('.vue-flow').count()",
-      "if (flowCount !== 1) throw new Error(`Expected exactly one .vue-flow, got ${flowCount}`)",
+      'if (flowCount !== 1) throw new Error(`Expected exactly one .vue-flow, got ${flowCount}`)',
     ].join('\n'),
   ])
 

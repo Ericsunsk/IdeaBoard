@@ -54,10 +54,11 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
     options.closeBoardHeaderEditing()
     options.clearActiveNodePanels()
     options.hideStrengthControl()
-    options.activeTool.value = tool
     if (tool === 'text') {
       options.toastInfo('文本工具稍后接入')
+      return
     }
+    options.activeTool.value = tool
   }
 
   function onEscapeShortcut() {

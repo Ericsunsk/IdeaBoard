@@ -61,10 +61,7 @@ export interface WorkflowFeatureRegistryItem {
   imageActionTitle?: string
 }
 
-type WorkflowFeatureRegistryBaseItem = Omit<
-  WorkflowFeatureRegistryItem,
-  'title' | 'adminTitle'
->
+type WorkflowFeatureRegistryBaseItem = Omit<WorkflowFeatureRegistryItem, 'title' | 'adminTitle'>
 
 const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[] = [
   {

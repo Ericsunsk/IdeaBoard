@@ -114,7 +114,11 @@
                 :severity="enabledMap[item.slug] ? 'success' : 'secondary'"
                 rounded
               />
-              <ToggleSwitch v-model="enabledMap[item.slug]" :disabled="saving[item.slug]" />
+              <ToggleSwitch
+                v-model="enabledMap[item.slug]"
+                :disabled="saving[item.slug]"
+                :aria-label="`${item.title} 启用状态`"
+              />
             </div>
 
             <div

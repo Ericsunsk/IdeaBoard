@@ -3,11 +3,7 @@ import { ref, computed } from 'vue'
 import type { User } from '../../shared/types'
 import { getUserInfoApi } from '../../shared/api/user'
 import { authClient, extractBetterAuthErrorMessage } from '../../shared/auth/client'
-import {
-  getStoredUser,
-  setStoredAuth,
-  clearStoredAuthState,
-} from '../../shared/utils/auth'
+import { getStoredUser, setStoredAuth, clearStoredAuthState } from '../../shared/utils/auth'
 import { clearAuthScopedQueryCache } from '../../shared/query/queryClient'
 import { resolveAuthUrl } from '../../shared/config/runtimeUrls'
 
@@ -34,9 +30,7 @@ function getUserIdentity(authUser: User | null): string | null {
 
 function getErrorStatusCode(error: unknown): number {
   const errorRecord =
-    error && typeof error === 'object'
-      ? (error as { status?: unknown; code?: unknown })
-      : null
+    error && typeof error === 'object' ? (error as { status?: unknown; code?: unknown }) : null
   return Number(errorRecord?.status ?? errorRecord?.code)
 }
 
@@ -81,6 +75,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function register(username: string, password: string) {
+    const normalizedUsername = username.trim()
     const safeLocalPart = username
       .trim()
       .toLowerCase()
@@ -90,11 +85,19 @@ export const useUserStore = defineStore('user', () => {
     const result = await authClient.signUp.email({
       email,
       password,
-      name: username,
-      username,
+      name: normalizedUsername,
+      username: normalizedUsername,
     })
     if (result?.error) {
       throw new Error(extractBetterAuthErrorMessage(result.error, '注册失败'))
+    }
+
+    await fetchUserInfo(true)
+    if (!user.value) {
+      await login(normalizedUsername, password)
+    }
+    if (!user.value) {
+      throw new Error('注册成功，但登录状态恢复失败')
     }
     return true
   }

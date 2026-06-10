@@ -5,6 +5,9 @@
     :class="[`is-${data.kind}`, { 'is-selected': selected }]"
     @mouseenter="isPointerOverNode = true"
     @mouseleave="isPointerOverNode = false"
+    @focusin="isFocusWithinNode = true"
+    @focusout="onNodeFocusOut"
+    @pointerdown.capture="onNodePointerDown"
   >
     <div
       v-if="showDefaultDragZone"
@@ -152,7 +155,7 @@
         :kind="data.kind"
         :snapshot-node="data.snapshotNode"
         :ui-state="props.uiState"
-        :show-handles="isPointerOverNode && !disableHandleRailInteraction"
+        :show-handles="showHandleControls"
         @request-internals-update="emit('request-internals-update')"
       />
     </div>
@@ -282,6 +285,8 @@ const promptUiState = computed<PromptNodeUiState | undefined>(
   () => props.uiState as PromptNodeUiState | undefined,
 )
 const isPointerOverNode = ref(false)
+const isFocusWithinNode = ref(false)
+const isTouchHandleHintActive = ref(false)
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
 const handleRailBounds = reactive({
   left: 0,
@@ -290,6 +295,7 @@ const handleRailBounds = reactive({
   height: 0,
 })
 let handleRailMeasureFrame = 0
+let touchHandleHintTimer: ReturnType<typeof setTimeout> | null = null
 let handleRailResizeObserver: ResizeObserver | null = null
 let observedHandleRailRoot: HTMLElement | null = null
 let observedHandleRailFrame: HTMLElement | null = null
@@ -300,6 +306,14 @@ const handleRailStyle = computed(() => ({
   width: `${handleRailBounds.width}px`,
   height: `${handleRailBounds.height}px`,
 }))
+const showHandleControls = computed(
+  () =>
+    !disableHandleRailInteraction.value &&
+    (isPointerOverNode.value ||
+      props.selected ||
+      isFocusWithinNode.value ||
+      isTouchHandleHintActive.value),
+)
 
 function resolveSnapshotNode<T>() {
   return props.data.snapshotNode && typeof props.data.snapshotNode === 'object'
@@ -484,8 +498,25 @@ onUpdated(() => {
 
 onBeforeUnmount(() => {
   if (handleRailMeasureFrame) cancelAnimationFrame(handleRailMeasureFrame)
+  if (touchHandleHintTimer) clearTimeout(touchHandleHintTimer)
   handleRailResizeObserver?.disconnect()
 })
+
+function onNodeFocusOut(event: FocusEvent) {
+  const nextTarget = event.relatedTarget
+  if (nextTarget instanceof Node && flowCanvasNodeRef.value?.contains(nextTarget)) return
+  isFocusWithinNode.value = false
+}
+
+function onNodePointerDown(event: PointerEvent) {
+  if (event.pointerType === 'mouse') return
+  isTouchHandleHintActive.value = true
+  if (touchHandleHintTimer) clearTimeout(touchHandleHintTimer)
+  touchHandleHintTimer = setTimeout(() => {
+    isTouchHandleHintActive.value = false
+    touchHandleHintTimer = null
+  }, 2400)
+}
 
 function onPromptTextUpdate(value: string) {
   emit('update-prompt-text', value)

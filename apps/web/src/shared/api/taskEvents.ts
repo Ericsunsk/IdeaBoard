@@ -3,33 +3,53 @@ import { getGetUserTaskQueryKey } from './generated-query/tasks/tasks'
 import type { ApiResponseTask } from './generated-query/model'
 import { extractImageUrlsFromTaskResult } from '../query/taskResult'
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
+import { taskApi } from './task'
 import type { Task } from './task'
 import { resolveApiUrl } from '../config/runtimeUrls'
 
-type TaskEventPayload = Pick<Task, 'task_id' | 'status' | 'result' | 'error_msg' | 'outputs'>
+type TaskEventPayload = Pick<
+  Task,
+  'task_id' | 'status' | 'result' | 'error_msg' | 'outputs' | 'cancel_reason'
+>
 
 const SSE_TIMEOUT_MS = 6 * 60 * 1000
+const POLL_INITIAL_DELAY_MS = 1200
+const POLL_MAX_DELAY_MS = 8000
+const POLL_BACKOFF_FACTOR = 1.6
+
+type WaitTaskResultOptions = {
+  timeoutMs?: number
+  pollInitialDelayMs?: number
+  pollMaxDelayMs?: number
+}
 
 export function waitTaskResultWithSse(
   taskId: string,
-  options?: { timeoutMs?: number },
+  options?: WaitTaskResultOptions,
 ): Promise<string[]> {
   const timeoutMs = options?.timeoutMs ?? SSE_TIMEOUT_MS
-  if (typeof EventSource === 'undefined') {
-    return Promise.reject(new Error('当前浏览器不支持任务进度推送'))
+  const deadlineAt = Date.now() + timeoutMs
+  const pollOptions = {
+    initialDelayMs: options?.pollInitialDelayMs ?? POLL_INITIAL_DELAY_MS,
+    maxDelayMs: options?.pollMaxDelayMs ?? POLL_MAX_DELAY_MS,
   }
-  return waitWithEventSource(taskId, timeoutMs)
+  if (typeof EventSource === 'undefined') {
+    return waitWithPolling(taskId, deadlineAt, pollOptions)
+  }
+  return waitWithEventSource(taskId, deadlineAt, pollOptions)
 }
 
-function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[]> {
+function waitWithEventSource(
+  taskId: string,
+  deadlineAt: number,
+  pollOptions: { initialDelayMs: number; maxDelayMs: number },
+): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    const es = new EventSource(
-      resolveApiUrl(`/user/tasks/${encodeURIComponent(taskId)}/events`),
-      {
-        withCredentials: true,
-      },
-    )
+    const es = new EventSource(resolveApiUrl(`/user/tasks/${encodeURIComponent(taskId)}/events`), {
+      withCredentials: true,
+    })
     let settled = false
+    let timeout = 0
 
     const cleanup = () => {
       clearTimeout(timeout)
@@ -50,9 +70,19 @@ function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[
       reject(error)
     }
 
-    const timeout = window.setTimeout(() => {
-      settleReject(new Error('任务进度推送超时，请稍后查看结果'))
-    }, timeoutMs)
+    const fallbackToPolling = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      waitWithPolling(taskId, deadlineAt, pollOptions).then(resolve, reject)
+    }
+
+    timeout = window.setTimeout(
+      () => {
+        settleReject(new Error('任务进度推送超时，请稍后查看结果'))
+      },
+      Math.max(0, deadlineAt - Date.now()),
+    )
 
     const handleTaskEvent = (task: TaskEventPayload) => {
       if (!task || typeof task !== 'object' || typeof task.status !== 'string') {
@@ -81,6 +111,10 @@ function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[
       if (task.status === 'failed') {
         const msg = task.error_msg?.trim() || '生成失败'
         settleReject(new Error(sanitizeApiErrorMessage(msg, '生成失败')))
+        return
+      }
+      if (task.status === 'cancelled') {
+        settleReject(createTaskCancelledError(task))
       }
     }
 
@@ -92,10 +126,81 @@ function waitWithEventSource(taskId: string, timeoutMs: number): Promise<string[
       }
     })
 
+    es.addEventListener('close', () => {
+      fallbackToPolling()
+    })
+
     es.onerror = () => {
-      settleReject(new Error('任务进度连接中断，请稍后重试'))
+      fallbackToPolling()
     }
   })
+}
+
+async function waitWithPolling(
+  taskId: string,
+  deadlineAt: number,
+  options: { initialDelayMs: number; maxDelayMs: number },
+): Promise<string[]> {
+  let nextDelayMs = options.initialDelayMs
+  let lastError: unknown
+
+  while (Date.now() <= deadlineAt) {
+    let task: TaskEventPayload | undefined
+    try {
+      const taskRes = await taskApi.get(taskId)
+      if (taskRes.data?.task) {
+        queryClient.setQueryData(getGetUserTaskQueryKey(taskId), taskRes)
+      }
+      task = taskRes.data?.task
+      lastError = undefined
+    } catch (error) {
+      if (isTaskNotFoundError(error)) throw error
+      lastError = error
+    }
+
+    if (task?.status === 'completed') {
+      return extractImageUrlsFromTaskEvent(task)
+    }
+    if (task?.status === 'failed') {
+      const msg = task.error_msg?.trim() || '生成失败'
+      throw new Error(sanitizeApiErrorMessage(msg, '生成失败'))
+    }
+    if (task?.status === 'cancelled') {
+      throw createTaskCancelledError(task)
+    }
+
+    const remainingMs = deadlineAt - Date.now()
+    if (remainingMs <= 0) break
+    await sleep(Math.min(nextDelayMs, remainingMs))
+    nextDelayMs = Math.min(
+      options.maxDelayMs,
+      Math.max(nextDelayMs + 1, Math.ceil(nextDelayMs * POLL_BACKOFF_FACTOR)),
+    )
+  }
+
+  if (lastError) {
+    throw new Error('任务状态查询超时，请稍后查看结果')
+  }
+  throw new Error('任务进度推送超时，请稍后查看结果')
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+function isTaskNotFoundError(error: unknown): boolean {
+  if (typeof error !== 'object' || !error) return false
+  const status = 'status' in error ? (error as { status?: unknown }).status : undefined
+  if (status === 404) return true
+  const code = 'code' in error ? (error as { code?: unknown }).code : undefined
+  return code === 404
+}
+
+export function createTaskCancelledError(task?: Pick<Task, 'error_msg' | 'cancel_reason'>): Error {
+  const msg = task?.cancel_reason?.trim() || task?.error_msg?.trim() || '任务已取消'
+  return new Error(sanitizeApiErrorMessage(msg, '任务已取消'))
 }
 
 function extractImageUrlsFromTaskEvent(task: TaskEventPayload): string[] {

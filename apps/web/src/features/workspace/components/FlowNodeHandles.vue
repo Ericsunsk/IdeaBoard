@@ -19,6 +19,10 @@
       { 'is-visible': props.showHandles },
     ]"
     :style="leftCenteredHandleStyle"
+    :aria-hidden="props.showHandles ? undefined : 'true'"
+    :aria-label="inputAggregateAriaLabel"
+    :tabindex="props.showHandles ? 0 : -1"
+    title="拖拽创建输入连接"
   >
     <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
   </Handle>
@@ -33,6 +37,10 @@
       { 'is-visible': props.showHandles },
     ]"
     :style="rightCenteredHandleStyle"
+    :aria-hidden="props.showHandles ? undefined : 'true'"
+    :aria-label="outputAggregateAriaLabel"
+    :tabindex="props.showHandles ? 0 : -1"
+    title="拖拽创建输出连接"
   >
     <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
   </Handle>
@@ -86,6 +94,17 @@ function getCanvasNodeVisiblePortsForKind(direction: 'input' | 'output'): Canvas
 const handleInputPorts = computed(() => getCanvasNodeVisiblePortsForKind('input'))
 const handleOutputPorts = computed(() => getCanvasNodeVisiblePortsForKind('output'))
 const hasInputPorts = computed(() => handleInputPorts.value.length > 0)
+const nodeKindLabel = computed(() => {
+  const labels: Record<FlowNodeData['kind'], string> = {
+    prompt: '提示词节点',
+    image: '图片节点',
+    fusion: '融合节点',
+    viewpoint: '视角节点',
+  }
+  return labels[props.kind] ?? '节点'
+})
+const inputAggregateAriaLabel = computed(() => `${nodeKindLabel.value}输入连接点，拖拽创建连接`)
+const outputAggregateAriaLabel = computed(() => `${nodeKindLabel.value}输出连接点，拖拽创建连接`)
 const aggregateOutputHandleId = computed(() => {
   const [firstPort] = handleOutputPorts.value
   return firstPort ? `out:${firstPort}` : null
@@ -150,6 +169,7 @@ watch(
   z-index: 24;
   cursor: crosshair;
   touch-action: none;
+  outline: none;
   transition:
     opacity 0.14s ease,
     color 0.14s ease;
@@ -210,16 +230,23 @@ watch(
 }
 
 .flow-canvas-node__handle-aggregate:hover,
-.flow-canvas-node__handle-aggregate.connecting {
+.flow-canvas-node__handle-aggregate.connecting,
+.flow-canvas-node__handle-aggregate:focus-visible {
   --handle-ring-color: #c4ccd8;
   --handle-plus-x: var(--handle-plus-hover-x);
   opacity: 1;
 }
 
 .flow-canvas-node__handle-aggregate.is-visible,
-.flow-canvas-node__handle-aggregate.connecting {
+.flow-canvas-node__handle-aggregate.connecting,
+.flow-canvas-node__handle-aggregate:focus-visible {
   --handle-plus-x: var(--handle-plus-active-x);
   opacity: 1;
+}
+
+.flow-canvas-node__handle-aggregate:focus-visible .flow-canvas-node__handle-plus {
+  border-color: #9278e6;
+  box-shadow: 0 0 0 3px rgba(146, 120, 230, 0.24);
 }
 
 .flow-canvas-node__handle-aggregate.is-visible:hover {

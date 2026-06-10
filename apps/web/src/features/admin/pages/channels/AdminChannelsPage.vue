@@ -100,7 +100,7 @@
                     rounded
                     size="small"
                     aria-label="添加 APIKey"
-                    @click="openAddAccountModal(card.channel)"
+                    @click="handleOpenAddAccountModal(card.channel)"
                   >
                     <template #icon>
                       <Plus />
@@ -139,7 +139,7 @@
                             :class="adminFramedIconButtonClass"
                             aria-label="编辑 APIKey"
                             title="编辑 APIKey"
-                            @click="openEditAccountModal(account)"
+                            @click="handleOpenEditAccountModal(account)"
                           >
                             <template #icon>
                               <EditPencil class="size-4 text-admin-text-2" />
@@ -189,6 +189,7 @@
                             :model-value="!model.disabled"
                             size="small"
                             class="!shrink-0"
+                            :aria-label="`${model.name} 模型启用状态`"
                             @update:model-value="toggleAccountModelStatus(account, model.name)"
                           />
                         </div>
@@ -226,47 +227,89 @@
       v-model:visible="showChannelModal"
       modal
       :header="isEditChannel ? '编辑渠道商' : '新增渠道商'"
-      :style="{ width: '480px' }"
+      :style="{ width: 'min(480px, calc(100vw - 24px))' }"
     >
       <div :class="adminDialogFormBodyClass">
         <label
           class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          for="admin-channel-name"
         >
           <span>渠道商名称</span>
           <InputText
+            id="admin-channel-name"
             v-model="channelForm.name"
             class="w-full"
             placeholder="例如：Nano Banana 官方"
+            :invalid="Boolean(channelFormErrors.name)"
+            aria-describedby="admin-channel-name-error"
+            @update:model-value="clearChannelFormError('name')"
           />
+          <Message
+            v-if="channelFormErrors.name"
+            id="admin-channel-name-error"
+            severity="error"
+            size="small"
+            :closable="false"
+          >
+            {{ channelFormErrors.name }}
+          </Message>
         </label>
         <label
           class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          for="admin-channel-type"
         >
           <span>接口类型</span>
           <Select
             v-model="channelForm.type"
+            input-id="admin-channel-type"
             class="w-full"
             :options="apiTypeOptions"
             option-label="label"
             option-value="value"
             placeholder="选择接口协议"
+            :invalid="Boolean(channelFormErrors.type)"
+            aria-describedby="admin-channel-type-error"
+            @update:model-value="clearChannelFormError('type')"
           />
+          <Message
+            v-if="channelFormErrors.type"
+            id="admin-channel-type-error"
+            severity="error"
+            size="small"
+            :closable="false"
+          >
+            {{ channelFormErrors.type }}
+          </Message>
         </label>
         <label
           class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          for="admin-channel-api-url"
         >
           <span>Base URL地址</span>
           <InputText
+            id="admin-channel-api-url"
             v-model="channelForm.api_url"
             class="w-full"
             placeholder="例如：https://api.example.com/v1"
-            @blur="inferChannelApiTypeFromUrl"
+            :invalid="Boolean(channelFormErrors.api_url)"
+            aria-describedby="admin-channel-api-url-error"
+            @blur="handleChannelApiUrlBlur"
+            @update:model-value="clearChannelFormError('api_url')"
           />
+          <Message
+            v-if="channelFormErrors.api_url"
+            id="admin-channel-api-url-error"
+            severity="error"
+            size="small"
+            :closable="false"
+          >
+            {{ channelFormErrors.api_url }}
+          </Message>
         </label>
       </div>
       <template #footer>
         <div :class="adminDialogCompactFooterActionsClass">
-          <Button label="取消" severity="secondary" outlined @click="showChannelModal = false" />
+          <Button label="取消" severity="secondary" outlined @click="closeChannelModal" />
           <Button label="确定" :loading="channelSaveLoading" @click="handleSaveChannel" />
         </div>
       </template>
@@ -277,7 +320,7 @@
       v-model:visible="showAccountModal"
       modal
       :header="isEditAccount ? '编辑 APIKey' : '新增 APIKey'"
-      :style="{ width: '500px' }"
+      :style="{ width: 'min(500px, calc(100vw - 24px))' }"
     >
       <div :class="adminDialogFormBodyClass">
         <div
@@ -290,62 +333,122 @@
 
         <label
           class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          for="admin-account-secret"
         >
           <span>{{ isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)' }}</span>
           <InputText
+            id="admin-account-secret"
             v-model="accountForm.secret"
             class="w-full"
             type="password"
             :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此渠道商的 API Key'"
+            :invalid="Boolean(accountFormErrors.secret)"
+            aria-describedby="admin-account-secret-error"
+            @update:model-value="clearAccountFormError('secret')"
           />
+          <Message
+            v-if="accountFormErrors.secret"
+            id="admin-account-secret-error"
+            severity="error"
+            size="small"
+            :closable="false"
+          >
+            {{ accountFormErrors.secret }}
+          </Message>
         </label>
 
         <label
           class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+          for="admin-account-models"
         >
           <span>分配模型</span>
           <AutoComplete
             v-model="accountForm.model_values"
+            input-id="admin-account-models"
             multiple
             fluid
             :suggestions="modelSuggestions"
             :loading="detectModelsLoading"
             placeholder="选择或输入分配给该 APIKey 的模型"
             :pt="modelSelectPt"
+            :invalid="Boolean(accountFormErrors.model_values)"
+            aria-describedby="admin-account-models-error"
             @focus="handleAccountModelSelectShow(true)"
             @complete="searchModelSuggestions"
+            @update:model-value="clearAccountFormError('model_values')"
           />
+          <Message
+            v-if="accountFormErrors.model_values"
+            id="admin-account-models-error"
+            severity="error"
+            size="small"
+            :closable="false"
+          >
+            {{ accountFormErrors.model_values }}
+          </Message>
         </label>
 
         <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <label
             class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+            for="admin-account-max-concurrent"
           >
             <span>最大并发数</span>
             <InputNumber
               v-model="accountForm.max_concurrent"
+              input-id="admin-account-max-concurrent"
               :min="accountLimits.max_concurrent.min"
               :max="accountLimits.max_concurrent.max"
               fluid
+              :invalid="Boolean(accountFormErrors.max_concurrent)"
+              aria-describedby="admin-account-max-concurrent-error"
+              @update:model-value="clearAccountFormError('max_concurrent')"
             />
+            <Message
+              v-if="accountFormErrors.max_concurrent"
+              id="admin-account-max-concurrent-error"
+              severity="error"
+              size="small"
+              :closable="false"
+            >
+              {{ accountFormErrors.max_concurrent }}
+            </Message>
           </label>
           <label
             class="flex min-w-0 flex-col gap-[7px] text-admin-meta font-semibold text-admin-text-2"
+            for="admin-account-timeout"
           >
             <span>超时时间(秒)</span>
             <InputNumber
               v-model="accountForm.timeout"
+              input-id="admin-account-timeout"
               :min="accountLimits.timeout_seconds.min"
               :max="accountLimits.timeout_seconds.max"
               fluid
+              :invalid="Boolean(accountFormErrors.timeout)"
+              aria-describedby="admin-account-timeout-error"
+              @update:model-value="clearAccountFormError('timeout')"
             />
+            <Message
+              v-if="accountFormErrors.timeout"
+              id="admin-account-timeout-error"
+              severity="error"
+              size="small"
+              :closable="false"
+            >
+              {{ accountFormErrors.timeout }}
+            </Message>
           </label>
         </div>
       </div>
       <template #footer>
         <div :class="adminDialogCompactFooterActionsClass">
-          <Button label="取消" severity="secondary" outlined @click="showAccountModal = false" />
-          <Button label="确定" :loading="accountSaveLoading" @click="handleSaveAccount" />
+          <Button label="取消" severity="secondary" outlined @click="closeAccountModal" />
+          <Button
+            label="确定"
+            :loading="accountSaveLoading"
+            @click="handleSaveAccountWithValidation"
+          />
         </div>
       </template>
     </Dialog>
@@ -473,6 +576,13 @@ const createEmptyChannelForm = (): ChannelFormData => ({
   api_url: '',
 })
 const channelForm = ref<ChannelFormData>(createEmptyChannelForm())
+type ChannelFormField = keyof ChannelFormData
+const createEmptyChannelFormErrors = (): Record<ChannelFormField, string> => ({
+  type: '',
+  name: '',
+  api_url: '',
+})
+const channelFormErrors = ref<Record<ChannelFormField, string>>(createEmptyChannelFormErrors())
 const apiTypeOptions = ADMIN_CHANNEL_API_TYPE_OPTIONS
 const modelSelectPt = {
   root: { class: 'w-full' },
@@ -518,9 +628,15 @@ function inferChannelApiTypeFromUrl() {
   }
 }
 
+function handleChannelApiUrlBlur() {
+  inferChannelApiTypeFromUrl()
+  validateChannelField('api_url')
+}
+
 function openAddChannelModal() {
   isEditChannel.value = false
   channelForm.value = createEmptyChannelForm()
+  resetChannelFormErrors()
   showChannelModal.value = true
 }
 
@@ -528,14 +644,19 @@ function openEditChannelModal(row: Channel) {
   isEditChannel.value = true
   currentChannelId.value = row.id
   channelForm.value = { type: row.type, name: row.name, api_url: row.api_url }
+  resetChannelFormErrors()
   showChannelModal.value = true
+}
+
+function closeChannelModal() {
+  showChannelModal.value = false
+  resetChannelFormErrors()
 }
 
 async function handleSaveChannel() {
   try {
-    const validationError = validateChannelForm()
-    if (validationError) {
-      appToast.warning(validationError)
+    if (!validateChannelForm()) {
+      appToast.warning('请修正渠道商表单错误')
       return
     }
     channelSaveLoading.value = true
@@ -568,6 +689,7 @@ async function handleSaveChannel() {
         appToast.success('渠道商已创建')
       }
       showChannelModal.value = false
+      resetChannelFormErrors()
       return
     }
 
@@ -579,6 +701,7 @@ async function handleSaveChannel() {
       appToast.success('渠道商已创建')
     }
     showChannelModal.value = false
+    resetChannelFormErrors()
     loadData()
   } catch (error) {
     appToast.error(extractApiErrorMessage(error, '保存渠道商失败'))
@@ -588,10 +711,45 @@ async function handleSaveChannel() {
 }
 
 function validateChannelForm() {
-  if (!channelForm.value.name.trim()) return '请输入渠道商名称'
-  if (!channelForm.value.type) return '请选择接口类型'
-  if (!channelForm.value.api_url.trim()) return '请输入 Base URL地址'
+  const nextErrors = createEmptyChannelFormErrors()
+  ;(['name', 'type', 'api_url'] as ChannelFormField[]).forEach((field) => {
+    nextErrors[field] = resolveChannelFieldError(field)
+  })
+  channelFormErrors.value = nextErrors
+  return !Object.values(nextErrors).some(Boolean)
+}
+
+function validateChannelField(field: ChannelFormField) {
+  channelFormErrors.value[field] = resolveChannelFieldError(field)
+  return !channelFormErrors.value[field]
+}
+
+function resolveChannelFieldError(field: ChannelFormField) {
+  if (field === 'name' && !channelForm.value.name.trim()) return '请输入渠道商名称'
+  if (field === 'type' && !channelForm.value.type) return '请选择接口类型'
+  if (field === 'api_url') {
+    const apiUrl = channelForm.value.api_url.trim()
+    if (!apiUrl) return '请输入 Base URL地址'
+    try {
+      const parsed = new URL(apiUrl)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return 'Base URL 需使用 http 或 https'
+      }
+    } catch {
+      return '请输入有效的 Base URL'
+    }
+  }
   return ''
+}
+
+function clearChannelFormError(field: ChannelFormField) {
+  if (channelFormErrors.value[field]) {
+    channelFormErrors.value[field] = ''
+  }
+}
+
+function resetChannelFormErrors() {
+  channelFormErrors.value = createEmptyChannelFormErrors()
 }
 
 function handleDeleteChannel(row: Channel) {
@@ -675,6 +833,84 @@ const {
   },
   onAfterMutation: loadData,
 })
+
+type AccountFormField = 'secret' | 'model_values' | 'max_concurrent' | 'timeout'
+const createEmptyAccountFormErrors = (): Record<AccountFormField, string> => ({
+  secret: '',
+  model_values: '',
+  max_concurrent: '',
+  timeout: '',
+})
+const accountFormErrors = ref<Record<AccountFormField, string>>(createEmptyAccountFormErrors())
+
+function handleOpenAddAccountModal(channel: Channel) {
+  resetAccountFormErrors()
+  openAddAccountModal(channel)
+}
+
+function handleOpenEditAccountModal(account: AdminAccount) {
+  resetAccountFormErrors()
+  openEditAccountModal(account)
+}
+
+function closeAccountModal() {
+  showAccountModal.value = false
+  resetAccountFormErrors()
+}
+
+async function handleSaveAccountWithValidation() {
+  if (!validateAccountForm()) {
+    appToast.warning('请修正 APIKey 表单错误')
+    return
+  }
+  await handleSaveAccount()
+}
+
+function validateAccountForm() {
+  const nextErrors = createEmptyAccountFormErrors()
+  const selectedModels = accountForm.value.model_values.map((item) => item.trim()).filter(Boolean)
+  if (selectedModels.length === 0) {
+    nextErrors.model_values = '请至少选择或输入一个模型'
+  }
+  if (!isEditAccount.value && !accountForm.value.secret.trim()) {
+    nextErrors.secret = '新增账号必须输入 API 密钥'
+  }
+  nextErrors.max_concurrent = resolveNumberRangeError(
+    accountForm.value.max_concurrent,
+    accountLimits.value.max_concurrent.min,
+    accountLimits.value.max_concurrent.max,
+    '最大并发数',
+  )
+  nextErrors.timeout = resolveNumberRangeError(
+    accountForm.value.timeout,
+    accountLimits.value.timeout_seconds.min,
+    accountLimits.value.timeout_seconds.max,
+    '超时时间',
+  )
+  accountFormErrors.value = nextErrors
+  return !Object.values(nextErrors).some(Boolean)
+}
+
+function resolveNumberRangeError(value: number, min: number, max: number, label: string) {
+  if (!Number.isFinite(value)) return `请输入${label}`
+  if (value < min || value > max) return `${label}需在 ${min}-${max} 之间`
+  return ''
+}
+
+function clearAccountFormError(field: AccountFormField) {
+  if (accountFormErrors.value[field]) {
+    accountFormErrors.value[field] = ''
+  }
+}
+
+function resetAccountFormErrors() {
+  accountFormErrors.value = createEmptyAccountFormErrors()
+}
+
+watch(showAccountModal, (visible) => {
+  if (!visible) resetAccountFormErrors()
+})
+
 const totalAccountCount = computed(() => accounts.value.length)
 const runningAccountCount = computed(
   () => accounts.value.filter((account) => account.status === 1 && account.fail_count < 5).length,

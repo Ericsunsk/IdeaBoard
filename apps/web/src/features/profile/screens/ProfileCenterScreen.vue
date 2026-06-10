@@ -31,6 +31,7 @@
                 ? '!bg-[#7a6bd5] !text-white'
                 : '!bg-transparent !text-[#86868b] hover:!bg-[#eef1fa] hover:!text-[#2c3448]'
             "
+            :aria-current="activeTab === item.key ? 'page' : undefined"
             @click="activeTab = item.key"
           >
             <span class="flex h-5 w-5 items-center justify-center">
@@ -75,6 +76,29 @@
       <main
         class="flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-[52px] py-11 [scrollbar-color:rgba(146,120,230,0.38)_transparent] [scrollbar-width:thin] max-[900px]:px-8 max-[640px]:px-5 max-[640px]:py-6"
       >
+        <nav
+          class="mb-6 hidden grid-cols-2 gap-2 rounded-2xl border border-[#e2e7f3] bg-white/80 p-1.5 max-[640px]:grid"
+          aria-label="个人中心导航"
+        >
+          <Button
+            v-for="item in navItems"
+            :key="`mobile-${item.key}`"
+            type="button"
+            text
+            class="!flex !h-10 !justify-center !gap-2 !rounded-xl !border-0 !px-3 !text-[14px] !font-semibold !shadow-none"
+            :class="
+              activeTab === item.key
+                ? '!bg-[#7a6bd5] !text-white'
+                : '!bg-transparent !text-[#6b7280] hover:!bg-[#eef1fa] hover:!text-[#2c3448]'
+            "
+            :aria-current="activeTab === item.key ? 'page' : undefined"
+            @click="activeTab = item.key"
+          >
+            <component :is="item.icon" class="h-4 w-4 stroke-[2]" />
+            <span>{{ item.label }}</span>
+          </Button>
+        </nav>
+
         <div
           class="mb-10 flex items-center justify-between gap-6 max-[720px]:flex-col max-[720px]:items-start"
         >
@@ -102,6 +126,7 @@
                 rounded
                 class="!absolute !right-[-4px] !bottom-[-4px] !flex !h-7 !w-7 !min-w-7 !items-center !justify-center !rounded-full !border !border-[#d9dfec] !bg-white/[0.98] !p-0 !text-[#6b7290] !shadow-none !transition !duration-200 hover:!border-[#c8d0e2] hover:!bg-[#f8faff] hover:!text-[#4a5169] disabled:!cursor-not-allowed disabled:!opacity-60"
                 :disabled="avatarUploading"
+                aria-label="更换头像"
                 title="更换头像"
                 @click="openAvatarPicker"
               >

@@ -10,16 +10,11 @@
     :pt="authDialogPt"
     @update:visible="handleVisibleChange"
   >
-    <div
-      v-motion="authModalMotion"
-      :class="authCompactModalShellClass"
-    >
+    <div v-motion="authModalMotion" :class="authCompactModalShellClass">
       <AuthModalCloseButton :disabled="loading" @click="handleClose" />
 
       <div class="mb-6 text-center">
-        <h2 :class="authModalTitleClass">
-          创建账号
-        </h2>
+        <h2 :class="authModalTitleClass">创建账号</h2>
         <p :class="authModalSubtitleClass">创建你的 IdeaBoard 账号，开始创作</p>
       </div>
 
@@ -165,6 +160,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:show', value: boolean): void
   (e: 'to-login'): void
+  (e: 'register-success'): void
 }>()
 
 type RegisterField = 'username' | 'password' | 'confirmPassword'
@@ -238,7 +234,10 @@ function clearFieldError(field: RegisterField) {
 
 function handlePasswordInput() {
   clearFieldError('password')
-  if (errors.value.confirmPassword && formValue.value.confirmPassword === formValue.value.password) {
+  if (
+    errors.value.confirmPassword &&
+    formValue.value.confirmPassword === formValue.value.password
+  ) {
     errors.value.confirmPassword = ''
   }
 }
@@ -276,9 +275,10 @@ async function handleRegister() {
   try {
     loading.value = true
     await userStore.register(formValue.value.username.trim(), formValue.value.password)
-    appToast.success('注册成功，请登录')
+    appToast.success('注册成功')
     resetForm()
-    emit('to-login')
+    emit('register-success')
+    emit('update:show', false)
   } catch (error: unknown) {
     appToast.error(error instanceof Error && error.message ? error.message : '注册失败，请稍后重试')
   } finally {

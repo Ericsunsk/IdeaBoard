@@ -24,11 +24,7 @@ import type {
   UpdateAdminRegistrationSettingBody,
 } from '../../../../shared/api/generated-query/model'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
-import {
-  storageApi,
-  type StorageProfile,
-  type StorageProfilePayload,
-} from '../api/storage'
+import { storageApi, type StorageProfile, type StorageProfilePayload } from '../api/storage'
 
 type SaveFeaturePromptInput = {
   slug: string
@@ -106,9 +102,7 @@ export async function deleteAdminUser(id: number): Promise<void> {
   requireApiOk(res, '注销失败')
 }
 
-export async function saveFeaturePrompt(
-  input: SaveFeaturePromptInput,
-): Promise<FeaturePrompt> {
+export async function saveFeaturePrompt(input: SaveFeaturePromptInput): Promise<FeaturePrompt> {
   const { slug, ...payload } = input
   const res = await setAdminFeaturePrompt(slug, payload)
   return requireApiData(res, '保存提示词失败')

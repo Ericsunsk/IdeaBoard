@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "api:generate": "orval --config orval.config.ts",
+    "api:check-generated": "tsx scripts/check-api-generated-drift.ts",
     "build": "vue-tsc -b && vite build",
     "format": "prettier . --write",
     "format:check": "prettier . --check",

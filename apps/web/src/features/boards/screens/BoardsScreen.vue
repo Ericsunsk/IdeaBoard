@@ -399,6 +399,10 @@ async function createAndOpenBoard() {
       return
     }
     console.warn('[boards] failed to sync new board', error)
+    deleteCanvasBoard(board.id)
+    reloadBoards()
+    appToast.error('创建同步失败，请稍后重试')
+    return
   }
   reloadBoards()
   router.push({ path: '/user/workspace', query: { boardId: board.id } })
@@ -517,6 +521,11 @@ async function handleDuplicateAction(board: CanvasBoardMeta) {
       return
     }
     console.warn('[boards] failed to sync duplicated board', error)
+    deleteCanvasBoard(copy.id)
+    deleteCanvasBoardState(copy.id)
+    reloadBoards()
+    appToast.error('复制同步失败，请稍后重试')
+    return
   }
   reloadBoards()
   appToast.success('已复制画布')

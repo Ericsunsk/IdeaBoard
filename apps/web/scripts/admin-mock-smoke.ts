@@ -1,9 +1,5 @@
 import { adminNavigationRouteDefs } from '../src/features/admin/app/adminNavigationMeta'
-import {
-  assertNoConsoleErrors,
-  createMockSmokeRuntime,
-  type CommandSpec,
-} from './mock-smoke-utils'
+import { assertNoConsoleErrors, createMockSmokeRuntime, type CommandSpec } from './mock-smoke-utils'
 
 type SmokePage = {
   label: string

@@ -11,6 +11,7 @@
       :show="showRegister"
       @update:show="onRegisterVisibleChange"
       @to-login="goLogin"
+      @register-success="onRegisterSuccess"
     />
   </div>
 </template>
@@ -55,6 +56,11 @@ function onLoginSuccess() {
   void router.replace(resolveLoginRedirectPath())
 }
 
+function onRegisterSuccess() {
+  skipCloseRedirectOnce.value = true
+  void router.replace(resolveLoginRedirectPath())
+}
+
 function onLoginVisibleChange(visible: boolean) {
   if (visible) return
   if (skipCloseRedirectOnce.value) {
@@ -66,6 +72,10 @@ function onLoginVisibleChange(visible: boolean) {
 
 function onRegisterVisibleChange(visible: boolean) {
   if (visible) return
+  if (skipCloseRedirectOnce.value) {
+    skipCloseRedirectOnce.value = false
+    return
+  }
   // 关闭注册弹窗时回到公开首页
   void router.replace('/user/home')
 }

@@ -1,6 +1,11 @@
 dist
 node_modules
 coverage
+.playwright-cli
+.playwright-mcp
+output
+*.log
+AGENTS.md
 
 src/auto-imports.d.ts
 src/components.d.ts

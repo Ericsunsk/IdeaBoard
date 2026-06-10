@@ -1,4 +1,5 @@
 import { taskApi } from '../../../shared/api/task'
+import { createTaskCancelledError } from '../../../shared/api/taskEvents'
 import { sanitizeApiErrorMessage } from '../../../shared/utils/errorMessages'
 import {
   type ExecutionFeature,
@@ -281,6 +282,7 @@ export async function waitExistingOrLiveTaskResult(taskId: string): Promise<stri
         outputs?: Array<{ role?: string; url?: string }>
         result?: string | null
         error_msg?: string
+        cancel_reason?: string
       }
     | undefined
   try {
@@ -299,6 +301,9 @@ export async function waitExistingOrLiveTaskResult(taskId: string): Promise<stri
   }
   if (task?.status === 'failed') {
     throw new Error(sanitizeApiErrorMessage(task.error_msg, '生成失败'))
+  }
+  if (task?.status === 'cancelled') {
+    throw createTaskCancelledError(task)
   }
   return waitTaskResult(taskId)
 }

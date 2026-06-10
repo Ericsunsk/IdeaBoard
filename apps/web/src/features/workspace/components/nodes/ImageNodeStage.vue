@@ -12,6 +12,8 @@
       'is-active': active && !expandModeActive,
     }"
     :style="{ height: `${stageHeight}px` }"
+    :aria-busy="directGenerating ? 'true' : undefined"
+    aria-label="图片节点输入与预览区域"
     @dragover.stop="onStageDragOver"
     @drop.stop="onStageDrop"
     @contextmenu.prevent.stop="onStageContextMenu"
@@ -21,8 +23,14 @@
         :src="stageDisplayUrl"
         class="image-node-stage-image"
         :class="{ 'is-dragging': dragging }"
+        alt="图片节点预览"
         draggable="false"
+        role="button"
+        tabindex="0"
+        aria-label="图片节点预览，按 Enter 打开预览，按 Space 添加到画布"
         @dblclick="emit('append-to-canvas')"
+        @keydown.enter.prevent="emit('open-preview')"
+        @keydown.space.prevent="emit('append-to-canvas')"
       />
       <ImageCanvasExtendOverlay
         v-if="expandModeActive && expandOverlayStyle"
@@ -50,18 +58,29 @@
         @canvas-pointerdown="emit('mask-canvas-pointerdown', $event)"
       />
       <div class="image-node-stage-actions">
-        <NodeActionButton variant="stage-ghost" @click="emit('open-preview')"
+        <NodeActionButton
+          variant="stage-ghost"
+          aria-label="打开图片预览"
+          @click="emit('open-preview')"
           >预览</NodeActionButton
         >
-        <NodeActionButton v-if="!inputLocked" variant="stage-ghost" @click="emit('reset')">
+        <NodeActionButton
+          v-if="!inputLocked"
+          variant="stage-ghost"
+          aria-label="清空图片输入"
+          @click="emit('reset')"
+        >
           清空
         </NodeActionButton>
       </div>
     </template>
-    <div
+    <button
       v-if="!displayImage"
+      type="button"
       class="image-node-stage-empty"
       :class="{ 'is-readonly': inputLocked, 'is-loading': directGenerating }"
+      :disabled="emptyStateDisabled"
+      :aria-label="emptyStageAriaLabel"
       @click="onEmptyStateClick"
     >
       <NodeEmptyStateIcon
@@ -69,7 +88,7 @@
         :class="{ 'image-node-stage-loader-logo': directGenerating }"
       />
       <span v-if="!directGenerating">{{ emptyStateLabel }}</span>
-    </div>
+    </button>
   </div>
 </template>
 
@@ -132,6 +151,12 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
 )
+const emptyStateDisabled = computed(() => !!props.inputLocked || !!props.directGenerating)
+const emptyStageAriaLabel = computed(() => {
+  if (props.directGenerating) return '图片正在生成，暂时无法上传'
+  if (props.inputLocked) return '等待生成完成后可上传图片'
+  return '上传图片作为输入'
+})
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
 const outputCountValue = computed(() => clampImageNodeOutputCount(props.outputCount))
 const stageElement = ref<HTMLElement | null>(null)
@@ -148,7 +173,7 @@ function onStageDrop(event: DragEvent) {
 }
 
 function onEmptyStateClick() {
-  if (props.inputLocked) return
+  if (emptyStateDisabled.value) return
   emit('open-file')
 }
 
@@ -175,6 +200,11 @@ function selectOutputCount(value: number) {
   background: #fff;
   cursor: grab;
   user-select: none;
+}
+
+.image-node-stage-image:focus-visible {
+  outline: 3px solid rgba(146, 120, 230, 0.36);
+  outline-offset: -4px;
 }
 
 .image-node-stage-image.is-dragging {
@@ -235,6 +265,7 @@ function selectOutputCount(value: number) {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  outline: none;
   transition:
     background-color 0.2s ease,
     color 0.2s ease;
@@ -243,6 +274,11 @@ function selectOutputCount(value: number) {
 .image-node-stage-empty:hover {
   background: #ffffff;
   color: #8894a5;
+}
+
+.image-node-stage-empty:focus-visible {
+  color: #6f5ed1;
+  box-shadow: inset 0 0 0 3px rgba(146, 120, 230, 0.28);
 }
 
 .image-node-stage-empty .node-empty-state-icon--image {
@@ -262,6 +298,10 @@ function selectOutputCount(value: number) {
 
 .image-node-stage-empty.is-readonly {
   cursor: default;
+}
+
+.image-node-stage-empty:disabled {
+  cursor: not-allowed;
 }
 
 .image-node-stage-empty.is-loading {
@@ -285,7 +325,8 @@ function selectOutputCount(value: number) {
   transition: opacity 0.16s ease;
 }
 
-.image-node-stage:hover .image-node-stage-actions {
+.image-node-stage:hover .image-node-stage-actions,
+.image-node-stage:focus-within .image-node-stage-actions {
   opacity: 1;
   pointer-events: auto;
 }

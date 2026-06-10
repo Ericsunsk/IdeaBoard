@@ -36,7 +36,7 @@
           rounded
           :class="userAvatarButtonClass"
           aria-haspopup="menu"
-          :aria-expanded="false"
+          :aria-expanded="userMenuOpen"
           @click="toggleUserMenu"
         >
           <Avatar
@@ -163,7 +163,14 @@
       </section>
     </main>
 
-    <Menu ref="userMenuRef" :model="userMenuItems" popup :pt="userMenuPt" />
+    <Menu
+      ref="userMenuRef"
+      :model="userMenuItems"
+      popup
+      :pt="userMenuPt"
+      @show="userMenuOpen = true"
+      @hide="userMenuOpen = false"
+    />
     <ConfirmDialog />
 
     <Drawer
@@ -262,6 +269,7 @@ const { logoutAndRedirect } = useLogoutRedirect()
 
 const activeKey = ref<AdminNavigationKey>('statistics')
 const mobileMenuOpen = ref(false)
+const userMenuOpen = ref(false)
 const userMenuRef = ref<PrimePopupMenu | null>(null)
 const anomalyRadarPopoverRef = ref<PrimePopupPanel | null>(null)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
@@ -399,6 +407,7 @@ function handleMobileMenuSelect(key: AdminNavigationKey, closeCallback: () => vo
 }
 
 function toggleUserMenu(event: Event) {
+  userMenuOpen.value = !userMenuOpen.value
   userMenuRef.value?.toggle(event)
 }
 

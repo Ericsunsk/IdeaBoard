@@ -86,4 +86,3 @@ export function getSafeTaskResultImageUrl(result: string): string {
   }
   return ''
 }
-

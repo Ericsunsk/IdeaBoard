@@ -93,6 +93,7 @@
               v-model="registrationEnabled"
               size="small"
               :disabled="registrationSettingLoading"
+              aria-label="开放注册"
               @update:model-value="handleToggleRegistration"
             />
           </div>
@@ -341,9 +342,7 @@
           <Tag value="访问控制" severity="secondary" rounded />
           <Tag value="强制限制" severity="danger" rounded />
         </div>
-        <h2 :class="adminDialogTitleClass">
-          高级访问限制
-        </h2>
+        <h2 :class="adminDialogTitleClass">高级访问限制</h2>
         <p class="mt-2.5 mb-0 text-admin-content leading-7 text-admin-subtitle-color">
           {{ banModalDescription }}
         </p>

@@ -81,7 +81,14 @@
       </div>
     </div>
     <div class="canvas-control-group pointer-events-auto">
-      <button type="button" class="canvas-icon-button share-btn" aria-label="分享" @mousedown.stop>
+      <button
+        type="button"
+        class="canvas-icon-button share-btn"
+        aria-label="分享功能稍后接入"
+        title="分享功能稍后接入"
+        disabled
+        @mousedown.stop
+      >
         <span class="canvas-icon-swap" aria-hidden="true">
           <ShareAndroid class="canvas-control-icon canvas-icon-swap-default" />
           <ShareAndroidSolid class="canvas-control-icon canvas-icon-swap-hover" />
@@ -102,9 +109,17 @@
           type="button"
           class="canvas-icon-button !flex !size-10 !shrink-0 !cursor-pointer !items-center !justify-center !overflow-visible !rounded-full !border-[var(--canvas-control-border-width)] !border-[#e2e4e8] !bg-[#f1f3f9] !text-[var(--ib-control-icon)] hover:!border-[#d8ddea] hover:!bg-[var(--ib-control-bg-hover)] hover:!text-[var(--ib-control-icon-hover)]"
           aria-label="账户菜单"
+          aria-haspopup="menu"
+          :aria-expanded="isUserMenuOpen"
+          aria-controls="workspace-user-menu"
           @click="toggleUserMenu"
         >
-          <img v-if="avatarUrl" :src="avatarUrl" class="h-full w-full rounded-[inherit] object-cover" />
+          <img
+            v-if="avatarUrl"
+            :src="avatarUrl"
+            class="h-full w-full rounded-[inherit] object-cover"
+            alt="用户头像"
+          />
           <div
             v-else
             class="flex h-full w-full items-center justify-center overflow-hidden rounded-[inherit]"
@@ -114,6 +129,7 @@
         </button>
         <div
           v-if="isUserMenuOpen"
+          id="workspace-user-menu"
           v-motion="{
             initial: { opacity: 0, y: 6, scale: 0.98 },
             enter: {
@@ -123,16 +139,19 @@
               transition: { duration: 160, easing: 'ease-out' },
             },
           }"
+          role="menu"
           class="absolute top-[calc(100%+8px)] right-0 z-[140] flex w-32 flex-col gap-0.5 rounded-[10px] bg-white/[0.98] p-1.5 backdrop-blur-[10px] [border:var(--canvas-control-border-width)_solid_#d8ddea]"
         >
           <button
             class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[#4b5565] hover:bg-[rgba(146,120,230,0.12)]"
+            role="menuitem"
             @click="onOpenCenter"
           >
             个人中心
           </button>
           <button
             class="h-[34px] w-full cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-left text-[13px] font-semibold text-[#d14343] hover:bg-[rgba(209,67,67,0.1)]"
+            role="menuitem"
             @click="onLogout"
           >
             退出登录

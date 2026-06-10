@@ -28,8 +28,10 @@
       type="button"
       class="canvas-icon-button"
       :class="{ 'is-active': activeTool === 'text' }"
-      aria-label="文本 (T)"
+      aria-label="文本工具稍后接入"
       :aria-pressed="activeTool === 'text'"
+      title="文本工具稍后接入"
+      disabled
       @click="emit('select-tool', 'text')"
     >
       <Text class="canvas-control-icon" />

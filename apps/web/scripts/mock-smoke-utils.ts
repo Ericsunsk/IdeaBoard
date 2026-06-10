@@ -1,8 +1,9 @@
-import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcessByStdio } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import type { Readable } from 'node:stream'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
@@ -81,7 +82,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
   const isVerbose = readBooleanEnv(process.env[options.verboseEnvName])
   const devServerLogs: string[] = []
 
-  let devServer: ChildProcessWithoutNullStreams | null = null
+  let devServer: ChildProcessByStdio<null, Readable, Readable> | null = null
   let smokePort = preferredPort
 
   const baseUrl = () => `http://${host}:${smokePort}`
@@ -143,7 +144,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
 
   async function startDevServer(extraEnv: Record<string, string | undefined> = {}) {
     smokePort = await resolveSmokePort()
-    devServer = spawn(
+    const server = spawn(
       process.platform === 'win32' ? 'npm.cmd' : 'npm',
       ['run', 'dev', '--', '--host', host, '--port', String(smokePort), '--strictPort'],
       {
@@ -155,9 +156,10 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     )
+    devServer = server
 
-    devServer.stdout.on('data', (chunk: Buffer) => recordDevServerOutput(chunk, 'stdout'))
-    devServer.stderr.on('data', (chunk: Buffer) => recordDevServerOutput(chunk, 'stderr'))
+    server.stdout.on('data', (chunk: Buffer) => recordDevServerOutput(chunk, 'stdout'))
+    server.stderr.on('data', (chunk: Buffer) => recordDevServerOutput(chunk, 'stderr'))
     await waitForDevServer()
   }
 
@@ -178,11 +180,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
     const stderr = result.stderr || ''
     if (result.status !== 0 && !runOptions.allowFailure) {
       throw new Error(
-        [
-          `Command failed: ${spec.command} ${fullArgs.join(' ')}`,
-          stdout.trim(),
-          stderr.trim(),
-        ]
+        [`Command failed: ${spec.command} ${fullArgs.join(' ')}`, stdout.trim(), stderr.trim()]
           .filter(Boolean)
           .join('\n'),
       )

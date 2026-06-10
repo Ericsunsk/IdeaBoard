@@ -1,8 +1,31 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useUserStore } from './user'
 import { queryClient } from '../../shared/query/queryClient'
 import type { User } from '../../shared/types'
+import { getUserInfoApi } from '../../shared/api/user'
+import { authClient } from '../../shared/auth/client'
+
+vi.mock('../../shared/api/user', () => ({
+  getUserInfoApi: vi.fn(),
+}))
+
+vi.mock('../../shared/auth/client', () => ({
+  authClient: {
+    signIn: {
+      username: vi.fn(),
+    },
+    signUp: {
+      email: vi.fn(),
+    },
+    signOut: vi.fn(),
+    getSession: vi.fn(),
+  },
+  extractBetterAuthErrorMessage: (error: unknown, fallback: string) =>
+    error && typeof error === 'object' && 'message' in error
+      ? String((error as { message?: unknown }).message || fallback)
+      : fallback,
+}))
 
 function makeUser(overrides: Partial<User> = {}): User {
   const id = overrides.id ?? 1
@@ -21,6 +44,7 @@ function makeUser(overrides: Partial<User> = {}): User {
 
 describe('useUserStore auth cache handling', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     queryClient.clear()
     localStorage.clear()
     setActivePinia(createPinia())
@@ -54,5 +78,49 @@ describe('useUserStore auth cache handling', () => {
     store.setAuth(makeUser({ id: 1, uid: 'USER01', auth_user_id: 'auth-1', avatar: '/avatar.png' }))
 
     expect(queryClient.getQueryData(['user', 'boards'])).toEqual({ owner: 1 })
+  })
+
+  it('registers and stores the created session user', async () => {
+    const store = useUserStore()
+    const registeredUser = makeUser({ id: 2, uid: 'USER02', username: 'alice' })
+    vi.mocked(authClient.signUp.email).mockResolvedValue({} as never)
+    vi.mocked(getUserInfoApi).mockResolvedValue({
+      code: 0,
+      msg: 'ok',
+      data: { user: registeredUser },
+    } as never)
+
+    await store.register(' alice ', 'secret-password')
+
+    expect(authClient.signUp.email).toHaveBeenCalledWith({
+      email: 'alice@ideaboard.local',
+      password: 'secret-password',
+      name: 'alice',
+      username: 'alice',
+    })
+    expect(authClient.signIn.username).not.toHaveBeenCalled()
+    expect(store.user).toEqual(registeredUser)
+  })
+
+  it('falls back to username login when sign up does not restore user info', async () => {
+    const store = useUserStore()
+    const registeredUser = makeUser({ id: 3, uid: 'USER03', username: 'bob' })
+    vi.mocked(authClient.signUp.email).mockResolvedValue({} as never)
+    vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
+    vi.mocked(getUserInfoApi)
+      .mockResolvedValueOnce({ code: 0, msg: 'ok', data: {} } as never)
+      .mockResolvedValueOnce({
+        code: 0,
+        msg: 'ok',
+        data: { user: registeredUser },
+      } as never)
+
+    await store.register('bob', 'secret-password')
+
+    expect(authClient.signIn.username).toHaveBeenCalledWith({
+      username: 'bob',
+      password: 'secret-password',
+    })
+    expect(store.user).toEqual(registeredUser)
   })
 })
