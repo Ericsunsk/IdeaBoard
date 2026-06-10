@@ -35,7 +35,6 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 		FeatureSlugPartialEdit,
 		FeatureSlugRemoveBg,
 		FeatureSlugStyleFusion,
-		FeatureSlugVirtual3D,
 		FeatureSlugPatternGen,
 		FeatureSlugHDUpscale,
 		FeatureSlugImageExtend,

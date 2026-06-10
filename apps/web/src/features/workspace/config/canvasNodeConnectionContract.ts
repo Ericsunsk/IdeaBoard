@@ -4,17 +4,12 @@ import type {
   FusionNodeItem,
   ImageNodeItem,
   PromptNodeItem,
-  ViewpointNodeItem,
 } from '../types/canvasNodes'
 
 export type CanvasConnectionKind = 'image' | 'prompt'
 export type CanvasConnectionDirection = 'input' | 'output'
 
-export type CanvasConnectionContractNode =
-  | PromptNodeItem
-  | ImageNodeItem
-  | ViewpointNodeItem
-  | FusionNodeItem
+export type CanvasConnectionContractNode = PromptNodeItem | ImageNodeItem | FusionNodeItem
 
 export interface CanvasNodePortContract {
   port: CanvasConnectionPort
@@ -49,8 +44,6 @@ export function getCanvasNodePortContracts(
       return [input('image', 'image'), output('image', 'image'), output('prompt', 'prompt')]
     case 'image':
       return [input('image', 'image'), output('image', 'image')]
-    case 'viewpoint':
-      return [input('image', 'image', true), input('prompt', 'prompt'), output('image', 'image')]
     case 'fusion':
       return [input('image', 'image', true), input('prompt', 'prompt'), output('image', 'image')]
     default:

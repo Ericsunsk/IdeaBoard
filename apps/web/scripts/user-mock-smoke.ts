@@ -58,7 +58,6 @@ const MOCK_BOARD_STATE = {
       inputImages: [],
     },
   ],
-  viewpointNodes: [],
   fusionNodes: [],
   connections: [],
   viewport: { canvasX: 0, canvasY: 0, zoomLevel: 100 },

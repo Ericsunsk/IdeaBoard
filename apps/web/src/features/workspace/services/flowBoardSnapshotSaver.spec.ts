@@ -28,7 +28,6 @@ function makeSnapshot(zoomLevel: number): CanvasBoardSnapshot {
   return {
     imageNodes: [],
     promptNodes: [],
-    viewpointNodes: [],
     fusionNodes: [],
     connections: [],
     viewport: { canvasX: 0, canvasY: 0, zoomLevel },

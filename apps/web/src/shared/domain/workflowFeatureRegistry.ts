@@ -2,7 +2,6 @@ import { WORKFLOW_FEATURE, type WorkflowFeature } from './workflowFeatures'
 
 export const WORKFLOW_FEATURE_GROUP = {
   prompt: 'prompt',
-  display: 'display',
   fusion: 'fusion',
   inpaint: 'inpaint',
   imageTools: 'image-tools',
@@ -24,12 +23,6 @@ export const WORKFLOW_FEATURE_GROUP_LIST: readonly WorkflowFeatureGroupMeta[] = 
     title: 'Prompt',
     desc: '草图成图、风格延展、抠图和图案生成类右键/生成工作流。',
     order: 10,
-  },
-  {
-    key: WORKFLOW_FEATURE_GROUP.display,
-    title: 'Display',
-    desc: '商品展示视角、光影和陈列表达。',
-    order: 30,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.fusion,
@@ -87,11 +80,6 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     slug: WORKFLOW_FEATURE.styleFusion,
     label: '多图融合',
     groupKey: WORKFLOW_FEATURE_GROUP.fusion,
-  },
-  {
-    slug: WORKFLOW_FEATURE.virtual3d,
-    label: '商品展示',
-    groupKey: WORKFLOW_FEATURE_GROUP.display,
   },
   {
     slug: WORKFLOW_FEATURE.removeBg,

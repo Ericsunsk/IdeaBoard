@@ -1,8 +1,4 @@
-export type CanvasNodeCreateActionKey =
-  | 'createImageNode'
-  | 'createPromptNode'
-  | 'createViewpointNode'
-  | 'createFusionNode'
+export type CanvasNodeCreateActionKey = 'createImageNode' | 'createPromptNode' | 'createFusionNode'
 
 export interface CanvasNodeMenuItem {
   key: string
@@ -27,13 +23,6 @@ export const CANVAS_NODE_MENU_ITEMS: readonly CanvasNodeMenuItem[] = [
     actionKey: 'createFusionNode',
     group: 'process',
     order: 60,
-  },
-  {
-    key: 'viewpoint',
-    label: '+ Display 节点',
-    actionKey: 'createViewpointNode',
-    group: 'process',
-    order: 80,
   },
 ] as const
 

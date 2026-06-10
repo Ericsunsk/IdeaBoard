@@ -160,7 +160,7 @@ export function useFlowSelectionExport(options: UseFlowSelectionExportOptions) {
       const data = node.data
       if (!data) continue
       const kind = data.kind
-      if (kind !== 'image' && kind !== 'fusion' && kind !== 'viewpoint') {
+      if (kind !== 'image' && kind !== 'fusion') {
         continue
       }
       const snapshotNode = data.snapshotNode

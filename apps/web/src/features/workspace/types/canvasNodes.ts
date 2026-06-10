@@ -81,20 +81,6 @@ export interface PromptNodeInputImage extends ImageNodeOutputItem {
 }
 export type FusionNodeInputImage = PromptNodeInputImage
 
-export interface ViewpointNodeItem {
-  id: number
-  type: 'viewpoint'
-  x: number
-  y: number
-  width: number
-  title?: string
-  activeCategory: 'top' | 'bottom' | 'set'
-  selectedViewpoint: string
-  lighting: 'warm_white' | 'afternoon' | 'hard_light'
-  outputStatus: WorkflowNodeOutputStatus
-  outputImages: ImageNodeOutputItem[]
-}
-
 export interface ImageNodeOutputItem {
   url: string
   ratio: number
@@ -131,12 +117,9 @@ export interface FusionNodeItem {
   outputImages: ImageNodeOutputItem[]
 }
 
-export type CanvasExecutionOutputNodeType = 'viewpoint' | 'fusion'
+export type CanvasExecutionOutputNodeType = 'fusion'
 
-export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = [
-  'viewpoint',
-  'fusion',
-]
+export const EXECUTION_OUTPUT_NODE_TYPES: readonly CanvasExecutionOutputNodeType[] = ['fusion']
 
 export function isCanvasExecutionOutputNodeType(
   value: unknown,
@@ -147,18 +130,17 @@ export function isCanvasExecutionOutputNodeType(
   )
 }
 
-export type CanvasExecutionOutputNodeItem = ViewpointNodeItem | FusionNodeItem
+export type CanvasExecutionOutputNodeItem = FusionNodeItem
 
 export type CanvasImageOutputNodeType = 'image' | CanvasExecutionOutputNodeType
 
 export type CanvasImageOutputNodeItem = ImageNodeItem | CanvasExecutionOutputNodeItem
 
-export type CanvasConnectionNodeType = 'image' | 'prompt' | 'viewpoint' | 'fusion'
+export type CanvasConnectionNodeType = 'image' | 'prompt' | 'fusion'
 
 export const CANVAS_CONNECTION_NODE_TYPES: readonly CanvasConnectionNodeType[] = [
   'image',
   'prompt',
-  'viewpoint',
   'fusion',
 ] as const
 
@@ -175,8 +157,6 @@ export function getDefaultCanvasNodeTitle(nodeType: CanvasConnectionNodeType): s
       return 'Image'
     case 'prompt':
       return 'Prompt'
-    case 'viewpoint':
-      return 'Display'
     case 'fusion':
       return 'Fusion'
   }
@@ -193,7 +173,7 @@ export interface CanvasConnection {
   toPort: CanvasConnectionPort
 }
 
-export type CanvasNodeItem = PromptNodeItem | ViewpointNodeItem | ImageNodeItem | FusionNodeItem
+export type CanvasNodeItem = PromptNodeItem | ImageNodeItem | FusionNodeItem
 
 export interface CanvasViewportState {
   canvasX: number
@@ -204,7 +184,6 @@ export interface CanvasViewportState {
 export interface CanvasBoardSnapshot {
   imageNodes: ImageNodeItem[]
   promptNodes: PromptNodeItem[]
-  viewpointNodes: ViewpointNodeItem[]
   fusionNodes: FusionNodeItem[]
   connections: CanvasConnection[]
   viewport: CanvasViewportState

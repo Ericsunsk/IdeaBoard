@@ -73,7 +73,6 @@ interface BoardPreviewBounds {
 const BOARD_NODE_COLLECTIONS = [
   { key: 'imageNodes', nodeType: 'image' },
   { key: 'promptNodes', nodeType: 'prompt' },
-  { key: 'viewpointNodes', nodeType: 'viewpoint' },
   { key: 'fusionNodes', nodeType: 'fusion' },
 ] as const satisfies ReadonlyArray<{
   key: keyof CanvasBoardSnapshot

@@ -654,12 +654,6 @@ function defaultMockFeaturePromptVariables(slug: string): FeaturePromptVariable[
       return promptVariables('{{user_prompt}}')
     case WORKFLOW_FEATURE.styleVariation:
       return [{ key: '{{strength}}', tone: 'control' }]
-    case WORKFLOW_FEATURE.virtual3d:
-      return [
-        { key: '{{viewpoint}}', tone: 'context' },
-        { key: '{{lighting}}', tone: 'context' },
-        { key: '{{user_prompt}}', tone: 'prompt' },
-      ]
     case WORKFLOW_FEATURE.styleFusion:
       return [
         { key: '{{user_prompt}}', tone: 'prompt' },

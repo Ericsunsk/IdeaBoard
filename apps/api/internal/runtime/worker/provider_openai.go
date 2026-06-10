@@ -403,7 +403,6 @@ func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq prov
 func openAISharedAllowedParamKeys() []string {
 	return []string{
 		"variation_strength",
-		"viewpoint",
 		"extend_top",
 		"extend_right",
 		"extend_bottom",

@@ -98,11 +98,10 @@ const handleOutputPorts = computed(() => getCanvasNodeVisiblePortsForKind('outpu
 const hasInputPorts = computed(() => handleInputPorts.value.length > 0)
 const areAggregateHandlesConnectable = computed(() => props.showHandles === true)
 const nodeKindLabel = computed(() => {
-  const labels: Record<FlowNodeData['kind'], string> = {
+  const labels: Partial<Record<FlowNodeData['kind'], string>> = {
     prompt: '提示词节点',
     image: '图片节点',
     fusion: '融合节点',
-    viewpoint: '视角节点',
   }
   return labels[props.kind] ?? '节点'
 })

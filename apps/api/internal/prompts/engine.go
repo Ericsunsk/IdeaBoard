@@ -10,46 +10,6 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-var viewpointTemplateLabels = map[string]string{
-	"top_front":      "正面平视",
-	"top_side":       "微侧展示",
-	"top_45":         "45° 侧视",
-	"top_back":       "背面展示",
-	"btm_front":      "正面立体",
-	"btm_side":       "微侧立体",
-	"btm_half_side":  "半侧动态",
-	"btm_back":       "背面立体",
-	"set_front":      "正面展示",
-	"set_45_side":    "45° 微侧",
-	"set_side_stand": "侧面静立",
-	"set_back":       "背面展示",
-}
-
-var viewpointLightingTemplateLabels = map[string]string{
-	"warm_white": "高级暖白",
-	"afternoon":  "午后暖阳",
-	"hard_light": "质感硬光",
-}
-
-func DescribeViewpointTemplateValue(value string) string {
-	return describeTemplateLabel(value, viewpointTemplateLabels)
-}
-
-func DescribeViewpointLightingTemplateValue(value string) string {
-	return describeTemplateLabel(value, viewpointLightingTemplateLabels)
-}
-
-func describeTemplateLabel(value string, labels map[string]string) string {
-	normalized := strings.TrimSpace(value)
-	if normalized == "" {
-		return ""
-	}
-	if label, ok := labels[normalized]; ok {
-		return label
-	}
-	return normalized
-}
-
 type promptParamReader func(map[string]interface{}, string) (interface{}, bool)
 type promptParamFormatter func(interface{}) (string, bool)
 
@@ -87,18 +47,6 @@ var featurePromptBindings = map[string][]promptTemplateBinding{
 		stringPromptBinding("{{upscale_factor}}", "upscale_factor"),
 		stringPromptBinding("{{output_format}}", "output_format"),
 		stringPromptBinding("{{output_quality}}", "output_quality"),
-	},
-	workflow.FeatureSlugVirtual3D: {
-		{
-			placeholder: "{{viewpoint}}",
-			paramKey:    "viewpoint",
-			formatter:   viewpointPromptValue,
-		},
-		{
-			placeholder: "{{lighting}}",
-			paramKey:    "lighting",
-			formatter:   lightingPromptValue,
-		},
 	},
 }
 
@@ -163,14 +111,6 @@ func readDirectPromptParam(params map[string]interface{}, key string) (interface
 
 func stringPromptValue(value interface{}) (string, bool) {
 	return fmt.Sprintf("%v", value), true
-}
-
-func viewpointPromptValue(value interface{}) (string, bool) {
-	return DescribeViewpointTemplateValue(fmt.Sprintf("%v", value)), true
-}
-
-func lightingPromptValue(value interface{}) (string, bool) {
-	return DescribeViewpointLightingTemplateValue(fmt.Sprintf("%v", value)), true
 }
 
 func ApplyFeatureSystemPrompt(

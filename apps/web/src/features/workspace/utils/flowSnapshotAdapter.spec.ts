@@ -346,7 +346,6 @@ describe('flowSnapshotAdapter', () => {
     const flow = canvasBoardSnapshotToFlow({
       imageNodes: [],
       promptNodes: [],
-      viewpointNodes: [],
       fusionNodes: [
         {
           id: 31,

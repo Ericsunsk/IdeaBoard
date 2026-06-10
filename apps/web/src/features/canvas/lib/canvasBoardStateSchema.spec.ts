@@ -28,20 +28,6 @@ function createValidState() {
         text: 'prompt',
       },
     ],
-    viewpointNodes: [
-      {
-        id: 5,
-        type: 'viewpoint' as const,
-        x: 0,
-        y: 0,
-        width: 240,
-        activeCategory: 'top' as const,
-        selectedViewpoint: 'front',
-        lighting: 'warm_white' as const,
-        outputStatus: 'idle' as const,
-        outputImages: [],
-      },
-    ],
     fusionNodes: [
       {
         id: 8,
@@ -64,8 +50,8 @@ function createValidState() {
         fromNodeType: 'image' as const,
         fromNodeId: 2,
         fromPort: 'image' as const,
-        toNodeType: 'viewpoint' as const,
-        toNodeId: 5,
+        toNodeType: 'fusion' as const,
+        toNodeId: 8,
         toPort: 'image' as const,
       },
     ],
@@ -86,7 +72,6 @@ describe('canvasBoardStateSchema', () => {
     const parsed = v.safeParse(canvasBoardStateSchema, {
       imageNodes: [],
       promptNodes: [],
-      viewpointNodes: [],
       fusionNodes: [],
       connections: [],
       viewport: { canvasX: 0, canvasY: 0, zoomLevel: 1 },

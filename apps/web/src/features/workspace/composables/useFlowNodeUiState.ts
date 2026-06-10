@@ -13,7 +13,6 @@ import {
   type CanvasExecutionOutputNodeItem,
   type CanvasExecutionOutputNodeType,
   type CanvasNodeItem,
-  type ViewpointNodeItem,
 } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import { parseHandlePort, resolveSourceImageFromNode } from '../services/flowTaskExecutorUtils'
@@ -51,8 +50,6 @@ function resolveExecutionActionLabels(
   nodeType: CanvasExecutionOutputNodeType,
 ): ExecutionActionLabels {
   switch (nodeType) {
-    case 'viewpoint':
-      return { ready: '生成', running: '生成中...' }
     case 'fusion':
       return { ready: '融合', running: '融合中...' }
   }
@@ -154,22 +151,9 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       }
     }
 
-    function resolveExecutionBlockedLabel(
-      nodeType: CanvasExecutionOutputNodeType,
-      node: CanvasExecutionOutputNodeItem,
-    ): string | null {
-      switch (nodeType) {
-        case 'viewpoint':
-          return (node as ViewpointNodeItem).selectedViewpoint ? null : '选择视角'
-        default:
-          return null
-      }
-    }
-
     function buildPrimaryAction(
       nodeType: CanvasExecutionOutputNodeType,
       nodeId: string,
-      executionNode: CanvasExecutionOutputNodeItem,
       status: FlowNodeConnectionStatus,
     ) {
       const actionLabels = resolveExecutionActionLabels(nodeType)
@@ -205,14 +189,6 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
             pendingPorts.length === 1
               ? `等待 ${pendingLabels[0]}`
               : `等待 ${pendingPorts.length} 个输入`,
-          disabled: true,
-        }
-      }
-
-      const blockedLabel = resolveExecutionBlockedLabel(nodeType, executionNode)
-      if (blockedLabel) {
-        return {
-          label: blockedLabel,
           disabled: true,
         }
       }
@@ -258,7 +234,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       const executionNode = snapshotNode as CanvasExecutionOutputNodeItem
       result[node.id] = {
         connection,
-        primaryAction: buildPrimaryAction(nodeType, node.id, executionNode, status),
+        primaryAction: buildPrimaryAction(nodeType, node.id, status),
         cacheStatus: resolveWorkflowNodeOutputStatus(
           executionNode.outputStatus,
           executionNode.outputImages,

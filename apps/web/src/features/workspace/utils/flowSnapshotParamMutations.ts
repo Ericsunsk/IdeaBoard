@@ -1,8 +1,4 @@
-import {
-  normalizeViewpointSelectionByCategory,
-  VIEWPOINT_LIGHTING_OPTIONS,
-} from '../config/nodeOptions'
-import type { PromptNodeInputImage, ViewpointNodeItem } from '../types/canvasNodes'
+import type { PromptNodeInputImage } from '../types/canvasNodes'
 import { normalizePromptAspectRatio } from '../config/promptAspectRatio'
 import { clampImageNodeOutputCount } from '../types/canvasNodes'
 import {
@@ -123,35 +119,6 @@ export function patchFlowSnapshotParam(
       const nextStrength = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
       if (snapshotNode.strength === nextStrength) return snapshotNode
       return { ...snapshotNode, strength: nextStrength }
-    }
-    case 'activeCategory': {
-      const category = value as ViewpointNodeItem['activeCategory']
-      const nextSelectedViewpoint = normalizeViewpointSelectionByCategory(
-        category,
-        String(snapshotNode.selectedViewpoint ?? ''),
-      )
-      if (
-        snapshotNode.activeCategory === category &&
-        snapshotNode.selectedViewpoint === nextSelectedViewpoint
-      ) {
-        return snapshotNode
-      }
-      return { ...snapshotNode, activeCategory: category, selectedViewpoint: nextSelectedViewpoint }
-    }
-    case 'selectedViewpoint': {
-      const nextSelectedViewpoint = String(value ?? '')
-      if (snapshotNode.selectedViewpoint === nextSelectedViewpoint) return snapshotNode
-      return { ...snapshotNode, selectedViewpoint: nextSelectedViewpoint }
-    }
-    case 'lighting': {
-      const allowed = VIEWPOINT_LIGHTING_OPTIONS.some(
-        (option: { value: string }) => option.value === value,
-      )
-      if (allowed) {
-        if (snapshotNode.lighting === value) return snapshotNode
-        return { ...snapshotNode, lighting: value }
-      }
-      return snapshotNode
     }
     default:
       return snapshotNode

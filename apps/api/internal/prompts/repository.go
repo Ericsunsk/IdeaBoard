@@ -256,12 +256,6 @@ func defaultPromptVariables(slug string) []FeaturePromptVariable {
 		return promptVariables("{{user_prompt}}")
 	case workflow.FeatureSlugStyleVariation:
 		return []FeaturePromptVariable{{Key: "{{strength}}", Tone: "control"}}
-	case workflow.FeatureSlugVirtual3D:
-		return []FeaturePromptVariable{
-			{Key: "{{viewpoint}}", Tone: "context"},
-			{Key: "{{lighting}}", Tone: "context"},
-			{Key: "{{user_prompt}}", Tone: "prompt"},
-		}
 	case workflow.FeatureSlugStyleFusion:
 		return []FeaturePromptVariable{
 			{Key: "{{user_prompt}}", Tone: "prompt"},

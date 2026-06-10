@@ -89,7 +89,7 @@ export function parseHandlePort(handle: string | null | undefined): string {
 
 export function resolveNodeType(nodeId: string): CanvasConnectionNodeType | null {
   const [head] = nodeId.split('-')
-  if (head === 'prompt' || head === 'image' || head === 'viewpoint' || head === 'fusion') {
+  if (head === 'prompt' || head === 'image' || head === 'fusion') {
     return head
   }
   return null
@@ -171,11 +171,7 @@ export async function assertTaskSubmitReady(
 }
 
 /** All node kinds that can produce image output usable as downstream source. */
-export const FLOW_EXECUTION_SOURCE_KINDS = new Set<CanvasConnectionNodeType>([
-  'image',
-  'fusion',
-  'viewpoint',
-])
+export const FLOW_EXECUTION_SOURCE_KINDS = new Set<CanvasConnectionNodeType>(['image', 'fusion'])
 
 export function isFlowExecutionSourceKind(kind: string): kind is CanvasConnectionNodeType {
   return FLOW_EXECUTION_SOURCE_KINDS.has(kind as CanvasConnectionNodeType)

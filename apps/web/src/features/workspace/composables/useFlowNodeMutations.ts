@@ -4,7 +4,6 @@ import {
   createFusionNodeAt,
   createImageNodeAt,
   createPromptNodeAt,
-  createViewpointNodeAt,
 } from '../utils/canvasNodeFactory'
 import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowConnectionAdapter'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
@@ -14,7 +13,7 @@ import { getDefaultCanvasNodeTitle } from '../types/canvasNodes'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { FlowHistorySnapshot, FlowTransactions } from './useFlowTransactions'
 
-export type FlowCreatableNodeKind = 'prompt' | 'image' | 'fusion' | 'viewpoint'
+export type FlowCreatableNodeKind = 'prompt' | 'image' | 'fusion'
 
 type UseFlowNodeMutationsOptions = {
   nodes: Ref<Array<Record<string, any>>>
@@ -53,8 +52,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         return createImageNodeAt(point)
       case 'fusion':
         return createFusionNodeAt(point)
-      case 'viewpoint':
-        return createViewpointNodeAt(point)
     }
   }
 
@@ -233,7 +230,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     updateSnapshotNode(nodeId, (snapshotNode) => patchFlowSnapshotParam(snapshotNode, payload))
   }
 
-  const EXECUTION_NODE_KINDS = new Set(['fusion', 'viewpoint'])
+  const EXECUTION_NODE_KINDS = new Set(['fusion'])
 
   function markFlowExecutionNodeDirty(
     nodeId: string,

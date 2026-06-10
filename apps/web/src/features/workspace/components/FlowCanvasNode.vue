@@ -126,22 +126,6 @@
         />
       </div>
     </template>
-    <template v-else-if="isViewpointNode && viewpointSnapshot">
-      <ViewpointNode
-        :node="viewpointSnapshot"
-        :active="selected"
-        :dragging="props.dragging"
-        :copy-mode="props.copyMode"
-        :ui-state="props.uiState"
-        @node-mousedown="noopMouse"
-        @update:title="emitNodeParam('title', $event)"
-        @delete="onDeleteRequest"
-        @update:category="emitNodeParam('activeCategory', $event)"
-        @select:viewpoint="emitNodeParam('selectedViewpoint', $event)"
-        @update:lighting="emitNodeParam('lighting', $event)"
-        @generate="onViewpointGenerate"
-      />
-    </template>
     <template v-else>
       <div class="flow-canvas-node__unsupported">Unsupported node</div>
     </template>
@@ -165,12 +149,7 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
 import { computed, reactive, ref, watch } from 'vue'
-import type {
-  FusionNodeItem,
-  ImageNodeItem,
-  PromptNodeItem,
-  ViewpointNodeItem,
-} from '../types/canvasNodes'
+import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../types/canvasNodes'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { ImageNodeAction, ImageStrengthAction } from '../types/imageActions'
@@ -244,7 +223,6 @@ const emit = defineEmits<{
   (e: 'update-prompt-text', value: string): void
   (e: 'update-node-param', payload: { key: string; value: unknown }): void
   (e: 'delete-node'): void
-  (e: 'generate-viewpoint'): void
   (e: 'image-stage-drop', event: DragEvent): void
   (e: 'media-input-image-drop', nodeId: string, event: DragEvent): void
   (e: 'media-input-image-open', nodeId: string): void
@@ -278,7 +256,6 @@ const emit = defineEmits<{
 const isPromptNode = computed(() => props.data.kind === 'prompt')
 const isImageNode = computed(() => props.data.kind === 'image')
 const isFusionNode = computed(() => props.data.kind === 'fusion')
-const isViewpointNode = computed(() => props.data.kind === 'viewpoint')
 const showDefaultDragZone = false
 const disableHandleRailInteraction = computed(
   () => isImageNode.value && (!!props.expandModeActive || !!props.maskEditorModeActive),
@@ -311,9 +288,7 @@ const handleRailStyle = computed(() => ({
 const showHandleControls = computed(
   () =>
     !disableHandleRailInteraction.value &&
-    (isPointerOverNode.value ||
-      isKeyboardFocusWithinNode.value ||
-      isTouchHandleHintActive.value),
+    (isPointerOverNode.value || isKeyboardFocusWithinNode.value || isTouchHandleHintActive.value),
 )
 
 function resolveSnapshotNode<T>() {
@@ -333,9 +308,6 @@ const imageSnapshot = computed<ImageNodeItem | null>(() => {
 })
 const fusionSnapshot = computed<FusionNodeItem | null>(() =>
   isFusionNode.value ? resolveSnapshotNode<FusionNodeItem>() : null,
-)
-const viewpointSnapshot = computed<ViewpointNodeItem | null>(() =>
-  isViewpointNode.value ? resolveSnapshotNode<ViewpointNodeItem>() : null,
 )
 
 const displayImage = computed<{ url: string } | null>(() => {
@@ -588,10 +560,6 @@ function emitNodeParam(key: string, value: unknown) {
 
 function onDeleteRequest() {
   emit('delete-node')
-}
-
-function onViewpointGenerate() {
-  emit('generate-viewpoint')
 }
 
 function onImageStageDrop(event: DragEvent) {

@@ -8,33 +8,6 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func TestTemplateValueDescriptions(t *testing.T) {
-	tests := []struct {
-		name string
-		got  string
-		want string
-	}{
-		{
-			name: "viewpoint uses display label",
-			got:  prompts.DescribeViewpointTemplateValue("top_45"),
-			want: "45° 侧视",
-		},
-		{
-			name: "lighting uses readable label",
-			got:  prompts.DescribeViewpointLightingTemplateValue("hard_light"),
-			want: "质感硬光",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.got != tt.want {
-				t.Fatalf("got %q, want %q", tt.got, tt.want)
-			}
-		})
-	}
-}
-
 func TestParseWorkflowFeatureSlug(t *testing.T) {
 	tests := []struct {
 		name string

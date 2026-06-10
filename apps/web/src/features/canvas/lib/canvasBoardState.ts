@@ -6,14 +6,12 @@ import type {
   ImageNodeItem,
   ImageNodeOutputItem,
   PromptNodeItem,
-  ViewpointNodeItem,
 } from '../../workspace/types/canvasNodes'
 import * as v from 'valibot'
 import { getAuthStorageUserScope } from '../../../shared/utils/auth'
 import { canvasBoardStateSchema } from './canvasBoardStateSchema'
 
 export type CanvasBoardStatePromptNode = PromptNodeItem
-export type CanvasBoardStateViewpointNode = ViewpointNodeItem
 export type CanvasBoardStateImageNodeOutput = ImageNodeOutputItem
 export type CanvasBoardStateImageNode = ImageNodeItem
 export type CanvasBoardStateFusionNode = FusionNodeItem
@@ -70,7 +68,6 @@ function stripPreviewSnapshot(state: CanvasBoardState): CanvasBoardState {
   return {
     imageNodes: state.imageNodes,
     promptNodes: state.promptNodes,
-    viewpointNodes: state.viewpointNodes,
     fusionNodes: state.fusionNodes,
     connections: state.connections,
     viewport: state.viewport,
@@ -153,7 +150,6 @@ export function collectCanvasBoardImageUrls(
   })
 
   appendOutputNodeImageUrls(urls, snapshot.imageNodes)
-  appendOutputNodeImageUrls(urls, snapshot.viewpointNodes)
   appendOutputNodeImageUrls(urls, snapshot.fusionNodes)
 
   return urls

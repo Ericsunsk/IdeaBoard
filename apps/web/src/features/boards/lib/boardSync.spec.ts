@@ -25,7 +25,6 @@ function makeState(updatedAt: number, zoomLevel: number): CanvasBoardState {
   return {
     imageNodes: [],
     promptNodes: [],
-    viewpointNodes: [],
     fusionNodes: [],
     connections: [],
     viewport: { canvasX: 0, canvasY: 0, zoomLevel },

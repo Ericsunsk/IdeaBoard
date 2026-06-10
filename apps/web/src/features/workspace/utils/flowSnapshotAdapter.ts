@@ -30,7 +30,7 @@ export interface FlowAdapterEdge {
   data?: unknown
 }
 
-type SnapshotNodeCollectionKey = 'imageNodes' | 'promptNodes' | 'viewpointNodes' | 'fusionNodes'
+type SnapshotNodeCollectionKey = 'imageNodes' | 'promptNodes' | 'fusionNodes'
 
 const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
   key: SnapshotNodeCollectionKey
@@ -38,7 +38,6 @@ const SNAPSHOT_NODE_COLLECTIONS: ReadonlyArray<{
 }> = [
   { key: 'imageNodes', nodeType: 'image' },
   { key: 'promptNodes', nodeType: 'prompt' },
-  { key: 'viewpointNodes', nodeType: 'viewpoint' },
   { key: 'fusionNodes', nodeType: 'fusion' },
 ]
 
@@ -54,7 +53,6 @@ export function createEmptyCanvasBoardSnapshot(): CanvasBoardSnapshot {
   return {
     imageNodes: [],
     promptNodes: [],
-    viewpointNodes: [],
     fusionNodes: [],
     connections: [],
     viewport: {
@@ -117,27 +115,33 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
 } {
   const nodes: FlowAdapterNode[] = []
   const edges: FlowAdapterEdge[] = []
+  const flowNodeIds = new Set<string>()
 
   SNAPSHOT_NODE_COLLECTIONS.forEach(({ key, nodeType }) => {
     snapshot[key].forEach((node) => {
+      const id = toFlowNodeId(nodeType, node.id)
       nodes.push({
-        id: toFlowNodeId(nodeType, node.id),
+        id,
         type: 'canvas',
         dragHandle: resolveFlowNodeDragHandle(nodeType),
         position: { x: node.x, y: node.y },
         data: toFlowDataFromCanvasNode(nodeType, node),
       })
+      flowNodeIds.add(id)
     })
   })
 
   snapshot.connections.forEach((connection) => {
+    const sourceNodeId = toFlowNodeId(connection.fromNodeType, connection.fromNodeId)
+    const targetNodeId = toFlowNodeId(connection.toNodeType, connection.toNodeId)
+    if (!flowNodeIds.has(sourceNodeId) || !flowNodeIds.has(targetNodeId)) return
     const sourceHandle = `out:${connection.fromPort}`
     const targetHandle = `in:${connection.toPort}`
     edges.push({
       id: `connection-${connection.id}`,
-      source: toFlowNodeId(connection.fromNodeType, connection.fromNodeId),
+      source: sourceNodeId,
       sourceHandle,
-      target: toFlowNodeId(connection.toNodeType, connection.toNodeId),
+      target: targetNodeId,
       targetHandle,
       animated: false,
       data: { connectionSnapshot: clone(connection) },
@@ -155,8 +159,6 @@ function resolveCollectionKeyByNodeType(
       return 'imageNodes'
     case 'prompt':
       return 'promptNodes'
-    case 'viewpoint':
-      return 'viewpointNodes'
     case 'fusion':
       return 'fusionNodes'
   }

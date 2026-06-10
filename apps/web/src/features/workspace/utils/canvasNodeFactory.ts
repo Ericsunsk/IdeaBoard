@@ -11,7 +11,6 @@ import type {
   FusionNodeItem,
   ImageNodeItem,
   PromptNodeItem,
-  ViewpointNodeItem,
 } from '../types/canvasNodes'
 
 function createCanvasEntityId(): number {
@@ -30,22 +29,6 @@ export function createPromptNodeAt(point: CanvasPoint): PromptNodeItem {
     outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
     aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
     inputImages: [],
-  }
-}
-
-export function createViewpointNodeAt(point: CanvasPoint): ViewpointNodeItem {
-  return {
-    id: createCanvasEntityId(),
-    type: 'viewpoint',
-    x: point.x,
-    y: point.y,
-    width: 320,
-    title: getDefaultCanvasNodeTitle('viewpoint'),
-    activeCategory: 'top',
-    selectedViewpoint: '',
-    lighting: 'warm_white',
-    outputStatus: 'idle',
-    outputImages: [],
   }
 }
 

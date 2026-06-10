@@ -18,7 +18,7 @@ export type CanvasConnectionNodeLookup = (
   nodeId: number,
 ) => CanvasConnectionContractNode | null
 
-const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>(['viewpoint', 'fusion'])
+const RELAY_IMAGE_OUTPUT_NODE_TYPES = new Set<CanvasConnectionNodeType>(['fusion'])
 
 export function resolveCanvasConnectionTone(port: CanvasConnectionPort): CanvasConnectionTone {
   if (port === 'prompt') return 'prompt'

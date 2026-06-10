@@ -14,7 +14,6 @@ const (
 	FeatureSlugPartialEdit    = "partial-edit"
 	FeatureSlugRemoveBg       = "remove-bg"
 	FeatureSlugStyleFusion    = "style-fusion"
-	FeatureSlugVirtual3D      = "virtual-3d"
 	FeatureSlugPatternGen     = "pattern-gen"
 	FeatureSlugHDUpscale      = "hd-upscale"
 	FeatureSlugImageExtend    = "image-extend"
@@ -26,7 +25,6 @@ var supportedWorkflowFeatureSlugs = []string{
 	FeatureSlugPartialEdit,
 	FeatureSlugRemoveBg,
 	FeatureSlugStyleFusion,
-	FeatureSlugVirtual3D,
 	FeatureSlugPatternGen,
 	FeatureSlugHDUpscale,
 	FeatureSlugImageExtend,

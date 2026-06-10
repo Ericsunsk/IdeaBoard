@@ -36,12 +36,6 @@ const featureGroupDefs = [
     order: 30,
     slugs: [WORKFLOW_FEATURE.styleFusion],
   },
-  {
-    key: 'display',
-    title: 'Display',
-    order: 40,
-    slugs: [WORKFLOW_FEATURE.virtual3d],
-  },
 ] as const satisfies readonly {
   key: string
   title: string

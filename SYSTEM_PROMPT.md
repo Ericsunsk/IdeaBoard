@@ -8,14 +8,13 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 ## 画布节点分类
 
-当前画布可创建节点一共 4 类：
+当前画布可创建节点一共 3 类：
 
-| 节点 | Vue Flow kind | Snapshot type | 负责的 feature | 说明 |
-| --- | --- | --- | --- | --- |
-| Image 节点 | `image` | `image-node` | `sketch-to-image`、`style-variation`、`partial-edit`、`remove-bg`、`hd-upscale`、`image-extend` | 图片作为主输入，覆盖右键工具、Prompt 改图、局部重绘、扩图和 HD |
-| Prompt 节点 | `prompt` | `prompt` | `pattern-gen`、`partial-edit` | 无图片输入时走 `pattern-gen`；有图片输入时逐图触发 `partial-edit` |
-| Fusion 节点 | `fusion` | `fusion` | `style-fusion` | 2 到 4 张输入图融合，blend point 会转为有序图片权重 |
-| Display 节点 | `viewpoint` | `viewpoint` | `virtual-3d` | 商品展示图，使用视角、光影和可选 Prompt |
+| 节点        | Vue Flow kind | Snapshot type | 负责的 feature                                                                                  | 说明                                                              |
+| ----------- | ------------- | ------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Image 节点  | `image`       | `image-node`  | `sketch-to-image`、`style-variation`、`partial-edit`、`remove-bg`、`hd-upscale`、`image-extend` | 图片作为主输入，覆盖右键工具、Prompt 改图、局部重绘、扩图和 HD    |
+| Prompt 节点 | `prompt`      | `prompt`      | `pattern-gen`、`partial-edit`                                                                   | 无图片输入时走 `pattern-gen`；有图片输入时逐图触发 `partial-edit` |
+| Fusion 节点 | `fusion`      | `fusion`      | `style-fusion`                                                                                  | 2 到 4 张输入图融合，blend point 会转为有序图片权重               |
 
 ## 后台配置合约
 
@@ -37,29 +36,27 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 ## 稳定变量
 
-| 变量 | 主要适用 feature | 说明 |
-| --- | --- | --- |
-| `{{user_prompt}}` | `partial-edit`、`pattern-gen`、`style-fusion`、`virtual-3d`、`image-extend` | 用户或连接 Prompt 文本；只能作为补充要求，不能覆盖系统边界 |
-| `{{strength}}` | `style-variation` | 风格延展强度百分比，来自 `variation_strength` |
-| `{{image_weights}}` | `style-fusion` | Fusion 输入图的有序权重，例如 `Image 1: 60%, Image 2: 40%` |
-| `{{viewpoint}}` | `virtual-3d` | Display 节点视角，后端会转换为可读描述 |
-| `{{lighting}}` | `virtual-3d` | Display 节点光影，后端会转换为可读描述 |
-| `{{extend_top}}` | `image-extend` | 基于原图高度向上扩展的百分比 |
-| `{{extend_right}}` | `image-extend` | 基于原图宽度向右扩展的百分比 |
-| `{{extend_bottom}}` | `image-extend` | 基于原图高度向下扩展的百分比 |
-| `{{extend_left}}` | `image-extend` | 基于原图宽度向左扩展的百分比 |
-| `{{upscale_mode}}` | `hd-upscale` | HD 增强模式 |
-| `{{upscale_factor}}` | `hd-upscale` | 放大倍数 |
-| `{{output_format}}` | `hd-upscale` | 输出格式 |
-| `{{output_quality}}` | `hd-upscale` | 输出质量 |
+| 变量                 | 主要适用 feature                                              | 说明                                                       |
+| -------------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
+| `{{user_prompt}}`    | `partial-edit`、`pattern-gen`、`style-fusion`、`image-extend` | 用户或连接 Prompt 文本；只能作为补充要求，不能覆盖系统边界 |
+| `{{strength}}`       | `style-variation`                                             | 风格延展强度百分比，来自 `variation_strength`              |
+| `{{image_weights}}`  | `style-fusion`                                                | Fusion 输入图的有序权重，例如 `Image 1: 60%, Image 2: 40%` |
+| `{{extend_top}}`     | `image-extend`                                                | 基于原图高度向上扩展的百分比                               |
+| `{{extend_right}}`   | `image-extend`                                                | 基于原图宽度向右扩展的百分比                               |
+| `{{extend_bottom}}`  | `image-extend`                                                | 基于原图高度向下扩展的百分比                               |
+| `{{extend_left}}`    | `image-extend`                                                | 基于原图宽度向左扩展的百分比                               |
+| `{{upscale_mode}}`   | `hd-upscale`                                                  | HD 增强模式                                                |
+| `{{upscale_factor}}` | `hd-upscale`                                                  | 放大倍数                                                   |
+| `{{output_format}}`  | `hd-upscale`                                                  | 输出格式                                                   |
+| `{{output_quality}}` | `hd-upscale`                                                  | 输出质量                                                   |
 
 以下字段是运行时媒体或任务参数，不是 prompt 模板变量，不要写进正文：
 
-| 字段 | 原因 |
-| --- | --- |
-| `original_image_url`、`image_urls` | 原图已作为媒体输入传给运行时；让模型读取 URL 会污染语义 |
-| `mask_image_url`、`mask_image_urls` | mask 是编辑边界和裁剪依据，不是模型需要阅读的正文信息 |
-| `reference_image_urls` | 多参考图会作为媒体输入传给 provider，prompt 只描述如何参考 |
+| 字段                                                  | 原因                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------------- |
+| `original_image_url`、`image_urls`                    | 原图已作为媒体输入传给运行时；让模型读取 URL 会污染语义       |
+| `mask_image_url`、`mask_image_urls`                   | mask 是编辑边界和裁剪依据，不是模型需要阅读的正文信息         |
+| `reference_image_urls`                                | 多参考图会作为媒体输入传给 provider，prompt 只描述如何参考    |
 | `ratio`、尺寸、模型、质量、sample count、本地重绘标记 | 这些由运行时、provider 或渲染链路控制，不属于自然语言任务边界 |
 
 Fusion 旧的 A/B 权重变量和融合比例变量已下线，不要再定义或使用；统一使用 `{{image_weights}}`。
@@ -263,35 +260,9 @@ Prompt 节点的 `pattern-gen` system prompt 是可选配置；未配置时直�
 {{user_prompt}}
 ```
 
-## Display 节点模板
-
-### `virtual-3d`
-
-可用变量：`{{viewpoint}}`、`{{lighting}}`、`{{user_prompt}}`。
-
-```text
-你是商品展示图生成助手。
-
-任务：将输入商品或服装生成更适合电商展示、陈列表达和商业呈现的单张展示图。
-
-目标视角：{{viewpoint}}
-目标光影：{{lighting}}
-
-执行原则：
-1. 保持主体商品本身的形态、结构、材质、颜色和关键设计细节稳定。
-2. 根据目标视角与光影生成更有展示感、陈列感和商业完成度的画面。
-3. 画面应简洁、聚焦主体，避免杂乱背景、文字、水印和海报式排版。
-4. 可以优化背景、承托关系、光影层次、商业质感和空间呈现，但不得更换主体身份或改变商品设计。
-5. 如果用户补充要求为空，则按目标视角与目标光影输出标准电商展示图。
-6. 输出单张结果图，不要拼图、文字、水印、边框或多方案并排。
-
-补充展示要求：
-{{user_prompt}}
-```
-
 ## 上线检查
 
-- 模板是否按真实节点归属维护：Image、Prompt、Fusion、Display。
+- 模板是否按真实节点归属维护：Image、Prompt、Fusion。
 - slug 是否是当前 canonical slug。
 - 模板是否只使用当前 feature 稳定变量。
 - Fusion 是否只使用 `{{image_weights}}`，没有旧的 A/B/ratio 变量。

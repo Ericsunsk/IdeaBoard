@@ -1,16 +1,24 @@
 import type { SubmitTaskData } from '../../../shared/api/task'
 import { canonicalizeRuntimeUploadRef } from '../../../shared/config/runtimeUrls'
-import { WORKFLOW_FEATURE, type WorkflowFeature } from '../../../shared/domain/workflowFeatures'
+import { WORKFLOW_FEATURE } from '../../../shared/domain/workflowFeatures'
 
-export const EXECUTION_FEATURE = WORKFLOW_FEATURE
+export const EXECUTION_FEATURE = {
+  partialEdit: WORKFLOW_FEATURE.partialEdit,
+  removeBg: WORKFLOW_FEATURE.removeBg,
+  styleFusion: WORKFLOW_FEATURE.styleFusion,
+  patternGen: WORKFLOW_FEATURE.patternGen,
+  sketchToImage: WORKFLOW_FEATURE.sketchToImage,
+  styleVariation: WORKFLOW_FEATURE.styleVariation,
+  hdUpscale: WORKFLOW_FEATURE.hdUpscale,
+  imageExtend: WORKFLOW_FEATURE.imageExtend,
+} as const
 
-export type ExecutionFeature = WorkflowFeature
+export type ExecutionFeature = (typeof EXECUTION_FEATURE)[keyof typeof EXECUTION_FEATURE]
 
 type ExecutionMetaEntry = {
   feature: ExecutionFeature
   promptPrefix?: string
   prompt?: string
-  successLabel?: string
 }
 
 export const EXECUTION_META = {
@@ -21,7 +29,6 @@ export const EXECUTION_META = {
   [EXECUTION_FEATURE.styleFusion]: {
     feature: EXECUTION_FEATURE.styleFusion,
     promptPrefix: '[style-fusion]',
-    successLabel: 'Fusion',
   },
   [EXECUTION_FEATURE.patternGen]: {
     feature: EXECUTION_FEATURE.patternGen,
@@ -34,11 +41,6 @@ export const EXECUTION_META = {
   },
   [EXECUTION_FEATURE.removeBg]: {
     feature: EXECUTION_FEATURE.removeBg,
-  },
-  [EXECUTION_FEATURE.virtual3d]: {
-    feature: EXECUTION_FEATURE.virtual3d,
-    promptPrefix: '[virtual-3d]',
-    successLabel: 'Display',
   },
   [EXECUTION_FEATURE.hdUpscale]: {
     feature: EXECUTION_FEATURE.hdUpscale,
@@ -60,8 +62,6 @@ export const EXECUTION_DIRECT_ACTION_META = {
   styleVariation: EXECUTION_META[EXECUTION_FEATURE.styleVariation],
   removeBg: EXECUTION_META[EXECUTION_FEATURE.removeBg],
 } as const
-
-export const EXECUTION_VIEWPOINT_META = EXECUTION_META[EXECUTION_FEATURE.virtual3d]
 
 export const EXECUTION_IMAGE_TOOL_META = {
   hdUpscale: EXECUTION_META[EXECUTION_FEATURE.hdUpscale],

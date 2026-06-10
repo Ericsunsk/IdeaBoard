@@ -39,7 +39,7 @@ import {
   submitPromptTextGenerationTask,
   waitExistingOrLiveTaskResult,
 } from '../services/flowImageDirectActionExecutor'
-import { loadImageSizeFromUrl } from './useFlowGenerationHandlers'
+import { loadImageSizeFromUrl } from '../utils/imageSize'
 import { usePendingImageResultNodes } from './usePendingImageResultNodes'
 import {
   normalizeTaskImageUrls,
@@ -279,7 +279,9 @@ export function useFlowImageDirectActions(options: UseFlowImageDirectActionsOpti
       await flushPendingTaskSnapshot()
     }
     if (failureCount > 0) {
-      options.onWarning(failureCount > 1 ? `${failureCount} 个生成任务恢复失败` : '生成任务恢复失败')
+      options.onWarning(
+        failureCount > 1 ? `${failureCount} 个生成任务恢复失败` : '生成任务恢复失败',
+      )
     }
   }
 

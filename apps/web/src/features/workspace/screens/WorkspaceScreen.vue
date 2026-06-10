@@ -134,7 +134,6 @@
             @update-prompt-text="(value) => onFlowPromptTextUpdate(nodeProps.id, value)"
             @update-node-param="(payload) => onFlowNodeParamUpdate(nodeProps.id, payload)"
             @delete-node="() => onFlowDeleteNode(nodeProps.id)"
-            @generate-viewpoint="() => onFlowViewpointGenerate(nodeProps.id)"
             @image-stage-drop="(event) => onFlowImageStageDrop(nodeProps.id, event)"
             @media-input-image-drop="onFlowMediaInputImageDrop"
             @media-input-image-open="onFlowMediaInputImageOpen"
@@ -223,7 +222,6 @@ import type { Edge, Node } from '@vue-flow/core'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
-import type { FlowHistorySnapshot } from '../composables/useFlowTransactions'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
 import { useFlowSelectionExport } from '../composables/useFlowSelectionExport'
@@ -231,7 +229,6 @@ import {
   useFlowNodeMutations,
   type FlowCreatableNodeKind,
 } from '../composables/useFlowNodeMutations'
-import { useFlowGenerationHandlers } from '../composables/useFlowGenerationHandlers'
 import { useFlowImageDirectActions } from '../composables/useFlowImageDirectActions'
 import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
 import { useFlowImageNodeInteractions } from '../composables/useFlowImageNodeInteractions'
@@ -528,26 +525,6 @@ function onFlowImageOpenPreview(nodeId: string) {
   if (!snapshot) return
   void openNodeImagePreview(snapshot, 'latest-output')
 }
-
-const { onFlowViewpointGenerate, isFlowExecutionNodeRunning } = useFlowGenerationHandlers({
-  nodes: nodes as Ref<Node[]>,
-  edges: edges as Ref<Edge[]>,
-  currentBoardId,
-  updateSnapshotNode,
-  captureHistory: flowTransactions.captureHistory as () => FlowHistorySnapshot,
-  onWarning: (text) => {
-    appToast.warning(text)
-  },
-  onSuccess: (text) => {
-    appToast.success(text)
-  },
-  onError: (text) => {
-    appToast.error(text)
-  },
-  onOutputCommitted: (nodeId) => {
-    markFlowExecutionNodeDirty(nodeId)
-  },
-})
 
 const {
   isNodeDirectActionRunning,
@@ -884,7 +861,6 @@ const {
 const { getFlowNodeUiStateCached } = useFlowNodeUiState({
   nodes: nodes as Ref<Node[]>,
   edges: edges as Ref<Edge[]>,
-  isFlowExecutionNodeRunning,
 })
 
 watch(

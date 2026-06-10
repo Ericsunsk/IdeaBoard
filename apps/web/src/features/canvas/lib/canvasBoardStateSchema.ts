@@ -32,7 +32,7 @@ const positiveIntegerSchema = v.pipe(finiteNumberSchema, v.integer(), v.minValue
 const nonEmptyStringSchema = v.pipe(v.string(), v.minLength(1))
 
 const workflowNodeOutputStatusSchema = v.picklist(['idle', 'running', 'ready', 'stale'])
-const canvasConnectionNodeTypeSchema = v.picklist(['image', 'prompt', 'viewpoint', 'fusion'])
+const canvasConnectionNodeTypeSchema = v.picklist(['image', 'prompt', 'fusion'])
 const canvasConnectionPortSchema = v.picklist(['image', 'prompt'])
 
 const imageNodeOutputItemSchema = v.strictObject({
@@ -60,20 +60,6 @@ const promptNodeItemSchema = v.strictObject({
   outputCount: v.optional(outputCountSchema, DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
   aspectRatio: v.optional(v.picklist(PROMPT_ASPECT_RATIO_OPTIONS), DEFAULT_PROMPT_ASPECT_RATIO),
   inputImages: v.optional(v.array(promptNodeInputImageSchema), () => []),
-})
-
-const viewpointNodeItemSchema = v.strictObject({
-  id: finiteNumberSchema,
-  type: v.literal('viewpoint'),
-  x: finiteNumberSchema,
-  y: finiteNumberSchema,
-  width: finiteNumberSchema,
-  title: v.optional(v.string()),
-  activeCategory: v.picklist(['top', 'bottom', 'set']),
-  selectedViewpoint: v.string(),
-  lighting: v.picklist(['warm_white', 'afternoon', 'hard_light']),
-  outputStatus: workflowNodeOutputStatusSchema,
-  outputImages: v.array(imageNodeOutputItemSchema),
 })
 
 const imageNodeItemSchema = v.strictObject({
@@ -132,7 +118,6 @@ const canvasViewportStateSchema = v.strictObject({
 const canvasBoardSnapshotShape = v.strictObject({
   imageNodes: v.array(imageNodeItemSchema),
   promptNodes: v.array(promptNodeItemSchema),
-  viewpointNodes: v.array(viewpointNodeItemSchema),
   fusionNodes: v.array(fusionNodeItemSchema),
   connections: v.array(canvasConnectionSchema),
   viewport: canvasViewportStateSchema,
@@ -146,7 +131,6 @@ export const canvasBoardSnapshotSchema = canvasBoardSnapshotShape satisfies v.Ge
 const canvasBoardStateShape = v.strictObject({
   imageNodes: v.array(imageNodeItemSchema),
   promptNodes: v.array(promptNodeItemSchema),
-  viewpointNodes: v.array(viewpointNodeItemSchema),
   fusionNodes: v.array(fusionNodeItemSchema),
   connections: v.array(canvasConnectionSchema),
   viewport: canvasViewportStateSchema,
