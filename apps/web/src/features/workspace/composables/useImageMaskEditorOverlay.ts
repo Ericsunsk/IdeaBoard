@@ -428,9 +428,10 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
 
   function commitMaskEditorMode(): boolean {
     const saved = saveMaskDraft()
+    if (!saved) return false
     state.value = null
     updateHistoryAvailability(null)
-    return saved
+    return true
   }
 
   function clearCommittedMaskData(nodeId: string) {

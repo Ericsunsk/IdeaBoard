@@ -30,7 +30,7 @@
       </Button>
     </div>
     <div class="min-h-0 flex-1 overflow-hidden bg-transparent">
-      <router-view :key="route.path === '/user/picture' ? route.path : route.fullPath" />
+      <router-view :key="route.path === '/user/workspace' ? route.path : route.fullPath" />
     </div>
 
     <UserAuthModals v-if="authMode" :mode="authMode" />

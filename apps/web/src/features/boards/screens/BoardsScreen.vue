@@ -14,6 +14,7 @@
           unstyled
           type="button"
           title="账户菜单"
+          aria-label="账户菜单"
           aria-haspopup="menu"
           :aria-expanded="isUserMenuOpen"
           :class="userAvatarButtonClass"
@@ -23,6 +24,7 @@
             v-if="userStore.user?.avatar"
             :src="userStore.user.avatar"
             :class="userAvatarClass"
+            alt="用户头像"
           />
           <div v-else :class="userAvatarPlaceholderClass">
             <User :class="avatarIconClass" />

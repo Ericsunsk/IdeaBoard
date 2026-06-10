@@ -30,6 +30,7 @@ const MOCK_BOARD_ID = 'mock-board-1'
 const MOCK_BOARD_NAME = 'Mock Workspace Board'
 const MOCK_UPDATED_AT = 1_764_000_000_000
 const MOCK_WORKSPACE_UPLOAD_URL = `/uploads/workspace/${MOCK_USER.uid}/${MOCK_BOARD_ID}/content/mock-upload.png`
+const MOCK_AVATAR_URL = `/uploads/profile/${MOCK_USER.uid}/avatar/mock-avatar.png`
 
 const AUTH_SESSION = {
   session: { id: 'user-mock-smoke-session' },
@@ -101,10 +102,23 @@ const BOARD_UPLOAD = {
   },
 }
 
+const AVATAR_UPLOAD = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    avatar: MOCK_AVATAR_URL,
+    width: 64,
+    height: 64,
+    mime: 'image/png',
+    ext: 'png',
+  },
+}
+
 const allowedUserApiRequestPatterns = [
   /\/api\/auth\/get-session(?:[?#]|\s|$)/,
   /\/api\/user\/info(?:[?#]|\s|$)/,
   /\/api\/user\/boards(?:[?#]|\s|$)/,
+  /\/api\/user\/profile\/avatar(?:[?#]|\s|$)/,
   new RegExp(`/api/user/boards/${MOCK_BOARD_ID}(?:[?#]|\\s|$)`),
   new RegExp(`/api/user/boards/${MOCK_BOARD_ID}/uploads(?:[?#]|\\s|$)`),
 ]
@@ -166,8 +180,7 @@ function setupBrowser(playwrightCli: CommandSpec) {
   smoke.routeJson(
     playwrightCli,
     '**/api/user/profile/avatar',
-    { code: 599, msg: 'user mock smoke blocked avatar mutation' },
-    599,
+    AVATAR_UPLOAD,
   )
 }
 
@@ -230,13 +243,110 @@ function assertWorkspaceDom(playwrightCli: CommandSpec, page: SmokePage) {
   assertNoConsoleErrors(consoleOutput, page.path)
 }
 
+function assertBoardsInteractions(playwrightCli: CommandSpec) {
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      'const nativeDialogs = []',
+      'page.on("dialog", async (dialog) => {',
+      '  nativeDialogs.push(dialog.message())',
+      '  await dialog.dismiss()',
+      '})',
+      'const moreButton = page.getByRole("button", { name: "More actions" }).first()',
+      'await moreButton.waitFor({ state: "visible", timeout: 10000 })',
+      'const triggerBox = await moreButton.boundingBox()',
+      'if (!triggerBox) throw new Error("Board menu trigger has no bounding box")',
+      'await moreButton.click()',
+      'const deleteItem = page.getByText("Delete", { exact: true }).last()',
+      'await deleteItem.waitFor({ state: "visible", timeout: 10000 })',
+      'const deleteBox = await deleteItem.boundingBox()',
+      'if (!deleteBox) throw new Error("Board delete menu item has no bounding box")',
+      'if (deleteBox.y > triggerBox.y + triggerBox.height + 2) {',
+      '  throw new Error(`Board menu should open above the trigger, got triggerY=${triggerBox.y}, itemY=${deleteBox.y}`)',
+      '}',
+      'await deleteItem.click()',
+      'await page.getByRole("heading", { name: "删除画布" }).waitFor({ timeout: 10000 })',
+      `await page.getByText(${JSON.stringify(`确认删除「${MOCK_BOARD_NAME}」？此操作不可撤销。`)}).waitFor({ timeout: 10000 })`,
+      'if (nativeDialogs.length > 0) {',
+      '  throw new Error(`Unexpected native dialog: ${nativeDialogs.join(", ")}`)',
+      '}',
+      'await page.getByRole("button", { name: "取消" }).click()',
+      'await page.getByRole("heading", { name: "删除画布" }).waitFor({ state: "hidden", timeout: 10000 })',
+    ].join('\n'),
+  ])
+}
+
+function assertCenterAvatarUpload(playwrightCli: CommandSpec) {
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      'const avatarButton = page.getByRole("button", { name: "更换头像" })',
+      'await avatarButton.waitFor({ state: "visible", timeout: 10000 })',
+      'const avatarInput = page.locator(\'input[type="file"][accept="image/*"]\').first()',
+      'await avatarInput.setInputFiles({',
+      '  name: "mock-avatar.png",',
+      '  mimeType: "image/png",',
+      '  buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),',
+      '})',
+      `await page.locator(${JSON.stringify(`img[src$="${MOCK_AVATAR_URL}"]`)}).first().waitFor({ state: "visible", timeout: 10000 })`,
+    ].join('\n'),
+  ])
+}
+
+function assertWorkspaceInteractions(playwrightCli: CommandSpec) {
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      'const pane = page.locator(".vue-flow__pane").first()',
+      'await pane.waitFor({ state: "visible", timeout: 10000 })',
+      'const paneBox = await pane.boundingBox()',
+      'if (!paneBox) throw new Error("Workspace pane has no bounding box")',
+      'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
+      'await accountButton.click()',
+      'const userMenu = page.getByRole("menu").filter({ hasText: "个人中心" })',
+      'await userMenu.waitFor({ state: "visible", timeout: 10000 })',
+      'await page.mouse.click(paneBox.x + paneBox.width - 24, paneBox.y + paneBox.height - 24)',
+      'await userMenu.waitFor({ state: "hidden", timeout: 10000 })',
+      'await pane.click({',
+      '  button: "right",',
+      '  position: {',
+      '    x: Math.min(Math.max(240, paneBox.width / 2), paneBox.width - 80),',
+      '    y: Math.min(Math.max(220, paneBox.height / 2), paneBox.height - 80),',
+      '  },',
+      '})',
+      'const contextMenu = page.locator(".workspace-node-context-menu")',
+      'await contextMenu.waitFor({ state: "visible", timeout: 10000 })',
+      'await page.mouse.click(paneBox.x + paneBox.width - 24, paneBox.y + paneBox.height - 24)',
+      'await contextMenu.waitFor({ state: "hidden", timeout: 10000 })',
+      'const node = page.locator(".vue-flow__node").first()',
+      'await node.hover()',
+      'await page.locator(".flow-canvas-node__handle-aggregate.is-visible").first().waitFor({ state: "visible", timeout: 10000 })',
+      'await page.mouse.move(paneBox.x + paneBox.width - 24, paneBox.y + paneBox.height - 24)',
+      'await page.waitForTimeout(300)',
+      'const visibleHandleCount = await page.locator(".flow-canvas-node__handle-aggregate.is-visible").count()',
+      'if (visibleHandleCount !== 0) {',
+      '  throw new Error(`Expected hover handles to hide after pointer leaves node, got ${visibleHandleCount}`)',
+      '}',
+    ].join('\n'),
+  ])
+}
+
 function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
   smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}${page.path}`])
   const snapshot = smoke.runCommand(playwrightCli, ['snapshot']).stdout
   assertPageReached(snapshot, page)
 
+  if (page.label === 'boards') {
+    assertBoardsInteractions(playwrightCli)
+  }
+
+  if (page.label === 'center') {
+    assertCenterAvatarUpload(playwrightCli)
+  }
+
   if (page.label === 'workspace') {
     assertWorkspaceDom(playwrightCli, page)
+    assertWorkspaceInteractions(playwrightCli)
   }
 
   const consoleOutput = smoke.runCommand(playwrightCli, ['console', 'error']).stdout

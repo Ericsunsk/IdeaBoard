@@ -13,6 +13,7 @@ const smoke = createMockSmokeRuntime({
   portEnvName: 'ADMIN_MOCK_SMOKE_PORT',
   verboseEnvName: 'ADMIN_MOCK_SMOKE_VERBOSE',
   sessionPrefix: 'ams',
+  defaultPort: 5174,
 })
 
 const AUTH_SESSION = {
@@ -90,6 +91,23 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
   }
 }
 
+function assertAdminUserMenu(playwrightCli: CommandSpec) {
+  smoke.runCommand(playwrightCli, [
+    'run-code',
+    [
+      'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
+      'await accountButton.waitFor({ state: "visible", timeout: 10000 })',
+      'await accountButton.click()',
+      'const profileItem = page.getByText("个人中心", { exact: true }).last()',
+      'const logoutItem = page.getByText("退出登录", { exact: true }).last()',
+      'await profileItem.waitFor({ state: "visible", timeout: 10000 })',
+      'await logoutItem.waitFor({ state: "visible", timeout: 10000 })',
+      'await page.mouse.click(24, 24)',
+      'await logoutItem.waitFor({ state: "hidden", timeout: 10000 })',
+    ].join('\n'),
+  ])
+}
+
 async function main() {
   let playwrightCli: CommandSpec | null = null
   try {
@@ -100,6 +118,7 @@ async function main() {
     for (const page of pages) {
       smokePage(playwrightCli, page)
     }
+    assertAdminUserMenu(playwrightCli)
 
     console.log(`admin mock smoke passed: ${pages.length} pages`)
   } catch (error) {

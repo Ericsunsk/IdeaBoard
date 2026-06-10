@@ -79,7 +79,7 @@ graph LR
 | 路径 | 说明 |
 |------|------|
 | `/user/home` | 用户首页与工作台入口 |
-| `/user/picture` | 画布工作台主页面 |
+| `/user/workspace` | 画布工作台主页面 |
 | `/user/boards` | 画板列表 |
 | `/user/center` | 用户中心 |
 | `/admin/*` | 管理后台 |
