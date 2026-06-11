@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"ideaboard/api/internal/platform/media"
@@ -20,8 +21,16 @@ import (
 
 const (
 	// maxRemoteFileSize caps remote downloads to prevent OOM from unbounded streams.
-	maxRemoteFileSize = 100 * 1024 * 1024 // 100 MB
+	maxRemoteFileSize     = 100 * 1024 * 1024 // 100 MB
+	storageCopyBufferSize = 32 * 1024
 )
+
+var storageCopyBufferPool = sync.Pool{
+	New: func() any {
+		buf := make([]byte, storageCopyBufferSize)
+		return &buf
+	},
+}
 
 func (s *StorageService) TestProfile(ctx context.Context, id string) error {
 	profiles, err := s.loadProfilesWithSecrets(ctx)
@@ -342,12 +351,7 @@ func (s *StorageService) saveReaderLocal(filename string, src io.Reader, size in
 			_ = os.Remove(dst)
 		}
 	}()
-	if size >= 0 {
-		if _, err := io.CopyN(dstFile, src, size); err != nil {
-			_ = dstFile.Close()
-			return "", fmt.Errorf("保存文件失败: %v", err)
-		}
-	} else if _, err := io.Copy(dstFile, src); err != nil {
+	if err := copyExactWithStorageBuffer(dstFile, src, size); err != nil {
 		_ = dstFile.Close()
 		return "", fmt.Errorf("保存文件失败: %v", err)
 	}
@@ -356,6 +360,37 @@ func (s *StorageService) saveReaderLocal(filename string, src io.Reader, size in
 	}
 	cleanupDst = false
 	return publicUploadURL(objectKey), nil
+}
+
+type storageCopyWriter struct {
+	dst io.Writer
+}
+
+func (w storageCopyWriter) Write(p []byte) (int, error) {
+	return w.dst.Write(p)
+}
+
+func copyWithStorageBuffer(dst io.Writer, src io.Reader) (int64, error) {
+	bufPtr := storageCopyBufferPool.Get().(*[]byte)
+	defer storageCopyBufferPool.Put(bufPtr)
+
+	return io.CopyBuffer(storageCopyWriter{dst: dst}, src, *bufPtr)
+}
+
+func copyExactWithStorageBuffer(dst io.Writer, src io.Reader, size int64) error {
+	if size < 0 {
+		_, err := copyWithStorageBuffer(dst, src)
+		return err
+	}
+
+	written, err := copyWithStorageBuffer(dst, io.LimitReader(src, size))
+	if err != nil {
+		return err
+	}
+	if written != size {
+		return io.EOF
+	}
+	return nil
 }
 
 func publicUploadURL(objectKey string) string {
@@ -542,7 +577,7 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 		}
 	}()
 
-	size, err := io.Copy(tmpFile, io.LimitReader(resp.Body, maxSize+1))
+	size, err := copyWithStorageBuffer(tmpFile, io.LimitReader(resp.Body, maxSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("读取图片数据失败: %v", err)
 	}
