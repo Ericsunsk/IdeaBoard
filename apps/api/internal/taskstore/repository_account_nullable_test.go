@@ -153,12 +153,10 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 		Status:     tasks.StatusPending,
 		RetryCount: 2,
 		CreatedAt:  now.Add(-5 * time.Minute),
+		UpdatedAt:  now.Add(-10 * time.Second),
 	}
 	if err := repo.Create(ctx, requeuedPendingTask); err != nil {
 		t.Fatalf("create requeued pending task failed: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, `UPDATE tasks SET updated_at = $1 WHERE task_id = $2`, now.Add(-10*time.Second), requeuedPendingTask.TaskID); err != nil {
-		t.Fatalf("patch requeued pending updated_at failed: %v", err)
 	}
 
 	runningTask := &tasks.Task{

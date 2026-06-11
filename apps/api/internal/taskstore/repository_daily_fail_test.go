@@ -42,6 +42,8 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 		UserID:            10,
 		AssignedChannelID: tasks.IDPtr(accountID + 10000),
 		AccountID:         tasks.IDPtr(accountID),
+		FeatureSlug:       "image-generate",
+		APIType:           "openai-compatible",
 		Status:            tasks.StatusRunning,
 		Result:            `{"model":"model-stop","username":"user-stop"}`,
 		CreatedAt:         createdAt,

@@ -3,6 +3,7 @@ package taskservice
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,36 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func seedTaskServiceSSEAccount(t testing.TB, ctx context.Context, db *sql.DB, suffix string) *accounts.ApiAccount {
+	t.Helper()
+
+	var channelID int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO channels (type, name, api_url, status)
+VALUES ('openai-compatible', $1, $2, 1)
+RETURNING id`,
+		"taskservice-sse-channel-"+suffix,
+		"https://example.com/taskservice-sse-"+suffix,
+	).Scan(&channelID); err != nil {
+		t.Fatalf("create SSE channel failed: %v", err)
+	}
+
+	account := &accounts.ApiAccount{
+		Name:      "taskservice-sse-account-" + suffix,
+		ChannelID: channelID,
+		Platform:  "openai-compatible",
+		ApiType:   "openai-compatible",
+		Models:    []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		ApiKey:    "test",
+		ProxyURL:  "https://example.com/taskservice-sse-" + suffix,
+		Status:    1,
+	}
+	if err := accounts.NewAccountRepository(db).Create(ctx, account); err != nil {
+		t.Fatalf("create SSE account failed: %v", err)
+	}
+	return account
+}
 
 func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -70,30 +101,10 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := testdb.Open(t)
 	taskRepo := taskstore.NewRepository(db)
-	accountRepo := accounts.NewAccountRepository(db)
 	ctx := context.Background()
 	hub := NewEventHub()
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: hub})
-	var channelID int64
-	if err := db.QueryRowContext(ctx, `
-INSERT INTO channels (type, name, api_url, status)
-VALUES ('openai-compatible', 'taskservice-sse-channel', 'https://example.com/taskservice-sse', 1)
-RETURNING id`).Scan(&channelID); err != nil {
-		t.Fatalf("create channel failed: %v", err)
-	}
-	account := &accounts.ApiAccount{
-		Name:      "taskservice-sse-account",
-		ChannelID: channelID,
-		Platform:  "openai-compatible",
-		ApiType:   "openai-compatible",
-		Models:    []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:    "test",
-		ProxyURL:  "https://example.com/taskservice-sse",
-		Status:    1,
-	}
-	if err := accountRepo.Create(ctx, account); err != nil {
-		t.Fatalf("create account failed: %v", err)
-	}
+	account := seedTaskServiceSSEAccount(t, ctx, db, "live")
 
 	task := &tasks.Task{
 		TaskID:            "task-sse-live",
@@ -185,12 +196,16 @@ func TestStreamUserTaskReturnsJSONWhenConnectionLimitReached(t *testing.T) {
 	ctx := context.Background()
 	hub := newEventHubWithLimits(10, 1)
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: hub})
+	account := seedTaskServiceSSEAccount(t, ctx, db, "limit")
 
 	task := &tasks.Task{
-		TaskID:     "task-sse-limit",
-		UserID:     9,
-		UserPrompt: "user prompt",
-		Status:     tasks.StatusRunning,
+		TaskID:            "task-sse-limit",
+		UserID:            9,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		UserPrompt:        "user prompt",
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-sse-limit",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
@@ -239,12 +254,16 @@ func TestStreamUserTaskHeartbeatSendsLatestSnapshotWhenPublishMissed(t *testing.
 	taskRepo := taskstore.NewRepository(db)
 	ctx := context.Background()
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: NewEventHub()})
+	account := seedTaskServiceSSEAccount(t, ctx, db, "heartbeat")
 
 	task := &tasks.Task{
-		TaskID:     "task-sse-heartbeat",
-		UserID:     10,
-		UserPrompt: "user prompt",
-		Status:     tasks.StatusRunning,
+		TaskID:            "task-sse-heartbeat",
+		UserID:            10,
+		AssignedChannelID: tasks.IDPtr(account.ChannelID),
+		AccountID:         tasks.IDPtr(account.ID),
+		UserPrompt:        "user prompt",
+		Status:            tasks.StatusRunning,
+		LeaseToken:        "lease-sse-heartbeat",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
