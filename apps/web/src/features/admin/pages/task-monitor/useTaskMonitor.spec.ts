@@ -8,14 +8,12 @@ import {
   type MonitorStats,
   type Task,
 } from '../../../../shared/api/generated-query/model'
-import { useTaskMonitor, TASK_MONITOR_PAGE_SIZE } from './useTaskMonitor'
+import { useTaskMonitor } from './useTaskMonitor'
 import { useTaskRuntimeMonitor } from './useTaskRuntimeMonitor'
 
 const mockState = vi.hoisted(() => ({
-  adminMockMode: undefined as unknown,
   getAdminMonitorReturn: undefined as unknown,
   listAdminTasksReturn: undefined as unknown,
-  mockTasks: [] as unknown[],
   pageVisible: undefined as unknown,
   pollingOptions: [] as unknown[],
   streamReturn: undefined as unknown,
@@ -49,34 +47,13 @@ vi.mock('../../shared/composables/useAdminQueryPolling', () => ({
   ),
 }))
 
-vi.mock('../../shared/lib/adminMockData', () => ({
-  createMockAdminTasks: vi.fn(() => mockState.mockTasks),
-  mockMonitorData: {
-    global_queue_len: 900,
-    wait_queue_len: 0,
-    running_attempts: 0,
-    account_loads: {},
-    execution_pressure: [],
-  },
-  mockMonitorStats: {
-    pending: 9,
-    running: 0,
-    completed: 0,
-    failed: 0,
-    cancelled: 0,
-  },
-  useAdminMockMode: vi.fn(() => mockState.adminMockMode),
-}))
-
 vi.mock('./useTaskMonitorStream', () => ({
   useTaskMonitorStream: vi.fn(() => mockState.streamReturn),
 }))
 
 beforeEach(() => {
-  mockState.adminMockMode = ref(false)
   mockState.getAdminMonitorReturn = undefined
   mockState.listAdminTasksReturn = undefined
-  mockState.mockTasks = []
   mockState.pageVisible = ref(true)
   mockState.pollingOptions = []
   mockState.streamReturn = undefined
@@ -111,33 +88,6 @@ describe('useTaskMonitor polling', () => {
     await nextTick()
 
     expect(polling.isEnabled()).toBe(false)
-  })
-
-  it('keeps mock-mode polling based on the visible mock page', async () => {
-    mockState.adminMockMode = ref(true)
-    mockState.listAdminTasksReturn = {
-      data: ref<ApiResponseTaskList>(),
-      error: ref(null),
-      isError: ref(false),
-      isLoading: ref(false),
-      refetch: vi.fn(),
-    }
-    mockState.mockTasks = [
-      ...Array.from({ length: TASK_MONITOR_PAGE_SIZE }, (_, index) =>
-        makeTask(ListAdminTasksStatus.completed, index + 1),
-      ),
-      makeTask(ListAdminTasksStatus.pending, TASK_MONITOR_PAGE_SIZE + 1),
-    ]
-
-    const monitor = useTaskMonitor()
-    const polling = mockState.pollingOptions[0] as { isEnabled: () => boolean }
-
-    expect(polling.isEnabled()).toBe(false)
-
-    monitor.page.value = 2
-    await nextTick()
-
-    expect(polling.isEnabled()).toBe(true)
   })
 
   it('exposes task list API errors so the page does not render them as an empty list', () => {

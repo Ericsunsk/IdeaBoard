@@ -396,12 +396,6 @@ import {
   updateRateLimitSettings,
   updateRegistrationSetting,
 } from '../../shared/queries/adminActions'
-import {
-  createMockAdminUsers,
-  mockRateLimitSettings,
-  mockRegistrationSetting,
-  useAdminMockMode,
-} from '../../shared/lib/adminMockData'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
@@ -436,6 +430,11 @@ type UserActionItem = {
 const userActionPopoverClass = 'flex min-w-[176px] flex-col gap-1'
 
 const userActionPopoverPt = createAdminPopoverPt({ contentClass: '!p-1.5' })
+const DEFAULT_RATE_LIMIT_SETTINGS = {
+  window_seconds: 60,
+  max_requests: 30,
+}
+const DEFAULT_REGISTRATION_ENABLED = false
 const RATE_LIMIT_MAX_REQUESTS = 10_000
 const RATE_LIMIT_MAX_WINDOW_SECONDS = 3_600
 
@@ -452,7 +451,6 @@ type UserStatusFilter = typeof USER_STATUS_FILTER_ALL | ListAdminUsersStatusValu
 
 const appToast = useAppToast()
 const confirm = useConfirm()
-const isMockMode = useAdminMockMode()
 const userStore = useUserStore()
 
 const queryClient = useQueryClient()
@@ -535,13 +533,10 @@ const userQueryParams = computed<ListAdminUsersParams>(() => ({
 }))
 const usersQuery = useListAdminUsers(userQueryParams, {
   query: {
-    enabled: computed(() => !isMockMode.value),
+    placeholderData: (previous) => previous,
   },
 })
-const mockUsersData = computed(() => createMockAdminUsers(userQueryParams.value))
-const usersData = computed(() =>
-  isMockMode.value ? mockUsersData.value : usersQuery.data.value?.data,
-)
+const usersData = computed(() => usersQuery.data.value?.data)
 
 const totalRecords = computed(() => usersData.value?.total ?? 0)
 const activeUserCount = computed(() => usersData.value?.active_count ?? 0)
@@ -567,16 +562,8 @@ function clearSearch() {
   currentPage.value = 1
 }
 
-const registrationSettingQuery = useGetAdminRegistrationSetting({
-  query: {
-    enabled: computed(() => !isMockMode.value),
-  },
-})
-const rateLimitSettingsQuery = useGetAdminRateLimitSettings({
-  query: {
-    enabled: computed(() => !isMockMode.value),
-  },
-})
+const registrationSettingQuery = useGetAdminRegistrationSetting()
+const rateLimitSettingsQuery = useGetAdminRateLimitSettings()
 
 function invalidateAdminUsersQuery() {
   return queryClient.invalidateQueries({ queryKey: getListAdminUsersQueryKey() })
@@ -627,7 +614,7 @@ const updateRegistrationSettingMutation = useMutation({
 
 const users = computed<User[]>(() => usersData.value?.list ?? [])
 const loading = computed(
-  () => !isMockMode.value && (usersQuery.isLoading.value || usersQuery.isFetching.value),
+  () => usersQuery.isLoading.value || usersQuery.isFetching.value,
 )
 const userPlaceholderRows = computed(() => {
   if (loading.value || users.value.length === 0) return 0
@@ -641,12 +628,12 @@ const userActionItems = computed<UserActionItem[]>(() => {
 })
 
 const rateLimitForm = ref({
-  window_seconds: mockRateLimitSettings.window_seconds,
-  max_requests: mockRateLimitSettings.max_requests,
+  window_seconds: DEFAULT_RATE_LIMIT_SETTINGS.window_seconds,
+  max_requests: DEFAULT_RATE_LIMIT_SETTINGS.max_requests,
 })
 const rateLimitSaving = computed(() => saveRateLimitMutation.isPending.value)
 
-const registrationEnabled = ref(mockRegistrationSetting.enabled)
+const registrationEnabled = ref(DEFAULT_REGISTRATION_ENABLED)
 const registrationSettingLoading = computed(
   () =>
     registrationSettingQuery.isLoading.value ||
@@ -678,14 +665,14 @@ const banModalDescription = computed(() =>
 watch(
   () => usersQuery.error.value,
   (error) => {
-    if (!isMockMode.value && error) appToast.error(formatDisplayErrorMessage(error, '加载用户失败'))
+    if (error) appToast.error(formatDisplayErrorMessage(error, '加载用户失败'))
   },
 )
 
 watch(
   () => registrationSettingQuery.error.value || rateLimitSettingsQuery.error.value,
   (error) => {
-    if (!isMockMode.value && error) {
+    if (error) {
       appToast.error(formatDisplayErrorMessage(error, '加载后台配置失败'))
     }
   },
@@ -783,7 +770,6 @@ function loadUsers() {
     appliedSearchKeyword.value = nextKeyword
     return
   }
-  if (isMockMode.value) return
   void usersQuery.refetch()
 }
 
@@ -794,10 +780,6 @@ async function handleSaveRateLimit() {
     return
   }
 
-  if (isMockMode.value) {
-    appToast.success('限流配置已保存')
-    return
-  }
   try {
     await saveRateLimitMutation.mutateAsync({
       window_seconds: rateLimitForm.value.window_seconds,
@@ -828,14 +810,7 @@ function validateRateLimitSettings() {
 }
 
 async function handleToggleRegistration(newValue: boolean) {
-  const fallbackEnabled = isMockMode.value
-    ? !newValue
-    : (registrationSettingQuery.data.value?.data?.enabled ?? !newValue)
-  if (isMockMode.value) {
-    registrationEnabled.value = newValue
-    appToast.success(newValue ? '已开放注册' : '已关闭注册')
-    return
-  }
+  const fallbackEnabled = registrationSettingQuery.data.value?.data?.enabled ?? !newValue
   try {
     await updateRegistrationSettingMutation.mutateAsync(newValue)
     appToast.success(newValue ? '已开放注册' : '已关闭注册')
@@ -846,10 +821,6 @@ async function handleToggleRegistration(newValue: boolean) {
 }
 
 function handleAction(key: UserActionKey, row: User) {
-  if (isMockMode.value) {
-    appToast.info('Mock 模式不执行用户变更')
-    return
-  }
   switch (key) {
     case 'status':
       handleToggleStatus(row)

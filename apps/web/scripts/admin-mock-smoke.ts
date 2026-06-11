@@ -6,7 +6,22 @@ type SmokePage = {
   path: string
 }
 
-const ADMIN_API_RE = /\/api\/admin(?:[/?#]|$)/
+const API_REQUEST_RE = /\/api\/(?:admin|auth|user)(?:[/?#]|$)/
+const ALLOWED_API_REQUESTS = [
+  /\/api\/auth\/get-session(?:[?#\s]|$)/,
+  /\/api\/user\/info(?:[?#\s]|$)/,
+  /\/api\/admin\/statistics(?:[?#\s]|$)/,
+  /\/api\/admin\/monitor(?:[/?#\s]|$)/,
+  /\/api\/admin\/tasks(?:[?#\s]|$)/,
+  /\/api\/admin\/channels(?:[?#\s]|$)/,
+  /\/api\/admin\/accounts(?:[/?#\s]|$)/,
+  /\/api\/admin\/users(?:[?#\s]|$)/,
+  /\/api\/admin\/settings\/registration(?:[?#\s]|$)/,
+  /\/api\/admin\/settings\/rate-limit(?:[?#\s]|$)/,
+  /\/api\/admin\/feature-prompts(?:[?#\s]|$)/,
+  /\/api\/admin\/storage\/providers(?:[?#\s]|$)/,
+  /\/api\/admin\/storage\/profiles(?:[?#\s]|$)/,
+] as const
 
 const smoke = createMockSmokeRuntime({
   hostEnvName: 'ADMIN_MOCK_SMOKE_HOST',
@@ -39,6 +54,208 @@ const USER_INFO = {
   },
 }
 
+const EMPTY_ADMIN_STATISTICS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    summary: {
+      total_calls: 0,
+      today_calls: 0,
+      today_success: 0,
+      today_failed: 0,
+      today_cancelled: 0,
+      yesterday_calls: 0,
+      yesterday_success: 0,
+      yesterday_failed: 0,
+      yesterday_cancelled: 0,
+      this_month_calls: 0,
+      this_month_cancelled: 0,
+      pending: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+    },
+    trend: [],
+    model_health: [],
+    quality_trend: [],
+    slow_models: [],
+    bottleneck_sources: [],
+    failure_categories: [],
+    backfill_status: {
+      range_start: '2026-01-01',
+      range_end: '2026-01-01',
+      missing_days: 0,
+      backfilled_days: 0,
+    },
+  },
+}
+
+const EMPTY_ADMIN_MONITOR = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    monitor: {
+      global_queue_len: 0,
+      wait_queue_len: 0,
+      running_attempts: 0,
+      account_loads: {},
+      execution_pressure: [],
+    },
+    stats: {
+      pending: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+    },
+  },
+}
+
+const ADMIN_MONITOR_STREAM = [
+  'retry: 600000',
+  'event: snapshot',
+  `data: ${JSON.stringify(EMPTY_ADMIN_MONITOR)}`,
+  '',
+  '',
+].join('\n')
+
+const EMPTY_ADMIN_TASKS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    list: [],
+    total: 0,
+    pending_count: 0,
+    running_count: 0,
+    completed_count: 0,
+    failed_count: 0,
+    cancelled_count: 0,
+    other_count: 0,
+  },
+}
+
+const EMPTY_ADMIN_USERS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    total: 0,
+    active_count: 0,
+    banned_count: 0,
+    admin_count: 0,
+    list: [],
+  },
+}
+
+const EMPTY_ADMIN_CHANNELS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    list: [],
+    total: 0,
+  },
+}
+
+const EMPTY_ADMIN_ACCOUNTS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    list: [],
+    total: 0,
+  },
+}
+
+const ADMIN_ACCOUNT_LIMITS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    limits: {
+      max_concurrent: { min: 1, max: 64, default: 3 },
+      timeout_seconds: { min: 1, max: 600, default: 120 },
+    },
+  },
+}
+
+const ADMIN_REGISTRATION_SETTING = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    enabled: false,
+  },
+}
+
+const ADMIN_RATE_LIMIT_SETTINGS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    window_seconds: 60,
+    max_requests: 30,
+  },
+}
+
+const EMPTY_FEATURE_PROMPTS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    prompts: [],
+  },
+}
+
+const STORAGE_PROVIDERS = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    providers: [
+      {
+        provider: 'local',
+        label: 'Local',
+        description: '服务器本地存储',
+        builtin: true,
+        create_allowed: false,
+        supports_test: false,
+        supports_bucket_info: false,
+        fields: [],
+      },
+      {
+        provider: 's3-compatible',
+        label: 'S3 Compatible',
+        description: 'S3 兼容对象存储',
+        builtin: false,
+        create_allowed: true,
+        supports_test: true,
+        supports_bucket_info: true,
+        fields: [
+          { key: 'bucket_name', label: 'Bucket', type: 'text', required: true },
+          { key: 'endpoint', label: 'Endpoint', type: 'text', required: true },
+          { key: 'region_id', label: 'Region', type: 'text' },
+          { key: 'access_key_id', label: 'Access Key', type: 'text', required: true },
+          { key: 'access_key_secret', label: 'Secret Key', type: 'password', required: true, secret: true },
+          { key: 'force_path_style', label: 'Path Style', type: 'switch' },
+        ],
+      },
+    ],
+  },
+}
+
+const STORAGE_PROFILES = {
+  code: 0,
+  msg: 'ok',
+  data: {
+    profiles: [
+      {
+        id: 'local',
+        name: 'Local Storage',
+        provider: 'local',
+        enabled: true,
+        is_current: true,
+        builtin: true,
+        secret_configured: false,
+        config: {},
+      },
+    ],
+  },
+}
+
 const pages: SmokePage[] = adminNavigationRouteDefs.map((route) => ({
   label: route.label,
   path: route.path,
@@ -48,21 +265,31 @@ function setupBrowser(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, ['open', 'about:blank'])
   smoke.routeJson(playwrightCli, '**/api/auth/get-session', AUTH_SESSION)
   smoke.routeJson(playwrightCli, '**/api/user/info', USER_INFO)
-  smoke.routeJson(
-    playwrightCli,
-    '**/api/admin/**',
-    { code: 599, msg: 'admin mock smoke blocked real admin API request' },
-    599,
-  )
+  smoke.routeResponse(playwrightCli, '**/api/admin/monitor/stream', ADMIN_MONITOR_STREAM, {
+    contentType: 'text/event-stream',
+  })
+  smoke.routeJson(playwrightCli, '**/api/admin/statistics**', EMPTY_ADMIN_STATISTICS)
+  smoke.routeJson(playwrightCli, '**/api/admin/monitor', EMPTY_ADMIN_MONITOR)
+  smoke.routeJson(playwrightCli, '**/api/admin/tasks**', EMPTY_ADMIN_TASKS)
+  smoke.routeJson(playwrightCli, '**/api/admin/channels', EMPTY_ADMIN_CHANNELS)
+  smoke.routeJson(playwrightCli, '**/api/admin/accounts/limits', ADMIN_ACCOUNT_LIMITS)
+  smoke.routeJson(playwrightCli, '**/api/admin/accounts**', EMPTY_ADMIN_ACCOUNTS)
+  smoke.routeJson(playwrightCli, '**/api/admin/users**', EMPTY_ADMIN_USERS)
+  smoke.routeJson(playwrightCli, '**/api/admin/settings/registration', ADMIN_REGISTRATION_SETTING)
+  smoke.routeJson(playwrightCli, '**/api/admin/settings/rate-limit', ADMIN_RATE_LIMIT_SETTINGS)
+  smoke.routeJson(playwrightCli, '**/api/admin/feature-prompts', EMPTY_FEATURE_PROMPTS)
+  smoke.routeJson(playwrightCli, '**/api/admin/storage/providers', STORAGE_PROVIDERS)
+  smoke.routeJson(playwrightCli, '**/api/admin/storage/profiles', STORAGE_PROFILES)
 }
 
-function assertNoAdminApiRequests(output: string, page: SmokePage) {
+function assertNoUnexpectedApiRequests(output: string, page: SmokePage) {
   const unexpectedRequests = output
     .split(/\r?\n/)
-    .filter((line) => ADMIN_API_RE.test(line))
+    .filter((line) => API_REQUEST_RE.test(line))
+    .filter((line) => !ALLOWED_API_REQUESTS.some((pattern) => pattern.test(line)))
     .join('\n')
   if (unexpectedRequests) {
-    throw new Error(`Unexpected admin API requests on ${page.path}\n${unexpectedRequests}`)
+    throw new Error(`Unexpected API requests on ${page.path}\n${unexpectedRequests}`)
   }
 }
 
@@ -84,7 +311,7 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
   assertNoConsoleErrors(consoleOutput, page.path)
 
   const requestsOutput = smoke.runCommand(playwrightCli, ['requests']).stdout
-  assertNoAdminApiRequests(requestsOutput, page)
+  assertNoUnexpectedApiRequests(requestsOutput, page)
 
   if (smoke.isVerbose) {
     console.log(`ok ${page.path}`)
@@ -112,7 +339,7 @@ async function main() {
   let playwrightCli: CommandSpec | null = null
   try {
     playwrightCli = smoke.resolvePlaywrightCli()
-    await smoke.startDevServer({ VITE_ADMIN_MOCK_DATA: '1' })
+    await smoke.startDevServer()
     setupBrowser(playwrightCli)
 
     for (const page of pages) {

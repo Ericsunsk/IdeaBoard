@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUsageStatisticsData } from './useUsageStatisticsData'
 
 const mockState = vi.hoisted(() => ({
-  adminMockMode: undefined as unknown,
   statisticsReturns: [] as unknown[],
 }))
 
@@ -11,13 +10,7 @@ vi.mock('../../../../shared/api/generated-query/admin-statistics/admin-statistic
   useGetAdminStatistics: vi.fn(() => mockState.statisticsReturns.shift()),
 }))
 
-vi.mock('../../shared/lib/adminMockData', () => ({
-  createMockAdminStatistics: vi.fn(),
-  useAdminMockMode: vi.fn(() => mockState.adminMockMode),
-}))
-
 beforeEach(() => {
-  mockState.adminMockMode = ref(false)
   mockState.statisticsReturns = [makeStatisticsQuery(), makeStatisticsQuery()]
 })
 

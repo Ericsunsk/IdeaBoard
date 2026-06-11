@@ -476,7 +476,6 @@ import {
   adminToolbarIconButtonClass,
   adminToolbarMetricClass,
 } from '../../shared/lib/adminUiClasses'
-import { createMockAdminChannels, useAdminMockMode } from '../../shared/lib/adminMockData'
 import {
   ADMIN_CHANNEL_API_TYPE_OPTIONS,
   DEFAULT_ADMIN_CHANNEL_API_TYPE,
@@ -489,7 +488,6 @@ import { useChannelAccounts } from './useChannelAccounts'
 const appToast = useAppToast()
 const { runAsyncAction } = useAsyncAction()
 const confirm = useConfirm()
-const isMockMode = useAdminMockMode()
 
 // State
 const loading = ref(false)
@@ -530,12 +528,6 @@ const emptyChannelMessage = computed(() => (hasChannelSearch.value ? '无匹配�
 async function loadData() {
   await runAsyncAction(
     async () => {
-      if (isMockMode.value) {
-        channels.value = createMockAdminChannels()
-        await loadAccounts()
-        return
-      }
-
       const chRes = await channelApi.list()
 
       if (chRes.code === 0) channels.value = chRes.data?.list || []
@@ -647,37 +639,6 @@ async function handleSaveChannel() {
     async () => {
       const submitData = { ...channelForm.value }
 
-      if (isMockMode.value) {
-        const now = new Date().toISOString()
-        if (isEditChannel.value) {
-          channels.value = channels.value.map((channel) =>
-            channel.id === currentChannelId.value
-              ? {
-                  ...channel,
-                  ...submitData,
-                  updated_at: now,
-                }
-              : channel,
-          )
-          appToast.success('渠道商已更新')
-        } else {
-          channels.value = [
-            {
-              id: Math.max(200, ...channels.value.map((channel) => channel.id)) + 1,
-              ...submitData,
-              status: 1,
-              created_at: now,
-              updated_at: now,
-            },
-            ...channels.value,
-          ]
-          appToast.success('渠道商已创建')
-        }
-        showChannelModal.value = false
-        resetChannelFormErrors()
-        return
-      }
-
       if (isEditChannel.value) {
         await channelApi.update(currentChannelId.value, submitData)
         appToast.success('渠道商已更新')
@@ -749,12 +710,6 @@ function handleDeleteChannel(row: Channel) {
     acceptLabel: '确定',
     accept: async () => {
       try {
-        if (isMockMode.value) {
-          channels.value = channels.value.filter((channel) => channel.id !== row.id)
-          appToast.success('删除成功')
-          return
-        }
-
         await channelApi.delete(row.id)
         appToast.success('删除成功')
         await loadData()

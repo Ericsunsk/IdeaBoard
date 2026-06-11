@@ -10,11 +10,6 @@ import adminAccountApi, {
   type AdminAccountModelInput,
   type AdminAccountUpdateRequest,
 } from '../../shared/api/adminAccounts'
-import {
-  createMockAdminAccounts,
-  mockAdminAccountLimits,
-  useAdminMockMode,
-} from '../../shared/lib/adminMockData'
 import { DEFAULT_ADMIN_CHANNEL_API_TYPE } from './channelApiTypes'
 import { extractApiErrorMessage } from './channelModelUtils'
 
@@ -44,7 +39,6 @@ export function useChannelAccounts(options: {
 }) {
   const { runAsyncAction } = useAsyncAction()
   const accounts = ref<AdminAccount[]>([])
-  const isMockMode = useAdminMockMode()
   const showAccountModal = ref(false)
   const isEditAccount = ref(false)
   const accountSaveLoading = ref(false)
@@ -90,11 +84,6 @@ export function useChannelAccounts(options: {
   }
 
   async function loadAccountLimits() {
-    if (isMockMode.value) {
-      accountLimits.value = mockAdminAccountLimits
-      return
-    }
-
     try {
       const res = await adminAccountApi.getLimits()
       accountLimits.value = normalizeAdminAccountLimits(res.data?.limits)
@@ -127,12 +116,6 @@ export function useChannelAccounts(options: {
   }
 
   async function loadAccounts() {
-    if (isMockMode.value) {
-      accounts.value = createMockAdminAccounts()
-      accountLimits.value = mockAdminAccountLimits
-      return
-    }
-
     const [nextAccounts] = await Promise.all([loadAllAccounts(), loadAccountLimits()])
     accounts.value = nextAccounts
   }
@@ -271,41 +254,6 @@ export function useChannelAccounts(options: {
           proxy_url: ch?.api_url || '',
         }
 
-        if (isMockMode.value) {
-          const now = new Date().toISOString()
-          const nextAccount: AdminAccount = {
-            id:
-              existingAccount?.id ??
-              Math.max(900, ...accounts.value.map((account) => account.id)) + 1,
-            name: baseData.name,
-            channel_id: channelId,
-            platform: baseData.platform,
-            api_type: baseData.api_type,
-            proxy_url: baseData.proxy_url,
-            models: mockAccountModelsFromInputs(modelInputs),
-            secret_configured: existingAccount?.secret_configured ?? true,
-            max_concurrent: baseData.max_concurrent,
-            current_concurrent: existingAccount?.current_concurrent ?? 0,
-            wait_queue_count: existingAccount?.wait_queue_count ?? 0,
-            running_status: existingAccount?.running_status ?? 'running',
-            fail_count: existingAccount?.fail_count ?? 0,
-            weight: existingAccount?.weight ?? 100,
-            timeout: baseData.timeout,
-            extra_config: existingAccount?.extra_config ?? '{}',
-            status: existingAccount?.status ?? 1,
-            created_at: existingAccount?.created_at ?? now,
-            updated_at: now,
-          }
-          accounts.value = isEditAccount.value
-            ? accounts.value.map((account) =>
-                account.id === currentAccountId.value ? nextAccount : account,
-              )
-            : [nextAccount, ...accounts.value]
-          options.message.success(isEditAccount.value ? '账号已更新' : '账号已创建')
-          showAccountModal.value = false
-          return
-        }
-
         if (isEditAccount.value) {
           const updateData: AdminAccountUpdateRequest = {
             ...baseData,
@@ -368,9 +316,7 @@ export function useChannelAccounts(options: {
       updated_at: updatedAt,
     }
 
-    if (!isMockMode.value) {
-      await adminAccountApi.update(account.id, createAccountUpdatePayload(nextAccount))
-    }
+    await adminAccountApi.update(account.id, createAccountUpdatePayload(nextAccount))
 
     accounts.value = accounts.value.map((item) => (item.id === account.id ? nextAccount : item))
   }
@@ -395,12 +341,6 @@ export function useChannelAccounts(options: {
       content: '确定删除该 APIKey 吗？关联的执行中任务会由后端统一结束。',
       onConfirm: async () => {
         try {
-          if (isMockMode.value) {
-            accounts.value = accounts.value.filter((item) => item.id !== account.id)
-            options.message.success('账号已删除')
-            return
-          }
-
           await adminAccountApi.delete(account.id)
           options.message.success('账号已删除')
           await options.onAfterMutation()
@@ -460,18 +400,6 @@ function accountModelInputsFromModels(models: AdminAccountModel[]): AdminAccount
     weight: model.weight,
     max_concurrent: model.max_concurrent,
     feature_slugs: model.feature_slugs,
-  }))
-}
-
-function mockAccountModelsFromInputs(models: AdminAccountModelInput[]): AdminAccountModel[] {
-  return models.map((model, index) => ({
-    id: index + 1,
-    name: model.name,
-    enabled: model.enabled ?? true,
-    weight: model.weight ?? 1,
-    max_concurrent: model.max_concurrent,
-    feature_slugs: model.feature_slugs,
-    sort_order: index,
   }))
 }
 

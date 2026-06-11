@@ -196,7 +196,6 @@ import {
   adminDialogScrollableBodyClass,
   adminDialogTitleClass,
 } from '../../shared/lib/adminUiClasses'
-import { createMockFeaturePrompts, useAdminMockMode } from '../../shared/lib/adminMockData'
 import { saveFeaturePrompt } from '../../shared/queries/adminActions'
 import {
   getListAdminFeaturePromptsQueryKey,
@@ -217,7 +216,6 @@ import {
 
 const appToast = useAppToast()
 const queryClient = useQueryClient()
-const isMockMode = useAdminMockMode()
 const { isScrolling: isPromptPanelScrolling, handleScroll: handlePromptPanelScroll } =
   useTransientScrolling()
 const { isScrolling: isPromptDialogScrolling, handleScroll: handlePromptDialogScroll } =
@@ -312,19 +310,8 @@ const savedPromptMap = reactive<Record<string, string>>({})
 const enabledMap = reactive<Record<string, boolean>>({})
 const promptConfigMap = reactive<Record<string, FeaturePrompt>>({})
 const saving = reactive<Record<string, boolean>>({})
-const mockPrompts = ref<FeaturePrompt[]>(
-  createMockFeaturePrompts(
-    groupedFeatureGroups.flatMap((group) => group.items.map((item) => item.slug)),
-  ),
-)
-const promptsQuery = useListAdminFeaturePrompts({
-  query: {
-    enabled: computed(() => !isMockMode.value),
-  },
-})
-const featurePrompts = computed(() =>
-  isMockMode.value ? mockPrompts.value : promptsQuery.data.value?.data?.prompts,
-)
+const promptsQuery = useListAdminFeaturePrompts()
+const featurePrompts = computed(() => promptsQuery.data.value?.data?.prompts)
 const savePromptMutation = useMutation({
   mutationFn: saveFeaturePrompt,
   onSuccess: async (config) => {
@@ -338,7 +325,7 @@ const savePromptMutation = useMutation({
 watch(
   () => promptsQuery.error.value,
   (error) => {
-    if (!isMockMode.value && error) {
+    if (error) {
       appToast.error(formatDisplayErrorMessage(error, '加载提示词失败'))
     }
   },
@@ -375,11 +362,6 @@ watch(
 async function savePrompt(slug: FeatureSlug) {
   saving[slug] = true
   try {
-    if (isMockMode.value) {
-      persistMockFeaturePrompt(slug)
-      appToast.success(`「${featureMap[slug].title}」提示词已保存`)
-      return
-    }
     await savePromptMutation.mutateAsync({
       slug,
       prompt: promptMap[slug] || '',
@@ -391,27 +373,5 @@ async function savePrompt(slug: FeatureSlug) {
   } finally {
     saving[slug] = false
   }
-}
-
-function persistMockFeaturePrompt(slug: FeatureSlug) {
-  const fallbackConfig = createMockFeaturePrompts([slug])[0]
-  if (!fallbackConfig) return
-
-  const current = promptConfigMap[slug] || fallbackConfig
-  const nextConfig: FeaturePrompt = {
-    ...current,
-    prompt: promptMap[slug] || '',
-    enabled: enabledMap[slug] ?? true,
-    schema_version: current.schema_version + 1,
-    updated_at: new Date().toISOString(),
-  }
-
-  mockPrompts.value = mockPrompts.value.map((config) =>
-    config.slug === slug ? nextConfig : config,
-  )
-  promptConfigMap[slug] = nextConfig
-  savedPromptMap[slug] = nextConfig.prompt
-  promptMap[slug] = nextConfig.prompt
-  enabledMap[slug] = nextConfig.enabled
 }
 </script>

@@ -1,22 +1,9 @@
 import { computed, watch } from 'vue'
 import { useGetAdminMonitor } from '../../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import { useAdminQueryPolling } from '../../shared/composables/useAdminQueryPolling'
-import { mockMonitorData, mockMonitorStats, useAdminMockMode } from '../../shared/lib/adminMockData'
 import { useTaskMonitorStream } from './useTaskMonitorStream'
 
 export function useTaskRuntimeMonitor() {
-  const isMockMode = useAdminMockMode()
-
-  if (isMockMode.value) {
-    return {
-      monitorData: computed(() => mockMonitorData),
-      monitorStats: computed(() => mockMonitorStats),
-      monitorStreamStatus: computed(() => 'connected'),
-      isError: computed(() => false),
-      error: computed(() => null),
-    }
-  }
-
   const stream = useTaskMonitorStream()
   const polling = useAdminQueryPolling({
     visibleInterval: 10_000,

@@ -10,12 +10,6 @@ import {
   type AdminAnomalyItem,
   type AdminAnomalySeverity,
 } from '../lib/adminAnomalyRules'
-import {
-  createMockAdminStatistics,
-  mockMonitorData,
-  mockMonitorStats,
-  useAdminMockMode,
-} from '../lib/adminMockData'
 import { useAdminQueryPolling } from './useAdminQueryPolling'
 
 type UseAdminAnomalyRadarOptions = {
@@ -35,17 +29,16 @@ const severityRank: Record<AdminAnomalySeverity, number> = {
 }
 
 export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) {
-  const isMockMode = useAdminMockMode()
   const isEnabled = computed(() => options.enabled?.value ?? true)
   const polling = useAdminQueryPolling({
     visibleInterval: 15_000,
     hiddenInterval: 60_000,
-    isEnabled: () => isEnabled.value && !isMockMode.value,
+    isEnabled: () => isEnabled.value,
   })
 
   const monitorQuery = useGetAdminMonitor({
     query: {
-      enabled: computed(() => isEnabled.value && !isMockMode.value),
+      enabled: isEnabled,
       refetchInterval: polling.refetchInterval,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
@@ -55,7 +48,7 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
     computed(() => ({ range: GetAdminStatisticsRange['1d'] })),
     {
       query: {
-        enabled: computed(() => isEnabled.value && !isMockMode.value),
+        enabled: isEnabled,
         refetchInterval: polling.refetchInterval,
         refetchIntervalInBackground: false,
         refetchOnWindowFocus: false,
@@ -64,16 +57,10 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
     },
   )
 
-  const monitorData = computed(() =>
-    isMockMode.value ? mockMonitorData : monitorQuery.data.value?.data?.monitor || null,
-  )
-  const monitorStats = computed(() =>
-    isMockMode.value ? mockMonitorStats : monitorQuery.data.value?.data?.stats || null,
-  )
+  const monitorData = computed(() => monitorQuery.data.value?.data?.monitor || null)
+  const monitorStats = computed(() => monitorQuery.data.value?.data?.stats || null)
   const statistics = computed<AdminStatistics | null>(() =>
-    isMockMode.value
-      ? createMockAdminStatistics(GetAdminStatisticsRange['1d'])
-      : (statisticsQuery.data.value?.data ?? null),
+    statisticsQuery.data.value?.data ?? null,
   )
   const stableRecords = ref(new Map<string, StableAnomalyRecord>())
   const anomalies = ref<AdminAnomalyItem[]>([])
@@ -85,8 +72,8 @@ export function useAdminAnomalyRadar(options: UseAdminAnomalyRadarOptions = {}) 
       monitorStats: monitorStats.value,
       statistics: statistics.value,
       isMonitorDegraded: false,
-      isMonitorUnavailable: !isMockMode.value && monitorQuery.isError.value,
-      isStatisticsUnavailable: !isMockMode.value && statisticsQuery.isError.value,
+      isMonitorUnavailable: monitorQuery.isError.value,
+      isStatisticsUnavailable: statisticsQuery.isError.value,
     })
   })
 

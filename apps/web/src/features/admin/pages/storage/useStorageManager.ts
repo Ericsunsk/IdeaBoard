@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import type {
   StorageProfile,
-  StorageProfilePayload,
   StorageProvider,
   StorageProviderMeta,
 } from '../../shared/api/storage'
@@ -22,11 +21,6 @@ import {
   testStorageProfile,
 } from '../../shared/queries/adminActions'
 import { buildVendorPresets, type VendorPresetOption } from './storageMeta'
-import {
-  mockStorageProfiles,
-  mockStorageProviders,
-  useAdminMockMode,
-} from '../../shared/lib/adminMockData'
 import {
   buildPayload,
   canApply as canApplyProfile,
@@ -48,19 +42,9 @@ export function useStorageManager() {
   const appToast = useAppToast()
   const { runAsyncAction } = useAsyncAction()
   const queryClient = useQueryClient()
-  const isMockMode = useAdminMockMode()
-  const mockProfiles = ref<StorageProfile[]>(copyMockStorageProfiles())
 
-  const providersQuery = useListAdminStorageProviders({
-    query: {
-      enabled: computed(() => !isMockMode.value),
-    },
-  })
-  const profilesQuery = useListAdminStorageProfiles({
-    query: {
-      enabled: computed(() => !isMockMode.value),
-    },
-  })
+  const providersQuery = useListAdminStorageProviders()
+  const profilesQuery = useListAdminStorageProfiles()
   const saveProfileMutation = useMutation({
     mutationFn: saveStorageProfile,
     onSuccess: () =>
@@ -93,11 +77,11 @@ export function useStorageManager() {
   const editingId = ref<string | null>(null)
   const selectedVendorKey = ref('aliyun-oss')
   const loading = computed(
-    () => !isMockMode.value && (providersQuery.isLoading.value || profilesQuery.isLoading.value),
+    () => providersQuery.isLoading.value || profilesQuery.isLoading.value,
   )
 
   const providers = computed<StorageProviderMeta[]>(() =>
-    isMockMode.value ? mockStorageProviders : (providersQuery.data.value?.data?.providers ?? []),
+    providersQuery.data.value?.data?.providers ?? [],
   )
   const bucketDomains = ref<string[]>([])
   const providerMap = computed(() => toProviderMetaMap(providers.value))
@@ -106,9 +90,8 @@ export function useStorageManager() {
   )
   const vendorPresets = computed(() => buildVendorPresets(creatableProviders.value))
   const storages = computed<StorageCard[]>(() =>
-    (isMockMode.value ? mockProfiles.value : (profilesQuery.data.value?.data?.profiles ?? [])).map(
-      (profile) =>
-        normalizeProfile({ ...profile, secret_configured: profile.secret_configured ?? false }),
+    (profilesQuery.data.value?.data?.profiles ?? []).map((profile) =>
+      normalizeProfile({ ...profile, secret_configured: profile.secret_configured ?? false }),
     ),
   )
   const form = ref<StorageCard>(createEmptyStorageProfile('s3-compatible', providerMap.value))
@@ -136,7 +119,7 @@ export function useStorageManager() {
   watch(
     () => providersQuery.error.value || profilesQuery.error.value,
     (error) => {
-      if (!isMockMode.value && error) {
+      if (error) {
         appToast.error(formatDisplayErrorMessage(error, '加载存储配置失败'))
       }
     },
@@ -174,37 +157,6 @@ export function useStorageManager() {
 
   function normalizeProfile(profile: StorageProfile): StorageCard {
     return normalizeStorageProfile(profile, providerMap.value)
-  }
-
-  function persistMockProfile(
-    payload: StorageProfilePayload,
-    editId: string | null | undefined,
-    apply: boolean,
-  ): StorageCard {
-    const existing = editId
-      ? mockProfiles.value.find((profile) => profile.id === editId)
-      : undefined
-    const id = editId || `mock-storage-${Date.now()}`
-    const nextProfile: StorageProfile = {
-      id,
-      name: payload.name,
-      provider: payload.provider,
-      enabled: payload.enabled,
-      is_current: apply || Boolean(existing?.is_current),
-      builtin: existing?.builtin ?? false,
-      secret_configured: true,
-      config: { ...payload.config },
-    }
-
-    const nextProfiles = nextProfile.is_current
-      ? mockProfiles.value.map((profile) => ({ ...profile, is_current: false }))
-      : mockProfiles.value
-
-    mockProfiles.value = existing
-      ? nextProfiles.map((profile) => (profile.id === id ? nextProfile : profile))
-      : [...nextProfiles, nextProfile]
-
-    return normalizeProfile(nextProfile)
   }
 
   function providerLabel(provider: StorageProvider) {
@@ -298,20 +250,6 @@ export function useStorageManager() {
       return null
     }
 
-    if (isMockMode.value) {
-      const saved = persistMockProfile(payload, editId, apply)
-      editorMode.value = 'edit'
-      editingId.value = saved.id
-      form.value = {
-        ...saved,
-        config: { ...saved.config },
-      }
-      if (showSuccess) {
-        appToast.success('保存成功')
-      }
-      return saved
-    }
-
     const response = await saveProfileMutation.mutateAsync({
       id: editId || undefined,
       payload,
@@ -364,14 +302,6 @@ export function useStorageManager() {
   async function applyStorage(id: string) {
     await runAsyncAction(
       async () => {
-        if (isMockMode.value) {
-          mockProfiles.value = mockProfiles.value.map((profile) => ({
-            ...profile,
-            is_current: profile.id === id,
-          }))
-          appToast.success('已设为当前存储')
-          return
-        }
         const response = await applyProfileMutation.mutateAsync(id)
         appToast.success(response.message || '已设为当前存储')
       },
@@ -390,10 +320,6 @@ export function useStorageManager() {
   async function handleTest(storage: StorageCard) {
     await runAsyncAction(
       async () => {
-        if (isMockMode.value) {
-          appToast.success('连接成功')
-          return
-        }
         const response = await testProfileMutation.mutateAsync(storage.id)
         appToast.success(response.message || '连接成功')
       },
@@ -417,12 +343,6 @@ export function useStorageManager() {
         const saved = await persistForm(false)
         if (!saved) return
 
-        if (isMockMode.value) {
-          bucketDomains.value = ['assets.example.com', 'cdn-assets.example.com']
-          appToast.success(`检测到 ${bucketDomains.value.length} 个域名`)
-          return
-        }
-
         const domains = await bucketDomainsMutation.mutateAsync(saved.id)
         if (domains.length > 0) {
           bucketDomains.value = domains
@@ -441,17 +361,6 @@ export function useStorageManager() {
   async function removeProfile(id: string) {
     await runAsyncAction(
       async () => {
-        if (isMockMode.value) {
-          const target = mockProfiles.value.find((profile) => profile.id === id)
-          if (!target || target.builtin) {
-            appToast.warning('内置存储不可删除')
-            return
-          }
-          mockProfiles.value = mockProfiles.value.filter((profile) => profile.id !== id)
-          appToast.success('删除成功')
-          if (editingId.value === id) closeEditor()
-          return
-        }
         const response = await deleteProfileMutation.mutateAsync(id)
         appToast.success(response.message || '删除成功')
         if (editingId.value === id) closeEditor()
@@ -463,7 +372,6 @@ export function useStorageManager() {
   }
 
   async function loadData() {
-    if (isMockMode.value) return
     await runAsyncAction(() => Promise.all([providersQuery.refetch(), profilesQuery.refetch()]), {
       errorMessage: '刷新存储配置失败',
     })
@@ -512,12 +420,4 @@ export function useStorageManager() {
     removeProfile,
     loadData,
   }
-}
-
-function copyMockStorageProfiles(): StorageProfile[] {
-  return mockStorageProfiles.map((profile) => ({
-    ...profile,
-    secret_configured: profile.secret_configured ?? false,
-    config: { ...profile.config },
-  }))
 }

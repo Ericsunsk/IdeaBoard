@@ -189,17 +189,29 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
     return { stdout, stderr, status: result.status ?? 0 }
   }
 
-  function routeJson(playwrightCli: CommandSpec, pattern: string, body: unknown, status = 200) {
+  function routeResponse(
+    playwrightCli: CommandSpec,
+    pattern: string,
+    body: string,
+    options: { contentType?: string; status?: number } = {},
+  ) {
     runCommand(playwrightCli, [
       'route',
       pattern,
       '--status',
-      String(status),
+      String(options.status ?? 200),
       '--content-type',
-      'application/json',
+      options.contentType ?? 'text/plain',
       '--body',
-      JSON.stringify(body),
+      body,
     ])
+  }
+
+  function routeJson(playwrightCli: CommandSpec, pattern: string, body: unknown, status = 200) {
+    routeResponse(playwrightCli, pattern, JSON.stringify(body), {
+      contentType: 'application/json',
+      status,
+    })
   }
 
   async function stopDevServer() {
@@ -228,6 +240,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
     },
     isVerbose,
     resolvePlaywrightCli,
+    routeResponse,
     routeJson,
     runCommand,
     startDevServer,
