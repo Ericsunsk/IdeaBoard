@@ -312,12 +312,7 @@ func (s *StorageService) saveUploadedFileLocal(file *multipart.FileHeader, opts 
 	}
 	defer src.Close()
 
-	data, err := io.ReadAll(src)
-	if err != nil {
-		return "", fmt.Errorf("读取文件失败: %v", err)
-	}
-
-	return s.saveBytesLocal(file.Filename, data, opts)
+	return s.saveReaderLocal(file.Filename, src, file.Size, opts)
 }
 
 func (s *StorageService) saveBytesLocal(filename string, data []byte, opts StorageStoreOptions) (string, error) {
