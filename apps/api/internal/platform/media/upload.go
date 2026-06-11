@@ -2,6 +2,7 @@ package media
 
 import (
 	"fmt"
+	"io"
 	"mime/multipart"
 )
 
@@ -44,6 +45,28 @@ func ValidateImageBytes(data []byte, ext string) error {
 	}
 
 	return validateImageMagic(data[:required], normalizedExt)
+}
+
+// ValidateImageReader verifies the image signature from a stream without
+// requiring callers to materialize the whole file in memory.
+func ValidateImageReader(r io.Reader, ext string) error {
+	normalizedExt, ok := NormalizeImageExtension(ext)
+	if !ok {
+		return fmt.Errorf("不支持的图片格式: %s", ext)
+	}
+	if r == nil {
+		return fmt.Errorf("文件内容不合法")
+	}
+
+	signatures := imageSignaturesByExtension(normalizedExt)
+	required := requiredImageHeaderLength(signatures)
+	buf := make([]byte, required)
+	n, err := io.ReadFull(r, buf)
+	if err != nil || n < required {
+		return fmt.Errorf("文件内容不合法")
+	}
+
+	return validateImageMagic(buf, normalizedExt)
 }
 
 func requiredImageHeaderLength(signatures []imageSignature) int {

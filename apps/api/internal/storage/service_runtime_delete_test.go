@@ -1,9 +1,16 @@
 package storage
 
 import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -65,6 +72,110 @@ func TestPublicUploadURLFallsBackToRelativePath(t *testing.T) {
 	if got != want {
 		t.Fatalf("publicUploadURL = %q, want %q", got, want)
 	}
+}
+
+func TestStoreRemoteLocalSavesImageAndCleansTempFile(t *testing.T) {
+	withTempWorkingDir(t)
+	tmpDir := t.TempDir()
+	t.Setenv("TMPDIR", tmpDir)
+
+	imageBytes := tinyPNGBytes(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(imageBytes)
+	}))
+	defer server.Close()
+
+	service, _ := newStorageServiceTest(t)
+	gotURL, err := service.StoreRemote(context.Background(), server.URL+"/image.png?token=secret", StorageStoreOptions{
+		AllowHosts: []string{server.URL},
+	})
+	if err != nil {
+		t.Fatalf("StoreRemote returned error: %v", err)
+	}
+	if !strings.HasPrefix(gotURL, "/uploads/") || !strings.HasSuffix(gotURL, ".png") {
+		t.Fatalf("StoreRemote url = %q, want local png upload url", gotURL)
+	}
+	storedPath := strings.TrimPrefix(gotURL, "/")
+	storedBytes, err := os.ReadFile(filepath.FromSlash(storedPath))
+	if err != nil {
+		t.Fatalf("read stored file failed: %v", err)
+	}
+	if !bytes.Equal(storedBytes, imageBytes) {
+		t.Fatalf("stored file bytes mismatch")
+	}
+	assertDirEmpty(t, tmpDir)
+}
+
+func TestDownloadRemoteFileInfersExtensionFromContentType(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("TMPDIR", tmpDir)
+
+	imageBytes := tinyPNGBytes(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(imageBytes)
+	}))
+	defer server.Close()
+
+	service := &StorageService{}
+	remoteFile, err := service.downloadRemoteFile(context.Background(), server.URL+"/image", []string{server.URL})
+	if err != nil {
+		t.Fatalf("downloadRemoteFile returned error: %v", err)
+	}
+	defer remoteFile.Cleanup()
+
+	if !strings.HasSuffix(remoteFile.Filename, ".png") {
+		t.Fatalf("filename = %q, want .png suffix", remoteFile.Filename)
+	}
+	if remoteFile.Size != int64(len(imageBytes)) {
+		t.Fatalf("size = %d, want %d", remoteFile.Size, len(imageBytes))
+	}
+}
+
+func TestDownloadRemoteFileRejectsDisguisedImage(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("TMPDIR", tmpDir)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("<html><body>not an image</body></html>"))
+	}))
+	defer server.Close()
+
+	service := &StorageService{}
+	_, err := service.downloadRemoteFile(context.Background(), server.URL+"/image.png", []string{server.URL})
+	if err == nil {
+		t.Fatal("expected disguised image to be rejected")
+	}
+	if !strings.Contains(err.Error(), "远程文件校验失败") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertDirEmpty(t, tmpDir)
+}
+
+func TestDownloadRemoteFileCleansTempFileOnOversize(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("TMPDIR", tmpDir)
+	const testMaxSize = int64(64)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte{0x89, 0x50, 0x4E, 0x47})
+		_, _ = io.Copy(w, io.LimitReader(zeroReader{}, testMaxSize+1))
+	}))
+	defer server.Close()
+
+	service := &StorageService{}
+	_, err := service.downloadRemoteFileWithLimit(context.Background(), server.URL+"/image.png", []string{server.URL}, testMaxSize)
+	if err == nil {
+		t.Fatal("expected oversize remote file to be rejected")
+	}
+	if !strings.Contains(err.Error(), "远程文件超过大小限制") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertDirEmpty(t, tmpDir)
 }
 
 func TestDeleteLocalByPrefixRemovesWorkspaceTree(t *testing.T) {
@@ -189,4 +300,37 @@ func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 			t.Fatalf("expected host mismatch error")
 		}
 	})
+}
+
+type zeroReader struct{}
+
+func (zeroReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 0
+	}
+	return len(p), nil
+}
+
+func tinyPNGBytes(t *testing.T) []byte {
+	t.Helper()
+	data, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCwkAAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatalf("decode tiny png: %v", err)
+	}
+	return data
+}
+
+func assertDirEmpty(t *testing.T, dir string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read temp dir failed: %v", err)
+	}
+	if len(entries) != 0 {
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		t.Fatalf("expected temp dir to be empty, found %v", names)
+	}
 }

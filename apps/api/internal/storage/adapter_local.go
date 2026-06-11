@@ -66,12 +66,13 @@ func (a *localStorageAdapter) StoreBytes(ctx context.Context, profile *StoragePr
 }
 
 func (a *localStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
-	data, filename, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
+	remoteFile, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
 	if err != nil {
 		return "", err
 	}
+	defer remoteFile.Cleanup()
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	return a.service.saveBytesLocal(filename, data, opts)
+	return a.service.saveReaderLocal(remoteFile.Filename, remoteFile, remoteFile.Size, opts)
 }

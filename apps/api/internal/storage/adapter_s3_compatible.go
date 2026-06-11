@@ -50,9 +50,10 @@ func (a *s3CompatibleStorageAdapter) StoreBytes(ctx context.Context, profile *St
 }
 
 func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
-	data, filename, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
+	remoteFile, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
 	if err != nil {
 		return "", err
 	}
-	return a.service.s3CompatibleService.uploadBytesWithConfig(ctx, filename, data, a.service.s3CompatibleConfigFromProfile(profile), opts)
+	defer remoteFile.Cleanup()
+	return a.service.s3CompatibleService.uploadReaderWithConfig(ctx, remoteFile.Filename, "application/octet-stream", remoteFile, remoteFile.Size, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
