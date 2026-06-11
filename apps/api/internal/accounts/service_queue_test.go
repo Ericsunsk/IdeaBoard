@@ -219,6 +219,7 @@ func TestUpdateAccountNormalizesZeroWeight(t *testing.T) {
 		Platform:      acc.Platform,
 		ApiType:       acc.ApiType,
 		Models:        []AccountModelInput{{Name: "gpt-image-1"}},
+		ProxyURL:      acc.ProxyURL,
 		MaxConcurrent: acc.MaxConcurrent,
 		Timeout:       acc.Timeout,
 		Weight:        0,
