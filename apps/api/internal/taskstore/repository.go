@@ -942,17 +942,18 @@ func (r *Repository) FailRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Que
 	}
 	for _, c := range updated {
 		task := &tasks.Task{
-			TaskID:         c.TaskID,
-			UserID:         c.UserID,
-			AccountID:      dbutil.Int64Ptr(c.AccountID),
-			Status:         tasks.StatusFailed,
-			Result:         c.Result,
-			FeatureSlug:    c.FeatureSlug,
-			RequestedModel: c.RequestedModel,
-			ResolvedModel:  c.ResolvedModel,
-			APIType:        c.ApiType,
-			CreatedAt:      c.CreatedAt,
-			CompletedAt:    &completedAt,
+			TaskID:            c.TaskID,
+			UserID:            c.UserID,
+			AssignedChannelID: dbutil.Int64Ptr(c.AssignedChannelID),
+			AccountID:         dbutil.Int64Ptr(c.AccountID),
+			Status:            tasks.StatusFailed,
+			Result:            c.Result,
+			FeatureSlug:       c.FeatureSlug,
+			RequestedModel:    c.RequestedModel,
+			ResolvedModel:     c.ResolvedModel,
+			APIType:           c.ApiType,
+			CreatedAt:         c.CreatedAt,
+			CompletedAt:       &completedAt,
 		}
 		if err := upsertDailyStatByTaskWithFallbackModelTx(ctx, q, task, fallbackModel); err != nil {
 			return nil, fmt.Errorf("upsert daily stat for task %s: %w", c.TaskID, err)

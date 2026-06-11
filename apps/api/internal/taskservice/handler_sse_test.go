@@ -49,12 +49,27 @@ RETURNING id`,
 	return account
 }
 
+func seedTaskServiceSSEUser(t testing.TB, ctx context.Context, db *sql.DB, id int64) {
+	t.Helper()
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO users (id, username, storage_uid, role, status)
+VALUES ($1, $2, $3, 'user', 1)
+ON CONFLICT (id) DO NOTHING`,
+		id,
+		fmt.Sprintf("taskservice_sse_user_%d", id),
+		fmt.Sprintf("SSE%03d", id),
+	); err != nil {
+		t.Fatalf("seed SSE user %d failed: %v", id, err)
+	}
+}
+
 func TestStreamUserTaskSendsTerminalTaskEventWithUserView(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := testdb.Open(t)
 	taskRepo := taskstore.NewRepository(db)
 	ctx := context.Background()
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: NewEventHub()})
+	seedTaskServiceSSEUser(t, ctx, db, 7)
 
 	task := &tasks.Task{
 		TaskID:     "task-sse-terminal",
@@ -105,6 +120,7 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 	hub := NewEventHub()
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: hub})
 	account := seedTaskServiceSSEAccount(t, ctx, db, "live")
+	seedTaskServiceSSEUser(t, ctx, db, 8)
 
 	task := &tasks.Task{
 		TaskID:            "task-sse-live",
@@ -197,6 +213,7 @@ func TestStreamUserTaskReturnsJSONWhenConnectionLimitReached(t *testing.T) {
 	hub := newEventHubWithLimits(10, 1)
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: hub})
 	account := seedTaskServiceSSEAccount(t, ctx, db, "limit")
+	seedTaskServiceSSEUser(t, ctx, db, 9)
 
 	task := &tasks.Task{
 		TaskID:            "task-sse-limit",
@@ -255,6 +272,7 @@ func TestStreamUserTaskHeartbeatSendsLatestSnapshotWhenPublishMissed(t *testing.
 	ctx := context.Background()
 	service := NewService(ServiceDeps{TaskRepo: taskRepo}, ServiceOptions{EventHub: NewEventHub()})
 	account := seedTaskServiceSSEAccount(t, ctx, db, "heartbeat")
+	seedTaskServiceSSEUser(t, ctx, db, 10)
 
 	task := &tasks.Task{
 		TaskID:            "task-sse-heartbeat",
