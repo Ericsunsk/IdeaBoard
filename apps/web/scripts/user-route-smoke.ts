@@ -208,11 +208,6 @@ function assertPageReached(snapshot: string, page: SmokePage) {
   if (!snapshot.includes(`Page URL: ${smoke.baseUrl}${page.path}`)) {
     throw new Error(`User route did not stay on ${page.path}\n${snapshot}`)
   }
-
-  const missingText = page.expectedText.filter((text) => !snapshot.includes(text))
-  if (missingText.length > 0) {
-    throw new Error(`Missing expected text on ${page.path}: ${missingText.join(', ')}\n${snapshot}`)
-  }
 }
 
 function waitForExpectedText(playwrightCli: CommandSpec, page: SmokePage) {
@@ -393,7 +388,7 @@ async function main() {
     }
     process.exitCode = 1
   } finally {
-    if (playwrightCli) {
+    if (playwrightCli && !process.env.GITHUB_ACTIONS) {
       smoke.runCommand(playwrightCli, ['close'], { allowFailure: true, timeoutMs: 10_000 })
     }
     await smoke.stopDevServer()

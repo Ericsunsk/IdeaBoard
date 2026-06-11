@@ -355,7 +355,7 @@ async function main() {
     }
     process.exitCode = 1
   } finally {
-    if (playwrightCli) {
+    if (playwrightCli && !process.env.GITHUB_ACTIONS) {
       smoke.runCommand(playwrightCli, ['close'], { allowFailure: true, timeoutMs: 10_000 })
     }
     await smoke.stopDevServer()
