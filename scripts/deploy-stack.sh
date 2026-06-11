@@ -155,6 +155,10 @@ nginx_auth_health_upstream() {
   printf '%s/api/health\n' "${auth_upstream%/}"
 }
 
+nginx_real_ip_include() {
+  env_or_file_value NGINX_REAL_IP_INCLUDE
+}
+
 image_source_repo_from_ref() {
   local value="$1"
   local image_path
@@ -650,10 +654,17 @@ render_host_nginx_config() {
   NGINX_API_UPSTREAM="$(nginx_api_upstream)" \
     NGINX_AUTH_UPSTREAM="$(nginx_auth_upstream)" \
     NGINX_AUTH_HEALTH_UPSTREAM="$(nginx_auth_health_upstream)" \
+    NGINX_REAL_IP_INCLUDE="$(nginx_real_ip_include)" \
     NGINX_WEB_ROOT="${NGINX_WEB_ROOT:-/usr/share/nginx/html}" \
     NGINX_ROOT_DIRECTIVE="${NGINX_ROOT_DIRECTIVE:-return 404}" \
     bash "$ROOT_DIR/scripts/render-nginx-template.sh" "$output_path"
   echo "Rendered Nginx config: $output_path"
+}
+
+render_cloudflare_real_ip_config() {
+  local output_path="${1:-$ROOT_DIR/deploy/nginx/cloudflare-real-ip.conf}"
+
+  bash "$ROOT_DIR/scripts/render-cloudflare-real-ip-conf.sh" "$output_path"
 }
 
 ensure_env_file
@@ -670,6 +681,12 @@ fi
 if [[ "$command" == "nginx-conf" ]]; then
   shift || true
   render_host_nginx_config "${1:-}"
+  exit 0
+fi
+
+if [[ "$command" == "cloudflare-real-ip-conf" ]]; then
+  shift || true
+  render_cloudflare_real_ip_config "${1:-}"
   exit 0
 fi
 
@@ -728,6 +745,7 @@ case "$command" in
     cat >&2 <<EOF
 Usage: ideaboard [update|smoke|restart|stop|status|logs|delete|uninstall|init-env|pull|up|migrate|ps]
        ideaboard nginx-conf [output-path]
+       ideaboard cloudflare-real-ip-conf [output-path]
 
 Default command: update
 Environment file: $ENV_FILE

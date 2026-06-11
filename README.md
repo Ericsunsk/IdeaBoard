@@ -396,6 +396,8 @@ Pages 配置：
 
 VPS 侧设置 `APP_BASE_URL=https://app.example.com`、`API_BASE_URL=https://api.example.com`，并执行 `ideaboard nginx-conf /tmp/ideaboard.nginx.conf` 生成当前 Nginx 反代配置。默认 upstream 是 `127.0.0.1:6000/6001`，后续可通过 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM` 切到 Docker bridge。
 
+生产上线前还要按 [Cloudflare edge hardening checklist](./DEPLOYMENT.md#cloudflare-edge-hardening) 复核源站防火墙、真实客户端 IP、API/Auth/SSE 缓存绕过、Rate Limiting/WAF、Pages preview/prod 环境隔离，以及 HTTPS/HSTS 灰度启用。
+
 PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` 等密钥表，可能落有上游 API key、S3 access key/secret 等敏感材料。所有 `postgres-*.sql` 都必须按 secret artifact 处理：建议加密保存，限制下载、传输与共享范围；完成 restore 后按受影响渠道轮换上游 API key 与对象存储凭据。详细规则见 [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)。
 
 ### 传统 Linux 部署
@@ -417,7 +419,7 @@ PostgreSQL backup 会包含 `api_account_secrets`、`storage_profile_secrets` �
 | ---------------------------------------------------------------------- | -------------------------------------------------------- |
 | [DEVELOPMENT.md](./DEVELOPMENT.md)                                     | 架构、contract、本地开发与目录边界                       |
 | [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md)                                 | Feature System Prompt 配置手册与推荐模板                 |
-| [DEPLOYMENT.md](./DEPLOYMENT.md)                                       | Cloudflare + Docker Compose、传统 Linux 部署、升级与回滚 |
+| [DEPLOYMENT.md](./DEPLOYMENT.md)                                       | Cloudflare + Docker Compose、edge hardening、传统 Linux 部署、升级与回滚 |
 | [docs/data-protection-runbook.md](./docs/data-protection-runbook.md)   | PostgreSQL backup、restore 与密钥材料处理规则            |
 | [docs/river_migration.md](./docs/river_migration.md)                   | River + PostgreSQL 任务队列迁移决策                      |
 | [docs/AUTH_OPERATION_RUNBOOK.md](./docs/AUTH_OPERATION_RUNBOOK.md)     | Auth 运维边界与应急流程                                  |

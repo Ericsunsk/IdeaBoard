@@ -7,6 +7,8 @@ server {
     listen 80;
     server_name _;
 
+    ${NGINX_REAL_IP_INCLUDE_DIRECTIVE}
+
     client_max_body_size 50m;
 
     add_header X-Frame-Options "SAMEORIGIN" always;

@@ -178,7 +178,10 @@ else
   checkout_ref "$STACK_DIR"
 fi
 
-chmod +x "$DEPLOY_SCRIPT" "$STACK_DIR/scripts/uninstall-vps.sh"
+chmod +x \
+  "$DEPLOY_SCRIPT" \
+  "$STACK_DIR/scripts/render-cloudflare-real-ip-conf.sh" \
+  "$STACK_DIR/scripts/uninstall-vps.sh"
 if [[ -w "$(dirname "$BIN_PATH")" ]]; then
   ln -sf "$DEPLOY_SCRIPT" "$BIN_PATH"
 else

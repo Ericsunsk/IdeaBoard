@@ -98,7 +98,7 @@ nano docker/.env
 IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-stack.sh update
 ```
 
-默认生产入口是宿主机反代服务，当前用 `ideaboard nginx-conf /tmp/ideaboard.nginx.conf` 生成 API 域名的 Nginx 配置。默认 upstream 是 `127.0.0.1:6000/6001`；如果宿主机反代服务已能稳定直连 Docker bridge，可在 `docker/.env` 设置 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM` 后重新生成配置。
+默认生产入口是宿主机反代服务，当前用 `ideaboard nginx-conf /tmp/ideaboard.nginx.conf` 生成 API 域名的 Nginx 配置。默认 upstream 是 `127.0.0.1:6000/6001`；如果宿主机反代服务已能稳定直连 Docker bridge，可在 `docker/.env` 设置 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM` 后重新生成配置。Cloudflare `Proxied` API 域名启用源站 allowlist 后，可用 `ideaboard cloudflare-real-ip-conf /tmp/cloudflare-real-ip.conf` 生成真实客户端 IP include。
 
 后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。生产 `.env` 必须填写 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 的完整 digest 引用，`ideaboard update` 会在 pull 前自动验签。
 

@@ -17,6 +17,7 @@
 <p align="center">
   <a href="#deployment-profile">部署概览</a> ·
   <a href="#recommended-docker">推荐 Docker 部署</a> ·
+  <a href="#cloudflare-edge-hardening">Cloudflare 加固</a> ·
   <a href="#release-artifact">发布产物</a> ·
   <a href="#install-flow">安装流程</a> ·
   <a href="#runtime-config">运行配置</a> ·
@@ -122,12 +123,25 @@ Cloudflare DNS 配置：
 Type: A 或 AAAA
 Name: api
 Value: VPS 公网 IP
-Proxy status: Proxied 或 DNS only
+Proxy status: Proxied
 ```
 
 VPS 防火墙建议只开放 SSH、80、443。API/Auth 容器只绑定 `127.0.0.1:6000` 和 `127.0.0.1:6001`，不要把 `6000/6001/PostgreSQL/NATS` 暴露到公网。
 
 默认生成的反代 upstream 指向 `127.0.0.1:6000/6001`。如果宿主机反代服务后续已能稳定直连 Docker bridge，可以在 `/opt/stacks/ideaboard/docker/.env` 设置 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM`，再重新执行 `ideaboard nginx-conf` 生成配置。
+
+<a id="cloudflare-edge-hardening"></a>
+
+### Cloudflare edge hardening checklist
+
+生产 API 域名默认使用 `Proxied`；临时切到 `DNS only` 时，Cloudflare WAF、Rate Limiting、Cache Rules 和源站 allowlist 均不再生效，上线前必须切回并复验。
+
+- Origin 防火墙：VPS 安全组 / `ufw` 只开放 SSH、80、443；80/443 入站只允许 Cloudflare IP ranges 到达源站，或使用等价的源站防火墙策略。`6000/6001/PostgreSQL/NATS` 始终只在 loopback、Docker network 或内网监听，禁止公网直连；Cloudflare IP ranges 变更时同步 allowlist。
+- 真实客户端 IP：宿主机反代层只信任 Cloudflare 来源，并通过 `CF-Connecting-IP` 恢复真实客户端 IP，再向 API/Auth 传递 `X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto`。不要允许非 Cloudflare 公网流量直接伪造这些 header。
+- Cache Rules：对 `api.example.com/api/*`、`/api/auth/*`、SSE 任务状态接口（如 `/api/user/tasks/*`）、上传写入接口，以及所有带 `Authorization` 或 session Cookie 的请求设置 bypass cache。`/uploads/*` 可单独按素材访问策略缓存，但不要继承 API/Auth 的缓存规则。
+- Rate Limiting / WAF：至少覆盖 `/api/auth/*` 登录注册与 session、管理员接口、上传接口、任务提交接口。首次启用建议先用 log / challenge / captcha 灰度观察误伤，再切换到 block。
+- Pages 环境隔离：Cloudflare Pages production 与 preview 使用独立 `VITE_API_BASE_URL`、`VITE_AUTH_BASE_URL`、`VITE_PUBLIC_ASSET_BASE_URL`。Preview 不连接生产 API/Auth/数据库，不复用生产 cookie domain，也不复用生产 secrets。
+- HTTPS / HSTS：SSL/TLS 使用 `Full (strict)`；源站证书有效并通过公网 health gate 后，再启用 Always Use HTTPS。HSTS 先用低 `max-age` 灰度，不要一开始启用 `preload` 或 `includeSubDomains`；确认所有子域都已 HTTPS 可用后再提高策略强度。
 
 <a id="recommended-docker"></a>
 
@@ -278,6 +292,21 @@ NGINX_AUTH_HEALTH_UPSTREAM=http://127.0.0.1:6001/api/health
 ```
 
 如果后续改为宿主机反代服务直连 Docker bridge，把这三个值写进 `/opt/stacks/ideaboard/docker/.env` 后重新执行 `ideaboard nginx-conf` 即可。
+
+如果 API 域名使用 Cloudflare `Proxied`，并且 VPS 防火墙已限制 80/443 只接受 Cloudflare IP ranges，可以生成真实客户端 IP include：
+
+```bash
+ideaboard cloudflare-real-ip-conf /tmp/cloudflare-real-ip.conf
+sudo cp /tmp/cloudflare-real-ip.conf /etc/nginx/cloudflare-real-ip.conf
+```
+
+然后在 `/opt/stacks/ideaboard/docker/.env` 设置：
+
+```text
+NGINX_REAL_IP_INCLUDE=/etc/nginx/cloudflare-real-ip.conf
+```
+
+重新执行 `ideaboard nginx-conf` 并 reload Nginx 后，反代会通过 `CF-Connecting-IP` 恢复真实客户端 IP。不要在源站仍允许非 Cloudflare 公网直连时启用该 include，否则客户端可以伪造真实 IP header。
 
 Cloudflare SSL/TLS 模式建议使用 `Full (strict)`；如果使用 Cloudflare Origin Certificate，请把证书配置在宿主机反代服务的 TLS 层。不要使用 `Flexible`，它会破坏回调地址、Cookie secure 语义和部分代理判断。
 
@@ -527,7 +556,7 @@ npm run migrate:dist
 - `AUTH_INTERNAL_KEY` 与 `/opt/ideaboard/apps/api/.env` 的同名变量一致，且不能使用 `replace-with-*` 占位值；不要设置 `AUTH_INSECURE_DEV`
 - `AUTH_TRUSTED_ORIGINS` 包含你的正式前端访问源，例如 `https://app.example.com`
 - `BETTER_AUTH_SECRET` 至少 32 字符高熵随机值，例如 `openssl rand -base64 32`；不能使用 `replace-with-*` 或本地开发 fallback
-- `BETTER_AUTH_URL` 设置为 HTTPS 的 Auth 对外访问地址；Pages + Tunnel 部署时通常是 `https://api.example.com`
+- `BETTER_AUTH_URL` 设置为 HTTPS 的 Auth 对外访问地址；Cloudflare Pages + VPS 反代部署时通常是 `https://api.example.com`
 - `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` 与 API 使用同一个业务库
 
 > [!IMPORTANT]
