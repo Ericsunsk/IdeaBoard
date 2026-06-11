@@ -29,6 +29,7 @@ const WEB_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const DEV_SERVER_TIMEOUT_MS = 45_000
 const COMMAND_TIMEOUT_MS = 60_000
 const COMMAND_BUFFER_SIZE = 1024 * 1024 * 20
+const USE_PROCESS_GROUP = process.platform !== 'win32'
 
 function readPortEnv(rawValue: string | undefined, fallback: number, envName: string): number {
   if (!rawValue) return fallback
@@ -39,6 +40,10 @@ function readPortEnv(rawValue: string | undefined, fallback: number, envName: st
 
 function readBooleanEnv(rawValue: string | undefined): boolean {
   return /^(1|true|yes)$/i.test(rawValue || '')
+}
+
+function isProcessRunning(child: ChildProcessByStdio<null, Readable, Readable>): boolean {
+  return child.exitCode == null && child.signalCode == null
 }
 
 function resolvePlaywrightCli(): CommandSpec {
@@ -129,7 +134,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
   async function waitForDevServer() {
     const deadline = Date.now() + DEV_SERVER_TIMEOUT_MS
     while (Date.now() < deadline) {
-      if (devServer?.exitCode != null) {
+      if (devServer && !isProcessRunning(devServer)) {
         throw new Error(`Vite dev server exited early with code ${devServer.exitCode}`)
       }
 
@@ -151,6 +156,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
       ['run', 'dev', '--', '--host', host, '--port', String(smokePort), '--strictPort'],
       {
         cwd: WEB_ROOT,
+        detached: USE_PROCESS_GROUP,
         env: {
           ...process.env,
           ...extraEnv,
@@ -163,6 +169,19 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
     server.stdout.on('data', (chunk: Buffer) => recordDevServerOutput(chunk, 'stdout'))
     server.stderr.on('data', (chunk: Buffer) => recordDevServerOutput(chunk, 'stderr'))
     await waitForDevServer()
+  }
+
+  function signalDevServer(server: ChildProcessByStdio<null, Readable, Readable>, signal: NodeJS.Signals) {
+    if (server.pid == null) return
+    if (USE_PROCESS_GROUP) {
+      try {
+        process.kill(-server.pid, signal)
+        return
+      } catch {
+        // Fall back to signaling the direct npm process if the process group is gone.
+      }
+    }
+    server.kill(signal)
   }
 
   function runCommand(spec: CommandSpec, args: string[], runOptions: RunCommandOptions = {}) {
@@ -238,19 +257,25 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
 
   async function stopDevServer() {
     const server = devServer
-    if (!server || server.exitCode != null) return
-    server.kill('SIGINT')
+    if (!server || !isProcessRunning(server)) return
+    signalDevServer(server, 'SIGINT')
     await Promise.race([
       new Promise<void>((resolve) => server.once('exit', () => resolve())),
       delay(3000),
     ])
-    if (server.exitCode == null) {
-      server.kill('SIGTERM')
+    if (isProcessRunning(server)) {
+      signalDevServer(server, 'SIGTERM')
       await Promise.race([
         new Promise<void>((resolve) => server.once('exit', () => resolve())),
         delay(1000),
       ])
     }
+    if (isProcessRunning(server)) {
+      signalDevServer(server, 'SIGKILL')
+    }
+    server.stdout.destroy()
+    server.stderr.destroy()
+    server.unref()
   }
 
   return {
