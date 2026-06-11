@@ -22,6 +22,8 @@ RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --omit=optional
 
 FROM node:${NODE_VERSION}-alpine AS runtime-base
 
+RUN apk upgrade --no-cache
+
 RUN rm -rf \
     /usr/local/bin/corepack \
     /usr/local/bin/npm \

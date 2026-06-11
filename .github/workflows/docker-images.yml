@@ -285,6 +285,8 @@ jobs:
       - name: Generate ${{ matrix.image.display }} SBOM
         timeout-minutes: 10
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
+        env:
+          SYFT_PLATFORM: linux/amd64
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
@@ -295,6 +297,8 @@ jobs:
       - name: Scan ${{ matrix.image.display }} image
         timeout-minutes: 10
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2
+        env:
+          GRYPE_PLATFORM: linux/amd64
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
           config: .grype.yaml
