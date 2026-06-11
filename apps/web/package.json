@@ -14,7 +14,7 @@
     "lint:style": "stylelint \"src/**/*.{css,vue}\" --allow-empty-input",
     "preview": "vite preview",
     "smoke:admin-mock": "tsx scripts/admin-mock-smoke.ts",
-    "smoke:user-mock": "tsx scripts/user-mock-smoke.ts",
+    "smoke:user": "tsx scripts/user-route-smoke.ts",
     "css:audit": "tsx scripts/audit-css-migration.ts",
     "test": "vitest",
     "test:run": "vitest run"

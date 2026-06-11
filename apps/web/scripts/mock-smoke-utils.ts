@@ -26,6 +26,7 @@ type MockSmokeRuntimeOptions = {
 
 const WEB_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const DEV_SERVER_TIMEOUT_MS = 45_000
+const COMMAND_TIMEOUT_MS = 60_000
 const COMMAND_BUFFER_SIZE = 1024 * 1024 * 20
 
 function readPortEnv(rawValue: string | undefined, fallback: number, envName: string): number {
@@ -165,19 +166,35 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
 
   function runCommand(spec: CommandSpec, args: string[], runOptions: RunCommandOptions = {}) {
     const fullArgs = [...spec.args, '--session', sessionName, ...args]
+    if (isVerbose) {
+      console.log(`[mock-smoke] ${args.slice(0, 2).join(' ')}`)
+    }
     const result = spawnSync(spec.command, fullArgs, {
       cwd: WEB_ROOT,
       encoding: 'utf8',
       env: process.env,
       maxBuffer: COMMAND_BUFFER_SIZE,
+      timeout: COMMAND_TIMEOUT_MS,
     })
-
-    if (result.error) {
-      throw result.error
-    }
 
     const stdout = result.stdout || ''
     const stderr = result.stderr || ''
+    if (result.error) {
+      const timedOut =
+        result.error && 'code' in result.error && result.error.code === 'ETIMEDOUT'
+      throw new Error(
+        [
+          timedOut
+            ? `Command timed out after ${COMMAND_TIMEOUT_MS}ms: ${spec.command} ${fullArgs.join(' ')}`
+            : `Command failed: ${spec.command} ${fullArgs.join(' ')}`,
+          stdout.trim(),
+          stderr.trim(),
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      )
+    }
+
     if (result.status !== 0 && !runOptions.allowFailure) {
       throw new Error(
         [`Command failed: ${spec.command} ${fullArgs.join(' ')}`, stdout.trim(), stderr.trim()]

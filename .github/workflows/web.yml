@@ -62,9 +62,12 @@ jobs:
         working-directory: apps/web
         run: npm run test:run
 
-      - name: User mock smoke
+      - name: User route smoke
         working-directory: apps/web
-        run: npm run smoke:user-mock
+        timeout-minutes: 5
+        env:
+          USER_ROUTE_SMOKE_VERBOSE: "1"
+        run: npm run smoke:user
 
       - name: Build
         working-directory: apps/web

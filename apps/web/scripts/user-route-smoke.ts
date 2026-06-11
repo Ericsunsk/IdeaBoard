@@ -8,10 +8,10 @@ type SmokePage = {
 }
 
 const smoke = createMockSmokeRuntime({
-  hostEnvName: 'USER_MOCK_SMOKE_HOST',
-  portEnvName: 'USER_MOCK_SMOKE_PORT',
-  verboseEnvName: 'USER_MOCK_SMOKE_VERBOSE',
-  sessionPrefix: 'ums',
+  hostEnvName: 'USER_ROUTE_SMOKE_HOST',
+  portEnvName: 'USER_ROUTE_SMOKE_PORT',
+  verboseEnvName: 'USER_ROUTE_SMOKE_VERBOSE',
+  sessionPrefix: 'urs',
 })
 
 const MOCK_USER = {
@@ -19,7 +19,7 @@ const MOCK_USER = {
   uid: 'USM001',
   username: 'mock-user',
   role: 'user',
-  auth_user_id: 'auth-user-mock',
+  auth_user_id: 'auth-user-route',
   avatar: '',
   status: 1,
   created_at: '2026-01-01T00:00:00Z',
@@ -33,7 +33,7 @@ const MOCK_WORKSPACE_UPLOAD_URL = `/uploads/workspace/${MOCK_USER.uid}/${MOCK_BO
 const MOCK_AVATAR_URL = `/uploads/profile/${MOCK_USER.uid}/avatar/mock-avatar.png`
 
 const AUTH_SESSION = {
-  session: { id: 'user-mock-smoke-session' },
+  session: { id: 'user-route-smoke-session' },
   user: { id: MOCK_USER.auth_user_id, username: MOCK_USER.username, role: MOCK_USER.role },
 }
 
@@ -156,25 +156,25 @@ function setupBrowser(playwrightCli: CommandSpec) {
   smoke.routeJson(
     playwrightCli,
     '**/api/admin/**',
-    { code: 599, msg: 'user mock smoke blocked admin API request' },
+    { code: 599, msg: 'user route smoke blocked admin API request' },
     599,
   )
   smoke.routeJson(
     playwrightCli,
     '**/api/user/tasks/**',
-    { code: 599, msg: 'user mock smoke blocked task API request' },
+    { code: 599, msg: 'user route smoke blocked task API request' },
     599,
   )
   smoke.routeJson(
     playwrightCli,
     '**/api/auth/change-password',
-    { code: 599, msg: 'user mock smoke blocked auth mutation' },
+    { code: 599, msg: 'user route smoke blocked auth mutation' },
     599,
   )
   smoke.routeJson(
     playwrightCli,
     '**/api/auth/sign-out',
-    { code: 599, msg: 'user mock smoke blocked auth mutation' },
+    { code: 599, msg: 'user route smoke blocked auth mutation' },
     599,
   )
   smoke.routeJson(
@@ -372,7 +372,7 @@ async function main() {
       smokePage(playwrightCli, page)
     }
 
-    console.log(`user mock smoke passed: ${pages.length} pages`)
+    console.log(`user route smoke passed: ${pages.length} pages`)
   } catch (error) {
     console.error(error instanceof Error ? error.message : error)
     if (smoke.devServerLogs.length > 0) {
