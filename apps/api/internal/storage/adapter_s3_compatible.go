@@ -46,7 +46,7 @@ func (a *s3CompatibleStorageAdapter) DeleteByPrefix(ctx context.Context, profile
 }
 
 func (a *s3CompatibleStorageAdapter) StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	return a.service.s3CompatibleService.UploadWithConfig(ctx, createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
+	return a.service.s3CompatibleService.uploadBytesWithConfig(ctx, filename, data, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
 
 func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -54,5 +54,5 @@ func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *S
 	if err != nil {
 		return "", err
 	}
-	return a.service.s3CompatibleService.UploadWithConfig(ctx, createMemoryFileHeader(filename, data), a.service.s3CompatibleConfigFromProfile(profile), opts)
+	return a.service.s3CompatibleService.uploadBytesWithConfig(ctx, filename, data, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }

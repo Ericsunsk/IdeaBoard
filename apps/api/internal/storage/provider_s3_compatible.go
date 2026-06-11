@@ -119,19 +119,40 @@ func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multip
 	}
 	defer src.Close()
 
-	data, err := io.ReadAll(src)
-	if err != nil {
-		return "", fmt.Errorf("读取文件失败: %v", err)
-	}
+	return s.putReaderWithConfig(ctx, client, file.Filename, file.Header.Get("Content-Type"), src, file.Size, cfg, opts)
+}
+
+func (s *S3CompatibleService) uploadBytesWithConfig(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
+	return s.uploadReaderWithConfig(ctx, filename, "application/octet-stream", bytes.NewReader(data), int64(len(data)), cfg, opts)
+}
+
+func (s *S3CompatibleService) uploadReaderWithConfig(ctx context.Context, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+	if !s.IsConfigEnabled(cfg) {
+		return "", fmt.Errorf("S3 兼容存储配置未启用或不完整")
+	}
+	if body == nil {
+		return "", fmt.Errorf("文件内容不能为空")
+	}
+	if size < 0 {
+		return "", fmt.Errorf("文件大小无效")
+	}
 
-	key, err := buildObjectKey(opts.DirPrefix, filepathExt(file.Filename))
+	client, err := s.clientWithConfig(cfg)
 	if err != nil {
 		return "", err
 	}
-	contentType := file.Header.Get("Content-Type")
+
+	return s.putReaderWithConfig(ctx, client, filename, contentType, body, size, cfg, opts)
+}
+
+func (s *S3CompatibleService) putReaderWithConfig(ctx context.Context, client *minio.Client, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
+	key, err := buildObjectKey(opts.DirPrefix, filepathExt(filename))
+	if err != nil {
+		return "", err
+	}
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
 	}
@@ -140,8 +161,8 @@ func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multip
 		ctx,
 		strings.TrimSpace(cfg.BucketName),
 		key,
-		bytes.NewReader(data),
-		int64(len(data)),
+		body,
+		size,
 		minio.PutObjectOptions{ContentType: contentType},
 	)
 	if err != nil {

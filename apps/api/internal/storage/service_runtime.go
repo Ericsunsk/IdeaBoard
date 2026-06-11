@@ -1,12 +1,10 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
-	"net/textproto"
 	"net/url"
 	"os"
 	"path"
@@ -292,8 +290,11 @@ func (s *StorageService) storeRemoteWithProfile(ctx context.Context, profile Sto
 		if err := validateRemoteImageBytes(filename, data); err != nil {
 			return "", err
 		}
-		fileHeader := createMemoryFileHeader(filename, data)
-		return s.uploadWithProfile(ctx, profile, fileHeader, opts)
+		adapter, err := s.adapterRegistry.get(profile.Provider)
+		if err != nil {
+			return "", err
+		}
+		return adapter.StoreBytes(ctx, &profile, filename, data, opts)
 	}
 
 	adapter, err := s.adapterRegistry.get(profile.Provider)
@@ -506,38 +507,10 @@ func validateRemoteImageBytes(filename string, data []byte) error {
 	return nil
 }
 
-func createMemoryFileHeader(filename string, data []byte) *multipart.FileHeader {
-	buffer := &multipartBuffer{filename: filename, data: data}
-	return buffer.FileHeader()
-}
-
 func decodeDataURL(dataURL string) (string, []byte, error) {
 	parsed, err := mediarefs.ParseDataImageURL(dataURL, maxRemoteFileSize)
 	if err != nil {
 		return "", nil, fmt.Errorf("无效的 base64 图片格式")
 	}
 	return fmt.Sprintf("gen_%d%s", time.Now().UnixNano(), parsed.Ext), parsed.Data, nil
-}
-
-type multipartBuffer struct {
-	filename string
-	data     []byte
-}
-
-func (m *multipartBuffer) FileHeader() *multipart.FileHeader {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	h := make(textproto.MIMEHeader)
-	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, m.filename))
-	h.Set("Content-Type", "application/octet-stream")
-	part, _ := writer.CreatePart(h)
-	_, _ = part.Write(m.data)
-	_ = writer.Close()
-
-	reader := multipart.NewReader(body, writer.Boundary())
-	form, _ := reader.ReadForm(int64(len(m.data) + 1024))
-	if files, ok := form.File["file"]; ok && len(files) > 0 {
-		return files[0]
-	}
-	return nil
 }
